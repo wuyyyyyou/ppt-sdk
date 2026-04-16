@@ -15,6 +15,7 @@ BUNDLE_DIR="$SCRIPT_DIR/bundle"
 CAIRO_RUNTIME_ROOT="$SCRIPT_DIR/src/presenton_sdk_pptx_generator/_runtime"
 CAIRO_STAGING_DIR="$CAIRO_RUNTIME_ROOT/cairo"
 NUITKA_PACKAGE_CONFIG="$SCRIPT_DIR/nuitka-package.config.yml"
+CAIRO_RUNTIME_HELPER="$SCRIPT_DIR/prepare_cairo_runtime.py"
 TEST_DIR=""
 RUN_TEST=false
 
@@ -71,128 +72,25 @@ cleanup_generated_runtime() {
 
 trap cleanup_generated_runtime EXIT
 
-normalize_runtime_path() {
-  local target="$1"
+prepend_env_path() {
+  local name="$1"
+  local value="$2"
+  local current="${!name:-}"
 
-  if [[ "$PLATFORM" == "windows" ]] && command -v cygpath >/dev/null 2>&1; then
-    case "$target" in
-      [A-Za-z]:/*|[A-Za-z]:\\*)
-        cygpath -u "$target"
-        return 0
-        ;;
-    esac
-  fi
-
-  printf '%s\n' "$target"
-}
-
-to_windows_path() {
-  if command -v cygpath >/dev/null 2>&1; then
-    cygpath -w "$1"
+  if [[ -z "$current" ]]; then
+    printf -v "$name" '%s' "$value"
+    export "$name"
     return 0
   fi
 
-  printf '%s\n' "$1"
-}
-
-contains_value() {
-  local needle="$1"
-  shift
-  local item
-
-  for item in "$@"; do
-    if [[ "$item" == "$needle" ]]; then
+  case "${current}${PATH_SEPARATOR:-:}" in
+    *"$value${PATH_SEPARATOR:-:}"*)
       return 0
-    fi
-  done
-
-  return 1
-}
-
-resolve_realpath() {
-  python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$1"
-}
-
-discover_cairo_runtime_dir() {
-  local -a candidates=()
-  local candidate normalized brew_prefix
-
-  if [[ -n "${CAIRO_RUNTIME_DIR:-}" ]]; then
-    candidates+=("$CAIRO_RUNTIME_DIR")
-  fi
-
-  case "$PLATFORM" in
-    darwin)
-      if command -v brew >/dev/null 2>&1; then
-        brew_prefix="$(brew --prefix cairo 2>/dev/null || true)"
-        if [[ -n "$brew_prefix" ]]; then
-          candidates+=("$brew_prefix/lib")
-        fi
-      fi
-      candidates+=("/opt/homebrew/opt/cairo/lib" "/usr/local/opt/cairo/lib")
-      ;;
-    windows)
-      candidates+=(
-        "C:/msys64/mingw64/bin"
-        "/c/msys64/mingw64/bin"
-        "C:/msys64/ucrt64/bin"
-        "/c/msys64/ucrt64/bin"
-        "C:/msys64/clang64/bin"
-        "/c/msys64/clang64/bin"
-        "C:/Program Files/GTK3-Runtime Win64/bin"
-        "C:/GTK3-Runtime Win64/bin"
-      )
       ;;
   esac
 
-  for candidate in "${candidates[@]}"; do
-    normalized="$(normalize_runtime_path "$candidate")"
-    case "$PLATFORM" in
-      darwin)
-        [[ -f "$normalized/libcairo.2.dylib" ]] && printf '%s\n' "$normalized" && return 0
-        ;;
-      windows)
-        [[ -f "$normalized/libcairo-2.dll" ]] && printf '%s\n' "$normalized" && return 0
-        ;;
-    esac
-  done
-
-  if [[ "$PLATFORM" == "windows" ]] && command -v where.exe >/dev/null 2>&1; then
-    while IFS= read -r candidate; do
-      candidate="$(printf '%s' "$candidate" | tr -d '\r')"
-      [[ -z "$candidate" ]] && continue
-      normalized="$(normalize_runtime_path "$(dirname "$candidate")")"
-      [[ -f "$normalized/libcairo-2.dll" ]] && printf '%s\n' "$normalized" && return 0
-    done < <(where.exe libcairo-2.dll 2>/dev/null || true)
-  fi
-
-  if [[ "$PLATFORM" == "windows" ]]; then
-    while IFS= read -r candidate; do
-      [[ -z "$candidate" ]] && continue
-      printf '%s\n' "$(dirname "$candidate")"
-      return 0
-    done < <(find /c/msys64 -type f -name 'libcairo-2.dll' 2>/dev/null || true)
-  fi
-
-  return 1
-}
-
-configure_cairo_runtime_env() {
-  local runtime_dir="$1"
-
-  case "$PLATFORM" in
-    darwin)
-      export CAIROCFFI_DLL_DIRECTORIES="$runtime_dir"
-      if [[ -n "${DYLD_FALLBACK_LIBRARY_PATH:-}" ]]; then
-        export DYLD_FALLBACK_LIBRARY_PATH="$runtime_dir:$DYLD_FALLBACK_LIBRARY_PATH"
-      else
-        export DYLD_FALLBACK_LIBRARY_PATH="$runtime_dir"
-      fi
-      ;;
-    windows)
-      export CAIRO_RUNTIME_DIR_WINDOWS="$(to_windows_path "$runtime_dir")"
-      ;;
-  esac
+  printf -v "$name" '%s:%s' "$value" "$current"
+  export "$name"
 }
 
 run_python_with_cairo() {
@@ -213,169 +111,24 @@ exec(compile(sys.argv[1], "<inline>", "exec"))' "$code" "$@"
   "$PYTHON_BIN" -c "$code" "$@"
 }
 
-stage_windows_cairo_runtime() {
-  local runtime_dir="$1"
-  local -a patterns=(
-    "libcairo-2.dll"
-    "libcairo-gobject-2.dll"
-    "libpixman-1-0.dll"
-    "libpng16-16.dll"
-    "zlib1.dll"
-    "libfreetype-6.dll"
-    "libfontconfig-1.dll"
-    "libexpat-1.dll"
-    "libffi-*.dll"
-    "libglib-2.0-0.dll"
-    "libgobject-2.0-0.dll"
-    "libgmodule-2.0-0.dll"
-    "libgthread-2.0-0.dll"
-    "libgio-2.0-0.dll"
-    "libintl-8.dll"
-    "libiconv-2.dll"
-    "libharfbuzz-0.dll"
-    "libgraphite2.dll"
-    "libfribidi-0.dll"
-    "libthai-0.dll"
-    "libdatrie-1.dll"
-    "libbrotlicommon.dll"
-    "libbrotlidec.dll"
-    "libbrotlienc.dll"
-    "libbz2-1.dll"
-    "libpcre2-8-0.dll"
-    "libxml2-2.dll"
-    "liblzma-5.dll"
-    "libstdc++-6.dll"
-    "libgcc_s_*.dll"
-    "libwinpthread-1.dll"
-  )
-  local -a copied=()
-  local copied_count=0
-  local pattern match base
-
-  rm -rf "$CAIRO_STAGING_DIR"
-  mkdir -p "$CAIRO_STAGING_DIR"
-
-  shopt -s nullglob
-  for pattern in "${patterns[@]}"; do
-    for match in "$runtime_dir"/$pattern; do
-      base="$(basename "$match")"
-      if contains_value "$base" "${copied[@]}"; then
-        continue
-      fi
-
-      cp "$match" "$CAIRO_STAGING_DIR/$base"
-      copied+=("$base")
-      copied_count=$((copied_count + 1))
-    done
-  done
-  shopt -u nullglob
-
-  if [[ ! -f "$CAIRO_STAGING_DIR/libcairo-2.dll" ]]; then
-    echo "Missing libcairo-2.dll in staged runtime from $runtime_dir" >&2
-    return 1
-  fi
-
-  if [[ "$copied_count" -lt 5 ]]; then
-    echo "Staged Cairo runtime looks incomplete from $runtime_dir" >&2
-    return 1
-  fi
-}
-
-stage_macos_cairo_runtime() {
-  local runtime_dir="$1"
-  local -a queue=()
-  local -a staged=()
-  local current current_real base dep dep_real dep_base dylib
-
-  rm -rf "$CAIRO_STAGING_DIR"
-  mkdir -p "$CAIRO_STAGING_DIR"
-
-  if [[ -f "$runtime_dir/libcairo.2.dylib" ]]; then
-    queue+=("$runtime_dir/libcairo.2.dylib")
-  fi
-  if [[ -f "$runtime_dir/libcairo-gobject.2.dylib" ]]; then
-    queue+=("$runtime_dir/libcairo-gobject.2.dylib")
-  fi
-
-  if [[ ${#queue[@]} -eq 0 ]]; then
-    echo "Could not find macOS Cairo dylibs in $runtime_dir" >&2
-    return 1
-  fi
-
-  while [[ ${#queue[@]} -gt 0 ]]; do
-    current="${queue[0]}"
-    if [[ ${#queue[@]} -eq 1 ]]; then
-      queue=()
-    else
-      queue=("${queue[@]:1}")
-    fi
-
-    current_real="$(resolve_realpath "$current")"
-    base="$(basename "$current_real")"
-    if contains_value "$base" "${staged[@]}"; then
-      continue
-    fi
-
-    cp "$current_real" "$CAIRO_STAGING_DIR/$base"
-    chmod u+w "$CAIRO_STAGING_DIR/$base" || true
-    staged+=("$base")
-
-    while IFS= read -r dep; do
-      case "$dep" in
-        /opt/homebrew/*|/usr/local/*)
-          if [[ ! -f "$dep" ]]; then
-            continue
-          fi
-          dep_real="$(resolve_realpath "$dep")"
-          dep_base="$(basename "$dep_real")"
-          if contains_value "$dep_base" "${staged[@]}" || contains_value "$dep_real" "${queue[@]}"; then
-            continue
-          fi
-          queue+=("$dep_real")
-          ;;
-      esac
-    done < <(otool -L "$current_real" | awk 'NR > 1 {print $1}')
-  done
-
-  shopt -s nullglob
-  for dylib in "$CAIRO_STAGING_DIR"/*.dylib; do
-    install_name_tool -id "@loader_path/$(basename "$dylib")" "$dylib"
-  done
-
-  for dylib in "$CAIRO_STAGING_DIR"/*.dylib; do
-    while IFS= read -r dep; do
-      case "$dep" in
-        /opt/homebrew/*|/usr/local/*)
-          dep_base="$(basename "$dep")"
-          if [[ -f "$CAIRO_STAGING_DIR/$dep_base" ]]; then
-            install_name_tool -change "$dep" "@loader_path/$dep_base" "$dylib"
-          fi
-          ;;
-      esac
-    done < <(otool -L "$dylib" | awk 'NR > 1 {print $1}')
-  done
-  shopt -u nullglob
-
-  [[ -f "$CAIRO_STAGING_DIR/libcairo.2.dylib" ]]
-}
-
 prepare_cairo_runtime() {
-  local runtime_dir
+  local -a cmd=("$PYTHON_BIN" "$CAIRO_RUNTIME_HELPER" --platform "$PLATFORM" --staging-dir "$CAIRO_STAGING_DIR")
+  local helper_output
+
+  if [[ -n "${CAIRO_RUNTIME_DIR:-}" ]]; then
+    cmd+=(--runtime-dir "$CAIRO_RUNTIME_DIR")
+  fi
+
+  helper_output="$("${cmd[@]}")"
+  eval "$helper_output"
 
   case "$PLATFORM" in
-    darwin|windows)
-      runtime_dir="$(discover_cairo_runtime_dir || true)"
-      if [[ -z "$runtime_dir" ]]; then
-        echo "Unable to locate Cairo runtime. Set CAIRO_RUNTIME_DIR to a directory containing libcairo for platform $PLATFORM." >&2
-        return 1
-      fi
-
-      configure_cairo_runtime_env "$runtime_dir"
-
-      case "$PLATFORM" in
-        darwin) stage_macos_cairo_runtime "$runtime_dir" ;;
-        windows) stage_windows_cairo_runtime "$runtime_dir" ;;
-      esac
+    darwin)
+      export CAIROCFFI_DLL_DIRECTORIES="$CAIRO_RUNTIME_DIR_FOR_IMPORTS"
+      prepend_env_path DYLD_FALLBACK_LIBRARY_PATH "$CAIRO_RUNTIME_DIR_FOR_IMPORTS"
+      ;;
+    windows)
+      export CAIRO_RUNTIME_DIR_WINDOWS="$CAIRO_RUNTIME_DIR_FOR_IMPORTS"
       ;;
   esac
 }
