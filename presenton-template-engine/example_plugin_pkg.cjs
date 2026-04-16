@@ -22,8 +22,8 @@ const TOOL_NAMES = [
 
 const MANIFEST = {
   name: "presenton-template-engine-plugin",
-  display_name: "Presenton Template Engine Plugin",
-  version: "0.1.1",
+  display_name: "presenton-template-engine-plugin",
+  version: "0.0.1",
   description:
     "Anna Executa plugin for Presenton template discovery and manifest-based deck HTML generation.",
   author: "Anna Developer",

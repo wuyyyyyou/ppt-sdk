@@ -8,8 +8,8 @@ TOOL_NAME = "generatePptx"
 
 MANIFEST = {
     "name": "presenton-pptx-generator-plugin",
-    "display_name": "Presenton PPTX Generator Plugin",
-    "version": "0.1.0",
+    "display_name": "presenton-pptx-generator-plugin",
+    "version": "0.0.1",
     "description": "Anna Executa plugin for generating .pptx files from PptxPresentationModel JSON files.",
     "author": "Anna Developer",
     "tools": [
