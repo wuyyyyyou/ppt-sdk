@@ -35,6 +35,7 @@ jobs:
             version="$(python3 -c "import tomllib; print(tomllib.load(open('presenton-pptx-generator/pyproject.toml', 'rb'))['project']['version'])")"
           fi
           version="${version#v}"
+          version="${version#presenton-pptx-generator-v}"
 
           release_tag="presenton-pptx-generator-v${version}"
           release_name="presenton-pptx-generator v${version}"

@@ -114,7 +114,7 @@ resolve_realpath() {
 }
 
 discover_cairo_runtime_dir() {
-  local candidates=()
+  local -a candidates=()
   local candidate normalized brew_prefix
 
   if [[ -n "${CAIRO_RUNTIME_DIR:-}" ]]; then
@@ -135,6 +135,10 @@ discover_cairo_runtime_dir() {
       candidates+=(
         "C:/msys64/mingw64/bin"
         "/c/msys64/mingw64/bin"
+        "C:/msys64/ucrt64/bin"
+        "/c/msys64/ucrt64/bin"
+        "C:/msys64/clang64/bin"
+        "/c/msys64/clang64/bin"
         "C:/Program Files/GTK3-Runtime Win64/bin"
         "C:/GTK3-Runtime Win64/bin"
       )
@@ -152,6 +156,23 @@ discover_cairo_runtime_dir() {
         ;;
     esac
   done
+
+  if [[ "$PLATFORM" == "windows" ]] && command -v where.exe >/dev/null 2>&1; then
+    while IFS= read -r candidate; do
+      candidate="$(printf '%s' "$candidate" | tr -d '\r')"
+      [[ -z "$candidate" ]] && continue
+      normalized="$(normalize_runtime_path "$(dirname "$candidate")")"
+      [[ -f "$normalized/libcairo-2.dll" ]] && printf '%s\n' "$normalized" && return 0
+    done < <(where.exe libcairo-2.dll 2>/dev/null || true)
+  fi
+
+  if [[ "$PLATFORM" == "windows" ]]; then
+    while IFS= read -r candidate; do
+      [[ -z "$candidate" ]] && continue
+      printf '%s\n' "$(dirname "$candidate")"
+      return 0
+    done < <(find /c/msys64 -type f -name 'libcairo-2.dll' 2>/dev/null || true)
+  fi
 
   return 1
 }
@@ -194,7 +215,7 @@ exec(compile(sys.argv[1], "<inline>", "exec"))' "$code" "$@"
 
 stage_windows_cairo_runtime() {
   local runtime_dir="$1"
-  local patterns=(
+  local -a patterns=(
     "libcairo-2.dll"
     "libcairo-gobject-2.dll"
     "libpixman-1-0.dll"
@@ -227,7 +248,7 @@ stage_windows_cairo_runtime() {
     "libgcc_s_*.dll"
     "libwinpthread-1.dll"
   )
-  local copied=()
+  local -a copied=()
   local copied_count=0
   local pattern match base
 
@@ -262,8 +283,8 @@ stage_windows_cairo_runtime() {
 
 stage_macos_cairo_runtime() {
   local runtime_dir="$1"
-  local queue=()
-  local staged=()
+  local -a queue=()
+  local -a staged=()
   local current current_real base dep dep_real dep_base dylib
 
   rm -rf "$CAIRO_STAGING_DIR"
