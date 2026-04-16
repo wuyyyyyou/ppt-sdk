@@ -1,0 +1,15 @@
+dist/
+build/
+.build/
+bundle/
+.cache/
+__pycache__/
+*.pyc
+*.egg-info/
+nuitka-crash-report.xml
+node_modules/
+sea-prep/
+*.blob
+*.spec.bak
+.docs/
+*/.env

@@ -1,0 +1,63 @@
+{
+  "group_id": "anime-culture-fork",
+  "group_name": "Anime Culture Neon",
+  "group_description": "Cyberpunk-inspired local TSX slides for anime culture, history, and editorial-style storytelling.",
+  "ordered": true,
+  "default": false,
+  "layouts": [
+    "slides/CoverHero.tsx",
+    "slides/AgendaCollage.tsx",
+    "slides/EraImprintTransition.tsx",
+    "slides/HistoryTimeline.tsx",
+    "slides/GenreGrid.tsx",
+    "slides/ClassicsGallery.tsx",
+    "slides/ProductionWorkflow.tsx",
+    "slides/IndustryDataDashboard.tsx",
+    "slides/GlobalImpactDashboard.tsx",
+    "slides/PilgrimageDestinations.tsx",
+    "slides/ConclusionOutlook.tsx",
+    "slides/MastersTribute.tsx",
+    "slides/PersonalGrowthMatrix.tsx",
+    "slides/FutureReadyTransition.tsx",
+    "slides/ThankYouClosing.tsx",
+    "slides/VoiceArtSpotlight.tsx",
+    "slides/MusicPowerShowcase.tsx",
+    "slides/TechAnimeFusion.tsx",
+    "slides/MerchEconomyGrid.tsx",
+    "slides/InfinitePossibilitiesClosing.tsx"
+  ],
+  "group_brief": "适合动漫、流行文化、青年消费与视觉风格鲜明的专题型汇报。",
+  "style_tags": [
+    "anime",
+    "cyberpunk",
+    "editorial",
+    "neon",
+    "high-contrast"
+  ],
+  "industry_tags": [
+    "entertainment",
+    "media",
+    "culture"
+  ],
+  "use_cases": [
+    "culture-report",
+    "visual-storytelling",
+    "timeline-overview",
+    "genre-overview",
+    "classics-overview",
+    "industry-analysis"
+  ],
+  "audience_tags": [
+    "general-public",
+    "student",
+    "creative-team"
+  ],
+  "tone_tags": [
+    "vivid",
+    "youthful",
+    "analytical"
+  ],
+  "cover_layout_id": "anime-culture-fork:cover-hero",
+  "agenda_layout_id": "anime-culture-fork:agenda-collage",
+  "closing_layout_id": "anime-culture-fork:infinite-possibilities-closing"
+}

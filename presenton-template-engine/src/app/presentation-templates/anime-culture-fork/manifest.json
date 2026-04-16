@@ -1,0 +1,1597 @@
+{
+  "title": "日本动漫文化探索",
+  "theme": {
+    "company_name": "ANIME CULTURE LAB",
+    "colors": {
+      "background": "#070711",
+      "background_text": "#FFFFFF",
+      "primary": "#00F6FF",
+      "primary_text": "#041018",
+      "card": "#10162A",
+      "stroke": "#22304A"
+    }
+  },
+  "slides": [
+    {
+      "id": "anime-cover",
+      "title": "日本动漫文化探索",
+      "speaker_note": "封面页：用赛博感视觉打开整套动漫文化主题内容。",
+      "source": {
+        "type": "local",
+        "path": "./slides/CoverHero.tsx"
+      },
+      "data": {
+        "englishTitle": "NIPPON ANIME CULTURE EXPLORATION",
+        "titleLineOne": "日本动漫",
+        "titleLineTwo": "文化探索",
+        "subtitle": "影像 · 类型 · 全球现象",
+        "verticalLabel": "アニメ文化",
+        "presenter": "Talentsec AI",
+        "reportDate": "2026.03.02",
+        "themeText": "Cyberpunk / Vivid",
+        "heroImage": {
+          "__image_url__": "https://page.talentsecsite.com/slides_images/15cbd0a2d8189d44b817d649be322a72.jpg",
+          "__image_prompt__": "Anime city collage with neon atmosphere"
+        }
+      }
+    },
+    {
+      "id": "anime-agenda",
+      "title": "目录",
+      "speaker_note": "目录页：用左右分栏结构概览整套内容。",
+      "source": {
+        "type": "local",
+        "path": "./slides/AgendaCollage.tsx"
+      },
+      "data": {
+        "title": "INDEX",
+        "subtitle": "目录概览 CONTENT OVERVIEW",
+        "sideMark": "目次",
+        "footerTag": "ANIME FILE / 02",
+        "items": [
+          {
+            "number": "01",
+            "title": "封面",
+            "subtitle": "COVER",
+            "highlighted": false
+          },
+          {
+            "number": "02",
+            "title": "动漫历史",
+            "subtitle": "HISTORY",
+            "highlighted": true
+          },
+          {
+            "number": "03",
+            "title": "经典作品",
+            "subtitle": "CLASSICS",
+            "highlighted": false
+          },
+          {
+            "number": "04",
+            "title": "产业现状",
+            "subtitle": "INDUSTRY",
+            "highlighted": false
+          },
+          {
+            "number": "05",
+            "title": "文化影响",
+            "subtitle": "INFLUENCE",
+            "highlighted": false
+          },
+          {
+            "number": "06",
+            "title": "未来展望",
+            "subtitle": "FUTURE",
+            "highlighted": false
+          }
+        ],
+        "topImage": {
+          "__image_url__": "https://a0.cdn.japantravel.com/photo/13029-75227/1000/osaka-nipponbashi-denden-town-75227.jpg",
+          "__image_prompt__": "Akihabara streetscape"
+        },
+        "bottomImage": {
+          "__image_url__": "https://img0.baidu.com/it/u=3217453079,2128722160&fm=253&fmt=auto&app=138&f=JPEG?w=752&h=500",
+          "__image_prompt__": "Anime Center at Akihabara"
+        },
+        "accentImage": {
+          "__image_url__": "https://img0.baidu.com/it/u=876945104,4164783173&fm=253&fmt=auto&app=120&f=JPEG?w=500&h=889",
+          "__image_prompt__": "Anime Contents Expo exhibition hall"
+        }
+      }
+    },
+    {
+      "id": "anime-history",
+      "title": "日本动漫发展历史",
+      "speaker_note": "时间线页：概览日本动漫从萌芽到全球化的五个阶段。",
+      "source": {
+        "type": "local",
+        "path": "./slides/HistoryTimeline.tsx"
+      },
+      "data": {
+        "title": "日本动漫发展历史",
+        "subtitle": "Evolution of Anime Industry (1917-202X)",
+        "modeTag": "TIMELINE_MINIMAL",
+        "sourceText": "DATA SOURCE: JAPAN ANIMATION ASSOCIATION",
+        "pageNumber": "PAGE 03",
+        "items": [
+          {
+            "year": "1917",
+            "title": "萌芽期",
+            "description": "实验短片探索动画形式，引入西方制作技术。",
+            "keyword": "Early Experiments",
+            "image": {
+              "__image_url__": "https://img2.baidu.com/it/u=1870057420,244422848&fm=253&fmt=auto?w=800&h=1067",
+              "__image_prompt__": "Early anime experiments"
+            }
+          },
+          {
+            "year": "1946",
+            "title": "探索期",
+            "description": "东映动画成立，TV动画《铁臂阿童木》开创先河。",
+            "keyword": "Toei & Astro Boy",
+            "image": {
+              "__image_url__": "https://img2.baidu.com/it/u=3228980748,1623164508&fm=253&fmt=auto&app=138&f=JPEG?w=716&h=500",
+              "__image_prompt__": "Astro Boy and postwar anime era"
+            }
+          },
+          {
+            "year": "1974",
+            "title": "成熟期",
+            "description": "机甲热潮爆发，OVA市场兴起，吉卜力工作室成立。",
+            "keyword": "Mecha & Ghibli",
+            "image": {
+              "__image_url__": "https://img0.baidu.com/it/u=3340433539,1284721959&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=667",
+              "__image_prompt__": "Mecha boom and Ghibli era"
+            }
+          },
+          {
+            "year": "1990",
+            "title": "细化期",
+            "description": "题材类型扩张，深夜档动画普及，制作数字化转型。",
+            "keyword": "Diversification",
+            "image": {
+              "__image_url__": "https://img1.baidu.com/it/u=3629113782,2022961971&fm=253&fmt=auto&app=138&f=JPEG?w=703&h=500",
+              "__image_prompt__": "Diversified anime genres in the 1990s"
+            }
+          },
+          {
+            "year": "2010",
+            "title": "全球化期",
+            "description": "流媒体平台推动全球传播，圈层壁垒被打破。",
+            "keyword": "Global Phenomenon",
+            "image": {
+              "__image_url__": "https://img0.baidu.com/it/u=1600073803,3122733679&fm=253&fmt=auto&app=120&f=JPEG?w=667&h=500",
+              "__image_prompt__": "Global streaming era of anime"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "anime-genres",
+      "title": "动漫流派与类型",
+      "speaker_note": "类型总览页：用 12 宫格展示日本动漫的主流流派与代表作品。",
+      "source": {
+        "type": "local",
+        "path": "./slides/GenreGrid.tsx"
+      },
+      "data": {
+        "backgroundTitle": "GENRES & TYPES",
+        "title": "流派与类型",
+        "subtitle": "MAJOR ANIME GENRES BREAKDOWN",
+        "viewLabel": "GRID_VIEW",
+        "items": [
+          {
+            "number": "01",
+            "title": "热血 / 王道",
+            "label": "REPRESENTATIVE",
+            "examples": [
+              "One Piece",
+              "Naruto",
+              "Dragon Ball",
+              "Demon Slayer"
+            ],
+            "accent": "cyan",
+            "icon": "flame"
+          },
+          {
+            "number": "02",
+            "title": "科幻 / 机甲",
+            "label": "REPRESENTATIVE",
+            "examples": [
+              "Evangelion",
+              "Gundam",
+              "Ghost in the Shell"
+            ],
+            "accent": "magenta",
+            "icon": "robot"
+          },
+          {
+            "number": "03",
+            "title": "日常 / 治愈",
+            "label": "REPRESENTATIVE",
+            "examples": [
+              "Natsume's Book of Friends",
+              "K-On!",
+              "Yuru Camp"
+            ],
+            "accent": "cyan",
+            "icon": "cup"
+          },
+          {
+            "number": "04",
+            "title": "校园 / 青春",
+            "label": "REPRESENTATIVE",
+            "examples": [
+              "Toradora!",
+              "Hyouka",
+              "My Teen Romantic Comedy"
+            ],
+            "accent": "magenta",
+            "icon": "cap"
+          },
+          {
+            "number": "05",
+            "title": "悬疑 / 推理",
+            "label": "REPRESENTATIVE",
+            "examples": [
+              "Detective Conan",
+              "Death Note",
+              "Monster"
+            ],
+            "accent": "magenta",
+            "icon": "detective"
+          },
+          {
+            "number": "06",
+            "title": "恋爱",
+            "label": "REPRESENTATIVE",
+            "examples": [
+              "Your Name",
+              "Kaguya-sama: Love is War"
+            ],
+            "accent": "cyan",
+            "icon": "heart"
+          },
+          {
+            "number": "07",
+            "title": "异世界",
+            "label": "REPRESENTATIVE",
+            "examples": [
+              "Re:Zero",
+              "Sword Art Online",
+              "Overlord"
+            ],
+            "accent": "magenta",
+            "icon": "portal"
+          },
+          {
+            "number": "08",
+            "title": "运动",
+            "label": "REPRESENTATIVE",
+            "examples": [
+              "Slam Dunk",
+              "Haikyuu!!",
+              "Blue Lock"
+            ],
+            "accent": "cyan",
+            "icon": "basketball"
+          },
+          {
+            "number": "09",
+            "title": "惊悚 / 心理",
+            "label": "REPRESENTATIVE",
+            "examples": [
+              "Psycho-Pass",
+              "Parasyte",
+              "Future Diary"
+            ],
+            "accent": "cyan",
+            "icon": "brain"
+          },
+          {
+            "number": "10",
+            "title": "历史 / 时代",
+            "label": "REPRESENTATIVE",
+            "examples": [
+              "Rurouni Kenshin",
+              "Dororo",
+              "Kingdom"
+            ],
+            "accent": "magenta",
+            "icon": "scroll"
+          },
+          {
+            "number": "11",
+            "title": "奇幻",
+            "label": "REPRESENTATIVE",
+            "examples": [
+              "Frieren",
+              "Fullmetal Alchemist",
+              "Fairy Tail"
+            ],
+            "accent": "cyan",
+            "icon": "fantasy"
+          },
+          {
+            "number": "12",
+            "title": "音乐 / 偶像",
+            "label": "REPRESENTATIVE",
+            "examples": [
+              "Love Live!",
+              "Bocchi the Rock!",
+              "Nana"
+            ],
+            "accent": "magenta",
+            "icon": "music"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anime-classics",
+      "title": "经典作品速览",
+      "speaker_note": "经典作品页：用 1 张高卡、1 张横卡和 4 张标准卡快速扫过代表性动画 IP。",
+      "source": {
+        "type": "local",
+        "path": "./slides/ClassicsGallery.tsx"
+      },
+      "data": {
+        "backgroundTitle": "CLASSICS",
+        "title": "经典作品速览",
+        "subtitle": "MASTERPIECES THAT DEFINED GENERATIONS",
+        "viewLabel": "GALLERY_MODE",
+        "items": [
+          {
+            "index": "01",
+            "yearLabel": "1986 - PRESENT",
+            "title": "七龙珠",
+            "accent": "cyan",
+            "variant": "tall",
+            "tags": [
+              {
+                "text": "ACTION",
+                "tone": "hot"
+              },
+              {
+                "text": "LEGEND",
+                "tone": "default"
+              }
+            ],
+            "image": {
+              "__image_url__": "https://img1.baidu.com/it/u=3385928667,4056760598&fm=253&fmt=auto&app=138&f=JPEG?w=800&h=1200",
+              "__image_prompt__": "Dragon Ball key visual"
+            }
+          },
+          {
+            "index": "02",
+            "yearLabel": "2001",
+            "title": "千与千寻",
+            "accent": "magenta",
+            "variant": "wide",
+            "tags": [
+              {
+                "text": "FANTASY",
+                "tone": "fantasy"
+              },
+              {
+                "text": "OSCAR WINNER",
+                "tone": "default"
+              }
+            ],
+            "image": {
+              "__image_url__": "https://img2.baidu.com/it/u=1175045921,4030921845&fm=253&fmt=auto&app=120&f=JPEG?w=931&h=500",
+              "__image_prompt__": "Spirited Away key visual"
+            }
+          },
+          {
+            "index": "03",
+            "yearLabel": "1995",
+            "title": "新世纪福音战士",
+            "accent": "cyan",
+            "variant": "standard",
+            "tags": [
+              {
+                "text": "MECHA",
+                "tone": "mecha"
+              },
+              {
+                "text": "PSYCHO",
+                "tone": "default"
+              }
+            ],
+            "image": {
+              "__image_url__": "https://img2.baidu.com/it/u=3827216377,2195327074&fm=253&fmt=auto&app=120&f=JPEG?w=889&h=500",
+              "__image_prompt__": "Neon Genesis Evangelion key visual"
+            }
+          },
+          {
+            "index": "04",
+            "yearLabel": "2019",
+            "title": "鬼灭之刃",
+            "accent": "magenta",
+            "variant": "standard",
+            "tags": [
+              {
+                "text": "PHENOMENON",
+                "tone": "hot"
+              },
+              {
+                "text": "HISTORICAL",
+                "tone": "default"
+              }
+            ],
+            "image": {
+              "__image_url__": "https://img1.baidu.com/it/u=3872612143,456213528&fm=253&fmt=auto&app=138&f=JPEG?w=643&h=500",
+              "__image_prompt__": "Demon Slayer key visual"
+            }
+          },
+          {
+            "index": "05",
+            "yearLabel": "2013",
+            "title": "进击的巨人",
+            "accent": "cyan",
+            "variant": "standard",
+            "tags": [
+              {
+                "text": "DARK FANTASY",
+                "tone": "dark"
+              },
+              {
+                "text": "EPIC",
+                "tone": "default"
+              }
+            ],
+            "image": {
+              "__image_url__": "https://img2.baidu.com/it/u=3996656251,468480899&fm=253&fmt=auto&app=138&f=JPEG?w=889&h=500",
+              "__image_prompt__": "Attack on Titan placeholder visual"
+            }
+          },
+          {
+            "index": "06",
+            "yearLabel": "1996 - PRESENT",
+            "title": "名侦探柯南",
+            "accent": "magenta",
+            "variant": "standard",
+            "tags": [
+              {
+                "text": "MYSTERY",
+                "tone": "muted"
+              },
+              {
+                "text": "LONG-RUNNING",
+                "tone": "default"
+              }
+            ],
+            "image": {
+              "__image_url__": "https://img1.baidu.com/it/u=2072336240,3667112291&fm=253&fmt=auto&app=120&f=JPEG?w=889&h=500",
+              "__image_prompt__": "Detective Conan placeholder visual"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "anime-production-workflow",
+      "title": "动漫制作流程",
+      "speaker_note": "流程页：用 8 张步骤卡片梳理动画从前期企划到宣发播出的完整流程。",
+      "source": {
+        "type": "local",
+        "path": "./slides/ProductionWorkflow.tsx"
+      },
+      "data": {
+        "backgroundLabel": "PIPELINE",
+        "title": "动漫制作流程",
+        "subtitle": "PRODUCTION WORKFLOW: FROM CONCEPT TO SCREEN",
+        "modeLabel": "FLOWCHART",
+        "footerTag": "ANIME FILE / 06",
+        "phases": [
+          {
+            "label": "PRE-PRODUCTION / 前期",
+            "accent": "cyan"
+          },
+          {
+            "label": "PRODUCTION / 中期",
+            "accent": "magenta"
+          },
+          {
+            "label": "POST / 后期",
+            "accent": "yellow"
+          }
+        ],
+        "steps": [
+          {
+            "number": "01",
+            "title": "企划・委员会",
+            "englishLabel": "PLANNING",
+            "description": "确定项目立项、预算筹集与核心主创人员。",
+            "accent": "cyan",
+            "icon": "handshake"
+          },
+          {
+            "number": "02",
+            "title": "脚本・系列构成",
+            "englishLabel": "SCRIPT",
+            "description": "编写剧本，确定每集大纲与台词内容。",
+            "accent": "cyan",
+            "icon": "script"
+          },
+          {
+            "number": "03",
+            "title": "分镜・演出",
+            "englishLabel": "STORYBOARD",
+            "description": "绘制画面蓝图，决定镜头调度、时间轴与画面构图。",
+            "accent": "cyan",
+            "icon": "storyboard"
+          },
+          {
+            "number": "04",
+            "title": "角色・美术设定",
+            "englishLabel": "DESIGN",
+            "description": "设计人物造型、服装、道具及背景美术风格。",
+            "accent": "cyan",
+            "icon": "design"
+          },
+          {
+            "number": "05",
+            "title": "Layout・原画",
+            "englishLabel": "KEY ANIMATION",
+            "description": "绘制关键动作帧与场景构图，并完成中间张补帧。",
+            "accent": "magenta",
+            "icon": "pencil"
+          },
+          {
+            "number": "06",
+            "title": "上色・摄影",
+            "englishLabel": "COLORING",
+            "description": "数字化上色，合成人物与背景，并补充光影特效。",
+            "accent": "magenta",
+            "icon": "camera"
+          },
+          {
+            "number": "07",
+            "title": "配音・音效",
+            "englishLabel": "AUDIO",
+            "description": "完成声优配音，叠加 BGM 背景音乐与环境音效。",
+            "accent": "yellow",
+            "icon": "audio"
+          },
+          {
+            "number": "08",
+            "title": "宣发・播出",
+            "englishLabel": "RELEASE",
+            "description": "制作 PV 宣发素材，并交付电视台与流媒体平台播出。",
+            "accent": "yellow",
+            "icon": "broadcast"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anime-industry-data",
+      "title": "产业现状与数据",
+      "speaker_note": "数据页：用三张 KPI 卡片、十年增长堆叠柱图和收入结构环图概览日本动漫产业规模。",
+      "source": {
+        "type": "local",
+        "path": "./slides/IndustryDataDashboard.tsx"
+      },
+      "data": {
+        "backgroundTitle": "INDUSTRY DATA",
+        "title": "产业现状与数据",
+        "subtitle": "MARKET ANALYSIS: GROWTH & TRENDS",
+        "systemLabel": "SYSTEM_READY",
+        "kpis": [
+          {
+            "accent": "cyan",
+            "icon": "yen",
+            "value": "2.93",
+            "unit": "Trillion",
+            "label": "Market Size",
+            "change": "▲ 106%"
+          },
+          {
+            "accent": "magenta",
+            "icon": "globe",
+            "value": "1.46",
+            "unit": "Trillion",
+            "label": "Overseas Rev.",
+            "change": "▲ 49% Share"
+          },
+          {
+            "accent": "yellow",
+            "icon": "play",
+            "value": "165.2",
+            "unit": "Billion",
+            "label": "Streaming",
+            "change": "▲ 22.3% YoY"
+          }
+        ],
+        "trendTitle": "Industry Growth Trend (10 Years)",
+        "domesticLabel": "Domestic",
+        "overseasLabel": "Overseas",
+        "trend": [
+          {
+            "year": "2014",
+            "domestic": 1.1,
+            "overseas": 0.3
+          },
+          {
+            "year": "2015",
+            "domestic": 1.2,
+            "overseas": 0.5
+          },
+          {
+            "year": "2016",
+            "domestic": 1.3,
+            "overseas": 0.7
+          },
+          {
+            "year": "2017",
+            "domestic": 1.35,
+            "overseas": 0.9
+          },
+          {
+            "year": "2018",
+            "domestic": 1.4,
+            "overseas": 1
+          },
+          {
+            "year": "2019",
+            "domestic": 1.5,
+            "overseas": 1.2
+          },
+          {
+            "year": "2020",
+            "domestic": 1.3,
+            "overseas": 1.1
+          },
+          {
+            "year": "2021",
+            "domestic": 1.4,
+            "overseas": 1.3
+          },
+          {
+            "year": "2022",
+            "domestic": 1.45,
+            "overseas": 1.4
+          },
+          {
+            "year": "2023",
+            "domestic": 1.47,
+            "overseas": 1.46
+          }
+        ],
+        "revenueTitle": "Revenue Structure",
+        "revenueSummary": "2023 / Revenue Mix",
+        "revenueBreakdown": [
+          {
+            "label": "Merchandise",
+            "value": 35,
+            "accent": "cyan"
+          },
+          {
+            "label": "Streaming",
+            "value": 25,
+            "accent": "magenta"
+          },
+          {
+            "label": "Overseas",
+            "value": 20,
+            "accent": "yellow"
+          },
+          {
+            "label": "Movie / TV",
+            "value": 20,
+            "accent": "slate"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anime-global-impact",
+      "title": "全球影响力与传播",
+      "speaker_note": "全球影响力页：用四项核心指标、影响力雷达图和区域分布卡展示动漫文化的国际传播势能。",
+      "source": {
+        "type": "local",
+        "path": "./slides/GlobalImpactDashboard.tsx"
+      },
+      "data": {
+        "backgroundTitle": "GLOBAL IMPACT",
+        "title": "全球影响力与传播",
+        "subtitle": "DATA VISUALIZATION & INSIGHTS",
+        "systemLabel": "SYSTEM_ANALYSIS",
+        "radarTitle": "影响力维度分析",
+        "kpis": [
+          {
+            "accent": "magenta",
+            "icon": "market",
+            "value": "$28.6B",
+            "label": "全球市场规模",
+            "subLabel": "Global Market Size"
+          },
+          {
+            "accent": "cyan",
+            "icon": "reach",
+            "value": "180+",
+            "label": "国家/地区覆盖",
+            "subLabel": "Countries Reached"
+          },
+          {
+            "accent": "yellow",
+            "icon": "audience",
+            "value": "50%+",
+            "label": "Gen Z 受众占比",
+            "subLabel": "Audience Share"
+          },
+          {
+            "accent": "green",
+            "icon": "growth",
+            "value": "106%",
+            "label": "十年增长率",
+            "subLabel": "10-Year Growth"
+          }
+        ],
+        "radarMetrics": [
+          {
+            "label": "社群活跃",
+            "englishLabel": "Community",
+            "value": 95
+          },
+          {
+            "label": "内容产出",
+            "englishLabel": "Content",
+            "value": 85
+          },
+          {
+            "label": "商业价值",
+            "englishLabel": "Commerce",
+            "value": 90
+          },
+          {
+            "label": "文化渗透",
+            "englishLabel": "Culture",
+            "value": 80
+          },
+          {
+            "label": "技术创新",
+            "englishLabel": "Tech",
+            "value": 75
+          },
+          {
+            "label": "跨界合作",
+            "englishLabel": "Collab",
+            "value": 88
+          }
+        ],
+        "regions": [
+          {
+            "name": "North America",
+            "icon": "flag",
+            "value": 35,
+            "accent": "cyan"
+          },
+          {
+            "name": "Europe",
+            "icon": "landmark",
+            "value": 25,
+            "accent": "magenta"
+          },
+          {
+            "name": "Asia-Pacific",
+            "icon": "torii",
+            "value": 30,
+            "accent": "yellow"
+          },
+          {
+            "name": "Others",
+            "icon": "globe",
+            "value": 10,
+            "accent": "slate"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anime-pilgrimage",
+      "title": "圣地巡礼",
+      "speaker_note": "圣地巡礼页：以秋叶原和吉卜力目的地对照的方式，呈现动漫文化从消费街区到沉浸式主题场馆的现实映射。",
+      "source": {
+        "type": "local",
+        "path": "./slides/PilgrimageDestinations.tsx"
+      },
+      "data": {
+        "backgroundTitle": "PILGRIMAGE",
+        "title": "圣地巡礼",
+        "subtitle": "REAL LIFE ANIME LOCATIONS",
+        "statLabel": "LOCATIONS_DETECTED",
+        "statValue": "2",
+        "centerLabel": "LOCATION DATA",
+        "locations": [
+          {
+            "accent": "cyan",
+            "badgeText": "OTALAND",
+            "badgeIcon": "gamepad",
+            "title": "AKIHABARA",
+            "nativeTitle": "秋葉原",
+            "coordinates": "35.6984° N, 139.7731° E",
+            "keywords": [
+              "Electric Town",
+              "Maid Cafes",
+              "Figures & Hobby"
+            ],
+            "description": "二次元文化的“麦加”。汇聚了 Animate、Mandarake 等顶级 ACG 商店，街头随处可见动漫广告与女仆咖啡厅体验。",
+            "tipLabel": "TRAVEL TIP",
+            "tipIcon": "info",
+            "tipText": "周日中央通会变为步行者天国，是拍照和体验街头 Cosplay 文化的最佳时机。",
+            "image": {
+              "__image_url__": "https://img0.baidu.com/it/u=991374720,953648227&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=667",
+              "__image_prompt__": "Akihabara electric town street view"
+            }
+          },
+          {
+            "accent": "yellow",
+            "badgeText": "FANTASY",
+            "badgeIcon": "leaf",
+            "title": "GHIBLI",
+            "nativeTitle": "ジブリ",
+            "coordinates": "35.6961° N, 139.5704° E",
+            "keywords": [
+              "Mitaka Museum",
+              "Ghibli Park",
+              "Immersion"
+            ],
+            "description": "宫崎骏童话世界的现实映射。从三鹰之森吉卜力美术馆的迷宫建筑，到爱知吉卜力公园的真实场景复原。",
+            "tipLabel": "MISSION ALERT",
+            "tipIcon": "ticket",
+            "tipText": "门票采用实名预约制，通常需提前 1 至 2 个月抢票。美术馆内禁止摄影，更适合沉浸式参观。",
+            "image": {
+              "__image_url__": "https://img1.baidu.com/it/u=78777134,2010514270&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=666",
+              "__image_prompt__": "Ghibli museum or Ghibli park scenery"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "anime-conclusion-outlook",
+      "title": "总结与未来展望",
+      "speaker_note": "总结页：左侧回顾日本动漫的历史、类型与全球影响，右侧提出技术、全球协作与可持续制作三条未来方向。",
+      "source": {
+        "type": "local",
+        "path": "./slides/ConclusionOutlook.tsx"
+      },
+      "data": {
+        "backgroundTitle": "FUTURE",
+        "title": "总结与未来展望",
+        "subtitle": "THE NEXT CHAPTER OF ANIME",
+        "modeLabel": "NEXT_PHASE",
+        "footerLabel": "END OF PRESENTATION // 2026",
+        "backgroundImage": {
+          "__image_url__": "https://page.talentsecsite.com/slides_images/4153552054434ac02f2b2361b630472e.webp",
+          "__image_prompt__": "Tokyo night city with neon atmosphere"
+        },
+        "reviewItems": [
+          {
+            "accent": "cyan",
+            "label": "LEGACY",
+            "title": "历史传承",
+            "description": "从1917年萌芽至今，百年的技术积累与匠人精神奠定了产业基石。"
+          },
+          {
+            "accent": "magenta",
+            "label": "DIVERSITY",
+            "title": "类型繁荣",
+            "description": "打破受众边界，从子供向到成人思考，构建了包罗万象的内容生态。"
+          },
+          {
+            "accent": "yellow",
+            "label": "IMPACT",
+            "title": "全球共鸣",
+            "description": "跨越语言与文化壁垒，成为日本最具影响力的软实力与文化名片。"
+          }
+        ],
+        "futureCards": [
+          {
+            "accent": "cyan",
+            "icon": "chip",
+            "title": "技术共创",
+            "tag": "TECH INNOVATION",
+            "description": "AI辅助作画与3D技术深度融合，提升制作效率，拓展视觉表现边界。"
+          },
+          {
+            "accent": "magenta",
+            "icon": "globe",
+            "title": "全球协作",
+            "tag": "GLOBALIZATION",
+            "description": "深化跨国制作委员会模式，推行本地化合拍，打造真正国际化的IP。"
+          },
+          {
+            "accent": "yellow",
+            "icon": "sprout",
+            "title": "可持续生产",
+            "tag": "SUSTAINABILITY",
+            "description": "改善从业者劳动环境，建立更公平的薪酬体系，培育新一代动画人才。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anime-era-transition",
+      "title": "时代的印记",
+      "speaker_note": "过渡页：用背景图与底部演化图条作为章节分隔，承接后续历史、类型与全球扩散内容。",
+      "source": {
+        "type": "local",
+        "path": "./slides/EraImprintTransition.tsx"
+      },
+      "data": {
+        "backgroundTitle": "EVOLUTION",
+        "title": "时代的印记",
+        "englishTitle": "THE IMPRINT OF THE ERA",
+        "subtitle": "从历史到现在 ｜ 类型演化 × 全球扩散",
+        "phaseLabel": "SYSTEM TRANSITION",
+        "phaseCode": "PHASE_04",
+        "backgroundImage": {
+          "__image_url__": "https://img2.baidu.com/it/u=4102985568,3703052695&fm=253&fmt=auto&app=138&f=JPEG?w=800&h=1739",
+          "__image_prompt__": "Cyberpunk anime background"
+        },
+        "imageStrip": [
+          {
+            "accent": "cyan",
+            "title": "Classic",
+            "image": {
+              "__image_url__": "https://img0.baidu.com/it/u=3789141775,1096177846&fm=253&fmt=auto&app=138&f=JPEG?w=800&h=985",
+              "__image_prompt__": "Classic anime style"
+            }
+          },
+          {
+            "accent": "magenta",
+            "title": "Mecha",
+            "image": {
+              "__image_url__": "https://img1.baidu.com/it/u=3841090598,3143431318&fm=253&fmt=auto&app=120&f=JPEG?w=800&h=1062",
+              "__image_prompt__": "Mecha anime style"
+            }
+          },
+          {
+            "accent": "yellow",
+            "title": "Fantasy",
+            "image": {
+              "__image_url__": "https://img2.baidu.com/it/u=1273694787,288933314&fm=253&fmt=auto&app=120&f=JPEG?w=1422&h=800",
+              "__image_prompt__": "Fantasy anime style"
+            }
+          },
+          {
+            "accent": "cyan",
+            "title": "Cyberpunk",
+            "image": {
+              "__image_url__": "https://img0.baidu.com/it/u=1922777353,2189113373&fm=253&fmt=auto&app=138&f=JPEG?w=475&h=1030",
+              "__image_prompt__": "Cyberpunk anime style"
+            }
+          },
+          {
+            "accent": "cyan",
+            "title": "Modern",
+            "image": {
+              "__image_url__": "https://img1.baidu.com/it/u=3710303054,3254773091&fm=253&fmt=auto&app=120&f=JPEG?w=626&h=353",
+              "__image_prompt__": "Modern anime style"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "anime-masters-tribute",
+      "title": "动漫大师致敬",
+      "speaker_note": "收尾人物页：以三位代表性创作者收束整套内容，强调日本动漫文化背后的奠基者、诗性叙事者与影像革新者。",
+      "source": {
+        "type": "local",
+        "path": "./slides/MastersTribute.tsx"
+      },
+      "data": {
+        "backgroundTitle": "LEGENDS",
+        "title": "动漫大师致敬",
+        "subtitle": "TRIBUTE TO THE CREATORS",
+        "archiveLabel": "MASTERS_ARCHIVE",
+        "creators": [
+          {
+            "accent": "yellow",
+            "name": "OSAMU TEZUKA",
+            "nativeName": "手塚 治虫",
+            "honorTitle": "GOD OF MANGA",
+            "worksLabel": "MASTERPIECES",
+            "works": [
+              "《铁臂阿童木》",
+              "《火鸟》",
+              "《怪医黑杰克》"
+            ],
+            "description": "确立了日本现代 TV 动画的基础模式，其作品蕴含深刻的人文主义关怀，是日本动漫产业的奠基人。",
+            "image": {
+              "__image_url__": "https://img0.baidu.com/it/u=2584943518,325157778&fm=253&fmt=auto&app=120&f=JPEG?w=642&h=500",
+              "__image_prompt__": "Osamu Tezuka portrait placeholder"
+            }
+          },
+          {
+            "accent": "cyan",
+            "name": "HAYAO MIYAZAKI",
+            "nativeName": "宮崎 駿",
+            "honorTitle": "POETIC NARRATIVE",
+            "worksLabel": "MASTERPIECES",
+            "works": [
+              "《千与千寻》",
+              "《天空之城》",
+              "《龙猫》"
+            ],
+            "description": "吉卜力工作室的灵魂人物，以精湛的手绘艺术、反战与环保主题，将日本动画提升至世界艺术殿堂。",
+            "image": {
+              "__image_url__": "https://img0.baidu.com/it/u=3393831810,1661066440&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=400",
+              "__image_prompt__": "Hayao Miyazaki portrait placeholder"
+            }
+          },
+          {
+            "accent": "magenta",
+            "name": "SATOSHI KON",
+            "nativeName": "今 敏",
+            "honorTitle": "VISUAL MAGICIAN",
+            "worksLabel": "MASTERPIECES",
+            "works": [
+              "《未麻的部屋》",
+              "《红辣椒》",
+              "《千年女优》"
+            ],
+            "description": "探索心理现实与梦境的边界，以精准的蒙太奇剪辑重新定义了动画影像的叙事可能性。",
+            "image": {
+              "__image_url__": "https://img1.baidu.com/it/u=2561601912,3913309165&fm=253&fmt=auto&app=138&f=JPEG?w=518&h=500",
+              "__image_prompt__": "Satoshi Kon portrait placeholder"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "anime-personal-growth",
+      "title": "动漫与个人成长",
+      "speaker_note": "个人成长页：用五张卡片总结动漫如何影响价值观、自律、审美、社群连接与语言学习动力。",
+      "source": {
+        "type": "local",
+        "path": "./slides/PersonalGrowthMatrix.tsx"
+      },
+      "data": {
+        "backgroundTitle": "GROWTH",
+        "title": "动漫与个人成长",
+        "subtitle": "IMPACT: VALUES, DREAMS & COMMUNITY",
+        "statusLabel": "AUDIENCE_IMPACT",
+        "statusNote": "ANALYSIS: PSYCHOLOGY & CULTURE",
+        "cards": [
+          {
+            "accent": "magenta",
+            "icon": "heart",
+            "variant": "small",
+            "title": "价值观",
+            "englishTitle": "Values",
+            "bullets": [
+              {
+                "label": "勇气与正义",
+                "text": "面对困难不退缩的精神"
+              },
+              {
+                "label": "友情羁绊",
+                "text": "团队合作与彼此信任"
+              },
+              {
+                "label": "责任感",
+                "text": "守护重要之人的决心"
+              }
+            ],
+            "quote": "“如果是为了伙伴，我什么都愿意做！”",
+            "quoteSource": "—— 蒙奇·D·路飞《海贼王》",
+            "statValue": "",
+            "statLabel": ""
+          },
+          {
+            "accent": "cyan",
+            "icon": "bolt",
+            "variant": "small",
+            "title": "梦想与自律",
+            "englishTitle": "Dreams",
+            "bullets": [
+              {
+                "label": "长期目标",
+                "text": "确立人生方向与热血追求"
+              },
+              {
+                "label": "刻意练习",
+                "text": "日常训练与自我超越"
+              },
+              {
+                "label": "抗挫折力",
+                "text": "失败后重新站起的韧性"
+              }
+            ],
+            "quote": "“直到最后一刻都不能放弃。”",
+            "quoteSource": "—— 安西教练《灌篮高手》",
+            "statValue": "",
+            "statLabel": ""
+          },
+          {
+            "accent": "yellow",
+            "icon": "eye",
+            "variant": "small",
+            "title": "审美与想象",
+            "englishTitle": "Aesthetics",
+            "bullets": [
+              {
+                "label": "世界观构建",
+                "text": "拓展对未来的无限想象"
+              },
+              {
+                "label": "视觉语言",
+                "text": "独特的色彩与构图美学"
+              },
+              {
+                "label": "情感共鸣",
+                "text": "通过画面传达细腻情感"
+              }
+            ],
+            "quote": "“只要走的方向正确，都接近幸福。”",
+            "quoteSource": "——《千与千寻》",
+            "statValue": "",
+            "statLabel": ""
+          },
+          {
+            "accent": "green",
+            "icon": "users",
+            "variant": "large",
+            "title": "社交与社群",
+            "englishTitle": "Social",
+            "bullets": [
+              {
+                "label": "同好连接",
+                "text": "打破地域限制的兴趣圈层"
+              },
+              {
+                "label": "漫展文化",
+                "text": "Comic Market 与 Cosplay 经济"
+              },
+              {
+                "label": "二创活力",
+                "text": "同人创作激发创造力"
+              }
+            ],
+            "quote": "",
+            "quoteSource": "",
+            "statValue": "30M+",
+            "statLabel": "GLOBAL COMMUNITY"
+          },
+          {
+            "accent": "purple",
+            "icon": "language",
+            "variant": "large",
+            "title": "语言与学习",
+            "englishTitle": "Culture",
+            "bullets": [
+              {
+                "label": "语言启蒙",
+                "text": "全球日语学习者的第一动力"
+              },
+              {
+                "label": "跨文化理解",
+                "text": "了解日本传统与现代社会"
+              },
+              {
+                "label": "历史兴趣",
+                "text": "通过战国与幕末题材延展历史兴趣"
+              }
+            ],
+            "quote": "",
+            "quoteSource": "",
+            "statValue": "TOP 1",
+            "statLabel": "REASON TO LEARN JP"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anime-future-ready-transition",
+      "title": "未来可期",
+      "speaker_note": "未来章节过渡页：以未来感背景、同心科技环与居中标题承接总结与未来展望内容。",
+      "source": {
+        "type": "local",
+        "path": "./slides/FutureReadyTransition.tsx"
+      },
+      "data": {
+        "backgroundTitle": "FUTURE",
+        "title": "未来可期",
+        "subtitle": "技术 × 叙事 × 全球协作",
+        "phaseLabel": "SYSTEM TRANSITION",
+        "phaseCode": "PHASE_05",
+        "phaseNote": "FUTURE_READY",
+        "loadingLabel": "NEXT CHAPTER LOADING",
+        "loadingValue": "99%",
+        "nextLabel": "NEXT PHASE",
+        "backgroundImage": {
+          "__image_url__": "https://page.talentsecsite.com/slides_images/d5e6d0cfe4ec9ba9a383caf514376809.webp",
+          "__image_prompt__": "Futuristic city night"
+        }
+      }
+    },
+    {
+      "id": "anime-thank-you-closing",
+      "title": "感谢聆听",
+      "speaker_note": "收尾页：保留感谢、讲者信息与二维码入口，用稳定双栏结构作为整套 deck 的第 15 页。",
+      "source": {
+        "type": "local",
+        "path": "./slides/ThankYouClosing.tsx"
+      },
+      "data": {
+        "backgroundTitle": "THANK YOU",
+        "title": "感谢聆听",
+        "subtitle": "FOR YOUR ATTENTION",
+        "presenterLabel": "PRESENTER",
+        "presenterName": "Talentsec AI",
+        "presenterRole": "Intelligent Presentation Generator",
+        "contacts": [
+          {
+            "label": "WEB",
+            "value": "www.talentsec.ai",
+            "icon": "globe"
+          },
+          {
+            "label": "MAIL",
+            "value": "contact@talentsec.ai",
+            "icon": "mail"
+          },
+          {
+            "label": "SOCIAL",
+            "value": "@TalentsecAI",
+            "icon": "signal"
+          }
+        ],
+        "systemLabel": "SYSTEM STATUS",
+        "systemValue": "COMPLETE",
+        "sessionCode": "SESSION_END",
+        "qrLabel": "SCAN FOR SLIDES",
+        "qrHelper": "ACCESS THE FULL DECK",
+        "qrTarget": "https://www.talentsec.ai",
+        "qrImage": {
+          "__image_url__": "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://www.talentsec.ai",
+          "__image_prompt__": "Talentsec slides QR code"
+        },
+        "footerLeft": "© 2026 Talentsec AI. All Rights Reserved.",
+        "footerRight": "Images sourced from Unsplash & Talentsec Asset Library"
+      }
+    },
+    {
+      "id": "anime-voice-art",
+      "title": "动漫配音艺术",
+      "speaker_note": "第 16 页人物页：用三位代表性声优的作品与风格，强调配音表演如何为角色塑形，并延展到粉丝文化与 IP 情感经济。",
+      "source": {
+        "type": "local",
+        "path": "./slides/VoiceArtSpotlight.tsx"
+      },
+      "data": {
+        "backgroundTitle": "VOICE ART",
+        "title": "动漫配音艺术",
+        "subtitle": "SEIYUU CULTURE & PERFORMANCE",
+        "signalLabel": "CULTURE_DEPTH",
+        "signalValue": "SOUL OF ANIME",
+        "voiceActors": [
+          {
+            "accent": "pink",
+            "name": "KANA HANAZAWA",
+            "nativeName": "花澤 香菜",
+            "honorTitle": "ANGELIC VOICE",
+            "worksLabel": "REPRESENTATIVE WORKS",
+            "works": [
+              "《PSYCHO-PASS》常守朱",
+              "《化物语》千石抚子"
+            ],
+            "description": "拥有温暖清澈的治愈声线，以细腻情感让角色具备真实温度与沉浸感。",
+            "image": {
+              "__image_url__": "https://img0.baidu.com/it/u=2780191879,1172788787&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=578",
+              "__image_prompt__": "Kana Hanazawa portrait placeholder"
+            }
+          },
+          {
+            "accent": "cyan",
+            "name": "HIROSHI KAMIYA",
+            "nativeName": "神谷 浩史",
+            "honorTitle": "PRECISION MASTER",
+            "worksLabel": "REPRESENTATIVE WORKS",
+            "works": [
+              "《进击的巨人》利威尔",
+              "《物语系列》阿良良木历"
+            ],
+            "description": "以冷静精准的台词节奏著称，展现了声优作为专业声音演员的控制力与层次感。",
+            "image": {
+              "__image_url__": "https://img1.baidu.com/it/u=4211245477,1398212609&fm=253&fmt=auto&app=120&f=JPEG?w=500&h=708",
+              "__image_prompt__": "Hiroshi Kamiya portrait placeholder"
+            }
+          },
+          {
+            "accent": "yellow",
+            "name": "RIE KUGIMIYA",
+            "nativeName": "釘宮 理恵",
+            "honorTitle": "TSUNDERE QUEEN",
+            "worksLabel": "REPRESENTATIVE WORKS",
+            "works": [
+              "《龙与虎》逢坂大河",
+              "《零之使魔》露易丝"
+            ],
+            "description": "把声优影响力延展到粉丝文化与舞台活动，证明配音表演也是驱动 IP 情感经济的核心力量。",
+            "image": {
+              "__image_url__": "https://img2.baidu.com/it/u=3430131771,107416127&fm=253&fmt=auto&app=138&f=JPEG?w=458&h=556",
+              "__image_prompt__": "Rie Kugimiya portrait placeholder"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "anime-music-power",
+      "title": "动漫音乐的力量",
+      "speaker_note": "第 17 页收尾页：以三张影响卡、经典 OST 歌单和静态频谱图收束，强调动漫音乐如何塑造品牌记忆、留存和全球传播。",
+      "source": {
+        "type": "local",
+        "path": "./slides/MusicPowerShowcase.tsx"
+      },
+      "data": {
+        "backgroundTitle": "MUSIC",
+        "title": "动漫音乐的力量",
+        "subtitle": "THE POWER OF ANIME MUSIC",
+        "signalLabel": "SOUND_ANALYSIS",
+        "signalNote": "CLASSIC OST COLLECTION",
+        "playlistTitle": "Iconic Tracks Selection",
+        "playlistCode": "CURATED OST / 05",
+        "chartTitle": "Audio Spectrum Visualization",
+        "chartCode": "STATIC FREQUENCY MAP",
+        "chartHint": "Replace with a real spectrum, waveform, or concert-equipment visual.",
+        "footerTag": "ANIME FILE / 17",
+        "impactCards": [
+          {
+            "accent": "cyan",
+            "icon": "search",
+            "title": "Discovery & Brand",
+            "description": "OP/ED themes drive first impressions and lasting brand recall for global audiences."
+          },
+          {
+            "accent": "magenta",
+            "icon": "headphones",
+            "title": "Retention Boost",
+            "description": "OST streaming on platforms like Spotify increases viewer engagement and long-term retention."
+          },
+          {
+            "accent": "yellow",
+            "icon": "globe",
+            "title": "Global Expansion",
+            "description": "Live concerts and tours (Ani-Song) expand the fan community beyond cultural borders."
+          }
+        ],
+        "tracks": [
+          {
+            "number": "01",
+            "title": "A Cruel Angel's Thesis",
+            "animeTitle": "Neon Genesis Evangelion (新世纪福音战士)"
+          },
+          {
+            "number": "02",
+            "title": "Tank!",
+            "animeTitle": "Cowboy Bebop (星际牛仔)"
+          },
+          {
+            "number": "03",
+            "title": "Gurenge (红莲华)",
+            "animeTitle": "Demon Slayer (鬼灭之刃)"
+          },
+          {
+            "number": "04",
+            "title": "Again",
+            "animeTitle": "Fullmetal Alchemist (钢之炼金术师)"
+          },
+          {
+            "number": "05",
+            "title": "My Dearest",
+            "animeTitle": "Guilty Crown (罪恶王冠)"
+          }
+        ],
+        "spectrumImage": {
+          "__image_url__": "https://img1.baidu.com/it/u=2252157521,4160635883&fm=253&fmt=auto&app=120&f=JPEG?w=793&h=446",
+          "__image_prompt__": "Audio spectrum visualization placeholder"
+        }
+      }
+    },
+    {
+      "id": "anime-tech-fusion",
+      "title": "动漫与科技融合",
+      "speaker_note": "第 18 页技术展望页：以 8 张技术流程卡展示 AI、虚拟制片与 VR/AR 如何重塑动漫产业链。",
+      "source": {
+        "type": "local",
+        "path": "./slides/TechAnimeFusion.tsx"
+      },
+      "data": {
+        "backgroundTitle": "TECH x ANIME",
+        "title": "动漫与科技融合",
+        "subtitle": "AI / VIRTUAL PRODUCTION / VR / AR INTEGRATION",
+        "systemLabel": "SYSTEM UPGRADE",
+        "systemProgress": 75,
+        "footerTag": "ANIME FILE / 18",
+        "steps": [
+          {
+            "number": "01",
+            "title": "企划・委员会",
+            "description": "传统项目立项流程。",
+            "icon": "handshake",
+            "mode": "standard",
+            "tags": []
+          },
+          {
+            "number": "02",
+            "title": "脚本・系列构成",
+            "description": "剧本与台词创作。",
+            "icon": "script",
+            "mode": "standard",
+            "tags": []
+          },
+          {
+            "number": "03",
+            "title": "分镜・演出",
+            "description": "引入 AI 辅助布局与 3D 预演。",
+            "icon": "layers",
+            "mode": "enhanced",
+            "tags": [
+              "AI 布局",
+              "预演"
+            ]
+          },
+          {
+            "number": "04",
+            "title": "角色・设定",
+            "description": "美术风格设定。",
+            "icon": "palette",
+            "mode": "standard",
+            "tags": []
+          },
+          {
+            "number": "05",
+            "title": "原画・动画",
+            "description": "动作捕捉与 AI 辅助补帧技术。",
+            "icon": "motion",
+            "mode": "enhanced",
+            "tags": [
+              "AI 中割",
+              "动捕术"
+            ]
+          },
+          {
+            "number": "06",
+            "title": "上色・摄影",
+            "description": "自动上色工具与虚拟制片背景。",
+            "icon": "magic",
+            "mode": "enhanced",
+            "tags": [
+              "自动色",
+              "虚拟屏"
+            ]
+          },
+          {
+            "number": "07",
+            "title": "配音・音效",
+            "description": "声优配音与音效合成。",
+            "icon": "voice",
+            "mode": "standard",
+            "tags": []
+          },
+          {
+            "number": "08",
+            "title": "宣发・体验",
+            "description": "VR/AR 沉浸式内容分发。",
+            "icon": "vr",
+            "mode": "enhanced",
+            "tags": [
+              "VR 观影",
+              "AR 特效"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "anime-merch-economy",
+      "title": "动漫周边经济",
+      "speaker_note": "第 19 页最后一页：用 8 张周边经济卡片收束全套内容，强调动漫 IP 在收藏、联名、线下体验与衍生消费上的持续延展能力。",
+      "source": {
+        "type": "local",
+        "path": "./slides/MerchEconomyGrid.tsx"
+      },
+      "data": {
+        "backgroundTitle": "MERCH & ECONOMY",
+        "title": "动漫周边经济",
+        "subtitle": "ANIME MERCHANDISE & SPIN-OFF MARKET",
+        "moduleLabel": "MARKET",
+        "moduleValue": "SEGMENTS",
+        "footerTag": "ANIME FILE / 19",
+        "footerNote": "IP EXTENSION / OFFLINE + ONLINE REVENUE",
+        "items": [
+          {
+            "number": "01",
+            "title": "手办模型",
+            "subtitle": "FIGURES & MODELS",
+            "accent": "cyan",
+            "icon": "cube"
+          },
+          {
+            "number": "02",
+            "title": "服装周边",
+            "subtitle": "APPAREL & FASHION",
+            "accent": "magenta",
+            "icon": "shirt"
+          },
+          {
+            "number": "03",
+            "title": "扭蛋商品",
+            "subtitle": "GACHAPON GOODS",
+            "accent": "cyan",
+            "icon": "gift"
+          },
+          {
+            "number": "04",
+            "title": "游戏改编",
+            "subtitle": "MOBILE & CONSOLE",
+            "accent": "magenta",
+            "icon": "gamepad"
+          },
+          {
+            "number": "05",
+            "title": "主题咖啡店",
+            "subtitle": "THEME CAFES",
+            "accent": "cyan",
+            "icon": "mug"
+          },
+          {
+            "number": "06",
+            "title": "品牌联名",
+            "subtitle": "BRAND COLLABORATIONS",
+            "accent": "magenta",
+            "icon": "handshake"
+          },
+          {
+            "number": "07",
+            "title": "展会活动",
+            "subtitle": "EXPOS & EVENTS",
+            "accent": "cyan",
+            "icon": "ticket"
+          },
+          {
+            "number": "08",
+            "title": "限定收藏品",
+            "subtitle": "LIMITED EDITIONS",
+            "accent": "magenta",
+            "icon": "gem"
+          }
+        ]
+      }
+    },
+    {
+      "id": "anime-infinite-possibilities-closing",
+      "title": "动漫的无限可能",
+      "speaker_note": "第 20 页最终收束页：以赛博风格的终章视觉强调动漫在故事、技术与全球粉丝协作中的持续延展潜力。",
+      "source": {
+        "type": "local",
+        "path": "./slides/InfinitePossibilitiesClosing.tsx"
+      },
+      "data": {
+        "backgroundTitle": "POSSIBILITIES",
+        "title": "动漫的无限可能",
+        "englishTitle": "INFINITE POSSIBILITIES",
+        "subtitle": "故事 × 技术 × 全球粉丝",
+        "ctaText": "探索 · 创造 · 协作",
+        "statusLabel": "SYSTEM_STATUS",
+        "statusDivider": "//",
+        "statusValue": "INFINITE_LOOP",
+        "backgroundImage": {
+          "__image_url__": "https://page.talentsecsite.com/slides_images/b7866a88c9214ac23704d39a6d2de96d.webp",
+          "__image_prompt__": "Sci-fi city night"
+        }
+      }
+    }
+  ]
+}

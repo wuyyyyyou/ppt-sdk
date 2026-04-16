@@ -1,0 +1,11 @@
+{
+  "name": "presenton-general-fork",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.15.4",
+    "zod": "^4.0.5"
+  }
+}

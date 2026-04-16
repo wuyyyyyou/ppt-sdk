@@ -1,0 +1,20 @@
+{
+  "group_id": "modern",
+  "group_name": "Modern",
+  "group_description": "Modern white and blue business pitch deck layouts with clean, professional design",
+  "ordered": false,
+  "default": false,
+  "registry_order": 60,
+  "layouts": [
+    "BulletWithIconsSlideLayout.tsx",
+    "BulletsWithIconsDescriptionGrid.tsx",
+    "ChartOrTableWithDescription.tsx",
+    "ChartOrTableWithMetricsDescription.tsx",
+    "ImageAndDescriptionLayout.tsx",
+    "ImageListWithDescriptionSlideLayout.tsx",
+    "ImagesWithDescriptionLayout.tsx",
+    "IntroSlideLayout.tsx",
+    "MetricsWithDescription.tsx",
+    "TableOfContentsLayout.tsx"
+  ]
+}

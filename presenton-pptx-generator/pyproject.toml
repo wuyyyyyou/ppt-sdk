@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "presenton-pptx-generator-executa"
+version = "0.1.0"
+description = "Presenton PPTX generator vendored into an Anna Executa plugin"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "aiohttp>=3.9.0",
+  "annotated-types>=0.7.0",
+  "cairosvg>=2.7.1",
+  "lxml>=5.0.0",
+  "pillow>=10.0.0",
+  "pydantic>=2.8.0",
+  "python-pptx>=1.0.2",
+]
+
+[project.scripts]
+presenton-pptx-generator = "presenton_sdk_pptx_generator.cli:main"
+presenton-pptx-generator-plugin = "presenton_pptx_generator_plugin:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+presenton_sdk_pptx_generator = ["templates/*.xml"]

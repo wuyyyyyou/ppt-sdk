@@ -1,0 +1,49 @@
+{
+  "name": "presenton-html-to-pptx-model-executa",
+  "version": "0.1.0",
+  "description": "Presenton HTML to PPTX model vendored into an Anna Executa plugin",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "example_plugin.js",
+    "build_binary.sh",
+    "scripts/patch-postject.mjs",
+    "scripts/prepare-sea-bundle.mjs",
+    "scripts/sea-bootstrap.cjs"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "check": "tsc --noEmit",
+    "start:plugin": "node example_plugin.js",
+    "build:binary": "./build_binary.sh",
+    "test": "node -e \"console.log('No vendored automated tests in this example package')\"",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.17",
+    "postject": "^1.0.0-alpha.6",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "puppeteer": "^24.0.0",
+    "sharp": "^0.34.5"
+  }
+}

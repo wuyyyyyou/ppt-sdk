@@ -1,0 +1,21 @@
+{
+  "group_id": "standard",
+  "group_name": "Standard",
+  "group_description": "Standard layouts for presentations",
+  "ordered": false,
+  "default": false,
+  "registry_order": 70,
+  "layouts": [
+    "ChartLeftTextRightLayout.tsx",
+    "ContactLayout.tsx",
+    "HeadingBulletImageDescriptionLayout.tsx",
+    "IconBulletDescriptionLayout.tsx",
+    "IconImageDescriptionLayout.tsx",
+    "ImageListWithDescriptionLayout.tsx",
+    "IntroSlideLayout.tsx",
+    "MetricsDescriptionLayout.tsx",
+    "NumberedBulletSingleImageLayout.tsx",
+    "TableOfContentsLayout.tsx",
+    "VisualMetricsSlideLayout.tsx"
+  ]
+}

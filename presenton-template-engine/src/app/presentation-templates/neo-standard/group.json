@@ -1,0 +1,27 @@
+{
+  "group_id": "neo-standard",
+  "group_name": "Neo Standard",
+  "group_description": "New standard purpose layouts for common presentation elements",
+  "ordered": false,
+  "default": false,
+  "registry_order": 20,
+  "layouts": [
+    "TitleBadgeChart.tsx",
+    "TitleDescriptionBulletList.tsx",
+    "TitleDescriptionContactCards.tsx",
+    "TitleDescriptionIconList.tsx",
+    "TitleDescriptionImageRight.tsx",
+    "TitleDescriptionMultiChartGrid.tsx",
+    "TitleDescriptionMultiChartGridWithBullets.tsx",
+    "TitleDescriptionMultiChartGridWithMetrics.tsx",
+    "TitleDescriptionRadialCards.tsx",
+    "TitleDescriptionTable.tsx",
+    "TitleDescriptionTimeline.tsx",
+    "TitleDualChartsComparison.tsx",
+    "TitleDualComparisonCards.tsx",
+    "TitleKpiGrid.tsx",
+    "TitleMetricsChart.tsx",
+    "TitleMetricsImage.tsx",
+    "TitlePointsDonutGrid.tsx"
+  ]
+}

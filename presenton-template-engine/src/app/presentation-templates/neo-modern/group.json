@@ -1,0 +1,27 @@
+{
+  "group_id": "neo-modern",
+  "group_name": "Neo Modern",
+  "group_description": "New modern purpose layouts for common presentation elements",
+  "ordered": false,
+  "default": false,
+  "registry_order": 30,
+  "layouts": [
+    "TitleDescriptionBulletList.tsx",
+    "TitleDescriptionContactList.tsx",
+    "TitleDescriptionDualMetricsGrid.tsx",
+    "TitleDescriptionIconTimeline.tsx",
+    "TitleDescriptionImageRight.tsx",
+    "TitleDescriptionMetricsChart.tsx",
+    "TitleDescriptionMetricsImage.tsx",
+    "TitleDescriptionMultiChartGrid.tsx",
+    "TitleDescriptionMultiChartGridWithBullets.tsx",
+    "TitleDescriptionMultiChartGridWithMetrics.tsx",
+    "TitleDescriptionTable.tsx",
+    "TitleDualComparisonCards.tsx",
+    "TitleDualComparisonCharts.tsx",
+    "TitleHorizontalAlternatingTimeline.tsx",
+    "TitleKpiSnapshotGrid.tsx",
+    "TitleSubtitlesChart.tsx",
+    "TitleTwoColumnNumberedList.tsx"
+  ]
+}
