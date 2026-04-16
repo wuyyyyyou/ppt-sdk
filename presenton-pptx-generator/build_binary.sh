@@ -93,7 +93,7 @@ if runtime_dir and hasattr(os, "add_dll_directory"):
 if runtime_dir:
     os.environ["CAIROCFFI_DLL_DIRECTORIES"] = runtime_dir
 exec(compile(sys.argv[1], "<inline>", "exec"))' "$code" "$@"
-    return 0
+    return $?
   fi
 
   "$PYTHON_BIN" -c "$code" "$@"
@@ -181,6 +181,8 @@ if ! run_python_with_cairo "import aiohttp, annotated_types, cairosvg, lxml, PIL
     -e .
 fi
 
+run_python_with_cairo "import aiohttp, annotated_types, cairosvg, lxml, PIL, pptx, pydantic, presenton_sdk_pptx_generator" >/dev/null
+
 if ! "$PYTHON_BIN" -m nuitka --version >/dev/null 2>&1; then
   UV_CACHE_DIR="$UV_CACHE_DIR" uv pip install \
     --python "$PYTHON_BIN" \
@@ -188,8 +190,25 @@ if ! "$PYTHON_BIN" -m nuitka --version >/dev/null 2>&1; then
     ordered-set
 fi
 
-PPTX_TEMPLATES_DIR="$(run_python_with_cairo "from pathlib import Path; import pptx; print((Path(pptx.__file__).resolve().parent / 'templates').as_posix())")"
-CAIROSVG_VERSION_FILE="$(run_python_with_cairo "from pathlib import Path; import cairosvg; print((Path(cairosvg.__file__).resolve().parent / 'VERSION').as_posix())")"
+if ! PPTX_TEMPLATES_DIR="$(run_python_with_cairo "from pathlib import Path; import pptx; print((Path(pptx.__file__).resolve().parent / 'templates').as_posix())")"; then
+  echo "Failed to locate python-pptx templates after dependency installation." >&2
+  exit 1
+fi
+
+if [[ -z "$PPTX_TEMPLATES_DIR" ]]; then
+  echo "Resolved python-pptx templates path is empty." >&2
+  exit 1
+fi
+
+if ! CAIROSVG_VERSION_FILE="$(run_python_with_cairo "from pathlib import Path; import cairosvg; print((Path(cairosvg.__file__).resolve().parent / 'VERSION').as_posix())")"; then
+  echo "Failed to locate CairoSVG version file after dependency installation." >&2
+  exit 1
+fi
+
+if [[ -z "$CAIROSVG_VERSION_FILE" ]]; then
+  echo "Resolved CairoSVG version file path is empty." >&2
+  exit 1
+fi
 
 echo "[4/6] Cleaning previous build outputs..."
 rm -rf "$BUILD_DIR" "$BUNDLE_DIR"
