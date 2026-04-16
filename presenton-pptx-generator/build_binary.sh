@@ -8,12 +8,10 @@ cd "$SCRIPT_DIR"
 PLUGIN_NAME="presenton-pptx-generator-plugin"
 ENTRY_POINT="example_plugin.py"
 VENV_DIR="$SCRIPT_DIR/.venv"
-PYTHON_BIN="$VENV_DIR/bin/python"
 UV_CACHE_DIR="$SCRIPT_DIR/.uv-cache"
 NUITKA_CACHE_DIR="$SCRIPT_DIR/.cache/nuitka"
 BUILD_DIR="$SCRIPT_DIR/.build/nuitka"
 BUNDLE_DIR="$SCRIPT_DIR/bundle"
-OUTPUT_PATH="$BUNDLE_DIR/$PLUGIN_NAME"
 RUN_TEST=false
 
 for arg in "$@"; do
@@ -30,13 +28,43 @@ for arg in "$@"; do
   esac
 done
 
+detect_platform() {
+  local os
+  os="$(uname -s)"
+
+  case "$os" in
+    Darwin) echo "darwin" ;;
+    MINGW*|MSYS*|CYGWIN*) echo "windows" ;;
+    *) echo "other" ;;
+  esac
+}
+
+detect_output_name() {
+  if [[ "$PLATFORM" == "windows" ]]; then
+    echo "${PLUGIN_NAME}.exe"
+  else
+    echo "${PLUGIN_NAME}"
+  fi
+}
+
+PLATFORM="$(detect_platform)"
+if [[ "$PLATFORM" == "windows" ]]; then
+  PYTHON_BIN="$VENV_DIR/Scripts/python.exe"
+else
+  PYTHON_BIN="$VENV_DIR/bin/python"
+fi
+
+OUTPUT_NAME="$(detect_output_name)"
+BUILD_OUTPUT_PATH="$BUILD_DIR/$OUTPUT_NAME"
+OUTPUT_PATH="$BUNDLE_DIR/$OUTPUT_NAME"
+
 if ! command -v uv >/dev/null 2>&1; then
   echo "uv is required but was not found in PATH." >&2
   exit 1
 fi
 
 echo "[1/5] Preparing virtual environment..."
-if [[ ! -x "$PYTHON_BIN" ]]; then
+if [[ ! -f "$PYTHON_BIN" ]]; then
   uv venv "$VENV_DIR"
 fi
 
@@ -79,14 +107,14 @@ NUITKA_CACHE_DIR="$NUITKA_CACHE_DIR" "$PYTHON_BIN" -m nuitka \
   --include-data-file="$CAIROSVG_VERSION_FILE=cairosvg/VERSION" \
   "$ENTRY_POINT"
 
-if [[ ! -f "$BUILD_DIR/$PLUGIN_NAME" ]]; then
-  echo "Build failed: missing $BUILD_DIR/$PLUGIN_NAME" >&2
+if [[ ! -f "$BUILD_OUTPUT_PATH" ]]; then
+  echo "Build failed: missing $BUILD_OUTPUT_PATH" >&2
   exit 1
 fi
 
-cp "$BUILD_DIR/$PLUGIN_NAME" "$OUTPUT_PATH"
+cp "$BUILD_OUTPUT_PATH" "$OUTPUT_PATH"
 chmod +x "$OUTPUT_PATH"
-rm -f "$BUILD_DIR/$PLUGIN_NAME"
+rm -f "$BUILD_OUTPUT_PATH"
 
 if [[ "$(uname -s)" == "Darwin" ]]; then
   codesign --force --sign - "$OUTPUT_PATH" >/dev/null 2>&1 || true
