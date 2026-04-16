@@ -86,12 +86,23 @@ run_python_with_cairo() {
   shift || true
 
   if [[ "$PLATFORM" == "windows" && -n "${CAIRO_RUNTIME_DIR_WINDOWS:-}" ]]; then
-    "$PYTHON_BIN" -c 'import os, sys
+    "$PYTHON_BIN" -c 'import ctypes, os, sys
 runtime_dir = os.environ.get("CAIRO_RUNTIME_DIR_WINDOWS")
-if runtime_dir and hasattr(os, "add_dll_directory"):
-    os.add_dll_directory(runtime_dir)
+dll_handles = []
 if runtime_dir:
+    current_path = os.environ.get("PATH")
+    if current_path:
+        parts = current_path.split(os.pathsep)
+        if runtime_dir not in parts:
+            os.environ["PATH"] = os.pathsep.join([runtime_dir, current_path])
+    else:
+        os.environ["PATH"] = runtime_dir
     os.environ["CAIROCFFI_DLL_DIRECTORIES"] = runtime_dir
+    if hasattr(os, "add_dll_directory"):
+        dll_handles.append(os.add_dll_directory(runtime_dir))
+    cairo_dll = os.path.join(runtime_dir, "libcairo-2.dll")
+    if os.path.isfile(cairo_dll):
+        dll_handles.append(ctypes.WinDLL(cairo_dll))
 exec(compile(sys.argv[1], "<inline>", "exec"))' "$code" "$@"
     return $?
   fi

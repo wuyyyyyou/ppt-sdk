@@ -9,6 +9,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "src"
+_WINDOWS_DLL_HANDLES: list[object] = []
+_LOADED_SHARED_LIBRARIES: list[object] = []
 
 
 def _resolve_cairo_runtime_dir() -> Path | None:
@@ -53,18 +55,20 @@ def _bootstrap_cairo_runtime() -> None:
     if sys.platform == "win32":
         _prepend_env_path("PATH", runtime_dir)
         if hasattr(os, "add_dll_directory"):
-            os.add_dll_directory(runtime_dir)
+            _WINDOWS_DLL_HANDLES.append(os.add_dll_directory(runtime_dir))
 
         cairo_dll = cairo_runtime_dir / "libcairo-2.dll"
         if cairo_dll.is_file():
-            ctypes.WinDLL(str(cairo_dll))
+            _LOADED_SHARED_LIBRARIES.append(ctypes.WinDLL(str(cairo_dll)))
         return
 
     if sys.platform == "darwin":
         _prepend_env_path("DYLD_FALLBACK_LIBRARY_PATH", runtime_dir)
         dylibs = sorted(cairo_runtime_dir.glob("*.dylib"))
         for dylib in dylibs:
-            ctypes.CDLL(str(dylib), mode=getattr(ctypes, "RTLD_GLOBAL", 0))
+            _LOADED_SHARED_LIBRARIES.append(
+                ctypes.CDLL(str(dylib), mode=getattr(ctypes, "RTLD_GLOBAL", 0))
+            )
 
 
 _bootstrap_cairo_runtime()
