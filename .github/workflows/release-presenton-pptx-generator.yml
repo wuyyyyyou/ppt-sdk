@@ -100,7 +100,7 @@ jobs:
           install: >-
             mingw-w64-x86_64-cairo
 
-      - name: Build binary
+      - name: Build standalone bundle
         working-directory: ${{ env.PROJECT_DIR }}
         env:
           CAIRO_RUNTIME_DIR: ${{ matrix.cairo_runtime_dir }}
@@ -117,11 +117,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          mkdir -p "$RELEASE_DIR/stage"
-          cp "bundle/$BINARY_NAME" "$RELEASE_DIR/stage/$BINARY_NAME"
-
+          mkdir -p "$RELEASE_DIR"
           archive_name="${ASSET_PREFIX}-${ASSET_SUFFIX}.tar.gz"
-          tar -C "$RELEASE_DIR/stage" -czf "$RELEASE_DIR/$archive_name" "$BINARY_NAME"
+          tar -C "bundle" -czf "$RELEASE_DIR/$archive_name" "$BINARY_NAME"
           (
             cd "$RELEASE_DIR"
             shasum -a 256 "$archive_name" > "$archive_name.sha256"
@@ -138,18 +136,12 @@ jobs:
           RELEASE_DIR: ${{ runner.temp }}/release-assets
         run: |
           $releaseDir = $env:RELEASE_DIR
-          $stageDir = Join-Path $releaseDir "stage"
           New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
-          New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
 
-          $binaryName = "$env:BINARY_NAME.exe"
-          $sourcePath = Join-Path $env:PROJECT_PATH "bundle/$binaryName"
-          $stageBinaryPath = Join-Path $stageDir $binaryName
-          Copy-Item -LiteralPath $sourcePath -Destination $stageBinaryPath -Force
-
+          $sourcePath = Join-Path $env:PROJECT_PATH "bundle/$env:BINARY_NAME"
           $archiveName = "$env:ASSET_PREFIX-$env:ASSET_SUFFIX.zip"
           $archivePath = Join-Path $releaseDir $archiveName
-          Compress-Archive -LiteralPath $stageBinaryPath -DestinationPath $archivePath -Force
+          Compress-Archive -LiteralPath $sourcePath -DestinationPath $archivePath -Force
 
           $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
           Set-Content -LiteralPath "$archivePath.sha256" -Value "$hash  $archiveName" -Encoding ascii
@@ -164,10 +156,115 @@ jobs:
             ${{ runner.temp }}/release-assets/*.sha256
           if-no-files-found: error
 
-  release:
+  smoke-test:
     needs:
       - prepare
       - build
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            asset_suffix: darwin-amd64
+            archive_format: tar.gz
+          - runner: macos-15
+            asset_suffix: darwin-arm64
+            archive_format: tar.gz
+          - runner: windows-2025
+            asset_suffix: windows-amd64
+            archive_format: zip
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download packaged assets
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets-${{ matrix.asset_suffix }}
+          path: ${{ runner.temp }}/release-assets
+
+      - name: Extract Unix bundle
+        if: ${{ matrix.archive_format == 'tar.gz' }}
+        shell: bash
+        env:
+          BINARY_NAME: ${{ needs.prepare.outputs.binary_name }}
+          ASSET_PREFIX: ${{ needs.prepare.outputs.asset_prefix }}
+          ASSET_SUFFIX: ${{ matrix.asset_suffix }}
+          EXTRACT_DIR: ${{ runner.temp }}/smoke
+        run: |
+          set -euo pipefail
+
+          archive_path="$RUNNER_TEMP/release-assets/${ASSET_PREFIX}-${ASSET_SUFFIX}.tar.gz"
+          mkdir -p "$EXTRACT_DIR"
+          tar -C "$EXTRACT_DIR" -xzf "$archive_path"
+
+      - name: Verify macOS dylib relocation
+        if: ${{ startsWith(matrix.runner, 'macos-') }}
+        shell: bash
+        env:
+          BINARY_NAME: ${{ needs.prepare.outputs.binary_name }}
+          EXTRACT_DIR: ${{ runner.temp }}/smoke
+        run: |
+          set -euo pipefail
+
+          if otool -L "$EXTRACT_DIR/$BINARY_NAME"/cairo/*.dylib | grep -E '/usr/local|/opt/homebrew'; then
+            echo "Found absolute Homebrew references in bundled Cairo dylibs" >&2
+            exit 1
+          fi
+
+      - name: Smoke test Unix bundle
+        if: ${{ matrix.archive_format == 'tar.gz' }}
+        shell: bash
+        env:
+          BINARY_NAME: ${{ needs.prepare.outputs.binary_name }}
+          EXTRACT_DIR: ${{ runner.temp }}/smoke
+        run: |
+          set -euo pipefail
+
+          binary_path="$EXTRACT_DIR/$BINARY_NAME/$BINARY_NAME"
+          chmod +x "$binary_path"
+          unset DYLD_LIBRARY_PATH DYLD_FALLBACK_LIBRARY_PATH CAIROCFFI_DLL_DIRECTORIES
+          python3 presenton-pptx-generator/smoke_test_bundle.py "$binary_path"
+
+      - name: Extract Windows bundle
+        if: ${{ matrix.archive_format == 'zip' }}
+        shell: pwsh
+        env:
+          ASSET_PREFIX: ${{ needs.prepare.outputs.asset_prefix }}
+          ASSET_SUFFIX: ${{ matrix.asset_suffix }}
+          EXTRACT_DIR: ${{ runner.temp }}/smoke
+          RELEASE_DIR: ${{ runner.temp }}/release-assets
+        run: |
+          $archivePath = Join-Path $env:RELEASE_DIR "$env:ASSET_PREFIX-$env:ASSET_SUFFIX.zip"
+          New-Item -ItemType Directory -Force -Path $env:EXTRACT_DIR | Out-Null
+          Expand-Archive -LiteralPath $archivePath -DestinationPath $env:EXTRACT_DIR -Force
+
+      - name: Smoke test Windows bundle
+        if: ${{ matrix.archive_format == 'zip' }}
+        shell: pwsh
+        env:
+          BINARY_NAME: ${{ needs.prepare.outputs.binary_name }}
+          EXTRACT_DIR: ${{ runner.temp }}/smoke
+        run: |
+          $pythonExe = Join-Path $env:pythonLocation "python.exe"
+          $env:PATH = [System.String]::Join(';', @(
+            [System.Environment]::GetEnvironmentVariable('SystemRoot', 'Process'),
+            (Join-Path $env:SystemRoot 'System32')
+          ))
+          Remove-Item Env:CAIROCFFI_DLL_DIRECTORIES -ErrorAction SilentlyContinue
+          $binaryPath = Join-Path (Join-Path $env:EXTRACT_DIR $env:BINARY_NAME) "$env:BINARY_NAME.exe"
+          & $pythonExe presenton-pptx-generator/smoke_test_bundle.py $binaryPath
+
+  release:
+    needs:
+      - prepare
+      - smoke-test
     runs-on: ubuntu-latest
     steps:
       - name: Download packaged assets

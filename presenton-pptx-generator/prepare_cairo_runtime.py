@@ -129,22 +129,22 @@ def stage_macos_runtime(runtime_dir: Path, staging_dir: Path) -> None:
         raise SystemExit(f"Could not find macOS Cairo dylibs in {runtime_dir}")
 
     copied_by_name: dict[str, Path] = {}
-    seen_realpaths: set[Path] = set()
 
     while queue:
-        current = queue.pop(0).resolve()
-        if current in seen_realpaths:
+        current = queue.pop(0)
+        target_name = current.name
+        if target_name in copied_by_name:
             continue
-        seen_realpaths.add(current)
+        resolved_current = current.resolve()
 
-        target = staging_dir / current.name
-        shutil.copy2(current, target)
+        target = staging_dir / target_name
+        shutil.copy2(resolved_current, target)
         target.chmod(target.stat().st_mode | 0o200)
-        copied_by_name[current.name] = target
+        copied_by_name[target_name] = target
 
-        for dep in otool_dependencies(current):
-            if dep.is_file():
-                queue.append(dep.resolve())
+        for dep in otool_dependencies(resolved_current):
+            if dep.is_file() and dep.name not in copied_by_name:
+                queue.append(dep)
 
     for dylib in copied_by_name.values():
         subprocess.run(
@@ -174,19 +174,29 @@ def stage_macos_runtime(runtime_dir: Path, staging_dir: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--platform", required=True, choices=["darwin", "windows"])
-    parser.add_argument("--staging-dir", required=True)
+    parser.add_argument("--staging-dir")
     parser.add_argument("--runtime-dir")
+    parser.add_argument("--discover-only", action="store_true")
     args = parser.parse_args()
 
-    staging_dir = Path(args.staging_dir)
     runtime_dir = discover_runtime_dir(args.platform, args.runtime_dir)
 
-    if args.platform == "darwin":
-        stage_macos_runtime(runtime_dir, staging_dir)
-        runtime_for_imports = str(runtime_dir)
+    if args.discover_only:
+        if args.platform == "darwin":
+            runtime_for_imports = str(runtime_dir)
+        else:
+            runtime_for_imports = windows_string(runtime_dir)
     else:
-        stage_windows_runtime(runtime_dir, staging_dir)
-        runtime_for_imports = windows_string(runtime_dir)
+        if not args.staging_dir:
+            parser.error("--staging-dir is required unless --discover-only is used")
+
+        staging_dir = Path(args.staging_dir)
+        if args.platform == "darwin":
+            stage_macos_runtime(runtime_dir, staging_dir)
+            runtime_for_imports = str(runtime_dir)
+        else:
+            stage_windows_runtime(runtime_dir, staging_dir)
+            runtime_for_imports = windows_string(runtime_dir)
 
     print(f"CAIRO_RUNTIME_DIR_FOR_IMPORTS={shlex.quote(runtime_for_imports)}")
 

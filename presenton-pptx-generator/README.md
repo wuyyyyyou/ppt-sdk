@@ -40,7 +40,7 @@ echo '{"jsonrpc":"2.0","method":"describe","id":1}' | .venv/bin/python example_p
 
 ## 打包二进制
 
-使用 Nuitka 打包，产物会写到 `bundle/` 目录：
+使用 Nuitka 打包，产物会写到 `bundle/` 目录下的 standalone bundle：
 
 ```bash
 cd /Users/leyouming/company_program/anna/anna-executa-examples/presenton-pptx-generator
@@ -55,6 +55,18 @@ cd /Users/leyouming/company_program/anna/anna-executa-examples/presenton-pptx-ge
 ```
 
 默认脚本会用 `uv` 管理 `.venv`，自动安装项目依赖以及 `nuitka`、`ordered-set`。
+
+打包完成后目录结构类似：
+
+```text
+bundle/
+  presenton-pptx-generator-plugin/
+    presenton-pptx-generator-plugin
+    cairo/
+    ...
+```
+
+其中主程序文件名保持固定，运行时依赖的 Cairo 动态库会随 bundle 一起分发。
 
 ### `generatePptx`
 
