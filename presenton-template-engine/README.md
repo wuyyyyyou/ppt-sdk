@@ -532,5 +532,5 @@ npm run test:pack
 你也可以手动指定 tarball 路径：
 
 ```bash
-node test/smoke-pack-install.mjs ./presenton-sdk-template-engine-0.0.2.tgz
+node test/smoke-pack-install.mjs ./presenton-sdk-template-engine-0.0.3.tgz
 ```
