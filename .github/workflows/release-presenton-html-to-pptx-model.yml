@@ -38,7 +38,7 @@ jobs:
 
           release_tag="presenton-html-to-pptx-model-v${version}"
           release_name="presenton-html-to-pptx-model v${version}"
-          binary_name="presenton-html-to-pptx-model-plugin"
+          binary_name="ppt-model"
           asset_prefix="${binary_name}-v${version}"
 
           {

@@ -38,7 +38,7 @@ jobs:
 
           release_tag="presenton-template-engine-v${version}"
           release_name="presenton-template-engine v${version}"
-          binary_name="presenton-template-engine-plugin"
+          binary_name="ppt-engine"
           asset_prefix="${binary_name}-v${version}"
 
           {

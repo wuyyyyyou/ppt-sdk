@@ -1,6 +1,6 @@
 {
   "name": "presenton-html-to-pptx-model-executa",
-  "version": "0.1.0",
+  "version": "0.0.2",
   "description": "Presenton HTML to PPTX model vendored into an Anna Executa plugin",
   "private": true,
   "type": "module",

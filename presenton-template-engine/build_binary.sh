@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-PLUGIN_NAME="presenton-template-engine-plugin"
+PLUGIN_NAME="ppt-engine"
 BUNDLE_DIR="$SCRIPT_DIR/bundle"
 SEA_PREP_DIR="$SCRIPT_DIR/sea-prep"
 RUN_TEST=false
@@ -156,7 +156,7 @@ ls -lh "$OUTPUT_PATH"
 
 if [[ "$RUN_TEST" == "true" ]]; then
   RESULT="$(printf '%s\n' '{"jsonrpc":"2.0","method":"describe","id":1}' | "$OUTPUT_PATH" 2>/dev/null)"
-  echo "$RESULT" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const r=JSON.parse(d);process.exit(r.result&&r.result.name==='presenton-template-engine-plugin'?0:1)})"
+  echo "$RESULT" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const r=JSON.parse(d);process.exit(r.result&&r.result.name==='ppt-engine'?0:1)})"
   echo "describe validation passed"
 else
   echo "skip (use --test to validate describe)"

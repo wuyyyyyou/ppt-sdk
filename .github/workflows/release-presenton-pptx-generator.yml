@@ -39,7 +39,7 @@ jobs:
 
           release_tag="presenton-pptx-generator-v${version}"
           release_name="presenton-pptx-generator v${version}"
-          binary_name="presenton-pptx-generator-plugin"
+          binary_name="ppt-gener"
           asset_prefix="${binary_name}-v${version}"
 
           {

@@ -49,7 +49,7 @@ npm install
 
 生成产物：
 
-- `bundle/presenton-html-to-pptx-model-plugin`
+- `bundle/ppt-model`
 
 说明：
 

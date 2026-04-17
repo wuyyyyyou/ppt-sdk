@@ -9,9 +9,9 @@ import { convertDeckHtmlToPptxModel } from "./dist/index.js";
 const TOOL_NAME = "convertDeckHtmlToPptxModel";
 
 const MANIFEST = {
-  name: "presenton-html-to-pptx-model-plugin",
-  display_name: "presenton-html-to-pptx-model-plugin",
-  version: "0.0.1",
+  name: "ppt-model",
+  display_name: "ppt-model",
+  version: "0.0.2",
   description:
     "Anna Executa plugin for converting rendered deck HTML files into PPTX presentation model JSON files.",
   author: "Anna Developer",

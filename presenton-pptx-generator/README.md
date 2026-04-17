@@ -60,8 +60,8 @@ cd /Users/leyouming/company_program/anna/anna-executa-examples/presenton-pptx-ge
 
 ```text
 bundle/
-  presenton-pptx-generator-plugin/
-    presenton-pptx-generator-plugin
+  ppt-gener/
+    ppt-gener
     cairo/
     ...
 ```

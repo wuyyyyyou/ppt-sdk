@@ -58,7 +58,7 @@ npm install
 
 生成产物：
 
-- `bundle/presenton-template-engine-plugin`
+- `bundle/ppt-engine`
 
 说明：
 
@@ -532,5 +532,5 @@ npm run test:pack
 你也可以手动指定 tarball 路径：
 
 ```bash
-node test/smoke-pack-install.mjs ./presenton-sdk-template-engine-0.1.0.tgz
+node test/smoke-pack-install.mjs ./presenton-sdk-template-engine-0.0.2.tgz
 ```

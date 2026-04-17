@@ -7,9 +7,9 @@ from typing import Any, Dict, Optional
 TOOL_NAME = "generatePptx"
 
 MANIFEST = {
-    "name": "presenton-pptx-generator-plugin",
-    "display_name": "presenton-pptx-generator-plugin",
-    "version": "0.0.1",
+    "name": "ppt-gener",
+    "display_name": "ppt-gener",
+    "version": "0.0.2",
     "description": "Anna Executa plugin for generating .pptx files from PptxPresentationModel JSON files.",
     "author": "Anna Developer",
     "tools": [
