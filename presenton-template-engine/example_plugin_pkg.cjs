@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
+const { randomUUID } = require("node:crypto");
 const readline = require("node:readline");
-const { mkdir, readFile, writeFile } = require("node:fs/promises");
+const { mkdir, readFile, stat, writeFile } = require("node:fs/promises");
+const os = require("node:os");
 const path = require("node:path");
 
 const {
@@ -19,11 +21,18 @@ const TOOL_NAMES = [
   "buildDeckHtmlFromManifest",
   "forkTemplateGroup",
 ];
+const FILE_TRANSPORT_DIRNAME = ".executa-file-transport";
+const FILE_TRANSPORT_FALLBACK_DIR = path.join(
+  os.tmpdir(),
+  "presenton-template-engine-executa",
+  "file-transport",
+);
+const MAX_STDOUT_RESPONSE_BYTES = 512 * 1024;
 
 const MANIFEST = {
   name: "ppt-engine",
   display_name: "ppt-engine",
-  version: "0.0.2",
+  version: "0.0.3",
   description:
     "Anna Executa plugin for Presenton template discovery and manifest-based deck HTML generation.",
   author: "Anna Developer",
@@ -210,6 +219,30 @@ function createInvalidParamsError(message) {
   return { code: -32602, message };
 }
 
+function formatRpcId(id) {
+  if (id === null) {
+    return "null";
+  }
+
+  if (id === undefined) {
+    return "undefined";
+  }
+
+  return String(id);
+}
+
+function isNonEmptyString(value) {
+  return typeof value === "string" && value.length > 0;
+}
+
+function truncateForLog(value, maxLength = 160) {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength)}...`;
+}
+
 function parseJsonArrayArgument(value) {
   if (typeof value !== "string") {
     return value;
@@ -263,6 +296,153 @@ function resolveFromCwd(cwd, targetPath) {
 
   const baseDir = cwd ? path.resolve(cwd) : process.cwd();
   return path.resolve(baseDir, targetPath);
+}
+
+function parseRequestLine(line) {
+  try {
+    return {
+      request: JSON.parse(line),
+      parseErrorResponse: null,
+    };
+  } catch {
+    return {
+      request: null,
+      parseErrorResponse: makeResponse(null, undefined, {
+        code: -32700,
+        message: "Parse error",
+      }),
+    };
+  }
+}
+
+function summarizeIncomingRequest(request, rawLine) {
+  if (!request || typeof request !== "object" || Array.isArray(request)) {
+    return `← invalid-json raw=${truncateForLog(rawLine)}`;
+  }
+
+  const id = formatRpcId(request.id);
+  const method = isNonEmptyString(request.method) ? request.method : "<missing>";
+
+  if (method !== "invoke") {
+    return `← method=${method} id=${id}`;
+  }
+
+  const tool = isNonEmptyString(request.params?.tool) ? request.params.tool : "<missing>";
+  return `← method=invoke id=${id} tool=${tool}`;
+}
+
+function summarizeResponse(request, response) {
+  const id = formatRpcId(response?.id);
+
+  if (response?.error) {
+    return `id=${id} error_code=${response.error.code} error_message=${JSON.stringify(response.error.message)}`;
+  }
+
+  if (request?.method === "invoke") {
+    const tool = isNonEmptyString(request.params?.tool) ? request.params.tool : "<missing>";
+    return `id=${id} tool=${tool} status=success`;
+  }
+
+  return `id=${id} status=success`;
+}
+
+function shouldUseFileTransport(request) {
+  return request?.method === "invoke";
+}
+
+async function resolveTransportDirectories(request) {
+  const candidates = [];
+  const requestedCwd = request?.params?.arguments?.cwd;
+
+  if (isNonEmptyString(requestedCwd)) {
+    try {
+      const resolvedCwd = resolveFromCwd(null, requestedCwd);
+      const cwdStat = await stat(resolvedCwd);
+      if (cwdStat.isDirectory()) {
+        candidates.push(path.join(resolvedCwd, FILE_TRANSPORT_DIRNAME));
+      }
+    } catch {
+      // Ignore invalid or inaccessible cwd and fall back to the plugin temp directory.
+    }
+  }
+
+  candidates.push(FILE_TRANSPORT_FALLBACK_DIR);
+  return [...new Set(candidates)];
+}
+
+async function writeStdoutLine(payload) {
+  await new Promise((resolve, reject) => {
+    process.stdout.write(`${payload}\n`, (error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
+
+function buildTransportFileName() {
+  return `executa-resp-${Date.now()}-${process.pid}-${randomUUID()}.json`;
+}
+
+async function writeResponseToTransportFile(serializedResponse, transportDir) {
+  await mkdir(transportDir, { recursive: true });
+  const transportPath = path.join(transportDir, buildTransportFileName());
+  await writeFile(transportPath, serializedResponse, "utf8");
+  return transportPath;
+}
+
+async function emitResponse(request, response) {
+  const serializedResponse = JSON.stringify(response);
+  const responseBytes = Buffer.byteLength(serializedResponse, "utf8");
+
+  if (!shouldUseFileTransport(request)) {
+    await writeStdoutLine(serializedResponse);
+    process.stderr.write(`→ stdout ${summarizeResponse(request, response)} bytes=${responseBytes}\n`);
+    return;
+  }
+
+  try {
+    const transportDirectories = await resolveTransportDirectories(request);
+    let lastError = null;
+
+    for (const transportDir of transportDirectories) {
+      try {
+        const transportPath = await writeResponseToTransportFile(serializedResponse, transportDir);
+        const pointer = JSON.stringify({
+          jsonrpc: "2.0",
+          id: response.id ?? null,
+          __file_transport: transportPath,
+        });
+        await writeStdoutLine(pointer);
+        process.stderr.write(
+          `→ file_transport ${summarizeResponse(request, response)} bytes=${responseBytes} path=${transportPath}\n`,
+        );
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError ?? new Error("No writable transport directory available");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown file transport error";
+    const fallbackResponse = responseBytes <= MAX_STDOUT_RESPONSE_BYTES
+      ? response
+      : makeResponse(response.id ?? null, undefined, {
+        code: -32603,
+        message: `Failed to write file transport response: ${message}`,
+      });
+    const fallbackSerialized = JSON.stringify(fallbackResponse);
+    const fallbackBytes = Buffer.byteLength(fallbackSerialized, "utf8");
+
+    await writeStdoutLine(fallbackSerialized);
+    process.stderr.write(
+      `→ stdout_fallback ${summarizeResponse(request, fallbackResponse)} bytes=${fallbackBytes} transport_error=${JSON.stringify(message)}\n`,
+    );
+  }
 }
 
 async function loadManifest(args) {
@@ -455,17 +635,7 @@ async function handleInvoke(id, params = {}) {
   }
 }
 
-async function handleRequest(line) {
-  let request;
-  try {
-    request = JSON.parse(line);
-  } catch {
-    return makeResponse(null, undefined, {
-      code: -32700,
-      message: "Parse error",
-    });
-  }
-
+async function handleRequest(request) {
   const { id, method, params = {} } = request;
 
   switch (method) {
@@ -499,21 +669,20 @@ rl.on("line", async (line) => {
     return;
   }
 
-  process.stderr.write(`← ${trimmed}\n`);
+  const { request, parseErrorResponse } = parseRequestLine(trimmed);
+  process.stderr.write(`${summarizeIncomingRequest(request, trimmed)}\n`);
 
   try {
-    const response = await handleRequest(trimmed);
-    const serialized = JSON.stringify(response);
-    process.stdout.write(`${serialized}\n`);
-    process.stderr.write(`→ ${serialized}\n`);
+    const response = parseErrorResponse ?? await handleRequest(request);
+    await emitResponse(request, response);
   } catch (error) {
-    const fallback = JSON.stringify(
-      makeResponse(null, undefined, {
+    const fallbackResponse = makeResponse(null, undefined, {
         code: -32603,
         message: error instanceof Error ? error.message : "Internal error",
-      }),
+      });
+    await writeStdoutLine(JSON.stringify(fallbackResponse));
+    process.stderr.write(
+      `→ stdout ${summarizeResponse(request, fallbackResponse)} bytes=${Buffer.byteLength(JSON.stringify(fallbackResponse), "utf8")}\n`,
     );
-    process.stdout.write(`${fallback}\n`);
-    process.stderr.write(`→ ${fallback}\n`);
   }
 });
