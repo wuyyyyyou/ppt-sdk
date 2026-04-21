@@ -13,3 +13,4 @@ sea-prep/
 *.spec.bak
 .docs/
 */.env
+**/.DS_Store

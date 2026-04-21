@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "method": "invoke",
+  "id": 1,
+  "params": {
+    "tool": "generatePptx",
+    "arguments": {
+      "cwd": "${workspaceFolder}/.vscode/generator/output",
+      "model_path": "${workspaceFolder}/.vscode/model/output/red-finance-model.json",
+      "output_path": "${workspaceFolder}/.vscode/generator/output/red-finance.pptx"
+    }
+  }
+}

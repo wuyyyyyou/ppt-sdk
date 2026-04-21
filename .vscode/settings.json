@@ -4,6 +4,10 @@
       "mode": "auto"
     }
   ],
+  "python.defaultInterpreterPath": "${workspaceFolder}/presenton-pptx-generator/.venv/bin/python",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/presenton-pptx-generator/src"
+  ],
   "files.exclude": {
     "**/.DS_Store": true
   },

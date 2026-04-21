@@ -130,6 +130,45 @@
       },
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Generator: Describe",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/.vscode/generator/run-plugin-once.mjs",
+      "env": {
+        "GENERATOR_STDIN_FILE": "${workspaceFolder}/.vscode/generator/describe-stdin.json",
+        "GENERATOR_STDOUT_FILE": "${workspaceFolder}/.vscode/generator/describe-stdout.json"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Generator: Health",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/.vscode/generator/run-plugin-once.mjs",
+      "env": {
+        "GENERATOR_STDIN_FILE": "${workspaceFolder}/.vscode/generator/health-stdin.json",
+        "GENERATOR_STDOUT_FILE": "${workspaceFolder}/.vscode/generator/health-stdout.json"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Generator: Generate PPTX",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/.vscode/generator/run-plugin-once.mjs",
+      "env": {
+        "GENERATOR_STDIN_FILE": "${workspaceFolder}/.vscode/generator/generate-stdin.json",
+        "GENERATOR_STDOUT_FILE": "${workspaceFolder}/.vscode/generator/stdout.json"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
     }
   ]
 }
