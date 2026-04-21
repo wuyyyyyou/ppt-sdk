@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "method": "invoke",
+  "id": 1,
+  "params": {
+    "tool": "getAllDiscoveredTemplateGroups",
+    "arguments": {
+      "cwd": "${workspaceFolder}/.vscode/engine/output",
+      "include_builtin": true,
+      "local_roots": ["${workspaceFolder}/.vscode/engine/output"]
+    }
+  }
+}

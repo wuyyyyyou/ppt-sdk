@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
@@ -17,12 +17,30 @@ function resolvePath(filePath, fallbackPath) {
   return path.isAbsolute(filePath) ? filePath : path.resolve(WORKSPACE_DIR, filePath);
 }
 
+function expandWorkspacePlaceholders(value) {
+  if (typeof value === "string") {
+    return value.replaceAll("${workspaceFolder}", WORKSPACE_DIR);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => expandWorkspacePlaceholders(item));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, expandWorkspacePlaceholders(item)]),
+    );
+  }
+
+  return value;
+}
+
 async function main() {
   const stdinFile = resolvePath(process.env.ENGINE_STDIN_FILE, DEFAULT_STDIN_FILE);
   const stdoutFile = resolvePath(process.env.ENGINE_STDOUT_FILE, DEFAULT_STDOUT_FILE);
 
   const rawInput = await readFile(stdinFile, "utf8");
-  const request = JSON.parse(rawInput);
+  const request = expandWorkspacePlaceholders(JSON.parse(rawInput));
   const serializedRequest = `${JSON.stringify(request)}\n`;
 
   const child = spawn(process.execPath, ["example_plugin.js"], {
@@ -52,6 +70,7 @@ async function main() {
     child.once("close", resolve);
   });
 
+  await mkdir(path.dirname(stdoutFile), { recursive: true });
   await writeFile(stdoutFile, stdout, "utf8");
 
   process.stdout.write(`engine stdout written to ${stdoutFile}\n`);

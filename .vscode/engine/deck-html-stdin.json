@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "method": "invoke",
+  "id": 1,
+  "params": {
+    "tool": "buildDeckHtmlFromManifest",
+    "arguments": {
+      "cwd": "${workspaceFolder}/.vscode/engine/output",
+      "manifest_path": "${workspaceFolder}/.vscode/engine/output/red-finance/manifest.json",
+      "output_dir": "${workspaceFolder}/.vscode/engine/output/html-model",
+      "name": "red-finance",
+      "single_page": true,
+      "page": 18
+    }
+  }
+}
