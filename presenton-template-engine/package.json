@@ -10,7 +10,6 @@
   "files": [
     "dist",
     "example_plugin.js",
-    "example_plugin_pkg.cjs",
     "build_binary.sh",
     "scripts/patch-postject.mjs",
     "scripts/prepare-sea-bundle.mjs",
@@ -30,7 +29,7 @@
   },
   "bin": {
     "presenton-template-engine-server": "./dist/cli.js",
-    "ppt-engine": "./example_plugin_pkg.cjs"
+    "ppt-engine": "./example_plugin.js"
   },
   "scripts": {
     "dev": "tsx src/cli.ts",

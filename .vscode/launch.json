@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Presenton: Plugin",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/presenton-template-engine",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start:plugin"],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ]
+}
