@@ -1,4 +1,5 @@
 import path from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -16,7 +17,9 @@ import {
 import { buildStandaloneDeckHtml } from "./build-deck.js";
 import type {
   BrowserRenderTheme,
+  BuildDeckHtmlFromManifestFileOutput,
   BuildDeckHtmlFromManifestInput,
+  BuildDeckHtmlFromManifestResult,
   DeckManifestInput,
   DeckManifestSlideInput,
   TemplateRenderThemeInput,
@@ -41,6 +44,30 @@ function escapeHtml(value: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function sanitizeFileNamePart(value: string): string {
+  const normalized = value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return normalized || "deck";
+}
+
+function resolveFromCwd(cwd: string | null | undefined, targetPath: string): string {
+  if (!targetPath || typeof targetPath !== "string") {
+    throw new Error("Path must be a non-empty string");
+  }
+
+  if (path.isAbsolute(targetPath)) {
+    return targetPath;
+  }
+
+  const baseDir = cwd ? path.resolve(cwd) : process.cwd();
+  return path.resolve(baseDir, targetPath);
 }
 
 function normalizeTheme(input?: TemplateRenderThemeInput | null): BrowserRenderTheme {
@@ -338,32 +365,87 @@ function buildSlideDocumentHtml(input: {
 
 export async function buildDeckHtmlFromManifest(
   input: BuildDeckHtmlFromManifestInput,
-): Promise<string> {
+): Promise<BuildDeckHtmlFromManifestResult> {
   if (!input || typeof input !== "object") {
     throw new Error("Manifest build input must be an object");
   }
 
-  validateDeckManifest(input.manifest);
+  if (!input.manifestPath || typeof input.manifestPath !== "string") {
+    throw new Error('Field "manifestPath" must be a non-empty string');
+  }
 
-  const manifestCwd = path.resolve(input.manifestCwd ?? input.cwd ?? process.cwd());
+  if (!input.outputDir || typeof input.outputDir !== "string") {
+    throw new Error('Field "outputDir" must be a non-empty string');
+  }
+
+  const manifestPath = resolveFromCwd(input.cwd, input.manifestPath);
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as DeckManifestInput;
+  validateDeckManifest(manifest);
+
+  const manifestCwd = path.dirname(manifestPath);
+  const outputDir = resolveFromCwd(input.cwd, input.outputDir);
+  const deckBaseName = sanitizeFileNamePart(
+    input.name ??
+    (typeof manifest.title === "string" && manifest.title.length > 0
+      ? manifest.title
+      : "presenton-manifest-deck"),
+  );
   const slides = await Promise.all(
-    input.manifest.slides.map(async (slide) => {
+    manifest.slides.map(async (slide, index) => {
       const resolvedSlide = await resolveManifestSlide(slide, manifestCwd);
       const html = buildSlideDocumentHtml({
         resolvedSlide,
         slide,
-        deckTheme: input.manifest.theme,
+        deckTheme: manifest.theme,
       });
+      const slideFileName = `${index + 1}-${deckBaseName}-${sanitizeFileNamePart(
+        resolvedSlide.layoutId,
+      )}.html`;
+      const slideOutputPath = path.join(outputDir, slideFileName);
 
       return {
         html,
+        slideId: slide.id,
+        layoutId: resolvedSlide.layoutId,
+        fileName: slideFileName,
+        outputPath: slideOutputPath,
         speaker_note: slide.speaker_note ?? "",
       };
     }),
   );
 
-  return buildStandaloneDeckHtml({
-    title: input.manifest.title ?? "Presenton Manifest Deck",
+  const title = manifest.title ?? "Presenton Manifest Deck";
+  const deckFileName = `${deckBaseName}-deck.html`;
+  const deckOutputPath = path.join(outputDir, deckFileName);
+  const deckHtml = buildStandaloneDeckHtml({
+    title,
     slides,
   });
+
+  await mkdir(outputDir, { recursive: true });
+  await Promise.all([
+    writeFile(deckOutputPath, deckHtml, "utf8"),
+    ...slides.map((slide) =>
+      writeFile(
+        slide.outputPath,
+        slide.html,
+        "utf8",
+      )),
+  ]);
+
+  return {
+    deckHtml,
+    deckFileName,
+    deckOutputPath,
+    outputDir,
+    slideFiles: slides.map((slide) => ({
+      fileName: slide.fileName,
+      outputPath: slide.outputPath,
+      slideId: slide.slideId,
+      layoutId: slide.layoutId,
+    })),
+    slideCount: slides.length,
+    title,
+    manifestPath,
+  };
 }

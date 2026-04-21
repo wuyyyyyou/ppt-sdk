@@ -79,9 +79,28 @@ export interface DeckManifestInput {
 }
 
 export interface BuildDeckHtmlFromManifestInput {
-  manifest: DeckManifestInput;
+  manifestPath: string;
+  outputDir: string;
+  name?: string | null;
   cwd?: string | null;
-  manifestCwd?: string | null;
+}
+
+export interface BuildDeckHtmlFromManifestFileOutput {
+  fileName: string;
+  outputPath: string;
+  slideId?: string;
+  layoutId?: string;
+}
+
+export interface BuildDeckHtmlFromManifestResult {
+  deckHtml: string;
+  deckFileName: string;
+  deckOutputPath: string;
+  outputDir: string;
+  slideFiles: BuildDeckHtmlFromManifestFileOutput[];
+  slideCount: number;
+  title: string;
+  manifestPath: string;
 }
 
 export interface BrowserRenderTheme {

@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import readline from "node:readline";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -127,20 +127,14 @@ const MANIFEST = {
     {
       name: "buildDeckHtmlFromManifest",
       description:
-        "Build deck HTML from a manifest object or manifest JSON file, write it to disk, and return the output path.",
+        "Build a deck viewer HTML and one HTML file per slide from a manifest JSON file, write them to an output directory, and return the generated file paths.",
       parameters: [
-        {
-          name: "manifest",
-          type: "object",
-          description: "Manifest object to render. Provide this or manifest_path.",
-          required: false,
-        },
         {
           name: "manifest_path",
           type: "string",
           description:
             "Path to a manifest JSON file. Relative paths are resolved from cwd when provided.",
-          required: false,
+          required: true,
         },
         {
           name: "cwd",
@@ -150,11 +144,18 @@ const MANIFEST = {
           required: false,
         },
         {
-          name: "output_path",
+          name: "output_dir",
           type: "string",
           description:
-            "File path where the generated deck HTML should be written. Relative paths are resolved from cwd when provided.",
+            "Directory where the generated deck HTML and per-slide HTML files should be written. Relative paths are resolved from cwd when provided.",
           required: true,
+        },
+        {
+          name: "name",
+          type: "string",
+          description:
+            "Optional base name for generated files. Defaults to manifest.title after filename sanitization.",
+          required: false,
         },
       ],
     },
@@ -445,44 +446,6 @@ async function emitResponse(request, response) {
   }
 }
 
-async function loadManifest(args) {
-  const hasManifest = args.manifest !== undefined;
-  const hasManifestPath = args.manifest_path !== undefined;
-
-  if (hasManifest && hasManifestPath) {
-    throw new Error('Provide either "manifest" or "manifest_path", not both');
-  }
-
-  if (!hasManifest && !hasManifestPath) {
-    throw new Error('Missing required "manifest" or "manifest_path"');
-  }
-
-  if (hasManifest) {
-    if (!args.manifest || typeof args.manifest !== "object" || Array.isArray(args.manifest)) {
-      throw new Error('"manifest" must be an object');
-    }
-
-    return {
-      manifest: args.manifest,
-      manifestPath: null,
-      manifestCwd: args.cwd ? resolveFromCwd(null, args.cwd) : process.cwd(),
-    };
-  }
-
-  if (typeof args.manifest_path !== "string" || args.manifest_path.length === 0) {
-    throw new Error('"manifest_path" must be a non-empty string');
-  }
-
-  const manifestPath = resolveFromCwd(args.cwd, args.manifest_path);
-  const manifestRaw = await readFile(manifestPath, "utf8");
-
-  return {
-    manifest: JSON.parse(manifestRaw),
-    manifestPath,
-    manifestCwd: path.dirname(manifestPath),
-  };
-}
-
 async function toolListDiscoveredTemplateGroupSummaries(args) {
   const input = normalizeDiscoveryInput(args);
   const groups = await listDiscoveredTemplateGroupSummaries(input);
@@ -522,32 +485,39 @@ async function toolBuildDeckHtmlFromManifest(args) {
     throw new Error("Arguments must be an object");
   }
 
-  if (typeof args.output_path !== "string" || args.output_path.length === 0) {
-    throw new Error('Missing required parameter: "output_path"');
+  if (args.manifest !== undefined) {
+    throw new Error('"manifest" is no longer supported; use "manifest_path"');
+  }
+
+  if (typeof args.manifest_path !== "string" || args.manifest_path.length === 0) {
+    throw new Error('Missing required parameter: "manifest_path"');
+  }
+
+  if (typeof args.output_dir !== "string" || args.output_dir.length === 0) {
+    throw new Error('Missing required parameter: "output_dir"');
   }
 
   const requestedCwd = args.cwd ? resolveFromCwd(null, args.cwd) : null;
-  const { manifest, manifestPath, manifestCwd } = await loadManifest({
-    ...args,
+  const result = await buildDeckHtmlFromManifest({
     cwd: requestedCwd ?? undefined,
+    manifestPath: args.manifest_path,
+    outputDir: args.output_dir,
+    name: typeof args.name === "string" && args.name.length > 0 ? args.name : undefined,
   });
-  const cwd = requestedCwd ?? manifestCwd;
-  const outputPath = resolveFromCwd(cwd, args.output_path);
-  const html = await buildDeckHtmlFromManifest({
-    cwd,
-    manifestCwd,
-    manifest,
-  });
-
-  await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, html, "utf8");
 
   return {
-    output_path: outputPath,
-    bytes: Buffer.byteLength(html, "utf8"),
-    slide_count: Array.isArray(manifest.slides) ? manifest.slides.length : 0,
-    title: typeof manifest.title === "string" ? manifest.title : null,
-    manifest_path: manifestPath,
+    output_dir: result.outputDir,
+    deck_output_path: result.deckOutputPath,
+    deck_file_name: result.deckFileName,
+    slide_files: result.slideFiles.map((file) => ({
+      file_name: file.fileName,
+      output_path: file.outputPath,
+      slide_id: file.slideId ?? null,
+      layout_id: file.layoutId ?? null,
+    })),
+    slide_count: result.slideCount,
+    title: result.title,
+    manifest_path: result.manifestPath,
   };
 }
 
@@ -689,9 +659,9 @@ rl.on("line", async (line) => {
         code: -32603,
         message: error instanceof Error ? error.message : "Internal error",
       });
-    await writeStdoutLine(JSON.stringify(fallbackResponse));
+    await emitResponse(request, fallbackResponse);
     process.stderr.write(
-      `→ stdout ${summarizeResponse(request, fallbackResponse)} bytes=${Buffer.byteLength(JSON.stringify(fallbackResponse), "utf8")}\n`,
+      `→ error ${summarizeResponse(request, fallbackResponse)} bytes=${Buffer.byteLength(JSON.stringify(fallbackResponse), "utf8")}\n`,
     );
   } finally {
     rl.close();
