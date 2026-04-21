@@ -9,7 +9,7 @@
       "manifest_path": "${workspaceFolder}/.vscode/engine/output/red-finance/manifest.json",
       "output_dir": "${workspaceFolder}/.vscode/engine/output/html-model",
       "name": "red-finance",
-      "single_page": true,
+      "single_page": false,
       "page": 18
     }
   }

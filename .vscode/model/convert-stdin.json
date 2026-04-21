@@ -1,0 +1,15 @@
+{
+  "jsonrpc": "2.0",
+  "method": "invoke",
+  "id": 1,
+  "params": {
+    "tool": "convertDeckHtmlToPptxModel",
+    "arguments": {
+      "cwd": "${workspaceFolder}/.vscode/model/output",
+      "html_path": "${workspaceFolder}/.vscode/engine/output/html-model/red-finance-deck.html",
+      "output_path": "${workspaceFolder}/.vscode/model/output/red-finance-model.json",
+      "name": "red-finance",
+      "screenshots_dir": "${workspaceFolder}/.vscode/model/output/screenshots"
+    }
+  }
+}
