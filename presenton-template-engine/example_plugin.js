@@ -207,6 +207,14 @@ const MANIFEST = {
           default: false,
         },
         {
+          name: "install_dependencies",
+          type: "boolean",
+          description:
+            "Whether to run npm install in the forked template directory after files are generated. Defaults to false.",
+          required: false,
+          default: false,
+        },
+        {
           name: "cwd",
           type: "string",
           description: "Working directory used to resolve out_dir when it is relative.",
@@ -580,11 +588,20 @@ async function toolForkTemplateGroup(args) {
         ? args.manifestTitle
         : undefined,
     overwrite: args.overwrite !== undefined ? Boolean(args.overwrite) : undefined,
+    installDependencies: args.install_dependencies !== undefined
+      ? Boolean(args.install_dependencies)
+      : args.installDependencies !== undefined
+        ? Boolean(args.installDependencies)
+        : undefined,
   });
 
   return {
     ...result,
     template_group: templateGroup,
+    dependencies_installed: result.dependenciesInstalled,
+    install_command: result.installCommand,
+    package_lock_path: result.packageLockPath,
+    node_modules_path: result.nodeModulesPath,
     manifest_slide_count: Array.isArray(result.manifest?.slides) ? result.manifest.slides.length : 0,
   };
 }
