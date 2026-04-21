@@ -157,7 +157,7 @@ async function collectDependencyGraph(entryFiles) {
 
 function buildTargetRelativePath(groupRoot, sourceFile) {
   if (sourceFile === groupRoot || sourceFile.startsWith(`${groupRoot}${path.sep}`)) {
-    return path.join("slides", path.relative(groupRoot, sourceFile));
+    return path.relative(groupRoot, sourceFile);
   }
 
   return path.join("shared", path.relative(appSourceRoot, sourceFile));
@@ -232,6 +232,7 @@ function buildTemplateGroupMetadata(group, slideTargetPaths, dependencyVersions)
     closingLayoutId: group.closing_layout_id ?? null,
     dependencies: dependencyVersions,
     packageJson: null,
+    originalManifest: null,
     slides: group.layouts.map((layout, index) => ({
       slideId: layout.layout_id.replace(/[:/]/g, "-"),
       layoutId: layout.layout_id,
@@ -256,6 +257,15 @@ async function readGroupPackageJson(groupRoot) {
   }
 
   return packageJson;
+}
+
+async function readGroupManifest(groupRoot) {
+  const manifestPath = path.join(groupRoot, "manifest.json");
+  if (!(await pathExists(manifestPath))) {
+    return null;
+  }
+
+  return JSON.parse(await readFile(manifestPath, "utf8"));
 }
 
 async function main() {
@@ -295,6 +305,7 @@ async function main() {
     const groupRoot = path.join(templateSourceRoot, manifestGroup.groupDirName);
     const { files, externalPackages } = await collectDependencyGraph(entryFiles);
     const groupPackageJson = await readGroupPackageJson(groupRoot);
+    const groupManifest = await readGroupManifest(groupRoot);
     const targetPathMap = new Map();
 
     for (const sourceFile of files) {
@@ -341,6 +352,7 @@ async function main() {
       dependencyVersions,
     );
     groupMetadata.packageJson = groupPackageJson;
+    groupMetadata.originalManifest = groupManifest;
 
     assetIndex.groups[group.group_id] = groupMetadata;
   }

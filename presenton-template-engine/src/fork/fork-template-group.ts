@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { LocalTemplateGroupMetadata } from "../discovery/index.js";
-import type { DeckManifestInput } from "../render/types.js";
+import type { DeckManifestInput, DeckManifestSlideInput } from "../render/types.js";
 
 type ForkableGroupSlideAsset = {
   slideId: string;
@@ -33,6 +33,7 @@ type ForkableGroupAsset = {
   closingLayoutId?: string | null;
   dependencies: Record<string, string>;
   packageJson?: Record<string, unknown> | null;
+  originalManifest?: DeckManifestInput | null;
   slides: ForkableGroupSlideAsset[];
 };
 
@@ -176,6 +177,96 @@ function buildManifest(group: ForkableGroupAsset, manifestTitle: string): DeckMa
       },
       data: slide.sampleData ?? {},
     })),
+  };
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeRelativeFilePath(value: string): string {
+  return value.replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+function buildManifestFromOriginal(
+  group: ForkableGroupAsset,
+  manifestTitle: string,
+): DeckManifestInput | null {
+  const originalManifest = group.originalManifest;
+  if (!isPlainRecord(originalManifest) || !Array.isArray(originalManifest.slides)) {
+    return null;
+  }
+
+  const slideBySourcePath = new Map(
+    group.slides.map((slide) => [normalizeRelativeFilePath(slide.sourcePath), slide]),
+  );
+  const slideById = new Map(group.slides.map((slide) => [slide.slideId, slide]));
+
+  const slides = originalManifest.slides.map((originalSlide, index) => {
+    if (!isPlainRecord(originalSlide)) {
+      throw new Error(
+        `Invalid original manifest for template group "${group.groupId}": slide at index ${index} must be an object`,
+      );
+    }
+
+    const originalSource = originalSlide.source;
+    if (
+      !isPlainRecord(originalSource) ||
+      originalSource.type !== "local" ||
+      typeof originalSource.path !== "string"
+    ) {
+      throw new Error(
+        `Invalid original manifest for template group "${group.groupId}": slide at index ${index} must use a local source.path`,
+      );
+    }
+
+    const sourceKey = normalizeRelativeFilePath(originalSource.path);
+    const matchingSlide =
+      slideBySourcePath.get(sourceKey) ??
+      (typeof originalSlide.id === "string" ? slideById.get(originalSlide.id) : undefined);
+
+    if (!matchingSlide) {
+      throw new Error(
+        `Invalid original manifest for template group "${group.groupId}": cannot map slide source "${originalSource.path}" to a forked slide file`,
+      );
+    }
+
+    const nextSlide: DeckManifestSlideInput = {
+      ...originalSlide,
+      id:
+        typeof originalSlide.id === "string" && originalSlide.id.length > 0
+          ? originalSlide.id
+          : matchingSlide.slideId,
+      source: {
+        type: "local",
+        path: `./${matchingSlide.sourcePath.replace(/\\/g, "/")}`,
+      },
+      data: isPlainRecord(originalSlide.data) ? originalSlide.data : {},
+    };
+
+    if (
+      nextSlide.title === undefined &&
+      typeof originalSlide.title !== "string" &&
+      matchingSlide.layoutName
+    ) {
+      nextSlide.title = matchingSlide.layoutName;
+    }
+
+    if (
+      nextSlide.speaker_note === undefined &&
+      typeof originalSlide.speaker_note !== "string" &&
+      matchingSlide.layoutName
+    ) {
+      nextSlide.speaker_note = matchingSlide.layoutName;
+    }
+
+    return nextSlide;
+  });
+
+  return {
+    ...originalManifest,
+    title: manifestTitle,
+    slides,
   };
 }
 
@@ -347,7 +438,8 @@ export async function forkTemplateGroup(
       ? input.manifestTitle.trim()
       : `${group.groupName} Fork Deck`;
 
-  const manifest = buildManifest(group, manifestTitle);
+  const manifest =
+    buildManifestFromOriginal(group, manifestTitle) ?? buildManifest(group, manifestTitle);
   const forkedGroupMetadata = buildForkedGroupMetadata(group, outDir);
   const groupJsonPath = path.join(outDir, "group.json");
   const manifestPath = path.join(outDir, "manifest.json");
