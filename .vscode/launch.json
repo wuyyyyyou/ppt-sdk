@@ -2,13 +2,13 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Presenton: Plugin",
+      "name": "Presenton Engine: Plugin",
       "type": "node",
       "request": "launch",
       "cwd": "${workspaceFolder}",
       "program": "${workspaceFolder}/.vscode/engine/run-plugin-once.mjs",
       "env": {
-        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/describe-stdin.json",
+        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/invoke-stdin.json",
         "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout.json"
       },
       "console": "integratedTerminal",

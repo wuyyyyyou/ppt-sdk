@@ -694,9 +694,6 @@ rl.on("line", async (line) => {
     );
   } finally {
     rl.close();
+    process.exit(0);
   }
-});
-
-rl.on("close", () => {
-  process.exit(0);
 });
