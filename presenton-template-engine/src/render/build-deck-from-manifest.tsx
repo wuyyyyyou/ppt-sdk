@@ -70,6 +70,26 @@ function resolveFromCwd(cwd: string | null | undefined, targetPath: string): str
   return path.resolve(baseDir, targetPath);
 }
 
+function parseSinglePageIndex(input: BuildDeckHtmlFromManifestInput, slideCount: number): number | null {
+  if (!input.singlePage) {
+    return null;
+  }
+
+  if (input.page === undefined || input.page === null) {
+    throw new Error('Field "page" is required when "singlePage" is true');
+  }
+
+  if (!Number.isInteger(input.page)) {
+    throw new Error('Field "page" must be an integer');
+  }
+
+  if (input.page < 1 || input.page > slideCount) {
+    throw new Error(`Field "page" must be between 1 and ${slideCount}`);
+  }
+
+  return input.page - 1;
+}
+
 function normalizeTheme(input?: TemplateRenderThemeInput | null): BrowserRenderTheme {
   const colors = input?.colors ?? input?.data?.colors ?? {};
   const font = input?.fonts?.body ?? input?.data?.fonts?.textFont ?? null;
@@ -390,6 +410,7 @@ export async function buildDeckHtmlFromManifest(
       ? manifest.title
       : "presenton-manifest-deck"),
   );
+  const singlePageIndex = parseSinglePageIndex(input, manifest.slides.length);
   const slides = await Promise.all(
     manifest.slides.map(async (slide, index) => {
       const resolvedSlide = await resolveManifestSlide(slide, manifestCwd);
@@ -413,19 +434,22 @@ export async function buildDeckHtmlFromManifest(
       };
     }),
   );
+  const slidesToWrite = singlePageIndex === null ? slides : [slides[singlePageIndex]];
 
   const title = manifest.title ?? "Presenton Manifest Deck";
   const deckFileName = `${deckBaseName}-deck.html`;
   const deckOutputPath = path.join(outputDir, deckFileName);
-  const deckHtml = buildStandaloneDeckHtml({
-    title,
-    slides,
-  });
+  const deckHtml = singlePageIndex === null
+    ? buildStandaloneDeckHtml({
+      title,
+      slides,
+    })
+    : "";
 
   await mkdir(outputDir, { recursive: true });
   await Promise.all([
-    writeFile(deckOutputPath, deckHtml, "utf8"),
-    ...slides.map((slide) =>
+    ...(singlePageIndex === null ? [writeFile(deckOutputPath, deckHtml, "utf8")] : []),
+    ...slidesToWrite.map((slide) =>
       writeFile(
         slide.outputPath,
         slide.html,
@@ -438,7 +462,10 @@ export async function buildDeckHtmlFromManifest(
     deckFileName,
     deckOutputPath,
     outputDir,
-    slideFiles: slides.map((slide) => ({
+    deckGenerated: singlePageIndex === null,
+    singlePage: singlePageIndex !== null,
+    page: singlePageIndex === null ? null : singlePageIndex + 1,
+    slideFiles: slidesToWrite.map((slide) => ({
       fileName: slide.fileName,
       outputPath: slide.outputPath,
       slideId: slide.slideId,

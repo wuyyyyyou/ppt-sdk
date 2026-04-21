@@ -82,6 +82,8 @@ export interface BuildDeckHtmlFromManifestInput {
   manifestPath: string;
   outputDir: string;
   name?: string | null;
+  singlePage?: boolean | null;
+  page?: number | null;
   cwd?: string | null;
 }
 
@@ -97,6 +99,9 @@ export interface BuildDeckHtmlFromManifestResult {
   deckFileName: string;
   deckOutputPath: string;
   outputDir: string;
+  deckGenerated: boolean;
+  singlePage: boolean;
+  page: number | null;
   slideFiles: BuildDeckHtmlFromManifestFileOutput[];
   slideCount: number;
   title: string;

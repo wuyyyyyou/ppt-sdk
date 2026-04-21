@@ -157,6 +157,21 @@ const MANIFEST = {
             "Optional base name for generated files. Defaults to manifest.title after filename sanitization.",
           required: false,
         },
+        {
+          name: "single_page",
+          type: "boolean",
+          description:
+            "Whether to generate only one slide HTML file. Defaults to false.",
+          required: false,
+          default: false,
+        },
+        {
+          name: "page",
+          type: "integer",
+          description:
+            "1-based page number to generate when single_page is true.",
+          required: false,
+        },
       ],
     },
     {
@@ -497,18 +512,28 @@ async function toolBuildDeckHtmlFromManifest(args) {
     throw new Error('Missing required parameter: "output_dir"');
   }
 
+  const page = args.page !== undefined ? Number(args.page) : undefined;
+  if (args.page !== undefined && !Number.isFinite(page)) {
+    throw new Error('"page" must be an integer');
+  }
+
   const requestedCwd = args.cwd ? resolveFromCwd(null, args.cwd) : null;
   const result = await buildDeckHtmlFromManifest({
     cwd: requestedCwd ?? undefined,
     manifestPath: args.manifest_path,
     outputDir: args.output_dir,
     name: typeof args.name === "string" && args.name.length > 0 ? args.name : undefined,
+    singlePage: args.single_page !== undefined ? Boolean(args.single_page) : undefined,
+    page,
   });
 
   return {
     output_dir: result.outputDir,
-    deck_output_path: result.deckOutputPath,
-    deck_file_name: result.deckFileName,
+    deck_output_path: result.deckGenerated ? result.deckOutputPath : null,
+    deck_file_name: result.deckGenerated ? result.deckFileName : null,
+    deck_generated: result.deckGenerated,
+    single_page: result.singlePage,
+    page: result.page,
     slide_files: result.slideFiles.map((file) => ({
       file_name: file.fileName,
       output_path: file.outputPath,
