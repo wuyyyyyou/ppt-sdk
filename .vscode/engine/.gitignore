@@ -1,3 +1,2 @@
-stdout.json
-describe-stdout.json
+*stdout.json
 invoke-stdin.json
