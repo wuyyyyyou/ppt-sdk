@@ -81,6 +81,7 @@ export interface DeckManifestInput {
 export interface BuildDeckHtmlFromManifestInput {
   manifest: DeckManifestInput;
   cwd?: string | null;
+  manifestCwd?: string | null;
 }
 
 export interface BrowserRenderTheme {

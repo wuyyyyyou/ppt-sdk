@@ -146,7 +146,7 @@ const MANIFEST = {
           name: "cwd",
           type: "string",
           description:
-            "Working directory used to resolve manifest_path, local slide paths, and relative output paths.",
+            "Working directory used to resolve manifest_path and relative output paths.",
           required: false,
         },
         {
@@ -535,6 +535,7 @@ async function toolBuildDeckHtmlFromManifest(args) {
   const outputPath = resolveFromCwd(cwd, args.output_path);
   const html = await buildDeckHtmlFromManifest({
     cwd,
+    manifestCwd,
     manifest,
   });
 

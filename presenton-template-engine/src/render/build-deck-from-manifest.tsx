@@ -248,13 +248,13 @@ async function resolveLocalSlide(
 
 async function resolveManifestSlide(
   slide: DeckManifestSlideInput,
-  cwd: string,
+  manifestCwd: string,
 ): Promise<ResolvedManifestSlide> {
   switch (slide.source.type) {
     case "builtin":
       return resolveBuiltinSlide(slide);
     case "local":
-      return resolveLocalSlide(slide, cwd);
+      return resolveLocalSlide(slide, manifestCwd);
     default:
       throw new Error(
         `Slide "${slide.id}" uses unsupported source type "${String((slide.source as { type?: unknown }).type)}"`,
@@ -345,10 +345,10 @@ export async function buildDeckHtmlFromManifest(
 
   validateDeckManifest(input.manifest);
 
-  const cwd = path.resolve(input.cwd ?? process.cwd());
+  const manifestCwd = path.resolve(input.manifestCwd ?? input.cwd ?? process.cwd());
   const slides = await Promise.all(
     input.manifest.slides.map(async (slide) => {
-      const resolvedSlide = await resolveManifestSlide(slide, cwd);
+      const resolvedSlide = await resolveManifestSlide(slide, manifestCwd);
       const html = buildSlideDocumentHtml({
         resolvedSlide,
         slide,
