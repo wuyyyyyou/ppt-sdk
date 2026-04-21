@@ -665,15 +665,17 @@ async function handleRequest(request) {
 }
 
 const rl = readline.createInterface({ input: process.stdin });
+let didHandleRequest = false;
 
 process.stderr.write("🔌 Presenton template engine Executa plugin started\n");
 process.stderr.write(`   Tools: ${TOOL_NAMES.join(", ")}\n`);
 
 rl.on("line", async (line) => {
   const trimmed = line.trim();
-  if (!trimmed) {
+  if (!trimmed || didHandleRequest) {
     return;
   }
+  didHandleRequest = true;
 
   const { request, parseErrorResponse } = parseRequestLine(trimmed);
   process.stderr.write(`${summarizeIncomingRequest(request, trimmed)}\n`);
@@ -690,5 +692,11 @@ rl.on("line", async (line) => {
     process.stderr.write(
       `→ stdout ${summarizeResponse(request, fallbackResponse)} bytes=${Buffer.byteLength(JSON.stringify(fallbackResponse), "utf8")}\n`,
     );
+  } finally {
+    rl.close();
   }
+});
+
+rl.on("close", () => {
+  process.exit(0);
 });

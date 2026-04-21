@@ -5,9 +5,12 @@
       "name": "Presenton: Plugin",
       "type": "node",
       "request": "launch",
-      "cwd": "${workspaceFolder}/presenton-template-engine",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "start:plugin"],
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/.vscode/engine/run-plugin-once.mjs",
+      "env": {
+        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/describe-stdin.json",
+        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout.json"
+      },
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**"]
     }
