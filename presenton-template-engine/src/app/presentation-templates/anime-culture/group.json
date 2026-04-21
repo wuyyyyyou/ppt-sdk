@@ -1,5 +1,5 @@
 {
-  "group_id": "anime-culture-fork",
+  "group_id": "anime-culture",
   "group_name": "Anime Culture Neon",
   "group_description": "Cyberpunk-inspired local TSX slides for anime culture, history, and editorial-style storytelling.",
   "ordered": true,
@@ -57,7 +57,7 @@
     "youthful",
     "analytical"
   ],
-  "cover_layout_id": "anime-culture-fork:cover-hero",
-  "agenda_layout_id": "anime-culture-fork:agenda-collage",
-  "closing_layout_id": "anime-culture-fork:infinite-possibilities-closing"
+  "cover_layout_id": "anime-culture:cover-hero",
+  "agenda_layout_id": "anime-culture:agenda-collage",
+  "closing_layout_id": "anime-culture:infinite-possibilities-closing"
 }
