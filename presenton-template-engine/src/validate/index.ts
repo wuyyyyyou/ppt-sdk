@@ -158,3 +158,10 @@ export type {
 } from "./types.js";
 export { RENDERED_RULES } from "./rendered/index.js";
 export { STATIC_RULES } from "./static/index.js";
+export {
+  GROUP_JSON_REQUIRED_RULE,
+  LOCAL_MODULE_EXPORT_RULE,
+  LOCAL_SOURCE_PATH_RULE,
+  MANIFEST_STRUCTURE_RULE,
+  SHARED_MODULE_ENTRY_RULE,
+} from "./static/index.js";

@@ -152,11 +152,11 @@ test("runDeckValidation combines static and rendered rules into one report", asy
   );
 });
 
-test("runStaticRules and runRenderedRules default to empty registries", async () => {
+test("runStaticRules and runRenderedRules can execute with explicit empty registries", async () => {
   const context = { manifestPath: "/tmp/manifest.json", includeRenderedChecks: true };
 
-  const staticDiagnostics = await runStaticRules(context);
-  const renderedDiagnostics = await runRenderedRules(context);
+  const staticDiagnostics = await runStaticRules(context, { rules: [] });
+  const renderedDiagnostics = await runRenderedRules(context, { rules: [] });
 
   assert.deepEqual(staticDiagnostics, []);
   assert.deepEqual(renderedDiagnostics, []);
