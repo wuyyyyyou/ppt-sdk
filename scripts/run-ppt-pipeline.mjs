@@ -8,8 +8,6 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { runValidationStage } from "./lib/pipeline-validation.mjs";
-
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const WORKSPACE_DIR = path.resolve(path.dirname(SCRIPT_PATH), "..");
 const OUTPUT_ROOT = path.join(WORKSPACE_DIR, ".vscode", "pipeline-output");
@@ -175,7 +173,6 @@ function buildRunContext({ manifestPath, presentationName, outRoot }) {
     engineOutputDir: path.join(runDir, "engine"),
     modelOutputDir: path.join(runDir, "model"),
     generatorOutputDir: path.join(runDir, "generator"),
-    validationReportPath: path.join(runDir, "validation", "validation-report.json"),
     logsDir: path.join(runDir, "logs"),
     modelOutputPath: path.join(runDir, "model", `${slug}-model.json`),
     pptxOutputPath: path.join(runDir, "generator", `${slug}.pptx`),
@@ -569,7 +566,7 @@ async function generatePipeline(options) {
 
   process.stdout.write(`Manifest: ${relativeToWorkspace(manifestPath)}\n`);
   process.stdout.write(`Run directory: ${relativeToWorkspace(runContext.runDir)}\n`);
-  process.stdout.write(`[1/4] Build deck HTML...\n`);
+  process.stdout.write(`[1/3] Build deck HTML...\n`);
 
   const engineRequest = createRpcRequest(1, "invoke", {
     tool: "buildDeckHtmlFromManifest",
@@ -595,18 +592,7 @@ async function generatePipeline(options) {
     throw new Error("Engine stage did not return deck_output_path");
   }
 
-  process.stdout.write(`[2/4] Validate deck HTML...\n`);
-  const validationStage = await runValidationStage({
-    engineDir: ENGINE_DIR,
-    modelDir: MODEL_DIR,
-    manifestPath,
-    deckOutputPath,
-    outputDir: runContext.engineOutputDir,
-    reportPath: runContext.validationReportPath,
-    presentationName: runContext.presentationName,
-  });
-
-  process.stdout.write(`[3/4] Convert deck HTML to model JSON...\n`);
+  process.stdout.write(`[2/3] Convert deck HTML to model JSON...\n`);
   const modelRequest = createRpcRequest(2, "invoke", {
     tool: "convertDeckHtmlToPptxModel",
     arguments: {
@@ -632,7 +618,7 @@ async function generatePipeline(options) {
     throw new Error("Model stage did not return output_path");
   }
 
-  process.stdout.write(`[4/4] Generate PPTX...\n`);
+  process.stdout.write(`[3/3] Generate PPTX...\n`);
   const generatorRequest = createRpcRequest(3, "invoke", {
     tool: "generatePptx",
     arguments: {
@@ -669,7 +655,6 @@ async function generatePipeline(options) {
       slide_count: engineStage.response.result?.data?.slide_count ?? null,
       log_paths: engineStage.logPaths,
     },
-    validation: validationStage.summary,
     model: {
       output_path: modelOutputPath,
       screenshots_dir: modelStage.response.result?.data?.screenshots_dir ?? null,
@@ -688,7 +673,6 @@ async function generatePipeline(options) {
 
   process.stdout.write("Pipeline completed.\n");
   process.stdout.write(`- Deck HTML: ${relativeToWorkspace(deckOutputPath)}\n`);
-  process.stdout.write(`- Validation Report: ${relativeToWorkspace(validationStage.reportPath)}\n`);
   process.stdout.write(`- Model JSON: ${relativeToWorkspace(modelOutputPath)}\n`);
   process.stdout.write(`- PPTX: ${relativeToWorkspace(finalPptxPath)}\n`);
   process.stdout.write(`- Summary: ${relativeToWorkspace(runContext.summaryPath)}\n`);

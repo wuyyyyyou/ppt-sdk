@@ -1,0 +1,15 @@
+{
+  "jsonrpc": "2.0",
+  "method": "invoke",
+  "id": 1,
+  "params": {
+    "tool": "validateDeckFromManifest",
+    "arguments": {
+      "cwd": "${workspaceFolder}/.vscode/engine/output",
+      "manifest_path": "${workspaceFolder}/.vscode/engine/output/red-finance/manifest.json",
+      "output_dir": "${workspaceFolder}/.vscode/engine/output/validation",
+      "name": "red-finance",
+      "include_rendered_checks": true
+    }
+  }
+}

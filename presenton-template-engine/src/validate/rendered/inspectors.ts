@@ -216,9 +216,10 @@ export async function inspectRenderedSlides(
     return inspections;
   }
 
-  const inspections = await Promise.all(
-    renderedContext.slides.map((slide) => inspectSlide(context, slide)),
-  );
+  const inspections: RenderedSlideInspection[] = [];
+  for (const slide of renderedContext.slides) {
+    inspections.push(await inspectSlide(context, slide));
+  }
   renderedContext.slideInspections = inspections;
   return inspections;
 }

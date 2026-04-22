@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { randomUUID } from "node:crypto";
-import { createRequire } from "node:module";
 import readline from "node:readline";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -14,7 +13,6 @@ import {
   getDiscoveredTemplateGroup,
   listDiscoveredTemplateGroupSummaries,
   runDeckValidation,
-  writeValidationReport,
 } from "./dist/index.js";
 
 const TOOL_NAMES = [
@@ -181,7 +179,7 @@ const MANIFEST = {
     {
       name: "validateDeckFromManifest",
       description:
-        "Run static and optional rendered stability validation on a manifest deck, optionally persist the validation report, and return structured diagnostics.",
+        "Run static and optional rendered stability validation on a manifest deck and return structured diagnostics.",
       parameters: [
         {
           name: "manifest_path",
@@ -223,20 +221,6 @@ const MANIFEST = {
           type: "string",
           description:
             "Optional prebuilt deck HTML path to reuse instead of rebuilding during rendered validation.",
-          required: false,
-        },
-        {
-          name: "report_output_path",
-          type: "string",
-          description:
-            "Optional JSON file path where the validation report should be written.",
-          required: false,
-        },
-        {
-          name: "puppeteer_resolve_from",
-          type: "string",
-          description:
-            "Optional package.json or file path used to resolve puppeteer when rendered validation is enabled.",
           required: false,
         },
       ],
@@ -621,52 +605,6 @@ async function toolBuildDeckHtmlFromManifest(args) {
   };
 }
 
-function resolveRequireBase(targetPath) {
-  const absolutePath = resolveFromCwd(null, targetPath);
-  const statsPath = path.extname(absolutePath) ? absolutePath : path.join(absolutePath, "package.json");
-  return statsPath;
-}
-
-async function createManagedValidationPage(args) {
-  const resolveFromValue = typeof args.puppeteer_resolve_from === "string"
-    ? args.puppeteer_resolve_from
-    : typeof args.puppeteerResolveFrom === "string"
-      ? args.puppeteerResolveFrom
-      : null;
-  if (!resolveFromValue) {
-    throw new Error(
-      'Rendered validation requires "puppeteer_resolve_from" so the plugin can resolve puppeteer.',
-    );
-  }
-
-  const requireFromTarget = createRequire(resolveRequireBase(resolveFromValue));
-  const puppeteer = requireFromTarget("puppeteer");
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--disable-web-security",
-      "--disable-background-timer-throttling",
-      "--disable-backgrounding-occluded-windows",
-      "--disable-renderer-backgrounding",
-      "--disable-features=TranslateUI",
-      "--disable-ipc-flooding-protection",
-    ],
-  });
-  const page = await browser.newPage();
-
-  return {
-    page,
-    async close() {
-      await page.close?.().catch(() => undefined);
-      await browser.close().catch(() => undefined);
-    },
-  };
-}
-
 async function toolValidateDeckFromManifest(args) {
   if (!args || typeof args !== "object") {
     throw new Error("Arguments must be an object");
@@ -686,51 +624,25 @@ async function toolValidateDeckFromManifest(args) {
       ? Boolean(args.includeRenderedChecks)
       : false;
 
-  const pageRuntime = includeRenderedChecks
-    ? await createManagedValidationPage(args)
-    : null;
+  const report = await runDeckValidation({
+    cwd: typeof args.cwd === "string" && args.cwd.length > 0
+      ? resolveFromCwd(null, args.cwd)
+      : undefined,
+    manifestPath: args.manifest_path,
+    outputDir: args.output_dir,
+    name: typeof args.name === "string" && args.name.length > 0 ? args.name : undefined,
+    includeRenderedChecks,
+    renderedArtifacts: typeof args.deck_html_path === "string" && args.deck_html_path.length > 0
+      ? { deckHtmlPath: args.deck_html_path }
+      : undefined,
+  });
 
-  try {
-    const report = await runDeckValidation({
-      cwd: typeof args.cwd === "string" && args.cwd.length > 0
-        ? resolveFromCwd(null, args.cwd)
-        : undefined,
-      manifestPath: args.manifest_path,
-      outputDir: args.output_dir,
-      name: typeof args.name === "string" && args.name.length > 0 ? args.name : undefined,
-      includeRenderedChecks,
-      renderedArtifacts: typeof args.deck_html_path === "string" && args.deck_html_path.length > 0
-        ? { deckHtmlPath: args.deck_html_path }
-        : undefined,
-      renderedOptions: pageRuntime
-        ? { page: pageRuntime.page }
-        : undefined,
-    });
-
-    const reportOutputPath = typeof args.report_output_path === "string" && args.report_output_path.length > 0
-      ? args.report_output_path
-      : typeof args.reportOutputPath === "string" && args.reportOutputPath.length > 0
-        ? args.reportOutputPath
-        : null;
-    const persisted = reportOutputPath
-      ? await writeValidationReport({
-        report,
-        outputPath: reportOutputPath,
-        manifestPath: args.manifest_path,
-        name: typeof args.name === "string" && args.name.length > 0 ? args.name : null,
-      })
-      : null;
-
-    return {
-      ok: report.ok,
-      summary: report.summary,
-      diagnostics: report.diagnostics,
-      report_output_path: persisted?.outputPath ?? null,
-      artifacts: report.artifacts ?? null,
-    };
-  } finally {
-    await pageRuntime?.close();
-  }
+  return {
+    ok: report.ok,
+    summary: report.summary,
+    diagnostics: report.diagnostics,
+    artifacts: report.artifacts ?? null,
+  };
 }
 
 async function toolForkTemplateGroup(args) {

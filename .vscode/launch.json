@@ -80,6 +80,19 @@
       "skipFiles": ["<node_internals>/**"]
     },
     {
+      "name": "Engine: validate",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/.vscode/engine/run-plugin-once.mjs",
+      "env": {
+        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/validate-stdin.json",
+        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout.json"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
       "name": "Engine: Fork",
       "type": "node",
       "request": "launch",

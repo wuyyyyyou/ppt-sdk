@@ -1,6 +1,6 @@
 import os from "node:os";
 import path from "node:path";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { access, mkdtemp, readFile } from "node:fs/promises";
 
 import { buildDeckHtmlFromManifest } from "../../render/build-deck-from-manifest.js";
 import type {
@@ -22,11 +22,192 @@ const DEFAULT_VIEWPORT: ValidationViewport = {
 
 export const DEFAULT_DECK_SELECTOR = "#presentation-slides-wrapper";
 export const DEFAULT_SLIDE_SELECTOR = '[data-presenton-slide-shell="true"]';
+const DEFAULT_BROWSER_ARGS = [
+  "--no-sandbox",
+  "--disable-setuid-sandbox",
+  "--disable-dev-shm-usage",
+  "--disable-gpu",
+  "--disable-web-security",
+  "--disable-background-timer-throttling",
+  "--disable-backgrounding-occluded-windows",
+  "--disable-renderer-backgrounding",
+  "--disable-features=TranslateUI",
+  "--disable-ipc-flooding-protection",
+];
+const CHROME_EXECUTABLE_ENV_KEYS = [
+  "PRESENTON_CHROME_EXECUTABLE_PATH",
+  "PUPPETEER_EXECUTABLE_PATH",
+  "CHROME_PATH",
+  "GOOGLE_CHROME_BIN",
+];
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+function getNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function getPlatformChromeExecutableCandidates(): string[] {
+  if (process.platform === "darwin") {
+    const homeDir = getNonEmptyString(process.env.HOME);
+    return [
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      homeDir
+        ? path.join(
+          homeDir,
+          "Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        )
+        : null,
+      "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
+    ].filter((candidate): candidate is string => Boolean(candidate));
+  }
+
+  if (process.platform === "win32") {
+    const localAppData = getNonEmptyString(process.env.LOCALAPPDATA);
+    const programFiles = getNonEmptyString(process.env.PROGRAMFILES);
+    const programFilesX86 = getNonEmptyString(process.env["PROGRAMFILES(X86)"]);
+    return [
+      localAppData
+        ? path.join(localAppData, "Google/Chrome/Application/chrome.exe")
+        : null,
+      programFiles
+        ? path.join(programFiles, "Google/Chrome/Application/chrome.exe")
+        : null,
+      programFilesX86
+        ? path.join(programFilesX86, "Google/Chrome/Application/chrome.exe")
+        : null,
+    ].filter((candidate): candidate is string => Boolean(candidate));
+  }
+
+  return [
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chromium",
+  ];
+}
+
+function getConfiguredChromeExecutable(): { key: string; value: string } | null {
+  for (const key of CHROME_EXECUTABLE_ENV_KEYS) {
+    const value = getNonEmptyString(process.env[key]);
+    if (value) {
+      return { key, value };
+    }
+  }
+
+  return null;
+}
+
+function getSystemChromeExecutableCandidates(): string[] {
+  return [...new Set(getPlatformChromeExecutableCandidates())];
+}
+
+async function findFirstAccessiblePath(candidates: string[]): Promise<string | null> {
+  for (const candidate of candidates) {
+    try {
+      await access(candidate);
+      return candidate;
+    } catch {
+      // Try the next known location.
+    }
+  }
+
+  return null;
+}
+
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function createBrowserLaunchError(
+  attempts: string[],
+  fallbackError: unknown,
+): Error {
+  const details = attempts.length > 0
+    ? ` ${attempts.join(" ")}`
+    : "";
+  return new Error(
+    `Could not launch a managed browser for rendered validation.${details} Puppeteer default launch also failed: ${formatErrorMessage(fallbackError)}`,
+    { cause: fallbackError instanceof Error ? fallbackError : undefined },
+  );
+}
+
+async function launchManagedBrowser(
+  puppeteer: any,
+  launchOptions?: Record<string, unknown>,
+): Promise<ValidationBrowserLike> {
+  const explicitExecutablePath = getNonEmptyString(launchOptions?.executablePath);
+  const explicitChannel = getNonEmptyString(launchOptions?.channel);
+  const normalizedLaunchOptions = {
+    headless: true,
+    args: DEFAULT_BROWSER_ARGS,
+    ...launchOptions,
+  };
+
+  if (explicitExecutablePath || explicitChannel) {
+    try {
+      return (await puppeteer.launch(normalizedLaunchOptions)) as ValidationBrowserLike;
+    } catch (error) {
+      const targetLabel = explicitExecutablePath
+        ? `executablePath "${explicitExecutablePath}"`
+        : `channel "${explicitChannel}"`;
+      throw new Error(
+        `Failed to launch browser for rendered validation using explicit ${targetLabel}: ${formatErrorMessage(error)}`,
+        { cause: error instanceof Error ? error : undefined },
+      );
+    }
+  }
+
+  const configuredExecutable = getConfiguredChromeExecutable();
+  if (configuredExecutable) {
+    try {
+      return (await puppeteer.launch({
+        ...normalizedLaunchOptions,
+        executablePath: configuredExecutable.value,
+      })) as ValidationBrowserLike;
+    } catch (error) {
+      throw new Error(
+        `Failed to launch browser for rendered validation using ${configuredExecutable.key}="${configuredExecutable.value}": ${formatErrorMessage(error)}`,
+        { cause: error instanceof Error ? error : undefined },
+      );
+    }
+  }
+
+  const systemCandidates = getSystemChromeExecutableCandidates();
+  const systemExecutablePath = await findFirstAccessiblePath(systemCandidates);
+  const attempts: string[] = [];
+
+  if (systemExecutablePath) {
+    try {
+      return (await puppeteer.launch({
+        ...normalizedLaunchOptions,
+        executablePath: systemExecutablePath,
+      })) as ValidationBrowserLike;
+    } catch (error) {
+      attempts.push(
+        `Tried system Chrome at "${systemExecutablePath}" first, but launch failed: ${formatErrorMessage(error)}.`,
+      );
+    }
+  } else {
+    attempts.push(
+      `No system Chrome executable was found in known locations: ${systemCandidates.join(", ")}.`,
+    );
+  }
+
+  try {
+    return (await puppeteer.launch(normalizedLaunchOptions)) as ValidationBrowserLike;
+  } catch (error) {
+    throw createBrowserLaunchError(attempts, error);
+  }
 }
 
 async function createManagedValidationPage(
@@ -50,22 +231,7 @@ async function createManagedValidationPage(
   }
 
   const puppeteer = puppeteerModule.default ?? puppeteerModule;
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--disable-web-security",
-      "--disable-background-timer-throttling",
-      "--disable-backgrounding-occluded-windows",
-      "--disable-renderer-backgrounding",
-      "--disable-features=TranslateUI",
-      "--disable-ipc-flooding-protection",
-    ],
-    ...launchOptions,
-  }) as ValidationBrowserLike;
+  const browser = await launchManagedBrowser(puppeteer, launchOptions);
 
   const page = await browser.newPage();
   return {
@@ -176,7 +342,8 @@ export async function collectRenderedSlideInfos(
 ): Promise<RenderedSlideInfo[]> {
   const slideElements = await deckElement.$$(slideSelector);
   const slides = await Promise.all(slideElements.map((slideElement, slideIndex) =>
-    slideElement.evaluate((shell, index) => {
+    slideElement.evaluate((shell, input) => {
+      const { index, selector } = input as { index: number; selector: string };
       const shellElement = shell as Element;
       const rootElement = shellElement.querySelector(
         "[data-manifest-slide-id], [data-presenton-deck-slot], [data-presenton-static-slide]",
@@ -200,16 +367,16 @@ export async function collectRenderedSlideInfos(
           : null;
 
       return {
-        slideIndex: index as number,
+        slideIndex: index,
         slideId,
         layoutId,
         templateGroup,
-        shellSelector: `${slideSelector}:nth-of-type(${(index as number) + 1})`,
+        shellSelector: `${selector}:nth-of-type(${index + 1})`,
         rootSelector,
         childElementCount: shellElement.children.length,
         screenshotRegionCount: shellElement.querySelectorAll('[data-pptx-export="screenshot"]').length,
       } satisfies RenderedSlideInfo;
-    }, slideIndex)
+    }, { index: slideIndex, selector: slideSelector })
   ));
 
   return slides;

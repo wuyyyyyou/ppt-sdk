@@ -130,7 +130,7 @@ export async function runRenderedRules(
     : await prepareRenderedValidationContext(context);
 
   try {
-    return runRuleCollection(rules, {
+    return await runRuleCollection(rules, {
       ...context,
       rendered: renderedContext,
     });
