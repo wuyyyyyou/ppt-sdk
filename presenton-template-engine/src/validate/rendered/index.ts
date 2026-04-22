@@ -1,4 +1,20 @@
 import type { StabilityRule } from "../types.js";
+import {
+  GRAPHIC_MODULE_SCREENSHOT_RULE,
+  TEXT_MODULE_SCREENSHOT_RULE,
+} from "./rules/screenshot-rules.js";
+import {
+  FIXED_HEIGHT_VERTICAL_ALIGN_RULE,
+  CENTERED_TEXT_SEMANTICS_RULE,
+  SINGLE_LINE_KEY_TEXT_RULE,
+} from "./rules/text-rules.js";
+import {
+  GRADIENT_CARD_RISK_RULE,
+  SVG_CURRENT_COLOR_RULE,
+  TEXT_STROKE_RISK_RULE,
+  TRANSLATE_CENTER_RISK_RULE,
+} from "./rules/style-risk-rules.js";
+
 export {
   collectRenderedSlideInfos,
   DEFAULT_DECK_SELECTOR,
@@ -8,5 +24,28 @@ export {
   prepareRenderedValidationContext,
   waitForDeckRenderReady,
 } from "./runtime.js";
+export { inspectRenderedSlides } from "./inspectors.js";
 
-export const RENDERED_RULES: StabilityRule[] = [];
+export const RENDERED_RULES: StabilityRule[] = [
+  GRAPHIC_MODULE_SCREENSHOT_RULE,
+  TEXT_MODULE_SCREENSHOT_RULE,
+  SINGLE_LINE_KEY_TEXT_RULE,
+  FIXED_HEIGHT_VERTICAL_ALIGN_RULE,
+  CENTERED_TEXT_SEMANTICS_RULE,
+  TEXT_STROKE_RISK_RULE,
+  SVG_CURRENT_COLOR_RULE,
+  GRADIENT_CARD_RISK_RULE,
+  TRANSLATE_CENTER_RISK_RULE,
+];
+
+export {
+  CENTERED_TEXT_SEMANTICS_RULE,
+  FIXED_HEIGHT_VERTICAL_ALIGN_RULE,
+  GRAPHIC_MODULE_SCREENSHOT_RULE,
+  GRADIENT_CARD_RISK_RULE,
+  SINGLE_LINE_KEY_TEXT_RULE,
+  SVG_CURRENT_COLOR_RULE,
+  TEXT_MODULE_SCREENSHOT_RULE,
+  TEXT_STROKE_RISK_RULE,
+  TRANSLATE_CENTER_RISK_RULE,
+};

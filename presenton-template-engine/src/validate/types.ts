@@ -81,6 +81,81 @@ export interface RenderedSlideInfo {
   screenshotRegionCount: number;
 }
 
+export interface RenderedElementSummary {
+  selector: string;
+  parentSelector: string | null;
+  tagName: string;
+  className: string | null;
+  textContent: string;
+  textLength: number;
+  directTextLength: number;
+  childElementCount: number;
+  screenshotExport: string | null;
+  attributes: Record<string, string>;
+  styles: {
+    display: string | null;
+    position: string | null;
+    whiteSpace: string | null;
+    textAlign: string | null;
+    justifyContent: string | null;
+    alignItems: string | null;
+    overflowX: string | null;
+    overflowY: string | null;
+    backgroundImage: string | null;
+    backgroundColor: string | null;
+    color: string | null;
+    webkitTextStrokeWidth: string | null;
+    webkitTextStrokeColor: string | null;
+    transform: string | null;
+    left: string | null;
+    top: string | null;
+    width: string | null;
+    height: string | null;
+  };
+  rect: {
+    width: number;
+    height: number;
+  };
+  parentRect: {
+    width: number;
+    height: number;
+  } | null;
+  parentStyles: {
+    display: string | null;
+    justifyContent: string | null;
+    alignItems: string | null;
+  } | null;
+  scroll: {
+    width: number;
+    height: number;
+    clientWidth: number;
+    clientHeight: number;
+  };
+  graphicCounts: {
+    svg: number;
+    canvas: number;
+    path: number;
+    line: number;
+    polyline: number;
+    polygon: number;
+    circle: number;
+    rect: number;
+  };
+  svgUsesCurrentColor: boolean;
+}
+
+export interface RenderedSlideInspection {
+  slideIndex: number;
+  slideId: string | null;
+  layoutId: string | null;
+  templateGroup: string | null;
+  totalTextLength: number;
+  totalTextElementCount: number;
+  screenshotRegionCount: number;
+  graphicSignalCount: number;
+  elements: RenderedElementSummary[];
+}
+
 export interface RenderedValidationRuntimeOptions {
   page?: ValidationPageLike | null;
   viewport?: ValidationViewport | null;
@@ -98,6 +173,8 @@ export interface RenderedValidationContext {
   deckSelector: string;
   slideSelector: string;
   slides: RenderedSlideInfo[];
+  slideInspections?: RenderedSlideInspection[];
+  inspectSlides?: () => Promise<RenderedSlideInspection[]>;
   ownedPage: boolean;
   close: () => Promise<void>;
 }

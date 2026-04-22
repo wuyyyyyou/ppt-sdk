@@ -166,12 +166,14 @@ export async function runDeckValidation(
 }
 
 export type {
+  RenderedElementSummary,
   RenderedValidationArtifacts,
   RenderedValidationContext,
   RunDeckValidationOptions,
   RunRuleCollectionOptions,
   RenderedValidationRuntimeOptions,
   RenderedSlideInfo,
+  RenderedSlideInspection,
   StabilityDiagnostic,
   StabilityDiagnosticCounts,
   StabilityDiagnosticLocation,
@@ -189,12 +191,22 @@ export type {
 export { RENDERED_RULES } from "./rendered/index.js";
 export { STATIC_RULES } from "./static/index.js";
 export {
+  CENTERED_TEXT_SEMANTICS_RULE,
   collectRenderedSlideInfos,
   DEFAULT_DECK_SELECTOR,
   DEFAULT_SLIDE_SELECTOR,
   disposeRenderedValidationContext,
+  FIXED_HEIGHT_VERTICAL_ALIGN_RULE,
+  GRAPHIC_MODULE_SCREENSHOT_RULE,
+  GRADIENT_CARD_RISK_RULE,
+  inspectRenderedSlides,
   prepareRenderedValidationArtifacts,
   prepareRenderedValidationContext,
+  SINGLE_LINE_KEY_TEXT_RULE,
+  SVG_CURRENT_COLOR_RULE,
+  TEXT_MODULE_SCREENSHOT_RULE,
+  TEXT_STROKE_RISK_RULE,
+  TRANSLATE_CENTER_RISK_RULE,
   waitForDeckRenderReady,
 } from "./rendered/index.js";
 export {
