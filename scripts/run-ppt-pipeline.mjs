@@ -40,6 +40,7 @@ function printUsage() {
       "  --manifest   Path to the manifest JSON file to render.",
       "  --name       Optional presentation name used for output file names.",
       "  --out-root   Optional output root directory. Defaults to .vscode/pipeline-output.",
+      "  --require-manifest-json-name  Require the selected manifest file to be named manifest.json.",
       "  --help       Show this message.",
       "",
     ].join("\n"),
@@ -513,6 +514,18 @@ async function generatePipeline(options) {
   }
 
   const manifestPath = resolveCliPath(manifestOption);
+  if (options["require-manifest-json-name"] !== undefined) {
+    const actualFileName = path.basename(manifestPath);
+    if (actualFileName !== "manifest.json") {
+      throw new Error(
+        [
+          'PPT: Generate PPTX From Current Manifest expects the active editor to be a file named "manifest.json".',
+          `Current file: ${actualFileName}`,
+          "Switch to the target manifest.json tab and rerun Cmd/Ctrl+Shift+B.",
+        ].join("\n"),
+      );
+    }
+  }
   await ensureFileReadable(manifestPath);
 
   const manifestStat = await stat(manifestPath);

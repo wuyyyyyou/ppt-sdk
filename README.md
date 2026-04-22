@@ -153,6 +153,8 @@ presenton-pptx-generator
 2. 确保当前激活的编辑器就是这个 manifest 文件
 3. 按 `Cmd/Ctrl + Shift + B`
 
+如果当前激活文件不是 `manifest.json`，任务会直接报错并提示你先切回目标 manifest 标签页。
+
 任务会调用 [`scripts/run-ppt-pipeline.mjs`](./scripts/run-ppt-pipeline.mjs)，按下面的固定顺序执行：
 
 1. `presenton-template-engine` 生成 deck HTML

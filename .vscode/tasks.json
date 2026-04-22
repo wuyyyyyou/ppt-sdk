@@ -26,6 +26,8 @@
       "args": [
         "${workspaceFolder}/scripts/run-ppt-pipeline.mjs",
         "generate",
+        "--require-manifest-json-name",
+        "1",
         "--manifest",
         "${file}"
       ],
