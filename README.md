@@ -131,6 +131,82 @@ presenton-pptx-generator
 
 这样可以在 VS Code 中用固定启动项反复调试每个阶段。
 
+## VS Code Tasks 一键生成 PPTX
+
+现在仓库还提供了一套更适合日常使用的 VS Code Tasks，用来直接从当前编辑的 `manifest.json` 生成最终 `.pptx`。
+
+推荐分工：
+
+- `Tasks`：跑整条流水线，适合日常生成和回归验证。
+- `Launch`：单阶段断点调试，适合排查模板渲染、模型提取或 PPTX 写出问题。
+
+### 默认任务
+
+新增的工作区任务位于 [`.vscode/tasks.json`](./.vscode/tasks.json)：
+
+- `PPT: Generate PPTX From Current Manifest`
+- `PPT: Check Environment`
+
+其中 `PPT: Generate PPTX From Current Manifest` 被设成了默认 build task，所以你可以直接：
+
+1. 在 VS Code 里打开要生成的 `manifest.json`
+2. 确保当前激活的编辑器就是这个 manifest 文件
+3. 按 `Cmd/Ctrl + Shift + B`
+
+任务会调用 [`scripts/run-ppt-pipeline.mjs`](./scripts/run-ppt-pipeline.mjs)，按下面的固定顺序执行：
+
+1. `presenton-template-engine` 生成 deck HTML
+2. `presenton-html-to-pptx-model` 生成 `*-model.json`
+3. `presenton-pptx-generator` 生成最终 `.pptx`
+
+### 输出目录
+
+每次运行都会生成一个新的时间戳目录，不覆盖旧结果：
+
+```text
+.vscode/pipeline-output/
+  <presentation-slug>/
+    <timestamp>/
+      manifest.json
+      engine/
+      model/
+      generator/
+      logs/
+      run-summary.json
+```
+
+例如：
+
+```text
+.vscode/pipeline-output/red-finance/20260422-143210/
+```
+
+其中：
+
+- `engine/`：第一阶段生成的 deck HTML
+- `model/`：第二阶段生成的 model JSON 和 screenshots
+- `generator/`：最终的 `.pptx`
+- `logs/`：每个阶段的 request/response/stdout/stderr
+- `run-summary.json`：这一轮流水线的汇总信息
+
+### 环境检查
+
+首次使用前，建议先运行一次 `PPT: Check Environment`。
+
+它会检查：
+
+- 当前 Node.js 是否为 20+
+- `presenton-template-engine` 和 `presenton-html-to-pptx-model` 的依赖和 `dist/` 是否就绪
+- `presenton-pptx-generator/.venv` 是否存在
+- 三个插件入口是否都能成功响应 `describe`
+- `presenton-html-to-pptx-model` 是否真的能拉起 Puppeteer 完成一次最小转换
+
+注意：
+
+- 如果这里报浏览器相关错误，优先检查本机 Chrome / Puppeteer 是否可用
+- 如果当前激活文件不是目标 manifest，默认任务会拿错输入文件
+- 这套 Tasks 面向“从 manifest 一键生成 `.pptx`”，更细的单阶段调试仍然建议使用 [`.vscode/launch.json`](./.vscode/launch.json)
+
 ## 推荐开发顺序
 
 如果要从头生成一份 PPT，推荐按这个顺序调试：

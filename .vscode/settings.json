@@ -9,14 +9,16 @@
     "${workspaceFolder}/presenton-pptx-generator/src"
   ],
   "files.exclude": {
-    "**/.DS_Store": true
+    "**/.DS_Store": true,
   },
   "search.exclude": {
     "**/dist": true,
-    "**/node_modules": true
+    "**/node_modules": true,
+    ".vscode/pipeline-output": true
   },
   "files.watcherExclude": {
     "**/dist/**": true,
-    "**/node_modules/**": true
+    "**/node_modules/**": true,
+    ".vscode/pipeline-output/**": true
   }
 }
