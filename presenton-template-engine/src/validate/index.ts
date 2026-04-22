@@ -1,4 +1,8 @@
-import { RENDERED_RULES } from "./rendered/index.js";
+import {
+  disposeRenderedValidationContext,
+  prepareRenderedValidationContext,
+  RENDERED_RULES,
+} from "./rendered/index.js";
 import { STATIC_RULES } from "./static/index.js";
 import type {
   RunDeckValidationOptions,
@@ -114,7 +118,26 @@ export async function runRenderedRules(
   context: ValidationContext,
   options: RunRuleCollectionOptions = {},
 ): Promise<StabilityDiagnostic[]> {
-  return runRuleCollection(options.rules ?? RENDERED_RULES, context);
+  const rules = options.rules ?? RENDERED_RULES;
+  if (rules.length === 0) {
+    return [];
+  }
+
+  const hadPreparedRenderedContext = Boolean(context.rendered);
+  const renderedContext = hadPreparedRenderedContext
+    ? context.rendered
+    : await prepareRenderedValidationContext(context);
+
+  try {
+    return runRuleCollection(rules, {
+      ...context,
+      rendered: renderedContext,
+    });
+  } finally {
+    if (!hadPreparedRenderedContext) {
+      await disposeRenderedValidationContext(context);
+    }
+  }
 }
 
 export async function runDeckValidation(
@@ -144,20 +167,36 @@ export async function runDeckValidation(
 
 export type {
   RenderedValidationArtifacts,
+  RenderedValidationContext,
   RunDeckValidationOptions,
   RunRuleCollectionOptions,
+  RenderedValidationRuntimeOptions,
+  RenderedSlideInfo,
   StabilityDiagnostic,
   StabilityDiagnosticCounts,
   StabilityDiagnosticLocation,
   StabilityRule,
   ValidationAppliesTo,
+  ValidationBrowserLike,
   ValidationContext,
+  ValidationElementHandleLike,
   ValidationPhase,
+  ValidationPageLike,
   ValidationReport,
   ValidationSeverity,
+  ValidationViewport,
 } from "./types.js";
 export { RENDERED_RULES } from "./rendered/index.js";
 export { STATIC_RULES } from "./static/index.js";
+export {
+  collectRenderedSlideInfos,
+  DEFAULT_DECK_SELECTOR,
+  DEFAULT_SLIDE_SELECTOR,
+  disposeRenderedValidationContext,
+  prepareRenderedValidationArtifacts,
+  prepareRenderedValidationContext,
+  waitForDeckRenderReady,
+} from "./rendered/index.js";
 export {
   FIXED_CANVAS_HINT_RULE,
   GROUP_JSON_REQUIRED_RULE,

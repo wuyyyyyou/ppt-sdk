@@ -90,6 +90,20 @@ test("runRuleCollection preserves deterministic diagnostic ordering", async () =
 });
 
 test("runDeckValidation combines static and rendered rules into one report", async () => {
+  const renderedContext = {
+    page: {
+      async setContent() {},
+      async $() {
+        return null;
+      },
+    },
+    deckSelector: "#presentation-slides-wrapper",
+    slideSelector: '[data-presenton-slide-shell="true"]',
+    slides: [],
+    ownedPage: false,
+    async close() {},
+  };
+
   const staticRule: StabilityRule = {
     id: "STATIC-EMPTY",
     title: "static empty",
@@ -133,6 +147,7 @@ test("runDeckValidation combines static and rendered rules into one report", asy
       manifestPath: "/tmp/manifest.json",
       includeRenderedChecks: true,
       renderedArtifacts: { deckHtmlPath: "/tmp/output/deck.html" },
+      rendered: renderedContext,
     },
     {
       staticRules: [staticRule],

@@ -40,6 +40,68 @@ export interface RenderedValidationArtifacts {
   renderedReportPath?: string | null;
 }
 
+export interface ValidationViewport {
+  width: number;
+  height: number;
+  deviceScaleFactor?: number;
+}
+
+export interface ValidationElementHandleLike {
+  $?: (selector: string) => Promise<ValidationElementHandleLike | null>;
+  $$: (selector: string) => Promise<ValidationElementHandleLike[]>;
+  evaluate: <T>(
+    pageFunction: (...args: any[]) => T,
+    ...args: any[]
+  ) => Promise<T>;
+}
+
+export interface ValidationPageLike {
+  setViewport?: (viewport: ValidationViewport) => Promise<void>;
+  setContent: (
+    html: string,
+    options?: { waitUntil?: string | string[]; timeout?: number },
+  ) => Promise<void>;
+  $: (selector: string) => Promise<ValidationElementHandleLike | null>;
+  close?: () => Promise<void>;
+}
+
+export interface ValidationBrowserLike {
+  newPage: () => Promise<ValidationPageLike>;
+  close: () => Promise<void>;
+}
+
+export interface RenderedSlideInfo {
+  slideIndex: number;
+  slideId: string | null;
+  layoutId: string | null;
+  templateGroup: string | null;
+  shellSelector: string;
+  rootSelector: string | null;
+  childElementCount: number;
+  screenshotRegionCount: number;
+}
+
+export interface RenderedValidationRuntimeOptions {
+  page?: ValidationPageLike | null;
+  viewport?: ValidationViewport | null;
+  contentWaitUntil?: string | string[];
+  contentTimeoutMs?: number;
+  renderReadyTimeoutMs?: number;
+  settleTimeMs?: number;
+  deckSelector?: string;
+  slideSelector?: string;
+  launchOptions?: Record<string, unknown>;
+}
+
+export interface RenderedValidationContext {
+  page: ValidationPageLike;
+  deckSelector: string;
+  slideSelector: string;
+  slides: RenderedSlideInfo[];
+  ownedPage: boolean;
+  close: () => Promise<void>;
+}
+
 export interface ValidationContext {
   cwd?: string | null;
   manifestPath: string;
@@ -48,6 +110,8 @@ export interface ValidationContext {
   includeRenderedChecks?: boolean;
   manifest?: DeckManifestInput | null;
   renderedArtifacts?: RenderedValidationArtifacts | null;
+  renderedOptions?: RenderedValidationRuntimeOptions | null;
+  rendered?: RenderedValidationContext | null;
 }
 
 export interface StabilityRule {
