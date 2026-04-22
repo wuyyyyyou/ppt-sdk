@@ -41,6 +41,21 @@ import {
   listThemePresets,
   type ThemePresetInfo,
 } from "./themes/default-theme-presets.js";
+import {
+  runDeckValidation,
+  runRenderedRules,
+  runStaticRules,
+  type RenderedValidationArtifacts,
+  type StabilityDiagnostic,
+  type StabilityDiagnosticCounts,
+  type StabilityDiagnosticLocation,
+  type StabilityRule,
+  type ValidationAppliesTo,
+  type ValidationContext,
+  type ValidationPhase,
+  type ValidationReport,
+  type ValidationSeverity,
+} from "./validate/index.js";
 
 export interface TemplateLayoutInfo {
   layout_id: string;
@@ -234,4 +249,19 @@ export {
   listDiscoveredTemplateGroupSummaries,
   listThemePresets,
   renderSlideHtml,
+  runDeckValidation,
+  runRenderedRules,
+  runStaticRules,
+};
+export type {
+  RenderedValidationArtifacts,
+  StabilityDiagnostic,
+  StabilityDiagnosticCounts,
+  StabilityDiagnosticLocation,
+  StabilityRule,
+  ValidationAppliesTo,
+  ValidationContext,
+  ValidationPhase,
+  ValidationReport,
+  ValidationSeverity,
 };

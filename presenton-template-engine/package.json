@@ -35,6 +35,7 @@
     "dev": "tsx src/cli.ts",
     "build": "node ./scripts/build-template-registry.mjs && tsup && node ./scripts/build-forkable-templates.mjs",
     "check": "tsc --noEmit",
+    "test:unit": "node --import tsx/esm --test test/**/*.test.ts",
     "start": "node dist/cli.js",
     "start:plugin": "node example_plugin.js",
     "build:binary": "./build_binary.sh",
