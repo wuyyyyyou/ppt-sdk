@@ -3,6 +3,7 @@ import {
   prepareRenderedValidationContext,
   RENDERED_RULES,
 } from "./rendered/index.js";
+import { writeValidationReport } from "./report-writer.js";
 import { STATIC_RULES } from "./static/index.js";
 import type {
   RunDeckValidationOptions,
@@ -188,6 +189,7 @@ export type {
   ValidationSeverity,
   ValidationViewport,
 } from "./types.js";
+export type { PersistedValidationReport } from "./report-writer.js";
 export { RENDERED_RULES } from "./rendered/index.js";
 export { STATIC_RULES } from "./static/index.js";
 export {
@@ -209,6 +211,7 @@ export {
   TRANSLATE_CENTER_RISK_RULE,
   waitForDeckRenderReady,
 } from "./rendered/index.js";
+export { writeValidationReport } from "./report-writer.js";
 export {
   FIXED_CANVAS_HINT_RULE,
   GROUP_JSON_REQUIRED_RULE,

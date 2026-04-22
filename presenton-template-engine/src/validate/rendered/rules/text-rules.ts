@@ -1,4 +1,8 @@
-import type { RenderedElementSummary, StabilityRule } from "../../types.js";
+import type {
+  RenderedElementSummary,
+  StabilityDiagnostic,
+  StabilityRule,
+} from "../../types.js";
 import { createRuleDiagnostic } from "../../static/helpers.js";
 import { inspectRenderedSlides } from "../inspectors.js";
 
@@ -50,7 +54,7 @@ export const SINGLE_LINE_KEY_TEXT_RULE: StabilityRule = {
   appliesTo: ["dom"],
   async run(context) {
     const inspections = await inspectRenderedSlides(context);
-    const diagnostics = [];
+    const diagnostics: StabilityDiagnostic[] = [];
 
     for (const slide of inspections) {
       for (const element of slide.elements.filter(isSingleLineTextCandidate)) {
@@ -92,7 +96,7 @@ export const FIXED_HEIGHT_VERTICAL_ALIGN_RULE: StabilityRule = {
   appliesTo: ["dom"],
   async run(context) {
     const inspections = await inspectRenderedSlides(context);
-    const diagnostics = [];
+    const diagnostics: StabilityDiagnostic[] = [];
 
     for (const slide of inspections) {
       for (const element of slide.elements.filter((item) =>
@@ -141,7 +145,7 @@ export const CENTERED_TEXT_SEMANTICS_RULE: StabilityRule = {
   appliesTo: ["dom"],
   async run(context) {
     const inspections = await inspectRenderedSlides(context);
-    const diagnostics = [];
+    const diagnostics: StabilityDiagnostic[] = [];
 
     for (const slide of inspections) {
       for (const element of slide.elements.filter(isCenteredTextCandidate)) {

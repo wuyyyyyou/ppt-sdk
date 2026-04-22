@@ -1,4 +1,4 @@
-import type { RenderedElementSummary, StabilityRule } from "../../types.js";
+import type { RenderedElementSummary, StabilityDiagnostic, StabilityRule } from "../../types.js";
 import { createRuleDiagnostic } from "../../static/helpers.js";
 import { inspectRenderedSlides } from "../inspectors.js";
 
@@ -59,7 +59,7 @@ export const GRAPHIC_MODULE_SCREENSHOT_RULE: StabilityRule = {
   appliesTo: ["dom"],
   async run(context) {
     const inspections = await inspectRenderedSlides(context);
-    const diagnostics = [];
+    const diagnostics: StabilityDiagnostic[] = [];
 
     for (const slide of inspections) {
       for (const element of slide.elements.filter(isGraphicDominantCandidate)) {
@@ -94,7 +94,7 @@ export const TEXT_MODULE_SCREENSHOT_RULE: StabilityRule = {
   appliesTo: ["dom"],
   async run(context) {
     const inspections = await inspectRenderedSlides(context);
-    const diagnostics = [];
+    const diagnostics: StabilityDiagnostic[] = [];
 
     for (const slide of inspections) {
       for (const element of slide.elements.filter(isTextDominantScreenshot)) {

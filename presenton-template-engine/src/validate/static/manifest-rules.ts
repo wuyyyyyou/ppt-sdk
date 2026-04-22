@@ -1,5 +1,5 @@
 import type { DeckManifestInput, DeckManifestSlideInput } from "../../render/types.js";
-import type { StabilityRule } from "../types.js";
+import type { StabilityDiagnostic, StabilityRule } from "../types.js";
 import {
   collectLocalManifestSlides,
   createRuleDiagnostic,
@@ -67,7 +67,7 @@ export const MANIFEST_STRUCTURE_RULE: StabilityRule = {
   appliesTo: ["manifest"],
   async run(context) {
     const state = await loadManifestState(context);
-    const diagnostics = [];
+    const diagnostics: StabilityDiagnostic[] = [];
 
     if (state.readError) {
       diagnostics.push(createRuleDiagnostic(this, {
@@ -174,7 +174,7 @@ export const LOCAL_SOURCE_PATH_RULE: StabilityRule = {
       return [];
     }
 
-    const diagnostics = [];
+    const diagnostics: StabilityDiagnostic[] = [];
     const localSlides = collectLocalManifestSlides(state.manifest);
     for (const slideRef of localSlides) {
       const resolution = await validateLocalSourcePath(slideRef, state.manifestDir);
@@ -213,7 +213,7 @@ export const LOCAL_MODULE_EXPORT_RULE: StabilityRule = {
       return [];
     }
 
-    const diagnostics = [];
+    const diagnostics: StabilityDiagnostic[] = [];
     const localSlides = collectLocalManifestSlides(state.manifest);
     for (const slideRef of localSlides) {
       const resolution = await validateLocalSourcePath(slideRef, state.manifestDir);
@@ -261,7 +261,7 @@ export const SHARED_MODULE_ENTRY_RULE: StabilityRule = {
       return [];
     }
 
-    const diagnostics = [];
+    const diagnostics: StabilityDiagnostic[] = [];
     const localSlides = collectLocalManifestSlides(state.manifest);
     for (const slideRef of localSlides) {
       if (!isSharedModulePath(slideRef.sourcePath)) {

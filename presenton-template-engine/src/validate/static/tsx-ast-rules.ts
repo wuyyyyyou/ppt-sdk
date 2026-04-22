@@ -3,7 +3,7 @@ import path from "node:path";
 
 import ts from "typescript";
 
-import type { StabilityRule } from "../types.js";
+import type { StabilityDiagnostic, StabilityRule } from "../types.js";
 import {
   collectLocalManifestSlides,
   createRuleDiagnostic,
@@ -176,8 +176,9 @@ function extractTopLevelSchemaKeys(
     return null;
   }
 
+  const objectLiteral = schemaObjectLiteral as ts.ObjectLiteralExpression;
   const keys = new Set<string>();
-  for (const property of schemaObjectLiteral.properties) {
+  for (const property of objectLiteral.properties) {
     if (!("name" in property) || !property.name) {
       continue;
     }
@@ -335,7 +336,7 @@ export const ZOD_SCHEMA_RULE: StabilityRule = {
       return [];
     }
 
-    const diagnostics = [];
+    const diagnostics: StabilityDiagnostic[] = [];
     for (const slideRef of collectLocalManifestSlides(state.manifest)) {
       const resolution = await validateLocalSourcePath(slideRef, state.manifestDir);
       if ("error" in resolution || slideRef.sourcePath.includes("/shared/")) {
@@ -378,7 +379,7 @@ export const SCHEMA_PARSE_RULE: StabilityRule = {
       return [];
     }
 
-    const diagnostics = [];
+    const diagnostics: StabilityDiagnostic[] = [];
     for (const slideRef of collectLocalManifestSlides(state.manifest)) {
       const resolution = await validateLocalSourcePath(slideRef, state.manifestDir);
       if ("error" in resolution) {
@@ -418,7 +419,7 @@ export const SCHEMA_FIELD_COVERAGE_RULE: StabilityRule = {
       return [];
     }
 
-    const diagnostics = [];
+    const diagnostics: StabilityDiagnostic[] = [];
     for (const slideRef of collectLocalManifestSlides(state.manifest)) {
       const resolution = await validateLocalSourcePath(slideRef, state.manifestDir);
       if ("error" in resolution) {
@@ -473,7 +474,7 @@ export const FIXED_CANVAS_HINT_RULE: StabilityRule = {
       return [];
     }
 
-    const diagnostics = [];
+    const diagnostics: StabilityDiagnostic[] = [];
     for (const slideRef of collectLocalManifestSlides(state.manifest)) {
       const resolution = await validateLocalSourcePath(slideRef, state.manifestDir);
       if ("error" in resolution) {
@@ -516,7 +517,7 @@ export const RUNTIME_DEPENDENCY_RULE: StabilityRule = {
       return [];
     }
 
-    const diagnostics = [];
+    const diagnostics: StabilityDiagnostic[] = [];
     for (const slideRef of collectLocalManifestSlides(state.manifest)) {
       const resolution = await validateLocalSourcePath(slideRef, state.manifestDir);
       if ("error" in resolution) {

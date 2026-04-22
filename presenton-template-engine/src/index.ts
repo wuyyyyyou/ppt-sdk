@@ -42,9 +42,26 @@ import {
   type ThemePresetInfo,
 } from "./themes/default-theme-presets.js";
 import {
+  CENTERED_TEXT_SEMANTICS_RULE,
+  collectRenderedSlideInfos,
+  DEFAULT_DECK_SELECTOR,
+  DEFAULT_SLIDE_SELECTOR,
+  disposeRenderedValidationContext,
+  FIXED_HEIGHT_VERTICAL_ALIGN_RULE,
+  GRAPHIC_MODULE_SCREENSHOT_RULE,
+  GRADIENT_CARD_RISK_RULE,
+  inspectRenderedSlides,
+  prepareRenderedValidationArtifacts,
+  prepareRenderedValidationContext,
   runDeckValidation,
   runRenderedRules,
   runStaticRules,
+  SINGLE_LINE_KEY_TEXT_RULE,
+  SVG_CURRENT_COLOR_RULE,
+  TEXT_MODULE_SCREENSHOT_RULE,
+  TEXT_STROKE_RISK_RULE,
+  TRANSLATE_CENTER_RISK_RULE,
+  type PersistedValidationReport,
   type RenderedElementSummary,
   type RenderedValidationArtifacts,
   type RenderedValidationContext,
@@ -64,6 +81,8 @@ import {
   type ValidationReport,
   type ValidationSeverity,
   type ValidationViewport,
+  waitForDeckRenderReady,
+  writeValidationReport,
 } from "./validate/index.js";
 
 export interface TemplateLayoutInfo {
@@ -278,8 +297,10 @@ export {
   TEXT_STROKE_RISK_RULE,
   TRANSLATE_CENTER_RISK_RULE,
   waitForDeckRenderReady,
+  writeValidationReport,
 };
 export type {
+  PersistedValidationReport,
   RenderedElementSummary,
   RenderedValidationArtifacts,
   RenderedValidationContext,

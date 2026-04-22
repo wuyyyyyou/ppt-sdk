@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { randomUUID } from "node:crypto";
+import { createRequire } from "node:module";
 import readline from "node:readline";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -12,6 +13,8 @@ import {
   getAllDiscoveredTemplateGroups,
   getDiscoveredTemplateGroup,
   listDiscoveredTemplateGroupSummaries,
+  runDeckValidation,
+  writeValidationReport,
 } from "./dist/index.js";
 
 const TOOL_NAMES = [
@@ -19,6 +22,7 @@ const TOOL_NAMES = [
   "getAllDiscoveredTemplateGroups",
   "getDiscoveredTemplateGroup",
   "buildDeckHtmlFromManifest",
+  "validateDeckFromManifest",
   "forkTemplateGroup",
 ];
 const FILE_TRANSPORT_DIRNAME = ".executa-file-transport";
@@ -34,7 +38,7 @@ const MANIFEST = {
   display_name: "ppt-engine",
   version: "0.0.3",
   description:
-    "Anna Executa plugin for Presenton template discovery and manifest-based deck HTML generation.",
+    "Anna Executa plugin for Presenton template discovery, manifest-based deck HTML generation, and stability validation.",
   author: "Anna Developer",
   tools: [
     {
@@ -170,6 +174,69 @@ const MANIFEST = {
           type: "integer",
           description:
             "1-based page number to generate when single_page is true.",
+          required: false,
+        },
+      ],
+    },
+    {
+      name: "validateDeckFromManifest",
+      description:
+        "Run static and optional rendered stability validation on a manifest deck, optionally persist the validation report, and return structured diagnostics.",
+      parameters: [
+        {
+          name: "manifest_path",
+          type: "string",
+          description:
+            "Path to a manifest JSON file. Relative paths are resolved from cwd when provided.",
+          required: true,
+        },
+        {
+          name: "output_dir",
+          type: "string",
+          description:
+            "Output directory used for generated validation artifacts when rendered checks need to build deck HTML.",
+          required: true,
+        },
+        {
+          name: "cwd",
+          type: "string",
+          description:
+            "Working directory used to resolve manifest_path and relative output paths.",
+          required: false,
+        },
+        {
+          name: "name",
+          type: "string",
+          description: "Optional presentation name forwarded to the validation engine.",
+          required: false,
+        },
+        {
+          name: "include_rendered_checks",
+          type: "boolean",
+          description:
+            "Whether to run browser-based rendered validation. Defaults to false.",
+          required: false,
+          default: false,
+        },
+        {
+          name: "deck_html_path",
+          type: "string",
+          description:
+            "Optional prebuilt deck HTML path to reuse instead of rebuilding during rendered validation.",
+          required: false,
+        },
+        {
+          name: "report_output_path",
+          type: "string",
+          description:
+            "Optional JSON file path where the validation report should be written.",
+          required: false,
+        },
+        {
+          name: "puppeteer_resolve_from",
+          type: "string",
+          description:
+            "Optional package.json or file path used to resolve puppeteer when rendered validation is enabled.",
           required: false,
         },
       ],
@@ -554,6 +621,118 @@ async function toolBuildDeckHtmlFromManifest(args) {
   };
 }
 
+function resolveRequireBase(targetPath) {
+  const absolutePath = resolveFromCwd(null, targetPath);
+  const statsPath = path.extname(absolutePath) ? absolutePath : path.join(absolutePath, "package.json");
+  return statsPath;
+}
+
+async function createManagedValidationPage(args) {
+  const resolveFromValue = typeof args.puppeteer_resolve_from === "string"
+    ? args.puppeteer_resolve_from
+    : typeof args.puppeteerResolveFrom === "string"
+      ? args.puppeteerResolveFrom
+      : null;
+  if (!resolveFromValue) {
+    throw new Error(
+      'Rendered validation requires "puppeteer_resolve_from" so the plugin can resolve puppeteer.',
+    );
+  }
+
+  const requireFromTarget = createRequire(resolveRequireBase(resolveFromValue));
+  const puppeteer = requireFromTarget("puppeteer");
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--disable-web-security",
+      "--disable-background-timer-throttling",
+      "--disable-backgrounding-occluded-windows",
+      "--disable-renderer-backgrounding",
+      "--disable-features=TranslateUI",
+      "--disable-ipc-flooding-protection",
+    ],
+  });
+  const page = await browser.newPage();
+
+  return {
+    page,
+    async close() {
+      await page.close?.().catch(() => undefined);
+      await browser.close().catch(() => undefined);
+    },
+  };
+}
+
+async function toolValidateDeckFromManifest(args) {
+  if (!args || typeof args !== "object") {
+    throw new Error("Arguments must be an object");
+  }
+
+  if (typeof args.manifest_path !== "string" || args.manifest_path.length === 0) {
+    throw new Error('Missing required parameter: "manifest_path"');
+  }
+
+  if (typeof args.output_dir !== "string" || args.output_dir.length === 0) {
+    throw new Error('Missing required parameter: "output_dir"');
+  }
+
+  const includeRenderedChecks = args.include_rendered_checks !== undefined
+    ? Boolean(args.include_rendered_checks)
+    : args.includeRenderedChecks !== undefined
+      ? Boolean(args.includeRenderedChecks)
+      : false;
+
+  const pageRuntime = includeRenderedChecks
+    ? await createManagedValidationPage(args)
+    : null;
+
+  try {
+    const report = await runDeckValidation({
+      cwd: typeof args.cwd === "string" && args.cwd.length > 0
+        ? resolveFromCwd(null, args.cwd)
+        : undefined,
+      manifestPath: args.manifest_path,
+      outputDir: args.output_dir,
+      name: typeof args.name === "string" && args.name.length > 0 ? args.name : undefined,
+      includeRenderedChecks,
+      renderedArtifacts: typeof args.deck_html_path === "string" && args.deck_html_path.length > 0
+        ? { deckHtmlPath: args.deck_html_path }
+        : undefined,
+      renderedOptions: pageRuntime
+        ? { page: pageRuntime.page }
+        : undefined,
+    });
+
+    const reportOutputPath = typeof args.report_output_path === "string" && args.report_output_path.length > 0
+      ? args.report_output_path
+      : typeof args.reportOutputPath === "string" && args.reportOutputPath.length > 0
+        ? args.reportOutputPath
+        : null;
+    const persisted = reportOutputPath
+      ? await writeValidationReport({
+        report,
+        outputPath: reportOutputPath,
+        manifestPath: args.manifest_path,
+        name: typeof args.name === "string" && args.name.length > 0 ? args.name : null,
+      })
+      : null;
+
+    return {
+      ok: report.ok,
+      summary: report.summary,
+      diagnostics: report.diagnostics,
+      report_output_path: persisted?.outputPath ?? null,
+      artifacts: report.artifacts ?? null,
+    };
+  } finally {
+    await pageRuntime?.close();
+  }
+}
+
 async function toolForkTemplateGroup(args) {
   if (!args || typeof args !== "object") {
     throw new Error("Arguments must be an object");
@@ -611,6 +790,7 @@ const TOOL_DISPATCH = {
   getAllDiscoveredTemplateGroups: toolGetAllDiscoveredTemplateGroups,
   getDiscoveredTemplateGroup: toolGetDiscoveredTemplateGroup,
   buildDeckHtmlFromManifest: toolBuildDeckHtmlFromManifest,
+  validateDeckFromManifest: toolValidateDeckFromManifest,
   forkTemplateGroup: toolForkTemplateGroup,
 };
 

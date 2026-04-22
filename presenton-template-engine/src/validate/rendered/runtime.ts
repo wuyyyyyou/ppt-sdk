@@ -6,6 +6,7 @@ import { buildDeckHtmlFromManifest } from "../../render/build-deck-from-manifest
 import type {
   RenderedSlideInfo,
   RenderedValidationArtifacts,
+  RenderedValidationContext,
   ValidationBrowserLike,
   ValidationContext,
   ValidationElementHandleLike,
@@ -216,7 +217,7 @@ export async function collectRenderedSlideInfos(
 
 export async function prepareRenderedValidationContext(
   context: ValidationContext,
-) {
+): Promise<RenderedValidationContext> {
   if (context.rendered) {
     return context.rendered;
   }
@@ -253,7 +254,7 @@ export async function prepareRenderedValidationContext(
     }
 
     const slides = await collectRenderedSlideInfos(deckElement, slideSelector);
-    const renderedContext = {
+    const renderedContext: RenderedValidationContext = {
       page: runtime.page,
       deckSelector,
       slideSelector,

@@ -66,13 +66,14 @@ async function inspectSlide(
       const segments: string[] = [];
       let current: Element | null = element;
       while (current && current !== inspectionRoot && segments.length < 4) {
-        const parent = current.parentElement;
+        const parent: Element | null = current.parentElement;
         if (!parent) {
           break;
         }
 
-        const siblings = Array.from(parent.children).filter((candidate) =>
-          candidate.tagName === current?.tagName
+        const currentTagName = current.tagName;
+        const siblings = Array.from(parent.children).filter((candidate): candidate is Element =>
+          candidate.tagName === currentTagName
         );
         const segment = `${current.tagName.toLowerCase()}:nth-of-type(${
           siblings.indexOf(current) + 1

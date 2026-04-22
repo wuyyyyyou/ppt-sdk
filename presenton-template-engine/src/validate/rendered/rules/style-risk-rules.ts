@@ -1,4 +1,8 @@
-import type { RenderedElementSummary, StabilityRule } from "../../types.js";
+import type {
+  RenderedElementSummary,
+  StabilityDiagnostic,
+  StabilityRule,
+} from "../../types.js";
 import { createRuleDiagnostic } from "../../static/helpers.js";
 import { inspectRenderedSlides } from "../inspectors.js";
 
@@ -55,7 +59,7 @@ export const TEXT_STROKE_RISK_RULE: StabilityRule = {
   appliesTo: ["dom"],
   async run(context) {
     const inspections = await inspectRenderedSlides(context);
-    const diagnostics = [];
+    const diagnostics: StabilityDiagnostic[] = [];
 
     for (const slide of inspections) {
       for (const element of slide.elements.filter(isTransparentStrokeText)) {
@@ -90,7 +94,7 @@ export const SVG_CURRENT_COLOR_RULE: StabilityRule = {
   appliesTo: ["dom"],
   async run(context) {
     const inspections = await inspectRenderedSlides(context);
-    const diagnostics = [];
+    const diagnostics: StabilityDiagnostic[] = [];
 
     for (const slide of inspections) {
       for (const element of slide.elements.filter(usesCurrentColorSvg)) {
@@ -124,7 +128,7 @@ export const GRADIENT_CARD_RISK_RULE: StabilityRule = {
   appliesTo: ["dom"],
   async run(context) {
     const inspections = await inspectRenderedSlides(context);
-    const diagnostics = [];
+    const diagnostics: StabilityDiagnostic[] = [];
 
     for (const slide of inspections) {
       for (const element of slide.elements.filter(isGradientCard)) {
@@ -160,7 +164,7 @@ export const TRANSLATE_CENTER_RISK_RULE: StabilityRule = {
   appliesTo: ["dom"],
   async run(context) {
     const inspections = await inspectRenderedSlides(context);
-    const diagnostics = [];
+    const diagnostics: StabilityDiagnostic[] = [];
 
     for (const slide of inspections) {
       for (const element of slide.elements.filter(usesTranslateCentering)) {

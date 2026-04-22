@@ -1,12 +1,12 @@
-import { builtinModules } from "node:module";
+import { builtinModules, createRequire } from "node:module";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { getAllGroupsWithTemplates } from "../dist/index.js";
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectDir = path.resolve(__dirname, "..");
+const requireFromProject = createRequire(path.join(projectDir, "package.json"));
+const { getAllGroupsWithTemplates } = requireFromProject("./dist/index.cjs");
 const appSourceRoot = path.join(projectDir, "src", "app");
 const templateSourceRoot = path.join(appSourceRoot, "presentation-templates");
 const registryManifestPath = path.join(
