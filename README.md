@@ -1,6 +1,6 @@
 # PPT SDK
 
-这个仓库把一条完整的 PPT 生成链路拆成三个相互独立、又可以串联使用的项目。
+这个仓库把一条完整的 PPT 生成链路拆成两个可串联使用的项目。
 
 整体目标是：
 
@@ -8,18 +8,22 @@
 2. 把 Deck HTML 转换成 PPTX 中间模型 JSON。
 3. 把 PPTX 中间模型 JSON 写成最终的 `.pptx` 文件。
 
-三个项目都同时保留了 vendored SDK 代码和 Anna Executa 插件入口，便于本地开发、调试和后续打包成二进制插件。
+两个项目都同时保留了 vendored SDK 代码和 Anna Executa 插件入口，便于本地开发、调试和后续打包成二进制插件。
+
+当前默认的 AI / task 入口已经收敛到 `ppt-engine`：
+
+- `presenton-template-engine` 对外同时负责 `manifest -> deck.html`
+- `presenton-template-engine` 也对外提供 `deck.html -> model.json`
 
 ## 项目结构
 
 ```text
 ppt-sdk/
   presenton-template-engine/
-  presenton-html-to-pptx-model/
   presenton-pptx-generator/
 ```
 
-## 三个项目分别做什么
+## 两个项目分别做什么
 
 ### `presenton-template-engine`
 
@@ -39,30 +43,13 @@ ppt-sdk/
 
 在完整链路里，它是第一步：负责把“模板 + 内容数据”变成浏览器可以渲染的 HTML。
 
-### `presenton-html-to-pptx-model`
-
-`presenton-html-to-pptx-model` 负责把已经渲染好的 Deck HTML 转换成 PPTX 中间模型。
-
-它会使用浏览器环境读取 HTML 页面里的 DOM、样式、图片和布局信息，然后生成一份 `PptxPresentationModel` JSON。
-
-它的输入通常是：
-
-- `presenton-template-engine` 生成的 `*-deck.html`
-
-它的输出通常是：
-
-- `*-model.json`
-- 必要时生成截图兜底资源
-
-在完整链路里，它是第二步：负责把“HTML 页面布局”转换成“PPTX 生成器可以理解的结构化模型”。
-
 ### `presenton-pptx-generator`
 
 `presenton-pptx-generator` 负责把 PPTX 中间模型写成真正的 `.pptx` 文件。
 
 它的输入通常是：
 
-- `presenton-html-to-pptx-model` 生成的 `*-model.json`
+- `presenton-template-engine` 生成的 `*-model.json`
 
 它的输出通常是：
 
@@ -70,7 +57,7 @@ ppt-sdk/
 
 在完整链路里，它是第三步：负责把“中间模型 JSON”落盘成可以用 PowerPoint、Keynote、WPS 等工具打开的 PPT 文件。
 
-## 三个项目如何协同生成 PPT
+## 两个项目如何协同生成 PPT
 
 完整流水线如下：
 
@@ -85,7 +72,7 @@ presenton-template-engine
 *-deck.html
   |
   v
-presenton-html-to-pptx-model
+presenton-template-engine
   |
   | 解析 HTML / DOM / 样式，生成 PPTX 中间模型
   v
@@ -104,23 +91,21 @@ presenton-pptx-generator
 | 阶段 | 项目 | 主要职责 | 典型输入 | 典型输出 |
 | --- | --- | --- | --- | --- |
 | 1 | `presenton-template-engine` | 模板渲染 | `manifest.json` | `*-deck.html` |
-| 2 | `presenton-html-to-pptx-model` | HTML 转 PPTX 模型 | `*-deck.html` | `*-model.json` |
+| 2 | `presenton-template-engine` | HTML 转 PPTX 模型 | `*-deck.html` | `*-model.json` |
 | 3 | `presenton-pptx-generator` | PPTX 模型转文件 | `*-model.json` | `*.pptx` |
 
 ## 本地调试方式
 
 仓库已经提供 VS Code 调试配置，位于 `.vscode/launch.json`。
 
-当前按职责分成三组：
+当前按职责分成两组：
 
 - `Engine:*`：调试 `presenton-template-engine`
-- `Model:*`：调试 `presenton-html-to-pptx-model`
 - `Generator:*`：调试 `presenton-pptx-generator`
 
 对应的调试输入文件分别放在：
 
 - `.vscode/engine/`
-- `.vscode/model/`
 - `.vscode/generator/`
 
 这些调试配置都采用同一种方式：
@@ -158,7 +143,7 @@ presenton-pptx-generator
 任务会调用 [`scripts/run-ppt-pipeline.mjs`](./scripts/run-ppt-pipeline.mjs)，按下面的固定顺序执行：
 
 1. `presenton-template-engine` 生成 deck HTML
-2. `presenton-html-to-pptx-model` 生成 `*-model.json`
+2. `presenton-template-engine` 调用 `convertDeckHtmlToPptxModel` 生成 `*-model.json`
 3. `presenton-pptx-generator` 生成最终 `.pptx`
 
 ### 输出目录
@@ -198,10 +183,10 @@ presenton-pptx-generator
 它会检查：
 
 - 当前 Node.js 是否为 20+
-- `presenton-template-engine` 和 `presenton-html-to-pptx-model` 的依赖和 `dist/` 是否就绪
+- `presenton-template-engine` 的依赖和 `dist/` 是否就绪
 - `presenton-pptx-generator/.venv` 是否存在
-- 三个插件入口是否都能成功响应 `describe`
-- `presenton-html-to-pptx-model` 是否真的能拉起 Puppeteer 完成一次最小转换
+- `presenton-template-engine` 和 `presenton-pptx-generator` 插件入口是否都能成功响应 `describe`
+- `presenton-template-engine` 的 `convertDeckHtmlToPptxModel` 是否真的能拉起 Puppeteer 完成一次最小转换
 
 注意：
 
@@ -214,7 +199,7 @@ presenton-pptx-generator
 如果要从头生成一份 PPT，推荐按这个顺序调试：
 
 1. 使用 `Engine: Deck Html` 生成 Deck HTML。
-2. 使用 `Model: Convert` 把 Deck HTML 转成 PPTX model JSON。
+2. 使用 `Engine: Convert` 把 Deck HTML 转成 PPTX model JSON。
 3. 使用 `Generator: Generate PPTX` 把 model JSON 生成最终 `.pptx`。
 
 如果要开发模板，通常主要修改：
@@ -223,8 +208,8 @@ presenton-pptx-generator
 
 如果要优化 HTML 到 PPTX 模型的识别效果，通常主要修改：
 
-- `presenton-html-to-pptx-model/src/extract/`
-- `presenton-html-to-pptx-model/src/convert/`
+- `presenton-template-engine/src/html-to-pptx-model/extract/`
+- `presenton-template-engine/src/html-to-pptx-model/convert/`
 
 如果要优化最终 PPTX 写入效果，通常主要修改：
 
@@ -235,5 +220,4 @@ presenton-pptx-generator
 更细的安装、启动、打包和 API 说明，请查看各子项目 README：
 
 - [`presenton-template-engine/README.md`](./presenton-template-engine/README.md)
-- [`presenton-html-to-pptx-model/README.md`](./presenton-html-to-pptx-model/README.md)
 - [`presenton-pptx-generator/README.md`](./presenton-pptx-generator/README.md)

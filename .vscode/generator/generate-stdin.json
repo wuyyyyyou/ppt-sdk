@@ -6,7 +6,7 @@
     "tool": "generatePptx",
     "arguments": {
       "cwd": "${workspaceFolder}/.vscode/generator/output",
-      "model_path": "${workspaceFolder}/.vscode/model/output/red-finance-model.json",
+      "model_path": "${workspaceFolder}/.vscode/engine/output/model/red-finance-model.json",
       "output_path": "${workspaceFolder}/.vscode/generator/output/red-finance.pptx"
     }
   }

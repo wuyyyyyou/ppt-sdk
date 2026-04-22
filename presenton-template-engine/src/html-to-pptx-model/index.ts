@@ -82,7 +82,7 @@ function debugLog(...args: unknown[]) {
   if (!DEBUG_HTML_TO_PPTX) {
     return;
   }
-  console.error("[presenton-html-to-pptx-model]", ...args);
+  console.error("[ppt-engine html-to-model]", ...args);
 }
 
 function getNonEmptyString(value: unknown): string | null {

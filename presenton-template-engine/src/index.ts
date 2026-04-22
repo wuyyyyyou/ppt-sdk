@@ -20,6 +20,18 @@ import {
   type ForkTemplateGroupInput,
   type ForkTemplateGroupResult,
 } from "./fork/fork-template-group.js";
+import {
+  convertDeckHtmlToPptxModel,
+  convertDeckPageToPptxModel,
+  extractDeckPageToSlideAttributes,
+  convertElementAttributesToPptxSlides,
+  convertSlideElementAttributesToPptxSlideModel,
+  sortElementsForPpt,
+  shouldKeepRootLevelElement,
+  type ConvertDeckHtmlToPptxModelInput,
+  type ConvertDeckPageToPptxModelInput,
+  type OrderedExtractedElement,
+} from "./html-to-pptx-model/index.js";
 import { buildDeckHtmlFromManifest } from "./render/build-deck-from-manifest.js";
 import { buildDeckHtml, buildStandaloneDeckHtml } from "./render/build-deck.js";
 import { renderSlideHtml } from "./render/render-slide.js";
@@ -262,6 +274,9 @@ export type {
   GetDiscoveredTemplateGroupInput,
   LocalTemplateGroupMetadata,
   LocalDeckManifestSlideSource,
+  ConvertDeckHtmlToPptxModelInput,
+  ConvertDeckPageToPptxModelInput,
+  OrderedExtractedElement,
   RenderSlideHtmlInput,
   TemplateDiscoverySourceType,
   TemplateRenderThemeInput,
@@ -271,13 +286,20 @@ export {
   buildDeckHtml,
   buildDeckHtmlFromManifest,
   buildStandaloneDeckHtml,
+  convertDeckHtmlToPptxModel,
+  convertDeckPageToPptxModel,
+  convertElementAttributesToPptxSlides,
+  convertSlideElementAttributesToPptxSlideModel,
   CENTERED_TEXT_SEMANTICS_RULE,
+  extractDeckPageToSlideAttributes,
   forkTemplateGroup,
   getAllDiscoveredTemplateGroups,
   getDiscoveredTemplateGroup,
   listDiscoveredTemplateGroupSummaries,
   listThemePresets,
   renderSlideHtml,
+  shouldKeepRootLevelElement,
+  sortElementsForPpt,
   collectRenderedSlideInfos,
   DEFAULT_DECK_SELECTOR,
   DEFAULT_SLIDE_SELECTOR,
@@ -321,3 +343,6 @@ export type {
   ValidationSeverity,
   ValidationViewport,
 };
+export * from "./html-to-pptx-model/types/browser.js";
+export * from "./html-to-pptx-model/types/element-attributes.js";
+export * from "./html-to-pptx-model/types/pptx-models.js";

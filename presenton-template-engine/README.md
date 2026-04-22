@@ -13,12 +13,14 @@
 
 - `example_plugin.js`
 
-当前暴露 5 个工具：
+当前暴露 7 个工具：
 
 - `listDiscoveredTemplateGroupSummaries`
 - `getAllDiscoveredTemplateGroups`
 - `getDiscoveredTemplateGroup`
 - `buildDeckHtmlFromManifest`
+- `convertDeckHtmlToPptxModel`
+- `validateDeckFromManifest`
 - `forkTemplateGroup`
 
 参数兼容说明：
@@ -76,6 +78,43 @@ npm install
 工具不会返回大段 HTML 内容，而是把结果写到 `output_path`，再返回输出文件路径和基础元数据。
 
 如果使用本地 TSX slide 或相对路径的 `output_path`，建议显式传入 `cwd`。
+
+### `convertDeckHtmlToPptxModel`
+
+这个工具读取 `html_path` 指向的 deck HTML 文件，生成 `PptxPresentationModel`，并把结果写到 `output_path`。
+
+支持的主要参数：
+
+- `html_path`
+- `output_path`
+- `cwd`
+- `name`
+- `settle_time_ms`
+- `screenshots_dir`
+
+说明：
+
+- 这个工具现在由 `ppt-engine` 直接对外暴露，便于 AI / task 只调用一个 Node 插件。
+- 转换实现源码已经内聚在 `presenton-template-engine` 内部，不再要求外部工作流额外调用独立的 HTML-to-model 插件。
+- 运行时仍然需要本机有可用的 Chrome / Chrome for Testing。
+
+### `validateDeckFromManifest`
+
+这个工具会对 manifest 对应的 deck 做静态校验，以及可选的浏览器渲染兼容校验。
+
+支持的主要参数：
+
+- `manifest_path`
+- `output_dir`
+- `cwd`
+- `name`
+- `include_rendered_checks`
+- `deck_html_path`
+
+说明：
+
+- `include_rendered_checks=true` 时会拉起浏览器做 rendered validation。
+- 如果已经有现成的 deck HTML，可以通过 `deck_html_path` 复用，避免重复构建。
 
 ### `forkTemplateGroup`
 

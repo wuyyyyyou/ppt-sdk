@@ -5,11 +5,11 @@
   "params": {
     "tool": "convertDeckHtmlToPptxModel",
     "arguments": {
-      "cwd": "${workspaceFolder}/.vscode/model/output",
+      "cwd": "${workspaceFolder}/.vscode/engine/output",
       "html_path": "${workspaceFolder}/.vscode/engine/output/html-model/red-finance-deck.html",
-      "output_path": "${workspaceFolder}/.vscode/model/output/red-finance-model.json",
+      "output_path": "${workspaceFolder}/.vscode/engine/output/model/red-finance-model.json",
       "name": "red-finance",
-      "screenshots_dir": "${workspaceFolder}/.vscode/model/output/screenshots"
+      "screenshots_dir": "${workspaceFolder}/.vscode/engine/output/model/screenshots"
     }
   }
 }

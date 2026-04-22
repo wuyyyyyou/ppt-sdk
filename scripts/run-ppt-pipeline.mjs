@@ -12,7 +12,6 @@ const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const WORKSPACE_DIR = path.resolve(path.dirname(SCRIPT_PATH), "..");
 const OUTPUT_ROOT = path.join(WORKSPACE_DIR, ".vscode", "pipeline-output");
 const ENGINE_DIR = path.join(WORKSPACE_DIR, "presenton-template-engine");
-const MODEL_DIR = path.join(WORKSPACE_DIR, "presenton-html-to-pptx-model");
 const GENERATOR_DIR = path.join(WORKSPACE_DIR, "presenton-pptx-generator");
 const GENERATOR_PYTHON = process.platform === "win32"
   ? path.join(GENERATOR_DIR, ".venv", "Scripts", "python.exe")
@@ -22,7 +21,7 @@ const GENERATE_TIMEOUT_MS = 15 * 60 * 1000;
 const CHECK_TIMEOUT_MS = 30 * 1000;
 const BROWSER_TROUBLESHOOTING_HINT = [
   "Ensure Chrome is available for Puppeteer.",
-  "Try: cd presenton-html-to-pptx-model && npx puppeteer browsers install chrome",
+  "Try: cd presenton-template-engine && npx puppeteer browsers install chrome",
 ].join(" ");
 
 function printUsage() {
@@ -371,16 +370,6 @@ async function collectEnvironmentIssues() {
       hint: "Run: cd presenton-template-engine && npm run build",
     },
     {
-      filePath: path.join(MODEL_DIR, "node_modules"),
-      message: "presenton-html-to-pptx-model dependencies are missing",
-      hint: "Run: cd presenton-html-to-pptx-model && npm install",
-    },
-    {
-      filePath: path.join(MODEL_DIR, "dist", "index.js"),
-      message: "presenton-html-to-pptx-model is not built",
-      hint: "Run: cd presenton-html-to-pptx-model && npm run build",
-    },
-    {
       filePath: GENERATOR_PYTHON,
       message: "presenton-pptx-generator virtualenv is missing",
       hint: [
@@ -414,15 +403,6 @@ async function runDescribeChecks() {
   });
 
   await invokeRpcStage({
-    stageName: "model-describe",
-    command: process.execPath,
-    args: ["example_plugin.js"],
-    cwd: MODEL_DIR,
-    request: describeRequest,
-    timeoutMs: CHECK_TIMEOUT_MS,
-  });
-
-  await invokeRpcStage({
     stageName: "generator-describe",
     command: GENERATOR_PYTHON,
     args: ["example_plugin.py"],
@@ -440,7 +420,7 @@ async function runModelBrowserSmokeCheck() {
     "<!doctype html>",
     "<html>",
     "<body>",
-    '  <div id="presentation-slides-wrapper">',
+    '  <div id="presentation-slides-wrapper" data-presenton-render-status="ready">',
     "    <div>",
     '      <div style="width:1280px;height:720px;background:#ffffff;position:relative;">',
     '        <h1 style="position:absolute;left:64px;top:64px;font-size:32px;color:#111827;">Env Check</h1>',
@@ -467,7 +447,7 @@ async function runModelBrowserSmokeCheck() {
       stageName: "model-browser-check",
       command: process.execPath,
       args: ["example_plugin.js"],
-      cwd: MODEL_DIR,
+      cwd: ENGINE_DIR,
       request,
       timeoutMs: GENERATE_TIMEOUT_MS,
     });
@@ -502,9 +482,8 @@ async function checkEnvironment() {
   process.stdout.write("Environment check passed.\n");
   process.stdout.write(`- Node.js: ${process.version}\n`);
   process.stdout.write(`- Engine plugin: ${relativeToWorkspace(ENGINE_DIR)}\n`);
-  process.stdout.write(`- Model plugin: ${relativeToWorkspace(MODEL_DIR)}\n`);
   process.stdout.write(`- Generator plugin: ${relativeToWorkspace(GENERATOR_DIR)}\n`);
-  process.stdout.write("- Model browser smoke check: passed\n");
+  process.stdout.write("- Engine HTML-to-model smoke check: passed\n");
 }
 
 async function generatePipeline(options) {
@@ -607,7 +586,7 @@ async function generatePipeline(options) {
     stageName: "model",
     command: process.execPath,
     args: ["example_plugin.js"],
-    cwd: MODEL_DIR,
+    cwd: ENGINE_DIR,
     request: modelRequest,
     timeoutMs: GENERATE_TIMEOUT_MS,
     logDir: runContext.logsDir,

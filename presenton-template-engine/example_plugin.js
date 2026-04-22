@@ -2,12 +2,13 @@
 
 import { randomUUID } from "node:crypto";
 import readline from "node:readline";
-import { mkdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
 import {
   buildDeckHtmlFromManifest,
+  convertDeckHtmlToPptxModel,
   forkTemplateGroup,
   getAllDiscoveredTemplateGroups,
   getDiscoveredTemplateGroup,
@@ -20,6 +21,7 @@ const TOOL_NAMES = [
   "getAllDiscoveredTemplateGroups",
   "getDiscoveredTemplateGroup",
   "buildDeckHtmlFromManifest",
+  "convertDeckHtmlToPptxModel",
   "validateDeckFromManifest",
   "forkTemplateGroup",
 ];
@@ -36,7 +38,7 @@ const MANIFEST = {
   display_name: "ppt-engine",
   version: "0.0.3",
   description:
-    "Anna Executa plugin for Presenton template discovery, manifest-based deck HTML generation, and stability validation.",
+    "Anna Executa plugin for Presenton template discovery, manifest-based deck HTML generation, deck HTML to PPTX model conversion, and stability validation.",
   author: "Anna Developer",
   tools: [
     {
@@ -221,6 +223,50 @@ const MANIFEST = {
           type: "string",
           description:
             "Optional prebuilt deck HTML path to reuse instead of rebuilding during rendered validation.",
+          required: false,
+        },
+      ],
+    },
+    {
+      name: "convertDeckHtmlToPptxModel",
+      description:
+        "Convert a rendered deck HTML file into a PptxPresentationModel JSON file and return the output path.",
+      parameters: [
+        {
+          name: "html_path",
+          type: "string",
+          description: "Path to the rendered deck HTML file to convert.",
+          required: true,
+        },
+        {
+          name: "output_path",
+          type: "string",
+          description: "Path where the generated PPTX model JSON file should be written.",
+          required: true,
+        },
+        {
+          name: "cwd",
+          type: "string",
+          description: "Working directory used to resolve relative input and output paths.",
+          required: false,
+        },
+        {
+          name: "name",
+          type: "string",
+          description: "Optional presentation name to store in the generated model.",
+          required: false,
+        },
+        {
+          name: "settle_time_ms",
+          type: "integer",
+          description: "Optional delay after render-ready before DOM extraction.",
+          required: false,
+        },
+        {
+          name: "screenshots_dir",
+          type: "string",
+          description:
+            "Optional directory for screenshot fallback assets used during extraction.",
           required: false,
         },
       ],
@@ -645,6 +691,52 @@ async function toolValidateDeckFromManifest(args) {
   };
 }
 
+async function toolConvertDeckHtmlToPptxModel(args) {
+  if (!args || typeof args !== "object") {
+    throw new Error("Arguments must be an object");
+  }
+
+  if (typeof args.html_path !== "string" || args.html_path.length === 0) {
+    throw new Error('Missing required parameter: "html_path"');
+  }
+
+  if (typeof args.output_path !== "string" || args.output_path.length === 0) {
+    throw new Error('Missing required parameter: "output_path"');
+  }
+
+  const cwd = args.cwd ? resolveFromCwd(null, args.cwd) : process.cwd();
+  const htmlPath = resolveFromCwd(cwd, args.html_path);
+  const outputPath = resolveFromCwd(cwd, args.output_path);
+  const screenshotsDir =
+    typeof args.screenshots_dir === "string" && args.screenshots_dir.length > 0
+      ? resolveFromCwd(cwd, args.screenshots_dir)
+      : undefined;
+  const html = await readFile(htmlPath, "utf8");
+  const name =
+    typeof args.name === "string" && args.name.length > 0
+      ? args.name
+      : path.basename(htmlPath, path.extname(htmlPath));
+
+  const model = await convertDeckHtmlToPptxModel({
+    html,
+    name,
+    settleTimeMs:
+      typeof args.settle_time_ms === "number" ? args.settle_time_ms : undefined,
+    screenshotsDir,
+  });
+
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  await writeFile(outputPath, `${JSON.stringify(model, null, 2)}\n`, "utf8");
+
+  return {
+    output_path: outputPath,
+    html_path: htmlPath,
+    slide_count: Array.isArray(model.slides) ? model.slides.length : 0,
+    name: model.name ?? name,
+    screenshots_dir: screenshotsDir ?? null,
+  };
+}
+
 async function toolForkTemplateGroup(args) {
   if (!args || typeof args !== "object") {
     throw new Error("Arguments must be an object");
@@ -703,6 +795,7 @@ const TOOL_DISPATCH = {
   getDiscoveredTemplateGroup: toolGetDiscoveredTemplateGroup,
   buildDeckHtmlFromManifest: toolBuildDeckHtmlFromManifest,
   validateDeckFromManifest: toolValidateDeckFromManifest,
+  convertDeckHtmlToPptxModel: toolConvertDeckHtmlToPptxModel,
   forkTemplateGroup: toolForkTemplateGroup,
 };
 

@@ -80,6 +80,19 @@
       "skipFiles": ["<node_internals>/**"]
     },
     {
+      "name": "Engine: Convert",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/.vscode/engine/run-plugin-once.mjs",
+      "env": {
+        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/convert-stdin.json",
+        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout.json"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
       "name": "Engine: validate",
       "type": "node",
       "request": "launch",
@@ -101,45 +114,6 @@
       "env": {
         "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/fork-stdin.json",
         "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout.json"
-      },
-      "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "name": "Model: Describe",
-      "type": "node",
-      "request": "launch",
-      "cwd": "${workspaceFolder}",
-      "program": "${workspaceFolder}/.vscode/model/run-plugin-once.mjs",
-      "env": {
-        "MODEL_STDIN_FILE": "${workspaceFolder}/.vscode/model/describe-stdin.json",
-        "MODEL_STDOUT_FILE": "${workspaceFolder}/.vscode/model/describe-stdout.json"
-      },
-      "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "name": "Model: Health",
-      "type": "node",
-      "request": "launch",
-      "cwd": "${workspaceFolder}",
-      "program": "${workspaceFolder}/.vscode/model/run-plugin-once.mjs",
-      "env": {
-        "MODEL_STDIN_FILE": "${workspaceFolder}/.vscode/model/health-stdin.json",
-        "MODEL_STDOUT_FILE": "${workspaceFolder}/.vscode/model/health-stdout.json"
-      },
-      "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "name": "Model: Convert",
-      "type": "node",
-      "request": "launch",
-      "cwd": "${workspaceFolder}",
-      "program": "${workspaceFolder}/.vscode/model/run-plugin-once.mjs",
-      "env": {
-        "MODEL_STDIN_FILE": "${workspaceFolder}/.vscode/model/convert-stdin.json",
-        "MODEL_STDOUT_FILE": "${workspaceFolder}/.vscode/model/stdout.json"
       },
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**"]

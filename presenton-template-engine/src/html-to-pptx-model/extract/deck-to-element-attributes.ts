@@ -45,7 +45,7 @@ function debugLog(...args: unknown[]) {
   if (!DEBUG_HTML_TO_PPTX) {
     return;
   }
-  console.error("[presenton-html-to-pptx-model]", ...args);
+  console.error("[ppt-engine html-to-model]", ...args);
 }
 
 function errorMessage(error: unknown): string {
@@ -114,7 +114,7 @@ async function getSpeakerNotes(
 function getScreenshotsDir(explicitDir?: string): string {
   const screenshotsDir =
     explicitDir ??
-    join(tmpdir(), "presenton-sdk-html-to-pptx-model", "screenshots");
+    join(tmpdir(), "presenton-template-engine", "html-to-pptx-model", "screenshots");
   mkdirSync(screenshotsDir, { recursive: true });
   return screenshotsDir;
 }
