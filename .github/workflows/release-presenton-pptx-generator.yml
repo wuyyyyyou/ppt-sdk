@@ -39,7 +39,17 @@ jobs:
 
           release_tag="presenton-pptx-generator-v${version}"
           release_name="presenton-pptx-generator v${version}"
-          binary_name="ppt-gener"
+          binary_name="$(python3 - <<'PY'
+import tomllib
+
+project = tomllib.load(open('presenton-pptx-generator/pyproject.toml', 'rb'))["project"]
+scripts = project.get("scripts", {})
+candidates = [name for name in scripts if name != "presenton-pptx-generator"]
+if len(candidates) != 1:
+    raise SystemExit(f"Expected exactly one plugin script entry, found: {candidates}")
+print(candidates[0])
+PY
+)"
           asset_prefix="${binary_name}-v${version}"
 
           {
