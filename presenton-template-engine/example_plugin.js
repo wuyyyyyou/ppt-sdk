@@ -211,6 +211,21 @@ const MANIFEST = {
           required: false,
         },
         {
+          name: "single_page",
+          type: "boolean",
+          description:
+            "Whether to validate only one slide from the manifest. Defaults to false.",
+          required: false,
+          default: false,
+        },
+        {
+          name: "page",
+          type: "integer",
+          description:
+            "1-based page number to validate when single_page is true.",
+          required: false,
+        },
+        {
           name: "include_rendered_checks",
           type: "boolean",
           description:
@@ -669,6 +684,10 @@ async function toolValidateDeckFromManifest(args) {
     : args.includeRenderedChecks !== undefined
       ? Boolean(args.includeRenderedChecks)
       : false;
+  const page = args.page !== undefined ? Number(args.page) : undefined;
+  if (args.page !== undefined && !Number.isFinite(page)) {
+    throw new Error('"page" must be an integer');
+  }
 
   const report = await runDeckValidation({
     cwd: typeof args.cwd === "string" && args.cwd.length > 0
@@ -677,6 +696,8 @@ async function toolValidateDeckFromManifest(args) {
     manifestPath: args.manifest_path,
     outputDir: args.output_dir,
     name: typeof args.name === "string" && args.name.length > 0 ? args.name : undefined,
+    singlePage: args.single_page !== undefined ? Boolean(args.single_page) : undefined,
+    page,
     includeRenderedChecks,
     renderedArtifacts: typeof args.deck_html_path === "string" && args.deck_html_path.length > 0
       ? { deckHtmlPath: args.deck_html_path }

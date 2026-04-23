@@ -9,7 +9,9 @@
       "manifest_path": "${workspaceFolder}/.vscode/engine/output/red-finance/manifest.json",
       "output_dir": "${workspaceFolder}/.vscode/engine/output/validation",
       "name": "red-finance",
-      "include_rendered_checks": true
+      "include_rendered_checks": true,
+      "single_page": true,
+      "page": 1
     }
   }
 }

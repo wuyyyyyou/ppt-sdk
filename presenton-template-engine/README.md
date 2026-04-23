@@ -108,6 +108,8 @@ npm install
 - `output_dir`
 - `cwd`
 - `name`
+- `single_page`
+- `page`
 - `include_rendered_checks`
 - `deck_html_path`
 
@@ -115,6 +117,8 @@ npm install
 
 - `include_rendered_checks=true` 时会拉起浏览器做 rendered validation。
 - 如果已经有现成的 deck HTML，可以通过 `deck_html_path` 复用，避免重复构建。
+- `single_page=true` 时只校验 `page` 指定的那一页，适合长 deck 的定点排查。
+- 单页模式会聚焦目标页本身，不会继续报告其他页上的跨页问题，例如别的页里的重复 `id`。
 
 ### `forkTemplateGroup`
 

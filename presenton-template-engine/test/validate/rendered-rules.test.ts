@@ -308,3 +308,64 @@ test("VALIDATE-012 reports translate-based centering for key text", async () => 
 
   assert.equal(diagnostics[0]?.ruleId, "VALIDATE-012");
 });
+
+test("single-page mode limits rendered diagnostics to the selected slide", async () => {
+  const firstSlideElement = createBaseElement({
+    selector: '[data-validation-role="single-line-key-text"]',
+    attributes: { "data-validation-role": "single-line-key-text" },
+    textContent: "First slide text",
+    textLength: 16,
+    directTextLength: 16,
+    scroll: {
+      width: 260,
+      height: 40,
+      clientWidth: 180,
+      clientHeight: 40,
+    },
+  });
+  const secondSlideElement = createBaseElement({
+    selector: '[data-validation-role="single-line-key-text"]',
+    attributes: { "data-validation-role": "single-line-key-text" },
+    textContent: "Second slide text",
+    textLength: 17,
+    directTextLength: 17,
+    scroll: {
+      width: 280,
+      height: 40,
+      clientWidth: 160,
+      clientHeight: 40,
+    },
+  });
+
+  const diagnostics = await runRenderedRules({
+    manifestPath: "/tmp/manifest.json",
+    singlePage: true,
+    page: 2,
+    rendered: {
+      page: {
+        async setContent() {},
+        async $() {
+          return null;
+        },
+      },
+      deckSelector: "#presentation-slides-wrapper",
+      slideSelector: '[data-presenton-slide-shell="true"]',
+      slides: [],
+      slideInspections: [
+        createInspection([firstSlideElement]),
+        {
+          ...createInspection([secondSlideElement]),
+          slideIndex: 1,
+          slideId: "slide-2",
+          layoutId: "test-layout-2",
+        },
+      ],
+      ownedPage: false,
+      async close() {},
+    },
+  }, { rules: [SINGLE_LINE_KEY_TEXT_RULE] });
+
+  assert.equal(diagnostics.length, 1);
+  assert.equal(diagnostics[0]?.ruleId, "DOM-005");
+  assert.equal(diagnostics[0]?.locations[0]?.slideId, "slide-2");
+});

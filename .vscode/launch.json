@@ -93,7 +93,7 @@
       "skipFiles": ["<node_internals>/**"]
     },
     {
-      "name": "Engine: validate",
+      "name": "Engine: Validate",
       "type": "node",
       "request": "launch",
       "cwd": "${workspaceFolder}",

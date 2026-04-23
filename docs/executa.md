@@ -248,6 +248,39 @@ jq -nc \
 | jq
 ```
 
+只校验某一页，避免长 deck 返回过多诊断：
+
+```fish
+jq -nc \
+  --arg cwd $PWD/.vscode/engine/output \
+  --arg manifest_path $PWD/.vscode/engine/output/red-finance/manifest.json \
+  --arg output_dir $PWD/.vscode/engine/output/validation \
+  '{
+    jsonrpc: "2.0",
+    method: "invoke",
+    id: 1,
+    params: {
+      tool: "validateDeckFromManifest",
+      arguments: {
+        cwd: $cwd,
+        manifest_path: $manifest_path,
+        output_dir: $output_dir,
+        name: "red-finance",
+        single_page: true,
+        page: 18,
+        include_rendered_checks: true
+      }
+    }
+  }' \
+| ./presenton-template-engine/bundle/ppt-engine \
+| jq
+```
+
+说明：
+
+- `single_page=true` 时必须同时传 `page`。
+- 单页模式只关注目标页本身，不再返回其他页上的跨页问题。
+
 ### Engine: Fork
 
 ```fish

@@ -201,3 +201,69 @@ test("shared module entries report STATIC-010", async () => {
     },
   );
 });
+
+test("single-page mode limits static validation to the selected slide", async () => {
+  await withDeckFixture(
+    async (deckDir) => {
+      await mkdir(path.join(deckDir, "slides"), { recursive: true });
+      await writeFile(path.join(deckDir, "slides", "BrokenSlide.ts"), MISSING_SCHEMA_SLIDE_MODULE, "utf8");
+      await writeFile(path.join(deckDir, "slides", "ValidSlide.ts"), VALID_SLIDE_MODULE, "utf8");
+      await writeFile(
+        path.join(deckDir, "group.json"),
+        `${JSON.stringify({
+          group_id: "deck-group",
+          group_name: "Deck Group",
+          group_description: "Validation fixture group",
+          ordered: false,
+          default: false,
+        }, null, 2)}\n`,
+        "utf8",
+      );
+
+      const manifestPath = path.join(deckDir, "manifest.json");
+      await writeFile(
+        manifestPath,
+        `${JSON.stringify({
+          title: "Selected Page Only",
+          slides: [
+            {
+              id: "slide-1",
+              source: { type: "local", path: "./slides/BrokenSlide.ts" },
+            },
+            {
+              id: "slide-2",
+              source: { type: "local", path: "./slides/ValidSlide.ts" },
+            },
+          ],
+        }, null, 2)}\n`,
+        "utf8",
+      );
+      return manifestPath;
+    },
+    async (manifestPath) => {
+      const diagnostics = await runStaticRules({
+        manifestPath,
+        singlePage: true,
+        page: 2,
+      });
+      assert.deepEqual(diagnostics, []);
+    },
+  );
+});
+
+test("single-page mode rejects page numbers outside the manifest range", async () => {
+  await withDeckFixture(
+    (deckDir) => writeBaseDeckFiles(deckDir),
+    async (manifestPath) => {
+      await assert.rejects(
+        () =>
+          runStaticRules({
+            manifestPath,
+            singlePage: true,
+            page: 2,
+          }),
+        /Field "page" must be between 1 and 1/,
+      );
+    },
+  );
+});

@@ -174,6 +174,7 @@ export interface RenderedValidationContext {
   slideSelector: string;
   slides: RenderedSlideInfo[];
   slideInspections?: RenderedSlideInspection[];
+  slideInspectionsArePageScoped?: boolean;
   inspectSlides?: () => Promise<RenderedSlideInspection[]>;
   ownedPage: boolean;
   close: () => Promise<void>;
@@ -184,6 +185,8 @@ export interface ValidationContext {
   manifestPath: string;
   outputDir?: string | null;
   name?: string | null;
+  singlePage?: boolean | null;
+  page?: number | null;
   includeRenderedChecks?: boolean;
   manifest?: DeckManifestInput | null;
   renderedArtifacts?: RenderedValidationArtifacts | null;

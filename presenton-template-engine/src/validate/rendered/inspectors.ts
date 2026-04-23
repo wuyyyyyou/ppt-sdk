@@ -4,6 +4,7 @@ import type {
   RenderedSlideInspection,
   ValidationContext,
 } from "../types.js";
+import { selectCollectionPageForValidation } from "../page-selection.js";
 import { prepareRenderedValidationContext } from "./runtime.js";
 
 async function inspectSlide(
@@ -207,19 +208,26 @@ export async function inspectRenderedSlides(
 ): Promise<RenderedSlideInspection[]> {
   const renderedContext = context.rendered ?? await prepareRenderedValidationContext(context);
   if (renderedContext.slideInspections) {
-    return renderedContext.slideInspections;
+    return renderedContext.slideInspectionsArePageScoped
+      ? renderedContext.slideInspections
+      : selectCollectionPageForValidation(renderedContext.slideInspections, context);
   }
 
   if (renderedContext.inspectSlides) {
-    const inspections = await renderedContext.inspectSlides();
+    const inspections = selectCollectionPageForValidation(
+      await renderedContext.inspectSlides(),
+      context,
+    );
     renderedContext.slideInspections = inspections;
+    renderedContext.slideInspectionsArePageScoped = Boolean(context.singlePage);
     return inspections;
   }
 
   const inspections: RenderedSlideInspection[] = [];
-  for (const slide of renderedContext.slides) {
+  for (const slide of selectCollectionPageForValidation(renderedContext.slides, context)) {
     inspections.push(await inspectSlide(context, slide));
   }
   renderedContext.slideInspections = inspections;
+  renderedContext.slideInspectionsArePageScoped = Boolean(context.singlePage);
   return inspections;
 }

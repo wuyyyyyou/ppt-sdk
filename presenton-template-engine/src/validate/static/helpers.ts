@@ -9,6 +9,7 @@ import {
   resolveLocalModulePath,
 } from "../../local-template/loader.js";
 import type { DeckManifestInput, DeckManifestSlideInput } from "../../render/types.js";
+import { selectManifestSlidesForValidation } from "../page-selection.js";
 import type {
   StabilityDiagnostic,
   StabilityDiagnosticLocation,
@@ -111,15 +112,38 @@ async function readManifestState(context: ValidationContext): Promise<ManifestSt
 
 export async function loadManifestState(context: ValidationContext): Promise<ManifestState> {
   const manifestPath = path.resolve(context.manifestPath);
+  const manifestDir = path.dirname(manifestPath);
+
+  if (context.manifest) {
+    return {
+      manifestPath,
+      manifestDir,
+      manifest: selectManifestSlidesForValidation(context.manifest, context),
+      readError: null,
+      parseError: null,
+    };
+  }
 
   const cached = manifestStateCache.get(manifestPath);
   if (cached) {
-    return cached;
+    const state = await cached;
+    return state.manifest
+      ? {
+        ...state,
+        manifest: selectManifestSlidesForValidation(state.manifest, context),
+      }
+      : state;
   }
 
   const nextStatePromise = readManifestState(context);
   manifestStateCache.set(manifestPath, nextStatePromise);
-  return nextStatePromise;
+  const state = await nextStatePromise;
+  return state.manifest
+    ? {
+      ...state,
+      manifest: selectManifestSlidesForValidation(state.manifest, context),
+    }
+    : state;
 }
 
 export function collectLocalManifestSlides(
