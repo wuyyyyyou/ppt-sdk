@@ -20,7 +20,7 @@ dependencies = [
 
 [project.scripts]
 presenton-pptx-generator = "presenton_sdk_pptx_generator.cli:main"
-tool-lightvoss_5433-ppt-gener-w7g2hnsn = "presenton_pptx_generator_plugin:main"
+tool-lightvoss_5433-ppt-gener-dc7ftcep = "presenton_pptx_generator_plugin:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
