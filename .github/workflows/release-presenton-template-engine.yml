@@ -38,17 +38,7 @@ jobs:
 
           release_tag="presenton-template-engine-v${version}"
           release_name="presenton-template-engine v${version}"
-          binary_name="$(python3 - <<'PY'
-import json
-
-package = json.load(open('presenton-template-engine/package.json', encoding='utf-8'))
-bin_map = package.get("bin", {})
-candidates = [name for name in bin_map if name != "presenton-template-engine-server"]
-if len(candidates) != 1:
-    raise SystemExit(f"Expected exactly one plugin bin entry, found: {candidates}")
-print(candidates[0])
-PY
-)"
+          binary_name="$(python3 -c "import json; package = json.load(open('presenton-template-engine/package.json', encoding='utf-8')); bin_map = package.get('bin', {}); candidates = [name for name in bin_map if name != 'presenton-template-engine-server']; assert len(candidates) == 1, f'Expected exactly one plugin bin entry, found: {candidates}'; print(candidates[0])")"
           asset_prefix="${binary_name}-v${version}"
 
           {
