@@ -1,6 +1,6 @@
 {
   "name": "presenton-template-engine-executa",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "Presenton template engine vendored into an Anna Executa plugin",
   "private": true,
   "type": "module",
@@ -29,7 +29,7 @@
   },
   "bin": {
     "presenton-template-engine-server": "./dist/cli.js",
-    "ppt-engine": "./example_plugin.js"
+    "tool-lightvoss_5433-ppt-engine-6443rj2a": "./example_plugin.js"
   },
   "scripts": {
     "dev": "tsx src/cli.ts",

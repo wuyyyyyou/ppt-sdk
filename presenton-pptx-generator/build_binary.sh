@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-PLUGIN_NAME="ppt-gener"
+PLUGIN_NAME="tool-lightvoss_5433-ppt-gener-w7g2hnsn"
 ENTRY_POINT="example_plugin.py"
 VENV_DIR="$SCRIPT_DIR/.venv"
 UV_CACHE_DIR="$SCRIPT_DIR/.uv-cache"

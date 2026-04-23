@@ -50,7 +50,7 @@ def main() -> None:
         binary_path,
         {"jsonrpc": "2.0", "method": "describe", "id": 1},
     )
-    assert describe["result"]["name"] == "ppt-gener"
+    assert describe["result"]["name"] == "tool-lightvoss_5433-ppt-gener-w7g2hnsn"
 
     health = invoke_rpc(
         binary_path,

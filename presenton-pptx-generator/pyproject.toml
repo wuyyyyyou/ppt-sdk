@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "presenton-pptx-generator-executa"
-version = "0.0.2"
+version = "0.1.0"
 description = "Presenton PPTX generator vendored into an Anna Executa plugin"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -20,7 +20,7 @@ dependencies = [
 
 [project.scripts]
 presenton-pptx-generator = "presenton_sdk_pptx_generator.cli:main"
-ppt-gener = "presenton_pptx_generator_plugin:main"
+tool-lightvoss_5433-ppt-gener-w7g2hnsn = "presenton_pptx_generator_plugin:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
