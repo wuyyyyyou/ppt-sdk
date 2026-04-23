@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import type { ElementHandleLike, PageLike } from "../types/browser.js";
 import type {
   ElementAttributes,
+  ElementBorderSideAttributes,
   SlideAttributesResult,
 } from "../types/element-attributes.js";
 
@@ -40,6 +41,18 @@ export type OrderedExtractedElement = {
 const DEFAULT_DECK_SELECTOR = "#presentation-slides-wrapper";
 const DEFAULT_SLIDE_SELECTOR = ":scope > div > div";
 const DEBUG_HTML_TO_PPTX = process.env.PRESENTON_DEBUG_HTML_TO_PPTX === "1";
+const SUPPORTED_SEMANTIC_INLINE_RICH_TEXT_TAGS = [
+  "strong",
+  "b",
+  "em",
+  "i",
+  "u",
+  "s",
+  "strike",
+  "del",
+  "code",
+  "br",
+] as const;
 
 function debugLog(...args: unknown[]) {
   if (!DEBUG_HTML_TO_PPTX) {
@@ -225,6 +238,142 @@ function shouldScreenshotChartContainer(
   return attributes.pptxExport === "screenshot";
 }
 
+function countVisibleBorderSides(
+  borderSides?: ElementAttributes["borderSides"],
+): number {
+  if (!borderSides) {
+    return 0;
+  }
+
+  return ["top", "right", "bottom", "left"].filter((side) => {
+    const borderSide = borderSides[side as keyof typeof borderSides] as ElementBorderSideAttributes | undefined;
+    return Boolean(
+      borderSide &&
+      borderSide.width !== undefined &&
+      borderSide.width > 0 &&
+      borderSide.color,
+    );
+  }).length;
+}
+
+export function resolveAutoConnectorType(
+  attributes: ElementAttributes,
+): string | undefined {
+  if (!attributes.position || !attributes.borderSides) {
+    return undefined;
+  }
+
+  const visibleSideCount = countVisibleBorderSides(attributes.borderSides);
+  if (visibleSideCount !== 1) {
+    return undefined;
+  }
+
+  const hasText = Boolean(attributes.innerText && attributes.innerText.trim().length > 0);
+  const hasFill = Boolean(attributes.background?.color);
+  const hasImage = Boolean(attributes.imageSrc);
+  if (hasText || hasFill || hasImage) {
+    return undefined;
+  }
+
+  const { width = 0, height = 0 } = attributes.position;
+  const maxThinDimension = 12;
+  const minLongDimension = 24;
+
+  if (
+    attributes.borderSides.left &&
+    width <= maxThinDimension &&
+    height >= minLongDimension
+  ) {
+    return "border-left";
+  }
+
+  if (
+    attributes.borderSides.right &&
+    width <= maxThinDimension &&
+    height >= minLongDimension
+  ) {
+    return "border-right";
+  }
+
+  if (
+    attributes.borderSides.top &&
+    height <= maxThinDimension &&
+    width >= minLongDimension
+  ) {
+    return "border-top";
+  }
+
+  if (
+    attributes.borderSides.bottom &&
+    height <= maxThinDimension &&
+    width >= minLongDimension
+  ) {
+    return "border-bottom";
+  }
+
+  return undefined;
+}
+
+export function shouldAutoScreenshotDecorativeElement(
+  attributes: ElementAttributes,
+): boolean {
+  if (!attributes.position) {
+    return false;
+  }
+
+  if (attributes.pptxExport === "screenshot") {
+    return false;
+  }
+
+  if (attributes.tagName === "svg" || attributes.tagName === "canvas" || attributes.tagName === "table") {
+    return false;
+  }
+
+  if (attributes.imageSrc || attributes.tagName === "img") {
+    return false;
+  }
+
+  const textLength = attributes.textLength ?? 0;
+  const directTextLength = attributes.directTextLength ?? 0;
+  const graphicSignalCount = attributes.graphicSignalCount ?? 0;
+  const childElementCount = attributes.childElementCount ?? 0;
+  const width = attributes.position.width ?? 0;
+  const height = attributes.position.height ?? 0;
+
+  return (
+    width >= 80 &&
+    height >= 80 &&
+    graphicSignalCount >= 10 &&
+    textLength <= 24 &&
+    directTextLength <= 8 &&
+    childElementCount > 0
+  );
+}
+
+export function supportsSemanticInlineRichTextNode(input: {
+  tagName: string;
+  attributeNames?: string[];
+}): boolean {
+  const tagName = input.tagName.toLowerCase();
+  if (!SUPPORTED_SEMANTIC_INLINE_RICH_TEXT_TAGS.includes(
+    tagName as typeof SUPPORTED_SEMANTIC_INLINE_RICH_TEXT_TAGS[number],
+  )) {
+    return false;
+  }
+
+  return (input.attributeNames ?? []).length === 0;
+}
+
+export function shouldSkipChildTraversal(
+  attributes: ElementAttributes,
+): boolean {
+  if (attributes.textHtml) {
+    return true;
+  }
+
+  return Boolean(attributes.should_screenshot && attributes.tagName !== "svg");
+}
+
 export function shouldKeepRootLevelElement(
   attributes: ElementAttributes,
   rootRect: {
@@ -395,48 +544,20 @@ async function getAllChildElementsAttributes({
       continue;
     }
 
-    if (attributes.tagName === "p") {
-      let innerElementTagNames: string[];
-      try {
-        innerElementTagNames = await childElementHandle.evaluate((el) => {
-          return Array.from<Element>(el.querySelectorAll("*")).map((node) =>
-            node.tagName.toLowerCase(),
-          );
-        });
-      } catch (error) {
-        throw new Error(
-          `Failed to inspect paragraph inline tags at ${traceLabel} depth=${depth} child_index=${childIndex}: ${errorMessage(error)}`,
-          { cause: error instanceof Error ? error : undefined },
-        );
-      }
-
-      const allowedInlineTags = new Set(["strong", "u", "em", "code", "s"]);
-      const hasOnlyAllowedInlineTags = innerElementTagNames.every((tag) =>
-        allowedInlineTags.has(tag),
-      );
-
-      if (innerElementTagNames.length > 0 && hasOnlyAllowedInlineTags) {
-        try {
-          attributes.innerText = await childElementHandle.evaluate(
-            (el) => el.innerHTML,
-          );
-        } catch (error) {
-          throw new Error(
-            `Failed to read paragraph innerHTML at ${traceLabel} depth=${depth} child_index=${childIndex}: ${errorMessage(error)}`,
-            { cause: error instanceof Error ? error : undefined },
-          );
-        }
-        allResults.push({ attributes, depth });
-        continue;
-      }
+    if (!attributes.connectorType) {
+      attributes.connectorType = resolveAutoConnectorType(attributes);
     }
 
     const shouldScreenshotChartWrapper =
       !attributes.should_screenshot &&
       shouldScreenshotChartContainer(attributes);
+    const shouldScreenshotDecorativeModule =
+      !attributes.should_screenshot &&
+      shouldAutoScreenshotDecorativeElement(attributes);
 
     if (
       shouldScreenshotChartWrapper ||
+      shouldScreenshotDecorativeModule ||
       (attributes.imageSrc &&
         attributes.tagName !== "img" &&
         (!attributes.innerText || attributes.innerText.trim().length === 0)) ||
@@ -450,7 +571,7 @@ async function getAllChildElementsAttributes({
 
     allResults.push({ attributes, depth });
 
-    if (attributes.should_screenshot && attributes.tagName !== "svg") {
+    if (shouldSkipChildTraversal(attributes)) {
       continue;
     }
 
@@ -598,6 +719,31 @@ async function getElementAttributes(
       return { hex, opacity: undefined };
     }
 
+    const supportedInlineTextTags = new Set([
+      "strong",
+      "b",
+      "em",
+      "i",
+      "u",
+      "s",
+      "strike",
+      "del",
+      "code",
+      "br",
+    ]);
+    const supportedTextContainers = new Set([
+      "p",
+      "span",
+      "div",
+      "li",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+    ]);
+
     function hasOnlyTextNodes(node: Element): boolean {
       const children = node.childNodes;
       for (let index = 0; index < children.length; index += 1) {
@@ -607,6 +753,70 @@ async function getElementAttributes(
         }
       }
       return true;
+    }
+
+    function getNormalizedTextLength(value: string | null | undefined): number {
+      return (value ?? "").replace(/\s+/g, " ").trim().length;
+    }
+
+    function getDirectTextLength(node: Element): number {
+      return Array.from(node.childNodes)
+        .filter((child) => child.nodeType === Node.TEXT_NODE)
+        .map((child) => child.textContent ?? "")
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .length;
+    }
+
+    function isSupportedInlineTextNode(node: Node): boolean {
+      if (node.nodeType === Node.TEXT_NODE) {
+        return true;
+      }
+
+      if (!(node instanceof HTMLElement)) {
+        return false;
+      }
+
+      const tagName = node.tagName.toLowerCase();
+      if (!supportedInlineTextTags.has(tagName)) {
+        return false;
+      }
+
+      if (node.getAttributeNames().length > 0) {
+        return false;
+      }
+
+      if (tagName === "br") {
+        return true;
+      }
+
+      return Array.from(node.childNodes).every((child) => isSupportedInlineTextNode(child));
+    }
+
+    function hasAggregatableMixedText(node: Element): boolean {
+      if (!(node instanceof HTMLElement)) {
+        return false;
+      }
+
+      const tagName = node.tagName.toLowerCase();
+      if (!supportedTextContainers.has(tagName)) {
+        return false;
+      }
+
+      if (hasOnlyTextNodes(node)) {
+        return false;
+      }
+
+      if (getNormalizedTextLength(node.textContent) === 0) {
+        return false;
+      }
+
+      return Array.from(node.childNodes).every((child) => isSupportedInlineTextNode(child));
+    }
+
+    function isTextSemanticNode(node: Element): boolean {
+      return hasOnlyTextNodes(node) || hasAggregatableMixedText(node);
     }
 
     function parsePosition(node: Element) {
@@ -1066,7 +1276,7 @@ async function getElementAttributes(
       computedStyles: CSSStyleDeclaration,
       node: Element,
     ) {
-      if (!hasOnlyTextNodes(node) || !(node instanceof HTMLElement)) {
+      if (!isTextSemanticNode(node) || !(node instanceof HTMLElement)) {
         return {
           textAlignHint: undefined,
           textVerticalAlignHint: undefined,
@@ -1110,7 +1320,7 @@ async function getElementAttributes(
     }
 
     function parseCenteredTextGeometryHint(node: Element) {
-      if (!hasOnlyTextNodes(node) || !(node instanceof HTMLElement)) {
+      if (!isTextSemanticNode(node) || !(node instanceof HTMLElement)) {
         return undefined;
       }
 
@@ -1144,7 +1354,7 @@ async function getElementAttributes(
     }
 
     function parseMeasuredTextWidth(node: Element) {
-      if (!hasOnlyTextNodes(node) || !(node instanceof HTMLElement)) {
+      if (!isTextSemanticNode(node) || !(node instanceof HTMLElement)) {
         return undefined;
       }
 
@@ -1183,6 +1393,123 @@ async function getElementAttributes(
       return undefined;
     }
 
+    function parseParentTextAlignmentHints(node: Element) {
+      if (!isTextSemanticNode(node) || !(node instanceof HTMLElement)) {
+        return {
+          textAlignHint: undefined,
+          textVerticalAlignHint: undefined,
+        };
+      }
+
+      const parent = node.parentElement;
+      if (!parent) {
+        return {
+          textAlignHint: undefined,
+          textVerticalAlignHint: undefined,
+        };
+      }
+
+      const parentStyles = window.getComputedStyle(parent);
+      if (
+        parentStyles.display !== "flex" &&
+        parentStyles.display !== "inline-flex"
+      ) {
+        return {
+          textAlignHint: undefined,
+          textVerticalAlignHint: undefined,
+        };
+      }
+
+      const parentRect = parent.getBoundingClientRect();
+      const nodeRect = node.getBoundingClientRect();
+      if (parentRect.width <= 0 || nodeRect.width <= 0) {
+        return {
+          textAlignHint: undefined,
+          textVerticalAlignHint: undefined,
+        };
+      }
+
+      const isRowDirection = !parentStyles.flexDirection.startsWith("column");
+      const parentCenterX = parentRect.left + parentRect.width / 2;
+      const nodeCenterX = nodeRect.left + nodeRect.width / 2;
+      const centerDelta = Math.abs(parentCenterX - nodeCenterX);
+
+      let textAlignHint: "center" | undefined;
+      let textVerticalAlignHint: "middle" | undefined;
+
+      if (isRowDirection) {
+        if (parentStyles.justifyContent.includes("center") && centerDelta <= 6) {
+          textAlignHint = "center";
+        }
+        if (parentStyles.alignItems.includes("center")) {
+          textVerticalAlignHint = "middle";
+        }
+      } else {
+        if (parentStyles.alignItems.includes("center") && centerDelta <= 6) {
+          textAlignHint = "center";
+        }
+        if (parentStyles.justifyContent.includes("center")) {
+          textVerticalAlignHint = "middle";
+        }
+      }
+
+      return {
+        textAlignHint,
+        textVerticalAlignHint,
+      };
+    }
+
+    function parseRichTextHtml(node: Element): string | undefined {
+      if (!hasAggregatableMixedText(node) || !(node instanceof HTMLElement)) {
+        return undefined;
+      }
+
+      const html = node.innerHTML.trim();
+      return html.length > 0 ? html : undefined;
+    }
+
+    function parseBorderSides(computedStyles: CSSStyleDeclaration) {
+      const parseSide = (side: "Top" | "Right" | "Bottom" | "Left") => {
+        const widthValue = parseFloat(computedStyles[`border${side}Width` as keyof CSSStyleDeclaration] as string);
+        const styleValue = String(
+          computedStyles[`border${side}Style` as keyof CSSStyleDeclaration] ?? "",
+        ).toLowerCase();
+        if (Number.isNaN(widthValue) || widthValue <= 0 || styleValue === "none" || styleValue === "hidden") {
+          return undefined;
+        }
+
+        const colorResult = colorToHex(
+          String(computedStyles[`border${side}Color` as keyof CSSStyleDeclaration] ?? ""),
+        );
+        if (!colorResult.hex) {
+          return undefined;
+        }
+
+        return {
+          color: colorResult.hex,
+          width: widthValue,
+          opacity: colorResult.opacity,
+        };
+      };
+
+      const borderSides = {
+        top: parseSide("Top"),
+        right: parseSide("Right"),
+        bottom: parseSide("Bottom"),
+        left: parseSide("Left"),
+      };
+
+      return Object.values(borderSides).some(Boolean) ? borderSides : undefined;
+    }
+
+    function sumGraphicSignals(node: Element): number {
+      const selectors = ["svg", "canvas", "path", "line", "polyline", "polygon", "circle", "rect"];
+      return selectors.reduce((sum, selector) => {
+        const selfCount = node.matches(selector) ? 1 : 0;
+        return sum + selfCount + node.querySelectorAll(selector).length;
+      }, 0);
+    }
+
     function parseElementAttributes(node: Element) {
       const computedStyles = window.getComputedStyle(node);
       const position = parsePosition(node);
@@ -1190,10 +1517,18 @@ async function getElementAttributes(
       const parsedBackgroundImage = parseBackgroundImage(computedStyles);
       const opacity = parseFloat(computedStyles.opacity);
       const textOnly = hasOnlyTextNodes(node);
+      const textSemanticNode = isTextSemanticNode(node);
       const { textAlignHint: flexTextAlignHint, textVerticalAlignHint } =
         parseFlexTextAlignmentHints(computedStyles, node);
+      const {
+        textAlignHint: parentTextAlignHint,
+        textVerticalAlignHint: parentTextVerticalAlignHint,
+      } = parseParentTextAlignmentHints(node);
       const textAlignHint =
-        flexTextAlignHint ?? parseCenteredTextGeometryHint(node);
+        flexTextAlignHint ?? parentTextAlignHint ?? parseCenteredTextGeometryHint(node);
+      const richTextHtml = parseRichTextHtml(node);
+      const borderSides = parseBorderSides(computedStyles);
+      const plainText = textSemanticNode ? (node.textContent || undefined) : undefined;
 
       return {
         tagName: node.tagName.toLowerCase(),
@@ -1204,10 +1539,16 @@ async function getElementAttributes(
             : node.className
               ? node.className.toString()
               : undefined,
-        innerText: textOnly ? node.textContent || undefined : undefined,
+        innerText: plainText,
+        textHtml: richTextHtml,
+        textLength: getNormalizedTextLength(node.textContent),
+        directTextLength: getDirectTextLength(node),
+        childElementCount: node.children.length,
+        graphicSignalCount: sumGraphicSignals(node),
         opacity: Number.isNaN(opacity) ? undefined : opacity,
         background: parseBackground(computedStyles),
         border: parseBorder(computedStyles),
+        borderSides,
         shadow: parseShadow(computedStyles),
         font: parseFont(computedStyles),
         position,
@@ -1218,7 +1559,7 @@ async function getElementAttributes(
           : parseInt(computedStyles.zIndex, 10),
         textAlign: parseTextAlign(computedStyles),
         textAlignHint,
-        textVerticalAlignHint,
+        textVerticalAlignHint: textVerticalAlignHint ?? parentTextVerticalAlignHint,
         lineHeight: parseLineHeight(computedStyles, node),
         measuredTextWidth: parseMeasuredTextWidth(node),
         borderRadius: borderRadiusValue,

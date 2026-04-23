@@ -1,10 +1,21 @@
 import type { ElementHandleLike } from "./browser.js";
 
+export interface ElementBorderSideAttributes {
+  color?: string;
+  width?: number;
+  opacity?: number;
+}
+
 export interface ElementAttributes {
   tagName: string;
   id?: string;
   className?: string;
   innerText?: string;
+  textHtml?: string;
+  textLength?: number;
+  directTextLength?: number;
+  childElementCount?: number;
+  graphicSignalCount?: number;
   opacity?: number;
   background?: {
     color?: string;
@@ -14,6 +25,12 @@ export interface ElementAttributes {
     color?: string;
     width?: number;
     opacity?: number;
+  };
+  borderSides?: {
+    top?: ElementBorderSideAttributes;
+    right?: ElementBorderSideAttributes;
+    bottom?: ElementBorderSideAttributes;
+    left?: ElementBorderSideAttributes;
   };
   shadow?: {
     offset?: [number, number];

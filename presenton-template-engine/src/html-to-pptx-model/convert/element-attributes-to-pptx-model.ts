@@ -106,6 +106,21 @@ function resolveVerticalAlignment(
   );
 }
 
+function hasTextualContent(element: ElementAttributes): boolean {
+  return Boolean(
+    (element.textHtml && element.textHtml.trim().length > 0) ||
+    (element.innerText && element.innerText.trim().length > 0),
+  );
+}
+
+function resolveParagraphTextContent(element: ElementAttributes): string | undefined {
+  if (element.textHtml && element.textHtml.trim().length > 0) {
+    return element.textHtml;
+  }
+
+  return element.innerText;
+}
+
 function isCompactPageNumberText(text?: string): boolean {
   if (!text) {
     return false;
@@ -220,7 +235,11 @@ function convertElementToPptxShape(
     return convertToPictureBox(element);
   }
 
-  if (element.innerText && element.innerText.trim().length > 0) {
+  if (element.connectorType) {
+    return convertToConnector(element);
+  }
+
+  if (hasTextualContent(element)) {
     if (
       element.background?.color &&
       element.borderRadius &&
@@ -318,7 +337,7 @@ function toParagraph(element: ElementAttributes): PptxParagraphModel {
       element.lineHeight,
       element.font?.size,
     ),
-    text: element.innerText,
+    text: resolveParagraphTextContent(element),
   };
 }
 
@@ -399,7 +418,7 @@ function convertToAutoShapeBox(
     text_wrap: element.textWrap ?? true,
     vertical_alignment: resolveVerticalAlignment(element),
     border_radius: borderRadius,
-    paragraphs: element.innerText ? [toParagraph(element)] : undefined,
+    paragraphs: hasTextualContent(element) ? [toParagraph(element)] : undefined,
   };
 }
 
@@ -434,12 +453,33 @@ function convertToPictureBox(element: ElementAttributes): PptxPictureBoxModel {
 }
 
 function convertToConnector(element: ElementAttributes): PptxConnectorModel {
+  const position = toRoundedPosition(element);
+  const connectorBorderSide = element.connectorType?.startsWith("border-")
+    ? element.connectorType.slice("border-".length)
+    : undefined;
+  const borderSide = connectorBorderSide
+    ? element.borderSides?.[connectorBorderSide as keyof typeof element.borderSides]
+    : undefined;
+  const thickness = Math.round(borderSide?.width ?? element.border?.width ?? 1);
+
+  if (connectorBorderSide === "left") {
+    position.width = thickness;
+  } else if (connectorBorderSide === "right") {
+    position.left = position.left + Math.max(position.width - thickness, 0);
+    position.width = thickness;
+  } else if (connectorBorderSide === "top") {
+    position.height = thickness;
+  } else if (connectorBorderSide === "bottom") {
+    position.top = position.top + Math.max(position.height - thickness, 0);
+    position.height = thickness;
+  }
+
   return {
     shape_type: "connector",
     type: PptxConnectorType.STRAIGHT,
-    position: toRoundedPosition(element),
-    thickness: element.border?.width ?? 0.5,
-    color: element.border?.color || element.background?.color || "000000",
-    opacity: element.border?.opacity ?? 1,
+    position,
+    thickness,
+    color: borderSide?.color || element.border?.color || element.background?.color || "000000",
+    opacity: borderSide?.opacity ?? element.border?.opacity ?? 1,
   };
 }
