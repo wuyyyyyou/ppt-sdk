@@ -18,6 +18,7 @@ jobs:
       version: ${{ steps.meta.outputs.version }}
       release_tag: ${{ steps.meta.outputs.release_tag }}
       release_name: ${{ steps.meta.outputs.release_name }}
+      plugin_name: ${{ steps.meta.outputs.plugin_name }}
       binary_name: ${{ steps.meta.outputs.binary_name }}
       asset_prefix: ${{ steps.meta.outputs.asset_prefix }}
     steps:
@@ -31,20 +32,27 @@ jobs:
           set -euo pipefail
 
           version="${{ github.event.inputs.version }}"
+          describe_version="$(python3 -c "import json; print(json.load(open('presenton-template-engine/package.json', encoding='utf-8'))['version'])")"
           if [[ -z "$version" ]]; then
-            version="$(python3 -c "import json; print(json.load(open('presenton-template-engine/package.json', encoding='utf-8'))['version'])")"
+            version="$describe_version"
           fi
           version="${version#v}"
+          if [[ "$version" != "$describe_version" ]]; then
+            echo "Release version '$version' must match describe version '$describe_version'." >&2
+            exit 1
+          fi
 
           release_tag="presenton-template-engine-v${version}"
           release_name="presenton-template-engine v${version}"
-          binary_name="$(python3 -c "import json; package = json.load(open('presenton-template-engine/package.json', encoding='utf-8')); bin_map = package.get('bin', {}); candidates = [name for name in bin_map if name != 'presenton-template-engine-server']; assert len(candidates) == 1, f'Expected exactly one plugin bin entry, found: {candidates}'; print(candidates[0])")"
+          plugin_name="$(python3 -c "import json; package = json.load(open('presenton-template-engine/package.json', encoding='utf-8')); bin_map = package.get('bin', {}); candidates = [name for name in bin_map if name != 'presenton-template-engine-server']; assert len(candidates) == 1, f'Expected exactly one plugin bin entry, found: {candidates}'; print(candidates[0])")"
+          binary_name="ppt-engine"
           asset_prefix="${binary_name}-v${version}"
 
           {
             echo "version=$version"
             echo "release_tag=$release_tag"
             echo "release_name=$release_name"
+            echo "plugin_name=$plugin_name"
             echo "binary_name=$binary_name"
             echo "asset_prefix=$asset_prefix"
           } >> "$GITHUB_OUTPUT"
@@ -93,18 +101,49 @@ jobs:
         if: ${{ matrix.archive_format == 'tar.gz' }}
         working-directory: ${{ env.PROJECT_DIR }}
         env:
+          PLUGIN_NAME: ${{ needs.prepare.outputs.plugin_name }}
           BINARY_NAME: ${{ needs.prepare.outputs.binary_name }}
           ASSET_PREFIX: ${{ needs.prepare.outputs.asset_prefix }}
           ASSET_SUFFIX: ${{ matrix.asset_suffix }}
+          VERSION: ${{ needs.prepare.outputs.version }}
           RELEASE_DIR: ${{ runner.temp }}/release-assets
         run: |
           set -euo pipefail
 
-          mkdir -p "$RELEASE_DIR/stage"
-          cp "bundle/$BINARY_NAME" "$RELEASE_DIR/stage/$BINARY_NAME"
+          stage_dir="$RELEASE_DIR/stage"
+          rm -rf "$stage_dir"
+          mkdir -p "$stage_dir/bin" "$stage_dir/lib" "$stage_dir/data"
+          cp "bundle/$PLUGIN_NAME" "$stage_dir/bin/$BINARY_NAME"
+          chmod 755 "$stage_dir/bin/$BINARY_NAME"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          
+          manifest = {
+              "name": os.environ["PLUGIN_NAME"],
+              "version": os.environ["VERSION"],
+              "runtime": {
+                  "binary": {
+                      "entrypoint": {
+                          "default": f"bin/{os.environ['BINARY_NAME']}",
+                          "windows-x86_64": f"bin/{os.environ['BINARY_NAME']}.exe",
+                          "windows-arm64": f"bin/{os.environ['BINARY_NAME']}.exe",
+                      },
+                      "lib_dirs": ["lib"],
+                      "data_dirs": ["data"],
+                      "permissions": {f"bin/{os.environ['BINARY_NAME']}": "0o755"},
+                  }
+              },
+          }
+          Path(os.environ["RELEASE_DIR"], "stage", "manifest.json").write_text(
+              json.dumps(manifest, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
 
           archive_name="${ASSET_PREFIX}-${ASSET_SUFFIX}.tar.gz"
-          tar -C "$RELEASE_DIR/stage" -czf "$RELEASE_DIR/$archive_name" "$BINARY_NAME"
+          tar -C "$stage_dir" -czf "$RELEASE_DIR/$archive_name" bin lib data manifest.json
           (
             cd "$RELEASE_DIR"
             shasum -a 256 "$archive_name" > "$archive_name.sha256"
@@ -115,24 +154,48 @@ jobs:
         shell: pwsh
         env:
           PROJECT_PATH: ${{ github.workspace }}/presenton-template-engine
+          PLUGIN_NAME: ${{ needs.prepare.outputs.plugin_name }}
           BINARY_NAME: ${{ needs.prepare.outputs.binary_name }}
           ASSET_PREFIX: ${{ needs.prepare.outputs.asset_prefix }}
           ASSET_SUFFIX: ${{ matrix.asset_suffix }}
+          VERSION: ${{ needs.prepare.outputs.version }}
           RELEASE_DIR: ${{ runner.temp }}/release-assets
         run: |
           $releaseDir = $env:RELEASE_DIR
           $stageDir = Join-Path $releaseDir "stage"
           New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
-          New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
+          Remove-Item -LiteralPath $stageDir -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path (Join-Path $stageDir "bin") | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $stageDir "lib") | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $stageDir "data") | Out-Null
 
-          $binaryName = "$env:BINARY_NAME.exe"
-          $sourcePath = Join-Path $env:PROJECT_PATH "bundle/$binaryName"
-          $stageBinaryPath = Join-Path $stageDir $binaryName
+          $sourcePath = Join-Path $env:PROJECT_PATH "bundle/$env:PLUGIN_NAME.exe"
+          $stageBinaryPath = Join-Path (Join-Path $stageDir "bin") "$env:BINARY_NAME.exe"
           Copy-Item -LiteralPath $sourcePath -Destination $stageBinaryPath -Force
+
+          $manifest = [ordered]@{
+            name = $env:PLUGIN_NAME
+            version = $env:VERSION
+            runtime = [ordered]@{
+              binary = [ordered]@{
+                entrypoint = [ordered]@{
+                  default = "bin/$env:BINARY_NAME"
+                  "windows-x86_64" = "bin/$env:BINARY_NAME.exe"
+                  "windows-arm64" = "bin/$env:BINARY_NAME.exe"
+                }
+                lib_dirs = @("lib")
+                data_dirs = @("data")
+                permissions = [ordered]@{
+                  "bin/$env:BINARY_NAME" = "0o755"
+                }
+              }
+            }
+          }
+          $manifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $stageDir "manifest.json") -Encoding utf8
 
           $archiveName = "$env:ASSET_PREFIX-$env:ASSET_SUFFIX.zip"
           $archivePath = Join-Path $releaseDir $archiveName
-          Compress-Archive -LiteralPath $stageBinaryPath -DestinationPath $archivePath -Force
+          Compress-Archive -LiteralPath (Join-Path $stageDir "bin"), (Join-Path $stageDir "lib"), (Join-Path $stageDir "data"), (Join-Path $stageDir "manifest.json") -DestinationPath $archivePath -Force
 
           $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
           Set-Content -LiteralPath "$archivePath.sha256" -Value "$hash  $archiveName" -Encoding ascii
