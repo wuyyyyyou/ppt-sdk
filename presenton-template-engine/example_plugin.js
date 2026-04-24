@@ -36,7 +36,7 @@ const MAX_STDOUT_RESPONSE_BYTES = 512 * 1024;
 const MANIFEST = {
   name: "tool-lightvoss_5433-ppt-engine-6443rj2a",
   display_name: "ppt-engine",
-  version: "0.1.0",
+  version: "0.1.1",
   description:
     "Anna Executa plugin for Presenton template discovery, manifest-based deck HTML generation, deck HTML to PPTX model conversion, and stability validation.",
   author: "Anna Developer",
@@ -884,21 +884,40 @@ async function handleRequest(request) {
 }
 
 const rl = readline.createInterface({ input: process.stdin });
-let didHandleRequest = false;
+let isShuttingDown = false;
+let pendingRequests = 0;
+
+function exitWhenDrained() {
+  if (isShuttingDown && pendingRequests === 0) {
+    process.exit(0);
+  }
+}
+
+function shutdown(signal) {
+  if (isShuttingDown) {
+    return;
+  }
+
+  isShuttingDown = true;
+  if (signal) {
+    process.stderr.write(`Received ${signal}; shutting down\n`);
+  }
+  rl.close();
+}
 
 process.stderr.write("🔌 Presenton template engine Executa plugin started\n");
 process.stderr.write(`   Tools: ${TOOL_NAMES.join(", ")}\n`);
 
 rl.on("line", async (line) => {
   const trimmed = line.trim();
-  if (!trimmed || didHandleRequest) {
+  if (!trimmed || isShuttingDown) {
     return;
   }
-  didHandleRequest = true;
 
   const { request, parseErrorResponse } = parseRequestLine(trimmed);
   process.stderr.write(`${summarizeIncomingRequest(request, trimmed)}\n`);
 
+  pendingRequests += 1;
   try {
     const response = parseErrorResponse ?? await handleRequest(request);
     await emitResponse(request, response);
@@ -912,7 +931,15 @@ rl.on("line", async (line) => {
       `→ error ${summarizeResponse(request, fallbackResponse)} bytes=${Buffer.byteLength(JSON.stringify(fallbackResponse), "utf8")}\n`,
     );
   } finally {
-    rl.close();
-    process.exit(0);
+    pendingRequests -= 1;
+    exitWhenDrained();
   }
 });
+
+rl.on("close", () => {
+  isShuttingDown = true;
+  exitWhenDrained();
+});
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
