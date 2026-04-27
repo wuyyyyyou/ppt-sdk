@@ -55,10 +55,14 @@ const LOCAL_TEMPLATE_RUNTIME_ALLOWED_PACKAGES = new Set([
   "zod",
   "recharts",
 ]);
-const LOCAL_TEMPLATE_RUNTIME_EXTERNAL_PACKAGES = new Set([
+const LOCAL_TEMPLATE_RUNTIME_SHIM_SPECIFIERS = [
   "react",
+  "react/jsx-runtime",
+  "react/jsx-dev-runtime",
   "react-dom",
-]);
+  "react-dom/client",
+  "react-dom/server",
+] as const;
 
 function assertWithinCwd(candidatePath: string, cwd: string, ownerLabel: string): void {
   const relativePath = path.relative(cwd, candidatePath);
@@ -200,7 +204,146 @@ function resolveAllowedRuntimeModule(specifier: string): string {
   }
 }
 
-function createLocalTemplateRuntimeResolver(cwd: string): Plugin {
+function buildRequireRuntimeModuleSource(
+  runtimePath: string,
+  variableName: string,
+  namedExports: string[],
+): string {
+  const exportLines = namedExports.map((exportName) => {
+    return `export const ${exportName} = ${variableName}.${exportName};`;
+  });
+
+  return [
+    'import { createRequire } from "node:module";',
+    "const require = createRequire(import.meta.url);",
+    `const ${variableName} = require(${JSON.stringify(runtimePath)});`,
+    `export default ${variableName};`,
+    ...exportLines,
+    "",
+  ].join("\n");
+}
+
+async function createLocalTemplateRuntimeShims(
+  compileRoot: string,
+): Promise<Map<string, string>> {
+  const shimDir = path.join(compileRoot, "runtime-shims");
+  await mkdir(shimDir, { recursive: true });
+
+  const shimSources = new Map<string, string>([
+    [
+      "react",
+      buildRequireRuntimeModuleSource(resolveAllowedRuntimeModule("react"), "React", [
+        "Children",
+        "Component",
+        "Fragment",
+        "Profiler",
+        "PureComponent",
+        "StrictMode",
+        "Suspense",
+        "cloneElement",
+        "createContext",
+        "createElement",
+        "createFactory",
+        "createRef",
+        "forwardRef",
+        "isValidElement",
+        "lazy",
+        "memo",
+        "startTransition",
+        "useCallback",
+        "useContext",
+        "useDebugValue",
+        "useDeferredValue",
+        "useEffect",
+        "useId",
+        "useImperativeHandle",
+        "useInsertionEffect",
+        "useLayoutEffect",
+        "useMemo",
+        "useReducer",
+        "useRef",
+        "useState",
+        "useSyncExternalStore",
+        "useTransition",
+        "version",
+      ]),
+    ],
+    [
+      "react/jsx-runtime",
+      buildRequireRuntimeModuleSource(
+        resolveAllowedRuntimeModule("react/jsx-runtime"),
+        "jsxRuntime",
+        ["Fragment", "jsx", "jsxs"],
+      ),
+    ],
+    [
+      "react/jsx-dev-runtime",
+      buildRequireRuntimeModuleSource(
+        resolveAllowedRuntimeModule("react/jsx-dev-runtime"),
+        "jsxDevRuntime",
+        ["Fragment", "jsxDEV"],
+      ),
+    ],
+    [
+      "react-dom",
+      buildRequireRuntimeModuleSource(resolveAllowedRuntimeModule("react-dom"), "ReactDOM", [
+        "createPortal",
+        "findDOMNode",
+        "flushSync",
+        "hydrate",
+        "render",
+        "unmountComponentAtNode",
+        "unstable_batchedUpdates",
+        "version",
+      ]),
+    ],
+    [
+      "react-dom/client",
+      buildRequireRuntimeModuleSource(
+        resolveAllowedRuntimeModule("react-dom/client"),
+        "ReactDOMClient",
+        ["createRoot", "hydrateRoot"],
+      ),
+    ],
+    [
+      "react-dom/server",
+      buildRequireRuntimeModuleSource(
+        resolveAllowedRuntimeModule("react-dom/server"),
+        "ReactDOMServer",
+        [
+          "renderToNodeStream",
+          "renderToPipeableStream",
+          "renderToReadableStream",
+          "renderToStaticMarkup",
+          "renderToStaticNodeStream",
+          "renderToString",
+          "version",
+        ],
+      ),
+    ],
+  ]);
+
+  const shimPaths = new Map<string, string>();
+  let index = 0;
+  for (const specifier of LOCAL_TEMPLATE_RUNTIME_SHIM_SPECIFIERS) {
+    const source = shimSources.get(specifier);
+    if (!source) {
+      continue;
+    }
+
+    const shimPath = path.join(shimDir, `${index}.mjs`);
+    await writeFile(shimPath, source, "utf8");
+    shimPaths.set(specifier, shimPath);
+    index += 1;
+  }
+
+  return shimPaths;
+}
+
+function createLocalTemplateRuntimeResolver(
+  cwd: string,
+  runtimeShims: Map<string, string>,
+): Plugin {
   const templateRoot = resolveExistingPath(cwd);
 
   return {
@@ -224,10 +367,10 @@ function createLocalTemplateRuntimeResolver(cwd: string): Plugin {
         }
 
         const packageName = getBarePackageName(specifier);
-        if (LOCAL_TEMPLATE_RUNTIME_EXTERNAL_PACKAGES.has(packageName)) {
+        const runtimeShimPath = runtimeShims.get(specifier);
+        if (runtimeShimPath) {
           return {
-            path: resolveAllowedRuntimeModule(specifier),
-            external: true,
+            path: runtimeShimPath,
           };
         }
 
@@ -284,6 +427,7 @@ async function compileLocalTemplateModule(
     .digest("hex")
     .slice(0, 16);
   const outputPath = path.join(compileRoot, `${sourceHash}.mjs`);
+  const runtimeShims = await createLocalTemplateRuntimeShims(compileRoot);
 
   try {
     await build({
@@ -297,7 +441,7 @@ async function compileLocalTemplateModule(
       jsx: "automatic",
       tsconfig: await resolveLocalTemplateTsconfigPath(cwd),
       logLevel: "silent",
-      plugins: [createLocalTemplateRuntimeResolver(cwd)],
+      plugins: [createLocalTemplateRuntimeResolver(cwd, runtimeShims)],
     });
   } catch (error) {
     throw new Error(

@@ -56,6 +56,55 @@ test("imports a TSX local template without template-local node_modules", async (
   }
 });
 
+test("imports a Recharts local template through runtime React shims", async () => {
+  const rootDir = await mkdtemp(path.join(tmpdir(), "presenton-local-template-loader-"));
+
+  try {
+    await mkdir(path.join(rootDir, "slides"), { recursive: true });
+    await writeFile(
+      path.join(rootDir, "slides", "ChartSlide.tsx"),
+      [
+        'import React from "react";',
+        'import * as z from "zod";',
+        'import { Bar, BarChart } from "recharts";',
+        "",
+        "export const Schema = z.object({",
+        '  title: z.string().default("Chart"),',
+        "});",
+        'export const layoutId = "recharts-fixture";',
+        'export const layoutName = "Recharts Fixture";',
+        'export const layoutDescription = "Loads Recharts through bundled runtime dependencies.";',
+        "",
+        "export default function ChartSlide({ data }) {",
+        "  const parsed = Schema.parse(data ?? {});",
+        "  return (",
+        "    <div>",
+        "      <h1>{parsed.title}</h1>",
+        '      <BarChart width={320} height={180} data={[{ name: "A", value: 10 }]}>',
+        '        <Bar dataKey="value" />',
+        "      </BarChart>",
+        "    </div>",
+        "  );",
+        "}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const moduleValue = await importLocalTemplateModule(
+      path.join(rootDir, "slides", "ChartSlide.tsx"),
+      rootDir,
+    );
+
+    assertLocalTemplateModule(moduleValue, path.join(rootDir, "slides", "ChartSlide.tsx"));
+    assert.equal(moduleValue.layoutId, "recharts-fixture");
+    assert.deepEqual(moduleValue.Schema.parse({}), { title: "Chart" });
+    assert.equal(typeof moduleValue.default, "function");
+  } finally {
+    await rm(rootDir, { recursive: true, force: true });
+  }
+});
+
 test("reports unsupported template runtime imports clearly", async () => {
   const rootDir = await mkdtemp(path.join(tmpdir(), "presenton-local-template-loader-"));
 
