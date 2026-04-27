@@ -167,7 +167,7 @@ function buildManifest(group: ForkableGroupAsset, manifestTitle: string): DeckMa
       speaker_note: slide.layoutName,
       source: {
         type: "local",
-        path: `./${slide.sourcePath.replace(/\\/g, "/")}`,
+        path: toManifestSourcePath(slide.sourcePath),
       },
       data: slide.sampleData ?? {},
     })),
@@ -182,6 +182,34 @@ function normalizeRelativeFilePath(value: string): string {
   return value.replace(/\\/g, "/").replace(/^\.\//, "");
 }
 
+function toManifestSourcePath(sourcePath: string): string {
+  return `./${normalizeRelativeFilePath(sourcePath)}`;
+}
+
+function addSlidePathMapping(
+  slideBySourcePath: Map<string, ForkableGroupSlideAsset>,
+  sourcePath: string,
+  slide: ForkableGroupSlideAsset,
+): void {
+  const normalizedSourcePath = normalizeRelativeFilePath(sourcePath);
+  if (!slideBySourcePath.has(normalizedSourcePath)) {
+    slideBySourcePath.set(normalizedSourcePath, slide);
+  }
+
+  if (normalizedSourcePath.startsWith("slides/")) {
+    const withoutSlidesPrefix = normalizedSourcePath.slice("slides/".length);
+    if (!slideBySourcePath.has(withoutSlidesPrefix)) {
+      slideBySourcePath.set(withoutSlidesPrefix, slide);
+    }
+    return;
+  }
+
+  const withSlidesPrefix = `slides/${normalizedSourcePath}`;
+  if (!slideBySourcePath.has(withSlidesPrefix)) {
+    slideBySourcePath.set(withSlidesPrefix, slide);
+  }
+}
+
 function buildManifestFromOriginal(
   group: ForkableGroupAsset,
   manifestTitle: string,
@@ -191,9 +219,10 @@ function buildManifestFromOriginal(
     return null;
   }
 
-  const slideBySourcePath = new Map(
-    group.slides.map((slide) => [normalizeRelativeFilePath(slide.sourcePath), slide]),
-  );
+  const slideBySourcePath = new Map<string, ForkableGroupSlideAsset>();
+  group.slides.forEach((slide) => {
+    addSlidePathMapping(slideBySourcePath, slide.sourcePath, slide);
+  });
   const slideById = new Map(group.slides.map((slide) => [slide.slideId, slide]));
 
   const slides = originalManifest.slides.map((originalSlide, index) => {
@@ -233,7 +262,7 @@ function buildManifestFromOriginal(
           : matchingSlide.slideId,
       source: {
         type: "local",
-        path: `./${matchingSlide.sourcePath.replace(/\\/g, "/")}`,
+        path: toManifestSourcePath(matchingSlide.sourcePath),
       },
       data: isPlainRecord(originalSlide.data) ? originalSlide.data : {},
     };

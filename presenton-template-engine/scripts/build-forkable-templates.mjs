@@ -155,7 +155,18 @@ async function collectDependencyGraph(entryFiles) {
   };
 }
 
-function buildTargetRelativePath(groupRoot, sourceFile) {
+function buildTargetRelativePath(groupRoot, sourceFile, entryFiles) {
+  if (entryFiles.has(sourceFile)) {
+    const groupRelativePath = path.relative(groupRoot, sourceFile);
+    if (groupRelativePath === "" || groupRelativePath.startsWith(`..${path.sep}`)) {
+      return path.join("slides", path.basename(sourceFile));
+    }
+
+    return groupRelativePath.startsWith(`slides${path.sep}`)
+      ? groupRelativePath
+      : path.join("slides", groupRelativePath);
+  }
+
   if (sourceFile === groupRoot || sourceFile.startsWith(`${groupRoot}${path.sep}`)) {
     return path.relative(groupRoot, sourceFile);
   }
@@ -307,9 +318,13 @@ async function main() {
     const groupPackageJson = await readGroupPackageJson(groupRoot);
     const groupManifest = await readGroupManifest(groupRoot);
     const targetPathMap = new Map();
+    const entryFileSet = new Set(entryFiles);
 
     for (const sourceFile of files) {
-      targetPathMap.set(sourceFile, buildTargetRelativePath(groupRoot, sourceFile));
+      targetPathMap.set(
+        sourceFile,
+        buildTargetRelativePath(groupRoot, sourceFile, entryFileSet),
+      );
     }
 
     const groupOutputDir = path.join(outputRoot, "groups", group.group_id);
