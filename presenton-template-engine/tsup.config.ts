@@ -15,7 +15,7 @@ export default defineConfig([
     target: "node20",
     outDir: "dist",
     shims: false,
-    external: ["typescript"],
+    external: ["esbuild", "typescript"],
   },
   {
     entry: {

@@ -1,10 +1,12 @@
-import { access, mkdir, writeFile } from "node:fs/promises";
-import { constants as fsConstants } from "node:fs";
+import { createHash } from "node:crypto";
+import { access, mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { constants as fsConstants, realpathSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import type { Plugin } from "esbuild";
 import type React from "react";
 import type { ZodTypeAny } from "zod";
 
@@ -42,6 +44,20 @@ export const ALLOWED_LOCAL_EXTENSIONS = new Set([
   ".js",
   ".mts",
   ".cts",
+]);
+
+const currentModulePath =
+  typeof __filename === "string" ? __filename : import.meta.url;
+const engineRequire = createRequire(currentModulePath);
+const LOCAL_TEMPLATE_RUNTIME_ALLOWED_PACKAGES = new Set([
+  "react",
+  "react-dom",
+  "zod",
+  "recharts",
+]);
+const LOCAL_TEMPLATE_RUNTIME_EXTERNAL_PACKAGES = new Set([
+  "react",
+  "react-dom",
 ]);
 
 function assertWithinCwd(candidatePath: string, cwd: string, ownerLabel: string): void {
@@ -135,46 +151,206 @@ export async function resolveLocalTemplateTsconfigPath(cwd: string): Promise<str
   return (await findNearestTsconfig(cwd)) ?? getFallbackLocalTemplateTsconfigPath();
 }
 
+function isRelativeOrAbsoluteSpecifier(specifier: string): boolean {
+  return (
+    specifier.startsWith(".") ||
+    specifier.startsWith("/") ||
+    /^[a-zA-Z]:[\\/]/.test(specifier)
+  );
+}
+
+function getBarePackageName(specifier: string): string {
+  if (specifier.startsWith("@")) {
+    const [scope, name] = specifier.split("/");
+    return scope && name ? `${scope}/${name}` : specifier;
+  }
+
+  return specifier.split("/")[0] ?? specifier;
+}
+
+function isPathWithinDirectory(candidatePath: string, directoryPath: string): boolean {
+  const relativePath = path.relative(
+    resolveExistingPath(directoryPath),
+    resolveExistingPath(candidatePath),
+  );
+  return (
+    relativePath.length === 0 ||
+    (!relativePath.startsWith(`..${path.sep}`) &&
+      relativePath !== ".." &&
+      !path.isAbsolute(relativePath))
+  );
+}
+
+function resolveExistingPath(candidatePath: string): string {
+  try {
+    return realpathSync.native(candidatePath);
+  } catch {
+    return path.resolve(candidatePath);
+  }
+}
+
+function resolveAllowedRuntimeModule(specifier: string): string {
+  try {
+    return engineRequire.resolve(specifier);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Presenton template runtime includes "${specifier}", but it could not be resolved from the bundled runtime: ${message}`,
+    );
+  }
+}
+
+function createLocalTemplateRuntimeResolver(cwd: string): Plugin {
+  const templateRoot = resolveExistingPath(cwd);
+
+  return {
+    name: "presenton-local-template-runtime",
+    setup(build) {
+      build.onResolve({ filter: /.*/ }, (args) => {
+        const specifier = args.path;
+
+        if (isRelativeOrAbsoluteSpecifier(specifier)) {
+          return;
+        }
+
+        if (specifier.startsWith("node:")) {
+          if (!args.importer || !isPathWithinDirectory(args.importer, templateRoot)) {
+            return;
+          }
+
+          throw new Error(
+            `This template imports "${specifier}", but Node built-in modules are not supported in Presenton local templates.`,
+          );
+        }
+
+        const packageName = getBarePackageName(specifier);
+        if (LOCAL_TEMPLATE_RUNTIME_EXTERNAL_PACKAGES.has(packageName)) {
+          return {
+            path: resolveAllowedRuntimeModule(specifier),
+            external: true,
+          };
+        }
+
+        if (!args.importer || !isPathWithinDirectory(args.importer, templateRoot)) {
+          return;
+        }
+
+        if (!LOCAL_TEMPLATE_RUNTIME_ALLOWED_PACKAGES.has(packageName)) {
+          throw new Error(
+            `This template imports "${specifier}", but it is not included in the Presenton template runtime.`,
+          );
+        }
+
+        const resolvedPath = resolveAllowedRuntimeModule(specifier);
+        return {
+          path: resolvedPath,
+        };
+      });
+    },
+  };
+}
+
+function formatLocalTemplateBuildError(error: unknown): string {
+  if (
+    error &&
+    typeof error === "object" &&
+    "errors" in error &&
+    Array.isArray((error as { errors?: unknown[] }).errors)
+  ) {
+    const messages = (error as { errors: Array<{ text?: unknown }> }).errors
+      .map((item) => (typeof item.text === "string" ? item.text : null))
+      .filter((item): item is string => Boolean(item));
+
+    if (messages.length > 0) {
+      return messages.join("; ");
+    }
+  }
+
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function compileLocalTemplateModule(
+  absolutePath: string,
+  cwd: string,
+): Promise<string> {
+  const { build } = await import("esbuild");
+  const compileRoot = await mkdtemp(
+    path.join(tmpdir(), "presenton-template-engine-local-template-"),
+  );
+  const sourceHash = createHash("sha256")
+    .update(path.resolve(absolutePath))
+    .update("\0")
+    .update(String(Date.now()))
+    .digest("hex")
+    .slice(0, 16);
+  const outputPath = path.join(compileRoot, `${sourceHash}.mjs`);
+
+  try {
+    await build({
+      entryPoints: [absolutePath],
+      outfile: outputPath,
+      absWorkingDir: cwd,
+      bundle: true,
+      platform: "node",
+      format: "esm",
+      target: "node20",
+      jsx: "automatic",
+      tsconfig: await resolveLocalTemplateTsconfigPath(cwd),
+      logLevel: "silent",
+      plugins: [createLocalTemplateRuntimeResolver(cwd)],
+    });
+  } catch (error) {
+    throw new Error(
+      `Failed to compile local template "${absolutePath}": ${formatLocalTemplateBuildError(error)}`,
+    );
+  }
+
+  return outputPath;
+}
+
 export async function importLocalTemplateModule(
   absolutePath: string,
   cwd: string,
 ): Promise<LocalTemplateModule> {
-  const { tsImport } = await import("tsx/esm/api");
-  const parentUrl = pathToFileURL(
-    path.join(cwd, "__presenton_manifest_loader__.ts"),
-  ).href;
-  const tsconfigPath = await resolveLocalTemplateTsconfigPath(cwd);
-  const loaded = await tsImport(pathToFileURL(absolutePath).href, {
-    parentURL: parentUrl,
-    tsconfig: tsconfigPath,
-  });
+  const compiledPath = await compileLocalTemplateModule(absolutePath, cwd);
+  const loaded = await import(pathToFileURL(compiledPath).href);
   return loaded as LocalTemplateModule;
+}
+
+function loadTemplateRenderRuntime(
+  requireFromRuntime: (id: string) => unknown,
+): LocalTemplateRenderRuntime | null {
+  const react = requireFromRuntime("react") as ReactModule;
+  const reactDomServer = requireFromRuntime("react-dom/server") as {
+    renderToStaticMarkup?: RenderToStaticMarkup;
+  };
+
+  if (
+    !react ||
+    typeof react.createElement !== "function" ||
+    !reactDomServer ||
+    typeof reactDomServer.renderToStaticMarkup !== "function"
+  ) {
+    return null;
+  }
+
+  return {
+    react,
+    renderToStaticMarkup: reactDomServer.renderToStaticMarkup,
+  };
 }
 
 export function loadLocalTemplateRenderRuntime(cwd: string): LocalTemplateRenderRuntime | null {
   const localRequire = createRequire(path.join(cwd, "__presenton_manifest_loader__.cjs"));
 
   try {
-    const react = localRequire("react") as ReactModule;
-    const reactDomServer = localRequire("react-dom/server") as {
-      renderToStaticMarkup?: RenderToStaticMarkup;
-    };
-
-    if (
-      !react ||
-      typeof react.createElement !== "function" ||
-      !reactDomServer ||
-      typeof reactDomServer.renderToStaticMarkup !== "function"
-    ) {
+    return loadTemplateRenderRuntime(engineRequire) ?? loadTemplateRenderRuntime(localRequire);
+  } catch {
+    try {
+      return loadTemplateRenderRuntime(localRequire);
+    } catch {
       return null;
     }
-
-    return {
-      react,
-      renderToStaticMarkup: reactDomServer.renderToStaticMarkup,
-    };
-  } catch {
-    return null;
   }
 }
 
