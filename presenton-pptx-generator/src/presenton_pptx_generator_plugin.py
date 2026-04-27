@@ -20,19 +20,19 @@ MANIFEST = {
                 {
                     "name": "model_path",
                     "type": "string",
-                    "description": "Path to the PptxPresentationModel JSON file.",
+                    "description": "Absolute path to the PptxPresentationModel JSON file.",
                     "required": True,
                 },
                 {
                     "name": "output_path",
                     "type": "string",
-                    "description": "Path where the generated .pptx file should be written.",
+                    "description": "Absolute path where the generated .pptx file should be written.",
                     "required": True,
                 },
                 {
                     "name": "cwd",
                     "type": "string",
-                    "description": "Working directory used to resolve relative input and output paths.",
+                    "description": "Optional absolute working directory retained for compatibility.",
                     "required": False,
                 },
             ],
@@ -58,33 +58,37 @@ def make_response(
     return response
 
 
-def resolve_path(cwd: Optional[str], target: str) -> Path:
-    if not isinstance(target, str) or not target:
-        raise ValueError("Expected a non-empty path string")
+def read_required_absolute_path(args: dict[str, Any], parameter_name: str) -> Path:
+    value = args.get(parameter_name)
+    if not isinstance(value, str) or not value:
+        raise ValueError(f'Missing required parameter: "{parameter_name}"')
 
-    base_dir = Path(cwd).expanduser().resolve() if cwd else Path.cwd()
-    return (base_dir / target).resolve() if not Path(target).expanduser().is_absolute() else Path(target).expanduser().resolve()
+    expanded = Path(value).expanduser()
+    if not expanded.is_absolute():
+        raise ValueError(f'"{parameter_name}" must be an absolute path')
+
+    return expanded.resolve()
+
+
+def validate_optional_absolute_path(args: dict[str, Any], parameter_name: str) -> None:
+    value = args.get(parameter_name)
+    if value is None:
+        return
+
+    if not isinstance(value, str) or not value:
+        raise ValueError(f'"{parameter_name}" must be a non-empty string when provided')
+
+    if not Path(value).expanduser().is_absolute():
+        raise ValueError(f'"{parameter_name}" must be an absolute path')
 
 
 def tool_generate_pptx(args: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(args, dict):
         raise ValueError("Arguments must be an object")
 
-    model_path_arg = args.get("model_path")
-    output_path_arg = args.get("output_path")
-    cwd_arg = args.get("cwd")
-
-    if not isinstance(model_path_arg, str) or not model_path_arg:
-        raise ValueError('Missing required parameter: "model_path"')
-
-    if not isinstance(output_path_arg, str) or not output_path_arg:
-        raise ValueError('Missing required parameter: "output_path"')
-
-    if cwd_arg is not None and (not isinstance(cwd_arg, str) or not cwd_arg):
-        raise ValueError('"cwd" must be a non-empty string when provided')
-
-    model_path = resolve_path(cwd_arg, model_path_arg)
-    output_path = resolve_path(cwd_arg, output_path_arg)
+    validate_optional_absolute_path(args, "cwd")
+    model_path = read_required_absolute_path(args, "model_path")
+    output_path = read_required_absolute_path(args, "output_path")
 
     from presenton_sdk_pptx_generator import generate_pptx_sync
 

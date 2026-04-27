@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { access, copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,18 +41,11 @@ type ForkableTemplatesAssetIndex = {
   groups: Record<string, ForkableGroupAsset>;
 };
 
-type DependencyInstallResult = {
-  packageLockPath: string | null;
-  nodeModulesPath: string;
-  installCommand: "npm install";
-};
-
 export interface ForkTemplateGroupInput {
   templateGroup: string;
   outDir: string;
   manifestTitle?: string | null;
   overwrite?: boolean;
-  installDependencies?: boolean;
 }
 
 export interface ForkTemplateGroupResult {
@@ -62,10 +54,6 @@ export interface ForkTemplateGroupResult {
   manifestPath: string;
   packageJsonPath: string;
   tsconfigPath: string;
-  packageLockPath: string | null;
-  nodeModulesPath: string | null;
-  dependenciesInstalled: boolean;
-  installCommand: string | null;
   manifest: DeckManifestInput;
 }
 
@@ -134,6 +122,12 @@ async function ensureOutputDirectory(outDir: string, overwrite: boolean): Promis
 
   await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
+}
+
+function assertAbsolutePath(value: string, fieldName: string): void {
+  if (!path.isAbsolute(value)) {
+    throw new Error(`Field "${fieldName}" must be an absolute path`);
+  }
 }
 
 async function copyDirectoryContents(sourceDir: string, targetDir: string): Promise<void> {
@@ -347,65 +341,6 @@ function buildDeckTsconfig() {
   };
 }
 
-async function runNpmInstall(outDir: string): Promise<DependencyInstallResult> {
-  const command = process.platform === "win32" ? "npm.cmd" : "npm";
-
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(command, ["install"], {
-      cwd: outDir,
-      env: process.env,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-
-    let stdout = "";
-    let stderr = "";
-
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk;
-    });
-
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk;
-    });
-
-    child.once("error", (error) => {
-      const message = error instanceof Error ? error.message : String(error);
-      reject(
-        new Error(
-          `Unable to install dependencies for forked template at ${outDir}: npm was not found or could not be started. Ensure npm is installed and available in PATH. ${message}`,
-        ),
-      );
-    });
-
-    child.once("close", (exitCode) => {
-      if (exitCode === 0) {
-        resolve();
-        return;
-      }
-
-      const details = [stderr.trim(), stdout.trim()].filter(Boolean).join("\n");
-      reject(
-        new Error(
-          `Unable to install dependencies for forked template at ${outDir}: npm install failed with exit code ${exitCode ?? "unknown"}${details ? `:\n${details}` : ""}`,
-        ),
-      );
-    });
-  });
-
-  const packageLockPath = path.join(outDir, "package-lock.json");
-  const nodeModulesPath = path.join(outDir, "node_modules");
-  await mkdir(nodeModulesPath, { recursive: true });
-
-  return {
-    packageLockPath: (await pathExists(packageLockPath)) ? packageLockPath : null,
-    nodeModulesPath,
-    installCommand: "npm install",
-  };
-}
-
 export async function forkTemplateGroup(
   input: ForkTemplateGroupInput,
 ): Promise<ForkTemplateGroupResult> {
@@ -421,13 +356,14 @@ export async function forkTemplateGroup(
     throw new Error('Field "outDir" is required');
   }
 
+  assertAbsolutePath(input.outDir, "outDir");
+  const outDir = path.normalize(input.outDir);
   const assetIndex = await loadAssetIndex();
   const group = assetIndex.groups[input.templateGroup];
   if (!group) {
     throw new Error(`Forkable template group not found: ${input.templateGroup}`);
   }
 
-  const outDir = path.resolve(input.outDir);
   await ensureOutputDirectory(outDir, input.overwrite === true);
 
   const sourceGroupDir = path.join(FORKABLE_TEMPLATES_DIR, "groups", group.groupId);
@@ -463,19 +399,12 @@ export async function forkTemplateGroup(
     "utf8",
   );
 
-  const installResult =
-    input.installDependencies === true ? await runNpmInstall(outDir) : null;
-
   return {
     outDir,
     groupJsonPath,
     manifestPath,
     packageJsonPath,
     tsconfigPath,
-    packageLockPath: installResult?.packageLockPath ?? null,
-    nodeModulesPath: installResult?.nodeModulesPath ?? null,
-    dependenciesInstalled: installResult !== null,
-    installCommand: installResult?.installCommand ?? null,
     manifest,
   };
 }

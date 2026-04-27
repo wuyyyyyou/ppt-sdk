@@ -57,17 +57,27 @@ function sanitizeFileNamePart(value: string): string {
   return normalized || "deck";
 }
 
-function resolveFromCwd(cwd: string | null | undefined, targetPath: string): string {
+function resolveAbsolutePath(targetPath: string, fieldName: string): string {
   if (!targetPath || typeof targetPath !== "string") {
-    throw new Error("Path must be a non-empty string");
+    throw new Error(`Field "${fieldName}" must be a non-empty string`);
   }
 
-  if (path.isAbsolute(targetPath)) {
-    return targetPath;
+  if (!path.isAbsolute(targetPath)) {
+    throw new Error(`Field "${fieldName}" must be an absolute path`);
   }
 
-  const baseDir = cwd ? path.resolve(cwd) : process.cwd();
-  return path.resolve(baseDir, targetPath);
+  return path.normalize(targetPath);
+}
+
+function resolveOptionalAbsolutePath(
+  targetPath: string | null | undefined,
+  fieldName: string,
+): string | undefined {
+  if (targetPath === undefined || targetPath === null) {
+    return undefined;
+  }
+
+  return resolveAbsolutePath(targetPath, fieldName);
 }
 
 function parseSinglePageIndex(input: BuildDeckHtmlFromManifestInput, slideCount: number): number | null {
@@ -398,12 +408,13 @@ export async function buildDeckHtmlFromManifest(
     throw new Error('Field "outputDir" must be a non-empty string');
   }
 
-  const manifestPath = resolveFromCwd(input.cwd, input.manifestPath);
+  resolveOptionalAbsolutePath(input.cwd, "cwd");
+  const manifestPath = resolveAbsolutePath(input.manifestPath, "manifestPath");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as DeckManifestInput;
   validateDeckManifest(manifest);
 
   const manifestCwd = path.dirname(manifestPath);
-  const outputDir = resolveFromCwd(input.cwd, input.outputDir);
+  const outputDir = resolveAbsolutePath(input.outputDir, "outputDir");
   const deckBaseName = sanitizeFileNamePart(
     input.name ??
     (typeof manifest.title === "string" && manifest.title.length > 0

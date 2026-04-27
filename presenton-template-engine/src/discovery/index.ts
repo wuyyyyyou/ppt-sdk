@@ -159,6 +159,16 @@ function normalizeGroupLocalPath(relativePath: string): string {
     : `./${normalizedRelativePath}`;
 }
 
+function assertAbsolutePath(value: unknown, fieldName: string): asserts value is string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`Field "${fieldName}" must be a non-empty string`);
+  }
+
+  if (!path.isAbsolute(value)) {
+    throw new Error(`Field "${fieldName}" must be an absolute path`);
+  }
+}
+
 function stripKnownLocalExtension(value: string): string {
   const extension = path.extname(value);
   if (!ALLOWED_LOCAL_EXTENSIONS.has(extension.toLowerCase())) {
@@ -710,6 +720,14 @@ function loadBuiltinGroups(includeBuiltin: boolean): DiscoveredTemplateGroupInfo
 export async function getAllDiscoveredTemplateGroups(
   input: DiscoverTemplateGroupsInput = {},
 ): Promise<DiscoveredTemplateGroupInfo[]> {
+  if (input.cwd !== undefined && input.cwd !== null) {
+    assertAbsolutePath(input.cwd, "cwd");
+  }
+
+  input.local_roots?.forEach((root, index) => {
+    assertAbsolutePath(root, `local_roots[${index}]`);
+  });
+
   const cwd = path.resolve(input.cwd ?? process.cwd());
   const includeBuiltin = input.include_builtin !== false;
   const localRoots = input.local_roots ?? [];

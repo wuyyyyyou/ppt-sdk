@@ -78,7 +78,7 @@ bundle/
 - `output_path`
 - `cwd`
 
-工具不会返回二进制文件内容，只返回写出的 `.pptx` 文件路径和结果摘要。
+工具不会返回二进制文件内容，只返回写出的 `.pptx` 文件路径和结果摘要。`model_path` 和 `output_path` 必须是绝对路径；`cwd` 如提供也必须是绝对路径。
 
 ## Vendored SDK
 

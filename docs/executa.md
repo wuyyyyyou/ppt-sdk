@@ -297,8 +297,7 @@ jq -nc \
         cwd: $cwd,
         template_group: "red-finance",
         out_dir: $out_dir,
-        overwrite: true,
-        install_dependencies: true
+        overwrite: true
       }
     }
   }' \

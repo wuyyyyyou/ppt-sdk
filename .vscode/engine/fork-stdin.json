@@ -8,8 +8,7 @@
       "cwd": "${workspaceFolder}/.vscode/engine/output",
       "template_group": "red-finance",
       "out_dir": "${workspaceFolder}/.vscode/engine/output/red-finance",
-      "overwrite": true,
-      "install_dependencies": true
+      "overwrite": true
     }
   }
 }

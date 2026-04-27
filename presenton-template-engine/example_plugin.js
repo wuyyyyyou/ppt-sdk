@@ -57,13 +57,13 @@ const MANIFEST = {
           name: "local_roots",
           type: "array",
           items: { type: "string" },
-          description: "Optional list of local template root directories.",
+          description: "Optional list of absolute local template root directories.",
           required: false,
         },
         {
           name: "cwd",
           type: "string",
-          description: "Working directory used to resolve local template paths.",
+          description: "Optional absolute working directory used by local template discovery.",
           required: false,
         },
       ],
@@ -84,13 +84,13 @@ const MANIFEST = {
           name: "local_roots",
           type: "array",
           items: { type: "string" },
-          description: "Optional list of local template root directories.",
+          description: "Optional list of absolute local template root directories.",
           required: false,
         },
         {
           name: "cwd",
           type: "string",
-          description: "Working directory used to resolve local template paths.",
+          description: "Optional absolute working directory used by local template discovery.",
           required: false,
         },
       ],
@@ -117,13 +117,13 @@ const MANIFEST = {
           name: "local_roots",
           type: "array",
           items: { type: "string" },
-          description: "Optional list of local template root directories.",
+          description: "Optional list of absolute local template root directories.",
           required: false,
         },
         {
           name: "cwd",
           type: "string",
-          description: "Working directory used to resolve local template paths.",
+          description: "Optional absolute working directory used by local template discovery.",
           required: false,
         },
       ],
@@ -137,21 +137,21 @@ const MANIFEST = {
           name: "manifest_path",
           type: "string",
           description:
-            "Path to a manifest JSON file. Relative paths are resolved from cwd when provided.",
+            "Absolute path to a manifest JSON file.",
           required: true,
         },
         {
           name: "cwd",
           type: "string",
           description:
-            "Working directory used to resolve manifest_path and relative output paths.",
+            "Optional absolute working directory retained for compatibility.",
           required: false,
         },
         {
           name: "output_dir",
           type: "string",
           description:
-            "Directory where the generated deck HTML and per-slide HTML files should be written. Relative paths are resolved from cwd when provided.",
+            "Absolute directory where the generated deck HTML and per-slide HTML files should be written.",
           required: true,
         },
         {
@@ -187,21 +187,21 @@ const MANIFEST = {
           name: "manifest_path",
           type: "string",
           description:
-            "Path to a manifest JSON file. Relative paths are resolved from cwd when provided.",
+            "Absolute path to a manifest JSON file.",
           required: true,
         },
         {
           name: "output_dir",
           type: "string",
           description:
-            "Output directory used for generated validation artifacts when rendered checks need to build deck HTML.",
+            "Absolute output directory used for generated validation artifacts when rendered checks need to build deck HTML.",
           required: true,
         },
         {
           name: "cwd",
           type: "string",
           description:
-            "Working directory used to resolve manifest_path and relative output paths.",
+            "Optional absolute working directory retained for compatibility.",
           required: false,
         },
         {
@@ -237,7 +237,7 @@ const MANIFEST = {
           name: "deck_html_path",
           type: "string",
           description:
-            "Optional prebuilt deck HTML path to reuse instead of rebuilding during rendered validation.",
+            "Optional absolute prebuilt deck HTML path to reuse instead of rebuilding during rendered validation.",
           required: false,
         },
       ],
@@ -250,19 +250,19 @@ const MANIFEST = {
         {
           name: "html_path",
           type: "string",
-          description: "Path to the rendered deck HTML file to convert.",
+          description: "Absolute path to the rendered deck HTML file to convert.",
           required: true,
         },
         {
           name: "output_path",
           type: "string",
-          description: "Path where the generated PPTX model JSON file should be written.",
+          description: "Absolute path where the generated PPTX model JSON file should be written.",
           required: true,
         },
         {
           name: "cwd",
           type: "string",
-          description: "Working directory used to resolve relative input and output paths.",
+          description: "Optional absolute working directory retained for compatibility.",
           required: false,
         },
         {
@@ -281,7 +281,7 @@ const MANIFEST = {
           name: "screenshots_dir",
           type: "string",
           description:
-            "Optional directory for screenshot fallback assets used during extraction.",
+            "Optional absolute directory for screenshot fallback assets used during extraction.",
           required: false,
         },
       ],
@@ -301,7 +301,7 @@ const MANIFEST = {
           name: "out_dir",
           type: "string",
           description:
-            "Target directory for the forked template group. Relative paths are resolved from cwd when provided.",
+            "Absolute target directory for the forked template group.",
           required: true,
         },
         {
@@ -319,17 +319,9 @@ const MANIFEST = {
           default: false,
         },
         {
-          name: "install_dependencies",
-          type: "boolean",
-          description:
-            "Whether to run npm install in the forked template directory after files are generated. Defaults to false.",
-          required: false,
-          default: false,
-        },
-        {
           name: "cwd",
           type: "string",
-          description: "Working directory used to resolve out_dir when it is relative.",
+          description: "Optional absolute working directory retained for compatibility.",
           required: false,
         },
       ],
@@ -408,6 +400,9 @@ function normalizeDiscoveryInput(args = {}) {
     if (!Array.isArray(localRoots) || localRoots.some((item) => typeof item !== "string")) {
       throw new Error('"local_roots" must be an array of strings');
     }
+    localRoots.forEach((item, index) => {
+      assertAbsolutePath(item, `local_roots[${index}]`);
+    });
     input.local_roots = localRoots;
   }
 
@@ -415,23 +410,41 @@ function normalizeDiscoveryInput(args = {}) {
     if (typeof args.cwd !== "string" || args.cwd.length === 0) {
       throw new Error('"cwd" must be a non-empty string when provided');
     }
+    assertAbsolutePath(args.cwd, "cwd");
     input.cwd = args.cwd;
   }
 
   return input;
 }
 
-function resolveFromCwd(cwd, targetPath) {
-  if (typeof targetPath !== "string" || targetPath.length === 0) {
-    throw new Error("Expected a non-empty path string");
+function assertAbsolutePath(value, parameterName) {
+  if (!path.isAbsolute(value)) {
+    throw new Error(`"${parameterName}" must be an absolute path`);
+  }
+}
+
+function readRequiredAbsolutePathArg(args, parameterName) {
+  const value = args?.[parameterName];
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`Missing required parameter: "${parameterName}"`);
   }
 
-  if (path.isAbsolute(targetPath)) {
-    return path.normalize(targetPath);
+  assertAbsolutePath(value, parameterName);
+  return path.normalize(value);
+}
+
+function readOptionalAbsolutePathArg(args, parameterName) {
+  const value = args?.[parameterName];
+  if (value === undefined || value === null) {
+    return undefined;
   }
 
-  const baseDir = cwd ? path.resolve(cwd) : process.cwd();
-  return path.resolve(baseDir, targetPath);
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`"${parameterName}" must be a non-empty string when provided`);
+  }
+
+  assertAbsolutePath(value, parameterName);
+  return path.normalize(value);
 }
 
 function parseRequestLine(line) {
@@ -492,10 +505,10 @@ async function resolveTransportDirectories(request) {
 
   if (isNonEmptyString(requestedCwd)) {
     try {
-      const resolvedCwd = resolveFromCwd(null, requestedCwd);
-      const cwdStat = await stat(resolvedCwd);
+      assertAbsolutePath(requestedCwd, "cwd");
+      const cwdStat = await stat(requestedCwd);
       if (cwdStat.isDirectory()) {
-        candidates.push(path.join(resolvedCwd, FILE_TRANSPORT_DIRNAME));
+        candidates.push(path.join(path.normalize(requestedCwd), FILE_TRANSPORT_DIRNAME));
       }
     } catch {
       // Ignore invalid or inaccessible cwd and fall back to the plugin temp directory.
@@ -624,24 +637,19 @@ async function toolBuildDeckHtmlFromManifest(args) {
     throw new Error('"manifest" is no longer supported; use "manifest_path"');
   }
 
-  if (typeof args.manifest_path !== "string" || args.manifest_path.length === 0) {
-    throw new Error('Missing required parameter: "manifest_path"');
-  }
-
-  if (typeof args.output_dir !== "string" || args.output_dir.length === 0) {
-    throw new Error('Missing required parameter: "output_dir"');
-  }
+  const manifestPath = readRequiredAbsolutePathArg(args, "manifest_path");
+  const outputDir = readRequiredAbsolutePathArg(args, "output_dir");
+  const cwd = readOptionalAbsolutePathArg(args, "cwd");
 
   const page = args.page !== undefined ? Number(args.page) : undefined;
   if (args.page !== undefined && !Number.isFinite(page)) {
     throw new Error('"page" must be an integer');
   }
 
-  const requestedCwd = args.cwd ? resolveFromCwd(null, args.cwd) : null;
   const result = await buildDeckHtmlFromManifest({
-    cwd: requestedCwd ?? undefined,
-    manifestPath: args.manifest_path,
-    outputDir: args.output_dir,
+    cwd,
+    manifestPath,
+    outputDir,
     name: typeof args.name === "string" && args.name.length > 0 ? args.name : undefined,
     singlePage: args.single_page !== undefined ? Boolean(args.single_page) : undefined,
     page,
@@ -671,13 +679,10 @@ async function toolValidateDeckFromManifest(args) {
     throw new Error("Arguments must be an object");
   }
 
-  if (typeof args.manifest_path !== "string" || args.manifest_path.length === 0) {
-    throw new Error('Missing required parameter: "manifest_path"');
-  }
-
-  if (typeof args.output_dir !== "string" || args.output_dir.length === 0) {
-    throw new Error('Missing required parameter: "output_dir"');
-  }
+  const manifestPath = readRequiredAbsolutePathArg(args, "manifest_path");
+  const outputDir = readRequiredAbsolutePathArg(args, "output_dir");
+  const cwd = readOptionalAbsolutePathArg(args, "cwd");
+  const deckHtmlPath = readOptionalAbsolutePathArg(args, "deck_html_path");
 
   const includeRenderedChecks = args.include_rendered_checks !== undefined
     ? Boolean(args.include_rendered_checks)
@@ -690,17 +695,15 @@ async function toolValidateDeckFromManifest(args) {
   }
 
   const report = await runDeckValidation({
-    cwd: typeof args.cwd === "string" && args.cwd.length > 0
-      ? resolveFromCwd(null, args.cwd)
-      : undefined,
-    manifestPath: args.manifest_path,
-    outputDir: args.output_dir,
+    cwd,
+    manifestPath,
+    outputDir,
     name: typeof args.name === "string" && args.name.length > 0 ? args.name : undefined,
     singlePage: args.single_page !== undefined ? Boolean(args.single_page) : undefined,
     page,
     includeRenderedChecks,
-    renderedArtifacts: typeof args.deck_html_path === "string" && args.deck_html_path.length > 0
-      ? { deckHtmlPath: args.deck_html_path }
+    renderedArtifacts: deckHtmlPath
+      ? { deckHtmlPath }
       : undefined,
   });
 
@@ -717,21 +720,10 @@ async function toolConvertDeckHtmlToPptxModel(args) {
     throw new Error("Arguments must be an object");
   }
 
-  if (typeof args.html_path !== "string" || args.html_path.length === 0) {
-    throw new Error('Missing required parameter: "html_path"');
-  }
-
-  if (typeof args.output_path !== "string" || args.output_path.length === 0) {
-    throw new Error('Missing required parameter: "output_path"');
-  }
-
-  const cwd = args.cwd ? resolveFromCwd(null, args.cwd) : process.cwd();
-  const htmlPath = resolveFromCwd(cwd, args.html_path);
-  const outputPath = resolveFromCwd(cwd, args.output_path);
-  const screenshotsDir =
-    typeof args.screenshots_dir === "string" && args.screenshots_dir.length > 0
-      ? resolveFromCwd(cwd, args.screenshots_dir)
-      : undefined;
+  readOptionalAbsolutePathArg(args, "cwd");
+  const htmlPath = readRequiredAbsolutePathArg(args, "html_path");
+  const outputPath = readRequiredAbsolutePathArg(args, "output_path");
+  const screenshotsDir = readOptionalAbsolutePathArg(args, "screenshots_dir");
   const html = await readFile(htmlPath, "utf8");
   const name =
     typeof args.name === "string" && args.name.length > 0
@@ -781,8 +773,9 @@ async function toolForkTemplateGroup(args) {
     throw new Error('Missing required parameter: "out_dir"');
   }
 
-  const resolvedCwd = args.cwd !== undefined ? resolveFromCwd(null, args.cwd) : null;
-  const outDir = resolveFromCwd(resolvedCwd, outDirValue);
+  readOptionalAbsolutePathArg(args, "cwd");
+  assertAbsolutePath(outDirValue, "out_dir");
+  const outDir = path.normalize(outDirValue);
   const result = await forkTemplateGroup({
     templateGroup,
     outDir,
@@ -792,20 +785,11 @@ async function toolForkTemplateGroup(args) {
         ? args.manifestTitle
         : undefined,
     overwrite: args.overwrite !== undefined ? Boolean(args.overwrite) : undefined,
-    installDependencies: args.install_dependencies !== undefined
-      ? Boolean(args.install_dependencies)
-      : args.installDependencies !== undefined
-        ? Boolean(args.installDependencies)
-        : undefined,
   });
 
   return {
     ...result,
     template_group: templateGroup,
-    dependencies_installed: result.dependenciesInstalled,
-    install_command: result.installCommand,
-    package_lock_path: result.packageLockPath,
-    node_modules_path: result.nodeModulesPath,
     manifest_slide_count: Array.isArray(result.manifest?.slides) ? result.manifest.slides.length : 0,
   };
 }

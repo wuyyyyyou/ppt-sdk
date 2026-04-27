@@ -27,6 +27,7 @@
 
 - 对于 discovery 相关工具里的 `local_roots` 这类 `array` 参数，除了直接传 JSON 数组，也兼容传字符串形式的 JSON 数组，例如 `"[\"/path/a\",\"/path/b\"]"`。
 - 如果传入的字符串无法解析为字符串数组，插件仍会返回参数错误。
+- 对外工具里的路径参数只接受绝对路径；如果传入相对路径，会明确返回对应参数不是绝对路径。
 
 ### 安装依赖
 
@@ -72,12 +73,9 @@ npm install
 
 这个工具支持两种输入方式：
 
-- 直接传 `manifest` 对象
 - 传 `manifest_path` 指向 JSON 文件
 
-工具不会返回大段 HTML 内容，而是把结果写到 `output_path`，再返回输出文件路径和基础元数据。
-
-如果使用本地 TSX slide 或相对路径的 `output_path`，建议显式传入 `cwd`。
+工具不会返回大段 HTML 内容，而是把结果写到 `output_dir`，再返回输出文件路径和基础元数据。`manifest_path` 和 `output_dir` 必须是绝对路径。
 
 ### `convertDeckHtmlToPptxModel`
 
@@ -87,10 +85,11 @@ npm install
 
 - `html_path`
 - `output_path`
-- `cwd`
 - `name`
 - `settle_time_ms`
 - `screenshots_dir`
+
+其中 `html_path`、`output_path` 和 `screenshots_dir` 必须是绝对路径。
 
 说明：
 
@@ -106,12 +105,13 @@ npm install
 
 - `manifest_path`
 - `output_dir`
-- `cwd`
 - `name`
 - `single_page`
 - `page`
 - `include_rendered_checks`
 - `deck_html_path`
+
+其中 `manifest_path`、`output_dir` 和可选的 `deck_html_path` 必须是绝对路径。
 
 说明：
 
@@ -136,12 +136,12 @@ npm install
 - `out_dir`: 输出目录
 - `manifest_title`: 可选，生成 `manifest.json` 时使用的标题
 - `overwrite`: 可选，是否覆盖非空输出目录，默认 `false`
-- `cwd`: 可选，解析相对 `out_dir` 时使用的工作目录
 
 说明：
 
 - 这个工具 fork 的是内置模板组，不是本地发现到的自定义模板组。
-- `out_dir` 如果是相对路径，会相对于 `cwd` 解析；未传 `cwd` 时相对于插件进程当前目录解析。
+- `out_dir` 必须是绝对路径。
+- fork 后不再执行 `npm install`，生成的 TSX 模板由引擎二进制内置运行时解析。
 - 返回结果里会包含生成后的绝对路径，以及内存中的 `manifest` 内容。
 
 ## Vendored SDK
