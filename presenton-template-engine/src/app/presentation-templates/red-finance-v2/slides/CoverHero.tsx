@@ -2,9 +2,9 @@ import React from "react";
 import * as z from "zod";
 
 import CoverBarDecoration from "../components/CoverBarDecoration.js";
-import { CoverMetaItem } from "../components/CoverMetaItem.js";
 import FinanceCanvas from "../components/FinanceCanvas.js";
 import { FinanceIcon } from "../components/FinanceIcons.js";
+import IconText from "../components/IconText.js";
 import { redFinanceTheme } from "../theme/tokens.js";
 
 export const Schema = z.object({
@@ -71,13 +71,16 @@ const CoverHero = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
       ) : null}
 
       <div className="absolute left-[100px] right-[60px] top-[40px] z-20 flex items-center justify-between">
-        <div
-          className="flex h-[34px] items-center gap-3 text-[20px] font-bold"
-          style={{ color: redFinanceTheme.colors.backgroundText }}
-        >
-          <FinanceIcon name="bank" className="h-7 w-7 flex-none" />
-          <div className="w-[520px] whitespace-nowrap">{parsed.brandName}</div>
-        </div>
+        <IconText
+          icon={<FinanceIcon name="bank" className="h-7 w-7 flex-none" />}
+          label={parsed.brandName}
+          height={34}
+          iconSize={28}
+          gap={12}
+          textWidth={520}
+          fontSize={20}
+          fontWeight={700}
+        />
 
         <div className="flex w-[305px] flex-col items-end">
           <div
@@ -126,16 +129,16 @@ const CoverHero = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
       ) : null}
 
       <div className="absolute bottom-[60px] left-[100px] z-10 flex items-center gap-[40px]">
-        <CoverMetaItem
+        <IconText
           icon={<FinanceIcon name="calendar" className="h-[18px] w-[18px]" />}
           label={parsed.reportDate}
           minTextWidth={112}
         />
-        <CoverMetaItem
+        <IconText
           icon={<FinanceIcon name="user" className="h-[18px] w-[18px]" />}
           label={`报告人：${parsed.presenter}`}
         />
-        <CoverMetaItem
+        <IconText
           icon={<FinanceIcon name="shield" className="h-[18px] w-[18px]" />}
           label={parsed.classification}
         />
