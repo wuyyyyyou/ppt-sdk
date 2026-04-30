@@ -23,6 +23,7 @@ import red_finance_DigitalCurrencyOverviewTaxonomyComponent, * as red_finance_Di
 import red_finance_GlobalCbdcStatusComparisonComponent, * as red_finance_GlobalCbdcStatusComparisonModule from "./red-finance/GlobalCbdcStatusComparison";
 import red_finance_DigitalRmbArchitectureKpisComponent, * as red_finance_DigitalRmbArchitectureKpisModule from "./red-finance/DigitalRmbArchitectureKpis";
 import red_finance_DigitalCurrencyArchitectureSecurityComponent, * as red_finance_DigitalCurrencyArchitectureSecurityModule from "./red-finance/DigitalCurrencyArchitectureSecurity";
+import red_finance_v2_CoverHeroComponent, * as red_finance_v2_CoverHeroModule from "./red-finance-v2/slides/CoverHero";
 import anime_culture_CoverHeroComponent, * as anime_culture_CoverHeroModule from "./anime-culture/slides/CoverHero";
 import anime_culture_AgendaCollageComponent, * as anime_culture_AgendaCollageModule from "./anime-culture/slides/AgendaCollage";
 import anime_culture_EraImprintTransitionComponent, * as anime_culture_EraImprintTransitionModule from "./anime-culture/slides/EraImprintTransition";
@@ -117,6 +118,61 @@ const red_financeLayouts: TemplateWithData[] = [
   createTemplateEntry(red_finance_DigitalCurrencyArchitectureSecurityComponent, red_finance_DigitalCurrencyArchitectureSecurityModule.Schema, red_finance_DigitalCurrencyArchitectureSecurityModule.layoutId, red_finance_DigitalCurrencyArchitectureSecurityModule.layoutName, red_finance_DigitalCurrencyArchitectureSecurityModule.layoutDescription, "red-finance", "DigitalCurrencyArchitectureSecurity", {"sampleData":{"title":"数字货币技术架构与安全","metaLabel":"TECH ARCHITECTURE & SECURITY","stackTitle":"核心技术栈","stackMeta":"Tech Stack","layers":[{"icon":"experience","title":"体验层 (Experience)","description":"数字钱包 · 硬件终端 · API接口"},{"icon":"smart","title":"智能层 (Smart)","description":"智能合约 · 隐私计算 · 监管探针"},{"icon":"ledger","title":"账本层 (Ledger)","description":"分布式账本 · 共识机制 · 状态机"},{"icon":"security","title":"密钥层 (Key Security)","description":"HSM机具 · 多重签名 · 门限签名"}],"comparisonTitle":"架构对比分析","comparisonMeta":"Architecture Comparison","chartTitle":"架构能力雷达","radarLabels":["吞吐量","韧性","治理","合规","隐私","追溯"],"radarSeries":[{"label":"中心化 (CBDC)","shortLabel":"C","color":"#B71C1C","fillColor":"rgba(183, 28, 28, 0.18)","values":[95,60,90,100,80,85]},{"label":"去中心化 (Crypto)","shortLabel":"D","color":"#9E9E9E","fillColor":"rgba(158, 158, 158, 0.16)","values":[30,95,40,20,40,70]}],"metrics":[{"icon":"throughput","title":"吞吐量 (TPS)","primaryValue":95,"secondaryValue":30},{"icon":"resilience","title":"系统韧性","primaryValue":60,"secondaryValue":95},{"icon":"governance","title":"治理效率","primaryValue":90,"secondaryValue":40},{"icon":"traceability","title":"可追溯性","primaryValue":85,"secondaryValue":70},{"icon":"privacy","title":"隐私保护","primaryValue":80,"secondaryValue":40},{"icon":"compliance","title":"监管合规","primaryValue":100,"secondaryValue":20}],"footerText":"金融行业战略分析报告 | 绝密资料","pageNumber":"19"}}),
 ];
 
+const red_finance_v2GroupMeta = {
+  "group_id": "red-finance-v2",
+  "group_name": "Red Finance V2",
+  "group_description": "Component-oriented finance templates for strategic reports, executive briefings, and industry analysis.",
+  "ordered": true,
+  "default": false,
+  "group_brief": "适合金融行业研究、战略分析、管理层汇报、数字货币与银行转型等正式型 PPT。V2 采用 slides/components/theme/blueprints 分层结构，便于 AI 精细修改。",
+  "style_tags": [
+    "finance",
+    "editorial",
+    "serious",
+    "componentized"
+  ],
+  "industry_tags": [
+    "finance",
+    "banking",
+    "fintech"
+  ],
+  "use_cases": [
+    "strategy-report",
+    "industry-analysis",
+    "executive-brief"
+  ],
+  "audience_tags": [
+    "management",
+    "board",
+    "client"
+  ],
+  "tone_tags": [
+    "professional",
+    "formal",
+    "analytical"
+  ],
+  "cover_layout_id": "red-finance-v2:cover-hero",
+  "agenda_layout_id": null,
+  "closing_layout_id": null
+} as const;
+const red_finance_v2Settings: TemplateGroupSettings = {
+  description: red_finance_v2GroupMeta.group_description,
+  ordered: red_finance_v2GroupMeta.ordered,
+  default: red_finance_v2GroupMeta.default,
+  groupBrief: red_finance_v2GroupMeta.group_brief ?? undefined,
+  styleTags: red_finance_v2GroupMeta.style_tags ?? undefined,
+  industryTags: red_finance_v2GroupMeta.industry_tags ?? undefined,
+  useCases: red_finance_v2GroupMeta.use_cases ?? undefined,
+  audienceTags: red_finance_v2GroupMeta.audience_tags ?? undefined,
+  toneTags: red_finance_v2GroupMeta.tone_tags ?? undefined,
+  coverLayoutId: red_finance_v2GroupMeta.cover_layout_id ?? undefined,
+  agendaLayoutId: red_finance_v2GroupMeta.agenda_layout_id ?? undefined,
+  closingLayoutId: red_finance_v2GroupMeta.closing_layout_id ?? undefined,
+};
+const red_finance_v2Layouts: TemplateWithData[] = [
+  createTemplateEntry(red_finance_v2_CoverHeroComponent, red_finance_v2_CoverHeroModule.Schema, red_finance_v2_CoverHeroModule.layoutId, red_finance_v2_CoverHeroModule.layoutName, red_finance_v2_CoverHeroModule.layoutDescription, "red-finance-v2", "CoverHero", {"sampleData":{"brandName":"GLOBAL FINANCE INSIGHTS","reportTag":"Strategic Analysis 2026","titleLineOne":"金融行业","titleLineTwo":"战略分析报告","subtitle":"把握趋势 · 夯实风控 · 驱动增长","reportDate":"2026/03/02","presenter":"[Name Here]","classification":"绝密资料 · 内部参考","chartBars":[{"height":120,"opacity":0.45},{"height":180,"opacity":0.6},{"height":150,"opacity":0.52},{"height":240,"opacity":0.8},{"height":320,"opacity":1}],"showPattern":true,"showAccentBar":true,"showChartBars":true},"layoutTags":["cover","finance","hero","componentized"],"layoutRole":"cover","contentElements":["headline","meta","hero-graphic"],"useCases":["cover","opening","executive-brief"],"suitableFor":"Suitable for opening a finance or strategy deck with a strong title, subtitle, and presenter metadata.","avoidFor":"Avoid using this layout for analytical body content, process steps, or dense comparison text.","density":"low","visualWeight":"visual-heavy","editableTextPriority":"high"}),
+];
+
 const anime_cultureGroupMeta = {
   "group_id": "anime-culture",
   "group_name": "Anime Culture Neon",
@@ -202,6 +258,13 @@ export const templates: TemplateLayoutsWithSettings[] = [
     description: red_financeGroupMeta.group_description,
     settings: red_financeSettings,
     layouts: red_financeLayouts,
+  },
+  {
+    id: red_finance_v2GroupMeta.group_id,
+    name: red_finance_v2GroupMeta.group_name,
+    description: red_finance_v2GroupMeta.group_description,
+    settings: red_finance_v2Settings,
+    layouts: red_finance_v2Layouts,
   },
   {
     id: anime_cultureGroupMeta.group_id,

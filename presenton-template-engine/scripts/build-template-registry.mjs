@@ -309,6 +309,17 @@ function sortTemplateFilesByGroupOrder(groupDirPath, templateFiles, groupLayouts
 
 async function collectTemplateFiles(groupDirPath) {
   const collected = [];
+  const slidesDirPath = path.join(groupDirPath, "slides");
+  let searchRoot = groupDirPath;
+
+  try {
+    const slidesDirEntries = await readdir(slidesDirPath, { withFileTypes: true });
+    if (Array.isArray(slidesDirEntries)) {
+      searchRoot = slidesDirPath;
+    }
+  } catch {
+    searchRoot = groupDirPath;
+  }
 
   const walk = async (currentDir) => {
     const entries = await readdir(currentDir, { withFileTypes: true });
@@ -341,7 +352,7 @@ async function collectTemplateFiles(groupDirPath) {
     }
   };
 
-  await walk(groupDirPath);
+  await walk(searchRoot);
   return collected;
 }
 

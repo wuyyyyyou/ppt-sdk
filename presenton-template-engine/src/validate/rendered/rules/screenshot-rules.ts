@@ -32,6 +32,41 @@ function isGraphicDominantCandidate(element: RenderedElementSummary): boolean {
     );
 }
 
+function isAncestorOfElement(
+  ancestor: RenderedElementSummary,
+  element: RenderedElementSummary,
+  elementsBySelector: Map<string, RenderedElementSummary>,
+): boolean {
+  let currentParentSelector = element.parentSelector;
+
+  while (currentParentSelector) {
+    if (currentParentSelector === ancestor.selector) {
+      return true;
+    }
+
+    currentParentSelector =
+      elementsBySelector.get(currentParentSelector)?.parentSelector ?? null;
+  }
+
+  return false;
+}
+
+function selectGraphicDominantTargets(
+  elements: RenderedElementSummary[],
+): RenderedElementSummary[] {
+  const elementsBySelector = new Map(
+    elements.map((element) => [element.selector, element]),
+  );
+  const candidates = elements.filter(isGraphicDominantCandidate);
+
+  return candidates.filter((candidate) =>
+    !candidates.some((otherCandidate) =>
+      otherCandidate !== candidate &&
+      isAncestorOfElement(candidate, otherCandidate, elementsBySelector)
+    )
+  );
+}
+
 function isTextDominantScreenshot(element: RenderedElementSummary): boolean {
   const graphicSignalCount = getGraphicSignalCount(element);
   if (element.attributes["data-pptx-export"] !== "screenshot") {
@@ -62,7 +97,7 @@ export const GRAPHIC_MODULE_SCREENSHOT_RULE: StabilityRule = {
     const diagnostics: StabilityDiagnostic[] = [];
 
     for (const slide of inspections) {
-      for (const element of slide.elements.filter(isGraphicDominantCandidate)) {
+      for (const element of selectGraphicDominantTargets(slide.elements)) {
         diagnostics.push(createRuleDiagnostic(this, {
           message: `Graphic-dominant module is missing data-pptx-export="screenshot" on slide "${slide.slideId ?? slide.slideIndex}"`,
           suggestion: "Wrap chart-like or geometry-heavy modules with a bounded container and set data-pptx-export=\"screenshot\" on that container.",

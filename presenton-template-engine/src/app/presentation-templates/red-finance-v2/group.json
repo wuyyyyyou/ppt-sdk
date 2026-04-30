@@ -1,0 +1,16 @@
+{
+  "group_id": "red-finance-v2",
+  "group_name": "Red Finance V2",
+  "group_description": "Component-oriented finance templates for strategic reports, executive briefings, and industry analysis.",
+  "group_brief": "适合金融行业研究、战略分析、管理层汇报、数字货币与银行转型等正式型 PPT。V2 采用 slides/components/theme/blueprints 分层结构，便于 AI 精细修改。",
+  "style_tags": ["finance", "editorial", "serious", "componentized"],
+  "industry_tags": ["finance", "banking", "fintech"],
+  "use_cases": ["strategy-report", "industry-analysis", "executive-brief"],
+  "audience_tags": ["management", "board", "client"],
+  "tone_tags": ["professional", "formal", "analytical"],
+  "cover_layout_id": "red-finance-v2:cover-hero",
+  "ordered": true,
+  "default": false,
+  "registry_order": 91,
+  "layouts": ["slides/CoverHero.tsx"]
+}

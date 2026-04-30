@@ -153,6 +153,51 @@ test("DOM-003 reports chart-like modules without screenshot export", async () =>
   assert.equal(diagnostics[0]?.ruleId, "DOM-003");
 });
 
+test("DOM-003 reports the most specific graphic-dominant module once", async () => {
+  const diagnostics = await runSingleRule(GRAPHIC_MODULE_SCREENSHOT_RULE, [
+    createBaseElement({
+      selector: '[data-test="slide-root"]',
+      parentSelector: null,
+      textLength: 72,
+      directTextLength: 0,
+      childElementCount: 1,
+      rect: { width: 1280, height: 720 },
+      graphicCounts: {
+        svg: 2,
+        canvas: 0,
+        path: 10,
+        line: 0,
+        polyline: 0,
+        polygon: 0,
+        circle: 0,
+        rect: 0,
+      },
+    }),
+    createBaseElement({
+      selector: '[data-test="chart-module"]',
+      parentSelector: '[data-test="slide-root"]',
+      attributes: { "data-chart-like": "true" },
+      textLength: 24,
+      directTextLength: 24,
+      rect: { width: 360, height: 220 },
+      graphicCounts: {
+        svg: 1,
+        canvas: 0,
+        path: 8,
+        line: 2,
+        polyline: 0,
+        polygon: 0,
+        circle: 0,
+        rect: 1,
+      },
+    }),
+  ]);
+
+  assert.equal(diagnostics.length, 1);
+  assert.equal(diagnostics[0]?.ruleId, "DOM-003");
+  assert.equal(diagnostics[0]?.locations[0]?.selector, '[data-test="chart-module"]');
+});
+
 test("DOM-004 reports screenshot regions that contain text-heavy content", async () => {
   const diagnostics = await runSingleRule(TEXT_MODULE_SCREENSHOT_RULE, [
     createBaseElement({
