@@ -33,7 +33,7 @@ function printUsage() {
       "",
       "Commands:",
       "  check-env    Validate the local toolchain needed by the VS Code PPT tasks.",
-      "  generate     Run manifest -> deck html -> model json -> pptx.",
+      "  generate     Run manifest -> deck html -> model json -> pptx, then validate deck HTML.",
       "",
       "Options:",
       "  --manifest   Path to the manifest JSON file to render.",
@@ -172,9 +172,12 @@ function buildRunContext({ manifestPath, presentationName, outRoot }) {
     engineOutputDir: path.join(runDir, "engine"),
     modelOutputDir: path.join(runDir, "model"),
     generatorOutputDir: path.join(runDir, "generator"),
+    validateOutputDir: path.join(runDir, "validate"),
     logsDir: path.join(runDir, "logs"),
     modelOutputPath: path.join(runDir, "model", `${slug}-model.json`),
     pptxOutputPath: path.join(runDir, "generator", `${slug}.pptx`),
+    validateInputPath: path.join(runDir, "validate", "validate-stdin.json"),
+    validationReportPath: path.join(runDir, "validate", "validation-report.json"),
     summaryPath: path.join(runDir, "run-summary.json"),
   };
 }
@@ -539,13 +542,14 @@ async function generatePipeline(options) {
     ensureDirectory(runContext.engineOutputDir),
     ensureDirectory(runContext.modelOutputDir),
     ensureDirectory(runContext.generatorOutputDir),
+    ensureDirectory(runContext.validateOutputDir),
     ensureDirectory(runContext.logsDir),
   ]);
   await writeFile(runContext.manifestCopyPath, manifestText, "utf8");
 
   process.stdout.write(`Manifest: ${relativeToWorkspace(manifestPath)}\n`);
   process.stdout.write(`Run directory: ${relativeToWorkspace(runContext.runDir)}\n`);
-  process.stdout.write(`[1/3] Build deck HTML...\n`);
+  process.stdout.write(`[1/4] Build deck HTML...\n`);
 
   const engineRequest = createRpcRequest(1, "invoke", {
     tool: "buildDeckHtmlFromManifest",
@@ -571,7 +575,7 @@ async function generatePipeline(options) {
     throw new Error("Engine stage did not return deck_output_path");
   }
 
-  process.stdout.write(`[2/3] Convert deck HTML to model JSON...\n`);
+  process.stdout.write(`[2/4] Convert deck HTML to model JSON...\n`);
   const modelRequest = createRpcRequest(2, "invoke", {
     tool: "convertDeckHtmlToPptxModel",
     arguments: {
@@ -597,7 +601,7 @@ async function generatePipeline(options) {
     throw new Error("Model stage did not return output_path");
   }
 
-  process.stdout.write(`[3/3] Generate PPTX...\n`);
+  process.stdout.write(`[3/4] Generate PPTX...\n`);
   const generatorRequest = createRpcRequest(3, "invoke", {
     tool: "generatePptx",
     arguments: {
@@ -619,6 +623,88 @@ async function generatePipeline(options) {
   const finalPptxPath = generatorStage.response.result?.data?.path;
   if (typeof finalPptxPath !== "string" || finalPptxPath.length === 0) {
     throw new Error("Generator stage did not return path");
+  }
+
+  process.stdout.write(`[4/4] Validate deck HTML (non-blocking)...\n`);
+  const validateRequest = createRpcRequest(4, "invoke", {
+    tool: "validateDeckFromManifest",
+    arguments: {
+      cwd: runContext.validateOutputDir,
+      manifest_path: manifestPath,
+      output_dir: runContext.validateOutputDir,
+      name: runContext.slug,
+      include_rendered_checks: true,
+      deck_html_path: deckOutputPath,
+      single_page: false,
+    },
+  });
+  await writeFile(
+    runContext.validateInputPath,
+    `${JSON.stringify(validateRequest, null, 2)}\n`,
+    "utf8",
+  );
+
+  let validation = null;
+  try {
+    const validateStage = await invokeRpcStage({
+      stageName: "validate",
+      command: process.execPath,
+      args: ["example_plugin.js"],
+      cwd: ENGINE_DIR,
+      request: validateRequest,
+      timeoutMs: GENERATE_TIMEOUT_MS,
+      logDir: runContext.logsDir,
+    });
+    const validationReport = {
+      generated_at: new Date().toISOString(),
+      manifest_path: manifestPath,
+      deck_html_path: deckOutputPath,
+      name: runContext.slug,
+      ...(validateStage.response.result?.data ?? {}),
+    };
+    await writeFile(
+      runContext.validationReportPath,
+      `${JSON.stringify(validationReport, null, 2)}\n`,
+      "utf8",
+    );
+    validation = {
+      ok: Boolean(validateStage.response.result?.data?.ok),
+      report_path: runContext.validationReportPath,
+      input_path: runContext.validateInputPath,
+      output_dir: runContext.validateOutputDir,
+      summary: validateStage.response.result?.data?.summary ?? null,
+      log_paths: validateStage.logPaths,
+      error: null,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const validationReport = {
+      generated_at: new Date().toISOString(),
+      manifest_path: manifestPath,
+      deck_html_path: deckOutputPath,
+      name: runContext.slug,
+      ok: false,
+      summary: null,
+      diagnostics: [],
+      validation_error: {
+        message,
+      },
+    };
+    await writeFile(
+      runContext.validationReportPath,
+      `${JSON.stringify(validationReport, null, 2)}\n`,
+      "utf8",
+    );
+    validation = {
+      ok: false,
+      report_path: runContext.validationReportPath,
+      input_path: runContext.validateInputPath,
+      output_dir: runContext.validateOutputDir,
+      summary: null,
+      log_paths: null,
+      error: message,
+    };
+    process.stderr.write(`Validation failed but PPTX was generated: ${message}\n`);
   }
 
   const summary = {
@@ -646,6 +732,7 @@ async function generatePipeline(options) {
       presentation_name: generatorStage.response.result?.data?.presentation_name ?? null,
       log_paths: generatorStage.logPaths,
     },
+    validation,
   };
 
   await writeFile(runContext.summaryPath, `${JSON.stringify(summary, null, 2)}\n`, "utf8");
@@ -654,6 +741,7 @@ async function generatePipeline(options) {
   process.stdout.write(`- Deck HTML: ${relativeToWorkspace(deckOutputPath)}\n`);
   process.stdout.write(`- Model JSON: ${relativeToWorkspace(modelOutputPath)}\n`);
   process.stdout.write(`- PPTX: ${relativeToWorkspace(finalPptxPath)}\n`);
+  process.stdout.write(`- Validation report: ${relativeToWorkspace(runContext.validationReportPath)}\n`);
   process.stdout.write(`- Summary: ${relativeToWorkspace(runContext.summaryPath)}\n`);
   process.stdout.write(`- Logs: ${relativeToWorkspace(runContext.logsDir)}\n`);
 }
