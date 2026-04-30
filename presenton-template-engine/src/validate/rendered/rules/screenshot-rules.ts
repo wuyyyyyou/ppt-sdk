@@ -32,25 +32,6 @@ function isGraphicDominantCandidate(element: RenderedElementSummary): boolean {
     );
 }
 
-function isAncestorOfElement(
-  ancestor: RenderedElementSummary,
-  element: RenderedElementSummary,
-  elementsBySelector: Map<string, RenderedElementSummary>,
-): boolean {
-  let currentParentSelector = element.parentSelector;
-
-  while (currentParentSelector) {
-    if (currentParentSelector === ancestor.selector) {
-      return true;
-    }
-
-    currentParentSelector =
-      elementsBySelector.get(currentParentSelector)?.parentSelector ?? null;
-  }
-
-  return false;
-}
-
 function selectGraphicDominantTargets(
   elements: RenderedElementSummary[],
 ): RenderedElementSummary[] {
@@ -58,12 +39,28 @@ function selectGraphicDominantTargets(
     elements.map((element) => [element.selector, element]),
   );
   const candidates = elements.filter(isGraphicDominantCandidate);
+  const candidateSelectorSet = new Set(candidates.map((candidate) => candidate.selector));
+  const ancestorCandidateSelectors = new Set<string>();
+
+  for (const candidate of candidates) {
+    const visitedParentSelectors = new Set<string>();
+    let currentParentSelector = candidate.parentSelector;
+    while (currentParentSelector) {
+      if (visitedParentSelectors.has(currentParentSelector)) {
+        break;
+      }
+      visitedParentSelectors.add(currentParentSelector);
+
+      if (candidateSelectorSet.has(currentParentSelector)) {
+        ancestorCandidateSelectors.add(currentParentSelector);
+      }
+      currentParentSelector =
+        elementsBySelector.get(currentParentSelector)?.parentSelector ?? null;
+    }
+  }
 
   return candidates.filter((candidate) =>
-    !candidates.some((otherCandidate) =>
-      otherCandidate !== candidate &&
-      isAncestorOfElement(candidate, otherCandidate, elementsBySelector)
-    )
+    !ancestorCandidateSelectors.has(candidate.selector)
   );
 }
 

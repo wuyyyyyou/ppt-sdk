@@ -1,9 +1,8 @@
 import React from "react";
 import * as z from "zod";
 
-import FinanceCanvas from "../components/FinanceCanvas.js";
+import FinanceContentFrame from "../components/FinanceContentFrame.js";
 import { FinanceIcon } from "../components/FinanceIcons.js";
-import IconText from "../components/IconText.js";
 import { redFinanceTheme } from "../theme/tokens.js";
 
 const AgendaIconSchema = z.enum([
@@ -65,84 +64,61 @@ const AgendaGrid = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
   const parsed = Schema.parse(data ?? {});
 
   return (
-    <div className="relative h-[720px] w-[1280px]">
-      <FinanceCanvas>
-        <div className="absolute left-[80px] right-[80px] top-[52px] z-10 flex items-end justify-between">
-          <div className="flex h-[58px] items-center whitespace-nowrap text-[48px] font-black leading-[58px]" style={{ color: redFinanceTheme.colors.backgroundText }}>
-            {parsed.title}
-          </div>
-          <IconText
-            icon={<FinanceIcon name="bank" className="h-[22px] w-[22px]" />}
-            label={parsed.brandName}
-            height={28}
-            iconSize={22}
-            gap={10}
-            textWidth={360}
-            fontSize={16}
-            fontWeight={500}
-            textColor={redFinanceTheme.colors.mutedText}
-          />
-        </div>
+    <FinanceContentFrame
+      title={parsed.title}
+      titleAccent="bottom"
+      metaIcon={<FinanceIcon name="bank" className="h-[22px] w-[22px]" />}
+      metaText={parsed.brandName}
+      footerText={parsed.footerText}
+      pageNumber={parsed.pageNumber}
+      showFooterDivider={false}
+      contentTop={178}
+    >
+      <div className="grid w-full grid-cols-2 gap-x-[60px] gap-y-[24px]">
+        {parsed.items.map((item) => {
+          const isHighlighted = item.highlighted;
 
-        <div className="absolute left-[80px] top-[138px] z-10 h-[2px] w-[1120px]" style={{ backgroundColor: redFinanceTheme.colors.stroke }} />
-        <div className="absolute left-[80px] top-[132px] z-10 h-[6px] w-[120px]" style={{ backgroundColor: redFinanceTheme.colors.primary }} />
+          return (
+            <div
+              key={`${item.number}-${item.title}`}
+              className="relative flex h-[70px] items-center overflow-hidden rounded-[4px] border px-[24px]"
+              style={{
+                backgroundColor: isHighlighted ? redFinanceTheme.colors.paleRed : redFinanceTheme.colors.background,
+                borderColor: redFinanceTheme.colors.stroke,
+                boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
+              }}
+            >
+              {isHighlighted ? (
+                <div
+                  className="absolute left-0 top-0 h-[70px] w-[5px]"
+                  style={{ backgroundColor: redFinanceTheme.colors.primary }}
+                />
+              ) : null}
 
-        <div className="absolute left-[80px] top-[178px] z-10 grid w-[1120px] grid-cols-2 gap-x-[60px] gap-y-[24px]">
-          {parsed.items.map((item) => {
-            const isHighlighted = item.highlighted;
-
-            return (
               <div
-                key={`${item.number}-${item.title}`}
-                className="relative flex h-[70px] items-center overflow-hidden rounded-[4px] border px-[24px]"
-                style={{
-                  backgroundColor: isHighlighted ? redFinanceTheme.colors.paleRed : redFinanceTheme.colors.background,
-                  borderColor: redFinanceTheme.colors.stroke,
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
-                }}
+                className="flex h-[28px] w-[42px] flex-none items-center justify-end whitespace-nowrap text-right text-[24px] font-black leading-[28px]"
+                style={{ color: redFinanceTheme.colors.primary }}
               >
-                {isHighlighted ? (
-                  <div
-                    className="absolute left-0 top-0 h-[70px] w-[5px]"
-                    style={{ backgroundColor: redFinanceTheme.colors.primary }}
-                  />
-                ) : null}
-
-                <div
-                  className="flex h-[28px] w-[42px] flex-none items-center justify-end whitespace-nowrap text-right text-[24px] font-black leading-[28px]"
-                  style={{ color: redFinanceTheme.colors.primary }}
-                >
-                  {item.number}
-                </div>
-                <div
-                  className="ml-[20px] flex h-[28px] min-w-0 flex-1 items-center whitespace-nowrap text-[20px] font-medium leading-[28px]"
-                  style={{ color: isHighlighted ? redFinanceTheme.colors.primary : redFinanceTheme.colors.backgroundText }}
-                >
-                  {item.title}
-                </div>
-                <div className="ml-[15px] flex h-[24px] w-[24px] flex-none items-center justify-center">
-                  <FinanceIcon
-                    name={item.icon}
-                    className="h-[24px] w-[24px]"
-                    stroke={isHighlighted ? redFinanceTheme.colors.primary : "#D6D6D6"}
-                  />
-                </div>
+                {item.number}
               </div>
-            );
-          })}
-        </div>
-
-        <div
-          className="absolute bottom-0 left-0 z-20 flex h-[50px] w-full items-center justify-between border-t px-[60px] text-[12px]"
-          style={{ borderColor: "#F5F5F5", color: "#9E9E9E", backgroundColor: redFinanceTheme.colors.background }}
-        >
-          <div className="flex h-[16px] items-center whitespace-nowrap leading-[16px]">{parsed.footerText}</div>
-          <div className="flex h-[16px] items-center whitespace-nowrap font-bold leading-[16px]" style={{ color: redFinanceTheme.colors.primary }}>
-            {parsed.pageNumber}
-          </div>
-        </div>
-      </FinanceCanvas>
-    </div>
+              <div
+                className="ml-[20px] flex h-[28px] min-w-0 flex-1 items-center whitespace-nowrap text-[20px] font-medium leading-[28px]"
+                style={{ color: isHighlighted ? redFinanceTheme.colors.primary : redFinanceTheme.colors.backgroundText }}
+              >
+                {item.title}
+              </div>
+              <div className="ml-[15px] flex h-[24px] w-[24px] flex-none items-center justify-center">
+                <FinanceIcon
+                  name={item.icon}
+                  className="h-[24px] w-[24px]"
+                  stroke={isHighlighted ? redFinanceTheme.colors.primary : "#D6D6D6"}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </FinanceContentFrame>
   );
 };
 

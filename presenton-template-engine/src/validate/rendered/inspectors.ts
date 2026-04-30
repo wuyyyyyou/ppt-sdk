@@ -2,10 +2,20 @@ import type {
   RenderedElementSummary,
   RenderedSlideInfo,
   RenderedSlideInspection,
+  RenderedValidationInspectionOptions,
   ValidationContext,
 } from "../types.js";
 import { selectCollectionPageForValidation } from "../page-selection.js";
 import { prepareRenderedValidationContext } from "./runtime.js";
+
+const DEFAULT_MAX_ELEMENTS_PER_SLIDE = 450;
+const DEFAULT_MAX_INSPECTION_MS_PER_SLIDE = 10_000;
+const DEFAULT_SKIP_SELECTOR = [
+  "[data-validation-ignore]",
+  "[data-presenton-validation-ignore]",
+  "[data-presenton-decorative]",
+  "[data-pptx-ignore]",
+].join(",");
 
 async function inspectSlide(
   context: ValidationContext,
@@ -21,12 +31,17 @@ async function inspectSlide(
     throw new Error(`Rendered slide shell not found for selector: ${slide.shellSelector}`);
   }
 
-  const snapshot = await shellElement.evaluate((shell, rootSelector) => {
+  const inspectionOptions = context.renderedOptions?.inspection ?? {};
+  const snapshot = await shellElement.evaluate((shell, rootSelector, options) => {
     const shellElement = shell as HTMLElement;
     const slideRoot = (rootSelector
       ? shellElement.querySelector(rootSelector)
       : null) as HTMLElement | null;
     const inspectionRoot = slideRoot ?? shellElement;
+    const normalizedOptions = options as Required<RenderedValidationInspectionOptions>;
+    const maxElementsPerSlide = normalizedOptions.maxElementsPerSlide;
+    const maxInspectionMsPerSlide = normalizedOptions.maxInspectionMsPerSlide;
+    const startedAt = performance.now();
 
     const getTextLength = (element: Element): number => {
       const textContent = element.textContent ?? "";
@@ -87,6 +102,157 @@ async function inspectSlide(
       return segments.length > 0 ? `${prefix} > ${segments.join(" > ")}` : prefix;
     };
 
+    const shouldSkipSubtree = (element: Element): boolean => {
+      if (element === inspectionRoot) {
+        return false;
+      }
+
+      if (
+        normalizedOptions.skipScreenshotChildren
+        && element.matches('[data-pptx-export="screenshot"]')
+      ) {
+        return false;
+      }
+
+      if (normalizedOptions.skipSelector && element.matches(normalizedOptions.skipSelector)) {
+        return true;
+      }
+
+      if (
+        normalizedOptions.skipAriaHidden
+        && element.getAttribute("aria-hidden") === "true"
+      ) {
+        return true;
+      }
+
+      if (
+        normalizedOptions.skipScreenshotChildren
+        && element.parentElement?.closest('[data-pptx-export="screenshot"]')
+      ) {
+        return true;
+      }
+
+      return false;
+    };
+
+    const getOwnGraphicCounts = (element: Element) => {
+      const tagName = element.tagName.toLowerCase();
+      return {
+        svg: tagName === "svg" ? 1 : 0,
+        canvas: tagName === "canvas" ? 1 : 0,
+        path: tagName === "path" ? 1 : 0,
+        line: tagName === "line" ? 1 : 0,
+        polyline: tagName === "polyline" ? 1 : 0,
+        polygon: tagName === "polygon" ? 1 : 0,
+        circle: tagName === "circle" ? 1 : 0,
+        rect: tagName === "rect" ? 1 : 0,
+      };
+    };
+
+    const mergeGraphicCounts = (
+      target: ReturnType<typeof getOwnGraphicCounts>,
+      source: ReturnType<typeof getOwnGraphicCounts>,
+    ) => {
+      target.svg += source.svg;
+      target.canvas += source.canvas;
+      target.path += source.path;
+      target.line += source.line;
+      target.polyline += source.polyline;
+      target.polygon += source.polygon;
+      target.circle += source.circle;
+      target.rect += source.rect;
+    };
+
+    const getGraphicSignalCount = (counts: ReturnType<typeof getOwnGraphicCounts>): number =>
+      Object.values(counts).reduce((sum, value) => sum + value, 0);
+
+    const shouldInspectElement = (
+      element: Element,
+      graphicCounts: ReturnType<typeof getOwnGraphicCounts>,
+    ): boolean => {
+      if (element === inspectionRoot) {
+        return true;
+      }
+
+      const textLength = getTextLength(element);
+      if (textLength > 0 || getGraphicSignalCount(graphicCounts) > 0) {
+        return true;
+      }
+
+      if (
+        element.hasAttribute("data-pptx-export")
+        || element.hasAttribute("data-validation-role")
+        || element.hasAttribute("data-chart-like")
+        || element.hasAttribute("data-manifest-slide-id")
+      ) {
+        return true;
+      }
+
+      return false;
+    };
+
+    const elementRecords: Array<{
+      element: Element;
+      graphicCounts: ReturnType<typeof getOwnGraphicCounts>;
+      svgUsesCurrentColor: boolean;
+    }> = [];
+    const graphicCountsByElement = new Map<Element, ReturnType<typeof getOwnGraphicCounts>>();
+    const svgUsesCurrentColorByElement = new Map<Element, boolean>();
+    let skippedElementCount = 0;
+    let truncated = false;
+
+    const visitElement = (element: Element): ReturnType<typeof getOwnGraphicCounts> => {
+      const ownGraphicCounts = getOwnGraphicCounts(element);
+      const aggregateGraphicCounts = { ...ownGraphicCounts };
+      const rawSvgMarkup = element.tagName.toLowerCase() === "svg" ? element.outerHTML : "";
+      const className = element.getAttribute("class") ?? "";
+      let svgUsesCurrentColor = /currentColor/.test(rawSvgMarkup)
+        || /\b(?:fill-current|stroke-current|text-current)\b/.test(className);
+
+      if (
+        elementRecords.length >= maxElementsPerSlide
+        || performance.now() - startedAt > maxInspectionMsPerSlide
+      ) {
+        truncated = true;
+        skippedElementCount += element.querySelectorAll("*").length;
+        graphicCountsByElement.set(element, aggregateGraphicCounts);
+        svgUsesCurrentColorByElement.set(element, svgUsesCurrentColor);
+        return aggregateGraphicCounts;
+      }
+
+      if (!shouldSkipSubtree(element)) {
+        // Keep traversing below. The element is added to records after children
+        // have contributed aggregate graphic counts.
+      } else {
+        skippedElementCount += 1 + element.querySelectorAll("*").length;
+        graphicCountsByElement.set(element, aggregateGraphicCounts);
+        svgUsesCurrentColorByElement.set(element, svgUsesCurrentColor);
+        return aggregateGraphicCounts;
+      }
+
+      for (const child of Array.from(element.children)) {
+        const childGraphicCounts = visitElement(child);
+        mergeGraphicCounts(aggregateGraphicCounts, childGraphicCounts);
+        svgUsesCurrentColor = svgUsesCurrentColor || Boolean(svgUsesCurrentColorByElement.get(child));
+      }
+
+      graphicCountsByElement.set(element, aggregateGraphicCounts);
+      svgUsesCurrentColorByElement.set(element, svgUsesCurrentColor);
+      if (shouldInspectElement(element, aggregateGraphicCounts)) {
+        const record = {
+          element,
+          graphicCounts: aggregateGraphicCounts,
+          svgUsesCurrentColor,
+        };
+        elementRecords.push(record);
+      } else {
+        skippedElementCount += 1;
+      }
+      return aggregateGraphicCounts;
+    };
+
+    visitElement(inspectionRoot);
+
     const summarizeElement = (element: Element): RenderedElementSummary => {
       const htmlElement = element as HTMLElement;
       const computedStyle = window.getComputedStyle(htmlElement);
@@ -99,27 +265,15 @@ async function inspectSlide(
         attribute.name,
         attribute.value,
       ]);
-      const graphicCounts = {
-        svg: element.querySelectorAll("svg").length + (element.tagName.toLowerCase() === "svg" ? 1 : 0),
-        canvas: element.querySelectorAll("canvas").length + (element.tagName.toLowerCase() === "canvas" ? 1 : 0),
-        path: element.querySelectorAll("path").length + (element.tagName.toLowerCase() === "path" ? 1 : 0),
-        line: element.querySelectorAll("line").length + (element.tagName.toLowerCase() === "line" ? 1 : 0),
-        polyline: element.querySelectorAll("polyline").length + (element.tagName.toLowerCase() === "polyline" ? 1 : 0),
-        polygon: element.querySelectorAll("polygon").length + (element.tagName.toLowerCase() === "polygon" ? 1 : 0),
-        circle: element.querySelectorAll("circle").length + (element.tagName.toLowerCase() === "circle" ? 1 : 0),
-        rect: element.querySelectorAll("rect").length + (element.tagName.toLowerCase() === "rect" ? 1 : 0),
-      };
-      const svgNodes = Array.from(element.querySelectorAll("svg"));
-      const svgUsesCurrentColor = svgNodes.some((svgNode) => {
-        const rawMarkup = svgNode.outerHTML;
-        const className = svgNode.getAttribute("class") ?? "";
-        return /currentColor/.test(rawMarkup)
-          || /\b(?:fill-current|stroke-current|text-current)\b/.test(className);
-      });
+      const graphicCounts = graphicCountsByElement.get(element) ?? getOwnGraphicCounts(element);
+      const svgUsesCurrentColor = Boolean(svgUsesCurrentColorByElement.get(element));
 
       return {
         selector: buildSelector(element),
-        parentSelector: parentElement ? buildSelector(parentElement) : null,
+        parentSelector:
+          parentElement && inspectionRoot.contains(parentElement)
+            ? buildSelector(parentElement)
+            : null,
         tagName: element.tagName.toLowerCase(),
         className: htmlElement.className || null,
         textContent: (element.textContent ?? "").replace(/\s+/g, " ").trim(),
@@ -176,8 +330,7 @@ async function inspectSlide(
       };
     };
 
-    const elements = [inspectionRoot, ...Array.from(inspectionRoot.querySelectorAll("*"))]
-      .map((element) => summarizeElement(element));
+    const elements = elementRecords.map(({ element }) => summarizeElement(element));
     const screenshotRegionCount = elements.filter((element) =>
       element.attributes["data-pptx-export"] === "screenshot"
     ).length;
@@ -190,9 +343,20 @@ async function inspectSlide(
       graphicSignalCount: elements.reduce((sum, element) =>
         sum + Object.values(element.graphicCounts).reduce((inner, value) => inner + value, 0), 0
       ),
+      inspectedElementCount: elements.length,
+      skippedElementCount,
+      truncated,
       elements,
     };
-  }, slide.rootSelector);
+  }, slide.rootSelector, {
+    maxElementsPerSlide:
+      inspectionOptions.maxElementsPerSlide ?? DEFAULT_MAX_ELEMENTS_PER_SLIDE,
+    maxInspectionMsPerSlide:
+      inspectionOptions.maxInspectionMsPerSlide ?? DEFAULT_MAX_INSPECTION_MS_PER_SLIDE,
+    skipSelector: inspectionOptions.skipSelector ?? DEFAULT_SKIP_SELECTOR,
+    skipAriaHidden: inspectionOptions.skipAriaHidden ?? true,
+    skipScreenshotChildren: inspectionOptions.skipScreenshotChildren ?? true,
+  } satisfies Required<RenderedValidationInspectionOptions>);
 
   return {
     slideIndex: slide.slideIndex,

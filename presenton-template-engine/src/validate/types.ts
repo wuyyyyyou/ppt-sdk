@@ -153,7 +153,18 @@ export interface RenderedSlideInspection {
   totalTextElementCount: number;
   screenshotRegionCount: number;
   graphicSignalCount: number;
+  inspectedElementCount?: number;
+  skippedElementCount?: number;
+  truncated?: boolean;
   elements: RenderedElementSummary[];
+}
+
+export interface RenderedValidationInspectionOptions {
+  maxElementsPerSlide?: number;
+  maxInspectionMsPerSlide?: number;
+  skipSelector?: string;
+  skipAriaHidden?: boolean;
+  skipScreenshotChildren?: boolean;
 }
 
 export interface RenderedValidationRuntimeOptions {
@@ -165,6 +176,7 @@ export interface RenderedValidationRuntimeOptions {
   settleTimeMs?: number;
   deckSelector?: string;
   slideSelector?: string;
+  inspection?: RenderedValidationInspectionOptions | null;
   launchOptions?: Record<string, unknown>;
 }
 
