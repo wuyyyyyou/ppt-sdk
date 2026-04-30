@@ -9,7 +9,10 @@ export type FinanceIconName =
   | "chart-line"
   | "chart-pie"
   | "chess"
+  | "briefcase"
+  | "coins"
   | "flag"
+  | "lightbulb"
   | "laptop-code"
   | "list"
   | "microchip"
@@ -74,6 +77,29 @@ export const FinanceIcon = ({
           <path d="M4 19h16" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
           <path d="m5 15 4-4 3 3 6-7" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M16 7h2.8v2.8" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case "coins":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+          <ellipse cx="12" cy="7" rx="5.5" ry="2.8" stroke={stroke} strokeWidth="1.8" />
+          <path d="M6.5 7v4.4C6.5 13 9 14.2 12 14.2s5.5-1.2 5.5-2.8V7" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M8 13.4v3.1c0 1.2 1.8 2.2 4 2.2s4-1 4-2.2v-3.1" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
+    case "briefcase":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+          <rect x="4" y="8" width="16" height="11" rx="2" stroke={stroke} strokeWidth="1.8" />
+          <path d="M9 8V6.4A1.4 1.4 0 0 1 10.4 5h3.2A1.4 1.4 0 0 1 15 6.4V8" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M4 12h16" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
+    case "lightbulb":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+          <path d="M9.2 16.4h5.6M10 19h4" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M8 10.2a4 4 0 1 1 8 0c0 1.4-.58 2.12-1.5 3.2-.68.8-1.14 1.65-1.3 2.5h-2.4c-.16-.85-.62-1.7-1.3-2.5-.92-1.08-1.5-1.8-1.5-3.2Z" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
     case "laptop-code":

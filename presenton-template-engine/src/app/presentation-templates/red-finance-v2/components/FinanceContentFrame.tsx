@@ -24,6 +24,8 @@ type FinanceContentFrameProps = {
 
 const titleLeft = 80;
 const titleTop = 52;
+const titleHeight = 58;
+const headerDividerTop = 126;
 const contentLeft = 80;
 const contentWidth = 1120;
 const footerHeight = 50;
@@ -50,8 +52,12 @@ const FinanceContentFrame = ({
       <FinanceCanvas>
         {titleAccent === "left" ? (
           <div
-            className="absolute top-[52px] z-10 h-[42px] w-[8px] rounded-[3px]"
-            style={{ left: titleLeft, backgroundColor: redFinanceTheme.colors.primary }}
+            className="absolute z-10 h-[42px] w-[8px] rounded-[3px]"
+            style={{
+              left: titleLeft,
+              top: titleTop + (titleHeight - 42) / 2,
+              backgroundColor: redFinanceTheme.colors.primary,
+            }}
           />
         ) : null}
 
@@ -76,7 +82,6 @@ const FinanceContentFrame = ({
               height={28}
               iconSize={22}
               gap={10}
-              textWidth={360}
               fontSize={16}
               fontWeight={700}
               textColor={redFinanceTheme.colors.mutedText}
@@ -86,9 +91,10 @@ const FinanceContentFrame = ({
 
         {showHeaderDivider ? (
           <div
-            className="absolute top-[138px] z-10 h-[2px]"
+            className="absolute z-10 h-[2px]"
             style={{
               left: contentLeft,
+              top: headerDividerTop,
               width: contentWidth,
               backgroundColor: redFinanceTheme.colors.stroke,
             }}
@@ -97,8 +103,12 @@ const FinanceContentFrame = ({
 
         {titleAccent === "bottom" ? (
           <div
-            className="absolute top-[132px] z-10 h-[6px] w-[120px]"
-            style={{ left: titleLeft, backgroundColor: redFinanceTheme.colors.primary }}
+            className="absolute z-10 h-[6px] w-[120px]"
+            style={{
+              left: titleLeft,
+              top: headerDividerTop - 6,
+              backgroundColor: redFinanceTheme.colors.primary,
+            }}
           />
         ) : null}
 

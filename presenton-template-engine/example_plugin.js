@@ -729,10 +729,24 @@ async function toolConvertDeckHtmlToPptxModel(args) {
     typeof args.name === "string" && args.name.length > 0
       ? args.name
       : path.basename(htmlPath, path.extname(htmlPath));
+  const deviceScaleFactor = args.device_scale_factor !== undefined
+    ? Number(args.device_scale_factor)
+    : args.deviceScaleFactor !== undefined
+      ? Number(args.deviceScaleFactor)
+      : undefined;
+  if (
+    deviceScaleFactor !== undefined
+    && (!Number.isFinite(deviceScaleFactor) || deviceScaleFactor <= 0)
+  ) {
+    throw new Error('"device_scale_factor" must be a positive number');
+  }
 
   const model = await convertDeckHtmlToPptxModel({
     html,
     name,
+    viewport: deviceScaleFactor
+      ? { width: 1280, height: 720, deviceScaleFactor }
+      : undefined,
     settleTimeMs:
       typeof args.settle_time_ms === "number" ? args.settle_time_ms : undefined,
     screenshotsDir,

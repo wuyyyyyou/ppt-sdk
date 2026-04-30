@@ -423,11 +423,14 @@ function convertToAutoShapeBox(
 }
 
 function convertToPictureBox(element: ElementAttributes): PptxPictureBoxModel {
-  const objectFit: PptxObjectFitModel = {
-    fit: element.objectFit
-      ? (element.objectFit as PptxObjectFitEnum)
-      : PptxObjectFitEnum.CONTAIN,
-  };
+  const isScreenshotExport = element.pptxExport === "screenshot";
+  const objectFit: PptxObjectFitModel | undefined = isScreenshotExport
+    ? undefined
+    : {
+      fit: element.objectFit
+        ? (element.objectFit as PptxObjectFitEnum)
+        : PptxObjectFitEnum.CONTAIN,
+    };
 
   const picture: PptxPictureModel = {
     is_network: element.imageSrc ? element.imageSrc.startsWith("http") : false,
@@ -438,7 +441,7 @@ function convertToPictureBox(element: ElementAttributes): PptxPictureBoxModel {
     shape_type: "picture",
     position: toRoundedPosition(element),
     margin: undefined,
-    clip: element.clip ?? true,
+    clip: isScreenshotExport ? false : element.clip ?? true,
     invert: element.filters?.invert === 1,
     opacity: element.opacity,
     border_radius: element.borderRadius

@@ -8,6 +8,13 @@ import { inspectRenderedSlides } from "../inspectors.js";
 
 function isSingleLineTextCandidate(element: RenderedElementSummary): boolean {
   const role = element.attributes["data-validation-role"];
+  if (role === "multi-line-body-text") {
+    return false;
+  }
+
+  const textBoxHeight = parseFloat(element.styles.height ?? "") || 0;
+  const looksLikeSingleLine = element.rect.height <= 30 || element.styles.whiteSpace === "nowrap";
+
   return (
     role === "single-line-key-text"
     || role === "single-line-box"
@@ -18,6 +25,7 @@ function isSingleLineTextCandidate(element: RenderedElementSummary): boolean {
       && element.rect.height > 0
       && element.rect.height <= 96
       && element.rect.width > 0
+      && (looksLikeSingleLine || textBoxHeight <= 30)
     )
   );
 }

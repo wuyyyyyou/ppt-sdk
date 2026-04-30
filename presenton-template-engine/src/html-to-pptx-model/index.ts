@@ -54,7 +54,7 @@ export interface ConvertDeckHtmlToPptxModelInput {
 const DEFAULT_VIEWPORT = {
   width: 1280,
   height: 720,
-  deviceScaleFactor: 1,
+  deviceScaleFactor: 2,
 };
 
 const DEFAULT_DECK_SELECTOR = "#presentation-slides-wrapper";

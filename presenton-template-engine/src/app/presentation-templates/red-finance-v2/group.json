@@ -13,5 +13,9 @@
   "ordered": true,
   "default": false,
   "registry_order": 91,
-  "layouts": ["slides/CoverHero.tsx", "slides/AgendaGrid.tsx"]
+  "layouts": [
+    "slides/CoverHero.tsx",
+    "slides/AgendaGrid.tsx",
+    "slides/IndustryOverview.tsx"
+  ]
 }

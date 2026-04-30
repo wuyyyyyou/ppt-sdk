@@ -57,6 +57,56 @@
           { "number": "10", "title": "总结展望", "icon": "flag", "highlighted": false }
         ]
       }
+    },
+    {
+      "id": "red-finance-v2-industry-overview",
+      "title": "行业概况",
+      "speaker_note": "行业概况页：用于展示金融行业宏观环境、行业规模、收入结构、业务重心和资产规模趋势。",
+      "source": {
+        "type": "local",
+        "path": "./slides/IndustryOverview.tsx"
+      },
+      "data": {
+        "title": "行业概况",
+        "metaLabel": "MARKET OVERVIEW",
+        "footerText": "金融行业战略分析报告 | 绝密资料",
+        "pageNumber": "03",
+        "infoItems": [
+          {
+            "icon": "bank",
+            "title": "宏观与监管",
+            "description": "稳增长与强监管并行，结构性政策持续优化。政策导向聚焦金融服务实体经济，防范系统性金融风险。"
+          },
+          {
+            "icon": "chart-line",
+            "title": "行业规模",
+            "description": "银行、证券、保险与资管多业态协同发展。银行业资产总额稳步增长，保险保费规模持续扩大。"
+          },
+          {
+            "icon": "coins",
+            "title": "收入结构",
+            "description": "息差持续承压，驱动业务转型。非息收入与财富管理业务占比显著抬升，成为新增长极。"
+          },
+          {
+            "icon": "briefcase",
+            "title": "业务重心",
+            "description": "企业金融+零售金融“双轮驱动”。供应链金融与场景金融深度融合，数字化服务能力成为核心竞争力。"
+          }
+        ],
+        "keyInsight": "关键启示：未来三年应重点提升中间业务收入，持续优化资产质量，并做强综合金融服务能力。",
+        "chartTitle": "金融行业资产规模趋势 (2022-2026E)",
+        "chartSubtitle": "单位：万亿元 (RMB)",
+        "chartMin": 300,
+        "chartMax": 550,
+        "chartTicks": [300, 350, 400, 450, 500, 550],
+        "chartBars": [
+          { "label": "2022", "value": 370 },
+          { "label": "2023", "value": 405 },
+          { "label": "2024", "value": 442 },
+          { "label": "2025", "value": 480 },
+          { "label": "2026E", "value": 525 }
+        ]
+      }
     }
   ]
 }
