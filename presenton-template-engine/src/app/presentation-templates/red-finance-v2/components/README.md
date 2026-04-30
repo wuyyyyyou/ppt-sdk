@@ -36,13 +36,14 @@
 
 金融主题的小图标组件。
 
-- 当前支持 `bank`、`calendar`、`user`、`shield`
+- 当前支持封面和目录页需要的小型业务图标，如 `bank`、`calendar`、`user`、`shield`、`list`、`chart-line`、`chart-pie` 等
 - 使用自包含的小型 SVG，SVG 内部直接写 `stroke`
 - 不依赖 `currentColor`、`stroke-current` 或外部 CSS 才能成立
 
 适合修改：
 
 - 新增模板组内常用图标
+- 扩展目录页或内容页的短标签图标
 - 调整图标的基础视觉风格
 - 保持图标在不同 slide 里的统一性
 
@@ -51,6 +52,7 @@
 - 小型自包含 SVG 可以使用，但要保持简单、独立、样式明确
 - 不要依赖 `currentColor`、`fill-current`、`stroke-current` 或外部 class 控制关键颜色
 - 如果某个模块确实是图形主导，应按验证规则加上 `data-pptx-export="screenshot"`
+- 目录项这类 `数字 + 标题 + 图标` 的结构，标题仍应保持真实文本，图标只作为辅助视觉
 
 ### `IconText`
 

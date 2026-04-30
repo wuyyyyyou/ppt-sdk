@@ -9,8 +9,9 @@
   "audience_tags": ["management", "board", "client"],
   "tone_tags": ["professional", "formal", "analytical"],
   "cover_layout_id": "red-finance-v2:cover-hero",
+  "agenda_layout_id": "red-finance-v2:agenda-grid",
   "ordered": true,
   "default": false,
   "registry_order": 91,
-  "layouts": ["slides/CoverHero.tsx"]
+  "layouts": ["slides/CoverHero.tsx", "slides/AgendaGrid.tsx"]
 }

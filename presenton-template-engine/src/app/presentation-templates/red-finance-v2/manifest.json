@@ -30,6 +30,33 @@
         "presenter": "[Name Here]",
         "classification": "绝密资料 · 内部参考"
       }
+    },
+    {
+      "id": "red-finance-v2-agenda",
+      "title": "目录",
+      "speaker_note": "目录页：用于展示报告章节结构，并高亮当前目录页。",
+      "source": {
+        "type": "local",
+        "path": "./slides/AgendaGrid.tsx"
+      },
+      "data": {
+        "title": "目录",
+        "brandName": "GLOBAL FINANCE INSIGHTS",
+        "footerText": "金融行业战略分析报告 | 绝密资料",
+        "pageNumber": "02",
+        "items": [
+          { "number": "01", "title": "封面", "icon": "book-open", "highlighted": false },
+          { "number": "02", "title": "目录", "icon": "list", "highlighted": true },
+          { "number": "03", "title": "行业概况", "icon": "chart-pie", "highlighted": false },
+          { "number": "04", "title": "市场趋势（2026）", "icon": "chart-line", "highlighted": false },
+          { "number": "05", "title": "数字化转型", "icon": "laptop-code", "highlighted": false },
+          { "number": "06", "title": "金融科技创新", "icon": "microchip", "highlighted": false },
+          { "number": "07", "title": "竞争格局", "icon": "chess", "highlighted": false },
+          { "number": "08", "title": "风险管理", "icon": "shield", "highlighted": false },
+          { "number": "09", "title": "战略规划", "icon": "route", "highlighted": false },
+          { "number": "10", "title": "总结展望", "icon": "flag", "highlighted": false }
+        ]
+      }
     }
   ]
 }
