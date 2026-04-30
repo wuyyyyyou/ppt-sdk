@@ -2,7 +2,7 @@ import React from "react";
 
 import { redFinanceTheme } from "../theme/tokens.js";
 
-type FinanceIconName =
+export type FinanceIconName =
   | "bank"
   | "book-open"
   | "calendar"
