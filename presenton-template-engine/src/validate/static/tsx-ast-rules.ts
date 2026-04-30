@@ -19,6 +19,10 @@ interface ParsedSourceFileState {
 
 const parsedSourceFileCache = new Map<string, Promise<ParsedSourceFileState>>();
 const ALLOWED_BARE_IMPORTS = new Set(["react", "zod"]);
+const FIXED_CANVAS_COMPONENT_NAMES = new Set([
+  "FinanceCanvas",
+  "FinanceContentFrame",
+]);
 
 async function loadParsedSourceFile(filePath: string): Promise<ParsedSourceFileState> {
   const absolutePath = path.resolve(filePath);
@@ -273,6 +277,27 @@ function hasFixedCanvasHints(sourceText: string): boolean {
   return widthPattern.test(sourceText) && heightPattern.test(sourceText);
 }
 
+function usesKnownFixedCanvasComponent(sourceFile: ts.SourceFile): boolean {
+  let found = false;
+
+  walk(sourceFile, (node) => {
+    if (found || !ts.isJsxOpeningLikeElement(node)) {
+      return;
+    }
+
+    const tagName = node.tagName;
+    if (!ts.isIdentifier(tagName)) {
+      return;
+    }
+
+    if (FIXED_CANVAS_COMPONENT_NAMES.has(tagName.text)) {
+      found = true;
+    }
+  });
+
+  return found;
+}
+
 function collectDisallowedBareImports(sourceFile: ts.SourceFile): string[] {
   const specifiers = new Set<string>();
 
@@ -482,7 +507,10 @@ export const FIXED_CANVAS_HINT_RULE: StabilityRule = {
       }
 
       const parsedSource = await loadParsedSourceFile(resolution.absolutePath);
-      if (hasFixedCanvasHints(parsedSource.sourceText)) {
+      if (
+        hasFixedCanvasHints(parsedSource.sourceText)
+        || usesKnownFixedCanvasComponent(parsedSource.sourceFile)
+      ) {
         continue;
       }
 

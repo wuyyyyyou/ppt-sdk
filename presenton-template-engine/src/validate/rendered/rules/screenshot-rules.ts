@@ -32,13 +32,61 @@ function isGraphicDominantCandidate(element: RenderedElementSummary): boolean {
     );
 }
 
+function isDescendantOfElement(
+  descendant: RenderedElementSummary,
+  ancestor: RenderedElementSummary,
+  elementsBySelector: Map<string, RenderedElementSummary>,
+): boolean {
+  const visitedParentSelectors = new Set<string>();
+  let currentParentSelector = descendant.parentSelector;
+
+  while (currentParentSelector) {
+    if (visitedParentSelectors.has(currentParentSelector)) {
+      break;
+    }
+    visitedParentSelectors.add(currentParentSelector);
+
+    if (currentParentSelector === ancestor.selector) {
+      return true;
+    }
+
+    currentParentSelector =
+      elementsBySelector.get(currentParentSelector)?.parentSelector ?? null;
+  }
+
+  return false;
+}
+
+function isTextStructuredContainer(
+  element: RenderedElementSummary,
+  elementsBySelector: Map<string, RenderedElementSummary>,
+): boolean {
+  if (element.attributes["data-chart-like"] === "true") {
+    return false;
+  }
+
+  const descendantTextElementCount = Array.from(elementsBySelector.values()).filter((candidate) =>
+    candidate !== element
+    && candidate.directTextLength > 0
+    && candidate.childElementCount === 0
+    && isDescendantOfElement(candidate, element, elementsBySelector)
+  ).length;
+  const graphicSignalCount = getGraphicSignalCount(element);
+
+  return descendantTextElementCount >= 3
+    && element.textLength >= 24
+    && graphicSignalCount <= descendantTextElementCount * 4;
+}
+
 function selectGraphicDominantTargets(
   elements: RenderedElementSummary[],
 ): RenderedElementSummary[] {
   const elementsBySelector = new Map(
     elements.map((element) => [element.selector, element]),
   );
-  const candidates = elements.filter(isGraphicDominantCandidate);
+  const candidates = elements
+    .filter(isGraphicDominantCandidate)
+    .filter((element) => !isTextStructuredContainer(element, elementsBySelector));
   const candidateSelectorSet = new Set(candidates.map((candidate) => candidate.selector));
   const ancestorCandidateSelectors = new Set<string>();
 
