@@ -28,14 +28,7 @@
         "subtitle": "把握趋势 · 夯实风控 · 驱动增长",
         "reportDate": "2026/03/02",
         "presenter": "[Name Here]",
-        "classification": "绝密资料 · 内部参考",
-        "chartBars": [
-          { "height": 120, "opacity": 0.45 },
-          { "height": 180, "opacity": 0.6 },
-          { "height": 150, "opacity": 0.52 },
-          { "height": 240, "opacity": 0.8 },
-          { "height": 320, "opacity": 1 }
-        ]
+        "classification": "绝密资料 · 内部参考"
       }
     }
   ]

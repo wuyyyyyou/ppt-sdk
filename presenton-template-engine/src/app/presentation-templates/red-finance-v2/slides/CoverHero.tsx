@@ -1,15 +1,11 @@
 import React from "react";
 import * as z from "zod";
 
+import CoverBarDecoration from "../components/CoverBarDecoration.js";
 import { CoverMetaItem } from "../components/CoverMetaItem.js";
 import FinanceCanvas from "../components/FinanceCanvas.js";
 import { FinanceIcon } from "../components/FinanceIcons.js";
 import { redFinanceTheme } from "../theme/tokens.js";
-
-const ChartBarSchema = z.object({
-  height: z.number().min(80).max(360).default(120),
-  opacity: z.number().min(0.2).max(1).default(0.45),
-});
 
 export const Schema = z.object({
   brandName: z.string().min(2).max(80).default("GLOBAL FINANCE INSIGHTS"),
@@ -20,22 +16,15 @@ export const Schema = z.object({
   reportDate: z.string().min(6).max(24).default("2026/03/02"),
   presenter: z.string().min(2).max(40).default("[Name Here]"),
   classification: z.string().min(4).max(40).default("绝密资料 · 内部参考"),
-  chartBars: z.array(ChartBarSchema).min(3).max(8).default([
-    { height: 120, opacity: 0.45 },
-    { height: 180, opacity: 0.6 },
-    { height: 150, opacity: 0.52 },
-    { height: 240, opacity: 0.8 },
-    { height: 320, opacity: 1 },
-  ]),
   showPattern: z.boolean().default(true),
   showAccentBar: z.boolean().default(true),
-  showChartBars: z.boolean().default(true),
+  showBarDecoration: z.boolean().default(true),
 });
 
 export const layoutId = "cover-hero";
 export const layoutName = "Cover Hero";
 export const layoutDescription =
-  "A component-oriented finance cover slide with editable title, metadata, and abstract chart bars.";
+  "A component-oriented finance cover slide with editable title, metadata, and a fixed decorative finance visual.";
 export const layoutTags = ["cover", "finance", "hero", "componentized"];
 export const layoutRole = "cover";
 export const contentElements = ["headline", "meta", "hero-graphic"];
@@ -130,20 +119,9 @@ const CoverHero = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
         <div className="h-[58px] w-[10px]" style={{ backgroundColor: redFinanceTheme.colors.deepRed }} />
       </div>
 
-      {parsed.showChartBars ? (
-        <div className="absolute bottom-[100px] right-[80px] z-10 flex h-[360px] items-end gap-[20px]">
-          {parsed.chartBars.map((bar, index) => (
-            <div
-              key={`${bar.height}-${bar.opacity}-${index}`}
-              className="w-[40px] rounded-t-[4px]"
-              style={{
-                height: `${bar.height}px`,
-                opacity: bar.opacity,
-                backgroundColor: redFinanceTheme.colors.primary,
-                boxShadow: "4px 4px 10px rgba(0,0,0,0.1)",
-              }}
-            />
-          ))}
+      {parsed.showBarDecoration ? (
+        <div className="absolute bottom-[100px] right-[80px] z-10">
+          <CoverBarDecoration />
         </div>
       ) : null}
 

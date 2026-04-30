@@ -198,6 +198,31 @@ test("DOM-003 reports the most specific graphic-dominant module once", async () 
   assert.equal(diagnostics[0]?.locations[0]?.selector, '[data-test="chart-module"]');
 });
 
+test("DOM-003 does not report text-rich slide roots with small decorative icons", async () => {
+  const diagnostics = await runSingleRule(GRAPHIC_MODULE_SCREENSHOT_RULE, [
+    createBaseElement({
+      selector: '[data-test="slide-root"]',
+      parentSelector: null,
+      textLength: 140,
+      directTextLength: 0,
+      childElementCount: 10,
+      rect: { width: 1280, height: 720 },
+      graphicCounts: {
+        svg: 4,
+        canvas: 0,
+        path: 12,
+        line: 0,
+        polyline: 0,
+        polygon: 0,
+        circle: 0,
+        rect: 0,
+      },
+    }),
+  ]);
+
+  assert.equal(diagnostics.length, 0);
+});
+
 test("DOM-004 reports screenshot regions that contain text-heavy content", async () => {
   const diagnostics = await runSingleRule(TEXT_MODULE_SCREENSHOT_RULE, [
     createBaseElement({

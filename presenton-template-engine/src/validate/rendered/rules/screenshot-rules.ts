@@ -23,7 +23,7 @@ function isGraphicDominantCandidate(element: RenderedElementSummary): boolean {
     && element.rect.height >= 80
     && (
       element.attributes["data-chart-like"] === "true"
-      || graphicSignalCount >= 8
+      || (graphicSignalCount >= 8 && element.textLength <= 80)
       || (
         (element.graphicCounts.svg > 0 || element.graphicCounts.canvas > 0)
         && graphicSignalCount >= 4
