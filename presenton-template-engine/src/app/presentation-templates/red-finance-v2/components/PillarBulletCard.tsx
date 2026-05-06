@@ -30,6 +30,14 @@ type PillarBulletCardProps = {
 };
 
 const BULLET_ITEM_LINE_HEIGHT = 19;
+const DEFAULT_DIVIDER_ESTIMATED_WIDTH = 280;
+
+const parseDividerDash = (dividerDash: string) => {
+  const [segmentToken, gapToken] = dividerDash.split(/\s+/);
+  const segment = Math.max(2, Number.parseFloat(segmentToken || "8") || 8);
+  const gap = Math.max(0, Number.parseFloat(gapToken || "6") || 6);
+  return { segment, gap };
+};
 
 const PillarBulletCard = ({
   number,
@@ -88,6 +96,18 @@ const PillarBulletCard = ({
   const titleLineHeight = isHeaderTight ? 1.12 : 1.2;
   const bulletSize = isXSmallText ? 5 : 6;
   const bulletLineHeight = isXSmallText ? 17 : isSmallText ? 18 : BULLET_ITEM_LINE_HEIGHT;
+  const dividerColor = "var(--stroke,#E5E7EB)";
+  const { segment: dividerSegmentLength, gap: dividerGap } = parseDividerDash(dividerDash);
+  const dividerSegmentCount =
+    dividerStyle === "dashed"
+      ? Math.max(
+          8,
+          Math.round(
+            (DEFAULT_DIVIDER_ESTIMATED_WIDTH + dividerGap) /
+              (dividerSegmentLength + dividerGap),
+          ),
+        )
+      : 1;
 
   return (
     <div
@@ -162,14 +182,40 @@ const PillarBulletCard = ({
       <div
         className="w-full"
         style={{
-          borderTopWidth: dividerThickness,
-          borderTopStyle: dividerBorderStyle,
-          borderTopColor: "var(--stroke,#E5E7EB)",
-          borderImage: dividerStyle === "dashed" ? `repeating-linear-gradient(to right, var(--stroke,#E5E7EB) 0 ${dividerDash.split(" ")[0]}, transparent ${dividerDash.split(" ")[0]} ${dividerDash}) 1` : undefined,
           marginTop: dividerMarginTop,
           marginBottom: dividerMarginBottom,
         }}
-      />
+      >
+        {dividerStyle === "dashed" ? (
+          <div
+            className="flex w-full"
+            style={{
+              gap: dividerGap,
+              height: dividerThickness,
+              overflow: "hidden",
+            }}
+          >
+            {Array.from({ length: dividerSegmentCount }).map((_, index) => (
+              <div
+                key={index}
+                className="flex-1"
+                style={{
+                  height: dividerThickness,
+                  backgroundColor: dividerColor,
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <div
+            className="w-full"
+            style={{
+              height: dividerThickness,
+              backgroundColor: dividerColor,
+            }}
+          />
+        )}
+      </div>
 
       <div
         className="flex min-h-0 flex-1 flex-col"
