@@ -14,6 +14,7 @@ export type FinanceIconName =
   | "compass"
   | "coins"
   | "database"
+  | "grid"
   | "flag"
   | "globe"
   | "leaf"
@@ -25,7 +26,11 @@ export type FinanceIconName =
   | "robot"
   | "route"
   | "shield"
-  | "user";
+  | "shuffle"
+  | "smartphone"
+  | "user"
+  | "user-plus"
+  | "users";
 
 type FinanceIconProps = {
   name: FinanceIconName;
@@ -133,6 +138,15 @@ export const FinanceIcon = ({
           <path d="M6.2 6.8v4.5c0 1.55 2.6 2.8 5.8 2.8s5.8-1.25 5.8-2.8V6.8M6.2 11.3v4.5c0 1.55 2.6 2.8 5.8 2.8s5.8-1.25 5.8-2.8v-4.5" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       );
+    case "grid":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+          <rect x="4.5" y="4.5" width="6.2" height="6.2" rx="1.2" stroke={stroke} strokeWidth="1.8" />
+          <rect x="13.3" y="4.5" width="6.2" height="6.2" rx="1.2" stroke={stroke} strokeWidth="1.8" />
+          <rect x="4.5" y="13.3" width="6.2" height="6.2" rx="1.2" stroke={stroke} strokeWidth="1.8" />
+          <rect x="13.3" y="13.3" width="6.2" height="6.2" rx="1.2" stroke={stroke} strokeWidth="1.8" />
+        </svg>
+      );
     case "laptop-code":
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
@@ -148,6 +162,13 @@ export const FinanceIcon = ({
           <path d="M10.2 10.2h3.6v3.6h-3.6z" stroke={stroke} strokeWidth="1.5" />
         </svg>
       );
+    case "smartphone":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+          <rect x="7" y="4.5" width="10" height="15" rx="2.4" stroke={stroke} strokeWidth="1.8" />
+          <path d="M10 7.5h4M10 16.5h4M12 14.5h.01" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
     case "chess":
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
@@ -161,6 +182,14 @@ export const FinanceIcon = ({
           <path d="M6.5 7.5h5c2.8 0 2.8 4 0 4h-2c-2.8 0-2.8 4 0 4h8" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
           <circle cx="5" cy="7.5" r="2" stroke={stroke} strokeWidth="1.8" />
           <circle cx="19" cy="15.5" r="2" stroke={stroke} strokeWidth="1.8" />
+        </svg>
+      );
+    case "shuffle":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+          <path d="M5 7.5h4c1.8 0 2.8.8 4 2.4l2 2.7c1.2 1.6 2.2 2.4 4 2.4h.5" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M17 5.5h2.5V8M17 18.5h2.5V16" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M5 16.5h4c1.8 0 2.8-.8 4-2.4l2-2.7c1.2-1.6 2.2-2.4 4-2.4h.5" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       );
     case "flag":
@@ -206,6 +235,22 @@ export const FinanceIcon = ({
         <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
           <circle cx="12" cy="8" r="3.2" stroke={stroke} strokeWidth="1.8" />
           <path d="M6.5 19c.9-3 3.15-4.5 5.5-4.5s4.6 1.5 5.5 4.5" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
+    case "user-plus":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+          <circle cx="10" cy="8" r="3" stroke={stroke} strokeWidth="1.8" />
+          <path d="M4.8 18c.9-2.8 2.9-4.3 5.2-4.3 2.3 0 4.3 1.5 5.2 4.3" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M18 7h2M19 6v2" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
+    case "users":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+          <circle cx="8" cy="9" r="2.2" stroke={stroke} strokeWidth="1.8" />
+          <circle cx="16" cy="9" r="2.2" stroke={stroke} strokeWidth="1.8" />
+          <path d="M4.8 18c.8-2.4 2.3-3.7 4.4-3.7 2.1 0 3.6 1.3 4.4 3.7M10.4 18c.8-2.4 2.3-3.7 4.4-3.7 2.1 0 3.6 1.3 4.4 3.7" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       );
     case "shield":

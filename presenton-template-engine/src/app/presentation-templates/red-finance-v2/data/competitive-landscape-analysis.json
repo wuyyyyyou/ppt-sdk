@@ -1,0 +1,65 @@
+{
+  "title": "竞争格局分析",
+  "metaLabel": "COMPETITIVE LANDSCAPE",
+  "participantsTitle": "主要市场参与者",
+  "participants": [
+    { "icon": "bank", "title": "传统银行/保险", "description": "牌照/资本/网点优势" },
+    { "icon": "smartphone", "title": "互联网巨头", "description": "流量/场景/体验优势" },
+    { "icon": "grid", "title": "FinTech 公司", "description": "垂直领域技术创新" },
+    { "icon": "globe", "title": "外资金融机构", "description": "跨境/高端财富管理" }
+  ],
+  "forcesTitle": "波特五力分析",
+  "forces": [
+    { "icon": "users", "title": "同业竞争", "level": "高", "description": "存量博弈加剧，息差收窄，产品同质化严重。" },
+    { "icon": "shuffle", "title": "替代品威胁", "level": "高", "description": "第三方支付、网络理财分流传统渠道流量。" },
+    { "icon": "user-plus", "title": "客户议价能力", "level": "高", "description": "信息透明度提升，客户转换成本降低。" },
+    { "icon": "route", "title": "潜在进入者", "level": "中", "description": "牌照监管壁垒高，但技术与场景渗透增强。" }
+  ],
+  "comparisonTitle": "竞争焦点与差异化路径对比",
+  "columns": {
+    "dimension": "竞争维度",
+    "traditional": "传统金融机构",
+    "tech": "互联网/科技巨头",
+    "winning": "差异化制胜路径"
+  },
+  "comparisonRows": [
+    {
+      "dimension": "客户获取",
+      "traditionalLead": "依赖线下网点与存量转化",
+      "traditionalSupport": "获客成本高，增长放缓",
+      "techLead": "高频生活场景流量变现",
+      "techSupport": "流量垄断，获客成本低",
+      "winningLead": "公私联动与场景嵌入",
+      "winningSupport": "深耕 B 端产业链，批量获取 C 端"
+    },
+    {
+      "dimension": "产品创新",
+      "traditionalLead": "标准化、严监管产品为主",
+      "traditionalSupport": "迭代周期长，信誉度高",
+      "techLead": "碎片化、定制化理财/信贷",
+      "techSupport": "迭代快，聚焦长尾需求",
+      "winningLead": "综合金融与财富管理",
+      "winningSupport": "投行、商行、私行的一体化服务"
+    },
+    {
+      "dimension": "风险控制",
+      "traditionalLead": "抵押担保，强资本约束",
+      "traditionalSupport": "风控严谨，覆盖面有限",
+      "techLead": "大数据信用风控",
+      "techSupport": "数据驱动，信用下沉",
+      "winningLead": "智能风控与周期管理",
+      "winningSupport": "AI 模型与专家经验的混合模式"
+    },
+    {
+      "dimension": "服务体验",
+      "traditionalLead": "低频、严肃、流程繁琐",
+      "traditionalSupport": "人际信任感强",
+      "techLead": "高频、极致便捷、交互强",
+      "techSupport": "缺乏深度咨询服务",
+      "winningLead": "全渠道与有温度的智能",
+      "winningSupport": "线上便捷交易，线下复杂咨询"
+    }
+  ],
+  "footerText": "金融行业战略分析报告 | 绝密资料",
+  "pageNumber": "07"
+}

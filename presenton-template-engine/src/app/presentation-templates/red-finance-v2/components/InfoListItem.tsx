@@ -1,4 +1,5 @@
 import React from "react";
+import { type ReactNode } from "react";
 
 import { redFinanceTheme } from "../theme/tokens.js";
 import { FinanceIcon, type FinanceIconName } from "./FinanceIcons.js";
@@ -9,6 +10,9 @@ type InfoListItemProps = {
   description: string;
   showDivider?: boolean;
   density?: "normal" | "compact" | "dense";
+  titleSuffix?: ReactNode;
+  descriptionMaxLines?: number;
+  fillHeight?: boolean;
 };
 
 const InfoListItem = ({
@@ -17,16 +21,17 @@ const InfoListItem = ({
   description,
   showDivider = true,
   density = "normal",
+  titleSuffix,
+  descriptionMaxLines = 2,
+  fillHeight = false,
 }: InfoListItemProps) => {
   const isCompact = density === "compact";
   const isDense = density === "dense";
-  const iconSize = isDense ? 26 : isCompact ? 34 : 40;
-  const titleHeight = isDense ? 18 : isCompact ? 22 : 24;
+  const iconSize = isDense ? 26 : isCompact ? 32 : 40;
   const titleFontSize = isDense ? 14 : isCompact ? 16 : 18;
   const descriptionFontSize = isDense ? 11 : isCompact ? 13 : 15;
   const descriptionLineHeight = isDense ? 14 : isCompact ? 18 : 22;
-  const descriptionMaxLines = 2;
-  const paddingBottom = isDense ? 5 : isCompact ? 10 : 15;
+  const paddingBottom = isDense ? 4 : isCompact ? 7 : 15;
   const dividerLeft = isDense ? 41 : isCompact ? 49 : 55;
   const titleMarginBottom = isDense ? 2 : 4;
   const gap = isDense ? 12 : 15;
@@ -39,7 +44,12 @@ const InfoListItem = ({
   return (
     <div
       className="relative flex items-start"
-      style={{ gap, paddingBottom }}
+      style={{
+        gap,
+        paddingBottom,
+        height: fillHeight ? "100%" : undefined,
+        minHeight: fillHeight ? undefined : isDense ? 46 : isCompact ? 52 : 68,
+      }}
     >
       <div
         className="flex flex-none items-center justify-center rounded-full"
@@ -51,18 +61,26 @@ const InfoListItem = ({
       >
         <FinanceIcon name={icon} className={iconClassName} />
       </div>
-      <div className="min-w-0 pr-[8px]">
+      <div
+        className="min-w-0"
+        style={{ paddingRight: titleSuffix ? 44 : 8 }}
+      >
         <div
-          className="flex items-center whitespace-nowrap font-bold"
+          className="font-bold"
           style={{
-            height: titleHeight,
             fontSize: titleFontSize,
-            lineHeight: `${titleHeight}px`,
             marginBottom: titleMarginBottom,
             color: redFinanceTheme.colors.backgroundText,
           }}
         >
-          {title}
+          <div className="min-w-0 truncate leading-[1.15]">
+            {title}
+          </div>
+          {titleSuffix ? (
+            <div className="absolute right-0 top-[1px]">
+              {titleSuffix}
+            </div>
+          ) : null}
         </div>
         <div
           data-validation-role="multi-line-body-text"

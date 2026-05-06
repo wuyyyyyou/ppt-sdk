@@ -71,6 +71,16 @@
         "path": "./slides/FintechInnovationApplications.tsx"
       },
       "data_path": "./data/fintech-innovation-applications.json"
+    },
+    {
+      "id": "red-finance-v2-competitive-landscape-analysis",
+      "title": "竞争格局分析",
+      "speaker_note": "竞争格局页：用于展示主要市场参与者、竞争压力来源，以及差异化竞争路径的结构化对比。",
+      "source": {
+        "type": "local",
+        "path": "./slides/CompetitiveLandscapeAnalysis.tsx"
+      },
+      "data_path": "./data/competitive-landscape-analysis.json"
     }
   ]
 }
