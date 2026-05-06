@@ -5,6 +5,7 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ResponsiveContainer,
   XAxis,
   YAxis,
 } from "recharts";
@@ -35,11 +36,6 @@ type TrendChartsPanelProps = {
   incomeChartSeries: TrendBarSeries[];
 };
 
-const lineChartWidth = 492;
-const lineChartHeight = 244;
-const barChartWidth = 492;
-const barChartHeight = 208;
-
 const clampValue = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, Number.isFinite(value) ? value : min));
 
@@ -62,11 +58,11 @@ const buildBarData = (labels: string[], series: TrendBarSeries[]) =>
   });
 
 const LineLegend = ({ series }: { series: TrendLineSeries[] }) => (
-  <div className="mt-[8px] flex items-center justify-center gap-[28px] text-[12px]">
+  <div className="flex items-center justify-center gap-[20px] text-[11px]">
     {series.map((entry) => (
       <div
         key={entry.label}
-        className="flex items-center gap-[8px]"
+        className="flex items-center gap-[8px] whitespace-nowrap"
         style={{ color: redFinanceTheme.colors.mutedText }}
       >
         <div className="relative h-[10px] w-[28px]">
@@ -86,11 +82,11 @@ const LineLegend = ({ series }: { series: TrendLineSeries[] }) => (
 );
 
 const BarLegend = ({ series }: { series: TrendBarSeries[] }) => (
-  <div className="mt-[10px] flex items-center justify-center gap-[32px] text-[12px]">
+  <div className="flex items-center justify-center gap-[28px] text-[12px]">
     {series.map((entry) => (
       <div
         key={entry.label}
-        className="flex items-center gap-[8px]"
+        className="flex items-center gap-[8px] whitespace-nowrap"
         style={{ color: redFinanceTheme.colors.mutedText }}
       >
         <div
@@ -120,47 +116,50 @@ const TrendChartsPanel = ({
     <div className="flex h-full gap-[30px]">
       <div className="flex-1">
         <ChartPanelCard title={aiChartTitle} tag={aiChartTag}>
-          <div className="flex flex-1 items-center justify-center">
-            <div className="flex flex-col items-center">
-              <LineChart
-                width={lineChartWidth}
-                height={lineChartHeight}
-                data={lineData}
-                margin={{ top: 6, right: 12, bottom: 8, left: -18 }}
-              >
-                <CartesianGrid
-                  vertical={false}
-                  stroke={redFinanceTheme.colors.stroke}
-                  strokeWidth={1}
-                />
-                <XAxis
-                  dataKey="label"
-                  axisLine={{ stroke: "#D0D0D0", strokeWidth: 1 }}
-                  tickLine={false}
-                  tick={{ fill: "#616161", fontSize: 11, fontWeight: 700 }}
-                />
-                <YAxis
-                  width={42}
-                  domain={[0, 100]}
-                  ticks={[0, 20, 40, 60, 80, 100]}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(value) => `${value}%`}
-                  tick={{ fill: "#9E9E9E", fontSize: 10 }}
-                />
-                {aiChartSeries.map((entry) => (
-                  <Line
-                    key={entry.label}
-                    type="monotone"
-                    dataKey={entry.label}
-                    stroke={entry.color}
-                    strokeWidth={3}
-                    dot={{ r: 4, strokeWidth: 2, fill: "#FFFFFF" }}
-                    activeDot={{ r: 5 }}
-                    isAnimationActive={false}
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={lineData}
+                  margin={{ top: 8, right: 18, bottom: 0, left: 10 }}
+                >
+                  <CartesianGrid
+                    vertical={false}
+                    stroke={redFinanceTheme.colors.stroke}
+                    strokeWidth={1}
                   />
-                ))}
-              </LineChart>
+                  <XAxis
+                    dataKey="label"
+                    axisLine={{ stroke: "#D0D0D0", strokeWidth: 1 }}
+                    tickLine={false}
+                    tick={{ fill: "#616161", fontSize: 11, fontWeight: 700 }}
+                    interval={0}
+                  />
+                  <YAxis
+                    width={56}
+                    domain={[0, 100]}
+                    ticks={[0, 20, 40, 60, 80, 100]}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(value) => `${value}%`}
+                    tick={{ fill: "#9E9E9E", fontSize: 10 }}
+                  />
+                  {aiChartSeries.map((entry) => (
+                    <Line
+                      key={entry.label}
+                      type="monotone"
+                      dataKey={entry.label}
+                      stroke={entry.color}
+                      strokeWidth={3}
+                      dot={{ r: 4, strokeWidth: 2, fill: "#FFFFFF" }}
+                      activeDot={{ r: 5 }}
+                      isAnimationActive={false}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex-none pt-[4px]">
               <LineLegend series={aiChartSeries} />
             </div>
           </div>
@@ -169,46 +168,49 @@ const TrendChartsPanel = ({
 
       <div className="flex-1">
         <ChartPanelCard title={incomeChartTitle} tag={incomeChartTag}>
-          <div className="flex flex-1 items-center justify-center">
-            <div className="flex flex-col items-center">
-              <BarChart
-                width={barChartWidth}
-                height={barChartHeight}
-                data={barData}
-                margin={{ top: 8, right: 12, bottom: 8, left: -18 }}
-                barGap={10}
-                barCategoryGap={36}
-              >
-                <CartesianGrid
-                  vertical={false}
-                  stroke={redFinanceTheme.colors.stroke}
-                  strokeWidth={1}
-                />
-                <XAxis
-                  dataKey="label"
-                  axisLine={{ stroke: "#D0D0D0", strokeWidth: 1 }}
-                  tickLine={false}
-                  tick={{ fill: "#616161", fontSize: 11 }}
-                />
-                <YAxis
-                  width={42}
-                  domain={[0, 60]}
-                  ticks={[0, 10, 20, 30, 40, 50, 60]}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(value) => `${value}%`}
-                  tick={{ fill: "#9E9E9E", fontSize: 10 }}
-                />
-                {incomeChartSeries.map((entry) => (
-                  <Bar
-                    key={entry.label}
-                    dataKey={entry.label}
-                    fill={entry.color}
-                    radius={[4, 4, 0, 0]}
-                    isAnimationActive={false}
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={barData}
+                  margin={{ top: 8, right: 18, bottom: 0, left: 8 }}
+                  barGap={10}
+                  barCategoryGap="26%"
+                >
+                  <CartesianGrid
+                    vertical={false}
+                    stroke={redFinanceTheme.colors.stroke}
+                    strokeWidth={1}
                   />
-                ))}
-              </BarChart>
+                  <XAxis
+                    dataKey="label"
+                    axisLine={{ stroke: "#D0D0D0", strokeWidth: 1 }}
+                    tickLine={false}
+                    tick={{ fill: "#616161", fontSize: 11 }}
+                    interval={0}
+                  />
+                  <YAxis
+                    width={54}
+                    domain={[0, 60]}
+                    ticks={[0, 10, 20, 30, 40, 50, 60]}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(value) => `${value}%`}
+                    tick={{ fill: "#9E9E9E", fontSize: 10 }}
+                  />
+                  {incomeChartSeries.map((entry) => (
+                    <Bar
+                      key={entry.label}
+                      dataKey={entry.label}
+                      fill={entry.color}
+                      radius={[4, 4, 0, 0]}
+                      isAnimationActive={false}
+                    />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex-none pt-[6px]">
               <BarLegend series={incomeChartSeries} />
             </div>
           </div>

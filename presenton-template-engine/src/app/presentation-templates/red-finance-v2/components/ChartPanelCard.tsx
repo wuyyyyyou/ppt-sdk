@@ -47,7 +47,10 @@ const ChartPanelCard = ({
       ) : null}
     </div>
 
-    <div className="flex flex-1 flex-col overflow-hidden" data-validation-ignore="true">
+    <div
+      className="flex flex-1 min-h-0 flex-col overflow-visible"
+      data-validation-ignore="true"
+    >
       {children}
     </div>
   </div>

@@ -1,30 +1,30 @@
 import { getBrowserRenderDeckRuntimeBundle } from "./runtime-bundle.js";
-import type {
-  BrowserRenderContext,
-  BuildDeckHtmlInput,
-  BuildStandaloneDeckHtmlInput,
-} from "./types.js";
+import type { BrowserRenderContext, BuildDeckHtmlInput, BuildStandaloneDeckHtmlInput } from "./types.js";
 
 const PRESENTATION_WRAPPER_ID = "presentation-slides-wrapper";
-const CONTEXT_ASSIGNMENT_PREFIX = "window.__PRESENTON_RENDER_CONTEXT__ = ";
 const DECK_VIEWER_MODE_CLASS = "presenton-viewer-mode";
 const DECK_VIEWER_SHELL_CLASS = "presenton-deck-viewer-shell";
 const SLIDE_WIDTH = 1280;
 const SLIDE_HEIGHT = 720;
+const THUMBNAIL_SCALE = 0.1625;
+const THUMBNAIL_WIDTH = Math.round(SLIDE_WIDTH * THUMBNAIL_SCALE);
+const THUMBNAIL_HEIGHT = Math.round(SLIDE_HEIGHT * THUMBNAIL_SCALE);
 
 interface ParsedSlideInput {
   speakerNote: string;
   context: BrowserRenderContext | null;
-  staticMarkup: string | null;
-  headStyleAndLinkTags: string[];
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function escapeHtmlAttribute(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return escapeHtml(value);
 }
 
 function escapeJsonForInlineScript(value: unknown): string {
@@ -36,46 +36,14 @@ function escapeJsonForInlineScript(value: unknown): string {
     .replace(/\u2029/g, "\\u2029");
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
-function stripScriptTags(html: string): string {
-  return html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
-}
-
-function collectHeadStyleAndLinkTags(html: string): string[] {
-  const headMatch = html.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i);
-  if (!headMatch) {
-    return [];
-  }
-
-  const headHtml = headMatch[1];
-  const tags = [
-    ...(headHtml.match(/<style\b[^>]*>[\s\S]*?<\/style>/gi) ?? []),
-    ...(headHtml.match(/<link\b[^>]*>/gi) ?? []).filter((tag) =>
-      /\brel\s*=\s*["']?stylesheet["']?/i.test(tag),
-    ),
-  ];
-
-  return tags.map((tag) => tag.trim()).filter(Boolean);
-}
-
-function extractDocumentTitle(html: string): string | null {
-  const match = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
-  return match ? match[1].trim() : null;
-}
-
 function extractContextFromHtml(html: string): BrowserRenderContext | null {
-  const assignmentStart = html.indexOf(CONTEXT_ASSIGNMENT_PREFIX);
+  const prefix = "window.__PRESENTON_RENDER_CONTEXT__ = ";
+  const assignmentStart = html.indexOf(prefix);
   if (assignmentStart === -1) {
     return null;
   }
 
-  const jsonStart = assignmentStart + CONTEXT_ASSIGNMENT_PREFIX.length;
+  const jsonStart = assignmentStart + prefix.length;
   let index = jsonStart;
   let depth = 0;
   let inString = false;
@@ -124,111 +92,16 @@ function extractContextFromHtml(html: string): BrowserRenderContext | null {
   throw new Error("Failed to parse window.__PRESENTON_RENDER_CONTEXT__ payload");
 }
 
-function findElementRangeById(
-  html: string,
-  id: string,
-): { start: number; openEnd: number; end: number; tagName: string } | null {
-  const pattern = new RegExp(
-    `<([a-zA-Z][\\w:-]*)\\b[^>]*\\bid\\s*=\\s*(['"])${id}\\2[^>]*>`,
-    "i",
-  );
-  const match = pattern.exec(html);
-  if (!match || match.index === undefined) {
-    return null;
-  }
-
-  const tagName = match[1];
-  const start = match.index;
-  const openEnd = start + match[0].length;
-  const tagPattern = new RegExp(`<\\/?${tagName}\\b[^>]*>`, "gi");
-  tagPattern.lastIndex = openEnd;
-
-  let depth = 1;
-  let tagMatch: RegExpExecArray | null;
-  while ((tagMatch = tagPattern.exec(html)) !== null) {
-    const token = tagMatch[0];
-    if (token.startsWith(`</`) || token.startsWith(`</${tagName}`)) {
-      depth -= 1;
-      if (depth === 0) {
-        return {
-          start,
-          openEnd,
-          end: tagMatch.index,
-          tagName,
-        };
-      }
-    } else if (!token.endsWith("/>")) {
-      depth += 1;
-    }
-  }
-
-  return null;
+function extractSpeakerNote(html: string): string {
+  const match = html.match(/\bdata-speaker-note\s*=\s*["']([^"']*)["']/i);
+  return match ? match[1] : "";
 }
 
-function extractWrapperInnerHtml(html: string): string | null {
-  const range = findElementRangeById(html, PRESENTATION_WRAPPER_ID);
-  if (!range) {
-    return null;
-  }
-
-  return html.slice(range.openEnd, range.end).trim() || null;
-}
-
-function extractBodyInnerHtml(html: string): string | null {
-  const match = html.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i);
-  if (!match) {
-    return null;
-  }
-
-  return match[1].trim() || null;
-}
-
-function extractSpeakerNoteFromMarkup(markup: string): string | null {
-  const match = markup.match(/\bdata-speaker-note\s*=\s*["']([^"']*)["']/i);
-  return match ? match[1] : null;
-}
-
-function extractStaticMarkup(html: string): string | null {
-  const wrapperInner = extractWrapperInnerHtml(html);
-  if (wrapperInner) {
-    const sanitized = stripScriptTags(wrapperInner).trim();
-    return sanitized || null;
-  }
-
-  const bodyInner = extractBodyInnerHtml(html);
-  if (!bodyInner) {
-    return null;
-  }
-
-  const sanitized = stripScriptTags(bodyInner)
-    .replace(
-      new RegExp(
-        `<div\\b[^>]*\\bid\\s*=\\s*(['"])${PRESENTATION_WRAPPER_ID}\\1[^>]*>[\\s\\S]*?<\\/div>`,
-        "gi",
-      ),
-      "",
-    )
-    .trim();
-
-  return sanitized || null;
-}
-
-function parseSlideInput(
-  slide: BuildDeckHtmlInput["slides"][number],
-): ParsedSlideInput {
+function parseSlideInput(slide: BuildDeckHtmlInput["slides"][number]): ParsedSlideInput {
   const context = extractContextFromHtml(slide.html);
-  const staticMarkup = context ? null : extractStaticMarkup(slide.html);
-  const inferredSpeakerNote =
-    slide.speaker_note ??
-    context?.speakerNote ??
-    (staticMarkup ? extractSpeakerNoteFromMarkup(staticMarkup) : null) ??
-    "";
-
   return {
-    speakerNote: inferredSpeakerNote,
+    speakerNote: slide.speaker_note ?? extractSpeakerNote(slide.html),
     context,
-    staticMarkup,
-    headStyleAndLinkTags: context ? [] : collectHeadStyleAndLinkTags(slide.html),
   };
 }
 
@@ -274,8 +147,7 @@ function buildDeckSharedStyles(): string[] {
     "      padding: 0;",
     `      width: ${SLIDE_WIDTH}px;`,
     `      min-height: ${SLIDE_HEIGHT}px;`,
-    "      overflow-x: hidden;",
-    "      overflow-y: auto;",
+    "      overflow: hidden;",
     "      background: #ffffff;",
     "    }",
     "    body {",
@@ -286,21 +158,7 @@ function buildDeckSharedStyles(): string[] {
     `      width: ${SLIDE_WIDTH}px;`,
     `      min-height: ${SLIDE_HEIGHT}px;`,
     "    }",
-    "    .presenton-deck-sidebar,",
-    "    .presenton-deck-stage-toolbar {",
-    "      display: none;",
-    "    }",
-    "    .presenton-deck-stage-panel,",
-    "    .presenton-deck-stage-viewport,",
-    "    .presenton-deck-stage-fit {",
-    `      width: ${SLIDE_WIDTH}px;`,
-    `      min-height: ${SLIDE_HEIGHT}px;`,
-    "    }",
     `    #${PRESENTATION_WRAPPER_ID} {`,
-    `      width: ${SLIDE_WIDTH}px;`,
-    `      min-height: ${SLIDE_HEIGHT}px;`,
-    "    }",
-    "    .presenton-deck-slide-shell {",
     `      width: ${SLIDE_WIDTH}px;`,
     `      min-height: ${SLIDE_HEIGHT}px;`,
     "    }",
@@ -318,22 +176,22 @@ function buildDeckSharedStyles(): string[] {
     "      color: #112133;",
     "    }",
     `    html.${DECK_VIEWER_MODE_CLASS} .${DECK_VIEWER_SHELL_CLASS} {`,
-      "      display: grid;",
-      "      grid-template-columns: 280px minmax(0, 1fr);",
-      "      width: 100%;",
-      "      height: 100vh;",
-      "      min-height: 100vh;",
+    "      display: grid;",
+    "      grid-template-columns: 280px minmax(0, 1fr);",
+    "      width: 100%;",
+    "      height: 100vh;",
+    "      min-height: 100vh;",
     "    }",
     `    html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-sidebar {`,
-      "      display: flex;",
-      "      flex-direction: column;",
-      "      gap: 16px;",
-      "      min-height: 0;",
-      "      padding: 24px 18px;",
-      "      box-sizing: border-box;",
-      "      border-right: 1px solid rgba(148, 163, 184, 0.28);",
-      "      background: rgba(255, 255, 255, 0.62);",
-      "      backdrop-filter: blur(18px);",
+    "      display: flex;",
+    "      flex-direction: column;",
+    "      gap: 16px;",
+    "      min-height: 0;",
+    "      padding: 24px 18px;",
+    "      box-sizing: border-box;",
+    "      border-right: 1px solid rgba(148, 163, 184, 0.28);",
+    "      background: rgba(255, 255, 255, 0.62);",
+    "      backdrop-filter: blur(18px);",
     "      overflow: hidden;",
     "    }",
     `    html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-sidebar-header {`,
@@ -355,10 +213,10 @@ function buildDeckSharedStyles(): string[] {
     "      color: #0f172a;",
     "    }",
     `    html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-thumbnail-list {`,
-      "      flex: 1;",
-      "      min-height: 0;",
-      "      overflow-y: auto;",
-      "      padding-right: 4px;",
+    "      flex: 1;",
+    "      min-height: 0;",
+    "      overflow-y: auto;",
+    "      padding-right: 4px;",
     "    }",
     `    html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-thumbnail {`,
     "      width: 100%;",
@@ -376,58 +234,56 @@ function buildDeckSharedStyles(): string[] {
     "      text-align: left;",
     "      box-sizing: border-box;",
     "    }",
-    `    html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-thumbnail:hover {`,
-    "      transform: translateY(-1px);",
-    "      box-shadow: 0 14px 36px rgba(15, 23, 42, 0.12);",
-    "      border-color: rgba(59, 130, 246, 0.35);",
-    "    }",
     `    html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-thumbnail[data-presenton-active-thumbnail="true"] {`,
     "      border-color: rgba(37, 99, 235, 0.42);",
     "      box-shadow: 0 16px 40px rgba(37, 99, 235, 0.16);",
     "    }",
     `    html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-thumbnail-meta {`,
     "      display: flex;",
-    "      align-items: center;",
-    "      justify-content: space-between;",
-    "      gap: 12px;",
+    "      flex-direction: column;",
+    "      gap: 4px;",
+    "      min-width: 0;",
     "    }",
     `    html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-thumbnail-index {`,
-    "      font-size: 12px;",
-    "      font-weight: 800;",
-    "      letter-spacing: 0.14em;",
+    "      font-size: 11px;",
+    "      font-weight: 700;",
+    "      letter-spacing: 0.08em;",
     "      text-transform: uppercase;",
-    "      color: #2563eb;",
+    "      color: #64748b;",
     "    }",
     `    html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-thumbnail-label {`,
-    "      font-size: 12px;",
-    "      color: #475569;",
-    "      white-space: nowrap;",
-    "      overflow: hidden;",
-    "      text-overflow: ellipsis;",
-    "      max-width: 140px;",
+    "      font-size: 13px;",
+    "      line-height: 1.35;",
+    "      font-weight: 600;",
+    "      color: #0f172a;",
+    "      word-break: break-word;",
     "    }",
     `    html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-thumbnail-fit {`,
-    "      width: 208px;",
-    "      height: 117px;",
+    "      position: relative;",
+    `      width: ${THUMBNAIL_WIDTH}px;`,
+    `      height: ${THUMBNAIL_HEIGHT}px;`,
     "      overflow: hidden;",
     "      border-radius: 12px;",
-    "      background: #dfe7f2;",
-    "      box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.2);",
+    "      background: #ffffff;",
+    "      border: 1px solid rgba(148, 163, 184, 0.18);",
     "    }",
     `    html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-thumbnail-canvas {`,
+    "      position: absolute;",
+    "      top: 0;",
+    "      left: 0;",
     `      width: ${SLIDE_WIDTH}px;`,
     `      height: ${SLIDE_HEIGHT}px;`,
-    `      transform: scale(${208 / SLIDE_WIDTH});`,
+    `      transform: scale(${THUMBNAIL_SCALE});`,
     "      transform-origin: top left;",
     "      pointer-events: none;",
     "    }",
     `    html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-stage-panel {`,
-      "      display: flex;",
-      "      flex-direction: column;",
-      "      min-width: 0;",
-      "      height: 100vh;",
-      "      min-height: 100vh;",
-      "      overflow: hidden;",
+    "      display: flex;",
+    "      flex-direction: column;",
+    "      min-width: 0;",
+    "      height: 100vh;",
+    "      min-height: 100vh;",
+    "      overflow: hidden;",
     "    }",
     `    html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-stage-toolbar {`,
     "      display: flex;",
@@ -469,14 +325,14 @@ function buildDeckSharedStyles(): string[] {
     "      color: #334155;",
     "    }",
     `    html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-stage-viewport {`,
-      "      flex: 1;",
-      "      min-height: 0;",
-      "      display: flex;",
-      "      align-items: flex-start;",
-      "      justify-content: center;",
-      "      padding: 28px;",
-      "      box-sizing: border-box;",
-      "      overflow: auto;",
+    "      flex: 1;",
+    "      min-height: 0;",
+    "      display: flex;",
+    "      align-items: flex-start;",
+    "      justify-content: center;",
+    "      padding: 28px;",
+    "      box-sizing: border-box;",
+    "      overflow: auto;",
     "    }",
     `    html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-stage-fit {`,
     "      position: relative;",
@@ -490,54 +346,22 @@ function buildDeckSharedStyles(): string[] {
     "      left: 0;",
     `      width: ${SLIDE_WIDTH}px;`,
     `      height: ${SLIDE_HEIGHT}px;`,
-    `      min-height: ${SLIDE_HEIGHT}px;`,
     "      transform: scale(var(--presenton-viewer-scale, 1));",
     "      transform-origin: top left;",
     "    }",
-    `    html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-slide-shell {`,
+    `    html.${DECK_VIEWER_MODE_CLASS} #${PRESENTATION_WRAPPER_ID} > [data-presenton-slide-shell="true"] {`,
     "      position: absolute;",
     "      inset: 0;",
-    "      opacity: 0;",
-    "      visibility: hidden;",
-    "      pointer-events: none;",
+    "      display: none;",
+    `      width: ${SLIDE_WIDTH}px;`,
+    `      height: ${SLIDE_HEIGHT}px;`,
     "      overflow: hidden;",
     "    }",
-    `    html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-slide-shell[data-presenton-active-slide="true"] {`,
-    "      opacity: 1;",
-    "      visibility: visible;",
-    "      pointer-events: auto;",
+    `    html.${DECK_VIEWER_MODE_CLASS} #${PRESENTATION_WRAPPER_ID} > [data-presenton-slide-shell="true"][data-presenton-active-slide="true"] {`,
+    "      display: block;",
     "    }",
     `    html.${DECK_VIEWER_MODE_CLASS} [data-presenton-render-status="error"] {`,
     "      min-height: 100vh;",
-    "    }",
-    "    @media (max-width: 1080px) {",
-    `      html.${DECK_VIEWER_MODE_CLASS} .${DECK_VIEWER_SHELL_CLASS} {`,
-    "        grid-template-columns: 1fr;",
-    "      }",
-    `      html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-sidebar {`,
-    "        display: none;",
-    "      }",
-    `      html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-stage-toolbar {`,
-    "        padding-top: 18px;",
-    "      }",
-    `      html.${DECK_VIEWER_MODE_CLASS} .presenton-deck-stage-viewport {`,
-    "        padding: 18px;",
-    "      }",
-    "    }",
-    "    @media (prefers-reduced-motion: reduce) {",
-    "      .presenton-deck-thumbnail {",
-    "        transition: none;",
-    "      }",
-    "    }",
-    "    [data-presenton-render-status=\"error\"] {",
-    "      display: flex;",
-    "      align-items: center;",
-    "      justify-content: center;",
-    "      color: #991b1b;",
-    "      background: #fef2f2;",
-    "      font-size: 14px;",
-    "      padding: 24px;",
-    "      box-sizing: border-box;",
     "    }",
   ];
 }
@@ -555,6 +379,7 @@ function buildDeckViewerScript(): string {
       const stageCounter = document.querySelector("[data-presenton-stage-counter='true']");
       const slideWidth = ${SLIDE_WIDTH};
       const slideHeight = ${SLIDE_HEIGHT};
+      const thumbnailScale = ${THUMBNAIL_SCALE};
       let activeIndex = 0;
       let initialized = false;
       let resizeObserver = null;
@@ -564,18 +389,11 @@ function buildDeckViewerScript(): string {
           ? Array.from(wrapper.querySelectorAll(":scope > [data-presenton-slide-shell='true']"))
           : [];
 
-      const getSlideRoot = (slideShell) => {
-        if (!slideShell) {
-          return null;
-        }
-        return slideShell.firstElementChild;
-      };
-
       const updateScale = () => {
         if (!html.classList.contains(${JSON.stringify(DECK_VIEWER_MODE_CLASS)})) {
           return;
         }
-        if (!stageViewport || !stageFit || !wrapper) {
+        if (!stageViewport || !stageFit) {
           return;
         }
         const bounds = stageViewport.getBoundingClientRect();
@@ -590,6 +408,7 @@ function buildDeckViewerScript(): string {
 
       const updateActiveState = () => {
         const slideShells = getSlideShells();
+        const nextActiveSlide = slideShells[activeIndex] ?? null;
         slideShells.forEach((slideShell, index) => {
           slideShell.setAttribute(
             "data-presenton-active-slide",
@@ -598,14 +417,23 @@ function buildDeckViewerScript(): string {
         });
 
         if (thumbnailList) {
-          Array.from(
+          const thumbnailButtons = Array.from(
             thumbnailList.querySelectorAll("[data-presenton-thumbnail-button='true']"),
-          ).forEach((button, index) => {
+          );
+          thumbnailButtons.forEach((button, index) => {
             button.setAttribute(
               "data-presenton-active-thumbnail",
               index === activeIndex ? "true" : "false",
             );
           });
+          const activeButton = thumbnailButtons[activeIndex];
+          activeButton?.scrollIntoView({ block: "nearest" });
+        }
+
+        if (stageTitle) {
+          stageTitle.textContent =
+            nextActiveSlide?.getAttribute("data-speaker-note") ||
+            "Slide " + String(activeIndex + 1);
         }
 
         if (stageCounter) {
@@ -648,8 +476,12 @@ function buildDeckViewerScript(): string {
 
           const canvas = document.createElement("div");
           canvas.className = "presenton-deck-thumbnail-canvas";
+          canvas.style.width = slideWidth + "px";
+          canvas.style.height = slideHeight + "px";
+          canvas.style.transform = "scale(" + String(thumbnailScale) + ")";
+          canvas.style.transformOrigin = "top left";
 
-          const slideRoot = getSlideRoot(slideShell);
+          const slideRoot = slideShell.firstElementChild;
           if (slideRoot) {
             canvas.appendChild(slideRoot.cloneNode(true));
           }
@@ -691,8 +523,6 @@ function buildDeckViewerScript(): string {
         window.addEventListener("resize", updateScale, { passive: true });
       };
 
-      const shouldUseViewerMode = () => !window.navigator.webdriver;
-
       const maybeInit = () => {
         if (initialized || !wrapper) {
           return;
@@ -703,20 +533,8 @@ function buildDeckViewerScript(): string {
           return;
         }
 
-        const hasDeckSlots = slideShells.some((slideShell) =>
-          Boolean(slideShell.querySelector("[data-presenton-deck-slot]")),
-        );
-        const status = wrapper.getAttribute("data-presenton-render-status");
-
-        if (hasDeckSlots && status !== "ready") {
-          return;
-        }
-
         initialized = true;
-
-        if (shouldUseViewerMode()) {
-          enableViewerMode();
-        }
+        enableViewerMode();
       };
 
       if (document.readyState === "loading") {
@@ -726,25 +544,11 @@ function buildDeckViewerScript(): string {
       }
 
       window.addEventListener("presenton:render-ready", maybeInit);
-
-      if (wrapper && window.MutationObserver) {
-        const observer = new MutationObserver(() => {
-          if (!initialized) {
-            maybeInit();
-          }
-        });
-        observer.observe(wrapper, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-          attributeFilter: ["data-presenton-render-status"],
-        });
-      }
     })();
   `.trim();
 }
 
-function buildDeckStaticReadyScript(): string {
+function buildDeckReadyScript(): string {
   return `
     (() => {
       const wrapper = document.getElementById(${JSON.stringify(PRESENTATION_WRAPPER_ID)});
@@ -757,35 +561,12 @@ function buildDeckStaticReadyScript(): string {
 function buildDeckDocumentHtml(input: {
   title: string;
   parsedSlides: ParsedSlideInput[];
-  headTags: string[];
 }): string {
   const runtimeBundle = getBrowserRenderDeckRuntimeBundle();
   const contexts = input.parsedSlides
     .map((slide) => slide.context)
     .filter((context): context is BrowserRenderContext => context !== null);
   const serializedContexts = escapeJsonForInlineScript(contexts);
-
-  const slideMarkup = input.parsedSlides
-    .map((slide, index) => {
-      if (slide.context) {
-        return [
-          `    <div class="w-full presenton-deck-slide-shell" data-presenton-slide-shell="true" data-speaker-note="${escapeHtmlAttribute(slide.speakerNote)}">`,
-          `      <div data-presenton-deck-slot="${index}" data-layout="${escapeHtmlAttribute(slide.context.layoutId)}" data-group="${escapeHtmlAttribute(slide.context.templateGroup)}" style="width:1280px;min-height:720px;"></div>`,
-          "    </div>",
-        ].join("\n");
-      }
-
-      return [
-        `    <div class="w-full presenton-deck-slide-shell" data-presenton-slide-shell="true" data-speaker-note="${escapeHtmlAttribute(slide.speakerNote)}">`,
-        '      <div data-presenton-static-slide="true" style="width:1280px;min-height:720px;">',
-        slide.staticMarkup ?? "",
-        "      </div>",
-        "    </div>",
-      ].join("\n");
-    })
-    .join("\n");
-
-  const optionalHeadTags = input.headTags.length > 0 ? `\n${input.headTags.join("\n")}` : "";
 
   return [
     "<!doctype html>",
@@ -796,8 +577,17 @@ function buildDeckDocumentHtml(input: {
     `  <title>${escapeHtml(input.title)}</title>`,
     "  <style>",
     ...buildDeckSharedStyles(),
+    "    [data-presenton-render-status=\"error\"] {",
+    "      display: flex;",
+    "      align-items: center;",
+    "      justify-content: center;",
+    "      color: #991b1b;",
+    "      background: #fef2f2;",
+    "      font-size: 14px;",
+    "      padding: 24px;",
+    "      box-sizing: border-box;",
+    "    }",
     "  </style>",
-    optionalHeadTags,
     "  <script>",
     "    window.tailwind = window.tailwind || {};",
     "  </script>",
@@ -806,7 +596,15 @@ function buildDeckDocumentHtml(input: {
     "<body>",
     ...buildDeckViewerShellStart(input.title),
     `          <div id="${PRESENTATION_WRAPPER_ID}" data-presenton-render-status="loading">`,
-    slideMarkup,
+    contexts
+      .map((context, index) =>
+        [
+          `    <div class="w-full presenton-deck-slide-shell" data-presenton-slide-shell="true" data-speaker-note="${escapeHtmlAttribute(input.parsedSlides[index]?.speakerNote ?? "")}">`,
+          `      <div data-presenton-deck-slot="${index}" data-layout="${escapeHtmlAttribute(context.layoutId)}" data-group="${escapeHtmlAttribute(context.templateGroup)}" style="width:1280px;min-height:720px;"></div>`,
+          "    </div>",
+        ].join("\n"),
+      )
+      .join("\n"),
     "          </div>",
     ...buildDeckViewerShellEnd(),
     "  <script>",
@@ -814,7 +612,7 @@ function buildDeckDocumentHtml(input: {
     "  </script>",
     contexts.length > 0
       ? ["  <script>", runtimeBundle, "  </script>"].join("\n")
-      : ["  <script>", buildDeckStaticReadyScript(), "  </script>"].join("\n"),
+      : ["  <script>", buildDeckReadyScript(), "  </script>"].join("\n"),
     "  <script>",
     buildDeckViewerScript(),
     "  </script>",
@@ -838,463 +636,27 @@ export function buildDeckHtml(input: BuildDeckHtmlInput): string {
     }
 
     const parsed = parseSlideInput(slide);
-    if (!parsed.context && !parsed.staticMarkup) {
-      throw new Error(
-        `Slide at index ${index} does not contain a render context or usable slide markup`,
-      );
+    if (!parsed.context) {
+      throw new Error(`Slide at index ${index} does not contain a render context`);
     }
     return parsed;
   });
 
   const title =
     input.title ??
-    extractDocumentTitle(input.slides[0].html) ??
     "Presenton Deck";
-  const headTags = Array.from(
-    new Set(parsedSlides.flatMap((slide) => slide.headStyleAndLinkTags)),
-  );
 
   return buildDeckDocumentHtml({
     title,
     parsedSlides,
-    headTags,
   });
-}
-
-function extractHeadHtml(html: string): string {
-  const match = html.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i);
-  return match ? match[1] : "";
-}
-
-function extractBodyHtml(html: string): string {
-  const match = html.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i);
-  return match ? match[1] : html;
-}
-
-function extractExternalScriptTags(html: string): string[] {
-  return Array.from(
-    html.matchAll(/<script\b[^>]*\bsrc\s*=\s*["'][^"']+["'][^>]*>\s*<\/script>/gi),
-  ).map((match) => match[0].trim());
-}
-
-function extractHeadStyles(html: string): string[] {
-  const headHtml = extractHeadHtml(html);
-  return Array.from(headHtml.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)).map(
-    (match) => match[1].trim(),
-  );
-}
-
-function extractBodyMarkupAndScripts(bodyHtml: string): {
-  markup: string;
-  scripts: string[];
-} {
-  const scripts: string[] = [];
-
-  const markup = bodyHtml.replace(
-    /<script\b([^>]*)>([\s\S]*?)<\/script>/gi,
-    (_, attributes = "", content = "") => {
-      if (/\bsrc\s*=/i.test(attributes)) {
-        return "";
-      }
-
-      const source = content.trim();
-      if (source) {
-        scripts.push(source);
-      }
-      return "";
-    },
-  );
-
-  return {
-    markup: markup.trim(),
-    scripts,
-  };
-}
-
-function splitCssSelectors(selectorList: string): string[] {
-  const selectors: string[] = [];
-  let current = "";
-  let parenDepth = 0;
-  let bracketDepth = 0;
-
-  for (const char of selectorList) {
-    if (char === "(") {
-      parenDepth += 1;
-    } else if (char === ")") {
-      parenDepth = Math.max(0, parenDepth - 1);
-    } else if (char === "[") {
-      bracketDepth += 1;
-    } else if (char === "]") {
-      bracketDepth = Math.max(0, bracketDepth - 1);
-    } else if (char === "," && parenDepth === 0 && bracketDepth === 0) {
-      selectors.push(current);
-      current = "";
-      continue;
-    }
-
-    current += char;
-  }
-
-  if (current) {
-    selectors.push(current);
-  }
-
-  return selectors;
-}
-
-function prefixCssSelector(selector: string, scopeSelector: string): string {
-  const trimmed = selector.trim();
-  if (!trimmed) {
-    return trimmed;
-  }
-
-  if (
-    trimmed === "from" ||
-    trimmed === "to" ||
-    /^[\d.\s%-]+$/.test(trimmed)
-  ) {
-    return trimmed;
-  }
-
-  const replacedRoots = trimmed
-    .replace(/\bhtml\b/g, scopeSelector)
-    .replace(/\bbody\b/g, scopeSelector)
-    .replace(/:root/g, scopeSelector);
-
-  if (replacedRoots === scopeSelector || replacedRoots.includes(scopeSelector)) {
-    return replacedRoots;
-  }
-
-  return `${scopeSelector} ${replacedRoots}`;
-}
-
-function prefixCssSelectors(selectorList: string, scopeSelector: string): string {
-  return splitCssSelectors(selectorList)
-    .map((selector) => prefixCssSelector(selector, scopeSelector))
-    .join(", ");
-}
-
-function findMatchingCssBrace(input: string, startIndex: number): number {
-  let depth = 0;
-  let inSingleQuote = false;
-  let inDoubleQuote = false;
-
-  for (let index = startIndex; index < input.length; index += 1) {
-    const char = input[index];
-    const previous = input[index - 1];
-
-    if (inSingleQuote) {
-      if (char === "'" && previous !== "\\") {
-        inSingleQuote = false;
-      }
-      continue;
-    }
-
-    if (inDoubleQuote) {
-      if (char === '"' && previous !== "\\") {
-        inDoubleQuote = false;
-      }
-      continue;
-    }
-
-    if (char === "'") {
-      inSingleQuote = true;
-      continue;
-    }
-
-    if (char === '"') {
-      inDoubleQuote = true;
-      continue;
-    }
-
-    if (char === "{") {
-      depth += 1;
-      continue;
-    }
-
-    if (char === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        return index;
-      }
-    }
-  }
-
-  return -1;
-}
-
-function scopeCss(css: string, scopeSelector: string): string {
-  let result = "";
-  let cursor = 0;
-
-  while (cursor < css.length) {
-    const openBraceIndex = css.indexOf("{", cursor);
-    if (openBraceIndex === -1) {
-      result += css.slice(cursor);
-      break;
-    }
-
-    const prelude = css.slice(cursor, openBraceIndex);
-    const closeBraceIndex = findMatchingCssBrace(css, openBraceIndex);
-
-    if (closeBraceIndex === -1) {
-      result += css.slice(cursor);
-      break;
-    }
-
-    const blockContent = css.slice(openBraceIndex + 1, closeBraceIndex);
-    const trimmedPrelude = prelude.trim();
-
-    if (trimmedPrelude.startsWith("@")) {
-      if (/^@(media|supports|container|layer|document)\b/i.test(trimmedPrelude)) {
-        result += `${trimmedPrelude} {${scopeCss(blockContent, scopeSelector)}}`;
-      } else {
-        result += `${trimmedPrelude} {${blockContent}}`;
-      }
-    } else {
-      result += `${prefixCssSelectors(trimmedPrelude, scopeSelector)} {${blockContent}}`;
-    }
-
-    cursor = closeBraceIndex + 1;
-  }
-
-  return result;
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function remapIds(
-  markup: string,
-  styles: string[],
-  scripts: string[],
-  slidePrefix: string,
-): {
-  markup: string;
-  styles: string[];
-  scripts: string[];
-} {
-  const ids = Array.from(
-    new Set(
-      Array.from(markup.matchAll(/\bid\s*=\s*["']([^"']+)["']/gi)).map(
-        (match) => match[1],
-      ),
-    ),
-  );
-
-  let nextMarkup = markup;
-  let nextStyles = styles;
-  let nextScripts = scripts;
-
-  for (const originalId of ids) {
-    const nextId = `${slidePrefix}-${originalId}`;
-    const idValuePattern = new RegExp(
-      `(\\bid\\s*=\\s*["'])${escapeRegExp(originalId)}(["'])`,
-      "g",
-    );
-    const hashReferencePattern = new RegExp(
-      `#${escapeRegExp(originalId)}(?![\\w-])`,
-      "g",
-    );
-    const getElementByIdPattern = new RegExp(
-      `(getElementById\\(\\s*["'])${escapeRegExp(originalId)}(["']\\s*\\))`,
-      "g",
-    );
-    const querySelectorPattern = new RegExp(
-      `((?:querySelector|querySelectorAll)\\(\\s*["']#)${escapeRegExp(originalId)}(["']\\s*\\))`,
-      "g",
-    );
-
-    nextMarkup = nextMarkup
-      .replace(idValuePattern, `$1${nextId}$2`)
-      .replace(hashReferencePattern, `#${nextId}`);
-
-    nextStyles = nextStyles.map((style) =>
-      style.replace(hashReferencePattern, `#${nextId}`),
-    );
-
-    nextScripts = nextScripts.map((script) =>
-      script
-        .replace(getElementByIdPattern, `$1${nextId}$2`)
-        .replace(querySelectorPattern, `$1${nextId}$2`)
-        .replace(hashReferencePattern, `#${nextId}`),
-    );
-  }
-
-  return {
-    markup: nextMarkup,
-    styles: nextStyles,
-    scripts: nextScripts,
-  };
-}
-
-function buildStandaloneDeckReadyScript(): string {
-  return `
-    (async () => {
-      const wrapper = document.getElementById(${JSON.stringify(PRESENTATION_WRAPPER_ID)});
-
-      const waitForLoad = () => new Promise((resolve) => {
-        if (document.readyState === "complete") {
-          resolve(undefined);
-          return;
-        }
-        window.addEventListener("load", () => resolve(undefined), { once: true });
-      });
-
-      try {
-        await waitForLoad();
-
-        if (document.fonts?.ready) {
-          await document.fonts.ready.catch(() => {});
-        }
-
-        await new Promise((resolve) => {
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve(undefined)));
-        });
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        wrapper?.setAttribute("data-presenton-render-status", "ready");
-        window.dispatchEvent(new CustomEvent("presenton:render-ready"));
-      } catch (error) {
-        wrapper?.setAttribute("data-presenton-render-status", "error");
-        wrapper?.setAttribute(
-          "data-presenton-render-message",
-          error instanceof Error ? error.message : String(error),
-        );
-      }
-    })();
-  `.trim();
 }
 
 export function buildStandaloneDeckHtml(
   input: BuildStandaloneDeckHtmlInput,
 ): string {
-  if (!input || typeof input !== "object") {
-    throw new Error("Standalone deck input must be an object");
-  }
-
-  if (!Array.isArray(input.slides) || input.slides.length === 0) {
-    throw new Error('Field "slides" must be a non-empty array');
-  }
-
-  const stylesheetLinks = new Set<string>();
-  const externalScripts = new Set<string>();
-  const scopedStyles: string[] = [];
-  const renderedSlides: string[] = [];
-
-  input.slides.forEach((slide, index) => {
-    if (!slide || typeof slide !== "object" || typeof slide.html !== "string") {
-      throw new Error(`Slide at index ${index} must contain an "html" string`);
-    }
-
-    const headHtml = extractHeadHtml(slide.html);
-    const bodyHtml = extractBodyHtml(slide.html);
-    const { markup: rawMarkup, scripts: rawScripts } =
-      extractBodyMarkupAndScripts(bodyHtml);
-
-    if (!rawMarkup) {
-      throw new Error(`Slide at index ${index} does not contain usable body markup`);
-    }
-
-    collectHeadStyleAndLinkTags(slide.html)
-      .filter((tag) => /<link\b/i.test(tag))
-      .forEach((tag) => stylesheetLinks.add(tag));
-
-    extractExternalScriptTags(slide.html).forEach((tag) => externalScripts.add(tag));
-
-    const rawStyles = extractHeadStyles(slide.html);
-    const scopeClass = `presenton-standalone-slide-scope-${index + 1}`;
-    const scopeSelector = `.${scopeClass}`;
-    const slidePrefix = `presenton-standalone-slide-${index + 1}`;
-    const remapped = remapIds(rawMarkup, rawStyles, rawScripts, slidePrefix);
-    const scopedSlideStyles = remapped.styles
-      .map((style) => scopeCss(style, scopeSelector).trim())
-      .filter(Boolean)
-      .join("\n");
-
-    if (scopedSlideStyles) {
-      scopedStyles.push(
-        `<style data-standalone-slide-scope="${slidePrefix}">\n${scopedSlideStyles}\n</style>`,
-      );
-    }
-
-    const inlineScripts = remapped.scripts
-      .map(
-        (script, scriptIndex) => `        <script data-standalone-slide-script="${slidePrefix}-${scriptIndex + 1}">
-          (() => {
-${script
-  .split("\n")
-  .map((line) => `            ${line}`)
-  .join("\n")}
-          })();
-        </script>`,
-      )
-      .join("\n");
-
-    const speakerNote =
-      slide.speaker_note ??
-      extractDocumentTitle(slide.html) ??
-      `Slide ${index + 1}`;
-
-    renderedSlides.push(
-      [
-        `    <div class="w-full presenton-standalone-slide-shell presenton-deck-slide-shell" data-presenton-slide-shell="true" data-speaker-note="${escapeHtmlAttribute(speakerNote)}">`,
-        '      <div data-presenton-static-slide="true" style="width:1280px;min-height:720px;">',
-        `        <div class="presenton-standalone-slide-scope ${scopeClass}" data-presenton-standalone-slide="${index + 1}">`,
-        remapped.markup,
-        "        </div>",
-        inlineScripts,
-        "      </div>",
-        "    </div>",
-      ]
-        .filter(Boolean)
-        .join("\n"),
-    );
+  return buildDeckHtml({
+    title: input.title,
+    slides: input.slides,
   });
-
-  const title =
-    input.title ??
-    extractDocumentTitle(input.slides[0].html) ??
-    "Presenton Standalone Deck";
-
-  return [
-    "<!doctype html>",
-    '<html lang="en">',
-    "<head>",
-    '  <meta charset="utf-8" />',
-    '  <meta name="viewport" content="width=1280, initial-scale=1" />',
-    `  <title>${escapeHtml(title)}</title>`,
-    "  <style>",
-    ...buildDeckSharedStyles(),
-    "    .presenton-standalone-slide-shell {",
-    "      width: 1280px;",
-    "      min-height: 720px;",
-    "    }",
-    "    .presenton-standalone-slide-scope {",
-    "      width: 1280px;",
-    "      min-height: 720px;",
-    "      position: relative;",
-    "      isolation: isolate;",
-    "    }",
-    "  </style>",
-    ...Array.from(stylesheetLinks),
-    ...Array.from(externalScripts),
-    ...scopedStyles,
-    "</head>",
-    "<body>",
-    ...buildDeckViewerShellStart(title),
-    `          <div id="${PRESENTATION_WRAPPER_ID}" data-presenton-render-status="loading">`,
-    ...renderedSlides,
-    "          </div>",
-    ...buildDeckViewerShellEnd(),
-    "  <script>",
-    buildStandaloneDeckReadyScript(),
-    "  </script>",
-    "  <script>",
-    buildDeckViewerScript(),
-    "  </script>",
-    "</body>",
-    "</html>",
-  ].join("\n");
 }

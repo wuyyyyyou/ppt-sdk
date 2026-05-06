@@ -1,21 +1,17 @@
 import path from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 
-import React from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-
 import { getLayoutByLayoutId } from "../app/presentation-templates/index.js";
 import type { TemplateWithData } from "../app/presentation-templates/utils.js";
 import {
   assertLocalTemplateModule,
   importLocalTemplateModule,
-  loadLocalTemplateRenderRuntime,
   resolveLocalModulePath,
-  type LocalSlideComponent as SlideComponent,
-  type LocalTemplateRenderRuntime,
 } from "../local-template/loader.js";
 import { buildStandaloneDeckHtml } from "./build-deck.js";
+import { getBrowserRenderRuntimeBundle } from "./runtime-bundle.js";
 import type {
+  BrowserRenderContext,
   BrowserRenderTheme,
   BuildDeckHtmlFromManifestFileOutput,
   BuildDeckHtmlFromManifestInput,
@@ -31,19 +27,25 @@ type ResolvedManifestSlide = {
   layoutName: string;
   layoutDescription: string;
   templateGroup: string;
-  component: SlideComponent;
-  sourceLabel: string;
-  renderRuntime?: LocalTemplateRenderRuntime | null;
 };
 
-const TAILWIND_CDN_SCRIPT = '<script src="https://cdn.tailwindcss.com"></script>';
+async function resolveLocalTemplateGroupId(manifestCwd: string): Promise<string> {
+  const groupPath = path.join(manifestCwd, "group.json");
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  try {
+    const rawValue = JSON.parse(await readFile(groupPath, "utf8")) as unknown;
+    if (
+      isPlainRecord(rawValue) &&
+      typeof rawValue.group_id === "string" &&
+      rawValue.group_id.length > 0
+    ) {
+      return rawValue.group_id;
+    }
+  } catch {
+    // Fall back to the manifest directory name when no group metadata exists.
+  }
+
+  return path.basename(manifestCwd);
 }
 
 function sanitizeFileNamePart(value: string): string {
@@ -80,7 +82,14 @@ function resolveOptionalAbsolutePath(
   return resolveAbsolutePath(targetPath, fieldName);
 }
 
-function parseSinglePageIndex(input: BuildDeckHtmlFromManifestInput, slideCount: number): number | null {
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function parseSinglePageIndex(
+  input: BuildDeckHtmlFromManifestInput,
+  slideCount: number,
+): number | null {
   if (!input.singlePage) {
     return null;
   }
@@ -113,62 +122,13 @@ function normalizeTheme(input?: TemplateRenderThemeInput | null): BrowserRenderT
   };
 }
 
-function buildThemeInlineStyle(
-  theme: BrowserRenderTheme,
-): React.CSSProperties & Record<string, string> {
-  const style: React.CSSProperties & Record<string, string> = {};
-
-  const assign = (key: string, value?: string | null) => {
-    if (typeof value === "string" && value.length > 0) {
-      style[key] = value;
-    }
-  };
-
-  assign("--primary-color", theme.colors.primary);
-  assign("--background-color", theme.colors.background);
-  assign("--card-color", theme.colors.card);
-  assign("--stroke", theme.colors.stroke);
-  assign("--primary-text", theme.colors.primary_text);
-  assign("--background-text", theme.colors.background_text);
-
-  if (theme.fontName) {
-    style.fontFamily = `"${theme.fontName}"`;
-    assign("--heading-font-family", `"${theme.fontName}"`);
-    assign("--body-font-family", `"${theme.fontName}"`);
-  }
-
-  for (let index = 0; index < 10; index += 1) {
-    assign(
-      `--graph-${index}`,
-      theme.colors[`graph_${index}`] ?? theme.colors[`graph-${index}`] ?? null,
-    );
-  }
-
-  return style;
-}
-
-function buildFontHeadTags(theme: BrowserRenderTheme): string[] {
-  if (!theme.fontName || !theme.fontUrl) {
-    return [];
-  }
-
-  const isCssUrl =
-    /\.css(\?|$)/i.test(theme.fontUrl) ||
-    theme.fontUrl.includes("fonts.googleapis.com");
-
-  if (isCssUrl) {
-    return [
-      `<link rel="stylesheet" href="${escapeHtml(theme.fontUrl)}" data-presenton-font-url="${escapeHtml(theme.fontUrl)}" />`,
-    ];
-  }
-
-  return [
-    [
-      "<style>",
-      `@font-face { font-family: '${theme.fontName}'; src: url('${theme.fontUrl}'); font-style: normal; font-display: swap; }`,
-      "</style>",
-    ].join("\n"),
-  ];
+function escapeJsonForInlineScript(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
 }
 
 function normalizeBuiltinLayoutId(templateGroup: string, layoutId: string): string {
@@ -187,10 +147,6 @@ function normalizeBuiltinLayoutId(templateGroup: string, layoutId: string): stri
   }
 
   return `${templateGroup}:${layoutId}`;
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function validateDeckManifest(manifest: DeckManifestInput): void {
@@ -296,15 +252,13 @@ function resolveBuiltinSlide(slide: DeckManifestSlideInput): ResolvedManifestSli
     layoutName: typedLayout.layoutName,
     layoutDescription: typedLayout.layoutDescription,
     templateGroup: slide.source.template_group,
-    component: typedLayout.component as SlideComponent,
-    sourceLabel: `builtin:${typedLayout.layoutId}`,
-    renderRuntime: null,
   };
 }
 
 async function resolveLocalSlide(
   slide: DeckManifestSlideInput,
   cwd: string,
+  templateGroup: string,
 ): Promise<ResolvedManifestSlide> {
   if (slide.source.type !== "local") {
     throw new Error(`Slide "${slide.id}" is not a local source`);
@@ -321,17 +275,13 @@ async function resolveLocalSlide(
   );
   const moduleValue = await importLocalTemplateModule(absolutePath, cwd);
   assertLocalTemplateModule(moduleValue, absolutePath);
-  const renderRuntime = loadLocalTemplateRenderRuntime(cwd);
 
   return {
     slideId: slide.id,
-    layoutId: moduleValue.layoutId,
+    layoutId: `${templateGroup}:${moduleValue.layoutId}`,
     layoutName: moduleValue.layoutName,
     layoutDescription: moduleValue.layoutDescription,
-    templateGroup: "local",
-    component: moduleValue.default,
-    sourceLabel: absolutePath,
-    renderRuntime,
+    templateGroup,
   };
 }
 
@@ -342,8 +292,10 @@ async function resolveManifestSlide(
   switch (slide.source.type) {
     case "builtin":
       return resolveBuiltinSlide(slide);
-    case "local":
-      return resolveLocalSlide(slide, manifestCwd);
+    case "local": {
+      const templateGroup = await resolveLocalTemplateGroupId(manifestCwd);
+      return resolveLocalSlide(slide, manifestCwd, templateGroup);
+    }
     default:
       throw new Error(
         `Slide "${slide.id}" uses unsupported source type "${String((slide.source as { type?: unknown }).type)}"`,
@@ -352,75 +304,59 @@ async function resolveManifestSlide(
 }
 
 function buildSlideDocumentHtml(input: {
-  resolvedSlide: ResolvedManifestSlide;
-  slide: DeckManifestSlideInput;
-  slideData: Record<string, unknown>;
-  deckTheme?: TemplateRenderThemeInput | null;
+  context: BrowserRenderContext;
 }): string {
-  const theme = normalizeTheme(input.slide.theme ?? input.deckTheme);
-  const slideTitle =
-    input.slide.title ??
-    `${input.resolvedSlide.templateGroup} - ${input.resolvedSlide.layoutName}`;
-  const LayoutComponent = input.resolvedSlide.component;
-  const renderRuntime = input.resolvedSlide.renderRuntime;
-  const ReactForRender = renderRuntime?.react ?? React;
-  const renderMarkup = renderRuntime?.renderToStaticMarkup ?? renderToStaticMarkup;
-  const slideData = {
-    ...input.slideData,
-    _logo_url__: theme.logoUrl ?? null,
-    __companyName__: theme.companyName ?? null,
-  };
-
-  const componentMarkup = renderMarkup(
-    ReactForRender.createElement(
-      "div",
-      {
-        "data-layout": input.resolvedSlide.layoutId,
-        "data-group": input.resolvedSlide.templateGroup,
-        "data-manifest-slide-id": input.slide.id,
-        style: buildThemeInlineStyle(theme),
-      },
-      ReactForRender.createElement(LayoutComponent, { data: slideData }),
-    ),
-  );
-
-  const headTags = [
-    '<meta charset="utf-8" />',
-    '<meta name="viewport" content="width=1280, initial-scale=1" />',
-    `<title>${escapeHtml(slideTitle)}</title>`,
-    "<style>",
-    "  html, body {",
-    "    margin: 0;",
-    "    padding: 0;",
-    "    width: 1280px;",
-    "    min-height: 720px;",
-    "    overflow: hidden;",
-    `    background: ${theme.colors.background ?? "#ffffff"};`,
-    "  }",
-    "  body {",
-    "    position: relative;",
-    "  }",
-    "  #presentation-slides-wrapper {",
-    "    width: 1280px;",
-    "    min-height: 720px;",
-    "  }",
-    "</style>",
-    ...buildFontHeadTags(theme),
-    TAILWIND_CDN_SCRIPT,
-  ].join("\n");
+  const runtimeBundle = getBrowserRenderRuntimeBundle();
+  const serializedContext = escapeJsonForInlineScript(input.context);
 
   return [
     "<!doctype html>",
     '<html lang="en">',
     "<head>",
-    headTags,
+    '  <meta charset="utf-8" />',
+    '  <meta name="viewport" content="width=1280, initial-scale=1" />',
+    `  <title>${input.context.title}</title>`,
+    "  <style>",
+    "    html, body {",
+    "      margin: 0;",
+    "      padding: 0;",
+    "      width: 1280px;",
+    "      min-height: 720px;",
+    "      overflow: hidden;",
+    `      background: ${input.context.theme.colors.background ?? "#ffffff"};`,
+    "    }",
+    "    body {",
+    "      position: relative;",
+    "      font-family: system-ui, sans-serif;",
+    "    }",
+    "    #presentation-slides-wrapper {",
+    "      width: 1280px;",
+    "      min-height: 720px;",
+    "    }",
+    '    [data-presenton-render-status="error"] {',
+    "      display: flex;",
+    "      align-items: center;",
+    "      justify-content: center;",
+    "      color: #991b1b;",
+    "      background: #fef2f2;",
+    "      font-size: 14px;",
+    "      padding: 24px;",
+    "      box-sizing: border-box;",
+    "    }",
+    "  </style>",
+    "  <script>",
+    "    window.tailwind = window.tailwind || {};",
+    "  </script>",
+    '  <script src="https://cdn.tailwindcss.com"></script>',
     "</head>",
     "<body>",
-    '  <div id="presentation-slides-wrapper">',
-    "    <div>",
-    componentMarkup,
-    "    </div>",
-    "  </div>",
+    '  <div id="presentation-slides-wrapper" data-presenton-render-status="loading"></div>',
+    "  <script>",
+    `    window.__PRESENTON_RENDER_CONTEXT__ = ${serializedContext};`,
+    "  </script>",
+    "  <script>",
+    runtimeBundle,
+    "  </script>",
     "</body>",
     "</html>",
   ].join("\n");
@@ -455,16 +391,26 @@ export async function buildDeckHtmlFromManifest(
       : "presenton-manifest-deck"),
   );
   const singlePageIndex = parseSinglePageIndex(input, manifest.slides.length);
+
   const slides = await Promise.all(
     manifest.slides.map(async (slide, index) => {
       const resolvedSlide = await resolveManifestSlide(slide, manifestCwd);
       const slideData = await resolveSlideData(slide, manifestCwd);
-      const html = buildSlideDocumentHtml({
-        resolvedSlide,
-        slide,
+      const theme = normalizeTheme(slide.theme ?? manifest.theme);
+      const slideTitle =
+        slide.title ??
+        `${resolvedSlide.templateGroup} - ${resolvedSlide.layoutName}`;
+
+      const context: BrowserRenderContext = {
+        templateGroup: resolvedSlide.templateGroup,
+        layoutId: resolvedSlide.layoutId,
         slideData,
-        deckTheme: manifest.theme,
-      });
+        speakerNote: slide.speaker_note ?? "",
+        title: slideTitle,
+        theme,
+      };
+
+      const html = buildSlideDocumentHtml({ context });
       const slideFileName = `${index + 1}-${deckBaseName}-${sanitizeFileNamePart(
         resolvedSlide.layoutId,
       )}.html`;
@@ -480,8 +426,8 @@ export async function buildDeckHtmlFromManifest(
       };
     }),
   );
-  const slidesToWrite = singlePageIndex === null ? slides : [slides[singlePageIndex]];
 
+  const slidesToWrite = singlePageIndex === null ? slides : [slides[singlePageIndex]];
   const title = manifest.title ?? "Presenton Manifest Deck";
   const deckFileName = `${deckBaseName}-deck.html`;
   const deckOutputPath = path.join(outputDir, deckFileName);
@@ -495,12 +441,7 @@ export async function buildDeckHtmlFromManifest(
   await mkdir(outputDir, { recursive: true });
   await Promise.all([
     ...(singlePageIndex === null ? [writeFile(deckOutputPath, deckHtml, "utf8")] : []),
-    ...slidesToWrite.map((slide) =>
-      writeFile(
-        slide.outputPath,
-        slide.html,
-        "utf8",
-      )),
+    ...slidesToWrite.map((slide) => writeFile(slide.outputPath, slide.html, "utf8")),
   ]);
 
   return {
@@ -511,7 +452,7 @@ export async function buildDeckHtmlFromManifest(
     deckGenerated: singlePageIndex === null,
     singlePage: singlePageIndex !== null,
     page: singlePageIndex === null ? null : singlePageIndex + 1,
-    slideFiles: slidesToWrite.map((slide) => ({
+    slideFiles: slidesToWrite.map((slide): BuildDeckHtmlFromManifestFileOutput => ({
       fileName: slide.fileName,
       outputPath: slide.outputPath,
       slideId: slide.slideId,

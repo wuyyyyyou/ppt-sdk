@@ -1,9 +1,38 @@
 import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 let runtimeBundleCache: string | null = null;
 let runtimeDeckBundleCache: string | null = null;
+
+function bundleRuntimeFromSource(bundleFileName: string): string | null {
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  const sourceEntryByBundleName: Record<string, string> = {
+    "render-slide.global.js": join(moduleDir, "../browser/render-slide.tsx"),
+    "render-deck.global.js": join(moduleDir, "../browser/render-deck.tsx"),
+  };
+
+  const entryPoint = sourceEntryByBundleName[bundleFileName];
+  if (!entryPoint || !existsSync(entryPoint)) {
+    return null;
+  }
+
+  const require = createRequire(import.meta.url);
+  const { buildSync } = require("esbuild") as typeof import("esbuild");
+  const result = buildSync({
+    entryPoints: [entryPoint],
+    bundle: true,
+    write: false,
+    format: "iife",
+    platform: "browser",
+    target: "es2020",
+    minify: false,
+  });
+
+  const output = result.outputFiles?.[0]?.text;
+  return output && output.length > 0 ? output : null;
+}
 
 function getRuntimeBundle(
   bundleFileName: string,
@@ -43,6 +72,14 @@ function getRuntimeBundle(
       content,
     };
   } catch (error) {
+    const bundledContent = bundleRuntimeFromSource(bundleFileName);
+    if (bundledContent) {
+      return {
+        cache: bundledContent,
+        content: bundledContent,
+      };
+    }
+
     const detail =
       error instanceof Error ? error.message : "Unknown runtime bundle read error";
     throw new Error(
