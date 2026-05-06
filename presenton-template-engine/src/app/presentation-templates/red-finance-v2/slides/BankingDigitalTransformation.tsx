@@ -5,7 +5,7 @@ import FinanceContentFrame from "../components/FinanceContentFrame.js";
 import { FinanceIcon } from "../components/FinanceIcons.js";
 import IconText from "../components/IconText.js";
 import KpiMetricItem from "../components/KpiMetricItem.js";
-import StrategyPillarCard from "../components/StrategyPillarCard.js";
+import PillarBulletCard from "../components/PillarBulletCard.js";
 
 const strategyItemSchema = z.object({
   lead: z.string().min(1).max(24),
@@ -139,7 +139,7 @@ const BankingDigitalTransformation = ({
           }}
         >
           {parsed.panels.map((panel) => (
-            <StrategyPillarCard
+            <PillarBulletCard
               key={panel.number}
               number={panel.number}
               icon={panel.icon}

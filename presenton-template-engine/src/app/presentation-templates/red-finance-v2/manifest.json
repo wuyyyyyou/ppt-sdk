@@ -81,6 +81,16 @@
         "path": "./slides/CompetitiveLandscapeAnalysis.tsx"
       },
       "data_path": "./data/competitive-landscape-analysis.json"
+    },
+    {
+      "id": "red-finance-v2-risk-management-compliance",
+      "title": "风险管理与合规",
+      "speaker_note": "风险与合规页：用于展示关键风险分布、核心洞察，以及风险治理与合规管控的结构化支柱。",
+      "source": {
+        "type": "local",
+        "path": "./slides/RiskManagementCompliance.tsx"
+      },
+      "data_path": "./data/risk-management-compliance.json"
     }
   ]
 }

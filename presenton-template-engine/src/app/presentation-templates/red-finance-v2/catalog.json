@@ -49,7 +49,7 @@
       "structure": "上方导语说明，中部多张转型支柱卡片，底部 KPI 汇总条",
       "layout_pattern": "intro-note-plus-pillar-cards-plus-kpi-strip",
       "suitable_for": ["数字化转型", "战略支柱", "能力建设", "关键举措"],
-      "key_components": ["FinanceContentFrame", "StableInlineRow", "IconText", "StrategyPillarCard", "KpiMetricItem"]
+      "key_components": ["FinanceContentFrame", "StableInlineRow", "IconText", "PillarBulletCard", "KpiMetricItem"]
     },
     {
       "id": "red-finance-v2-fintech-innovation-applications",
@@ -70,6 +70,16 @@
       "layout_pattern": "left-cards-plus-analysis-right-comparison-table",
       "suitable_for": ["竞争格局", "市场对比", "战略定位", "差异化路径"],
       "key_components": ["FinanceContentFrame", "ShortInfoCard", "InfoListItem", "StableMatrixGrid"]
+    },
+    {
+      "id": "red-finance-v2-risk-management-compliance",
+      "title": "风险管理与合规",
+      "source_path": "./slides/RiskManagementCompliance.tsx",
+      "data_path": "./data/risk-management-compliance.json",
+      "structure": "左侧为雷达图图表卡与关键洞察，右侧为风险治理支柱卡片矩阵",
+      "layout_pattern": "left-radar-chart-plus-insight-right-pillar-grid",
+      "suitable_for": ["风险管理", "合规治理", "控制框架", "风险全景"],
+      "key_components": ["FinanceContentFrame", "ChartCardShell", "MeasuredChartArea", "FinanceRadarChart", "InsightCallout", "PillarBulletCard"]
     }
   ]
 }
