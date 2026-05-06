@@ -54,6 +54,7 @@ const LOCAL_TEMPLATE_RUNTIME_ALLOWED_PACKAGES = new Set([
   "react-dom",
   "zod",
   "recharts",
+  "use-resize-observer",
 ]);
 const LOCAL_TEMPLATE_RUNTIME_SHIM_SPECIFIERS = [
   "react",

@@ -6,11 +6,14 @@ export type FinanceIconName =
   | "bank"
   | "book-open"
   | "calendar"
+  | "chart-column"
   | "chart-line"
   | "chart-pie"
   | "chess"
   | "briefcase"
+  | "compass"
   | "coins"
+  | "database"
   | "flag"
   | "globe"
   | "leaf"
@@ -83,6 +86,15 @@ export const FinanceIcon = ({
           <path d="M16 7h2.8v2.8" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
+    case "chart-column":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+          <path d="M4.5 19h15" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+          <rect x="6" y="11.5" width="2.6" height="5" rx="0.8" fill={stroke} stroke="none" />
+          <rect x="10.7" y="8.5" width="2.6" height="8" rx="0.8" fill={stroke} stroke="none" />
+          <rect x="15.4" y="5.5" width="2.6" height="11" rx="0.8" fill={stroke} stroke="none" />
+        </svg>
+      );
     case "coins":
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
@@ -99,11 +111,26 @@ export const FinanceIcon = ({
           <path d="M4 12h16" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       );
+    case "compass":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+          <circle cx="12" cy="12" r="8" stroke={stroke} strokeWidth="1.8" />
+          <path d="m9.2 14.8 1.8-5.4 5.4-1.8-1.8 5.4-5.4 1.8Z" stroke={stroke} strokeWidth="1.8" strokeLinejoin="round" />
+          <path d="M12 4v2.2M12 17.8V20M4 12h2.2M17.8 12H20" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
     case "lightbulb":
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
           <path d="M9.2 16.4h5.6M10 19h4" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
           <path d="M8 10.2a4 4 0 1 1 8 0c0 1.4-.58 2.12-1.5 3.2-.68.8-1.14 1.65-1.3 2.5h-2.4c-.16-.85-.62-1.7-1.3-2.5-.92-1.08-1.5-1.8-1.5-3.2Z" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case "database":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+          <ellipse cx="12" cy="6.8" rx="5.8" ry="2.8" stroke={stroke} strokeWidth="1.8" />
+          <path d="M6.2 6.8v4.5c0 1.55 2.6 2.8 5.8 2.8s5.8-1.25 5.8-2.8V6.8M6.2 11.3v4.5c0 1.55 2.6 2.8 5.8 2.8s5.8-1.25 5.8-2.8v-4.5" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       );
     case "laptop-code":

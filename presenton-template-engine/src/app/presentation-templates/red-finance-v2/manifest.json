@@ -51,6 +51,16 @@
         "path": "./slides/MarketTrends.tsx"
       },
       "data_path": "./data/market-trends.json"
+    },
+    {
+      "id": "red-finance-v2-banking-digital-transformation",
+      "title": "银行业数字化转型",
+      "speaker_note": "转型策略页：用于展示银行数字化转型的核心支柱、关键抓手，以及成功衡量指标。",
+      "source": {
+        "type": "local",
+        "path": "./slides/BankingDigitalTransformation.tsx"
+      },
+      "data_path": "./data/banking-digital-transformation.json"
     }
   ]
 }

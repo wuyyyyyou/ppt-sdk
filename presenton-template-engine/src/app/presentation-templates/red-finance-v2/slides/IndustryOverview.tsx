@@ -122,8 +122,8 @@ const IndustryOverview = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
       contentTop={170}
       contentHeight={500}
     >
-      <div className="flex h-full gap-[50px] overflow-hidden">
-        <div className="flex w-[600px] flex-none flex-col">
+      <div className="flex h-full gap-[36px] overflow-hidden">
+        <div className="flex w-[620px] flex-none flex-col">
           <div
             className="flex flex-col overflow-hidden"
             style={{ gap: infoListGap }}
@@ -145,8 +145,12 @@ const IndustryOverview = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
           </div>
         </div>
 
-        <div className="flex flex-1 items-start">
-          <ChartCardShell title={parsed.chartTitle} subtitle={parsed.chartSubtitle}>
+        <div className="flex flex-1 items-end pb-[8px]">
+          <ChartCardShell
+            title={parsed.chartTitle}
+            subtitle={parsed.chartSubtitle}
+            className="h-[392px] w-full"
+          >
             <FinanceBarChart
               labels={parsed.chartBars.map((bar) => bar.label)}
               series={[
@@ -160,6 +164,7 @@ const IndustryOverview = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
               maxValue={parsed.chartMax}
               ticks={parsed.chartTicks}
               yAxisWidth={58}
+              plotHeight={274}
             />
           </ChartCardShell>
         </div>

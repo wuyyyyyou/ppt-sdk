@@ -3,6 +3,7 @@ import * as z from "zod";
 
 import ChartCardShell from "../components/ChartCardShell.js";
 import FinanceContentFrame from "../components/FinanceContentFrame.js";
+import MeasuredChartArea from "../components/MeasuredChartArea.js";
 import FinanceBarChart from "../components/FinanceBarChart.js";
 import FinanceLineChart from "../components/FinanceLineChart.js";
 import { FinanceIcon } from "../components/FinanceIcons.js";
@@ -122,7 +123,7 @@ const MarketTrends = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
       contentTop={154}
       contentHeight={498}
     >
-      <div className="flex h-full flex-col gap-[20px] overflow-hidden">
+      <div className="flex h-full flex-col gap-[12px] overflow-hidden">
         <div
           className="grid gap-[15px]"
           style={{ gridTemplateColumns: `repeat(${parsed.trends.length}, minmax(0, 1fr))` }}
@@ -137,64 +138,76 @@ const MarketTrends = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
           ))}
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-2 gap-[16px]">
-          <ChartCardShell title={parsed.aiChartTitle} rightMeta={parsed.aiChartTag}>
-            <FinanceLineChart
-              labels={parsed.aiChartLabels}
-              series={parsed.aiChartSeries}
-              minValue={0}
-              maxValue={100}
-              ticks={[0, 20, 40, 60, 80, 100]}
-              yAxisWidth={48}
-              legend={
-                <div className="flex items-center justify-center gap-[28px] text-[12px]" style={{ color: "#616161" }}>
-                  {parsed.aiChartSeries.map((entry) => (
-                    <div key={entry.label} className="flex items-center gap-[8px]">
-                      <div className="relative h-[10px] w-[28px]">
-                        <div
-                          className="absolute left-0 right-0 top-1/2 h-[2px] -translate-y-1/2 rounded-full"
-                          style={{ backgroundColor: entry.color }}
-                        />
-                        <div
-                          className="absolute left-1/2 top-1/2 h-[8px] w-[8px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[2px] bg-white"
-                          style={{ borderColor: entry.color }}
-                        />
-                      </div>
-                      <span>{entry.label}</span>
+        <div className="grid min-h-0 flex-1 grid-cols-2 gap-[14px]">
+          <ChartCardShell title={parsed.aiChartTitle} rightMeta={parsed.aiChartTag} className="min-h-0">
+            <MeasuredChartArea minHeight={220}>
+              {({ width, height }) => (
+                <FinanceLineChart
+                  width={width}
+                  height={height}
+                  labels={parsed.aiChartLabels}
+                  series={parsed.aiChartSeries}
+                  minValue={0}
+                  maxValue={100}
+                  ticks={[0, 20, 40, 60, 80, 100]}
+                  yAxisWidth={48}
+                  legend={
+                    <div className="flex items-center justify-center gap-[28px] text-[12px]" style={{ color: "#616161" }}>
+                      {parsed.aiChartSeries.map((entry) => (
+                        <div key={entry.label} className="flex items-center gap-[8px]">
+                          <div className="relative h-[10px] w-[28px]">
+                            <div
+                              className="absolute left-0 right-0 top-1/2 h-[2px] -translate-y-1/2 rounded-full"
+                              style={{ backgroundColor: entry.color }}
+                            />
+                            <div
+                              className="absolute left-1/2 top-1/2 h-[8px] w-[8px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[2px] bg-white"
+                              style={{ borderColor: entry.color }}
+                            />
+                          </div>
+                          <span>{entry.label}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              }
-            />
+                  }
+                />
+              )}
+            </MeasuredChartArea>
           </ChartCardShell>
 
-          <ChartCardShell title={parsed.incomeChartTitle} rightMeta={parsed.incomeChartTag}>
-            <FinanceBarChart
-              labels={parsed.incomeChartLabels}
-              series={parsed.incomeChartSeries}
-              minValue={0}
-              maxValue={50}
-              ticks={[0, 10, 20, 30, 40, 50]}
-              yAxisWidth={48}
-              tickFormatter={(value) => `${value}%`}
-              legend={
-                <div className="flex flex-col gap-[10px]">
-                  <div className="grid grid-cols-3 text-center text-[11px]" style={{ color: "#616161" }}>
-                    {parsed.incomeChartLabels.map((label) => (
-                      <div key={label}>{label}</div>
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-center gap-[32px] text-[12px]" style={{ color: "#616161" }}>
-                    {parsed.incomeChartSeries.map((entry) => (
-                      <div key={entry.label} className="flex items-center gap-[8px]">
-                        <div className="h-[14px] w-[14px] rounded-[2px]" style={{ backgroundColor: entry.color }} />
-                        <span>{entry.label}</span>
+          <ChartCardShell title={parsed.incomeChartTitle} rightMeta={parsed.incomeChartTag} className="min-h-0">
+            <MeasuredChartArea minHeight={220}>
+              {({ width, height }) => (
+                <FinanceBarChart
+                  width={width}
+                  height={height}
+                  labels={parsed.incomeChartLabels}
+                  series={parsed.incomeChartSeries}
+                  minValue={0}
+                  maxValue={50}
+                  ticks={[0, 10, 20, 30, 40, 50]}
+                  yAxisWidth={48}
+                  tickFormatter={(value) => `${value}%`}
+                  legend={
+                    <div className="flex flex-col gap-[10px]">
+                      <div className="grid grid-cols-3 text-center text-[11px]" style={{ color: "#616161" }}>
+                        {parsed.incomeChartLabels.map((label) => (
+                          <div key={label}>{label}</div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              }
-            />
+                      <div className="flex items-center justify-center gap-[32px] text-[12px]" style={{ color: "#616161" }}>
+                        {parsed.incomeChartSeries.map((entry) => (
+                          <div key={entry.label} className="flex items-center gap-[8px]">
+                            <div className="h-[14px] w-[14px] rounded-[2px]" style={{ backgroundColor: entry.color }} />
+                            <span>{entry.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  }
+                />
+              )}
+            </MeasuredChartArea>
           </ChartCardShell>
         </div>
       </div>

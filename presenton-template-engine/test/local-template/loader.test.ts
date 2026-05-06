@@ -105,6 +105,49 @@ test("imports a Recharts local template through runtime React shims", async () =
   }
 });
 
+test("imports a use-resize-observer local template through runtime React shims", async () => {
+  const rootDir = await mkdtemp(path.join(tmpdir(), "presenton-local-template-loader-"));
+
+  try {
+    await mkdir(path.join(rootDir, "slides"), { recursive: true });
+    await writeFile(
+      path.join(rootDir, "slides", "MeasuredSlide.tsx"),
+      [
+        'import React from "react";',
+        'import * as z from "zod";',
+        'import useResizeObserver from "use-resize-observer";',
+        "",
+        "export const Schema = z.object({",
+        '  title: z.string().default("Measured"),',
+        "});",
+        'export const layoutId = "resize-observer-fixture";',
+        'export const layoutName = "Resize Observer Fixture";',
+        'export const layoutDescription = "Loads use-resize-observer through bundled runtime dependencies.";',
+        "",
+        "export default function MeasuredSlide({ data }) {",
+        "  const parsed = Schema.parse(data ?? {});",
+        "  const { ref, width = 0 } = useResizeObserver();",
+        "  return <div ref={ref}>{parsed.title}-{width}</div>;",
+        "}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const moduleValue = await importLocalTemplateModule(
+      path.join(rootDir, "slides", "MeasuredSlide.tsx"),
+      rootDir,
+    );
+
+    assertLocalTemplateModule(moduleValue, path.join(rootDir, "slides", "MeasuredSlide.tsx"));
+    assert.equal(moduleValue.layoutId, "resize-observer-fixture");
+    assert.deepEqual(moduleValue.Schema.parse({}), { title: "Measured" });
+    assert.equal(typeof moduleValue.default, "function");
+  } finally {
+    await rm(rootDir, { recursive: true, force: true });
+  }
+});
+
 test("reports unsupported template runtime imports clearly", async () => {
   const rootDir = await mkdtemp(path.join(tmpdir(), "presenton-local-template-loader-"));
 

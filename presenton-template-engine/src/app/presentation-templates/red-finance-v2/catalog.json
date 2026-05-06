@@ -40,6 +40,16 @@
       "layout_pattern": "top-trend-cards-bottom-dual-chart-panels",
       "suitable_for": ["市场趋势", "年度展望", "行业预测", "重点驱动因素"],
       "key_components": ["FinanceContentFrame", "TrendSignalCard", "ChartCardShell", "FinanceLineChart", "FinanceBarChart"]
+    },
+    {
+      "id": "red-finance-v2-banking-digital-transformation",
+      "title": "银行业数字化转型",
+      "source_path": "./slides/BankingDigitalTransformation.tsx",
+      "data_path": "./data/banking-digital-transformation.json",
+      "structure": "上方导语说明，中部多张转型支柱卡片，底部 KPI 汇总条",
+      "layout_pattern": "intro-note-plus-pillar-cards-plus-kpi-strip",
+      "suitable_for": ["数字化转型", "战略支柱", "能力建设", "关键举措"],
+      "key_components": ["FinanceContentFrame", "IconText", "StrategyPillarCard", "KpiMetricItem"]
     }
   ]
 }
