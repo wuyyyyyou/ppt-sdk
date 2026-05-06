@@ -1,8 +1,9 @@
 import React from "react";
 import * as z from "zod";
 
-import BarChartCard from "../components/BarChartCard.js";
+import ChartCardShell from "../components/ChartCardShell.js";
 import FinanceContentFrame from "../components/FinanceContentFrame.js";
+import FinanceBarChart from "../components/FinanceBarChart.js";
 import { FinanceIcon } from "../components/FinanceIcons.js";
 import InfoListItem from "../components/InfoListItem.js";
 import InsightCallout from "../components/InsightCallout.js";
@@ -145,14 +146,22 @@ const IndustryOverview = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
         </div>
 
         <div className="flex flex-1 items-start">
-          <BarChartCard
-            title={parsed.chartTitle}
-            subtitle={parsed.chartSubtitle}
-            bars={parsed.chartBars}
-            minValue={parsed.chartMin}
-            maxValue={parsed.chartMax}
-            ticks={parsed.chartTicks}
-          />
+          <ChartCardShell title={parsed.chartTitle} subtitle={parsed.chartSubtitle}>
+            <FinanceBarChart
+              labels={parsed.chartBars.map((bar) => bar.label)}
+              series={[
+                {
+                  label: "资产规模",
+                  color: "#B71C1C",
+                  values: parsed.chartBars.map((bar) => bar.value),
+                },
+              ]}
+              minValue={parsed.chartMin}
+              maxValue={parsed.chartMax}
+              ticks={parsed.chartTicks}
+              yAxisWidth={58}
+            />
+          </ChartCardShell>
         </div>
       </div>
     </FinanceContentFrame>
