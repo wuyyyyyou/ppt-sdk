@@ -206,6 +206,14 @@ const RiskManagementCompliance = ({
     parsed.pillars.some((pillar) => pillar.items.length > 3 || pillar.title.length > 12)
       ? "compact"
       : "normal";
+  const hasPillarOverflowRisk = parsed.pillars.some(
+    (pillar) =>
+      pillar.items.length >= 3 ||
+      pillar.title.length > 8 ||
+      pillar.items.some((item) => item.body.length > 26),
+  );
+  const pillarHeaderDensity = hasPillarOverflowRisk ? "tight" : "compact";
+  const pillarTextScale = hasPillarOverflowRisk ? "xsmall" : "small";
 
   return (
     <FinanceContentFrame
@@ -281,6 +289,13 @@ const RiskManagementCompliance = ({
                   title={pillar.title}
                   items={pillar.items}
                   density={pillarDensity}
+                  titlePlacement="right"
+                  showWatermark={false}
+                  dividerStyle="dashed"
+                  headerDensity={pillarHeaderDensity}
+                  textScale={pillarTextScale}
+                  dividerThickness={2}
+                  dividerDash="10 6"
                 />
               </div>
             ))}
