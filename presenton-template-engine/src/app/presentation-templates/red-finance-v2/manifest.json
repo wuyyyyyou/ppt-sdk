@@ -61,6 +61,16 @@
         "path": "./slides/BankingDigitalTransformation.tsx"
       },
       "data_path": "./data/banking-digital-transformation.json"
+    },
+    {
+      "id": "red-finance-v2-fintech-innovation-applications",
+      "title": "金融科技创新与应用",
+      "speaker_note": "金融科技应用页：用于展示关键技术方向，以及这些技术在金融场景中的代表性应用方式。",
+      "source": {
+        "type": "local",
+        "path": "./slides/FintechInnovationApplications.tsx"
+      },
+      "data_path": "./data/fintech-innovation-applications.json"
     }
   ]
 }

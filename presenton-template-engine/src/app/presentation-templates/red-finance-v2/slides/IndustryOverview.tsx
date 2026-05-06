@@ -146,7 +146,7 @@ const IndustryOverview = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
           </div>
         </div>
 
-        <div className="flex flex-1 items-end pb-[8px]">
+        <div className="flex flex-1 items-end">
           <ChartCardShell
             title={parsed.chartTitle}
             subtitle={parsed.chartSubtitle}

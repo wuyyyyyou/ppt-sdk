@@ -1,0 +1,40 @@
+{
+  "title": "金融科技创新与应用",
+  "metaLabel": "FINTECH INNOVATION",
+  "visualTitle": "技术驱动金融重构",
+  "visualDescription": "以人工智能、大数据、云计算为核心的新技术集群，正在重塑金融服务的基础设施与交互模式，推动行业向智能化、开放化演进。",
+  "innovations": [
+    {
+      "icon": "wallet",
+      "title": "支付与嵌入式金融",
+      "tag": "Infrastructure",
+      "description": "推动实时支付网络建设，将信贷、保险等金融服务嵌入电商、物流等非金融场景，实现“金融即服务”能力输出。"
+    },
+    {
+      "icon": "brain",
+      "title": "GenAI 应用",
+      "tag": "AI / LLM",
+      "description": "部署金融垂类大模型，支撑客户经营 Copilot、投研报告生成与自动化合规审单，显著提升人效与响应速度。"
+    },
+    {
+      "icon": "architecture",
+      "title": "开放架构",
+      "tag": "Architecture",
+      "description": "从传统单体系统转向云原生与微服务架构，通过标准化 API 治理实现跨机构协同与业务敏捷迭代。"
+    },
+    {
+      "icon": "regtech",
+      "title": "RegTech 与合规",
+      "tag": "Risk Mgmt",
+      "description": "结合知识图谱与 NLP，提升 KYC、AML 与模型监控的自动化水平，满足穿透式监管与可解释要求。"
+    },
+    {
+      "icon": "security",
+      "title": "安全与隐私",
+      "tag": "Security",
+      "description": "建设零信任安全架构，结合联邦学习与多方安全计算，在保障数据隐私前提下释放数据协同价值。"
+    }
+  ],
+  "footerText": "金融行业战略分析报告 | 绝密资料",
+  "pageNumber": "06"
+}

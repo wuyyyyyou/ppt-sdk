@@ -19,6 +19,7 @@ type FinanceContentFrameProps = {
   showFooterDivider?: boolean;
   contentTop?: number;
   contentHeight?: number;
+  contentBottomInset?: number;
   contentClassName?: string;
 };
 
@@ -43,9 +44,11 @@ const FinanceContentFrame = ({
   showFooterDivider = true,
   contentTop = 178,
   contentHeight,
+  contentBottomInset = 16,
   contentClassName,
 }: FinanceContentFrameProps) => {
   const titleOffset = titleAccent === "left" ? 24 : 0;
+  const contentBottom = showFooter ? footerHeight + contentBottomInset : contentBottomInset;
 
   return (
     <div className="relative h-[720px] w-[1280px]">
@@ -119,7 +122,10 @@ const FinanceContentFrame = ({
             left: contentLeft,
             top: contentTop,
             width: contentWidth,
-            height: contentHeight,
+            height: contentHeight ?? undefined,
+            bottom: contentHeight === undefined ? contentBottom : undefined,
+            boxSizing: "border-box",
+            paddingBottom: contentBottomInset,
             zIndex: 10,
           }}
         >

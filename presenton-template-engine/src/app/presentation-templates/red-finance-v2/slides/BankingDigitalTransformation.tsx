@@ -150,7 +150,7 @@ const BankingDigitalTransformation = ({
         </div>
 
         <div
-          className="mb-[8px] mt-auto flex items-center gap-[18px] rounded-[8px] border px-[24px] py-[12px]"
+          className="mt-auto flex items-center gap-[18px] rounded-[8px] border px-[24px] py-[12px]"
           style={{
             backgroundColor: "#FAFAFA",
             borderColor: "var(--stroke,#E5E7EB)",

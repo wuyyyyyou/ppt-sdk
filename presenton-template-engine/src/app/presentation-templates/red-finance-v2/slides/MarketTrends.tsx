@@ -121,7 +121,7 @@ const MarketTrends = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
       footerText={parsed.footerText}
       pageNumber={parsed.pageNumber}
       contentTop={154}
-      contentHeight={498}
+      contentHeight={516}
     >
       <div className="flex h-full flex-col gap-[12px] overflow-hidden">
         <div

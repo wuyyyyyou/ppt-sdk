@@ -18,6 +18,7 @@
     "slides/AgendaGrid.tsx",
     "slides/IndustryOverview.tsx",
     "slides/MarketTrends.tsx",
-    "slides/BankingDigitalTransformation.tsx"
+    "slides/BankingDigitalTransformation.tsx",
+    "slides/FintechInnovationApplications.tsx"
   ]
 }

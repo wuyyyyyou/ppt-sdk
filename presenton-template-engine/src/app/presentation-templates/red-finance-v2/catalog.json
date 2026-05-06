@@ -50,6 +50,16 @@
       "layout_pattern": "intro-note-plus-pillar-cards-plus-kpi-strip",
       "suitable_for": ["数字化转型", "战略支柱", "能力建设", "关键举措"],
       "key_components": ["FinanceContentFrame", "StableInlineRow", "IconText", "StrategyPillarCard", "KpiMetricItem"]
+    },
+    {
+      "id": "red-finance-v2-fintech-innovation-applications",
+      "title": "金融科技创新与应用",
+      "source_path": "./slides/FintechInnovationApplications.tsx",
+      "data_path": "./data/fintech-innovation-applications.json",
+      "structure": "左侧技术概念视觉说明，右侧五张应用场景卡片纵向排列",
+      "layout_pattern": "left-concept-panel-right-application-card-list",
+      "suitable_for": ["金融科技应用", "技术创新", "能力版图", "应用场景"],
+      "key_components": ["FinanceContentFrame", "InnovationApplicationCard"]
     }
   ]
 }
