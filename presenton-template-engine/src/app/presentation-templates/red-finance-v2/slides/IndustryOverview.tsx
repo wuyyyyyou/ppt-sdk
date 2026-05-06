@@ -7,6 +7,7 @@ import FinanceBarChart from "../components/FinanceBarChart.js";
 import { FinanceIcon } from "../components/FinanceIcons.js";
 import InfoListItem from "../components/InfoListItem.js";
 import InsightCallout from "../components/InsightCallout.js";
+import MeasuredChartArea from "../components/MeasuredChartArea.js";
 
 const overviewIconSchema = z.enum([
   "bank",
@@ -151,21 +152,26 @@ const IndustryOverview = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
             subtitle={parsed.chartSubtitle}
             className="h-[392px] w-full"
           >
-            <FinanceBarChart
-              labels={parsed.chartBars.map((bar) => bar.label)}
-              series={[
-                {
-                  label: "资产规模",
-                  color: "#B71C1C",
-                  values: parsed.chartBars.map((bar) => bar.value),
-                },
-              ]}
-              minValue={parsed.chartMin}
-              maxValue={parsed.chartMax}
-              ticks={parsed.chartTicks}
-              yAxisWidth={58}
-              plotHeight={274}
-            />
+            <MeasuredChartArea minHeight={274}>
+              {({ width, height }) => (
+                <FinanceBarChart
+                  width={width}
+                  height={height}
+                  labels={parsed.chartBars.map((bar) => bar.label)}
+                  series={[
+                    {
+                      label: "资产规模",
+                      color: "#B71C1C",
+                      values: parsed.chartBars.map((bar) => bar.value),
+                    },
+                  ]}
+                  minValue={parsed.chartMin}
+                  maxValue={parsed.chartMax}
+                  ticks={parsed.chartTicks}
+                  yAxisWidth={58}
+                />
+              )}
+            </MeasuredChartArea>
           </ChartCardShell>
         </div>
       </div>

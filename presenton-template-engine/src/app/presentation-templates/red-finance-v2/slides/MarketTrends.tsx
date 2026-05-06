@@ -189,20 +189,13 @@ const MarketTrends = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
                   yAxisWidth={48}
                   tickFormatter={(value) => `${value}%`}
                   legend={
-                    <div className="flex flex-col gap-[10px]">
-                      <div className="grid grid-cols-3 text-center text-[11px]" style={{ color: "#616161" }}>
-                        {parsed.incomeChartLabels.map((label) => (
-                          <div key={label}>{label}</div>
-                        ))}
-                      </div>
-                      <div className="flex items-center justify-center gap-[32px] text-[12px]" style={{ color: "#616161" }}>
+                    <div className="flex items-center justify-center gap-[32px] text-[12px]" style={{ color: "#616161" }}>
                         {parsed.incomeChartSeries.map((entry) => (
                           <div key={entry.label} className="flex items-center gap-[8px]">
                             <div className="h-[14px] w-[14px] rounded-[2px]" style={{ backgroundColor: entry.color }} />
                             <span>{entry.label}</span>
                           </div>
                         ))}
-                      </div>
                     </div>
                   }
                 />
