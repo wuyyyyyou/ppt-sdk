@@ -167,7 +167,12 @@ const CompetitiveLandscapeAnalysis = ({
   const parsed = Schema.parse(data ?? {});
   const participantDensity =
     parsed.participants.length > 3 ? "dense" : "compact";
-  const forceDensity = "compact";
+  const hasForceOverflowRisk =
+    parsed.forces.length >= 4 ||
+    parsed.forces.some((item) => item.title.length > 6 || item.description.length > 18);
+  const forceDensity = hasForceOverflowRisk ? "dense" : "compact";
+  const forceTextScale = hasForceOverflowRisk ? "small" : "normal";
+  const forceDescriptionMaxLines = hasForceOverflowRisk ? 1 : 2;
   const matrixDensity =
     parsed.comparisonRows.length > 5
       ? "dense"
@@ -223,13 +228,22 @@ const CompetitiveLandscapeAnalysis = ({
                   title={item.title}
                   description={item.description}
                   density={forceDensity}
-                  descriptionMaxLines={2}
+                  textScale={forceTextScale}
+                  titleSuffixReservedWidth={forceDensity === "dense" ? 34 : 44}
+                  descriptionMaxLines={forceDescriptionMaxLines}
                   showDivider={index < parsed.forces.length - 1}
                   fillHeight
                   titleSuffix={
                     <div
-                      className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[3px] px-[5px] text-[11px] font-bold leading-none"
-                      style={getForceLevelStyles(item.level)}
+                      className="inline-flex items-center justify-center rounded-[3px] font-bold leading-none"
+                      style={{
+                        ...getForceLevelStyles(item.level),
+                        height: forceDensity === "dense" ? 16 : 18,
+                        minWidth: forceDensity === "dense" ? 16 : 18,
+                        paddingLeft: forceDensity === "dense" ? 4 : 5,
+                        paddingRight: forceDensity === "dense" ? 4 : 5,
+                        fontSize: forceDensity === "dense" ? 10 : 11,
+                      }}
                     >
                       {item.level}
                     </div>

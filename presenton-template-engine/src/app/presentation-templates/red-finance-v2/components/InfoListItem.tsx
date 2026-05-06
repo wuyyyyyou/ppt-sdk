@@ -10,7 +10,9 @@ type InfoListItemProps = {
   description: string;
   showDivider?: boolean;
   density?: "normal" | "compact" | "dense";
+  textScale?: "normal" | "small";
   titleSuffix?: ReactNode;
+  titleSuffixReservedWidth?: number;
   descriptionMaxLines?: number;
   fillHeight?: boolean;
 };
@@ -21,19 +23,31 @@ const InfoListItem = ({
   description,
   showDivider = true,
   density = "normal",
+  textScale = "normal",
   titleSuffix,
+  titleSuffixReservedWidth = 44,
   descriptionMaxLines = 2,
   fillHeight = false,
 }: InfoListItemProps) => {
   const isCompact = density === "compact";
   const isDense = density === "dense";
+  const isSmallText = textScale === "small";
   const iconSize = isDense ? 26 : isCompact ? 32 : 40;
-  const titleFontSize = isDense ? 14 : isCompact ? 16 : 18;
-  const descriptionFontSize = isDense ? 11 : isCompact ? 13 : 15;
-  const descriptionLineHeight = isDense ? 14 : isCompact ? 18 : 22;
+  const titleFontSizeBase = isDense ? 14 : isCompact ? 16 : 18;
+  const descriptionFontSizeBase = isDense ? 11 : isCompact ? 13 : 15;
+  const descriptionLineHeightBase = isDense ? 14 : isCompact ? 18 : 22;
+  const titleFontSize = isSmallText
+    ? Math.max(12, titleFontSizeBase - (isDense ? 1 : 2))
+    : titleFontSizeBase;
+  const descriptionFontSize = isSmallText
+    ? Math.max(10, descriptionFontSizeBase - 1)
+    : descriptionFontSizeBase;
+  const descriptionLineHeight = isSmallText
+    ? Math.max(descriptionFontSize + 2, descriptionLineHeightBase - 2)
+    : descriptionLineHeightBase;
   const paddingBottom = isDense ? 4 : isCompact ? 7 : 15;
   const dividerLeft = isDense ? 41 : isCompact ? 49 : 55;
-  const titleMarginBottom = isDense ? 2 : 4;
+  const titleMarginBottom = isSmallText ? 2 : isDense ? 2 : 4;
   const gap = isDense ? 12 : 15;
   const iconClassName = isDense
     ? "h-[14px] w-[14px]"
@@ -63,7 +77,7 @@ const InfoListItem = ({
       </div>
       <div
         className="min-w-0"
-        style={{ paddingRight: titleSuffix ? 44 : 8 }}
+        style={{ paddingRight: titleSuffix ? titleSuffixReservedWidth : 8 }}
       >
         <div
           className="font-bold"
