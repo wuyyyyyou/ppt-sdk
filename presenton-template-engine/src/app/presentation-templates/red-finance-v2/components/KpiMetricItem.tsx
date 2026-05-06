@@ -1,5 +1,7 @@
 import React from "react";
 
+import StableInlineRow from "./StableInlineRow.js";
+
 type KpiMetricItemProps = {
   value: string;
   label: string;
@@ -8,13 +10,7 @@ type KpiMetricItemProps = {
 const KPI_ROW_HEIGHT = 24;
 
 const KpiMetricItem = ({ value, label }: KpiMetricItemProps) => (
-  <div
-    className="inline-flex items-center whitespace-nowrap"
-    style={{
-      height: KPI_ROW_HEIGHT,
-      gap: 10,
-    }}
-  >
+  <StableInlineRow height={KPI_ROW_HEIGHT} gap={10}>
     <div
       className="flex flex-none items-center"
       style={{
@@ -38,7 +34,7 @@ const KpiMetricItem = ({ value, label }: KpiMetricItemProps) => (
     >
       {label}
     </div>
-  </div>
+  </StableInlineRow>
 );
 
 export default KpiMetricItem;

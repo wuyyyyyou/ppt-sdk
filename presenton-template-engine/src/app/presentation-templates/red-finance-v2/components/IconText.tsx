@@ -1,6 +1,7 @@
 import React, { type CSSProperties, type ReactNode } from "react";
 
 import { redFinanceTheme } from "../theme/tokens.js";
+import StableInlineRow from "./StableInlineRow.js";
 
 type IconTextProps = {
   icon: ReactNode;
@@ -28,11 +29,10 @@ const IconText = ({
   textColor = redFinanceTheme.colors.backgroundText,
 }: IconTextProps) => {
   return (
-    <div
-      className="inline-flex items-center"
+    <StableInlineRow
+      height={height}
+      gap={gap}
       style={{
-        height,
-        gap,
         fontSize,
       }}
     >
@@ -58,7 +58,7 @@ const IconText = ({
       >
         {label}
       </div>
-    </div>
+    </StableInlineRow>
   );
 };
 

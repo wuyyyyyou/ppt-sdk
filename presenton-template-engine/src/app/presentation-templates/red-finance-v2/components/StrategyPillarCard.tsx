@@ -4,6 +4,7 @@ import {
   FinanceIcon,
   type FinanceIconName,
 } from "./FinanceIcons.js";
+import StableInlineRow from "./StableInlineRow.js";
 
 export type StrategyPillarItem = {
   lead: string;
@@ -16,6 +17,8 @@ type StrategyPillarCardProps = {
   title: string;
   items: StrategyPillarItem[];
 };
+
+const STRATEGY_ITEM_LINE_HEIGHT = 19;
 
 const StrategyPillarCard = ({
   number,
@@ -68,20 +71,35 @@ const StrategyPillarCard = ({
           key={`${title}-${index}`}
           className="flex items-start gap-[12px]"
         >
-          <div
-            className="mt-[7px] h-[6px] w-[6px] flex-none rounded-full"
-            style={{ backgroundColor: "var(--primary-color,#B71C1C)" }}
-          />
-          <div className="flex flex-1 items-start gap-[8px] text-[13px] leading-[1.45]">
+          <StableInlineRow
+            height={STRATEGY_ITEM_LINE_HEIGHT}
+            gap={0}
+            inline={false}
+            className="w-[6px] flex-none"
+          >
             <div
-              className="shrink-0 font-bold"
-              style={{ color: "var(--background-text,#212121)" }}
+              className="h-[6px] w-[6px] rounded-full"
+              style={{ backgroundColor: "var(--primary-color,#B71C1C)" }}
+            />
+          </StableInlineRow>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <StableInlineRow
+              height={STRATEGY_ITEM_LINE_HEIGHT}
+              gap={0}
+              style={{
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "var(--background-text,#212121)",
+              }}
             >
-              {item.lead}：
-            </div>
+              <span>{item.lead}：</span>
+            </StableInlineRow>
             <div
-              className="flex-1"
-              style={{ color: "var(--text-muted,#616161)" }}
+              className="mt-[1px] text-[13px]"
+              style={{
+                lineHeight: "1.45",
+                color: "var(--text-muted,#616161)",
+              }}
             >
               {item.body}
             </div>

@@ -49,7 +49,7 @@
       "structure": "上方导语说明，中部多张转型支柱卡片，底部 KPI 汇总条",
       "layout_pattern": "intro-note-plus-pillar-cards-plus-kpi-strip",
       "suitable_for": ["数字化转型", "战略支柱", "能力建设", "关键举措"],
-      "key_components": ["FinanceContentFrame", "IconText", "StrategyPillarCard", "KpiMetricItem"]
+      "key_components": ["FinanceContentFrame", "StableInlineRow", "IconText", "StrategyPillarCard", "KpiMetricItem"]
     }
   ]
 }
