@@ -16,6 +16,7 @@
   "layouts": [
     "slides/CoverHero.tsx",
     "slides/AgendaGrid.tsx",
-    "slides/IndustryOverview.tsx"
+    "slides/IndustryOverview.tsx",
+    "slides/MarketTrends.tsx"
   ]
 }

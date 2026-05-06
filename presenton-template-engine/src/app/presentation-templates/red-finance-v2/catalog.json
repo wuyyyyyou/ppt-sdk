@@ -30,6 +30,16 @@
       "layout_pattern": "left-text-right-bar-chart-bottom-callout",
       "suitable_for": ["行业概况", "市场总量", "规模趋势", "业务重心"],
       "key_components": ["FinanceContentFrame", "InfoListItem", "BarChartCard", "InsightCallout"]
+    },
+    {
+      "id": "red-finance-v2-market-trends",
+      "title": "市场趋势",
+      "source_path": "./slides/MarketTrends.tsx",
+      "data_path": "./data/market-trends.json",
+      "structure": "上方 5 个趋势信号卡，下方左右并列两张预测图表卡",
+      "layout_pattern": "top-trend-cards-bottom-dual-chart-panels",
+      "suitable_for": ["市场趋势", "年度展望", "行业预测", "重点驱动因素"],
+      "key_components": ["FinanceContentFrame", "TrendSignalCard", "ChartPanelCard", "TrendChartsPanel"]
     }
   ]
 }

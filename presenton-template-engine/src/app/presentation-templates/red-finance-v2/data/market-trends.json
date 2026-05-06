@@ -1,0 +1,48 @@
+{
+  "title": "市场趋势",
+  "metaLabel": "MARKET TRENDS",
+  "footerText": "金融行业战略分析报告 | 绝密资料",
+  "pageNumber": "04",
+  "trends": [
+    {
+      "icon": "robot",
+      "title": "AI规模化落地",
+      "description": "客服、风控与运营自动化持续提速，生成式 AI 开始重塑前中后台流程。"
+    },
+    {
+      "icon": "coins",
+      "title": "财富管理崛起",
+      "description": "从吃息差转向赚中收，投顾、托管与私行业务协同增强。"
+    },
+    {
+      "icon": "network",
+      "title": "开放金融生态",
+      "description": "API 协作与跨界联合加深，平台化金融服务成为主要抓手。"
+    },
+    {
+      "icon": "leaf",
+      "title": "绿色与ESG",
+      "description": "绿色信贷体系完善，碳金融产品创新和信息披露进入常态化阶段。"
+    },
+    {
+      "icon": "globe",
+      "title": "跨境业务深化",
+      "description": "跨境支付、清算与互联互通机制优化，国际化服务能力继续提升。"
+    }
+  ],
+  "aiChartTitle": "金融机构AI技术应用渗透率预测",
+  "aiChartTag": "2024-2027E",
+  "aiChartLabels": ["2024", "2025", "2026E", "2027E"],
+  "aiChartSeries": [
+    { "label": "智能客服", "color": "#B71C1C", "values": [45, 58, 72, 85] },
+    { "label": "智能风控", "color": "#EF5350", "values": [60, 68, 78, 88] },
+    { "label": "智能投研", "color": "#FF8A80", "values": [30, 42, 55, 68] }
+  ],
+  "incomeChartTitle": "银行业收入结构变化趋势",
+  "incomeChartTag": "非息收入占比 (%)",
+  "incomeChartLabels": ["大型银行", "股份制银行", "城商行"],
+  "incomeChartSeries": [
+    { "label": "2024", "color": "#FFCDD2", "values": [28, 32, 18] },
+    { "label": "2026E", "color": "#B71C1C", "values": [35, 40, 24] }
+  ]
+}

@@ -12,10 +12,14 @@ export type FinanceIconName =
   | "briefcase"
   | "coins"
   | "flag"
+  | "globe"
+  | "leaf"
   | "lightbulb"
   | "laptop-code"
   | "list"
   | "microchip"
+  | "network"
+  | "robot"
   | "route"
   | "shield"
   | "user";
@@ -138,6 +142,36 @@ export const FinanceIcon = ({
           <path d="M6 20V5" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
           <path d="M7 5.5h9.5l-1.4 3 1.4 3H7" stroke={stroke} strokeWidth="1.8" strokeLinejoin="round" />
           <path d="M6 20h8" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
+    case "robot":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+          <rect x="6" y="8" width="12" height="9" rx="2.4" stroke={stroke} strokeWidth="1.8" />
+          <path d="M12 4.5v2.5M9.5 12h.01M14.5 12h.01M9 15.2h6M4.8 10.5v4M19.2 10.5v4" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
+    case "network":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+          <circle cx="6" cy="12" r="2" stroke={stroke} strokeWidth="1.8" />
+          <circle cx="18" cy="7" r="2" stroke={stroke} strokeWidth="1.8" />
+          <circle cx="18" cy="17" r="2" stroke={stroke} strokeWidth="1.8" />
+          <path d="M8 11.2 16 7.8M8 12.8 16 16.2" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
+    case "leaf":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+          <path d="M18 5c-5.8.5-9.8 4.2-10.5 9.5 3.6.3 6.2-.7 8.1-2.7C17.7 9.8 18.2 7.5 18 5Z" stroke={stroke} strokeWidth="1.8" strokeLinejoin="round" />
+          <path d="M8 18c1.1-2.8 3.4-4.9 6.8-6.6" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
+    case "globe":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+          <circle cx="12" cy="12" r="8" stroke={stroke} strokeWidth="1.8" />
+          <path d="M4.5 12h15M12 4a13 13 0 0 1 0 16M12 4a13 13 0 0 0 0 16" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       );
     case "user":

@@ -41,6 +41,16 @@
         "path": "./slides/IndustryOverview.tsx"
       },
       "data_path": "./data/industry-overview.json"
+    },
+    {
+      "id": "red-finance-v2-market-trends",
+      "title": "市场趋势",
+      "speaker_note": "市场趋势页：用于展示关键市场驱动因素，以及 AI 渗透率和收入结构变化预测。",
+      "source": {
+        "type": "local",
+        "path": "./slides/MarketTrends.tsx"
+      },
+      "data_path": "./data/market-trends.json"
     }
   ]
 }
