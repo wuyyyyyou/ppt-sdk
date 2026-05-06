@@ -1,11 +1,11 @@
 import React from "react";
 import * as z from "zod";
 
-import ComparisonMatrixTable from "../components/ComparisonMatrixTable.js";
 import FinanceContentFrame from "../components/FinanceContentFrame.js";
 import { FinanceIcon } from "../components/FinanceIcons.js";
 import InfoListItem from "../components/InfoListItem.js";
 import ShortInfoCard from "../components/ShortInfoCard.js";
+import StableMatrixGrid from "../components/StableMatrixGrid.js";
 import { redFinanceTheme } from "../theme/tokens.js";
 
 const participantIconSchema = z.enum([
@@ -243,16 +243,16 @@ const CompetitiveLandscapeAnalysis = ({
         <div className="flex min-w-0 flex-1 flex-col">
           <SectionHeading title={parsed.comparisonTitle} />
           <div className="min-h-0 flex-1 overflow-hidden">
-            <ComparisonMatrixTable
+            <StableMatrixGrid
               density={matrixDensity}
-              dimensionHeader={parsed.columns.dimension}
+              rowHeaderLabel={parsed.columns.dimension}
               columns={[
                 { label: parsed.columns.traditional, width: 200 },
                 { label: parsed.columns.tech, width: 200 },
-                { label: parsed.columns.winning },
+                { label: parsed.columns.winning, tone: "accent" },
               ]}
               rows={parsed.comparisonRows.map((row) => ({
-                dimension: row.dimension,
+                header: row.dimension,
                 cells: [
                   {
                     lead: row.traditionalLead,

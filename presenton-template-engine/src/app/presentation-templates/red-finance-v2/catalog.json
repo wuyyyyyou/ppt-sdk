@@ -69,7 +69,7 @@
       "structure": "左侧为市场参与者短卡和五力分析列表，右侧为竞争维度对比矩阵表格",
       "layout_pattern": "left-cards-plus-analysis-right-comparison-table",
       "suitable_for": ["竞争格局", "市场对比", "战略定位", "差异化路径"],
-      "key_components": ["FinanceContentFrame", "ShortInfoCard", "InfoListItem", "ComparisonMatrixTable"]
+      "key_components": ["FinanceContentFrame", "ShortInfoCard", "InfoListItem", "StableMatrixGrid"]
     }
   ]
 }
