@@ -150,7 +150,7 @@ const MarketTrends = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
                   minValue={0}
                   maxValue={100}
                   ticks={[0, 20, 40, 60, 80, 100]}
-                  yAxisWidth={48}
+                  yAxisWidth={40}
                   legend={
                     <div className="flex items-center justify-center gap-[28px] text-[12px]" style={{ color: "#616161" }}>
                       {parsed.aiChartSeries.map((entry) => (
@@ -186,7 +186,7 @@ const MarketTrends = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
                   minValue={0}
                   maxValue={50}
                   ticks={[0, 10, 20, 30, 40, 50]}
-                  yAxisWidth={48}
+                  yAxisWidth={40}
                   tickFormatter={(value) => `${value}%`}
                   legend={
                     <div className="flex items-center justify-center gap-[32px] text-[12px]" style={{ color: "#616161" }}>

@@ -28,6 +28,9 @@ type FinanceBarChartProps = {
   width?: number;
   height?: number;
   tickFormatter?: (value: number) => string;
+  barGap?: number;
+  barCategoryGap?: number | string;
+  maxBarSize?: number;
 };
 
 const clampValue = (value: number, min: number, max: number) =>
@@ -64,11 +67,15 @@ const FinanceBarChart = ({
   width,
   height,
   tickFormatter = defaultTickFormatter,
+  barGap = 8,
+  barCategoryGap = "18%",
+  maxBarSize,
 }: FinanceBarChartProps) => {
   const data = buildBarData(labels, series, minValue, maxValue);
   const chartWidth = width ?? 0;
   const chartHeight = Math.max(0, (height ?? 0) - (legend ? legendReserve : 0));
-  const chartMarginLeft = 8;
+  const chartMarginLeft = 3;
+  const chartMarginRight = Math.max(12, Math.round(yAxisWidth * 0.35));
   const horizontalGridCoordinatesGenerator = ({
     offset,
   }: {
@@ -97,9 +104,10 @@ const FinanceBarChart = ({
           width={chartWidth}
           height={chartHeight}
           data={data}
-          margin={{ top: 8, right: yAxisWidth + chartMarginLeft, bottom: 0, left: chartMarginLeft }}
-          barGap={10}
-          barCategoryGap="26%"
+          margin={{ top: 8, right: chartMarginRight, bottom: 0, left: chartMarginLeft }}
+          barGap={barGap}
+          barCategoryGap={barCategoryGap}
+          maxBarSize={maxBarSize}
         >
           <CartesianGrid
             vertical={false}

@@ -65,7 +65,8 @@ const FinanceLineChart = ({
   const data = buildLineData(labels, series, minValue, maxValue);
   const chartWidth = width ?? 0;
   const chartHeight = Math.max(0, (height ?? 0) - (legend ? legendReserve : 0));
-  const chartMarginLeft = 10;
+  const chartMarginLeft = 3;
+  const chartMarginRight = Math.max(12, Math.round(yAxisWidth * 0.35));
   const horizontalGridCoordinatesGenerator = ({
     offset,
   }: {
@@ -94,7 +95,7 @@ const FinanceLineChart = ({
           width={chartWidth}
           height={chartHeight}
           data={data}
-          margin={{ top: 8, right: yAxisWidth + chartMarginLeft, bottom: 0, left: chartMarginLeft }}
+          margin={{ top: 8, right: chartMarginRight, bottom: 0, left: chartMarginLeft }}
         >
           <CartesianGrid
             vertical={false}
@@ -109,6 +110,7 @@ const FinanceLineChart = ({
             tick={{ fill: "#616161", fontSize: 11, fontWeight: 700 }}
             interval={0}
             height={defaultXAxisReserve}
+            padding={{ left: 6, right: 18 }}
           />
           <YAxis
             width={yAxisWidth}

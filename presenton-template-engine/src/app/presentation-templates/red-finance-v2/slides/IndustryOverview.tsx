@@ -168,7 +168,10 @@ const IndustryOverview = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
                   minValue={parsed.chartMin}
                   maxValue={parsed.chartMax}
                   ticks={parsed.chartTicks}
-                  yAxisWidth={58}
+                  yAxisWidth={46}
+                  barGap={0}
+                  barCategoryGap="18%"
+                  maxBarSize={36}
                 />
               )}
             </MeasuredChartArea>
