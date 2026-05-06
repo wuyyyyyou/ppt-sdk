@@ -5,6 +5,10 @@ export interface ElementHandleLike {
 }
 
 export interface PageLike {
+  evaluateOnNewDocument?: (
+    pageFunction: (...args: any[]) => unknown,
+    ...args: any[]
+  ) => Promise<void>;
   setViewport?: (viewport: {
     width: number;
     height: number;

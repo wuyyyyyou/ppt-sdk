@@ -352,13 +352,9 @@ function buildDeckSharedStyles(): string[] {
     `    html.${DECK_VIEWER_MODE_CLASS} #${PRESENTATION_WRAPPER_ID} > [data-presenton-slide-shell="true"] {`,
     "      position: absolute;",
     "      inset: 0;",
-    "      display: none;",
     `      width: ${SLIDE_WIDTH}px;`,
     `      height: ${SLIDE_HEIGHT}px;`,
     "      overflow: hidden;",
-    "    }",
-    `    html.${DECK_VIEWER_MODE_CLASS} #${PRESENTATION_WRAPPER_ID} > [data-presenton-slide-shell="true"][data-presenton-active-slide="true"] {`,
-    "      display: block;",
     "    }",
     `    html.${DECK_VIEWER_MODE_CLASS} [data-presenton-render-status="error"] {`,
     "      min-height: 100vh;",
@@ -369,6 +365,9 @@ function buildDeckSharedStyles(): string[] {
 function buildDeckViewerScript(): string {
   return `
     (() => {
+      if (window.__PRESENTON_DISABLE_VIEWER_MODE__) {
+        return;
+      }
       const wrapper = document.getElementById(${JSON.stringify(PRESENTATION_WRAPPER_ID)});
       const html = document.documentElement;
       const shell = document.querySelector("[data-presenton-viewer-shell='true']");
@@ -414,6 +413,9 @@ function buildDeckViewerScript(): string {
             "data-presenton-active-slide",
             index === activeIndex ? "true" : "false",
           );
+          slideShell.style.display = index === activeIndex ? "block" : "none";
+          slideShell.style.visibility = index === activeIndex ? "visible" : "hidden";
+          slideShell.style.pointerEvents = index === activeIndex ? "auto" : "none";
         });
 
         if (thumbnailList) {

@@ -58,6 +58,7 @@ const DEFAULT_VIEWPORT = {
 };
 
 const DEFAULT_DECK_SELECTOR = "#presentation-slides-wrapper";
+const DECK_VIEWER_MODE_CLASS = "presenton-viewer-mode";
 const DEBUG_HTML_TO_PPTX = process.env.PRESENTON_DEBUG_HTML_TO_PPTX === "1";
 const DEFAULT_BROWSER_ARGS = [
   "--no-sandbox",
@@ -278,6 +279,16 @@ export async function convertDeckHtmlToPptxModel(
       debugLog("setViewport.done");
     }
 
+    if (runtime.page.evaluateOnNewDocument) {
+      debugLog("evaluateOnNewDocument.disableViewerMode.start");
+      await runtime.page.evaluateOnNewDocument(() => {
+        (window as typeof window & {
+          __PRESENTON_DISABLE_VIEWER_MODE__?: boolean;
+        }).__PRESENTON_DISABLE_VIEWER_MODE__ = true;
+      });
+      debugLog("evaluateOnNewDocument.disableViewerMode.done");
+    }
+
     const deckSelector = input.deckSelector ?? DEFAULT_DECK_SELECTOR;
     const contentTimeoutMs = input.contentTimeoutMs ?? 300000;
 
@@ -305,6 +316,10 @@ export async function convertDeckHtmlToPptxModel(
       debugLog("settle.done");
     }
 
+    debugLog("normalizeDeckForExtraction.start");
+    await normalizeDeckForExtraction(runtime.page, deckSelector);
+    debugLog("normalizeDeckForExtraction.done");
+
     debugLog("extractDeckPageToSlideAttributes.start");
     return await convertDeckPageToPptxModel({
       page: runtime.page,
@@ -318,6 +333,43 @@ export async function convertDeckHtmlToPptxModel(
       await runtime.close();
     }
   }
+}
+
+async function normalizeDeckForExtraction(
+  page: PageLike,
+  deckSelector: string,
+): Promise<void> {
+  const deckElement = await page.$(deckSelector);
+  if (!deckElement) {
+    throw new Error(`Presentation slides wrapper not found: ${deckSelector}`);
+  }
+
+  await deckElement.evaluate(
+    (el, viewerModeClass) => {
+      const html = document.documentElement;
+      (window as typeof window & {
+        __PRESENTON_DISABLE_VIEWER_MODE__?: boolean;
+      }).__PRESENTON_DISABLE_VIEWER_MODE__ = true;
+
+      html.classList.remove(viewerModeClass);
+      (el as HTMLElement).style.removeProperty("--presenton-viewer-scale");
+
+      const slideShells = Array.from(
+        el.querySelectorAll(':scope > [data-presenton-slide-shell="true"]'),
+      ) as HTMLElement[];
+
+      slideShells.forEach((slideShell: HTMLElement) => {
+        slideShell.style.display = "block";
+        slideShell.style.visibility = "visible";
+        slideShell.style.pointerEvents = "auto";
+        slideShell.style.position = "relative";
+        slideShell.style.inset = "auto";
+      });
+    },
+    DECK_VIEWER_MODE_CLASS,
+  );
+
+  await delay(0);
 }
 
 async function createManagedPage(launchOptions?: Record<string, unknown>): Promise<{
