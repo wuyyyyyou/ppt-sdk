@@ -28,10 +28,6 @@
     }
   ],
   "radarTicks": [20, 40, 60, 80, 100],
-  "riskLegend": [
-    { "color": "#B71C1C", "label": "高风险关注领域 (Cyber / AI)" },
-    { "color": "#E57373", "label": "传统核心风险 (Credit / Market)" }
-  ],
   "insightBody": "随着数字化深入，网络安全与模型风险显著上升，已成为与传统信用风险并列的一级管控重点。",
   "pillarsTitle": "风险治理四大支柱",
   "pillars": [

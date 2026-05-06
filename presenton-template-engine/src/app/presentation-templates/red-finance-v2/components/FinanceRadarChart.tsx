@@ -85,12 +85,13 @@ const FinanceRadarChart = ({
           height={chartHeight}
           data={data}
           outerRadius={outerRadius}
-          margin={{ top: 10, right: 28, bottom: 12, left: 28 }}
+          margin={{ top: 2, right: 12, bottom: 2, left: 12 }}
         >
           <PolarGrid
             gridType="polygon"
-            stroke={redFinanceTheme.colors.stroke}
+            stroke="#D6D6D6"
             radialLines
+            polarRadius={ticks}
           />
           <PolarAngleAxis
             dataKey="label"
@@ -99,6 +100,7 @@ const FinanceRadarChart = ({
               fontSize: labelFontSize,
               fontWeight: 700,
             }}
+            tickLine={false}
           />
           <PolarRadiusAxis
             axisLine={false}

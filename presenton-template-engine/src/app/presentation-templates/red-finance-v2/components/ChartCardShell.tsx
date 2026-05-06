@@ -6,6 +6,8 @@ type ChartCardShellProps = {
   rightMeta?: string;
   children: ReactNode;
   className?: string;
+  padding?: number;
+  headerMarginBottom?: number;
 };
 
 const ChartCardShell = ({
@@ -14,17 +16,23 @@ const ChartCardShell = ({
   rightMeta,
   children,
   className,
+  padding = 20,
+  headerMarginBottom = 15,
 }: ChartCardShellProps) => (
   <div
     data-pptx-export="screenshot"
     data-chart-like="true"
-    className={`flex h-full flex-col rounded-[8px] border bg-[#FAFAFA] p-[20px] ${className ?? ""}`.trim()}
+    className={`flex h-full flex-col rounded-[8px] border bg-[#FAFAFA] ${className ?? ""}`.trim()}
     style={{
+      padding,
       borderColor: "var(--stroke,#E5E7EB)",
       boxShadow: "0 4px 6px rgba(0,0,0,0.02)",
     }}
   >
-    <div className="mb-[15px] flex items-start justify-between gap-[16px]">
+    <div
+      className="flex items-start justify-between gap-[16px]"
+      style={{ marginBottom: headerMarginBottom }}
+    >
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-[10px]">
           <div

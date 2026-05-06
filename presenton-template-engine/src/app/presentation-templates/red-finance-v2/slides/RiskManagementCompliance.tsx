@@ -18,11 +18,6 @@ const riskSeriesSchema = z.object({
   values: z.array(z.number().min(0).max(100)).min(5).max(8),
 });
 
-const legendItemSchema = z.object({
-  color: z.string().min(4).max(20),
-  label: z.string().min(2).max(32),
-});
-
 const pillarItemSchema = z.object({
   lead: z.string().min(1).max(24),
   body: z.string().min(4).max(120),
@@ -67,10 +62,6 @@ export const Schema = z.object({
   ]),
   radarTicks: z.array(z.number().min(0).max(100)).min(3).max(6).default([
     20, 40, 60, 80, 100,
-  ]),
-  riskLegend: z.array(legendItemSchema).min(0).max(4).default([
-    { color: "#B71C1C", label: "高风险关注领域 (Cyber / AI)" },
-    { color: "#E57373", label: "传统核心风险 (Credit / Market)" },
   ]),
   insightBody: z
     .string()
@@ -209,13 +200,6 @@ const RiskManagementCompliance = ({
   data: Partial<z.infer<typeof Schema>>;
 }) => {
   const parsed = Schema.parse(data ?? {});
-  const legendItems =
-    parsed.riskLegend.length > 0
-      ? parsed.riskLegend
-      : parsed.radarSeries.map((item) => ({
-          color: item.color,
-          label: item.label,
-        }));
   const pillarCount = parsed.pillars.length;
   const pillarRows = pillarCount <= 2 ? 1 : 2;
   const pillarDensity =
@@ -240,8 +224,10 @@ const RiskManagementCompliance = ({
             title={parsed.riskMapTitle}
             subtitle={parsed.riskMapSubtitle}
             className="h-[388px]"
+            padding={16}
+            headerMarginBottom={8}
           >
-            <MeasuredChartArea minHeight={280}>
+            <MeasuredChartArea minHeight={300} className="pt-[2px]">
               {({ width, height }) => (
                 <FinanceRadarChart
                   labels={parsed.radarLabels}
@@ -251,10 +237,12 @@ const RiskManagementCompliance = ({
                   ticks={parsed.radarTicks}
                   width={width}
                   height={height}
-                  outerRadius={parsed.radarLabels.length >= 8 ? "58%" : "63%"}
-                  legendReserve={48}
+                  outerRadius={parsed.radarLabels.length >= 8 ? "72%" : "76%"}
+                  legendReserve={34}
+                  radiusAxisWidth={18}
+                  labelFontSize={10}
                   legend={
-                    <div className="flex flex-wrap items-center justify-center gap-x-[24px] gap-y-[8px]">
+                    <div className="flex flex-wrap items-center justify-center gap-x-[20px] gap-y-[6px]">
                       {parsed.radarSeries.map((item) => (
                         <SeriesLegend
                           key={item.label}
@@ -269,23 +257,6 @@ const RiskManagementCompliance = ({
               )}
             </MeasuredChartArea>
           </ChartCardShell>
-
-          <div className="mt-[10px] flex flex-wrap items-center justify-center gap-x-[24px] gap-y-[8px] px-[10px]">
-            {legendItems.map((item) => (
-              <div key={item.label} className="flex items-center gap-[8px]">
-                <div
-                  className="h-[8px] w-[8px] rounded-full"
-                  style={{ backgroundColor: item.color }}
-                />
-                <div
-                  className="text-[11px] leading-[1.3]"
-                  style={{ color: redFinanceTheme.colors.mutedText }}
-                >
-                  {item.label}
-                </div>
-              </div>
-            ))}
-          </div>
 
           <div className="mt-[12px]">
             <InsightCallout text={parsed.insightBody} icon="lightbulb" density="compact" />
