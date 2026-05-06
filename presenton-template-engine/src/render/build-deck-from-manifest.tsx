@@ -189,6 +189,10 @@ function normalizeBuiltinLayoutId(templateGroup: string, layoutId: string): stri
   return `${templateGroup}:${layoutId}`;
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
 function validateDeckManifest(manifest: DeckManifestInput): void {
   if (!manifest || typeof manifest !== "object") {
     throw new Error('Field "manifest" must be an object');
@@ -224,11 +228,39 @@ function validateDeckManifest(manifest: DeckManifestInput): void {
     if (
       slide.data !== undefined &&
       slide.data !== null &&
-      (typeof slide.data !== "object" || Array.isArray(slide.data))
+      !isPlainRecord(slide.data)
     ) {
       throw new Error(`Slide "${slide.id}" field "data" must be an object when provided`);
     }
+
+    if (
+      slide.data_path !== undefined &&
+      slide.data_path !== null &&
+      (typeof slide.data_path !== "string" || slide.data_path.length === 0)
+    ) {
+      throw new Error(`Slide "${slide.id}" field "data_path" must be a non-empty string when provided`);
+    }
   });
+}
+
+async function resolveSlideData(
+  slide: DeckManifestSlideInput,
+  manifestCwd: string,
+): Promise<Record<string, unknown>> {
+  if (typeof slide.data_path === "string" && slide.data_path.length > 0) {
+    const absolutePath = path.resolve(manifestCwd, slide.data_path);
+    const rawValue = JSON.parse(await readFile(absolutePath, "utf8")) as unknown;
+    if (!isPlainRecord(rawValue)) {
+      throw new Error(`Slide "${slide.id}" data_path must point to a JSON object: ${slide.data_path}`);
+    }
+    return rawValue;
+  }
+
+  if (isPlainRecord(slide.data)) {
+    return slide.data;
+  }
+
+  return {};
 }
 
 function resolveBuiltinSlide(slide: DeckManifestSlideInput): ResolvedManifestSlide {
@@ -322,6 +354,7 @@ async function resolveManifestSlide(
 function buildSlideDocumentHtml(input: {
   resolvedSlide: ResolvedManifestSlide;
   slide: DeckManifestSlideInput;
+  slideData: Record<string, unknown>;
   deckTheme?: TemplateRenderThemeInput | null;
 }): string {
   const theme = normalizeTheme(input.slide.theme ?? input.deckTheme);
@@ -333,7 +366,7 @@ function buildSlideDocumentHtml(input: {
   const ReactForRender = renderRuntime?.react ?? React;
   const renderMarkup = renderRuntime?.renderToStaticMarkup ?? renderToStaticMarkup;
   const slideData = {
-    ...(input.slide.data ?? {}),
+    ...input.slideData,
     _logo_url__: theme.logoUrl ?? null,
     __companyName__: theme.companyName ?? null,
   };
@@ -425,9 +458,11 @@ export async function buildDeckHtmlFromManifest(
   const slides = await Promise.all(
     manifest.slides.map(async (slide, index) => {
       const resolvedSlide = await resolveManifestSlide(slide, manifestCwd);
+      const slideData = await resolveSlideData(slide, manifestCwd);
       const html = buildSlideDocumentHtml({
         resolvedSlide,
         slide,
+        slideData,
         deckTheme: manifest.theme,
       });
       const slideFileName = `${index + 1}-${deckBaseName}-${sanitizeFileNamePart(

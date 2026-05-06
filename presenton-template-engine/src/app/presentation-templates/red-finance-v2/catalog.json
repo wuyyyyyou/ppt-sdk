@@ -1,0 +1,35 @@
+{
+  "group_id": "red-finance-v2",
+  "slides": [
+    {
+      "id": "red-finance-v2-cover",
+      "title": "金融行业战略分析报告",
+      "source_path": "./slides/CoverHero.tsx",
+      "data_path": "./data/cover-hero.json",
+      "structure": "左上品牌与标签，左中双行大标题，左下元信息，右侧为纯装饰柱状体块",
+      "layout_pattern": "cover-hero-left-title-right-decoration",
+      "suitable_for": ["封面", "战略报告开场", "正式型行业汇报"],
+      "key_components": ["FinanceCanvas", "IconText", "CoverBarDecoration"]
+    },
+    {
+      "id": "red-finance-v2-agenda",
+      "title": "目录",
+      "source_path": "./slides/AgendaGrid.tsx",
+      "data_path": "./data/agenda-grid.json",
+      "structure": "顶部标题区，主体为 10 宫格目录卡片，右上品牌标签，底部说明和页码",
+      "layout_pattern": "title-plus-agenda-grid",
+      "suitable_for": ["目录", "章节导览", "汇报结构总览"],
+      "key_components": ["FinanceContentFrame", "AgendaCard", "IconText"]
+    },
+    {
+      "id": "red-finance-v2-industry-overview",
+      "title": "行业概况",
+      "source_path": "./slides/IndustryOverview.tsx",
+      "data_path": "./data/industry-overview.json",
+      "structure": "左侧纵向信息条，右侧柱状图，底部关键启示横条",
+      "layout_pattern": "left-text-right-bar-chart-bottom-callout",
+      "suitable_for": ["行业概况", "市场总量", "规模趋势", "业务重心"],
+      "key_components": ["FinanceContentFrame", "InfoListItem", "BarChartCard", "InsightCallout"]
+    }
+  ]
+}

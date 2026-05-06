@@ -35,6 +35,22 @@ export interface LocalTemplateGroupMetadata {
   closing_layout_id?: string;
 }
 
+export interface LocalTemplateCatalogSlide {
+  id?: string;
+  title?: string;
+  source_path?: string;
+  data_path?: string;
+  structure?: string;
+  layout_pattern?: string;
+  suitable_for?: string[];
+  key_components?: string[];
+}
+
+export interface LocalTemplateCatalog {
+  group_id?: string;
+  slides: LocalTemplateCatalogSlide[];
+}
+
 export interface DiscoveredTemplateLayoutInfo {
   layout_id: string;
   layout_name: string;
@@ -50,6 +66,7 @@ export interface DiscoveredTemplateLayoutInfo {
   density?: "low" | "medium" | "high";
   visual_weight?: "text-heavy" | "balanced" | "visual-heavy";
   editable_text_priority?: "high" | "medium" | "low";
+  catalog?: LocalTemplateCatalogSlide;
   source: {
     type: TemplateDiscoverySourceType;
     path?: string;
@@ -73,6 +90,7 @@ export interface DiscoveredTemplateGroupInfo {
   closing_layout_id?: string;
   layout_roles_summary?: string[];
   content_elements_summary?: string[];
+  catalog?: LocalTemplateCatalog;
   source: {
     type: TemplateDiscoverySourceType;
     root_dir?: string;
@@ -97,6 +115,7 @@ export interface DiscoveredTemplateGroupSummaryInfo {
   closing_layout_id?: string;
   layout_roles_summary?: string[];
   content_elements_summary?: string[];
+  catalog?: LocalTemplateCatalog;
   source: {
     type: TemplateDiscoverySourceType;
     root_dir?: string;
@@ -129,6 +148,10 @@ async function pathExists(candidatePath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
 function toPortablePath(baseDir: string, targetPath: string): string {
@@ -265,6 +288,7 @@ function buildGroupSummary(
     closing_layout_id: group.closing_layout_id,
     layout_roles_summary: layoutRolesSummary,
     content_elements_summary: contentElementsSummary,
+    catalog: group.catalog,
     source: { ...group.source },
     layout_count: group.layouts.length,
   };
@@ -510,6 +534,69 @@ async function collectSlideRelativePaths(
   return collectedPaths;
 }
 
+async function readLocalTemplateCatalog(
+  groupRoot: string,
+  groupId: string,
+): Promise<LocalTemplateCatalog | undefined> {
+  const catalogPath = path.join(groupRoot, "catalog.json");
+  if (!(await pathExists(catalogPath))) {
+    return undefined;
+  }
+
+  let rawValue: unknown;
+  try {
+    rawValue = JSON.parse(await readFile(catalogPath, "utf8"));
+  } catch (error) {
+    throw new Error(
+      `Failed to parse catalog.json for local template group "${groupRoot}": ${
+        error instanceof Error ? error.message : "Unknown parse error"
+      }`,
+    );
+  }
+
+  if (!isPlainRecord(rawValue) || !Array.isArray(rawValue.slides)) {
+    throw new Error(`catalog.json must contain an object with a "slides" array: ${catalogPath}`);
+  }
+
+  if (rawValue.group_id !== undefined && rawValue.group_id !== groupId) {
+    throw new Error(`catalog.json group_id must match group.json group_id: ${catalogPath}`);
+  }
+
+  const slides = rawValue.slides.map((slideValue, index) => {
+    if (!isPlainRecord(slideValue)) {
+      throw new Error(`catalog.json slide at index ${index} must be an object: ${catalogPath}`);
+    }
+
+    const entry: LocalTemplateCatalogSlide = {};
+    for (const fieldName of ["id", "title", "source_path", "data_path", "structure", "layout_pattern"] as const) {
+      const fieldValue = slideValue[fieldName];
+      if (fieldValue !== undefined && typeof fieldValue !== "string") {
+        throw new Error(`catalog.json field "slides[${index}].${fieldName}" must be a string: ${catalogPath}`);
+      }
+      if (typeof fieldValue === "string") {
+        entry[fieldName] = fieldValue;
+      }
+    }
+
+    for (const fieldName of ["suitable_for", "key_components"] as const) {
+      const fieldValue = slideValue[fieldName];
+      if (fieldValue !== undefined && !isStringArray(fieldValue)) {
+        throw new Error(`catalog.json field "slides[${index}].${fieldName}" must be a string array: ${catalogPath}`);
+      }
+      if (Array.isArray(fieldValue)) {
+        entry[fieldName] = [...fieldValue];
+      }
+    }
+
+    return entry;
+  });
+
+  return {
+    group_id: typeof rawValue.group_id === "string" ? rawValue.group_id : undefined,
+    slides,
+  };
+}
+
 async function loadManifestLocalSlideOrder(groupRoot: string): Promise<Map<string, number>> {
   const manifestPath = path.join(groupRoot, "manifest.json");
   if (!(await pathExists(manifestPath))) {
@@ -599,8 +686,20 @@ async function loadLocalGroup(
   cwd: string,
 ): Promise<DiscoveredTemplateGroupInfo> {
   const metadata = await readLocalTemplateGroupMetadata(groupRoot);
+  const catalog = await readLocalTemplateCatalog(groupRoot, metadata.group_id);
   const slidePaths = await collectSlideRelativePaths(groupRoot, metadata.layouts);
   const seenLayoutIds = new Set<string>();
+  const catalogBySourcePath = new Map<string, LocalTemplateCatalogSlide>();
+  const catalogById = new Map<string, LocalTemplateCatalogSlide>();
+
+  catalog?.slides.forEach((entry) => {
+    if (typeof entry.source_path === "string" && entry.source_path.length > 0) {
+      catalogBySourcePath.set(normalizeGroupLocalPath(entry.source_path), entry);
+    }
+    if (typeof entry.id === "string" && entry.id.length > 0) {
+      catalogById.set(entry.id, entry);
+    }
+  });
 
   const layouts: DiscoveredTemplateLayoutInfo[] = [];
   for (const slidePath of slidePaths) {
@@ -618,6 +717,8 @@ async function loadLocalGroup(
       );
     }
     seenLayoutIds.add(moduleValue.layoutId);
+    const catalogEntry = catalogBySourcePath.get(normalizeGroupLocalPath(slidePath))
+      ?? catalogById.get(moduleValue.layoutId);
 
     layouts.push({
       layout_id: moduleValue.layoutId,
@@ -638,6 +739,7 @@ async function loadLocalGroup(
       density: moduleValue.density,
       visual_weight: moduleValue.visualWeight,
       editable_text_priority: moduleValue.editableTextPriority,
+      catalog: catalogEntry,
       source: {
         type: "local",
         path: slidePath,
@@ -668,6 +770,7 @@ async function loadLocalGroup(
     content_elements_summary: collectUniqueStrings(
       layouts.map((layout) => layout.content_elements),
     ),
+    catalog,
     layouts,
   };
 }

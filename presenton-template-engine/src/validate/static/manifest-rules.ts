@@ -6,6 +6,8 @@ import {
   groupJsonExists,
   isSharedModulePath,
   loadManifestState,
+  validateManifestDataFile,
+  validateManifestDataPath,
   validateLocalModuleExports,
   validateLocalSourcePath,
 } from "./helpers.js";
@@ -152,7 +154,70 @@ export const MANIFEST_STRUCTURE_RULE: StabilityRule = {
           locations: [{ filePath: state.manifestPath, jsonPath: `$.slides[${slideIndex}].data` }],
         }));
       }
+
+      if (
+        slideValue.data_path !== undefined &&
+        slideValue.data_path !== null &&
+        (typeof slideValue.data_path !== "string" || slideValue.data_path.length === 0)
+      ) {
+        diagnostics.push(createRuleDiagnostic(this, {
+          message: `Slide "${slideValue.id ?? `index-${slideIndex}`}" field "data_path" must be a non-empty string when provided`,
+          suggestion: 'Change "data_path" to a relative JSON file path, or remove it when inline "data" is enough.',
+          locations: [{ filePath: state.manifestPath, jsonPath: `$.slides[${slideIndex}].data_path` }],
+        }));
+      }
     });
+
+    return diagnostics;
+  },
+};
+
+export const MANIFEST_EXTERNAL_DATA_RULE: StabilityRule = {
+  id: "STATIC-011",
+  title: "Manifest external slide data files must be readable JSON objects",
+  phase: "static",
+  severity: "error",
+  docs: [
+    ".docs/manifest-tsx-guide/manifest-spec.md",
+  ],
+  appliesTo: ["manifest"],
+  async run(context) {
+    const state = await loadManifestState(context);
+    if (!state.manifest?.slides?.length) {
+      return [];
+    }
+
+    const diagnostics: StabilityDiagnostic[] = [];
+    for (const [slideIndex, slideValue] of state.manifest.slides.entries()) {
+      if (!isSlideObject(slideValue) || typeof slideValue.data_path !== "string" || slideValue.data_path.length === 0) {
+        continue;
+      }
+
+      const pathValidation = await validateManifestDataPath(slideValue.data_path, state.manifestDir);
+      if ("error" in pathValidation) {
+        diagnostics.push(createRuleDiagnostic(this, {
+          message: `Slide "${slideValue.id ?? `index-${slideIndex}`}" references unreadable data_path "${slideValue.data_path}"`,
+          suggestion: "Point data_path to a readable JSON file relative to manifest.json.",
+          locations: [{ filePath: state.manifestPath, jsonPath: `$.slides[${slideIndex}].data_path` }],
+          evidence: {
+            data_path: slideValue.data_path,
+          },
+        }));
+        continue;
+      }
+
+      const fileValidation = await validateManifestDataFile(pathValidation.absolutePath);
+      if ("error" in fileValidation) {
+        diagnostics.push(createRuleDiagnostic(this, {
+          message: `Slide "${slideValue.id ?? `index-${slideIndex}`}" data_path "${slideValue.data_path}" is invalid: ${fileValidation.error}`,
+          suggestion: "Ensure the referenced JSON file exists, is valid JSON, and its root value is an object.",
+          locations: [{ filePath: state.manifestPath, jsonPath: `$.slides[${slideIndex}].data_path` }],
+          evidence: {
+            data_path: slideValue.data_path,
+          },
+        }));
+      }
+    }
 
     return diagnostics;
   },

@@ -67,6 +67,7 @@ export interface DeckManifestSlideInput {
   id: string;
   source: DeckManifestSlideSource;
   data?: Record<string, unknown> | null;
+  data_path?: string | null;
   title?: string | null;
   speaker_note?: string | null;
   theme?: TemplateRenderThemeInput | null;

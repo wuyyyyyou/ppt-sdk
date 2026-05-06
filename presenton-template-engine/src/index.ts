@@ -12,6 +12,8 @@ import {
   type DiscoveredTemplateGroupSummaryInfo,
   type DiscoveredTemplateLayoutInfo,
   type GetDiscoveredTemplateGroupInput,
+  type LocalTemplateCatalog,
+  type LocalTemplateCatalogSlide,
   type LocalTemplateGroupMetadata,
   type TemplateDiscoverySourceType,
 } from "./discovery/index.js";
@@ -112,6 +114,7 @@ export interface TemplateLayoutInfo {
   density?: "low" | "medium" | "high";
   visual_weight?: "text-heavy" | "balanced" | "visual-heavy";
   editable_text_priority?: "high" | "medium" | "low";
+  catalog?: LocalTemplateCatalogSlide;
 }
 
 export interface TemplateGroupInfo {
@@ -131,6 +134,7 @@ export interface TemplateGroupInfo {
   closing_layout_id?: string;
   layout_roles_summary?: string[];
   content_elements_summary?: string[];
+  catalog?: LocalTemplateCatalog;
   layouts: TemplateLayoutInfo[];
 }
 
@@ -151,6 +155,7 @@ export interface TemplateGroupSummaryInfo {
   closing_layout_id?: string;
   layout_roles_summary?: string[];
   content_elements_summary?: string[];
+  catalog?: LocalTemplateCatalog;
   layout_count: number;
 }
 
@@ -273,6 +278,8 @@ export type {
   ForkTemplateGroupResult,
   GetDiscoveredTemplateGroupInput,
   LocalTemplateGroupMetadata,
+  LocalTemplateCatalog,
+  LocalTemplateCatalogSlide,
   LocalDeckManifestSlideSource,
   ConvertDeckHtmlToPptxModelInput,
   ConvertDeckPageToPptxModelInput,

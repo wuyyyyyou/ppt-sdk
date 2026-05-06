@@ -95,7 +95,7 @@ async function readManifestState(context: ValidationContext): Promise<ManifestSt
     return {
       manifestPath,
       manifestDir,
-      manifest: isPlainRecord(rawValue) ? rawValue as DeckManifestInput : null,
+      manifest: isPlainRecord(rawValue) ? rawValue as unknown as DeckManifestInput : null,
       readError: null,
       parseError: isPlainRecord(rawValue) ? null : "Manifest root must be a JSON object",
     };
@@ -227,5 +227,38 @@ export async function groupJsonExists(manifestDir: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+export async function validateManifestDataPath(
+  dataPath: string,
+  manifestDir: string,
+): Promise<{ absolutePath: string } | { error: string }> {
+  try {
+    const absolutePath = path.resolve(manifestDir, dataPath);
+    await access(absolutePath, fsConstants.R_OK);
+    return { absolutePath };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export async function validateManifestDataFile(
+  absolutePath: string,
+): Promise<{ ok: true } | { error: string }> {
+  try {
+    const rawValue = JSON.parse(await readFile(absolutePath, "utf8")) as unknown;
+    if (!isPlainRecord(rawValue)) {
+      return {
+        error: "Data file root must be a JSON object",
+      };
+    }
+    return { ok: true };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }
