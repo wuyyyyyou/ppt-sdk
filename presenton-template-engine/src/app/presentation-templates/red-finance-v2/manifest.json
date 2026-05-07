@@ -171,6 +171,16 @@
         "path": "./slides/GlobalCbdcStatusComparison.tsx"
       },
       "data_path": "./data/global-cbdc-status-comparison.json"
+    },
+    {
+      "id": "red-finance-v2-digital-rmb-architecture-kpis",
+      "title": "中国数字人民币 (e-CNY)",
+      "speaker_note": "内容页：用于展示数字人民币的双层运营结构、核心推进指标，以及典型应用场景矩阵。",
+      "source": {
+        "type": "local",
+        "path": "./slides/DigitalRmbArchitectureKpis.tsx"
+      },
+      "data_path": "./data/digital-rmb-architecture-kpis.json"
     }
   ]
 }

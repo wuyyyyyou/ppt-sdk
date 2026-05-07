@@ -49,6 +49,7 @@ type StableMatrixGridProps = {
   rowHeaderBackgroundColor?: string;
   shadow?: string;
   borderRadius?: number;
+  rowHeaderAlign?: StableMatrixGridAlign;
 };
 
 function resolveTextAlign(align?: StableMatrixGridAlign): "left" | "center" | "right" {
@@ -75,6 +76,21 @@ function resolveColumnWidth(width: number | string | undefined, fallback: string
   return fallback;
 }
 
+function buildCellLayoutStyle(width: number | string | undefined, fallback: string) {
+  const resolvedWidth = resolveColumnWidth(width, fallback);
+  if (resolvedWidth.includes("fr") || resolvedWidth.includes("minmax")) {
+    return {
+      flex: "1 1 0",
+      minWidth: 0,
+    } as const;
+  }
+
+  return {
+    flex: `0 0 ${resolvedWidth}`,
+    width: resolvedWidth,
+  } as const;
+}
+
 const StableMatrixGrid = ({
   rowHeaderLabel,
   rowHeaderWidth = 110,
@@ -89,6 +105,7 @@ const StableMatrixGrid = ({
   rowHeaderBackgroundColor = "#FFFFFF",
   shadow = "0 4px 6px rgba(0,0,0,0.03)",
   borderRadius = 8,
+  rowHeaderAlign = "center",
 }: StableMatrixGridProps) => {
   const isCompact = density === "compact";
   const isDense = density === "dense";
@@ -98,14 +115,13 @@ const StableMatrixGrid = ({
   const cellSupportFontSize = isDense ? 10 : 11;
   const headerPaddingY = isDense ? 12 : 15;
   const cellPaddingY = isDense ? 11 : isCompact ? 12 : 14;
-  const columnTemplate = [
-    resolveColumnWidth(rowHeaderWidth, "110px"),
-    ...columns.map((column, index) =>
-      resolveColumnWidth(
-        column.width,
-        index === columns.length - 1 ? "minmax(0, 1fr)" : "1fr",
-      )),
-  ].join(" ");
+  const rowHeaderLayoutStyle = buildCellLayoutStyle(rowHeaderWidth, "110px");
+  const columnLayoutStyles = columns.map((column, index) =>
+    buildCellLayoutStyle(
+      column.width,
+      index === columns.length - 1 ? "minmax(0, 1fr)" : "1fr",
+    ),
+  );
 
   return (
     <div
@@ -117,27 +133,30 @@ const StableMatrixGrid = ({
       }}
     >
       <div
-        className="grid h-full w-full"
+        className="h-full w-full"
         style={{
-          gridTemplateRows: `auto repeat(${rows.length}, minmax(0, 1fr))`,
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         <div
-          className="grid"
           style={{
-            gridTemplateColumns: columnTemplate,
-            backgroundColor: headerBackgroundColor,
-            color: headerTextColor,
+            display: "flex",
+            width: "100%",
+            flex: "0 0 auto",
           }}
         >
           <div
             className="flex items-center px-[15px] font-bold"
             style={{
-              justifyContent: "center",
+              ...rowHeaderLayoutStyle,
+              justifyContent: resolveFlexAlignment(rowHeaderAlign),
               paddingTop: headerPaddingY,
               paddingBottom: headerPaddingY,
               fontSize: headerFontSize,
-              textAlign: "center",
+              textAlign: resolveTextAlign(rowHeaderAlign),
+              backgroundColor: headerBackgroundColor,
+              color: headerTextColor,
             }}
           >
             {rowHeaderLabel}
@@ -147,11 +166,14 @@ const StableMatrixGrid = ({
               key={column.id ?? `${column.label}-${index}`}
               className="flex items-center px-[15px] font-bold"
               style={{
+                ...columnLayoutStyles[index],
                 justifyContent: resolveFlexAlignment(column.headerAlign),
                 paddingTop: headerPaddingY,
                 paddingBottom: headerPaddingY,
                 fontSize: headerFontSize,
                 textAlign: resolveTextAlign(column.headerAlign),
+                backgroundColor: headerBackgroundColor,
+                color: headerTextColor,
               }}
             >
               {column.label}
@@ -161,25 +183,28 @@ const StableMatrixGrid = ({
 
         {rows.map((row, rowIndex) => {
           const baseRowBackground = row.backgroundColor ?? stripeColors[rowIndex % 2];
+          const rowBorderTop = rowIndex === 0 ? "none" : `1px solid ${rowDividerColor}`;
           return (
             <div
               key={row.id ?? `${row.header}-${rowIndex}`}
-              className="grid"
               style={{
-                gridTemplateColumns: columnTemplate,
-                backgroundColor: baseRowBackground,
-                borderTop: rowIndex === 0 ? "none" : `1px solid ${rowDividerColor}`,
+                display: "flex",
+                width: "100%",
+                flex: "1 1 0",
+                minHeight: 0,
               }}
             >
               <div
                 className="flex px-[15px]"
                 style={{
+                  ...rowHeaderLayoutStyle,
                   alignItems: "center",
-                  justifyContent: resolveFlexAlignment(row.headerAlign),
-                  textAlign: resolveTextAlign(row.headerAlign),
+                  justifyContent: resolveFlexAlignment(row.headerAlign ?? rowHeaderAlign),
+                  textAlign: resolveTextAlign(row.headerAlign ?? rowHeaderAlign),
                   paddingTop: cellPaddingY,
                   paddingBottom: cellPaddingY,
                   backgroundColor: row.headerBackgroundColor ?? rowHeaderBackgroundColor,
+                  borderTop: rowBorderTop,
                 }}
               >
                 <div
@@ -202,6 +227,7 @@ const StableMatrixGrid = ({
                     key={`${row.id ?? row.header}-${cellIndex}`}
                     className="flex px-[15px]"
                     style={{
+                      ...columnLayoutStyles[cellIndex],
                       alignItems: "center",
                       justifyContent: resolveFlexAlignment(align),
                       textAlign: resolveTextAlign(align),
@@ -209,11 +235,12 @@ const StableMatrixGrid = ({
                       paddingBottom: cellPaddingY,
                       backgroundColor:
                         cell.backgroundColor ??
-                        (tone === "accent" ? "rgba(183, 28, 28, 0.03)" : undefined),
+                        (tone === "accent" ? "rgba(183, 28, 28, 0.03)" : baseRowBackground),
+                      borderTop: rowBorderTop,
                     }}
                   >
                     <div
-                      className="flex h-full flex-col"
+                      className="flex h-full w-full flex-col"
                       style={{
                         alignItems: resolveFlexAlignment(align),
                         justifyContent: "center",

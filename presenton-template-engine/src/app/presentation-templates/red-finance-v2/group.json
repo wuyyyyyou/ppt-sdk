@@ -29,6 +29,7 @@
     "slides/ChinaUsFintechCapabilities.tsx",
     "slides/DigitalCurrencyFocus.tsx",
     "slides/DigitalCurrencyOverviewTaxonomy.tsx",
-    "slides/GlobalCbdcStatusComparison.tsx"
+    "slides/GlobalCbdcStatusComparison.tsx",
+    "slides/DigitalRmbArchitectureKpis.tsx"
   ]
 }

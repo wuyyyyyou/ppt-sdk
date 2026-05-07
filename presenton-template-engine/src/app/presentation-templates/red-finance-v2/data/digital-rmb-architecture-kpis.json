@@ -1,0 +1,80 @@
+{
+  "title": "中国数字人民币 (e-CNY)",
+  "metaLabel": "ARCHITECTURE & KPIs",
+  "architectureTitle": "双层运营体系",
+  "architectureNodes": [
+    {
+      "icon": "bank",
+      "title": "中国人民银行",
+      "subtitle": "发行层 (PBoC)"
+    },
+    {
+      "icon": "network",
+      "title": "指定运营机构",
+      "subtitle": "分发层 (商业银行)"
+    },
+    {
+      "icon": "smartphone",
+      "title": "用户 / 钱包",
+      "subtitle": "应用层 (流通)"
+    }
+  ],
+  "flowLabels": ["100% 准备金", "兑换 / 流通"],
+  "metricsTitle": "关键运营数据",
+  "metrics": [
+    {
+      "icon": "wallet",
+      "value": "2.61亿+",
+      "label": "开立钱包数量",
+      "note": "个人与对公钱包持续增长"
+    },
+    {
+      "icon": "grid",
+      "value": "26+",
+      "label": "试点城市区域",
+      "note": "覆盖零售、交通、政务等场景"
+    },
+    {
+      "icon": "chart-column",
+      "value": "1.8万亿+",
+      "label": "累计交易金额",
+      "note": "交易规模保持稳步扩张"
+    },
+    {
+      "icon": "users",
+      "value": "1000万+",
+      "label": "支持商户门店",
+      "note": "线下受理网络持续拓展"
+    }
+  ],
+  "scenariosTitle": "核心应用场景",
+  "scenarioColumns": {
+    "category": "场景分类",
+    "mode": "应用模式",
+    "value": "核心价值"
+  },
+  "scenarios": [
+    {
+      "category": "零售消费",
+      "mode": "扫码 / 被扫 / 碰一碰",
+      "value": "支付即结算，低费率"
+    },
+    {
+      "category": "交通出行",
+      "mode": "离线 NFC / 硬钱包",
+      "value": "无网支付，快速过闸"
+    },
+    {
+      "category": "政务发放",
+      "mode": "智能合约代发",
+      "value": "资金透明，精准直达"
+    },
+    {
+      "category": "跨境支付",
+      "mode": "货币桥 (mBridge)",
+      "value": "缩短链路，降低成本"
+    }
+  ],
+  "footerText": "金融行业战略分析报告 | 绝密资料",
+  "pageNumber": "18"
+}

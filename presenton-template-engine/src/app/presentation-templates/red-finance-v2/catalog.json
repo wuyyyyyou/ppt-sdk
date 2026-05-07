@@ -160,6 +160,16 @@
       "layout_pattern": "stage-legend-plus-progress-card-grid-plus-comparison-table",
       "suitable_for": ["CBDC 对比", "推进状态总览", "跨国 benchmark", "数字货币阶段分析"],
       "key_components": ["FinanceContentFrame", "StatusPill", "ProgressStatusCard", "IconText", "StableMatrixGrid"]
+    },
+    {
+      "id": "red-finance-v2-digital-rmb-architecture-kpis",
+      "title": "中国数字人民币 (e-CNY)",
+      "source_path": "./slides/DigitalRmbArchitectureKpis.tsx",
+      "data_path": "./data/digital-rmb-architecture-kpis.json",
+      "structure": "左侧为三层运营架构流，右上为四张横向 KPI 卡，右下为应用场景稳定矩阵",
+      "layout_pattern": "left-architecture-flow-right-kpi-cards-bottom-scenario-matrix",
+      "suitable_for": ["数字人民币概览", "支付基础设施", "运营架构说明", "场景分析"],
+      "key_components": ["FinanceContentFrame", "FinanceSectionHeading", "HorizontalFeatureCard", "StableMatrixGrid"]
     }
   ]
 }
