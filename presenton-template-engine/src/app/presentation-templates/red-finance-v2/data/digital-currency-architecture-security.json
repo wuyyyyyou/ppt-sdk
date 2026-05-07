@@ -1,0 +1,88 @@
+{
+  "title": "数字货币技术架构与安全",
+  "metaLabel": "TECH ARCHITECTURE & SECURITY",
+  "stackTitle": "核心技术栈",
+  "stackMeta": "Tech Stack",
+  "layers": [
+    {
+      "icon": "smartphone",
+      "title": "体验层 (Experience)",
+      "description": "数字钱包 · 硬件终端 · API 接口"
+    },
+    {
+      "icon": "microchip",
+      "title": "智能层 (Smart)",
+      "description": "智能合约 · 隐私计算 · 监管探针"
+    },
+    {
+      "icon": "database",
+      "title": "账本层 (Ledger)",
+      "description": "分布式账本 · 共识机制 · 状态机"
+    },
+    {
+      "icon": "security",
+      "title": "密钥层 (Key Security)",
+      "description": "HSM 机具 · 多重签名 · 门限签名"
+    }
+  ],
+  "chartTitle": "架构能力雷达",
+  "radarLabels": ["吞吐量", "韧性", "治理", "合规", "隐私", "追溯"],
+  "radarSeries": [
+    {
+      "label": "中心化 (CBDC)",
+      "shortLabel": "C",
+      "color": "#B71C1C",
+      "fillColor": "rgba(183, 28, 28, 0.18)",
+      "values": [95, 60, 90, 100, 80, 85]
+    },
+    {
+      "label": "去中心化 (Crypto)",
+      "shortLabel": "D",
+      "color": "#9E9E9E",
+      "fillColor": "rgba(158, 158, 158, 0.16)",
+      "dashed": true,
+      "values": [30, 95, 40, 20, 40, 70]
+    }
+  ],
+  "radarTicks": [20, 40, 60, 80, 100],
+  "metrics": [
+    {
+      "icon": "bolt",
+      "title": "吞吐量 (TPS)",
+      "leftValue": 95,
+      "rightValue": 30
+    },
+    {
+      "icon": "shield",
+      "title": "系统韧性",
+      "leftValue": 60,
+      "rightValue": 95
+    },
+    {
+      "icon": "gavel",
+      "title": "治理效率",
+      "leftValue": 90,
+      "rightValue": 40
+    },
+    {
+      "icon": "route",
+      "title": "可追溯性",
+      "leftValue": 85,
+      "rightValue": 70
+    },
+    {
+      "icon": "security",
+      "title": "隐私保护",
+      "leftValue": 80,
+      "rightValue": 40
+    },
+    {
+      "icon": "regtech",
+      "title": "监管合规",
+      "leftValue": 100,
+      "rightValue": 20
+    }
+  ],
+  "footerText": "金融行业战略分析报告 | 绝密资料",
+  "pageNumber": "19"
+}

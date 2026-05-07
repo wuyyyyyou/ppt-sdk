@@ -30,6 +30,7 @@
     "slides/DigitalCurrencyFocus.tsx",
     "slides/DigitalCurrencyOverviewTaxonomy.tsx",
     "slides/GlobalCbdcStatusComparison.tsx",
-    "slides/DigitalRmbArchitectureKpis.tsx"
+    "slides/DigitalRmbArchitectureKpis.tsx",
+    "slides/DigitalCurrencyArchitectureSecurity.tsx"
   ]
 }

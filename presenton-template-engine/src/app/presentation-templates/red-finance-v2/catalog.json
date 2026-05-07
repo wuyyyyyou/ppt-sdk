@@ -170,6 +170,16 @@
       "layout_pattern": "left-architecture-flow-right-kpi-cards-bottom-scenario-matrix",
       "suitable_for": ["数字人民币概览", "支付基础设施", "运营架构说明", "场景分析"],
       "key_components": ["FinanceContentFrame", "FinanceSectionHeading", "HorizontalFeatureCard", "StableMatrixGrid"]
+    },
+    {
+      "id": "red-finance-v2-digital-currency-architecture-security",
+      "title": "数字货币技术架构与安全",
+      "source_path": "./slides/DigitalCurrencyArchitectureSecurity.tsx",
+      "data_path": "./data/digital-currency-architecture-security.json",
+      "structure": "左侧为核心技术栈分层卡，右侧为架构能力雷达图与双评分指标卡矩阵",
+      "layout_pattern": "left-tech-stack-right-radar-plus-dual-score-metrics",
+      "suitable_for": ["数字货币架构", "CBDC 与加密资产对比", "安全能力评估", "金融科技基础设施"],
+      "key_components": ["FinanceContentFrame", "FinanceSectionHeading", "HorizontalFeatureCard", "ChartCardShell", "FinanceRadarChart", "DualValueMetricCard"]
     }
   ]
 }

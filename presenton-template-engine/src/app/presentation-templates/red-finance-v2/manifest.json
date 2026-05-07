@@ -181,6 +181,16 @@
         "path": "./slides/DigitalRmbArchitectureKpis.tsx"
       },
       "data_path": "./data/digital-rmb-architecture-kpis.json"
+    },
+    {
+      "id": "red-finance-v2-digital-currency-architecture-security",
+      "title": "数字货币技术架构与安全",
+      "speaker_note": "内容页：用于展示数字货币核心技术栈、中心化与去中心化架构能力雷达，以及安全与合规能力评分。",
+      "source": {
+        "type": "local",
+        "path": "./slides/DigitalCurrencyArchitectureSecurity.tsx"
+      },
+      "data_path": "./data/digital-currency-architecture-security.json"
     }
   ]
 }
