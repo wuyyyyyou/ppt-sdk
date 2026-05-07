@@ -1,0 +1,95 @@
+{
+  "title": "数字货币概述与分类",
+  "metaLabel": "OVERVIEW & TAXONOMY",
+  "definitionLabel": "核心定义",
+  "definitionText": "以电子形式存在的价值数字化表示，具备交易媒介、记账单位和价值储存功能，依托密码学技术实现价值流转。",
+  "features": [
+    {
+      "icon": "code",
+      "label": "可编程性"
+    },
+    {
+      "icon": "bolt",
+      "label": "即时结算"
+    },
+    {
+      "icon": "shield",
+      "label": "隐私分层"
+    },
+    {
+      "icon": "contract",
+      "label": "合规设计"
+    }
+  ],
+  "categories": [
+    {
+      "icon": "bank",
+      "title": "央行数字货币 (CBDC)",
+      "description": "由央行发行，具有法偿性的国家法定货币数字化形态。"
+    },
+    {
+      "icon": "coins",
+      "title": "稳定币 (Stablecoins)",
+      "description": "锚定法币或资产组合，旨在维持价格稳定的支付工具。"
+    },
+    {
+      "icon": "microchip",
+      "title": "加密资产 (Crypto)",
+      "description": "去中心化发行，由市场供需决定价格，主要作为投机或存储资产。"
+    }
+  ],
+  "chartTitle": "数字货币市值分布",
+  "chartCenterLabel": "市值分布",
+  "chartSegments": [
+    {
+      "label": "加密资产",
+      "value": 65,
+      "color": "#B71C1C"
+    },
+    {
+      "label": "稳定币",
+      "value": 30,
+      "color": "#EF5350"
+    },
+    {
+      "label": "CBDC",
+      "value": 5,
+      "color": "#FFCDD2"
+    }
+  ],
+  "columns": {
+    "category": "分类类别",
+    "issuer": "发行主体",
+    "backing": "价值背书",
+    "volatility": "波动性",
+    "regulation": "监管态势"
+  },
+  "comparisonRows": [
+    {
+      "category": "CBDC",
+      "issuer": "中央银行",
+      "backing": "国家信用",
+      "volatility": "极低 (1:1)",
+      "volatilityTone": "low",
+      "regulation": "主导与推广"
+    },
+    {
+      "category": "稳定币",
+      "issuer": "私人机构",
+      "backing": "储备资产",
+      "volatility": "低 (锚定)",
+      "volatilityTone": "low",
+      "regulation": "准入与审计"
+    },
+    {
+      "category": "加密资产",
+      "issuer": "去中心化网络",
+      "backing": "共识/算力",
+      "volatility": "极高",
+      "volatilityTone": "high",
+      "regulation": "反洗钱/牌照"
+    }
+  ],
+  "footerText": "金融行业战略分析报告 | 绝密资料",
+  "pageNumber": "16"
+}

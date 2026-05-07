@@ -1,4 +1,4 @@
-import React from "react";
+import React, { type ReactNode } from "react";
 
 import { redFinanceTheme } from "../theme/tokens.js";
 
@@ -17,6 +17,7 @@ export type StableMatrixGridColumn = {
 export type StableMatrixGridCell = {
   lead: string;
   support?: string;
+  content?: ReactNode;
   tone?: StableMatrixGridTone;
   align?: StableMatrixGridAlign;
   backgroundColor?: string;
@@ -108,10 +109,9 @@ const StableMatrixGrid = ({
 
   return (
     <div
-      className="h-full overflow-hidden border"
+      className="relative h-full overflow-hidden"
       style={{
         backgroundColor: redFinanceTheme.colors.background,
-        borderColor: outerBorderColor,
         boxShadow: shadow,
         borderRadius,
       }}
@@ -220,32 +220,38 @@ const StableMatrixGrid = ({
                         textAlign: resolveTextAlign(align),
                       }}
                     >
-                      <div
-                        style={{
-                          marginBottom: cell.support ? 4 : 0,
-                          fontSize: cellLeadFontSize,
-                          fontWeight: cell.leadWeight ?? (tone === "accent" ? 700 : 400),
-                          color:
-                            cell.leadColor ??
-                            (tone === "accent"
-                              ? redFinanceTheme.colors.primary
-                              : redFinanceTheme.colors.mutedText),
-                        }}
-                      >
-                        {cell.lead}
-                      </div>
-                      {cell.support ? (
-                        <div
-                          style={{
-                            fontSize: cellSupportFontSize,
-                            color:
-                              cell.supportColor ??
-                              (tone === "accent" ? "#9D2E2E" : "#8F8F8F"),
-                          }}
-                        >
-                          {cell.support}
-                        </div>
-                      ) : null}
+                      {cell.content ? (
+                        cell.content
+                      ) : (
+                        <>
+                          <div
+                            style={{
+                              marginBottom: cell.support ? 4 : 0,
+                              fontSize: cellLeadFontSize,
+                              fontWeight: cell.leadWeight ?? (tone === "accent" ? 700 : 400),
+                              color:
+                                cell.leadColor ??
+                                (tone === "accent"
+                                  ? redFinanceTheme.colors.primary
+                                  : redFinanceTheme.colors.mutedText),
+                            }}
+                          >
+                            {cell.lead}
+                          </div>
+                          {cell.support ? (
+                            <div
+                              style={{
+                                fontSize: cellSupportFontSize,
+                                color:
+                                  cell.supportColor ??
+                                  (tone === "accent" ? "#9D2E2E" : "#8F8F8F"),
+                              }}
+                            >
+                              {cell.support}
+                            </div>
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   </div>
                 );
@@ -254,6 +260,14 @@ const StableMatrixGrid = ({
           );
         })}
       </div>
+
+      <div
+        className="pointer-events-none absolute inset-0 border"
+        style={{
+          borderColor: outerBorderColor,
+          borderRadius,
+        }}
+      />
     </div>
   );
 };

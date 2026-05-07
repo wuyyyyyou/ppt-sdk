@@ -7,6 +7,7 @@ import FinanceSectionHeading from "../components/FinanceSectionHeading.js";
 import IconTextCard from "../components/IconTextCard.js";
 import InfoListItem from "../components/InfoListItem.js";
 import StableMatrixGrid from "../components/StableMatrixGrid.js";
+import StatusPill from "../components/StatusPill.js";
 import { redFinanceTheme } from "../theme/tokens.js";
 
 const participantIconSchema = z.enum([
@@ -221,19 +222,16 @@ const CompetitiveLandscapeAnalysis = ({
                   fillHeight
                   verticalAlign="center"
                   titleSuffix={
-                    <div
-                      className="inline-flex items-center justify-center rounded-[3px] font-bold leading-none"
-                      style={{
-                        ...getForceLevelStyles(item.level),
-                        height: forceDensity === "dense" ? 16 : 18,
-                        minWidth: forceDensity === "dense" ? 16 : 18,
-                        paddingLeft: forceDensity === "dense" ? 4 : 5,
-                        paddingRight: forceDensity === "dense" ? 4 : 5,
-                        fontSize: forceDensity === "dense" ? 10 : 11,
-                      }}
-                    >
-                      {item.level}
-                    </div>
+                    <StatusPill
+                      label={item.level}
+                      backgroundColor={getForceLevelStyles(item.level).backgroundColor}
+                      textColor={getForceLevelStyles(item.level).color}
+                      height={forceDensity === "dense" ? 16 : 18}
+                      minWidth={forceDensity === "dense" ? 16 : 18}
+                      paddingX={forceDensity === "dense" ? 4 : 5}
+                      fontSize={forceDensity === "dense" ? 10 : 11}
+                      borderRadius={3}
+                    />
                   }
                 />
               ))}

@@ -4,6 +4,7 @@ import { redFinanceTheme } from "../theme/tokens.js";
 
 export type FinanceIconName =
   | "bank"
+  | "bolt"
   | "book-open"
   | "brain"
   | "calendar"
@@ -61,6 +62,17 @@ export const FinanceIcon = ({
           <path d="M4 9.5 12 5l8 4.5" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M6.5 10.5v6.5M10 10.5v6.5M14 10.5v6.5M17.5 10.5v6.5" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
           <path d="M4.5 19h15M3.5 8.8h17" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
+    case "bolt":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+          <path
+            d="M13.5 3 6.8 12h4.4L10.5 21l6.7-9h-4.4L13.5 3Z"
+            stroke={stroke}
+            strokeWidth="1.8"
+            strokeLinejoin="round"
+          />
         </svg>
       );
     case "calendar":

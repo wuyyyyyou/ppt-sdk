@@ -151,6 +151,16 @@
         "path": "./slides/DigitalCurrencyFocus.tsx"
       },
       "data_path": "./data/digital-currency-focus.json"
+    },
+    {
+      "id": "red-finance-v2-digital-currency-overview-taxonomy",
+      "title": "数字货币概述与分类",
+      "speaker_note": "内容页：用于概述数字货币的核心定义、关键特征、三类主要形态及其监管与波动性差异。",
+      "source": {
+        "type": "local",
+        "path": "./slides/DigitalCurrencyOverviewTaxonomy.tsx"
+      },
+      "data_path": "./data/digital-currency-overview-taxonomy.json"
     }
   ]
 }

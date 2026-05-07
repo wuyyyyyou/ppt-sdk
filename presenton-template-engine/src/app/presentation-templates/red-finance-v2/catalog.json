@@ -140,6 +140,16 @@
       "layout_pattern": "section-focus-hero-left-card-stack-right",
       "suitable_for": ["章节过渡", "战略聚焦", "主题引入", "chapter break"],
       "key_components": ["FinanceSectionFocusFrame", "HorizontalFeatureCard"]
+    },
+    {
+      "id": "red-finance-v2-digital-currency-overview-taxonomy",
+      "title": "数字货币概述与分类",
+      "source_path": "./slides/DigitalCurrencyOverviewTaxonomy.tsx",
+      "data_path": "./data/digital-currency-overview-taxonomy.json",
+      "structure": "上方为定义与特性 pill，中部为三张分类卡和占比环图，下方为分类比较矩阵",
+      "layout_pattern": "definition-plus-pill-row-taxonomy-cards-donut-table",
+      "suitable_for": ["分类概述", "概念澄清", "结构对比", "占比概览"],
+      "key_components": ["FinanceContentFrame", "IconText", "IconTextCard", "ChartCardShell", "FinanceDonutChart", "StableMatrixGrid"]
     }
   ]
 }
