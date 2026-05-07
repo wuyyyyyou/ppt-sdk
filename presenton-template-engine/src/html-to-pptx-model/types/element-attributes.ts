@@ -17,6 +17,13 @@ export interface ElementAttributes {
   descendantTextLeafCount?: number;
   childElementCount?: number;
   graphicSignalCount?: number;
+  descendantInlineCompositionCount?: number;
+  inlineComposition?: {
+    type: "row" | "icon-text" | "status-pill";
+    role: "container" | "label" | "leading";
+    qualified: boolean;
+    textSource?: "child" | "direct";
+  };
   opacity?: number;
   background?: {
     color?: string;

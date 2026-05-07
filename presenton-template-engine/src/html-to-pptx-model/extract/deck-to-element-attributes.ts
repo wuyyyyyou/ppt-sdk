@@ -333,18 +333,30 @@ export function shouldAutoScreenshotDecorativeElement(
     return false;
   }
 
+  if (
+    attributes.inlineComposition?.role === "container" &&
+    attributes.inlineComposition.qualified
+  ) {
+    return false;
+  }
+
   const textLength = attributes.textLength ?? 0;
   const directTextLength = attributes.directTextLength ?? 0;
   const descendantTextLeafCount = attributes.descendantTextLeafCount ?? 0;
+  const descendantInlineCompositionCount =
+    attributes.descendantInlineCompositionCount ?? 0;
   const graphicSignalCount = attributes.graphicSignalCount ?? 0;
   const childElementCount = attributes.childElementCount ?? 0;
   const width = attributes.position.width ?? 0;
   const height = attributes.position.height ?? 0;
 
   const looksLikeStructuredTextModule =
-    descendantTextLeafCount >= 3 &&
-    textLength >= 12 &&
-    graphicSignalCount <= descendantTextLeafCount * 4;
+    (
+      descendantTextLeafCount >= 3 &&
+      textLength >= 12 &&
+      graphicSignalCount <= descendantTextLeafCount * 4
+    ) ||
+    (descendantInlineCompositionCount >= 2 && textLength > 0);
 
   return (
     width >= 80 &&
@@ -750,6 +762,12 @@ async function getElementAttributes(
       "h5",
       "h6",
     ]);
+    const supportedInlineCompositionTypes = new Set([
+      "row",
+      "icon-text",
+      "status-pill",
+    ]);
+    const supportedInlineCompositionRoles = new Set(["label", "leading"]);
 
     function hasOnlyTextNodes(node: Element): boolean {
       const children = node.childNodes;
@@ -784,6 +802,153 @@ async function getElementAttributes(
           element.children.length === 0
         );
       }).length;
+    }
+
+    function countDescendantInlineCompositions(node: Element): number {
+      return Array.from(
+        node.querySelectorAll("[data-pptx-inline-composition]"),
+      ).length;
+    }
+
+    function getInlineCompositionType(
+      node: Element | null,
+    ): "row" | "icon-text" | "status-pill" | undefined {
+      const compositionType = node?.getAttribute("data-pptx-inline-composition");
+      if (!compositionType || !supportedInlineCompositionTypes.has(compositionType)) {
+        return undefined;
+      }
+      return compositionType as "row" | "icon-text" | "status-pill";
+    }
+
+    function getInlineCompositionRole(
+      node: Element | null,
+    ): "label" | "leading" | undefined {
+      const role = node?.getAttribute("data-pptx-inline-role");
+      if (!role || !supportedInlineCompositionRoles.has(role)) {
+        return undefined;
+      }
+      return role as "label" | "leading";
+    }
+
+    function isSmallInlineLeadingNode(node: Element): boolean {
+      const rect = node.getBoundingClientRect();
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        rect.width <= 40 &&
+        rect.height <= 40
+      );
+    }
+
+    function evaluateInlineCompositionContainer(node: Element): {
+      type: "row" | "icon-text" | "status-pill";
+      role: "container";
+      qualified: boolean;
+      textSource?: "child" | "direct";
+    } | undefined {
+      if (!(node instanceof HTMLElement)) {
+        return undefined;
+      }
+
+      const type = getInlineCompositionType(node);
+      if (!type) {
+        return undefined;
+      }
+
+      const computedStyles = window.getComputedStyle(node);
+      const isSupportedDisplay =
+        computedStyles.display === "flex" ||
+        computedStyles.display === "inline-flex";
+      const isSingleRow = !computedStyles.flexDirection.startsWith("column");
+      const wraps =
+        computedStyles.flexWrap !== "nowrap" &&
+        computedStyles.whiteSpace !== "nowrap";
+      const childElements = Array.from(node.children);
+      const rect = node.getBoundingClientRect();
+
+      let labelChildCount = 0;
+      let leadingChildCount = 0;
+      let unsupportedChildCount = 0;
+
+      for (const child of childElements) {
+        const role = getInlineCompositionRole(child);
+        if (role === "label") {
+          if (getNormalizedTextLength(child.textContent) > 0) {
+            labelChildCount += 1;
+          } else {
+            unsupportedChildCount += 1;
+          }
+          continue;
+        }
+
+        if (role === "leading") {
+          if (isSmallInlineLeadingNode(child)) {
+            leadingChildCount += 1;
+          } else {
+            unsupportedChildCount += 1;
+          }
+          continue;
+        }
+
+        if (getNormalizedTextLength(child.textContent) > 0 && hasOnlyTextNodes(child)) {
+          labelChildCount += 1;
+          continue;
+        }
+
+        unsupportedChildCount += 1;
+      }
+
+      const hasDirectText = getDirectTextLength(node) > 0;
+      const totalLabelCount = labelChildCount + (hasDirectText ? 1 : 0);
+      const qualified =
+        isSupportedDisplay &&
+        isSingleRow &&
+        !wraps &&
+        rect.height > 0 &&
+        rect.height <= 56 &&
+        childElements.length > 0 &&
+        childElements.length <= 3 &&
+        totalLabelCount === 1 &&
+        leadingChildCount <= 2 &&
+        unsupportedChildCount === 0;
+
+      return {
+        type,
+        role: "container",
+        qualified,
+        textSource: hasDirectText ? "direct" : "child",
+      };
+    }
+
+    function parseInlineComposition(node: Element): {
+      type: "row" | "icon-text" | "status-pill";
+      role: "container" | "label" | "leading";
+      qualified: boolean;
+      textSource?: "child" | "direct";
+    } | undefined {
+      const containerComposition = evaluateInlineCompositionContainer(node);
+      if (containerComposition) {
+        return containerComposition;
+      }
+
+      const role = getInlineCompositionRole(node);
+      if (!role) {
+        return undefined;
+      }
+
+      const parentComposition = node.parentElement
+        ? evaluateInlineCompositionContainer(node.parentElement)
+        : undefined;
+      if (!parentComposition) {
+        return undefined;
+      }
+
+      return {
+        type: parentComposition.type,
+        role,
+        qualified: parentComposition.qualified,
+        textSource: parentComposition.textSource,
+      };
     }
 
     function isSupportedInlineTextNode(node: Node): boolean {
@@ -833,7 +998,17 @@ async function getElementAttributes(
     }
 
     function isTextSemanticNode(node: Element): boolean {
-      return hasOnlyTextNodes(node) || hasAggregatableMixedText(node);
+      const inlineComposition = parseInlineComposition(node);
+      return (
+        hasOnlyTextNodes(node) ||
+        hasAggregatableMixedText(node) ||
+        Boolean(
+          inlineComposition &&
+            inlineComposition.role === "container" &&
+            inlineComposition.qualified &&
+            inlineComposition.textSource === "direct",
+        )
+      );
     }
 
     function parsePosition(node: Element) {
@@ -876,28 +1051,58 @@ async function getElementAttributes(
     }
 
     function parseBorder(computedStyles: CSSStyleDeclaration) {
-      const borderColorResult = colorToHex(computedStyles.borderColor);
-      const borderWidth = parseFloat(computedStyles.borderWidth);
+      const sideKeys = ["Top", "Right", "Bottom", "Left"] as const;
+      const sides = sideKeys.map((side) => {
+        const width = parseFloat(
+          computedStyles[`border${side}Width` as keyof CSSStyleDeclaration] as string,
+        );
+        const style = String(
+          computedStyles[`border${side}Style` as keyof CSSStyleDeclaration] ?? "",
+        ).toLowerCase();
+        const color = colorToHex(
+          String(computedStyles[`border${side}Color` as keyof CSSStyleDeclaration] ?? ""),
+        );
 
-      if (borderWidth === 0) {
+        return {
+          width: Number.isNaN(width) ? 0 : width,
+          style,
+          color: color.hex,
+          opacity: color.opacity,
+        };
+      });
+
+      const visibleSides = sides.filter((side) => (
+        side.width > 0 &&
+        side.style !== "none" &&
+        side.style !== "hidden" &&
+        side.color
+      ));
+
+      if (visibleSides.length === 0) {
         return undefined;
       }
 
-      const border = {
-        color: borderColorResult.hex,
-        width: Number.isNaN(borderWidth) ? undefined : borderWidth,
-        opacity: borderColorResult.opacity,
+      if (visibleSides.length !== 4) {
+        return undefined;
+      }
+
+      const [firstSide, ...restSides] = visibleSides;
+      const allSidesMatch = restSides.every((side) => (
+        side.width === firstSide.width &&
+        side.style === firstSide.style &&
+        side.color === firstSide.color &&
+        side.opacity === firstSide.opacity
+      ));
+
+      if (!allSidesMatch) {
+        return undefined;
+      }
+
+      return {
+        color: firstSide.color,
+        width: firstSide.width,
+        opacity: firstSide.opacity,
       };
-
-      if (
-        !border.color &&
-        border.width === undefined &&
-        border.opacity === undefined
-      ) {
-        return undefined;
-      }
-
-      return border;
     }
 
     function parseShadow(computedStyles: CSSStyleDeclaration) {
@@ -1533,6 +1738,7 @@ async function getElementAttributes(
       const borderRadiusValue = parseBorderRadius(computedStyles, node);
       const parsedBackgroundImage = parseBackgroundImage(computedStyles);
       const opacity = parseFloat(computedStyles.opacity);
+      const inlineComposition = parseInlineComposition(node);
       const textOnly = hasOnlyTextNodes(node);
       const textSemanticNode = isTextSemanticNode(node);
       const { textAlignHint: flexTextAlignHint, textVerticalAlignHint } =
@@ -1561,8 +1767,10 @@ async function getElementAttributes(
         textLength: getNormalizedTextLength(node.textContent),
         directTextLength: getDirectTextLength(node),
         descendantTextLeafCount: countDescendantTextLeafNodes(node),
+        descendantInlineCompositionCount: countDescendantInlineCompositions(node),
         childElementCount: node.children.length,
         graphicSignalCount: sumGraphicSignals(node),
+        inlineComposition,
         opacity: Number.isNaN(opacity) ? undefined : opacity,
         background: parseBackground(computedStyles),
         border: parseBorder(computedStyles),
