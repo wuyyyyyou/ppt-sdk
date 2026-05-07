@@ -59,7 +59,7 @@
       "structure": "左侧技术概念视觉说明，右侧五张应用场景卡片纵向排列",
       "layout_pattern": "left-concept-panel-right-application-card-list",
       "suitable_for": ["金融科技应用", "技术创新", "能力版图", "应用场景"],
-      "key_components": ["FinanceContentFrame", "InnovationApplicationCard"]
+      "key_components": ["FinanceContentFrame", "HorizontalFeatureCard"]
     },
     {
       "id": "red-finance-v2-competitive-landscape-analysis",
@@ -100,6 +100,16 @@
       "layout_pattern": "top-summary-cards-middle-dual-panels-bottom-next-steps-strip",
       "suitable_for": ["总结页", "管理层结论", "行动建议", "下一步规划"],
       "key_components": ["FinanceContentFrame", "IconTextCard", "SectionPanelShell"]
+    },
+    {
+      "id": "red-finance-v2-industry-development-timeline",
+      "title": "金融行业发展时间线",
+      "source_path": "./slides/IndustryDevelopmentTimeline.tsx",
+      "data_path": "./data/industry-development-timeline.json",
+      "structure": "左侧纵向年份与阶段标签，中部主时间轴节点，右侧里程碑横向卡片",
+      "layout_pattern": "vertical-axis-left-period-right-milestone-cards",
+      "suitable_for": ["行业时间线", "发展历程", "政策演进", "关键里程碑"],
+      "key_components": ["FinanceContentFrame", "VerticalMilestoneTimeline", "HorizontalFeatureCard"]
     }
   ]
 }

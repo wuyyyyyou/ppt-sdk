@@ -111,6 +111,16 @@
         "path": "./slides/ConclusionOutlook.tsx"
       },
       "data_path": "./data/conclusion-outlook.json"
+    },
+    {
+      "id": "red-finance-v2-industry-development-timeline",
+      "title": "金融行业发展时间线",
+      "speaker_note": "时间线页：用于回顾金融行业关键发展节点、监管里程碑与未来演进方向。",
+      "source": {
+        "type": "local",
+        "path": "./slides/IndustryDevelopmentTimeline.tsx"
+      },
+      "data_path": "./data/industry-development-timeline.json"
     }
   ]
 }

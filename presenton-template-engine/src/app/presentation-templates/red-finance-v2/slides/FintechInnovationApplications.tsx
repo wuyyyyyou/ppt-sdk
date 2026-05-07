@@ -1,9 +1,9 @@
 import React from "react";
 import * as z from "zod";
 
-import InnovationApplicationCard from "../components/InnovationApplicationCard.js";
 import FinanceContentFrame from "../components/FinanceContentFrame.js";
 import { FinanceIcon } from "../components/FinanceIcons.js";
+import HorizontalFeatureCard from "../components/HorizontalFeatureCard.js";
 import { redFinanceTheme } from "../theme/tokens.js";
 
 const innovationIconSchema = z.enum([
@@ -181,9 +181,9 @@ const FintechInnovationApplications = ({
           style={{ gap: `${cardGap}px` }}
         >
           {parsed.innovations.map((item, index) => (
-            <InnovationApplicationCard
+            <HorizontalFeatureCard
               key={`${item.title}-${index}`}
-              icon={item.icon}
+              iconName={item.icon}
               title={item.title}
               tag={item.tag}
               description={item.description}
