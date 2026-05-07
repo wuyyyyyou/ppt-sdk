@@ -289,7 +289,7 @@ const MANIFEST = {
     {
       name: "forkTemplateGroup",
       description:
-        "Fork a builtin template group into a target local directory with TSX slides, group.json, manifest.json, and package metadata.",
+        "Fork a builtin template group into a target local directory with TSX slides, group.json, manifest.json, catalog.json, and data assets.",
       parameters: [
         {
           name: "template_group",

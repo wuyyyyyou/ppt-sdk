@@ -563,8 +563,9 @@ function buildDeckReadyScript(): string {
 function buildDeckDocumentHtml(input: {
   title: string;
   parsedSlides: ParsedSlideInput[];
+  runtimeBundle?: string | null;
 }): string {
-  const runtimeBundle = getBrowserRenderDeckRuntimeBundle();
+  const runtimeBundle = input.runtimeBundle ?? getBrowserRenderDeckRuntimeBundle();
   const contexts = input.parsedSlides
     .map((slide) => slide.context)
     .filter((context): context is BrowserRenderContext => context !== null);
@@ -651,6 +652,7 @@ export function buildDeckHtml(input: BuildDeckHtmlInput): string {
   return buildDeckDocumentHtml({
     title,
     parsedSlides,
+    runtimeBundle: input.runtimeBundle,
   });
 }
 
@@ -660,5 +662,6 @@ export function buildStandaloneDeckHtml(
   return buildDeckHtml({
     title: input.title,
     slides: input.slides,
+    runtimeBundle: input.runtimeBundle,
   });
 }

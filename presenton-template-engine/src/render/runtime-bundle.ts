@@ -9,8 +9,8 @@ let runtimeDeckBundleCache: string | null = null;
 function bundleRuntimeFromSource(bundleFileName: string): string | null {
   const moduleDir = dirname(fileURLToPath(import.meta.url));
   const sourceEntryByBundleName: Record<string, string> = {
-    "render-slide.global.js": join(moduleDir, "../browser/render-slide.tsx"),
-    "render-deck.global.js": join(moduleDir, "../browser/render-deck.tsx"),
+    "render-slide.global.js": join(moduleDir, "../browser/render-slide-auto.ts"),
+    "render-deck.global.js": join(moduleDir, "../browser/render-deck-auto.ts"),
   };
 
   const entryPoint = sourceEntryByBundleName[bundleFileName];

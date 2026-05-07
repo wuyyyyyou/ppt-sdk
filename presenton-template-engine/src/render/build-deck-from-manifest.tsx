@@ -9,6 +9,7 @@ import {
   resolveLocalModulePath,
 } from "../local-template/loader.js";
 import { buildStandaloneDeckHtml } from "./build-deck.js";
+import { buildLocalBrowserRuntimeBundle, type LocalRuntimeEntry } from "./local-runtime-bundle.js";
 import { getBrowserRenderRuntimeBundle } from "./runtime-bundle.js";
 import type {
   BrowserRenderContext,
@@ -27,6 +28,7 @@ type ResolvedManifestSlide = {
   layoutName: string;
   layoutDescription: string;
   templateGroup: string;
+  localEntryPath?: string;
 };
 
 async function resolveLocalTemplateGroupId(manifestCwd: string): Promise<string> {
@@ -282,6 +284,7 @@ async function resolveLocalSlide(
     layoutName: moduleValue.layoutName,
     layoutDescription: moduleValue.layoutDescription,
     templateGroup,
+    localEntryPath: absolutePath,
   };
 }
 
@@ -305,8 +308,9 @@ async function resolveManifestSlide(
 
 function buildSlideDocumentHtml(input: {
   context: BrowserRenderContext;
+  runtimeBundle?: string | null;
 }): string {
-  const runtimeBundle = getBrowserRenderRuntimeBundle();
+  const runtimeBundle = input.runtimeBundle ?? getBrowserRenderRuntimeBundle();
   const serializedContext = escapeJsonForInlineScript(input.context);
 
   return [
@@ -417,24 +421,67 @@ export async function buildDeckHtmlFromManifest(
       const slideOutputPath = path.join(outputDir, slideFileName);
 
       return {
+        context,
         html,
         slideId: slide.id,
         layoutId: resolvedSlide.layoutId,
         fileName: slideFileName,
         outputPath: slideOutputPath,
         speaker_note: slide.speaker_note ?? "",
+        localEntryPath: resolvedSlide.localEntryPath,
       };
     }),
   );
 
-  const slidesToWrite = singlePageIndex === null ? slides : [slides[singlePageIndex]];
+  const localRuntimeEntries = Array.from(
+    new Map(
+      slides
+        .filter(
+          (slide): slide is typeof slide & { localEntryPath: string } =>
+            typeof slide.localEntryPath === "string" && slide.localEntryPath.length > 0,
+        )
+        .map((slide) => [
+          slide.layoutId,
+          {
+            layoutId: slide.layoutId,
+            absolutePath: slide.localEntryPath,
+          } satisfies LocalRuntimeEntry,
+        ]),
+    ).values(),
+  );
+  const localSlideRuntimeBundle =
+    localRuntimeEntries.length > 0
+      ? await buildLocalBrowserRuntimeBundle({
+        mode: "slide",
+        cwd: manifestCwd,
+        entries: localRuntimeEntries,
+      })
+      : null;
+  const localDeckRuntimeBundle =
+    localRuntimeEntries.length > 0
+      ? await buildLocalBrowserRuntimeBundle({
+        mode: "deck",
+        cwd: manifestCwd,
+        entries: localRuntimeEntries,
+      })
+      : null;
+  const slidesWithRuntime = slides.map((slide) => ({
+    ...slide,
+    html: buildSlideDocumentHtml({
+      context: slide.context,
+      runtimeBundle: slide.localEntryPath ? localSlideRuntimeBundle : null,
+    }),
+  }));
+
+  const slidesToWrite = singlePageIndex === null ? slidesWithRuntime : [slidesWithRuntime[singlePageIndex]];
   const title = manifest.title ?? "Presenton Manifest Deck";
   const deckFileName = `${deckBaseName}-deck.html`;
   const deckOutputPath = path.join(outputDir, deckFileName);
   const deckHtml = singlePageIndex === null
     ? buildStandaloneDeckHtml({
       title,
-      slides,
+      slides: slidesWithRuntime,
+      runtimeBundle: localDeckRuntimeBundle,
     })
     : "";
 
@@ -458,7 +505,7 @@ export async function buildDeckHtmlFromManifest(
       slideId: slide.slideId,
       layoutId: slide.layoutId,
     })),
-    slideCount: slides.length,
+    slideCount: slidesWithRuntime.length,
     title,
     manifestPath,
   };

@@ -19,8 +19,8 @@ export default defineConfig([
   },
   {
     entry: {
-      "browser/render-slide": "src/browser/render-slide.tsx",
-      "browser/render-deck": "src/browser/render-deck.tsx",
+      "browser/render-slide": "src/browser/render-slide-auto.ts",
+      "browser/render-deck": "src/browser/render-deck-auto.ts",
     },
     format: ["iife"],
     platform: "browser",

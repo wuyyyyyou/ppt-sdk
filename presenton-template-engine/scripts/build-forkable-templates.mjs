@@ -1,5 +1,5 @@
 import { builtinModules, createRequire } from "node:module";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -49,6 +49,14 @@ async function pathExists(candidatePath) {
   try {
     await readFile(candidatePath);
     return true;
+  } catch {
+    return false;
+  }
+}
+
+async function directoryExists(candidatePath) {
+  try {
+    return (await stat(candidatePath)).isDirectory();
   } catch {
     return false;
   }
@@ -279,6 +287,18 @@ async function readGroupManifest(groupRoot) {
   return JSON.parse(await readFile(manifestPath, "utf8"));
 }
 
+async function copyOptionalGroupAssets(groupRoot, groupOutputDir) {
+  const catalogPath = path.join(groupRoot, "catalog.json");
+  if (await pathExists(catalogPath)) {
+    await cp(catalogPath, path.join(groupOutputDir, "catalog.json"));
+  }
+
+  const dataDir = path.join(groupRoot, "data");
+  if (await directoryExists(dataDir)) {
+    await cp(dataDir, path.join(groupOutputDir, "data"), { recursive: true });
+  }
+}
+
 async function main() {
   const templateGroups = getAllGroupsWithTemplates();
   const registryManifest = await readRegistryManifest();
@@ -344,6 +364,8 @@ async function main() {
 
       await writeFile(targetPath, rewritten, "utf8");
     }
+
+    await copyOptionalGroupAssets(groupRoot, groupOutputDir);
 
     const dependencyVersions = groupPackageJson?.dependencies
       ? { ...groupPackageJson.dependencies }

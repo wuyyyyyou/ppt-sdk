@@ -127,8 +127,8 @@ npm install
 - `slides/*.tsx`
 - `group.json`
 - `manifest.json`
-- `package.json`
-- `tsconfig.json`
+- `catalog.json`，如果原模板组提供
+- `data/`，如果原模板组提供
 
 输入参数：
 

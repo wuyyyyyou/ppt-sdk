@@ -52,14 +52,13 @@ export interface ForkTemplateGroupResult {
   outDir: string;
   groupJsonPath: string;
   manifestPath: string;
-  packageJsonPath: string;
-  tsconfigPath: string;
+  catalogJsonPath?: string;
+  dataDirPath?: string;
   manifest: DeckManifestInput;
 }
 
 const FORKABLE_TEMPLATES_DIR = path.join(getCurrentModuleDir(), "forkable-templates");
 const FORKABLE_INDEX_PATH = path.join(FORKABLE_TEMPLATES_DIR, "index.json");
-const FALLBACK_PACKAGE_NAME_PREFIX = "presenton-forked";
 
 let assetIndexPromise: Promise<ForkableTemplatesAssetIndex> | null = null;
 
@@ -301,6 +300,17 @@ function toTitleCaseFromSlug(value: string): string {
     .join(" ");
 }
 
+function rewriteLayoutIdGroup(layoutId: string | undefined, nextGroupId: string): string | undefined {
+  if (!layoutId) {
+    return undefined;
+  }
+
+  const [, localLayoutId] = layoutId.includes(":")
+    ? layoutId.split(":", 2)
+    : ["", layoutId];
+  return localLayoutId ? `${nextGroupId}:${localLayoutId}` : undefined;
+}
+
 function inferForkedGroupId(group: ForkableGroupAsset, outDir: string): string {
   const basenameId = normalizePackageName(path.basename(path.resolve(outDir)));
   if (basenameId.length > 0 && basenameId !== group.groupId) {
@@ -333,41 +343,24 @@ function buildForkedGroupMetadata(
     use_cases: group.useCases ?? undefined,
     audience_tags: group.audienceTags ?? undefined,
     tone_tags: group.toneTags ?? undefined,
-    cover_layout_id: group.coverLayoutId ?? undefined,
-    agenda_layout_id: group.agendaLayoutId ?? undefined,
-    closing_layout_id: group.closingLayoutId ?? undefined,
+    cover_layout_id: rewriteLayoutIdGroup(group.coverLayoutId ?? undefined, forkedGroupId),
+    agenda_layout_id: rewriteLayoutIdGroup(group.agendaLayoutId ?? undefined, forkedGroupId),
+    closing_layout_id: rewriteLayoutIdGroup(group.closingLayoutId ?? undefined, forkedGroupId),
   };
 }
 
-function buildDeckPackageJson(group: ForkableGroupAsset, forkedGroupId: string) {
-  const packageJsonTemplate =
-    group.packageJson && typeof group.packageJson === "object" && !Array.isArray(group.packageJson)
-      ? group.packageJson
-      : {};
+async function rewriteForkedCatalogGroupId(catalogJsonPath: string, forkedGroupId: string): Promise<void> {
+  if (!(await pathExists(catalogJsonPath))) {
+    return;
+  }
 
-  return {
-    ...packageJsonTemplate,
-    name:
-      normalizePackageName(`${FALLBACK_PACKAGE_NAME_PREFIX}-${forkedGroupId}`) ||
-      FALLBACK_PACKAGE_NAME_PREFIX,
-    private:
-      typeof packageJsonTemplate.private === "boolean" ? packageJsonTemplate.private : true,
-    type: typeof packageJsonTemplate.type === "string" ? packageJsonTemplate.type : "module",
-    dependencies: group.dependencies,
-  };
-}
+  const catalog = JSON.parse(await readFile(catalogJsonPath, "utf8")) as unknown;
+  if (!isPlainRecord(catalog)) {
+    return;
+  }
 
-function buildDeckTsconfig() {
-  return {
-    compilerOptions: {
-      target: "ES2022",
-      module: "NodeNext",
-      moduleResolution: "NodeNext",
-      jsx: "react-jsx",
-      esModuleInterop: true,
-      allowSyntheticDefaultImports: true,
-    },
-  };
+  catalog.group_id = forkedGroupId;
+  await writeFile(catalogJsonPath, `${JSON.stringify(catalog, null, 2)}\n`, "utf8");
 }
 
 export async function forkTemplateGroup(
@@ -408,8 +401,8 @@ export async function forkTemplateGroup(
   const forkedGroupMetadata = buildForkedGroupMetadata(group, outDir);
   const groupJsonPath = path.join(outDir, "group.json");
   const manifestPath = path.join(outDir, "manifest.json");
-  const packageJsonPath = path.join(outDir, "package.json");
-  const tsconfigPath = path.join(outDir, "tsconfig.json");
+  const catalogJsonPath = path.join(outDir, "catalog.json");
+  const dataDirPath = path.join(outDir, "data");
 
   await writeFile(
     `${groupJsonPath}`,
@@ -417,23 +410,14 @@ export async function forkTemplateGroup(
     "utf8",
   );
   await writeFile(`${manifestPath}`, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-  await writeFile(
-    `${packageJsonPath}`,
-    `${JSON.stringify(buildDeckPackageJson(group, forkedGroupMetadata.group_id), null, 2)}\n`,
-    "utf8",
-  );
-  await writeFile(
-    `${tsconfigPath}`,
-    `${JSON.stringify(buildDeckTsconfig(), null, 2)}\n`,
-    "utf8",
-  );
+  await rewriteForkedCatalogGroupId(catalogJsonPath, forkedGroupMetadata.group_id);
 
   return {
     outDir,
     groupJsonPath,
     manifestPath,
-    packageJsonPath,
-    tsconfigPath,
+    catalogJsonPath: (await pathExists(catalogJsonPath)) ? catalogJsonPath : undefined,
+    dataDirPath: (await pathExists(dataDirPath)) ? dataDirPath : undefined,
     manifest,
   };
 }

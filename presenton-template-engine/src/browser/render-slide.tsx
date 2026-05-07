@@ -4,13 +4,19 @@ import { createRoot } from "react-dom/client";
 
 import { getLayoutByLayoutId } from "../app/presentation-templates/index.js";
 import type { BrowserRenderContext } from "../render/types.js";
+import type { TemplateWithData } from "../app/presentation-templates/utils.js";
 
 declare global {
   interface Window {
     __PRESENTON_RENDER_CONTEXT__?: BrowserRenderContext;
     __PRESENTON_REMOTE_SVG_PENDING__?: number;
+    __PRESENTON_DISABLE_AUTO_RENDER__?: boolean;
+    __PRESENTON_LOCAL_LAYOUTS__?: BrowserLocalLayoutRegistry;
   }
 }
+
+export type BrowserLayoutResolver = (layoutId: string) => TemplateWithData | undefined;
+export type BrowserLocalLayoutRegistry = Record<string, TemplateWithData>;
 
 const GRAPH_COLOR_KEYS = Array.from({ length: 10 }, (_, index) => index);
 
@@ -153,8 +159,21 @@ function ErrorFallback({ message }: { message: string }) {
   );
 }
 
-function SlideDocument({ context }: { context: BrowserRenderContext }) {
-  const layout = getLayoutByLayoutId(context.layoutId);
+function resolveBrowserLayout(
+  layoutId: string,
+  localResolver?: BrowserLayoutResolver,
+): TemplateWithData | undefined {
+  return localResolver?.(layoutId) ?? window.__PRESENTON_LOCAL_LAYOUTS__?.[layoutId] ?? getLayoutByLayoutId(layoutId);
+}
+
+function SlideDocument({
+  context,
+  localResolver,
+}: {
+  context: BrowserRenderContext;
+  localResolver?: BrowserLayoutResolver;
+}) {
+  const layout = resolveBrowserLayout(context.layoutId, localResolver);
 
   if (!layout) {
     return (
@@ -180,7 +199,7 @@ function SlideDocument({ context }: { context: BrowserRenderContext }) {
   );
 }
 
-function render() {
+export function renderPresentonSlide(localResolver?: BrowserLayoutResolver) {
   const container = document.getElementById("presentation-slides-wrapper");
   if (!container) {
     throw new Error('Missing mount node "#presentation-slides-wrapper"');
@@ -195,25 +214,27 @@ function render() {
 
   const root = createRoot(container);
   flushSync(() => {
-    root.render(<SlideDocument context={context} />);
+    root.render(<SlideDocument context={context} localResolver={localResolver} />);
   });
   waitForReady(container);
 }
 
-try {
-  render();
-} catch (error) {
-  const container = document.getElementById("presentation-slides-wrapper");
-  const message =
-    error instanceof Error ? error.message : "Unknown browser render error";
+export function renderPresentonSlideWithErrorBoundary(localResolver?: BrowserLayoutResolver) {
+  try {
+    renderPresentonSlide(localResolver);
+  } catch (error) {
+    const container = document.getElementById("presentation-slides-wrapper");
+    const message =
+      error instanceof Error ? error.message : "Unknown browser render error";
 
-  if (container) {
-    markStatus(container, "error", message);
-    const root = createRoot(container);
-    flushSync(() => {
-      root.render(<ErrorFallback message={message} />);
-    });
-  } else {
-    console.error(message);
+    if (container) {
+      markStatus(container, "error", message);
+      const root = createRoot(container);
+      flushSync(() => {
+        root.render(<ErrorFallback message={message} />);
+      });
+    } else {
+      console.error(message);
+    }
   }
 }
