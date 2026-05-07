@@ -1,13 +1,14 @@
-import React from "react";
+import React, { type ReactNode } from "react";
 
 import { redFinanceTheme } from "../theme/tokens.js";
 import { FinanceIcon, type FinanceIconName } from "./FinanceIcons.js";
 
 type IconTextCardProps = {
-  icon: FinanceIconName;
-  title?: string;
-  titleLines?: string[];
-  description?: string;
+  icon?: FinanceIconName;
+  iconNode?: ReactNode;
+  title?: ReactNode;
+  titleLines?: ReactNode[];
+  description?: ReactNode;
   topAccent?: boolean;
   density?: "normal" | "compact" | "dense";
   descriptionMaxLines?: number;
@@ -15,6 +16,7 @@ type IconTextCardProps = {
   accentColor?: string;
   iconBackgroundColor?: string;
   variant?: "compact" | "summary";
+  className?: string;
   cardPaddingX?: number;
   cardPaddingTop?: number;
   cardPaddingBottom?: number;
@@ -24,10 +26,15 @@ type IconTextCardProps = {
   descriptionFontSize?: number;
   minHeight?: number;
   shadow?: string;
+  cardBackgroundColor?: string;
+  cardBorderColor?: string;
+  borderRadius?: number;
+  topAccentThickness?: number;
 };
 
 const IconTextCard = ({
   icon,
+  iconNode,
   title,
   titleLines,
   description,
@@ -38,6 +45,7 @@ const IconTextCard = ({
   accentColor = "var(--primary-color,#B71C1C)",
   iconBackgroundColor = "#FFEBEE",
   variant = "compact",
+  className,
   cardPaddingX,
   cardPaddingTop,
   cardPaddingBottom,
@@ -47,6 +55,10 @@ const IconTextCard = ({
   descriptionFontSize,
   minHeight,
   shadow,
+  cardBackgroundColor,
+  cardBorderColor,
+  borderRadius,
+  topAccentThickness,
 }: IconTextCardProps) => {
   const isCompact = density === "compact";
   const isDense = density === "dense";
@@ -67,56 +79,72 @@ const IconTextCard = ({
   const resolvedDescriptionFontSize =
     descriptionFontSize ?? (isSummary ? 13 : isDense ? 10 : isCompact ? 11 : 12);
   const descriptionLineHeight = isSummary ? 1.52 : isDense ? 1.3 : 1.4;
-  const resolvedTitleLines =
-    titleLines && titleLines.length > 0 ? titleLines : title ? [title] : [];
   const resolvedShadow =
     shadow ?? (isSummary ? "0 4px 10px rgba(0,0,0,0.03)" : "0 2px 4px rgba(0,0,0,0.03)");
   const iconRadius = iconShape === "rounded" ? 12 : 9999;
+  const resolvedBorderRadius = borderRadius ?? 6;
+  const resolvedTitleLines =
+    titleLines && titleLines.length > 0 ? titleLines : title ? [title] : [];
+  const hasIcon = Boolean(iconNode ?? icon);
 
   return (
     <div
-      className={`relative flex h-full flex-col overflow-hidden rounded-[6px] border ${isLeftAligned ? "items-start text-left" : "items-center text-center"}`}
+      className={[
+        "relative flex h-full flex-col overflow-hidden border",
+        isLeftAligned ? "items-start text-left" : "items-center text-center",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
       style={{
         paddingLeft: resolvedCardPaddingX,
         paddingRight: resolvedCardPaddingX,
         paddingTop: resolvedCardPaddingTop,
         paddingBottom: resolvedCardPaddingBottom,
-        borderColor: redFinanceTheme.colors.stroke,
-        backgroundColor: redFinanceTheme.colors.background,
+        borderColor: cardBorderColor ?? redFinanceTheme.colors.stroke,
+        backgroundColor: cardBackgroundColor ?? redFinanceTheme.colors.background,
         boxShadow: resolvedShadow,
         minHeight,
+        borderRadius: resolvedBorderRadius,
       }}
     >
       {topAccent ? (
         <div
           className="absolute left-0 top-0 w-full"
-          style={{ backgroundColor: accentColor, height: isSummary ? 5 : 4 }}
+          style={{
+            backgroundColor: accentColor,
+            height: topAccentThickness ?? (isSummary ? 5 : 4),
+          }}
         />
       ) : null}
-      <div
-        className="flex items-center justify-center"
-        style={{
-          width: resolvedIconSize,
-          height: resolvedIconSize,
-          marginBottom: isSummary ? 14 : iconMarginBottom,
-          backgroundColor: iconBackgroundColor,
-          borderRadius: iconRadius,
-        }}
-      >
-        <FinanceIcon
-          name={icon}
-          className={
-            isSummary
-              ? "h-[22px] w-[22px]"
-              : isDense
-                ? "h-[18px] w-[18px]"
-                : isCompact
-                  ? "h-5 w-5"
-                  : "h-6 w-6"
-          }
-          stroke={accentColor}
-        />
-      </div>
+      {hasIcon ? (
+        <div
+          className="flex items-center justify-center"
+          style={{
+            width: resolvedIconSize,
+            height: resolvedIconSize,
+            marginBottom: isSummary ? 14 : iconMarginBottom,
+            backgroundColor: iconBackgroundColor,
+            borderRadius: iconRadius,
+          }}
+        >
+          {iconNode ?? (icon ? (
+            <FinanceIcon
+              name={icon}
+              className={
+                isSummary
+                  ? "h-[22px] w-[22px]"
+                  : isDense
+                    ? "h-[18px] w-[18px]"
+                    : isCompact
+                      ? "h-5 w-5"
+                      : "h-6 w-6"
+              }
+              stroke={accentColor}
+            />
+          ) : null)}
+        </div>
+      ) : null}
       {resolvedTitleLines.length > 0 ? (
         <div
           className="flex w-full flex-col"
@@ -124,7 +152,7 @@ const IconTextCard = ({
         >
           {resolvedTitleLines.map((line, index) => (
             <p
-              key={`${line}-${index}`}
+              key={index}
               className="font-bold leading-[1.3]"
               style={{
                 fontSize: resolvedTitleFontSize,
@@ -138,7 +166,7 @@ const IconTextCard = ({
         </div>
       ) : null}
       {description ? (
-        <p
+        <div
           className="leading-[1.4]"
           style={{
             fontSize: resolvedDescriptionFontSize,
@@ -149,7 +177,7 @@ const IconTextCard = ({
           }}
         >
           {description}
-        </p>
+        </div>
       ) : null}
     </div>
   );

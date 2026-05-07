@@ -8,16 +8,23 @@ type HorizontalFeatureCardTone = "default" | "accent" | "future";
 type HorizontalFeatureCardProps = {
   iconName?: FinanceIconName;
   icon?: ReactNode;
-  title: string;
-  description: string;
-  tag?: string;
+  title: ReactNode;
+  description: ReactNode;
+  tag?: ReactNode;
   density?: "normal" | "compact" | "dense";
   tone?: HorizontalFeatureCardTone;
   minHeight?: number;
   className?: string;
   railColor?: string;
+  railSide?: "left" | "right";
+  contentAlign?: "left" | "right";
   iconBackgroundColor?: string;
   iconStroke?: string;
+  cardBackgroundColor?: string;
+  borderColor?: string;
+  titleColor?: string;
+  descriptionColor?: string;
+  shadow?: string;
   tagUppercase?: boolean;
 };
 
@@ -64,17 +71,26 @@ const HorizontalFeatureCard = ({
   minHeight,
   className,
   railColor,
+  railSide = "left",
+  contentAlign = "left",
   iconBackgroundColor,
   iconStroke,
+  cardBackgroundColor,
+  borderColor,
+  titleColor,
+  descriptionColor,
+  shadow,
   tagUppercase = true,
 }: HorizontalFeatureCardProps) => {
   const defaults = toneDefaults(tone);
   const isDense = density === "dense";
   const isCompact = density === "compact";
+  const isRightAligned = contentAlign === "right";
   const resolvedRailColor = railColor ?? defaults.railColor;
   const resolvedIconBackgroundColor =
     iconBackgroundColor ?? defaults.iconBackgroundColor;
   const resolvedIconStroke = iconStroke ?? defaults.iconStroke;
+  const hasIcon = Boolean(icon ?? iconName);
   const iconBoxSize = isDense ? 46 : isCompact ? 48 : 52;
   const iconClassName = isDense ? "h-5 w-5" : "h-6 w-6";
   const outerPaddingX = isDense ? 16 : 18;
@@ -93,15 +109,17 @@ const HorizontalFeatureCard = ({
         .join(" ")}
       style={{
         minHeight,
-        borderColor: redFinanceTheme.colors.stroke,
-        backgroundColor: redFinanceTheme.colors.background,
-        boxShadow: "0 4px 6px rgba(0,0,0,0.02)",
+        borderColor: borderColor ?? redFinanceTheme.colors.stroke,
+        backgroundColor: cardBackgroundColor ?? redFinanceTheme.colors.background,
+        boxShadow: shadow ?? "0 4px 6px rgba(0,0,0,0.02)",
       }}
     >
-      <div
-        className="w-[4px] flex-none"
-        style={{ backgroundColor: resolvedRailColor }}
-      />
+      {railSide === "left" ? (
+        <div
+          className="w-[4px] flex-none"
+          style={{ backgroundColor: resolvedRailColor }}
+        />
+      ) : null}
       <div
         className="flex min-w-0 flex-1 items-center"
         style={{
@@ -112,25 +130,35 @@ const HorizontalFeatureCard = ({
           paddingBottom: outerPaddingY,
         }}
       >
-        <div
-          className="flex flex-none items-center justify-center rounded-[10px]"
-          style={{
-            width: iconBoxSize,
-            height: iconBoxSize,
-            backgroundColor: resolvedIconBackgroundColor,
-          }}
-        >
-          {icon ?? (iconName ? (
-            <FinanceIcon
-              name={iconName}
-              className={iconClassName}
-              stroke={resolvedIconStroke}
-            />
-          ) : null)}
-        </div>
-        <div className="min-w-0 flex-1">
+        {hasIcon ? (
           <div
-            className="flex items-start justify-between"
+            className="flex flex-none items-center justify-center rounded-[10px]"
+            style={{
+              width: iconBoxSize,
+              height: iconBoxSize,
+              backgroundColor: resolvedIconBackgroundColor,
+            }}
+          >
+            {icon ?? (iconName ? (
+              <FinanceIcon
+                name={iconName}
+                className={iconClassName}
+                stroke={resolvedIconStroke}
+              />
+            ) : null)}
+          </div>
+        ) : null}
+        <div
+          className={[
+            "min-w-0 flex-1",
+            isRightAligned ? "text-right" : "text-left",
+          ].join(" ")}
+        >
+          <div
+            className={[
+              "flex items-start",
+              isRightAligned ? "flex-row-reverse justify-between" : "justify-between",
+            ].join(" ")}
             style={{
               gap: titleGap,
               marginBottom: titleMarginBottom,
@@ -140,7 +168,7 @@ const HorizontalFeatureCard = ({
               className="min-w-0 flex-1 font-bold leading-[1.3]"
               style={{
                 fontSize: titleFontSize,
-                color: redFinanceTheme.colors.backgroundText,
+                color: titleColor ?? redFinanceTheme.colors.backgroundText,
               }}
             >
               {title}
@@ -159,18 +187,23 @@ const HorizontalFeatureCard = ({
               </div>
             ) : null}
           </div>
-          <p
+          <div
             style={{
               fontSize: descriptionFontSize,
               lineHeight: descriptionLineHeight,
-              color: redFinanceTheme.colors.mutedText,
-              margin: 0,
+              color: descriptionColor ?? redFinanceTheme.colors.mutedText,
             }}
           >
             {description}
-          </p>
+          </div>
         </div>
       </div>
+      {railSide === "right" ? (
+        <div
+          className="w-[4px] flex-none"
+          style={{ backgroundColor: resolvedRailColor }}
+        />
+      ) : null}
     </div>
   );
 };

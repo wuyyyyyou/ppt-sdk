@@ -1,0 +1,113 @@
+{
+  "title": "中美金融科技与数字能力对比",
+  "metaLabel": "FINTECH & DIGITAL CAPABILITIES",
+  "chinaLabel": "中国 (CN)",
+  "usLabel": "美国 (US)",
+  "dimensionLabel": "对比维度 / Dimensions",
+  "rows": [
+    {
+      "icon": "microchip",
+      "dimensionTitle": "支付轨道",
+      "dimensionSubtitle": "Payment Rails",
+      "chinaTitle": "超级 App 主导 · 实时结算",
+      "chinaDetail": {
+        "lead": "二维码普及率超 90%，",
+        "highlight": "移动端流量垄断",
+        "tail": "，T+0 实时结算成为体验基线。"
+      },
+      "usTitle": "卡组织主导 · 逐步实时化",
+      "usDetail": {
+        "lead": "信用卡体系根基深厚，",
+        "highlight": "FedNow",
+        "tail": " 正推动实时支付基础设施完善。"
+      }
+    },
+    {
+      "icon": "network",
+      "dimensionTitle": "开放银行",
+      "dimensionSubtitle": "Open Banking",
+      "chinaTitle": "生态平台驱动",
+      "chinaDetail": {
+        "lead": "通过",
+        "highlight": "场景嵌入",
+        "tail": "开放能力，API 标准持续统一，平台壁垒高。"
+      },
+      "usTitle": "聚合器驱动 (Aggregators)",
+      "usDetail": {
+        "lead": "市场化主导，",
+        "highlight": "Plaid",
+        "tail": " 连接金融数据，FDX 标准逐渐成熟。"
+      }
+    },
+    {
+      "icon": "architecture",
+      "dimensionTitle": "云与架构",
+      "dimensionSubtitle": "Cloud & Arch",
+      "chinaTitle": "云原生跨越式发展",
+      "chinaDetail": {
+        "lead": "核心系统",
+        "highlight": "分布式改造",
+        "tail": "激进，更多转向私有云与行业云组合。"
+      },
+      "usTitle": "混合云与大型机并存",
+      "usDetail": {
+        "lead": "成熟",
+        "highlight": "公有云",
+        "tail": "应用广泛，但核心账务层仍保留大型机。"
+      }
+    },
+    {
+      "icon": "brain",
+      "dimensionTitle": "AI 与分析",
+      "dimensionSubtitle": "AI & Analytics",
+      "chinaTitle": "消费端应用普及",
+      "chinaDetail": {
+        "lead": "人脸识别、",
+        "highlight": "极速信贷",
+        "tail": "与智能推荐广泛落地，训练数据规模大。"
+      },
+      "usTitle": "企业级风控与量化",
+      "usDetail": {
+        "lead": "深耕",
+        "highlight": "MLOps",
+        "tail": " 与量化交易，在复杂衍生品定价上保持领先。"
+      }
+    },
+    {
+      "icon": "regtech",
+      "dimensionTitle": "合规科技",
+      "dimensionSubtitle": "RegTech",
+      "chinaTitle": "大数据实时监测",
+      "chinaDetail": {
+        "lead": "侧重",
+        "highlight": "资金流向",
+        "tail": "监控，反洗钱规则迭代速度快。"
+      },
+      "usTitle": "模型验证与制裁筛查",
+      "usDetail": {
+        "lead": "强调",
+        "highlight": "模型风险管理",
+        "tail": "，全球制裁名单筛查与审计链路更成熟。"
+      }
+    },
+    {
+      "icon": "security",
+      "dimensionTitle": "网络安全",
+      "dimensionSubtitle": "Cybersecurity",
+      "chinaTitle": "数据主权与隐私计算",
+      "chinaDetail": {
+        "lead": "推行",
+        "highlight": "数据本地化",
+        "tail": "，多方安全计算在跨机构共享中更活跃。"
+      },
+      "usTitle": "零信任架构 (Zero Trust)",
+      "usDetail": {
+        "lead": "防御边界持续弱化，身份认证与",
+        "highlight": "威胁情报",
+        "tail": "体系高度工业化。"
+      }
+    }
+  ],
+  "footerText": "金融行业战略分析报告 | 绝密资料",
+  "pageNumber": "13"
+}

@@ -131,6 +131,16 @@
         "path": "./slides/ChinaUsMarketComparison.tsx"
       },
       "data_path": "./data/china-us-market-comparison.json"
+    },
+    {
+      "id": "red-finance-v2-china-us-fintech-capabilities",
+      "title": "中美金融科技与数字能力对比",
+      "speaker_note": "对比页：用于比较中美在支付、开放银行、云架构、AI、合规科技与网络安全等数字能力维度的差异。",
+      "source": {
+        "type": "local",
+        "path": "./slides/ChinaUsFintechCapabilities.tsx"
+      },
+      "data_path": "./data/china-us-fintech-capabilities.json"
     }
   ]
 }
