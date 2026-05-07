@@ -15,6 +15,7 @@ type InfoListItemProps = {
   titleSuffixReservedWidth?: number;
   descriptionMaxLines?: number;
   fillHeight?: boolean;
+  verticalAlign?: "start" | "center" | "end";
 };
 
 const InfoListItem = ({
@@ -28,6 +29,7 @@ const InfoListItem = ({
   titleSuffixReservedWidth = 44,
   descriptionMaxLines = 2,
   fillHeight = false,
+  verticalAlign = "start",
 }: InfoListItemProps) => {
   const isCompact = density === "compact";
   const isDense = density === "dense";
@@ -57,10 +59,17 @@ const InfoListItem = ({
 
   return (
     <div
-      className="relative flex items-start"
+      className="relative flex"
       style={{
         gap,
         paddingBottom,
+        alignItems: fillHeight
+          ? verticalAlign === "end"
+            ? "flex-end"
+            : verticalAlign === "center"
+              ? "center"
+              : "flex-start"
+          : "flex-start",
         height: fillHeight ? "100%" : undefined,
         minHeight: fillHeight ? undefined : isDense ? 46 : isCompact ? 52 : 68,
       }}
@@ -76,7 +85,7 @@ const InfoListItem = ({
         <FinanceIcon name={icon} className={iconClassName} />
       </div>
       <div
-        className="min-w-0"
+        className="relative min-w-0 flex-1"
         style={{ paddingRight: titleSuffix ? titleSuffixReservedWidth : 8 }}
       >
         <div

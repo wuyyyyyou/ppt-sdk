@@ -219,6 +219,7 @@ const CompetitiveLandscapeAnalysis = ({
                   descriptionMaxLines={forceDescriptionMaxLines}
                   showDivider={index < parsed.forces.length - 1}
                   fillHeight
+                  verticalAlign="center"
                   titleSuffix={
                     <div
                       className="inline-flex items-center justify-center rounded-[3px] font-bold leading-none"
