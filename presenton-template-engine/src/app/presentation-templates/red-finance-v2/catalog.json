@@ -80,6 +80,16 @@
       "layout_pattern": "left-radar-chart-plus-insight-right-pillar-grid",
       "suitable_for": ["风险管理", "合规治理", "控制框架", "风险全景"],
       "key_components": ["FinanceContentFrame", "ChartCardShell", "MeasuredChartArea", "FinanceRadarChart", "InsightCallout", "PillarBulletCard"]
+    },
+    {
+      "id": "red-finance-v2-strategic-roadmap",
+      "title": "战略规划与路线图",
+      "source_path": "./slides/StrategicRoadmap.tsx",
+      "data_path": "./data/strategic-roadmap.json",
+      "structure": "上方左侧战略愿景与右侧支柱短卡，中部横向执行路线图，下方 ROI 与 KPI 汇总区",
+      "layout_pattern": "vision-plus-pillar-cards-plus-timeline-plus-summary-metrics",
+      "suitable_for": ["战略规划", "执行路线图", "年度重点工作", "里程碑规划"],
+      "key_components": ["FinanceContentFrame", "FinanceSectionHeading", "ShortInfoCard", "TimelineBoard", "KpiMetricItem"]
     }
   ]
 }

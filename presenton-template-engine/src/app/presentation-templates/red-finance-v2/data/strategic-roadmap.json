@@ -1,0 +1,56 @@
+{
+  "title": "战略规划与路线图",
+  "metaLabel": "STRATEGIC ROADMAP",
+  "visionLabel": "2026 战略愿景",
+  "visionLines": [
+    "稳增长 · 提效能",
+    "优结构 · 强风控",
+    "打造卓越客户体验"
+  ],
+  "pillarsTitle": "五大战略支柱",
+  "pillars": [
+    { "icon": "customer", "titleLines": ["客户与品牌", "重塑"] },
+    { "icon": "pricing", "titleLines": ["产品与定价", "优化"] },
+    { "icon": "data", "titleLines": ["数字与数据", "驱动"] },
+    { "icon": "ecosystem", "titleLines": ["生态与合作", "共赢"] },
+    { "icon": "talent", "titleLines": ["组织与人才", "升级"] }
+  ],
+  "roadmapTitle": "2026 执行路线图 (12个月)",
+  "roadmapPhases": [
+    {
+      "quarter": "Q1",
+      "title": "基建与治理",
+      "items": ["启动统一数据湖建设", "成立数字化转型委员会", "完成核心系统云化评估"]
+    },
+    {
+      "quarter": "Q2",
+      "title": "试点与上线",
+      "items": ["发布智能营销 Copilot", "区块链平台 v1.0 上线", "完成 50 家网点改造"]
+    },
+    {
+      "quarter": "Q3",
+      "title": "扩围与优化",
+      "items": ["全面推广 RPA 自动化", "启动跨境支付实时结算", "发布 ESG 金融产品系列"]
+    },
+    {
+      "quarter": "Q4",
+      "title": "评估与迭代",
+      "items": ["完成年度战略 ROI 复盘", "优化 AI 风控模型参数", "制定 2027 深化改革方案"]
+    }
+  ],
+  "roiTitle": "投资与回报预期",
+  "roiMetrics": [
+    { "label": "预算增幅", "value": "15%", "caption": "重点投向 AI 算力" },
+    { "label": "盈亏平衡", "value": "18个月", "caption": "由效率提升驱动" },
+    { "label": "三年 ROI", "value": "250%", "caption": "规模化落地兑现" }
+  ],
+  "kpiTitle": "核心 KPI 框架",
+  "kpis": [
+    { "value": "+18%", "label": "非息收入增长" },
+    { "value": "<30%", "label": "成本收入比" },
+    { "value": "1.85%", "label": "风险调整收益率" },
+    { "value": "75%", "label": "数字渠道活跃度" }
+  ],
+  "footerText": "金融行业战略分析报告 | 绝密资料",
+  "pageNumber": "09"
+}

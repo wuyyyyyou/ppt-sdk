@@ -3,6 +3,7 @@ import * as z from "zod";
 
 import FinanceContentFrame from "../components/FinanceContentFrame.js";
 import { FinanceIcon } from "../components/FinanceIcons.js";
+import FinanceSectionHeading from "../components/FinanceSectionHeading.js";
 import InfoListItem from "../components/InfoListItem.js";
 import ShortInfoCard from "../components/ShortInfoCard.js";
 import StableMatrixGrid from "../components/StableMatrixGrid.js";
@@ -134,21 +135,6 @@ export const density = "high";
 export const visualWeight = "balanced";
 export const editableTextPriority = "high";
 
-const SectionHeading = ({ title }: { title: string }) => (
-  <div className="mb-[8px] flex items-center gap-[10px]">
-    <div
-      className="h-[22px] w-[4px] rounded-full"
-      style={{ backgroundColor: redFinanceTheme.colors.primary }}
-    />
-    <h2
-      className="text-[18px] font-bold"
-      style={{ color: redFinanceTheme.colors.backgroundText }}
-    >
-      {title}
-    </h2>
-  </div>
-);
-
 const getForceLevelStyles = (level: string) => {
   if (level.includes("高") || /high/i.test(level)) {
     return { backgroundColor: "#FFCDD2", color: "#B71C1C" };
@@ -194,7 +180,7 @@ const CompetitiveLandscapeAnalysis = ({
       <div className="flex h-full gap-[28px] overflow-hidden">
         <div className="flex w-[360px] flex-none flex-col">
           <div className="mb-[8px]">
-            <SectionHeading title={parsed.participantsTitle} />
+            <FinanceSectionHeading title={parsed.participantsTitle} />
             <div className="grid grid-cols-2 gap-[6px]">
               {parsed.participants.map((item, index) => (
                 <ShortInfoCard
@@ -211,7 +197,7 @@ const CompetitiveLandscapeAnalysis = ({
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col">
-            <SectionHeading title={parsed.forcesTitle} />
+            <FinanceSectionHeading title={parsed.forcesTitle} />
             <div
               className="grid min-h-0 flex-1 overflow-hidden rounded-[8px] border px-[14px] py-[8px]"
               style={{
@@ -255,7 +241,7 @@ const CompetitiveLandscapeAnalysis = ({
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <SectionHeading title={parsed.comparisonTitle} />
+          <FinanceSectionHeading title={parsed.comparisonTitle} />
           <div className="min-h-0 flex-1 overflow-hidden">
             <StableMatrixGrid
               density={matrixDensity}

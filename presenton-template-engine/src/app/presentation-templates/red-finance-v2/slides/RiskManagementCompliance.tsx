@@ -5,6 +5,7 @@ import ChartCardShell from "../components/ChartCardShell.js";
 import FinanceContentFrame from "../components/FinanceContentFrame.js";
 import { FinanceIcon } from "../components/FinanceIcons.js";
 import FinanceRadarChart from "../components/FinanceRadarChart.js";
+import FinanceSectionHeading from "../components/FinanceSectionHeading.js";
 import InsightCallout from "../components/InsightCallout.js";
 import MeasuredChartArea from "../components/MeasuredChartArea.js";
 import PillarBulletCard from "../components/PillarBulletCard.js";
@@ -131,37 +132,6 @@ export const density = "high";
 export const visualWeight = "balanced";
 export const editableTextPriority = "high";
 
-const SectionHeading = ({
-  title,
-  subtitle,
-}: {
-  title: string;
-  subtitle?: string;
-}) => (
-  <div className="mb-[10px] flex items-end justify-between gap-[12px]">
-    <div className="flex items-center gap-[10px]">
-      <div
-        className="h-[22px] w-[4px] rounded-full"
-        style={{ backgroundColor: redFinanceTheme.colors.primary }}
-      />
-      <h2
-        className="text-[18px] font-bold"
-        style={{ color: redFinanceTheme.colors.backgroundText }}
-      >
-        {title}
-      </h2>
-    </div>
-    {subtitle ? (
-      <div
-        className="whitespace-nowrap text-[12px]"
-        style={{ color: redFinanceTheme.colors.subtleText }}
-      >
-        {subtitle}
-      </div>
-    ) : null}
-  </div>
-);
-
 const SeriesLegend = ({
   label,
   color,
@@ -272,7 +242,7 @@ const RiskManagementCompliance = ({
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <SectionHeading title={parsed.pillarsTitle} />
+          <FinanceSectionHeading title={parsed.pillarsTitle} marginBottom={10} />
           <div
             className="grid min-h-0 flex-1"
             style={{

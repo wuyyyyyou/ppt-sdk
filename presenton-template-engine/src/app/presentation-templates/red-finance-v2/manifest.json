@@ -91,6 +91,16 @@
         "path": "./slides/RiskManagementCompliance.tsx"
       },
       "data_path": "./data/risk-management-compliance.json"
+    },
+    {
+      "id": "red-finance-v2-strategic-roadmap",
+      "title": "战略规划与路线图",
+      "speaker_note": "战略路线图页：用于展示年度战略愿景、核心支柱、阶段性执行路线图，以及 ROI 与 KPI 目标。",
+      "source": {
+        "type": "local",
+        "path": "./slides/StrategicRoadmap.tsx"
+      },
+      "data_path": "./data/strategic-roadmap.json"
     }
   ]
 }
