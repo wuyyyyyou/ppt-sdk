@@ -2,6 +2,24 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "PPT: Build Template Engine",
+      "type": "process",
+      "command": "npm",
+      "args": [
+        "run",
+        "build"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/presenton-template-engine"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "PPT: Check Environment",
       "type": "process",
       "command": "node",
@@ -34,6 +52,10 @@
       "options": {
         "cwd": "${workspaceFolder}"
       },
+      "dependsOn": [
+        "PPT: Build Template Engine"
+      ],
+      "dependsOrder": "sequence",
       "group": {
         "kind": "build",
         "isDefault": true
