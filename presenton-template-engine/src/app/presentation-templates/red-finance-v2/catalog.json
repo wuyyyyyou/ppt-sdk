@@ -110,6 +110,16 @@
       "layout_pattern": "vertical-axis-left-period-right-milestone-cards",
       "suitable_for": ["行业时间线", "发展历程", "政策演进", "关键里程碑"],
       "key_components": ["FinanceContentFrame", "VerticalMilestoneTimeline", "HorizontalFeatureCard"]
+    },
+    {
+      "id": "red-finance-v2-china-us-market-comparison",
+      "title": "中美金融市场规模与结构对比",
+      "source_path": "./slides/ChinaUsMarketComparison.tsx",
+      "data_path": "./data/china-us-market-comparison.json",
+      "structure": "上方左侧雷达图卡与右侧双值指标卡矩阵，下方三列结构化对比面板",
+      "layout_pattern": "top-radar-plus-dual-metric-cards-bottom-comparison-panels",
+      "suitable_for": ["中美对比", "区域比较", "结构分析", "市场 benchmark"],
+      "key_components": ["FinanceContentFrame", "ChartCardShell", "FinanceRadarChart", "DualValueMetricCard", "ComparisonPanel"]
     }
   ]
 }

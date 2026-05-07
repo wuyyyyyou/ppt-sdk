@@ -1,0 +1,129 @@
+{
+  "title": "中美金融市场规模与结构对比",
+  "metaLabel": "CN-US MARKET COMPARISON",
+  "radarTitle": "结构成熟度对比",
+  "radarSubtitle": "China vs US Market Structure",
+  "radarLabels": [
+    "银行资产深度",
+    "资本市场深度",
+    "数字化普及",
+    "非息收入占比",
+    "实时支付覆盖",
+    "绿色金融政策"
+  ],
+  "radarSeries": [
+    {
+      "label": "中国 (CN)",
+      "color": "#B71C1C",
+      "fillColor": "rgba(183, 28, 28, 0.20)",
+      "values": [95, 60, 90, 50, 95, 85]
+    },
+    {
+      "label": "美国 (US)",
+      "color": "#1565C0",
+      "fillColor": "rgba(21, 101, 192, 0.18)",
+      "values": [65, 95, 75, 85, 60, 70]
+    }
+  ],
+  "radarTicks": [25, 50, 75, 100],
+  "metrics": [
+    {
+      "icon": "bank",
+      "title": "银行资产 / GDP",
+      "leftLabel": "中国",
+      "rightLabel": "美国",
+      "leftValue": "310%",
+      "rightValue": "105%",
+      "leftShare": 75,
+      "rightShare": 25
+    },
+    {
+      "icon": "chart-line",
+      "title": "股市总市值 / GDP",
+      "leftLabel": "中国",
+      "rightLabel": "美国",
+      "leftValue": "65%",
+      "rightValue": "180%",
+      "leftShare": 26,
+      "rightShare": 74
+    },
+    {
+      "icon": "smartphone",
+      "title": "移动支付渗透率",
+      "leftLabel": "中国",
+      "rightLabel": "美国",
+      "leftValue": "92%",
+      "rightValue": "48%",
+      "leftShare": 66,
+      "rightShare": 34
+    },
+    {
+      "icon": "users",
+      "title": "居民金融资产股票占比",
+      "leftLabel": "中国",
+      "rightLabel": "美国",
+      "leftValue": "18%",
+      "rightValue": "45%",
+      "leftShare": 28,
+      "rightShare": 72
+    }
+  ],
+  "comparisonPanels": [
+    {
+      "icon": "shield",
+      "title": "监管风格 (Regulation)",
+      "sections": [
+        {
+          "badge": "CN",
+          "badgeColor": "#B71C1C",
+          "title": "审慎监管 + 发展导向",
+          "description": "强调宏观审慎与风险防范，政策窗口指导力度强，兼顾行业发展与稳定。"
+        },
+        {
+          "badge": "US",
+          "badgeColor": "#1565C0",
+          "title": "规则导向 + 市场化",
+          "description": "以信息披露为核心，事后监管与执法力度大，强调市场自我调节机制。"
+        }
+      ]
+    },
+    {
+      "icon": "network",
+      "title": "分销渠道 (Distribution)",
+      "sections": [
+        {
+          "badge": "CN",
+          "badgeColor": "#B71C1C",
+          "title": "超级 App + 线下网点",
+          "description": "支付宝、微信等超级入口占据 C 端流量，银行网点向智能化、咨询型转型。"
+        },
+        {
+          "badge": "US",
+          "badgeColor": "#1565C0",
+          "title": "独立顾问 + 邮件体系",
+          "description": "独立理财顾问体系成熟，邮件营销仍是主流，App 功能相对垂直。"
+        }
+      ]
+    },
+    {
+      "icon": "coins",
+      "title": "利润结构 (Profit Mix)",
+      "sections": [
+        {
+          "badge": "CN",
+          "badgeColor": "#B71C1C",
+          "title": "息差主导 -> 非息提升",
+          "description": "传统利差收入占比仍高，但正快速向财富管理等中收业务转型。"
+        },
+        {
+          "badge": "US",
+          "badgeColor": "#1565C0",
+          "title": "多元化非息收入",
+          "description": "资管、投行、交易佣金等非息收入占比高，收入来源更加均衡。"
+        }
+      ]
+    }
+  ],
+  "footerText": "金融行业战略分析报告 | 绝密资料",
+  "pageNumber": "12"
+}

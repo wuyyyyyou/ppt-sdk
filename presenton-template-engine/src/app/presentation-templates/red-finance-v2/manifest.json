@@ -121,6 +121,16 @@
         "path": "./slides/IndustryDevelopmentTimeline.tsx"
       },
       "data_path": "./data/industry-development-timeline.json"
+    },
+    {
+      "id": "red-finance-v2-china-us-market-comparison",
+      "title": "中美金融市场规模与结构对比",
+      "speaker_note": "对比页：用于比较中美金融市场的结构成熟度、关键指标，以及监管、渠道和利润结构差异。",
+      "source": {
+        "type": "local",
+        "path": "./slides/ChinaUsMarketComparison.tsx"
+      },
+      "data_path": "./data/china-us-market-comparison.json"
     }
   ]
 }

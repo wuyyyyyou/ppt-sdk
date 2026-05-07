@@ -39,6 +39,32 @@ const clampValue = (value: number, min: number, max: number) =>
 
 const defaultTickFormatter = (value: number) => `${value}`;
 
+const resolveRadarOuterRadius = (
+  outerRadius: number | string,
+  maxRadius: number,
+) => {
+  if (typeof outerRadius === "number") {
+    return Math.max(0, Math.min(outerRadius, maxRadius));
+  }
+
+  const percentMatch = outerRadius.trim().match(/^(\d+(?:\.\d+)?)%$/);
+  if (percentMatch) {
+    return Math.max(0, (Number(percentMatch[1]) / 100) * maxRadius);
+  }
+
+  const numeric = Number(outerRadius);
+  return Number.isFinite(numeric) ? Math.max(0, Math.min(numeric, maxRadius)) : maxRadius;
+};
+
+const scaleRadiusTicks = (ticks: number[], minValue: number, maxValue: number, outerRadius: number) => {
+  const range = maxValue - minValue;
+  if (range <= 0 || outerRadius <= 0) {
+    return [];
+  }
+
+  return ticks.map((value) => ((value - minValue) / range) * outerRadius);
+};
+
 const buildRadarData = (
   labels: string[],
   series: FinanceRadarChartSeries[],
@@ -71,11 +97,14 @@ const FinanceRadarChart = ({
   const data = buildRadarData(labels, series, minValue, maxValue);
   const chartWidth = width ?? 0;
   const chartHeight = Math.max(0, (height ?? 0) - (legend ? legendReserve : 0));
+  const maxRadius = Math.max(0, Math.min(chartWidth, chartHeight) / 2 - 24);
+  const radarOuterRadius = resolveRadarOuterRadius(outerRadius, maxRadius);
   const radiusTicks: TickItem[] = ticks.map((value, index) => ({
     value,
     coordinate: value,
     index,
   }));
+  const polarRadius = scaleRadiusTicks(ticks, minValue, maxValue, radarOuterRadius);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -84,14 +113,14 @@ const FinanceRadarChart = ({
           width={chartWidth}
           height={chartHeight}
           data={data}
-          outerRadius={outerRadius}
+          outerRadius={radarOuterRadius}
           margin={{ top: 2, right: 12, bottom: 2, left: 12 }}
         >
           <PolarGrid
             gridType="polygon"
             stroke="#D6D6D6"
             radialLines
-            polarRadius={ticks}
+            polarRadius={polarRadius}
           />
           <PolarAngleAxis
             dataKey="label"
