@@ -141,6 +141,16 @@
         "path": "./slides/ChinaUsFintechCapabilities.tsx"
       },
       "data_path": "./data/china-us-fintech-capabilities.json"
+    },
+    {
+      "id": "red-finance-v2-digital-currency-focus",
+      "title": "数字货币",
+      "speaker_note": "过渡页：用于引出数字货币章节，概述 CBDC、稳定币与加密资产三类战略关注重点。",
+      "source": {
+        "type": "local",
+        "path": "./slides/DigitalCurrencyFocus.tsx"
+      },
+      "data_path": "./data/digital-currency-focus.json"
     }
   ]
 }

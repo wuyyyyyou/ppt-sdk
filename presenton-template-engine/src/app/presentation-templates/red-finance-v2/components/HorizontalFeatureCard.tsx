@@ -11,20 +11,28 @@ type HorizontalFeatureCardProps = {
   title: ReactNode;
   description: ReactNode;
   tag?: ReactNode;
+  endAdornment?: ReactNode;
   density?: "normal" | "compact" | "dense";
   tone?: HorizontalFeatureCardTone;
   minHeight?: number;
   className?: string;
   railColor?: string;
+  railWidth?: number;
   railSide?: "left" | "right";
   contentAlign?: "left" | "right";
   iconBackgroundColor?: string;
   iconStroke?: string;
   cardBackgroundColor?: string;
   borderColor?: string;
+  cardRadius?: number;
   titleColor?: string;
   descriptionColor?: string;
   shadow?: string;
+  iconBoxSize?: number;
+  titleFontSize?: number;
+  descriptionFontSize?: number;
+  descriptionLineHeight?: number;
+  titleNoWrap?: boolean;
   tagUppercase?: boolean;
 };
 
@@ -66,20 +74,28 @@ const HorizontalFeatureCard = ({
   title,
   description,
   tag,
+  endAdornment,
   density = "normal",
   tone = "default",
   minHeight,
   className,
   railColor,
+  railWidth = 4,
   railSide = "left",
   contentAlign = "left",
   iconBackgroundColor,
   iconStroke,
   cardBackgroundColor,
   borderColor,
+  cardRadius = 8,
   titleColor,
   descriptionColor,
   shadow,
+  iconBoxSize,
+  titleFontSize,
+  descriptionFontSize,
+  descriptionLineHeight,
+  titleNoWrap = false,
   tagUppercase = true,
 }: HorizontalFeatureCardProps) => {
   const defaults = toneDefaults(tone);
@@ -91,14 +107,14 @@ const HorizontalFeatureCard = ({
     iconBackgroundColor ?? defaults.iconBackgroundColor;
   const resolvedIconStroke = iconStroke ?? defaults.iconStroke;
   const hasIcon = Boolean(icon ?? iconName);
-  const iconBoxSize = isDense ? 46 : isCompact ? 48 : 52;
+  const resolvedIconBoxSize = iconBoxSize ?? (isDense ? 46 : isCompact ? 48 : 52);
   const iconClassName = isDense ? "h-5 w-5" : "h-6 w-6";
   const outerPaddingX = isDense ? 16 : 18;
   const outerPaddingY = isDense ? 12 : isCompact ? 13 : 14;
   const innerGap = isDense ? 14 : 16;
-  const titleFontSize = isDense ? 15 : 16;
-  const descriptionFontSize = isDense ? 12 : 13;
-  const descriptionLineHeight = isDense ? 1.4 : 1.45;
+  const resolvedTitleFontSize = titleFontSize ?? (isDense ? 15 : 16);
+  const resolvedDescriptionFontSize = descriptionFontSize ?? (isDense ? 12 : 13);
+  const resolvedDescriptionLineHeight = descriptionLineHeight ?? (isDense ? 1.4 : 1.45);
   const titleGap = isDense ? 10 : 12;
   const titleMarginBottom = isDense ? 5 : 6;
 
@@ -109,6 +125,7 @@ const HorizontalFeatureCard = ({
         .join(" ")}
       style={{
         minHeight,
+        borderRadius: cardRadius,
         borderColor: borderColor ?? redFinanceTheme.colors.stroke,
         backgroundColor: cardBackgroundColor ?? redFinanceTheme.colors.background,
         boxShadow: shadow ?? "0 4px 6px rgba(0,0,0,0.02)",
@@ -116,8 +133,8 @@ const HorizontalFeatureCard = ({
     >
       {railSide === "left" ? (
         <div
-          className="w-[4px] flex-none"
-          style={{ backgroundColor: resolvedRailColor }}
+          className="flex-none"
+          style={{ width: railWidth, backgroundColor: resolvedRailColor }}
         />
       ) : null}
       <div
@@ -134,8 +151,8 @@ const HorizontalFeatureCard = ({
           <div
             className="flex flex-none items-center justify-center rounded-[10px]"
             style={{
-              width: iconBoxSize,
-              height: iconBoxSize,
+              width: resolvedIconBoxSize,
+              height: resolvedIconBoxSize,
               backgroundColor: resolvedIconBackgroundColor,
             }}
           >
@@ -165,9 +182,11 @@ const HorizontalFeatureCard = ({
             }}
           >
             <div
-              className="min-w-0 flex-1 font-bold leading-[1.3]"
+              className={["min-w-0 flex-1 font-bold leading-[1.3]", titleNoWrap ? "whitespace-nowrap" : ""]
+                .filter(Boolean)
+                .join(" ")}
               style={{
-                fontSize: titleFontSize,
+                fontSize: resolvedTitleFontSize,
                 color: titleColor ?? redFinanceTheme.colors.backgroundText,
               }}
             >
@@ -189,19 +208,24 @@ const HorizontalFeatureCard = ({
           </div>
           <div
             style={{
-              fontSize: descriptionFontSize,
-              lineHeight: descriptionLineHeight,
+              fontSize: resolvedDescriptionFontSize,
+              lineHeight: resolvedDescriptionLineHeight,
               color: descriptionColor ?? redFinanceTheme.colors.mutedText,
             }}
           >
             {description}
           </div>
         </div>
+        {endAdornment ? (
+          <div className="flex flex-none items-center justify-center">
+            {endAdornment}
+          </div>
+        ) : null}
       </div>
       {railSide === "right" ? (
         <div
-          className="w-[4px] flex-none"
-          style={{ backgroundColor: resolvedRailColor }}
+          className="flex-none"
+          style={{ width: railWidth, backgroundColor: resolvedRailColor }}
         />
       ) : null}
     </div>

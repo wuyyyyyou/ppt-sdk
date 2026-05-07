@@ -1,0 +1,25 @@
+{
+  "sectionTag": "PART 05 · STRATEGIC FOCUS",
+  "title": "数字货币",
+  "subtitle": "重塑全球价值流转的新基石",
+  "description": "从国家主权的央行数字货币到私人部门的稳定币与加密资产，数字化形态正在根本性改变货币的发行、流通与治理机制。",
+  "cards": [
+    {
+      "icon": "bank",
+      "title": "央行数字货币（CBDC）",
+      "description": "国家信用背书的法定货币数字化形态，兼顾支付效率、可追踪性与金融安全。"
+    },
+    {
+      "icon": "coins",
+      "title": "稳定币（Stablecoins）",
+      "description": "连接法币与加密世界的桥梁，正在演进为跨境支付和实时清算的新型基础设施。"
+    },
+    {
+      "icon": "microchip",
+      "title": "加密资产（Crypto Assets）",
+      "description": "去中心化网络原生的价值载体，也是 Web3 经济体系中的关键流通单元。"
+    }
+  ],
+  "footerText": "金融行业战略分析报告 | DIGITAL CURRENCY & ASSETS",
+  "pageNumber": "15"
+}

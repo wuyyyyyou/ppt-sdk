@@ -130,6 +130,16 @@
       "layout_pattern": "mirrored-country-cards-with-center-dimension-tiles",
       "suitable_for": ["中美对比", "能力对比", "数字化 maturity", "金融科技 benchmark"],
       "key_components": ["FinanceContentFrame", "HorizontalFeatureCard", "IconTextCard"]
+    },
+    {
+      "id": "red-finance-v2-digital-currency-focus",
+      "title": "数字货币",
+      "source_path": "./slides/DigitalCurrencyFocus.tsx",
+      "data_path": "./data/digital-currency-focus.json",
+      "structure": "左侧章节聚焦 hero，右侧三张战略焦点卡，底层为装饰性环形背景",
+      "layout_pattern": "section-focus-hero-left-card-stack-right",
+      "suitable_for": ["章节过渡", "战略聚焦", "主题引入", "chapter break"],
+      "key_components": ["FinanceSectionFocusFrame", "HorizontalFeatureCard"]
     }
   ]
 }
