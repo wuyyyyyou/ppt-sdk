@@ -335,10 +335,16 @@ export function shouldAutoScreenshotDecorativeElement(
 
   const textLength = attributes.textLength ?? 0;
   const directTextLength = attributes.directTextLength ?? 0;
+  const descendantTextLeafCount = attributes.descendantTextLeafCount ?? 0;
   const graphicSignalCount = attributes.graphicSignalCount ?? 0;
   const childElementCount = attributes.childElementCount ?? 0;
   const width = attributes.position.width ?? 0;
   const height = attributes.position.height ?? 0;
+
+  const looksLikeStructuredTextModule =
+    descendantTextLeafCount >= 3 &&
+    textLength >= 12 &&
+    graphicSignalCount <= descendantTextLeafCount * 4;
 
   return (
     width >= 80 &&
@@ -346,7 +352,8 @@ export function shouldAutoScreenshotDecorativeElement(
     graphicSignalCount >= 10 &&
     textLength <= 24 &&
     directTextLength <= 8 &&
-    childElementCount > 0
+    childElementCount > 0 &&
+    !looksLikeStructuredTextModule
   );
 }
 
@@ -767,6 +774,16 @@ async function getElementAttributes(
         .replace(/\s+/g, " ")
         .trim()
         .length;
+    }
+
+    function countDescendantTextLeafNodes(node: Element): number {
+      return Array.from(node.querySelectorAll("*")).filter((candidate) => {
+        const element = candidate as Element;
+        return (
+          getDirectTextLength(element) > 0 &&
+          element.children.length === 0
+        );
+      }).length;
     }
 
     function isSupportedInlineTextNode(node: Node): boolean {
@@ -1543,6 +1560,7 @@ async function getElementAttributes(
         textHtml: richTextHtml,
         textLength: getNormalizedTextLength(node.textContent),
         directTextLength: getDirectTextLength(node),
+        descendantTextLeafCount: countDescendantTextLeafNodes(node),
         childElementCount: node.children.length,
         graphicSignalCount: sumGraphicSignals(node),
         opacity: Number.isNaN(opacity) ? undefined : opacity,

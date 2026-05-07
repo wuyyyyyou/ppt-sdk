@@ -1,0 +1,117 @@
+{
+  "title": "全球CBDC发展现状对比",
+  "metaLabel": "GLOBAL CBDC STATUS",
+  "stageLabels": {
+    "research": "研究阶段 (Research)",
+    "pilot": "试点阶段 (Pilot)",
+    "launched": "正式推出 (Launched)"
+  },
+  "countries": [
+    {
+      "name": "中国",
+      "code": "CN",
+      "marker": "star",
+      "stage": "pilot",
+      "progress": 90,
+      "status": "大规模试点"
+    },
+    {
+      "name": "美国",
+      "code": "US",
+      "marker": "flag",
+      "stage": "research",
+      "progress": 30,
+      "status": "批发型研究"
+    },
+    {
+      "name": "欧盟",
+      "code": "EU",
+      "marker": "euro",
+      "stage": "pilot",
+      "progress": 50,
+      "status": "准备阶段"
+    },
+    {
+      "name": "日本",
+      "code": "JP",
+      "marker": "circle",
+      "stage": "pilot",
+      "progress": 40,
+      "status": "概念验证"
+    },
+    {
+      "name": "印度",
+      "code": "IN",
+      "marker": "chakra",
+      "stage": "pilot",
+      "progress": 60,
+      "status": "零售试点"
+    },
+    {
+      "name": "巴西",
+      "code": "BR",
+      "marker": "leaf",
+      "stage": "pilot",
+      "progress": 70,
+      "status": "Drex试点"
+    },
+    {
+      "name": "尼日利亚",
+      "code": "NG",
+      "marker": "check",
+      "stage": "launched",
+      "progress": 100,
+      "status": "eNaira推出"
+    },
+    {
+      "name": "巴哈马",
+      "code": "BS",
+      "marker": "wave",
+      "stage": "launched",
+      "progress": 100,
+      "status": "Sand Dollar"
+    }
+  ],
+  "columns": {
+    "market": "国家/地区",
+    "phase": "当前阶段",
+    "design": "核心设计特点",
+    "interoperability": "互操作性进展"
+  },
+  "comparisonRows": [
+    {
+      "market": "中国 (e-CNY)",
+      "phase": "大规模试点",
+      "stage": "pilot",
+      "design": "双层运营，支持双离线支付",
+      "interoperability": "mBridge项目核心成员",
+      "interoperabilityStatus": "check"
+    },
+    {
+      "market": "欧盟 (Digital Euro)",
+      "phase": "准备阶段",
+      "stage": "pilot",
+      "design": "强调隐私保护，中介分发模式",
+      "interoperability": "欧元区内互通规划",
+      "interoperabilityStatus": "progress"
+    },
+    {
+      "market": "美国 (Digital Dollar)",
+      "phase": "研究阶段",
+      "stage": "research",
+      "design": "批发型优先，注重隐私合规",
+      "interoperability": "暂无具体跨境计划",
+      "interoperabilityStatus": "none"
+    },
+    {
+      "market": "巴哈马 (Sand Dollar)",
+      "phase": "正式推出",
+      "stage": "launched",
+      "design": "零售型，旨在提升普惠金融",
+      "interoperability": "与万事达卡合作发卡",
+      "interoperabilityStatus": "link"
+    }
+  ],
+  "footerText": "金融行业战略分析报告 | 绝密资料",
+  "pageNumber": "17"
+}

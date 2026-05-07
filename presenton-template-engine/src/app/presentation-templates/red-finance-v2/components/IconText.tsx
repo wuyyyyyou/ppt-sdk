@@ -14,6 +14,7 @@ type IconTextProps = {
   fontSize?: number;
   fontWeight?: CSSProperties["fontWeight"];
   textColor?: string;
+  noWrap?: boolean;
 };
 
 const IconText = ({
@@ -27,6 +28,7 @@ const IconText = ({
   fontSize = 16,
   fontWeight = 500,
   textColor = redFinanceTheme.colors.backgroundText,
+  noWrap = true,
 }: IconTextProps) => {
   return (
     <StableInlineRow
@@ -46,10 +48,10 @@ const IconText = ({
         {icon}
       </div>
       <div
-        className="flex items-center whitespace-nowrap"
+        className={["flex items-center", noWrap ? "whitespace-nowrap" : "whitespace-normal"].join(" ")}
         style={{
-          height,
-          lineHeight: `${height}px`,
+          height: noWrap ? height : undefined,
+          lineHeight: noWrap ? `${height}px` : 1.35,
           width: textWidth ? `${textWidth}px` : undefined,
           minWidth: minTextWidth ? `${minTextWidth}px` : undefined,
           fontWeight,

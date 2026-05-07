@@ -14,6 +14,7 @@ export interface ElementAttributes {
   textHtml?: string;
   textLength?: number;
   directTextLength?: number;
+  descendantTextLeafCount?: number;
   childElementCount?: number;
   graphicSignalCount?: number;
   opacity?: number;

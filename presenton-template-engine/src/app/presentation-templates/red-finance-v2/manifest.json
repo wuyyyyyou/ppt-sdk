@@ -161,6 +161,16 @@
         "path": "./slides/DigitalCurrencyOverviewTaxonomy.tsx"
       },
       "data_path": "./data/digital-currency-overview-taxonomy.json"
+    },
+    {
+      "id": "red-finance-v2-global-cbdc-status-comparison",
+      "title": "全球CBDC发展现状对比",
+      "speaker_note": "对比页：用于比较主要经济体和代表国家的 CBDC 推进阶段、设计重点与互操作性进展。",
+      "source": {
+        "type": "local",
+        "path": "./slides/GlobalCbdcStatusComparison.tsx"
+      },
+      "data_path": "./data/global-cbdc-status-comparison.json"
     }
   ]
 }

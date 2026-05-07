@@ -1,9 +1,12 @@
-import React from "react";
+import React, { type ReactNode } from "react";
 
 type StatusPillProps = {
   label: string;
   backgroundColor: string;
   textColor: string;
+  leadingDotColor?: string;
+  leadingIcon?: ReactNode;
+  gap?: number;
   minWidth?: number;
   height?: number;
   paddingX?: number;
@@ -17,6 +20,9 @@ const StatusPill = ({
   label,
   backgroundColor,
   textColor,
+  leadingDotColor,
+  leadingIcon,
+  gap = 8,
   minWidth = 76,
   height = 22,
   paddingX = 12,
@@ -42,9 +48,31 @@ const StatusPill = ({
       borderRadius,
       fontSize,
       fontWeight,
+      gap,
     }}
   >
-    {label}
+    {leadingIcon ? (
+      <span
+        className="flex flex-none items-center justify-center"
+        style={{
+          width: fontSize,
+          height: fontSize,
+        }}
+      >
+        {leadingIcon}
+      </span>
+    ) : null}
+    {!leadingIcon && leadingDotColor ? (
+      <span
+        className="flex-none rounded-full"
+        style={{
+          width: Math.max(6, Math.round(fontSize * 0.65)),
+          height: Math.max(6, Math.round(fontSize * 0.65)),
+          backgroundColor: leadingDotColor,
+        }}
+      />
+    ) : null}
+    <span>{label}</span>
   </div>
 );
 

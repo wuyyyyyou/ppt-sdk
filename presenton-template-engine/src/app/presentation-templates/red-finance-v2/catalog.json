@@ -150,6 +150,16 @@
       "layout_pattern": "definition-plus-pill-row-taxonomy-cards-donut-table",
       "suitable_for": ["分类概述", "概念澄清", "结构对比", "占比概览"],
       "key_components": ["FinanceContentFrame", "IconText", "IconTextCard", "ChartCardShell", "FinanceDonutChart", "StableMatrixGrid"]
+    },
+    {
+      "id": "red-finance-v2-global-cbdc-status-comparison",
+      "title": "全球CBDC发展现状对比",
+      "source_path": "./slides/GlobalCbdcStatusComparison.tsx",
+      "data_path": "./data/global-cbdc-status-comparison.json",
+      "structure": "顶部阶段标签，中部 8 张国家进度卡，下方为设计与互操作性对比矩阵",
+      "layout_pattern": "stage-legend-plus-progress-card-grid-plus-comparison-table",
+      "suitable_for": ["CBDC 对比", "推进状态总览", "跨国 benchmark", "数字货币阶段分析"],
+      "key_components": ["FinanceContentFrame", "StatusPill", "ProgressStatusCard", "IconText", "StableMatrixGrid"]
     }
   ]
 }
