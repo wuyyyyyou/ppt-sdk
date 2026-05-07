@@ -4,6 +4,7 @@ import {
   FinanceIcon,
   type FinanceIconName,
 } from "./FinanceIcons.js";
+import SectionPanelShell from "./SectionPanelShell.js";
 import StableInlineRow from "./StableInlineRow.js";
 
 export type PillarBulletItem = {
@@ -110,18 +111,22 @@ const PillarBulletCard = ({
       : 1;
 
   return (
-    <div
-      className="relative flex h-full min-h-0 flex-col rounded-[8px] border"
-      style={{
-        paddingLeft: cardPaddingX,
-        paddingRight: cardPaddingX,
-        paddingTop: cardPaddingTop,
-        paddingBottom: cardPaddingBottom,
-        borderColor: "var(--stroke,#E5E7EB)",
-        backgroundColor: "var(--background-color,#FFFFFF)",
-        boxShadow: "0 4px 6px rgba(0,0,0,0.02)",
-      }}
+    <SectionPanelShell
+      className="relative h-full min-h-0 rounded-[8px]"
+      backgroundColor="var(--background-color,#FFFFFF)"
+      borderColor="var(--stroke,#E5E7EB)"
+      shadow="0 4px 6px rgba(0,0,0,0.02)"
+      radius={8}
+      paddingX={cardPaddingX}
+      paddingY={0}
     >
+      <div
+        style={{
+          paddingTop: cardPaddingTop,
+          paddingBottom: cardPaddingBottom,
+          minHeight: "100%",
+        }}
+      >
       <div
         className="absolute left-0 top-0 h-[6px] w-full"
         style={{ backgroundColor: accentColor }}
@@ -267,7 +272,8 @@ const PillarBulletCard = ({
           </div>
         ))}
       </div>
-    </div>
+      </div>
+    </SectionPanelShell>
   );
 };
 

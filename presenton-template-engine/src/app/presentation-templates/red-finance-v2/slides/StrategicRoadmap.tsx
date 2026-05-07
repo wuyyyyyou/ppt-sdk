@@ -4,9 +4,9 @@ import * as z from "zod";
 import FinanceContentFrame from "../components/FinanceContentFrame.js";
 import { FinanceIcon } from "../components/FinanceIcons.js";
 import FinanceSectionHeading from "../components/FinanceSectionHeading.js";
+import IconTextCard from "../components/IconTextCard.js";
 import IconText from "../components/IconText.js";
 import KpiMetricItem from "../components/KpiMetricItem.js";
-import ShortInfoCard from "../components/ShortInfoCard.js";
 import TimelineBoard from "../components/TimelineBoard.js";
 
 const pillarIconSchema = z.enum(["customer", "pricing", "data", "ecosystem", "talent"]);
@@ -184,7 +184,7 @@ const StrategicRoadmap = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
               }}
             >
               {parsed.pillars.map((pillar, index) => (
-                <ShortInfoCard
+                <IconTextCard
                   key={`${pillar.titleLines.join("-")}-${index}`}
                   icon={resolvePillarIcon(pillar.icon)}
                   titleLines={pillar.titleLines}

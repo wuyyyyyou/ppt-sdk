@@ -1,0 +1,53 @@
+{
+  "title": "总结与展望",
+  "metaLabel": "CONCLUSION & OUTLOOK",
+  "conclusions": [
+    {
+      "icon": "chart-line",
+      "title": "非息驱动增强",
+      "description": "盈利模式正从传统息差依赖转向多元化收入结构，财富管理、资产托管与投行业务协同将持续抬升轻资本业务贡献。"
+    },
+    {
+      "icon": "microchip",
+      "title": "数字能力为底座",
+      "description": "数据治理与 AI 基础设施已从 IT 投入升级为增长引擎，全行级数据湖与智能中台将支撑精细运营和敏捷创新。"
+    },
+    {
+      "icon": "shield",
+      "title": "风控与合规并重",
+      "description": "在创新提速的同时，需要同步强化网络安全、模型风险与跨境合规能力，构建主动型、智能化的全面风险管理体系。"
+    }
+  ],
+  "prioritiesTitle": "未来12个月优先事项",
+  "prioritiesTag": "Priorities",
+  "priorities": [
+    {
+      "title": "数据治理攻坚战",
+      "description": "完成主数据标准统一，消除核心系统之间的数据孤岛，夯实经营分析与风控建模底座。"
+    },
+    {
+      "title": "AI场景规模化落地",
+      "description": "聚焦智能客服、信贷审批辅助与营销 Copilot 三个场景，形成可复制的规模化交付路径。"
+    },
+    {
+      "title": "大财富管理体系构建",
+      "description": "整合私行与投行资源，面向高净值客户推出定制化全权委托与综合资产配置服务。"
+    }
+  ],
+  "successFactorsTitle": "关键成功要素",
+  "successFactorsTag": "Key Success Factors",
+  "successFactors": [
+    { "icon": "flag", "titleLines": ["一把手工程", "顶层推动"] },
+    { "icon": "database", "titleLines": ["数据与IT", "治理能力"] },
+    { "icon": "users", "titleLines": ["敏捷组织", "与人才"] }
+  ],
+  "nextStepsTitle": "后续动作",
+  "nextStepsTag": "Next Steps",
+  "nextSteps": [
+    { "action": "明确首批数字化试点项目清单", "timing": "T+1月" },
+    { "action": "确立季度关键里程碑与 KPI", "timing": "T+2月" },
+    { "action": "建立战略执行闭环复盘机制", "timing": "T+3月" }
+  ],
+  "footerText": "金融行业战略分析报告 | 绝密资料",
+  "pageNumber": "10"
+}

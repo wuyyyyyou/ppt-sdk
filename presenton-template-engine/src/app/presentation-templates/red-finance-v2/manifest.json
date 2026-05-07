@@ -101,6 +101,16 @@
         "path": "./slides/StrategicRoadmap.tsx"
       },
       "data_path": "./data/strategic-roadmap.json"
+    },
+    {
+      "id": "red-finance-v2-conclusion-outlook",
+      "title": "总结与展望",
+      "speaker_note": "总结页：用于收束关键结论、未来12个月优先事项、关键成功要素，以及后续动作建议。",
+      "source": {
+        "type": "local",
+        "path": "./slides/ConclusionOutlook.tsx"
+      },
+      "data_path": "./data/conclusion-outlook.json"
     }
   ]
 }

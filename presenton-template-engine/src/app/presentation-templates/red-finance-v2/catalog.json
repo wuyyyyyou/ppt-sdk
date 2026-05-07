@@ -39,7 +39,7 @@
       "structure": "上方 5 个趋势信号卡，下方左右并列两张预测图表卡",
       "layout_pattern": "top-trend-cards-bottom-dual-chart-panels",
       "suitable_for": ["市场趋势", "年度展望", "行业预测", "重点驱动因素"],
-      "key_components": ["FinanceContentFrame", "ShortInfoCard", "ChartCardShell", "FinanceLineChart", "FinanceBarChart"]
+      "key_components": ["FinanceContentFrame", "IconTextCard", "ChartCardShell", "FinanceLineChart", "FinanceBarChart"]
     },
     {
       "id": "red-finance-v2-banking-digital-transformation",
@@ -69,7 +69,7 @@
       "structure": "左侧为市场参与者短卡和五力分析列表，右侧为竞争维度对比矩阵表格",
       "layout_pattern": "left-cards-plus-analysis-right-comparison-table",
       "suitable_for": ["竞争格局", "市场对比", "战略定位", "差异化路径"],
-      "key_components": ["FinanceContentFrame", "ShortInfoCard", "InfoListItem", "StableMatrixGrid"]
+      "key_components": ["FinanceContentFrame", "IconTextCard", "InfoListItem", "StableMatrixGrid"]
     },
     {
       "id": "red-finance-v2-risk-management-compliance",
@@ -89,7 +89,17 @@
       "structure": "上方左侧战略愿景与右侧支柱短卡，中部横向执行路线图，下方 ROI 与 KPI 汇总区",
       "layout_pattern": "vision-plus-pillar-cards-plus-timeline-plus-summary-metrics",
       "suitable_for": ["战略规划", "执行路线图", "年度重点工作", "里程碑规划"],
-      "key_components": ["FinanceContentFrame", "FinanceSectionHeading", "ShortInfoCard", "TimelineBoard", "KpiMetricItem"]
+      "key_components": ["FinanceContentFrame", "FinanceSectionHeading", "IconTextCard", "TimelineBoard", "KpiMetricItem"]
+    },
+    {
+      "id": "red-finance-v2-conclusion-outlook",
+      "title": "总结与展望",
+      "source_path": "./slides/ConclusionOutlook.tsx",
+      "data_path": "./data/conclusion-outlook.json",
+      "structure": "顶部三张总结卡，中部左右并列两块总结面板，底部深色后续动作条",
+      "layout_pattern": "top-summary-cards-middle-dual-panels-bottom-next-steps-strip",
+      "suitable_for": ["总结页", "管理层结论", "行动建议", "下一步规划"],
+      "key_components": ["FinanceContentFrame", "IconTextCard", "SectionPanelShell"]
     }
   ]
 }

@@ -7,7 +7,7 @@ import MeasuredChartArea from "../components/MeasuredChartArea.js";
 import FinanceBarChart from "../components/FinanceBarChart.js";
 import FinanceLineChart from "../components/FinanceLineChart.js";
 import { FinanceIcon } from "../components/FinanceIcons.js";
-import ShortInfoCard from "../components/ShortInfoCard.js";
+import IconTextCard from "../components/IconTextCard.js";
 
 const trendIconSchema = z.enum([
   "robot",
@@ -129,7 +129,7 @@ const MarketTrends = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
           style={{ gridTemplateColumns: `repeat(${parsed.trends.length}, minmax(0, 1fr))` }}
         >
           {parsed.trends.map((trend, index) => (
-            <ShortInfoCard
+            <IconTextCard
               key={`${trend.title}-${index}`}
               icon={trend.icon}
               title={trend.title}

@@ -4,8 +4,8 @@ import * as z from "zod";
 import FinanceContentFrame from "../components/FinanceContentFrame.js";
 import { FinanceIcon } from "../components/FinanceIcons.js";
 import FinanceSectionHeading from "../components/FinanceSectionHeading.js";
+import IconTextCard from "../components/IconTextCard.js";
 import InfoListItem from "../components/InfoListItem.js";
-import ShortInfoCard from "../components/ShortInfoCard.js";
 import StableMatrixGrid from "../components/StableMatrixGrid.js";
 import { redFinanceTheme } from "../theme/tokens.js";
 
@@ -183,7 +183,7 @@ const CompetitiveLandscapeAnalysis = ({
             <FinanceSectionHeading title={parsed.participantsTitle} />
             <div className="grid grid-cols-2 gap-[6px]">
               {parsed.participants.map((item, index) => (
-                <ShortInfoCard
+                <IconTextCard
                   key={`${item.title}-${index}`}
                   icon={item.icon}
                   title={item.title}
