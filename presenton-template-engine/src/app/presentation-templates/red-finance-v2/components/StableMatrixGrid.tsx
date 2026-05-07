@@ -50,6 +50,7 @@ type StableMatrixGridProps = {
   shadow?: string;
   borderRadius?: number;
   rowHeaderAlign?: StableMatrixGridAlign;
+  headerPaddingY?: number;
 };
 
 function resolveTextAlign(align?: StableMatrixGridAlign): "left" | "center" | "right" {
@@ -106,6 +107,7 @@ const StableMatrixGrid = ({
   shadow = "0 4px 6px rgba(0,0,0,0.03)",
   borderRadius = 8,
   rowHeaderAlign = "center",
+  headerPaddingY: headerPaddingYOverride,
 }: StableMatrixGridProps) => {
   const isCompact = density === "compact";
   const isDense = density === "dense";
@@ -113,7 +115,7 @@ const StableMatrixGrid = ({
   const rowHeaderFontSize = isDense ? 13 : 14;
   const cellLeadFontSize = isDense ? 13 : 14;
   const cellSupportFontSize = isDense ? 10 : 11;
-  const headerPaddingY = isDense ? 12 : 15;
+  const headerPaddingY = headerPaddingYOverride ?? (isDense ? 12 : 15);
   const cellPaddingY = isDense ? 11 : isCompact ? 12 : 14;
   const rowHeaderLayoutStyle = buildCellLayoutStyle(rowHeaderWidth, "110px");
   const columnLayoutStyles = columns.map((column, index) =>

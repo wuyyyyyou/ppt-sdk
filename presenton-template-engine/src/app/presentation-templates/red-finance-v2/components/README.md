@@ -1,639 +1,143 @@
-# Red Finance V2 组件说明
-
-本目录存放 `red-finance-v2` 模板组的可复用视觉组件。
-
-这些组件的目标是让 AI 修改模板时能快速判断：
-
-- 页面结构应该在 `slides/*.tsx` 中调整
-- 可复用视觉单元应该在 `components/*.tsx` 中调整
-- 设计常量应该在 `theme/` 中调整
-- 未来稳定复用的区域骨架可以放入 `blueprints/`
-
-## 当前组件
-
-### `FinanceCanvas`
-
-固定的金融模板页画布。
-
-- 提供 `1280x720` 单页画布
-- 设置页面背景色、基础文字色和字体
-- 引入封面页需要的中英文字体
-- 每个 slide 通常只在根部使用一次
-
-适合修改：
-
-- 整页背景
-- 基础字体
-- 页面级默认颜色
-- 画布级统一样式
-
-不适合放入：
-
-- 某一页独有的业务内容
-- 某一页独有的复杂布局
-- 普通内容页的页眉、页脚、页码规则；这类结构优先使用 `FinanceContentFrame`
-
-### `FinanceContentFrame`
-
-普通内容页的基础画板。
-
-- 基于 `FinanceCanvas` 提供统一页眉、标题、右上角 meta、内容区、页脚和页码
-- 支持 `titleAccent="bottom"`，用于目录页这类标题下短红线
-- 支持 `titleAccent="left"`，用于行业概况、市场趋势等标题左侧短红线
-- 右上角 meta 使用 `IconText`，可表达品牌名、章节标签或页面状态
-- 页脚默认包含左侧灰色说明文字和右侧红色页码
-- 内容区默认保留底部留白，避免主体卡片或图表直接贴到页脚灰线
-
-适合修改：
-
-- 普通内容页共同的页眉、页脚、分割线位置
-- 标题强调条样式
-- 内容区默认边界、起始位置和底部留白
-
-不适合放入：
-
-- 封面页的大标题和封面专属图形
-- 某一页独有的卡片、图表或正文结构
-
-### `FinanceSectionFocusFrame`
-
-章节过渡页/战略聚焦页的基础画板。
-
-- 基于 `FinanceCanvas` 提供顶部强调条、底部 footer，以及左右分栏内容容器
-- 支持通过 `backgroundDecoration` 注入整页背景装饰，但不把具体主题图形写死
-- 适合“章节引入”“战略聚焦”“主题切换”这类非标准内容页
-
-适合修改：
-
-- 过渡页统一的顶部红条、底部页码和左右栏基础定位
-- 多个章节页共用的背景装饰承载层
-
-不适合放入：
-
-- 普通内容页的标题栏和 header divider；那类仍优先用 `FinanceContentFrame`
-- 某一页独有的 hero 文案和卡片结构
-
-### `FinanceIcon`
-
-金融主题的小图标组件。
-
-- 当前支持封面和目录页需要的小型业务图标，如 `bank`、`calendar`、`user`、`shield`、`list`、`chart-line`、`chart-pie` 等
-- 使用自包含的小型 SVG，SVG 内部直接写 `stroke`
-- 不依赖 `currentColor`、`stroke-current` 或外部 CSS 才能成立
-
-适合修改：
-
-- 新增模板组内常用图标
-- 扩展目录页或内容页的短标签图标
-- 调整图标的基础视觉风格
-- 保持图标在不同 slide 里的统一性
-
-注意：
-
-- 小型自包含 SVG 可以使用，但要保持简单、独立、样式明确
-- 不要依赖 `currentColor`、`fill-current`、`stroke-current` 或外部 class 控制关键颜色
-- 如果某个模块确实是图形主导，应按验证规则加上 `data-pptx-export="screenshot"`
-- 目录项这类 `数字 + 标题 + 图标` 的结构，标题仍应保持真实文本，图标只作为辅助视觉
-
-### `AgendaCard`
-
-目录页的单个章节卡片。
-
-- 表达 `编号 + 标题 + 图标` 这类目录项
-- 支持 `highlighted` 高亮态，用于标识当前页或重点章节
-- 保持标题为真实文本节点，方便导出 PPT 后继续编辑
-- 图标使用 `FinanceIcon`，只作为辅助视觉，不把整张卡片截图化
-
-适合修改：
-
-- 所有目录卡片的统一高度、边框、阴影和高亮样式
-- 编号、标题、图标之间的间距
-- 高亮态左侧强调条和背景色
-
-不适合放入：
-
-- 整个目录页的 grid 列数和间距；这些属于 `slides/AgendaGrid.tsx`
-- 目录项的业务文案；这些应来自 slide 的 `Schema` / manifest data
-
-### `InfoListItem`
-
-通用的信息条组件。
-
-- 表达 `圆形图标 + 标题 + 描述` 这类短说明结构
-- 支持可选底部分割线，适合组成纵向信息列表
-- 标题和描述都保持真实文本，方便导出 PPT 后继续编辑
-- 支持通过 `textScale` 在不改整体结构密度的前提下单独缩小文案
-- 支持通过 `titleSuffixReservedWidth` 给右上角徽标或状态标签预留不同宽度
-- 当前用于 `IndustryOverview` 左侧四条行业概况信息
-
-适合修改：
-
-- 信息列表里每一条的统一图标尺寸、标题字号、描述行高和分割线位置
-- 多个内容页都会复用的 `图标 + 文案` 结构
-
-不适合放入：
-
-- 整个列表的间距和列宽；这些属于具体 `slides/*.tsx`
-- 业务文案默认值；这些应来自 slide 的 `Schema` / manifest data
-- 图表、KPI 数字卡、复杂富文本
-
-### `FinanceSectionHeading`
-
-通用的小节标题组件。
-
-- 表达 `红色短竖条 + 标题 + 可选右侧副标题`
-- 适合内容页中的局部区块标题，避免每个 slide 重复手写同一套结构
-- 当前用于竞争格局页、风险管理页，以及战略路线图页的小节标题
-- 也适合数字人民币、运营架构、KPI、场景矩阵这类内容页里的短红线区块标题
-
-适合修改：
-
-- 小节标题的统一字号、间距、强调条颜色和副标题样式
-- 多个 slide 共用的 section heading 视觉
-
-不适合放入：
-
-- 页面主标题
-- 某一页独有的复杂标题排版
-
-### `InsightCallout`
-
-通用的重点启示条。
-
-- 表达 `图标 + 一段关键结论`
-- 默认使用红色背景，适合金融报告中的关键启示、管理建议或风险提示
-- 文本保持真实文本，便于 PPT 中继续编辑
-- 当前用于 `IndustryOverview` 左下方关键启示
-
-适合修改：
-
-- 启示条的统一颜色、图标、内边距和字号
-- 多个页面共用的重点提示视觉
-
-不适合放入：
-
-- 长段正文
-- 多条 bullet
-- 图表或复杂指标矩阵
-
-### `ChartCardShell`
-
-通用的图表背景卡片。
-
-- 提供图表标题、副标题和右上角标签
-- 用于包裹真实图表，不关心具体是柱状图还是折线图
-- 保留统一边框、底色、内边距和标题布局
-
-适合修改：
-
-- 图表卡统一外壳样式
-- 多种图表共用的标题区和标签区
-
-不适合放入：
-
-- 具体图表系列配置
-- 大段正文
-- 只适合页面层处理的布局逻辑
-
-### `MeasuredChartArea`
-
-图表测量容器。
-
-- 使用 `use-resize-observer` 读取当前容器的实际 `width/height`
-- 通过 render prop 把尺寸传给内部图表组件
-- 只有在拿到有效尺寸后才渲染图表，避免图表以 `0x0` 尺寸初始化
-- 当前 `FinanceBarChart` 和 `FinanceLineChart` 都依赖这种方式拿到稳定尺寸
-- 适合放在 `ChartCardShell` 内部，作为图表和外壳之间的尺寸桥接层
-
-适合修改：
-
-- 图表区域的最小高度
-- 图表容器的尺寸测量方式
-- 多个页面共用的图表渲染时机控制
-
-不适合放入：
-
-- 图表数据和系列配置
-- 图表标题、副标题和标签区
-- 页面级 grid、列宽和卡片布局
-
-### `FinanceBarChart`
-
-通用的金融柱状图组件。
-
-- 使用 Recharts 渲染分组/单组柱状图
-- 只负责图表本身，不负责外层标题壳
-- 适合复用到行业概况、收入结构等页面
-
-适合修改：
-
-- 柱状图数据、坐标轴、刻度和图例
-- 需要复用的金融类柱状图样式
-
-不适合放入：
-
-- 图表外壳标题区
-- 复杂页面布局
-
-### `FinanceLineChart`
-
-通用的金融折线图组件。
-
-- 使用 Recharts 渲染多折线趋势图
-- 只负责图表本身，不负责外层标题壳
-- 适合复用到预测趋势、渗透率趋势等页面
-
-适合修改：
-
-- 折线系列、坐标轴、刻度和图例
-- 需要复用的趋势类折线图样式
-
-不适合放入：
-
-- 图表外壳标题区
-- 复杂页面布局
-
-### `FinanceRadarChart`
-
-通用的金融雷达图组件。
-
-- 使用 Recharts 渲染多系列雷达图
-- 只负责图表本身，不负责外层标题壳
-- 支持多系列、虚线系列、刻度、图例预留高度
-- 适合复用到风险分布、能力评估、治理成熟度等页面
-
-适合修改：
-
-- 雷达图系列、刻度、角轴标签和填充样式
-- 需要复用的风险/能力类雷达图视觉
-
-不适合放入：
-
-- 图表外壳标题区
-- 大段正文
-- 页面级布局逻辑
-
-### `FinanceDonutChart`
-
-通用的金融占比环图组件。
-
-- 使用纯 `svg` 渲染环形分布和右侧图例，不依赖 Recharts
-- 表达 `中心标签 + 多段占比环 + 图例/百分比` 这类结构化占比图
-- 只负责图表本身，不负责标题壳；通常和 `ChartCardShell`、`MeasuredChartArea` 搭配
-- 支持根据容器实际尺寸收缩图例行高，避免在较矮卡片里出现图例溢出
-- 当前用于 `DigitalCurrencyOverviewTaxonomy` 页右侧市值分布图
-
-适合修改：
-
-- 环图线宽、中心标签、图例间距和百分比展示样式
-- 数字货币市值分布、收入构成、业务占比、渠道占比这类环图
-
-不适合放入：
-
-- 图表标题、副标题和右上角标签
-- 多层嵌套旭日图或复杂交互图
-- 页面级列宽和卡片布局
-
-### `IconTextCard`
-
-通用的图标文字卡组件。
-
-- 表达 `图标 + 标题`、`图标 + 标题 + 简短描述`，或更高密度的总结型卡片
-- 保持所有文本为真实文本节点，便于导出后继续编辑
-- 支持 `titleLines`、`align`、`density`、`accentColor`、`iconBackgroundColor`
-- 支持 `variant="summary"`、图标形状、标题字号、描述字号、最小高度等扩展能力
-- 当前用于 `MarketTrends` 顶部趋势卡、战略路线图页的支柱短卡，以及总结页顶部总结卡 / 关键成功要素卡
-
-适合修改：
-
-- 图标文字卡的统一边框、圆角、顶部分隔条、图标底色和紧凑度
-- 轻量卡与总结卡这类同语义卡片的视觉层级
-- 多个页面都会复用的 `icon + text` 卡片结构
-
-不适合放入：
-
-- 多层级 bullet 列表
-- 时间线节点语义
-- 图表或复杂数据结构
-
-### `SectionPanelShell`
-
-通用的内容分区壳子组件。
-
-- 表达带统一背景、边框、圆角和内边距的内容面板
-- 适合承载“未来12个月优先事项”“关键成功要素”这类 panel，也适合作为更复杂卡片的低层视觉壳子
-- 当前 `PillarBulletCard` 已基于它实现，第十页左右两块面板也直接复用
-
-适合修改：
-
-- panel 统一的背景色、边框色、圆角和内边距
-- 多个页面共用的浅灰内容壳子
-
-不适合放入：
-
-- 业务文案
-- 具体列表结构
-- 图表坐标系和时间线语义
-
-### `TimelineBoard`
-
-通用的路线图时间线面板。
-
-- 表达 `阶段节点 + 阶段标题 + 阶段事项列表` 的横向时间线
-- 使用普通 `div/flex` 结构绘制连接线和阶段卡，避免依赖复杂图形方案
-- 适合执行路线图、阶段性里程碑、年度推进计划等页面
-
-适合修改：
-
-- 时间线卡片的统一边框、节点圆点、连接线和 bullet 排版
-- 多个路线图类页面共用的阶段板式
-
-不适合放入：
-
-- 需要自由连线的流程图
-- 复杂甘特图
-- 需要真正图表坐标系的时间序列分析
-
-### `HorizontalFeatureCard`
-
-通用的横向内容卡组件。
-
-- 表达 `左侧强调条 + 图标 + 标题 + 可选 tag + 一段说明`
-- 适合纵向列出多条技术应用方向、能力场景、里程碑节点或方案模块
-- 当前用于 `FintechInnovationApplications` 右侧应用卡，也用于纵向时间线里的里程碑卡
-- 也适合承接 `数值主标题 + 标签说明 + 简短备注` 这类横向 KPI 摘要卡，不必再新增专用 KPI 卡组件
-- 也适合承接技术栈、架构层、能力层这类 `图标 + 标题 + 短说明` 的纵向分层卡，页面层负责外部连接线或分组壳
-- 和 `IconTextCard` 共享“图标信息卡”的视觉家族，但信息密度更高、布局是横向行卡，不建议直接当成同一个业务组件使用
-- 支持 `tone`、`density`、`minHeight`、自定义 rail/icon 配色，方便不同 slide 做有限变化而不再新增特化卡片
-
-适合修改：
-
-- 横向内容卡统一的左侧强调条、图标底板、标题区和 tag 样式
-- 技术应用、能力场景、架构分层、里程碑说明、方案模块、KPI 摘要卡这类中密度说明卡
-
-不适合放入：
-
-- 居中短卡信号提示；这种仍优先用 `IconTextCard`
-- 多图表混排
-- 长段正文或复杂富文本
-
-### `VerticalMilestoneTimeline`
-
-通用的纵向里程碑时间线组件。
-
-- 表达 `左侧 period/stage + 中轴线与圆点 + 右侧横向里程碑卡`
-- 使用普通 `div/flex` 结构绘制主轴、节点和连接线，避免依赖复杂图形方案
-- 当前用于 `IndustryDevelopmentTimeline` 页
-- 卡片部分直接复用 `HorizontalFeatureCard`，避免再新增时间线专属卡片组件
-
-适合修改：
-
-- 纵向时间线的年份区宽度、主轴位置、节点圆点、连接线和每行密度
-- 行业发展、政策演进、产品演化、阶段里程碑这类纵向时间叙事页面
-
-不适合放入：
-
-- 横向路线图；那类仍优先用 `TimelineBoard`
-- 复杂分叉流程图
-- 真正基于坐标轴的时序图表
-
-### `DualValueMetricCard`
-
-通用的双值对比指标卡组件。
-
-- 表达 `标题 + 左右两个核心数值 + 图例 + 进度条`
-- 适合中国/美国、当前/目标、方案 A / 方案 B 这类二元指标比较
-- 默认使用 `split` 模式表达双端占比条；也支持 `stacked` 模式表达两个独立评分条
-- 保持数值与文本都是独立真实文本，便于导出后继续编辑
-- 当前用于 `ChinaUsMarketComparison` 页上半区的四张指标卡
-- 也用于 `DigitalCurrencyArchitectureSecurity` 页的六个架构能力双评分卡，避免再新增相近的评分卡组件
-
-适合修改：
-
-- 双值指标卡统一的标题、图例、进度条和数值字号
-- 区域比较、方案比较、前后状态比较、能力评分对比这类双值摘要卡
-
-不适合放入：
-
-- 三个以上主体同时比较
-- 长段描述文本
-- 图表坐标系类可视化
-
-### `ComparisonPanel`
-
-通用的多段结构化对比面板组件。
-
-- 表达 `深色头部 + 标题 + 多段 badge/title/description 内容`
-- 不绑定国家语义，`CN/US` 只是数据层传入的 badge
-- 默认适合 2 段内容对比，也可放宽到 3-4 段
-- 当前用于 `ChinaUsMarketComparison` 页下半区三张面板
-
-适合修改：
-
-- 对比面板统一的 header、badge、分隔线和正文层级
-- 国家对比、渠道对比、方案对比、市场对比这类结构化文本面板
-
-不适合放入：
-
-- 规则矩阵表
-- 超过 4 段的长列表
-- 需要复杂自由排版的图文卡
-
-### `StableMatrixGrid`
-
-通用的稳定矩阵原语组件。
-
-- 使用 `div + css grid` 渲染，不依赖原生 `table`
-- 目标是兼顾 `HTML -> PPTX` 导出稳定性与文本可编辑性
-- 表达 `行头列 + 多个矩阵列 + 若干强调单元格` 这类结构化比较内容
-- 当前用于 `CompetitiveLandscapeAnalysis` 右侧竞争对比矩阵
-- 也适合 `场景分类 / 应用模式 / 核心价值` 这类轻量三列表格，无需再新增专用场景表组件
-
-支持的主要能力：
-
-- 行头标题、列标题、列宽控制
-- `lead/support` 两层单元格内容
-- 可选 `content` 自定义单元格内容，适合放状态标签、小徽标或轻量 ReactNode
-- 行、列、单元格级别的对齐控制
-- 行级斑马纹、分隔线、行头底色
-- 列级或单元格级 accent 强调
-- 单元格级颜色和字重覆盖
-- 额外覆盖一层最上层边框 overlay，减少 `HTML -> PPTX` 时内部白色 cell 遮住外框的问题
-
-适合修改：
-
-- 列宽、行头宽度、表头样式
-- 强调列、强调单元格、斑马纹规则
-- 竞争对比、能力对比、策略路径矩阵、场景映射表
-
-不适合放入：
-
-- 可排序、可筛选、可分页的数据表
-- 数百行数据
-- 复杂交互型数据网格
-
-### `StatusPill`
-
-通用的状态标签/底色胶囊组件。
-
-- 表达 `有颜色背景 + 单行短文本` 这类紧凑状态块
-- 支持自定义背景色、文字色、最小宽度、高度、圆角、字号和左右内边距
-- 支持可选 `leadingDotColor` / `leadingIcon`，适合把短状态标签升级成 `圆点/小图标 + 文本` 的阶段 pill
-- 目标是统一多页里风险等级、状态标签、波动性标签、短 badge 的尺寸和对齐
-- 当前用于 `DigitalCurrencyOverviewTaxonomy` 页的波动性标签，以及 `CompetitiveLandscapeAnalysis` 页的五力等级小标签
-
-适合修改：
-
-- 各类短状态块的统一高度、最小宽度、圆角和字号
-- 各类阶段、状态、风险级别 pill 的图标/圆点前导样式
-- 风险等级、状态、阶段、短 badge 这类轻量标签
-
-不适合放入：
-
-- 多行正文
-- 复杂图标组合或长标题卡片
-- 需要大段说明文字的面板
-
-### `ProgressStatusCard`
-
-通用的进度状态卡组件。
-
-- 表达 `标题 + 右上角标识 + 单条进度条 + 底部状态说明`
-- 适合 rollout、成熟度、试点推进、 adoption 进展这类单主体状态卡
-- 保持标题和状态说明都为真实文本，便于导出后继续编辑
-- 当前用于 `GlobalCbdcStatusComparison` 页中部国家进度卡网格
-
-适合修改：
-
-- 进度卡统一的边框、圆角、阴影、进度条高度和标题层级
-- 各类单主体进展、成熟度、覆盖度状态卡
-
-不适合放入：
-
-- 左右双值对比；那类仍优先用 `DualValueMetricCard`
-- 多段正文说明
-- 复杂图表或多系列指标
-
-### `PillarBulletCard`
-
-通用的支柱要点卡片组件。
-
-- 表达 `编号 + 图标 + 标题 + 多条抓手说明`
-- 适合承载多张同构的战略支柱、能力模块或重点举措卡片
-- 标题和条目说明都保持真实文本，便于导出 PPT 后继续编辑
-- 条目圆点使用固定首行高度盒对齐，减少导出到 PPT 后与首行文字的上下漂移
-- 支持通过 `density` 控制卡片在高密度页面中的压缩版本
-- 当前基于 `SectionPanelShell` 实现，复用统一 panel 壳子视觉
-
-适合修改：
-
-- 卡片统一的红色顶边、编号、水印感数字和图标底板
-- 支柱卡里的条目间距、分隔线和正文层级
-
-不适合放入：
-
-- 跨卡片的整体 grid 布局
-- KPI 数字条
-- 图表容器
-
-### `StableInlineRow`
-
-通用的稳定行内对齐原语。
-
-- 表达 `多个元素同一行居中对齐` 这类容易在 HTML -> PPT 导出时失真的结构
-- 接收任意 `children`，适合让 AI Agent 自己拼接 `图标 + 文字`、`数字 + 单位 + 标签`、`徽标 + 标签 + 状态` 等组合
-- 通过固定 `height`、显式 `items-center`、可控 `gap`，减少导出后文字盒和图形盒的垂直漂移
-- 支持 `inline` 切换 `inline-flex` / `flex`，支持 `wrap` 控制是否允许换行
-- `IconText` 和 `KpiMetricItem` 都基于它实现；多行 bullet 文本不应强行塞进单行组件，而应沿用同样的固定首行盒模型
-
-适合修改：
-
-- 多个单行元素的对齐关系
-- 通用的间距、固定高度、是否允许换行
-- 需要暴露给 AI Agent 直接组合的稳定行内结构
-
-不适合放入：
-
-- 多行长正文
-- 图表
-- 复杂卡片的整块布局
-- 强依赖业务语义的特化视觉样式
-
-### `KpiMetricItem`
-
-通用的 `数值 + 指标说明` 组件。
-
-- 表达 `60%+ 数字渠道渗透率` 这类紧凑 KPI
-- 基于 `StableInlineRow` 固定数值和说明文字的对齐关系，提升 PPTX 导出稳定性
-- 适合多个页面复用这类横向指标项
-
-适合修改：
-
-- 数值和说明的字号、字重、间距
-- 紧凑 KPI 项的统一对齐方式
-
-不适合放入：
-
-- 整个 KPI 条的背景和外层布局
-- 多行长段说明
-- 图表或复杂卡片结构
-
-### `IconText`
-
-通用的 `图标 + 单行文本` 组件。
-
-- 当前用于顶部品牌名、底部日期、报告人、密级，以及 KPI 标题这类短信息
-- 通过 `height`、`iconSize`、`gap`、`fontSize`、`fontWeight` 控制不同尺寸
-- 通过 `textWidth` 或 `minTextWidth` 给关键单行文本明确宽度
-- 基于 `StableInlineRow` 保证文本不换行，并使用固定高度文本盒提升 PPT 导出对齐稳定性
-
-适合修改：
-
-- 图标和文字组成的短标签
-- 品牌名、日期、作者、密级等单行信息
-- 图标和文字的对齐方式
-- 单行信息的字体大小、字重、间距、固定宽度
-
-不适合放入：
-
-- 多行正文
-- 图表
-- 页面主体内容块
-- 需要复杂换行或富文本混排的内容
-
-### `CoverBarDecoration`
-
-封面页右侧固定柱状装饰。
-
-- 只表达金融、增长、趋势的视觉氛围
-- 不是数据图表，不承载真实业务数值
-- 内部柱子的数量、高度、透明度由组件固定
-- 使用 `data-pptx-export="screenshot"` 作为纯装饰整体导出，减少 PPT 中零散图形对象
-
-适合修改：
-
-- 整组装饰的位置和显示开关，优先在 `slides/CoverHero.tsx` 中调整
-- 整组装饰的视觉风格，才修改本组件
-
-不适合放入：
-
-- 真实指标数据
-- 可配置的图表序列
-- 需要用户逐项编辑的柱形图
-
-## AI 修改建议
-
-- 修改某一页的内容和布局，优先看 `slides/*.tsx`
-- 修改多个页面都会复用的视觉单元，再改 `components/*.tsx`
-- 修改颜色、字体、基础 token，优先看 `theme/tokens.ts`
-- 新增普通内容页时，优先用 `FinanceContentFrame` 包住页面主体；封面页才直接使用 `FinanceCanvas`
-- 装饰性视觉不要暴露过细的数据参数；如果只是氛围图形，保留显示开关即可
-- 真实图表和纯装饰柱状图要分开：`FinanceBarChart` / `FinanceLineChart` 表达数据，`CoverBarDecoration` 只表达封面氛围
-- 图表类组件默认截图化，但不要把图表旁边的大段说明文字一起包进截图
-- 不要把最终业务文案硬编码在组件里，业务内容应尽量来自 slide 的 `Schema`
-- 关键文字必须保留为真实文本节点，方便后续 PPT 中继续编辑
-- 固定高度的单行组合，优先使用 `StableInlineRow`，不要在 slide 里重复手写一套 `flex` / `inline-flex` 对齐结构
-- 遇到 `图标 + 单行文本` 这类已有明确语义的结构，优先使用 `IconText`
-- 多行 bullet 正文不要强行塞进 `StableInlineRow`；应改用“固定首行高度 + 文本自然换行”的写法
-- 关键线条优先使用独立 `div`，不要依赖单边 border 或伪元素
-- 组件要保持轻量、纯渲染，不要依赖 `window`、`document` 或运行时网络请求
+# Red Finance V2 组件索引
+
+本目录存放 `red-finance-v2` 模板组的可复用视觉组件。组件只负责稳定的视觉单元和导出友好的结构；页面级布局、业务文案和数据默认值应优先放在 `slides/*.tsx` 与 `data/*.json` 中。
+
+## 使用原则
+
+- 页面主结构放在 `slides/*.tsx`，不要把整页业务逻辑塞进组件。
+- 多页复用的视觉单元放在 `components/*.tsx`，保持轻量、纯渲染。
+- 颜色、字体、阴影等常量优先来自 `theme/tokens.ts`。
+- 关键文字保持真实文本节点，避免整块截图化。
+- 图表和复杂 SVG 可截图兜底，但旁边的标题、说明、结论仍应保持可编辑文本。
+
+## 组件总览
+
+| 组件 | 分层 | 主要用途 | 常见依赖 |
+| --- | --- | --- | --- |
+| `FinanceCanvas` | 画布基础 | 固定 1280x720 页面画布、背景、基础字体 | `theme/tokens` |
+| `FinanceContentFrame` | 页面框架 | 普通内容页标题、meta、内容区、页脚、页码 | `FinanceCanvas`, `IconText` |
+| `FinanceSectionFocusFrame` | 页面框架 | 章节过渡页、战略聚焦页的左右分栏画板 | `FinanceCanvas` |
+| `CoverBarDecoration` | 装饰 | 封面右侧金融柱状氛围图 | `theme/tokens` |
+| `FinanceIcon` | 基础原语 | 金融主题自包含 SVG 图标 | `theme/tokens` |
+| `StableInlineRow` | 基础原语 | 稳定的单行横向对齐 | - |
+| `IconText` | 基础原语 | 图标 + 单行文本 | `StableInlineRow` |
+| `StatusPill` | 基础原语 | 状态、阶段、风险等级等短标签 | `IconText` |
+| `KpiMetricItem` | 基础原语 | 数值 + 指标说明的紧凑 KPI | `StableInlineRow` |
+| `FinanceSectionHeading` | 基础原语 | 红色短竖条 + 小节标题 | `theme/tokens` |
+| `SectionPanelShell` | 容器壳 | 通用浅色内容面板 | `theme/tokens` |
+| `ChartCardShell` | 容器壳 | 图表标题、副标题、标签和内容壳 | - |
+| `MeasuredChartArea` | 图表辅助 | 测量容器尺寸后再渲染图表 | `use-resize-observer` |
+| `AgendaCard` | 卡片 | 目录页章节卡片 | `FinanceIcon` |
+| `InfoListItem` | 卡片 | 图标 + 标题 + 描述的信息条 | `FinanceIcon` |
+| `InsightCallout` | 卡片 | 图标 + 关键结论提示条 | `FinanceIcon` |
+| `IconTextCard` | 卡片 | 图标文字短卡、总结卡 | `FinanceIcon` |
+| `HorizontalFeatureCard` | 卡片 | 横向功能/能力/KPI 说明卡 | `FinanceIcon` |
+| `PillarBulletCard` | 卡片 | 编号 + 图标 + 标题 + 多条抓手 | `SectionPanelShell`, `StableInlineRow`, `FinanceIcon` |
+| `DualValueMetricCard` | 卡片 | 左右双值对比指标卡 | `IconText` |
+| `ProgressStatusCard` | 卡片 | 单主体进度状态卡 | `theme/tokens` |
+| `ComparisonPanel` | 卡片 | 多段结构化对比面板 | `IconText` |
+| `FinanceBarChart` | 图形 | 金融柱状图 | `Recharts` |
+| `FinanceLineChart` | 图形 | 金融折线图 | `Recharts` |
+| `FinanceRadarChart` | 图形 | 多系列能力/风险雷达图 | `Recharts` |
+| `FinanceDonutChart` | 图形 | SVG 环形占比图 | `theme/tokens` |
+| `StableMatrixGrid` | 结构化组件 | 可编辑矩阵/对比表 | `theme/tokens` |
+| `TimelineBoard` | 结构化组件 | 横向路线图阶段面板 | `theme/tokens` |
+| `VerticalMilestoneTimeline` | 结构化组件 | 纵向里程碑时间线 | `HorizontalFeatureCard` |
+
+## 分层说明
+
+### 1. 页面框架与画布
+
+- `FinanceCanvas` 是最低层画布。封面等特殊页可直接使用；普通内容页不要重复手写画布。
+- `FinanceContentFrame` 是普通内容页首选框架，统一标题、右上角 meta、内容区、页脚和页码。
+- `FinanceSectionFocusFrame` 用于章节过渡、战略聚焦、主题切换等非标准内容页。
+- `CoverBarDecoration` 是封面装饰，不承载真实数据；如果需要真实柱状图，使用 `FinanceBarChart`。
+
+### 2. 基础原语
+
+- `FinanceIcon` 提供金融主题图标，适合按钮、卡片、meta、列表项等辅助视觉。
+- `StableInlineRow` 解决导出时单行元素垂直漂移问题，适合 `图标 + 文本`、`数字 + 单位` 等组合。
+- `IconText` 是 `图标 + 单行文本` 的语义封装，适合品牌、日期、作者、密级、短标签。
+- `StatusPill` 用于状态、阶段、风险等级等短 badge。
+- `KpiMetricItem` 用于紧凑 KPI，不负责外层卡片背景。
+- `FinanceSectionHeading` 用于内容区小节标题，不用于页面主标题。
+
+### 3. 容器壳
+
+- `SectionPanelShell` 是通用浅色面板壳，适合作为复杂卡片或页面局部面板的底座。
+- `ChartCardShell` 只负责图表外壳和标题区，不负责具体图表。
+- `MeasuredChartArea` 是图表尺寸桥接层，通常放在 `ChartCardShell` 内，再渲染具体图表。
+
+### 4. 卡片组件
+
+- `AgendaCard`：目录项，表达 `编号 + 标题 + 图标`。
+- `InfoListItem`：纵向信息列表项，表达 `图标 + 标题 + 描述`。
+- `InsightCallout`：单条重点启示或风险提示。
+- `IconTextCard`：轻量图标文字卡，适合趋势、要点、总结类短内容。
+- `HorizontalFeatureCard`：中密度横向说明卡，适合能力场景、技术应用、架构分层、KPI 摘要。
+- `PillarBulletCard`：战略支柱或能力模块卡，内部承载多条 bullet。
+- `DualValueMetricCard`：两个主体或两个状态的指标对比。
+- `ProgressStatusCard`：单主体进度、成熟度、覆盖度状态。
+- `ComparisonPanel`：结构化文本对比，适合国家、渠道、方案、市场等多段比较。
+
+### 5. 图形组件
+
+- `FinanceBarChart`、`FinanceLineChart`、`FinanceRadarChart` 基于 Recharts，只负责图表本体。
+- `FinanceDonutChart` 使用 SVG 实现环形占比图，适合市值分布、收入构成、渠道占比等场景。
+- 图形组件通常搭配 `ChartCardShell` 和 `MeasuredChartArea` 使用；不要把图表标题、结论段落写进图表组件。
+
+### 6. 结构化组件
+
+- `StableMatrixGrid` 是可编辑矩阵/表格原语，适合竞争对比、能力矩阵、场景映射，不适合大数据表、排序分页表。
+- `TimelineBoard` 是横向路线图，适合阶段计划、年度推进、执行路径。
+- `VerticalMilestoneTimeline` 是纵向时间叙事，内部复用 `HorizontalFeatureCard`，适合行业发展、政策演进、产品演化。
+
+## 依赖关系
+
+常见组合方式：
+
+```text
+FinanceCanvas
+├─ FinanceContentFrame
+│  └─ IconText
+│     └─ StableInlineRow
+└─ FinanceSectionFocusFrame
+
+ChartCardShell
+└─ MeasuredChartArea
+   ├─ FinanceBarChart
+   ├─ FinanceLineChart
+   ├─ FinanceRadarChart
+   └─ FinanceDonutChart
+
+SectionPanelShell
+└─ PillarBulletCard
+   └─ StableInlineRow
+
+HorizontalFeatureCard
+└─ VerticalMilestoneTimeline
+
+IconText
+├─ StatusPill
+├─ DualValueMetricCard
+└─ ComparisonPanel
+```
+
+依赖选择规则：
+
+- 需要整页框架：先选 `FinanceContentFrame` 或 `FinanceSectionFocusFrame`。
+- 需要稳定单行对齐：先选 `StableInlineRow`，有明确图标文本语义时选 `IconText`。
+- 需要图表：`ChartCardShell` 负责外壳，`MeasuredChartArea` 负责尺寸，具体图表只负责绘制。
+- 需要卡片：优先复用已有卡片；只有出现新的稳定语义时才新增组件。
+- 需要表格/矩阵：优先用 `StableMatrixGrid`，不要在 slide 中临时拼一套表格样式。
+
+## AI 修改规则
+
+- 改某一页的布局、列宽、数据映射：优先改 `slides/*.tsx`。
+- 改某一页的默认内容：优先改 `data/*.json` 和对应 `Schema`。
+- 改多个页面共享的视觉单元：再改 `components/*.tsx`。
+- 改颜色、字体、阴影、边框：优先改 `theme/tokens.ts`。
+- 不要在组件里硬编码业务文案，默认内容应来自 slide schema 或 data。
+- 不要新增与 `IconTextCard`、`HorizontalFeatureCard`、`PillarBulletCard`、`StableMatrixGrid` 语义高度重叠的特化组件。
+- 多行正文不要塞进 `StableInlineRow`；它只适合单行稳定对齐。
+- 纯装饰可以截图化；核心标题、表格文字、KPI 数值和说明文字应保持可编辑。

@@ -345,6 +345,7 @@ const DigitalRmbArchitectureKpis = ({
                 rowHeaderWidth={tableDensity === "dense" ? 120 : 132}
                 rowHeaderAlign="center"
                 density={tableDensity}
+                headerPaddingY={10}
                 headerBackgroundColor="#FAFAFA"
                 headerTextColor={redFinanceTheme.colors.primary}
                 rowHeaderBackgroundColor="#FCFCFC"
