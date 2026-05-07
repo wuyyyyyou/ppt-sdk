@@ -1,6 +1,7 @@
 import React, { type ReactNode } from "react";
 
 import { redFinanceTheme } from "../theme/tokens.js";
+import IconText from "./IconText.js";
 
 type DualValueMetricCardProps = {
   title: string;
@@ -91,20 +92,36 @@ const DualValueMetricCard = ({
         className="mb-[7px] flex items-center justify-between font-medium leading-none"
         style={{ fontSize: 11, color: "#8A8A8A" }}
       >
-        <div className="flex items-center gap-[6px]">
-          <div
-            className="h-[8px] w-[8px] rounded-full"
-            style={{ backgroundColor: leftColor }}
-          />
-          <span>{leftLabel}</span>
-        </div>
-        <div className="flex items-center gap-[6px]">
-          <div
-            className="h-[8px] w-[8px] rounded-full"
-            style={{ backgroundColor: rightColor }}
-          />
-          <span>{rightLabel}</span>
-        </div>
+        <IconText
+          icon={
+            <div
+              className="h-[8px] w-[8px] rounded-full"
+              style={{ backgroundColor: leftColor }}
+            />
+          }
+          label={leftLabel}
+          height={16}
+          iconSize={8}
+          gap={6}
+          fontSize={11}
+          fontWeight={500}
+          textColor="#8A8A8A"
+        />
+        <IconText
+          icon={
+            <div
+              className="h-[8px] w-[8px] rounded-full"
+              style={{ backgroundColor: rightColor }}
+            />
+          }
+          label={rightLabel}
+          height={16}
+          iconSize={8}
+          gap={6}
+          fontSize={11}
+          fontWeight={500}
+          textColor="#8A8A8A"
+        />
       </div>
 
       <div

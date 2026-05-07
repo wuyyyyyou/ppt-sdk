@@ -1,6 +1,7 @@
 import React, { type ReactNode } from "react";
 
 import { redFinanceTheme } from "../theme/tokens.js";
+import IconText from "./IconText.js";
 
 export type ComparisonPanelSection = {
   badge: string;
@@ -58,8 +59,16 @@ const ComparisonPanel = ({
           color: headerTextColor,
         }}
       >
-        {icon ? <div className="flex-none">{icon}</div> : null}
-        <div className="min-w-0 text-[14px] font-bold leading-none">{title}</div>
+        <IconText
+          icon={icon ?? <></>}
+          label={title}
+          height={headerHeight}
+          iconSize={18}
+          gap={10}
+          fontSize={14}
+          fontWeight={700}
+          textColor={headerTextColor}
+        />
       </div>
 
       <div
