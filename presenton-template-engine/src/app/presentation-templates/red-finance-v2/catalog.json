@@ -9,7 +9,48 @@
       "structure": "左上品牌与标签，左中双行大标题，左下元信息，右侧为纯装饰柱状体块",
       "layout_pattern": "cover-hero-left-title-right-decoration",
       "suitable_for": ["封面", "战略报告开场", "正式型行业汇报"],
-      "key_components": ["FinanceCanvas", "IconText", "CoverBarDecoration"]
+      "key_components": ["FinanceCanvas", "IconText", "CoverBarDecoration"],
+      "component_slots": [
+        {
+          "name": "brand-meta",
+          "purpose": "品牌、标签或右上角元信息",
+          "can_recompose": false
+        },
+        {
+          "name": "hero-title",
+          "purpose": "封面主标题",
+          "can_recompose": true
+        },
+        {
+          "name": "subtitle-ribbon",
+          "purpose": "副标题色带",
+          "can_recompose": true
+        },
+        {
+          "name": "report-meta",
+          "purpose": "日期、作者、密级等报告元信息",
+          "can_recompose": true
+        },
+        {
+          "name": "decorative-visual",
+          "purpose": "装饰性视觉区",
+          "can_recompose": true
+        }
+      ],
+      "fixed_components": ["FinanceCanvas"],
+      "replaceable_components": ["IconText", "CoverBarDecoration"],
+      "component_families": ["page-shell", "primitive"],
+      "density_range": ["medium", "high"],
+      "composition_options": [
+        "调整标题分行和装饰柱体显示",
+        "弱化或强化右侧视觉权重",
+        "替换元信息字段"
+      ],
+      "agent_notes": [
+        "先根据 component_slots 判断内容块能否重组，再决定是否改 TSX。",
+        "固定组件优先保留，replaceable_components 可按 components/README.md 的同家族组件替换。",
+        "最终以 source_path 对应 TSX 的 Schema 和实际 props 为准。"
+      ]
     },
     {
       "id": "red-finance-v2-agenda",
@@ -19,7 +60,43 @@
       "structure": "顶部标题区，主体为 10 宫格目录卡片，右上品牌标签，底部说明和页码",
       "layout_pattern": "title-plus-agenda-grid",
       "suitable_for": ["目录", "章节导览", "汇报结构总览"],
-      "key_components": ["FinanceContentFrame", "AgendaCard", "IconText"]
+      "key_components": ["FinanceContentFrame", "AgendaCard", "IconText"],
+      "component_slots": [
+        {
+          "name": "page-title",
+          "purpose": "页面标题区",
+          "can_recompose": true
+        },
+        {
+          "name": "agenda-grid",
+          "purpose": "目录卡片网格",
+          "can_recompose": true
+        },
+        {
+          "name": "brand-meta",
+          "purpose": "品牌、标签或右上角元信息",
+          "can_recompose": false
+        },
+        {
+          "name": "footer-note",
+          "purpose": "底部说明或页脚信息",
+          "can_recompose": false
+        }
+      ],
+      "fixed_components": ["FinanceContentFrame"],
+      "replaceable_components": ["AgendaCard", "IconText"],
+      "component_families": ["page-shell", "card", "primitive"],
+      "density_range": ["medium", "high"],
+      "composition_options": [
+        "减少目录项形成更疏朗结构",
+        "按章节分组重排目录卡",
+        "替换图标强调不同叙事线"
+      ],
+      "agent_notes": [
+        "先根据 component_slots 判断内容块能否重组，再决定是否改 TSX。",
+        "固定组件优先保留，replaceable_components 可按 components/README.md 的同家族组件替换。",
+        "最终以 source_path 对应 TSX 的 Schema 和实际 props 为准。"
+      ]
     },
     {
       "id": "red-finance-v2-industry-overview",
@@ -29,7 +106,49 @@
       "structure": "左侧纵向信息条，右侧柱状图，底部关键启示横条",
       "layout_pattern": "left-text-right-bar-chart-bottom-callout",
       "suitable_for": ["行业概况", "市场总量", "规模趋势", "业务重心"],
-      "key_components": ["FinanceContentFrame", "InfoListItem", "ChartCardShell", "FinanceBarChart", "InsightCallout"]
+      "key_components": [
+        "FinanceContentFrame",
+        "InfoListItem",
+        "ChartCardShell",
+        "FinanceBarChart",
+        "InsightCallout"
+      ],
+      "component_slots": [
+        {
+          "name": "info-list",
+          "purpose": "左侧结构化信息列表",
+          "can_recompose": true
+        },
+        {
+          "name": "chart-panel",
+          "purpose": "图表卡片区",
+          "can_recompose": true
+        },
+        {
+          "name": "insight-callout",
+          "purpose": "关键结论提示条",
+          "can_recompose": true
+        }
+      ],
+      "fixed_components": ["FinanceContentFrame"],
+      "replaceable_components": [
+        "InfoListItem",
+        "ChartCardShell",
+        "FinanceBarChart",
+        "InsightCallout"
+      ],
+      "component_families": ["page-shell", "primitive", "chart", "card"],
+      "density_range": ["medium", "high"],
+      "composition_options": [
+        "左侧信息条数量可在 3-6 条间变化",
+        "右侧图表可替换为趋势或结构图",
+        "底部 callout 可改成风险提示"
+      ],
+      "agent_notes": [
+        "先根据 component_slots 判断内容块能否重组，再决定是否改 TSX。",
+        "固定组件优先保留，replaceable_components 可按 components/README.md 的同家族组件替换。",
+        "最终以 source_path 对应 TSX 的 Schema 和实际 props 为准。"
+      ]
     },
     {
       "id": "red-finance-v2-market-trends",
@@ -39,7 +158,49 @@
       "structure": "上方 5 个趋势信号卡，下方左右并列两张预测图表卡",
       "layout_pattern": "top-trend-cards-bottom-dual-chart-panels",
       "suitable_for": ["市场趋势", "年度展望", "行业预测", "重点驱动因素"],
-      "key_components": ["FinanceContentFrame", "IconTextCard", "ChartCardShell", "FinanceLineChart", "FinanceBarChart"]
+      "key_components": [
+        "FinanceContentFrame",
+        "IconTextCard",
+        "ChartCardShell",
+        "FinanceLineChart",
+        "FinanceBarChart"
+      ],
+      "component_slots": [
+        {
+          "name": "trend-card-row",
+          "purpose": "趋势信号卡片行",
+          "can_recompose": true
+        },
+        {
+          "name": "left-chart-panel",
+          "purpose": "左侧图表卡片",
+          "can_recompose": true
+        },
+        {
+          "name": "right-chart-panel",
+          "purpose": "右侧图表卡片",
+          "can_recompose": true
+        }
+      ],
+      "fixed_components": ["FinanceContentFrame"],
+      "replaceable_components": [
+        "IconTextCard",
+        "ChartCardShell",
+        "FinanceLineChart",
+        "FinanceBarChart"
+      ],
+      "component_families": ["page-shell", "card", "chart"],
+      "density_range": ["medium", "high"],
+      "composition_options": [
+        "上方趋势卡数量可调整",
+        "双图表可改成单图表加结论卡",
+        "图表类型可在折线和柱状间替换"
+      ],
+      "agent_notes": [
+        "先根据 component_slots 判断内容块能否重组，再决定是否改 TSX。",
+        "固定组件优先保留，replaceable_components 可按 components/README.md 的同家族组件替换。",
+        "最终以 source_path 对应 TSX 的 Schema 和实际 props 为准。"
+      ]
     },
     {
       "id": "red-finance-v2-banking-digital-transformation",
@@ -49,7 +210,49 @@
       "structure": "上方导语说明，中部多张转型支柱卡片，底部 KPI 汇总条",
       "layout_pattern": "intro-note-plus-pillar-cards-plus-kpi-strip",
       "suitable_for": ["数字化转型", "战略支柱", "能力建设", "关键举措"],
-      "key_components": ["FinanceContentFrame", "StableInlineRow", "IconText", "PillarBulletCard", "KpiMetricItem"]
+      "key_components": [
+        "FinanceContentFrame",
+        "StableInlineRow",
+        "IconText",
+        "PillarBulletCard",
+        "KpiMetricItem"
+      ],
+      "component_slots": [
+        {
+          "name": "intro-note",
+          "purpose": "导语说明区",
+          "can_recompose": true
+        },
+        {
+          "name": "pillar-card-grid",
+          "purpose": "战略支柱卡片组",
+          "can_recompose": true
+        },
+        {
+          "name": "kpi-strip",
+          "purpose": "底部 KPI 指标条",
+          "can_recompose": true
+        }
+      ],
+      "fixed_components": ["FinanceContentFrame"],
+      "replaceable_components": [
+        "StableInlineRow",
+        "IconText",
+        "PillarBulletCard",
+        "KpiMetricItem"
+      ],
+      "component_families": ["page-shell", "structure", "primitive", "card"],
+      "density_range": ["medium", "high"],
+      "composition_options": [
+        "支柱卡数量可调整",
+        "底部 KPI 可改成行动指标",
+        "导语可替换成阶段目标"
+      ],
+      "agent_notes": [
+        "先根据 component_slots 判断内容块能否重组，再决定是否改 TSX。",
+        "固定组件优先保留，replaceable_components 可按 components/README.md 的同家族组件替换。",
+        "最终以 source_path 对应 TSX 的 Schema 和实际 props 为准。"
+      ]
     },
     {
       "id": "red-finance-v2-fintech-innovation-applications",
@@ -59,7 +262,33 @@
       "structure": "左侧技术概念视觉说明，右侧五张应用场景卡片纵向排列",
       "layout_pattern": "left-concept-panel-right-application-card-list",
       "suitable_for": ["金融科技应用", "技术创新", "能力版图", "应用场景"],
-      "key_components": ["FinanceContentFrame", "HorizontalFeatureCard"]
+      "key_components": ["FinanceContentFrame", "HorizontalFeatureCard"],
+      "component_slots": [
+        {
+          "name": "concept-panel",
+          "purpose": "概念或技术说明面板",
+          "can_recompose": true
+        },
+        {
+          "name": "application-card-stack",
+          "purpose": "应用场景卡片栈",
+          "can_recompose": true
+        }
+      ],
+      "fixed_components": ["FinanceContentFrame"],
+      "replaceable_components": ["HorizontalFeatureCard"],
+      "component_families": ["page-shell", "card"],
+      "density_range": ["low", "medium"],
+      "composition_options": [
+        "左侧概念面板可改成关键结论",
+        "右侧卡片可按场景或技术分组",
+        "卡片数量可随密度调整"
+      ],
+      "agent_notes": [
+        "先根据 component_slots 判断内容块能否重组，再决定是否改 TSX。",
+        "固定组件优先保留，replaceable_components 可按 components/README.md 的同家族组件替换。",
+        "最终以 source_path 对应 TSX 的 Schema 和实际 props 为准。"
+      ]
     },
     {
       "id": "red-finance-v2-competitive-landscape-analysis",
@@ -69,7 +298,47 @@
       "structure": "左侧为市场参与者短卡和五力分析列表，右侧为竞争维度对比矩阵表格",
       "layout_pattern": "left-cards-plus-analysis-right-comparison-table",
       "suitable_for": ["竞争格局", "市场对比", "战略定位", "差异化路径"],
-      "key_components": ["FinanceContentFrame", "IconTextCard", "InfoListItem", "StableMatrixGrid"]
+      "key_components": [
+        "FinanceContentFrame",
+        "IconTextCard",
+        "InfoListItem",
+        "StableMatrixGrid"
+      ],
+      "component_slots": [
+        {
+          "name": "participant-cards",
+          "purpose": "市场参与者短卡",
+          "can_recompose": true
+        },
+        {
+          "name": "force-analysis-list",
+          "purpose": "竞争压力或五力分析列表",
+          "can_recompose": true
+        },
+        {
+          "name": "comparison-matrix",
+          "purpose": "结构化对比矩阵",
+          "can_recompose": true
+        }
+      ],
+      "fixed_components": ["FinanceContentFrame"],
+      "replaceable_components": [
+        "IconTextCard",
+        "InfoListItem",
+        "StableMatrixGrid"
+      ],
+      "component_families": ["page-shell", "card", "primitive", "structure"],
+      "density_range": ["medium", "high"],
+      "composition_options": [
+        "右侧矩阵可替换为策略优先级矩阵",
+        "左侧五力分析可改成竞争压力列表",
+        "短卡数量可调整"
+      ],
+      "agent_notes": [
+        "先根据 component_slots 判断内容块能否重组，再决定是否改 TSX。",
+        "固定组件优先保留，replaceable_components 可按 components/README.md 的同家族组件替换。",
+        "最终以 source_path 对应 TSX 的 Schema 和实际 props 为准。"
+      ]
     },
     {
       "id": "red-finance-v2-risk-management-compliance",
@@ -79,7 +348,51 @@
       "structure": "左侧为雷达图图表卡与关键洞察，右侧为风险治理支柱卡片矩阵",
       "layout_pattern": "left-radar-chart-plus-insight-right-pillar-grid",
       "suitable_for": ["风险管理", "合规治理", "控制框架", "风险全景"],
-      "key_components": ["FinanceContentFrame", "ChartCardShell", "MeasuredChartArea", "FinanceRadarChart", "InsightCallout", "PillarBulletCard"]
+      "key_components": [
+        "FinanceContentFrame",
+        "ChartCardShell",
+        "MeasuredChartArea",
+        "FinanceRadarChart",
+        "InsightCallout",
+        "PillarBulletCard"
+      ],
+      "component_slots": [
+        {
+          "name": "radar-chart-panel",
+          "purpose": "雷达图或能力图表区",
+          "can_recompose": true
+        },
+        {
+          "name": "insight-callout",
+          "purpose": "关键结论提示条",
+          "can_recompose": true
+        },
+        {
+          "name": "governance-pillar-grid",
+          "purpose": "治理支柱卡片矩阵",
+          "can_recompose": true
+        }
+      ],
+      "fixed_components": ["FinanceContentFrame"],
+      "replaceable_components": [
+        "ChartCardShell",
+        "MeasuredChartArea",
+        "FinanceRadarChart",
+        "InsightCallout",
+        "PillarBulletCard"
+      ],
+      "component_families": ["page-shell", "chart", "card"],
+      "density_range": ["medium", "high"],
+      "composition_options": [
+        "雷达图可替换为风险热区摘要",
+        "治理支柱可按风险类型或控制层级重组",
+        "callout 可作为整改重点"
+      ],
+      "agent_notes": [
+        "先根据 component_slots 判断内容块能否重组，再决定是否改 TSX。",
+        "固定组件优先保留，replaceable_components 可按 components/README.md 的同家族组件替换。",
+        "最终以 source_path 对应 TSX 的 Schema 和实际 props 为准。"
+      ]
     },
     {
       "id": "red-finance-v2-strategic-roadmap",
@@ -89,7 +402,54 @@
       "structure": "上方左侧战略愿景与右侧支柱短卡，中部横向执行路线图，下方 ROI 与 KPI 汇总区",
       "layout_pattern": "vision-plus-pillar-cards-plus-timeline-plus-summary-metrics",
       "suitable_for": ["战略规划", "执行路线图", "年度重点工作", "里程碑规划"],
-      "key_components": ["FinanceContentFrame", "FinanceSectionHeading", "IconTextCard", "TimelineBoard", "KpiMetricItem"]
+      "key_components": [
+        "FinanceContentFrame",
+        "FinanceSectionHeading",
+        "IconTextCard",
+        "TimelineBoard",
+        "KpiMetricItem"
+      ],
+      "component_slots": [
+        {
+          "name": "vision-block",
+          "purpose": "战略愿景或核心主张区",
+          "can_recompose": true
+        },
+        {
+          "name": "pillar-short-cards",
+          "purpose": "短支柱卡片组",
+          "can_recompose": true
+        },
+        {
+          "name": "timeline-board",
+          "purpose": "横向路线图面板",
+          "can_recompose": true
+        },
+        {
+          "name": "summary-metrics",
+          "purpose": "总结指标区",
+          "can_recompose": true
+        }
+      ],
+      "fixed_components": ["FinanceContentFrame"],
+      "replaceable_components": [
+        "FinanceSectionHeading",
+        "IconTextCard",
+        "TimelineBoard",
+        "KpiMetricItem"
+      ],
+      "component_families": ["page-shell", "primitive", "card", "structure"],
+      "density_range": ["medium", "high"],
+      "composition_options": [
+        "横向时间线可改成阶段卡片",
+        "上方愿景块可弱化为小节说明",
+        "底部指标可改成里程碑完成标准"
+      ],
+      "agent_notes": [
+        "先根据 component_slots 判断内容块能否重组，再决定是否改 TSX。",
+        "固定组件优先保留，replaceable_components 可按 components/README.md 的同家族组件替换。",
+        "最终以 source_path 对应 TSX 的 Schema 和实际 props 为准。"
+      ]
     },
     {
       "id": "red-finance-v2-conclusion-outlook",
@@ -99,7 +459,42 @@
       "structure": "顶部三张总结卡，中部左右并列两块总结面板，底部深色后续动作条",
       "layout_pattern": "top-summary-cards-middle-dual-panels-bottom-next-steps-strip",
       "suitable_for": ["总结页", "管理层结论", "行动建议", "下一步规划"],
-      "key_components": ["FinanceContentFrame", "IconTextCard", "SectionPanelShell"]
+      "key_components": [
+        "FinanceContentFrame",
+        "IconTextCard",
+        "SectionPanelShell"
+      ],
+      "component_slots": [
+        {
+          "name": "summary-card-row",
+          "purpose": "顶部总结卡片行",
+          "can_recompose": true
+        },
+        {
+          "name": "dual-section-panels",
+          "purpose": "双内容面板",
+          "can_recompose": true
+        },
+        {
+          "name": "next-step-strip",
+          "purpose": "底部下一步行动条",
+          "can_recompose": true
+        }
+      ],
+      "fixed_components": ["FinanceContentFrame"],
+      "replaceable_components": ["IconTextCard", "SectionPanelShell"],
+      "component_families": ["page-shell", "card"],
+      "density_range": ["low", "medium", "high"],
+      "composition_options": [
+        "顶部总结卡可改成三条行动原则",
+        "中部双面板可改成机会/风险",
+        "底部条可改成下一步会议议程"
+      ],
+      "agent_notes": [
+        "先根据 component_slots 判断内容块能否重组，再决定是否改 TSX。",
+        "固定组件优先保留，replaceable_components 可按 components/README.md 的同家族组件替换。",
+        "最终以 source_path 对应 TSX 的 Schema 和实际 props 为准。"
+      ]
     },
     {
       "id": "red-finance-v2-industry-development-timeline",
@@ -109,7 +504,45 @@
       "structure": "左侧纵向年份与阶段标签，中部主时间轴节点，右侧里程碑横向卡片",
       "layout_pattern": "vertical-axis-left-period-right-milestone-cards",
       "suitable_for": ["行业时间线", "发展历程", "政策演进", "关键里程碑"],
-      "key_components": ["FinanceContentFrame", "VerticalMilestoneTimeline", "HorizontalFeatureCard"]
+      "key_components": [
+        "FinanceContentFrame",
+        "VerticalMilestoneTimeline",
+        "HorizontalFeatureCard"
+      ],
+      "component_slots": [
+        {
+          "name": "period-axis",
+          "purpose": "时期或年份轴",
+          "can_recompose": true
+        },
+        {
+          "name": "milestone-timeline",
+          "purpose": "主里程碑时间线",
+          "can_recompose": true
+        },
+        {
+          "name": "milestone-feature-cards",
+          "purpose": "里程碑说明卡片",
+          "can_recompose": true
+        }
+      ],
+      "fixed_components": ["FinanceContentFrame"],
+      "replaceable_components": [
+        "VerticalMilestoneTimeline",
+        "HorizontalFeatureCard"
+      ],
+      "component_families": ["page-shell", "structure", "card"],
+      "density_range": ["medium", "high"],
+      "composition_options": [
+        "时间轴可按政策、技术、市场三条线重组",
+        "里程碑卡数量可调整",
+        "右侧卡片可改成阶段启示"
+      ],
+      "agent_notes": [
+        "先根据 component_slots 判断内容块能否重组，再决定是否改 TSX。",
+        "固定组件优先保留，replaceable_components 可按 components/README.md 的同家族组件替换。",
+        "最终以 source_path 对应 TSX 的 Schema 和实际 props 为准。"
+      ]
     },
     {
       "id": "red-finance-v2-china-us-market-comparison",
@@ -119,7 +552,49 @@
       "structure": "上方左侧雷达图卡与右侧双值指标卡矩阵，下方三列结构化对比面板",
       "layout_pattern": "top-radar-plus-dual-metric-cards-bottom-comparison-panels",
       "suitable_for": ["中美对比", "区域比较", "结构分析", "市场 benchmark"],
-      "key_components": ["FinanceContentFrame", "ChartCardShell", "FinanceRadarChart", "DualValueMetricCard", "ComparisonPanel"]
+      "key_components": [
+        "FinanceContentFrame",
+        "ChartCardShell",
+        "FinanceRadarChart",
+        "DualValueMetricCard",
+        "ComparisonPanel"
+      ],
+      "component_slots": [
+        {
+          "name": "radar-chart-panel",
+          "purpose": "雷达图或能力图表区",
+          "can_recompose": true
+        },
+        {
+          "name": "dual-metric-grid",
+          "purpose": "双值指标卡片网格",
+          "can_recompose": true
+        },
+        {
+          "name": "comparison-panels",
+          "purpose": "多段对比面板",
+          "can_recompose": true
+        }
+      ],
+      "fixed_components": ["FinanceContentFrame"],
+      "replaceable_components": [
+        "ChartCardShell",
+        "FinanceRadarChart",
+        "DualValueMetricCard",
+        "ComparisonPanel"
+      ],
+      "component_families": ["page-shell", "chart", "card", "structure"],
+      "density_range": ["medium", "high"],
+      "composition_options": [
+        "双值指标可改成多主体 benchmark",
+        "雷达图可替换为结构占比图",
+        "底部对比面板可按维度重排"
+      ],
+      "agent_notes": [
+        "先根据 component_slots 判断内容块能否重组，再决定是否改 TSX。",
+        "固定组件优先保留，replaceable_components 可按 components/README.md 的同家族组件替换。",
+        "最终以 source_path 对应 TSX 的 Schema 和实际 props 为准。"
+      ]
     },
     {
       "id": "red-finance-v2-china-us-fintech-capabilities",
@@ -128,8 +603,48 @@
       "data_path": "./data/china-us-fintech-capabilities.json",
       "structure": "左右镜像能力说明卡，中轴为维度短卡，按 5-6 行纵向对比",
       "layout_pattern": "mirrored-country-cards-with-center-dimension-tiles",
-      "suitable_for": ["中美对比", "能力对比", "数字化 maturity", "金融科技 benchmark"],
-      "key_components": ["FinanceContentFrame", "HorizontalFeatureCard", "IconTextCard"]
+      "suitable_for": [
+        "中美对比",
+        "能力对比",
+        "数字化 maturity",
+        "金融科技 benchmark"
+      ],
+      "key_components": [
+        "FinanceContentFrame",
+        "HorizontalFeatureCard",
+        "IconTextCard"
+      ],
+      "component_slots": [
+        {
+          "name": "left-capability-stack",
+          "purpose": "左侧能力卡片栈",
+          "can_recompose": true
+        },
+        {
+          "name": "dimension-tiles",
+          "purpose": "中轴维度卡片",
+          "can_recompose": true
+        },
+        {
+          "name": "right-capability-stack",
+          "purpose": "右侧能力卡片栈",
+          "can_recompose": true
+        }
+      ],
+      "fixed_components": ["FinanceContentFrame"],
+      "replaceable_components": ["HorizontalFeatureCard", "IconTextCard"],
+      "component_families": ["page-shell", "card"],
+      "density_range": ["low", "medium", "high"],
+      "composition_options": [
+        "左右主体可替换为任意两类对象",
+        "中轴维度可增减",
+        "能力卡可由对比改成差距诊断"
+      ],
+      "agent_notes": [
+        "先根据 component_slots 判断内容块能否重组，再决定是否改 TSX。",
+        "固定组件优先保留，replaceable_components 可按 components/README.md 的同家族组件替换。",
+        "最终以 source_path 对应 TSX 的 Schema 和实际 props 为准。"
+      ]
     },
     {
       "id": "red-finance-v2-digital-currency-focus",
@@ -139,7 +654,38 @@
       "structure": "左侧章节聚焦 hero，右侧三张战略焦点卡，底层为装饰性环形背景",
       "layout_pattern": "section-focus-hero-left-card-stack-right",
       "suitable_for": ["章节过渡", "战略聚焦", "主题引入", "chapter break"],
-      "key_components": ["FinanceSectionFocusFrame", "HorizontalFeatureCard"]
+      "key_components": ["FinanceSectionFocusFrame", "HorizontalFeatureCard"],
+      "component_slots": [
+        {
+          "name": "section-hero",
+          "purpose": "章节聚焦主视觉区",
+          "can_recompose": true
+        },
+        {
+          "name": "strategic-focus-card-stack",
+          "purpose": "战略焦点卡片栈",
+          "can_recompose": true
+        },
+        {
+          "name": "background-decoration",
+          "purpose": "背景装饰层",
+          "can_recompose": false
+        }
+      ],
+      "fixed_components": ["FinanceSectionFocusFrame"],
+      "replaceable_components": ["HorizontalFeatureCard"],
+      "component_families": ["page-shell", "card"],
+      "density_range": ["low", "medium", "high"],
+      "composition_options": [
+        "章节 hero 可替换为问题陈述",
+        "右侧三卡可改成机会/风险/行动",
+        "背景装饰可弱化"
+      ],
+      "agent_notes": [
+        "先根据 component_slots 判断内容块能否重组，再决定是否改 TSX。",
+        "固定组件优先保留，replaceable_components 可按 components/README.md 的同家族组件替换。",
+        "最终以 source_path 对应 TSX 的 Schema 和实际 props 为准。"
+      ]
     },
     {
       "id": "red-finance-v2-digital-currency-overview-taxonomy",
@@ -149,7 +695,62 @@
       "structure": "上方为定义与特性 pill，中部为三张分类卡和占比环图，下方为分类比较矩阵",
       "layout_pattern": "definition-plus-pill-row-taxonomy-cards-donut-table",
       "suitable_for": ["分类概述", "概念澄清", "结构对比", "占比概览"],
-      "key_components": ["FinanceContentFrame", "IconText", "IconTextCard", "ChartCardShell", "FinanceDonutChart", "StableMatrixGrid"]
+      "key_components": [
+        "FinanceContentFrame",
+        "IconText",
+        "IconTextCard",
+        "ChartCardShell",
+        "FinanceDonutChart",
+        "StableMatrixGrid"
+      ],
+      "component_slots": [
+        {
+          "name": "definition-strip",
+          "purpose": "定义与特性说明条",
+          "can_recompose": true
+        },
+        {
+          "name": "taxonomy-card-row",
+          "purpose": "分类卡片行",
+          "can_recompose": true
+        },
+        {
+          "name": "donut-chart-panel",
+          "purpose": "环形占比图表区",
+          "can_recompose": true
+        },
+        {
+          "name": "comparison-matrix",
+          "purpose": "结构化对比矩阵",
+          "can_recompose": true
+        }
+      ],
+      "fixed_components": ["FinanceContentFrame"],
+      "replaceable_components": [
+        "IconText",
+        "IconTextCard",
+        "ChartCardShell",
+        "FinanceDonutChart",
+        "StableMatrixGrid"
+      ],
+      "component_families": [
+        "page-shell",
+        "primitive",
+        "card",
+        "chart",
+        "structure"
+      ],
+      "density_range": ["medium", "high"],
+      "composition_options": [
+        "分类卡数量可调整",
+        "环图可替换为结构占比或成熟度图",
+        "矩阵维度可按监管/波动/应用重组"
+      ],
+      "agent_notes": [
+        "先根据 component_slots 判断内容块能否重组，再决定是否改 TSX。",
+        "固定组件优先保留，replaceable_components 可按 components/README.md 的同家族组件替换。",
+        "最终以 source_path 对应 TSX 的 Schema 和实际 props 为准。"
+      ]
     },
     {
       "id": "red-finance-v2-global-cbdc-status-comparison",
@@ -158,8 +759,55 @@
       "data_path": "./data/global-cbdc-status-comparison.json",
       "structure": "顶部阶段标签，中部 8 张国家进度卡，下方为设计与互操作性对比矩阵",
       "layout_pattern": "stage-legend-plus-progress-card-grid-plus-comparison-table",
-      "suitable_for": ["CBDC 对比", "推进状态总览", "跨国 benchmark", "数字货币阶段分析"],
-      "key_components": ["FinanceContentFrame", "StatusPill", "ProgressStatusCard", "IconText", "StableMatrixGrid"]
+      "suitable_for": [
+        "CBDC 对比",
+        "推进状态总览",
+        "跨国 benchmark",
+        "数字货币阶段分析"
+      ],
+      "key_components": [
+        "FinanceContentFrame",
+        "StatusPill",
+        "ProgressStatusCard",
+        "IconText",
+        "StableMatrixGrid"
+      ],
+      "component_slots": [
+        {
+          "name": "stage-legend",
+          "purpose": "阶段图例或状态说明",
+          "can_recompose": true
+        },
+        {
+          "name": "progress-card-grid",
+          "purpose": "进度状态卡片网格",
+          "can_recompose": true
+        },
+        {
+          "name": "comparison-matrix",
+          "purpose": "结构化对比矩阵",
+          "can_recompose": true
+        }
+      ],
+      "fixed_components": ["FinanceContentFrame"],
+      "replaceable_components": [
+        "StatusPill",
+        "ProgressStatusCard",
+        "IconText",
+        "StableMatrixGrid"
+      ],
+      "component_families": ["page-shell", "primitive", "card", "structure"],
+      "density_range": ["medium", "high"],
+      "composition_options": [
+        "国家卡数量可调整",
+        "阶段图例可改成推进状态说明",
+        "底部矩阵可换成区域对比"
+      ],
+      "agent_notes": [
+        "先根据 component_slots 判断内容块能否重组，再决定是否改 TSX。",
+        "固定组件优先保留，replaceable_components 可按 components/README.md 的同家族组件替换。",
+        "最终以 source_path 对应 TSX 的 Schema 和实际 props 为准。"
+      ]
     },
     {
       "id": "red-finance-v2-digital-rmb-architecture-kpis",
@@ -168,8 +816,53 @@
       "data_path": "./data/digital-rmb-architecture-kpis.json",
       "structure": "左侧为三层运营架构流，右上为四张横向 KPI 卡，右下为应用场景稳定矩阵",
       "layout_pattern": "left-architecture-flow-right-kpi-cards-bottom-scenario-matrix",
-      "suitable_for": ["数字人民币概览", "支付基础设施", "运营架构说明", "场景分析"],
-      "key_components": ["FinanceContentFrame", "FinanceSectionHeading", "HorizontalFeatureCard", "StableMatrixGrid"]
+      "suitable_for": [
+        "数字人民币概览",
+        "支付基础设施",
+        "运营架构说明",
+        "场景分析"
+      ],
+      "key_components": [
+        "FinanceContentFrame",
+        "FinanceSectionHeading",
+        "HorizontalFeatureCard",
+        "StableMatrixGrid"
+      ],
+      "component_slots": [
+        {
+          "name": "architecture-flow",
+          "purpose": "架构流程或参与方关系区",
+          "can_recompose": true
+        },
+        {
+          "name": "kpi-card-row",
+          "purpose": "KPI 卡片行",
+          "can_recompose": true
+        },
+        {
+          "name": "scenario-matrix",
+          "purpose": "场景矩阵",
+          "can_recompose": true
+        }
+      ],
+      "fixed_components": ["FinanceContentFrame"],
+      "replaceable_components": [
+        "FinanceSectionHeading",
+        "HorizontalFeatureCard",
+        "StableMatrixGrid"
+      ],
+      "component_families": ["page-shell", "primitive", "card", "structure"],
+      "density_range": ["medium", "high"],
+      "composition_options": [
+        "架构流可改成参与方关系",
+        "KPI 卡可换成应用效果",
+        "场景矩阵可按行业重组"
+      ],
+      "agent_notes": [
+        "先根据 component_slots 判断内容块能否重组，再决定是否改 TSX。",
+        "固定组件优先保留，replaceable_components 可按 components/README.md 的同家族组件替换。",
+        "最终以 source_path 对应 TSX 的 Schema 和实际 props 为准。"
+      ]
     },
     {
       "id": "red-finance-v2-digital-currency-architecture-security",
@@ -178,8 +871,109 @@
       "data_path": "./data/digital-currency-architecture-security.json",
       "structure": "左侧为核心技术栈分层卡，右侧为架构能力雷达图与双评分指标卡矩阵",
       "layout_pattern": "left-tech-stack-right-radar-plus-dual-score-metrics",
-      "suitable_for": ["数字货币架构", "CBDC 与加密资产对比", "安全能力评估", "金融科技基础设施"],
-      "key_components": ["FinanceContentFrame", "FinanceSectionHeading", "HorizontalFeatureCard", "ChartCardShell", "FinanceRadarChart", "DualValueMetricCard"]
+      "suitable_for": [
+        "数字货币架构",
+        "CBDC 与加密资产对比",
+        "安全能力评估",
+        "金融科技基础设施"
+      ],
+      "key_components": [
+        "FinanceContentFrame",
+        "FinanceSectionHeading",
+        "HorizontalFeatureCard",
+        "ChartCardShell",
+        "FinanceRadarChart",
+        "DualValueMetricCard"
+      ],
+      "component_slots": [
+        {
+          "name": "tech-stack-cards",
+          "purpose": "技术栈分层卡片",
+          "can_recompose": true
+        },
+        {
+          "name": "radar-chart-panel",
+          "purpose": "雷达图或能力图表区",
+          "can_recompose": true
+        },
+        {
+          "name": "dual-score-metrics",
+          "purpose": "双评分指标卡片组",
+          "can_recompose": true
+        }
+      ],
+      "fixed_components": ["FinanceContentFrame"],
+      "replaceable_components": [
+        "FinanceSectionHeading",
+        "HorizontalFeatureCard",
+        "ChartCardShell",
+        "FinanceRadarChart",
+        "DualValueMetricCard"
+      ],
+      "component_families": ["page-shell", "primitive", "card", "chart"],
+      "density_range": ["medium", "high"],
+      "composition_options": [
+        "技术栈卡可按层级或能力重排",
+        "雷达图可换成安全能力评分",
+        "双值指标可替换为对比对象"
+      ],
+      "agent_notes": [
+        "先根据 component_slots 判断内容块能否重组，再决定是否改 TSX。",
+        "固定组件优先保留，replaceable_components 可按 components/README.md 的同家族组件替换。",
+        "最终以 source_path 对应 TSX 的 Schema 和实际 props 为准。"
+      ]
     }
-  ]
+  ],
+  "component_reference": {
+    "path": "./components/README.md",
+    "purpose": "组件手册：用于理解组件分层、用途、依赖关系、组合方式和 AI 修改规则。",
+    "read_order": "读取 catalog.json 后、制定组件编排蓝图前读取。",
+    "source_of_truth": "README 用于组件语义和组合建议；具体 props、Schema 和布局以 slides/*.tsx 与 components/*.tsx 为准。"
+  },
+  "agent_reading_order": [
+    "catalog.json：先理解页面能力、槽位、变体空间",
+    "components/README.md：再理解组件分层、依赖和复用规则",
+    "selected slides/*.tsx：确认 Schema、layout metadata 和页面实现",
+    "selected components/*.tsx：仅在需要改组件或确认 props 时读取"
+  ],
+  "component_families": {
+    "page-shell": [
+      "FinanceCanvas",
+      "FinanceContentFrame",
+      "FinanceSectionFocusFrame"
+    ],
+    "primitive": [
+      "FinanceIcon",
+      "StableInlineRow",
+      "IconText",
+      "StatusPill",
+      "KpiMetricItem",
+      "FinanceSectionHeading"
+    ],
+    "card": [
+      "AgendaCard",
+      "InfoListItem",
+      "InsightCallout",
+      "IconTextCard",
+      "HorizontalFeatureCard",
+      "PillarBulletCard",
+      "DualValueMetricCard",
+      "ProgressStatusCard",
+      "ComparisonPanel",
+      "SectionPanelShell"
+    ],
+    "chart": [
+      "ChartCardShell",
+      "MeasuredChartArea",
+      "FinanceBarChart",
+      "FinanceLineChart",
+      "FinanceRadarChart",
+      "FinanceDonutChart"
+    ],
+    "structure": [
+      "StableMatrixGrid",
+      "TimelineBoard",
+      "VerticalMilestoneTimeline"
+    ]
+  }
 }

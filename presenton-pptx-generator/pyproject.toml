@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "presenton-pptx-generator-executa"
-version = "1.2.0"
+version = "1.2.1"
 description = "Presenton PPTX generator vendored into an Anna Executa plugin"
 readme = "README.md"
 requires-python = ">=3.9"
