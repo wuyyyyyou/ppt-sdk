@@ -1,5 +1,5 @@
 import path from "node:path";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 
 import { getLayoutByLayoutId } from "../app/presentation-templates/index.js";
 import type { TemplateWithData } from "../app/presentation-templates/utils.js";
@@ -30,6 +30,56 @@ type ResolvedManifestSlide = {
   templateGroup: string;
   localEntryPath?: string;
 };
+
+type BrowserLike = {
+  newPage: () => Promise<PageLike>;
+  close: () => Promise<void>;
+};
+
+type PageLike = {
+  setViewport?: (viewport: {
+    width: number;
+    height: number;
+    deviceScaleFactor?: number;
+  }) => Promise<void>;
+  setContent: (
+    html: string,
+    options?: { waitUntil?: string | string[]; timeout?: number },
+  ) => Promise<void>;
+  $: (selector: string) => Promise<ElementHandleLike | null>;
+  close?: () => Promise<void>;
+};
+
+type ElementHandleLike = {
+  evaluate: <T>(pageFunction: (...args: any[]) => T, ...args: any[]) => Promise<T>;
+  screenshot: (options?: { path?: string }) => Promise<unknown>;
+};
+
+const DEFAULT_SLIDE_SCREENSHOT_VIEWPORT = {
+  width: 1280,
+  height: 720,
+  deviceScaleFactor: 2,
+};
+const DEFAULT_RENDER_TIMEOUT_MS = 300_000;
+const SLIDE_RENDER_SELECTOR = "#presentation-slides-wrapper";
+const DEFAULT_BROWSER_ARGS = [
+  "--no-sandbox",
+  "--disable-setuid-sandbox",
+  "--disable-dev-shm-usage",
+  "--disable-gpu",
+  "--disable-web-security",
+  "--disable-background-timer-throttling",
+  "--disable-backgrounding-occluded-windows",
+  "--disable-renderer-backgrounding",
+  "--disable-features=TranslateUI",
+  "--disable-ipc-flooding-protection",
+];
+const CHROME_EXECUTABLE_ENV_KEYS = [
+  "PRESENTON_CHROME_EXECUTABLE_PATH",
+  "PUPPETEER_EXECUTABLE_PATH",
+  "CHROME_PATH",
+  "GOOGLE_CHROME_BIN",
+];
 
 async function resolveLocalTemplateGroupId(manifestCwd: string): Promise<string> {
   const groupPath = path.join(manifestCwd, "group.json");
@@ -86,6 +136,247 @@ function resolveOptionalAbsolutePath(
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function getNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function getPlatformChromeExecutableCandidates(): string[] {
+  if (process.platform === "darwin") {
+    const homeDir = getNonEmptyString(process.env.HOME);
+    return [
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      homeDir
+        ? path.join(
+          homeDir,
+          "Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        )
+        : null,
+      "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
+    ].filter((candidate): candidate is string => Boolean(candidate));
+  }
+
+  if (process.platform === "win32") {
+    const localAppData = getNonEmptyString(process.env.LOCALAPPDATA);
+    const programFiles = getNonEmptyString(process.env.PROGRAMFILES);
+    const programFilesX86 = getNonEmptyString(process.env["PROGRAMFILES(X86)"]);
+    return [
+      localAppData
+        ? path.join(localAppData, "Google/Chrome/Application/chrome.exe")
+        : null,
+      programFiles
+        ? path.join(programFiles, "Google/Chrome/Application/chrome.exe")
+        : null,
+      programFilesX86
+        ? path.join(programFilesX86, "Google/Chrome/Application/chrome.exe")
+        : null,
+    ].filter((candidate): candidate is string => Boolean(candidate));
+  }
+
+  return [
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chromium",
+  ];
+}
+
+function getConfiguredChromeExecutable(): { key: string; value: string } | null {
+  for (const key of CHROME_EXECUTABLE_ENV_KEYS) {
+    const value = getNonEmptyString(process.env[key]);
+    if (value) {
+      return { key, value };
+    }
+  }
+
+  return null;
+}
+
+async function findFirstAccessiblePath(candidates: string[]): Promise<string | null> {
+  for (const candidate of candidates) {
+    try {
+      await access(candidate);
+      return candidate;
+    } catch {
+      // Try the next known location.
+    }
+  }
+
+  return null;
+}
+
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function createBrowserLaunchError(
+  attempts: string[],
+  fallbackError: unknown,
+): Error {
+  const details = attempts.length > 0
+    ? ` ${attempts.join(" ")}`
+    : "";
+  return new Error(
+    `Could not launch a managed browser for buildDeckHtmlFromManifest slide screenshots.${details} Puppeteer default launch also failed: ${formatErrorMessage(fallbackError)}`,
+    { cause: fallbackError instanceof Error ? fallbackError : undefined },
+  );
+}
+
+async function launchManagedBrowser(puppeteer: any): Promise<BrowserLike> {
+  const normalizedLaunchOptions = {
+    headless: true,
+    args: DEFAULT_BROWSER_ARGS,
+  };
+
+  const configuredExecutable = getConfiguredChromeExecutable();
+  if (configuredExecutable) {
+    try {
+      return (await puppeteer.launch({
+        ...normalizedLaunchOptions,
+        executablePath: configuredExecutable.value,
+      })) as BrowserLike;
+    } catch (error) {
+      throw new Error(
+        `Failed to launch browser for buildDeckHtmlFromManifest using ${configuredExecutable.key}="${configuredExecutable.value}": ${formatErrorMessage(error)}`,
+        { cause: error instanceof Error ? error : undefined },
+      );
+    }
+  }
+
+  const systemCandidates = [...new Set(getPlatformChromeExecutableCandidates())];
+  const systemExecutablePath = await findFirstAccessiblePath(systemCandidates);
+  const attempts: string[] = [];
+
+  if (systemExecutablePath) {
+    try {
+      return (await puppeteer.launch({
+        ...normalizedLaunchOptions,
+        executablePath: systemExecutablePath,
+      })) as BrowserLike;
+    } catch (error) {
+      attempts.push(
+        `Tried system Chrome at "${systemExecutablePath}" first, but launch failed: ${formatErrorMessage(error)}.`,
+      );
+    }
+  } else {
+    attempts.push(
+      `No system Chrome executable was found in known locations: ${systemCandidates.join(", ")}.`,
+    );
+  }
+
+  try {
+    return (await puppeteer.launch(normalizedLaunchOptions)) as BrowserLike;
+  } catch (error) {
+    throw createBrowserLaunchError(attempts, error);
+  }
+}
+
+async function createManagedPage(): Promise<{
+  browser: BrowserLike;
+  page: PageLike;
+  close: () => Promise<void>;
+}> {
+  let puppeteerModule: any;
+  try {
+    const importPuppeteer = new Function(
+      "return import('puppeteer')",
+    ) as () => Promise<any>;
+    puppeteerModule = await importPuppeteer();
+  } catch (error) {
+    throw new Error(
+      "buildDeckHtmlFromManifest requires `puppeteer` to be installed to render per-slide screenshots.",
+      { cause: error },
+    );
+  }
+
+  const puppeteer = puppeteerModule.default ?? puppeteerModule;
+  const browser = await launchManagedBrowser(puppeteer);
+  const page = await browser.newPage();
+
+  return {
+    browser,
+    page,
+    close: async () => {
+      await page.close?.().catch(() => undefined);
+      await browser.close().catch(() => undefined);
+    },
+  };
+}
+
+async function waitForSlideRenderReady(
+  page: PageLike,
+  timeoutMs = DEFAULT_RENDER_TIMEOUT_MS,
+): Promise<ElementHandleLike> {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt <= timeoutMs) {
+    const slideElement = await page.$(SLIDE_RENDER_SELECTOR);
+    if (!slideElement) {
+      await delay(50);
+      continue;
+    }
+
+    const status = await slideElement.evaluate((el) =>
+      el.getAttribute("data-presenton-render-status"),
+    );
+
+    if (status === "ready") {
+      return slideElement;
+    }
+
+    if (status === "error") {
+      const message = await slideElement.evaluate((el) =>
+        el.getAttribute("data-presenton-render-message"),
+      );
+      throw new Error(
+        message
+          ? `Slide render failed: ${message}`
+          : "Slide render failed with status=error",
+      );
+    }
+
+    await delay(50);
+  }
+
+  throw new Error(
+    `Timed out waiting for slide render ready: ${SLIDE_RENDER_SELECTOR} within ${timeoutMs}ms`,
+  );
+}
+
+async function writeSlideScreenshots(
+  slides: Array<{ html: string; outputPath: string }>,
+): Promise<void> {
+  const runtime = await createManagedPage();
+
+  try {
+    await runtime.page.setViewport?.(DEFAULT_SLIDE_SCREENSHOT_VIEWPORT);
+
+    for (const slide of slides) {
+      await runtime.page.setContent(slide.html, {
+        waitUntil: "domcontentloaded",
+        timeout: DEFAULT_RENDER_TIMEOUT_MS,
+      });
+      const slideElement = await waitForSlideRenderReady(runtime.page);
+      const screenshot = await slideElement.screenshot({ path: slide.outputPath });
+      if (!screenshot) {
+        throw new Error(`Failed to write slide screenshot: ${slide.outputPath}`);
+      }
+    }
+  } finally {
+    await runtime.close();
+  }
 }
 
 function parseSinglePageIndex(
@@ -417,7 +708,7 @@ export async function buildDeckHtmlFromManifest(
       const html = buildSlideDocumentHtml({ context });
       const slideFileName = `${index + 1}-${deckBaseName}-${sanitizeFileNamePart(
         resolvedSlide.layoutId,
-      )}.html`;
+      )}.png`;
       const slideOutputPath = path.join(outputDir, slideFileName);
 
       return {
@@ -486,10 +777,10 @@ export async function buildDeckHtmlFromManifest(
     : "";
 
   await mkdir(outputDir, { recursive: true });
-  await Promise.all([
-    ...(singlePageIndex === null ? [writeFile(deckOutputPath, deckHtml, "utf8")] : []),
-    ...slidesToWrite.map((slide) => writeFile(slide.outputPath, slide.html, "utf8")),
-  ]);
+  if (singlePageIndex === null) {
+    await writeFile(deckOutputPath, deckHtml, "utf8");
+  }
+  await writeSlideScreenshots(slidesToWrite);
 
   return {
     deckHtml,
@@ -504,6 +795,8 @@ export async function buildDeckHtmlFromManifest(
       outputPath: slide.outputPath,
       slideId: slide.slideId,
       layoutId: slide.layoutId,
+      kind: "image",
+      mimeType: "image/png",
     })),
     slideCount: slidesWithRuntime.length,
     title,

@@ -75,7 +75,9 @@ npm install
 
 - 传 `manifest_path` 指向 JSON 文件
 
-工具不会返回大段 HTML 内容，而是把结果写到 `output_dir`，再返回输出文件路径和基础元数据。`manifest_path` 和 `output_dir` 必须是绝对路径。
+工具不会返回大段 HTML 内容，而是把结果写到 `output_dir`，再返回输出文件路径和基础元数据。它会输出整体的 `*-deck.html`，并为每一页输出浏览器渲染后的 PNG 截图，便于多模态 Agent 直接检查页面视觉结果。`manifest_path` 和 `output_dir` 必须是绝对路径。
+
+注意：由于逐页 PNG 需要真实浏览器渲染，这个工具运行时需要本机有可用的 Chrome / Chrome for Testing。
 
 ### `convertDeckHtmlToPptxModel`
 

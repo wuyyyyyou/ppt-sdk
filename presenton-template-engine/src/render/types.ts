@@ -95,6 +95,8 @@ export interface BuildDeckHtmlFromManifestFileOutput {
   outputPath: string;
   slideId?: string;
   layoutId?: string;
+  kind?: "image";
+  mimeType?: "image/png";
 }
 
 export interface BuildDeckHtmlFromManifestResult {

@@ -131,7 +131,7 @@ const MANIFEST = {
     {
       name: "buildDeckHtmlFromManifest",
       description:
-        "Build a deck viewer HTML and one HTML file per slide from a manifest JSON file, write them to an output directory, and return the generated file paths.",
+        "Build a deck viewer HTML and one rendered PNG image per slide from a manifest JSON file, write them to an output directory, and return the generated file paths.",
       parameters: [
         {
           name: "manifest_path",
@@ -151,7 +151,7 @@ const MANIFEST = {
           name: "output_dir",
           type: "string",
           description:
-            "Absolute directory where the generated deck HTML and per-slide HTML files should be written.",
+            "Absolute directory where the generated deck HTML and per-slide PNG images should be written.",
           required: true,
         },
         {
@@ -165,7 +165,7 @@ const MANIFEST = {
           name: "single_page",
           type: "boolean",
           description:
-            "Whether to generate only one slide HTML file. Defaults to false.",
+            "Whether to generate only one slide PNG image. Defaults to false.",
           required: false,
           default: false,
         },
@@ -667,6 +667,8 @@ async function toolBuildDeckHtmlFromManifest(args) {
       output_path: file.outputPath,
       slide_id: file.slideId ?? null,
       layout_id: file.layoutId ?? null,
+      kind: file.kind ?? "image",
+      mime_type: file.mimeType ?? "image/png",
     })),
     slide_count: result.slideCount,
     title: result.title,
