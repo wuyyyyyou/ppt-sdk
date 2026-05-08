@@ -1,4 +1,5 @@
 import os
+import shutil
 import tempfile
 import uuid
 import zipfile
@@ -72,8 +73,15 @@ class PptxPresentationCreator:
         drawing_ns = "http://schemas.openxmlformats.org/drawingml/2006/main"
         rel_ns = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
         package_rel_ns = "http://schemas.openxmlformats.org/package/2006/relationships"
+        content_types_ns = "http://schemas.openxmlformats.org/package/2006/content-types"
         notes_master_rel_type = (
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster"
+        )
+        printer_settings_rel_type = (
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/printerSettings"
+        )
+        printer_settings_content_type = (
+            "application/vnd.openxmlformats-officedocument.presentationml.printerSettings"
         )
 
         def ensure_grp_sppr_xfrm(slide_path: str):
@@ -93,6 +101,305 @@ class PptxPresentationCreator:
             if changed:
                 slide_tree.write(
                     slide_path,
+                    xml_declaration=True,
+                    encoding="UTF-8",
+                    standalone="yes",
+                )
+
+        def ensure_drawing_paragraph_end_rpr(xml_path: str):
+            xml_tree = etree.parse(xml_path)
+            xml_root = xml_tree.getroot()
+            paragraph_elements = xml_root.findall(f".//{{{drawing_ns}}}p")
+            changed = False
+            end_para_rpr_tag = f"{{{drawing_ns}}}endParaRPr"
+
+            for paragraph in paragraph_elements:
+                end_para_rpr_elements = paragraph.findall(end_para_rpr_tag)
+                if not end_para_rpr_elements:
+                    etree.SubElement(paragraph, end_para_rpr_tag)
+                    changed = True
+                    continue
+
+                keep_end_para_rpr = end_para_rpr_elements[0]
+                for duplicate_end_para_rpr in end_para_rpr_elements[1:]:
+                    paragraph.remove(duplicate_end_para_rpr)
+                    changed = True
+
+                if len(paragraph) == 0 or paragraph[-1] is keep_end_para_rpr:
+                    continue
+
+                paragraph.remove(keep_end_para_rpr)
+                paragraph.append(keep_end_para_rpr)
+                changed = True
+
+            if changed:
+                xml_tree.write(
+                    xml_path,
+                    xml_declaration=True,
+                    encoding="UTF-8",
+                    standalone="yes",
+                )
+
+        def ensure_slide_paragraphs_end_rpr(ppt_dir: str):
+            slides_dir = os.path.join(ppt_dir, "slides")
+            if not os.path.isdir(slides_dir):
+                return
+
+            for file_name in os.listdir(slides_dir):
+                if file_name.endswith(".xml"):
+                    ensure_drawing_paragraph_end_rpr(os.path.join(slides_dir, file_name))
+
+        def normalize_zero_shadows(xml_path: str):
+            xml_tree = etree.parse(xml_path)
+            xml_root = xml_tree.getroot()
+            changed = False
+
+            for outer_shadow in xml_root.findall(f".//{{{drawing_ns}}}outerShdw"):
+                if not all(
+                    outer_shadow.get(attr_name) == "0"
+                    for attr_name in ("blurRad", "dist", "dir")
+                ):
+                    continue
+
+                color_element = outer_shadow.find(f"{{{drawing_ns}}}srgbClr")
+                alpha_element = (
+                    color_element.find(f"{{{drawing_ns}}}alpha")
+                    if color_element is not None
+                    else None
+                )
+                zero_shadow_attrs = ["blurRad", "dist", "dir"]
+                if alpha_element is not None and alpha_element.get("val") == "0":
+                    zero_shadow_attrs.append("rotWithShape")
+
+                for attr_name in zero_shadow_attrs:
+                    if attr_name in outer_shadow.attrib:
+                        del outer_shadow.attrib[attr_name]
+                        changed = True
+
+            if changed:
+                xml_tree.write(
+                    xml_path,
+                    xml_declaration=True,
+                    encoding="UTF-8",
+                    standalone="yes",
+                )
+
+        def normalize_zero_shadows_in_pptx(extract_dir: str):
+            ppt_dir = os.path.join(extract_dir, "ppt")
+            if not os.path.isdir(ppt_dir):
+                return
+
+            for root, _, files in os.walk(ppt_dir):
+                for file_name in files:
+                    if not file_name.endswith(".xml"):
+                        continue
+                    normalize_zero_shadows(os.path.join(root, file_name))
+
+        def theme_is_complete(theme_path: str):
+            theme_tree = etree.parse(theme_path)
+            theme_root = theme_tree.getroot()
+            required_lists = (
+                "fillStyleLst",
+                "lnStyleLst",
+                "effectStyleLst",
+                "bgFillStyleLst",
+            )
+            for list_name in required_lists:
+                style_list = theme_root.find(f".//{{{drawing_ns}}}{list_name}")
+                if style_list is None or len(style_list) < 3:
+                    return False
+
+            major_font = theme_root.find(f".//{{{drawing_ns}}}majorFont")
+            minor_font = theme_root.find(f".//{{{drawing_ns}}}minorFont")
+            if major_font is None or minor_font is None:
+                return False
+            if (
+                len(major_font.findall(f"{{{drawing_ns}}}font")) < 10
+                or len(minor_font.findall(f"{{{drawing_ns}}}font")) < 10
+            ):
+                return False
+
+            return True
+
+        def normalize_incomplete_themes(ppt_dir: str):
+            themes_dir = os.path.join(ppt_dir, "theme")
+            if not os.path.isdir(themes_dir):
+                return
+
+            theme_paths = [
+                os.path.join(themes_dir, file_name)
+                for file_name in os.listdir(themes_dir)
+                if file_name.startswith("theme") and file_name.endswith(".xml")
+            ]
+            complete_theme_path = next(
+                (theme_path for theme_path in theme_paths if theme_is_complete(theme_path)),
+                None,
+            )
+            if complete_theme_path is None:
+                return
+
+            for theme_path in theme_paths:
+                if theme_path == complete_theme_path or theme_is_complete(theme_path):
+                    continue
+                shutil.copyfile(complete_theme_path, theme_path)
+
+        def remove_printer_settings_parts(ppt_dir: str, targets: List[str]):
+            for target in targets:
+                target_path = os.path.normpath(
+                    os.path.join(ppt_dir, target.replace("/", os.sep))
+                )
+                try:
+                    common_path = os.path.commonpath([ppt_dir, target_path])
+                except ValueError:
+                    continue
+                if common_path != ppt_dir:
+                    continue
+                if os.path.isfile(target_path):
+                    os.remove(target_path)
+                    parent = os.path.dirname(target_path)
+                    while parent != ppt_dir and os.path.isdir(parent):
+                        try:
+                            os.rmdir(parent)
+                        except OSError:
+                            break
+                        parent = os.path.dirname(parent)
+
+            printer_settings_dir = os.path.join(ppt_dir, "printerSettings")
+            if os.path.isdir(printer_settings_dir):
+                shutil.rmtree(printer_settings_dir)
+
+        def remove_printer_settings_content_type(extract_dir: str):
+            has_bin_parts = False
+            for root, _, files in os.walk(extract_dir):
+                if any(file_name.lower().endswith(".bin") for file_name in files):
+                    has_bin_parts = True
+                    break
+
+            if has_bin_parts:
+                return
+
+            content_types_path = os.path.join(extract_dir, "[Content_Types].xml")
+            if not os.path.exists(content_types_path):
+                return
+
+            content_types_tree = etree.parse(content_types_path)
+            content_types_root = content_types_tree.getroot()
+            default_tag = f"{{{content_types_ns}}}Default"
+            changed = False
+            for default in list(content_types_root.findall(default_tag)):
+                if (
+                    default.get("Extension") == "bin"
+                    and default.get("ContentType") == printer_settings_content_type
+                ):
+                    content_types_root.remove(default)
+                    changed = True
+
+            if changed:
+                content_types_tree.write(
+                    content_types_path,
+                    xml_declaration=True,
+                    encoding="UTF-8",
+                    standalone="yes",
+                )
+
+        def normalize_presentation_relationship_ids(
+            rels_path: str,
+            presentation_path: str,
+        ):
+            rels_tree = etree.parse(rels_path)
+            rels_root = rels_tree.getroot()
+            presentation_tree = etree.parse(presentation_path)
+            presentation_root = presentation_tree.getroot()
+            rel_tag = f"{{{package_rel_ns}}}Relationship"
+            rel_id_attr = f"{{{rel_ns}}}id"
+
+            rels = list(rels_root.findall(rel_tag))
+            original_relationships = [
+                (rel.get("Id"), rel.get("Type"), rel.get("Target")) for rel in rels
+            ]
+            rels_by_id = {
+                rel.get("Id"): rel for rel in rels if rel.get("Id") is not None
+            }
+            assigned_ids = {}
+            ordered_rels = []
+            next_id = 1
+
+            def assign_rel(rel, preferred_id: Optional[str] = None):
+                nonlocal next_id
+                if rel is None or rel in ordered_rels:
+                    return None
+
+                rel_id = preferred_id
+                if rel_id is None:
+                    while f"rId{next_id}" in assigned_ids:
+                        next_id += 1
+                    rel_id = f"rId{next_id}"
+
+                rel.set("Id", rel_id)
+                assigned_ids[rel_id] = rel
+                ordered_rels.append(rel)
+
+                if rel_id.startswith("rId") and rel_id[3:].isdigit():
+                    next_id = max(next_id, int(rel_id[3:]) + 1)
+
+                return rel_id
+
+            slide_master_ids = presentation_root.findall(
+                f".//{{{presentation_ns}}}sldMasterId"
+            )
+            for slide_master_id in slide_master_ids:
+                rel = rels_by_id.get(slide_master_id.get(rel_id_attr))
+                new_rel_id = assign_rel(rel, f"rId{next_id}")
+                if new_rel_id:
+                    slide_master_id.set(rel_id_attr, new_rel_id)
+
+            slide_ids = presentation_root.findall(f".//{{{presentation_ns}}}sldId")
+            for slide_id in slide_ids:
+                rel = rels_by_id.get(slide_id.get(rel_id_attr))
+                new_rel_id = assign_rel(rel)
+                if new_rel_id:
+                    slide_id.set(rel_id_attr, new_rel_id)
+
+            notes_master_ids = presentation_root.findall(
+                f".//{{{presentation_ns}}}notesMasterId"
+            )
+            for notes_master_id in notes_master_ids:
+                rel = rels_by_id.get(notes_master_id.get(rel_id_attr))
+                new_rel_id = assign_rel(rel)
+                if new_rel_id:
+                    notes_master_id.set(rel_id_attr, new_rel_id)
+
+            known_tail_types = [
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps",
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps",
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles",
+            ]
+            for rel_type in known_tail_types:
+                for rel in rels:
+                    if rel.get("Type") == rel_type:
+                        assign_rel(rel)
+
+            for rel in rels:
+                assign_rel(rel)
+
+            normalized_relationships = [
+                (rel.get("Id"), rel.get("Type"), rel.get("Target"))
+                for rel in ordered_rels
+            ]
+            if normalized_relationships != original_relationships:
+                for rel in list(rels_root.findall(rel_tag)):
+                    rels_root.remove(rel)
+                for rel in ordered_rels:
+                    rels_root.append(rel)
+                rels_tree.write(
+                    rels_path,
+                    xml_declaration=True,
+                    encoding="UTF-8",
+                    standalone="yes",
+                )
+                presentation_tree.write(
+                    presentation_path,
                     xml_declaration=True,
                     encoding="UTF-8",
                     standalone="yes",
@@ -119,12 +426,20 @@ class PptxPresentationCreator:
                 rel_tag = f"{{{package_rel_ns}}}Relationship"
                 notes_master_rel = None
                 existing_ids = set()
-                for rel in rels_root.findall(rel_tag):
+                rels_changed = False
+                printer_settings_targets = []
+                for rel in list(rels_root.findall(rel_tag)):
                     rel_id = rel.get("Id")
                     if rel_id:
                         existing_ids.add(rel_id)
                     if rel.get("Type") == notes_master_rel_type:
                         notes_master_rel = rel
+                    if rel.get("Type") == printer_settings_rel_type:
+                        target = rel.get("Target")
+                        if target:
+                            printer_settings_targets.append(target)
+                        rels_root.remove(rel)
+                        rels_changed = True
 
                 notes_masters_dir = os.path.join(ppt_dir, "notesMasters")
                 has_notes_master = os.path.isdir(notes_masters_dir) and any(
@@ -139,6 +454,9 @@ class PptxPresentationCreator:
                     notes_master_rel.set("Id", f"rId{next_id}")
                     notes_master_rel.set("Type", notes_master_rel_type)
                     notes_master_rel.set("Target", "notesMasters/notesMaster1.xml")
+                    rels_changed = True
+
+                if rels_changed:
                     rels_tree.write(
                         rels_path,
                         xml_declaration=True,
@@ -146,9 +464,18 @@ class PptxPresentationCreator:
                         standalone="yes",
                     )
 
+                remove_printer_settings_parts(ppt_dir, printer_settings_targets)
+                remove_printer_settings_content_type(extract_dir)
+
+                presentation_tree = etree.parse(presentation_path)
+                presentation_root = presentation_tree.getroot()
+                presentation_changed = False
+                slide_size = presentation_root.find(f"{{{presentation_ns}}}sldSz")
+                if slide_size is not None and slide_size.get("type") is not None:
+                    del slide_size.attrib["type"]
+                    presentation_changed = True
+
                 if has_notes_master and notes_master_rel is not None:
-                    presentation_tree = etree.parse(presentation_path)
-                    presentation_root = presentation_tree.getroot()
                     notes_master_id_lst = presentation_root.find(
                         f"{{{presentation_ns}}}notesMasterIdLst"
                     )
@@ -177,12 +504,21 @@ class PptxPresentationCreator:
                             f"{{{rel_ns}}}id",
                             notes_master_rel.get("Id"),
                         )
-                        presentation_tree.write(
-                            presentation_path,
-                            xml_declaration=True,
-                            encoding="UTF-8",
-                            standalone="yes",
-                        )
+                        presentation_changed = True
+
+                if presentation_changed:
+                    presentation_tree.write(
+                        presentation_path,
+                        xml_declaration=True,
+                        encoding="UTF-8",
+                        standalone="yes",
+                    )
+
+                normalize_presentation_relationship_ids(rels_path, presentation_path)
+
+            ensure_slide_paragraphs_end_rpr(ppt_dir)
+            normalize_zero_shadows_in_pptx(extract_dir)
+            normalize_incomplete_themes(ppt_dir)
 
             with zipfile.ZipFile(pptx_path, "w", zipfile.ZIP_DEFLATED) as new_zip:
                 for root, _, files in os.walk(extract_dir):
@@ -480,7 +816,6 @@ class PptxPresentationCreator:
             outer_shadow = etree.SubElement(
                 effect_list,
                 f"{{{nsmap['a']}}}outerShdw",
-                {"blurRad": "0", "dist": "0", "dir": "0"},
                 nsmap=nsmap,
             )
             color_element = etree.SubElement(
