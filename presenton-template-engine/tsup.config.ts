@@ -33,4 +33,22 @@ export default defineConfig([
     dts: false,
     shims: false,
   },
+  {
+    entry: {
+      "browser/local-render-slide": "src/browser/local-render-slide.ts",
+      "browser/local-render-deck": "src/browser/local-render-deck.ts",
+      "browser/template-entry": "src/browser/template-entry.ts",
+    },
+    format: ["esm"],
+    platform: "browser",
+    target: "es2020",
+    outDir: "dist",
+    splitting: false,
+    sourcemap: false,
+    clean: false,
+    minify: false,
+    dts: false,
+    shims: false,
+    external: ["react", "react-dom", "react-dom/client", "zod"],
+  },
 ]);

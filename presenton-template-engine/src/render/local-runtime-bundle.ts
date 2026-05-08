@@ -33,24 +33,33 @@ function getCurrentModuleDir(): string {
 
 function resolveBrowserRenderEntry(mode: LocalRuntimeBundleMode): string {
   const moduleDir = getCurrentModuleDir();
-  const relativeEntry = mode === "deck" ? "browser/render-deck.tsx" : "browser/render-slide.tsx";
+  const distEntry =
+    mode === "deck"
+      ? "browser/local-render-deck.js"
+      : "browser/local-render-slide.js";
+  const sourceEntry =
+    mode === "deck" ? "browser/render-deck.tsx" : "browser/render-slide.tsx";
   const candidates = [
-    path.join(moduleDir, "..", relativeEntry),
-    path.join(moduleDir, "..", "src", relativeEntry),
-    path.join(moduleDir, "..", "..", "src", relativeEntry),
+    path.join(moduleDir, "..", distEntry),
+    path.join(moduleDir, "..", "dist", distEntry),
+    path.join(moduleDir, "..", sourceEntry),
+    path.join(moduleDir, "..", "src", sourceEntry),
+    path.join(moduleDir, "..", "..", "src", sourceEntry),
   ];
-  const sourceEntry = candidates.find((candidate) => existsSync(candidate));
-  if (!sourceEntry) {
+  const entry = candidates.find((candidate) => existsSync(candidate));
+  if (!entry) {
     throw new Error(
-      `Failed to locate browser render source entry for local templates: ${relativeEntry}`,
+      `Failed to locate browser render entry for local templates: ${distEntry} or ${sourceEntry}`,
     );
   }
 
-  return sourceEntry;
+  return entry;
 }
 
 function resolveTemplateUtilsEntry(): string {
   const candidates = [
+    path.join(getCurrentModuleDir(), "../browser/template-entry.js"),
+    path.join(getCurrentModuleDir(), "../dist/browser/template-entry.js"),
     path.join(getCurrentModuleDir(), "../app/presentation-templates/utils.ts"),
     path.join(getCurrentModuleDir(), "../src/app/presentation-templates/utils.ts"),
     path.join(getCurrentModuleDir(), "../../src/app/presentation-templates/utils.ts"),
