@@ -293,6 +293,14 @@ async function copyOptionalGroupAssets(groupRoot, groupOutputDir) {
     await cp(catalogPath, path.join(groupOutputDir, "catalog.json"));
   }
 
+  const componentsReadmePath = path.join(groupRoot, "components", "README.md");
+  if (await pathExists(componentsReadmePath)) {
+    await cp(
+      componentsReadmePath,
+      path.join(groupOutputDir, "components", "README.md"),
+    );
+  }
+
   const dataDir = path.join(groupRoot, "data");
   if (await directoryExists(dataDir)) {
     await cp(dataDir, path.join(groupOutputDir, "data"), { recursive: true });
