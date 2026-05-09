@@ -1,0 +1,50 @@
+{
+  "title": "Timeline Plan",
+  "metaLabel": "BLUEPRINT / TIMELINE",
+  "footerText": "Red Finance V3 | Timeline Plan",
+  "pageNumber": "07",
+  "variant": "horizontal-roadmap",
+  "density": "medium",
+  "heading": "路线图",
+  "subtitle": "按阶段表达演进路径、实施节奏或里程碑。",
+  "phases": [
+    { "label": "01", "title": "Assess", "items": ["识别问题", "定义范围"] },
+    { "label": "02", "title": "Design", "items": ["设计方案", "对齐依赖"] },
+    { "label": "03", "title": "Deliver", "items": ["落地执行", "跟踪结果"] }
+  ],
+  "milestones": [
+    {
+      "period": "2022",
+      "stage": "Start",
+      "title": "Policy kickoff",
+      "description": "起点阶段，用于表达行业或项目的启动节点。",
+      "icon": "calendar",
+      "tone": "default",
+      "tag": "start"
+    },
+    {
+      "period": "2024",
+      "stage": "Scale",
+      "title": "Operational expansion",
+      "description": "中期阶段，通常是扩张或整合的关键窗口。",
+      "icon": "route",
+      "tone": "accent",
+      "tag": "scale"
+    },
+    {
+      "period": "2026",
+      "stage": "Next",
+      "title": "Future state",
+      "description": "下一步目标，用来承接规划和建议。",
+      "icon": "lightbulb",
+      "tone": "future",
+      "tag": "future"
+    }
+  ],
+  "metrics": [
+    { "value": "3", "label": "phases" },
+    { "value": "6", "label": "months" },
+    { "value": "12", "label": "milestones" }
+  ],
+  "summary": "适合有明显阶段和节奏的规划页面。"
+}

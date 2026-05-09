@@ -1,0 +1,78 @@
+{
+  "id": "two-column-insight",
+  "name": "Two Column Insight",
+  "description": "Two-column analytical slide with narrative on one side and evidence, cards, metrics, or a compact chart on the other side.",
+  "implementation_status": "implemented",
+  "slide_renderer": "./slides/TwoColumnInsight.tsx",
+  "layout_family": "two-column",
+  "content_intents": ["overview", "insight", "analysis", "explanation"],
+  "suitable_for": ["行业概览", "观点解释", "问题分析", "策略说明"],
+  "avoid_for": ["复杂时间线", "大规模矩阵", "多图表仪表盘", "纯封面"],
+  "slots": [
+    {
+      "name": "primary-narrative",
+      "purpose": "承载页面主观点、解释性正文和关键判断",
+      "required": true,
+      "allowed_component_families": ["heading", "callout", "list", "card"],
+      "allowed_components": ["FinanceSectionHeading", "InsightCallout", "InfoListItem", "IconTextCard"],
+      "content_type": "editable-text",
+      "min_items": 1,
+      "max_items": 4,
+      "text_limits": { "title_max": 28, "body_max": 140 },
+      "can_reorder": true,
+      "can_replace": true
+    },
+    {
+      "name": "evidence-panel",
+      "purpose": "放置支撑观点的指标、卡片、结构图或单个紧凑图表",
+      "required": true,
+      "allowed_component_families": ["card", "kpi", "chart"],
+      "allowed_components": ["KpiMetricItem", "DualValueMetricCard", "ChartCardShell", "FinanceBarChart", "FinanceLineChart"],
+      "content_type": "cards",
+      "min_items": 1,
+      "max_items": 4,
+      "text_limits": { "title_max": 30, "body_max": 90, "label_max": 18 },
+      "can_reorder": true,
+      "can_replace": true
+    },
+    {
+      "name": "insight-callout",
+      "purpose": "页面底部或侧边的最终结论提示",
+      "required": false,
+      "allowed_component_families": ["callout", "card"],
+      "allowed_components": ["InsightCallout", "SectionPanelShell"],
+      "content_type": "editable-text",
+      "min_items": 0,
+      "max_items": 1,
+      "text_limits": { "body_max": 120 },
+      "can_reorder": false,
+      "can_replace": true
+    }
+  ],
+  "variants": [
+    {
+      "id": "narrative-left-evidence-right",
+      "name": "Narrative Left Evidence Right",
+      "description": "左侧解释观点，右侧放数据或卡片证据。",
+      "best_for": ["观点解释", "行业概览", "原因分析"]
+    },
+    {
+      "id": "evidence-left-narrative-right",
+      "name": "Evidence Left Narrative Right",
+      "description": "左侧先给数据证据，右侧给判断和解释。",
+      "best_for": ["结果复盘", "先数据后结论", "异常解释"]
+    }
+  ],
+  "density_range": ["medium", "high"],
+  "component_families": ["heading", "callout", "list", "card", "kpi", "chart"],
+  "agent_selection_rules": [
+    "当一个核心观点需要 1-4 个证据单元支撑时选择。",
+    "如果证据是超过 6 行的表格或多维对比，应选择 comparison-matrix。",
+    "如果核心内容是时间顺序，应选择 timeline-plan。"
+  ],
+  "export_notes": [
+    "主观点、证据标题、指标数值和 callout 必须保持真实文本。",
+    "单个复杂图表可以截图兜底，但图表标题和关键结论应在 DOM 文本中。",
+    "避免双栏内同时放长正文和高密度图表。"
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "id": "closing-actions",
+  "name": "Closing Actions",
+  "description": "Closing structure for final conclusions, priorities, decision asks, and next actions.",
+  "implementation_status": "implemented",
+  "slide_renderer": "./slides/ClosingActions.tsx",
+  "layout_family": "closing",
+  "content_intents": ["conclusion", "recommendation", "next-actions", "decision"],
+  "suitable_for": ["总结展望", "行动建议", "下一步计划", "决策请求"],
+  "avoid_for": ["章节开场", "复杂图表", "多主体矩阵", "详细路线图"],
+  "slots": [
+    {
+      "name": "final-message",
+      "purpose": "收束全 deck 的最终判断或建议主张",
+      "required": true,
+      "allowed_component_families": ["heading", "callout"],
+      "allowed_components": ["FinanceSectionHeading", "InsightCallout"],
+      "content_type": "editable-text",
+      "min_items": 1,
+      "max_items": 2,
+      "text_limits": { "title_max": 32, "body_max": 140 },
+      "can_reorder": false,
+      "can_replace": true
+    },
+    {
+      "name": "action-list",
+      "purpose": "列出建议行动、负责人视角或下一步安排",
+      "required": true,
+      "allowed_component_families": ["card", "list", "primitive"],
+      "allowed_components": ["HorizontalFeatureCard", "InfoListItem", "StatusPill"],
+      "content_type": "actions",
+      "min_items": 3,
+      "max_items": 5,
+      "text_limits": { "title_max": 26, "body_max": 90, "label_max": 16 },
+      "can_reorder": true,
+      "can_replace": true
+    },
+    {
+      "name": "decision-ask",
+      "purpose": "可选决策请求、会议动作或资源需求",
+      "required": false,
+      "allowed_component_families": ["callout", "card"],
+      "allowed_components": ["InsightCallout", "SectionPanelShell"],
+      "content_type": "editable-text",
+      "min_items": 0,
+      "max_items": 1,
+      "text_limits": { "title_max": 28, "body_max": 120 },
+      "can_reorder": false,
+      "can_replace": true
+    }
+  ],
+  "variants": [
+    {
+      "id": "conclusion-plus-actions",
+      "name": "Conclusion Plus Actions",
+      "description": "上方最终结论，下方行动清单。",
+      "best_for": ["总结建议", "汇报结尾", "行动计划"]
+    },
+    {
+      "id": "decision-ask-focus",
+      "name": "Decision Ask Focus",
+      "description": "突出需要管理层确认或授权的事项。",
+      "best_for": ["董事会决策", "预算请求", "资源协调"]
+    }
+  ],
+  "density_range": ["medium", "high"],
+  "component_families": ["heading", "callout", "card", "list", "primitive"],
+  "agent_selection_rules": [
+    "当页面是 deck 末尾且需要输出建议、行动或决策请求时选择。",
+    "如果只是章节之间过渡，应使用 section-divider。",
+    "行动项必须具体，避免写成抽象口号。"
+  ],
+  "export_notes": [
+    "最终判断、行动标题、责任/时间标签和决策请求必须保持真实文本。",
+    "不要把行动清单做成截图。",
+    "如果使用状态色，仍需保留状态文字。"
+  ]
+}

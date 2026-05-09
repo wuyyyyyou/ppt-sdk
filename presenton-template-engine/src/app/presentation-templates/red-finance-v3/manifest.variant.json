@@ -1,0 +1,106 @@
+{
+  "title": "Red Finance V3 Variant Demo Deck",
+  "theme": {
+    "company_name": "GLOBAL FINANCE INSIGHTS",
+    "colors": {
+      "background": "#FFFFFF",
+      "background_text": "#212121",
+      "primary": "#B71C1C",
+      "primary_text": "#FFFFFF",
+      "card": "#FAFAFA",
+      "stroke": "#E5E7EB"
+    }
+  },
+  "slides": [
+    {
+      "id": "red-finance-v3-variant-cover-statement",
+      "title": "Red Finance V3",
+      "speaker_note": "V3 变体封面页：使用 statement-visual 变体，弱化说明点并强化视觉装饰。",
+      "source": {
+        "type": "local",
+        "path": "./slides/CoverStatement.tsx"
+      },
+      "data_path": "./data/demo-variant/cover-statement.json"
+    },
+    {
+      "id": "red-finance-v3-variant-section-divider",
+      "title": "蓝图优先架构",
+      "speaker_note": "V3 变体章节页：使用 minimal-statement 变体，形成更低密度的章节停顿。",
+      "source": {
+        "type": "local",
+        "path": "./slides/SectionDivider.tsx"
+      },
+      "data_path": "./data/demo-variant/section-divider.json"
+    },
+    {
+      "id": "red-finance-v3-variant-two-column-insight",
+      "title": "Two Column Insight",
+      "speaker_note": "通用两栏观点页变体：证据优先，叙事后置。",
+      "source": {
+        "type": "local",
+        "path": "./slides/TwoColumnInsight.tsx"
+      },
+      "data_path": "./data/demo-variant/two-column-insight.json"
+    },
+    {
+      "id": "red-finance-v3-variant-three-column-cards",
+      "title": "Three Column Cards",
+      "speaker_note": "通用卡片页变体：两行三列紧凑卡片。",
+      "source": {
+        "type": "local",
+        "path": "./slides/ThreeColumnCards.tsx"
+      },
+      "data_path": "./data/demo-variant/three-column-cards.json"
+    },
+    {
+      "id": "red-finance-v3-variant-chart-with-narrative",
+      "title": "Chart With Narrative",
+      "speaker_note": "通用图表叙事页变体：上图下叙事。",
+      "source": {
+        "type": "local",
+        "path": "./slides/ChartWithNarrative.tsx"
+      },
+      "data_path": "./data/demo-variant/chart-with-narrative.json"
+    },
+    {
+      "id": "red-finance-v3-variant-comparison-matrix",
+      "title": "Comparison Matrix",
+      "speaker_note": "通用对比矩阵页变体：维度优先解释。",
+      "source": {
+        "type": "local",
+        "path": "./slides/ComparisonMatrix.tsx"
+      },
+      "data_path": "./data/demo-variant/comparison-matrix.json"
+    },
+    {
+      "id": "red-finance-v3-variant-timeline-plan",
+      "title": "Timeline Plan",
+      "speaker_note": "通用路线图页变体：纵向里程碑。",
+      "source": {
+        "type": "local",
+        "path": "./slides/TimelinePlan.tsx"
+      },
+      "data_path": "./data/demo-variant/timeline-plan.json"
+    },
+    {
+      "id": "red-finance-v3-variant-kpi-summary",
+      "title": "KPI Summary",
+      "speaker_note": "通用 KPI 汇总页变体：紧凑指标看板。",
+      "source": {
+        "type": "local",
+        "path": "./slides/KpiSummary.tsx"
+      },
+      "data_path": "./data/demo-variant/kpi-summary.json"
+    },
+    {
+      "id": "red-finance-v3-variant-closing-actions",
+      "title": "Closing Actions",
+      "speaker_note": "通用结尾行动页变体：突出决策请求。",
+      "source": {
+        "type": "local",
+        "path": "./slides/ClosingActions.tsx"
+      },
+      "data_path": "./data/demo-variant/closing-actions.json"
+    }
+  ]
+}

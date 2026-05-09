@@ -1,0 +1,91 @@
+{
+  "id": "cover-statement",
+  "name": "Cover Statement",
+  "description": "Strong opening statement with brand, report metadata, supporting notes, and restrained finance decoration.",
+  "implementation_status": "implemented",
+  "slide_renderer": "./slides/CoverStatement.tsx",
+  "layout_family": "cover",
+  "content_intents": ["opening", "positioning", "theme-statement"],
+  "suitable_for": ["封面", "战略报告开场", "主题声明", "管理层汇报开场"],
+  "avoid_for": ["正文分析", "复杂图表", "对比矩阵", "长流程说明"],
+  "slots": [
+    {
+      "name": "brand-meta",
+      "purpose": "品牌、标签、日期、报告人和密级等元信息",
+      "required": true,
+      "allowed_component_families": ["primitive", "heading"],
+      "allowed_components": ["IconText", "FinanceIcon"],
+      "content_type": "meta",
+      "min_items": 2,
+      "max_items": 5,
+      "text_limits": { "label_max": 80 },
+      "can_reorder": true,
+      "can_replace": true
+    },
+    {
+      "name": "hero-statement",
+      "purpose": "封面主标题和副标题，表达整份 deck 的中心主题",
+      "required": true,
+      "allowed_component_families": ["heading"],
+      "allowed_components": ["FinanceCanvas"],
+      "content_type": "editable-text",
+      "min_items": 2,
+      "max_items": 3,
+      "text_limits": { "title_max": 32, "body_max": 48 },
+      "can_reorder": false,
+      "can_replace": false
+    },
+    {
+      "name": "supporting-notes",
+      "purpose": "少量说明点，辅助解释报告定位或方法",
+      "required": false,
+      "allowed_component_families": ["card", "primitive"],
+      "allowed_components": ["SectionPanelShell", "IconText"],
+      "content_type": "list",
+      "min_items": 2,
+      "max_items": 4,
+      "text_limits": { "title_max": 32, "body_max": 36 },
+      "can_reorder": true,
+      "can_replace": true
+    },
+    {
+      "name": "decorative-visual",
+      "purpose": "金融风格视觉装饰，不承载关键业务事实",
+      "required": false,
+      "allowed_component_families": ["decoration"],
+      "allowed_components": ["CoverBarDecoration"],
+      "content_type": "decoration",
+      "min_items": 0,
+      "max_items": 1,
+      "text_limits": {},
+      "can_reorder": false,
+      "can_replace": true
+    }
+  ],
+  "variants": [
+    {
+      "id": "statement-notes",
+      "name": "Statement With Notes",
+      "description": "左侧大标题，右侧说明点，适合正式但需要解释定位的开场。",
+      "best_for": ["新模板基线", "方法论开场", "需要解释报告视角"]
+    },
+    {
+      "id": "statement-visual",
+      "name": "Statement With Visual",
+      "description": "强化装饰图形，弱化说明点，适合高层汇报封面。",
+      "best_for": ["董事会汇报", "客户提案封面", "正式研究报告"]
+    }
+  ],
+  "density_range": ["low", "medium"],
+  "component_families": ["heading", "primitive", "card", "decoration"],
+  "agent_selection_rules": [
+    "当页面是 deck 第一页且只需要表达主题、机构和报告元信息时选择。",
+    "如果内容包含可验证数据、趋势或结论证据，不要使用封面蓝图。",
+    "标题应控制在两行以内，副标题只承担定位说明。"
+  ],
+  "export_notes": [
+    "标题、日期、报告人和说明点必须保持真实文本。",
+    "装饰图形可以作为可截图视觉，不应放入关键事实。",
+    "避免把长段正文塞入 hero-statement。"
+  ]
+}

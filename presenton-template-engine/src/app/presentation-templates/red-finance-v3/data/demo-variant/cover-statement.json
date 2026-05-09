@@ -1,0 +1,14 @@
+{
+  "brandName": "GLOBAL FINANCE INSIGHTS",
+  "reportTag": "Blueprint-first Baseline",
+  "titleLineOne": "Red Finance V3",
+  "titleLineTwo": "迁移基线",
+  "subtitle": "从成品页复用切换到蓝图驱动生成",
+  "reportDate": "2026/05/09",
+  "presenter": "Template Migration",
+  "classification": "Internal Draft",
+  "variant": "statement-visual",
+  "density": "medium",
+  "noteTitle": "V3 baseline",
+  "notes": ["独立模板组可发现", "主路径只包含通用 slide", "上一代成品页保留为参考资产"]
+}

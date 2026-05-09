@@ -1,0 +1,54 @@
+{
+  "title": "Comparison Matrix",
+  "metaLabel": "BLUEPRINT / MATRIX",
+  "footerText": "Red Finance V3 | Comparison Matrix",
+  "pageNumber": "06",
+  "variant": "entity-first",
+  "density": "high",
+  "matrixTitle": "对比矩阵",
+  "rowHeaderLabel": "维度",
+  "columns": [
+    { "label": "China" },
+    { "label": "US" },
+    { "label": "Gap" }
+  ],
+  "rows": [
+    {
+      "header": "Scale",
+      "cells": [
+        { "lead": "Large", "support": "broad ecosystem" },
+        { "lead": "Large", "support": "deep market" },
+        { "lead": "Medium", "support": "different structure" }
+      ]
+    },
+    {
+      "header": "Data",
+      "cells": [
+        { "lead": "Strong", "support": "platform depth" },
+        { "lead": "Strong", "support": "capital depth" },
+        { "lead": "High", "support": "different stack" }
+      ]
+    },
+    {
+      "header": "Regulation",
+      "cells": [
+        { "lead": "Tight", "support": "policy-led" },
+        { "lead": "Mixed", "support": "multi-agency" },
+        { "lead": "High", "support": "compliance focus" }
+      ]
+    }
+  ],
+  "sections": [
+    {
+      "badge": "01",
+      "title": "Key takeaway",
+      "description": "矩阵页不是大表格，而是用结构化方式说明几个关键差异。"
+    },
+    {
+      "badge": "02",
+      "title": "Use case",
+      "description": "适合中美对比、能力比较、方案比较或评分矩阵。"
+    }
+  ],
+  "summary": "适合多维对比，不适合单一观点说明。"
+}

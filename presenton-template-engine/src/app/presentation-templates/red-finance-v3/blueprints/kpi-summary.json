@@ -1,0 +1,78 @@
+{
+  "id": "kpi-summary",
+  "name": "KPI Summary",
+  "description": "Metric summary structure for business results, targets, operating health, or performance comparisons.",
+  "implementation_status": "implemented",
+  "slide_renderer": "./slides/KpiSummary.tsx",
+  "layout_family": "kpi",
+  "content_intents": ["metrics", "performance", "target-breakdown", "result-review"],
+  "suitable_for": ["经营指标", "目标拆解", "结果复盘", "关键 KPI 汇总"],
+  "avoid_for": ["长文本解释", "政策演进", "复杂表格", "章节转场"],
+  "slots": [
+    {
+      "name": "headline-metric",
+      "purpose": "页面最重要的 1-2 个核心指标或结论数字",
+      "required": true,
+      "allowed_component_families": ["kpi", "heading"],
+      "allowed_components": ["KpiMetricItem", "DualValueMetricCard"],
+      "content_type": "kpi",
+      "min_items": 1,
+      "max_items": 2,
+      "text_limits": { "title_max": 24, "body_max": 60, "label_max": 16 },
+      "can_reorder": true,
+      "can_replace": true
+    },
+    {
+      "name": "metric-grid",
+      "purpose": "多项指标网格，展示目标、现状、变化或状态",
+      "required": true,
+      "allowed_component_families": ["kpi", "card"],
+      "allowed_components": ["KpiMetricItem", "DualValueMetricCard", "ProgressStatusCard", "IconTextCard"],
+      "content_type": "kpi",
+      "min_items": 3,
+      "max_items": 8,
+      "text_limits": { "title_max": 22, "body_max": 50, "label_max": 16 },
+      "can_reorder": true,
+      "can_replace": true
+    },
+    {
+      "name": "metric-interpretation",
+      "purpose": "解释指标变化背后的原因或管理动作",
+      "required": false,
+      "allowed_component_families": ["callout", "list"],
+      "allowed_components": ["InsightCallout", "InfoListItem"],
+      "content_type": "editable-text",
+      "min_items": 0,
+      "max_items": 3,
+      "text_limits": { "title_max": 26, "body_max": 90 },
+      "can_reorder": true,
+      "can_replace": true
+    }
+  ],
+  "variants": [
+    {
+      "id": "hero-kpi-grid",
+      "name": "Hero KPI Grid",
+      "description": "顶部核心指标，底部网格补充。",
+      "best_for": ["经营仪表盘", "结果复盘", "目标拆解"]
+    },
+    {
+      "id": "compact-metric-board",
+      "name": "Compact Metric Board",
+      "description": "6-8 个紧凑指标形成一页概览。",
+      "best_for": ["多指标概览", "管理层速览", "项目状态"]
+    }
+  ],
+  "density_range": ["medium", "high"],
+  "component_families": ["kpi", "heading", "card", "callout", "list"],
+  "agent_selection_rules": [
+    "当页面核心是数值、目标、状态或变化率时选择。",
+    "如果需要解释单一指标背后的复杂原因，应选择 two-column-insight。",
+    "指标超过 8 个时应分组或拆页。"
+  ],
+  "export_notes": [
+    "所有指标数值、单位、标签和解释文字必须保持真实文本。",
+    "进度条或状态色不能替代数字和文本。",
+    "避免把 KPI 做成不可编辑图片。"
+  ]
+}

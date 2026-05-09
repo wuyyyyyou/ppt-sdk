@@ -1,0 +1,106 @@
+{
+  "title": "Red Finance V3 Baseline Demo Deck",
+  "theme": {
+    "company_name": "GLOBAL FINANCE INSIGHTS",
+    "colors": {
+      "background": "#FFFFFF",
+      "background_text": "#212121",
+      "primary": "#B71C1C",
+      "primary_text": "#FFFFFF",
+      "card": "#FAFAFA",
+      "stroke": "#E5E7EB"
+    }
+  },
+  "slides": [
+    {
+      "id": "red-finance-v3-cover-statement",
+      "title": "Red Finance V3",
+      "speaker_note": "V3 基线封面页：用于验证 blueprint-first 模板组的最小发现和渲染链路。",
+      "source": {
+        "type": "local",
+        "path": "./slides/CoverStatement.tsx"
+      },
+      "data_path": "./data/demo/cover-statement.json"
+    },
+    {
+      "id": "red-finance-v3-section-divider",
+      "title": "蓝图优先架构",
+      "speaker_note": "V3 基线章节页：用于展示蓝图、槽位和变体的通用表达方式。",
+      "source": {
+        "type": "local",
+        "path": "./slides/SectionDivider.tsx"
+      },
+      "data_path": "./data/demo/section-divider.json"
+    },
+    {
+      "id": "red-finance-v3-two-column-insight",
+      "title": "Two Column Insight",
+      "speaker_note": "通用两栏观点页：左侧主叙事，右侧少量证据卡片。",
+      "source": {
+        "type": "local",
+        "path": "./slides/TwoColumnInsight.tsx"
+      },
+      "data_path": "./data/demo/two-column-insight.json"
+    },
+    {
+      "id": "red-finance-v3-three-column-cards",
+      "title": "Three Column Cards",
+      "speaker_note": "通用三列卡片页：用于并列支柱、分类或策略选项。",
+      "source": {
+        "type": "local",
+        "path": "./slides/ThreeColumnCards.tsx"
+      },
+      "data_path": "./data/demo/three-column-cards.json"
+    },
+    {
+      "id": "red-finance-v3-chart-with-narrative",
+      "title": "Chart With Narrative",
+      "speaker_note": "通用图表叙事页：一张主图表搭配解释要点。",
+      "source": {
+        "type": "local",
+        "path": "./slides/ChartWithNarrative.tsx"
+      },
+      "data_path": "./data/demo/chart-with-narrative.json"
+    },
+    {
+      "id": "red-finance-v3-comparison-matrix",
+      "title": "Comparison Matrix",
+      "speaker_note": "通用对比矩阵页：用于多主体、多维度比较。",
+      "source": {
+        "type": "local",
+        "path": "./slides/ComparisonMatrix.tsx"
+      },
+      "data_path": "./data/demo/comparison-matrix.json"
+    },
+    {
+      "id": "red-finance-v3-timeline-plan",
+      "title": "Timeline Plan",
+      "speaker_note": "通用路线图页：用于阶段规划、里程碑或演进路径。",
+      "source": {
+        "type": "local",
+        "path": "./slides/TimelinePlan.tsx"
+      },
+      "data_path": "./data/demo/timeline-plan.json"
+    },
+    {
+      "id": "red-finance-v3-kpi-summary",
+      "title": "KPI Summary",
+      "speaker_note": "通用 KPI 汇总页：用于经营指标、目标拆解和状态速览。",
+      "source": {
+        "type": "local",
+        "path": "./slides/KpiSummary.tsx"
+      },
+      "data_path": "./data/demo/kpi-summary.json"
+    },
+    {
+      "id": "red-finance-v3-closing-actions",
+      "title": "Closing Actions",
+      "speaker_note": "通用结尾行动页：用于总结结论、行动建议和决策请求。",
+      "source": {
+        "type": "local",
+        "path": "./slides/ClosingActions.tsx"
+      },
+      "data_path": "./data/demo/closing-actions.json"
+    }
+  ]
+}

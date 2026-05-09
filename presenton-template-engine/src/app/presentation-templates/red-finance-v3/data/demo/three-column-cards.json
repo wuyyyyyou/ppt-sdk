@@ -1,0 +1,31 @@
+{
+  "title": "Three Column Cards",
+  "metaLabel": "BLUEPRINT / THREE COLUMN",
+  "footerText": "Red Finance V3 | Three Column Cards",
+  "pageNumber": "04",
+  "variant": "three-equal-columns",
+  "density": "medium",
+  "heading": "并列支柱",
+  "subtitle": "三列并列，适合能力、策略、问题、机会或风险分类。",
+  "cards": [
+    {
+      "icon": "chart-column",
+      "title": "结构化表达",
+      "description": "把同级要点拆成三列，避免页面变成长列表。",
+      "tag": "structure"
+    },
+    {
+      "icon": "shield",
+      "title": "平衡密度",
+      "description": "每张卡只容纳一组短说明，保持页面整洁。",
+      "tag": "balance"
+    },
+    {
+      "icon": "route",
+      "title": "易于延展",
+      "description": "适合继续扩展到更多分组或再拆成下一页。",
+      "tag": "extend"
+    }
+  ],
+  "summary": "适合三类并列信息，不适合单线叙事或复杂矩阵。"
+}

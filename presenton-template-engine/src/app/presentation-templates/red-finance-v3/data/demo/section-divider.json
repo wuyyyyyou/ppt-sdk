@@ -1,0 +1,30 @@
+{
+  "sectionNumber": "01",
+  "eyebrow": "Architecture",
+  "title": "蓝图优先架构",
+  "subtitle": "先确定表达结构、槽位和组件家族，再生成具体页面，降低不同 deck 之间的同质化。",
+  "footerText": "Red Finance V3 | Blueprint-first Baseline",
+  "pageNumber": "02",
+  "variant": "left-statement-right-cards",
+  "density": "medium",
+  "points": [
+    {
+      "title": "Blueprint catalog",
+      "description": "catalog 描述可用结构、适用内容类型和选择规则。",
+      "tag": "structure",
+      "icon": "grid"
+    },
+    {
+      "title": "Slot contract",
+      "description": "每个槽位声明允许的组件家族、密度范围和变体边界。",
+      "tag": "slots",
+      "icon": "shuffle"
+    },
+    {
+      "title": "Generic renderers",
+      "description": "slides 负责稳定渲染，业务主题由数据和蓝图实例驱动。",
+      "tag": "render",
+      "icon": "chart-line"
+    }
+  ]
+}
