@@ -174,12 +174,6 @@
     "把选中的蓝图 TSX 复制或派生到 slides/*.tsx，再直接修改最终页面。",
     "manifest.json 的 source.path 只指向 slides/*.tsx。",
     "data/*.json 只承载内容；如果结构、间距或组件不合适，改 slides/*.tsx。",
-    "reference-slides/ 只读参考，不得进入生成链路。",
-    "archives/blueprint-contracts/ 只保留历史 JSON 契约，不作为当前工作流入口。"
-  ],
-  "archived_contracts": {
-    "path": "./archives/blueprint-contracts",
-    "status": "archived",
-    "note": "历史 JSON 蓝图契约已归档；当前 V3 使用 TSX-first 工作流。"
-  }
+    "reference-slides/ 只读参考，不得进入生成链路。"
+  ]
 }

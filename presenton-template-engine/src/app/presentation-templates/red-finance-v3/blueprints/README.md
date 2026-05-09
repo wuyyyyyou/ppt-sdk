@@ -18,7 +18,6 @@
 - `slides/*.tsx`：具体 deck 的最终页面，Agent 可以直接修改。
 - `data/*.json`：只承载内容数据，不承载页面结构决策。
 - `reference-slides/*.tsx`：只读参考，不进入生成链路。
-- `archives/blueprint-contracts/`：历史 JSON 契约归档，不作为当前工作流入口。
 
 ## 蓝图 TSX 应包含
 
