@@ -7,7 +7,7 @@
     "arguments": {
       "cwd": "${workspaceFolder}/.vscode/engine/output",
       "template_group": "red-finance-v3",
-      "out_dir": "${workspaceFolder}/.vscode/engine/output/red-finance-v3",
+      "out_dir": "${workspaceFolder}/.vscode/engine/output/red-finance-v3-1356",
       "overwrite": true
     }
   }
