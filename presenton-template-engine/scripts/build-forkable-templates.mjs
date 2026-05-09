@@ -1,5 +1,5 @@
 import { builtinModules, createRequire } from "node:module";
-import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { copyFile, cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -57,6 +57,14 @@ async function pathExists(candidatePath) {
 async function directoryExists(candidatePath) {
   try {
     return (await stat(candidatePath)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+async function fileExists(candidatePath) {
+  try {
+    return (await stat(candidatePath)).isFile();
   } catch {
     return false;
   }
@@ -287,24 +295,73 @@ async function readGroupManifest(groupRoot) {
   return JSON.parse(await readFile(manifestPath, "utf8"));
 }
 
-async function copyOptionalGroupAssets(groupRoot, groupOutputDir) {
+async function copyFileIfExists(sourcePath, targetPath) {
+  if (!(await fileExists(sourcePath))) {
+    return;
+  }
+
+  await mkdir(path.dirname(targetPath), { recursive: true });
+  await copyFile(sourcePath, targetPath);
+}
+
+async function copyDirectorySupplement(sourceDir, targetDir) {
+  if (!(await directoryExists(sourceDir))) {
+    return;
+  }
+
+  await mkdir(targetDir, { recursive: true });
+
+  const entries = await readdir(sourceDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const sourcePath = path.join(sourceDir, entry.name);
+    const targetPath = path.join(targetDir, entry.name);
+
+    if (entry.isDirectory()) {
+      await copyDirectorySupplement(sourcePath, targetPath);
+      continue;
+    }
+
+    if (!entry.isFile() || (await fileExists(targetPath))) {
+      continue;
+    }
+
+    await mkdir(path.dirname(targetPath), { recursive: true });
+    await copyFile(sourcePath, targetPath);
+  }
+}
+
+async function copyOptionalGroupAssets(groupRoot, groupOutputDir, options = {}) {
+  const includeWorkspaceAssets = options.includeWorkspaceAssets === true;
   const catalogPath = path.join(groupRoot, "catalog.json");
   if (await pathExists(catalogPath)) {
     await cp(catalogPath, path.join(groupOutputDir, "catalog.json"));
-  }
-
-  const componentsReadmePath = path.join(groupRoot, "components", "README.md");
-  if (await pathExists(componentsReadmePath)) {
-    await cp(
-      componentsReadmePath,
-      path.join(groupOutputDir, "components", "README.md"),
-    );
   }
 
   const dataDir = path.join(groupRoot, "data");
   if (await directoryExists(dataDir)) {
     await cp(dataDir, path.join(groupOutputDir, "data"), { recursive: true });
   }
+
+  await copyFileIfExists(
+    path.join(groupRoot, "components", "README.md"),
+    path.join(groupOutputDir, "components", "README.md"),
+  );
+
+  if (!includeWorkspaceAssets) {
+    return;
+  }
+
+  for (const relativeDir of ["blueprints", "components", "reference-slides"]) {
+    await copyDirectorySupplement(
+      path.join(groupRoot, relativeDir),
+      path.join(groupOutputDir, relativeDir),
+    );
+  }
+
+  await copyFileIfExists(
+    path.join(groupRoot, "slides", "README.md"),
+    path.join(groupOutputDir, "slides", "README.md"),
+  );
 }
 
 async function main() {
@@ -373,7 +430,9 @@ async function main() {
       await writeFile(targetPath, rewritten, "utf8");
     }
 
-    await copyOptionalGroupAssets(groupRoot, groupOutputDir);
+    await copyOptionalGroupAssets(groupRoot, groupOutputDir, {
+      includeWorkspaceAssets: group.group_id === "red-finance-v3",
+    });
 
     const dependencyVersions = groupPackageJson?.dependencies
       ? { ...groupPackageJson.dependencies }
