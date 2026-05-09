@@ -1,9 +1,9 @@
 {
   "sectionNumber": "01",
   "eyebrow": "Architecture",
-  "title": "蓝图优先架构",
+  "title": "TSX 优先架构",
   "subtitle": "先确定表达结构、槽位和组件家族，再生成具体页面，降低不同 deck 之间的同质化。",
-  "footerText": "Red Finance V3 | Blueprint-first Baseline",
+  "footerText": "Red Finance V3 | TSX-first Baseline",
   "pageNumber": "02",
   "variant": "left-statement-right-cards",
   "density": "medium",

@@ -1,0 +1,105 @@
+import React from "react";
+import * as z from "zod";
+
+import FinanceContentFrame from "../components/FinanceContentFrame.js";
+import FinanceSectionHeading from "../components/FinanceSectionHeading.js";
+import { FinanceIcon } from "../components/FinanceIcons.js";
+import DualValueMetricCard from "../components/DualValueMetricCard.js";
+import InsightCallout from "../components/InsightCallout.js";
+import KpiMetricItem from "../components/KpiMetricItem.js";
+
+const MetricSchema = z.object({
+  value: z.string().min(1).max(24),
+  label: z.string().min(2).max(24),
+});
+
+export const Schema = z.object({
+  title: z.string().min(2).max(28).default("KPI Summary"),
+  metaLabel: z.string().min(2).max(48).default("BLUEPRINT / KPI"),
+  footerText: z.string().min(6).max(80).default("Red Finance V3 | KPI Summary"),
+  pageNumber: z.string().min(1).max(4).default("08"),
+  variant: z.enum(["hero-kpi-grid", "compact-metric-board"]).default("hero-kpi-grid"),
+  density: z.enum(["medium", "high"]).default("medium"),
+  heading: z.string().min(2).max(32).default("关键指标"),
+  subtitle: z.string().min(8).max(96).default("适合经营指标、目标拆解、结果复盘和状态概览。"),
+  headlineTitle: z.string().min(2).max(36).default("核心表现"),
+  leftLabel: z.string().min(2).max(18).default("Current"),
+  rightLabel: z.string().min(2).max(18).default("Target"),
+  leftValue: z.string().min(1).max(24).default("84"),
+  rightValue: z.string().min(1).max(24).default("90"),
+  leftShare: z.number().min(0).max(100).default(84),
+  rightShare: z.number().min(0).max(100).default(90),
+  metrics: z.array(MetricSchema).min(3).max(8).default([
+    { value: "84%", label: "Completion" },
+    { value: "12", label: "Open items" },
+    { value: "3", label: "Critical risks" },
+    { value: "7", label: "Weeks left" },
+  ]),
+  insights: z.array(z.string().min(8).max(120)).min(1).max(3).default([
+    "数值是核心，解释只负责说明变化原因和下一步动作。",
+  ]),
+});
+
+export const layoutId = "kpi-summary";
+export const layoutName = "KPI Summary";
+export const layoutDescription =
+  "A tsx-first summary slide for metrics, targets, and performance snapshots.";
+export const layoutTags = ["kpi", "summary", "performance", "tsx-first"];
+export const layoutRole = "content";
+export const contentElements = ["headline-metric", "metric-grid", "insight"];
+export const useCases = ["metrics", "performance", "target-breakdown", "result-review"];
+export const suitableFor = "Suitable for metric-heavy pages that need a concise summary and a few supporting indicators.";
+export const avoidFor = "Avoid using this layout for narrative-heavy pages or complex comparisons.";
+export const density = "high";
+export const visualWeight = "balanced";
+export const editableTextPriority = "high";
+
+const KpiSummary = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
+  const parsed = Schema.parse(data ?? {});
+  const metricDensity = parsed.density === "high" ? "compact" : "normal";
+  const gridClass = parsed.variant === "compact-metric-board" ? "grid-cols-4" : "grid-cols-2";
+
+  return (
+    <FinanceContentFrame
+      title={parsed.title}
+      metaIcon={<FinanceIcon name="chart-column" className="h-[22px] w-[22px]" />}
+      metaText={parsed.metaLabel}
+      footerText={parsed.footerText}
+      pageNumber={parsed.pageNumber}
+      contentTop={156}
+      contentBottomInset={12}
+    >
+      <div className="flex h-full min-h-0 flex-col gap-[14px]">
+        <FinanceSectionHeading title={parsed.heading} subtitle={parsed.subtitle} />
+        <div className={parsed.variant === "hero-kpi-grid" ? "grid grid-cols-[1.05fr_0.95fr] gap-[18px]" : "flex flex-col gap-[18px]"}>
+          <DualValueMetricCard
+            title={parsed.headlineTitle}
+            icon={<FinanceIcon name="wallet" className="h-[18px] w-[18px]" />}
+            leftLabel={parsed.leftLabel}
+            rightLabel={parsed.rightLabel}
+            leftValue={parsed.leftValue}
+            rightValue={parsed.rightValue}
+            leftShare={parsed.leftShare}
+            rightShare={parsed.rightShare}
+            density="normal"
+            progressMode="split"
+          />
+          <div className={`grid ${gridClass} gap-[10px]`}>
+            {parsed.metrics.map((metric) => (
+              <div key={metric.label} className="rounded-[8px] border bg-white px-[14px] py-[12px]">
+                <KpiMetricItem value={metric.value} label={metric.label} />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="grid gap-[10px]">
+          {parsed.insights.map((insight, index) => (
+            <InsightCallout key={`${insight}-${index}`} text={insight} density={metricDensity} />
+          ))}
+        </div>
+      </div>
+    </FinanceContentFrame>
+  );
+};
+
+export default KpiSummary;

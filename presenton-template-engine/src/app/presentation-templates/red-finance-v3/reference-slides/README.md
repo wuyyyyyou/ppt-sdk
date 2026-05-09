@@ -13,7 +13,7 @@
 
 1. `../catalog.json`
 2. `../blueprints/README.md`
-3. 选中的 `../blueprints/*.json`
+3. 选中的 `../blueprints/*.tsx`
 4. `../components/README.md`
 5. 如果需要视觉参考，再阅读本目录中的相关文件
 

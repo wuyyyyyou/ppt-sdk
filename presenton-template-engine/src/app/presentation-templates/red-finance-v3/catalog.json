@@ -1,790 +1,185 @@
 {
   "group_id": "red-finance-v3",
-  "catalog_type": "blueprint-first",
-  "version": 1,
-  "purpose": "帮助 PPT AI Agent 根据内容意图选择结构蓝图、槽位和组件家族，而不是直接复用固定业务页。",
+  "catalog_type": "tsx-first",
+  "version": 2,
+  "purpose": "帮助 PPT AI Agent 先选择可复制的 TSX 蓝图基础页，再派生到 slides/*.tsx 并直接修改最终页面实现。",
+  "directory_roles": {
+    "blueprints": {
+      "path": "./blueprints",
+      "role": "可直接复制的 TSX 基础页目录。",
+      "rules": [
+        "先从这里选择最接近内容结构的基础页。",
+        "复制到 ./slides 后再按具体 deck 修改。",
+        "不要把这里当运行时 JSON DSL。"
+      ]
+    },
+    "slides": {
+      "path": "./slides",
+      "role": "具体 deck 的最终页面目录。",
+      "rules": [
+        "manifest.json 只指向这里的 TSX 文件。",
+        "AI 可以直接修改这里的 TSX 来调整布局、组件组合和内容映射。",
+        "这里的页面不应长期停留在未修改的基础页状态。"
+      ]
+    },
+    "reference_slides": {
+      "path": "./reference-slides",
+      "role": "从 red-finance-v2 迁移来的只读参考页。",
+      "rules": [
+        "只用于观察视觉密度、组件组合和导出习惯。",
+        "不得写入 group.json.layouts。",
+        "不得作为 manifest.json 的 source.path。"
+      ]
+    },
+    "data": {
+      "path": "./data",
+      "role": "demo 或具体 deck 的页面内容数据。",
+      "rules": [
+        "JSON 只承载内容，不承载页面结构决策。",
+        "如果布局越界或组件不合适，应优先修改 slides/*.tsx。"
+      ]
+    }
+  },
   "blueprints": [
     {
       "id": "cover-statement",
       "name": "Cover Statement",
-      "blueprint_path": "./blueprints/cover-statement.json",
-      "slide_renderer": "./slides/CoverStatement.tsx",
+      "blueprint_source": "./blueprints/CoverStatement.tsx",
+      "example_slide": "./slides/CoverStatement.tsx",
       "layout_family": "cover",
-      "content_intents": [
-        "opening",
-        "positioning",
-        "theme-statement"
-      ],
-      "suitable_for": [
-        "封面",
-        "战略报告开场",
-        "主题声明",
-        "管理层汇报开场"
-      ],
-      "avoid_for": [
-        "正文分析",
-        "复杂图表",
-        "对比矩阵",
-        "长流程说明"
-      ],
-      "primary_slots": [
-        "brand-meta",
-        "hero-statement",
-        "supporting-notes"
-      ],
-      "supported_variants": [
-        "statement-notes",
-        "statement-visual"
-      ],
-      "density_range": [
-        "low",
-        "medium"
-      ],
-      "recommended_when": [
-        "需要正式开场",
-        "需要说明报告定位",
-        "需要强主题声明"
-      ],
-      "not_recommended_when": [
-        "页面需要证据分析",
-        "页面核心是数据图表"
-      ]
+      "content_intents": ["opening", "positioning", "theme-statement"],
+      "suitable_for": ["封面", "战略报告开场", "主题声明", "管理层汇报开场"],
+      "avoid_for": ["正文分析", "复杂图表", "对比矩阵", "长流程说明"]
     },
     {
       "id": "section-divider",
       "name": "Section Divider",
-      "blueprint_path": "./blueprints/section-divider.json",
-      "slide_renderer": "./slides/SectionDivider.tsx",
+      "blueprint_source": "./blueprints/SectionDivider.tsx",
+      "example_slide": "./slides/SectionDivider.tsx",
       "layout_family": "section",
-      "content_intents": [
-        "transition",
-        "framing",
-        "section-introduction"
-      ],
-      "suitable_for": [
-        "章节分隔",
-        "主题切换",
-        "分析框架引入",
-        "方法说明"
-      ],
-      "avoid_for": [
-        "指标汇总",
-        "细节对比",
-        "长时间线",
-        "大段正文"
-      ],
-      "primary_slots": [
-        "section-statement",
-        "framing-cards"
-      ],
-      "supported_variants": [
-        "left-statement-right-cards",
-        "minimal-statement"
-      ],
-      "density_range": [
-        "low",
-        "medium"
-      ],
-      "recommended_when": [
-        "需要章节过渡",
-        "需要重置叙事节奏",
-        "需要引出新分析框架"
-      ],
-      "not_recommended_when": [
-        "页面必须承载多维比较",
-        "页面需要高密度表格"
-      ]
+      "content_intents": ["transition", "framing", "section-introduction"],
+      "suitable_for": ["章节分隔", "主题切换", "分析框架引入", "方法说明"],
+      "avoid_for": ["指标汇总", "细节对比", "长时间线", "大段正文"]
     },
     {
       "id": "two-column-insight",
       "name": "Two Column Insight",
-      "blueprint_path": "./blueprints/two-column-insight.json",
-      "slide_renderer": "./slides/TwoColumnInsight.tsx",
+      "blueprint_source": "./blueprints/TwoColumnInsight.tsx",
+      "example_slide": "./slides/TwoColumnInsight.tsx",
       "layout_family": "two-column",
-      "content_intents": [
-        "overview",
-        "insight",
-        "analysis",
-        "explanation"
-      ],
-      "suitable_for": [
-        "行业概览",
-        "观点解释",
-        "问题分析",
-        "策略说明"
-      ],
-      "avoid_for": [
-        "复杂时间线",
-        "大规模矩阵",
-        "多图表仪表盘",
-        "纯封面"
-      ],
-      "primary_slots": [
-        "primary-narrative",
-        "evidence-panel"
-      ],
-      "supported_variants": [
-        "narrative-left-evidence-right",
-        "evidence-left-narrative-right"
-      ],
-      "density_range": [
-        "medium",
-        "high"
-      ],
-      "recommended_when": [
-        "一个观点需要证据支撑",
-        "右侧只有少量图表或卡片"
-      ],
-      "not_recommended_when": [
-        "内容本质是时间顺序",
-        "内容本质是大矩阵"
-      ]
+      "content_intents": ["overview", "insight", "analysis", "explanation"],
+      "suitable_for": ["行业概览", "观点解释", "问题分析", "策略说明"],
+      "avoid_for": ["复杂时间线", "大规模矩阵", "多图表仪表盘", "纯封面"]
     },
     {
       "id": "three-column-cards",
       "name": "Three Column Cards",
-      "blueprint_path": "./blueprints/three-column-cards.json",
-      "slide_renderer": "./slides/ThreeColumnCards.tsx",
+      "blueprint_source": "./blueprints/ThreeColumnCards.tsx",
+      "example_slide": "./slides/ThreeColumnCards.tsx",
       "layout_family": "three-column",
-      "content_intents": [
-        "categorization",
-        "pillars",
-        "options",
-        "recommendations"
-      ],
-      "suitable_for": [
-        "能力支柱",
-        "机会问题策略",
-        "三类方案",
-        "风险分类"
-      ],
-      "avoid_for": [
-        "单一深度观点",
-        "时间线",
-        "大表格",
-        "趋势图"
-      ],
-      "primary_slots": [
-        "page-frame",
-        "card-columns"
-      ],
-      "supported_variants": [
-        "three-equal-columns",
-        "six-compact-cards"
-      ],
-      "density_range": [
-        "medium",
-        "high"
-      ],
-      "recommended_when": [
-        "内容天然分成三组",
-        "需要并列表达多个同级要点"
-      ],
-      "not_recommended_when": [
-        "每组都需要长正文",
-        "需要强时间顺序"
-      ]
+      "content_intents": ["categorization", "pillars", "options", "recommendations"],
+      "suitable_for": ["能力支柱", "机会问题策略", "三类方案", "风险分类"],
+      "avoid_for": ["单一深度观点", "时间线", "大表格", "趋势图"]
     },
     {
       "id": "chart-with-narrative",
       "name": "Chart With Narrative",
-      "blueprint_path": "./blueprints/chart-with-narrative.json",
-      "slide_renderer": "./slides/ChartWithNarrative.tsx",
+      "blueprint_source": "./blueprints/ChartWithNarrative.tsx",
+      "example_slide": "./slides/ChartWithNarrative.tsx",
       "layout_family": "chart-narrative",
-      "content_intents": [
-        "trend",
-        "scale",
-        "structure-change",
-        "evidence"
-      ],
-      "suitable_for": [
-        "趋势分析",
-        "规模变化",
-        "结构变化",
-        "预测说明"
-      ],
-      "avoid_for": [
-        "无数据观点",
-        "多主体大矩阵",
-        "流程计划",
-        "封面转场"
-      ],
-      "primary_slots": [
-        "chart-panel",
-        "narrative-panel"
-      ],
-      "supported_variants": [
-        "large-chart-right-notes",
-        "top-chart-bottom-insight"
-      ],
-      "density_range": [
-        "medium",
-        "high"
-      ],
-      "recommended_when": [
-        "核心是单个图表加解释",
-        "需要说明趋势或口径"
-      ],
-      "not_recommended_when": [
-        "图表超过一张",
-        "需要复杂比较矩阵"
-      ]
+      "content_intents": ["trend", "scale", "structure-change", "evidence"],
+      "suitable_for": ["趋势分析", "规模变化", "结构变化", "预测说明"],
+      "avoid_for": ["无数据观点", "多主体大矩阵", "流程计划", "封面转场"]
     },
     {
       "id": "comparison-matrix",
       "name": "Comparison Matrix",
-      "blueprint_path": "./blueprints/comparison-matrix.json",
-      "slide_renderer": "./slides/ComparisonMatrix.tsx",
+      "blueprint_source": "./blueprints/ComparisonMatrix.tsx",
+      "example_slide": "./slides/ComparisonMatrix.tsx",
       "layout_family": "matrix",
-      "content_intents": [
-        "comparison",
-        "evaluation",
-        "tradeoff",
-        "benchmark"
-      ],
-      "suitable_for": [
-        "中美对比",
-        "方案对比",
-        "能力矩阵",
-        "市场结构比较"
-      ],
-      "avoid_for": [
-        "单一叙事",
-        "时间演进",
-        "封面",
-        "超过 6 行的大表"
-      ],
-      "primary_slots": [
-        "matrix-core",
-        "comparison-context"
-      ],
-      "supported_variants": [
-        "entity-by-dimension",
-        "capability-heatmap"
-      ],
-      "density_range": [
-        "medium",
-        "high"
-      ],
-      "recommended_when": [
-        "需要多维横向比较",
-        "需要定量或半定量评分"
-      ],
-      "not_recommended_when": [
-        "只有单一指标",
-        "内容是时间顺序"
-      ]
+      "content_intents": ["comparison", "evaluation", "tradeoff", "benchmark"],
+      "suitable_for": ["中美对比", "方案对比", "能力矩阵", "市场结构比较"],
+      "avoid_for": ["单一叙事", "时间演进", "封面", "超过 6 行的大表"]
     },
     {
       "id": "timeline-plan",
       "name": "Timeline Plan",
-      "blueprint_path": "./blueprints/timeline-plan.json",
-      "slide_renderer": "./slides/TimelinePlan.tsx",
+      "blueprint_source": "./blueprints/TimelinePlan.tsx",
+      "example_slide": "./slides/TimelinePlan.tsx",
       "layout_family": "timeline",
-      "content_intents": [
-        "roadmap",
-        "milestones",
-        "sequence",
-        "implementation"
-      ],
-      "suitable_for": [
-        "战略路线图",
-        "实施节奏",
-        "行业演进",
-        "政策里程碑"
-      ],
-      "avoid_for": [
-        "无顺序分类",
-        "多维矩阵",
-        "单图表分析",
-        "KPI 汇总"
-      ],
-      "primary_slots": [
-        "timeline-core",
-        "roadmap-context"
-      ],
-      "supported_variants": [
-        "horizontal-roadmap",
-        "vertical-milestones"
-      ],
-      "density_range": [
-        "medium",
-        "high"
-      ],
-      "recommended_when": [
-        "内容有明确阶段",
-        "内容要表达演进路径"
-      ],
-      "not_recommended_when": [
-        "只是列举分类",
-        "没有先后顺序"
-      ]
+      "content_intents": ["roadmap", "execution", "phasing", "milestones"],
+      "suitable_for": ["实施路径", "战略路线图", "阶段规划", "里程碑计划"],
+      "avoid_for": ["纯指标汇总", "大矩阵", "封面", "无顺序的分类说明"]
     },
     {
       "id": "kpi-summary",
       "name": "KPI Summary",
-      "blueprint_path": "./blueprints/kpi-summary.json",
-      "slide_renderer": "./slides/KpiSummary.tsx",
+      "blueprint_source": "./blueprints/KpiSummary.tsx",
+      "example_slide": "./slides/KpiSummary.tsx",
       "layout_family": "kpi",
-      "content_intents": [
-        "metrics",
-        "performance",
-        "target-breakdown",
-        "result-review"
-      ],
-      "suitable_for": [
-        "经营指标",
-        "目标拆解",
-        "结果复盘",
-        "关键 KPI 汇总"
-      ],
-      "avoid_for": [
-        "长文本解释",
-        "政策演进",
-        "复杂表格",
-        "章节转场"
-      ],
-      "primary_slots": [
-        "headline-metric",
-        "metric-grid"
-      ],
-      "supported_variants": [
-        "hero-kpi-grid",
-        "compact-metric-board"
-      ],
-      "density_range": [
-        "medium",
-        "high"
-      ],
-      "recommended_when": [
-        "页面核心是数值和状态",
-        "需要展示目标和结果"
-      ],
-      "not_recommended_when": [
-        "需要长解释",
-        "需要多主体矩阵"
-      ]
+      "content_intents": ["performance", "targets", "status", "dashboard"],
+      "suitable_for": ["指标汇总", "经营看板", "目标拆解", "状态速览"],
+      "avoid_for": ["长叙事", "复杂路线图", "大段解释"]
     },
     {
       "id": "closing-actions",
       "name": "Closing Actions",
-      "blueprint_path": "./blueprints/closing-actions.json",
-      "slide_renderer": "./slides/ClosingActions.tsx",
+      "blueprint_source": "./blueprints/ClosingActions.tsx",
+      "example_slide": "./slides/ClosingActions.tsx",
       "layout_family": "closing",
-      "content_intents": [
-        "conclusion",
-        "recommendation",
-        "next-actions",
-        "decision"
-      ],
-      "suitable_for": [
-        "总结展望",
-        "行动建议",
-        "下一步计划",
-        "决策请求"
-      ],
-      "avoid_for": [
-        "章节开场",
-        "复杂图表",
-        "多主体矩阵",
-        "详细路线图"
-      ],
-      "primary_slots": [
-        "final-message",
-        "action-list"
-      ],
-      "supported_variants": [
-        "conclusion-plus-actions",
-        "decision-ask-focus"
-      ],
-      "density_range": [
-        "medium",
-        "high"
-      ],
-      "recommended_when": [
-        "页面是结尾",
-        "需要输出明确行动和决策"
-      ],
-      "not_recommended_when": [
-        "内容仍在展开分析",
-        "只是一个章节过渡"
-      ]
-    }
-  ],
-  "component_families": [
-    {
-      "id": "page-shell",
-      "purpose": "整页画布、普通内容页框架和章节聚焦框架。",
-      "components": [
-        "FinanceCanvas",
-        "FinanceContentFrame",
-        "FinanceSectionFocusFrame"
-      ],
-      "slot_types": [
-        "page-title",
-        "section-heading",
-        "footer-meta"
-      ],
-      "suitable_slots": [
-        "page-title",
-        "section-heading",
-        "footer-meta"
-      ],
-      "avoid_slots": [
-        "chart",
-        "matrix",
-        "timeline",
-        "metric"
-      ],
-      "text_capacity": "shell only; do not store business copy here",
-      "screenshot_policy": "never screenshot as a whole when it contains editable text",
-      "cross_page_reuse": true,
-      "export_notes": [
-        "只负责稳定页面边界、标题、meta 和页脚。",
-        "业务内容必须放在 child slot 中。"
-      ]
-    },
-    {
-      "id": "heading",
-      "purpose": "页面标题、小节标题、图标文字和短标签。",
-      "components": [
-        "FinanceSectionHeading",
-        "IconText"
-      ],
-      "slot_types": [
-        "page-title",
-        "section-heading",
-        "footer-meta"
-      ],
-      "suitable_slots": [
-        "page-title",
-        "section-heading",
-        "footer-meta"
-      ],
-      "avoid_slots": [
-        "narrative-text",
-        "chart",
-        "matrix",
-        "timeline"
-      ],
-      "text_capacity": "single line or short subtitle; title <= 32 chars",
-      "screenshot_policy": "must remain editable text",
-      "cross_page_reuse": true,
-      "export_notes": [
-        "标题和 meta 必须保持真实文本。",
-        "不要承载长正文。"
-      ]
-    },
-    {
-      "id": "primitive",
-      "purpose": "图标、单行对齐、状态短标签和紧凑 KPI 原语。",
-      "components": [
-        "FinanceIcon",
-        "StableInlineRow",
-        "StatusPill",
-        "KpiMetricItem"
-      ],
-      "slot_types": [
-        "metric",
-        "kpi-strip",
-        "footer-meta"
-      ],
-      "suitable_slots": [
-        "metric",
-        "kpi-strip",
-        "footer-meta"
-      ],
-      "avoid_slots": [
-        "narrative-text",
-        "bullet-list",
-        "chart",
-        "matrix"
-      ],
-      "text_capacity": "single value or label; label <= 24 chars",
-      "screenshot_policy": "must remain editable when it contains labels or values",
-      "cross_page_reuse": true,
-      "export_notes": [
-        "KPI 数值和状态标签必须保留文本。",
-        "StableInlineRow 只用于单行。"
-      ]
-    },
-    {
-      "id": "card",
-      "purpose": "信息卡、支柱卡、行动卡、对比面板和 callout。",
-      "components": [
-        "IconTextCard",
-        "HorizontalFeatureCard",
-        "PillarBulletCard",
-        "InfoListItem",
-        "InsightCallout",
-        "DualValueMetricCard",
-        "ProgressStatusCard",
-        "ComparisonPanel"
-      ],
-      "slot_types": [
-        "narrative-text",
-        "bullet-list",
-        "metric",
-        "kpi-strip",
-        "comparison",
-        "callout"
-      ],
-      "suitable_slots": [
-        "narrative-text",
-        "bullet-list",
-        "metric",
-        "kpi-strip",
-        "comparison",
-        "callout"
-      ],
-      "avoid_slots": [
-        "page-title",
-        "chart",
-        "matrix",
-        "timeline",
-        "decoration"
-      ],
-      "text_capacity": "title <= 28 chars, body <= 120 chars, bullets <= 4",
-      "screenshot_policy": "text-led cards must remain editable; visual progress bars may screenshot fallback",
-      "cross_page_reuse": true,
-      "export_notes": [
-        "卡片正文、KPI 和行动项要保留 DOM 文本。",
-        "不要把长段正文塞入单张卡片。"
-      ]
-    },
-    {
-      "id": "chart",
-      "purpose": "图表壳、测量容器和金融图表。",
-      "components": [
-        "ChartCardShell",
-        "MeasuredChartArea",
-        "FinanceBarChart",
-        "FinanceLineChart",
-        "FinanceRadarChart",
-        "FinanceDonutChart"
-      ],
-      "slot_types": [
-        "chart"
-      ],
-      "suitable_slots": [
-        "chart"
-      ],
-      "avoid_slots": [
-        "narrative-text",
-        "bullet-list",
-        "page-title",
-        "timeline"
-      ],
-      "text_capacity": "chart title <= 36 chars, axis label <= 18 chars",
-      "screenshot_policy": "chart canvas/svg area can screenshot; title/source/insight text should stay editable",
-      "cross_page_reuse": true,
-      "export_notes": [
-        "图表区域允许截图兜底。",
-        "图表标题、口径和结论放在外部可编辑文本。"
-      ]
-    },
-    {
-      "id": "matrix",
-      "purpose": "结构化矩阵、对比表和能力评估。",
-      "components": [
-        "StableMatrixGrid"
-      ],
-      "slot_types": [
-        "matrix",
-        "comparison"
-      ],
-      "suitable_slots": [
-        "matrix",
-        "comparison"
-      ],
-      "avoid_slots": [
-        "chart",
-        "timeline",
-        "decoration"
-      ],
-      "text_capacity": "cell lead <= 48 chars, support <= 80 chars, rows <= 6",
-      "screenshot_policy": "matrix text should remain editable where possible",
-      "cross_page_reuse": true,
-      "export_notes": [
-        "矩阵行列标题和单元格文本要可编辑。",
-        "超过 6 行应拆页。"
-      ]
-    },
-    {
-      "id": "timeline",
-      "purpose": "路线图、阶段计划和里程碑叙事。",
-      "components": [
-        "TimelineBoard",
-        "VerticalMilestoneTimeline"
-      ],
-      "slot_types": [
-        "timeline"
-      ],
-      "suitable_slots": [
-        "timeline"
-      ],
-      "avoid_slots": [
-        "matrix",
-        "chart",
-        "page-title"
-      ],
-      "text_capacity": "phase title <= 28 chars, item <= 80 chars, stages <= 6",
-      "screenshot_policy": "connectors can screenshot; milestone text must remain editable",
-      "cross_page_reuse": true,
-      "export_notes": [
-        "时间标签、阶段标题和节点说明保持文本。",
-        "没有顺序关系时不要使用 timeline。"
-      ]
-    },
-    {
-      "id": "decoration",
-      "purpose": "纯视觉装饰，不承载业务事实。",
-      "components": [
-        "CoverBarDecoration"
-      ],
-      "slot_types": [
-        "decoration"
-      ],
-      "suitable_slots": [
-        "decoration"
-      ],
-      "avoid_slots": [
-        "narrative-text",
-        "metric",
-        "chart",
-        "matrix",
-        "timeline"
-      ],
-      "text_capacity": "no required text",
-      "screenshot_policy": "can screenshot",
-      "cross_page_reuse": true,
-      "export_notes": [
-        "装饰不应承载唯一语义。"
-      ]
+      "content_intents": ["closing", "actions", "decision-request", "next-steps"],
+      "suitable_for": ["总结页", "行动建议", "决策请求", "下一步计划"],
+      "avoid_for": ["正文分析", "复杂图表", "多维对比"]
     }
   ],
   "reference_examples": [
     {
       "reference_path": "./reference-slides/IndustryOverview.tsx",
       "source_v2_path": "../red-finance-v2/slides/IndustryOverview.tsx",
-      "visual_pattern": "left-info-list-right-bar-chart-bottom-callout",
-      "extractable_slots": [
-        "narrative-text",
-        "chart",
-        "callout"
-      ],
-      "related_blueprints": [
-        "two-column-insight",
-        "chart-with-narrative"
-      ],
+      "visual_pattern": "左侧叙事列表 + 右侧图表 + 底部强调结论",
+      "related_blueprints": ["two-column-insight", "chart-with-narrative"],
       "do_not_copy_directly": true
     },
     {
       "reference_path": "./reference-slides/MarketTrends.tsx",
       "source_v2_path": "../red-finance-v2/slides/MarketTrends.tsx",
-      "visual_pattern": "top-trend-cards-bottom-dual-charts",
-      "extractable_slots": [
-        "card",
-        "chart",
-        "callout"
-      ],
-      "related_blueprints": [
-        "three-column-cards",
-        "chart-with-narrative"
-      ],
+      "visual_pattern": "顶部卡片 + 底部图表面板",
+      "related_blueprints": ["three-column-cards", "chart-with-narrative"],
       "do_not_copy_directly": true
     },
     {
       "reference_path": "./reference-slides/ChinaUsMarketComparison.tsx",
       "source_v2_path": "../red-finance-v2/slides/ChinaUsMarketComparison.tsx",
-      "visual_pattern": "comparison-panels-plus-metrics",
-      "extractable_slots": [
-        "comparison",
-        "metric",
-        "matrix"
-      ],
-      "related_blueprints": [
-        "comparison-matrix",
-        "kpi-summary"
-      ],
+      "visual_pattern": "对比面板 + 指标",
+      "related_blueprints": ["comparison-matrix", "kpi-summary"],
       "do_not_copy_directly": true
     },
     {
       "reference_path": "./reference-slides/StrategicRoadmap.tsx",
       "source_v2_path": "../red-finance-v2/slides/StrategicRoadmap.tsx",
-      "visual_pattern": "strategic-pillars-plus-roadmap-plus-kpis",
-      "extractable_slots": [
-        "timeline",
-        "kpi-strip",
-        "card"
-      ],
-      "related_blueprints": [
-        "timeline-plan",
-        "kpi-summary",
-        "three-column-cards"
-      ],
+      "visual_pattern": "支柱要点 + 路线图 + KPI",
+      "related_blueprints": ["timeline-plan", "kpi-summary", "three-column-cards"],
       "do_not_copy_directly": true
     },
     {
       "reference_path": "./reference-slides/ConclusionOutlook.tsx",
       "source_v2_path": "../red-finance-v2/slides/ConclusionOutlook.tsx",
-      "visual_pattern": "summary-priorities-success-factors-actions",
-      "extractable_slots": [
-        "callout",
-        "bullet-list",
-        "actions"
-      ],
-      "related_blueprints": [
-        "closing-actions",
-        "three-column-cards"
-      ],
+      "visual_pattern": "总结优先级 + 行动项",
+      "related_blueprints": ["closing-actions", "three-column-cards"],
       "do_not_copy_directly": true
     }
   ],
   "agent_workflow_notes": [
-    "先读 catalog，再选 blueprint，再映射 slots，最后才考虑具体组件。",
-    "如果模板组存在 blueprints/，必须读取 blueprints/README.md 和目标 blueprint JSON。",
-    "不要把 reference-slides 当主生成入口；它只用于观察视觉密度和排版习惯。",
-    "如果 slot 语义不匹配，先换 blueprint，不要先硬改组件。",
-    "manifest 仍然引用 slides/*.tsx；blueprint 选择结果应写入 data JSON 的 blueprintId/variant/density 或等价字段。"
+    "先读 catalog.json，选择最接近内容结构的 blueprints/*.tsx。",
+    "把选中的蓝图 TSX 复制或派生到 slides/*.tsx，再直接修改最终页面。",
+    "manifest.json 的 source.path 只指向 slides/*.tsx。",
+    "data/*.json 只承载内容；如果结构、间距或组件不合适，改 slides/*.tsx。",
+    "reference-slides/ 只读参考，不得进入生成链路。",
+    "archives/blueprint-contracts/ 只保留历史 JSON 契约，不作为当前工作流入口。"
   ],
-  "slides": [
-    {
-      "id": "red-finance-v3-cover-statement",
-      "title": "Cover Statement",
-      "source_path": "./slides/CoverStatement.tsx",
-      "data_path": "./data/demo/cover-statement.json",
-      "structure": "左侧品牌、主声明和元信息，右侧为说明点和装饰图形",
-      "layout_pattern": "cover-statement-left-title-right-notes",
-      "suitable_for": [
-        "封面",
-        "主题声明",
-        "正式汇报开场"
-      ],
-      "key_components": [
-        "FinanceCanvas",
-        "IconText",
-        "CoverBarDecoration",
-        "SectionPanelShell"
-      ]
-    },
-    {
-      "id": "red-finance-v3-section-divider",
-      "title": "Section Divider",
-      "source_path": "./slides/SectionDivider.tsx",
-      "data_path": "./data/demo/section-divider.json",
-      "structure": "左侧章节编号、标题和导语，右侧为三张能力说明卡",
-      "layout_pattern": "section-divider-left-statement-right-feature-cards",
-      "suitable_for": [
-        "章节分隔",
-        "主题切换",
-        "方法框架"
-      ],
-      "key_components": [
-        "FinanceSectionFocusFrame",
-        "HorizontalFeatureCard",
-        "FinanceIcon"
-      ]
-    }
-  ]
+  "archived_contracts": {
+    "path": "./archives/blueprint-contracts",
+    "status": "archived",
+    "note": "历史 JSON 蓝图契约已归档；当前 V3 使用 TSX-first 工作流。"
+  }
 }

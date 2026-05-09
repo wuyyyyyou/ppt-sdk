@@ -15,7 +15,7 @@
     {
       "id": "red-finance-v3-cover-statement",
       "title": "Red Finance V3",
-      "speaker_note": "V3 基线封面页：用于验证 blueprint-first 模板组的最小发现和渲染链路。",
+      "speaker_note": "V3 基线封面页：用于验证 TSX-first 模板组的最小发现和渲染链路。",
       "source": {
         "type": "local",
         "path": "./slides/CoverStatement.tsx"
@@ -24,8 +24,8 @@
     },
     {
       "id": "red-finance-v3-section-divider",
-      "title": "蓝图优先架构",
-      "speaker_note": "V3 基线章节页：用于展示蓝图、槽位和变体的通用表达方式。",
+      "title": "TSX 优先架构",
+      "speaker_note": "V3 基线章节页：用于展示蓝图基础页、具体 slide 和组件组合的通用表达方式。",
       "source": {
         "type": "local",
         "path": "./slides/SectionDivider.tsx"

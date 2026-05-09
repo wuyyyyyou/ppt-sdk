@@ -1,9 +1,9 @@
 {
   "group_id": "red-finance-v3",
   "group_name": "Red Finance V3",
-  "group_description": "Blueprint-first finance templates for strategic reports, executive briefings, and structured analysis decks.",
-  "group_brief": "适合金融行业研究、战略分析、管理层汇报、数字货币与银行转型等正式型 PPT。V3 采用 blueprint-first 架构，优先让 AI Agent 选择表达结构、槽位和组件家族，再生成具体页面。",
-  "style_tags": ["finance", "editorial", "serious", "blueprint-first"],
+  "group_description": "TSX-first finance templates for strategic reports, executive briefings, and structured analysis decks.",
+  "group_brief": "适合金融行业研究、战略分析、管理层汇报、数字货币与银行转型等正式型 PPT。V3 采用 TSX-first 架构，先让 AI Agent 选择最接近的基础页，再复制到具体页面并直接修改 TSX。",
+  "style_tags": ["finance", "editorial", "serious", "tsx-first"],
   "industry_tags": ["finance", "banking", "fintech"],
   "use_cases": ["strategy-report", "industry-analysis", "executive-brief"],
   "audience_tags": ["management", "board", "client"],
