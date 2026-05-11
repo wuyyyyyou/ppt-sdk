@@ -81,7 +81,7 @@ export interface RpcToolResult {
 type TransFileResponse = {
   jsonrpc: "2.0";
   id: number | string | null;
-  __trans_file__: string;
+  __file_transport: string;
 };
 
 function makeSuccessResponse<T>(id: JsonRpcRequest["id"], tool: string, data: T): JsonRpcSuccessResponse<T> {
@@ -162,10 +162,30 @@ function readOptionalInteger(
   return value;
 }
 
-async function writeLargeResponseToFile<T>(response: JsonRpcSuccessResponse<T>): Promise<string> {
-  await mkdir(FILE_TRANSPORT_FALLBACK_DIR, { recursive: true });
+function readOptionalAbsolutePath(
+  params: Record<string, unknown> | undefined,
+  name: string,
+): string | undefined {
+  const value = params?.[name];
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`Parameter must be a non-empty string: ${name}`);
+  }
+  if (!path.isAbsolute(value)) {
+    throw new Error(`Field "${name}" must be an absolute path`);
+  }
+  return value;
+}
+
+async function writeLargeResponseToFile<T>(
+  response: JsonRpcSuccessResponse<T>,
+  transportDir: string,
+): Promise<string> {
+  await mkdir(transportDir, { recursive: true });
   const filePath = path.join(
-    FILE_TRANSPORT_FALLBACK_DIR,
+    transportDir,
     `executa-resp-${Date.now()}-${randomUUID()}.json`,
   );
   await writeFile(filePath, `${JSON.stringify(response, null, 2)}\n`, "utf8");
@@ -173,6 +193,7 @@ async function writeLargeResponseToFile<T>(response: JsonRpcSuccessResponse<T>):
 }
 
 async function maybeWrapResponse<T>(
+  transportCwd: string | undefined,
   response: JsonRpcSuccessResponse<T>,
 ): Promise<JsonRpcSuccessResponse<T> | TransFileResponse> {
   const raw = JSON.stringify(response);
@@ -180,11 +201,14 @@ async function maybeWrapResponse<T>(
     return response;
   }
 
-  const filePath = await writeLargeResponseToFile(response);
+  const transportDir = transportCwd
+    ? path.join(transportCwd, FILE_TRANSPORT_DIRNAME)
+    : FILE_TRANSPORT_FALLBACK_DIR;
+  const filePath = await writeLargeResponseToFile(response, transportDir);
   return {
     jsonrpc: "2.0",
     id: response.id,
-    __trans_file__: filePath,
+    __file_transport: filePath,
   };
 }
 
@@ -200,6 +224,7 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
         name: "create_task_project",
         description: "Create a new task project and initialize task-state files.",
         parameters: [
+          { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
           { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
           { name: "title", type: "string", required: false, description: "Optional project title." },
           { name: "initial_request", type: "string", required: false, description: "Optional seed request." },
@@ -209,6 +234,7 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
         name: "open_task_project",
         description: "Open an existing task project and read current task-state data.",
         parameters: [
+          { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
           { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
         ],
       },
@@ -216,6 +242,7 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
         name: "query_task_state",
         description: "Query current state and recommended next action.",
         parameters: [
+          { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
           { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
         ],
       },
@@ -223,6 +250,7 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
         name: "record_requirements",
         description: "Persist user requirements.",
         parameters: [
+          { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
           { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
           { name: "requirements", type: "object", required: true, description: "Requirements payload." },
           { name: "source", type: "string", required: false, description: "Source of the requirements." },
@@ -232,6 +260,7 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
         name: "record_outline",
         description: "Persist the content outline.",
         parameters: [
+          { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
           { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
           { name: "outline", type: "object", required: true, description: "Outline payload." },
         ],
@@ -240,6 +269,7 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
         name: "record_page_plan",
         description: "Persist or patch the page plan.",
         parameters: [
+          { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
           { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
           { name: "mode", type: "string", required: true, description: "replace_all or update_page." },
           { name: "page_plan", type: "object", required: true, description: "Page plan payload." },
@@ -249,6 +279,7 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
         name: "start_page_iteration",
         description: "Select a page and begin page-level authoring.",
         parameters: [
+          { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
           { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
           { name: "page_id", type: "string", required: true, description: "Target page id." },
           { name: "page_number", type: "integer", required: false, description: "Optional page number." },
@@ -258,6 +289,7 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
         name: "record_page_progress",
         description: "Persist one page progress state transition.",
         parameters: [
+          { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
           { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
           { name: "page_id", type: "string", required: true, description: "Target page id." },
           { name: "page_state", type: "string", required: true, description: "Page state." },
@@ -269,6 +301,7 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
         name: "advance_task_state",
         description: "Advance deck state and create a checkpoint.",
         parameters: [
+          { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
           { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
           { name: "target_deck_state", type: "string", required: false, description: "Target deck state." },
           { name: "target_page_state", type: "string", required: false, description: "Target page state." },
@@ -279,6 +312,7 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
         name: "rewind_task_state",
         description: "Rewind to a prior checkpoint or safe deck state.",
         parameters: [
+          { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
           { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
           { name: "target_state", type: "string", required: false, description: "Target deck state." },
           { name: "checkpoint_id", type: "string", required: false, description: "Checkpoint id." },
@@ -289,6 +323,7 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
         name: "branch_task_project",
         description: "Create a project branch from the current or specified checkpoint.",
         parameters: [
+          { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
           { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
           { name: "checkpoint_id", type: "string", required: false, description: "Checkpoint id." },
           { name: "branch_name", type: "string", required: false, description: "Branch name." },
@@ -299,6 +334,7 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
         name: "list_task_checkpoints",
         description: "List checkpoints and branches.",
         parameters: [
+          { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
           { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
           { name: "include_branches", type: "boolean", required: false, description: "Whether to include branches." },
         ],
@@ -307,6 +343,7 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
         name: "recover_task_project",
         description: "Recover a project by rebuilding missing or broken task-state files.",
         parameters: [
+          { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
           { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
         ],
       },
@@ -314,6 +351,7 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
         name: "validate_task_project",
         description: "Validate task-state files without modifying them.",
         parameters: [
+          { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
           { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
         ],
       },
@@ -326,6 +364,7 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
 }
 
 async function handleCreateTaskProject(args: Record<string, unknown>) {
+  readOptionalAbsolutePath(args, "cwd");
   return createTaskProject({
     projectDir: readRequiredString(args, "project_dir"),
     title: readOptionalString(args, "title"),
@@ -334,12 +373,14 @@ async function handleCreateTaskProject(args: Record<string, unknown>) {
 }
 
 async function handleOpenTaskProject(args: Record<string, unknown>) {
+  readOptionalAbsolutePath(args, "cwd");
   return openTaskProject({
     projectDir: readRequiredString(args, "project_dir"),
   } satisfies OpenTaskProjectInput);
 }
 
 async function handleQueryTaskState(args: Record<string, unknown>) {
+  readOptionalAbsolutePath(args, "cwd");
   const opened = await openTaskProject({
     projectDir: readRequiredString(args, "project_dir"),
   });
@@ -350,6 +391,7 @@ async function handleQueryTaskState(args: Record<string, unknown>) {
 }
 
 async function handleRecordRequirements(args: Record<string, unknown>) {
+  readOptionalAbsolutePath(args, "cwd");
   return recordRequirements({
     projectDir: readRequiredString(args, "project_dir"),
     requirements: args.requirements as RecordRequirementsInput["requirements"],
@@ -358,6 +400,7 @@ async function handleRecordRequirements(args: Record<string, unknown>) {
 }
 
 async function handleRecordOutline(args: Record<string, unknown>) {
+  readOptionalAbsolutePath(args, "cwd");
   return recordOutline({
     projectDir: readRequiredString(args, "project_dir"),
     outline: args.outline as RecordOutlineInput["outline"],
@@ -365,6 +408,7 @@ async function handleRecordOutline(args: Record<string, unknown>) {
 }
 
 async function handleRecordPagePlan(args: Record<string, unknown>) {
+  readOptionalAbsolutePath(args, "cwd");
   return recordPagePlan({
     projectDir: readRequiredString(args, "project_dir"),
     mode: readRequiredString(args, "mode") as RecordPagePlanInput["mode"],
@@ -373,6 +417,7 @@ async function handleRecordPagePlan(args: Record<string, unknown>) {
 }
 
 async function handleStartPageIteration(args: Record<string, unknown>) {
+  readOptionalAbsolutePath(args, "cwd");
   return startPageIteration({
     projectDir: readRequiredString(args, "project_dir"),
     pageId: readRequiredString(args, "page_id"),
@@ -381,6 +426,7 @@ async function handleStartPageIteration(args: Record<string, unknown>) {
 }
 
 async function handleRecordPageProgress(args: Record<string, unknown>) {
+  readOptionalAbsolutePath(args, "cwd");
   return recordPageProgress({
     projectDir: readRequiredString(args, "project_dir"),
     pageId: readRequiredString(args, "page_id"),
@@ -394,6 +440,7 @@ async function handleRecordPageProgress(args: Record<string, unknown>) {
 }
 
 async function handleAdvanceTaskState(args: Record<string, unknown>) {
+  readOptionalAbsolutePath(args, "cwd");
   return advanceTaskState({
     projectDir: readRequiredString(args, "project_dir"),
     targetDeckState: readOptionalString(args, "target_deck_state") as AdvanceTaskStateInput["targetDeckState"],
@@ -403,6 +450,7 @@ async function handleAdvanceTaskState(args: Record<string, unknown>) {
 }
 
 async function handleRewindTaskState(args: Record<string, unknown>) {
+  readOptionalAbsolutePath(args, "cwd");
   return rewindTaskState({
     projectDir: readRequiredString(args, "project_dir"),
     targetState: readOptionalString(args, "target_state") as RewindTaskStateInput["targetState"],
@@ -412,6 +460,7 @@ async function handleRewindTaskState(args: Record<string, unknown>) {
 }
 
 async function handleBranchTaskProject(args: Record<string, unknown>) {
+  readOptionalAbsolutePath(args, "cwd");
   return branchTaskProject({
     projectDir: readRequiredString(args, "project_dir"),
     checkpointId: readOptionalString(args, "checkpoint_id"),
@@ -421,6 +470,7 @@ async function handleBranchTaskProject(args: Record<string, unknown>) {
 }
 
 async function handleListTaskCheckpoints(args: Record<string, unknown>) {
+  readOptionalAbsolutePath(args, "cwd");
   return listTaskCheckpoints({
     projectDir: readRequiredString(args, "project_dir"),
     includeBranches: readOptionalBoolean(args, "include_branches"),
@@ -428,10 +478,12 @@ async function handleListTaskCheckpoints(args: Record<string, unknown>) {
 }
 
 async function handleRecoverTaskProject(args: Record<string, unknown>) {
+  readOptionalAbsolutePath(args, "cwd");
   return recoverTaskProject(readRequiredString(args, "project_dir"));
 }
 
 async function handleValidateTaskProject(args: Record<string, unknown>) {
+  readOptionalAbsolutePath(args, "cwd");
   return validateTaskProject(readRequiredString(args, "project_dir"));
 }
 
@@ -480,9 +532,10 @@ export async function invokeTaskStateMachine(
   }
 
   try {
+    const transportCwd = readOptionalAbsolutePath(argumentsValue, "cwd");
     const data = await handler(argumentsValue);
     const response = makeSuccessResponse(request.id, tool, data);
-    return await maybeWrapResponse(response);
+    return await maybeWrapResponse(transportCwd, response);
   } catch (error) {
     return makeErrorResponse(
       request.id,

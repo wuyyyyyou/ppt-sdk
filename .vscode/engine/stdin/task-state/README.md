@@ -28,6 +28,7 @@
 
 支持参数：
 
+- `cwd`：可选，必须是绝对路径。状态机的文件传输结果会优先写到 `cwd/.executa-file-transport/`。
 - `project_dir`：必填，项目目录，建议写绝对路径。
 - `title`：可选，任务或项目标题。
 - `initial_request`：可选，初始需求描述；当前样例会传入，但实现里主要还是以 `project_dir` 和 `title` 初始化项目。
@@ -42,6 +43,7 @@
   "params": {
     "tool": "create_task_project",
     "arguments": {
+      "cwd": "${workspaceFolder}/.vscode/engine/output",
       "project_dir": "${workspaceFolder}/.vscode/engine/output/task-state/create-task-demo",
       "title": "Task State Demo Deck",
       "initial_request": "Create a concise demo deck for testing the PPT task state machine."
@@ -49,6 +51,8 @@
   }
 }
 ```
+
+运行后，这个样例会在 `project_dir` 下创建新的任务项目，并把状态机返回结果对应的文件传输内容写到 `cwd` 下。
 
 ## 需求和规划
 

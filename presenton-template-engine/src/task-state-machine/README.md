@@ -28,5 +28,7 @@ Important behavior:
   `artifacts`.
 - Recovery is explicit through `recover_task_project`; normal `open_task_project`
   remains read-oriented except for the `project_opened` event.
-- Large RPC responses can be returned through a top-level `__trans_file__`
-  pointer. The outer plugin also emits `__file_transport` for compatibility.
+- Large RPC responses can be returned through a top-level `__file_transport`
+  pointer. When `cwd` is provided in the RPC arguments, the transport file is
+  written under `cwd/.executa-file-transport/`; otherwise it falls back to the
+  plugin temp directory.
