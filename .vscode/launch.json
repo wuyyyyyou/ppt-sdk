@@ -158,6 +158,19 @@
       "skipFiles": ["<node_internals>/**"]
     },
     {
+      "name": "Engine-Task: Record Outline",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/.vscode/engine/run-plugin-once.mjs",
+      "env": {
+        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/stdin/task-state/record_outline_stdin.json",
+        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout/task-state/record_outline_stdout.json"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
       "name": "Engine-Task: Record Template Selection",
       "type": "node",
       "request": "launch",

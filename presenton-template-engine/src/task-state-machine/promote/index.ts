@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -107,7 +108,7 @@ function relativeFromPromote(projectDir: string, filePath: string): string {
 }
 
 function collectSourceFiles(projectDir: string): Record<string, string> {
-  return {
+  const files: Record<string, string> = {
     task: getTaskFilePath(projectDir),
     state: getStateFilePath(projectDir),
     currentPage: getCurrentPageFilePath(projectDir),
@@ -116,6 +117,18 @@ function collectSourceFiles(projectDir: string): Record<string, string> {
     pagePlan: getPagePlanFilePath(projectDir),
     artifacts: getArtifactsFilePath(projectDir),
   };
+
+  const templateDir = path.join(projectDir, "template");
+  const templateGroupFile = path.join(templateDir, "group.json");
+  if (existsSync(templateGroupFile)) {
+    files.templateGroup = templateGroupFile;
+    files.templateManifest = path.join(templateDir, "manifest.json");
+    files.templateCatalog = path.join(templateDir, "catalog.json");
+    files.templateSlidesReadme = path.join(templateDir, "slides", "README.md");
+    files.templateComponentsReadme = path.join(templateDir, "components", "README.md");
+  }
+
+  return files;
 }
 
 function getPromoteKind(opened: OpenTaskProjectResult): TaskPromoteKind {
@@ -221,10 +234,12 @@ function getDeckStageGuidance(context: PromoteRenderContext): string[] {
       ];
     case "project_forked":
       return [
-        "读取用户需求和模板目录下的 README、manifest、catalog。",
-        "先生成整套 deck 的叙事大纲，不要直接开始写全部页面 TSX。",
-        "大纲应包含章节、每页标题、页面目标和核心信息。",
-        "大纲确认后调用 `record_outline`。",
+        "先读取 `requirements.json`，把 `pageCount` 当作大纲页数的硬约束，不要多写或少写。",
+        "再读取模板工作副本中的 `template/group.json`、`template/manifest.json`、`template/catalog.json`、`template/slides/README.md` 和 `template/components/README.md`，理解模板可用的页面族、组件家族和表达边界。",
+        "先生成整套 deck 的叙事大纲，不要直接开始写全部页面 TSX，也不要提前把实现细节锁死。",
+        "大纲要写成可给用户审阅的草案：先定叙事主线和章节，再按页列出每页的标题、目标和核心信息。",
+        "如果需求页数和内容冲突，先和用户确认是否需要改需求，再改大纲。",
+        "确认无误后再调用 `record_outline`。",
       ];
     case "outline_ready":
       return [
@@ -546,19 +561,36 @@ function buildOutlineStatus(outline: TaskOutlineRecord | null): string {
 function buildOutlinePromoteChecklist(outline: TaskOutlineRecord | null): string[] {
   if (!outline) {
     return [
-      "先从需求中提炼整套 deck 的叙事主线。",
-      "把 deck 拆成章节和页面列表，每页写清标题、目标和核心信息。",
-      "不要直接生成 TSX，只先形成结构化大纲。",
-      "确认后调用 `record_outline`。",
+      "先读需求和模板工作副本，明确主题、受众、场景、页数和模板表达边界。",
+      "先写整套 deck 的叙事主线，再拆成章节和逐页结构。",
+      "每一页都要写清 `pageId`、`pageNumber`、`title`、`goal` 和 `coreMessage`。",
+      "页数必须严格等于 `requirements.pageCount`，不能多也不能少。",
+      "不要直接生成 TSX，也不要把组件实现细节写进大纲。",
+      "先把大纲草案给用户确认，再调用 `record_outline`。",
     ];
   }
 
   return [
     "先检查 `outline.json` 里的叙事主线是否和需求一致。",
     `当前章节：${outline.outline.sections.join(" / ") || "未填"}`,
-    "需要确认每页的标题、目标和核心信息是否足够支撑后续页面计划。",
+    `当前页面数：${outline.outline.pages.length}`,
+    "确认每页是否都承担了不同职责，避免两页说同一件事。",
+    "确认每页标题、目标和核心信息是否足够支撑后续页面计划。",
     "如果要调整页数或章节顺序，先回到需求层解释原因，再更新大纲。",
     "大纲确认后，再进入 `record_page_plan`。",
+  ];
+}
+
+function buildOutlineQualityStandards(requirements: TaskRequirementsRecord | null): string[] {
+  const pageCount = requirements?.requirements.pageCount;
+  return [
+    pageCount ? `页数必须等于 \`${pageCount}\`` : "页数必须和需求确认结果一致。",
+    "章节顺序要服务于整套 deck 的教学或讲述节奏。",
+    "每页只保留一个核心信息，不要把多页内容塞进同一页。",
+    "标题要具体、可审阅，能看出这页在整个 deck 里的作用。",
+    "内容要符合目标受众、使用场景、语气和语言。",
+    "模板信息只能用来约束表达方式和可复用组件，不要提前锁死 TSX 实现。",
+    "在调用 `record_outline` 前，先把草案展示给用户确认。",
   ];
 }
 
@@ -716,6 +748,12 @@ function buildDeckPromoteMarkdown(context: PromoteRenderContext): string {
     "## 大纲状态",
     "",
     buildOutlineStatus(context.outline),
+    ...(action.type === "write_outline" ? [
+      "",
+      "## 大纲质量标准",
+      "",
+      formatList(buildOutlineQualityStandards(context.requirements)),
+    ] : []),
     "",
     "## 页面计划状态",
     "",

@@ -222,6 +222,102 @@
 
 运行前需要先跑 `Engine-Task: Record Requirements` 后再选择模板组，确保当前状态已进入 `requirements_collected`。
 
+### `record_outline`
+
+这个子工具用于把用户确认的大纲写入 `task-state/outline.json`，并把 deck 状态推进到 `outline_ready`。
+
+在这个阶段，PPT AI Agent 应该先读取 `promote/deck/project_forked.md`，再结合 `task-state/requirements.json` 和模板工作副本里的 `template/group.json`、`template/manifest.json`、`template/catalog.json`、`template/slides/README.md`、`template/components/README.md` 产出大纲草案。
+大纲要先写成给用户审阅的版本，再在确认后调用这个子工具。
+
+支持参数：
+
+- `cwd`：可选，必须是绝对路径。状态机的文件传输结果会优先写到 `cwd/.executa-file-transport/`。
+- `project_dir`：必填，已有任务项目目录，必须是绝对路径。
+- `outline`：必填，大纲对象。
+- `outline.narrative`：必填，整套 deck 的叙事主线。
+- `outline.sections`：必填，章节列表。
+- `outline.pages`：必填，页面列表。
+- `outline.pages[].pageId`：必填，页面 id。
+- `outline.pages[].pageNumber`：必填，页码。
+- `outline.pages[].title`：必填，页面标题。
+- `outline.pages[].goal`：必填，页面目标。
+- `outline.pages[].coreMessage`：必填，页面核心信息。
+
+写入行为：
+
+- 写入 `task-state/outline.json`。
+- 同步生成 `page-plan.json` 的初版页面条目框架，供后续页面计划继续细化。
+- 状态会推进到 `outline_ready`。
+- 如果当前大纲页数和需求页数不一致，应该先重新确认，而不是直接写死。
+- 大纲页数应该和 `requirements.pageCount` 保持一致。
+- 这里记录的是已确认的大纲，不是实现细节，也不是 TSX 方案。
+
+当前测试样例：
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "invoke",
+  "id": 1,
+  "params": {
+    "tool": "record_outline",
+    "arguments": {
+      "cwd": "${workspaceFolder}/.vscode/engine/output",
+      "project_dir": "${workspaceFolder}/.vscode/engine/output/task-state/create-task-demo",
+      "outline": {
+        "narrative": "先介绍什么是 AI Agent，再说明它的核心能力、典型工作方式、适合课堂讲解的理解路径，以及最后给出对学生的学习启发和课堂总结。",
+        "sections": [
+          "AI Agent 是什么",
+          "AI Agent 怎么工作",
+          "AI Agent 在课堂里如何理解",
+          "AI Agent 的应用与边界",
+          "课堂总结"
+        ],
+        "pages": [
+          {
+            "pageId": "slide-01",
+            "pageNumber": 1,
+            "title": "AI Agent 是什么",
+            "goal": "用最直观的方式建立 AI Agent 的基本概念。",
+            "coreMessage": "AI Agent 不是单纯回答问题的模型，而是能围绕目标执行动作的智能体。"
+          },
+          {
+            "pageId": "slide-02",
+            "pageNumber": 2,
+            "title": "AI Agent 怎么工作",
+            "goal": "说明感知、推理、行动和反馈构成的工作闭环。",
+            "coreMessage": "AI Agent 通过感知环境、规划步骤、调用工具和持续反馈来完成任务。"
+          },
+          {
+            "pageId": "slide-03",
+            "pageNumber": 3,
+            "title": "课堂里如何理解 AI Agent",
+            "goal": "把抽象概念转成学生能快速理解的课堂类比。",
+            "coreMessage": "可以把 AI Agent 理解成会听指令、会规划、会执行的课堂小助手。"
+          },
+          {
+            "pageId": "slide-04",
+            "pageNumber": 4,
+            "title": "AI Agent 的应用与边界",
+            "goal": "帮助学生理解它能做什么，也知道它不能替代什么。",
+            "coreMessage": "AI Agent 能提升效率，但仍需要人来确认目标、判断结果和控制风险。"
+          },
+          {
+            "pageId": "slide-05",
+            "pageNumber": 5,
+            "title": "课堂总结",
+            "goal": "收束全篇，留下一个便于学生记忆的总结。",
+            "coreMessage": "理解 AI Agent 的关键，是把它看成一个能围绕目标持续行动的智能助手。"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+运行前需要先跑 `Engine-Task: Record Template Selection`，确保当前状态已进入 `project_forked`。
+
 ## 单页实现流程
 
 - `start_page_iteration`：选择某一页，进入这一页的设计和实现流程。

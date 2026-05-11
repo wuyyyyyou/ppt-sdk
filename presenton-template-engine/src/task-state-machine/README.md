@@ -36,6 +36,9 @@ Important behavior:
 - `record_template_selection` overwrites and forks the selected template group
   into `<projectDir>/template`, records the selected template group, and advances
   the deck to `project_forked`.
+- `project_forked` is the outline-creation gate: the Agent should read the
+  template working copy metadata and turn the confirmed requirements into a
+  page-by-page outline before any TSX work starts.
 - `recordPageProgress` marks the deck as `deck_html_ready` only after every
   page in `page-plan.json` has a `page_locked` event.
 - Checkpoints snapshot `task`, `state`, `current-page`, `page-plan`, and
