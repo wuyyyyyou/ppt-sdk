@@ -132,6 +132,32 @@
       "skipFiles": ["<node_internals>/**"]
     },
     {
+      "name": "Engine-Task: Open Task",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/.vscode/engine/run-plugin-once.mjs",
+      "env": {
+        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/stdin/task-state/open_task_stdin.json",
+        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout/task-state/open_task_stdout.json"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Engine-Task: Query Task",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/.vscode/engine/run-plugin-once.mjs",
+      "env": {
+        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/stdin/task-state/query_task_stdin.json",
+        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout/task-state/query_task_stdout.json"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
       "name": "Generator: Describe",
       "type": "node",
       "request": "launch",

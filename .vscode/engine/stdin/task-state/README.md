@@ -54,6 +54,62 @@
 
 运行后，这个样例会在 `project_dir` 下创建新的任务项目，并把状态机返回结果对应的文件传输内容写到 `cwd` 下。
 
+### `open_task_project`
+
+这个子工具用于打开一个已经存在的任务项目，并读取当前 `task-state/` 信息。
+
+支持参数：
+
+- `cwd`：可选，必须是绝对路径。状态机的文件传输结果会优先写到 `cwd/.executa-file-transport/`。
+- `project_dir`：必填，已有任务项目目录，必须是绝对路径。
+
+当前测试样例：
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "invoke",
+  "id": 1,
+  "params": {
+    "tool": "open_task_project",
+    "arguments": {
+      "cwd": "${workspaceFolder}/.vscode/engine/output",
+      "project_dir": "${workspaceFolder}/.vscode/engine/output/task-state/create-task-demo"
+    }
+  }
+}
+```
+
+运行前需要先跑 `Engine-Task: Create Task`，确保 `project_dir` 目录已经存在并包含 `task-state/`。
+
+### `query_task_state`
+
+这个子工具用于查询当前任务项目的状态，并返回建议 PPT AI Agent 下一步做什么。
+
+支持参数：
+
+- `cwd`：可选，必须是绝对路径。状态机的文件传输结果会优先写到 `cwd/.executa-file-transport/`。
+- `project_dir`：必填，已有任务项目目录，必须是绝对路径。
+
+当前测试样例：
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "invoke",
+  "id": 1,
+  "params": {
+    "tool": "query_task_state",
+    "arguments": {
+      "cwd": "${workspaceFolder}/.vscode/engine/output",
+      "project_dir": "${workspaceFolder}/.vscode/engine/output/task-state/create-task-demo"
+    }
+  }
+}
+```
+
+运行前需要先跑 `Engine-Task: Create Task`，并且这个项目目录里已经有状态文件可读。
+
 ## 需求和规划
 
 - `record_requirements`：记录用户需求，例如主题、目标受众、风格、素材要求等。
