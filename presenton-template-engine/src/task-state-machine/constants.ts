@@ -1,0 +1,10 @@
+export const TASK_STATE_MACHINE_MODULE_ID = "task-state-machine" as const;
+export const TASK_STATE_MACHINE_STATE_DIRNAME = "task-state" as const;
+export const TASK_STATE_MACHINE_TASK_FILE_NAME = "task.json" as const;
+export const TASK_STATE_MACHINE_STATE_FILE_NAME = "state.json" as const;
+export const TASK_STATE_MACHINE_CURRENT_PAGE_FILE_NAME = "current-page.json" as const;
+export const TASK_STATE_MACHINE_REQUIREMENTS_FILE_NAME = "requirements.json" as const;
+export const TASK_STATE_MACHINE_OUTLINE_FILE_NAME = "outline.json" as const;
+export const TASK_STATE_MACHINE_PAGE_PLAN_FILE_NAME = "page-plan.json" as const;
+export const TASK_STATE_MACHINE_ARTIFACTS_FILE_NAME = "artifacts.json" as const;
+export const TASK_STATE_MACHINE_EVENTS_FILE_NAME = "events.jsonl" as const;

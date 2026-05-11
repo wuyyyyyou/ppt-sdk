@@ -14,6 +14,8 @@ import {
   getDiscoveredTemplateGroup,
   listDiscoveredTemplateGroupSummaries,
   runDeckValidation,
+  describeTaskStateMachine,
+  invokeTaskStateMachine,
 } from "./dist/index.js";
 
 const TOOL_NAMES = [
@@ -24,6 +26,22 @@ const TOOL_NAMES = [
   "convertDeckHtmlToPptxModel",
   "validateDeckFromManifest",
   "forkTemplateGroup",
+];
+const TASK_STATE_MACHINE_TOOL_NAMES = [
+  "create_task_project",
+  "open_task_project",
+  "query_task_state",
+  "record_requirements",
+  "record_outline",
+  "record_page_plan",
+  "start_page_iteration",
+  "record_page_progress",
+  "advance_task_state",
+  "rewind_task_state",
+  "branch_task_project",
+  "list_task_checkpoints",
+  "recover_task_project",
+  "validate_task_project",
 ];
 const FILE_TRANSPORT_DIRNAME = ".executa-file-transport";
 const FILE_TRANSPORT_FALLBACK_DIR = path.join(
@@ -563,6 +581,7 @@ async function emitResponse(request, response) {
         const pointer = JSON.stringify({
           jsonrpc: "2.0",
           id: response.id ?? null,
+          __trans_file__: transportPath,
           __file_transport: transportPath,
         });
         await writeStdoutLine(pointer);
@@ -864,16 +883,26 @@ async function handleRequest(request) {
   const { id, method, params = {} } = request;
 
   switch (method) {
-    case "describe":
-      return makeResponse(id, MANIFEST);
+    case "describe": {
+      const stateMachineManifest = await describeTaskStateMachine();
+      return makeResponse(id, {
+        ...MANIFEST,
+        tools: [
+          ...MANIFEST.tools,
+          ...stateMachineManifest.tools,
+        ],
+      });
+    }
     case "invoke":
-      return handleInvoke(id, params);
+      return TASK_STATE_MACHINE_TOOL_NAMES.includes(params?.tool)
+        ? invokeTaskStateMachine({ jsonrpc: "2.0", id, method, params })
+        : handleInvoke(id, params);
     case "health":
       return makeResponse(id, {
         status: "healthy",
         timestamp: new Date().toISOString(),
         version: MANIFEST.version,
-        tools_count: MANIFEST.tools.length,
+        tools_count: MANIFEST.tools.length + TASK_STATE_MACHINE_TOOL_NAMES.length,
       });
     default:
       return makeResponse(id, undefined, {
@@ -906,7 +935,7 @@ function shutdown(signal) {
 }
 
 process.stderr.write("🔌 Presenton template engine Executa plugin started\n");
-process.stderr.write(`   Tools: ${TOOL_NAMES.join(", ")}\n`);
+process.stderr.write(`   Tools: ${[...TOOL_NAMES, ...TASK_STATE_MACHINE_TOOL_NAMES].join(", ")}\n`);
 
 rl.on("line", async (line) => {
   const trimmed = line.trim();
