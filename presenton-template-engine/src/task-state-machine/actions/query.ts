@@ -1,11 +1,16 @@
+import path from "node:path";
+
 import type {
   TaskArtifactIndexRecord,
   TaskCurrentPageRecord,
   TaskPagePlanRecord,
+  TaskPromoteDocumentReference,
   TaskRuntimeStateRecord,
   TaskStateRecord,
 } from "../types.js";
 import type { OpenTaskProjectResult } from "./project.js";
+import { ensureTaskPromoteDocument } from "../promote/index.js";
+import { readOptionalRequirementsRecord } from "../storage/records.js";
 
 export interface TaskRecommendedAction {
   type:
@@ -51,6 +56,12 @@ export interface RecommendedActionResult {
   expectedArtifacts: string[];
   allowedOperations: string[];
   agentInstruction: string;
+  promote: TaskPromoteDocumentReference;
+  promotePath: string;
+  promoteKind: TaskPromoteDocumentReference["kind"];
+  promoteVersion: string;
+  promoteFreshness: TaskPromoteDocumentReference["freshness"];
+  promoteEntryPath: string;
 }
 
 export function buildTaskStateSnapshot(result: OpenTaskProjectResult): TaskStateSnapshot {
@@ -74,51 +85,170 @@ export function getTaskStateQueryResult(result: OpenTaskProjectResult): TaskStat
 function getDefaultRecommendedAction(deckState: TaskRuntimeStateRecord["deckState"]): TaskRecommendedAction {
   switch (deckState) {
     case "initialized":
-      return { type: "collect_requirements", summary: "先收集用户需求。", requiresUserInput: true };
+      return {
+        type: "collect_requirements",
+        summary: "先阅读 promote/current.md，再收集并确认用户需求。",
+        requiresUserInput: true,
+      };
     case "project_ready":
-      return { type: "collect_requirements", summary: "继续收集并确认需求。", requiresUserInput: true };
+      return {
+        type: "collect_requirements",
+        summary: "先阅读 promote/current.md，继续收集并确认需求。",
+        requiresUserInput: true,
+      };
     case "requirements_collected":
-      return { type: "select_template_group", summary: "选择内部模板组。", requiresUserInput: true };
+      return {
+        type: "select_template_group",
+        summary: "先阅读 promote/current.md，再选择内部模板组。",
+        requiresUserInput: true,
+      };
     case "template_selected":
-      return { type: "fork_template_group", summary: "fork 模板组到任务目录。", requiresUserInput: false };
+      return {
+        type: "fork_template_group",
+        summary: "先阅读 promote/current.md，然后 fork 模板组到任务目录。",
+        requiresUserInput: false,
+      };
     case "project_forked":
-      return { type: "write_outline", summary: "先写内容大纲。", requiresUserInput: true };
+      return { type: "write_outline", summary: "先阅读 promote/current.md，再写内容大纲。", requiresUserInput: true };
     case "outline_ready":
-      return { type: "write_page_plan", summary: "生成页面实现计划。", requiresUserInput: false };
+      return { type: "write_page_plan", summary: "先阅读 promote/current.md，再生成页面实现计划。", requiresUserInput: false };
     case "page_plan_ready":
-      return { type: "start_page_authoring", summary: "开始逐页实现。", requiresUserInput: false };
+      return { type: "start_page_authoring", summary: "先阅读 promote/current.md，再开始逐页实现。", requiresUserInput: false };
     case "page_iteration_active":
-      return { type: "render_current_page", summary: "对当前页进行单页渲染。", requiresUserInput: false };
+      return { type: "render_current_page", summary: "先阅读 promote/current.md，再对当前页进行单页渲染。", requiresUserInput: false };
     case "deck_html_ready":
-      return { type: "request_deck_html_approval", summary: "请求用户确认整套 HTML。", requiresUserInput: true };
+      return { type: "request_deck_html_approval", summary: "先阅读 promote/current.md，再请求用户确认整套 HTML。", requiresUserInput: true };
     case "deck_review_pending":
-      return { type: "review_page_png", summary: "等待 deck HTML 审阅结果。", requiresUserInput: true };
+      return { type: "review_page_png", summary: "先阅读 promote/current.md，再等待 deck HTML 审阅结果。", requiresUserInput: true };
     case "deck_reviewed":
-      return { type: "convert_deck_html_to_model", summary: "将 HTML 转成 PPT 模型。", requiresUserInput: false };
+      return { type: "convert_deck_html_to_model", summary: "先阅读 promote/current.md，再将 HTML 转成 PPT 模型。", requiresUserInput: false };
     case "model_ready":
-      return { type: "generate_pptx", summary: "生成最终 PPTX。", requiresUserInput: false };
+      return { type: "generate_pptx", summary: "先阅读 promote/current.md，再生成最终 PPTX。", requiresUserInput: false };
     case "pptx_ready":
-      return { type: "complete_task", summary: "任务完成并归档。", requiresUserInput: false };
+      return { type: "complete_task", summary: "先阅读 promote/current.md，再完成任务归档。", requiresUserInput: false };
     case "completed":
-      return { type: "complete_task", summary: "任务已完成。", requiresUserInput: false };
+      return { type: "complete_task", summary: "任务已完成，可先阅读 promote/current.md 复核历史。", requiresUserInput: false };
     case "failed":
-      return { type: "recover_from_failure", summary: "从失败状态恢复。", requiresUserInput: true };
+      return { type: "recover_from_failure", summary: "先阅读 promote/current.md，再从失败状态恢复。", requiresUserInput: true };
+    default:
+      return { type: "complete_task", summary: "先阅读 promote/current.md，再继续处理任务。", requiresUserInput: false };
   }
 }
 
-export function getRecommendedActionResult(
+function getRequiredInputs(
   result: OpenTaskProjectResult,
-): RecommendedActionResult {
+  recommendedAction: TaskRecommendedAction,
+  requirements: Awaited<ReturnType<typeof readOptionalRequirementsRecord>>,
+): string[] {
+  if (recommendedAction.type === "collect_requirements") {
+    const requirementFields = [
+      "requirements.topic",
+      "requirements.audience",
+      "requirements.scenario",
+      "requirements.pageCount",
+    ];
+
+    if (!requirements) {
+      return requirementFields;
+    }
+
+    const payload = requirements.requirements;
+    const missing: string[] = [];
+    if (!payload.topic?.trim()) missing.push("requirements.topic");
+    if (!payload.audience?.trim()) missing.push("requirements.audience");
+    if (!payload.scenario?.trim()) missing.push("requirements.scenario");
+    if (!Number.isInteger(payload.pageCount) || payload.pageCount <= 0) missing.push("requirements.pageCount");
+    return missing.length > 0 ? missing : requirementFields;
+  }
+
+  if (recommendedAction.type === "select_template_group") {
+    return ["template_group"];
+  }
+
+  if (recommendedAction.type === "write_outline") {
+    return ["outline.narrative", "outline.sections", "outline.pages"];
+  }
+
+  if (recommendedAction.type === "write_page_plan") {
+    return ["page_plan.pages"];
+  }
+
+  if (recommendedAction.type === "start_page_authoring") {
+    return result.currentPage ? [] : ["current_page"];
+  }
+
+  if (recommendedAction.type === "review_page_png") {
+    return result.currentPage ? ["page_png_review_result"] : ["current_page"];
+  }
+
+  if (recommendedAction.type === "recover_from_failure") {
+    return ["recovery_decision"];
+  }
+
+  return recommendedAction.requiresUserInput ? ["user_confirmation"] : [];
+}
+
+function getExpectedArtifacts(
+  result: OpenTaskProjectResult,
+  recommendedAction: TaskRecommendedAction,
+): string[] {
+  const projectDir = result.projectDir;
+  const pageId = result.currentPage?.pageId;
+
+  switch (recommendedAction.type) {
+    case "collect_requirements":
+      return [path.join(projectDir, "task-state", "requirements.json")];
+    case "write_outline":
+      return [path.join(projectDir, "task-state", "outline.json")];
+    case "write_page_plan":
+      return [path.join(projectDir, "task-state", "page-plan.json")];
+    case "start_page_authoring":
+    case "render_current_page":
+    case "review_page_png":
+    case "fix_current_page":
+    case "lock_current_page":
+      return pageId
+        ? [path.join(projectDir, "output", "screenshots", `${pageId}.png`)]
+        : [];
+    case "request_deck_html_approval":
+      return [path.join(projectDir, "output", "deck.html")];
+    case "convert_deck_html_to_model":
+      return [path.join(projectDir, "output", "ppt-model.json")];
+    case "generate_pptx":
+      return [path.join(projectDir, "output", "deck.pptx")];
+    default:
+      return [];
+  }
+}
+
+export async function getRecommendedActionResult(
+  result: OpenTaskProjectResult,
+): Promise<RecommendedActionResult> {
   const recommendedAction = getDefaultRecommendedAction(result.state.deckState);
+  const requirements = await readOptionalRequirementsRecord(result.projectDir);
+  const requiredInputs = getRequiredInputs(result, recommendedAction, requirements);
+  const expectedArtifacts = getExpectedArtifacts(result, recommendedAction);
+  const promote = await ensureTaskPromoteDocument(result, {
+    type: recommendedAction.type,
+    summary: recommendedAction.summary,
+    requiredInputs,
+    expectedArtifacts,
+    allowedOperations: result.state.allowedTransitions,
+  });
   return {
     deckState: result.state.deckState,
     pageState: result.state.pageState,
     recommendedAction,
     blockedBy: result.state.blockedBy,
-    requiredInputs: recommendedAction.requiresUserInput ? ["user_confirmation"] : [],
-    expectedArtifacts: [],
+    requiredInputs,
+    expectedArtifacts,
     allowedOperations: result.state.allowedTransitions,
-    agentInstruction: recommendedAction.summary,
+    agentInstruction: `先阅读 ${promote.entryPath}，再按 ${promote.path} 中的步骤执行。`,
+    promote,
+    promotePath: promote.path,
+    promoteKind: promote.kind,
+    promoteVersion: promote.version,
+    promoteFreshness: promote.freshness,
+    promoteEntryPath: promote.entryPath,
   };
 }
-

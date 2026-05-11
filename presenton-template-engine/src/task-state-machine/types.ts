@@ -171,6 +171,37 @@ export interface TaskArtifactIndexRecord {
   artifacts: TaskArtifactRecord[];
 }
 
+export type TaskPromoteKind = "deck" | "page" | "recovery";
+export type TaskPromoteFreshness = "fresh" | "stale";
+
+export interface TaskPromoteDocumentReference {
+  kind: TaskPromoteKind;
+  version: string;
+  freshness: TaskPromoteFreshness;
+  readBeforeAction: true;
+  stage: string;
+  path: string;
+  entryPath: string;
+  manifestPath: string;
+  pageId?: string;
+  pageNumber?: number;
+}
+
+export interface TaskPromoteManifestRecord {
+  projectId: string;
+  updatedAt: string;
+  version: string;
+  kind: TaskPromoteKind;
+  deckState: TaskStateMachineDeckState;
+  pageState?: TaskStateMachinePageState;
+  currentPageId?: string;
+  currentPath: string;
+  documentPath: string;
+  manifestPath: string;
+  sourceUpdatedAt: string;
+  sourceFiles: Record<string, string>;
+}
+
 export interface TaskStateMachineEventRecord {
   eventId: string;
   eventType: TaskStateMachineEventType;

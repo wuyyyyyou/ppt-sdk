@@ -84,7 +84,7 @@
 
 ### `query_task_state`
 
-这个子工具用于查询当前任务项目的状态，并返回建议 PPT AI Agent 下一步做什么。
+这个子工具用于查询当前任务项目的状态，并生成 `promote/current.md` 和当前阶段对应的 `promote/*.md` 行动说明，再返回建议 PPT AI Agent 下一步做什么。
 
 支持参数：
 
@@ -109,6 +109,15 @@
 ```
 
 运行前需要先跑 `Engine-Task: Create Task`，并且这个项目目录里已经有状态文件可读。
+
+返回结果里，`recommendation` 会包含这些关键字段：
+
+- `promotePath`：当前阶段真正应该先读的 md 文件。
+- `promoteKind`：`deck`、`page` 或 `recovery`。
+- `promoteVersion`：当前 promote 文档版本。
+- `promoteFreshness`：当前文档是否是本次查询生成的。
+- `promoteEntryPath`：`promote/current.md` 的入口路径。
+- `agentInstruction`：给 PPT AI Agent 的简短执行提示。
 
 ## 需求和规划
 

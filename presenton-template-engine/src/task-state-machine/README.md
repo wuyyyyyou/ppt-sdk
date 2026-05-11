@@ -1,7 +1,8 @@
 # PPT Task State Machine
 
 This module persists and drives PPT task workflow state under a project-local
-`task-state/` directory.
+`task-state/` directory, and generates a derived `promote/` instruction layer
+for PPT AI Agent consumption.
 
 Core files:
 
@@ -13,6 +14,7 @@ Core files:
 - `page-plan.json`: per-page implementation plan.
 - `artifacts.json`: generated artifact index.
 - `events.jsonl`: append-only event log.
+- `promote/`: derived stage instructions for the current deck or page state.
 
 JSON-RPC tools are exposed through `describeTaskStateMachine` and
 `invokeTaskStateMachine`, then merged into `example_plugin.js` alongside the
@@ -28,6 +30,9 @@ Important behavior:
   `artifacts`.
 - Recovery is explicit through `recover_task_project`; normal `open_task_project`
   remains read-oriented except for the `project_opened` event.
+- `query_task_state` also materializes `promote/current.md` and the current
+  stage-specific `promote/*.md` guidance file before returning recommendation
+  metadata.
 - Large RPC responses can be returned through a top-level `__file_transport`
   pointer. When `cwd` is provided in the RPC arguments, the transport file is
   written under `cwd/.executa-file-transport/`; otherwise it falls back to the

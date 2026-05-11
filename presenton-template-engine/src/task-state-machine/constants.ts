@@ -1,5 +1,6 @@
 export const TASK_STATE_MACHINE_MODULE_ID = "task-state-machine" as const;
 export const TASK_STATE_MACHINE_STATE_DIRNAME = "task-state" as const;
+export const TASK_STATE_MACHINE_PROMOTE_DIRNAME = "promote" as const;
 export const TASK_STATE_MACHINE_TASK_FILE_NAME = "task.json" as const;
 export const TASK_STATE_MACHINE_STATE_FILE_NAME = "state.json" as const;
 export const TASK_STATE_MACHINE_CURRENT_PAGE_FILE_NAME = "current-page.json" as const;
@@ -8,3 +9,9 @@ export const TASK_STATE_MACHINE_OUTLINE_FILE_NAME = "outline.json" as const;
 export const TASK_STATE_MACHINE_PAGE_PLAN_FILE_NAME = "page-plan.json" as const;
 export const TASK_STATE_MACHINE_ARTIFACTS_FILE_NAME = "artifacts.json" as const;
 export const TASK_STATE_MACHINE_EVENTS_FILE_NAME = "events.jsonl" as const;
+export const TASK_STATE_MACHINE_PROMOTE_MANIFEST_FILE_NAME = "manifest.json" as const;
+export const TASK_STATE_MACHINE_PROMOTE_CURRENT_FILE_NAME = "current.md" as const;
+export const TASK_STATE_MACHINE_PROMOTE_DECK_DIRNAME = "deck" as const;
+export const TASK_STATE_MACHINE_PROMOTE_PAGES_DIRNAME = "pages" as const;
+export const TASK_STATE_MACHINE_PROMOTE_TEMPLATES_DIRNAME = "templates" as const;
+export const TASK_STATE_MACHINE_PROMOTE_RECOVERY_FILE_NAME = "recovery.md" as const;

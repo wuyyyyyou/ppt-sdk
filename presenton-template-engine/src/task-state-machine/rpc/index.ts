@@ -240,7 +240,7 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
       },
       {
         name: "query_task_state",
-        description: "Query current state and recommended next action.",
+        description: "Query current state, generate promote guidance docs, and return the recommended next action.",
         parameters: [
           { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
           { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
@@ -386,7 +386,7 @@ async function handleQueryTaskState(args: Record<string, unknown>) {
   });
   return {
     snapshot: getTaskStateQueryResult(opened),
-    recommendation: getRecommendedActionResult(opened),
+    recommendation: await getRecommendedActionResult(opened),
   };
 }
 
