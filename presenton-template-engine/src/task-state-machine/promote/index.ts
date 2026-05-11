@@ -183,7 +183,7 @@ function getDeckStageGuidance(context: PromoteRenderContext): string[] {
         `先检查已有需求记录：\`${context.sourceFiles.requirements}\`。如果文件不存在，就从用户原始请求开始建立第一版需求。`,
         "对已有字段只做确认和补充，不要无理由覆盖用户已经确认的内容。",
         "必须确认主题、受众、使用场景和页数；建议同时确认语言、语气、视觉偏好、必须覆盖的信息和用户素材。",
-        "需求完整后调用 `record_requirements`，把确认后的结构化需求写入 `task-state/requirements.json`。",
+        "需求完整后调用 `record_requirements`，默认使用 `mode: \"merge\"` 只更新本次确认字段；只有用户明确要求重写全部需求时才使用 `mode: \"replace_all\"`。",
       ];
     case "requirements_collected":
       return [
@@ -280,6 +280,7 @@ function getRecommendedToolCall(context: PromoteRenderContext): unknown {
         tool: "record_requirements",
         arguments: {
           project_dir: projectDir,
+          mode: "merge",
           requirements: {
             topic: "<用户确认的主题>",
             audience: "<目标受众>",
@@ -476,7 +477,7 @@ function buildRequirementsPromoteChecklist(requirements: TaskRequirementsRecord 
       "先读 `task-state/requirements.json`，确认有没有已有需求。",
       "如果没有 `requirements.json`，优先向用户收集主题、受众、场景和页数。",
       "补充确认语言、语气、必须覆盖的信息和用户素材约束。",
-      "把最终确认结果写入 `record_requirements`。",
+      "把最终确认结果通过 `record_requirements` 写入，使用 `mode: \"merge\"`。",
       "当前项目还没有结构化需求，不能直接进入大纲阶段。",
     ];
   }
@@ -493,6 +494,8 @@ function buildRequirementsPromoteChecklist(requirements: TaskRequirementsRecord 
     payload.mustCover?.length
       ? `必须覆盖的信息：${payload.mustCover.join(" / ")}`
       : "必须覆盖的信息尚未补齐。",
+    "补充或修正单个字段时调用 `record_requirements` 并使用 `mode: \"merge\"`，保留未提到的既有字段。",
+    "只有用户明确要求废弃原需求并重写时，才调用 `record_requirements` 并使用 `mode: \"replace_all\"`。",
     "如果已有内容和用户新意图冲突，优先解释冲突并重新确认，而不是直接写死。",
   ];
 }

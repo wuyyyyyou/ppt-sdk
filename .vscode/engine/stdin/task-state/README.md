@@ -125,6 +125,61 @@
 - `record_outline`：记录已经确认的大纲和页数安排。
 - `record_page_plan`：记录或更新每页的实现计划，用来连接“大纲”到“一页一页实现”。
 
+### `record_requirements`
+
+这个子工具用于把已经和用户确认过的 PPT 需求写入 `task-state/requirements.json`，并把 deck 状态推进到 `requirements_collected`。
+
+支持参数：
+
+- `cwd`：可选，必须是绝对路径。状态机的文件传输结果会优先写到 `cwd/.executa-file-transport/`。
+- `project_dir`：必填，已有任务项目目录，必须是绝对路径。
+- `mode`：可选，支持 `"merge"` 或 `"replace_all"`，默认是 `"merge"`。
+- `requirements`：必填，结构化需求对象。
+- `requirements.topic`：必填，PPT 主题。
+- `requirements.audience`：必填，目标受众。
+- `requirements.scenario`：必填，使用场景。
+- `requirements.pageCount`：必填，页数，必须是数字。
+- `requirements.tone`：可选，语气或视觉风格。
+- `requirements.language`：可选，输出语言。
+- `requirements.mustCover`：可选，必须覆盖的信息数组；没有必须覆盖的信息时可以传空数组。
+- `source`：可选，需求来源；用户确认的需求建议写 `"user"`。
+
+写入行为：
+
+- `mode: "merge"`：默认行为。如果已有 `requirements.json`，只覆盖本次 `requirements` 里传入的字段，未传入字段保留原样；如果没有已有文件，则创建新文件。
+- `mode: "replace_all"`：整份替换 `requirements.json` 里的 `requirements` 内容。只有用户明确要求重写全部需求时才建议使用。
+- 无论使用哪种模式，写入后的结果都必须包含 `topic`、`audience`、`scenario` 和有效的 `pageCount`。
+
+当前测试样例：
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "invoke",
+  "id": 1,
+  "params": {
+    "tool": "record_requirements",
+    "arguments": {
+      "cwd": "${workspaceFolder}/.vscode/engine/output",
+      "project_dir": "${workspaceFolder}/.vscode/engine/output/task-state/create-task-demo",
+      "mode": "merge",
+      "requirements": {
+        "topic": "AI Agent 介绍",
+        "audience": "学生",
+        "scenario": "上课",
+        "pageCount": 5,
+        "tone": "专业、精致",
+        "language": "中文",
+        "mustCover": []
+      },
+      "source": "user"
+    }
+  }
+}
+```
+
+运行前需要先跑 `Engine-Task: Create Task`，确保 `project_dir` 目录已经存在并包含 `task-state/`。
+
 ## 单页实现流程
 
 - `start_page_iteration`：选择某一页，进入这一页的设计和实现流程。

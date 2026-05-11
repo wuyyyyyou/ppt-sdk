@@ -10,6 +10,7 @@ import type {
 import {
   appendTaskEvent,
   readOptionalPagePlanRecord,
+  readOptionalRequirementsRecord,
   readOptionalStateRecord,
   readOptionalTaskRecord,
   writePagePlanRecord,
@@ -18,17 +19,13 @@ import {
   writeStateRecord,
 } from "../storage/records.js";
 
+type RequirementsPayload = TaskRequirementsRecord["requirements"];
+type RecordRequirementsMode = "merge" | "replace_all";
+
 export interface RecordRequirementsInput {
   projectDir: string;
-  requirements: {
-    topic: string;
-    audience: string;
-    scenario: string;
-    pageCount: number;
-    tone?: string;
-    language?: string;
-    mustCover?: string[];
-  };
+  mode?: RecordRequirementsMode;
+  requirements: Partial<RequirementsPayload>;
   source?: string;
 }
 
@@ -100,9 +97,54 @@ function updateDeckState(
 
 function buildRequirementsPayload(input: RecordRequirementsInput) {
   return {
+    mode: input.mode ?? "merge",
     requirements: input.requirements,
     source: input.source ?? "user",
   };
+}
+
+function assertRecordRequirementsMode(mode: string | undefined): asserts mode is RecordRequirementsMode | undefined {
+  if (mode !== undefined && mode !== "merge" && mode !== "replace_all") {
+    throw new Error(`Unsupported record requirements mode: ${mode}`);
+  }
+}
+
+function assertStringField(value: unknown, fieldName: string): asserts value is string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`Missing required requirements field: ${fieldName}`);
+  }
+}
+
+function assertRequirementsPayload(payload: Partial<RequirementsPayload>): asserts payload is RequirementsPayload {
+  assertStringField(payload.topic, "topic");
+  assertStringField(payload.audience, "audience");
+  assertStringField(payload.scenario, "scenario");
+
+  if (!Number.isInteger(payload.pageCount) || Number(payload.pageCount) <= 0) {
+    throw new Error("Missing required requirements field: pageCount");
+  }
+
+  if (payload.mustCover !== undefined && !Array.isArray(payload.mustCover)) {
+    throw new Error("requirements.mustCover must be an array when provided");
+  }
+}
+
+function resolveRequirementsPayload(
+  existing: TaskRequirementsRecord | null,
+  input: RecordRequirementsInput,
+): RequirementsPayload {
+  assertRecordRequirementsMode(input.mode);
+
+  const mode = input.mode ?? "merge";
+  const requirements = mode === "merge"
+    ? {
+        ...(existing?.requirements ?? {}),
+        ...input.requirements,
+      }
+    : input.requirements;
+
+  assertRequirementsPayload(requirements);
+  return requirements;
 }
 
 function buildOutlinePayload(input: RecordOutlineInput) {
@@ -145,11 +187,13 @@ export async function recordRequirements(
     throw new Error(`state.json not found in ${input.projectDir}`);
   }
 
+  const existingRequirements = await readOptionalRequirementsRecord(input.projectDir);
+  const requirements = resolveRequirementsPayload(existingRequirements, input);
   const requirementsRecord: TaskRequirementsRecord = {
     projectId: task.projectId,
     updatedAt: nowIso(),
-    requirements: input.requirements,
-    source: input.source ?? "user",
+    requirements,
+    source: input.source ?? existingRequirements?.source ?? "user",
   };
   await writeRequirementsRecord(input.projectDir, requirementsRecord);
 

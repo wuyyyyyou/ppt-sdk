@@ -252,7 +252,8 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
         parameters: [
           { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
           { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
-          { name: "requirements", type: "object", required: true, description: "Requirements payload." },
+          { name: "mode", type: "string", required: false, description: "merge or replace_all. Defaults to merge." },
+          { name: "requirements", type: "object", required: true, description: "Requirements payload. Partial payloads are allowed in merge mode." },
           { name: "source", type: "string", required: false, description: "Source of the requirements." },
         ],
       },
@@ -392,8 +393,12 @@ async function handleQueryTaskState(args: Record<string, unknown>) {
 
 async function handleRecordRequirements(args: Record<string, unknown>) {
   readOptionalAbsolutePath(args, "cwd");
+  if (!isRecord(args.requirements)) {
+    throw new Error("Missing required parameter: requirements");
+  }
   return recordRequirements({
     projectDir: readRequiredString(args, "project_dir"),
+    mode: readOptionalString(args, "mode") as RecordRequirementsInput["mode"],
     requirements: args.requirements as RecordRequirementsInput["requirements"],
     source: readOptionalString(args, "source"),
   });

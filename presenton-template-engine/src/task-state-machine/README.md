@@ -24,6 +24,10 @@ Important behavior:
 
 - Page authoring is page-level: select, author, render, review, fix, accept,
   then lock.
+- `record_requirements` defaults to `mode: "merge"` so repeated calls preserve
+  existing requirement fields that the latest input does not mention. Use
+  `mode: "replace_all"` only when the full requirement record should be
+  replaced.
 - `recordPageProgress` marks the deck as `deck_html_ready` only after every
   page in `page-plan.json` has a `page_locked` event.
 - Checkpoints snapshot `task`, `state`, `current-page`, `page-plan`, and
