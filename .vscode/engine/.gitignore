@@ -1,4 +1,3 @@
-*stdout.json
-invoke-stdin.json
-*-stdin.json
+stdin/*.json
+stdout/*.json
 output/

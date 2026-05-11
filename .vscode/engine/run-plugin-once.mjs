@@ -6,8 +6,8 @@ import { spawn } from "node:child_process";
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const WORKSPACE_DIR = path.resolve(SCRIPT_DIR, "..", "..");
 const PROJECT_DIR = path.join(WORKSPACE_DIR, "presenton-template-engine");
-const DEFAULT_STDIN_FILE = path.join(SCRIPT_DIR, "describe-stdin.json");
-const DEFAULT_STDOUT_FILE = path.join(SCRIPT_DIR, "stdout.json");
+const DEFAULT_STDIN_FILE = path.join(SCRIPT_DIR, "stdin", "describe-stdin.json");
+const DEFAULT_STDOUT_FILE = path.join(SCRIPT_DIR, "stdout", "stdout.json");
 
 function resolvePath(filePath, fallbackPath) {
   if (!filePath) {

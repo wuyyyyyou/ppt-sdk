@@ -8,8 +8,8 @@
       "cwd": "${workspaceFolder}",
       "program": "${workspaceFolder}/.vscode/engine/run-plugin-once.mjs",
       "env": {
-        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/describe-stdin.json",
-        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/describe-stdout.json"
+        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/stdin/describe-stdin.json",
+        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout/describe-stdout.json"
       },
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**"]
@@ -21,8 +21,8 @@
       "cwd": "${workspaceFolder}",
       "program": "${workspaceFolder}/.vscode/engine/run-plugin-once.mjs",
       "env": {
-        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/health-stdin.json",
-        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/health-stdout.json"
+        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/stdin/health-stdin.json",
+        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout/health-stdout.json"
       },
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**"]
@@ -34,8 +34,8 @@
       "cwd": "${workspaceFolder}",
       "program": "${workspaceFolder}/.vscode/engine/run-plugin-once.mjs",
       "env": {
-        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/list-summary-stdin.json",
-        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout.json"
+        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/stdin/list-summary-stdin.json",
+        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout/stdout.json"
       },
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**"]
@@ -47,8 +47,8 @@
       "cwd": "${workspaceFolder}",
       "program": "${workspaceFolder}/.vscode/engine/run-plugin-once.mjs",
       "env": {
-        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/all-groups-stdin.json",
-        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout.json"
+        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/stdin/all-groups-stdin.json",
+        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout/stdout.json"
       },
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**"]
@@ -60,8 +60,8 @@
       "cwd": "${workspaceFolder}",
       "program": "${workspaceFolder}/.vscode/engine/run-plugin-once.mjs",
       "env": {
-        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/get-group-stdin.json",
-        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout.json"
+        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/stdin/get-group-stdin.json",
+        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout/stdout.json"
       },
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**"]
@@ -73,8 +73,8 @@
       "cwd": "${workspaceFolder}",
       "program": "${workspaceFolder}/.vscode/engine/run-plugin-once.mjs",
       "env": {
-        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/deck-html-stdin.json",
-        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout.json"
+        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/stdin/deck-html-stdin.json",
+        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout/stdout.json"
       },
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**"]
@@ -86,8 +86,8 @@
       "cwd": "${workspaceFolder}",
       "program": "${workspaceFolder}/.vscode/engine/run-plugin-once.mjs",
       "env": {
-        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/convert-stdin.json",
-        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout.json"
+        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/stdin/convert-stdin.json",
+        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout/stdout.json"
       },
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**"]
@@ -99,8 +99,8 @@
       "cwd": "${workspaceFolder}",
       "program": "${workspaceFolder}/.vscode/engine/run-plugin-once.mjs",
       "env": {
-        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/validate-stdin.json",
-        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout.json"
+        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/stdin/validate-stdin.json",
+        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout/stdout.json"
       },
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**"]
@@ -112,8 +112,8 @@
       "cwd": "${workspaceFolder}",
       "program": "${workspaceFolder}/.vscode/engine/run-plugin-once.mjs",
       "env": {
-        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/fork-stdin.json",
-        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout.json"
+        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/stdin/fork-stdin.json",
+        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout/stdout.json"
       },
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**"]
