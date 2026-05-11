@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 
 import { listDiscoveredTemplateGroupSummaries } from "../../discovery/index.js";
+import { forkTemplateGroup } from "../../fork/fork-template-group.js";
 import type {
   TaskRuntimeStateRecord,
 } from "../types.js";
@@ -24,6 +26,10 @@ export interface RecordTemplateSelectionResult {
   deckState: TaskRuntimeStateRecord["deckState"];
   selectedTemplateGroupId: string;
   selectedTemplateGroupName?: string;
+  templateDir: string;
+  manifestPath?: string;
+  catalogJsonPath?: string;
+  dataDirPath?: string;
   updatedAt: string;
 }
 
@@ -59,14 +65,22 @@ export async function recordTemplateSelection(
     throw new Error(`Template group not found: ${templateGroup}`);
   }
 
+  const templateDir = path.join(input.projectDir, "template");
+  const forkResult = await forkTemplateGroup({
+    templateGroup: selectedGroup.group_id,
+    outDir: templateDir,
+    manifestTitle: task.title ?? selectedGroup.group_name,
+    overwrite: true,
+  });
+
   const updatedAt = nowIso();
   const nextState: TaskRuntimeStateRecord = {
     ...state,
     updatedAt,
-    deckState: "template_selected",
+    deckState: "project_forked",
     selectedTemplateGroupId: selectedGroup.group_id,
     selectedTemplateGroupName: selectedGroup.group_name,
-    allowedTransitions: ["project_forked"],
+    allowedTransitions: ["outline_ready"],
     blockedBy: [],
     recoverable: true,
   };
@@ -86,12 +100,34 @@ export async function recordTemplateSelection(
     },
   });
 
+  await appendTaskEvent(input.projectDir, {
+    eventId: randomUUID(),
+    eventType: "template_group_forked",
+    projectId: task.projectId,
+    timestamp: updatedAt,
+    actor: "system",
+    payload: {
+      templateGroup: selectedGroup.group_id,
+      templateGroupName: selectedGroup.group_name,
+      outDir: forkResult.outDir,
+      groupJsonPath: forkResult.groupJsonPath,
+      manifestPath: forkResult.manifestPath,
+      catalogJsonPath: forkResult.catalogJsonPath ?? null,
+      dataDirPath: forkResult.dataDirPath ?? null,
+      overwrite: true,
+    },
+  });
+
   return {
     projectId: task.projectId,
     path: input.projectDir,
     deckState: nextState.deckState,
     selectedTemplateGroupId: selectedGroup.group_id,
     selectedTemplateGroupName: selectedGroup.group_name,
+    templateDir,
+    manifestPath: forkResult.manifestPath,
+    catalogJsonPath: forkResult.catalogJsonPath,
+    dataDirPath: forkResult.dataDirPath,
     updatedAt,
   };
 }

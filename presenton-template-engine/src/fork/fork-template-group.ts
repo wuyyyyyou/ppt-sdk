@@ -57,10 +57,17 @@ export interface ForkTemplateGroupResult {
   manifest: DeckManifestInput;
 }
 
-const FORKABLE_TEMPLATES_DIR = path.join(getCurrentModuleDir(), "forkable-templates");
-const FORKABLE_INDEX_PATH = path.join(FORKABLE_TEMPLATES_DIR, "index.json");
+type LoadedForkableTemplatesAssets = {
+  index: ForkableTemplatesAssetIndex;
+  templatesDir: string;
+};
 
-let assetIndexPromise: Promise<ForkableTemplatesAssetIndex> | null = null;
+const FORKABLE_TEMPLATES_DIR_CANDIDATES = [
+  path.join(getCurrentModuleDir(), "forkable-templates"),
+  path.join(getCurrentModuleDir(), "..", "..", "dist", "forkable-templates"),
+];
+
+let assetIndexPromise: Promise<LoadedForkableTemplatesAssets> | null = null;
 
 function getCurrentModuleDir(): string {
   if (typeof __dirname === "string") {
@@ -79,18 +86,24 @@ async function pathExists(candidatePath: string): Promise<boolean> {
   }
 }
 
-async function loadAssetIndex(): Promise<ForkableTemplatesAssetIndex> {
+async function loadAssetIndex(): Promise<LoadedForkableTemplatesAssets> {
   if (!assetIndexPromise) {
     assetIndexPromise = (async () => {
-      if (!(await pathExists(FORKABLE_INDEX_PATH))) {
-        throw new Error(
-          `Forkable template assets not found at ${FORKABLE_INDEX_PATH}. Rebuild or reinstall @presenton-sdk/template-engine.`,
-        );
+      for (const templatesDir of FORKABLE_TEMPLATES_DIR_CANDIDATES) {
+        const indexPath = path.join(templatesDir, "index.json");
+        if (await pathExists(indexPath)) {
+          return {
+            index: JSON.parse(
+              await readFile(indexPath, "utf8"),
+            ) as ForkableTemplatesAssetIndex,
+            templatesDir,
+          };
+        }
       }
 
-      return JSON.parse(
-        await readFile(FORKABLE_INDEX_PATH, "utf8"),
-      ) as ForkableTemplatesAssetIndex;
+      throw new Error(
+        `Forkable template assets not found in any known location: ${FORKABLE_TEMPLATES_DIR_CANDIDATES.join(", ")}. Rebuild or reinstall @presenton-sdk/template-engine.`,
+      );
     })();
   }
 
@@ -380,7 +393,7 @@ export async function forkTemplateGroup(
 
   assertAbsolutePath(input.outDir, "outDir");
   const outDir = path.normalize(input.outDir);
-  const assetIndex = await loadAssetIndex();
+  const { index: assetIndex, templatesDir } = await loadAssetIndex();
   const group = assetIndex.groups[input.templateGroup];
   if (!group) {
     throw new Error(`Forkable template group not found: ${input.templateGroup}`);
@@ -388,7 +401,7 @@ export async function forkTemplateGroup(
 
   await ensureOutputDirectory(outDir, input.overwrite === true);
 
-  const sourceGroupDir = path.join(FORKABLE_TEMPLATES_DIR, "groups", group.groupId);
+  const sourceGroupDir = path.join(templatesDir, "groups", group.groupId);
   await copyDirectoryContents(sourceGroupDir, outDir);
 
   const manifestTitle =

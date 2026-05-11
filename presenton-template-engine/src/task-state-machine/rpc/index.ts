@@ -263,7 +263,7 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
       },
       {
         name: "record_template_selection",
-        description: "Record the user-confirmed template group and advance to template_selected.",
+        description: "Record the user-confirmed template group, fork it into project template/, and advance to project_forked.",
         parameters: [
           { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
           { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },

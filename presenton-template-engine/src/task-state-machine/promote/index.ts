@@ -211,13 +211,13 @@ function getDeckStageGuidance(context: PromoteRenderContext): string[] {
         "读取 `requirements.json`，确认主题、受众、页数、语气和素材约束。",
         "调用 `listDiscoveredTemplateGroupSummaries` 列出当前全部可用模板组，不要由 Agent 直接替用户拍板。",
         "把完整模板组选项展示给用户，让用户明确确认要使用的 `template_group`。",
-        "用户确认后调用 `record_template_selection` 记录所选模板组并进入 `template_selected`。",
+        "用户确认后调用 `record_template_selection`，它会记录所选模板组并直接 fork 到 `template/`，然后进入 `project_forked`。",
       ];
     case "template_selected":
       return [
         "确认已选模板组 id/name 和来源。",
-        "把已选模板组 fork 到当前项目的 `template/` 工作副本。",
-        "fork 完成后推进到 `project_forked`。",
+        "如果还停在这个中间态，优先检查是否漏掉了 fork 步骤。",
+        "正常主线应直接由 `record_template_selection` 进入 `project_forked`。",
       ];
     case "project_forked":
       return [
@@ -627,7 +627,7 @@ function buildDeckStageChecklist(context: PromoteRenderContext): string[] {
         "先调用 `listDiscoveredTemplateGroupSummaries` 获取当前全部可用模板组。",
         "把模板组清单完整展示给用户，并结合需求简要说明各组选项的差异。",
         "等待用户明确确认一个 `template_group`，不要由 Agent 直接替用户决定。",
-        "用户确认后调用 `record_template_selection`，它会记录模板选择并推进到 `template_selected`。",
+        "用户确认后调用 `record_template_selection`，它会记录模板选择、fork 模板组到 `template/`，并推进到 `project_forked`。",
       ];
     case "fork_template_group":
       return [

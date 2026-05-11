@@ -8,8 +8,8 @@ Core files:
 
 - `task.json`: stable task identity, active revision, completion marker.
 - `state.json`: current deck/page state, blockers, allowed transitions.
-  It may also carry selected template group id/name while the project sits at
-  `template_selected`.
+  It may also carry selected template group id/name after the template group is
+  forked.
 - `current-page.json`: active page state and latest render artifact paths.
 - `requirements.json`: confirmed user requirements.
 - `outline.json`: confirmed narrative outline.
@@ -33,6 +33,9 @@ Important behavior:
 - `query_task_state` returns available template group summaries during
   `requirements_collected`; the Agent should present that full list to the user,
   then call `record_template_selection` with the confirmed `template_group`.
+- `record_template_selection` overwrites and forks the selected template group
+  into `<projectDir>/template`, records the selected template group, and advances
+  the deck to `project_forked`.
 - `recordPageProgress` marks the deck as `deck_html_ready` only after every
   page in `page-plan.json` has a `page_locked` event.
 - Checkpoints snapshot `task`, `state`, `current-page`, `page-plan`, and

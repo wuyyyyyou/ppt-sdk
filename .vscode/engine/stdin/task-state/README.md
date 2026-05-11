@@ -122,7 +122,7 @@
 ## 需求和规划
 
 - `record_requirements`：记录用户需求，例如主题、目标受众、风格、素材要求等。
-- `record_template_selection`：记录用户确认的模板组，并进入模板已选择阶段。
+- `record_template_selection`：记录用户确认的模板组，fork 到项目 `template/`，并进入模板已 fork 阶段。
 - `record_outline`：记录已经确认的大纲和页数安排。
 - `record_page_plan`：记录或更新每页的实现计划，用来连接“大纲”到“一页一页实现”。
 
@@ -183,7 +183,7 @@
 
 ### `record_template_selection`
 
-这个子工具用于把用户最终确认的模板组写入状态机，并把 deck 状态推进到 `template_selected`。
+这个子工具用于把用户最终确认的模板组写入状态机，使用 overwrite 方式 fork 到项目目录下的 `template/`，并把 deck 状态推进到 `project_forked`。
 
 支持参数：
 
@@ -192,6 +192,13 @@
 - `template_group`：必填，用户确认的模板组 id。
 - `selection_reason`：可选，选择理由或确认说明。
 - `source`：可选，来源，通常写 `"user"`。
+
+写入行为：
+
+- fork 输出目录固定为 `project_dir/template`。
+- 如果 `project_dir/template` 已存在且非空，会以 overwrite 方式重建。
+- fork 成功后状态会进入 `project_forked`，下一步开始读取模板工作副本并生成大纲。
+- 如果 fork 失败，状态不会推进。
 
 当前测试样例：
 

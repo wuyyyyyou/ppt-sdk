@@ -197,7 +197,7 @@ export async function recordRequirements(
   };
   await writeRequirementsRecord(input.projectDir, requirementsRecord);
 
-  const nextState = updateDeckState(state, "requirements_collected", ["template_selected"]);
+  const nextState = updateDeckState(state, "requirements_collected", ["project_forked"]);
   await writeStateRecord(input.projectDir, nextState);
 
   const timestamp = nowIso();

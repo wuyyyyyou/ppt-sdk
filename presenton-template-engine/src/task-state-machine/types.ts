@@ -31,6 +31,7 @@ export const TASK_STATE_MACHINE_EVENT_TYPES = [
   "project_opened",
   "requirements_recorded",
   "template_group_selected",
+  "template_group_forked",
   "outline_recorded",
   "page_plan_recorded",
   "page_iteration_started",
