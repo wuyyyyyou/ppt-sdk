@@ -122,6 +122,7 @@
 ## 需求和规划
 
 - `record_requirements`：记录用户需求，例如主题、目标受众、风格、素材要求等。
+- `record_template_selection`：记录用户确认的模板组，并进入模板已选择阶段。
 - `record_outline`：记录已经确认的大纲和页数安排。
 - `record_page_plan`：记录或更新每页的实现计划，用来连接“大纲”到“一页一页实现”。
 
@@ -179,6 +180,40 @@
 ```
 
 运行前需要先跑 `Engine-Task: Create Task`，确保 `project_dir` 目录已经存在并包含 `task-state/`。
+
+### `record_template_selection`
+
+这个子工具用于把用户最终确认的模板组写入状态机，并把 deck 状态推进到 `template_selected`。
+
+支持参数：
+
+- `cwd`：可选，必须是绝对路径。状态机的文件传输结果会优先写到 `cwd/.executa-file-transport/`。
+- `project_dir`：必填，已有任务项目目录，必须是绝对路径。
+- `template_group`：必填，用户确认的模板组 id。
+- `selection_reason`：可选，选择理由或确认说明。
+- `source`：可选，来源，通常写 `"user"`。
+
+当前测试样例：
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "invoke",
+  "id": 1,
+  "params": {
+    "tool": "record_template_selection",
+    "arguments": {
+      "cwd": "${workspaceFolder}/.vscode/engine/output",
+      "project_dir": "${workspaceFolder}/.vscode/engine/output/task-state/create-task-demo",
+      "template_group": "general",
+      "selection_reason": "用户确认使用通用模板组。",
+      "source": "user"
+    }
+  }
+}
+```
+
+运行前需要先跑 `Engine-Task: Record Requirements` 后再选择模板组，确保当前状态已进入 `requirements_collected`。
 
 ## 单页实现流程
 

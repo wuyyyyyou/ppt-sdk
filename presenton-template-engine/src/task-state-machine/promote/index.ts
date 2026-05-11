@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { OpenTaskProjectResult } from "../actions/project.js";
+import type { DiscoveredTemplateGroupSummaryInfo } from "../../discovery/index.js";
 import type {
   TaskArtifactIndexRecord,
   TaskCurrentPageRecord,
@@ -45,6 +46,7 @@ export interface PromoteActionContext {
   requiredInputs: string[];
   expectedArtifacts: string[];
   allowedOperations: string[];
+  availableTemplateGroups?: DiscoveredTemplateGroupSummaryInfo[];
 }
 
 interface PromoteRenderContext {
@@ -52,6 +54,7 @@ interface PromoteRenderContext {
   requirements: TaskRequirementsRecord | null;
   outline: TaskOutlineRecord | null;
   action: PromoteActionContext;
+  availableTemplateGroups: DiscoveredTemplateGroupSummaryInfo[];
   generatedAt: string;
   sourceFiles: Record<string, string>;
 }
@@ -79,6 +82,24 @@ function formatCodeList(items: string[]): string {
 
 function formatJson(value: unknown): string {
   return `\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``;
+}
+
+function formatTemplateGroupOptions(groups: DiscoveredTemplateGroupSummaryInfo[]): string {
+  if (groups.length === 0) {
+    return "- 当前没有发现可用模板组。先重新调用 `listDiscoveredTemplateGroupSummaries` 确认模板注册状态。";
+  }
+
+  return groups.map((group) => {
+    const tags = [
+      ...(group.style_tags ?? []),
+      ...(group.industry_tags ?? []),
+      ...(group.use_cases ?? []),
+      ...(group.audience_tags ?? []),
+      ...(group.tone_tags ?? []),
+    ];
+    const tagText = tags.length > 0 ? ` 标签：${tags.join(" / ")}。` : "";
+    return `- \`${group.group_id}\`：${group.group_name}。${group.group_description} 布局数：${group.layout_count}。来源：${group.source.type}。${tagText}`;
+  }).join("\n");
 }
 
 function relativeFromPromote(projectDir: string, filePath: string): string {
@@ -188,13 +209,14 @@ function getDeckStageGuidance(context: PromoteRenderContext): string[] {
     case "requirements_collected":
       return [
         "读取 `requirements.json`，确认主题、受众、页数、语气和素材约束。",
-        "基于需求选择合适的内部模板组，并说明选择理由。",
-        "模板组确认后推进到 `template_selected`，后续再 fork 模板工作副本。",
+        "调用 `listDiscoveredTemplateGroupSummaries` 列出当前全部可用模板组，不要由 Agent 直接替用户拍板。",
+        "把完整模板组选项展示给用户，让用户明确确认要使用的 `template_group`。",
+        "用户确认后调用 `record_template_selection` 记录所选模板组并进入 `template_selected`。",
       ];
     case "template_selected":
       return [
-        "确认模板组来源和版本。",
-        "把模板组 fork 到当前项目的 `template/` 工作副本。",
+        "确认已选模板组 id/name 和来源。",
+        "把已选模板组 fork 到当前项目的 `template/` 工作副本。",
         "fork 完成后推进到 `project_forked`。",
       ];
     case "project_forked":
@@ -315,11 +337,12 @@ function getRecommendedToolCall(context: PromoteRenderContext): unknown {
       };
     case "select_template_group":
       return {
-        tool: "advance_task_state",
+        tool: "record_template_selection",
         arguments: {
           project_dir: projectDir,
-          target_deck_state: "template_selected",
-          reason: "内部模板组已经选定。",
+          template_group: "<用户确认的 template_group>",
+          selection_reason: "<用户确认或 Agent 解释的选择理由>",
+          source: "user",
         },
       };
     case "fork_template_group":
@@ -445,6 +468,7 @@ function buildKnownFacts(context: PromoteRenderContext): string[] {
     `deck 状态：\`${opened.state.deckState}\``,
     `page 状态：\`${opened.state.pageState ?? "none"}\``,
     `当前页：\`${currentPage?.pageId ?? "none"}\``,
+    `已选模板组：${opened.state.selectedTemplateGroupId ? `\`${opened.state.selectedTemplateGroupId}\`${opened.state.selectedTemplateGroupName ? `（${opened.state.selectedTemplateGroupName}）` : ""}` : "未选择"}`,
     `需求记录：${requirements ? `已存在，更新时间 \`${requirements.updatedAt}\`` : "未找到"}`,
     `大纲记录：${outline ? `已存在，页面数 ${outline.outline.pages.length}` : "未找到"}`,
     `页面计划：${pagePlan ? `已存在，页面数 ${pagePlan.pages.length}` : "未找到"}`,
@@ -600,9 +624,10 @@ function buildDeckStageChecklist(context: PromoteRenderContext): string[] {
       ];
     case "select_template_group":
       return [
-        "先读需求，判断主题、受众、场景和视觉语气。",
-        "选择模板组时优先考虑组件覆盖度、页面密度和目标受众。",
-        "选定后记录选择理由，再推进到 `template_selected`。",
+        "先调用 `listDiscoveredTemplateGroupSummaries` 获取当前全部可用模板组。",
+        "把模板组清单完整展示给用户，并结合需求简要说明各组选项的差异。",
+        "等待用户明确确认一个 `template_group`，不要由 Agent 直接替用户决定。",
+        "用户确认后调用 `record_template_selection`，它会记录模板选择并推进到 `template_selected`。",
       ];
     case "fork_template_group":
       return [
@@ -681,6 +706,12 @@ function buildDeckPromoteMarkdown(context: PromoteRenderContext): string {
     "## 需求状态",
     "",
     buildRequirementsStatus(context.requirements),
+    ...(context.availableTemplateGroups.length > 0 ? [
+      "",
+      "## 可用模板组",
+      "",
+      formatTemplateGroupOptions(context.availableTemplateGroups),
+    ] : []),
     "",
     "## 大纲状态",
     "",
@@ -971,6 +1002,7 @@ export async function ensureTaskPromoteDocument(
     requirements,
     outline,
     action,
+    availableTemplateGroups: action.availableTemplateGroups ?? [],
     generatedAt,
     sourceFiles,
   };

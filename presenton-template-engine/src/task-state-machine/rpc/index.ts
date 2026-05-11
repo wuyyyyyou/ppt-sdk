@@ -32,6 +32,10 @@ import {
   type RecordRequirementsInput,
 } from "../actions/plan.js";
 import {
+  recordTemplateSelection,
+  type RecordTemplateSelectionInput,
+} from "../actions/template.js";
+import {
   recordPageProgress,
   startPageIteration,
   type RecordPageProgressInput,
@@ -258,6 +262,17 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
         ],
       },
       {
+        name: "record_template_selection",
+        description: "Record the user-confirmed template group and advance to template_selected.",
+        parameters: [
+          { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
+          { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
+          { name: "template_group", type: "string", required: true, description: "Selected template group id from listDiscoveredTemplateGroupSummaries." },
+          { name: "selection_reason", type: "string", required: false, description: "Why the template group was selected." },
+          { name: "source", type: "string", required: false, description: "Source of the selection. Defaults to user." },
+        ],
+      },
+      {
         name: "record_outline",
         description: "Persist the content outline.",
         parameters: [
@@ -404,6 +419,16 @@ async function handleRecordRequirements(args: Record<string, unknown>) {
   });
 }
 
+async function handleRecordTemplateSelection(args: Record<string, unknown>) {
+  readOptionalAbsolutePath(args, "cwd");
+  return recordTemplateSelection({
+    projectDir: readRequiredString(args, "project_dir"),
+    templateGroup: readRequiredString(args, "template_group"),
+    selectionReason: readOptionalString(args, "selection_reason"),
+    source: readOptionalString(args, "source"),
+  } satisfies RecordTemplateSelectionInput);
+}
+
 async function handleRecordOutline(args: Record<string, unknown>) {
   readOptionalAbsolutePath(args, "cwd");
   return recordOutline({
@@ -497,6 +522,7 @@ const TOOL_DISPATCH = {
   open_task_project: handleOpenTaskProject,
   query_task_state: handleQueryTaskState,
   record_requirements: handleRecordRequirements,
+  record_template_selection: handleRecordTemplateSelection,
   record_outline: handleRecordOutline,
   record_page_plan: handleRecordPagePlan,
   start_page_iteration: handleStartPageIteration,

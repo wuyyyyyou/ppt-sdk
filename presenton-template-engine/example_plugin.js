@@ -32,6 +32,7 @@ const TASK_STATE_MACHINE_TOOL_NAMES = [
   "open_task_project",
   "query_task_state",
   "record_requirements",
+  "record_template_selection",
   "record_outline",
   "record_page_plan",
   "start_page_iteration",

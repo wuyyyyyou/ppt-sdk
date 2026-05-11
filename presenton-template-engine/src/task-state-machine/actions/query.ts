@@ -1,5 +1,9 @@
 import path from "node:path";
 
+import {
+  listDiscoveredTemplateGroupSummaries,
+  type DiscoveredTemplateGroupSummaryInfo,
+} from "../../discovery/index.js";
 import type {
   TaskArtifactIndexRecord,
   TaskCurrentPageRecord,
@@ -62,6 +66,7 @@ export interface RecommendedActionResult {
   promoteVersion: string;
   promoteFreshness: TaskPromoteDocumentReference["freshness"];
   promoteEntryPath: string;
+  availableTemplateGroups?: DiscoveredTemplateGroupSummaryInfo[];
 }
 
 export function buildTaskStateSnapshot(result: OpenTaskProjectResult): TaskStateSnapshot {
@@ -99,13 +104,13 @@ function getDefaultRecommendedAction(deckState: TaskRuntimeStateRecord["deckStat
     case "requirements_collected":
       return {
         type: "select_template_group",
-        summary: "先阅读 promote/current.md，再选择内部模板组。",
+        summary: "先阅读 promote/current.md，再列出全部可用模板组，让用户确认使用哪一组。",
         requiresUserInput: true,
       };
     case "template_selected":
       return {
         type: "fork_template_group",
-        summary: "先阅读 promote/current.md，然后 fork 模板组到任务目录。",
+        summary: "先阅读 promote/current.md，然后 fork 已选模板组到任务目录。",
         requiresUserInput: false,
       };
     case "project_forked":
@@ -228,12 +233,16 @@ export async function getRecommendedActionResult(
   const requirements = await readOptionalRequirementsRecord(result.projectDir);
   const requiredInputs = getRequiredInputs(result, recommendedAction, requirements);
   const expectedArtifacts = getExpectedArtifacts(result, recommendedAction);
+  const availableTemplateGroups = recommendedAction.type === "select_template_group"
+    ? await listDiscoveredTemplateGroupSummaries({ include_builtin: true })
+    : undefined;
   const promote = await ensureTaskPromoteDocument(result, {
     type: recommendedAction.type,
     summary: recommendedAction.summary,
     requiredInputs,
     expectedArtifacts,
     allowedOperations: result.state.allowedTransitions,
+    availableTemplateGroups,
   });
   return {
     deckState: result.state.deckState,
@@ -250,5 +259,6 @@ export async function getRecommendedActionResult(
     promoteVersion: promote.version,
     promoteFreshness: promote.freshness,
     promoteEntryPath: promote.entryPath,
+    availableTemplateGroups,
   };
 }

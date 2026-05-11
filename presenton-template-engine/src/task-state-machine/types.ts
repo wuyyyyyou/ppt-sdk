@@ -30,6 +30,7 @@ export const TASK_STATE_MACHINE_EVENT_TYPES = [
   "project_created",
   "project_opened",
   "requirements_recorded",
+  "template_group_selected",
   "outline_recorded",
   "page_plan_recorded",
   "page_iteration_started",
@@ -85,6 +86,8 @@ export interface TaskRuntimeStateRecord {
   deckState: TaskStateMachineDeckState;
   pageState?: TaskStateMachinePageState;
   currentPageId?: string;
+  selectedTemplateGroupId?: string;
+  selectedTemplateGroupName?: string;
   blockedBy: string[];
   allowedTransitions: Array<TaskStateMachineDeckState | TaskStateMachinePageState>;
   allPagesLocked: boolean;
