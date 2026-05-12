@@ -20,6 +20,7 @@ import {
   getCurrentPageFilePath,
   getOutlineFilePath,
   getPagePlanFilePath,
+  getPageProgressFilePath,
   getRequirementsFilePath,
   getStateFilePath,
   getTaskFilePath,
@@ -134,6 +135,7 @@ function collectSourceFiles(projectDir: string): Record<string, string> {
     task: getTaskFilePath(projectDir),
     state: getStateFilePath(projectDir),
     currentPage: getCurrentPageFilePath(projectDir),
+    pageProgress: getPageProgressFilePath(projectDir),
     requirements: getRequirementsFilePath(projectDir),
     outline: getOutlineFilePath(projectDir),
     pagePlan: getPagePlanFilePath(projectDir),
@@ -1693,7 +1695,7 @@ function buildPageFixRequiredPromoteMarkdown(context: PromoteRenderContext): str
     "",
     context.latestReviewNotes?.trim()
       ? context.latestReviewNotes.trim()
-      : "- 未在状态事件中找到明确的 `review_notes`。先根据上一版截图和当前页骨架判断必须修复的问题。",
+      : "- 未在 `page-progress.json` 中找到明确的 `review_notes`。先根据上一版截图和当前页骨架判断必须修复的问题。",
     "",
     "## 下一步行动建议",
     "",
@@ -2000,7 +2002,7 @@ function buildDeckReviewPendingPromoteMarkdown(context: PromoteRenderContext): s
       "2. 等待用户给出明确结论：通过，或需要修改。",
       "3. 如果用户确认通过：调用 `advance_task_state`，把 `target_deck_state` 设为 `deck_reviewed`，`reason` 写明用户已确认的 HTML 路径；随后调用 `query_task_state` 读取下一阶段 promote。最终进入 `deck_reviewed`。",
       "4. 如果用户认为不对或要求修改：先让用户指出需要修改的页码、页面 id 或具体问题；不要直接推进到 `deck_reviewed`。",
-      "5. 对需要修改的情况，优先调用 `branch_task_project` 创建调整分支；然后调用 `rewind_task_state` 把 deck 回到 `page_iteration_active`，再调用 `start_page_iteration` 选中需要修改的页面；随后重新走页面实现、渲染、截图审查、锁定流程。最终应重新回到 `deck_html_ready`，重新生成整套 HTML 后再进入本阶段。",
+      "5. 对需要修改的情况，调用 `record_deck_review_feedback`：把用户指出的页标记为未锁定和 `page_fix_required`，把用户反馈整理进 `review_notes`，状态机会切回第一张待修页。随后重新走页面修复、渲染、截图审查、锁定流程。最终应重新回到 `deck_html_ready`，重新生成整套 HTML 后再进入本阶段。",
     ].join("\n"),
     "",
     "## 推荐调用的子工具",
@@ -2027,34 +2029,19 @@ function buildDeckReviewPendingPromoteMarkdown(context: PromoteRenderContext): s
       },
     }),
     "",
-    "### 用户要求修改时先创建调整分支",
+    "### 用户要求修改时记录返修页",
     "",
     formatJson({
-      tool: "branch_task_project",
+      tool: "record_deck_review_feedback",
       arguments: {
         project_dir: projectDir,
-        reason: `用户审阅整套 deck HTML 后要求修改：${deckHtmlPath}`,
-      },
-    }),
-    "",
-    "### 用户要求修改时回到逐页阶段",
-    "",
-    formatJson({
-      tool: "rewind_task_state",
-      arguments: {
-        project_dir: projectDir,
-        target_state: "page_iteration_active",
-        reason: "用户审阅 deck HTML 后要求修改，需要回到页面级流程重新调整。",
-      },
-    }),
-    "",
-    "### 选中用户指出需要修改的页面",
-    "",
-    formatJson({
-      tool: "start_page_iteration",
-      arguments: {
-        project_dir: projectDir,
-        page_id: "<用户指出需要修改的 page_id，例如 slide-01>",
+        pages: [
+          {
+            page_id: "<用户指出需要修改的 page_id，例如 slide-01>",
+            summary: "<用户审阅整套 deck HTML 后要求修改这一页的摘要>",
+            review_notes: "<把用户希望修改的地方整理成可执行修复清单>",
+          },
+        ],
       },
     }),
     "",
@@ -2496,53 +2483,22 @@ function buildManifest(
   };
 }
 
-async function readLatestPageReviewNotes(
-  projectDir: string,
+function readLatestPageReviewNotes(
+  opened: OpenTaskProjectResult,
   pageId?: string,
-): Promise<string | null> {
+): string | null {
   if (!pageId) {
     return null;
   }
 
-  const events = await readTaskEvents(projectDir);
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index];
-    if (event.payload.pageId !== pageId) {
-      continue;
-    }
-
-    const reviewNotes = event.payload.reviewNotes ?? event.payload.review_notes;
-    if (typeof reviewNotes === "string" && reviewNotes.trim().length > 0) {
-      return reviewNotes;
-    }
-  }
-
-  return null;
+  const reviewNotes = opened.pageProgress?.pages.find((page) => page.pageId === pageId)?.reviewNotes;
+  return reviewNotes?.trim().length ? reviewNotes : null;
 }
 
-async function readLockedPageIds(
-  projectDir: string,
-  currentPage: TaskCurrentPageRecord | null,
-): Promise<string[]> {
-  const lockedPageIds = new Set<string>();
-  const events = await readTaskEvents(projectDir);
-
-  for (const event of events) {
-    if (event.eventType !== "page_locked") {
-      continue;
-    }
-
-    const pageId = event.payload.pageId;
-    if (typeof pageId === "string" && pageId.length > 0) {
-      lockedPageIds.add(pageId);
-    }
-  }
-
-  if (currentPage?.locked) {
-    lockedPageIds.add(currentPage.pageId);
-  }
-
-  return Array.from(lockedPageIds);
+function readLockedPageIds(opened: OpenTaskProjectResult): string[] {
+  return opened.pageProgress?.pages
+    .filter((page) => page.locked)
+    .map((page) => page.pageId) ?? [];
 }
 
 function extractFirstHtmlPath(value: string | undefined): string | null {
@@ -2591,10 +2547,10 @@ export async function ensureTaskPromoteDocument(
   const requirements = await readOptionalRequirementsRecord(projectDir);
   const outline = await readOptionalOutlineRecord(projectDir);
   const latestReviewNotes = kind === "page"
-    ? await readLatestPageReviewNotes(projectDir, opened.currentPage?.pageId)
+    ? readLatestPageReviewNotes(opened, opened.currentPage?.pageId)
     : null;
   const lockedPageIds = kind === "page"
-    ? await readLockedPageIds(projectDir, opened.currentPage)
+    ? readLockedPageIds(opened)
     : [];
   const deckReviewInfo = opened.state.deckState === "deck_review_pending"
     ? await readLatestDeckReviewInfo(projectDir)

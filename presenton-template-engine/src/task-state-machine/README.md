@@ -50,8 +50,12 @@ Important behavior:
   first page's fine-grained authoring.
 - Page-level promote docs also write `promote/rules/*.md` with compact
   manifest, TSX authoring, and export rules for the current page.
+- `page-progress.json` is the canonical per-page progress table. It stores each
+  page's current state, lock flag, latest summary, review notes, and render
+  paths. Events remain an audit log, not the source of truth for current page
+  lock state.
 - `recordPageProgress` marks the deck as `deck_html_ready` only after every
-  page in `page-plan.json` has a `page_locked` event.
+  page in `page-plan.json` is locked in `page-progress.json`.
 - Checkpoints snapshot `task`, `state`, `current-page`, `page-plan`, and
   `artifacts`.
 - Recovery is explicit through `recover_task_project`; normal `open_task_project`

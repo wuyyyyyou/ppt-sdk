@@ -5,6 +5,7 @@ import type {
   TaskCurrentPageRecord,
   TaskOutlineRecord,
   TaskPagePlanRecord,
+  TaskPageProgressRecord,
   TaskRequirementsRecord,
   TaskRuntimeStateRecord,
   TaskStateRecord,
@@ -15,6 +16,7 @@ import {
   readOptionalCurrentPageRecord,
   readOptionalOutlineRecord,
   readOptionalPagePlanRecord,
+  readOptionalPageProgressRecord,
   readOptionalRequirementsRecord,
   readOptionalStateRecord,
   readOptionalTaskRecord,
@@ -22,6 +24,7 @@ import {
   writeCurrentPageRecord,
   writeOutlineRecord,
   writePagePlanRecord,
+  writePageProgressRecord,
   writeRequirementsRecord,
   writeStateRecord,
   writeTaskRecord,
@@ -70,8 +73,11 @@ function syncDeckStateFromArtifacts(
   state: TaskRuntimeStateRecord,
   currentPage: TaskCurrentPageRecord | null,
   pagePlan: TaskPagePlanRecord | null,
+  pageProgress: TaskPageProgressRecord | null,
 ): TaskRuntimeStateRecord {
-  const allPagesLocked = Boolean(currentPage?.locked) && Boolean(pagePlan?.pages.length);
+  const progressByPageId = new Map(pageProgress?.pages.map((page) => [page.pageId, page]) ?? []);
+  const allPagesLocked = Boolean(pagePlan?.pages.length)
+    && Boolean(pagePlan?.pages.every((page) => progressByPageId.get(page.pageId)?.locked === true));
   return {
     ...state,
     allPagesLocked,
@@ -92,6 +98,36 @@ function syncDeckStateFromArtifacts(
               ? ["page_review"]
               : ["page_authoring"],
     updatedAt: nowIso(),
+  };
+}
+
+function buildPageProgressFromArtifacts(
+  task: TaskStateRecord,
+  pagePlan: TaskPagePlanRecord | null,
+  currentPage: TaskCurrentPageRecord | null,
+  existing: TaskPageProgressRecord | null,
+): TaskPageProgressRecord {
+  const now = nowIso();
+  const existingByPageId = new Map(existing?.pages.map((page) => [page.pageId, page]) ?? []);
+
+  return {
+    projectId: task.projectId,
+    updatedAt: now,
+    pages: (pagePlan?.pages ?? []).map((page) => {
+      const existingPage = existingByPageId.get(page.pageId);
+      const current = currentPage?.pageId === page.pageId ? currentPage : null;
+      return {
+        pageId: page.pageId,
+        pageNumber: page.pageNumber,
+        pageState: current?.pageState ?? existingPage?.pageState ?? "page_selected",
+        locked: current?.locked ?? existingPage?.locked ?? false,
+        summary: existingPage?.summary,
+        reviewNotes: existingPage?.reviewNotes,
+        lastRenderedHtmlPath: current?.lastRenderedHtmlPath ?? existingPage?.lastRenderedHtmlPath,
+        lastRenderedPngPath: current?.lastRenderedPngPath ?? existingPage?.lastRenderedPngPath,
+        updatedAt: current?.updatedAt ?? existingPage?.updatedAt ?? now,
+      };
+    }),
   };
 }
 
@@ -123,12 +159,20 @@ export async function recoverTaskProject(projectDir: string): Promise<RecoveryRe
 
   const currentPage = await readOptionalCurrentPageRecord(projectDir);
   const pagePlan = await readOptionalPagePlanRecord(projectDir);
+  let pageProgress = await readOptionalPageProgressRecord(projectDir);
   const requirements = await readOptionalRequirementsRecord(projectDir);
   const outline = await readOptionalOutlineRecord(projectDir);
   const artifacts = await readOptionalArtifactsRecord(projectDir);
 
+  if (pagePlan && !pageProgress) {
+    pageProgress = buildPageProgressFromArtifacts(task, pagePlan, currentPage, null);
+    await writePageProgressRecord(projectDir, pageProgress);
+    repairedFiles.push("page-progress.json");
+    issues.push({ file: "page-progress.json", level: "repairable", message: "Missing page-progress.json rebuilt from page-plan/current-page." });
+  }
+
   if (currentPage && pagePlan) {
-    state = syncDeckStateFromArtifacts(state, currentPage, pagePlan);
+    state = syncDeckStateFromArtifacts(state, currentPage, pagePlan, pageProgress);
     await writeStateRecord(projectDir, state);
     repairedFiles.push("state.json");
   } else if (state.deckState === "page_iteration_active" && !currentPage) {
@@ -171,6 +215,10 @@ export async function recoverTaskProject(projectDir: string): Promise<RecoveryRe
     throw new Error("page-plan.json projectId mismatch");
   }
 
+  if (pageProgress && pageProgress.projectId !== task.projectId) {
+    throw new Error("page-progress.json projectId mismatch");
+  }
+
   if (artifacts && artifacts.projectId !== task.projectId) {
     throw new Error("artifacts.json projectId mismatch");
   }
@@ -185,6 +233,10 @@ export async function recoverTaskProject(projectDir: string): Promise<RecoveryRe
 
   if (pagePlan) {
     await writePagePlanRecord(projectDir, pagePlan);
+  }
+
+  if (pageProgress) {
+    await writePageProgressRecord(projectDir, pageProgress);
   }
 
   if (artifacts) {

@@ -37,8 +37,10 @@ import {
   type RecordTemplateSelectionInput,
 } from "../actions/template.js";
 import {
+  recordDeckReviewFeedback,
   recordPageProgress,
   startPageIteration,
+  type RecordDeckReviewFeedbackInput,
   type RecordPageProgressInput,
   type StartPageIterationInput,
 } from "../actions/page.js";
@@ -382,6 +384,15 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
         ],
       },
       {
+        name: "record_deck_review_feedback",
+        description: "Record deck HTML review feedback, unlock requested pages, and return to the first page fix flow.",
+        parameters: [
+          { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
+          { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
+          { name: "pages", type: "array", required: true, description: "Pages to revise. Each item accepts page_id, summary, and review_notes." },
+        ],
+      },
+      {
         name: "advance_task_state",
         description: "Advance deck state and create a checkpoint.",
         parameters: [
@@ -551,6 +562,29 @@ async function handleRecordPageProgress(args: Record<string, unknown>) {
   } satisfies RecordPageProgressInput);
 }
 
+async function handleRecordDeckReviewFeedback(args: Record<string, unknown>) {
+  readOptionalAbsolutePath(args, "cwd");
+  const pages = args.pages;
+  if (!Array.isArray(pages)) {
+    throw new Error('Field "pages" must be an array');
+  }
+
+  return recordDeckReviewFeedback({
+    projectDir: readRequiredString(args, "project_dir"),
+    pages: pages.map((page) => {
+      if (!isRecord(page)) {
+        throw new Error('Each "pages" item must be an object');
+      }
+
+      return {
+        pageId: readRequiredString(page, "page_id"),
+        summary: readOptionalString(page, "summary"),
+        reviewNotes: readOptionalString(page, "review_notes"),
+      };
+    }),
+  } satisfies RecordDeckReviewFeedbackInput);
+}
+
 async function handleAdvanceTaskState(args: Record<string, unknown>) {
   readOptionalAbsolutePath(args, "cwd");
   return advanceTaskState({
@@ -611,6 +645,7 @@ const TOOL_DISPATCH = {
   record_page_plan: handleRecordPagePlan,
   start_page_iteration: handleStartPageIteration,
   record_page_progress: handleRecordPageProgress,
+  record_deck_review_feedback: handleRecordDeckReviewFeedback,
   advance_task_state: handleAdvanceTaskState,
   rewind_task_state: handleRewindTaskState,
   branch_task_project: handleBranchTaskProject,

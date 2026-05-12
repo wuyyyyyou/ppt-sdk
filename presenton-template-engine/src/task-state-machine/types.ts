@@ -43,6 +43,7 @@ export const TASK_STATE_MACHINE_EVENT_TYPES = [
   "page_locked",
   "artifact_recorded",
   "approval_recorded",
+  "deck_review_feedback_recorded",
   "state_advanced",
   "state_rewound",
   "branch_created",
@@ -103,6 +104,24 @@ export interface TaskCurrentPageRecord {
   locked: boolean;
   lastRenderedHtmlPath?: string;
   lastRenderedPngPath?: string;
+}
+
+export interface TaskPageProgressItem {
+  pageId: string;
+  pageNumber?: number;
+  pageState: TaskStateMachinePageState;
+  locked: boolean;
+  summary?: string;
+  reviewNotes?: string;
+  lastRenderedHtmlPath?: string;
+  lastRenderedPngPath?: string;
+  updatedAt: string;
+}
+
+export interface TaskPageProgressRecord {
+  projectId: string;
+  updatedAt: string;
+  pages: TaskPageProgressItem[];
 }
 
 export interface TaskPagePlanItem {

@@ -10,15 +10,18 @@ import type {
   TaskRuntimeStateRecord,
   TaskStateRecord,
   TaskStateMachineDeckState,
+  TaskPageProgressRecord,
 } from "../types.js";
 import {
   appendTaskEvent,
   readOptionalArtifactsRecord,
   readOptionalCurrentPageRecord,
   readOptionalPagePlanRecord,
+  readOptionalPageProgressRecord,
   readOptionalStateRecord,
   readOptionalTaskRecord,
   writeArtifactsRecord,
+  writePageProgressRecord,
   writeStateRecord,
   writeTaskRecord,
 } from "../storage/records.js";
@@ -52,6 +55,7 @@ export interface OpenTaskProjectResult {
   state: TaskRuntimeStateRecord;
   currentPage: Awaited<ReturnType<typeof readOptionalCurrentPageRecord>>;
   pagePlan: Awaited<ReturnType<typeof readOptionalPagePlanRecord>>;
+  pageProgress: Awaited<ReturnType<typeof readOptionalPageProgressRecord>>;
   artifacts: Awaited<ReturnType<typeof readOptionalArtifactsRecord>>;
 }
 
@@ -130,6 +134,11 @@ async function initializeProjectFiles(projectDir: string, task: TaskStateRecord,
     updatedAt: task.updatedAt,
     artifacts: [],
   });
+  await writePageProgressRecord(projectDir, {
+    projectId: task.projectId,
+    updatedAt: task.updatedAt,
+    pages: [],
+  } satisfies TaskPageProgressRecord);
 
   await appendTaskEvent(projectDir, {
     eventId: randomUUID(),
@@ -200,6 +209,7 @@ export async function openTaskProject(
 
   const currentPage = await readOptionalCurrentPageRecord(input.projectDir);
   const pagePlan = await readOptionalPagePlanRecord(input.projectDir);
+  const pageProgress = await readOptionalPageProgressRecord(input.projectDir);
   const artifacts = await readOptionalArtifactsRecord(input.projectDir);
 
   await appendTaskEvent(input.projectDir, {
@@ -222,6 +232,7 @@ export async function openTaskProject(
     state,
     currentPage,
     pagePlan,
+    pageProgress,
     artifacts,
   };
 }
@@ -231,6 +242,7 @@ export function getTaskStatePaths(projectDir: string) {
     taskPath: resolveTaskStateFilePath(projectDir, "task.json"),
     statePath: resolveTaskStateFilePath(projectDir, "state.json"),
     currentPagePath: resolveTaskStateFilePath(projectDir, "current-page.json"),
+    pageProgressPath: resolveTaskStateFilePath(projectDir, "page-progress.json"),
     pagePlanPath: resolveTaskStateFilePath(projectDir, "page-plan.json"),
     artifactsPath: resolveTaskStateFilePath(projectDir, "artifacts.json"),
     eventsPath: resolveTaskStateFilePath(projectDir, "events.jsonl"),

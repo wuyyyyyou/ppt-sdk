@@ -4,6 +4,7 @@ export const TASK_STATE_MACHINE_PROMOTE_DIRNAME = "promote" as const;
 export const TASK_STATE_MACHINE_TASK_FILE_NAME = "task.json" as const;
 export const TASK_STATE_MACHINE_STATE_FILE_NAME = "state.json" as const;
 export const TASK_STATE_MACHINE_CURRENT_PAGE_FILE_NAME = "current-page.json" as const;
+export const TASK_STATE_MACHINE_PAGE_PROGRESS_FILE_NAME = "page-progress.json" as const;
 export const TASK_STATE_MACHINE_REQUIREMENTS_FILE_NAME = "requirements.json" as const;
 export const TASK_STATE_MACHINE_OUTLINE_FILE_NAME = "outline.json" as const;
 export const TASK_STATE_MACHINE_PAGE_PLAN_FILE_NAME = "page-plan.json" as const;

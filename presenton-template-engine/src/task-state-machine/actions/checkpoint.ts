@@ -6,6 +6,7 @@ import type {
   TaskArtifactIndexRecord,
   TaskCurrentPageRecord,
   TaskPagePlanRecord,
+  TaskPageProgressRecord,
   TaskRuntimeStateRecord,
   TaskStateRecord,
 } from "../types.js";
@@ -14,11 +15,13 @@ import {
   readOptionalArtifactsRecord,
   readOptionalCurrentPageRecord,
   readOptionalPagePlanRecord,
+  readOptionalPageProgressRecord,
   readOptionalStateRecord,
   readOptionalTaskRecord,
   writeArtifactsRecord,
   writeCurrentPageRecord,
   writePagePlanRecord,
+  writePageProgressRecord,
   writeStateRecord,
   writeTaskRecord,
 } from "../storage/records.js";
@@ -32,6 +35,7 @@ export interface CheckpointRecord {
   state: TaskRuntimeStateRecord;
   currentPage: TaskCurrentPageRecord | null;
   pagePlan: TaskPagePlanRecord | null;
+  pageProgress: TaskPageProgressRecord | null;
   artifacts: TaskArtifactIndexRecord | null;
 }
 
@@ -128,6 +132,7 @@ export async function createCheckpointFromCurrentState(
     state,
     currentPage: await readOptionalCurrentPageRecord(projectDir),
     pagePlan: await readOptionalPagePlanRecord(projectDir),
+    pageProgress: await readOptionalPageProgressRecord(projectDir),
     artifacts: await readOptionalArtifactsRecord(projectDir),
   };
 
@@ -174,6 +179,33 @@ export async function advanceTaskState(
       currentPage.updatedAt = nowIso();
       currentPage.locked = input.targetPageState === "page_locked";
       await writeCurrentPageRecord(input.projectDir, currentPage);
+
+      const pageProgress = await readOptionalPageProgressRecord(input.projectDir);
+      if (pageProgress) {
+        const existingProgressPage = pageProgress.pages.find((page) => page.pageId === currentPage.pageId);
+        await writePageProgressRecord(input.projectDir, {
+          ...pageProgress,
+          updatedAt: nowIso(),
+          pages: [
+            ...pageProgress.pages.filter((page) => page.pageId !== currentPage.pageId),
+            {
+              pageId: currentPage.pageId,
+              pageNumber: currentPage.pageNumber,
+              pageState: currentPage.pageState,
+              locked: currentPage.locked,
+              summary: existingProgressPage?.summary,
+              reviewNotes: existingProgressPage?.reviewNotes,
+              lastRenderedHtmlPath: currentPage.lastRenderedHtmlPath,
+              lastRenderedPngPath: currentPage.lastRenderedPngPath,
+              updatedAt: currentPage.updatedAt,
+            },
+          ].sort((left, right) => {
+            const leftNumber = left.pageNumber ?? Number.MAX_SAFE_INTEGER;
+            const rightNumber = right.pageNumber ?? Number.MAX_SAFE_INTEGER;
+            return leftNumber === rightNumber ? left.pageId.localeCompare(right.pageId) : leftNumber - rightNumber;
+          }),
+        });
+      }
     }
   }
 
@@ -216,6 +248,10 @@ export async function restoreTaskState(
 
   if (checkpoint.pagePlan) {
     await writePagePlanRecord(input.projectDir, checkpoint.pagePlan);
+  }
+
+  if (checkpoint.pageProgress) {
+    await writePageProgressRecord(input.projectDir, checkpoint.pageProgress);
   }
 
   if (checkpoint.artifacts) {

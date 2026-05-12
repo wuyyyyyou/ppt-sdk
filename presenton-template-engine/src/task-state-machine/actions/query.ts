@@ -8,6 +8,7 @@ import type {
   TaskArtifactIndexRecord,
   TaskCurrentPageRecord,
   TaskPagePlanRecord,
+  TaskPageProgressRecord,
   TaskPromoteDocumentReference,
   TaskRuntimeStateRecord,
   TaskStateRecord,
@@ -43,6 +44,7 @@ export interface TaskStateSnapshot {
   state: TaskRuntimeStateRecord;
   currentPage: TaskCurrentPageRecord | null;
   pagePlan: TaskPagePlanRecord | null;
+  pageProgress: TaskPageProgressRecord | null;
   artifacts: TaskArtifactIndexRecord | null;
 }
 
@@ -79,6 +81,7 @@ export function buildTaskStateSnapshot(result: OpenTaskProjectResult): TaskState
     },
     currentPage: result.currentPage,
     pagePlan: result.pagePlan,
+    pageProgress: result.pageProgress,
     artifacts: result.artifacts,
   };
 }

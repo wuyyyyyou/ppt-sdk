@@ -4,6 +4,7 @@ import {
   TASK_STATE_MACHINE_EVENTS_FILE_NAME,
   TASK_STATE_MACHINE_OUTLINE_FILE_NAME,
   TASK_STATE_MACHINE_PAGE_PLAN_FILE_NAME,
+  TASK_STATE_MACHINE_PAGE_PROGRESS_FILE_NAME,
   TASK_STATE_MACHINE_REQUIREMENTS_FILE_NAME,
   TASK_STATE_MACHINE_STATE_FILE_NAME,
   TASK_STATE_MACHINE_TASK_FILE_NAME,
@@ -13,6 +14,7 @@ import type {
   TaskCurrentPageRecord,
   TaskOutlineRecord,
   TaskPagePlanRecord,
+  TaskPageProgressRecord,
   TaskRequirementsRecord,
   TaskRuntimeStateRecord,
   TaskStateRecord,
@@ -42,6 +44,10 @@ export function getCurrentPageFilePath(projectDir: string): string {
 
 export function getPagePlanFilePath(projectDir: string): string {
   return resolveTaskStateFilePath(projectDir, TASK_STATE_MACHINE_PAGE_PLAN_FILE_NAME);
+}
+
+export function getPageProgressFilePath(projectDir: string): string {
+  return resolveTaskStateFilePath(projectDir, TASK_STATE_MACHINE_PAGE_PROGRESS_FILE_NAME);
 }
 
 export function getRequirementsFilePath(projectDir: string): string {
@@ -125,6 +131,25 @@ export async function writePagePlanRecord(
   record: TaskPagePlanRecord,
 ): Promise<void> {
   await writeJsonObject(getPagePlanFilePath(projectDir), record);
+}
+
+export async function readPageProgressRecord(
+  projectDir: string,
+): Promise<TaskPageProgressRecord> {
+  return readJsonObject<TaskPageProgressRecord>(getPageProgressFilePath(projectDir));
+}
+
+export async function readOptionalPageProgressRecord(
+  projectDir: string,
+): Promise<TaskPageProgressRecord | null> {
+  return readOptionalJsonObject<TaskPageProgressRecord>(getPageProgressFilePath(projectDir));
+}
+
+export async function writePageProgressRecord(
+  projectDir: string,
+  record: TaskPageProgressRecord,
+): Promise<void> {
+  await writeJsonObject(getPageProgressFilePath(projectDir), record);
 }
 
 export async function readRequirementsRecord(

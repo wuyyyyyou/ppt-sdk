@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type {
   TaskPagePlanItem,
   TaskPagePlanRecord,
+  TaskPageProgressRecord,
   TaskOutlineRecord,
   TaskRequirementsRecord,
   TaskRuntimeStateRecord,
@@ -10,10 +11,12 @@ import type {
 import {
   appendTaskEvent,
   readOptionalPagePlanRecord,
+  readOptionalPageProgressRecord,
   readOptionalRequirementsRecord,
   readOptionalStateRecord,
   readOptionalTaskRecord,
   writePagePlanRecord,
+  writePageProgressRecord,
   writeOutlineRecord,
   writeRequirementsRecord,
   writeStateRecord,
@@ -195,6 +198,34 @@ function buildPagePlanFromOutline(
   };
 }
 
+function buildPageProgressFromPlan(
+  projectId: string,
+  pagePlan: TaskPagePlanRecord,
+  existing: TaskPageProgressRecord | null,
+): TaskPageProgressRecord {
+  const now = nowIso();
+  const existingByPageId = new Map(existing?.pages.map((page) => [page.pageId, page]) ?? []);
+
+  return {
+    projectId,
+    updatedAt: now,
+    pages: pagePlan.pages.map((page) => {
+      const existingPage = existingByPageId.get(page.pageId);
+      return {
+        pageId: page.pageId,
+        pageNumber: page.pageNumber,
+        pageState: existingPage?.pageState ?? "page_selected",
+        locked: existingPage?.locked ?? false,
+        summary: existingPage?.summary,
+        reviewNotes: existingPage?.reviewNotes,
+        lastRenderedHtmlPath: existingPage?.lastRenderedHtmlPath,
+        lastRenderedPngPath: existingPage?.lastRenderedPngPath,
+        updatedAt: existingPage?.updatedAt ?? now,
+      };
+    }),
+  };
+}
+
 export async function recordRequirements(
   input: RecordRequirementsInput,
 ): Promise<RecordPlanResult> {
@@ -260,8 +291,10 @@ export async function recordOutline(
   await writeOutlineRecord(input.projectDir, outlineRecord);
 
   const pagePlan = buildPagePlanFromOutline(task.projectId, input.outline.pages);
+  const pageProgress = buildPageProgressFromPlan(task.projectId, pagePlan, null);
   const nextState = updateDeckState(state, "outline_ready", ["page_iteration_active"]);
   await writePagePlanRecord(input.projectDir, pagePlan);
+  await writePageProgressRecord(input.projectDir, pageProgress);
   await writeStateRecord(input.projectDir, nextState);
 
   const timestamp = nowIso();
@@ -321,7 +354,10 @@ export async function recordPagePlan(
   }
 
   nextPlan.updatedAt = nowIso();
+  const existingProgress = await readOptionalPageProgressRecord(input.projectDir);
+  const nextProgress = buildPageProgressFromPlan(task.projectId, nextPlan, existingProgress);
   await writePagePlanRecord(input.projectDir, nextPlan);
+  await writePageProgressRecord(input.projectDir, nextProgress);
 
   const nextState = {
     ...state,
