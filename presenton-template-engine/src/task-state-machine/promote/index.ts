@@ -154,12 +154,16 @@ function getCurrentPagePlanItem(
   return pagePlan.pages.find((page) => page.pageId === currentPage.pageId) ?? null;
 }
 
+function getFirstPagePlanItem(pagePlan: TaskPagePlanRecord | null): TaskPagePlanItem | null {
+  return pagePlan?.pages[0] ?? null;
+}
+
 function getPageProgressGuidance(currentPage: TaskCurrentPageRecord | null): string[] {
   switch (currentPage?.pageState) {
     case "page_selected":
       return [
-        "阅读当前页的 `page-plan.json` 条目和模板工作副本中的 `slides/README.md`、`components/README.md`。",
-        "修改当前页 TSX、必要的数据 JSON 或共享组件。",
+        "阅读当前页从大纲派生出的页面骨架，以及模板工作副本中的 `slides/README.md`、`components/README.md`。",
+        "在当前页阶段再决定具体组件、布局和视觉表达，然后修改 TSX、必要的数据 JSON 或共享组件。",
         "完成页面实现后调用 `record_page_progress`，把 `page_state` 记录为 `page_authoring`。",
       ];
     case "page_authoring":
@@ -238,19 +242,21 @@ function getDeckStageGuidance(context: PromoteRenderContext): string[] {
         "再读取模板工作副本中的 `template/group.json`、`template/manifest.json`、`template/catalog.json`、`template/slides/README.md` 和 `template/components/README.md`，理解模板可用的页面族、组件家族和表达边界。",
         "先生成整套 deck 的叙事大纲，不要直接开始写全部页面 TSX，也不要提前把实现细节锁死。",
         "大纲要写成可给用户审阅的草案：先定叙事主线和章节，再按页列出每页的标题、目标和核心信息。",
+        "大纲确认后，系统会自动生成页面骨架；这里不需要再额外做一轮全 deck 的 `page_plan` 规划。",
         "如果需求页数和内容冲突，先和用户确认是否需要改需求，再改大纲。",
         "确认无误后再调用 `record_outline`。",
       ];
     case "outline_ready":
       return [
-        "读取 `outline.json`，把每一页转成粗粒度页面实现计划。",
-        "页面计划只写方向，不提前锁死最终设计。",
-        "每页至少包含目标、核心信息、建议表达形态、候选组件方向和开放问题。",
-        "完成后调用 `record_page_plan`，通常使用 `replace_all`。",
+        "读取 `outline.json`，确认它已经覆盖所有页数和核心信息。",
+        "页面骨架已经由系统自动生成，这不是新的 deck 级规划阶段，不要再单独做一轮全局 `page_plan`。",
+        "现在的重点是直接进入第一页的精细生成，而不是继续扩展整套 deck 的计划。",
+        "如果大纲与需求冲突，回到需求层修正；如果大纲无误，直接开始逐页实现。",
       ];
     case "page_plan_ready":
       return [
-        "读取 `page-plan.json`，选择第一张未开始或未锁定的页面。",
+        "读取自动生成的页面骨架，确认它只是从大纲派生出来的内部结构。",
+        "不要把这里当成新的 deck 级规划阶段；现在只需要选第一页并开始逐页精细生成。",
         "调用 `start_page_iteration` 设置当前页。",
         "进入逐页实现后，每一页都要经过修改、单页渲染、PNG 自审、修复或接受、锁定。",
       ];
@@ -309,7 +315,8 @@ function getDeckStageGuidance(context: PromoteRenderContext): string[] {
 function getRecommendedToolCall(context: PromoteRenderContext): unknown {
   const projectDir = context.opened.projectDir;
   const currentPage = context.opened.currentPage;
-  const pagePlanItem = getCurrentPagePlanItem(context.opened.pagePlan, currentPage);
+  const pagePlanItem = getCurrentPagePlanItem(context.opened.pagePlan, currentPage)
+    ?? getFirstPagePlanItem(context.opened.pagePlan);
 
   switch (context.action.type) {
     case "collect_requirements":
@@ -577,7 +584,7 @@ function buildOutlinePromoteChecklist(outline: TaskOutlineRecord | null): string
     "确认每页是否都承担了不同职责，避免两页说同一件事。",
     "确认每页标题、目标和核心信息是否足够支撑后续页面计划。",
     "如果要调整页数或章节顺序，先回到需求层解释原因，再更新大纲。",
-    "大纲确认后，再进入 `record_page_plan`。",
+    "大纲确认后，系统会自动生成页面骨架，不需要再单独调用 `record_page_plan` 做一轮全局规划。",
   ];
 }
 
@@ -600,17 +607,17 @@ function buildPagePlanStatus(
 ): string {
   if (!pagePlan) {
     return [
-      "- 当前还没有 `page-plan.json`。",
-      "- 需要把大纲映射成整套 deck 的逐页实现计划。",
+      "- 当前还没有自动生成的页面骨架。",
+      "- 需要先完成大纲，系统才会派生出每页的内部骨架。",
     ].join("\n");
   }
 
   const currentPageItem = getCurrentPagePlanItem(pagePlan, currentPage);
   return [
-    `- 页面计划更新时间：\`${pagePlan.updatedAt}\``,
-    `- 计划页数：${pagePlan.pages.length}`,
-    `- 当前页计划：${currentPageItem?.pageId ?? "未选定"}`,
-    "- 前几页计划预览：",
+    `- 页面骨架更新时间：\`${pagePlan.updatedAt}\``,
+    `- 骨架页数：${pagePlan.pages.length}`,
+    `- 当前页骨架：${currentPageItem?.pageId ?? "未选定"}`,
+    "- 前几页骨架预览：",
     formatJson(pagePlan.pages.slice(0, 3)),
   ].join("\n");
 }
@@ -621,22 +628,20 @@ function buildPagePlanPromoteChecklist(
 ): string[] {
   if (!pagePlan) {
     return [
-      "先把 outline 转成全 deck 的页面实现计划。",
+      "先让系统根据 outline 自动生成页面骨架。",
       "每页至少写清 pageId、pageNumber、title、goal、coreMessage。",
-      "建议同时标注 suggestedExpression、candidateComponentFamilies 和 openQuestions。",
-      "确认后调用 `record_page_plan`，通常用 `replace_all`。",
+      "如果需要进一步补充，也只是在这个骨架上做局部修补，不要把它升级成新的 deck 级规划。",
     ];
   }
 
   const currentPageItem = getCurrentPagePlanItem(pagePlan, currentPage);
   return [
-    "先读 `page-plan.json`，不要直接开始逐页改 TSX。",
+    "先读自动生成的页面骨架，不要把它当成新的 deck 级规划阶段。",
     currentPageItem
-      ? `当前页计划：${currentPageItem.pageId} / ${currentPageItem.title}`
+      ? `当前页骨架：${currentPageItem.pageId} / ${currentPageItem.title}`
       : "当前还没有选定页，需要先通过 `start_page_iteration` 选页。",
-    "检查每页是否存在开放问题，是否需要先问用户再动手。",
-    "如果计划里缺少候选组件方向或表达形态，先补计划，再进入页级实现。",
-    "page-plan 确认后进入 `start_page_iteration`。",
+    "如果骨架里缺少候选组件方向或表达形态，只做当前页的局部补充，不要回到全 deck 规划。",
+    "确认后直接进入 `start_page_iteration` 或当前页实现。",
   ];
 }
 
@@ -650,7 +655,7 @@ function buildDeckStageChecklist(context: PromoteRenderContext): string[] {
       return buildPagePlanPromoteChecklist(context.opened.pagePlan, context.opened.currentPage);
     case "start_page_authoring":
       return [
-        ...buildPagePlanPromoteChecklist(context.opened.pagePlan, context.opened.currentPage),
+        "读取自动生成的页面骨架，确认它只是从大纲派生出来的内部结构。",
         "选择第一页未锁定或最适合作为起点的页面。",
         "调用 `start_page_iteration` 后，后续 query 会生成 page 级 promote 文档。",
       ];
@@ -755,7 +760,7 @@ function buildDeckPromoteMarkdown(context: PromoteRenderContext): string {
       formatList(buildOutlineQualityStandards(context.requirements)),
     ] : []),
     "",
-    "## 页面计划状态",
+    "## 页面骨架状态",
     "",
     buildPagePlanStatus(context.opened.pagePlan, context.opened.currentPage),
     "",
@@ -817,11 +822,11 @@ function buildPagePromoteMarkdown(context: PromoteRenderContext): string {
     "",
     buildPageSummary(currentPage, pagePlanItem, context.opened.artifacts),
     "",
-    "## 页面计划",
+    "## 当前页骨架",
     "",
     pagePlanItem ? formatJson(pagePlanItem) : "- `page-plan.json` 中没有找到当前页条目。",
     "",
-    "## 页面计划概览",
+    "## 页面骨架概览",
     "",
     buildPagePlanStatus(context.opened.pagePlan, currentPage),
     "",

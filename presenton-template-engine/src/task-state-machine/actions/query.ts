@@ -22,7 +22,6 @@ export interface TaskRecommendedAction {
     | "select_template_group"
     | "fork_template_group"
     | "write_outline"
-    | "write_page_plan"
     | "start_page_authoring"
     | "render_current_page"
     | "review_page_png"
@@ -116,7 +115,7 @@ function getDefaultRecommendedAction(deckState: TaskRuntimeStateRecord["deckStat
     case "project_forked":
       return { type: "write_outline", summary: "先阅读 promote/current.md，再写内容大纲。", requiresUserInput: true };
     case "outline_ready":
-      return { type: "write_page_plan", summary: "先阅读 promote/current.md，再生成页面实现计划。", requiresUserInput: false };
+      return { type: "start_page_authoring", summary: "先阅读 promote/current.md，再直接开始第一页的精细生成。", requiresUserInput: false };
     case "page_plan_ready":
       return { type: "start_page_authoring", summary: "先阅读 promote/current.md，再开始逐页实现。", requiresUserInput: false };
     case "page_iteration_active":
@@ -174,12 +173,12 @@ function getRequiredInputs(
     return ["outline.narrative", "outline.sections", "outline.pages"];
   }
 
-  if (recommendedAction.type === "write_page_plan") {
-    return ["page_plan.pages"];
-  }
-
   if (recommendedAction.type === "start_page_authoring") {
-    return result.currentPage ? [] : ["current_page"];
+    if (result.currentPage) {
+      return [];
+    }
+
+    return result.pagePlan?.pages.length ? [] : ["current_page"];
   }
 
   if (recommendedAction.type === "review_page_png") {
@@ -205,8 +204,6 @@ function getExpectedArtifacts(
       return [path.join(projectDir, "task-state", "requirements.json")];
     case "write_outline":
       return [path.join(projectDir, "task-state", "outline.json")];
-    case "write_page_plan":
-      return [path.join(projectDir, "task-state", "page-plan.json")];
     case "start_page_authoring":
     case "render_current_page":
     case "review_page_png":

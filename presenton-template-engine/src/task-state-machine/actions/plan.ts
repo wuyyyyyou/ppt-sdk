@@ -239,7 +239,7 @@ export async function recordOutline(
   await writeOutlineRecord(input.projectDir, outlineRecord);
 
   const pagePlan = buildPagePlanFromOutline(task.projectId, input.outline.pages);
-  const nextState = updateDeckState(state, "outline_ready", ["page_plan_ready"]);
+  const nextState = updateDeckState(state, "outline_ready", ["page_iteration_active"]);
   await writePagePlanRecord(input.projectDir, pagePlan);
   await writeStateRecord(input.projectDir, nextState);
 
@@ -302,7 +302,10 @@ export async function recordPagePlan(
   nextPlan.updatedAt = nowIso();
   await writePagePlanRecord(input.projectDir, nextPlan);
 
-  const nextState = updateDeckState(state, "page_plan_ready", ["page_iteration_active"]);
+  const nextState = {
+    ...state,
+    updatedAt: nowIso(),
+  };
   await writeStateRecord(input.projectDir, nextState);
 
   const timestamp = nowIso();

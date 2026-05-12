@@ -124,7 +124,8 @@
 - `record_requirements`：记录用户需求，例如主题、目标受众、风格、素材要求等。
 - `record_template_selection`：记录用户确认的模板组，fork 到项目 `template/`，并进入模板已 fork 阶段。
 - `record_outline`：记录已经确认的大纲和页数安排。
-- `record_page_plan`：记录或更新每页的实现计划，用来连接“大纲”到“一页一页实现”。
+- `record_page_plan`：记录或更新页骨架里的局部信息，通常只用于修补或极少数内部调整。
+- `start_page_iteration`：选择一页开始进入页级精细生成。
 
 ### `record_requirements`
 
@@ -228,6 +229,7 @@
 
 在这个阶段，PPT AI Agent 应该先读取 `promote/deck/project_forked.md`，再结合 `task-state/requirements.json` 和模板工作副本里的 `template/group.json`、`template/manifest.json`、`template/catalog.json`、`template/slides/README.md`、`template/components/README.md` 产出大纲草案。
 大纲要先写成给用户审阅的版本，再在确认后调用这个子工具。
+调用后，系统会自动把大纲派生为页面骨架，不需要再额外走一轮全 deck 的 page plan。
 
 支持参数：
 
@@ -246,7 +248,7 @@
 写入行为：
 
 - 写入 `task-state/outline.json`。
-- 同步生成 `page-plan.json` 的初版页面条目框架，供后续页面计划继续细化。
+- 同步生成 `page-plan.json` 的初版页面骨架，供后续逐页精细生成直接使用。
 - 状态会推进到 `outline_ready`。
 - 如果当前大纲页数和需求页数不一致，应该先重新确认，而不是直接写死。
 - 大纲页数应该和 `requirements.pageCount` 保持一致。
@@ -317,6 +319,45 @@
 ```
 
 运行前需要先跑 `Engine-Task: Record Template Selection`，确保当前状态已进入 `project_forked`。
+
+### `start_page_iteration`
+
+这个子工具用于选择某一页，进入这一页的设计和实现流程。
+
+支持参数：
+
+- `cwd`：可选，必须是绝对路径。状态机的文件传输结果会优先写到 `cwd/.executa-file-transport/`。
+- `project_dir`：必填，已有任务项目目录，必须是绝对路径。
+- `page_id`：必填，要开始实现的页面 id。
+- `page_number`：可选，页面页码；如果已经知道页码，建议一并传入。
+
+写入行为：
+
+- 写入 `task-state/current-page.json`，把当前页标记为 `page_selected`。
+- 把 deck 状态推进到 `page_iteration_active`。
+- 后续 `query_task_state` 会进入页级 promote 文档，开始围绕这一页进行修改、渲染、自审和锁定。
+- 这个子工具不负责写页面内容本身，只负责把当前页选出来。
+
+当前测试样例：
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "invoke",
+  "id": 1,
+  "params": {
+    "tool": "start_page_iteration",
+    "arguments": {
+      "cwd": "${workspaceFolder}/.vscode/engine/output",
+      "project_dir": "${workspaceFolder}/.vscode/engine/output/task-state/create-task-demo",
+      "page_id": "slide-01",
+      "page_number": 1
+    }
+  }
+}
+```
+
+运行前需要先跑 `Engine-Task: Record Outline`，确保当前项目里已经有大纲和自动生成的页面骨架。
 
 ## 单页实现流程
 

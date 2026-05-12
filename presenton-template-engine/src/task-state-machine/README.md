@@ -13,7 +13,7 @@ Core files:
 - `current-page.json`: active page state and latest render artifact paths.
 - `requirements.json`: confirmed user requirements.
 - `outline.json`: confirmed narrative outline.
-- `page-plan.json`: per-page implementation plan.
+- `page-plan.json`: auto-generated page skeleton derived from the outline.
 - `artifacts.json`: generated artifact index.
 - `events.jsonl`: append-only event log.
 - `promote/`: derived stage instructions for the current deck or page state.
@@ -39,6 +39,10 @@ Important behavior:
 - `project_forked` is the outline-creation gate: the Agent should read the
   template working copy metadata and turn the confirmed requirements into a
   page-by-page outline before any TSX work starts.
+- `record_outline` automatically derives the page skeleton from the outline; it
+  is not a separate deck-level planning phase.
+- After the outline is recorded, the next meaningful step is to start the
+  first page's fine-grained authoring.
 - `recordPageProgress` marks the deck as `deck_html_ready` only after every
   page in `page-plan.json` has a `page_locked` event.
 - Checkpoints snapshot `task`, `state`, `current-page`, `page-plan`, and

@@ -141,11 +141,12 @@ export async function recoverTaskProject(projectDir: string): Promise<RecoveryRe
     });
     state = {
       ...state,
-      deckState: "page_plan_ready",
+      deckState: "outline_ready",
       pageState: undefined,
       currentPageId: undefined,
       allPagesLocked: false,
       blockedBy: ["current_page_missing"],
+      allowedTransitions: ["page_iteration_active"],
       updatedAt: nowIso(),
     };
     await writeStateRecord(projectDir, state);
