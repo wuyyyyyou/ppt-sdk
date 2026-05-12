@@ -212,7 +212,7 @@ function getDefaultRecommendedAction(result: OpenTaskProjectResult): TaskRecomme
           };
       }
     case "deck_html_ready":
-      return { type: "request_deck_html_approval", summary: "先阅读 promote/current.md，再请求用户确认整套 HTML。", requiresUserInput: true };
+      return { type: "render_full_deck_html", summary: "先阅读 promote/current.md，再生成整套 deck HTML；生成成功后进入用户审阅阶段。", requiresUserInput: false };
     case "deck_review_pending":
       return { type: "review_page_png", summary: "先阅读 promote/current.md，再等待 deck HTML 审阅结果。", requiresUserInput: true };
     case "deck_reviewed":
@@ -307,6 +307,7 @@ function getExpectedArtifacts(
       return pageId
         ? [path.join(projectDir, "output", "screenshots", `${pageId}.png`)]
         : [];
+    case "render_full_deck_html":
     case "request_deck_html_approval":
       return [path.join(projectDir, "output", "deck.html")];
     case "convert_deck_html_to_model":

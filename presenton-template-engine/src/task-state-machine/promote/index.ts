@@ -61,6 +61,7 @@ interface PromoteRenderContext {
   generatedAt: string;
   sourceFiles: Record<string, string>;
   latestReviewNotes?: string | null;
+  lockedPageIds: string[];
 }
 
 function nowIso(): string {
@@ -1734,9 +1735,244 @@ function buildPageFixRequiredPromoteMarkdown(context: PromoteRenderContext): str
   ].join("\n");
 }
 
+function buildPageAcceptedPromoteMarkdown(context: PromoteRenderContext): string {
+  const currentPage = context.opened.currentPage;
+  const pagePlanItem = getCurrentPagePlanItem(context.opened.pagePlan, currentPage);
+  const pageLabel = currentPage?.pageId ?? "<page_id>";
+  const renderedPngPath = currentPage?.lastRenderedPngPath ?? "<当前页 PNG 路径>";
+
+  return [
+    `# Page 阶段行动说明：${pageLabel}`,
+    "",
+    "## 当前阶段",
+    "",
+    `当前 deck 状态是 \`${context.opened.state.deckState}\`，page 状态是 \`${currentPage?.pageState ?? "none"}\`。`,
+    "",
+    "## 本阶段目标",
+    "",
+    "当前页已经通过截图自审。本阶段只负责锁定当前页，不再继续修改、渲染或重新审查。",
+    "",
+    "## 必读文件",
+    "",
+    formatCodeList([
+      context.sourceFiles.currentPage,
+      context.sourceFiles.pagePlan,
+    ]),
+    "",
+    "## 当前页骨架",
+    "",
+    pagePlanItem ? formatJson(pagePlanItem) : "- `page-plan.json` 中没有找到当前页条目。",
+    "",
+    "## 已通过的截图",
+    "",
+    `\`${renderedPngPath}\``,
+    "",
+    "## 下一步行动建议",
+    "",
+    [
+      "1. 确认当前页已经完成 PNG 自审并被接受。",
+      "2. 不要再修改 `template/slides`、`template/data`、`template/manifest.json` 或组件文件。",
+      "3. 调用 `record_page_progress`，把 `page_state` 记录为 `page_locked`。",
+      "4. 锁定成功后立即调用 `query_task_state`，并重新阅读最新的 `promote/current.md`。",
+    ].join("\n"),
+    "",
+    "## 推荐调用的子工具",
+    "",
+    formatJson([
+      {
+        tool: "record_page_progress",
+        arguments: {
+          project_dir: context.opened.projectDir,
+          page_id: currentPage?.pageId ?? "<page_id>",
+          page_state: "page_locked",
+          summary: "当前页已通过截图自审并锁定，不再直接修改。",
+        },
+      },
+      {
+        tool: "query_task_state",
+        arguments: {
+          project_dir: context.opened.projectDir,
+          response_mode: "compact",
+        },
+      },
+    ]),
+  ].join("\n");
+}
+
+function getUnfinishedPageItems(context: PromoteRenderContext): TaskPagePlanItem[] {
+  const pagePlan = context.opened.pagePlan;
+  if (!pagePlan) {
+    return [];
+  }
+
+  const lockedPageIds = new Set(context.lockedPageIds);
+  return pagePlan.pages.filter((page) => !lockedPageIds.has(page.pageId));
+}
+
+function formatPagePlanItemList(pages: TaskPagePlanItem[]): string {
+  if (pages.length === 0) {
+    return "- 无。";
+  }
+
+  return pages.map((page) => {
+    return `- \`${page.pageId}\`：第 ${page.pageNumber} 页，${page.title}。目标：${page.goal}`;
+  }).join("\n");
+}
+
+function buildPageLockedPromoteMarkdown(context: PromoteRenderContext): string {
+  const currentPage = context.opened.currentPage;
+  const pageLabel = currentPage?.pageId ?? "<page_id>";
+  const renderedPngPath = currentPage?.lastRenderedPngPath ?? "<当前页 PNG 路径>";
+  const unfinishedPages = getUnfinishedPageItems(context);
+  const nextPage = unfinishedPages[0] ?? null;
+
+  return [
+    `# Page 阶段行动说明：${pageLabel}`,
+    "",
+    "## 当前阶段",
+    "",
+    `当前 deck 状态是 \`${context.opened.state.deckState}\`，page 状态是 \`${currentPage?.pageState ?? "none"}\`。`,
+    "",
+    "## 本阶段目标",
+    "",
+    "当前页已经锁定。本阶段只负责确认后续未完成页面，并切换到下一页继续逐页实现。",
+    "",
+    "## 必读文件",
+    "",
+    formatCodeList([
+      context.sourceFiles.currentPage,
+    ]),
+    "",
+    "## 当前页锁定结果",
+    "",
+    formatList([
+      `当前页：\`${pageLabel}\``,
+      `页码：${currentPage?.pageNumber ?? "未知"}`,
+      `最近 PNG：\`${renderedPngPath}\``,
+      "当前页已锁定，不要继续直接修改这一页。",
+    ]),
+    "",
+    "## 未完成页面",
+    "",
+    formatPagePlanItemList(unfinishedPages),
+    "",
+    "## 下一步行动建议",
+    "",
+    nextPage
+      ? [
+        `1. 选择下一页：\`${nextPage.pageId}\`（第 ${nextPage.pageNumber} 页，${nextPage.title}）。`,
+        "2. 调用 `start_page_iteration` 子工具，把当前工作页切换到这个未完成页面。",
+        "3. 切换成功后立即调用 `query_task_state`，并重新阅读最新的 `promote/current.md`。",
+      ].join("\n")
+      : [
+        "1. 当前没有未完成页面。",
+        "2. 调用 `query_task_state`，并重新阅读最新的 `promote/current.md`，确认 deck 是否已经进入后续阶段。",
+      ].join("\n"),
+    "",
+    "## 推荐调用的子工具",
+    "",
+    formatJson(nextPage
+      ? [
+        {
+          tool: "start_page_iteration",
+          arguments: {
+            project_dir: context.opened.projectDir,
+            page_id: nextPage.pageId,
+            page_number: nextPage.pageNumber,
+          },
+        },
+        {
+          tool: "query_task_state",
+          arguments: {
+            project_dir: context.opened.projectDir,
+            response_mode: "compact",
+          },
+        },
+      ]
+      : [
+        {
+          tool: "query_task_state",
+          arguments: {
+            project_dir: context.opened.projectDir,
+            response_mode: "compact",
+          },
+        },
+      ]),
+  ].join("\n");
+}
+
+function buildDeckHtmlReadyPromoteMarkdown(context: PromoteRenderContext): string {
+  const projectDir = context.opened.projectDir;
+  const manifestPath = context.sourceFiles.templateManifest ?? path.join(projectDir, "template", "manifest.json");
+  const outputDir = path.join(projectDir, "output", "deck-html");
+  const buildDeckHtmlToolCall = {
+    tool: "buildDeckHtmlFromManifest",
+    arguments: {
+      cwd: path.join(projectDir, "output"),
+      manifest_path: manifestPath,
+      output_dir: outputDir,
+      name: "deck",
+      single_page: false,
+    },
+  };
+
+  return [
+    "# Deck 阶段行动说明：deck_html_ready",
+    "",
+    "## 当前阶段",
+    "",
+    `当前 deck 状态是 \`${context.opened.state.deckState}\`。`,
+    "",
+    "## 本阶段目标",
+    "",
+    "所有页面已经锁定。现在要生成整套 deck HTML，生成成功后进入用户审阅阶段。",
+    "",
+    "## 必读文件",
+    "",
+    formatCodeList(Object.values(context.sourceFiles)),
+    "",
+    "## 下一步行动建议",
+    "",
+    [
+      "1. 调用 `buildDeckHtmlFromManifest`，不要使用 `single_page: true`。",
+      "2. 如果生成失败，先阅读错误信息并修复 manifest、data、TSX 或组件问题；不要在失败时推进状态。",
+      "3. 如果修复需要改已锁定页面，先回退或创建分支，再按页面流程重新自审和锁定。",
+      "4. 生成成功后记录返回的 `deck_output_path`，这是给用户审阅的整套 deck HTML。",
+      "5. 只有 `buildDeckHtmlFromManifest` 成功返回 `deck_output_path` 后，才调用 `advance_task_state`。",
+      "6. 将 deck 状态推进到 `deck_review_pending`。",
+      "7. 推进成功后立即调用 `query_task_state`，并重新阅读最新的 `promote/current.md`。",
+    ].join("\n"),
+    "",
+    "## 推荐调用的子工具",
+    "",
+    formatJson([
+      buildDeckHtmlToolCall,
+      {
+        tool: "advance_task_state",
+        arguments: {
+          project_dir: projectDir,
+          target_deck_state: "deck_review_pending",
+          reason: "整套 deck HTML 已生成：<buildDeckHtmlFromManifest 返回的 deck_output_path>，等待用户审阅。",
+        },
+      },
+      {
+        tool: "query_task_state",
+        arguments: {
+          project_dir: projectDir,
+          response_mode: "compact",
+        },
+      },
+    ]),
+  ].join("\n");
+}
+
 function buildDeckPromoteMarkdown(context: PromoteRenderContext): string {
   const { opened, action } = context;
   const guidance = getDeckStageGuidance(context);
+
+  if (opened.state.deckState === "deck_html_ready") {
+    return buildDeckHtmlReadyPromoteMarkdown(context);
+  }
 
   if (action.type === "collect_requirements") {
     return buildCollectRequirementsPromoteMarkdown(context);
@@ -1842,6 +2078,14 @@ function buildPagePromoteMarkdown(context: PromoteRenderContext): string {
 
   if (currentPage?.pageState === "page_fix_required") {
     return buildPageFixRequiredPromoteMarkdown(context);
+  }
+
+  if (currentPage?.pageState === "page_accepted") {
+    return buildPageAcceptedPromoteMarkdown(context);
+  }
+
+  if (currentPage?.pageState === "page_locked") {
+    return buildPageLockedPromoteMarkdown(context);
   }
 
   const pagePlanItem = getCurrentPagePlanItem(context.opened.pagePlan, currentPage);
@@ -2168,6 +2412,31 @@ async function readLatestPageReviewNotes(
   return null;
 }
 
+async function readLockedPageIds(
+  projectDir: string,
+  currentPage: TaskCurrentPageRecord | null,
+): Promise<string[]> {
+  const lockedPageIds = new Set<string>();
+  const events = await readTaskEvents(projectDir);
+
+  for (const event of events) {
+    if (event.eventType !== "page_locked") {
+      continue;
+    }
+
+    const pageId = event.payload.pageId;
+    if (typeof pageId === "string" && pageId.length > 0) {
+      lockedPageIds.add(pageId);
+    }
+  }
+
+  if (currentPage?.locked) {
+    lockedPageIds.add(currentPage.pageId);
+  }
+
+  return Array.from(lockedPageIds);
+}
+
 export async function ensureTaskPromoteDocument(
   opened: OpenTaskProjectResult,
   action: PromoteActionContext,
@@ -2182,6 +2451,9 @@ export async function ensureTaskPromoteDocument(
   const latestReviewNotes = kind === "page"
     ? await readLatestPageReviewNotes(projectDir, opened.currentPage?.pageId)
     : null;
+  const lockedPageIds = kind === "page"
+    ? await readLockedPageIds(projectDir, opened.currentPage)
+    : [];
 
   await mkdir(resolvePromoteDir(projectDir), { recursive: true });
   await mkdir(resolvePromoteDeckDir(projectDir), { recursive: true });
@@ -2198,6 +2470,7 @@ export async function ensureTaskPromoteDocument(
     generatedAt,
     sourceFiles,
     latestReviewNotes,
+    lockedPageIds,
   };
 
   const markdown = kind === "page"
