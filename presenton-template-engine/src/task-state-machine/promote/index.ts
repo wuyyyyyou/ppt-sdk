@@ -65,6 +65,10 @@ interface PromoteRenderContext {
   lockedPageIds: string[];
   deckReviewHtmlPath?: string | null;
   deckReviewReason?: string | null;
+  pptModelPath?: string | null;
+  pptModelReason?: string | null;
+  pptxPath?: string | null;
+  pptxReason?: string | null;
 }
 
 function nowIso(): string {
@@ -2057,6 +2061,186 @@ function buildDeckReviewPendingPromoteMarkdown(context: PromoteRenderContext): s
   ].join("\n");
 }
 
+function buildDeckReviewedPromoteMarkdown(context: PromoteRenderContext): string {
+  const projectDir = context.opened.projectDir;
+  const deckHtmlPath = context.deckReviewHtmlPath ?? "<用户已确认通过的 deck.html 路径>";
+  const pptModelPath = path.join(projectDir, "output", "ppt-model.json");
+  const screenshotsDir = path.join(projectDir, "output", "ppt-model-screenshots");
+
+  return [
+    "# Deck 阶段行动说明：deck_reviewed",
+    "",
+    "## 当前阶段",
+    "",
+    `当前 deck 状态是 \`${context.opened.state.deckState}\`。用户已经确认整套 deck HTML 可以继续生成 PPT 模型。`,
+    "",
+    "## 本阶段目标",
+    "",
+    `使用已确认的 deck HTML 生成 PPT 中间模型：\`${pptModelPath}\`。`,
+    "",
+    "## 已确认的 HTML",
+    "",
+    `\`${deckHtmlPath}\``,
+    ...(context.deckReviewReason ? [
+      "",
+      "## 用户确认记录",
+      "",
+      context.deckReviewReason,
+    ] : []),
+    "",
+    "## 下一步行动建议",
+    "",
+    [
+      `1. 调用 \`convertDeckHtmlToPptxModel\`，输入 HTML 路径使用：\`${deckHtmlPath}\`。`,
+      `2. 将生成的 PPT 模型写入：\`${pptModelPath}\`。`,
+      `3. 如果转换成功，确认返回结果里的 \`output_path\` 是 \`${pptModelPath}\`，并记录 \`slide_count\`。`,
+      "4. 转换失败时先阅读错误信息；不要推进状态，也不要生成 PPTX。",
+      "5. 转换成功后调用 `advance_task_state`，把 deck 状态推进到 `model_ready`，并把生成的 `ppt-model.json` 写入 `related_artifacts`。",
+      "6. 推进成功后调用 `query_task_state`，重新读取最新 promote，进入下一阶段。",
+    ].join("\n"),
+    "",
+    "## 推荐调用的子工具",
+    "",
+    "### 生成 PPT 模型",
+    "",
+    formatJson({
+      tool: "convertDeckHtmlToPptxModel",
+      arguments: {
+        cwd: path.join(projectDir, "output"),
+        html_path: deckHtmlPath,
+        output_path: pptModelPath,
+        name: "deck",
+        screenshots_dir: screenshotsDir,
+      },
+    }),
+    "",
+    "### 推进到 model_ready",
+    "",
+    formatJson({
+      tool: "advance_task_state",
+      arguments: {
+        project_dir: projectDir,
+        target_deck_state: "model_ready",
+        reason: `用户确认 HTML 后已生成 PPT 中间模型：${pptModelPath}`,
+        related_artifacts: [
+          pptModelPath,
+        ],
+      },
+    }),
+    "",
+    "### 查询下一阶段",
+    "",
+    formatJson({
+      tool: "query_task_state",
+      arguments: {
+        project_dir: projectDir,
+        response_mode: "compact",
+      },
+    }),
+  ].join("\n");
+}
+
+function buildModelReadyPromoteMarkdown(context: PromoteRenderContext): string {
+  const projectDir = context.opened.projectDir;
+  const pptModelPath = context.pptModelPath ?? path.join(projectDir, "output", "ppt-model.json");
+  const pptxPath = path.join(projectDir, "output", "deck.pptx");
+
+  return [
+    "# Deck 阶段行动说明：model_ready",
+    "",
+    "## 当前阶段",
+    "",
+    `当前 deck 状态是 \`${context.opened.state.deckState}\`。PPT 中间模型已经生成，可以继续生成最终 PPTX。`,
+    "",
+    "## 本阶段目标",
+    "",
+    `使用 \`${pptModelPath}\` 生成最终 PPTX：\`${pptxPath}\`。`,
+    "",
+    "## 已生成的 PPT 模型",
+    "",
+    `\`${pptModelPath}\``,
+    ...(context.pptModelReason ? [
+      "",
+      "## 模型生成记录",
+      "",
+      context.pptModelReason,
+    ] : []),
+    "",
+    "## 下一步行动建议",
+    "",
+    [
+      `1. 调用 \`generatePptx\`，输入模型路径使用：\`${pptModelPath}\`。`,
+      `2. 将最终 PPTX 写入：\`${pptxPath}\`。`,
+      "3. 如果生成失败，先阅读错误信息并修复模型或生成器输入；不要推进状态。",
+      "4. 如果生成成功，确认返回结果中的 PPTX 路径指向上方输出文件。",
+      "5. 生成成功后调用 `advance_task_state`，把 deck 状态推进到 `pptx_ready`，并把生成的 PPTX 路径写入 `related_artifacts`。",
+      "6. 推进成功后调用 `query_task_state`，重新读取最新 promote，进入下一阶段。",
+    ].join("\n"),
+    "",
+    "## 推荐调用的子工具",
+    "",
+    "### 生成最终 PPTX",
+    "",
+    formatJson({
+      tool: "generatePptx",
+      arguments: {
+        cwd: path.join(projectDir, "output"),
+        model_path: pptModelPath,
+        output_path: pptxPath,
+      },
+    }),
+    "",
+    "### 推进到 pptx_ready",
+    "",
+    formatJson({
+      tool: "advance_task_state",
+      arguments: {
+        project_dir: projectDir,
+        target_deck_state: "pptx_ready",
+        reason: `已根据 PPT 中间模型生成最终 PPTX：${pptxPath}`,
+        related_artifacts: [
+          pptxPath,
+        ],
+      },
+    }),
+    "",
+    "### 查询下一阶段",
+    "",
+    formatJson({
+      tool: "query_task_state",
+      arguments: {
+        project_dir: projectDir,
+        response_mode: "compact",
+      },
+    }),
+  ].join("\n");
+}
+
+function buildPptxReadyPromoteMarkdown(context: PromoteRenderContext): string {
+  const projectDir = context.opened.projectDir;
+  const deckHtmlPath = context.deckReviewHtmlPath ?? path.join(projectDir, "output", "deck.html");
+  const pptxPath = context.pptxPath ?? path.join(projectDir, "output", "deck.pptx");
+
+  return [
+    "# Deck 阶段行动说明：pptx_ready",
+    "",
+    "## 当前阶段",
+    "",
+    "PPTX 生成流程已经完成。",
+    "",
+    "## 输出文件",
+    "",
+    `- Deck HTML：\`${deckHtmlPath}\``,
+    `- PPTX 文件：\`${pptxPath}\``,
+    ...(context.pptxReason ? [
+      "",
+      "## 生成记录",
+      "",
+      context.pptxReason,
+    ] : []),
+  ].join("\n");
+}
+
 function buildDeckPromoteMarkdown(context: PromoteRenderContext): string {
   const { opened, action } = context;
   const guidance = getDeckStageGuidance(context);
@@ -2067,6 +2251,18 @@ function buildDeckPromoteMarkdown(context: PromoteRenderContext): string {
 
   if (opened.state.deckState === "deck_review_pending") {
     return buildDeckReviewPendingPromoteMarkdown(context);
+  }
+
+  if (opened.state.deckState === "deck_reviewed") {
+    return buildDeckReviewedPromoteMarkdown(context);
+  }
+
+  if (opened.state.deckState === "model_ready") {
+    return buildModelReadyPromoteMarkdown(context);
+  }
+
+  if (opened.state.deckState === "pptx_ready") {
+    return buildPptxReadyPromoteMarkdown(context);
   }
 
   if (action.type === "collect_requirements") {
@@ -2510,13 +2706,86 @@ function extractFirstHtmlPath(value: string | undefined): string | null {
   return match?.[0] ?? null;
 }
 
+function extractFirstJsonPath(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const match = value.match(/(?:\/|\.{1,2}\/|[A-Za-z]:\\)[^\s，。；;"]+\.json/);
+  return match?.[0] ?? null;
+}
+
+function extractFirstPptxPath(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const match = value.match(/(?:\/|\.{1,2}\/|[A-Za-z]:\\)[^\s，。；;"]+\.pptx/);
+  return match?.[0] ?? null;
+}
+
+async function readLatestPptModelInfo(
+  projectDir: string,
+): Promise<{ modelPath: string | null; reason: string | null }> {
+  const events = await readTaskEvents(projectDir);
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.eventType !== "state_advanced" || event.payload.targetDeckState !== "model_ready") {
+      continue;
+    }
+
+    const relatedArtifacts = Array.isArray(event.payload.relatedArtifacts)
+      ? event.payload.relatedArtifacts.filter((item): item is string => typeof item === "string")
+      : [];
+    const modelPathFromArtifacts = relatedArtifacts.find((item) => item.endsWith(".json")) ?? null;
+    const reason = typeof event.payload.reason === "string" ? event.payload.reason : null;
+
+    return {
+      modelPath: modelPathFromArtifacts ?? extractFirstJsonPath(reason ?? undefined),
+      reason,
+    };
+  }
+
+  return { modelPath: null, reason: null };
+}
+
+async function readLatestPptxInfo(
+  projectDir: string,
+): Promise<{ pptxPath: string | null; reason: string | null }> {
+  const events = await readTaskEvents(projectDir);
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.eventType !== "state_advanced" || event.payload.targetDeckState !== "pptx_ready") {
+      continue;
+    }
+
+    const relatedArtifacts = Array.isArray(event.payload.relatedArtifacts)
+      ? event.payload.relatedArtifacts.filter((item): item is string => typeof item === "string")
+      : [];
+    const pptxPathFromArtifacts = relatedArtifacts.find((item) => item.endsWith(".pptx")) ?? null;
+    const reason = typeof event.payload.reason === "string" ? event.payload.reason : null;
+
+    return {
+      pptxPath: pptxPathFromArtifacts ?? extractFirstPptxPath(reason ?? undefined),
+      reason,
+    };
+  }
+
+  return { pptxPath: null, reason: null };
+}
+
 async function readLatestDeckReviewInfo(
   projectDir: string,
 ): Promise<{ htmlPath: string | null; reason: string | null }> {
   const events = await readTaskEvents(projectDir);
+  const targetStates = new Set(["deck_reviewed", "deck_review_pending"]);
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index];
-    if (event.eventType !== "state_advanced" || event.payload.targetDeckState !== "deck_review_pending") {
+    if (
+      event.eventType !== "state_advanced"
+      || typeof event.payload.targetDeckState !== "string"
+      || !targetStates.has(event.payload.targetDeckState)
+    ) {
       continue;
     }
 
@@ -2553,8 +2822,16 @@ export async function ensureTaskPromoteDocument(
     ? readLockedPageIds(opened)
     : [];
   const deckReviewInfo = opened.state.deckState === "deck_review_pending"
+    || opened.state.deckState === "deck_reviewed"
+    || opened.state.deckState === "pptx_ready"
     ? await readLatestDeckReviewInfo(projectDir)
     : { htmlPath: null, reason: null };
+  const pptModelInfo = opened.state.deckState === "model_ready"
+    ? await readLatestPptModelInfo(projectDir)
+    : { modelPath: null, reason: null };
+  const pptxInfo = opened.state.deckState === "pptx_ready"
+    ? await readLatestPptxInfo(projectDir)
+    : { pptxPath: null, reason: null };
 
   await mkdir(resolvePromoteDir(projectDir), { recursive: true });
   await mkdir(resolvePromoteDeckDir(projectDir), { recursive: true });
@@ -2574,6 +2851,10 @@ export async function ensureTaskPromoteDocument(
     lockedPageIds,
     deckReviewHtmlPath: deckReviewInfo.htmlPath,
     deckReviewReason: deckReviewInfo.reason,
+    pptModelPath: pptModelInfo.modelPath,
+    pptModelReason: pptModelInfo.reason,
+    pptxPath: pptxInfo.pptxPath,
+    pptxReason: pptxInfo.reason,
   };
 
   const markdown = kind === "page"
