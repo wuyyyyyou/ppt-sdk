@@ -112,6 +112,7 @@ export interface TaskPagePlanItem {
   title: string;
   goal: string;
   coreMessage: string;
+  dataPath?: string;
   suggestedExpression?: string;
   candidateComponentFamilies?: string[];
   openQuestions?: string[];

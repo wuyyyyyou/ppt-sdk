@@ -13,7 +13,7 @@ Core files:
 - `current-page.json`: active page state and latest render artifact paths.
 - `requirements.json`: confirmed user requirements.
 - `outline.json`: confirmed narrative outline.
-- `page-plan.json`: auto-generated page skeleton derived from the outline.
+- `page-plan.json`: auto-generated page skeleton derived from the outline, including suggested slide/data paths for each page.
 - `artifacts.json`: generated artifact index.
 - `events.jsonl`: append-only event log.
 - `promote/`: derived stage instructions for the current deck or page state.
@@ -43,6 +43,8 @@ Important behavior:
   is not a separate deck-level planning phase.
 - After the outline is recorded, the next meaningful step is to start the
   first page's fine-grained authoring.
+- Page-level promote docs also write `promote/rules/*.md` with compact
+  manifest, TSX authoring, and export rules for the current page.
 - `recordPageProgress` marks the deck as `deck_html_ready` only after every
   page in `page-plan.json` has a `page_locked` event.
 - Checkpoints snapshot `task`, `state`, `current-page`, `page-plan`, and

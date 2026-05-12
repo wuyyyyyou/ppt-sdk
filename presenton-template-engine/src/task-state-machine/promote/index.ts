@@ -40,6 +40,7 @@ import {
 } from "../storage/paths.js";
 
 const PROMOTE_VERSION = "1.0.0";
+const PROMOTE_RULES_DIRNAME = "rules";
 
 export interface PromoteActionContext {
   type: string;
@@ -107,6 +108,22 @@ function relativeFromPromote(projectDir: string, filePath: string): string {
   return path.relative(resolvePromoteDir(projectDir), filePath) || path.basename(filePath);
 }
 
+function resolvePromoteRulesDir(projectDir: string): string {
+  return path.join(resolvePromoteDir(projectDir), PROMOTE_RULES_DIRNAME);
+}
+
+function resolvePromoteRuleFilePath(projectDir: string, fileName: string): string {
+  return path.join(resolvePromoteRulesDir(projectDir), fileName);
+}
+
+function getPromoteRuleFilePaths(projectDir: string): Record<string, string> {
+  return {
+    manifestSpec: resolvePromoteRuleFilePath(projectDir, "ppt-manifest-spec.md"),
+    tsxAuthoring: resolvePromoteRuleFilePath(projectDir, "ppt-tsx-authoring.md"),
+    tsxExportRules: resolvePromoteRuleFilePath(projectDir, "ppt-tsx-export-rules.md"),
+  };
+}
+
 function collectSourceFiles(projectDir: string): Record<string, string> {
   const files: Record<string, string> = {
     task: getTaskFilePath(projectDir),
@@ -124,6 +141,7 @@ function collectSourceFiles(projectDir: string): Record<string, string> {
     files.templateGroup = templateGroupFile;
     files.templateManifest = path.join(templateDir, "manifest.json");
     files.templateCatalog = path.join(templateDir, "catalog.json");
+    files.templateBlueprintsReadme = path.join(templateDir, "blueprints", "README.md");
     files.templateSlidesReadme = path.join(templateDir, "slides", "README.md");
     files.templateComponentsReadme = path.join(templateDir, "components", "README.md");
   }
@@ -158,24 +176,42 @@ function getFirstPagePlanItem(pagePlan: TaskPagePlanRecord | null): TaskPagePlan
   return pagePlan?.pages[0] ?? null;
 }
 
+function toPascalCase(value: string): string {
+  const parts = value
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  const joined = parts
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+  if (joined.length === 0) {
+    return "SlidePage";
+  }
+
+  return /^[A-Za-z]/.test(joined) ? joined : `Slide${joined}`;
+}
+
 function getPageProgressGuidance(currentPage: TaskCurrentPageRecord | null): string[] {
   switch (currentPage?.pageState) {
     case "page_selected":
       return [
-        "阅读当前页从大纲派生出的页面骨架，以及模板工作副本中的 `slides/README.md`、`components/README.md`。",
-        "在当前页阶段再决定具体组件、布局和视觉表达，然后修改 TSX、必要的数据 JSON 或共享组件。",
+        "阅读当前页作业单、页面骨架、模板 README、manifest/catalog 和 `promote/rules/*.md`。",
+        "为当前页选择最贴合大纲的蓝图或现有 slide 起点，派生出当前页最终 `slides/*.tsx` 和 `data/*.json`。",
+        "必须做实质改造：当前页不能长期停留在只 re-export 蓝图的状态，也不能只改 data 迁就版式。",
+        "同步更新 `manifest.json`，确保当前页有稳定 slide id、title、speaker_note、local source 和 data_path。",
         "完成页面实现后调用 `record_page_progress`，把 `page_state` 记录为 `page_authoring`。",
       ];
     case "page_authoring":
       return [
-        "继续完成当前页 TSX 和数据修改。",
-        "生成单页预览 PNG。",
-        "渲染完成后调用 `record_page_progress`，把 `page_state` 记录为 `page_rendered`，并写入渲染产物路径。",
+        "继续完成当前页 TSX、data JSON、manifest 或必要的组件修改。",
+        "调用 `buildDeckHtmlFromManifest`，使用 `single_page: true` 和当前页页码生成单页 deck HTML 与 PNG。",
+        "渲染完成后调用 `record_page_progress`，把 `page_state` 记录为 `page_rendered`，并写入返回的 HTML 和当前页 PNG 路径。",
       ];
     case "page_rendered":
       return [
-        "读取最近一次 PNG 预览。",
-        "检查文字溢出、遮挡、空白、错位、图表比例和视觉层级。",
+        "读取最近一次当前页 PNG 预览，不要只凭代码判断质量。",
+        "按页面作业单里的截图审查提示词检查文字溢出、遮挡、空白、错位、图表比例、视觉层级和内容贴合度。",
         "开始自审时调用 `record_page_progress`，把 `page_state` 记录为 `page_review_pending`。",
       ];
     case "page_review_pending":
@@ -622,6 +658,62 @@ function buildPagePlanStatus(
   ].join("\n");
 }
 
+function buildPromoteRuleMarkdown(
+  title: string,
+  summary: string,
+  bullets: string[],
+): string {
+  return [
+    `# ${title}`,
+    "",
+    summary,
+    "",
+    ...bullets.map((item) => `- ${item}`),
+  ].join("\n");
+}
+
+function buildManifestRuleMarkdown(): string {
+  return buildPromoteRuleMarkdown(
+    "PPT Manifest 规则",
+    "页级页面实现优先通过 manifest.json 装配，manifest 负责 slide 顺序、source、data_path、title 和 speaker_note。",
+    [
+      "manifest 只引用 `./slides/*.tsx`，不要直接把最终 deck 绑定到 `blueprints/*.tsx` 或 `reference-slides/*.tsx`。",
+      "如果当前页需要新增或替换页面入口，优先修改 `slides/*.tsx`，再同步更新 `manifest.json`。",
+      "如果页面内容变化，优先更新 `data/*.json`；如果布局、组件编排或数据契约变化，才改 `slides/*.tsx`。",
+      "当前页的 `source.path` 应指向最终页面入口，`data_path` 应指向当前页的数据文件。",
+      "不要用 manifest 承担页面结构决策；页面结构要留给当前页 TSX 和组件组合。",
+    ],
+  );
+}
+
+function buildTsxAuthoringRuleMarkdown(): string {
+  return buildPromoteRuleMarkdown(
+    "PPT TSX 编写规则",
+    "当前页 TSX 是最终可导出的 PPT 页面，不是普通 React 网页，也不是只读蓝图。",
+    [
+      "先从最接近当前页结构的 `blueprints/*.tsx` 派生，再落到 `slides/*.tsx` 继续改。",
+      "必须在当前页 TSX 中完成页面结构、组件编排、数据映射和可编辑文本的最终决定。",
+      "如果当前页只是在 re-export 蓝图，说明还没有真正进入精修状态，必须继续改。",
+      "优先复用 `components/*.tsx`，但不要为了复用组件牺牲当前页表达的贴合度。",
+      "修改 TSX 时要同时考虑 `Schema`、默认值、layout metadata 和可导出稳定性。",
+    ],
+  );
+}
+
+function buildTsxExportRuleMarkdown(): string {
+  return buildPromoteRuleMarkdown(
+    "PPT TSX 导出与截图规则",
+    "当前页修改完成后，要走现有 deck HTML 生成链路，再基于当前页 PNG 做自审。",
+    [
+      "调用 `buildDeckHtmlFromManifest` 生成 deck HTML；如果只检查当前页，使用 `single_page: true` 并传入当前页页码。",
+      "生成后先检查当前页的 PNG，不要只看 HTML 或 TSX 源码。",
+      "自审重点是文字溢出、遮挡、空白、错位、图表比例、视觉重心和内容是否贴合大纲。",
+      "如果当前页不通过，调用 `record_page_progress` 记录 `page_fix_required`，带上 review notes 后继续修复。",
+      "当前页通过后再记录 `page_accepted`，然后锁定页面。",
+    ],
+  );
+}
+
 function buildPagePlanPromoteChecklist(
   pagePlan: TaskPagePlanRecord | null,
   currentPage: TaskCurrentPageRecord | null,
@@ -631,6 +723,7 @@ function buildPagePlanPromoteChecklist(
       "先让系统根据 outline 自动生成页面骨架。",
       "每页至少写清 pageId、pageNumber、title、goal、coreMessage。",
       "如果需要进一步补充，也只是在这个骨架上做局部修补，不要把它升级成新的 deck 级规划。",
+      "页级精修必须同时考虑 manifest、data、slides、components 和导出自审闭环。",
     ];
   }
 
@@ -641,7 +734,8 @@ function buildPagePlanPromoteChecklist(
       ? `当前页骨架：${currentPageItem.pageId} / ${currentPageItem.title}`
       : "当前还没有选定页，需要先通过 `start_page_iteration` 选页。",
     "如果骨架里缺少候选组件方向或表达形态，只做当前页的局部补充，不要回到全 deck 规划。",
-    "确认后直接进入 `start_page_iteration` 或当前页实现。",
+    "当前页必须显式决定：manifest 入口、data 文件、slide TSX 和必要的 component 改造。",
+    "不要只引用 blueprint；要主动改结构、组件或文案，形成真正的最终页面。",
   ];
 }
 
@@ -712,6 +806,8 @@ function buildPageSummary(
     `- 页面标题：${pagePlanItem?.title ?? "未记录"}`,
     `- 页面目标：${pagePlanItem?.goal ?? "未记录"}`,
     `- 核心信息：${pagePlanItem?.coreMessage ?? "未记录"}`,
+    `- 建议 slide 文件：${pagePlanItem?.slidePath ? `\`${pagePlanItem.slidePath}\`` : "未记录"}`,
+    `- 建议 data 文件：${pagePlanItem?.dataPath ? `\`${pagePlanItem.dataPath}\`` : "未记录"}`,
     `- 最近 PNG：${currentPage.lastRenderedPngPath ? `\`${currentPage.lastRenderedPngPath}\`` : "无"}`,
     `- 页级有效工件：\n${formatList(pageArtifacts)}`,
   ].join("\n");
@@ -796,6 +892,23 @@ function buildPagePromoteMarkdown(context: PromoteRenderContext): string {
   const currentPage = context.opened.currentPage;
   const pagePlanItem = getCurrentPagePlanItem(context.opened.pagePlan, currentPage);
   const guidance = getPageProgressGuidance(currentPage);
+  const ruleFiles = getPromoteRuleFilePaths(context.opened.projectDir);
+  const currentPageSlide = pagePlanItem?.slidePath
+    ?? `./slides/${currentPage?.pageId ? `${toPascalCase(currentPage.pageId)}.tsx` : "SlidePage.tsx"}`;
+  const currentPageData = pagePlanItem?.dataPath
+    ?? `./data/${currentPage?.pageId ?? "current-page"}.json`;
+  const manifestPath = context.sourceFiles.templateManifest ?? path.join(context.opened.projectDir, "template", "manifest.json");
+  const buildDeckHtmlToolCall = {
+    tool: "buildDeckHtmlFromManifest",
+    arguments: {
+      cwd: path.join(context.opened.projectDir, "output"),
+      manifest_path: manifestPath,
+      output_dir: path.join(context.opened.projectDir, "output", "page-preview", currentPage?.pageId ?? "current-page"),
+      name: currentPage?.pageId ?? "current-page",
+      single_page: true,
+      page: pagePlanItem?.pageNumber ?? currentPage?.pageNumber ?? null,
+    },
+  };
 
   return [
     `# Page 阶段行动说明：${currentPage?.pageId ?? "unknown"}`,
@@ -814,13 +927,44 @@ function buildPagePromoteMarkdown(context: PromoteRenderContext): string {
       context.sourceFiles.currentPage,
       context.sourceFiles.pagePlan,
       context.sourceFiles.artifacts,
+      context.sourceFiles.templateGroup,
+      context.sourceFiles.templateManifest,
+      context.sourceFiles.templateCatalog,
+      context.sourceFiles.templateBlueprintsReadme,
       path.join(context.opened.projectDir, "template", "slides", "README.md"),
       path.join(context.opened.projectDir, "template", "components", "README.md"),
-    ]),
+      ruleFiles.manifestSpec,
+      ruleFiles.tsxAuthoring,
+      ruleFiles.tsxExportRules,
+    ].filter((item): item is string => typeof item === "string" && item.length > 0)),
     "",
     "## 当前页事实",
     "",
     buildPageSummary(currentPage, pagePlanItem, context.opened.artifacts),
+    "",
+    "## 当前页改造目标",
+    "",
+    formatList([
+      `当前页 slide 入口建议为 \`${currentPageSlide}\`。`,
+      `当前页数据文件建议为 \`${currentPageData}\`。`,
+      "如果现有页面只是蓝图复用，必须继续改成贴合当前大纲的最终页面。",
+      "如果当前页只是改了 data，没有改结构或组件，也不算通过。",
+      "如果当前页已引入新组件或改造现有组件，说明进入了真正的精修阶段。",
+      "页面实现优先顺序：先改 TSX 结构，再改 data，再补组件，再同步 manifest。",
+    ]),
+    "",
+    "## 当前页修改范围",
+    "",
+    formatList([
+      `\`${currentPageSlide}\`：当前页最终 TSX 入口，负责页面结构、组件编排和表达方式。`,
+      `\`${currentPageData}\`：当前页内容数据，只承载内容，不承载布局决策。`,
+      `\`${manifestPath}\`：如果当前页新增、替换或重排入口，需要同步更新。`,
+      "`template/components/*.tsx`：只有当当前页确实缺少可复用组件、或者需要抽象重复结构时才改。",
+    ]),
+    "",
+    "## 当前页 HTML 生成",
+    "",
+    formatJson(buildDeckHtmlToolCall),
     "",
     "## 当前页骨架",
     "",
@@ -844,7 +988,8 @@ function buildPagePromoteMarkdown(context: PromoteRenderContext): string {
       "检查文字是否溢出、遮挡或过小。",
       "检查标题、图表、注释和页脚是否重叠。",
       "检查画面是否空白、比例失衡或视觉重心不稳定。",
-      "检查组件使用是否符合模板 README 和当前页表达目标。",
+      "检查组件使用是否符合模板 README、manifest 入口和当前页表达目标。",
+      "检查当前页是否真的比蓝图更进一步：至少要有结构、组件或文案上的实质变化。",
       "如果不通过，记录 `page_fix_required` 并继续修改；通过后记录 `page_accepted`，再锁定页面。",
     ]),
     "",
@@ -861,6 +1006,12 @@ function buildPagePromoteMarkdown(context: PromoteRenderContext): string {
     "- 如果当前页和页面计划对不上，先运行 `validate_task_project`。",
     "- 如果用户要求改已锁定页面，优先回退到该页检查点或创建分支。",
     "- 不要在没有 PNG 自审的情况下直接锁定页面。",
+    "",
+    "## 当前页截图审查提示词",
+    "",
+    "请只审查当前页 PNG，不要泛评整套 deck。",
+    "重点检查：当前页内容是否贴合大纲；是否真的比蓝图有实质修改；manifest/data/tsx 是否协调；是否存在文字溢出、遮挡、空白、重叠或导出异常。",
+    "给出通过/不通过结论，并列出必须修复的具体项。",
   ].join("\n");
 }
 
@@ -948,6 +1099,14 @@ async function writePromoteTemplates(projectDir: string): Promise<void> {
   await writeFile(path.join(templatesDir, "deck.md"), `${buildTemplateMarkdown("deck")}\n`, "utf8");
   await writeFile(path.join(templatesDir, "page.md"), `${buildTemplateMarkdown("page")}\n`, "utf8");
   await writeFile(path.join(templatesDir, "recovery.md"), `${buildTemplateMarkdown("recovery")}\n`, "utf8");
+}
+
+async function writePromoteRules(projectDir: string): Promise<void> {
+  const rulesDir = resolvePromoteRulesDir(projectDir);
+  await mkdir(rulesDir, { recursive: true });
+  await writeFile(resolvePromoteRuleFilePath(projectDir, "ppt-manifest-spec.md"), `${buildManifestRuleMarkdown()}\n`, "utf8");
+  await writeFile(resolvePromoteRuleFilePath(projectDir, "ppt-tsx-authoring.md"), `${buildTsxAuthoringRuleMarkdown()}\n`, "utf8");
+  await writeFile(resolvePromoteRuleFilePath(projectDir, "ppt-tsx-export-rules.md"), `${buildTsxExportRuleMarkdown()}\n`, "utf8");
 }
 
 function buildReference(
@@ -1039,6 +1198,7 @@ export async function ensureTaskPromoteDocument(
   await mkdir(resolvePromoteDeckDir(projectDir), { recursive: true });
   await mkdir(resolvePromotePagesDir(projectDir), { recursive: true });
   await writePromoteTemplates(projectDir);
+  await writePromoteRules(projectDir);
 
   const context: PromoteRenderContext = {
     opened,

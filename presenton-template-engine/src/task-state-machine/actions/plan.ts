@@ -153,6 +153,26 @@ function buildOutlinePayload(input: RecordOutlineInput) {
   };
 }
 
+function toPascalCase(value: string): string {
+  const parts = value
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  const joined = parts
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+  return joined.length > 0 ? (/[a-zA-Z]/.test(joined[0]) ? joined : `Slide${joined}`) : "SlidePage";
+}
+
+function buildPageTargetPaths(pageId: string): { slidePath: string; dataPath: string } {
+  const slideName = toPascalCase(pageId);
+  return {
+    slidePath: `./slides/${slideName}.tsx`,
+    dataPath: `./data/${pageId}.json`,
+  };
+}
+
 function buildPagePlanFromOutline(
   projectId: string,
   outlinePages: RecordOutlineInput["outline"]["pages"],
@@ -163,6 +183,7 @@ function buildPagePlanFromOutline(
     title: page.title,
     goal: page.goal,
     coreMessage: page.coreMessage,
+    ...buildPageTargetPaths(page.pageId),
     candidateComponentFamilies: [],
     openQuestions: [],
   }));

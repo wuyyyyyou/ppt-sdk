@@ -248,7 +248,7 @@
 写入行为：
 
 - 写入 `task-state/outline.json`。
-- 同步生成 `page-plan.json` 的初版页面骨架，供后续逐页精细生成直接使用。
+- 同步生成 `page-plan.json` 的初版页面骨架，供后续逐页精细生成直接使用，同时给每页补上建议的 slide/data 路径。
 - 状态会推进到 `outline_ready`。
 - 如果当前大纲页数和需求页数不一致，应该先重新确认，而不是直接写死。
 - 大纲页数应该和 `requirements.pageCount` 保持一致。
@@ -336,6 +336,7 @@
 - 写入 `task-state/current-page.json`，把当前页标记为 `page_selected`。
 - 把 deck 状态推进到 `page_iteration_active`。
 - 后续 `query_task_state` 会进入页级 promote 文档，开始围绕这一页进行修改、渲染、自审和锁定。
+- 页级 promote 还会写出 `promote/rules/*.md`，分别说明 manifest、TSX 编写和导出/截图规约。
 - 这个子工具不负责写页面内容本身，只负责把当前页选出来。
 
 当前测试样例：
