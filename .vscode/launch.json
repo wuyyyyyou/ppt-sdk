@@ -223,6 +223,19 @@
       "skipFiles": ["<node_internals>/**"]
     },
     {
+      "name": "Engine-Task: Advance Task State",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/.vscode/engine/run-plugin-once.mjs",
+      "env": {
+        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/stdin/task-state/advance_task_state_stdin.json",
+        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout/task-state/advance_task_state_stdout.json"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
       "name": "Generator: Describe",
       "type": "node",
       "request": "launch",

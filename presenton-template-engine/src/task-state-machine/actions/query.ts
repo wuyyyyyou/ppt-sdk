@@ -214,7 +214,7 @@ function getDefaultRecommendedAction(result: OpenTaskProjectResult): TaskRecomme
     case "deck_html_ready":
       return { type: "render_full_deck_html", summary: "先阅读 promote/current.md，再生成整套 deck HTML；生成成功后进入用户审阅阶段。", requiresUserInput: false };
     case "deck_review_pending":
-      return { type: "review_page_png", summary: "先阅读 promote/current.md，再等待 deck HTML 审阅结果。", requiresUserInput: true };
+      return { type: "request_deck_html_approval", summary: "先阅读 promote/current.md，再让用户审阅整套 deck HTML；确认通过则进入 deck_reviewed，需要修改则回到页面流程。", requiresUserInput: true };
     case "deck_reviewed":
       return { type: "convert_deck_html_to_model", summary: "先阅读 promote/current.md，再将 HTML 转成 PPT 模型。", requiresUserInput: false };
     case "model_ready":

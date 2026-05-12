@@ -390,6 +390,8 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
           { name: "target_deck_state", type: "string", required: false, description: "Target deck state." },
           { name: "target_page_state", type: "string", required: false, description: "Target page state." },
           { name: "reason", type: "string", required: true, description: "Advance reason." },
+          { name: "related_artifacts", type: "array", items: { type: "string" }, required: false, description: "Related artifact paths, such as generated deck HTML." },
+          { name: "related_checkpoint", type: "string", required: false, description: "Related checkpoint id." },
         ],
       },
       {
@@ -556,6 +558,8 @@ async function handleAdvanceTaskState(args: Record<string, unknown>) {
     targetDeckState: readOptionalString(args, "target_deck_state") as AdvanceTaskStateInput["targetDeckState"],
     targetPageState: readOptionalString(args, "target_page_state") as AdvanceTaskStateInput["targetPageState"],
     reason: readRequiredString(args, "reason"),
+    relatedArtifacts: Array.isArray(args.related_artifacts) ? (args.related_artifacts as string[]) : undefined,
+    relatedCheckpoint: readOptionalString(args, "related_checkpoint"),
   });
 }
 

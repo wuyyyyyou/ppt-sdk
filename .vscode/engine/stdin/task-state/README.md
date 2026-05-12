@@ -424,6 +424,44 @@
 - `rewind_task_state`：回退到某个检查点，或回退到指定的安全状态。
 - `branch_task_project`：基于当前状态或某个检查点创建分支，用于尝试另一版方案。
 
+### `advance_task_state`
+
+这个子工具用于把任务推进到指定 deck 状态或 page 状态，并创建一个检查点。当前从 `deck_html_ready` 进入用户审阅阶段时，可以用它把 deck 状态推进到 `deck_review_pending`。
+
+支持参数：
+
+- `cwd`：可选，必须是绝对路径。状态机的文件传输结果会优先写到 `cwd/.executa-file-transport/`。
+- `project_dir`：必填，已有任务项目目录，必须是绝对路径。
+- `target_deck_state`：可选，要推进到的 deck 状态，例如 `deck_review_pending`。
+- `target_page_state`：可选，要推进到的 page 状态。通常页级主流程优先使用 `record_page_progress`。
+- `reason`：必填，说明为什么可以推进状态。建议写清楚关键产物路径或用户确认依据。
+- `related_artifacts`：可选，字符串数组。建议记录本次推进依赖的产物路径，例如整套 deck HTML。
+- `related_checkpoint`：可选，相关检查点 id。
+
+当前测试样例：
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "invoke",
+  "id": 1,
+  "params": {
+    "tool": "advance_task_state",
+    "arguments": {
+      "cwd": "${workspaceFolder}/.vscode/engine/output",
+      "project_dir": "${workspaceFolder}/.vscode/engine/output/task-state/create-task-demo",
+      "target_deck_state": "deck_review_pending",
+      "reason": "整套 deck HTML 已生成：${workspaceFolder}/.vscode/engine/output/task-state/create-task-demo/output/deck-html/slide-02-deck.html，等待用户审阅。",
+      "related_artifacts": [
+        "${workspaceFolder}/.vscode/engine/output/task-state/create-task-demo/output/deck-html/slide-02-deck.html"
+      ]
+    }
+  }
+}
+```
+
+运行前建议先跑 `Engine-Task: Query Task`，确认当前状态是 `deck_html_ready`，并且已经按 `promote/deck/deck_html_ready.md` 生成整套 deck HTML。运行时可以直接选择 VS Code launch：`Engine-Task: Advance Task State`。
+
 ## 检查点和恢复
 
 - `list_task_checkpoints`：列出项目已有的检查点，也可以一起列出分支。

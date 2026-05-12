@@ -62,6 +62,8 @@ interface PromoteRenderContext {
   sourceFiles: Record<string, string>;
   latestReviewNotes?: string | null;
   lockedPageIds: string[];
+  deckReviewHtmlPath?: string | null;
+  deckReviewReason?: string | null;
 }
 
 function nowIso(): string {
@@ -1966,12 +1968,118 @@ function buildDeckHtmlReadyPromoteMarkdown(context: PromoteRenderContext): strin
   ].join("\n");
 }
 
+function buildDeckReviewPendingPromoteMarkdown(context: PromoteRenderContext): string {
+  const projectDir = context.opened.projectDir;
+  const deckHtmlPath = context.deckReviewHtmlPath ?? "<上一步 buildDeckHtmlFromManifest 返回的 deck_output_path>";
+
+  return [
+    "# Deck 阶段行动说明：deck_review_pending",
+    "",
+    "## 当前阶段",
+    "",
+    `当前 deck 状态是 \`${context.opened.state.deckState}\`。整套 deck HTML 已生成，正在等待用户审阅。`,
+    "",
+    "## 本阶段目标",
+    "",
+    "让用户审阅整套 HTML。PPT AI Agent 不能替用户确认通过；必须等待用户明确说“通过”或指出要修改的问题。",
+    "",
+    "## 待审阅 HTML",
+    "",
+    deckHtmlPath ? `\`${deckHtmlPath}\`` : "- 未从状态事件中找到 HTML 路径。先检查上一轮 `advance_task_state` 的 `reason` 或 `related_artifacts` 是否记录了 `deck_output_path`。",
+    ...(context.deckReviewReason ? [
+      "",
+      "## 上一步记录",
+      "",
+      context.deckReviewReason,
+    ] : []),
+    "",
+    "## 下一步行动建议",
+    "",
+    [
+      "1. 把上方 HTML 路径交给用户审阅，说明这是整套 deck 的 HTML 预览稿。",
+      "2. 等待用户给出明确结论：通过，或需要修改。",
+      "3. 如果用户确认通过：调用 `advance_task_state`，把 `target_deck_state` 设为 `deck_reviewed`，`reason` 写明用户已确认的 HTML 路径；随后调用 `query_task_state` 读取下一阶段 promote。最终进入 `deck_reviewed`。",
+      "4. 如果用户认为不对或要求修改：先让用户指出需要修改的页码、页面 id 或具体问题；不要直接推进到 `deck_reviewed`。",
+      "5. 对需要修改的情况，优先调用 `branch_task_project` 创建调整分支；然后调用 `rewind_task_state` 把 deck 回到 `page_iteration_active`，再调用 `start_page_iteration` 选中需要修改的页面；随后重新走页面实现、渲染、截图审查、锁定流程。最终应重新回到 `deck_html_ready`，重新生成整套 HTML 后再进入本阶段。",
+    ].join("\n"),
+    "",
+    "## 推荐调用的子工具",
+    "",
+    "### 用户确认 HTML 通过",
+    "",
+    formatJson({
+      tool: "advance_task_state",
+      arguments: {
+        project_dir: projectDir,
+        target_deck_state: "deck_reviewed",
+        reason: `用户确认整套 deck HTML 审阅通过：${deckHtmlPath}`,
+        related_artifacts: deckHtmlPath ? [deckHtmlPath] : [],
+      },
+    }),
+    "",
+    "### 确认通过后查询下一步",
+    "",
+    formatJson({
+      tool: "query_task_state",
+      arguments: {
+        project_dir: projectDir,
+        response_mode: "compact",
+      },
+    }),
+    "",
+    "### 用户要求修改时先创建调整分支",
+    "",
+    formatJson({
+      tool: "branch_task_project",
+      arguments: {
+        project_dir: projectDir,
+        reason: `用户审阅整套 deck HTML 后要求修改：${deckHtmlPath}`,
+      },
+    }),
+    "",
+    "### 用户要求修改时回到逐页阶段",
+    "",
+    formatJson({
+      tool: "rewind_task_state",
+      arguments: {
+        project_dir: projectDir,
+        target_state: "page_iteration_active",
+        reason: "用户审阅 deck HTML 后要求修改，需要回到页面级流程重新调整。",
+      },
+    }),
+    "",
+    "### 选中用户指出需要修改的页面",
+    "",
+    formatJson({
+      tool: "start_page_iteration",
+      arguments: {
+        project_dir: projectDir,
+        page_id: "<用户指出需要修改的 page_id，例如 slide-01>",
+      },
+    }),
+    "",
+    "### 进入页面级 promote",
+    "",
+    formatJson({
+      tool: "query_task_state",
+      arguments: {
+        project_dir: projectDir,
+        response_mode: "compact",
+      },
+    }),
+  ].join("\n");
+}
+
 function buildDeckPromoteMarkdown(context: PromoteRenderContext): string {
   const { opened, action } = context;
   const guidance = getDeckStageGuidance(context);
 
   if (opened.state.deckState === "deck_html_ready") {
     return buildDeckHtmlReadyPromoteMarkdown(context);
+  }
+
+  if (opened.state.deckState === "deck_review_pending") {
+    return buildDeckReviewPendingPromoteMarkdown(context);
   }
 
   if (action.type === "collect_requirements") {
@@ -2437,6 +2545,40 @@ async function readLockedPageIds(
   return Array.from(lockedPageIds);
 }
 
+function extractFirstHtmlPath(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const match = value.match(/(?:\/|\.{1,2}\/|[A-Za-z]:\\)[^\s，。；;"]+\.html/);
+  return match?.[0] ?? null;
+}
+
+async function readLatestDeckReviewInfo(
+  projectDir: string,
+): Promise<{ htmlPath: string | null; reason: string | null }> {
+  const events = await readTaskEvents(projectDir);
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.eventType !== "state_advanced" || event.payload.targetDeckState !== "deck_review_pending") {
+      continue;
+    }
+
+    const relatedArtifacts = Array.isArray(event.payload.relatedArtifacts)
+      ? event.payload.relatedArtifacts.filter((item): item is string => typeof item === "string")
+      : [];
+    const htmlPathFromArtifacts = relatedArtifacts.find((item) => item.endsWith(".html")) ?? null;
+    const reason = typeof event.payload.reason === "string" ? event.payload.reason : null;
+
+    return {
+      htmlPath: htmlPathFromArtifacts ?? extractFirstHtmlPath(reason ?? undefined),
+      reason,
+    };
+  }
+
+  return { htmlPath: null, reason: null };
+}
+
 export async function ensureTaskPromoteDocument(
   opened: OpenTaskProjectResult,
   action: PromoteActionContext,
@@ -2454,6 +2596,9 @@ export async function ensureTaskPromoteDocument(
   const lockedPageIds = kind === "page"
     ? await readLockedPageIds(projectDir, opened.currentPage)
     : [];
+  const deckReviewInfo = opened.state.deckState === "deck_review_pending"
+    ? await readLatestDeckReviewInfo(projectDir)
+    : { htmlPath: null, reason: null };
 
   await mkdir(resolvePromoteDir(projectDir), { recursive: true });
   await mkdir(resolvePromoteDeckDir(projectDir), { recursive: true });
@@ -2471,6 +2616,8 @@ export async function ensureTaskPromoteDocument(
     sourceFiles,
     latestReviewNotes,
     lockedPageIds,
+    deckReviewHtmlPath: deckReviewInfo.htmlPath,
+    deckReviewReason: deckReviewInfo.reason,
   };
 
   const markdown = kind === "page"
