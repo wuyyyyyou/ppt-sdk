@@ -62,6 +62,7 @@
 
 - `cwd`：可选，必须是绝对路径。状态机的文件传输结果会优先写到 `cwd/.executa-file-transport/`。
 - `project_dir`：必填，已有任务项目目录，必须是绝对路径。
+- `response_mode`：可选，`compact` 或 `full`。默认是 `compact`，只返回给 PPT AI Agent 下一步行动所需的精简信息；调试时可设为 `full` 取回完整状态快照。
 
 当前测试样例：
 
@@ -102,7 +103,8 @@
     "tool": "query_task_state",
     "arguments": {
       "cwd": "${workspaceFolder}/.vscode/engine/output",
-      "project_dir": "${workspaceFolder}/.vscode/engine/output/task-state/create-task-demo"
+      "project_dir": "${workspaceFolder}/.vscode/engine/output/task-state/create-task-demo",
+      "response_mode": "compact"
     }
   }
 }
@@ -110,14 +112,15 @@
 
 运行前需要先跑 `Engine-Task: Create Task`，并且这个项目目录里已经有状态文件可读。
 
-返回结果里，`recommendation` 会包含这些关键字段：
+默认返回结果为紧凑结构，`recommendation` 只包含这些关键字段：
 
+- `agentInstruction`：给 PPT AI Agent 的简短执行提示。
+- `promoteEntryPath`：`promote/current.md` 的入口路径。
 - `promotePath`：当前阶段真正应该先读的 md 文件。
 - `promoteKind`：`deck`、`page` 或 `recovery`。
-- `promoteVersion`：当前 promote 文档版本。
-- `promoteFreshness`：当前文档是否是本次查询生成的。
-- `promoteEntryPath`：`promote/current.md` 的入口路径。
-- `agentInstruction`：给 PPT AI Agent 的简短执行提示。
+- `stage`：当前 promote 阶段，例如 `project_ready` 或 `page_iteration_active:page_selected`。
+
+如果需要兼容旧调试输出，可传入 `"response_mode": "full"`，此时会返回完整 `snapshot` 和完整 `recommendation`。
 
 ## 需求和规划
 

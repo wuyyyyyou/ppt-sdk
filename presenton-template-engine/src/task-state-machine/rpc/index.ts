@@ -21,6 +21,7 @@ import {
 import {
   getRecommendedActionResult,
   getTaskStateQueryResult,
+  type RecommendedActionResult,
   type TaskStateQueryResult,
 } from "../actions/query.js";
 import {
@@ -88,6 +89,30 @@ type TransFileResponse = {
   __file_transport: string;
 };
 
+type QueryTaskStateResponseMode = "compact" | "full";
+
+interface CompactTaskStateQueryResult {
+  projectId: string;
+  projectDir: string;
+  deckState: TaskStateQueryResult["state"]["deckState"];
+  pageState?: TaskStateQueryResult["state"]["pageState"];
+  currentPageId?: string;
+  blockedBy: string[];
+  allowedTransitions: Array<string>;
+  allPagesLocked: boolean;
+  recoverable: boolean;
+}
+
+interface CompactRecommendedActionResult {
+  agentInstruction: string;
+  promoteEntryPath: string;
+  promotePath: string;
+  promoteKind: RecommendedActionResult["promoteKind"];
+  stage: string;
+  deckState: RecommendedActionResult["deckState"];
+  pageState?: RecommendedActionResult["pageState"];
+}
+
 function makeSuccessResponse<T>(id: JsonRpcRequest["id"], tool: string, data: T): JsonRpcSuccessResponse<T> {
   return {
     jsonrpc: "2.0",
@@ -136,6 +161,48 @@ function readOptionalString(params: Record<string, unknown> | undefined, name: s
     throw new Error(`Parameter must be a non-empty string: ${name}`);
   }
   return value;
+}
+
+function readQueryTaskStateResponseMode(params: Record<string, unknown> | undefined): QueryTaskStateResponseMode {
+  const value = readOptionalString(params, "response_mode");
+  if (value === undefined || value === "compact") {
+    return "compact";
+  }
+  if (value === "full") {
+    return "full";
+  }
+  throw new Error('Parameter "response_mode" must be "compact" or "full"');
+}
+
+function buildCompactTaskStateQueryResult(
+  projectDir: string,
+  snapshot: TaskStateQueryResult,
+): CompactTaskStateQueryResult {
+  return {
+    projectId: snapshot.task.projectId,
+    projectDir,
+    deckState: snapshot.state.deckState,
+    pageState: snapshot.state.pageState,
+    currentPageId: snapshot.state.currentPageId ?? snapshot.currentPage?.pageId,
+    blockedBy: snapshot.blockedBy,
+    allowedTransitions: snapshot.allowedTransitions,
+    allPagesLocked: snapshot.state.allPagesLocked,
+    recoverable: snapshot.state.recoverable,
+  };
+}
+
+function buildCompactRecommendedActionResult(
+  recommendation: RecommendedActionResult,
+): CompactRecommendedActionResult {
+  return {
+    agentInstruction: recommendation.agentInstruction,
+    promoteEntryPath: recommendation.promoteEntryPath,
+    promotePath: recommendation.promotePath,
+    promoteKind: recommendation.promoteKind,
+    stage: recommendation.promote.stage,
+    deckState: recommendation.deckState,
+    pageState: recommendation.pageState,
+  };
 }
 
 function readOptionalBoolean(
@@ -248,6 +315,7 @@ export async function describeTaskStateMachine(): Promise<Record<string, unknown
         parameters: [
           { name: "cwd", type: "string", required: false, description: "Optional absolute working directory used for file transport output." },
           { name: "project_dir", type: "string", required: true, description: "Absolute project directory." },
+          { name: "response_mode", type: "string", required: false, description: "compact or full. Defaults to compact for PPT AI Agent context efficiency." },
         ],
       },
       {
@@ -400,9 +468,21 @@ async function handleQueryTaskState(args: Record<string, unknown>) {
   const opened = await openTaskProject({
     projectDir: readRequiredString(args, "project_dir"),
   });
+  const snapshot = getTaskStateQueryResult(opened);
+  const recommendation = await getRecommendedActionResult(opened);
+  const responseMode = readQueryTaskStateResponseMode(args);
+
+  if (responseMode === "full") {
+    return {
+      snapshot,
+      recommendation,
+    };
+  }
+
   return {
-    snapshot: getTaskStateQueryResult(opened),
-    recommendation: await getRecommendedActionResult(opened),
+    responseMode,
+    snapshot: buildCompactTaskStateQueryResult(opened.projectDir, snapshot),
+    recommendation: buildCompactRecommendedActionResult(recommendation),
   };
 }
 

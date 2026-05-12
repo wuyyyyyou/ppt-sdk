@@ -1136,9 +1136,68 @@ function buildPageSummary(
   ].join("\n");
 }
 
+function buildCollectRequirementsPromoteMarkdown(context: PromoteRenderContext): string {
+  const { opened, action, requirements } = context;
+  const requirementsPath = context.sourceFiles.requirements;
+
+  return [
+    `# Deck 阶段行动说明：${opened.state.deckState}`,
+    "",
+    "## 当前阶段",
+    "",
+    `当前 deck 状态是 \`${opened.state.deckState}\`。`,
+    "",
+    "## 本阶段目标",
+    "",
+    "确认用户的 PPT 制作需求，并通过状态机写入结构化 `requirements.json`。",
+    "",
+    "## 必读文件",
+    "",
+    formatCodeList([
+      context.sourceFiles.task,
+      context.sourceFiles.state,
+      requirementsPath,
+    ]),
+    "",
+    "## 当前已知信息",
+    "",
+    formatList([
+      `项目：\`${opened.task.title ?? opened.task.projectId}\``,
+      `项目目录：\`${opened.projectDir}\``,
+      `需求记录：${requirements ? `已存在，路径 \`${requirementsPath}\`` : `未找到，预期路径 \`${requirementsPath}\``}`,
+    ]),
+    "",
+    "## 下一步行动建议",
+    "",
+    [
+      `1. 先读取 \`${requirementsPath}\`，确认是否已有结构化需求；如果文件不存在，就从用户原始请求开始建立第一版需求。`,
+      "2. 和用户核对并补齐需求。必须确认：主题、目标受众、使用场景、页数；建议同时确认：语言、语气、视觉偏好、必须覆盖的信息、用户提供的素材或参考文件。已有字段只做确认和补充，不要无理由覆盖。",
+      "3. 需求完整后调用 `record_requirements` 子工具写入状态机。默认使用 `mode: \"merge\"`，只更新本次确认字段；只有用户明确要求重写全部需求时，才使用 `mode: \"replace_all\"`。",
+      "4. `record_requirements` 成功后，继续调用 `query_task_state` 子工具查询下一阶段要做什么，并重新阅读最新的 `promote/current.md`。",
+    ].join("\n"),
+    "",
+    "## 推荐调用的子工具",
+    "",
+    formatJson([
+      getRecommendedToolCall(context),
+      {
+        tool: "query_task_state",
+        arguments: {
+          project_dir: opened.projectDir,
+          response_mode: "compact",
+        },
+      },
+    ]),
+  ].join("\n");
+}
+
 function buildDeckPromoteMarkdown(context: PromoteRenderContext): string {
   const { opened, action } = context;
   const guidance = getDeckStageGuidance(context);
+
+  if (action.type === "collect_requirements") {
+    return buildCollectRequirementsPromoteMarkdown(context);
+  }
 
   return [
     `# Deck 阶段行动说明：${opened.state.deckState}`,

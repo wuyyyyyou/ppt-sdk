@@ -30,9 +30,14 @@ Important behavior:
   existing requirement fields that the latest input does not mention. Use
   `mode: "replace_all"` only when the full requirement record should be
   replaced.
-- `query_task_state` returns available template group summaries during
-  `requirements_collected`; the Agent should present that full list to the user,
-  then call `record_template_selection` with the confirmed `template_group`.
+- `query_task_state` defaults to `response_mode: "compact"` so the RPC response
+  only carries the current state summary and promote paths needed by the PPT AI
+  Agent. Use `response_mode: "full"` for debugging or integrations that need the
+  full state snapshot.
+- In `response_mode: "full"`, `query_task_state` returns available template
+  group summaries during `requirements_collected`; the Agent should present
+  that full list to the user, then call `record_template_selection` with the
+  confirmed `template_group`.
 - `record_template_selection` overwrites and forks the selected template group
   into `<projectDir>/template`, records the selected template group, and advances
   the deck to `project_forked`.
