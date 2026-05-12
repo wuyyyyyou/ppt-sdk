@@ -25,6 +25,7 @@ import {
   getTaskFilePath,
   readOptionalOutlineRecord,
   readOptionalRequirementsRecord,
+  readTaskEvents,
 } from "../storage/records.js";
 import { writeJsonObject } from "../storage/json.js";
 import {
@@ -59,6 +60,7 @@ interface PromoteRenderContext {
   availableTemplateGroups: DiscoveredTemplateGroupSummaryInfo[];
   generatedAt: string;
   sourceFiles: Record<string, string>;
+  latestReviewNotes?: string | null;
 }
 
 function nowIso(): string {
@@ -226,8 +228,8 @@ function getPageProgressGuidance(currentPage: TaskCurrentPageRecord | null): str
     case "page_authoring":
       return [
         "继续完成当前页 TSX、data JSON、manifest 或必要的组件修改。",
-        "调用 `buildDeckHtmlFromManifest`，使用 `single_page: true` 和当前页页码生成单页 deck HTML 与 PNG。",
-        "渲染完成后调用 `record_page_progress`，把 `page_state` 记录为 `page_review`，并写入返回的 HTML 和当前页 PNG 路径。",
+        "调用 `buildDeckHtmlFromManifest`，使用 `single_page: true` 和当前页页码生成当前页 PNG 截图。",
+        "单页模式通常不会生成 deck HTML；渲染完成后调用 `record_page_progress`，把 `page_state` 记录为 `page_review`，并写入返回的当前页 PNG 路径。",
       ];
     case "page_review":
       return [
@@ -239,9 +241,10 @@ function getPageProgressGuidance(currentPage: TaskCurrentPageRecord | null): str
       ];
     case "page_fix_required":
       return [
-        "按 `review_notes` 修改当前页 TSX、数据或组件。",
-        "修改后重新渲染单页 PNG。",
-        "再次调用 `record_page_progress` 进入 `page_authoring` 或后续渲染状态。",
+        "按 `review_notes` 修改当前页 TSX、data、manifest 或必要组件。",
+        "修复完成后调用 `buildDeckHtmlFromManifest`，使用 `single_page: true` 重新生成当前页 PNG 截图。",
+        "如果 TSX 报错或渲染失败，先修复报错并重复渲染，直到成功生成截图。",
+        "截图生成成功后调用 `record_page_progress`，把 `page_state` 记录为 `page_review`，并写入新的 `rendered_png_path`。",
       ];
     case "page_accepted":
       return [
@@ -268,7 +271,7 @@ function getPageStateGuidance(): string[] {
   return [
     "`page_selected`：当前页已选中，开始读取骨架、模板和规则，准备创建或修改当前页文件；完成初始实现后记录 `page_authoring`。",
     "`page_authoring`：当前页正在实现中，允许继续修改 TSX、data、manifest 或必要组件；渲染完成后记录 `page_review`。",
-    "`page_review`：当前页 HTML 和 PNG 已生成，正在基于截图审查；审查后要么记录 `page_fix_required`，要么记录 `page_accepted`。",
+    "`page_review`：当前页 PNG 截图已生成，正在基于截图审查；审查后要么记录 `page_fix_required`，要么记录 `page_accepted`。",
     "`page_fix_required`：当前页自审未通过，需要根据 `review_notes` 继续修复。",
     "`page_accepted`：当前页通过自审，可以准备锁定；随后记录 `page_locked`。",
     "`page_locked`：当前页已经锁定，不应再直接编辑；如需修改，先回退或分支；如果还有未锁定页面，先切换到下一页。",
@@ -494,10 +497,10 @@ function getRecommendedToolCall(context: PromoteRenderContext): unknown {
     case "render_current_page":
       return buildPageProgressCall(
         "page_review",
-        "已调用 buildDeckHtmlFromManifest 生成当前页单页 HTML 和 PNG，准备进行截图审查。",
+        "已调用 buildDeckHtmlFromManifest 生成当前页 PNG 截图，准备进行截图审查。",
         {
-          rendered_html_path: "<单页 HTML 路径>",
-          rendered_png_path: "<单页 PNG 路径>",
+          rendered_png_path: "<buildDeckHtmlFromManifest 返回的 slide_files[0].output_path>",
+          rendered_html_path: "<可选；single_page: true 通常不生成 deck HTML，可不填>",
         },
       );
     case "review_page_png":
@@ -1475,7 +1478,7 @@ function buildPageAuthoringPromoteMarkdown(context: PromoteRenderContext): strin
     "",
     "## 本阶段目标",
     "",
-    "继续完成当前页 TSX、data 和 manifest 的实现，并生成单页 deck HTML 与截图。",
+    "继续完成当前页 TSX、data 和 manifest 的实现，并生成当前页 PNG 截图。",
     "",
     "## 必读文件",
     "",
@@ -1527,8 +1530,8 @@ function buildPageAuthoringPromoteMarkdown(context: PromoteRenderContext): strin
       `2. 检查 \`${manifestPath}\`，确认当前页对应的 slide id、title、speaker_note、source 和 data_path 都正确。`,
       `3. 开始修改当前页工作文件。必须严格遵守 \`${ruleFiles.manifestSpec}\`、\`${ruleFiles.tsxAuthoring}\`、\`${ruleFiles.tsxExportRules}\`；先规划这一页需要卡片、表格、图表或其他表达模块，再动手写 TSX 和 data。为了保证 PPT 多样性，尽量对 \`${slidePath}\` 做合适的结构或组件编排修改，不要只修改 \`${dataPath}\` 就结束。`,
       `4. 去 \`${componentsDir}\` 寻找可复用组件；有合适组件就复用，没有合适组件就直接在 \`${slidePath}\` 里写当前页需要的局部结构。`,
-      "5. 工作文件修改完成后，调用 `buildDeckHtmlFromManifest` 生成当前页 deck HTML 和截图。如果因为 TSX 报错导致调用失败，先分析报错原因，针对性修改出错位置，然后继续调用 `buildDeckHtmlFromManifest`，直到成功生成 deck HTML 和截图。",
-      "6. 生成成功后调用 `record_page_progress` 子工具，把 `page_state` 记录为 `page_review`，并写入返回的 HTML 路径和当前页 PNG 路径。成功后继续调用 `query_task_state`，重新阅读最新的 `promote/current.md`。",
+      "5. 工作文件修改完成后，调用 `buildDeckHtmlFromManifest` 生成当前页 PNG 截图。如果因为 TSX 报错导致调用失败，先分析报错原因，针对性修改出错位置，然后继续调用 `buildDeckHtmlFromManifest`，直到成功生成截图。",
+      "6. 生成成功后调用 `record_page_progress` 子工具，把 `page_state` 记录为 `page_review`，并把 `rendered_png_path` 写成 `buildDeckHtmlFromManifest` 返回的 `slide_files[0].output_path`。`single_page: true` 通常不会生成 deck HTML，`rendered_html_path` 可以不填。成功后继续调用 `query_task_state`，重新阅读最新的 `promote/current.md`。",
     ].join("\n"),
     "",
     "## 推荐调用的子工具",
@@ -1541,14 +1544,183 @@ function buildPageAuthoringPromoteMarkdown(context: PromoteRenderContext): strin
           project_dir: context.opened.projectDir,
           page_id: currentPage?.pageId ?? "<page_id>",
           page_state: "page_review",
-          summary: "已生成当前页单页 deck HTML 和截图，准备进入截图审查。",
+          summary: "已生成当前页 PNG 截图，准备进入截图审查。",
           changed_files: [
             slidePath,
             dataPath,
             manifestPath,
           ],
-          rendered_html_path: "<buildDeckHtmlFromManifest 返回的单页 HTML 路径>",
-          rendered_png_path: "<buildDeckHtmlFromManifest 返回的当前页 PNG 路径>",
+          rendered_png_path: "<buildDeckHtmlFromManifest 返回的 slide_files[0].output_path>",
+          rendered_html_path: "<可选；single_page: true 通常不生成 deck HTML，可不填>",
+        },
+      },
+      {
+        tool: "query_task_state",
+        arguments: {
+          project_dir: context.opened.projectDir,
+          response_mode: "compact",
+        },
+      },
+    ]),
+  ].join("\n");
+}
+
+function buildPageReviewPromoteMarkdown(context: PromoteRenderContext): string {
+  const currentPage = context.opened.currentPage;
+  const pagePlanItem = getCurrentPagePlanItem(context.opened.pagePlan, currentPage);
+  const renderedPngPath = currentPage?.lastRenderedPngPath ?? "<当前页 PNG 路径>";
+  const pageLabel = currentPage?.pageId ?? "<page_id>";
+
+  return [
+    `# Page 阶段行动说明：${pageLabel}`,
+    "",
+    "## 当前阶段",
+    "",
+    `当前 deck 状态是 \`${context.opened.state.deckState}\`，page 状态是 \`${currentPage?.pageState ?? "none"}\`。`,
+    "",
+    "## 本阶段目标",
+    "",
+    "基于当前页 PNG 截图完成视觉自审，并决定进入修复或接受阶段。",
+    "",
+    "## 必读文件",
+    "",
+    formatCodeList([
+      context.sourceFiles.pagePlan,
+    ]),
+    "",
+    "## 当前页骨架",
+    "",
+    pagePlanItem ? formatJson(pagePlanItem) : "- `page-plan.json` 中没有找到当前页条目。",
+    "",
+    "## 当前截图",
+    "",
+    `\`${renderedPngPath}\``,
+    "",
+    "## 下一步行动建议",
+    "",
+    [
+      `1. 读取当前页截图文件：\`${renderedPngPath}\`。不要只凭代码或文件名判断质量。`,
+      "2. 按截图自审要求审评当前页，并输出审查结论。结论必须包含：是否通过；如果未通过，逐条写明原因和需要修复的位置。",
+      "3. 截图自审要求：检查文字是否溢出、遮挡、裁切、过小或换行异常；检查标题、图表、注释、页脚、页码和装饰元素是否重叠；检查画面是否空白、比例失衡、视觉重心不稳定或层级混乱；检查内容是否贴合 `page-plan.json` 中的页面目标和核心信息；检查页面是否有结构、组件编排或文案表达上的实质改造，而不是只套蓝图或只替换 data。",
+      "4. 如果发现问题，调用 `record_page_progress` 记录 `page_fix_required`，并把 `review_notes` 写成可执行的修复清单；如果通过自审，调用 `record_page_progress` 记录 `page_accepted`，并在 `review_notes` 中写明通过依据。",
+      "5. `record_page_progress` 成功后，继续调用 `query_task_state` 子工具查询下一阶段要做什么，并重新阅读最新的 `promote/current.md`。",
+    ].join("\n"),
+    "",
+    "## 推荐调用的子工具",
+    "",
+    formatJson([
+      {
+        tool: "record_page_progress",
+        arguments: {
+          project_dir: context.opened.projectDir,
+          page_id: currentPage?.pageId ?? "<page_id>",
+          page_state: "<page_fix_required | page_accepted>",
+          summary: "<当前页截图自审结论摘要>",
+          review_notes: "<通过依据；或未通过原因和需要修复的具体位置>",
+        },
+      },
+      {
+        tool: "query_task_state",
+        arguments: {
+          project_dir: context.opened.projectDir,
+          response_mode: "compact",
+        },
+      },
+    ]),
+  ].join("\n");
+}
+
+function buildPageFixRequiredPromoteMarkdown(context: PromoteRenderContext): string {
+  const currentPage = context.opened.currentPage;
+  const pagePlanItem = getCurrentPagePlanItem(context.opened.pagePlan, currentPage);
+  const ruleFiles = getPromoteRuleFilePaths(context.opened.projectDir);
+  const slideRelativePath = pagePlanItem?.slidePath
+    ?? `./slides/${currentPage?.pageId ? `${toPascalCase(currentPage.pageId)}.tsx` : "SlidePage.tsx"}`;
+  const dataRelativePath = pagePlanItem?.dataPath
+    ?? `./data/${currentPage?.pageId ?? "current-page"}.json`;
+  const slidePath = resolveTemplateWorkFilePath(context.opened.projectDir, slideRelativePath);
+  const dataPath = resolveTemplateWorkFilePath(context.opened.projectDir, dataRelativePath);
+  const manifestPath = context.sourceFiles.templateManifest ?? path.join(context.opened.projectDir, "template", "manifest.json");
+  const componentsDir = path.join(context.opened.projectDir, "template", "components");
+  const pageLabel = currentPage?.pageId ?? "<page_id>";
+  const previousPngPath = currentPage?.lastRenderedPngPath ?? "<上一版当前页 PNG 路径>";
+  const previewOutputDir = path.join(context.opened.projectDir, "output", "page-preview", currentPage?.pageId ?? "current-page");
+  const buildDeckHtmlToolCall = {
+    tool: "buildDeckHtmlFromManifest",
+    arguments: {
+      cwd: path.join(context.opened.projectDir, "output"),
+      manifest_path: manifestPath,
+      output_dir: previewOutputDir,
+      name: currentPage?.pageId ?? "current-page",
+      single_page: true,
+      page: pagePlanItem?.pageNumber ?? currentPage?.pageNumber ?? null,
+    },
+  };
+
+  return [
+    `# Page 阶段行动说明：${pageLabel}`,
+    "",
+    "## 当前阶段",
+    "",
+    `当前 deck 状态是 \`${context.opened.state.deckState}\`，page 状态是 \`${currentPage?.pageState ?? "none"}\`。`,
+    "",
+    "## 本阶段目标",
+    "",
+    "根据上一轮截图自审结论修复当前页，重新生成当前页 PNG 截图，并回到 `page_review`。",
+    "",
+    "## 必读文件",
+    "",
+    formatCodeList([
+      context.sourceFiles.pagePlan,
+      context.sourceFiles.currentPage,
+      ruleFiles.manifestSpec,
+      ruleFiles.tsxAuthoring,
+      ruleFiles.tsxExportRules,
+    ]),
+    "",
+    "## 当前页骨架",
+    "",
+    pagePlanItem ? formatJson(pagePlanItem) : "- `page-plan.json` 中没有找到当前页条目。",
+    "",
+    "## 上一版截图",
+    "",
+    `\`${previousPngPath}\``,
+    "",
+    "## 待修复问题",
+    "",
+    context.latestReviewNotes?.trim()
+      ? context.latestReviewNotes.trim()
+      : "- 未在状态事件中找到明确的 `review_notes`。先根据上一版截图和当前页骨架判断必须修复的问题。",
+    "",
+    "## 下一步行动建议",
+    "",
+    [
+      `1. 读取上一版截图：\`${previousPngPath}\`，并结合上方 \`待修复问题\` 明确本轮要修什么。`,
+      `2. 修改当前页相关工作文件：\`${slidePath}\`、\`${dataPath}\`、\`${manifestPath}\`。优先修复截图指出的问题，不要扩大到整套 deck 重构。`,
+      `3. 修改时严格遵守 \`${ruleFiles.manifestSpec}\`、\`${ruleFiles.tsxAuthoring}\`、\`${ruleFiles.tsxExportRules}\`。如果问题来自布局、层级、组件表达或文字组织，优先调整 \`${slidePath}\`；如果问题来自内容字段，再调整 \`${dataPath}\`；如需复用组件，先检查 \`${componentsDir}\`，没有合适组件就直接在当前页 TSX 中实现局部结构。`,
+      "4. 修复完成后调用 `buildDeckHtmlFromManifest`，使用 `single_page: true` 重新生成当前页 PNG 截图。如果 TSX 报错或渲染失败，分析报错原因，针对性修复，然后继续调用 `buildDeckHtmlFromManifest`，直到成功生成截图。",
+      "5. 截图生成成功后调用 `record_page_progress`，把 `page_state` 记录为 `page_review`，把 `rendered_png_path` 写成 `buildDeckHtmlFromManifest` 返回的 `slide_files[0].output_path`，并在 `review_notes` 中简要说明本轮修复内容。成功后继续调用 `query_task_state`，重新阅读最新的 `promote/current.md`。",
+    ].join("\n"),
+    "",
+    "## 推荐调用的子工具",
+    "",
+    formatJson([
+      buildDeckHtmlToolCall,
+      {
+        tool: "record_page_progress",
+        arguments: {
+          project_dir: context.opened.projectDir,
+          page_id: currentPage?.pageId ?? "<page_id>",
+          page_state: "page_review",
+          summary: "已按 review_notes 修复当前页并重新生成 PNG 截图。",
+          changed_files: [
+            slidePath,
+            dataPath,
+            manifestPath,
+          ],
+          rendered_png_path: "<buildDeckHtmlFromManifest 返回的 slide_files[0].output_path>",
+          rendered_html_path: "<可选；single_page: true 通常不生成 deck HTML，可不填>",
+          review_notes: "<本轮修复了哪些截图问题>",
         },
       },
       {
@@ -1662,6 +1834,14 @@ function buildPagePromoteMarkdown(context: PromoteRenderContext): string {
 
   if (currentPage?.pageState === "page_authoring") {
     return buildPageAuthoringPromoteMarkdown(context);
+  }
+
+  if (currentPage?.pageState === "page_review") {
+    return buildPageReviewPromoteMarkdown(context);
+  }
+
+  if (currentPage?.pageState === "page_fix_required") {
+    return buildPageFixRequiredPromoteMarkdown(context);
   }
 
   const pagePlanItem = getCurrentPagePlanItem(context.opened.pagePlan, currentPage);
@@ -1964,6 +2144,30 @@ function buildManifest(
   };
 }
 
+async function readLatestPageReviewNotes(
+  projectDir: string,
+  pageId?: string,
+): Promise<string | null> {
+  if (!pageId) {
+    return null;
+  }
+
+  const events = await readTaskEvents(projectDir);
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.payload.pageId !== pageId) {
+      continue;
+    }
+
+    const reviewNotes = event.payload.reviewNotes ?? event.payload.review_notes;
+    if (typeof reviewNotes === "string" && reviewNotes.trim().length > 0) {
+      return reviewNotes;
+    }
+  }
+
+  return null;
+}
+
 export async function ensureTaskPromoteDocument(
   opened: OpenTaskProjectResult,
   action: PromoteActionContext,
@@ -1975,6 +2179,9 @@ export async function ensureTaskPromoteDocument(
   const sourceFiles = collectSourceFiles(projectDir);
   const requirements = await readOptionalRequirementsRecord(projectDir);
   const outline = await readOptionalOutlineRecord(projectDir);
+  const latestReviewNotes = kind === "page"
+    ? await readLatestPageReviewNotes(projectDir, opened.currentPage?.pageId)
+    : null;
 
   await mkdir(resolvePromoteDir(projectDir), { recursive: true });
   await mkdir(resolvePromoteDeckDir(projectDir), { recursive: true });
@@ -1990,6 +2197,7 @@ export async function ensureTaskPromoteDocument(
     availableTemplateGroups: action.availableTemplateGroups ?? [],
     generatedAt,
     sourceFiles,
+    latestReviewNotes,
   };
 
   const markdown = kind === "page"
