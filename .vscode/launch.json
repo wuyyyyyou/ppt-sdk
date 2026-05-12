@@ -236,6 +236,19 @@
       "skipFiles": ["<node_internals>/**"]
     },
     {
+      "name": "Engine-Task: Record Deck Review Feedback",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/.vscode/engine/run-plugin-once.mjs",
+      "env": {
+        "ENGINE_STDIN_FILE": "${workspaceFolder}/.vscode/engine/stdin/task-state/record_deck_review_feedback_stdin.json",
+        "ENGINE_STDOUT_FILE": "${workspaceFolder}/.vscode/engine/stdout/task-state/record_deck_review_feedback_stdout.json"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
       "name": "Generator: Describe",
       "type": "node",
       "request": "launch",

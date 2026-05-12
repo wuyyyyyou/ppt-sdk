@@ -462,6 +462,52 @@
 
 运行前建议先跑 `Engine-Task: Query Task`，确认当前状态是 `deck_html_ready`，并且已经按 `promote/deck/deck_html_ready.md` 生成整套 deck HTML。运行时可以直接选择 VS Code launch：`Engine-Task: Advance Task State`。
 
+### `record_deck_review_feedback`
+
+这个子工具用于在 `deck_review_pending` 阶段记录用户对整套 deck HTML 的返修意见。它会把用户指出的页面改成未锁定，并把这些页的状态改为 `page_fix_required`，同时把用户反馈写入 `page-progress.json` 的 `reviewNotes`。
+
+支持参数：
+
+- `cwd`：可选，必须是绝对路径。状态机的文件传输结果会优先写到 `cwd/.executa-file-transport/`。
+- `project_dir`：必填，已有任务项目目录，必须是绝对路径。
+- `pages`：必填，数组。每一项代表一页返修反馈。
+- `pages[].page_id`：必填，需要返修的页面 id。
+- `pages[].summary`：可选，用户反馈摘要。
+- `pages[].review_notes`：可选，整理后的可执行返修清单。
+
+写入行为：
+
+- 写入 `task-state/page-progress.json`，把对应页面设为 `page_fix_required` 且 `locked: false`。
+- 写入 `task-state/current-page.json`，把当前工作页切到第一张待修页。
+- 写入 `task-state/state.json`，把 deck 状态切回 `page_iteration_active`。
+- 写入事件日志 `deck_review_feedback_recorded`。
+
+当前测试样例：
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "invoke",
+  "id": 1,
+  "params": {
+    "tool": "record_deck_review_feedback",
+    "arguments": {
+      "cwd": "${workspaceFolder}/.vscode/engine/output",
+      "project_dir": "${workspaceFolder}/.vscode/engine/output/task-state/create-task-demo",
+      "pages": [
+        {
+          "page_id": "slide-01",
+          "summary": "用户审阅整套 deck HTML 后认为第一页需要加强核心概念表达。",
+          "review_notes": "第一页需要更突出 AI Agent 与普通问答模型的区别；减少泛化文案，增加一条可执行动作链路示例。"
+        }
+      ]
+    }
+  }
+}
+```
+
+运行前建议先跑 `Engine-Task: Advance Task State`，让当前任务进入 `deck_review_pending`。运行时选择 VS Code launch：`Engine-Task: Record Deck Review Feedback`。
+
 ## 检查点和恢复
 
 - `list_task_checkpoints`：列出项目已有的检查点，也可以一起列出分支。

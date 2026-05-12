@@ -37,6 +37,7 @@ const TASK_STATE_MACHINE_TOOL_NAMES = [
   "record_page_plan",
   "start_page_iteration",
   "record_page_progress",
+  "record_deck_review_feedback",
   "advance_task_state",
   "rewind_task_state",
   "branch_task_project",
