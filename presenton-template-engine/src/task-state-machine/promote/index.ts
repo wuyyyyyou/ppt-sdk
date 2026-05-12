@@ -1191,12 +1191,134 @@ function buildCollectRequirementsPromoteMarkdown(context: PromoteRenderContext):
   ].join("\n");
 }
 
+function buildSelectTemplateGroupPromoteMarkdown(context: PromoteRenderContext): string {
+  const { opened, requirements } = context;
+  const requirementsPath = context.sourceFiles.requirements;
+
+  return [
+    `# Deck 阶段行动说明：${opened.state.deckState}`,
+    "",
+    "## 当前阶段",
+    "",
+    `当前 deck 状态是 \`${opened.state.deckState}\`。`,
+    "",
+    "## 本阶段目标",
+    "",
+    "基于已确认的需求，让用户从可用模板组中明确选择一个 `template_group`。",
+    "",
+    "## 必读文件",
+    "",
+    formatCodeList([
+      context.sourceFiles.task,
+      context.sourceFiles.state,
+      requirementsPath,
+    ]),
+    "",
+    "## 当前需求",
+    "",
+    buildRequirementsStatus(requirements),
+    "",
+    "## 可用模板组",
+    "",
+    formatTemplateGroupOptions(context.availableTemplateGroups),
+    "",
+    "## 下一步行动建议",
+    "",
+    [
+      "1. 直接阅读上方 `可用模板组` 列表，不需要再次调用模板发现工具。",
+      "2. 结合 `requirements.json` 中的主题、受众、场景、页数、语气和素材约束，向用户展示候选模板组，并简要说明每个候选项适合或不适合的原因。",
+      "3. 等待用户明确确认一个 `template_group`，不要由 PPT AI Agent 直接替用户拍板。",
+      "4. 用户确认后调用 `record_template_selection` 子工具。这个子工具会把对应模板组 fork 到当前项目的 `template/` 目录，并以 `overwrite: true` 的方式覆盖该工作副本。",
+      "5. `record_template_selection` 成功后，继续调用 `query_task_state` 子工具查询下一阶段要做什么，并重新阅读最新的 `promote/current.md`。",
+    ].join("\n"),
+    "",
+    "## 推荐调用的子工具",
+    "",
+    formatJson([
+      getRecommendedToolCall(context),
+      {
+        tool: "query_task_state",
+        arguments: {
+          project_dir: opened.projectDir,
+          response_mode: "compact",
+        },
+      },
+    ]),
+  ].join("\n");
+}
+
+function buildWriteOutlinePromoteMarkdown(context: PromoteRenderContext): string {
+  const { opened, requirements, outline } = context;
+  const requirementsPath = context.sourceFiles.requirements;
+  const outlinePath = context.sourceFiles.outline;
+
+  return [
+    `# Deck 阶段行动说明：${opened.state.deckState}`,
+    "",
+    "## 当前阶段",
+    "",
+    `当前 deck 状态是 \`${opened.state.deckState}\`。`,
+    "",
+    "## 本阶段目标",
+    "",
+    "根据已确认的用户需求，生成一份可审阅、页数准确、叙事清晰的 PPT 大纲。",
+    "",
+    "## 必读文件",
+    "",
+    formatCodeList([
+      context.sourceFiles.task,
+      context.sourceFiles.state,
+      requirementsPath,
+      outlinePath,
+    ]),
+    "",
+    "## 当前需求",
+    "",
+    buildRequirementsStatus(requirements),
+    "",
+    "## 当前大纲",
+    "",
+    buildOutlineStatus(outline),
+    "",
+    "## 下一步行动建议",
+    "",
+    [
+      `1. 先读取 \`${requirementsPath}\`，把其中的 \`pageCount\` 作为硬约束，大纲页数不能多也不能少。`,
+      "2. 根据用户需求生成整套 deck 的叙事主线、章节结构和逐页安排。每一页都要写清 `pageId`、`pageNumber`、`title`、`goal` 和 `coreMessage`。",
+      "3. 先把大纲草案给用户确认。不要直接开始写页面 TSX，也不要把组件、布局或模板实现细节写进大纲。",
+      "4. 用户确认大纲后，调用 `record_outline` 子工具写入状态机。`record_outline` 成功后，系统会自动派生页面骨架，不需要额外做一轮全 deck 的 `page_plan`。",
+      "5. `record_outline` 成功后，继续调用 `query_task_state` 子工具查询下一阶段要做什么，并重新阅读最新的 `promote/current.md`。",
+    ].join("\n"),
+    "",
+    "## 推荐调用的子工具",
+    "",
+    formatJson([
+      getRecommendedToolCall(context),
+      {
+        tool: "query_task_state",
+        arguments: {
+          project_dir: opened.projectDir,
+          response_mode: "compact",
+        },
+      },
+    ]),
+  ].join("\n");
+}
+
 function buildDeckPromoteMarkdown(context: PromoteRenderContext): string {
   const { opened, action } = context;
   const guidance = getDeckStageGuidance(context);
 
   if (action.type === "collect_requirements") {
     return buildCollectRequirementsPromoteMarkdown(context);
+  }
+
+  if (action.type === "select_template_group") {
+    return buildSelectTemplateGroupPromoteMarkdown(context);
+  }
+
+  if (action.type === "write_outline") {
+    return buildWriteOutlinePromoteMarkdown(context);
   }
 
   return [
