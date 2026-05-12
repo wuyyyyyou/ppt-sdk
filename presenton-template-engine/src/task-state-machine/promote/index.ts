@@ -172,8 +172,28 @@ function getCurrentPagePlanItem(
   return pagePlan.pages.find((page) => page.pageId === currentPage.pageId) ?? null;
 }
 
-function getFirstPagePlanItem(pagePlan: TaskPagePlanRecord | null): TaskPagePlanItem | null {
-  return pagePlan?.pages[0] ?? null;
+function getStartPagePlanItem(
+  pagePlan: TaskPagePlanRecord | null,
+  currentPage: TaskCurrentPageRecord | null,
+): TaskPagePlanItem | null {
+  if (!pagePlan || pagePlan.pages.length === 0) {
+    return null;
+  }
+
+  if (!currentPage) {
+    return pagePlan.pages[0] ?? null;
+  }
+
+  const currentIndex = pagePlan.pages.findIndex((page) => page.pageId === currentPage.pageId);
+  if (currentIndex < 0) {
+    return pagePlan.pages[0] ?? null;
+  }
+
+  if (currentPage.locked) {
+    return pagePlan.pages[currentIndex + 1] ?? null;
+  }
+
+  return pagePlan.pages[currentIndex] ?? null;
 }
 
 function toPascalCase(value: string): string {
@@ -198,6 +218,7 @@ function getPageProgressGuidance(currentPage: TaskCurrentPageRecord | null): str
       return [
         "阅读当前页作业单、页面骨架、模板 README、manifest/catalog 和 `promote/rules/*.md`。",
         "为当前页选择最贴合大纲的蓝图或现有 slide 起点，派生出当前页最终 `slides/*.tsx` 和 `data/*.json`。",
+        "如果 `slides/*.tsx` 或 `data/*.json` 还不存在，先创建它们；如果已经存在，就在现有文件基础上继续精修。",
         "必须做实质改造：当前页不能长期停留在只 re-export 蓝图的状态，也不能只改 data 迁就版式。",
         "同步更新 `manifest.json`，确保当前页有稳定 slide id、title、speaker_note、local source 和 data_path。",
         "完成页面实现后调用 `record_page_progress`，把 `page_state` 记录为 `page_authoring`。",
@@ -235,7 +256,7 @@ function getPageProgressGuidance(currentPage: TaskCurrentPageRecord | null): str
     case "page_locked":
       return [
         "当前页已锁定，不要继续直接修改这一页。",
-        "检查是否还有未锁定页面。",
+        "检查是否还有未锁定页面；如果有，就用 `start_page_iteration` 切换到下一页。",
         "如需修改已锁定页，先通过回退、分支或重新选择页面处理。",
       ];
     default:
@@ -245,6 +266,19 @@ function getPageProgressGuidance(currentPage: TaskCurrentPageRecord | null): str
         "如果当前页状态损坏，先运行 `validate_task_project` 或 `recover_task_project`。",
       ];
   }
+}
+
+function getPageStateGuidance(): string[] {
+  return [
+    "`page_selected`：当前页已选中，开始读取骨架、模板和规则，准备创建或修改当前页文件；完成初始实现后记录 `page_authoring`。",
+    "`page_authoring`：当前页正在实现中，允许继续修改 TSX、data、manifest 或必要组件；渲染完成后记录 `page_rendered`。",
+    "`page_rendered`：当前页已经生成单页 HTML 和 PNG，等待基于截图进入自审；开始审查时记录 `page_review_pending`。",
+    "`page_review_pending`：当前页 PNG 已生成，正在审查是否通过；审查后要么记录 `page_fix_required`，要么记录 `page_accepted`。",
+    "`page_fix_required`：当前页自审未通过，需要根据 `review_notes` 继续修复。",
+    "`page_accepted`：当前页通过自审，可以准备锁定；随后记录 `page_locked`。",
+    "`page_locked`：当前页已经锁定，不应再直接编辑；如需修改，先回退或分支；如果还有未锁定页面，先切换到下一页。",
+    "推荐流转：`page_selected -> page_authoring -> page_rendered -> page_review_pending -> page_fix_required / page_accepted -> page_locked`。",
+  ];
 }
 
 function getDeckStageGuidance(context: PromoteRenderContext): string[] {
@@ -351,8 +385,22 @@ function getDeckStageGuidance(context: PromoteRenderContext): string[] {
 function getRecommendedToolCall(context: PromoteRenderContext): unknown {
   const projectDir = context.opened.projectDir;
   const currentPage = context.opened.currentPage;
-  const pagePlanItem = getCurrentPagePlanItem(context.opened.pagePlan, currentPage)
-    ?? getFirstPagePlanItem(context.opened.pagePlan);
+  const startPagePlanItem = getStartPagePlanItem(context.opened.pagePlan, currentPage);
+  const buildPageProgressCall = (
+    pageState: string,
+    summary: string,
+    extras: Record<string, unknown> = {},
+  ) => ({
+    tool: "record_page_progress",
+    arguments: {
+      project_dir: projectDir,
+      page_id: currentPage?.pageId ?? "<page_id>",
+      page_state: pageState,
+      summary,
+      changed_files: ["<本轮修改的 TSX/JSON/manifest 文件，可选>"],
+      ...extras,
+    },
+  });
 
   switch (context.action.type) {
     case "collect_requirements":
@@ -439,27 +487,55 @@ function getRecommendedToolCall(context: PromoteRenderContext): unknown {
         tool: "start_page_iteration",
         arguments: {
           project_dir: projectDir,
-          page_id: pagePlanItem?.pageId ?? "<page_id>",
-          page_number: pagePlanItem?.pageNumber ?? "<page_number>",
+          page_id: startPagePlanItem?.pageId ?? "<page_id>",
+          page_number: startPagePlanItem?.pageNumber ?? "<page_number>",
         },
       };
+    case "author_current_page":
+      return buildPageProgressCall(
+        "page_authoring",
+        "已完成当前页 TSX、data 和 manifest 的初始实现，准备进入单页渲染。",
+      );
     case "render_current_page":
-    case "review_page_png":
-    case "fix_current_page":
-    case "lock_current_page":
-      return {
-        tool: "record_page_progress",
-        arguments: {
-          project_dir: projectDir,
-          page_id: currentPage?.pageId ?? "<page_id>",
-          page_state: "<page_authoring | page_rendered | page_review_pending | page_fix_required | page_accepted | page_locked>",
-          summary: "<本轮页面实现、渲染或审查摘要>",
-          review_notes: "<PNG 自审结论，可选>",
-          changed_files: ["<本轮修改的 TSX/JSON 文件，可选>"],
-          rendered_html_path: "<单页 HTML 路径，可选>",
-          rendered_png_path: "<单页 PNG 路径，可选>",
+      return buildPageProgressCall(
+        "page_rendered",
+        "已调用 buildDeckHtmlFromManifest 生成当前页单页 HTML 和 PNG。",
+        {
+          rendered_html_path: "<单页 HTML 路径>",
+          rendered_png_path: "<单页 PNG 路径>",
         },
-      };
+      );
+    case "review_page_png":
+      if (currentPage?.pageState === "page_rendered") {
+        return buildPageProgressCall(
+          "page_review_pending",
+          "已开始基于当前页 PNG 做截图自审。",
+          {
+            review_notes: "<PNG 初步自审记录>",
+          },
+        );
+      }
+
+      return buildPageProgressCall(
+        "<page_fix_required | page_accepted>",
+        "已完成当前页 PNG 自审，并根据结果决定修复或接受。",
+        {
+          review_notes: "<PNG 自审结论；不通过时写明必须修复项>",
+        },
+      );
+    case "fix_current_page":
+      return buildPageProgressCall(
+        "page_authoring",
+        "已按 review_notes 修复当前页 TSX、data 或 manifest，准备重新渲染。",
+        {
+          review_notes: "<本轮修复说明>",
+        },
+      );
+    case "lock_current_page":
+      return buildPageProgressCall(
+        "page_locked",
+        "当前页已通过自审并锁定，不再直接修改。",
+      );
     case "request_deck_html_approval":
       return {
         tool: "advance_task_state",
@@ -658,60 +734,307 @@ function buildPagePlanStatus(
   ].join("\n");
 }
 
-function buildPromoteRuleMarkdown(
-  title: string,
-  summary: string,
-  bullets: string[],
-): string {
+function buildManifestRuleMarkdown(): string {
+  const exampleManifest = {
+    title: "Task Deck",
+    theme: {
+      company_name: "PPT AI Agent",
+    },
+    slides: [
+      {
+        id: "slide-01",
+        title: "AI Agent 是什么",
+        speaker_note: "引导用户理解 AI Agent 的基本概念。",
+        source: {
+          type: "local",
+          path: "./slides/Slide01.tsx",
+        },
+        data_path: "./data/slide-01.json",
+      },
+    ],
+  };
+
   return [
-    `# ${title}`,
+    "# PPT Manifest 规则",
     "",
-    summary,
+    "## 文件职责",
     "",
-    ...bullets.map((item) => `- ${item}`),
+    "`manifest.json` 描述一整套 deck 如何装配，它驱动 `ppt-engine.buildDeckHtmlFromManifest`。",
+    "",
+    "它负责：",
+    "",
+    "- deck 标题和默认主题",
+    "- slide 顺序",
+    "- 每页使用哪个 source",
+    "- 每页从哪里读取数据",
+    "- 每页标题和 speaker note",
+    "",
+    "它不负责：",
+    "",
+    "- 模板组发现。模板组发现依赖 `group.json` 和工具内部发现机制。",
+    "- 页面结构说明。页面结构说明主要看 `catalog.json`。",
+    "- TSX 组件实现。页面实现放在 `slides/*.tsx` 和 `components/*.tsx`。",
+    "",
+    "## 推荐结构",
+    "",
+    "fork 后的模板建议采用 TSX-first 的本地页面装配方式：",
+    "",
+    "```json",
+    ...formatJson(exampleManifest).split("\n"),
+    "```",
+    "",
+    "## 顶层字段",
+    "",
+    "- `title`：可选字符串，用于 deck 标题和默认输出文件名。",
+    "- `theme`：可选对象，作为 deck 级默认主题。",
+    "- `slides`：必填非空数组，顺序就是 deck 页面顺序。",
+    "",
+    "## slide 字段",
+    "",
+    "每个 slide 通常需要：",
+    "",
+    "- `id`：在整个 manifest 内唯一，推荐稳定、语义化。",
+    "- `title`：当前页标题。",
+    "- `speaker_note`：当前页备注。",
+    "- `source`：本地页面入口。fork 后模板通常使用 `type: \"local\"`。",
+    "- `data_path`：指向相对于 `manifest.json` 的数据文件。",
+    "",
+    "## local source 规则",
+    "",
+    "- `source.type` 必须是 `local`。",
+    "- `source.path` 必须指向最终页面入口 `./slides/*.tsx`。",
+    "- 不要把 `components/*`、`data/*` 或 `blueprints/*` 写成最终入口。",
+    "- `blueprints/*.tsx` 只是基础页，不是最终 manifest 入口。",
+    "",
+    "## data_path 规则",
+    "",
+    "- 优先使用 `data_path`，让页面数据保存在 `data/*.json`。",
+    "- `data_path` 相对 `manifest.json` 解析。",
+    "- 数据文件顶层必须是对象。",
+    "- 如果同时存在 `data_path` 和 `data`，优先使用 `data_path`。",
+    "",
+    "## TSX-first 蓝图模板组",
+    "",
+    "- `blueprints/*.tsx` 是可复制的基础页和起始结构。",
+    "- `slides/*.tsx` 是最终页面，应该直接承载具体 deck 的结构、组件编排和表达。",
+    "- 新 deck 优先从 `blueprints/*.tsx` 派生 `slides/*.tsx`，再在最终页面里直接修改。",
+    "- 不要只改 manifest 或 data 来迁就版式；结构和表达必须在最终 slide 中解决。",
+    "",
+    "## 推荐示例",
+    "",
+    "```json",
+    ...formatJson(exampleManifest.slides[0]).split("\n"),
+    "```",
+    "",
+    "## 失败模式",
+    "",
+    "- manifest 指向 `blueprints/*.tsx`。",
+    "- manifest 把页面结构责任推给 data。",
+    "- manifest 没有同步更新 `data_path` 或 `speaker_note`。",
+    "- 一个 deck 仍然依赖不稳定的临时入口。",
   ].join("\n");
 }
 
-function buildManifestRuleMarkdown(): string {
-  return buildPromoteRuleMarkdown(
-    "PPT Manifest 规则",
-    "页级页面实现优先通过 manifest.json 装配，manifest 负责 slide 顺序、source、data_path、title 和 speaker_note。",
-    [
-      "manifest 只引用 `./slides/*.tsx`，不要直接把最终 deck 绑定到 `blueprints/*.tsx` 或 `reference-slides/*.tsx`。",
-      "如果当前页需要新增或替换页面入口，优先修改 `slides/*.tsx`，再同步更新 `manifest.json`。",
-      "如果页面内容变化，优先更新 `data/*.json`；如果布局、组件编排或数据契约变化，才改 `slides/*.tsx`。",
-      "当前页的 `source.path` 应指向最终页面入口，`data_path` 应指向当前页的数据文件。",
-      "不要用 manifest 承担页面结构决策；页面结构要留给当前页 TSX 和组件组合。",
-    ],
-  );
-}
-
 function buildTsxAuthoringRuleMarkdown(): string {
-  return buildPromoteRuleMarkdown(
-    "PPT TSX 编写规则",
-    "当前页 TSX 是最终可导出的 PPT 页面，不是普通 React 网页，也不是只读蓝图。",
-    [
-      "先从最接近当前页结构的 `blueprints/*.tsx` 派生，再落到 `slides/*.tsx` 继续改。",
-      "必须在当前页 TSX 中完成页面结构、组件编排、数据映射和可编辑文本的最终决定。",
-      "如果当前页只是在 re-export 蓝图，说明还没有真正进入精修状态，必须继续改。",
-      "优先复用 `components/*.tsx`，但不要为了复用组件牺牲当前页表达的贴合度。",
-      "修改 TSX 时要同时考虑 `Schema`、默认值、layout metadata 和可导出稳定性。",
+  const exampleData = {
+    title: "AI Agent 是什么",
+    subtitle: "最直观的基本概念说明",
+    bullets: [
+      "AI Agent 不只是回答问题。",
+      "AI Agent 会围绕目标执行动作。",
+      "AI Agent 通常会调用工具并持续反馈。",
     ],
-  );
+  };
+
+  return [
+    "# PPT TSX 编写规范",
+    "",
+    "## 目标",
+    "",
+    "本地 TSX 不是普通网页组件，而是一页可导出的 PPT slide。",
+    "",
+    "每个 `slides/*.tsx` 文件负责：",
+    "",
+    "- 接收一页 `data`",
+    "- 用 `Schema` 校验和补默认值",
+    "- 复用 `components/` 中的稳定组件",
+    "- 输出固定 1280x720 的单页画布",
+    "",
+    "不要在一个 TSX 文件里生成整套 deck。",
+    "",
+    "## 组件优先原则",
+    "",
+    "页面不是固定版式模板，而是组件编排结果。",
+    "",
+    "写 TSX 时先想这三个问题：",
+    "",
+    "1. 这一页由哪些组件块组成",
+    "2. 哪些组件是主结构，哪些是辅助结构",
+    "3. 哪些区域是可替换槽位，哪些区域是稳定壳",
+    "",
+    "## 目录结构",
+    "",
+    "fork 后模板采用 TSX-first 蓝图结构，通常包含 `manifest.json`、`catalog.json`、`blueprints/`、`slides/`、`components/`、`data/`、`theme/` 和 `group.json`。",
+    "",
+    "## 必须导出",
+    "",
+    "每个 `slides/*.tsx` 必须导出：`Schema`、默认 React 组件、`layoutId`、`layoutName`、`layoutDescription`。",
+    "",
+    "推荐继续导出：`layoutTags`、`layoutRole`、`contentElements`、`useCases`、`density`、`visualWeight`、`editableTextPriority`。",
+    "",
+    "## 推荐骨架",
+    "",
+    "```tsx",
+    "import React from \"react\";",
+    "import * as z from \"zod\";",
+    "",
+    "export const Schema = z.object({",
+    "  title: z.string().min(2).max(20).default(\"AI Agent 是什么\"),",
+    "  bullets: z.array(z.string().min(4).max(40)).min(1).max(4).default([",
+    "    \"AI Agent 不只是回答问题。\",",
+    "  ]),",
+    "});",
+    "",
+    "export const layoutId = \"slide-01\";",
+    "export const layoutName = \"Slide 01\";",
+    "export const layoutDescription = \"A customized page for the current outline item.\";",
+    "",
+    "const Slide01 = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {",
+    "  const parsed = Schema.parse(data ?? {});",
+    "",
+    "  return <div className=\"h-[720px] w-[1280px]\">{parsed.title}</div>;",
+    "};",
+    "",
+    "export default Slide01;",
+    "```",
+    "",
+    "## Schema 规则",
+    "",
+    "- 组件读取的所有字段都必须出现在 `Schema`。",
+    "- 渲染时优先使用 `parsed`，不要继续直接读取原始 `data`。",
+    "- 用 `.min()`、`.max()`、数组限制控制文本长度和列表数量。",
+    "- 给标题、列表、图表、卡片等字段提供合理默认值。",
+    "- 避免 `any`、`foo`、`data2` 和过深嵌套。",
+    "",
+    "## 数据与 TSX 的配合",
+    "",
+    "1. 先读对应 TSX 的 `Schema`。",
+    "2. 再改 `data/*.json`，让数据满足 schema。",
+    "3. 如果用户需求确实超出现有 schema，才修改 TSX 的 schema 和布局。",
+    "4. 修改后保持 `manifest.json` 的 `data_path` 与数据文件一致。",
+    "",
+    "## 组件复用原则",
+    "",
+    "- 先读 `blueprints/README.md`、`components/README.md`、`slides/README.md`。",
+    "- 优先复用 `components/` 里的稳定组件。",
+    "- 新增或手写与现有组件语义重叠的 UI 前，先确认是否已有合适组件。",
+    "- 如果多个页面需要同一种新视觉能力，优先组合已有组件，再考虑小幅扩展 `components/*.tsx`。",
+    "",
+    "## TSX-first 蓝图规则",
+    "",
+    "- 先从最接近当前页结构的 `blueprints/*.tsx` 派生，再落到 `slides/*.tsx` 继续改。",
+    "- `slides/*.tsx` 不应长期停留在只 re-export 蓝图的状态。",
+    "- 不要只改 `data/*.json` 或 `manifest.json` 来迁就版式。",
+    "- 如果用户需求要求改变布局、组件组合、层级、视觉风格或信息密度，必须修改 `slides/*.tsx`。",
+    "",
+    "## 布局规则",
+    "",
+    "- 外层必须是固定 slide 画布：`h-[720px] w-[1280px]`，或复用已经固定画布的 frame 组件。",
+    "- 页面内容必须完整出现在首屏，不依赖滚动、hover、点击或动画。",
+    "",
+    "## 示例数据",
+    "",
+    "```json",
+    ...formatJson(exampleData).split("\n"),
+    "```",
+  ].join("\n");
 }
 
 function buildTsxExportRuleMarkdown(): string {
-  return buildPromoteRuleMarkdown(
-    "PPT TSX 导出与截图规则",
-    "当前页修改完成后，要走现有 deck HTML 生成链路，再基于当前页 PNG 做自审。",
-    [
-      "调用 `buildDeckHtmlFromManifest` 生成 deck HTML；如果只检查当前页，使用 `single_page: true` 并传入当前页页码。",
-      "生成后先检查当前页的 PNG，不要只看 HTML 或 TSX 源码。",
-      "自审重点是文字溢出、遮挡、空白、错位、图表比例、视觉重心和内容是否贴合大纲。",
-      "如果当前页不通过，调用 `record_page_progress` 记录 `page_fix_required`，带上 review notes 后继续修复。",
-      "当前页通过后再记录 `page_accepted`，然后锁定页面。",
-    ],
-  );
+  const buildDeckHtmlExample = {
+    tool: "buildDeckHtmlFromManifest",
+    arguments: {
+      cwd: "./output",
+      manifest_path: "./template/manifest.json",
+      output_dir: "./output/page-preview/slide-01",
+      name: "slide-01",
+      single_page: true,
+      page: 1,
+    },
+  };
+
+  return [
+    "# PPT TSX 导出稳定性规则",
+    "",
+    "## 目标",
+    "",
+    "TSX 的最终目标不是网页展示，而是进入 `buildDeckHtmlFromManifest`、deck HTML 与每页截图、HTML 到 PPT 模型以及最终 PPTX 导出。",
+    "",
+    "## 核心原则",
+    "",
+    "- 固定 1280x720 单页画布。",
+    "- 无需滚动、点击、hover、动画即可完整展示。",
+    "- 关键标题、正文、bullet、指标说明保持为真实文本节点。",
+    "- 图形主导模块可以截图，但不要把大段可编辑正文一起截图。",
+    "- 布局有明确边界，文字长度和列表数量受控。",
+    "",
+    "## 禁止事项",
+    "",
+    "- 可滚动长页面。",
+    "- 依赖交互或动画过程表达信息。",
+    "- 把关键文字画到 canvas 或整张图片里。",
+    "- 用复杂 CSS 特效承载关键内容。",
+    "- 让内容自动撑破 1280x720 画布。",
+    "",
+    "## 文本结构规则",
+    "",
+    "- 关键文本尽量拆成独立文本块，不要把图标、前缀和正文混在一个复杂节点里。",
+    "- 关键单行文本应有明确宽度，必要时使用 `whitespace-nowrap`。",
+    "- 固定高度的单行文本盒应使用 `flex` 或 `inline-flex` 明确垂直居中。",
+    "",
+    "## 图表与截图规则",
+    "",
+    "- 图形主导模块默认应在外层加 `data-pptx-export=\"screenshot\"`。",
+    "- 文本主导模块默认不要整块截图。",
+    "- 混合型模块只截图纯图形区域，不要把标题、正文、结论一起包进去。",
+    "- 截图容器必须有明确宽高、明确背景、边界收敛到单个图表或纯图形模块。",
+    "",
+    "## 导出示例",
+    "",
+    "```json",
+    ...formatJson(buildDeckHtmlExample).split("\n"),
+    "```",
+    "",
+    "## 生成 HTML 后的自检清单",
+    "",
+    "- 是否有文字溢出、裁切、换行异常。",
+    "- 是否有元素超出页面边界。",
+    "- 是否有文字或 UI 重叠。",
+    "- 图表是否空白、错位、比例异常。",
+    "- 图片是否缺失或拉伸异常。",
+    "- 页面标题、页码、顺序是否正确。",
+    "- 内容是否贴合用户需求和已确认大纲。",
+    "- 所有页面是否都在 1280x720 内完整展示。",
+    "",
+    "## 修改后流程",
+    "",
+    "1. 回到 `slides/*.tsx`、`components/*.tsx` 或 `data/*.json` 修复。",
+    "2. 重新调用 `buildDeckHtmlFromManifest`。",
+    "3. 再次检查所有受影响页面截图。",
+    "4. 截图没有明显问题后，才能把 HTML 路径给用户审阅。",
+    "",
+    "## 修改前后的自检",
+    "",
+    "- 已加载 `ppt-tsx-authoring`。",
+    "- 已读对应 `Schema`。",
+    "- 已确认数据是否满足 schema。",
+    "- 已判断问题是数据问题、布局问题还是导出兼容问题。",
+    "- 没有新增第三方库。",
+    "- 没有把关键文本截图化。",
+    "- 没有引入滚动、hover、点击依赖。",
+    "- 没有使用复杂 CSS 承载关键内容。",
+    "- 已重新生成 HTML 并检查截图。",
+  ].join("\n");
 }
 
 function buildPagePlanPromoteChecklist(
@@ -806,8 +1129,8 @@ function buildPageSummary(
     `- 页面标题：${pagePlanItem?.title ?? "未记录"}`,
     `- 页面目标：${pagePlanItem?.goal ?? "未记录"}`,
     `- 核心信息：${pagePlanItem?.coreMessage ?? "未记录"}`,
-    `- 建议 slide 文件：${pagePlanItem?.slidePath ? `\`${pagePlanItem.slidePath}\`` : "未记录"}`,
-    `- 建议 data 文件：${pagePlanItem?.dataPath ? `\`${pagePlanItem.dataPath}\`` : "未记录"}`,
+    `- 建议 slide 文件：${pagePlanItem?.slidePath ? `\`${pagePlanItem.slidePath}\`` : "未记录"}（不存在则先创建，已存在则在当前文件基础上继续精修）`,
+    `- 建议 data 文件：${pagePlanItem?.dataPath ? `\`${pagePlanItem.dataPath}\`` : "未记录"}（不存在则先创建，已存在则按当前页继续补充或修正）`,
     `- 最近 PNG：${currentPage.lastRenderedPngPath ? `\`${currentPage.lastRenderedPngPath}\`` : "无"}`,
     `- 页级有效工件：\n${formatList(pageArtifacts)}`,
   ].join("\n");
@@ -921,6 +1244,10 @@ function buildPagePromoteMarkdown(context: PromoteRenderContext): string {
     "",
     "只打磨当前这一页。不要一次性改完整套 deck。",
     "",
+    "## 当前页推荐动作",
+    "",
+    context.action.summary,
+    "",
     "## 必读文件",
     "",
     formatCodeList([
@@ -942,11 +1269,15 @@ function buildPagePromoteMarkdown(context: PromoteRenderContext): string {
     "",
     buildPageSummary(currentPage, pagePlanItem, context.opened.artifacts),
     "",
+    "## page_state 说明",
+    "",
+    formatList(getPageStateGuidance()),
+    "",
     "## 当前页改造目标",
     "",
     formatList([
-      `当前页 slide 入口建议为 \`${currentPageSlide}\`。`,
-      `当前页数据文件建议为 \`${currentPageData}\`。`,
+      `当前页 slide 入口建议为 \`${currentPageSlide}\`；如果该文件不存在，就先创建它；如果已经存在，就在它基础上继续精修。`,
+      `当前页数据文件建议为 \`${currentPageData}\`；如果该文件不存在，就先创建它；如果已经存在，就按当前页内容继续补充或修正。`,
       "如果现有页面只是蓝图复用，必须继续改成贴合当前大纲的最终页面。",
       "如果当前页只是改了 data，没有改结构或组件，也不算通过。",
       "如果当前页已引入新组件或改造现有组件，说明进入了真正的精修阶段。",
@@ -956,8 +1287,8 @@ function buildPagePromoteMarkdown(context: PromoteRenderContext): string {
     "## 当前页修改范围",
     "",
     formatList([
-      `\`${currentPageSlide}\`：当前页最终 TSX 入口，负责页面结构、组件编排和表达方式。`,
-      `\`${currentPageData}\`：当前页内容数据，只承载内容，不承载布局决策。`,
+      `\`${currentPageSlide}\`：当前页最终 TSX 入口，负责页面结构、组件编排和表达方式；不存在就创建，存在就精修。`,
+      `\`${currentPageData}\`：当前页内容数据，只承载内容，不承载布局决策；不存在就创建，存在就按当前页继续补充。`,
       `\`${manifestPath}\`：如果当前页新增、替换或重排入口，需要同步更新。`,
       "`template/components/*.tsx`：只有当当前页确实缺少可复用组件、或者需要抽象重复结构时才改。",
     ]),

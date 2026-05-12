@@ -360,6 +360,56 @@
 
 运行前需要先跑 `Engine-Task: Record Outline`，确保当前项目里已经有大纲和自动生成的页面骨架。
 
+### `record_page_progress`
+
+这个子工具用于记录单页当前进度，并把当前页推进到下一种 page 状态。
+
+支持参数：
+
+- `cwd`：可选，必须是绝对路径。状态机的文件传输结果会优先写到 `cwd/.executa-file-transport/`。
+- `project_dir`：必填，已有任务项目目录，必须是绝对路径。
+- `page_id`：必填，要记录进度的页面 id。
+- `page_state`：必填，要写入的页面状态。当前支持 `page_selected`、`page_authoring`、`page_rendered`、`page_review_pending`、`page_fix_required`、`page_accepted`、`page_locked`。
+- `summary`：必填，本轮页面工作的摘要。
+- `review_notes`：可选，PNG 自审意见或修复说明。
+- `changed_files`：可选，字符串数组。本轮实际修改过的 TSX、JSON 或其他页面相关文件路径。
+- `rendered_html_path`：可选，单页 HTML 路径。
+- `rendered_png_path`：可选，单页 PNG 路径。
+
+写入行为：
+
+- 写入 `task-state/current-page.json`，更新当前页的 page 状态。
+- 写入 `task-state/state.json`，同步 deck 状态、当前页状态和可推进状态。
+- 写入事件日志，记录本次页级阶段变化。
+- 如果写入的是 `page_locked`，并且所有页面都已锁定，deck 状态会推进到 `deck_html_ready`。
+
+当前测试样例：
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "invoke",
+  "id": 1,
+  "params": {
+    "tool": "record_page_progress",
+    "arguments": {
+      "cwd": "${workspaceFolder}/.vscode/engine/output",
+      "project_dir": "${workspaceFolder}/.vscode/engine/output/task-state/create-task-demo",
+      "page_id": "slide-01",
+      "page_state": "page_authoring",
+      "summary": "已完成当前页的初步结构调整，准备进入单页渲染。",
+      "changed_files": [
+        "template/slides/Slide01.tsx",
+        "template/data/slide-01.json",
+        "template/manifest.json"
+      ]
+    }
+  }
+}
+```
+
+运行前需要先跑 `Engine-Task: Start Page Iteration`，确保当前页已经存在于 `current-page.json`，这样 `record_page_progress` 才能正确推进页面状态。
+
 ## 单页实现流程
 
 - `start_page_iteration`：选择某一页，进入这一页的设计和实现流程。

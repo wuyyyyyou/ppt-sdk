@@ -23,6 +23,7 @@ export interface TaskRecommendedAction {
     | "fork_template_group"
     | "write_outline"
     | "start_page_authoring"
+    | "author_current_page"
     | "render_current_page"
     | "review_page_png"
     | "fix_current_page"
@@ -86,8 +87,10 @@ export function getTaskStateQueryResult(result: OpenTaskProjectResult): TaskStat
   };
 }
 
-function getDefaultRecommendedAction(deckState: TaskRuntimeStateRecord["deckState"]): TaskRecommendedAction {
-  switch (deckState) {
+function getDefaultRecommendedAction(result: OpenTaskProjectResult): TaskRecommendedAction {
+  const { state, currentPage } = result;
+
+  switch (state.deckState) {
     case "initialized":
       return {
         type: "collect_requirements",
@@ -119,7 +122,56 @@ function getDefaultRecommendedAction(deckState: TaskRuntimeStateRecord["deckStat
     case "page_plan_ready":
       return { type: "start_page_authoring", summary: "先阅读 promote/current.md，再开始逐页实现。", requiresUserInput: false };
     case "page_iteration_active":
-      return { type: "render_current_page", summary: "先阅读 promote/current.md，再对当前页进行单页渲染。", requiresUserInput: false };
+      switch (currentPage?.pageState) {
+        case "page_selected":
+          return {
+            type: "author_current_page",
+            summary: "先阅读 promote/current.md 和当前页作业单，完成当前页 TSX、data 和 manifest 的初始实现；完成后记录 page_authoring。",
+            requiresUserInput: false,
+          };
+        case "page_authoring":
+          return {
+            type: "render_current_page",
+            summary: "先阅读 promote/current.md，再用当前页的 TSX 和 data 生成单页 HTML 与 PNG。",
+            requiresUserInput: false,
+          };
+        case "page_rendered":
+          return {
+            type: "review_page_png",
+            summary: "先阅读 promote/current.md，再打开当前页 PNG 进行自审；通过则记录 page_review_pending 并继续判断是否 page_accepted，发现问题则记录 page_fix_required。",
+            requiresUserInput: false,
+          };
+        case "page_review_pending":
+          return {
+            type: "review_page_png",
+            summary: "先阅读 promote/current.md，基于当前页 PNG 做最终审查；通过则记录 page_accepted，发现问题则记录 page_fix_required。",
+            requiresUserInput: false,
+          };
+        case "page_fix_required":
+          return {
+            type: "fix_current_page",
+            summary: "先阅读 promote/current.md 和 review_notes，修复当前页 TSX、data 或 manifest；修复完成后回到 page_authoring 再重新渲染。",
+            requiresUserInput: false,
+          };
+        case "page_accepted":
+          return {
+            type: "lock_current_page",
+            summary: "先阅读 promote/current.md，确认当前页通过自审后锁定当前页。",
+            requiresUserInput: false,
+          };
+        case "page_locked":
+          return {
+            type: "start_page_authoring",
+            summary: "当前页已锁定，先阅读 promote/current.md，然后切换到下一页继续逐页实现。",
+            requiresUserInput: false,
+          };
+        default:
+          return {
+            type: "author_current_page",
+            summary: "先阅读 promote/current.md，再继续当前页的实现、渲染和自审闭环。",
+            requiresUserInput: false,
+          };
+      }
     case "deck_html_ready":
       return { type: "request_deck_html_approval", summary: "先阅读 promote/current.md，再请求用户确认整套 HTML。", requiresUserInput: true };
     case "deck_review_pending":
@@ -171,6 +223,10 @@ function getRequiredInputs(
 
   if (recommendedAction.type === "write_outline") {
     return ["outline.narrative", "outline.sections", "outline.pages"];
+  }
+
+  if (recommendedAction.type === "author_current_page") {
+    return result.currentPage ? [] : ["current_page"];
   }
 
   if (recommendedAction.type === "start_page_authoring") {
@@ -226,7 +282,7 @@ function getExpectedArtifacts(
 export async function getRecommendedActionResult(
   result: OpenTaskProjectResult,
 ): Promise<RecommendedActionResult> {
-  const recommendedAction = getDefaultRecommendedAction(result.state.deckState);
+  const recommendedAction = getDefaultRecommendedAction(result);
   const requirements = await readOptionalRequirementsRecord(result.projectDir);
   const requiredInputs = getRequiredInputs(result, recommendedAction, requirements);
   const expectedArtifacts = getExpectedArtifacts(result, recommendedAction);
