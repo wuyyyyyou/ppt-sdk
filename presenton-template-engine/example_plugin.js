@@ -56,7 +56,7 @@ const MAX_STDOUT_RESPONSE_BYTES = 512 * 1024;
 const MANIFEST = {
   name: "tool-lightvoss_5433-ppt-engine-6443rj2a",
   display_name: "ppt-engine",
-  version: "1.2.2",
+  version: "2.0.0",
   description:
     "Anna Executa plugin for Presenton template discovery, manifest-based deck HTML generation, deck HTML to PPTX model conversion, and stability validation.",
   author: "Anna Developer",
