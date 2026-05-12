@@ -72,7 +72,11 @@ export interface RecommendedActionResult {
 export function buildTaskStateSnapshot(result: OpenTaskProjectResult): TaskStateSnapshot {
   return {
     task: result.task,
-    state: result.state,
+    state: {
+      ...result.state,
+      pageState: getEffectivePageState(result) ?? result.state.pageState,
+      allowedTransitions: getEffectiveAllowedTransitions(result),
+    },
     currentPage: result.currentPage,
     pagePlan: result.pagePlan,
     artifacts: result.artifacts,
@@ -83,12 +87,53 @@ export function getTaskStateQueryResult(result: OpenTaskProjectResult): TaskStat
   return {
     ...buildTaskStateSnapshot(result),
     blockedBy: result.state.blockedBy,
-    allowedTransitions: result.state.allowedTransitions,
+    allowedTransitions: getEffectiveAllowedTransitions(result),
   };
 }
 
+function normalizePageState(pageState: string | undefined): TaskRuntimeStateRecord["pageState"] {
+  if (pageState === "page_rendered" || pageState === "page_review_pending") {
+    return "page_review";
+  }
+
+  return pageState as TaskRuntimeStateRecord["pageState"];
+}
+
+function getEffectivePageState(result: OpenTaskProjectResult): TaskRuntimeStateRecord["pageState"] {
+  return normalizePageState(result.currentPage?.pageState ?? result.state.pageState);
+}
+
+function getEffectiveAllowedTransitions(result: OpenTaskProjectResult): TaskRuntimeStateRecord["allowedTransitions"] {
+  if (result.state.deckState === "page_iteration_active") {
+    switch (getEffectivePageState(result)) {
+      case "page_selected":
+        return ["page_authoring"];
+      case "page_authoring":
+        return ["page_review"];
+      case "page_review":
+        return ["page_accepted", "page_fix_required"];
+      case "page_fix_required":
+        return ["page_authoring"];
+      case "page_accepted":
+        return ["page_locked"];
+      case "page_locked":
+        return [];
+      default:
+        return ["page_authoring"];
+    }
+  }
+
+  return result.state.allowedTransitions.map((operation) => {
+    const operationName = String(operation);
+    return operationName === "page_rendered" || operationName === "page_review_pending"
+      ? "page_review"
+      : operation;
+  });
+}
+
 function getDefaultRecommendedAction(result: OpenTaskProjectResult): TaskRecommendedAction {
-  const { state, currentPage } = result;
+  const { state } = result;
+  const currentPageState = getEffectivePageState(result);
 
   switch (state.deckState) {
     case "initialized":
@@ -122,7 +167,7 @@ function getDefaultRecommendedAction(result: OpenTaskProjectResult): TaskRecomme
     case "page_plan_ready":
       return { type: "start_page_authoring", summary: "先阅读 promote/current.md，再开始逐页实现。", requiresUserInput: false };
     case "page_iteration_active":
-      switch (currentPage?.pageState) {
+      switch (currentPageState) {
         case "page_selected":
           return {
             type: "author_current_page",
@@ -132,19 +177,13 @@ function getDefaultRecommendedAction(result: OpenTaskProjectResult): TaskRecomme
         case "page_authoring":
           return {
             type: "render_current_page",
-            summary: "先阅读 promote/current.md，再用当前页的 TSX 和 data 生成单页 HTML 与 PNG。",
+            summary: "先阅读 promote/current.md，再用当前页的 TSX 和 data 生成单页 HTML 与 PNG；成功后进入 page_review。",
             requiresUserInput: false,
           };
-        case "page_rendered":
+        case "page_review":
           return {
             type: "review_page_png",
-            summary: "先阅读 promote/current.md，再打开当前页 PNG 进行自审；通过则记录 page_review_pending 并继续判断是否 page_accepted，发现问题则记录 page_fix_required。",
-            requiresUserInput: false,
-          };
-        case "page_review_pending":
-          return {
-            type: "review_page_png",
-            summary: "先阅读 promote/current.md，基于当前页 PNG 做最终审查；通过则记录 page_accepted，发现问题则记录 page_fix_required。",
+            summary: "先阅读 promote/current.md，基于当前页 PNG 做截图审查；通过则记录 page_accepted，发现问题则记录 page_fix_required。",
             requiresUserInput: false,
           };
         case "page_fix_required":
@@ -286,25 +325,40 @@ export async function getRecommendedActionResult(
   const requirements = await readOptionalRequirementsRecord(result.projectDir);
   const requiredInputs = getRequiredInputs(result, recommendedAction, requirements);
   const expectedArtifacts = getExpectedArtifacts(result, recommendedAction);
+  const allowedOperations = getEffectiveAllowedTransitions(result);
   const availableTemplateGroups = recommendedAction.type === "select_template_group"
     ? await listDiscoveredTemplateGroupSummaries({ include_builtin: true })
     : undefined;
-  const promote = await ensureTaskPromoteDocument(result, {
+  const effectiveResult: OpenTaskProjectResult = {
+    ...result,
+    state: {
+      ...result.state,
+      pageState: getEffectivePageState(result) ?? result.state.pageState,
+      allowedTransitions: allowedOperations,
+    },
+    currentPage: result.currentPage
+      ? {
+        ...result.currentPage,
+        pageState: getEffectivePageState(result) ?? result.currentPage.pageState,
+      }
+      : result.currentPage,
+  };
+  const promote = await ensureTaskPromoteDocument(effectiveResult, {
     type: recommendedAction.type,
     summary: recommendedAction.summary,
     requiredInputs,
     expectedArtifacts,
-    allowedOperations: result.state.allowedTransitions,
+    allowedOperations,
     availableTemplateGroups,
   });
   return {
     deckState: result.state.deckState,
-    pageState: result.state.pageState,
+    pageState: getEffectivePageState(result) ?? result.state.pageState,
     recommendedAction,
     blockedBy: result.state.blockedBy,
     requiredInputs,
     expectedArtifacts,
-    allowedOperations: result.state.allowedTransitions,
+    allowedOperations,
     agentInstruction: `先阅读 ${promote.entryPath}，再按 ${promote.path} 中的步骤执行。`,
     promote,
     promotePath: promote.path,

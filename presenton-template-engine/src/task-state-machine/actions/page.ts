@@ -28,6 +28,7 @@ export interface RecordPageProgressInput {
   pageState:
     | "page_selected"
     | "page_authoring"
+    | "page_review"
     | "page_rendered"
     | "page_review_pending"
     | "page_fix_required"
@@ -53,16 +54,14 @@ function nowIso(): string {
 }
 
 function buildAllowedTransitions(
-  pageState: RecordPageProgressInput["pageState"],
+  pageState: TaskCurrentPageRecord["pageState"],
 ): TaskRuntimeStateRecord["allowedTransitions"] {
   switch (pageState) {
     case "page_selected":
       return ["page_authoring"];
     case "page_authoring":
-      return ["page_rendered"];
-    case "page_rendered":
-      return ["page_review_pending"];
-    case "page_review_pending":
+      return ["page_review"];
+    case "page_review":
       return ["page_accepted", "page_fix_required"];
     case "page_fix_required":
       return ["page_authoring"];
@@ -74,17 +73,15 @@ function buildAllowedTransitions(
 }
 
 function getPageProgressEventType(
-  pageState: RecordPageProgressInput["pageState"],
+  pageState: TaskCurrentPageRecord["pageState"],
 ): "page_selected" | "page_authoring_started" | "page_rendered" | "page_reviewed" | "page_fixed" | "page_accepted" | "page_locked" {
   switch (pageState) {
     case "page_selected":
       return "page_selected";
     case "page_authoring":
       return "page_authoring_started";
-    case "page_rendered":
+    case "page_review":
       return "page_rendered";
-    case "page_review_pending":
-      return "page_reviewed";
     case "page_fix_required":
       return "page_fixed";
     case "page_accepted":
@@ -92,6 +89,16 @@ function getPageProgressEventType(
     case "page_locked":
       return "page_locked";
   }
+}
+
+function normalizePageProgressState(
+  pageState: RecordPageProgressInput["pageState"],
+): TaskCurrentPageRecord["pageState"] {
+  if (pageState === "page_rendered" || pageState === "page_review_pending") {
+    return "page_review";
+  }
+
+  return pageState;
 }
 
 async function isAllPagesLocked(
@@ -126,7 +133,7 @@ async function isAllPagesLocked(
 function buildPageStateRecord(
   projectId: string,
   pageId: string,
-  pageState: RecordPageProgressInput["pageState"],
+  pageState: TaskCurrentPageRecord["pageState"],
   pageNumber?: number,
   renderedHtmlPath?: string,
   renderedPngPath?: string,
@@ -198,6 +205,7 @@ export async function startPageIteration(
 export async function recordPageProgress(
   input: RecordPageProgressInput,
 ): Promise<PageProgressResult> {
+  const pageState = normalizePageProgressState(input.pageState);
   const task = await readOptionalTaskRecord(input.projectDir);
   if (!task) {
     throw new Error(`task.json not found in ${input.projectDir}`);
@@ -210,12 +218,12 @@ export async function recordPageProgress(
 
   const existingPage = await readOptionalCurrentPageRecord(input.projectDir);
   const currentPage = {
-    ...(existingPage ?? buildPageStateRecord(task.projectId, input.pageId, input.pageState)),
+    ...(existingPage ?? buildPageStateRecord(task.projectId, input.pageId, pageState)),
     projectId: task.projectId,
     pageId: input.pageId,
-    pageState: input.pageState,
+    pageState,
     updatedAt: nowIso(),
-    locked: input.pageState === "page_locked",
+    locked: pageState === "page_locked",
     lastRenderedHtmlPath: input.renderedHtmlPath ?? existingPage?.lastRenderedHtmlPath,
     lastRenderedPngPath: input.renderedPngPath ?? existingPage?.lastRenderedPngPath,
   };
@@ -225,17 +233,17 @@ export async function recordPageProgress(
   const pagePlan = await readOptionalPagePlanRecord(input.projectDir);
   const allPagesLocked = await isAllPagesLocked(input.projectDir, pagePlan, currentPage);
   const nextDeckState: TaskRuntimeStateRecord["deckState"] =
-    allPagesLocked && input.pageState === "page_locked" ? "deck_html_ready" : "page_iteration_active";
+    allPagesLocked && pageState === "page_locked" ? "deck_html_ready" : "page_iteration_active";
 
   const nextState: TaskRuntimeStateRecord = {
     ...state,
     updatedAt: nowIso(),
     deckState: nextDeckState,
-    pageState: input.pageState,
+    pageState,
     currentPageId: input.pageId,
     blockedBy:
-      input.pageState === "page_review_pending" ? ["page_png_review"] : [],
-    allowedTransitions: buildAllowedTransitions(input.pageState),
+      pageState === "page_review" ? ["page_png_review"] : [],
+    allowedTransitions: buildAllowedTransitions(pageState),
     allPagesLocked,
     recoverable: true,
   };
@@ -244,7 +252,7 @@ export async function recordPageProgress(
   const timestamp = nowIso();
   await appendTaskEvent(input.projectDir, {
     eventId: randomUUID(),
-    eventType: getPageProgressEventType(input.pageState),
+    eventType: getPageProgressEventType(pageState),
     projectId: task.projectId,
     timestamp,
     actor: "agent",

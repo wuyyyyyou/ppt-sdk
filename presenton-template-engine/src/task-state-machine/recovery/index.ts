@@ -78,21 +78,19 @@ function syncDeckStateFromArtifacts(
     currentPageId: currentPage?.pageId ?? state.currentPageId,
     pageState: currentPage?.pageState ?? state.pageState,
     blockedBy:
-      currentPage?.pageState === "page_review_pending"
+      currentPage?.pageState === "page_review"
         ? ["page_png_review"]
         : [],
     allowedTransitions:
       currentPage?.pageState === "page_locked"
         ? []
-        : currentPage?.pageState === "page_review_pending"
+        : currentPage?.pageState === "page_review"
           ? ["page_accepted", "page_fix_required"]
           : currentPage?.pageState === "page_fix_required"
             ? ["page_authoring"]
-            : currentPage?.pageState === "page_rendered"
-              ? ["page_review_pending"]
-              : currentPage?.pageState === "page_authoring"
-                ? ["page_rendered"]
-                : ["page_authoring"],
+            : currentPage?.pageState === "page_authoring"
+              ? ["page_review"]
+              : ["page_authoring"],
     updatedAt: nowIso(),
   };
 }

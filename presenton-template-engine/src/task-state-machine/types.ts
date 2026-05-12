@@ -19,8 +19,7 @@ export const TASK_STATE_MACHINE_DECK_STATES = [
 export const TASK_STATE_MACHINE_PAGE_STATES = [
   "page_selected",
   "page_authoring",
-  "page_rendered",
-  "page_review_pending",
+  "page_review",
   "page_fix_required",
   "page_accepted",
   "page_locked",

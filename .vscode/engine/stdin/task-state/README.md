@@ -372,7 +372,7 @@
 - `cwd`：可选，必须是绝对路径。状态机的文件传输结果会优先写到 `cwd/.executa-file-transport/`。
 - `project_dir`：必填，已有任务项目目录，必须是绝对路径。
 - `page_id`：必填，要记录进度的页面 id。
-- `page_state`：必填，要写入的页面状态。当前支持 `page_selected`、`page_authoring`、`page_rendered`、`page_review_pending`、`page_fix_required`、`page_accepted`、`page_locked`。
+- `page_state`：必填，要写入的页面状态。当前主线支持 `page_selected`、`page_authoring`、`page_review`、`page_fix_required`、`page_accepted`、`page_locked`。兼容旧输入 `page_rendered`、`page_review_pending`，写入时会归一化为 `page_review`。
 - `summary`：必填，本轮页面工作的摘要。
 - `review_notes`：可选，PNG 自审意见或修复说明。
 - `changed_files`：可选，字符串数组。本轮实际修改过的 TSX、JSON 或其他页面相关文件路径。
@@ -416,7 +416,7 @@
 ## 单页实现流程
 
 - `start_page_iteration`：选择某一页，进入这一页的设计和实现流程。
-- `record_page_progress`：记录这一页的阶段进度，例如已实现、已截图、已审查、需要修改、已锁定。
+- `record_page_progress`：记录这一页的阶段进度，例如已实现、已生成截图并进入审查、需要修改、已接受、已锁定。
 
 ## 状态推进和回退
 
