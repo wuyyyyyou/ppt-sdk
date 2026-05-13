@@ -10,7 +10,7 @@
   ],
   "files.exclude": {
     "**/.DS_Store": true,
-    "**/.idea": true,
+    "**/.idea": true
   },
   "search.exclude": {
     "**/dist": true,
