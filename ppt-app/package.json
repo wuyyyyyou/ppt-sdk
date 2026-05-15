@@ -1,0 +1,32 @@
+{
+  "name": "ppt-app",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Anna App workspace for the PPT generation workflow.",
+  "type": "module",
+  "scripts": {
+    "dev": "anna-app dev",
+    "dev:standalone": "tsx dev-server/server.ts",
+    "build": "vite build --outDir bundle",
+    "check": "tsc --noEmit",
+    "validate": "anna-app validate --strict"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@anna-ai/cli": "^0.1.9",
+    "@vitejs/plugin-react": "^4.3.0",
+    "@types/node": "^20.19.17",
+    "@types/react": "^18.3.24",
+    "@types/react-dom": "^18.3.7",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2",
+    "vite": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

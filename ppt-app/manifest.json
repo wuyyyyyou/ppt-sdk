@@ -1,0 +1,57 @@
+{
+  "schema": 2,
+  "permissions": ["tools.invoke"],
+  "required_executas": [
+    {
+      "tool_id": "tool-CHANGEME-ppt-engine",
+      "min_version": "1.0.0",
+      "version": "latest"
+    },
+    {
+      "tool_id": "tool-CHANGEME-ppt-gener",
+      "min_version": "1.0.0",
+      "version": "latest"
+    }
+  ],
+  "optional_executas": [],
+  "tags": ["presentation", "ppt", "workflow"],
+  "ui": {
+    "bundle": {
+      "format": "static-spa",
+      "entry": "index.html",
+      "external_origins": []
+    },
+    "views": [
+      {
+        "name": "main",
+        "title": "PPT App",
+        "default": true,
+        "entry": "index.html",
+        "min_size": { "w": 900, "h": 640 },
+        "default_size": { "w": 1200, "h": 820 },
+        "resizable": true,
+        "movable": true,
+        "single_instance": true
+      }
+    ],
+    "host_api": {
+      "tools": [
+        "required:tool-CHANGEME-ppt-engine",
+        "required:tool-CHANGEME-ppt-gener"
+      ],
+      "chat": [],
+      "artifact": [],
+      "llm": [],
+      "fs": [],
+      "storage": [],
+      "prefs": [],
+      "window": []
+    },
+    "csp_overrides": {
+      "img-src": ["'self'", "data:", "blob:"],
+      "font-src": ["'self'", "data:"],
+      "style-src": ["'self'"],
+      "script-src": ["'self'"]
+    }
+  }
+}
