@@ -17,7 +17,7 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
   async function invoke<T>(
     toolId: string,
     method: string,
-    args: Record<string, unknown>
+    args: object
   ): Promise<T> {
     return runtime.tools.invoke({ tool_id: toolId, method, args }) as Promise<T>;
   }

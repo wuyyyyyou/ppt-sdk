@@ -27,7 +27,7 @@ export function createLocalPptBackend(options: LocalBackendOptions): PptBackend 
   async function invoke<T>(
     toolId: string,
     method: string,
-    args: Record<string, unknown>
+    args: object
   ): Promise<T> {
     const response = await fetch(`${options.baseUrl}/tools/invoke`, {
       method: "POST",

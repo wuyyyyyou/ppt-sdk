@@ -1,74 +1,176 @@
-import { useMemo } from "react";
-import { FileText, LayoutDashboard, PlayCircle } from "lucide-react";
-import { WORKFLOW_STAGES } from "./routes";
-import { detectRuntimeMode } from "../runtime/runtimeMode";
+import { PanelTop } from "lucide-react";
+import { BriefPage } from "../features/deck-workspace/components/BriefPage";
+import { DeckPage } from "../features/deck-workspace/components/DeckPage";
+import { ExportPage } from "../features/deck-workspace/components/ExportPage";
+import { LibraryPage } from "../features/deck-workspace/components/LibraryPage";
+import { OutlinePage } from "../features/deck-workspace/components/OutlinePage";
+import { PanelHeader } from "../features/deck-workspace/components/PanelHeader";
+import { ProgressLine } from "../features/deck-workspace/components/ProgressLine";
+import { RefinePage } from "../features/deck-workspace/components/RefinePage";
+import { ReviewPage } from "../features/deck-workspace/components/ReviewPage";
+import { useDeckWorkspace } from "../features/deck-workspace/hooks/useDeckWorkspace";
+import { useI18n } from "../i18n/useI18n";
+import { formatSlideNumber } from "../features/deck-workspace/utils";
 
 export function App() {
-  const runtimeMode = useMemo(() => detectRuntimeMode(), []);
+  const { locale, setLocale, t } = useI18n();
+  const { state, actions } = useDeckWorkspace(t, locale);
+  const selectedSlide = state.deck[state.currentSlide] ?? state.deck[0];
 
   return (
-    <main className="app-shell">
-      <aside className="sidebar" aria-label="Workflow stages">
-        <div className="brand">
-          <FileText size={22} aria-hidden="true" />
-          <div>
-            <h1>PPT App</h1>
-            <span>{runtimeMode}</span>
-          </div>
+    <main className="anna-stage">
+      <button
+        className={`launcher-btn ${state.panelMode === "closed" ? "visible" : ""}`}
+        onClick={() => actions.setPanelMode("visible")}
+        aria-label={t.appName}
+      >
+        <PanelTop size={24} />
+      </button>
+
+      <button
+        className={`minimized-pill ${state.panelMode === "minimized" ? "visible" : ""}`}
+        onClick={() => actions.setPanelMode("visible")}
+      >
+        <PanelTop size={20} />
+        <span>
+          {t.appName}
+          {state.currentStatus ? <small> · {state.currentStatus}</small> : null}
+        </span>
+      </button>
+
+      <section className={`deck-panel ${state.panelMode === "visible" ? "visible" : ""}`}>
+        <div className={`toast ${state.toast ? "visible" : ""}`}>{state.toast}</div>
+
+        <PanelHeader
+          t={t}
+          locale={locale}
+          setLocale={setLocale}
+          status={state.currentStatus}
+          onLibrary={() => actions.navigate("library")}
+          onMinimize={() => actions.setPanelMode("minimized")}
+          onClose={() => actions.setPanelMode("closed")}
+        />
+
+        {state.page === "main" ? (
+          <ProgressLine stage={state.stage} t={t} onNavigate={actions.navigateMain} />
+        ) : null}
+
+        <div className="view-container">
+          {state.page === "main" && state.stage === "brief" ? (
+            <BriefPage
+              t={t}
+              prompt={state.prompt}
+              setPrompt={actions.setPrompt}
+              loading={state.loading}
+              reviewOutlineFirst={state.reviewOutlineFirst}
+              setReviewOutlineFirst={actions.setReviewOutlineFirst}
+              contextRows={state.contextRows}
+              addContextRow={actions.addContextRow}
+              updateContextRow={actions.updateContextRow}
+              removeContextRow={actions.removeContextRow}
+              addStyleRow={actions.addStyleRow}
+              addMoreRows={actions.addMoreRows}
+              lookPickerOpen={state.lookPickerOpen}
+              setLookPickerOpen={actions.setLookPickerOpen}
+              selectedLookId={state.selectedLookId}
+              selectLook={actions.selectLook}
+              generateDeck={actions.generateDeck}
+              showToast={actions.showToast}
+            />
+          ) : null}
+
+          {state.page === "main" && state.stage === "outline" ? (
+            <OutlinePage
+              t={t}
+              outline={state.outline}
+              expandedOutline={state.expandedOutline}
+              setExpandedOutline={actions.setExpandedOutline}
+              updateOutlineItem={actions.updateOutlineItem}
+              feedback={state.outlineFeedback}
+              setFeedback={actions.setOutlineFeedback}
+              applyFeedback={actions.applyOutlineFeedback}
+              createDeck={actions.createDeckFromOutline}
+              loading={state.loading}
+            />
+          ) : null}
+
+          {state.page === "main" && state.stage === "deck" ? (
+            <DeckPage
+              t={t}
+              deckTitle={state.deckTitle}
+              setDeckTitle={actions.setDeckTitle}
+              deck={state.deck}
+              currentSlide={state.currentSlide}
+              setCurrentSlide={actions.setCurrentSlide}
+              onRefineDeck={() => {
+                actions.setRefineScope("deck");
+                actions.navigate("refine");
+              }}
+              onRefineSlide={() => {
+                actions.setRefineScope("slide");
+                actions.navigate("refine");
+              }}
+              onPreview={() => actions.navigate("review")}
+              onExport={() => actions.navigate("export")}
+            />
+          ) : null}
+
+          {state.page === "library" ? (
+            <LibraryPage
+              t={t}
+              onBack={actions.goBack}
+              onOpen={actions.openLocalProject}
+              onReveal={() => actions.showToast(t.toasts.localFolder)}
+            />
+          ) : null}
+
+          {state.page === "review" ? (
+            <ReviewPage
+              t={t}
+              deck={state.deck}
+              currentSlide={state.currentSlide}
+              setCurrentSlide={actions.setCurrentSlide}
+              previewMode={state.previewMode}
+              setPreviewMode={actions.setPreviewMode}
+              onBack={actions.goBack}
+              updateDeckTitle={actions.updateDeckTitle}
+              moveSlide={actions.moveSlide}
+              deleteSlide={actions.deleteSlide}
+              addSlide={actions.addSlide}
+              onRefineSlide={(index) => {
+                actions.setCurrentSlide(index);
+                actions.setRefineScope("slide");
+                actions.navigate("refine");
+              }}
+            />
+          ) : null}
+
+          {state.page === "refine" ? (
+            <RefinePage
+              t={t}
+              scope={state.refineScope}
+              setScope={actions.setRefineScope}
+              slide={selectedSlide}
+              slideNumber={formatSlideNumber(state.currentSlide)}
+              deckCount={state.deck.length}
+              loading={state.loading}
+              onBack={actions.goBack}
+              onRefineDeck={actions.refineDeck}
+              onRefineSlide={actions.refineSlide}
+            />
+          ) : null}
+
+          {state.page === "export" ? (
+            <ExportPage
+              t={t}
+              status={state.exportStatus}
+              loading={state.loading}
+              onBack={actions.goBack}
+              onExport={actions.exportFile}
+            />
+          ) : null}
         </div>
-
-        <nav className="stage-nav">
-          {WORKFLOW_STAGES.map((stage, index) => (
-            <a key={stage.id} href={`#${stage.id}`}>
-              <span>{index + 1}</span>
-              {stage.label}
-            </a>
-          ))}
-        </nav>
-      </aside>
-
-      <section className="workspace" aria-label="Current workflow step">
-        <header className="workspace-header">
-          <div>
-            <p>Workspace</p>
-            <h2>Review-first PPT workflow</h2>
-          </div>
-          <button type="button">
-            <PlayCircle size={18} aria-hidden="true" />
-            New task
-          </button>
-        </header>
-
-        <section className="panel">
-          <div className="panel-heading">
-            <LayoutDashboard size={20} aria-hidden="true" />
-            <h3>Project foundation</h3>
-          </div>
-          <p>
-            This screen is a structural placeholder. Feature pages will attach
-            to the shared backend adapter as the engine app-facing tools are
-            implemented.
-          </p>
-        </section>
       </section>
-
-      <aside className="inspector" aria-label="Task state">
-        <h2>State</h2>
-        <dl>
-          <div>
-            <dt>Backend</dt>
-            <dd>PptBackend</dd>
-          </div>
-          <div>
-            <dt>Engine</dt>
-            <dd>app_* tools</dd>
-          </div>
-          <div>
-            <dt>Export gate</dt>
-            <dd>HTML review</dd>
-          </div>
-        </dl>
-      </aside>
     </main>
   );
 }

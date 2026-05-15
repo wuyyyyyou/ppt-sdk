@@ -1,7 +1,7 @@
 export interface AnnaToolInvokeInput {
   tool_id: string;
   method: string;
-  args: Record<string, unknown>;
+  args: object;
 }
 
 export interface AnnaRuntime {
