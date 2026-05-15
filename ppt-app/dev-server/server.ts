@@ -1,9 +1,7 @@
 import http from "node:http";
 import { localToolRegistry } from "./toolRegistry";
-import {
-  invokeJsonRpcTool,
-  type ToolInvokeRequest
-} from "./jsonRpcClient";
+import { invokeJsonRpcTool } from "./jsonRpcClient";
+import { parseToolInvokeRequest } from "./httpTypes";
 
 const host = process.env.PPT_APP_DEV_HOST ?? "127.0.0.1";
 const port = Number(process.env.PPT_APP_DEV_PORT ?? 8787);
@@ -47,7 +45,7 @@ const server = http.createServer(async (request, response) => {
   }
 
   try {
-    const body = (await readJsonBody(request)) as ToolInvokeRequest;
+    const body = parseToolInvokeRequest(await readJsonBody(request));
     const tool = localToolRegistry[body.tool_id];
 
     if (!tool) {

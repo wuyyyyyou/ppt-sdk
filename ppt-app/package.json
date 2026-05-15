@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "anna-app dev",
+    "dev:ui": "vite --host 127.0.0.1 --port 5174",
     "dev:standalone": "tsx dev-server/server.ts",
     "build": "vite build --outDir bundle",
     "check": "tsc --noEmit",
