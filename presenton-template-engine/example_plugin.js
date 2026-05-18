@@ -9,16 +9,26 @@ import path from "node:path";
 import {
   buildDeckHtmlFromManifest,
   convertDeckHtmlToPptxModel,
+  createAppWorkspace,
   forkTemplateGroup,
   getAllDiscoveredTemplateGroups,
   getDiscoveredTemplateGroup,
+  listAppWorkspaces,
   listDiscoveredTemplateGroupSummaries,
+  openAppWorkspace,
   runDeckValidation,
   describeTaskStateMachine,
   invokeTaskStateMachine,
+  updateAppWorkspaceSettings,
+  updateAppWorkspaceTitle,
 } from "./dist/index.js";
 
 const TOOL_NAMES = [
+  "app_list_workspaces",
+  "app_create_workspace",
+  "app_open_workspace",
+  "app_update_workspace_settings",
+  "app_update_workspace_title",
   "listDiscoveredTemplateGroupSummaries",
   "getAllDiscoveredTemplateGroups",
   "getDiscoveredTemplateGroup",
@@ -61,6 +71,76 @@ const MANIFEST = {
     "Anna Executa plugin for Presenton template discovery, manifest-based deck HTML generation, deck HTML to PPTX model conversion, and stability validation.",
   author: "Anna Developer",
   tools: [
+    {
+      name: "app_list_workspaces",
+      description:
+        "Scan the default PPT task workspace root and return existing ppt-YYYYMMDD-HHmmss workspaces.",
+      parameters: [],
+    },
+    {
+      name: "app_create_workspace",
+      description:
+        "Create a new PPT task workspace under the default workspace root and initialize core JSON files.",
+      parameters: [
+        {
+          name: "title",
+          type: "string",
+          description: "Optional project title. Defaults to the generated workspace id.",
+          required: false,
+        },
+      ],
+    },
+    {
+      name: "app_open_workspace",
+      description:
+        "Open an existing PPT task workspace and initialize any missing core JSON files.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_update_workspace_settings",
+      description:
+        "Update setting.json for an existing PPT task workspace and return the refreshed workspace.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+        {
+          name: "setting",
+          type: "object",
+          description: "Partial settings object to merge into setting.json.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_update_workspace_title",
+      description:
+        "Update task.json title for an existing PPT task workspace and return the refreshed workspace.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+        {
+          name: "title",
+          type: "string",
+          description: "New workspace title.",
+          required: true,
+        },
+      ],
+    },
     {
       name: "listDiscoveredTemplateGroupSummaries",
       description:
@@ -624,6 +704,65 @@ async function toolListDiscoveredTemplateGroupSummaries(args) {
   };
 }
 
+async function toolAppListWorkspaces() {
+  return listAppWorkspaces();
+}
+
+async function toolAppCreateWorkspace(args) {
+  if (args !== undefined && (!args || typeof args !== "object" || Array.isArray(args))) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const title =
+    typeof args?.title === "string" && args.title.trim().length > 0
+      ? args.title.trim()
+      : undefined;
+
+  return createAppWorkspace({ title });
+}
+
+async function toolAppOpenWorkspace(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return openAppWorkspace({ workspace_dir: workspaceDir });
+}
+
+async function toolAppUpdateWorkspaceSettings(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const setting = args.setting;
+  if (!setting || typeof setting !== "object" || Array.isArray(setting)) {
+    throw new Error('"setting" must be an object');
+  }
+
+  return updateAppWorkspaceSettings({
+    workspace_dir: workspaceDir,
+    setting,
+  });
+}
+
+async function toolAppUpdateWorkspaceTitle(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  if (typeof args.title !== "string" || args.title.trim().length === 0) {
+    throw new Error('"title" must be a non-empty string');
+  }
+
+  return updateAppWorkspaceTitle({
+    workspace_dir: workspaceDir,
+    title: args.title,
+  });
+}
+
 async function toolGetAllDiscoveredTemplateGroups(args) {
   const input = normalizeDiscoveryInput(args);
   const groups = await getAllDiscoveredTemplateGroups(input);
@@ -832,6 +971,11 @@ async function toolForkTemplateGroup(args) {
 }
 
 const TOOL_DISPATCH = {
+  app_list_workspaces: toolAppListWorkspaces,
+  app_create_workspace: toolAppCreateWorkspace,
+  app_open_workspace: toolAppOpenWorkspace,
+  app_update_workspace_settings: toolAppUpdateWorkspaceSettings,
+  app_update_workspace_title: toolAppUpdateWorkspaceTitle,
   listDiscoveredTemplateGroupSummaries: toolListDiscoveredTemplateGroupSummaries,
   getAllDiscoveredTemplateGroups: toolGetAllDiscoveredTemplateGroups,
   getDiscoveredTemplateGroup: toolGetDiscoveredTemplateGroup,

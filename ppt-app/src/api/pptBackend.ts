@@ -1,9 +1,12 @@
 import type {
   CreateProjectInput,
+  CreateWorkspaceInput,
   GeneratePptxInput,
   GeneratePptxResult,
+  ListWorkspacesResult,
   ListTemplatesInput,
   ListTemplatesResult,
+  OpenWorkspaceInput,
   PrepareExportModelInput,
   PrepareExportModelResult,
   ProjectResult,
@@ -13,7 +16,10 @@ import type {
   RecordOutlineInput,
   RenderDeckHtmlInput,
   RenderDeckHtmlResult,
-  SelectTemplateInput
+  SelectTemplateInput,
+  UpdateWorkspaceSettingsInput,
+  UpdateWorkspaceTitleInput,
+  WorkspaceResult
 } from "./types";
 import { createAnnaPptBackend } from "./annaPptBackend";
 import { createLocalPptBackend } from "./localPptBackend";
@@ -21,6 +27,13 @@ import { connectAnnaRuntime } from "../runtime/annaRuntime";
 import { detectRuntimeMode } from "../runtime/runtimeMode";
 
 export interface PptBackend {
+  listWorkspaces(): Promise<ListWorkspacesResult>;
+  createWorkspace(input: CreateWorkspaceInput): Promise<WorkspaceResult>;
+  openWorkspace(input: OpenWorkspaceInput): Promise<WorkspaceResult>;
+  updateWorkspaceSettings(
+    input: UpdateWorkspaceSettingsInput
+  ): Promise<WorkspaceResult>;
+  updateWorkspaceTitle(input: UpdateWorkspaceTitleInput): Promise<WorkspaceResult>;
   createProject(input: CreateProjectInput): Promise<ProjectResult>;
   getProject(input: { projectDir: string }): Promise<ProjectResult>;
   recordRequirements(input: RecordRequirementsInput): Promise<ProjectResult>;

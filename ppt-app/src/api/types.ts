@@ -3,6 +3,76 @@ export interface ToolIds {
   pptGener: string;
 }
 
+export interface WorkspaceSummary {
+  workspace_id: string;
+  workspace_dir: string;
+  title: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkspaceFiles {
+  task: string;
+  setting: string;
+  outline: string;
+  pages: string;
+}
+
+export interface WorkspaceResult {
+  workspace_root: string;
+  workspace_dir: string;
+  workspace_id: string;
+  initialized: boolean;
+  created_files: string[];
+  missing_files: string[];
+  files: WorkspaceFiles;
+  task: unknown;
+  setting: unknown;
+  outline: unknown;
+  pages: unknown;
+}
+
+export interface WorkspaceSettings {
+  audience?: string;
+  goal?: string;
+  style_notes?: string;
+  language?: string;
+  output_language?: string;
+  aspect_ratio?: string;
+  slide_count?: string;
+  text_density?: string;
+  visual_tone?: string;
+  typography?: string;
+  updated_at?: string;
+  [key: string]: unknown;
+}
+
+export interface ListWorkspacesResult {
+  workspace_root: string;
+  has_workspaces: boolean;
+  latest_workspace: WorkspaceSummary | null;
+  workspaces: WorkspaceSummary[];
+}
+
+export interface CreateWorkspaceInput {
+  title?: string;
+}
+
+export interface OpenWorkspaceInput {
+  workspace_dir: string;
+}
+
+export interface UpdateWorkspaceSettingsInput {
+  workspace_dir: string;
+  setting: WorkspaceSettings;
+}
+
+export interface UpdateWorkspaceTitleInput {
+  workspace_dir: string;
+  title: string;
+}
+
 export interface CreateProjectInput {
   projectDir: string;
   title: string;

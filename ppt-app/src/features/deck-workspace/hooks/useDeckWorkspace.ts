@@ -1,4 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPptBackend, type PptBackend } from "../../../api/pptBackend";
+import type {
+  ListWorkspacesResult,
+  WorkspaceResult,
+  WorkspaceSettings
+} from "../../../api/types";
 import {
   createLocalProjectDeck,
   initialDeck,
@@ -51,6 +57,12 @@ export interface DeckWorkspaceActions {
   deleteSlide: (index: number) => void;
   addSlide: () => void;
   openLocalProject: (projectName: string) => void;
+  openWorkspace: (workspaceDir: string) => Promise<void>;
+  scanWorkspaces: () => Promise<void>;
+  useLatestWorkspace: () => Promise<void>;
+  createWorkspace: () => Promise<void>;
+  saveWorkspaceSettings: (setting: WorkspaceSettings) => Promise<void>;
+  saveWorkspaceTitle: (title: string) => Promise<void>;
   refineDeck: () => Promise<void>;
   refineSlide: () => Promise<void>;
   exportFile: (type: "PPTX" | "PDF") => Promise<void>;
@@ -78,6 +90,43 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [refineScope, setRefineScope] = useState<RefineScope>("deck");
   const [loading, setLoading] = useState<LoadingKind>("none");
   const [exportStatus, setExportStatus] = useState("");
+  const [backend, setBackend] = useState<PptBackend | null>(null);
+  const [workspaceScan, setWorkspaceScan] = useState<ListWorkspacesResult | null>(null);
+  const [currentWorkspace, setCurrentWorkspace] = useState<WorkspaceResult | null>(null);
+  const [workspaceLoading, setWorkspaceLoading] = useState(true);
+  const [workspaceError, setWorkspaceError] = useState("");
+  const [workspaceSettingsSaving, setWorkspaceSettingsSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function initializeBackend() {
+      try {
+        const nextBackend = await createPptBackend();
+        if (cancelled) return;
+        setBackend(nextBackend);
+        const scan = await nextBackend.listWorkspaces();
+        if (cancelled) return;
+        setWorkspaceScan(scan);
+      } catch (error) {
+        if (!cancelled) {
+          setWorkspaceError(
+            error instanceof Error ? error.message : "Failed to scan workspaces."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setWorkspaceLoading(false);
+        }
+      }
+    }
+
+    void initializeBackend();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const currentStatus = useMemo(() => {
     if (loading === "outline") return t.status.creatingOutline;
@@ -315,6 +364,124 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setPage("main");
   }
 
+  function getWorkspaceTitle(workspace: WorkspaceResult) {
+    return typeof workspace.task === "object" &&
+      workspace.task !== null &&
+      typeof (workspace.task as { title?: unknown }).title === "string"
+      ? (workspace.task as { title: string }).title
+      : workspace.workspace_id;
+  }
+
+  async function scanWorkspaces() {
+    if (!backend) return;
+
+    setWorkspaceLoading(true);
+    setWorkspaceError("");
+    try {
+      setWorkspaceScan(await backend.listWorkspaces());
+    } catch (error) {
+      setWorkspaceError(
+        error instanceof Error ? error.message : "Failed to scan workspaces."
+      );
+    } finally {
+      setWorkspaceLoading(false);
+    }
+  }
+
+  async function useLatestWorkspace() {
+    if (!backend || !workspaceScan?.latest_workspace) return;
+
+    await openWorkspace(workspaceScan.latest_workspace.workspace_dir);
+  }
+
+  async function openWorkspace(workspaceDir: string) {
+    if (!backend) return;
+
+    setWorkspaceLoading(true);
+    setWorkspaceError("");
+    try {
+      const workspace = await backend.openWorkspace({
+        workspace_dir: workspaceDir
+      });
+      setCurrentWorkspace(workspace);
+      setDeckTitle(getWorkspaceTitle(workspace));
+      setPage("main");
+      showToast(`已打开工作区 ${workspace.workspace_id}`);
+    } catch (error) {
+      setWorkspaceError(
+        error instanceof Error ? error.message : "Failed to open workspace."
+      );
+    } finally {
+      setWorkspaceLoading(false);
+    }
+  }
+
+  async function createWorkspace() {
+    if (!backend) return;
+
+    setWorkspaceLoading(true);
+    setWorkspaceError("");
+    try {
+      const workspace = await backend.createWorkspace({});
+      setCurrentWorkspace(workspace);
+      setWorkspaceScan(await backend.listWorkspaces());
+      setDeckTitle(getWorkspaceTitle(workspace));
+      setPage("main");
+      showToast(`已创建工作区 ${workspace.workspace_id}`);
+    } catch (error) {
+      setWorkspaceError(
+        error instanceof Error ? error.message : "Failed to create workspace."
+      );
+    } finally {
+      setWorkspaceLoading(false);
+    }
+  }
+
+  async function saveWorkspaceSettings(setting: WorkspaceSettings) {
+    if (!backend || !currentWorkspace) return;
+
+    setWorkspaceSettingsSaving(true);
+    setWorkspaceError("");
+    try {
+      const workspace = await backend.updateWorkspaceSettings({
+        workspace_dir: currentWorkspace.workspace_dir,
+        setting
+      });
+      setCurrentWorkspace(workspace);
+      setWorkspaceScan(await backend.listWorkspaces());
+      showToast(t.status.settingsSaved);
+    } catch (error) {
+      setWorkspaceError(
+        error instanceof Error ? error.message : "Failed to save settings."
+      );
+    } finally {
+      setWorkspaceSettingsSaving(false);
+    }
+  }
+
+  async function saveWorkspaceTitle(title: string) {
+    if (!backend || !currentWorkspace) return;
+
+    setWorkspaceSettingsSaving(true);
+    setWorkspaceError("");
+    try {
+      const workspace = await backend.updateWorkspaceTitle({
+        workspace_dir: currentWorkspace.workspace_dir,
+        title
+      });
+      setCurrentWorkspace(workspace);
+      setDeckTitle(getWorkspaceTitle(workspace));
+      setWorkspaceScan(await backend.listWorkspaces());
+      showToast(t.status.settingsSaved);
+    } catch (error) {
+      setWorkspaceError(
+        error instanceof Error ? error.message : "Failed to save workspace title."
+      );
+    } finally {
+      setWorkspaceSettingsSaving(false);
+    }
+  }
+
   async function refineDeck() {
     setLoading("refineDeck");
     await sleep(1600);
@@ -381,7 +548,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     refineScope,
     loading,
     exportStatus,
-    currentStatus
+    currentStatus,
+    workspaceScan,
+    currentWorkspace,
+    workspaceLoading,
+    workspaceError,
+    workspaceSettingsSaving
   };
 
   const actions: DeckWorkspaceActions = {
@@ -414,6 +586,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     deleteSlide,
     addSlide,
     openLocalProject,
+    openWorkspace,
+    scanWorkspaces,
+    useLatestWorkspace,
+    createWorkspace,
+    saveWorkspaceSettings,
+    saveWorkspaceTitle,
     refineDeck,
     refineSlide,
     exportFile

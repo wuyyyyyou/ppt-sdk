@@ -85,6 +85,148 @@ button {
   transform: none;
 }
 
+.workspace-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(246, 247, 251, 0.76);
+  backdrop-filter: blur(16px);
+}
+
+.workspace-dialog {
+  width: min(100%, 420px);
+  padding: 22px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 22px 52px rgba(17, 24, 39, 0.16);
+}
+
+.workspace-dialog-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  color: var(--accent);
+  background: var(--accent-light);
+}
+
+.workspace-dialog-copy h2 {
+  margin: 0 0 8px;
+  color: var(--text-main);
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.workspace-dialog-copy p {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.workspace-dialog-copy strong {
+  overflow-wrap: anywhere;
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.workspace-dialog-body {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.workspace-state,
+.workspace-card {
+  display: grid;
+  gap: 6px;
+  min-height: 86px;
+  padding: 14px;
+  border: 1px solid rgba(17, 24, 39, 0.07);
+  border-radius: 12px;
+  background: rgba(246, 247, 251, 0.74);
+}
+
+.workspace-card.muted {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.workspace-card span,
+.workspace-state {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.workspace-card strong {
+  color: var(--text-main);
+  font-size: 15px;
+}
+
+.workspace-card small {
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.workspace-error {
+  padding: 10px 12px;
+  border: 1px solid rgba(210, 61, 61, 0.18);
+  border-radius: 10px;
+  color: #9f2b2b;
+  background: rgba(255, 241, 241, 0.92);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.workspace-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.workspace-primary-btn,
+.workspace-secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.workspace-primary-btn {
+  border: 0;
+  color: #fff;
+  background: var(--accent);
+}
+
+.workspace-secondary-btn {
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.workspace-primary-btn:disabled,
+.workspace-secondary-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
 .panel-header {
   z-index: 2;
   display: flex;
@@ -974,12 +1116,65 @@ button {
   font-size: 13px;
 }
 
+.workspace-section-label {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.workspace-title-button {
+  align-self: flex-start;
+  max-width: 100%;
+  border: 0;
+  padding: 0;
+  color: var(--text-main);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.workspace-title-button:hover {
+  color: var(--accent);
+}
+
+.workspace-title-editor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.workspace-title-editor input {
+  min-width: 220px;
+  min-height: 30px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 8px;
+  padding: 5px 9px;
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  font-weight: 650;
+  outline: none;
+}
+
+.workspace-title-editor input:focus {
+  border-color: rgba(124, 108, 240, 0.44);
+  box-shadow: 0 0 0 3px rgba(124, 108, 240, 0.1);
+}
+
 .workspace-row span,
 .local-deck-row span,
 .pref-row span,
 .refine-summary span {
   color: var(--text-muted);
   font-size: 12px;
+}
+
+.workspace-row span {
+  overflow-wrap: anywhere;
 }
 
 .local-deck-list {
@@ -1009,6 +1204,20 @@ button {
   background: transparent;
 }
 
+.empty-library-row {
+  padding: 14px 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.create-workspace-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
 .preferences-box {
   padding: 14px;
 }
@@ -1023,14 +1232,40 @@ button {
   margin-bottom: 12px;
 }
 
+.pref-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .pref-row {
   min-height: 34px;
+  gap: 12px;
 }
 
 .pref-row strong {
   color: var(--text-muted);
   font-size: 13px;
   font-weight: 600;
+  text-align: right;
+}
+
+.pref-row input,
+.pref-row select {
+  width: min(62%, 320px);
+  min-height: 30px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 8px;
+  padding: 5px 9px;
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  outline: none;
+}
+
+.pref-row input:focus,
+.pref-row select:focus {
+  border-color: rgba(124, 108, 240, 0.44);
+  box-shadow: 0 0 0 3px rgba(124, 108, 240, 0.1);
 }
 
 .mode-toggle,

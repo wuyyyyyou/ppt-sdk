@@ -1,4 +1,9 @@
 import type { OutlineDetail, Slide } from "../../data/mockDeck";
+import type {
+  ListWorkspacesResult,
+  WorkspaceResult,
+  WorkspaceSettings
+} from "../../api/types";
 
 export type MainStage = "brief" | "outline" | "deck";
 export type PageId = "main" | "library" | "review" | "refine" | "export";
@@ -44,4 +49,11 @@ export interface DeckWorkspaceState {
   loading: LoadingKind;
   exportStatus: string;
   currentStatus: string;
+  workspaceScan: ListWorkspacesResult | null;
+  currentWorkspace: WorkspaceResult | null;
+  workspaceLoading: boolean;
+  workspaceError: string;
+  workspaceSettingsSaving: boolean;
 }
+
+export type { WorkspaceSettings };

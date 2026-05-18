@@ -3,9 +3,11 @@ import type { PptBackend } from "./pptBackend";
 import type {
   GeneratePptxInput,
   GeneratePptxResult,
+  ListWorkspacesResult,
   PrepareExportModelResult,
   ProjectResult,
-  RenderDeckHtmlResult
+  RenderDeckHtmlResult,
+  WorkspaceResult
 } from "./types";
 
 const PPT_ENGINE_TOOL_ID =
@@ -13,16 +15,50 @@ const PPT_ENGINE_TOOL_ID =
 const PPT_GENER_TOOL_ID =
   import.meta.env.VITE_PPT_GENER_TOOL_ID ?? "tool-CHANGEME-ppt-gener";
 
+function unwrapToolResult<T>(result: unknown): T {
+  if (
+    typeof result === "object" &&
+    result !== null &&
+    !Array.isArray(result) &&
+    (result as { success?: unknown }).success === true &&
+    "data" in result
+  ) {
+    return (result as { data: T }).data;
+  }
+
+  return result as T;
+}
+
 export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
   async function invoke<T>(
     toolId: string,
     method: string,
     args: object
   ): Promise<T> {
-    return runtime.tools.invoke({ tool_id: toolId, method, args }) as Promise<T>;
+    return unwrapToolResult<T>(
+      await runtime.tools.invoke({ tool_id: toolId, method, args })
+    );
   }
 
   return {
+    listWorkspaces: () =>
+      invoke<ListWorkspacesResult>(PPT_ENGINE_TOOL_ID, "app_list_workspaces", {}),
+    createWorkspace: (input) =>
+      invoke<WorkspaceResult>(PPT_ENGINE_TOOL_ID, "app_create_workspace", input),
+    openWorkspace: (input) =>
+      invoke<WorkspaceResult>(PPT_ENGINE_TOOL_ID, "app_open_workspace", input),
+    updateWorkspaceSettings: (input) =>
+      invoke<WorkspaceResult>(
+        PPT_ENGINE_TOOL_ID,
+        "app_update_workspace_settings",
+        input
+      ),
+    updateWorkspaceTitle: (input) =>
+      invoke<WorkspaceResult>(
+        PPT_ENGINE_TOOL_ID,
+        "app_update_workspace_title",
+        input
+      ),
     createProject: (input) =>
       invoke<ProjectResult>(PPT_ENGINE_TOOL_ID, "app_create_project", input),
     getProject: (input) =>

@@ -8,6 +8,7 @@ import { PanelHeader } from "../features/deck-workspace/components/PanelHeader";
 import { ProgressLine } from "../features/deck-workspace/components/ProgressLine";
 import { RefinePage } from "../features/deck-workspace/components/RefinePage";
 import { ReviewPage } from "../features/deck-workspace/components/ReviewPage";
+import { WorkspaceDialog } from "../features/deck-workspace/components/WorkspaceDialog";
 import { useDeckWorkspace } from "../features/deck-workspace/hooks/useDeckWorkspace";
 import { useI18n } from "../i18n/useI18n";
 import { formatSlideNumber } from "../features/deck-workspace/utils";
@@ -40,6 +41,17 @@ export function App() {
 
       <section className={`deck-panel ${state.panelMode === "visible" ? "visible" : ""}`}>
         <div className={`toast ${state.toast ? "visible" : ""}`}>{state.toast}</div>
+
+        <WorkspaceDialog
+          locale={locale}
+          scan={state.workspaceScan}
+          workspace={state.currentWorkspace}
+          loading={state.workspaceLoading}
+          error={state.workspaceError}
+          onUseLatest={actions.useLatestWorkspace}
+          onCreate={actions.createWorkspace}
+          onRescan={actions.scanWorkspaces}
+        />
 
         <PanelHeader
           t={t}
@@ -118,9 +130,15 @@ export function App() {
           {state.page === "library" ? (
             <LibraryPage
               t={t}
+              workspaceScan={state.workspaceScan}
+              currentWorkspace={state.currentWorkspace}
+              loading={state.workspaceLoading}
+              savingSettings={state.workspaceSettingsSaving}
               onBack={actions.goBack}
-              onOpen={actions.openLocalProject}
-              onReveal={() => actions.showToast(t.toasts.localFolder)}
+              onOpen={actions.openWorkspace}
+              onCreateWorkspace={actions.createWorkspace}
+              onSaveSettings={actions.saveWorkspaceSettings}
+              onSaveTitle={actions.saveWorkspaceTitle}
             />
           ) : null}
 

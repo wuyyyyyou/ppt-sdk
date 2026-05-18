@@ -2,9 +2,11 @@ import type { PptBackend } from "./pptBackend";
 import type {
   GeneratePptxInput,
   GeneratePptxResult,
+  ListWorkspacesResult,
   PrepareExportModelResult,
   ProjectResult,
-  RenderDeckHtmlResult
+  RenderDeckHtmlResult,
+  WorkspaceResult
 } from "./types";
 
 const LOCAL_PPT_ENGINE_TOOL_ID = "tool-local-ppt-engine";
@@ -21,6 +23,20 @@ interface LocalToolResponse<T> {
     code?: number;
     message: string;
   };
+}
+
+function unwrapToolResult<T>(result: unknown): T {
+  if (
+    typeof result === "object" &&
+    result !== null &&
+    !Array.isArray(result) &&
+    (result as { success?: unknown }).success === true &&
+    "data" in result
+  ) {
+    return (result as { data: T }).data;
+  }
+
+  return result as T;
 }
 
 export function createLocalPptBackend(options: LocalBackendOptions): PptBackend {
@@ -44,10 +60,40 @@ export function createLocalPptBackend(options: LocalBackendOptions): PptBackend 
       throw new Error(payload.error?.message ?? "Local tool invoke failed.");
     }
 
-    return payload.result as T;
+    return unwrapToolResult<T>(payload.result);
   }
 
   return {
+    listWorkspaces: () =>
+      invoke<ListWorkspacesResult>(
+        LOCAL_PPT_ENGINE_TOOL_ID,
+        "app_list_workspaces",
+        {}
+      ),
+    createWorkspace: (input) =>
+      invoke<WorkspaceResult>(
+        LOCAL_PPT_ENGINE_TOOL_ID,
+        "app_create_workspace",
+        input
+      ),
+    openWorkspace: (input) =>
+      invoke<WorkspaceResult>(
+        LOCAL_PPT_ENGINE_TOOL_ID,
+        "app_open_workspace",
+        input
+      ),
+    updateWorkspaceSettings: (input) =>
+      invoke<WorkspaceResult>(
+        LOCAL_PPT_ENGINE_TOOL_ID,
+        "app_update_workspace_settings",
+        input
+      ),
+    updateWorkspaceTitle: (input) =>
+      invoke<WorkspaceResult>(
+        LOCAL_PPT_ENGINE_TOOL_ID,
+        "app_update_workspace_title",
+        input
+      ),
     createProject: (input) =>
       invoke<ProjectResult>(
         LOCAL_PPT_ENGINE_TOOL_ID,

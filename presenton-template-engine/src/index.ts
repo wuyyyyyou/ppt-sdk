@@ -98,6 +98,7 @@ import {
   waitForDeckRenderReady,
   writeValidationReport,
 } from "./validate/index.js";
+export * from "./app-workspace/index.js";
 export * from "./task-state-machine/index.js";
 
 export interface TemplateLayoutInfo {
