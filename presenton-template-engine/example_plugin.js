@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 
 import {
+  appendAppWorkspaceLog,
   buildDeckHtmlFromManifest,
   convertDeckHtmlToPptxModel,
   createAppWorkspace,
@@ -29,6 +30,7 @@ const TOOL_NAMES = [
   "app_list_workspaces",
   "app_create_workspace",
   "app_open_workspace",
+  "app_append_workspace_log",
   "app_get_workspace_outline",
   "app_update_workspace_outline",
   "app_update_workspace_settings",
@@ -122,6 +124,31 @@ const MANIFEST = {
           name: "setting",
           type: "object",
           description: "Partial settings object to merge into setting.json.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_append_workspace_log",
+      description:
+        "Append one JSONL log entry under an existing PPT task workspace .log directory.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+        {
+          name: "channel",
+          type: "string",
+          description: "Workspace log channel. Currently supports ai-outline.",
+          required: true,
+        },
+        {
+          name: "entry",
+          type: "object",
+          description: "JSON-serializable log entry to append.",
           required: true,
         },
       ],
@@ -775,6 +802,29 @@ async function toolAppGetWorkspaceOutline(args) {
   return getAppWorkspaceOutline({ workspace_dir: workspaceDir });
 }
 
+async function toolAppAppendWorkspaceLog(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const channel = args.channel;
+  if (channel !== "ai-outline") {
+    throw new Error('"channel" must be "ai-outline"');
+  }
+
+  const entry = args.entry;
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+    throw new Error('"entry" must be an object');
+  }
+
+  return appendAppWorkspaceLog({
+    workspace_dir: workspaceDir,
+    channel,
+    entry,
+  });
+}
+
 async function toolAppUpdateWorkspaceOutline(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -1036,6 +1086,7 @@ const TOOL_DISPATCH = {
   app_list_workspaces: toolAppListWorkspaces,
   app_create_workspace: toolAppCreateWorkspace,
   app_open_workspace: toolAppOpenWorkspace,
+  app_append_workspace_log: toolAppAppendWorkspaceLog,
   app_get_workspace_outline: toolAppGetWorkspaceOutline,
   app_update_workspace_outline: toolAppUpdateWorkspaceOutline,
   app_update_workspace_settings: toolAppUpdateWorkspaceSettings,

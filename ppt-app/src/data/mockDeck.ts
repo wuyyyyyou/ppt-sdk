@@ -5,8 +5,7 @@ export interface Slide {
 
 export interface OutlineDetail {
   title: string;
-  summary: string;
-  bullets: string[];
+  outline: string;
 }
 
 export interface LocalDeck {
@@ -53,71 +52,38 @@ export const initialDeck: Slide[] = [
 export const outlineDetails: OutlineDetail[] = [
   {
     title: "AI Agents That Do the Work",
-    summary:
-      "Frame the shift from chat-based AI to agents that execute repeatable workflows.",
-    bullets: [
-      "AI is moving from answering to doing",
-      "Repeated workflows can become reusable skills",
-      "Anna turns instructions into executable work"
-    ]
+    outline:
+      "Frame the shift from chat-based AI to agents that execute repeatable workflows. Show that repeated processes can become reusable AI skills, and position Anna as the system that turns instructions into executable work."
   },
   {
     title: "The Cost of Manual Work",
-    summary:
-      "Show the hidden operational drag of research, notes, spreadsheets, and emails.",
-    bullets: [
-      "Work fragments across tabs, docs, and tools",
-      "Copy-paste creates errors and delay",
-      "Teams repeat the same process every week"
-    ]
+    outline:
+      "Show the hidden operational drag of research, notes, spreadsheets, and emails. Emphasize fragmented work, copy-paste errors, and repeated weekly processes that slow teams down."
   },
   {
     title: "From Tasks to Reusable Skills",
-    summary: "Explain how one-off tasks become repeatable AI capabilities.",
-    bullets: [
-      "Capture the workflow once",
-      "Turn steps into a reusable skill",
-      "Run it again with new inputs"
-    ]
+    outline:
+      "Explain how one-off tasks become repeatable AI capabilities. Cover capturing the workflow once, packaging the steps as a reusable skill, and running it again with new inputs."
   },
   {
     title: "How Anna Executes Across Tools",
-    summary:
-      "Introduce Anna's hybrid execution model across local tools, browser, and approved services.",
-    bullets: [
-      "Reasoning happens in conversation",
-      "Execution happens through tools",
-      "Users stay in control of sensitive actions"
-    ]
+    outline:
+      "Introduce Anna's hybrid execution model across local tools, browser, and approved services. Explain the split between reasoning in conversation and execution through approved tools while users stay in control."
   },
   {
     title: "Business Development Example",
-    summary: "Use BD research as a concrete workflow example.",
-    bullets: [
-      "Start with one company name",
-      "Research, organize, and summarize findings",
-      "Produce a pitch-ready brief"
-    ]
+    outline:
+      "Use business development research as a concrete workflow example. Start with one company name, research and organize findings, then produce a pitch-ready brief."
   },
   {
     title: "Security Boundaries",
-    summary:
-      "Explain why real agent action needs boundaries for authority, data, and execution.",
-    bullets: [
-      "Prompts are not a security boundary",
-      "Credentials should be mediated",
-      "File and tool access should be scoped"
-    ]
+    outline:
+      "Explain why real agent action needs boundaries for authority, data, and execution. Make clear that prompts are not a security boundary and that credentials, files, and tools should be mediated."
   },
   {
     title: "Build Your First AI Skill",
-    summary:
-      "End with a clear next step for turning one repeated workflow into a skill.",
-    bullets: [
-      "Pick one repeated process",
-      "Define inputs, steps, and outputs",
-      "Let Anna run it again"
-    ]
+    outline:
+      "End with a clear next step for turning one repeated workflow into a skill. Ask the audience to pick one repeated process, define inputs and outputs, and let Anna run it again."
   }
 ];
 

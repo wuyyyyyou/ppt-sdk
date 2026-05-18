@@ -1,5 +1,6 @@
 import type { PptBackend } from "./pptBackend";
 import type {
+  AppendWorkspaceLogResult,
   GeneratePptxInput,
   GeneratePptxResult,
   WorkspaceOutline,
@@ -81,6 +82,12 @@ export function createLocalPptBackend(options: LocalBackendOptions): PptBackend 
       invoke<WorkspaceResult>(
         LOCAL_PPT_ENGINE_TOOL_ID,
         "app_open_workspace",
+        input
+      ),
+    appendWorkspaceLog: (input) =>
+      invoke<AppendWorkspaceLogResult>(
+        LOCAL_PPT_ENGINE_TOOL_ID,
+        "app_append_workspace_log",
         input
       ),
     getWorkspaceOutline: (input) =>

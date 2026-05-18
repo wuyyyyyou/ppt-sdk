@@ -50,18 +50,18 @@ export interface WorkspaceSettings {
 
 export interface WorkspaceOutlineItem {
   title: string;
-  summary: string;
-  bullets: string[];
+  outline: string;
 }
 
 export interface WorkspaceOutline {
-  version: 1;
+  version: 2;
   title: string;
   status: "draft" | "confirmed";
   items: WorkspaceOutlineItem[];
   source: {
     prompt: string;
     context: unknown[];
+    setting: Record<string, unknown>;
   };
   updated_at: string | null;
 }
@@ -104,8 +104,21 @@ export interface UpdateWorkspaceOutlineInput {
     source?: {
       prompt: string;
       context: unknown[];
+      setting?: Record<string, unknown>;
     };
   };
+}
+
+export interface AppendWorkspaceLogInput {
+  workspace_dir: string;
+  channel: "ai-outline";
+  entry: Record<string, unknown>;
+}
+
+export interface AppendWorkspaceLogResult {
+  workspace_dir: string;
+  log_file: string;
+  appended: true;
 }
 
 export interface CreateProjectInput {

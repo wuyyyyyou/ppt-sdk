@@ -16,17 +16,17 @@ export interface AppWorkspaceFiles {
 
 export interface AppWorkspaceOutlineItem {
   title: string;
-  summary: string;
-  bullets: string[];
+  outline: string;
 }
 
 export interface AppWorkspaceOutlineSource {
   prompt: string;
   context: unknown[];
+  setting: Record<string, unknown>;
 }
 
 export interface AppWorkspaceOutline {
-  version: 1;
+  version: 2;
   title: string;
   status: "draft" | "confirmed";
   items: AppWorkspaceOutlineItem[];
@@ -85,4 +85,16 @@ export interface UpdateAppWorkspaceOutlineInput {
     items?: unknown;
     source?: unknown;
   };
+}
+
+export interface AppendAppWorkspaceLogInput {
+  workspace_dir: string;
+  channel: "ai-outline";
+  entry: Record<string, unknown>;
+}
+
+export interface AppendAppWorkspaceLogResult {
+  workspace_dir: string;
+  log_file: string;
+  appended: true;
 }

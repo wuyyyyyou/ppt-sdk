@@ -1,5 +1,21 @@
-import type { AnnaRuntime } from "../runtime/annaRuntime";
-import type { AiClient, GeneratedDeck } from "./types";
+import type { AnnaLlmCompleteInput, AnnaRuntime } from "../runtime/annaRuntime";
+import {
+  buildGenerateOutlineLlmRequest,
+  buildOutlineRepairRequest,
+  buildReviseOutlineLlmRequest,
+  getExpectedSlideCount,
+} from "./outlinePrompt";
+import {
+  OutlineValidationError,
+  parseOutlineJson,
+  validateGeneratedOutline,
+} from "./outlineParser";
+import type {
+  AiAttemptLog,
+  AiClient,
+  GeneratedDeck,
+  OutlineGenerationResult,
+} from "./types";
 
 interface AnnaCompletionContent {
   type?: string;
@@ -8,6 +24,18 @@ interface AnnaCompletionContent {
 
 interface AnnaCompletionResult {
   content?: AnnaCompletionContent;
+}
+
+const MAX_OUTLINE_ATTEMPTS = 3;
+
+export class AiOutlineGenerationError extends Error {
+  constructor(
+    message: string,
+    public readonly attempts: AiAttemptLog[]
+  ) {
+    super(message);
+    this.name = "AiOutlineGenerationError";
+  }
 }
 
 function extractCompletionText(result: unknown): string {
@@ -47,19 +75,92 @@ async function completeJson<T>(
   return parseJsonResult<T>(extractCompletionText(result), label);
 }
 
+async function completeOutlineWithRetry(
+  runtime: AnnaRuntime,
+  operation: "generateOutline" | "reviseOutline",
+  initialRequest: AnnaLlmCompleteInput,
+  expectedSlideCount: number | null
+): Promise<OutlineGenerationResult> {
+  const attempts: AiAttemptLog[] = [];
+  let request = initialRequest;
+  let lastValidationErrors: string[] = [];
+
+  for (let attempt = 1; attempt <= MAX_OUTLINE_ATTEMPTS; attempt += 1) {
+    try {
+      const rawResult = await runtime.llm.complete(request);
+      const rawText = extractCompletionText(rawResult);
+
+      try {
+        const parsed = parseOutlineJson(rawText);
+        const outline = validateGeneratedOutline(parsed, expectedSlideCount);
+        attempts.push({
+          operation,
+          attempt,
+          status: "success",
+          llmRequest: request,
+          llmRawResponse: rawResult,
+          validation: {
+            ok: true,
+            errors: [],
+          },
+        });
+        return { outline, attempts };
+      } catch (error) {
+        const errors =
+          error instanceof OutlineValidationError
+            ? error.errors
+            : [error instanceof Error ? error.message : String(error)];
+        lastValidationErrors = errors;
+        attempts.push({
+          operation,
+          attempt,
+          status: attempt < MAX_OUTLINE_ATTEMPTS ? "retry" : "error",
+          llmRequest: request,
+          llmRawResponse: rawResult,
+          validation: {
+            ok: false,
+            errors,
+          },
+        });
+
+        if (attempt < MAX_OUTLINE_ATTEMPTS) {
+          request = buildOutlineRepairRequest(request, rawText, errors);
+          continue;
+        }
+      }
+    } catch (error) {
+      attempts.push({
+        operation,
+        attempt,
+        status: attempt < MAX_OUTLINE_ATTEMPTS ? "retry" : "error",
+        llmRequest: request,
+        error: {
+          message: error instanceof Error ? error.message : String(error),
+        },
+      });
+
+      if (attempt < MAX_OUTLINE_ATTEMPTS) {
+        continue;
+      }
+    }
+  }
+
+  throw new AiOutlineGenerationError(
+    lastValidationErrors.length > 0
+      ? `Anna LLM returned invalid outline JSON: ${lastValidationErrors.join("; ")}`
+      : "Anna LLM failed to generate outline JSON.",
+    attempts
+  );
+}
+
 export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
   return {
     generateOutline(input) {
-      return completeJson(
+      return completeOutlineWithRetry(
         runtime,
-        "outline",
-        [
-          "Return a JSON array of presentation outline items.",
-          "Each item must have title, summary, and bullets fields.",
-          `Locale: ${input.locale}`,
-          `Prompt: ${input.prompt}`,
-          `Context: ${JSON.stringify(input.contextRows)}`
-        ].join("\n")
+        "generateOutline",
+        buildGenerateOutlineLlmRequest(input),
+        getExpectedSlideCount(input.setting)
       );
     },
 
@@ -69,27 +170,23 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         "deck",
         [
           "Return a JSON object with title, outline, and slides fields.",
-          "outline items must have title, summary, bullets.",
+          "outline items must have title and outline.",
           "slides must have title and subtitle.",
           `Locale: ${input.locale}`,
           `Prompt: ${input.prompt}`,
-          `Context: ${JSON.stringify(input.contextRows)}`
+          `Context: ${JSON.stringify(input.contextRows)}`,
+          `Setting: ${JSON.stringify(input.setting ?? {})}`
         ].join("\n"),
         2200
       );
     },
 
     reviseOutline(input) {
-      return completeJson(
+      return completeOutlineWithRetry(
         runtime,
-        "revised outline",
-        [
-          "Revise this presentation outline according to the feedback.",
-          "Return only a JSON array of outline items with title, summary, bullets.",
-          `Locale: ${input.locale}`,
-          `Feedback: ${input.feedback}`,
-          `Outline: ${JSON.stringify(input.outline)}`
-        ].join("\n")
+        "reviseOutline",
+        buildReviseOutlineLlmRequest(input),
+        getExpectedSlideCount(input.setting)
       );
     },
 

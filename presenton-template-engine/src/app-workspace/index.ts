@@ -1,7 +1,9 @@
 import os from "node:os";
 import path from "node:path";
-import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import type {
+  AppendAppWorkspaceLogInput,
+  AppendAppWorkspaceLogResult,
   AppWorkspaceResult,
   AppWorkspaceSummary,
   AppWorkspaceOutline,
@@ -23,6 +25,9 @@ const WORKSPACE_FILE_NAMES = [
   "outline.json",
   "pages.json",
 ] as const;
+const WORKSPACE_LOG_FILE_NAMES = {
+  "ai-outline": "ai-outline.jsonl",
+} as const;
 
 function padDatePart(value: number): string {
   return String(value).padStart(2, "0");
@@ -172,14 +177,10 @@ function normalizeOutlineItem(value: unknown): AppWorkspaceOutlineItem | null {
   }
 
   const record = value as Record<string, unknown>;
-  const bullets = Array.isArray(record.bullets)
-    ? record.bullets.filter((item): item is string => typeof item === "string")
-    : [];
 
   return {
     title: normalizeString(record.title),
-    summary: normalizeString(record.summary),
-    bullets,
+    outline: normalizeString(record.outline),
   };
 }
 
@@ -199,13 +200,17 @@ function normalizeOutlineJson(outline: unknown): AppWorkspaceOutline {
     : [];
 
   return {
-    version: 1,
+    version: 2,
     title: normalizeString(existing.title),
     status: existing.status === "confirmed" ? "confirmed" : "draft",
     items,
     source: {
       prompt: normalizeString(source.prompt),
       context: Array.isArray(source.context) ? source.context : [],
+      setting:
+        source.setting && typeof source.setting === "object" && !Array.isArray(source.setting)
+          ? (source.setting as Record<string, unknown>)
+          : {},
     },
     updated_at: typeof existing.updated_at === "string" ? existing.updated_at : null,
   };
@@ -429,6 +434,32 @@ export async function getAppWorkspaceOutline(
   return normalizeOutlineJson(workspace.outline);
 }
 
+export async function appendAppWorkspaceLog(
+  input: AppendAppWorkspaceLogInput,
+): Promise<AppendAppWorkspaceLogResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const logFileName = WORKSPACE_LOG_FILE_NAMES[input.channel];
+  if (!logFileName) {
+    throw new Error('"channel" must be a supported workspace log channel');
+  }
+
+  const logDir = path.join(workspace.workspace_dir, ".log");
+  const logFile = path.join(logDir, logFileName);
+  const entry = {
+    timestamp: new Date().toISOString(),
+    ...input.entry,
+  };
+
+  await mkdir(logDir, { recursive: true });
+  await appendFile(logFile, `${JSON.stringify(entry)}\n`, "utf8");
+
+  return {
+    workspace_dir: workspace.workspace_dir,
+    log_file: logFile,
+    appended: true,
+  };
+}
+
 export async function updateAppWorkspaceOutline(
   input: UpdateAppWorkspaceOutlineInput,
 ): Promise<AppWorkspaceResult> {
@@ -446,6 +477,8 @@ export async function updateAppWorkspaceOutline(
 }
 
 export type {
+  AppendAppWorkspaceLogInput,
+  AppendAppWorkspaceLogResult,
   AppWorkspaceFiles,
   AppWorkspaceOutline,
   AppWorkspaceOutlineItem,

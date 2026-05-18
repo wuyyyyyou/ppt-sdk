@@ -918,9 +918,8 @@ button {
   transform: rotate(180deg);
 }
 
-.outline-item-large ul {
-  margin: 8px 0 0 58px;
-  padding-left: 18px;
+.outline-item-large p {
+  margin: 8px 0 0 40px;
   color: var(--text-muted);
   font-size: 13px;
   line-height: 1.6;

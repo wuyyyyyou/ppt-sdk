@@ -5,6 +5,12 @@ import {
   type Slide
 } from "../data/mockDeck";
 import { sleep } from "../features/deck-workspace/utils";
+import {
+  buildGenerateOutlineLlmRequest,
+  buildReviseOutlineLlmRequest,
+  getExpectedSlideCount,
+} from "./outlinePrompt";
+import { validateGeneratedOutline } from "./outlineParser";
 import type {
   AiClient,
   GenerateDeckInput,
@@ -16,8 +22,7 @@ import type {
 
 function cloneOutline(outline: OutlineDetail[]): OutlineDetail[] {
   return outline.map((item) => ({
-    ...item,
-    bullets: [...item.bullets]
+    ...item
   }));
 }
 
@@ -25,11 +30,58 @@ function cloneSlides(slides: Slide[]): Slide[] {
   return slides.map((slide) => ({ ...slide }));
 }
 
+function fitOutlineCount(outline: OutlineDetail[], count: number | null): OutlineDetail[] {
+  if (count === null || count === outline.length) {
+    return cloneOutline(outline);
+  }
+
+  if (count < outline.length) {
+    return cloneOutline(outline.slice(0, count));
+  }
+
+  const next = cloneOutline(outline);
+  while (next.length < count) {
+    next.push({
+      title: `Supporting Point ${next.length + 1}`,
+      outline:
+        "Add a focused supporting page that extends the core argument with one clear takeaway.",
+    });
+  }
+  return next;
+}
+
 export function createMockAiClient(): AiClient {
   return {
-    async generateOutline() {
+    async generateOutline(input) {
       await sleep(900);
-      return cloneOutline(outlineDetails);
+      const llmRequest = buildGenerateOutlineLlmRequest(input);
+      const expectedSlideCount = getExpectedSlideCount(input.setting);
+      const rawOutline = {
+        title: input.locale === "zh" ? "AI Agent 工作流" : "AI Agent Workflows",
+        items: fitOutlineCount(outlineDetails, expectedSlideCount),
+      };
+      const outline = validateGeneratedOutline(rawOutline, expectedSlideCount);
+      return {
+        outline,
+        attempts: [
+          {
+            operation: "generateOutline",
+            attempt: 1,
+            status: "success",
+            llmRequest,
+            llmRawResponse: {
+              content: {
+                type: "text",
+                text: JSON.stringify(rawOutline),
+              },
+            },
+            validation: {
+              ok: true,
+              errors: [],
+            },
+          },
+        ],
+      };
     },
 
     async generateDeck(input: GenerateDeckInput) {
@@ -43,22 +95,51 @@ export function createMockAiClient(): AiClient {
 
     async reviseOutline(input: ReviseOutlineInput) {
       await sleep(700);
-      if (!input.feedback.trim()) {
-        return cloneOutline(input.outline);
-      }
+      const llmRequest = buildReviseOutlineLlmRequest(input);
+      const expectedSlideCount = getExpectedSlideCount(input.setting);
+      const revisedItems = !input.feedback.trim()
+        ? fitOutlineCount(input.outline, expectedSlideCount)
+        : fitOutlineCount(input.outline, expectedSlideCount).map((item, index) =>
+            index === 5
+              ? { ...item, title: "Security Boundaries for Real Action" }
+              : { ...item }
+          );
+      const rawOutline = {
+        title:
+          input.title ||
+          (input.locale === "zh" ? "AI Agent 工作流" : "AI Agent Workflows"),
+        items: revisedItems,
+      };
+      const outline = validateGeneratedOutline(rawOutline, expectedSlideCount);
 
-      return input.outline.map((item, index) =>
-        index === 5
-          ? { ...item, title: "Security Boundaries for Real Action" }
-          : { ...item, bullets: [...item.bullets] }
-      );
+      return {
+        outline,
+        attempts: [
+          {
+            operation: "reviseOutline",
+            attempt: 1,
+            status: "success",
+            llmRequest,
+            llmRawResponse: {
+              content: {
+                type: "text",
+                text: JSON.stringify(rawOutline),
+              },
+            },
+            validation: {
+              ok: true,
+              errors: [],
+            },
+          },
+        ],
+      };
     },
 
     async generateSlidesFromOutline(input: GenerateSlidesFromOutlineInput) {
       await sleep(1200);
       return input.outline.map((item) => ({
         title: item.title,
-        subtitle: item.summary
+        subtitle: item.outline
       }));
     },
 

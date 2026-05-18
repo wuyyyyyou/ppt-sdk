@@ -1,4 +1,6 @@
 import type {
+  AppendWorkspaceLogInput,
+  AppendWorkspaceLogResult,
   CreateProjectInput,
   CreateWorkspaceInput,
   GeneratePptxInput,
@@ -33,6 +35,7 @@ export interface PptBackend {
   listWorkspaces(): Promise<ListWorkspacesResult>;
   createWorkspace(input: CreateWorkspaceInput): Promise<WorkspaceResult>;
   openWorkspace(input: OpenWorkspaceInput): Promise<WorkspaceResult>;
+  appendWorkspaceLog(input: AppendWorkspaceLogInput): Promise<AppendWorkspaceLogResult>;
   getWorkspaceOutline(input: GetWorkspaceOutlineInput): Promise<WorkspaceOutline>;
   updateWorkspaceOutline(input: UpdateWorkspaceOutlineInput): Promise<WorkspaceResult>;
   updateWorkspaceSettings(

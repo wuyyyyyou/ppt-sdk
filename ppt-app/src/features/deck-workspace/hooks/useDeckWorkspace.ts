@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { createAiClient, type AiClient } from "../../../ai/aiClient";
+import { createAiClient, type AiAttemptLog, type AiClient } from "../../../ai/aiClient";
 import { createPptBackend, type PptBackend } from "../../../api/pptBackend";
 import type {
   ListWorkspacesResult,
+  WorkspaceResult,
   WorkspaceOutline,
   WorkspaceOutlineItem,
-  WorkspaceResult,
   WorkspaceSettings
 } from "../../../api/types";
 import {
@@ -114,11 +114,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       )
       .map((item) => ({
         title: item.title,
-        summary: typeof item.summary === "string" ? item.summary : "",
-        bullets: Array.isArray(item.bullets)
-          ? item.bullets.filter((bullet): bullet is string => typeof bullet === "string")
-          : []
+        outline: typeof item.outline === "string" ? item.outline : ""
       }));
+  }
+
+  function workspaceSettingsToState(workspace: WorkspaceResult | null): WorkspaceSettings {
+    return workspace?.setting && typeof workspace.setting === "object" && !Array.isArray(workspace.setting)
+      ? (workspace.setting as WorkspaceSettings)
+      : {};
   }
 
   function buildOutlineArtifact(items = outline, title = deckTitle) {
@@ -128,7 +131,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       items,
       source: {
         prompt,
-        context: contextRows
+        context: contextRows,
+        setting: workspaceSettingsToState(currentWorkspace)
       }
     };
   }
@@ -309,16 +313,23 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     if (reviewOutlineFirst) {
       setLoading("outline");
+      let workspace: WorkspaceResult | null = null;
       try {
-        const generatedOutline = await aiClient.generateOutline({
+        workspace = await ensureCurrentWorkspace();
+        const setting = workspaceSettingsToState(workspace);
+        const result = await aiClient.generateOutline({
           prompt,
           contextRows,
-          locale
+          locale,
+          setting
         });
-        setOutline(generatedOutline);
-        await saveOutlineArtifact(generatedOutline);
+        await appendOutlineAiAttemptLogs(workspace, result.attempts);
+        setDeckTitle(result.outline.title);
+        setOutline(result.outline.items);
+        await saveOutlineArtifact(result.outline.items, result.outline.title, workspace, setting);
         setStage("outline");
       } catch (error) {
+        await appendOutlineErrorLog(workspace, "generateOutline", error);
         showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
       } finally {
         setLoading("none");
@@ -328,15 +339,17 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     setLoading("deck");
     try {
+      const workspace = await ensureCurrentWorkspace();
       const result = await aiClient.generateDeck({
         prompt,
         contextRows,
         locale,
-        outlineFirst: false
+        outlineFirst: false,
+        setting: workspaceSettingsToState(workspace)
       });
       setGenerated(true);
       setOutline(result.outline);
-      await saveOutlineArtifact(result.outline, result.title);
+      await saveOutlineArtifact(result.outline, result.title, workspace);
       setDeck(result.slides);
       setCurrentSlide(0);
       setStage("deck");
@@ -374,17 +387,25 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (!aiClient) return;
     if (!outlineFeedback.trim()) return;
     setLoading("outline");
+    let workspace: WorkspaceResult | null = null;
     try {
-      const revisedOutline = await aiClient.reviseOutline({
+      workspace = await ensureCurrentWorkspace();
+      const setting = workspaceSettingsToState(workspace);
+      const result = await aiClient.reviseOutline({
+        title: deckTitle,
         outline,
         feedback: outlineFeedback,
-        locale
+        locale,
+        setting
       });
-      setOutline(revisedOutline);
-      await saveOutlineArtifact(revisedOutline);
+      await appendOutlineAiAttemptLogs(workspace, result.attempts);
+      setDeckTitle(result.outline.title);
+      setOutline(result.outline.items);
+      await saveOutlineArtifact(result.outline.items, result.outline.title, workspace, setting);
       setOutlineFeedback("");
       showToast(t.toasts.outlineUpdated);
     } catch (error) {
+      await appendOutlineErrorLog(workspace, "reviseOutline", error);
       showToast(error instanceof Error ? error.message : t.toasts.createOutlineFirst);
     } finally {
       setLoading("none");
@@ -436,7 +457,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setDeck((items) => [...items, { title, subtitle }]);
     setOutline((items) => [
       ...items,
-      { title, summary: t.outline.fallbackSummary, bullets: [] }
+      { title, outline: t.outline.fallbackSummary }
     ]);
   }
 
@@ -447,8 +468,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setOutline(
       nextDeck.map((slide) => ({
         title: slide.title,
-        summary: slide.subtitle,
-        bullets: []
+        outline: slide.subtitle
       }))
     );
     setGenerated(true);
@@ -475,14 +495,86 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return workspace;
   }
 
-  async function saveOutlineArtifact(items = outline, title = deckTitle) {
+  async function appendOutlineAiLog(
+    workspace: WorkspaceResult | null,
+    entry: Record<string, unknown>
+  ) {
+    if (!backend || !workspace) return;
+
+    try {
+      await backend.appendWorkspaceLog({
+        workspace_dir: workspace.workspace_dir,
+        channel: "ai-outline",
+        entry
+      });
+    } catch (error) {
+      console.warn(
+        "Failed to append outline AI log",
+        error instanceof Error ? error.message : error
+      );
+    }
+  }
+
+  async function appendOutlineAiAttemptLogs(
+    workspace: WorkspaceResult | null,
+    attempts: AiAttemptLog[]
+  ) {
+    for (const attempt of attempts) {
+      await appendOutlineAiLog(workspace, {
+        event: `ai.outline.${attempt.operation}.attempt`,
+        ...attempt
+      });
+    }
+  }
+
+  async function appendOutlineErrorLog(
+    workspace: WorkspaceResult | null,
+    operation: AiAttemptLog["operation"],
+    error: unknown
+  ) {
+    const attempts =
+      error &&
+      typeof error === "object" &&
+      "attempts" in error &&
+      Array.isArray((error as { attempts?: unknown }).attempts)
+        ? ((error as { attempts: AiAttemptLog[] }).attempts)
+        : [];
+
+    if (attempts.length > 0) {
+      await appendOutlineAiAttemptLogs(workspace, attempts);
+      return;
+    }
+
+    await appendOutlineAiLog(workspace, {
+      event: `ai.outline.${operation}.error`,
+      operation,
+      status: "error",
+      error: {
+        message: error instanceof Error ? error.message : String(error)
+      }
+    });
+  }
+
+  async function saveOutlineArtifact(
+    items = outline,
+    title = deckTitle,
+    workspaceOverride: WorkspaceResult | null = null,
+    settingOverride: WorkspaceSettings | null = null
+  ) {
     if (!backend) return null;
-    const workspace = await ensureCurrentWorkspace();
+    const workspace = workspaceOverride ?? (await ensureCurrentWorkspace());
     if (!workspace) return null;
 
     const updatedWorkspace = await backend.updateWorkspaceOutline({
       workspace_dir: workspace.workspace_dir,
-      outline: buildOutlineArtifact(items, title)
+      outline: {
+        ...buildOutlineArtifact(items, title),
+        source: {
+          prompt,
+          context: contextRows,
+          setting: settingOverride ?? workspaceSettingsToState(workspace)
+        }
+      }
     });
     applyWorkspace(updatedWorkspace);
     setWorkspaceScan(await backend.listWorkspaces());

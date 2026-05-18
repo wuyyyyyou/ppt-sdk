@@ -1,6 +1,7 @@
 import type { AnnaRuntime } from "../runtime/annaRuntime";
 import type { PptBackend } from "./pptBackend";
 import type {
+  AppendWorkspaceLogResult,
   GeneratePptxInput,
   GeneratePptxResult,
   WorkspaceOutline,
@@ -48,6 +49,12 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invoke<WorkspaceResult>(PPT_ENGINE_TOOL_ID, "app_create_workspace", input),
     openWorkspace: (input) =>
       invoke<WorkspaceResult>(PPT_ENGINE_TOOL_ID, "app_open_workspace", input),
+    appendWorkspaceLog: (input) =>
+      invoke<AppendWorkspaceLogResult>(
+        PPT_ENGINE_TOOL_ID,
+        "app_append_workspace_log",
+        input
+      ),
     getWorkspaceOutline: (input) =>
       invoke<WorkspaceOutline>(
         PPT_ENGINE_TOOL_ID,

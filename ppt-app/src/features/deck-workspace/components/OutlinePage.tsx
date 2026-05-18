@@ -83,16 +83,10 @@ export function OutlinePage(props: OutlinePageProps) {
                 className="outline-summary"
                 onClick={() => setExpandedOutline(expanded ? null : index)}
               >
-                <span>{item.summary || t.outline.fallbackSummary}</span>
+                <span>{item.outline || t.outline.fallbackSummary}</span>
                 <ChevronDown className={expanded ? "rotated" : ""} size={14} />
               </button>
-              {expanded && item.bullets.length > 0 ? (
-                <ul>
-                  {item.bullets.map((bullet) => (
-                    <li key={bullet}>{bullet}</li>
-                  ))}
-                </ul>
-              ) : null}
+              {expanded ? <p>{item.outline || t.outline.fallbackSummary}</p> : null}
             </article>
           );
         })}
