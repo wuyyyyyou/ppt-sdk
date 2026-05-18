@@ -12,6 +12,7 @@ import {
   createAppWorkspace,
   forkTemplateGroup,
   getAllDiscoveredTemplateGroups,
+  getAppWorkspaceOutline,
   getDiscoveredTemplateGroup,
   listAppWorkspaces,
   listDiscoveredTemplateGroupSummaries,
@@ -19,6 +20,7 @@ import {
   runDeckValidation,
   describeTaskStateMachine,
   invokeTaskStateMachine,
+  updateAppWorkspaceOutline,
   updateAppWorkspaceSettings,
   updateAppWorkspaceTitle,
 } from "./dist/index.js";
@@ -27,6 +29,8 @@ const TOOL_NAMES = [
   "app_list_workspaces",
   "app_create_workspace",
   "app_open_workspace",
+  "app_get_workspace_outline",
+  "app_update_workspace_outline",
   "app_update_workspace_settings",
   "app_update_workspace_title",
   "listDiscoveredTemplateGroupSummaries",
@@ -118,6 +122,38 @@ const MANIFEST = {
           name: "setting",
           type: "object",
           description: "Partial settings object to merge into setting.json.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_get_workspace_outline",
+      description:
+        "Read and normalize outline.json for an existing PPT task workspace.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_update_workspace_outline",
+      description:
+        "Write outline.json for an existing PPT task workspace and return the refreshed workspace.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+        {
+          name: "outline",
+          type: "object",
+          description: "Outline artifact with title, items, source, status, and updated_at fields.",
           required: true,
         },
       ],
@@ -730,6 +766,32 @@ async function toolAppOpenWorkspace(args) {
   return openAppWorkspace({ workspace_dir: workspaceDir });
 }
 
+async function toolAppGetWorkspaceOutline(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return getAppWorkspaceOutline({ workspace_dir: workspaceDir });
+}
+
+async function toolAppUpdateWorkspaceOutline(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const outline = args.outline;
+  if (!outline || typeof outline !== "object" || Array.isArray(outline)) {
+    throw new Error('"outline" must be an object');
+  }
+
+  return updateAppWorkspaceOutline({
+    workspace_dir: workspaceDir,
+    outline,
+  });
+}
+
 async function toolAppUpdateWorkspaceSettings(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -974,6 +1036,8 @@ const TOOL_DISPATCH = {
   app_list_workspaces: toolAppListWorkspaces,
   app_create_workspace: toolAppCreateWorkspace,
   app_open_workspace: toolAppOpenWorkspace,
+  app_get_workspace_outline: toolAppGetWorkspaceOutline,
+  app_update_workspace_outline: toolAppUpdateWorkspaceOutline,
   app_update_workspace_settings: toolAppUpdateWorkspaceSettings,
   app_update_workspace_title: toolAppUpdateWorkspaceTitle,
   listDiscoveredTemplateGroupSummaries: toolListDiscoveredTemplateGroupSummaries,

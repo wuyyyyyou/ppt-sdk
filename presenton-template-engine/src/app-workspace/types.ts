@@ -14,6 +14,26 @@ export interface AppWorkspaceFiles {
   pages: string;
 }
 
+export interface AppWorkspaceOutlineItem {
+  title: string;
+  summary: string;
+  bullets: string[];
+}
+
+export interface AppWorkspaceOutlineSource {
+  prompt: string;
+  context: unknown[];
+}
+
+export interface AppWorkspaceOutline {
+  version: 1;
+  title: string;
+  status: "draft" | "confirmed";
+  items: AppWorkspaceOutlineItem[];
+  source: AppWorkspaceOutlineSource;
+  updated_at: string | null;
+}
+
 export interface AppWorkspaceResult {
   workspace_root: string;
   workspace_dir: string;
@@ -51,4 +71,18 @@ export interface UpdateAppWorkspaceSettingsInput {
 export interface UpdateAppWorkspaceTitleInput {
   workspace_dir: string;
   title: string;
+}
+
+export interface GetAppWorkspaceOutlineInput {
+  workspace_dir: string;
+}
+
+export interface UpdateAppWorkspaceOutlineInput {
+  workspace_dir: string;
+  outline: {
+    title?: string;
+    status?: string;
+    items?: unknown;
+    source?: unknown;
+  };
 }

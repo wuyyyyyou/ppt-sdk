@@ -4,9 +4,13 @@ import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import type {
   AppWorkspaceResult,
   AppWorkspaceSummary,
+  AppWorkspaceOutline,
+  AppWorkspaceOutlineItem,
   CreateAppWorkspaceInput,
+  GetAppWorkspaceOutlineInput,
   ListAppWorkspacesResult,
   OpenAppWorkspaceInput,
+  UpdateAppWorkspaceOutlineInput,
   UpdateAppWorkspaceSettingsInput,
   UpdateAppWorkspaceTitleInput,
 } from "./types.js";
@@ -155,11 +159,55 @@ function normalizeSettingJson(setting: unknown): Record<string, unknown> {
 }
 
 function createDefaultOutlineJson() {
+  return normalizeOutlineJson(null);
+}
+
+function normalizeString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function normalizeOutlineItem(value: unknown): AppWorkspaceOutlineItem | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const bullets = Array.isArray(record.bullets)
+    ? record.bullets.filter((item): item is string => typeof item === "string")
+    : [];
+
+  return {
+    title: normalizeString(record.title),
+    summary: normalizeString(record.summary),
+    bullets,
+  };
+}
+
+function normalizeOutlineJson(outline: unknown): AppWorkspaceOutline {
+  const existing =
+    outline && typeof outline === "object" && !Array.isArray(outline)
+      ? (outline as Record<string, unknown>)
+      : {};
+  const source =
+    existing.source && typeof existing.source === "object" && !Array.isArray(existing.source)
+      ? (existing.source as Record<string, unknown>)
+      : {};
+  const items = Array.isArray(existing.items)
+    ? existing.items
+        .map(normalizeOutlineItem)
+        .filter((item): item is AppWorkspaceOutlineItem => item !== null)
+    : [];
+
   return {
     version: 1,
-    title: "",
-    items: [],
-    updated_at: null,
+    title: normalizeString(existing.title),
+    status: existing.status === "confirmed" ? "confirmed" : "draft",
+    items,
+    source: {
+      prompt: normalizeString(source.prompt),
+      context: Array.isArray(source.context) ? source.context : [],
+    },
+    updated_at: typeof existing.updated_at === "string" ? existing.updated_at : null,
   };
 }
 
@@ -208,6 +256,12 @@ async function ensureWorkspaceFiles(
     await writeJsonFile(files.setting, normalizedSetting);
   }
 
+  const currentOutline = await readJsonFileIfExists(files.outline);
+  const normalizedOutline = normalizeOutlineJson(currentOutline);
+  if (JSON.stringify(currentOutline) !== JSON.stringify(normalizedOutline)) {
+    await writeJsonFile(files.outline, normalizedOutline);
+  }
+
   const missingFiles: string[] = [];
   for (const fileName of WORKSPACE_FILE_NAMES) {
     const filePath = path.join(normalizedWorkspaceDir, fileName);
@@ -226,9 +280,21 @@ async function ensureWorkspaceFiles(
     files,
     task: await readJsonFileIfExists(files.task),
     setting: normalizedSetting,
-    outline: await readJsonFileIfExists(files.outline),
+    outline: normalizedOutline,
     pages: await readJsonFileIfExists(files.pages),
   };
+}
+
+async function touchWorkspaceTask(workspace: AppWorkspaceResult, updatedAt: string): Promise<void> {
+  const existing =
+    workspace.task && typeof workspace.task === "object" && !Array.isArray(workspace.task)
+      ? (workspace.task as Record<string, unknown>)
+      : {};
+
+  await writeJsonFile(workspace.files.task, {
+    ...existing,
+    updated_at: updatedAt,
+  });
 }
 
 async function getWorkspaceSummary(workspaceDir: string): Promise<AppWorkspaceSummary> {
@@ -356,13 +422,40 @@ export async function updateAppWorkspaceTitle(
   return ensureWorkspaceFiles(input.workspace_dir);
 }
 
+export async function getAppWorkspaceOutline(
+  input: GetAppWorkspaceOutlineInput,
+): Promise<AppWorkspaceOutline> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  return normalizeOutlineJson(workspace.outline);
+}
+
+export async function updateAppWorkspaceOutline(
+  input: UpdateAppWorkspaceOutlineInput,
+): Promise<AppWorkspaceResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const updatedAt = new Date().toISOString();
+  const nextOutline = normalizeOutlineJson({
+    ...normalizeOutlineJson(workspace.outline),
+    ...input.outline,
+    updated_at: updatedAt,
+  });
+
+  await writeJsonFile(workspace.files.outline, nextOutline);
+  await touchWorkspaceTask(workspace, updatedAt);
+  return ensureWorkspaceFiles(input.workspace_dir);
+}
+
 export type {
   AppWorkspaceFiles,
+  AppWorkspaceOutline,
+  AppWorkspaceOutlineItem,
   AppWorkspaceResult,
   AppWorkspaceSummary,
   CreateAppWorkspaceInput,
+  GetAppWorkspaceOutlineInput,
   ListAppWorkspacesResult,
   OpenAppWorkspaceInput,
+  UpdateAppWorkspaceOutlineInput,
   UpdateAppWorkspaceSettingsInput,
   UpdateAppWorkspaceTitleInput,
 } from "./types.js";

@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { createAiClient, type AiClient } from "../../../ai/aiClient";
 import { createPptBackend, type PptBackend } from "../../../api/pptBackend";
 import type {
   ListWorkspacesResult,
+  WorkspaceOutline,
+  WorkspaceOutlineItem,
   WorkspaceResult,
   WorkspaceSettings
 } from "../../../api/types";
@@ -12,10 +15,7 @@ import {
   type Slide
 } from "../../../data/mockDeck";
 import { formatMessage, type Locale, type Messages } from "../../../i18n/messages";
-import {
-  deckReadyStatus,
-  sleep
-} from "../utils";
+import { deckReadyStatus, sleep } from "../utils";
 import type {
   ContextRow,
   DeckWorkspaceState,
@@ -50,7 +50,7 @@ export interface DeckWorkspaceActions {
   selectLook: (id: string) => void;
   generateDeck: () => Promise<void>;
   createDeckFromOutline: () => Promise<void>;
-  applyOutlineFeedback: () => void;
+  applyOutlineFeedback: () => Promise<void>;
   updateOutlineItem: (index: number, title: string) => void;
   updateDeckTitle: (index: number, title: string) => void;
   moveSlide: (index: number, direction: -1 | 1) => void;
@@ -91,20 +91,70 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [loading, setLoading] = useState<LoadingKind>("none");
   const [exportStatus, setExportStatus] = useState("");
   const [backend, setBackend] = useState<PptBackend | null>(null);
+  const [aiClient, setAiClient] = useState<AiClient | null>(null);
   const [workspaceScan, setWorkspaceScan] = useState<ListWorkspacesResult | null>(null);
   const [currentWorkspace, setCurrentWorkspace] = useState<WorkspaceResult | null>(null);
   const [workspaceLoading, setWorkspaceLoading] = useState(true);
   const [workspaceError, setWorkspaceError] = useState("");
   const [workspaceSettingsSaving, setWorkspaceSettingsSaving] = useState(false);
 
+  function workspaceOutlineToState(workspaceOutline: unknown) {
+    const outlineRecord =
+      workspaceOutline && typeof workspaceOutline === "object" && !Array.isArray(workspaceOutline)
+        ? (workspaceOutline as Partial<WorkspaceOutline>)
+        : null;
+    const items = Array.isArray(outlineRecord?.items) ? outlineRecord.items : [];
+
+    return items
+      .filter(
+        (item): item is WorkspaceOutlineItem =>
+          item !== null &&
+          typeof item === "object" &&
+          typeof (item as WorkspaceOutlineItem).title === "string"
+      )
+      .map((item) => ({
+        title: item.title,
+        summary: typeof item.summary === "string" ? item.summary : "",
+        bullets: Array.isArray(item.bullets)
+          ? item.bullets.filter((bullet): bullet is string => typeof bullet === "string")
+          : []
+      }));
+  }
+
+  function buildOutlineArtifact(items = outline, title = deckTitle) {
+    return {
+      title,
+      status: "draft" as const,
+      items,
+      source: {
+        prompt,
+        context: contextRows
+      }
+    };
+  }
+
+  function applyWorkspace(workspace: WorkspaceResult) {
+    setCurrentWorkspace(workspace);
+    setDeckTitle(getWorkspaceTitle(workspace));
+    const workspaceOutline = workspaceOutlineToState(workspace.outline);
+    if (workspaceOutline.length > 0) {
+      setOutline(workspaceOutline);
+      setStage("outline");
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
 
-    async function initializeBackend() {
+    async function initializeClients() {
       try {
-        const nextBackend = await createPptBackend();
+        const [nextBackend, nextAiClient] = await Promise.all([
+          createPptBackend(),
+          createAiClient()
+        ]);
         if (cancelled) return;
         setBackend(nextBackend);
+        setAiClient(nextAiClient);
         const scan = await nextBackend.listWorkspaces();
         if (cancelled) return;
         setWorkspaceScan(scan);
@@ -121,7 +171,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       }
     }
 
-    void initializeBackend();
+    void initializeClients();
 
     return () => {
       cancelled = true;
@@ -255,47 +305,90 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function generateDeck() {
+    if (!aiClient) return;
+
     if (reviewOutlineFirst) {
       setLoading("outline");
-      await sleep(900);
-      setOutline(outlineDetails);
-      setLoading("none");
-      setStage("outline");
+      try {
+        const generatedOutline = await aiClient.generateOutline({
+          prompt,
+          contextRows,
+          locale
+        });
+        setOutline(generatedOutline);
+        await saveOutlineArtifact(generatedOutline);
+        setStage("outline");
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
+      } finally {
+        setLoading("none");
+      }
       return;
     }
 
     setLoading("deck");
-    await sleep(1100);
-    setGenerated(true);
-    setOutline(outlineDetails);
-    setDeck(initialDeck);
-    setCurrentSlide(0);
-    setStage("deck");
-    setDeckTitle(locale === "zh" ? "AI Agent 工作流" : "AI Agent Workflows");
-    setLoading("none");
+    try {
+      const result = await aiClient.generateDeck({
+        prompt,
+        contextRows,
+        locale,
+        outlineFirst: false
+      });
+      setGenerated(true);
+      setOutline(result.outline);
+      await saveOutlineArtifact(result.outline, result.title);
+      setDeck(result.slides);
+      setCurrentSlide(0);
+      setStage("deck");
+      setDeckTitle(result.title);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
+    } finally {
+      setLoading("none");
+    }
   }
 
   async function createDeckFromOutline() {
+    if (!aiClient) return;
+
     setLoading("deckFromOutline");
-    await sleep(1200);
-    setDeck(outline.map((item) => ({ title: item.title, subtitle: item.summary })));
-    setGenerated(true);
-    setCurrentSlide(0);
-    setStage("deck");
-    setLoading("none");
+    try {
+      await saveOutlineArtifact(outline);
+      setDeck(
+        await aiClient.generateSlidesFromOutline({
+          outline,
+          locale
+        })
+      );
+      setGenerated(true);
+      setCurrentSlide(0);
+      setStage("deck");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
+    } finally {
+      setLoading("none");
+    }
   }
 
-  function applyOutlineFeedback() {
+  async function applyOutlineFeedback() {
+    if (!aiClient) return;
     if (!outlineFeedback.trim()) return;
-    setOutline((items) =>
-      items.map((item, index) =>
-        index === 5
-          ? { ...item, title: "Security Boundaries for Real Action" }
-          : item
-      )
-    );
-    setOutlineFeedback("");
-    showToast(t.toasts.outlineUpdated);
+    setLoading("outline");
+    try {
+      const revisedOutline = await aiClient.reviseOutline({
+        outline,
+        feedback: outlineFeedback,
+        locale
+      });
+      setOutline(revisedOutline);
+      await saveOutlineArtifact(revisedOutline);
+      setOutlineFeedback("");
+      showToast(t.toasts.outlineUpdated);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t.toasts.createOutlineFirst);
+    } finally {
+      setLoading("none");
+    }
   }
 
   function updateOutlineItem(index: number, title: string) {
@@ -372,6 +465,30 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       : workspace.workspace_id;
   }
 
+  async function ensureCurrentWorkspace() {
+    if (!backend) return null;
+    if (currentWorkspace) return currentWorkspace;
+
+    const workspace = await backend.createWorkspace({});
+    applyWorkspace(workspace);
+    setWorkspaceScan(await backend.listWorkspaces());
+    return workspace;
+  }
+
+  async function saveOutlineArtifact(items = outline, title = deckTitle) {
+    if (!backend) return null;
+    const workspace = await ensureCurrentWorkspace();
+    if (!workspace) return null;
+
+    const updatedWorkspace = await backend.updateWorkspaceOutline({
+      workspace_dir: workspace.workspace_dir,
+      outline: buildOutlineArtifact(items, title)
+    });
+    applyWorkspace(updatedWorkspace);
+    setWorkspaceScan(await backend.listWorkspaces());
+    return updatedWorkspace;
+  }
+
   async function scanWorkspaces() {
     if (!backend) return;
 
@@ -403,8 +520,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const workspace = await backend.openWorkspace({
         workspace_dir: workspaceDir
       });
-      setCurrentWorkspace(workspace);
-      setDeckTitle(getWorkspaceTitle(workspace));
+      applyWorkspace(workspace);
       setPage("main");
       showToast(`已打开工作区 ${workspace.workspace_id}`);
     } catch (error) {
@@ -423,9 +539,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setWorkspaceError("");
     try {
       const workspace = await backend.createWorkspace({});
-      setCurrentWorkspace(workspace);
+      applyWorkspace(workspace);
       setWorkspaceScan(await backend.listWorkspaces());
-      setDeckTitle(getWorkspaceTitle(workspace));
       setPage("main");
       showToast(`已创建工作区 ${workspace.workspace_id}`);
     } catch (error) {
@@ -447,7 +562,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         workspace_dir: currentWorkspace.workspace_dir,
         setting
       });
-      setCurrentWorkspace(workspace);
+      applyWorkspace(workspace);
       setWorkspaceScan(await backend.listWorkspaces());
       showToast(t.status.settingsSaved);
     } catch (error) {
@@ -469,8 +584,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         workspace_dir: currentWorkspace.workspace_dir,
         title
       });
-      setCurrentWorkspace(workspace);
-      setDeckTitle(getWorkspaceTitle(workspace));
+      applyWorkspace(workspace);
       setWorkspaceScan(await backend.listWorkspaces());
       showToast(t.status.settingsSaved);
     } catch (error) {
@@ -483,39 +597,42 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function refineDeck() {
+    if (!aiClient) return;
+
     setLoading("refineDeck");
-    await sleep(1600);
-    setDeck((items) =>
-      items.map((slide) => ({
-        ...slide,
-        title: slide.title.includes("Refined")
-          ? slide.title
-          : `${slide.title} (Refined)`
-      }))
-    );
-    setLoading("none");
-    setPage("main");
-    showToast(t.status.deckRefined);
+    try {
+      setDeck(await aiClient.refineDeck({ slides: deck, locale }));
+      setPage("main");
+      showToast(t.status.deckRefined);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t.status.refiningDeck);
+    } finally {
+      setLoading("none");
+    }
   }
 
   async function refineSlide() {
+    if (!aiClient) return;
+    const slide = deck[currentSlide];
+    if (!slide) return;
+
     setLoading("refineSlide");
-    await sleep(1200);
-    setDeck((items) =>
-      items.map((slide, index) =>
-        index === currentSlide
-          ? {
-              ...slide,
-              title: slide.title.includes("Updated")
-                ? slide.title
-                : `${slide.title} (Updated)`
-            }
-          : slide
-      )
-    );
-    setLoading("none");
-    setPage("main");
-    showToast(t.status.slideRefined);
+    try {
+      const refinedSlide = await aiClient.refineSlide({
+        slide,
+        slideIndex: currentSlide,
+        locale
+      });
+      setDeck((items) =>
+        items.map((item, index) => (index === currentSlide ? refinedSlide : item))
+      );
+      setPage("main");
+      showToast(t.status.slideRefined);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t.status.refiningSlide);
+    } finally {
+      setLoading("none");
+    }
   }
 
   async function exportFile(type: "PPTX" | "PDF") {

@@ -3,6 +3,7 @@ import type {
   CreateWorkspaceInput,
   GeneratePptxInput,
   GeneratePptxResult,
+  GetWorkspaceOutlineInput,
   ListWorkspacesResult,
   ListTemplatesInput,
   ListTemplatesResult,
@@ -18,7 +19,9 @@ import type {
   RenderDeckHtmlResult,
   SelectTemplateInput,
   UpdateWorkspaceSettingsInput,
+  UpdateWorkspaceOutlineInput,
   UpdateWorkspaceTitleInput,
+  WorkspaceOutline,
   WorkspaceResult
 } from "./types";
 import { createAnnaPptBackend } from "./annaPptBackend";
@@ -30,6 +33,8 @@ export interface PptBackend {
   listWorkspaces(): Promise<ListWorkspacesResult>;
   createWorkspace(input: CreateWorkspaceInput): Promise<WorkspaceResult>;
   openWorkspace(input: OpenWorkspaceInput): Promise<WorkspaceResult>;
+  getWorkspaceOutline(input: GetWorkspaceOutlineInput): Promise<WorkspaceOutline>;
+  updateWorkspaceOutline(input: UpdateWorkspaceOutlineInput): Promise<WorkspaceResult>;
   updateWorkspaceSettings(
     input: UpdateWorkspaceSettingsInput
   ): Promise<WorkspaceResult>;

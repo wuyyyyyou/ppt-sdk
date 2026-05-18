@@ -12,8 +12,8 @@ interface OutlinePageProps {
   updateOutlineItem: (index: number, title: string) => void;
   feedback: string;
   setFeedback: (value: string) => void;
-  applyFeedback: () => void;
-  createDeck: () => void;
+  applyFeedback: () => Promise<void>;
+  createDeck: () => Promise<void>;
   loading: LoadingKind;
 }
 

@@ -48,6 +48,24 @@ export interface WorkspaceSettings {
   [key: string]: unknown;
 }
 
+export interface WorkspaceOutlineItem {
+  title: string;
+  summary: string;
+  bullets: string[];
+}
+
+export interface WorkspaceOutline {
+  version: 1;
+  title: string;
+  status: "draft" | "confirmed";
+  items: WorkspaceOutlineItem[];
+  source: {
+    prompt: string;
+    context: unknown[];
+  };
+  updated_at: string | null;
+}
+
 export interface ListWorkspacesResult {
   workspace_root: string;
   has_workspaces: boolean;
@@ -71,6 +89,23 @@ export interface UpdateWorkspaceSettingsInput {
 export interface UpdateWorkspaceTitleInput {
   workspace_dir: string;
   title: string;
+}
+
+export interface GetWorkspaceOutlineInput {
+  workspace_dir: string;
+}
+
+export interface UpdateWorkspaceOutlineInput {
+  workspace_dir: string;
+  outline: {
+    title?: string;
+    status?: "draft" | "confirmed";
+    items?: WorkspaceOutlineItem[];
+    source?: {
+      prompt: string;
+      context: unknown[];
+    };
+  };
 }
 
 export interface CreateProjectInput {

@@ -4,9 +4,23 @@ export interface AnnaToolInvokeInput {
   args: object;
 }
 
+export interface AnnaLlmCompleteInput {
+  messages: Array<{
+    role: "user" | "assistant" | "system";
+    content: {
+      type: "text";
+      text: string;
+    };
+  }>;
+  maxTokens?: number;
+}
+
 export interface AnnaRuntime {
   tools: {
     invoke(input: AnnaToolInvokeInput): Promise<unknown>;
+  };
+  llm: {
+    complete(input: AnnaLlmCompleteInput): Promise<unknown>;
   };
 }
 

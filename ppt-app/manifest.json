@@ -41,7 +41,7 @@
       ],
       "chat": [],
       "artifact": [],
-      "llm": [],
+      "llm": ["complete"],
       "fs": [],
       "storage": [],
       "prefs": [],

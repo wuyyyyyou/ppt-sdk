@@ -2,6 +2,7 @@ import type { PptBackend } from "./pptBackend";
 import type {
   GeneratePptxInput,
   GeneratePptxResult,
+  WorkspaceOutline,
   ListWorkspacesResult,
   PrepareExportModelResult,
   ProjectResult,
@@ -80,6 +81,18 @@ export function createLocalPptBackend(options: LocalBackendOptions): PptBackend 
       invoke<WorkspaceResult>(
         LOCAL_PPT_ENGINE_TOOL_ID,
         "app_open_workspace",
+        input
+      ),
+    getWorkspaceOutline: (input) =>
+      invoke<WorkspaceOutline>(
+        LOCAL_PPT_ENGINE_TOOL_ID,
+        "app_get_workspace_outline",
+        input
+      ),
+    updateWorkspaceOutline: (input) =>
+      invoke<WorkspaceResult>(
+        LOCAL_PPT_ENGINE_TOOL_ID,
+        "app_update_workspace_outline",
         input
       ),
     updateWorkspaceSettings: (input) =>

@@ -19,7 +19,7 @@ interface BriefPageProps {
   setLookPickerOpen: (value: boolean) => void;
   selectedLookId: string | null;
   selectLook: (id: string) => void;
-  generateDeck: () => void;
+  generateDeck: () => Promise<void>;
   showToast: (message: string) => void;
 }
 
