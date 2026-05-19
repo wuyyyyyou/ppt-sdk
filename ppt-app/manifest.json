@@ -27,8 +27,8 @@
         "title": "PPT App",
         "default": true,
         "entry": "index.html",
-        "min_size": { "w": 600, "h": 700 },
-        "default_size": { "w": 600, "h": 700 },
+        "min_size": { "w": 900, "h": 720 },
+        "default_size": { "w": 1080, "h": 760 },
         "resizable": true,
         "movable": true,
         "single_instance": true
