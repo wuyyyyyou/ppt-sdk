@@ -31,6 +31,7 @@ interface AnnaCompletionResult {
 }
 
 const MAX_OUTLINE_ATTEMPTS = 3;
+const LLM_COMPLETE_TIMEOUT_MS = 120_000;
 
 export class AiOutlineGenerationError extends Error {
   constructor(
@@ -82,13 +83,26 @@ function parseJsonResult<T>(text: string, label: string): T {
   }
 }
 
+function completeLlm(
+  runtime: AnnaRuntime,
+  input: AnnaLlmCompleteInput
+): Promise<unknown> {
+  if (typeof runtime.call === "function") {
+    return runtime.call("llm", "complete", input, {
+      timeoutMs: LLM_COMPLETE_TIMEOUT_MS,
+    });
+  }
+
+  return runtime.llm.complete(input);
+}
+
 async function completeJson<T>(
   runtime: AnnaRuntime,
   label: string,
   prompt: string,
   maxTokens = 1400
 ): Promise<T> {
-  const result = await runtime.llm.complete({
+  const result = await completeLlm(runtime, {
     messages: [
       {
         role: "user",
@@ -116,7 +130,7 @@ async function completeOutlineWithRetry(
 
   for (let attempt = 1; attempt <= MAX_OUTLINE_ATTEMPTS; attempt += 1) {
     try {
-      const rawResult = await runtime.llm.complete(request);
+      const rawResult = await completeLlm(runtime, request);
       const rawText = extractCompletionText(rawResult);
 
       try {
@@ -158,19 +172,21 @@ async function completeOutlineWithRetry(
         }
       }
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       attempts.push({
         operation,
         attempt,
-        status: attempt < MAX_OUTLINE_ATTEMPTS ? "retry" : "error",
+        status: "error",
         llmRequest: request,
         error: {
-          message: error instanceof Error ? error.message : String(error),
+          message,
         },
       });
 
-      if (attempt < MAX_OUTLINE_ATTEMPTS) {
-        continue;
-      }
+      throw new AiOutlineGenerationError(
+        `Anna LLM request failed: ${message}`,
+        attempts
+      );
     }
   }
 

@@ -16,6 +16,12 @@ export interface AnnaLlmCompleteInput {
 }
 
 export interface AnnaRuntime {
+  call?<T = unknown>(
+    ns: string,
+    method: string,
+    args?: object,
+    options?: { timeoutMs?: number }
+  ): Promise<T>;
   tools: {
     invoke(input: AnnaToolInvokeInput): Promise<unknown>;
   };
