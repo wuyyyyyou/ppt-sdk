@@ -1,4 +1,4 @@
-export type RuntimeMode = "anna" | "standalone" | "mock";
+export type RuntimeMode = "anna" | "mock";
 
 export function detectRuntimeMode(): RuntimeMode {
   if (typeof window !== "undefined" && "AnnaAppRuntime" in window) {
@@ -9,5 +9,7 @@ export function detectRuntimeMode(): RuntimeMode {
     return "mock";
   }
 
-  return "standalone";
+  throw new Error(
+    "AnnaAppRuntime is not available. Run the app with `npm run dev`, `npm run dev:mock-llm`, or inside the Anna host."
+  );
 }

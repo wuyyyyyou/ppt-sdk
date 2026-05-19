@@ -6,7 +6,7 @@ The app is intentionally thin:
 
 - UI is shipped as a static SPA bundle.
 - Production backend calls go through `AnnaAppRuntime.tools.invoke`.
-- Local standalone calls go through `dev-server` and JSON-RPC over stdio.
+- Local development uses `anna-app dev` with local Executa shims.
 - Workflow logic should live in `ppt-engine` app-facing tools, not in the frontend.
 
 ## Scripts
@@ -15,8 +15,6 @@ The app is intentionally thin:
 npm run dev
 npm run dev:mock-llm
 npm run dev:mock-llm:retry
-npm run dev:ui
-npm run dev:standalone
 npm run build
 npm run check
 npm run validate
@@ -56,9 +54,8 @@ ppt-gener:  tool-lightvoss_5433-ppt-gener-dc7ftcep
 ```
 
 The engine shim starts `presenton-template-engine/example_plugin.js` from the
-engine directory, so `ppt-app` talks to the same backend plugin used by the
-standalone bridge. The generator shim starts
-`presenton-pptx-generator/example_plugin.py` through `uv run`.
+engine directory. The generator shim starts `presenton-pptx-generator/example_plugin.py`
+through `uv run`.
 
 Before using the harness, rebuild the static bundle:
 
@@ -120,12 +117,3 @@ npm run dev:mock-llm:retry
 `@anna-ai/cli@0.1.12` matches `contentIncludes` against `String(args.messages)`,
 so this fixture uses the current message-count string shape to target the repair
 request.
-
-`npm run dev:standalone` starts the local HTTP-to-JSON-RPC bridge. It is a bridge to local tools, not a production backend.
-
-`npm run dev:ui` starts the Vite UI at `http://127.0.0.1:5174` and proxies `/api` to the standalone bridge at `http://127.0.0.1:8787`. For local plugin-backed UI testing, run both:
-
-```bash
-npm run dev:standalone
-npm run dev:ui
-```

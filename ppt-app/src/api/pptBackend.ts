@@ -27,7 +27,6 @@ import type {
   WorkspaceResult
 } from "./types";
 import { createAnnaPptBackend } from "./annaPptBackend";
-import { createLocalPptBackend } from "./localPptBackend";
 import { connectAnnaRuntime } from "../runtime/annaRuntime";
 import { detectRuntimeMode } from "../runtime/runtimeMode";
 
@@ -64,5 +63,5 @@ export async function createPptBackend(): Promise<PptBackend> {
     return createAnnaPptBackend(await connectAnnaRuntime());
   }
 
-  return createLocalPptBackend({ baseUrl: "/api" });
+  throw new Error("PptBackend is only available inside Anna runtime.");
 }
