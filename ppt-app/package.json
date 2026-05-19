@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "anna-app dev",
+    "dev:mock-llm": "anna-app dev --mock-llm fixtures/mock-outline.jsonl",
+    "dev:mock-llm:retry": "anna-app dev --mock-llm fixtures/mock-outline-retry.jsonl",
     "dev:ui": "vite --host 127.0.0.1 --port 5174",
     "dev:standalone": "tsx dev-server/server.ts",
     "build": "vite build --outDir bundle",
@@ -18,11 +20,11 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@anna-ai/cli": "^0.1.9",
-    "@vitejs/plugin-react": "^4.3.0",
+    "@anna-ai/cli": "^0.1.12",
     "@types/node": "^20.19.17",
     "@types/react": "^18.3.24",
     "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.3.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.2",
     "vite": "^5.4.0"

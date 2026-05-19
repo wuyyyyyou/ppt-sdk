@@ -3,12 +3,12 @@
   "permissions": ["tools.invoke"],
   "required_executas": [
     {
-      "tool_id": "tool-CHANGEME-ppt-engine",
+      "tool_id": "tool-lightvoss_5433-ppt-engine-6443rj2a",
       "min_version": "1.0.0",
       "version": "latest"
     },
     {
-      "tool_id": "tool-CHANGEME-ppt-gener",
+      "tool_id": "tool-lightvoss_5433-ppt-gener-dc7ftcep",
       "min_version": "1.0.0",
       "version": "latest"
     }
@@ -36,8 +36,8 @@
     ],
     "host_api": {
       "tools": [
-        "required:tool-CHANGEME-ppt-engine",
-        "required:tool-CHANGEME-ppt-gener"
+        "required:tool-lightvoss_5433-ppt-engine-6443rj2a",
+        "required:tool-lightvoss_5433-ppt-gener-dc7ftcep"
       ],
       "chat": [],
       "artifact": [],

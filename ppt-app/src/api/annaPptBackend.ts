@@ -13,9 +13,11 @@ import type {
 } from "./types";
 
 const PPT_ENGINE_TOOL_ID =
-  import.meta.env.VITE_PPT_ENGINE_TOOL_ID ?? "tool-CHANGEME-ppt-engine";
+  import.meta.env.VITE_PPT_ENGINE_TOOL_ID ??
+  "tool-lightvoss_5433-ppt-engine-6443rj2a";
 const PPT_GENER_TOOL_ID =
-  import.meta.env.VITE_PPT_GENER_TOOL_ID ?? "tool-CHANGEME-ppt-gener";
+  import.meta.env.VITE_PPT_GENER_TOOL_ID ??
+  "tool-lightvoss_5433-ppt-gener-dc7ftcep";
 
 function unwrapToolResult<T>(result: unknown): T {
   if (

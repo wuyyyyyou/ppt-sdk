@@ -23,7 +23,11 @@ interface AnnaCompletionContent {
 }
 
 interface AnnaCompletionResult {
-  content?: AnnaCompletionContent;
+  content?: AnnaCompletionContent | AnnaCompletionContent[] | string;
+  text?: string;
+  message?: {
+    content?: AnnaCompletionContent | AnnaCompletionContent[] | string;
+  };
 }
 
 const MAX_OUTLINE_ATTEMPTS = 3;
@@ -39,7 +43,32 @@ export class AiOutlineGenerationError extends Error {
 }
 
 function extractCompletionText(result: unknown): string {
-  const content = (result as AnnaCompletionResult | null)?.content;
+  if (typeof result === "string") {
+    return result;
+  }
+
+  const completion = result as AnnaCompletionResult | null;
+  if (typeof completion?.text === "string") {
+    return completion.text;
+  }
+
+  return (
+    extractContentText(completion?.content) ||
+    extractContentText(completion?.message?.content)
+  );
+}
+
+function extractContentText(
+  content: AnnaCompletionResult["content"] | undefined
+): string {
+  if (typeof content === "string") {
+    return content;
+  }
+
+  if (Array.isArray(content)) {
+    return content.map((item) => extractContentText(item)).join("");
+  }
+
   return content?.type === "text" && typeof content.text === "string"
     ? content.text
     : "";

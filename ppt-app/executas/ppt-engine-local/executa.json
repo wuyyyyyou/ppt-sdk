@@ -1,0 +1,7 @@
+{
+  "tool_id": "tool-lightvoss_5433-ppt-engine-6443rj2a",
+  "type": "node",
+  "command": ["node", "ppt_engine_local.js"],
+  "enabled": true,
+  "_comment": "Local anna-app dev shim. It starts ../../presenton-template-engine/example_plugin.js with the real ppt-engine tool_id."
+}

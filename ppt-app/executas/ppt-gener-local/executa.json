@@ -1,0 +1,14 @@
+{
+  "tool_id": "tool-lightvoss_5433-ppt-gener-dc7ftcep",
+  "type": "python",
+  "command": [
+    "uv",
+    "run",
+    "--project",
+    "../../../presenton-pptx-generator",
+    "python",
+    "ppt_gener_local.py"
+  ],
+  "enabled": true,
+  "_comment": "Local anna-app dev shim. It starts ../../presenton-pptx-generator/example_plugin.py with the real ppt-gener tool_id."
+}
