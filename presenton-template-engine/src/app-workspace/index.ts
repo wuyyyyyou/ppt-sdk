@@ -1,17 +1,37 @@
 import os from "node:os";
 import path from "node:path";
 import { appendFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import {
+  getDiscoveredTemplateGroup,
+  listDiscoveredTemplateGroupSummaries,
+  type DiscoveredTemplateGroupSummaryInfo,
+} from "../discovery/index.js";
+import { forkTemplateGroup } from "../fork/fork-template-group.js";
+import {
+  getTemplatePreviewGroup,
+  readTemplatePreviewDataUrl,
+  type TemplatePreviewImage,
+} from "../template-previews/index.js";
 import type {
   AppendAppWorkspaceLogInput,
   AppendAppWorkspaceLogResult,
+  AppTemplateGroupSummary,
+  AppTemplatePreviewRef,
+  AppTemplatePreviewResult,
   AppWorkspaceResult,
   AppWorkspaceSummary,
   AppWorkspaceOutline,
   AppWorkspaceOutlineItem,
+  AppWorkspaceTemplateSelection,
   CreateAppWorkspaceInput,
+  GetAppTemplateGroupInput,
+  GetAppTemplatePreviewInput,
   GetAppWorkspaceOutlineInput,
+  ListAppTemplateGroupsResult,
   ListAppWorkspacesResult,
   OpenAppWorkspaceInput,
+  SelectAppWorkspaceTemplateInput,
+  SelectAppWorkspaceTemplateResult,
   UpdateAppWorkspaceOutlineInput,
   UpdateAppWorkspaceSettingsInput,
   UpdateAppWorkspaceTitleInput,
@@ -24,6 +44,7 @@ const WORKSPACE_FILE_NAMES = [
   "setting.json",
   "outline.json",
   "pages.json",
+  "template.json",
 ] as const;
 const WORKSPACE_LOG_FILE_NAMES = {
   "ai-outline": "ai-outline.jsonl",
@@ -75,6 +96,7 @@ function buildWorkspaceFilePaths(workspaceDir: string) {
     setting: path.join(workspaceDir, "setting.json"),
     outline: path.join(workspaceDir, "outline.json"),
     pages: path.join(workspaceDir, "pages.json"),
+    template: path.join(workspaceDir, "template.json"),
   };
 }
 
@@ -224,6 +246,19 @@ function createDefaultPagesJson() {
   };
 }
 
+function createDefaultTemplateJson() {
+  return {
+    version: 1,
+    selected_template_group: "",
+    selected_template_group_name: "",
+    template_dir: "",
+    manifest_path: "",
+    catalog_json_path: "",
+    data_dir_path: "",
+    selected_at: null,
+  };
+}
+
 async function ensureWorkspaceFiles(
   workspaceDir: string,
   options: CreateAppWorkspaceInput = {},
@@ -246,6 +281,7 @@ async function ensureWorkspaceFiles(
     setting: createDefaultSettingJson(),
     outline: createDefaultOutlineJson(),
     pages: createDefaultPagesJson(),
+    template: createDefaultTemplateJson(),
   };
 
   for (const [key, filePath] of Object.entries(files)) {
@@ -287,6 +323,7 @@ async function ensureWorkspaceFiles(
     setting: normalizedSetting,
     outline: normalizedOutline,
     pages: await readJsonFileIfExists(files.pages),
+    template: await readJsonFileIfExists(files.template),
   };
 }
 
@@ -476,18 +513,162 @@ export async function updateAppWorkspaceOutline(
   return ensureWorkspaceFiles(input.workspace_dir);
 }
 
+function buildTemplatePreviewUrl(image: TemplatePreviewImage): string {
+  return `template-previews/${image.group_id}/${image.file_name}`;
+}
+
+function mapPreviewRef(image: TemplatePreviewImage | null): AppTemplatePreviewRef | null {
+  return image
+    ? {
+        group_id: image.group_id,
+        layout_id: image.layout_id,
+        layout_name: image.layout_name,
+        file_name: image.file_name,
+        mime_type: image.mime_type,
+        width: image.width,
+        height: image.height,
+        primary: image.primary,
+        url: buildTemplatePreviewUrl(image),
+      }
+    : null;
+}
+
+async function mapTemplateGroupSummary(
+  group: DiscoveredTemplateGroupSummaryInfo,
+): Promise<AppTemplateGroupSummary> {
+  const previewGroup = await getTemplatePreviewGroup(group.group_id).catch(() => null);
+  const images = previewGroup?.images ?? [];
+  const cover = group.cover_layout_id
+    ? images.find((image) => image.layout_id === group.cover_layout_id) ?? null
+    : null;
+  const primary = images.find((image) => image.primary) ?? null;
+  const preview = cover ?? primary ?? images[0] ?? null;
+  const previews = images
+    .map(mapPreviewRef)
+    .filter((ref): ref is AppTemplatePreviewRef => ref !== null);
+
+  return {
+    group_id: group.group_id,
+    group_name: group.group_name,
+    group_description: group.group_description,
+    ordered: group.ordered,
+    default: group.default,
+    group_brief: group.group_brief,
+    style_tags: group.style_tags,
+    industry_tags: group.industry_tags,
+    use_cases: group.use_cases,
+    audience_tags: group.audience_tags,
+    tone_tags: group.tone_tags,
+    cover_layout_id: group.cover_layout_id,
+    agenda_layout_id: group.agenda_layout_id,
+    closing_layout_id: group.closing_layout_id,
+    layout_roles_summary: group.layout_roles_summary,
+    content_elements_summary: group.content_elements_summary,
+    layout_count: group.layout_count,
+    preview: mapPreviewRef(preview),
+    previews,
+  };
+}
+
+export async function listAppTemplateGroups(): Promise<ListAppTemplateGroupsResult> {
+  const groups = await listDiscoveredTemplateGroupSummaries({ include_builtin: true });
+  const mapped = await Promise.all(groups.map(mapTemplateGroupSummary));
+  return {
+    groups: mapped,
+    count: mapped.length,
+  };
+}
+
+export async function getAppTemplateGroup(input: GetAppTemplateGroupInput) {
+  const group = await getDiscoveredTemplateGroup({
+    group_id: input.group_id,
+    include_builtin: true,
+  });
+
+  if (!group) {
+    throw new Error(`Template group not found: ${input.group_id}`);
+  }
+
+  return group;
+}
+
+export async function getAppTemplatePreview(
+  input: GetAppTemplatePreviewInput,
+): Promise<AppTemplatePreviewResult> {
+  return readTemplatePreviewDataUrl(input.group_id, input.layout_id);
+}
+
+export async function selectAppWorkspaceTemplate(
+  input: SelectAppWorkspaceTemplateInput,
+): Promise<SelectAppWorkspaceTemplateResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const templateGroup = input.template_group.trim();
+  if (templateGroup.length === 0) {
+    throw new Error('"template_group" must be a non-empty string');
+  }
+
+  const availableGroups = await listDiscoveredTemplateGroupSummaries({ include_builtin: true });
+  const selectedGroup = availableGroups.find((group) => group.group_id === templateGroup);
+  if (!selectedGroup) {
+    throw new Error(`Template group not found: ${templateGroup}`);
+  }
+
+  const title =
+    workspace.task &&
+    typeof workspace.task === "object" &&
+    !Array.isArray(workspace.task) &&
+    typeof (workspace.task as { title?: unknown }).title === "string"
+      ? (workspace.task as { title: string }).title
+      : selectedGroup.group_name;
+  const templateDir = path.join(workspace.workspace_dir, "template");
+  const forkResult = await forkTemplateGroup({
+    templateGroup: selectedGroup.group_id,
+    outDir: templateDir,
+    manifestTitle: title,
+    overwrite: true,
+  });
+  const selectedAt = new Date().toISOString();
+  const selection: AppWorkspaceTemplateSelection = {
+    version: 1,
+    selected_template_group: selectedGroup.group_id,
+    selected_template_group_name: selectedGroup.group_name,
+    template_dir: templateDir,
+    manifest_path: forkResult.manifestPath,
+    catalog_json_path: forkResult.catalogJsonPath,
+    data_dir_path: forkResult.dataDirPath,
+    selected_at: selectedAt,
+  };
+
+  await writeJsonFile(workspace.files.template, selection);
+  await touchWorkspaceTask(workspace, selectedAt);
+
+  return {
+    workspace: await ensureWorkspaceFiles(input.workspace_dir),
+    selection,
+  };
+}
+
 export type {
   AppendAppWorkspaceLogInput,
   AppendAppWorkspaceLogResult,
+  AppTemplateGroupSummary,
+  AppTemplatePreviewRef,
+  AppTemplatePreviewResult,
   AppWorkspaceFiles,
   AppWorkspaceOutline,
   AppWorkspaceOutlineItem,
   AppWorkspaceResult,
   AppWorkspaceSummary,
+  AppWorkspaceTemplateSelection,
   CreateAppWorkspaceInput,
+  GetAppTemplateGroupInput,
+  GetAppTemplatePreviewInput,
   GetAppWorkspaceOutlineInput,
+  ListAppTemplateGroupsResult,
   ListAppWorkspacesResult,
   OpenAppWorkspaceInput,
+  SelectAppWorkspaceTemplateInput,
+  SelectAppWorkspaceTemplateResult,
   UpdateAppWorkspaceOutlineInput,
   UpdateAppWorkspaceSettingsInput,
   UpdateAppWorkspaceTitleInput,

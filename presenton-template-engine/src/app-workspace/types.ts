@@ -12,6 +12,7 @@ export interface AppWorkspaceFiles {
   setting: string;
   outline: string;
   pages: string;
+  template: string;
 }
 
 export interface AppWorkspaceOutlineItem {
@@ -46,6 +47,7 @@ export interface AppWorkspaceResult {
   setting: unknown;
   outline: unknown;
   pages: unknown;
+  template: unknown;
 }
 
 export interface ListAppWorkspacesResult {
@@ -97,4 +99,81 @@ export interface AppendAppWorkspaceLogResult {
   workspace_dir: string;
   log_file: string;
   appended: true;
+}
+
+export interface AppTemplatePreviewRef {
+  group_id: string;
+  layout_id: string;
+  layout_name: string;
+  file_name: string;
+  mime_type: "image/png";
+  width: number;
+  height: number;
+  primary: boolean;
+  url: string;
+}
+
+export interface AppTemplateGroupSummary {
+  group_id: string;
+  group_name: string;
+  group_description: string;
+  ordered: boolean;
+  default: boolean;
+  group_brief?: string;
+  style_tags?: string[];
+  industry_tags?: string[];
+  use_cases?: string[];
+  audience_tags?: string[];
+  tone_tags?: string[];
+  cover_layout_id?: string;
+  agenda_layout_id?: string;
+  closing_layout_id?: string;
+  layout_roles_summary?: string[];
+  content_elements_summary?: string[];
+  layout_count: number;
+  preview: AppTemplatePreviewRef | null;
+  previews: AppTemplatePreviewRef[];
+}
+
+export interface ListAppTemplateGroupsResult {
+  groups: AppTemplateGroupSummary[];
+  count: number;
+}
+
+export interface GetAppTemplateGroupInput {
+  group_id: string;
+}
+
+export interface GetAppTemplatePreviewInput {
+  group_id: string;
+  layout_id?: string;
+}
+
+export interface AppTemplatePreviewResult {
+  group_id: string;
+  layout_id: string;
+  file_name: string;
+  mime_type: "image/png";
+  data_url: string;
+}
+
+export interface SelectAppWorkspaceTemplateInput {
+  workspace_dir: string;
+  template_group: string;
+}
+
+export interface AppWorkspaceTemplateSelection {
+  version: 1;
+  selected_template_group: string;
+  selected_template_group_name: string;
+  template_dir: string;
+  manifest_path: string;
+  catalog_json_path?: string;
+  data_dir_path?: string;
+  selected_at: string;
+}
+
+export interface SelectAppWorkspaceTemplateResult {
+  workspace: AppWorkspaceResult;
+  selection: AppWorkspaceTemplateSelection;
 }

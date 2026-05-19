@@ -56,6 +56,16 @@ import {
   type ThemePresetInfo,
 } from "./themes/default-theme-presets.js";
 import {
+  getTemplatePreviewGroup,
+  getTemplatePreviewImage,
+  getTemplatePreviewIndex,
+  readTemplatePreviewDataUrl,
+  type TemplatePreviewDataUrlResult,
+  type TemplatePreviewGroup,
+  type TemplatePreviewImage,
+  type TemplatePreviewIndex,
+} from "./template-previews/index.js";
+import {
   CENTERED_TEXT_SEMANTICS_RULE,
   collectRenderedSlideInfos,
   DEFAULT_DECK_SELECTOR,
@@ -290,6 +300,10 @@ export type {
   TemplateDiscoverySourceType,
   TemplateRenderThemeInput,
   ThemePresetInfo,
+  TemplatePreviewDataUrlResult,
+  TemplatePreviewGroup,
+  TemplatePreviewImage,
+  TemplatePreviewIndex,
 };
 export {
   buildDeckHtml,
@@ -304,8 +318,12 @@ export {
   forkTemplateGroup,
   getAllDiscoveredTemplateGroups,
   getDiscoveredTemplateGroup,
+  getTemplatePreviewGroup,
+  getTemplatePreviewImage,
+  getTemplatePreviewIndex,
   listDiscoveredTemplateGroupSummaries,
   listThemePresets,
+  readTemplatePreviewDataUrl,
   renderSlideHtml,
   shouldKeepRootLevelElement,
   sortElementsForPpt,

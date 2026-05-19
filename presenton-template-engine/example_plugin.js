@@ -12,13 +12,17 @@ import {
   convertDeckHtmlToPptxModel,
   createAppWorkspace,
   forkTemplateGroup,
+  getAppTemplateGroup,
+  getAppTemplatePreview,
   getAllDiscoveredTemplateGroups,
   getAppWorkspaceOutline,
   getDiscoveredTemplateGroup,
   listAppWorkspaces,
+  listAppTemplateGroups,
   listDiscoveredTemplateGroupSummaries,
   openAppWorkspace,
   runDeckValidation,
+  selectAppWorkspaceTemplate,
   describeTaskStateMachine,
   invokeTaskStateMachine,
   updateAppWorkspaceOutline,
@@ -35,6 +39,10 @@ const TOOL_NAMES = [
   "app_update_workspace_outline",
   "app_update_workspace_settings",
   "app_update_workspace_title",
+  "app_list_template_groups",
+  "app_get_template_group",
+  "app_get_template_preview",
+  "app_select_workspace_template",
   "listDiscoveredTemplateGroupSummaries",
   "getAllDiscoveredTemplateGroups",
   "getDiscoveredTemplateGroup",
@@ -200,6 +208,63 @@ const MANIFEST = {
           name: "title",
           type: "string",
           description: "New workspace title.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_list_template_groups",
+      description:
+        "List builtin PPT template groups with static preview metadata for the app template picker.",
+      parameters: [],
+    },
+    {
+      name: "app_get_template_group",
+      description:
+        "Return one builtin PPT template group with layout details for the app template picker.",
+      parameters: [
+        {
+          name: "group_id",
+          type: "string",
+          description: "Template group id, such as red-finance-v3.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_get_template_preview",
+      description:
+        "Return one static template preview image as a data URL.",
+      parameters: [
+        {
+          name: "group_id",
+          type: "string",
+          description: "Template group id.",
+          required: true,
+        },
+        {
+          name: "layout_id",
+          type: "string",
+          description: "Optional full layout id. Defaults to the group's primary preview.",
+          required: false,
+        },
+      ],
+    },
+    {
+      name: "app_select_workspace_template",
+      description:
+        "Select a template group for an app workspace and fork it into workspace/template.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+        {
+          name: "template_group",
+          type: "string",
+          description: "Builtin template group id to fork into the workspace template directory.",
           required: true,
         },
       ],
@@ -875,6 +940,60 @@ async function toolAppUpdateWorkspaceTitle(args) {
   });
 }
 
+async function toolAppListTemplateGroups() {
+  return listAppTemplateGroups();
+}
+
+async function toolAppGetTemplateGroup(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  if (typeof args.group_id !== "string" || args.group_id.length === 0) {
+    throw new Error('Missing required parameter: "group_id"');
+  }
+
+  return getAppTemplateGroup({ group_id: args.group_id });
+}
+
+async function toolAppGetTemplatePreview(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  if (typeof args.group_id !== "string" || args.group_id.length === 0) {
+    throw new Error('Missing required parameter: "group_id"');
+  }
+
+  if (
+    args.layout_id !== undefined &&
+    (typeof args.layout_id !== "string" || args.layout_id.length === 0)
+  ) {
+    throw new Error('"layout_id" must be a non-empty string when provided');
+  }
+
+  return getAppTemplatePreview({
+    group_id: args.group_id,
+    layout_id: args.layout_id,
+  });
+}
+
+async function toolAppSelectWorkspaceTemplate(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  if (typeof args.template_group !== "string" || args.template_group.trim().length === 0) {
+    throw new Error('"template_group" must be a non-empty string');
+  }
+
+  return selectAppWorkspaceTemplate({
+    workspace_dir: workspaceDir,
+    template_group: args.template_group,
+  });
+}
+
 async function toolGetAllDiscoveredTemplateGroups(args) {
   const input = normalizeDiscoveryInput(args);
   const groups = await getAllDiscoveredTemplateGroups(input);
@@ -1091,6 +1210,10 @@ const TOOL_DISPATCH = {
   app_update_workspace_outline: toolAppUpdateWorkspaceOutline,
   app_update_workspace_settings: toolAppUpdateWorkspaceSettings,
   app_update_workspace_title: toolAppUpdateWorkspaceTitle,
+  app_list_template_groups: toolAppListTemplateGroups,
+  app_get_template_group: toolAppGetTemplateGroup,
+  app_get_template_preview: toolAppGetTemplatePreview,
+  app_select_workspace_template: toolAppSelectWorkspaceTemplate,
   listDiscoveredTemplateGroupSummaries: toolListDiscoveredTemplateGroupSummaries,
   getAllDiscoveredTemplateGroups: toolGetAllDiscoveredTemplateGroups,
   getDiscoveredTemplateGroup: toolGetDiscoveredTemplateGroup,

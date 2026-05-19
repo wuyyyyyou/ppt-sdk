@@ -8,6 +8,7 @@ import { PanelHeader } from "../features/deck-workspace/components/PanelHeader";
 import { ProgressLine } from "../features/deck-workspace/components/ProgressLine";
 import { RefinePage } from "../features/deck-workspace/components/RefinePage";
 import { ReviewPage } from "../features/deck-workspace/components/ReviewPage";
+import { TemplatePage } from "../features/deck-workspace/components/TemplatePage";
 import { WorkspaceDialog } from "../features/deck-workspace/components/WorkspaceDialog";
 import { useDeckWorkspace } from "../features/deck-workspace/hooks/useDeckWorkspace";
 import { useI18n } from "../i18n/useI18n";
@@ -88,6 +89,16 @@ export function App() {
               selectLook={actions.selectLook}
               generateDeck={actions.generateDeck}
               showToast={actions.showToast}
+            />
+          ) : null}
+
+          {state.page === "main" && state.stage === "template" ? (
+            <TemplatePage
+              t={t}
+              templates={state.templateGroups}
+              selectedTemplateGroupId={state.selectedTemplateGroupId}
+              loading={state.loading}
+              selectTemplate={actions.selectTemplate}
             />
           ) : null}
 

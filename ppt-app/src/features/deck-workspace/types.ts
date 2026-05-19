@@ -1,17 +1,19 @@
 import type { OutlineDetail, Slide } from "../../data/mockDeck";
 import type {
   ListWorkspacesResult,
+  TemplateSummary,
   WorkspaceResult,
   WorkspaceSettings
 } from "../../api/types";
 
-export type MainStage = "brief" | "outline" | "deck";
+export type MainStage = "template" | "brief" | "outline" | "deck";
 export type PageId = "main" | "library" | "review" | "refine" | "export";
 export type PanelMode = "visible" | "minimized" | "closed";
 export type RefineScope = "deck" | "slide";
 export type PreviewMode = "grid" | "organize" | "present";
 export type LoadingKind =
   | "none"
+  | "template"
   | "deck"
   | "outline"
   | "deckFromOutline"
@@ -54,6 +56,8 @@ export interface DeckWorkspaceState {
   workspaceLoading: boolean;
   workspaceError: string;
   workspaceSettingsSaving: boolean;
+  templateGroups: TemplateSummary[];
+  selectedTemplateGroupId: string | null;
 }
 
 export type { WorkspaceSettings };

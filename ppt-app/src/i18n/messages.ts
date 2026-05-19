@@ -33,8 +33,10 @@ export interface Messages {
     delete: string;
     pptx: string;
     pdf: string;
+    useTemplate: string;
   };
   stages: {
+    template: string;
     brief: string;
     outline: string;
     deck: string;
@@ -78,6 +80,20 @@ export interface Messages {
       attachmentPlaceholder: string;
       outputLanguage: string;
     };
+  };
+  template: {
+    title: string;
+    helper: string;
+    loading: string;
+    empty: string;
+    layouts: string;
+    selected: string;
+    viewAll: string;
+    previewTitle: string;
+    pageCounter: string;
+    previous: string;
+    next: string;
+    close: string;
   };
   outline: {
     title: string;
@@ -183,9 +199,11 @@ export const messages: Record<Locale, Messages> = {
       duplicate: "Duplicate",
       delete: "Delete",
       pptx: "PPTX",
-      pdf: "PDF"
+      pdf: "PDF",
+      useTemplate: "Use template"
     },
     stages: {
+      template: "Template",
       brief: "Brief",
       outline: "Outline",
       deck: "Deck"
@@ -236,6 +254,20 @@ export const messages: Record<Locale, Messages> = {
         attachmentPlaceholder: "logo, brand style, source notes...",
         outputLanguage: "English"
       }
+    },
+    template: {
+      title: "Choose a template",
+      helper: "Pick the visual system Anna should fork into this workspace.",
+      loading: "Loading templates...",
+      empty: "No templates found.",
+      layouts: "layouts",
+      selected: "Template selected",
+      viewAll: "View all pages",
+      previewTitle: "Template preview",
+      pageCounter: "{current} / {total}",
+      previous: "Previous",
+      next: "Next",
+      close: "Close"
     },
     outline: {
       title: "Review outline",
@@ -380,9 +412,11 @@ export const messages: Record<Locale, Messages> = {
       duplicate: "复制",
       delete: "删除",
       pptx: "PPTX",
-      pdf: "PDF"
+      pdf: "PDF",
+      useTemplate: "使用模板"
     },
     stages: {
+      template: "模板",
       brief: "需求",
       outline: "大纲",
       deck: "成稿"
@@ -433,6 +467,20 @@ export const messages: Record<Locale, Messages> = {
         attachmentPlaceholder: "logo、品牌风格、来源资料...",
         outputLanguage: "中文"
       }
+    },
+    template: {
+      title: "选择模板",
+      helper: "选择要 fork 到当前工作区的视觉模板。",
+      loading: "正在加载模板...",
+      empty: "没有发现可用模板。",
+      layouts: "个版式",
+      selected: "已选择模板",
+      viewAll: "查看全部页面",
+      previewTitle: "模板预览",
+      pageCounter: "{current} / {total}",
+      previous: "上一页",
+      next: "下一页",
+      close: "关闭"
     },
     outline: {
       title: "审阅大纲",

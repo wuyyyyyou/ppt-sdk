@@ -17,6 +17,7 @@ export interface WorkspaceFiles {
   setting: string;
   outline: string;
   pages: string;
+  template: string;
 }
 
 export interface WorkspaceResult {
@@ -31,6 +32,7 @@ export interface WorkspaceResult {
   setting: unknown;
   outline: unknown;
   pages: unknown;
+  template: unknown;
 }
 
 export interface WorkspaceSettings {
@@ -138,23 +140,64 @@ export interface RecordRequirementsInput {
   requirements: string;
 }
 
-export interface ListTemplatesInput {
-  projectDir?: string;
-}
-
 export interface TemplateSummary {
-  id: string;
-  name: string;
-  description?: string;
+  group_id: string;
+  group_name: string;
+  group_description: string;
+  ordered: boolean;
+  default: boolean;
+  group_brief?: string;
+  style_tags?: string[];
+  industry_tags?: string[];
+  use_cases?: string[];
+  audience_tags?: string[];
+  tone_tags?: string[];
+  cover_layout_id?: string;
+  agenda_layout_id?: string;
+  closing_layout_id?: string;
+  layout_roles_summary?: string[];
+  content_elements_summary?: string[];
+  layout_count: number;
+  preview: TemplatePreviewRef | null;
+  previews: TemplatePreviewRef[];
 }
 
 export interface ListTemplatesResult {
   templates: TemplateSummary[];
+  count: number;
 }
 
 export interface SelectTemplateInput {
-  projectDir: string;
-  templateId: string;
+  workspace_dir: string;
+  template_group: string;
+}
+
+export interface TemplatePreviewRef {
+  group_id: string;
+  layout_id: string;
+  layout_name: string;
+  file_name: string;
+  mime_type: "image/png";
+  width: number;
+  height: number;
+  primary: boolean;
+  url: string;
+}
+
+export interface WorkspaceTemplateSelection {
+  version: 1;
+  selected_template_group: string;
+  selected_template_group_name: string;
+  template_dir: string;
+  manifest_path: string;
+  catalog_json_path?: string;
+  data_dir_path?: string;
+  selected_at: string;
+}
+
+export interface SelectTemplateResult {
+  workspace: WorkspaceResult;
+  selection: WorkspaceTemplateSelection;
 }
 
 export interface RecordOutlineInput {

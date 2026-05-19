@@ -7,7 +7,6 @@ import type {
   GeneratePptxResult,
   GetWorkspaceOutlineInput,
   ListWorkspacesResult,
-  ListTemplatesInput,
   ListTemplatesResult,
   OpenWorkspaceInput,
   PrepareExportModelInput,
@@ -20,6 +19,7 @@ import type {
   RenderDeckHtmlInput,
   RenderDeckHtmlResult,
   SelectTemplateInput,
+  SelectTemplateResult,
   UpdateWorkspaceSettingsInput,
   UpdateWorkspaceOutlineInput,
   UpdateWorkspaceTitleInput,
@@ -44,8 +44,8 @@ export interface PptBackend {
   createProject(input: CreateProjectInput): Promise<ProjectResult>;
   getProject(input: { projectDir: string }): Promise<ProjectResult>;
   recordRequirements(input: RecordRequirementsInput): Promise<ProjectResult>;
-  listTemplates(input: ListTemplatesInput): Promise<ListTemplatesResult>;
-  selectTemplate(input: SelectTemplateInput): Promise<ProjectResult>;
+  listTemplates(): Promise<ListTemplatesResult>;
+  selectTemplate(input: SelectTemplateInput): Promise<SelectTemplateResult>;
   recordOutline(input: RecordOutlineInput): Promise<ProjectResult>;
   renderDeckHtml(input: RenderDeckHtmlInput): Promise<RenderDeckHtmlResult>;
   recordDeckReview(input: RecordDeckReviewInput): Promise<ProjectResult>;

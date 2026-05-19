@@ -3,6 +3,7 @@ import { createAiClient, type AiAttemptLog, type AiClient } from "../../../ai/ai
 import { createPptBackend, type PptBackend } from "../../../api/pptBackend";
 import type {
   ListWorkspacesResult,
+  TemplateSummary,
   WorkspaceResult,
   WorkspaceOutline,
   WorkspaceOutlineItem,
@@ -63,6 +64,7 @@ export interface DeckWorkspaceActions {
   createWorkspace: () => Promise<void>;
   saveWorkspaceSettings: (setting: WorkspaceSettings) => Promise<void>;
   saveWorkspaceTitle: (title: string) => Promise<void>;
+  selectTemplate: (groupId: string) => Promise<void>;
   refineDeck: () => Promise<void>;
   refineSlide: () => Promise<void>;
   exportFile: (type: "PPTX" | "PDF") => Promise<void>;
@@ -71,7 +73,7 @@ export interface DeckWorkspaceActions {
 export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [panelMode, setPanelMode] = useState<PanelMode>("visible");
   const [page, setPage] = useState<PageId>("main");
-  const [stage, setStage] = useState<MainStage>("brief");
+  const [stage, setStage] = useState<MainStage>("template");
   const [history, setHistory] = useState<PageId[]>(["main"]);
   const [toast, setToast] = useState("");
   const [prompt, setPrompt] = useState("");
@@ -97,6 +99,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [workspaceLoading, setWorkspaceLoading] = useState(true);
   const [workspaceError, setWorkspaceError] = useState("");
   const [workspaceSettingsSaving, setWorkspaceSettingsSaving] = useState(false);
+  const [templateGroups, setTemplateGroups] = useState<TemplateSummary[]>([]);
+  const [selectedTemplateGroupId, setSelectedTemplateGroupId] = useState<string | null>(null);
 
   function workspaceOutlineToState(workspaceOutline: unknown) {
     const outlineRecord =
@@ -145,6 +149,16 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       setOutline(workspaceOutline);
       setStage("outline");
     }
+    const templateRecord =
+      workspace.template && typeof workspace.template === "object" && !Array.isArray(workspace.template)
+        ? (workspace.template as { selected_template_group?: unknown })
+        : null;
+    if (typeof templateRecord?.selected_template_group === "string" && templateRecord.selected_template_group) {
+      setSelectedTemplateGroupId(templateRecord.selected_template_group);
+      if (workspaceOutline.length === 0) {
+        setStage("brief");
+      }
+    }
   }
 
   useEffect(() => {
@@ -162,6 +176,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         const scan = await nextBackend.listWorkspaces();
         if (cancelled) return;
         setWorkspaceScan(scan);
+        const templates = await nextBackend.listTemplates();
+        if (cancelled) return;
+        setTemplateGroups(templates.templates);
       } catch (error) {
         if (!cancelled) {
           setWorkspaceError(
@@ -183,6 +200,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }, []);
 
   const currentStatus = useMemo(() => {
+    if (loading === "template") return t.template.loading;
     if (loading === "outline") return t.status.creatingOutline;
     if (loading === "deck" || loading === "deckFromOutline") {
       return t.status.creatingDeck;
@@ -213,6 +231,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   function navigateMain(nextStage: MainStage) {
+    if (nextStage === "brief" && !selectedTemplateGroupId) {
+      showToast(t.template.helper);
+      return;
+    }
     if (nextStage === "outline" && outline.length === 0) {
       showToast(t.toasts.createOutlineFirst);
       return;
@@ -644,6 +666,29 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
+  async function selectTemplate(groupId: string) {
+    if (!backend) return;
+
+    setLoading("template");
+    try {
+      const workspace = await ensureCurrentWorkspace();
+      if (!workspace) return;
+      const result = await backend.selectTemplate({
+        workspace_dir: workspace.workspace_dir,
+        template_group: groupId
+      });
+      applyWorkspace(result.workspace);
+      setSelectedTemplateGroupId(result.selection.selected_template_group);
+      setWorkspaceScan(await backend.listWorkspaces());
+      setStage("brief");
+      showToast(t.template.selected);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t.template.empty);
+    } finally {
+      setLoading("none");
+    }
+  }
+
   async function saveWorkspaceSettings(setting: WorkspaceSettings) {
     if (!backend || !currentWorkspace) return;
 
@@ -762,7 +807,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     currentWorkspace,
     workspaceLoading,
     workspaceError,
-    workspaceSettingsSaving
+    workspaceSettingsSaving,
+    templateGroups,
+    selectedTemplateGroupId
   };
 
   const actions: DeckWorkspaceActions = {
@@ -801,6 +848,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     createWorkspace,
     saveWorkspaceSettings,
     saveWorkspaceTitle,
+    selectTemplate,
     refineDeck,
     refineSlide,
     exportFile

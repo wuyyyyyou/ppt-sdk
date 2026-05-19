@@ -4,6 +4,7 @@ import type {
   AppendWorkspaceLogResult,
   GeneratePptxInput,
   GeneratePptxResult,
+  TemplateSummary,
   WorkspaceOutline,
   ListWorkspacesResult,
   PrepareExportModelResult,
@@ -91,10 +92,17 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         "app_record_requirements",
         input
       ),
-    listTemplates: (input) =>
-      invoke(PPT_ENGINE_TOOL_ID, "app_list_templates", input),
+    listTemplates: () =>
+      invoke<{ groups?: TemplateSummary[]; count?: number }>(
+        PPT_ENGINE_TOOL_ID,
+        "app_list_template_groups",
+        {}
+      ).then((result) => ({
+        templates: result.groups ?? [],
+        count: result.count ?? result.groups?.length ?? 0,
+      })),
     selectTemplate: (input) =>
-      invoke<ProjectResult>(PPT_ENGINE_TOOL_ID, "app_select_template", input),
+      invoke(PPT_ENGINE_TOOL_ID, "app_select_workspace_template", input),
     recordOutline: (input) =>
       invoke<ProjectResult>(PPT_ENGINE_TOOL_ID, "app_record_outline", input),
     renderDeckHtml: (input) =>

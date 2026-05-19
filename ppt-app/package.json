@@ -5,6 +5,11 @@
   "description": "Anna App workspace for the PPT generation workflow.",
   "type": "module",
   "scripts": {
+    "sync:template-previews": "node ./scripts/sync-template-previews.mjs",
+    "predev": "npm run sync:template-previews",
+    "predev:mock-llm": "npm run sync:template-previews",
+    "predev:mock-llm:retry": "npm run sync:template-previews",
+    "prebuild": "npm run sync:template-previews",
     "dev": "anna-app dev",
     "dev:mock-llm": "anna-app dev --mock-llm fixtures/mock-outline.jsonl",
     "dev:mock-llm:retry": "anna-app dev --mock-llm fixtures/mock-outline-retry.jsonl",

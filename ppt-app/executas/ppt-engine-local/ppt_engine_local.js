@@ -2,13 +2,20 @@
 
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const shimDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(shimDir, "../../..");
 const engineDir = path.join(repoRoot, "presenton-template-engine");
+
+// Anna runtime does not currently understand the plugin's __file_transport
+// pointer protocol, so this shim reads the file and inlines the JSON-RPC
+// response back into stdout. Very large payloads (e.g. base64 PNGs) can
+// crash the runtime's line-based parser, so we cap the inlined size and
+// surface a clear JSON-RPC error instead of letting the process die.
+const MAX_INLINE_TRANSPORT_BYTES = 1024 * 1024;
 
 const child = spawn(process.execPath, ["example_plugin.js"], {
   cwd: engineDir,
@@ -66,6 +73,25 @@ async function resolveFileTransportLine(line) {
   }
 
   try {
+    const transportStat = await stat(transportPath);
+    if (transportStat.size > MAX_INLINE_TRANSPORT_BYTES) {
+      process.stderr.write(
+        `ppt-engine-local refusing to inline ${transportStat.size} bytes from ${transportPath}; ` +
+          `payload exceeds ${MAX_INLINE_TRANSPORT_BYTES} byte cap. ` +
+          `Return a URL or external reference instead of embedding large data in the JSON-RPC response.\n`,
+      );
+      return JSON.stringify({
+        jsonrpc: "2.0",
+        id: parsed.id ?? null,
+        error: {
+          code: -32603,
+          message:
+            `ppt-engine-local refusing to inline ${transportStat.size}-byte tool response ` +
+            `(cap ${MAX_INLINE_TRANSPORT_BYTES}). ` +
+            `Have the tool return a URL or external reference instead of embedding the data.`,
+        },
+      });
+    }
     return (await readFile(transportPath, "utf8")).trim();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

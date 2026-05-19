@@ -1,13 +1,25 @@
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 let runtimeBundleCache: string | null = null;
 let runtimeDeckBundleCache: string | null = null;
 
+function getCurrentModulePath(): string {
+  if (typeof __filename === "string" && isAbsolute(__filename)) {
+    return __filename;
+  }
+
+  return fileURLToPath(import.meta.url);
+}
+
+function getCurrentModuleDir(): string {
+  return dirname(getCurrentModulePath());
+}
+
 function bundleRuntimeFromSource(bundleFileName: string): string | null {
-  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  const moduleDir = getCurrentModuleDir();
   const sourceEntryByBundleName: Record<string, string> = {
     "render-slide.global.js": join(moduleDir, "../browser/render-slide-auto.ts"),
     "render-deck.global.js": join(moduleDir, "../browser/render-deck-auto.ts"),
@@ -18,7 +30,7 @@ function bundleRuntimeFromSource(bundleFileName: string): string | null {
     return null;
   }
 
-  const require = createRequire(import.meta.url);
+  const require = createRequire(getCurrentModulePath());
   const { buildSync } = require("esbuild") as typeof import("esbuild");
   const result = buildSync({
     entryPoints: [entryPoint],
@@ -44,7 +56,7 @@ function getRuntimeBundle(
 
   const candidateFiles = new Set<string>();
 
-  if (typeof __filename !== "undefined") {
+  if (typeof __filename === "string" && isAbsolute(__filename)) {
     const currentDir = dirname(__filename);
     candidateFiles.add(join(currentDir, `browser/${bundleFileName}`));
     candidateFiles.add(join(currentDir, `dist/browser/${bundleFileName}`));
@@ -52,7 +64,7 @@ function getRuntimeBundle(
     candidateFiles.add(join(currentDir, `../dist/browser/${bundleFileName}`));
   }
 
-  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  const moduleDir = getCurrentModuleDir();
   candidateFiles.add(join(moduleDir, `browser/${bundleFileName}`));
   candidateFiles.add(join(moduleDir, `dist/browser/${bundleFileName}`));
   candidateFiles.add(join(moduleDir, `../browser/${bundleFileName}`));
