@@ -1816,6 +1816,166 @@ button {
   font-size: 12px;
 }
 
+.deck-html-review {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.deck-html-review-header,
+.deck-html-review-actions {
+  display: flex;
+  align-items: center;
+}
+
+.deck-html-review-header {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.deck-html-review-header div:first-child {
+  min-width: 0;
+}
+
+.deck-html-review-header strong,
+.deck-html-review-header span {
+  display: block;
+}
+
+.deck-html-review-header strong {
+  overflow: hidden;
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deck-html-review-header span {
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deck-html-review-actions {
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.icon-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.icon-action-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.deck-html-review-state,
+.deck-html-review-error {
+  display: flex;
+  gap: 10px;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 12px;
+}
+
+.deck-html-review-state {
+  align-items: center;
+  color: var(--text-muted);
+  background: rgba(17, 24, 39, 0.04);
+}
+
+.deck-html-review-state svg {
+  animation: spin 1s linear infinite;
+}
+
+.deck-html-review-error {
+  align-items: flex-start;
+  color: #991b1b;
+  background: #fef2f2;
+}
+
+.deck-html-review-error strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #7f1d1d;
+  font-size: 12px;
+}
+
+.deck-html-review-error pre {
+  overflow: auto;
+  max-height: 160px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.deck-html-selected-frame,
+.present-html-frame,
+.grid-card-html-frame {
+  overflow: hidden;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.deck-html-selected-frame {
+  width: 100%;
+  height: 310px;
+}
+
+.present-html-frame {
+  width: 100%;
+  height: 430px;
+}
+
+.grid-card-html-frame {
+  width: 100%;
+  height: 118px;
+  margin: 8px 0 10px;
+}
+
+.deck-html-selected-frame iframe,
+.present-html-frame iframe,
+.grid-card-html-frame iframe {
+  width: 1280px;
+  height: 720px;
+  border: 0;
+  background: #fff;
+  transform-origin: 0 0;
+}
+
+.deck-html-selected-frame iframe {
+  transform: scale(0.43);
+}
+
+.present-html-frame iframe {
+  transform: scale(0.59);
+}
+
+.grid-card-html-frame iframe {
+  pointer-events: none;
+  transform: scale(0.16);
+}
+
 .preview-grid-view {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

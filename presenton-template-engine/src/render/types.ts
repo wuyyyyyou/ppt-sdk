@@ -113,6 +113,23 @@ export interface BuildDeckHtmlFromManifestResult {
   manifestPath: string;
 }
 
+export interface BuildDeckHtmlPagesFromManifestSlideOutput {
+  slideId: string;
+  layoutId: string;
+  title: string;
+  fileName: string;
+  outputPath: string;
+  speakerNote: string;
+}
+
+export interface BuildDeckHtmlPagesFromManifestResult {
+  outputDir: string;
+  slides: BuildDeckHtmlPagesFromManifestSlideOutput[];
+  slideCount: number;
+  title: string;
+  manifestPath: string;
+}
+
 export interface BrowserRenderTheme {
   logoUrl: string | null;
   companyName: string | null;

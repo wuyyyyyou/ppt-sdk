@@ -177,3 +177,24 @@ export interface SelectAppWorkspaceTemplateResult {
   workspace: AppWorkspaceResult;
   selection: AppWorkspaceTemplateSelection;
 }
+
+export interface RenderAppWorkspaceDeckHtmlInput {
+  workspace_dir: string;
+}
+
+export interface RenderAppWorkspaceDeckHtmlResult {
+  workspace_dir: string;
+  manifest_path: string;
+  output_dir: string;
+  slides: Array<{
+    slide_id: string;
+    layout_id: string;
+    title: string;
+    html_path: string;
+    preview_url?: string;
+    speaker_note: string;
+  }>;
+  slide_count: number;
+  title: string;
+  rendered_at: string;
+}

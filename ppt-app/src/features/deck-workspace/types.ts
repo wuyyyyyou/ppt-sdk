@@ -1,6 +1,7 @@
 import type { OutlineDetail, Slide } from "../../data/mockDeck";
 import type {
   ListWorkspacesResult,
+  RenderDeckHtmlResult,
   TemplateSummary,
   WorkspaceResult,
   WorkspaceSettings
@@ -17,9 +18,17 @@ export type LoadingKind =
   | "deck"
   | "outline"
   | "deckFromOutline"
+  | "review"
   | "refineDeck"
   | "refineSlide"
   | "export";
+
+export interface DeckReviewRenderState {
+  status: "idle" | "loading" | "ready" | "error";
+  result: RenderDeckHtmlResult | null;
+  error: string;
+  renderKey: string;
+}
 
 export interface ContextRow {
   id: string;
@@ -47,6 +56,7 @@ export interface DeckWorkspaceState {
   expandedOutline: number | null;
   outlineFeedback: string;
   previewMode: PreviewMode;
+  reviewRender: DeckReviewRenderState;
   refineScope: RefineScope;
   loading: LoadingKind;
   exportStatus: string;

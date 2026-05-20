@@ -1,15 +1,19 @@
 import {
+  AlertTriangle,
   ChevronDown,
   Copy,
+  ExternalLink,
   GripVertical,
   LayoutGrid,
+  LoaderCircle,
   Maximize2,
   Plus,
+  RefreshCw,
   Trash2
 } from "lucide-react";
 import type { Slide } from "../../../data/mockDeck";
 import type { Messages } from "../../../i18n/messages";
-import type { PreviewMode } from "../types";
+import type { DeckReviewRenderState, PreviewMode } from "../types";
 import { formatSlideNumber } from "../utils";
 import { PageHeader } from "./PageHeader";
 import { SlidePreview } from "./SlidePreview";
@@ -22,6 +26,8 @@ interface ReviewPageProps {
   setCurrentSlide: (index: number) => void;
   previewMode: PreviewMode;
   setPreviewMode: (mode: PreviewMode) => void;
+  reviewRender: DeckReviewRenderState;
+  renderDeckHtml: () => Promise<void>;
   onBack: () => void;
   updateDeckTitle: (index: number, title: string) => void;
   moveSlide: (index: number, direction: -1 | 1) => void;
@@ -38,6 +44,8 @@ export function ReviewPage(props: ReviewPageProps) {
     setCurrentSlide,
     previewMode,
     setPreviewMode,
+    reviewRender,
+    renderDeckHtml,
     onBack,
     updateDeckTitle,
     moveSlide,
@@ -46,6 +54,8 @@ export function ReviewPage(props: ReviewPageProps) {
     onRefineSlide
   } = props;
   const selected = deck[currentSlide] ?? deck[0];
+  const renderedSlides = reviewRender.result?.slides ?? [];
+  const selectedRenderedSlide = renderedSlides[currentSlide] ?? renderedSlides[0];
 
   return (
     <section className="page active review-page">
@@ -70,6 +80,67 @@ export function ReviewPage(props: ReviewPageProps) {
       </div>
       <p className="review-gate">{t.review.htmlGate}</p>
 
+      <section className={`deck-html-review ${reviewRender.status}`}>
+        <header className="deck-html-review-header">
+          <div>
+            <strong>{reviewRender.result?.title ?? t.review.title}</strong>
+            {reviewRender.result ? (
+              <span>
+                {reviewRender.result.slide_count} slides · {reviewRender.result.output_dir}
+              </span>
+            ) : null}
+          </div>
+          <div className="deck-html-review-actions">
+            {selectedRenderedSlide?.preview_url ? (
+              <a
+                className="icon-action-btn"
+                href={selectedRenderedSlide.preview_url}
+                target="_blank"
+                rel="noreferrer"
+                title={t.review.openHtml}
+              >
+                <ExternalLink size={14} />
+              </a>
+            ) : null}
+            <button
+              className="icon-action-btn"
+              onClick={() => void renderDeckHtml()}
+              disabled={reviewRender.status === "loading"}
+              title={t.review.renderAgain}
+            >
+              <RefreshCw size={14} />
+            </button>
+          </div>
+        </header>
+
+        {reviewRender.status === "loading" ? (
+          <div className="deck-html-review-state">
+            <LoaderCircle size={18} />
+            <span>{t.review.rendering}</span>
+          </div>
+        ) : null}
+
+        {reviewRender.status === "error" ? (
+          <div className="deck-html-review-error">
+            <AlertTriangle size={18} />
+            <div>
+              <strong>{t.review.renderFailed}</strong>
+              <pre>{reviewRender.error}</pre>
+            </div>
+          </div>
+        ) : null}
+
+        {reviewRender.status === "ready" && selectedRenderedSlide?.preview_url ? (
+          <div className="deck-html-selected-frame">
+            <iframe
+              title={selectedRenderedSlide.title}
+              src={selectedRenderedSlide.preview_url}
+              sandbox="allow-scripts allow-same-origin"
+            />
+          </div>
+        ) : null}
+      </section>
+
       {previewMode === "grid" ? (
         <div className="preview-grid-view">
           {deck.map((slide, index) => (
@@ -79,6 +150,15 @@ export function ReviewPage(props: ReviewPageProps) {
               onClick={() => setCurrentSlide(index)}
             >
               <span>{formatSlideNumber(index)}</span>
+              {renderedSlides[index]?.preview_url ? (
+                <div className="grid-card-html-frame">
+                  <iframe
+                    title={renderedSlides[index].title}
+                    src={renderedSlides[index].preview_url}
+                    sandbox="allow-scripts allow-same-origin"
+                  />
+                </div>
+              ) : null}
               <strong>{slide.title}</strong>
               <p>{slide.subtitle}</p>
               <div className="grid-card-actions">
@@ -130,7 +210,17 @@ export function ReviewPage(props: ReviewPageProps) {
 
       {previewMode === "present" ? (
         <div className="preview-present-view">
-          <SlidePreview slide={selected} index={currentSlide} large />
+          {selectedRenderedSlide?.preview_url ? (
+            <div className="present-html-frame">
+              <iframe
+                title={selectedRenderedSlide.title}
+                src={selectedRenderedSlide.preview_url}
+                sandbox="allow-scripts allow-same-origin"
+              />
+            </div>
+          ) : (
+            <SlidePreview slide={selected} index={currentSlide} large />
+          )}
           <ThumbnailStrip deck={deck} currentSlide={currentSlide} setCurrentSlide={setCurrentSlide} />
         </div>
       ) : null}

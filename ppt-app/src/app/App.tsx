@@ -161,6 +161,8 @@ export function App() {
               setCurrentSlide={actions.setCurrentSlide}
               previewMode={state.previewMode}
               setPreviewMode={actions.setPreviewMode}
+              reviewRender={state.reviewRender}
+              renderDeckHtml={actions.renderDeckHtml}
               onBack={actions.goBack}
               updateDeckTitle={actions.updateDeckTitle}
               moveSlide={actions.moveSlide}

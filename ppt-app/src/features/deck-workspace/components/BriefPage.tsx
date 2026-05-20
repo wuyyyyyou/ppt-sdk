@@ -1,4 +1,4 @@
-import { CheckCircle2, File, Plus, Sparkles, Upload, X } from "lucide-react";
+import { File, Plus, Sparkles, Upload, X } from "lucide-react";
 import type { Messages } from "../../../i18n/messages";
 import type { ContextRow, LoadingKind } from "../types";
 
@@ -29,8 +29,6 @@ export function BriefPage(props: BriefPageProps) {
     prompt,
     setPrompt,
     loading,
-    reviewOutlineFirst,
-    setReviewOutlineFirst,
     contextRows,
     addContextRow,
     updateContextRow,
@@ -60,28 +58,18 @@ export function BriefPage(props: BriefPageProps) {
         <button
           className="inline-create-btn"
           onClick={generateDeck}
-          disabled={loading === "deck" || loading === "outline"}
+          disabled={loading === "deck" || loading === "outline" || loading === "review"}
         >
-          {loading === "deck" || loading === "outline" ? (
+          {loading === "deck" || loading === "outline" || loading === "review" ? (
             <span className="spinner small" />
           ) : (
             <Sparkles size={14} />
           )}
-          {reviewOutlineFirst ? t.controls.createOutline : t.controls.createDeck}
+          {t.controls.createDeck}
         </button>
       </div>
 
       <div className="brief-options">
-        <button
-          className={`checkbox-row ${reviewOutlineFirst ? "active" : ""}`}
-          onClick={() => setReviewOutlineFirst(!reviewOutlineFirst)}
-        >
-          <span className="checkbox-custom">
-            {reviewOutlineFirst ? <CheckCircle2 size={14} /> : null}
-          </span>
-          {t.brief.reviewOutlineFirst}
-        </button>
-
         <div>
           <div className="section-label">{t.brief.optionalContext}</div>
           <div className="chips-row">

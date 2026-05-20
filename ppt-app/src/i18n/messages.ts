@@ -128,6 +128,10 @@ export interface Messages {
     organize: string;
     present: string;
     htmlGate: string;
+    rendering: string;
+    renderAgain: string;
+    renderFailed: string;
+    openHtml: string;
   };
   refine: {
     title: string;
@@ -302,7 +306,11 @@ export const messages: Record<Locale, Messages> = {
       grid: "Grid",
       organize: "Organize",
       present: "Present",
-      htmlGate: "HTML review is required before PPTX export."
+      htmlGate: "HTML review is required before PPTX export.",
+      rendering: "Rendering HTML preview",
+      renderAgain: "Render again",
+      renderFailed: "Render failed",
+      openHtml: "Open HTML"
     },
     refine: {
       title: "Refine",
@@ -514,7 +522,11 @@ export const messages: Record<Locale, Messages> = {
       grid: "网格",
       organize: "整理",
       present: "放映",
-      htmlGate: "导出 PPTX 前需要先完成 HTML 审阅。"
+      htmlGate: "导出 PPTX 前需要先完成 HTML 审阅。",
+      rendering: "正在渲染 HTML 预览",
+      renderAgain: "重新渲染",
+      renderFailed: "渲染失败",
+      openHtml: "打开 HTML"
     },
     refine: {
       title: "优化",

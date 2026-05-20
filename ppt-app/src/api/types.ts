@@ -206,12 +206,25 @@ export interface RecordOutlineInput {
 }
 
 export interface RenderDeckHtmlInput {
-  projectDir: string;
+  workspace_dir: string;
 }
 
 export interface RenderDeckHtmlResult {
-  htmlPath: string;
-  screenshotPaths: string[];
+  workspace_dir: string;
+  manifest_path: string;
+  output_dir: string;
+  preview_url?: string | null;
+  slides: Array<{
+    slide_id: string;
+    layout_id: string;
+    title: string;
+    html_path: string;
+    preview_url: string;
+    speaker_note: string;
+  }>;
+  slide_count: number;
+  title: string;
+  rendered_at: string;
   diagnostics?: unknown;
 }
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { randomUUID } from "node:crypto";
+import { createServer } from "node:http";
 import readline from "node:readline";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -21,6 +22,7 @@ import {
   listAppTemplateGroups,
   listDiscoveredTemplateGroupSummaries,
   openAppWorkspace,
+  renderAppWorkspaceDeckHtml,
   runDeckValidation,
   selectAppWorkspaceTemplate,
   describeTaskStateMachine,
@@ -43,6 +45,7 @@ const TOOL_NAMES = [
   "app_get_template_group",
   "app_get_template_preview",
   "app_select_workspace_template",
+  "app_render_deck_html",
   "listDiscoveredTemplateGroupSummaries",
   "getAllDiscoveredTemplateGroups",
   "getDiscoveredTemplateGroup",
@@ -265,6 +268,19 @@ const MANIFEST = {
           name: "template_group",
           type: "string",
           description: "Builtin template group id to fork into the workspace template directory.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_render_deck_html",
+      description:
+        "Render the selected workspace template manifest to reviewable deck HTML and return a local preview URL.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
           required: true,
         },
       ],
@@ -675,6 +691,91 @@ function readOptionalAbsolutePathArg(args, parameterName) {
   return path.normalize(value);
 }
 
+const previewFiles = new Map();
+let previewServerPromise = null;
+
+async function handlePreviewRequest(request, response) {
+  const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+  const parts = requestUrl.pathname.split("/").filter(Boolean);
+
+  if (parts.length !== 3 || parts[0] !== "preview" || parts[2] !== "deck.html") {
+    response.writeHead(404, {
+      "content-type": "text/plain; charset=utf-8",
+      "cache-control": "no-store",
+    });
+    response.end("Not found");
+    return;
+  }
+
+  const previewId = parts[1];
+  const htmlPath = previewFiles.get(previewId);
+  if (!htmlPath) {
+    response.writeHead(404, {
+      "content-type": "text/plain; charset=utf-8",
+      "cache-control": "no-store",
+    });
+    response.end("Preview expired or not found");
+    return;
+  }
+
+  try {
+    const html = await readFile(htmlPath, "utf8");
+    response.writeHead(200, {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+    });
+    response.end(html);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to read preview HTML";
+    response.writeHead(500, {
+      "content-type": "text/plain; charset=utf-8",
+      "cache-control": "no-store",
+    });
+    response.end(message);
+  }
+}
+
+function ensurePreviewServer() {
+  if (previewServerPromise) {
+    return previewServerPromise;
+  }
+
+  previewServerPromise = new Promise((resolve, reject) => {
+    const server = createServer((request, response) => {
+      void handlePreviewRequest(request, response);
+    });
+
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        reject(new Error("Failed to bind local preview server"));
+        return;
+      }
+
+      process.stderr.write(`Preview server listening on 127.0.0.1:${address.port}\n`);
+      resolve({ server, port: address.port });
+    });
+  });
+
+  return previewServerPromise;
+}
+
+async function registerPreviewHtml(htmlPath) {
+  const normalizedHtmlPath = path.normalize(htmlPath);
+  const htmlStat = await stat(normalizedHtmlPath);
+  if (!htmlStat.isFile()) {
+    throw new Error(`Preview HTML is not a file: ${normalizedHtmlPath}`);
+  }
+
+  const { port } = await ensurePreviewServer();
+  const previewId = randomUUID();
+  previewFiles.set(previewId, normalizedHtmlPath);
+
+  return `http://127.0.0.1:${port}/preview/${previewId}/deck.html`;
+}
+
 function parseRequestLine(line) {
   try {
     return {
@@ -994,6 +1095,29 @@ async function toolAppSelectWorkspaceTemplate(args) {
   });
 }
 
+async function toolAppRenderDeckHtml(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const result = await renderAppWorkspaceDeckHtml({
+    workspace_dir: workspaceDir,
+  });
+  const slides = await Promise.all(
+    result.slides.map(async (slide) => ({
+      ...slide,
+      preview_url: await registerPreviewHtml(slide.html_path),
+    })),
+  );
+
+  return {
+    ...result,
+    slides,
+    preview_url: slides[0]?.preview_url ?? null,
+  };
+}
+
 async function toolGetAllDiscoveredTemplateGroups(args) {
   const input = normalizeDiscoveryInput(args);
   const groups = await getAllDiscoveredTemplateGroups(input);
@@ -1214,6 +1338,7 @@ const TOOL_DISPATCH = {
   app_get_template_group: toolAppGetTemplateGroup,
   app_get_template_preview: toolAppGetTemplatePreview,
   app_select_workspace_template: toolAppSelectWorkspaceTemplate,
+  app_render_deck_html: toolAppRenderDeckHtml,
   listDiscoveredTemplateGroupSummaries: toolListDiscoveredTemplateGroupSummaries,
   getAllDiscoveredTemplateGroups: toolGetAllDiscoveredTemplateGroups,
   getDiscoveredTemplateGroup: toolGetDiscoveredTemplateGroup,

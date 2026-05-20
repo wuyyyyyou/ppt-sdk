@@ -19,6 +19,7 @@ import { formatMessage, type Locale, type Messages } from "../../../i18n/message
 import { deckReadyStatus, sleep } from "../utils";
 import type {
   ContextRow,
+  DeckReviewRenderState,
   DeckWorkspaceState,
   LoadingKind,
   MainStage,
@@ -67,6 +68,7 @@ export interface DeckWorkspaceActions {
   selectTemplate: (groupId: string) => Promise<void>;
   refineDeck: () => Promise<void>;
   refineSlide: () => Promise<void>;
+  renderDeckHtml: () => Promise<void>;
   exportFile: (type: "PPTX" | "PDF") => Promise<void>;
 }
 
@@ -89,6 +91,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [expandedOutline, setExpandedOutline] = useState<number | null>(null);
   const [outlineFeedback, setOutlineFeedback] = useState("");
   const [previewMode, setPreviewMode] = useState<PreviewMode>("grid");
+  const [reviewRender, setReviewRender] = useState<DeckReviewRenderState>({
+    status: "idle",
+    result: null,
+    error: "",
+    renderKey: ""
+  });
   const [refineScope, setRefineScope] = useState<RefineScope>("deck");
   const [loading, setLoading] = useState<LoadingKind>("none");
   const [exportStatus, setExportStatus] = useState("");
@@ -128,6 +136,16 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       : {};
   }
 
+  function workspaceReviewRenderKey(workspace: WorkspaceResult) {
+    const templateRecord =
+      workspace.template && typeof workspace.template === "object" && !Array.isArray(workspace.template)
+        ? (workspace.template as { manifest_path?: unknown })
+        : null;
+    const manifestPath =
+      typeof templateRecord?.manifest_path === "string" ? templateRecord.manifest_path : "";
+    return `${workspace.workspace_dir}:${manifestPath}`;
+  }
+
   function buildOutlineArtifact(items = outline, title = deckTitle) {
     return {
       title,
@@ -141,8 +159,38 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     };
   }
 
+  function applyRenderedDeck(result: Awaited<ReturnType<PptBackend["renderDeckHtml"]>>) {
+    setGenerated(true);
+    setDeckTitle(result.title);
+    setDeck(
+      result.slides.map((slide) => ({
+        title: slide.title,
+        subtitle: slide.layout_id
+      }))
+    );
+    setOutline(
+      result.slides.map((slide) => ({
+        title: slide.title,
+        outline: slide.layout_id
+      }))
+    );
+    setCurrentSlide(0);
+    setStage("deck");
+  }
+
   function applyWorkspace(workspace: WorkspaceResult) {
     setCurrentWorkspace(workspace);
+    const renderKey = workspaceReviewRenderKey(workspace);
+    setReviewRender((current) =>
+      current.renderKey === renderKey
+        ? current
+        : {
+            status: "idle",
+            result: null,
+            error: "",
+            renderKey
+          }
+    );
     setDeckTitle(getWorkspaceTitle(workspace));
     const workspaceOutline = workspaceOutlineToState(workspace.outline);
     if (workspaceOutline.length > 0) {
@@ -205,6 +253,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (loading === "deck" || loading === "deckFromOutline") {
       return t.status.creatingDeck;
     }
+    if (loading === "review") return t.review.rendering;
     if (loading === "refineDeck") return t.status.refiningDeck;
     if (loading === "refineSlide") return t.status.refiningSlide;
     if (loading === "export") return t.status.exporting;
@@ -228,6 +277,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setHistory((items) =>
       items.at(-1) === nextPage ? items : [...items, nextPage]
     );
+    if (nextPage === "review") {
+      void renderDeckHtml();
+    }
   }
 
   function navigateMain(nextStage: MainStage) {
@@ -331,51 +383,25 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function generateDeck() {
-    if (!aiClient) return;
-
-    if (reviewOutlineFirst) {
-      setLoading("outline");
-      let workspace: WorkspaceResult | null = null;
-      try {
-        workspace = await ensureCurrentWorkspace();
-        const setting = workspaceSettingsToState(workspace);
-        const result = await aiClient.generateOutline({
-          prompt,
-          contextRows,
-          locale,
-          setting
-        });
-        await appendOutlineAiAttemptLogs(workspace, result.attempts);
-        setDeckTitle(result.outline.title);
-        setOutline(result.outline.items);
-        await saveOutlineArtifact(result.outline.items, result.outline.title, workspace, setting);
-        setStage("outline");
-      } catch (error) {
-        await appendOutlineErrorLog(workspace, "generateOutline", error);
-        showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
-      } finally {
-        setLoading("none");
-      }
-      return;
-    }
+    if (!backend) return;
 
     setLoading("deck");
     try {
       const workspace = await ensureCurrentWorkspace();
-      const result = await aiClient.generateDeck({
-        prompt,
-        contextRows,
-        locale,
-        outlineFirst: false,
-        setting: workspaceSettingsToState(workspace)
+      if (!workspace) return;
+      const renderKey = workspaceReviewRenderKey(workspace);
+      const result = await backend.renderDeckHtml({
+        workspace_dir: workspace.workspace_dir
       });
-      setGenerated(true);
-      setOutline(result.outline);
-      await saveOutlineArtifact(result.outline, result.title, workspace);
-      setDeck(result.slides);
-      setCurrentSlide(0);
-      setStage("deck");
-      setDeckTitle(result.title);
+      applyRenderedDeck(result);
+      setReviewRender({
+        status: "ready",
+        result,
+        error: "",
+        renderKey
+      });
+      setPage("review");
+      setHistory((items) => (items.at(-1) === "review" ? items : [...items, "review"]));
     } catch (error) {
       showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
     } finally {
@@ -772,6 +798,47 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
+  async function renderDeckHtml() {
+    if (!backend) return;
+
+    const workspace = await ensureCurrentWorkspace();
+    if (!workspace) return;
+
+    const renderKey = workspaceReviewRenderKey(workspace);
+    setLoading("review");
+    setReviewRender({
+      status: "loading",
+      result: null,
+      error: "",
+      renderKey
+    });
+
+    try {
+      const result = await backend.renderDeckHtml({
+        workspace_dir: workspace.workspace_dir
+      });
+      applyRenderedDeck(result);
+      setReviewRender({
+        status: "ready",
+        result,
+        error: "",
+        renderKey
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to render deck HTML.";
+      setReviewRender({
+        status: "error",
+        result: null,
+        error: message,
+        renderKey
+      });
+      showToast(message);
+    } finally {
+      setLoading("none");
+    }
+  }
+
   async function exportFile(type: "PPTX" | "PDF") {
     setLoading("export");
     setExportStatus(t.exportPage.preparing);
@@ -799,6 +866,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     expandedOutline,
     outlineFeedback,
     previewMode,
+    reviewRender,
     refineScope,
     loading,
     exportStatus,
@@ -851,6 +919,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     selectTemplate,
     refineDeck,
     refineSlide,
+    renderDeckHtml,
     exportFile
   };
 

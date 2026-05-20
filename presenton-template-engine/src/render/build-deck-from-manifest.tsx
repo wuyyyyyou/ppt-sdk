@@ -14,6 +14,7 @@ import { getBrowserRenderRuntimeBundle } from "./runtime-bundle.js";
 import type {
   BrowserRenderContext,
   BrowserRenderTheme,
+  BuildDeckHtmlPagesFromManifestResult,
   BuildDeckHtmlFromManifestFileOutput,
   BuildDeckHtmlFromManifestInput,
   BuildDeckHtmlFromManifestResult,
@@ -29,6 +30,27 @@ type ResolvedManifestSlide = {
   layoutDescription: string;
   templateGroup: string;
   localEntryPath?: string;
+};
+
+type PreparedManifestSlide = {
+  context: BrowserRenderContext;
+  html: string;
+  slideId: string;
+  layoutId: string;
+  fileName: string;
+  outputPath: string;
+  speaker_note: string;
+  localEntryPath?: string;
+};
+
+type PreparedManifestDeck = {
+  manifestPath: string;
+  manifestCwd: string;
+  outputDir: string;
+  deckBaseName: string;
+  title: string;
+  singlePageIndex: number | null;
+  slides: PreparedManifestSlide[];
 };
 
 type BrowserLike = {
@@ -657,9 +679,9 @@ function buildSlideDocumentHtml(input: {
   ].join("\n");
 }
 
-export async function buildDeckHtmlFromManifest(
+async function prepareManifestDeck(
   input: BuildDeckHtmlFromManifestInput,
-): Promise<BuildDeckHtmlFromManifestResult> {
+): Promise<PreparedManifestDeck> {
   if (!input || typeof input !== "object") {
     throw new Error("Manifest build input must be an object");
   }
@@ -748,14 +770,6 @@ export async function buildDeckHtmlFromManifest(
         entries: localRuntimeEntries,
       })
       : null;
-  const localDeckRuntimeBundle =
-    localRuntimeEntries.length > 0
-      ? await buildLocalBrowserRuntimeBundle({
-        mode: "deck",
-        cwd: manifestCwd,
-        entries: localRuntimeEntries,
-      })
-      : null;
   const slidesWithRuntime = slides.map((slide) => ({
     ...slide,
     html: buildSlideDocumentHtml({
@@ -764,32 +778,114 @@ export async function buildDeckHtmlFromManifest(
     }),
   }));
 
-  const slidesToWrite = singlePageIndex === null ? slidesWithRuntime : [slidesWithRuntime[singlePageIndex]];
-  const title = manifest.title ?? "Presenton Manifest Deck";
-  const deckFileName = `${deckBaseName}-deck.html`;
-  const deckOutputPath = path.join(outputDir, deckFileName);
-  const deckHtml = singlePageIndex === null
+  return {
+    manifestPath,
+    manifestCwd,
+    outputDir,
+    deckBaseName,
+    title: manifest.title ?? "Presenton Manifest Deck",
+    singlePageIndex,
+    slides: slidesWithRuntime,
+  };
+}
+
+export async function buildDeckHtmlPagesFromManifest(
+  input: BuildDeckHtmlFromManifestInput,
+): Promise<BuildDeckHtmlPagesFromManifestResult> {
+  const prepared = await prepareManifestDeck(input);
+  const slidesToWrite =
+    prepared.singlePageIndex === null
+      ? prepared.slides
+      : [prepared.slides[prepared.singlePageIndex]];
+
+  await mkdir(prepared.outputDir, { recursive: true });
+  await Promise.all(
+    slidesToWrite.map(async (slide, index) => {
+      const pageNumber =
+        prepared.singlePageIndex === null ? index + 1 : prepared.singlePageIndex + 1;
+      const fileName = `${String(pageNumber).padStart(2, "0")}-${prepared.deckBaseName}-${sanitizeFileNamePart(
+        slide.layoutId,
+      )}.html`;
+      const outputPath = path.join(prepared.outputDir, fileName);
+      slide.fileName = fileName;
+      slide.outputPath = outputPath;
+      await writeFile(outputPath, slide.html, "utf8");
+    }),
+  );
+
+  return {
+    outputDir: prepared.outputDir,
+    slides: slidesToWrite.map((slide) => ({
+      slideId: slide.slideId,
+      layoutId: slide.layoutId,
+      title: slide.context.title,
+      fileName: slide.fileName,
+      outputPath: slide.outputPath,
+      speakerNote: slide.speaker_note,
+    })),
+    slideCount: prepared.slides.length,
+    title: prepared.title,
+    manifestPath: prepared.manifestPath,
+  };
+}
+
+export async function buildDeckHtmlFromManifest(
+  input: BuildDeckHtmlFromManifestInput,
+): Promise<BuildDeckHtmlFromManifestResult> {
+  const prepared = await prepareManifestDeck(input);
+  const localRuntimeEntries = Array.from(
+    new Map(
+      prepared.slides
+        .filter(
+          (slide): slide is typeof slide & { localEntryPath: string } =>
+            typeof slide.localEntryPath === "string" && slide.localEntryPath.length > 0,
+        )
+        .map((slide) => [
+          slide.layoutId,
+          {
+            layoutId: slide.layoutId,
+            absolutePath: slide.localEntryPath,
+          } satisfies LocalRuntimeEntry,
+        ]),
+    ).values(),
+  );
+  const localDeckRuntimeBundle =
+    localRuntimeEntries.length > 0
+      ? await buildLocalBrowserRuntimeBundle({
+        mode: "deck",
+        cwd: prepared.manifestCwd,
+        entries: localRuntimeEntries,
+      })
+      : null;
+  const title = prepared.title;
+  const deckFileName = `${prepared.deckBaseName}-deck.html`;
+  const deckOutputPath = path.join(prepared.outputDir, deckFileName);
+  const deckHtml = prepared.singlePageIndex === null
     ? buildStandaloneDeckHtml({
       title,
-      slides: slidesWithRuntime,
+      slides: prepared.slides,
       runtimeBundle: localDeckRuntimeBundle,
     })
     : "";
 
-  await mkdir(outputDir, { recursive: true });
-  if (singlePageIndex === null) {
+  await mkdir(prepared.outputDir, { recursive: true });
+  if (prepared.singlePageIndex === null) {
     await writeFile(deckOutputPath, deckHtml, "utf8");
   }
+  const slidesToWrite =
+    prepared.singlePageIndex === null
+      ? prepared.slides
+      : [prepared.slides[prepared.singlePageIndex]];
   await writeSlideScreenshots(slidesToWrite);
 
   return {
     deckHtml,
     deckFileName,
     deckOutputPath,
-    outputDir,
-    deckGenerated: singlePageIndex === null,
-    singlePage: singlePageIndex !== null,
-    page: singlePageIndex === null ? null : singlePageIndex + 1,
+    outputDir: prepared.outputDir,
+    deckGenerated: prepared.singlePageIndex === null,
+    singlePage: prepared.singlePageIndex !== null,
+    page: prepared.singlePageIndex === null ? null : prepared.singlePageIndex + 1,
     slideFiles: slidesToWrite.map((slide): BuildDeckHtmlFromManifestFileOutput => ({
       fileName: slide.fileName,
       outputPath: slide.outputPath,
@@ -798,8 +894,8 @@ export async function buildDeckHtmlFromManifest(
       kind: "image",
       mimeType: "image/png",
     })),
-    slideCount: slidesWithRuntime.length,
+    slideCount: prepared.slides.length,
     title,
-    manifestPath,
+    manifestPath: prepared.manifestPath,
   };
 }

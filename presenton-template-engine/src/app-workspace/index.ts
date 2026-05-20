@@ -12,6 +12,7 @@ import {
   readTemplatePreviewDataUrl,
   type TemplatePreviewImage,
 } from "../template-previews/index.js";
+import { buildDeckHtmlPagesFromManifest } from "../render/build-deck-from-manifest.js";
 import type {
   AppendAppWorkspaceLogInput,
   AppendAppWorkspaceLogResult,
@@ -30,6 +31,8 @@ import type {
   ListAppTemplateGroupsResult,
   ListAppWorkspacesResult,
   OpenAppWorkspaceInput,
+  RenderAppWorkspaceDeckHtmlInput,
+  RenderAppWorkspaceDeckHtmlResult,
   SelectAppWorkspaceTemplateInput,
   SelectAppWorkspaceTemplateResult,
   UpdateAppWorkspaceOutlineInput,
@@ -257,6 +260,33 @@ function createDefaultTemplateJson() {
     data_dir_path: "",
     selected_at: null,
   };
+}
+
+function readSelectedTemplateManifestPath(workspace: AppWorkspaceResult): string {
+  const template =
+    workspace.template && typeof workspace.template === "object" && !Array.isArray(workspace.template)
+      ? (workspace.template as Record<string, unknown>)
+      : {};
+  const manifestPath = typeof template.manifest_path === "string" ? template.manifest_path.trim() : "";
+
+  if (!manifestPath) {
+    throw new Error(
+      "No workspace template is selected. Select a template before rendering deck HTML.",
+    );
+  }
+
+  assertAbsolutePath(manifestPath, "template.manifest_path");
+  const normalizedManifestPath = path.normalize(manifestPath);
+  const relativePath = path.relative(workspace.workspace_dir, normalizedManifestPath);
+  if (
+    relativePath.length === 0 ||
+    relativePath.startsWith("..") ||
+    path.isAbsolute(relativePath)
+  ) {
+    throw new Error('"template.manifest_path" must be inside the workspace directory');
+  }
+
+  return normalizedManifestPath;
 }
 
 async function ensureWorkspaceFiles(
@@ -648,6 +678,36 @@ export async function selectAppWorkspaceTemplate(
   };
 }
 
+export async function renderAppWorkspaceDeckHtml(
+  input: RenderAppWorkspaceDeckHtmlInput,
+): Promise<RenderAppWorkspaceDeckHtmlResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const manifestPath = readSelectedTemplateManifestPath(workspace);
+  const renderedAt = new Date().toISOString();
+  const outputDir = path.join(workspace.workspace_dir, "output", "app-render");
+  const result = await buildDeckHtmlPagesFromManifest({
+    manifestPath,
+    outputDir,
+    name: `${workspace.workspace_id}-review`,
+  });
+
+  return {
+    workspace_dir: workspace.workspace_dir,
+    manifest_path: result.manifestPath,
+    output_dir: result.outputDir,
+    slides: result.slides.map((slide) => ({
+      slide_id: slide.slideId,
+      layout_id: slide.layoutId,
+      title: slide.title,
+      html_path: slide.outputPath,
+      speaker_note: slide.speakerNote,
+    })),
+    slide_count: result.slideCount,
+    title: result.title,
+    rendered_at: renderedAt,
+  };
+}
+
 export type {
   AppendAppWorkspaceLogInput,
   AppendAppWorkspaceLogResult,
@@ -667,6 +727,8 @@ export type {
   ListAppTemplateGroupsResult,
   ListAppWorkspacesResult,
   OpenAppWorkspaceInput,
+  RenderAppWorkspaceDeckHtmlInput,
+  RenderAppWorkspaceDeckHtmlResult,
   SelectAppWorkspaceTemplateInput,
   SelectAppWorkspaceTemplateResult,
   UpdateAppWorkspaceOutlineInput,
