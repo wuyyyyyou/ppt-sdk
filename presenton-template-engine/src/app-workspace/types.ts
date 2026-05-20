@@ -24,6 +24,7 @@ export interface AppWorkspaceOutlineSource {
   prompt: string;
   context: unknown[];
   setting: Record<string, unknown>;
+  kind?: string;
 }
 
 export interface AppWorkspaceOutline {
@@ -180,6 +181,29 @@ export interface SelectAppWorkspaceTemplateResult {
 
 export interface RenderAppWorkspaceDeckHtmlInput {
   workspace_dir: string;
+}
+
+export interface AppWorkspacePageItem {
+  page_id: string;
+  index: number;
+  title: string;
+  layout_id: string;
+  html_path: string;
+  speaker_note: string;
+}
+
+export interface AppWorkspacePages {
+  version: 1;
+  status: "rendered";
+  title: string;
+  manifest_path: string;
+  output_dir: string;
+  rendered_at: string;
+  pages: AppWorkspacePageItem[];
+  source: {
+    kind: "template-manifest";
+  };
+  updated_at: string;
 }
 
 export interface RenderAppWorkspaceDeckHtmlResult {

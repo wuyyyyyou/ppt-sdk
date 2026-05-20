@@ -23,6 +23,7 @@ import type {
   AppWorkspaceSummary,
   AppWorkspaceOutline,
   AppWorkspaceOutlineItem,
+  AppWorkspacePages,
   AppWorkspaceTemplateSelection,
   CreateAppWorkspaceInput,
   GetAppTemplateGroupInput,
@@ -236,6 +237,7 @@ function normalizeOutlineJson(outline: unknown): AppWorkspaceOutline {
         source.setting && typeof source.setting === "object" && !Array.isArray(source.setting)
           ? (source.setting as Record<string, unknown>)
           : {},
+      kind: normalizeString(source.kind) || undefined,
     },
     updated_at: typeof existing.updated_at === "string" ? existing.updated_at : null,
   };
@@ -690,18 +692,59 @@ export async function renderAppWorkspaceDeckHtml(
     outputDir,
     name: `${workspace.workspace_id}-review`,
   });
+  const slides = result.slides.map((slide) => ({
+    slide_id: slide.slideId,
+    layout_id: slide.layoutId,
+    title: slide.title,
+    html_path: slide.outputPath,
+    speaker_note: slide.speakerNote,
+  }));
+  const outline: AppWorkspaceOutline = {
+    version: 2,
+    title: result.title,
+    status: "confirmed",
+    items: slides.map((slide) => ({
+      title: slide.title,
+      outline: slide.speaker_note || slide.layout_id,
+    })),
+    source: {
+      prompt: "",
+      context: [],
+      setting: normalizeSettingJson(workspace.setting),
+      kind: "template-manifest",
+    },
+    updated_at: renderedAt,
+  };
+  const pages: AppWorkspacePages = {
+    version: 1,
+    status: "rendered",
+    title: result.title,
+    manifest_path: result.manifestPath,
+    output_dir: result.outputDir,
+    rendered_at: renderedAt,
+    pages: slides.map((slide, index) => ({
+      page_id: slide.slide_id,
+      index,
+      title: slide.title,
+      layout_id: slide.layout_id,
+      html_path: slide.html_path,
+      speaker_note: slide.speaker_note,
+    })),
+    source: {
+      kind: "template-manifest",
+    },
+    updated_at: renderedAt,
+  };
+
+  await writeJsonFile(workspace.files.outline, outline);
+  await writeJsonFile(workspace.files.pages, pages);
+  await touchWorkspaceTask(workspace, renderedAt);
 
   return {
     workspace_dir: workspace.workspace_dir,
     manifest_path: result.manifestPath,
     output_dir: result.outputDir,
-    slides: result.slides.map((slide) => ({
-      slide_id: slide.slideId,
-      layout_id: slide.layoutId,
-      title: slide.title,
-      html_path: slide.outputPath,
-      speaker_note: slide.speakerNote,
-    })),
+    slides,
     slide_count: result.slideCount,
     title: result.title,
     rendered_at: renderedAt,

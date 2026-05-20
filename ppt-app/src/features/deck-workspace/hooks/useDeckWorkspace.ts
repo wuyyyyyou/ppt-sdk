@@ -7,6 +7,8 @@ import type {
   WorkspaceResult,
   WorkspaceOutline,
   WorkspaceOutlineItem,
+  WorkspacePageItem,
+  WorkspacePages,
   WorkspaceSettings
 } from "../../../api/types";
 import {
@@ -130,6 +132,65 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       }));
   }
 
+  function normalizeWorkspacePage(value: unknown): WorkspacePageItem | null {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return null;
+    }
+
+    const record = value as Partial<WorkspacePageItem>;
+    const pageId = typeof record.page_id === "string" ? record.page_id : "";
+    const title = typeof record.title === "string" ? record.title : pageId;
+    const layoutId = typeof record.layout_id === "string" ? record.layout_id : "";
+    const htmlPath = typeof record.html_path === "string" ? record.html_path : "";
+    const speakerNote =
+      typeof record.speaker_note === "string" ? record.speaker_note : "";
+    const index = typeof record.index === "number" ? record.index : 0;
+
+    if (!pageId && !title && !layoutId && !htmlPath) {
+      return null;
+    }
+
+    return {
+      page_id: pageId,
+      index,
+      title,
+      layout_id: layoutId,
+      html_path: htmlPath,
+      speaker_note: speakerNote
+    };
+  }
+
+  function workspacePagesToState(workspacePages: unknown) {
+    const pagesRecord =
+      workspacePages && typeof workspacePages === "object" && !Array.isArray(workspacePages)
+        ? (workspacePages as Partial<WorkspacePages>)
+        : null;
+    const pages = Array.isArray(pagesRecord?.pages)
+      ? pagesRecord.pages
+          .map(normalizeWorkspacePage)
+          .filter((page): page is WorkspacePageItem => page !== null)
+          .sort((left, right) => left.index - right.index)
+      : [];
+
+    if (pages.length === 0) return null;
+
+    return {
+      title: typeof pagesRecord?.title === "string" ? pagesRecord.title : "",
+      deck: pages.map((page) => ({
+        title: page.title,
+        subtitle: page.layout_id
+      })),
+      outline: pages.map((page) => ({
+        title: page.title,
+        outline: page.speaker_note || page.layout_id
+      }))
+    };
+  }
+
+  function hasRenderedWorkspacePages(workspace: WorkspaceResult) {
+    return workspacePagesToState(workspace.pages) !== null;
+  }
+
   function workspaceSettingsToState(workspace: WorkspaceResult | null): WorkspaceSettings {
     return workspace?.setting && typeof workspace.setting === "object" && !Array.isArray(workspace.setting)
       ? (workspace.setting as WorkspaceSettings)
@@ -171,7 +232,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setOutline(
       result.slides.map((slide) => ({
         title: slide.title,
-        outline: slide.layout_id
+        outline: slide.speaker_note || slide.layout_id
       }))
     );
     setCurrentSlide(0);
@@ -193,9 +254,23 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     );
     setDeckTitle(getWorkspaceTitle(workspace));
     const workspaceOutline = workspaceOutlineToState(workspace.outline);
+    const workspacePages = workspacePagesToState(workspace.pages);
+    if (workspacePages) {
+      setGenerated(true);
+      setDeckTitle(workspacePages.title || getWorkspaceTitle(workspace));
+      setDeck(workspacePages.deck);
+      setOutline(workspaceOutline.length > 0 ? workspaceOutline : workspacePages.outline);
+      setCurrentSlide(0);
+      setStage("deck");
+    } else {
+      setGenerated(false);
+      setCurrentSlide(0);
+    }
     if (workspaceOutline.length > 0) {
       setOutline(workspaceOutline);
-      setStage("outline");
+      if (!workspacePages) {
+        setStage("outline");
+      }
     }
     const templateRecord =
       workspace.template && typeof workspace.template === "object" && !Array.isArray(workspace.template)
@@ -203,7 +278,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         : null;
     if (typeof templateRecord?.selected_template_group === "string" && templateRecord.selected_template_group) {
       setSelectedTemplateGroupId(templateRecord.selected_template_group);
-      if (workspaceOutline.length === 0) {
+      if (!workspacePages && workspaceOutline.length === 0) {
         setStage("brief");
       }
     }
@@ -392,26 +467,17 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function generateDeck() {
     if (!backend) return;
 
-    setLoading("deck");
     try {
       const workspace = await ensureCurrentWorkspace();
       if (!workspace) return;
-      const renderKey = workspaceReviewRenderKey(workspace);
-      const result = await backend.renderDeckHtml({
-        workspace_dir: workspace.workspace_dir
-      });
-      applyRenderedDeck(result);
-      setReviewRender({
-        status: "ready",
-        result,
-        error: "",
-        renderKey
-      });
-      setPage("review");
-      setHistory((items) => (items.at(-1) === "review" ? items : [...items, "review"]));
+
+      const rendered = await renderDeckHtmlForWorkspace(workspace, "deck");
+      if (rendered) {
+        setPage("main");
+        setHistory((items) => (items.at(-1) === "main" ? items : [...items, "main"]));
+      }
     } catch (error) {
       showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
-    } finally {
       setLoading("none");
     }
   }
@@ -667,9 +733,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const workspace = await backend.openWorkspace({
         workspace_dir: workspaceDir
       });
+      const shouldOpenDeck = hasRenderedWorkspacePages(workspace);
       applyWorkspace(workspace);
-      setPage("main");
-      showToast(`已打开工作区 ${workspace.workspace_id}`);
+      if (shouldOpenDeck) {
+        setPage("main");
+        setHistory((items) => (items.at(-1) === "main" ? items : [...items, "main"]));
+        const rendered = await renderDeckHtmlForWorkspace(workspace, "review");
+        if (rendered) {
+          showToast(`已打开工作区 ${workspace.workspace_id}`);
+        }
+      } else {
+        setPage("main");
+        showToast(`已打开工作区 ${workspace.workspace_id}`);
+      }
     } catch (error) {
       setWorkspaceError(
         error instanceof Error ? error.message : "Failed to open workspace."
@@ -805,14 +881,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
-  async function renderDeckHtml() {
+  async function renderDeckHtmlForWorkspace(
+    workspace: WorkspaceResult,
+    loadingKind: LoadingKind
+  ) {
     if (!backend) return;
 
-    const workspace = await ensureCurrentWorkspace();
-    if (!workspace) return;
-
     const renderKey = workspaceReviewRenderKey(workspace);
-    setLoading("review");
+    setLoading(loadingKind);
     setReviewRender({
       status: "loading",
       result: null,
@@ -831,6 +907,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         error: "",
         renderKey
       });
+      void backend.listWorkspaces().then(setWorkspaceScan).catch((error) => {
+        console.warn(
+          "Failed to refresh workspaces after render",
+          error instanceof Error ? error.message : error
+        );
+      });
+      return true;
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to render deck HTML.";
@@ -841,9 +924,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         renderKey
       });
       showToast(message);
+      return false;
     } finally {
       setLoading("none");
     }
+  }
+
+  async function renderDeckHtml() {
+    if (!backend) return;
+
+    const workspace = await ensureCurrentWorkspace();
+    if (!workspace) return;
+
+    await renderDeckHtmlForWorkspace(workspace, "review");
   }
 
   async function exportFile(type: "PPTX" | "PDF") {

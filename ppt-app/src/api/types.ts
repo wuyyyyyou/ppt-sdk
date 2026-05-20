@@ -64,8 +64,32 @@ export interface WorkspaceOutline {
     prompt: string;
     context: unknown[];
     setting: Record<string, unknown>;
+    kind?: string;
   };
   updated_at: string | null;
+}
+
+export interface WorkspacePageItem {
+  page_id: string;
+  index: number;
+  title: string;
+  layout_id: string;
+  html_path: string;
+  speaker_note: string;
+}
+
+export interface WorkspacePages {
+  version: 1;
+  status?: "rendered" | string;
+  title?: string;
+  manifest_path?: string;
+  output_dir?: string;
+  rendered_at?: string;
+  pages: WorkspacePageItem[];
+  source?: {
+    kind?: string;
+  };
+  updated_at?: string | null;
 }
 
 export interface ListWorkspacesResult {
