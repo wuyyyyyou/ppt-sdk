@@ -130,13 +130,9 @@ export function ReviewPage(props: ReviewPageProps) {
           </div>
         ) : null}
 
-        {reviewRender.status === "ready" && selectedRenderedSlide?.preview_url ? (
-          <div className="deck-html-selected-frame">
-            <iframe
-              title={selectedRenderedSlide.title}
-              src={selectedRenderedSlide.preview_url}
-              sandbox="allow-scripts allow-same-origin"
-            />
+        {reviewRender.status === "ready" && !selectedRenderedSlide?.preview_url ? (
+          <div className="deck-html-review-state">
+            <span>{t.review.renderFailed}</span>
           </div>
         ) : null}
       </section>
@@ -221,7 +217,12 @@ export function ReviewPage(props: ReviewPageProps) {
           ) : (
             <SlidePreview slide={selected} index={currentSlide} large />
           )}
-          <ThumbnailStrip deck={deck} currentSlide={currentSlide} setCurrentSlide={setCurrentSlide} />
+          <ThumbnailStrip
+            deck={deck}
+            currentSlide={currentSlide}
+            setCurrentSlide={setCurrentSlide}
+            renderedSlides={renderedSlides}
+          />
         </div>
       ) : null}
     </section>

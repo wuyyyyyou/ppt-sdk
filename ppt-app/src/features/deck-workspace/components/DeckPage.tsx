@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, Edit3, MessageCircle } from "lucide-react";
 import type { Slide } from "../../../data/mockDeck";
 import { formatMessage, type Messages } from "../../../i18n/messages";
+import type { DeckReviewRenderState } from "../types";
 import { formatSlideCount, formatSlideNumber } from "../utils";
 import { SlidePreview } from "./SlidePreview";
 import { ThumbnailStrip } from "./ThumbnailStrip";
@@ -12,6 +13,7 @@ interface DeckPageProps {
   deck: Slide[];
   currentSlide: number;
   setCurrentSlide: (index: number) => void;
+  reviewRender: DeckReviewRenderState;
   onRefineDeck: () => void;
   onRefineSlide: () => void;
   onPreview: () => void;
@@ -26,12 +28,15 @@ export function DeckPage(props: DeckPageProps) {
     deck,
     currentSlide,
     setCurrentSlide,
+    reviewRender,
     onRefineDeck,
     onRefineSlide,
     onPreview,
     onExport
   } = props;
   const slide = deck[currentSlide] ?? deck[0];
+  const renderedSlides = reviewRender.result?.slides ?? [];
+  const selectedRenderedSlide = renderedSlides[currentSlide] ?? renderedSlides[0];
 
   return (
     <section className="page active deck-page">
@@ -41,7 +46,17 @@ export function DeckPage(props: DeckPageProps) {
         </button>
       </div>
 
-      <SlidePreview slide={slide} index={currentSlide} large />
+      {reviewRender.status === "ready" && selectedRenderedSlide?.preview_url ? (
+        <div className="deck-stage-html-frame">
+          <iframe
+            title={selectedRenderedSlide.title}
+            src={selectedRenderedSlide.preview_url}
+            sandbox="allow-scripts allow-same-origin"
+          />
+        </div>
+      ) : (
+        <SlidePreview slide={slide} index={currentSlide} large />
+      )}
 
       <div className="preview-controls">
         <label className="deck-title-editor">
@@ -78,7 +93,12 @@ export function DeckPage(props: DeckPageProps) {
         </button>
       </div>
 
-      <ThumbnailStrip deck={deck} currentSlide={currentSlide} setCurrentSlide={setCurrentSlide} />
+      <ThumbnailStrip
+        deck={deck}
+        currentSlide={currentSlide}
+        setCurrentSlide={setCurrentSlide}
+        renderedSlides={renderedSlides}
+      />
 
       <div className="action-bar">
         <button className="secondary-btn" onClick={onPreview}>

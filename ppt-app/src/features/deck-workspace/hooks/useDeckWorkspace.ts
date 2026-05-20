@@ -278,7 +278,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       items.at(-1) === nextPage ? items : [...items, nextPage]
     );
     if (nextPage === "review") {
-      void renderDeckHtml();
+      const renderKey = currentWorkspace ? workspaceReviewRenderKey(currentWorkspace) : "";
+      const hasCurrentRender =
+        reviewRender.status === "ready" &&
+        reviewRender.result !== null &&
+        reviewRender.renderKey === renderKey;
+      if (!hasCurrentRender) {
+        void renderDeckHtml();
+      }
     }
   }
 

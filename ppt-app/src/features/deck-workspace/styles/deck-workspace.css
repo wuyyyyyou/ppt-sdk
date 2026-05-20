@@ -1463,6 +1463,28 @@ button {
   margin-bottom: 16px;
 }
 
+.deck-stage-html-frame {
+  flex: none;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 0;
+  margin-bottom: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 14px 32px rgba(17, 24, 39, 0.08);
+}
+
+.deck-stage-html-frame iframe {
+  width: 1280px;
+  height: 720px;
+  border: 0;
+  background: #fff;
+  transform: scale(0.64);
+  transform-origin: 0 0;
+}
+
 .slide-num-tag {
   position: absolute;
   left: 18px;
@@ -1554,8 +1576,8 @@ button {
 
 .thumb {
   display: flex;
-  width: 86px;
-  min-width: 86px;
+  width: 112px;
+  min-width: 112px;
   flex-direction: column;
   gap: 6px;
   border: 1px solid rgba(17, 24, 39, 0.06);
@@ -1564,6 +1586,24 @@ button {
   color: var(--text-main);
   background: rgba(255, 255, 255, 0.5);
   text-align: left;
+}
+
+.thumb-html-frame {
+  width: 92px;
+  height: 52px;
+  overflow: hidden;
+  border: 1px solid rgba(17, 24, 39, 0.06);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.thumb-html-frame iframe {
+  width: 1280px;
+  height: 720px;
+  border: 0;
+  pointer-events: none;
+  transform: scale(0.072);
+  transform-origin: 0 0;
 }
 
 .thumb.active {

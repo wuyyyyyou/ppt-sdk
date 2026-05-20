@@ -125,6 +125,7 @@ export function App() {
               deck={state.deck}
               currentSlide={state.currentSlide}
               setCurrentSlide={actions.setCurrentSlide}
+              reviewRender={state.reviewRender}
               onRefineDeck={() => {
                 actions.setRefineScope("deck");
                 actions.navigate("refine");
