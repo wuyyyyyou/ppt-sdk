@@ -386,11 +386,13 @@ export interface RecordDeckReviewInput {
 }
 
 export interface PrepareExportModelInput {
-  projectDir: string;
+  workspace_dir: string;
 }
 
 export interface PrepareExportModelResult {
   modelPath: string;
+  htmlPath: string;
+  outputDir: string;
 }
 
 export interface GeneratePptxInput {
@@ -404,7 +406,22 @@ export interface GeneratePptxResult {
 }
 
 export interface RecordPptxExportInput {
-  projectDir: string;
+  workspace_dir: string;
   pptxPath: string;
   generatorResult?: unknown;
+}
+
+export interface ExportPdfInput {
+  workspace_dir: string;
+}
+
+export interface ExportPdfResult {
+  pdfPath: string;
+  htmlPath: string;
+  outputDir: string;
+}
+
+export interface RecordPdfExportInput {
+  workspace_dir: string;
+  pdfPath: string;
 }

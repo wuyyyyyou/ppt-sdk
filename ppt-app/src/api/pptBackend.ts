@@ -16,10 +16,13 @@ import type {
   PreparePageFilesInput,
   PreparePageFilesResult,
   ProjectResult,
+  ExportPdfInput,
+  ExportPdfResult,
   RecordDeckReviewInput,
   RecordPagePlanInput,
   RecordPageProgressInput,
   RecordPptxExportInput,
+  RecordPdfExportInput,
   RecordRequirementsInput,
   RecordOutlineInput,
   RenderDeckHtmlInput,
@@ -71,7 +74,9 @@ export interface PptBackend {
     input: PrepareExportModelInput
   ): Promise<PrepareExportModelResult>;
   generatePptx(input: GeneratePptxInput): Promise<GeneratePptxResult>;
+  exportPdf(input: ExportPdfInput): Promise<ExportPdfResult>;
   recordPptxExport(input: RecordPptxExportInput): Promise<ProjectResult>;
+  recordPdfExport(input: RecordPdfExportInput): Promise<ProjectResult>;
 }
 
 export async function createPptBackend(): Promise<PptBackend> {

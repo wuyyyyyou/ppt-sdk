@@ -1,5 +1,6 @@
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { appendFile, copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import {
   getDiscoveredTemplateGroup,
@@ -13,9 +14,11 @@ import {
   type TemplatePreviewImage,
 } from "../template-previews/index.js";
 import {
+  buildDeckHtmlFromManifest,
   buildDeckHtmlPagesFromManifest,
   buildDeckPageScreenshotFromManifest,
 } from "../render/build-deck-from-manifest.js";
+import { convertDeckHtmlToPptxModel } from "../html-to-pptx-model/index.js";
 import type {
   AppendAppWorkspaceLogInput,
   AppendAppWorkspaceLogResult,
@@ -30,6 +33,8 @@ import type {
   AppPagePlanItem,
   AppPageProgress,
   AppPageProgressItem,
+  ExportAppPdfInput,
+  ExportAppPdfResult,
   AppWorkspacePages,
   AppWorkspaceTemplateSelection,
   AppTemplatePlanningBlueprint,
@@ -46,8 +51,12 @@ import type {
   OpenAppWorkspaceInput,
   PrepareAppPageFilesInput,
   PrepareAppPageFilesResult,
+  PrepareAppExportModelInput,
+  PrepareAppExportModelResult,
   RecordAppPagePlanInput,
   RecordAppPageProgressInput,
+  RecordAppPdfExportInput,
+  RecordAppPptxExportInput,
   RenderAppWorkspacePagePreviewInput,
   RenderAppWorkspacePagePreviewResult,
   RenderAppWorkspaceDeckHtmlInput,
@@ -1050,6 +1059,239 @@ export async function renderAppWorkspaceDeckHtml(
   };
 }
 
+async function launchPdfBrowser(): Promise<any> {
+  const puppeteerModule = await import("puppeteer");
+  const puppeteer = puppeteerModule.default ?? puppeteerModule;
+  return puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+  });
+}
+
+function buildPdfHtmlFromDataUrls(imageDataUrls: string[]): string {
+  const slides = imageDataUrls.map((dataUrl, index) => [
+    `<section class="page" data-page="${index + 1}">`,
+    `<img alt="Slide ${index + 1}" src="${dataUrl}" />`,
+    "</section>",
+  ].join("\n")).join("\n");
+
+  return [
+    "<!doctype html>",
+    '<html lang="en">',
+    "<head>",
+    '  <meta charset="utf-8" />',
+    '  <meta name="viewport" content="width=1280, initial-scale=1" />',
+    "  <style>",
+    "    @page {",
+    "      size: 13.333in 7.5in;",
+    "      margin: 0;",
+    "    }",
+    "    html, body {",
+    "      margin: 0;",
+    "      padding: 0;",
+    "      width: 100%;",
+    "      background: #ffffff;",
+    "    }",
+    "    body {",
+    "      -webkit-print-color-adjust: exact;",
+    "      print-color-adjust: exact;",
+    "    }",
+    "    .page {",
+    "      width: 1280px;",
+    "      height: 720px;",
+    "      overflow: hidden;",
+    "      page-break-after: always;",
+    "    }",
+    "    .page:last-child {",
+    "      page-break-after: auto;",
+    "    }",
+    "    img {",
+    "      display: block;",
+    "      width: 1280px;",
+    "      height: 720px;",
+    "      object-fit: cover;",
+    "    }",
+    "  </style>",
+    "</head>",
+    "<body>",
+    slides,
+    "</body>",
+    "</html>",
+  ].join("\n");
+}
+
+async function createPdfFromSlideHtmlPaths(
+  slideHtmlPaths: string[],
+  pdfPath: string,
+): Promise<void> {
+  const browser = await launchPdfBrowser();
+
+  try {
+    const slideDataUrls: string[] = [];
+
+    for (const slideHtmlPath of slideHtmlPaths) {
+      const slideBrowserPage = await browser.newPage();
+      try {
+        await slideBrowserPage.setViewport({ width: 1280, height: 720, deviceScaleFactor: 2 });
+        await slideBrowserPage.goto(pathToFileURL(slideHtmlPath).href, {
+          waitUntil: "networkidle0",
+        });
+        await slideBrowserPage.waitForSelector("#presentation-slides-wrapper[data-presenton-render-status='ready']", {
+          timeout: 120_000,
+        });
+        const screenshot = await slideBrowserPage.screenshot({
+          type: "png",
+          fullPage: false,
+        });
+        slideDataUrls.push(`data:image/png;base64,${Buffer.from(screenshot).toString("base64")}`);
+      } finally {
+        await slideBrowserPage.close().catch(() => undefined);
+      }
+    }
+
+    const pdfPage = await browser.newPage();
+    try {
+      await pdfPage.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1 });
+      await pdfPage.setContent(buildPdfHtmlFromDataUrls(slideDataUrls), {
+        waitUntil: "load",
+      });
+      await pdfPage.pdf({
+        path: pdfPath,
+        printBackground: true,
+        preferCSSPageSize: true,
+      });
+    } finally {
+      await pdfPage.close().catch(() => undefined);
+    }
+  } finally {
+    await browser.close().catch(() => undefined);
+  }
+}
+
+async function recordWorkspaceExport(
+  workspace: AppWorkspaceResult,
+  artifactType: "pptx" | "pdf",
+  artifactPath: string,
+  extra?: Record<string, unknown>,
+): Promise<AppWorkspaceResult> {
+  const updatedAt = new Date().toISOString();
+  const existing =
+    workspace.task && typeof workspace.task === "object" && !Array.isArray(workspace.task)
+      ? (workspace.task as Record<string, unknown>)
+      : {};
+  const existingArtifacts =
+    existing.artifacts && typeof existing.artifacts === "object" && !Array.isArray(existing.artifacts)
+      ? (existing.artifacts as Record<string, unknown>)
+      : {};
+
+  await writeJsonFile(workspace.files.task, {
+    ...existing,
+    updated_at: updatedAt,
+    artifacts: {
+      ...existingArtifacts,
+      [artifactType]: {
+        path: artifactPath,
+        updated_at: updatedAt,
+        ...extra,
+      },
+    },
+  });
+
+  return ensureWorkspaceFiles(workspace.workspace_dir);
+}
+
+export async function prepareAppExportModel(
+  input: PrepareAppExportModelInput,
+): Promise<PrepareAppExportModelResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const manifestPath = readSelectedTemplateManifestPath(workspace);
+  const outputDir = path.join(workspace.workspace_dir, "output");
+  const preparedAt = new Date().toISOString();
+  const result = await buildDeckHtmlFromManifest({
+    manifestPath,
+    outputDir,
+    name: `${workspace.workspace_id}-export`,
+  });
+  const model = await convertDeckHtmlToPptxModel({
+    html: result.deckHtml,
+    name: result.title,
+  });
+  const modelPath = path.join(outputDir, "ppt-model.json");
+
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(modelPath, `${JSON.stringify(model, null, 2)}\n`, "utf8");
+  await touchWorkspaceTask(workspace, preparedAt);
+
+  return {
+    workspace_dir: workspace.workspace_dir,
+    manifest_path: manifestPath,
+    html_path: result.deckOutputPath,
+    model_path: modelPath,
+    output_dir: outputDir,
+    prepared_at: preparedAt,
+  };
+}
+
+export async function exportAppPdf(
+  input: ExportAppPdfInput,
+): Promise<ExportAppPdfResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const outputDir = path.join(workspace.workspace_dir, "output");
+  const pdfPath = path.join(outputDir, "deck.pdf");
+  const exportedAt = new Date().toISOString();
+  const pagesRecord =
+    workspace.pages && typeof workspace.pages === "object" && !Array.isArray(workspace.pages)
+      ? (workspace.pages as Record<string, unknown>)
+      : null;
+  const existingHtmlPaths = Array.isArray(pagesRecord?.pages)
+    ? pagesRecord.pages
+        .map((page) =>
+          page && typeof page === "object" && !Array.isArray(page) && typeof (page as { html_path?: unknown }).html_path === "string"
+            ? (page as { html_path: string }).html_path
+            : "",
+        )
+        .filter((htmlPath): htmlPath is string => htmlPath.length > 0)
+    : [];
+  const rendered = existingHtmlPaths.length > 0
+    ? null
+    : await renderAppWorkspaceDeckHtml({
+      workspace_dir: workspace.workspace_dir,
+    });
+  const htmlPaths =
+    existingHtmlPaths.length > 0
+      ? existingHtmlPaths
+      : rendered?.slides.map((slide) => slide.html_path) ?? [];
+
+  await mkdir(outputDir, { recursive: true });
+  await createPdfFromSlideHtmlPaths(htmlPaths, pdfPath);
+  await touchWorkspaceTask(workspace, exportedAt);
+
+  return {
+    workspace_dir: workspace.workspace_dir,
+    manifest_path: rendered?.manifest_path ?? readSelectedTemplateManifestPath(workspace),
+    html_path: htmlPaths[0] ?? "",
+    pdf_path: pdfPath,
+    output_dir: outputDir,
+    exported_at: exportedAt,
+  };
+}
+
+export async function recordAppPptxExport(
+  input: RecordAppPptxExportInput,
+): Promise<AppWorkspaceResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  return recordWorkspaceExport(workspace, "pptx", input.pptx_path, {
+    generator_result: input.generator_result ?? null,
+  });
+}
+
+export async function recordAppPdfExport(
+  input: RecordAppPdfExportInput,
+): Promise<AppWorkspaceResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  return recordWorkspaceExport(workspace, "pdf", input.pdf_path);
+}
+
 function buildBlueprintLookup(context: AppTemplatePlanningContext): Map<string, AppTemplatePlanningBlueprint> {
   return new Map(context.blueprints.map((blueprint) => [blueprint.id, blueprint]));
 }
@@ -1319,6 +1561,8 @@ export type {
   AppPagePlanItem,
   AppPageProgress,
   AppPageProgressItem,
+  ExportAppPdfInput,
+  ExportAppPdfResult,
   AppTemplatePlanningBlueprint,
   AppTemplatePlanningContext,
   AppTemplateGroupSummary,
@@ -1342,8 +1586,12 @@ export type {
   OpenAppWorkspaceInput,
   PrepareAppPageFilesInput,
   PrepareAppPageFilesResult,
+  PrepareAppExportModelInput,
+  PrepareAppExportModelResult,
   RecordAppPagePlanInput,
   RecordAppPageProgressInput,
+  RecordAppPdfExportInput,
+  RecordAppPptxExportInput,
   RenderAppWorkspaceDeckHtmlInput,
   RenderAppWorkspaceDeckHtmlResult,
   RenderAppWorkspacePagePreviewInput,

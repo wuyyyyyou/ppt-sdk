@@ -110,8 +110,7 @@ async function completeJson<T>(
   runtime: AnnaRuntime,
   label: string,
   prompt: string,
-  expectedShape: string,
-  maxTokens = 1400
+  expectedShape: string
 ): Promise<T> {
   let request: AnnaLlmCompleteInput = {
     messages: [
@@ -122,8 +121,7 @@ async function completeJson<T>(
           text: prompt
         }
       }
-    ],
-    maxTokens
+    ]
   };
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {

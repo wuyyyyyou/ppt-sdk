@@ -12,6 +12,7 @@ import {
   buildDeckHtmlFromManifest,
   convertDeckHtmlToPptxModel,
   createAppWorkspace,
+  exportAppPdf,
   forkTemplateGroup,
   getAppTemplateGroup,
   getAppTemplatePlanningContext,
@@ -26,8 +27,11 @@ import {
   listDiscoveredTemplateGroupSummaries,
   openAppWorkspace,
   prepareAppPageFiles,
+  prepareAppExportModel,
   recordAppPagePlan,
   recordAppPageProgress,
+  recordAppPdfExport,
+  recordAppPptxExport,
   renderAppWorkspaceDeckHtml,
   renderAppWorkspacePagePreview,
   runDeckValidation,
@@ -60,6 +64,10 @@ const TOOL_NAMES = [
   "app_record_page_progress",
   "app_render_workspace_page_preview",
   "app_render_deck_html",
+  "app_prepare_export_model",
+  "app_export_pdf",
+  "app_record_pptx_export",
+  "app_record_pdf_export",
   "listDiscoveredTemplateGroupSummaries",
   "getAllDiscoveredTemplateGroups",
   "getDiscoveredTemplateGroup",
@@ -411,6 +419,76 @@ const MANIFEST = {
           name: "workspace_dir",
           type: "string",
           description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_prepare_export_model",
+      description:
+        "Build the final export deck HTML for the workspace and convert it into a PPTX model JSON file.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_export_pdf",
+      description:
+        "Render the workspace deck into a share-ready PDF file.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_record_pptx_export",
+      description:
+        "Record the generated PPTX export path in the workspace artifacts.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+        {
+          name: "pptx_path",
+          type: "string",
+          description: "Absolute path to the generated PPTX file.",
+          required: true,
+        },
+        {
+          name: "generator_result",
+          type: "object",
+          description: "Optional raw generator result to store with the export record.",
+          required: false,
+        },
+      ],
+    },
+    {
+      name: "app_record_pdf_export",
+      description:
+        "Record the generated PDF export path in the workspace artifacts.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+        {
+          name: "pdf_path",
+          type: "string",
+          description: "Absolute path to the generated PDF file.",
           required: true,
         },
       ],
@@ -1344,6 +1422,55 @@ async function toolAppRenderDeckHtml(args) {
   };
 }
 
+async function toolAppPrepareExportModel(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return prepareAppExportModel({
+    workspace_dir: workspaceDir,
+  });
+}
+
+async function toolAppExportPdf(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return exportAppPdf({
+    workspace_dir: workspaceDir,
+  });
+}
+
+async function toolAppRecordPptxExport(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const pptxPath = readRequiredAbsolutePathArg(args, "pptx_path");
+  return recordAppPptxExport({
+    workspace_dir: workspaceDir,
+    pptx_path: pptxPath,
+    generator_result: args.generator_result,
+  });
+}
+
+async function toolAppRecordPdfExport(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const pdfPath = readRequiredAbsolutePathArg(args, "pdf_path");
+  return recordAppPdfExport({
+    workspace_dir: workspaceDir,
+    pdf_path: pdfPath,
+  });
+}
+
 async function toolGetAllDiscoveredTemplateGroups(args) {
   const input = normalizeDiscoveryInput(args);
   const groups = await getAllDiscoveredTemplateGroups(input);
@@ -1572,6 +1699,10 @@ const TOOL_DISPATCH = {
   app_record_page_progress: toolAppRecordPageProgress,
   app_render_workspace_page_preview: toolAppRenderWorkspacePagePreview,
   app_render_deck_html: toolAppRenderDeckHtml,
+  app_prepare_export_model: toolAppPrepareExportModel,
+  app_export_pdf: toolAppExportPdf,
+  app_record_pptx_export: toolAppRecordPptxExport,
+  app_record_pdf_export: toolAppRecordPdfExport,
   listDiscoveredTemplateGroupSummaries: toolListDiscoveredTemplateGroupSummaries,
   getAllDiscoveredTemplateGroups: toolGetAllDiscoveredTemplateGroups,
   getDiscoveredTemplateGroup: toolGetDiscoveredTemplateGroup,

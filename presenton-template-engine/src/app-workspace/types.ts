@@ -361,3 +361,40 @@ export interface RenderAppWorkspaceDeckHtmlResult {
   title: string;
   rendered_at: string;
 }
+
+export interface PrepareAppExportModelInput {
+  workspace_dir: string;
+}
+
+export interface PrepareAppExportModelResult {
+  workspace_dir: string;
+  manifest_path: string;
+  html_path: string;
+  model_path: string;
+  output_dir: string;
+  prepared_at: string;
+}
+
+export interface ExportAppPdfInput {
+  workspace_dir: string;
+}
+
+export interface ExportAppPdfResult {
+  workspace_dir: string;
+  manifest_path: string;
+  html_path: string;
+  pdf_path: string;
+  output_dir: string;
+  exported_at: string;
+}
+
+export interface RecordAppPptxExportInput {
+  workspace_dir: string;
+  pptx_path: string;
+  generator_result?: unknown;
+}
+
+export interface RecordAppPdfExportInput {
+  workspace_dir: string;
+  pdf_path: string;
+}

@@ -32,6 +32,12 @@ export interface DeckReviewRenderState {
   renderKey: string;
 }
 
+export interface ExportArtifact {
+  type: "PPTX" | "PDF";
+  path: string;
+  href: string;
+}
+
 export interface ContextRow {
   id: string;
   label: string;
@@ -64,6 +70,7 @@ export interface DeckWorkspaceState {
   refineScope: RefineScope;
   loading: LoadingKind;
   exportStatus: string;
+  exportArtifact: ExportArtifact | null;
   currentStatus: string;
   workspaceScan: ListWorkspacesResult | null;
   currentWorkspace: WorkspaceResult | null;

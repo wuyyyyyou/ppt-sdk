@@ -21,11 +21,12 @@ import {
   type Slide
 } from "../../../data/mockDeck";
 import { formatMessage, type Locale, type Messages } from "../../../i18n/messages";
-import { deckReadyStatus, sleep } from "../utils";
+import { deckReadyStatus } from "../utils";
 import type {
   ContextRow,
   DeckReviewRenderState,
   DeckWorkspaceState,
+  ExportArtifact,
   LoadingKind,
   MainStage,
   PageId,
@@ -113,6 +114,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [refineScope, setRefineScope] = useState<RefineScope>("deck");
   const [loading, setLoading] = useState<LoadingKind>("none");
   const [exportStatus, setExportStatus] = useState("");
+  const [exportArtifact, setExportArtifact] = useState<ExportArtifact | null>(null);
   const [backend, setBackend] = useState<PptBackend | null>(null);
   const [aiClient, setAiClient] = useState<AiClient | null>(null);
   const [agentClient, setAgentClient] = useState<AgentClient | null>(null);
@@ -267,6 +269,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     };
   }
 
+  function toFileUrl(filePath: string) {
+    return `file://${encodeURI(filePath)}`;
+  }
+
   function hasRenderedWorkspacePages(workspace: WorkspaceResult) {
     return workspacePagesToState(workspace.pages) !== null;
   }
@@ -280,11 +286,40 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   function workspaceReviewRenderKey(workspace: WorkspaceResult) {
     const templateRecord =
       workspace.template && typeof workspace.template === "object" && !Array.isArray(workspace.template)
-        ? (workspace.template as { manifest_path?: unknown })
+        ? (workspace.template as { manifest_path?: unknown; selected_at?: unknown })
+        : null;
+    const settingRecord =
+      workspace.setting && typeof workspace.setting === "object" && !Array.isArray(workspace.setting)
+        ? (workspace.setting as { updated_at?: unknown })
+        : null;
+    const outlineRecord =
+      workspace.outline && typeof workspace.outline === "object" && !Array.isArray(workspace.outline)
+        ? (workspace.outline as { updated_at?: unknown })
+        : null;
+    const pagePlanRecord =
+      workspace.page_plan && typeof workspace.page_plan === "object" && !Array.isArray(workspace.page_plan)
+        ? (workspace.page_plan as { updated_at?: unknown })
+        : null;
+    const pageProgressRecord =
+      workspace.page_progress && typeof workspace.page_progress === "object" && !Array.isArray(workspace.page_progress)
+        ? (workspace.page_progress as { updated_at?: unknown })
+        : null;
+    const pagesRecord =
+      workspace.pages && typeof workspace.pages === "object" && !Array.isArray(workspace.pages)
+        ? (workspace.pages as { updated_at?: unknown })
         : null;
     const manifestPath =
       typeof templateRecord?.manifest_path === "string" ? templateRecord.manifest_path : "";
-    return `${workspace.workspace_dir}:${manifestPath}`;
+    const selectedAt = typeof templateRecord?.selected_at === "string" ? templateRecord.selected_at : "";
+    const updatedParts = [
+      typeof settingRecord?.updated_at === "string" ? settingRecord.updated_at : "",
+      typeof outlineRecord?.updated_at === "string" ? outlineRecord.updated_at : "",
+      typeof pagePlanRecord?.updated_at === "string" ? pagePlanRecord.updated_at : "",
+      typeof pageProgressRecord?.updated_at === "string" ? pageProgressRecord.updated_at : "",
+      typeof pagesRecord?.updated_at === "string" ? pagesRecord.updated_at : "",
+      selectedAt,
+    ];
+    return `${workspace.workspace_dir}:${manifestPath}:${updatedParts.join(":")}`;
   }
 
   function buildOutlineArtifact(items = outline, title = deckTitle) {
@@ -321,6 +356,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   function applyWorkspace(workspace: WorkspaceResult) {
     setCurrentWorkspace(workspace);
+    setExportArtifact(readWorkspaceExportArtifact(workspace));
     const renderKey = workspaceReviewRenderKey(workspace);
     setReviewRender((current) =>
       current.renderKey === renderKey
@@ -735,6 +771,50 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       : workspace.workspace_id;
   }
 
+  function readWorkspaceExportArtifact(workspace: WorkspaceResult): ExportArtifact | null {
+    if (!workspace.task || typeof workspace.task !== "object" || Array.isArray(workspace.task)) {
+      return null;
+    }
+
+    const task = workspace.task as {
+      artifacts?: {
+        pptx?: { path?: unknown; updated_at?: unknown };
+        pdf?: { path?: unknown; updated_at?: unknown };
+      };
+    };
+    const pptx = task.artifacts?.pptx;
+    const pdf = task.artifacts?.pdf;
+    const candidates = [
+      {
+        type: "PPTX" as const,
+        path: typeof pptx?.path === "string" ? pptx.path : "",
+        updatedAt: typeof pptx?.updated_at === "string" ? pptx.updated_at : ""
+      },
+      {
+        type: "PDF" as const,
+        path: typeof pdf?.path === "string" ? pdf.path : "",
+        updatedAt: typeof pdf?.updated_at === "string" ? pdf.updated_at : ""
+      }
+    ].filter((item) => item.path);
+
+    if (candidates.length === 0) {
+      return null;
+    }
+
+    const latest = [...candidates].sort((left, right) => {
+      if (left.updatedAt === right.updatedAt) return 0;
+      if (!left.updatedAt) return 1;
+      if (!right.updatedAt) return -1;
+      return right.updatedAt.localeCompare(left.updatedAt);
+    })[0];
+
+    return {
+      type: latest.type,
+      path: latest.path,
+      href: toFileUrl(latest.path)
+    };
+  }
+
   async function ensureCurrentWorkspace() {
     if (!backend) return null;
     if (currentWorkspace) return currentWorkspace;
@@ -1013,22 +1093,26 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function renderDeckHtmlForWorkspace(
     workspace: WorkspaceResult,
     loadingKind: LoadingKind
-  ) {
-    if (!backend) return;
+  ): Promise<Awaited<ReturnType<PptBackend["renderDeckHtml"]>> | null> {
+    if (!backend) return null;
 
-    const renderKey = workspaceReviewRenderKey(workspace);
     setLoading(loadingKind);
-    setReviewRender({
+    setReviewRender((current) => ({
+      ...current,
       status: "loading",
       result: null,
-      error: "",
-      renderKey
-    });
+      error: ""
+    }));
 
     try {
       const result = await backend.renderDeckHtml({
         workspace_dir: workspace.workspace_dir
       });
+      const refreshedWorkspace = await backend.openWorkspace({
+        workspace_dir: workspace.workspace_dir
+      });
+      const renderKey = workspaceReviewRenderKey(refreshedWorkspace);
+      applyWorkspace(refreshedWorkspace);
       applyRenderedDeck(result);
       setReviewRender({
         status: "ready",
@@ -1042,10 +1126,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           error instanceof Error ? error.message : error
         );
       });
-      return true;
+      return result;
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to render deck HTML.";
+      const renderKey = workspaceReviewRenderKey(workspace);
       setReviewRender({
         status: "error",
         result: null,
@@ -1053,7 +1138,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         renderKey
       });
       showToast(message);
-      return false;
+      return null;
     } finally {
       setLoading("none");
     }
@@ -1069,12 +1154,81 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function exportFile(type: "PPTX" | "PDF") {
+    if (!backend) return;
+
+    const workspace = await ensureCurrentWorkspace();
+    if (!workspace) return;
+
+    const needsFreshRender =
+      reviewRender.status !== "ready" ||
+      reviewRender.result === null ||
+      reviewRender.renderKey !== workspaceReviewRenderKey(workspace);
+
     setLoading("export");
     setExportStatus(t.exportPage.preparing);
-    await sleep(900);
-    setLoading("none");
-    setExportStatus(formatMessage(t.exportPage.ready, { type }));
-    showToast(type === "PPTX" ? t.toasts.pptxExported : t.toasts.pdfExported);
+    setExportArtifact(null);
+    try {
+      if (needsFreshRender) {
+        const rendered = await renderDeckHtmlForWorkspace(workspace, "export");
+        if (!rendered) return;
+        setLoading("export");
+        setExportStatus(t.exportPage.preparing);
+      }
+
+      if (type === "PPTX") {
+        const exportModel = await backend.prepareExportModel({
+          workspace_dir: workspace.workspace_dir
+        });
+        const generatorResult = await backend.generatePptx({
+          modelPath: exportModel.modelPath,
+          outputPath: `${workspace.workspace_dir}/output/deck.pptx`
+        });
+        const pptxPath = generatorResult.pptxPath;
+        await backend.recordPptxExport({
+          workspace_dir: workspace.workspace_dir,
+          pptxPath: generatorResult.pptxPath,
+          generatorResult
+        });
+        setExportArtifact({
+          type,
+          path: pptxPath,
+          href: toFileUrl(pptxPath)
+        });
+        applyWorkspace(
+          await backend.openWorkspace({
+            workspace_dir: workspace.workspace_dir
+          })
+        );
+      } else {
+        const pdfResult = await backend.exportPdf({
+          workspace_dir: workspace.workspace_dir
+        });
+        const pdfPath = pdfResult.pdfPath;
+        await backend.recordPdfExport({
+          workspace_dir: workspace.workspace_dir,
+          pdfPath
+        });
+        setExportArtifact({
+          type,
+          path: pdfPath,
+          href: toFileUrl(pdfPath)
+        });
+        applyWorkspace(
+          await backend.openWorkspace({
+            workspace_dir: workspace.workspace_dir
+          })
+        );
+      }
+
+      setExportStatus(formatMessage(t.exportPage.ready, { type }));
+      showToast(type === "PPTX" ? t.toasts.pptxExported : t.toasts.pdfExported);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t.status.exporting;
+      setExportStatus(message);
+      showToast(message);
+    } finally {
+      setLoading("none");
+    }
   }
 
   const state: DeckWorkspaceState = {
@@ -1099,9 +1253,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     createDeckProgress,
     pageProgress,
     refineScope,
-    loading,
-    exportStatus,
-    currentStatus,
+      loading,
+      exportStatus,
+      exportArtifact,
+      currentStatus,
     workspaceScan,
     currentWorkspace,
     workspaceLoading,

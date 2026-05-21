@@ -2,6 +2,8 @@ import type { AnnaRuntime } from "../runtime/annaRuntime";
 import type { PptBackend } from "./pptBackend";
 import type {
   AppendWorkspaceLogResult,
+  ExportPdfInput,
+  ExportPdfResult,
   GeneratePptxInput,
   GeneratePptxResult,
   PagePlan,
@@ -14,6 +16,7 @@ import type {
   ProjectResult,
   RenderDeckHtmlResult,
   RenderWorkspacePagePreviewResult,
+  RecordPdfExportInput,
   TemplatePlanningContext,
   WorkspaceResult
 } from "./types";
@@ -37,6 +40,57 @@ function unwrapToolResult<T>(result: unknown): T {
   }
 
   return result as T;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function readString(record: Record<string, unknown>, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.length > 0) {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+function normalizePrepareExportModelResult(
+  value: unknown
+): PrepareExportModelResult {
+  const record = isRecord(value) ? value : {};
+
+  return {
+    modelPath: readString(record, "modelPath", "model_path"),
+    htmlPath: readString(record, "htmlPath", "html_path"),
+    outputDir: readString(record, "outputDir", "output_dir"),
+  };
+}
+
+function normalizeGeneratePptxResult(
+  value: unknown,
+  fallbackOutputPath: string
+): GeneratePptxResult {
+  const record = isRecord(value) ? value : {};
+
+  return {
+    ...(record as object),
+    pptxPath:
+      readString(record, "pptxPath", "pptx_path", "path") || fallbackOutputPath,
+    summary: record.summary ?? value,
+  };
+}
+
+function normalizeExportPdfResult(value: unknown): ExportPdfResult {
+  const record = isRecord(value) ? value : {};
+
+  return {
+    pdfPath: readString(record, "pdfPath", "pdf_path"),
+    htmlPath: readString(record, "htmlPath", "html_path"),
+    outputDir: readString(record, "outputDir", "output_dir"),
+  };
 }
 
 export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
@@ -157,14 +211,34 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         PPT_ENGINE_TOOL_ID,
         "app_prepare_export_model",
         input
-      ),
+      ).then(normalizePrepareExportModelResult),
     generatePptx: (input: GeneratePptxInput) =>
-      invoke<GeneratePptxResult>(PPT_GENER_TOOL_ID, "generatePptx", input),
+      invoke<GeneratePptxResult>(PPT_GENER_TOOL_ID, "generatePptx", {
+        model_path: input.modelPath,
+        output_path: input.outputPath,
+      }).then((result) => normalizeGeneratePptxResult(result, input.outputPath)),
+    exportPdf: (input: ExportPdfInput) =>
+      invoke<ExportPdfResult>(PPT_ENGINE_TOOL_ID, "app_export_pdf", input).then(
+        normalizeExportPdfResult
+      ),
     recordPptxExport: (input) =>
       invoke<ProjectResult>(
         PPT_ENGINE_TOOL_ID,
         "app_record_pptx_export",
-        input
+        {
+          workspace_dir: input.workspace_dir,
+          pptx_path: input.pptxPath,
+          generator_result: input.generatorResult,
+        }
+      ),
+    recordPdfExport: (input: RecordPdfExportInput) =>
+      invoke<ProjectResult>(
+        PPT_ENGINE_TOOL_ID,
+        "app_record_pdf_export",
+        {
+          workspace_dir: input.workspace_dir,
+          pdf_path: input.pdfPath,
+        }
       )
   };
 }

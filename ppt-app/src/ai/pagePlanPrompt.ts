@@ -75,7 +75,6 @@ export function buildGeneratePagePlanLlmRequest(input: {
         },
       },
     ],
-    maxTokens: 2600,
   };
 }
 

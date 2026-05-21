@@ -200,6 +200,7 @@ export function App() {
             <ExportPage
               t={t}
               status={state.exportStatus}
+              artifact={state.exportArtifact}
               loading={state.loading}
               onBack={actions.goBack}
               onExport={actions.exportFile}

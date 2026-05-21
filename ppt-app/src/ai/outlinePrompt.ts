@@ -185,7 +185,6 @@ export function buildGenerateOutlineLlmRequest(
         },
       },
     ],
-    maxTokens: 1800,
   };
 }
 
@@ -210,7 +209,6 @@ export function buildReviseOutlineLlmRequest(
         },
       },
     ],
-    maxTokens: 1800,
   };
 }
 

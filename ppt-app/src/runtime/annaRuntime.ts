@@ -12,7 +12,6 @@ export interface AnnaLlmCompleteInput {
       text: string;
     };
   }>;
-  maxTokens?: number;
 }
 
 export interface AnnaAgentRunFrame {
