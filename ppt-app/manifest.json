@@ -1,6 +1,5 @@
 {
   "schema": 2,
-  "slug": "ppt-app-debug-0521",
   "permissions": ["tools.invoke"],
   "required_executas": [
     {

@@ -1,5 +1,6 @@
 import type { OutlineDetail } from "../data/mockDeck";
 import type { GeneratedOutline } from "./types";
+import { parseStructuredJson } from "./structuredJson";
 
 export class OutlineValidationError extends Error {
   constructor(public readonly errors: string[]) {
@@ -8,14 +9,8 @@ export class OutlineValidationError extends Error {
   }
 }
 
-function extractJsonText(text: string): string {
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  return fenced ? fenced[1].trim() : trimmed;
-}
-
 export function parseOutlineJson(text: string): unknown {
-  return JSON.parse(extractJsonText(text)) as unknown;
+  return parseStructuredJson<unknown>(text);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

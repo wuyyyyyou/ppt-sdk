@@ -21,8 +21,8 @@ import type { ContextRow } from "../types";
 import type { Locale } from "../../../i18n/messages";
 
 const MAX_RENDER_ATTEMPTS = 10;
-const MAX_SELF_REVIEW_ATTEMPTS = 3;
-const MAX_AGENT_FAILURES = 3;
+const MAX_SELF_REVIEW_ATTEMPTS = 5;
+const MAX_AGENT_FAILURES = 5;
 
 export type CreateDeckFlowPhase =
   | "outline"
@@ -208,8 +208,11 @@ function buildSelfReviewPrompt(input: {
 }) {
   return [
     "Review the generated PPT slide screenshot for visual quality.",
+    "First use `upload_local_file` on the screenshot path, then inspect that uploaded image with `analyze_image` before making a visual judgment.",
+    "If image analysis is unavailable or inconclusive, use the rendered HTML path as fallback context and still return a JSON review.",
     "Return only one JSON object matching this shape:",
     '{"pass":true,"score":8,"issues":[],"revision_request":"","confidence":"medium"}',
+    "Do not include markdown, code fences, explanations, or any extra text.",
     "",
     `Screenshot path: ${input.screenshotPath}`,
     `Page title: ${input.page.title}`,

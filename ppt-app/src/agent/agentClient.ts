@@ -1,6 +1,10 @@
 import type { AnnaAgentSession, AnnaRuntime } from "../runtime/annaRuntime";
+import {
+  buildStructuredJsonRepairPrompt,
+  parseStructuredJson,
+} from "../ai/structuredJson";
 
-const AGENT_RUN_TIMEOUT_MS = 300_000;
+const AGENT_RUN_TIMEOUT_MS = 600_000;
 const MAX_AGENT_SESSION_RETRIES = 1;
 const DEFAULT_AGENT_SESSION_EXPIRES_IN_SECONDS = 600;
 const AGENT_SESSION_RENEW_MARGIN_MS = 60_000;
@@ -76,23 +80,9 @@ export function isAgentInfrastructureError(error: unknown): error is AgentInfras
   return error instanceof AgentInfrastructureError;
 }
 
-function extractJsonObject(text: string): string {
-  const trimmed = text.trim();
-  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
-    return trimmed;
-  }
-
-  const match = trimmed.match(/\{[\s\S]*\}/);
-  if (!match) {
-    throw new Error("Agent response did not contain a JSON object.");
-  }
-
-  return match[0];
-}
-
 function parseJsonObject<T>(text: string, label: string): T {
   try {
-    return JSON.parse(extractJsonObject(text)) as T;
+    return parseStructuredJson<T>(text);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to parse Agent ${label} JSON: ${message}`);
@@ -453,7 +443,17 @@ export async function createAgentClient(runtime: AnnaRuntime): Promise<AgentClie
 
     async runSelfReviewPrompt(prompt, options) {
       const collected = await collectWithSessionRetry(prompt, options);
-      return normalizeSelfReview(parseJsonObject(collected.text, "self-review"));
+      try {
+        return normalizeSelfReview(parseJsonObject(collected.text, "self-review"));
+      } catch (error) {
+        const repairPrompt = buildStructuredJsonRepairPrompt(
+          collected.text,
+          '{"pass":true,"score":8,"issues":[],"revision_request":"","confidence":"medium"}',
+          error instanceof Error ? error.message : String(error)
+        );
+        const repaired = await collectWithSessionRetry(repairPrompt, options);
+        return normalizeSelfReview(parseJsonObject(repaired.text, "self-review"));
+      }
     },
 
     async close() {

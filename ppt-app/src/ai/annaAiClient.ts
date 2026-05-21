@@ -7,6 +7,7 @@ import {
 } from "./outlinePrompt";
 import {
   buildGeneratePagePlanLlmRequest,
+  buildPagePlanRepairPrompt,
   parsePagePlanJson,
 } from "./pagePlanPrompt";
 import {
@@ -14,6 +15,10 @@ import {
   parseOutlineJson,
   validateGeneratedOutline,
 } from "./outlineParser";
+import {
+  buildStructuredJsonRepairPrompt,
+  parseStructuredJson,
+} from "./structuredJson";
 import type {
   AiAttemptLog,
   AiClient,
@@ -81,9 +86,10 @@ function extractContentText(
 
 function parseJsonResult<T>(text: string, label: string): T {
   try {
-    return JSON.parse(text) as T;
-  } catch {
-    throw new Error(`Anna LLM returned invalid JSON for ${label}.`);
+    return parseStructuredJson<T>(text);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Anna LLM returned invalid JSON for ${label}: ${message}`);
   }
 }
 
@@ -104,9 +110,10 @@ async function completeJson<T>(
   runtime: AnnaRuntime,
   label: string,
   prompt: string,
+  expectedShape: string,
   maxTokens = 1400
 ): Promise<T> {
-  const result = await completeLlm(runtime, {
+  let request: AnnaLlmCompleteInput = {
     messages: [
       {
         role: "user",
@@ -117,9 +124,44 @@ async function completeJson<T>(
       }
     ],
     maxTokens
-  });
+  };
 
-  return parseJsonResult<T>(extractCompletionText(result), label);
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const result = await completeLlm(runtime, request);
+    const rawText = extractCompletionText(result);
+
+    try {
+      return parseJsonResult<T>(rawText, label);
+    } catch (error) {
+      if (attempt >= 2) {
+        throw error;
+      }
+
+      const message = error instanceof Error ? error.message : String(error);
+      request = {
+        ...request,
+        messages: [
+          ...request.messages,
+          {
+            role: "assistant",
+            content: {
+              type: "text",
+              text: rawText
+            }
+          },
+          {
+            role: "user",
+            content: {
+              type: "text",
+              text: buildStructuredJsonRepairPrompt(rawText, expectedShape, message)
+            }
+          }
+        ]
+      };
+    }
+  }
+
+  throw new Error(`Anna LLM returned invalid JSON for ${label}.`);
 }
 
 async function completeOutlineWithRetry(
@@ -214,11 +256,43 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
     },
 
     async generatePagePlan(input) {
-      const rawResult = await completeLlm(
-        runtime,
-        buildGeneratePagePlanLlmRequest(input)
-      );
-      return parsePagePlanJson(extractCompletionText(rawResult));
+      let request = buildGeneratePagePlanLlmRequest(input);
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        const rawResult = await completeLlm(runtime, request);
+        const rawText = extractCompletionText(rawResult);
+
+        try {
+          return parsePagePlanJson(rawText);
+        } catch (error) {
+          if (attempt >= 2) {
+            throw error;
+          }
+
+          const message = error instanceof Error ? error.message : String(error);
+          request = {
+            ...request,
+            messages: [
+              ...request.messages,
+              {
+                role: "assistant",
+                content: {
+                  type: "text",
+                  text: rawText
+                }
+              },
+              {
+                role: "user",
+                content: {
+                  type: "text",
+                  text: buildPagePlanRepairPrompt([message])
+                }
+              }
+            ]
+          };
+        }
+      }
+
+      throw new Error("Anna LLM returned invalid page plan JSON.");
     },
 
     async generateDeck(input) {
@@ -234,6 +308,7 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
           `Context: ${JSON.stringify(input.contextRows)}`,
           `Setting: ${JSON.stringify(input.setting ?? {})}`
         ].join("\n"),
+        '{"title":"...","outline":[{"title":"...","outline":"..."}],"slides":[{"title":"...","subtitle":"..."}]}',
         2200
       );
     },
@@ -256,7 +331,8 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
           "Return only a JSON array. Each item must have title and subtitle.",
           `Locale: ${input.locale}`,
           `Outline: ${JSON.stringify(input.outline)}`
-        ].join("\n")
+        ].join("\n"),
+        '[{"title":"...","subtitle":"..."}]'
       );
     },
 
@@ -269,7 +345,8 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
           "Each slide must have title and subtitle.",
           `Locale: ${input.locale}`,
           `Slides: ${JSON.stringify(input.slides)}`
-        ].join("\n")
+        ].join("\n"),
+        '[{"title":"...","subtitle":"..."}]'
       );
     },
 
@@ -282,7 +359,8 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
           `Locale: ${input.locale}`,
           `Slide number: ${input.slideIndex + 1}`,
           `Slide: ${JSON.stringify(input.slide)}`
-        ].join("\n")
+        ].join("\n"),
+        '{"title":"...","subtitle":"..."}'
       );
     }
   };

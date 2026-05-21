@@ -1,6 +1,7 @@
 import type { PagePlan, TemplatePlanningContext, WorkspaceOutline } from "../api/types";
 import type { AnnaLlmCompleteInput } from "../runtime/annaRuntime";
 import type { Locale } from "../i18n/messages";
+import { parseStructuredJson } from "./structuredJson";
 
 function readOutputLanguage(outline: WorkspaceOutline, locale: Locale) {
   const setting = outline.source?.setting ?? {};
@@ -79,16 +80,20 @@ export function buildGeneratePagePlanLlmRequest(input: {
 }
 
 export function parsePagePlanJson(text: string): PagePlan {
-  const trimmed = text.trim();
-  const jsonText = trimmed.startsWith("{") ? trimmed : trimmed.match(/\{[\s\S]*\}/)?.[0];
-  if (!jsonText) {
-    throw new Error("Anna LLM returned no page plan JSON.");
-  }
-
-  const parsed = JSON.parse(jsonText) as PagePlan;
+  const parsed = parseStructuredJson<PagePlan>(text);
   if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.pages)) {
     throw new Error("Anna LLM returned invalid page plan JSON.");
   }
 
   return parsed;
+}
+
+export function buildPagePlanRepairPrompt(errors: string[]): string {
+  return [
+    "The previous response was invalid.",
+    "Return exactly one JSON object only.",
+    "Do not include markdown, code fences, comments, explanations, or extra text.",
+    "Fix these validation issues:",
+    ...errors.map((error) => `- ${error}`),
+  ].join("\n");
 }
