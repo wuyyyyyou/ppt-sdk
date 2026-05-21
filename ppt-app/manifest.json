@@ -42,6 +42,13 @@
       "chat": [],
       "artifact": [],
       "llm": ["complete"],
+      "agent": {
+        "session": {
+          "auto": true,
+          "fixed": null
+        },
+        "tools": []
+      },
       "fs": [],
       "storage": [],
       "prefs": [],

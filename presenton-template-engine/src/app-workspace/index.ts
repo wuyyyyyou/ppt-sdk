@@ -1,6 +1,6 @@
 import os from "node:os";
 import path from "node:path";
-import { appendFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { appendFile, copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import {
   getDiscoveredTemplateGroup,
   listDiscoveredTemplateGroupSummaries,
@@ -12,7 +12,10 @@ import {
   readTemplatePreviewDataUrl,
   type TemplatePreviewImage,
 } from "../template-previews/index.js";
-import { buildDeckHtmlPagesFromManifest } from "../render/build-deck-from-manifest.js";
+import {
+  buildDeckHtmlPagesFromManifest,
+  buildDeckPageScreenshotFromManifest,
+} from "../render/build-deck-from-manifest.js";
 import type {
   AppendAppWorkspaceLogInput,
   AppendAppWorkspaceLogResult,
@@ -23,15 +26,30 @@ import type {
   AppWorkspaceSummary,
   AppWorkspaceOutline,
   AppWorkspaceOutlineItem,
+  AppPagePlan,
+  AppPagePlanItem,
+  AppPageProgress,
+  AppPageProgressItem,
   AppWorkspacePages,
   AppWorkspaceTemplateSelection,
+  AppTemplatePlanningBlueprint,
+  AppTemplatePlanningContext,
   CreateAppWorkspaceInput,
+  GetAppPagePlanInput,
+  GetAppPageProgressInput,
   GetAppTemplateGroupInput,
+  GetAppTemplatePlanningContextInput,
   GetAppTemplatePreviewInput,
   GetAppWorkspaceOutlineInput,
   ListAppTemplateGroupsResult,
   ListAppWorkspacesResult,
   OpenAppWorkspaceInput,
+  PrepareAppPageFilesInput,
+  PrepareAppPageFilesResult,
+  RecordAppPagePlanInput,
+  RecordAppPageProgressInput,
+  RenderAppWorkspacePagePreviewInput,
+  RenderAppWorkspacePagePreviewResult,
   RenderAppWorkspaceDeckHtmlInput,
   RenderAppWorkspaceDeckHtmlResult,
   SelectAppWorkspaceTemplateInput,
@@ -47,11 +65,16 @@ const WORKSPACE_FILE_NAMES = [
   "task.json",
   "setting.json",
   "outline.json",
+  "page-plan.json",
+  "page-progress.json",
   "pages.json",
   "template.json",
 ] as const;
 const WORKSPACE_LOG_FILE_NAMES = {
   "ai-outline": "ai-outline.jsonl",
+  "ai-page-plan": "ai-page-plan.jsonl",
+  "ai-page-agent": "ai-page-agent.jsonl",
+  "ai-page-agent-stream": "ai-page-agent-stream.jsonl",
 } as const;
 
 function padDatePart(value: number): string {
@@ -99,6 +122,8 @@ function buildWorkspaceFilePaths(workspaceDir: string) {
     task: path.join(workspaceDir, "task.json"),
     setting: path.join(workspaceDir, "setting.json"),
     outline: path.join(workspaceDir, "outline.json"),
+    page_plan: path.join(workspaceDir, "page-plan.json"),
+    page_progress: path.join(workspaceDir, "page-progress.json"),
     pages: path.join(workspaceDir, "pages.json"),
     template: path.join(workspaceDir, "template.json"),
   };
@@ -146,6 +171,8 @@ function createDefaultTaskJson(workspaceDir: string, title?: string) {
       task: "task.json",
       setting: "setting.json",
       outline: "outline.json",
+      page_plan: "page-plan.json",
+      page_progress: "page-progress.json",
       pages: "pages.json",
     },
   };
@@ -243,9 +270,178 @@ function normalizeOutlineJson(outline: unknown): AppWorkspaceOutline {
   };
 }
 
+function getPlainRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function normalizeRelativeManifestPath(value: unknown, fieldName: string): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`"${fieldName}" must be a non-empty relative path`);
+  }
+
+  const normalized = value.trim().replace(/\\/g, "/");
+  if (path.isAbsolute(normalized) || normalized.includes("..")) {
+    throw new Error(`"${fieldName}" must stay inside the template directory`);
+  }
+
+  return normalized.startsWith("./") ? normalized : `./${normalized}`;
+}
+
+function normalizePagePlanItem(value: unknown, index: number): AppPagePlanItem {
+  const record = getPlainRecord(value);
+  const pageId = normalizeString(record.page_id) || `page-${String(index + 1).padStart(2, "0")}`;
+  const manifestSlideId = normalizeString(record.manifest_slide_id) || pageId;
+  const slidePath = normalizeRelativeManifestPath(
+    record.slide_path || `./slides/${pageId}.tsx`,
+    `pages[${index}].slide_path`,
+  );
+  const dataPath = normalizeRelativeManifestPath(
+    record.data_path || `./data/${pageId}.json`,
+    `pages[${index}].data_path`,
+  );
+  const blueprintSource = normalizeRelativeManifestPath(
+    record.blueprint_source,
+    `pages[${index}].blueprint_source`,
+  );
+
+  if (!slidePath.startsWith("./slides/") || !slidePath.endsWith(".tsx")) {
+    throw new Error(`pages[${index}].slide_path must point to ./slides/*.tsx`);
+  }
+
+  if (!dataPath.startsWith("./data/") || !dataPath.endsWith(".json")) {
+    throw new Error(`pages[${index}].data_path must point to ./data/*.json`);
+  }
+
+  if (!blueprintSource.startsWith("./blueprints/") || !blueprintSource.endsWith(".tsx")) {
+    throw new Error(`pages[${index}].blueprint_source must point to ./blueprints/*.tsx`);
+  }
+
+  return {
+    page_id: pageId,
+    index,
+    title: normalizeString(record.title) || pageId,
+    outline: normalizeString(record.outline),
+    blueprint_id: normalizeString(record.blueprint_id),
+    blueprint_source: blueprintSource,
+    slide_path: slidePath,
+    data_path: dataPath,
+    manifest_slide_id: manifestSlideId,
+    reason: normalizeString(record.reason),
+  };
+}
+
+function normalizePagePlanJson(value: unknown): AppPagePlan {
+  const record = getPlainRecord(value);
+  const source = getPlainRecord(record.source);
+  const pages = Array.isArray(record.pages)
+    ? record.pages.map(normalizePagePlanItem)
+    : [];
+  const seenIds = new Set<string>();
+
+  pages.forEach((page) => {
+    if (seenIds.has(page.manifest_slide_id)) {
+      throw new Error(`Duplicate manifest_slide_id "${page.manifest_slide_id}"`);
+    }
+    seenIds.add(page.manifest_slide_id);
+  });
+
+  return {
+    version: 1,
+    status:
+      record.status === "prepared" || record.status === "stale"
+        ? record.status
+        : "planned",
+    title: normalizeString(record.title),
+    source: {
+      outline_updated_at:
+        typeof source.outline_updated_at === "string" ? source.outline_updated_at : null,
+      template_group: normalizeString(source.template_group),
+      template_manifest_path: normalizeString(source.template_manifest_path),
+      generated_by: normalizeString(source.generated_by),
+    },
+    pages,
+    updated_at:
+      typeof record.updated_at === "string" ? record.updated_at : new Date().toISOString(),
+  };
+}
+
+function normalizePageProgressItem(value: unknown): AppPageProgressItem | null {
+  const record = getPlainRecord(value);
+  const pageId = normalizeString(record.page_id);
+  if (!pageId) return null;
+
+  return {
+    page_id: pageId,
+    index: typeof record.index === "number" ? record.index : 0,
+    title: normalizeString(record.title) || pageId,
+    status: normalizeString(record.status) || "pending",
+    render_attempts: typeof record.render_attempts === "number" ? record.render_attempts : 0,
+    self_review_attempts:
+      typeof record.self_review_attempts === "number" ? record.self_review_attempts : 0,
+    agent_failures: typeof record.agent_failures === "number" ? record.agent_failures : 0,
+    slide_path: normalizeString(record.slide_path),
+    data_path: normalizeString(record.data_path),
+    last_html_path: normalizeString(record.last_html_path),
+    last_screenshot_path: normalizeString(record.last_screenshot_path),
+    last_error: normalizeString(record.last_error),
+    review: record.review ?? null,
+    updated_at: typeof record.updated_at === "string" ? record.updated_at : null,
+  };
+}
+
+function normalizePageProgressJson(value: unknown): AppPageProgress {
+  const record = getPlainRecord(value);
+  const pages = Array.isArray(record.pages)
+    ? record.pages
+        .map(normalizePageProgressItem)
+        .filter((item): item is AppPageProgressItem => item !== null)
+        .sort((left, right) => left.index - right.index)
+    : [];
+
+  return {
+    version: 1,
+    status: normalizeString(record.status) || "idle",
+    pages,
+    updated_at: typeof record.updated_at === "string" ? record.updated_at : null,
+  };
+}
+
 function createDefaultPagesJson() {
   return {
     version: 1,
+    pages: [],
+    updated_at: null,
+  };
+}
+
+function createDefaultPagePlanJson(): AppPagePlan {
+  return {
+    version: 1,
+    status: "planned",
+    title: "",
+    source: {
+      outline_updated_at: null,
+      template_group: "",
+      template_manifest_path: "",
+      generated_by: "",
+    },
+    pages: [],
+    updated_at: new Date(0).toISOString(),
+  };
+}
+
+function createDefaultPageProgressJson(): AppPageProgress {
+  return {
+    version: 1,
+    status: "idle",
     pages: [],
     updated_at: null,
   };
@@ -291,6 +487,48 @@ function readSelectedTemplateManifestPath(workspace: AppWorkspaceResult): string
   return normalizedManifestPath;
 }
 
+function readSelectedTemplateDir(workspace: AppWorkspaceResult): string {
+  const template =
+    workspace.template && typeof workspace.template === "object" && !Array.isArray(workspace.template)
+      ? (workspace.template as Record<string, unknown>)
+      : {};
+  const templateDir = typeof template.template_dir === "string" ? template.template_dir.trim() : "";
+
+  if (!templateDir) {
+    throw new Error(
+      "No workspace template is selected. Select a template before using template planning.",
+    );
+  }
+
+  assertAbsolutePath(templateDir, "template.template_dir");
+  const normalizedTemplateDir = path.normalize(templateDir);
+  const relativePath = path.relative(workspace.workspace_dir, normalizedTemplateDir);
+  if (
+    relativePath.length === 0 ||
+    relativePath.startsWith("..") ||
+    path.isAbsolute(relativePath)
+  ) {
+    throw new Error('"template.template_dir" must be inside the workspace directory');
+  }
+
+  return normalizedTemplateDir;
+}
+
+function readSelectedTemplateCatalogPath(workspace: AppWorkspaceResult): string {
+  const template =
+    workspace.template && typeof workspace.template === "object" && !Array.isArray(workspace.template)
+      ? (workspace.template as Record<string, unknown>)
+      : {};
+  const catalogPath = typeof template.catalog_json_path === "string" ? template.catalog_json_path.trim() : "";
+
+  if (catalogPath) {
+    assertAbsolutePath(catalogPath, "template.catalog_json_path");
+    return path.normalize(catalogPath);
+  }
+
+  return path.join(readSelectedTemplateDir(workspace), "catalog.json");
+}
+
 async function ensureWorkspaceFiles(
   workspaceDir: string,
   options: CreateAppWorkspaceInput = {},
@@ -312,6 +550,8 @@ async function ensureWorkspaceFiles(
     task: createDefaultTaskJson(normalizedWorkspaceDir, options.title),
     setting: createDefaultSettingJson(),
     outline: createDefaultOutlineJson(),
+    page_plan: createDefaultPagePlanJson(),
+    page_progress: createDefaultPageProgressJson(),
     pages: createDefaultPagesJson(),
     template: createDefaultTemplateJson(),
   };
@@ -354,6 +594,8 @@ async function ensureWorkspaceFiles(
     task: await readJsonFileIfExists(files.task),
     setting: normalizedSetting,
     outline: normalizedOutline,
+    page_plan: await readJsonFileIfExists(files.page_plan),
+    page_progress: await readJsonFileIfExists(files.page_progress),
     pages: await readJsonFileIfExists(files.pages),
     template: await readJsonFileIfExists(files.template),
   };
@@ -565,6 +807,24 @@ function mapPreviewRef(image: TemplatePreviewImage | null): AppTemplatePreviewRe
     : null;
 }
 
+function normalizePlanningBlueprint(value: unknown): AppTemplatePlanningBlueprint | null {
+  const record = getPlainRecord(value);
+  const id = normalizeString(record.id);
+  const blueprintSource = normalizeString(record.blueprint_source);
+  if (!id || !blueprintSource) return null;
+
+  return {
+    id,
+    name: normalizeString(record.name) || id,
+    blueprint_source: blueprintSource,
+    example_slide: normalizeString(record.example_slide) || undefined,
+    layout_family: normalizeString(record.layout_family) || undefined,
+    content_intents: normalizeStringArray(record.content_intents),
+    suitable_for: normalizeStringArray(record.suitable_for),
+    avoid_for: normalizeStringArray(record.avoid_for),
+  };
+}
+
 async function mapTemplateGroupSummary(
   group: DiscoveredTemplateGroupSummaryInfo,
 ): Promise<AppTemplateGroupSummary> {
@@ -628,6 +888,41 @@ export async function getAppTemplatePreview(
   input: GetAppTemplatePreviewInput,
 ): Promise<AppTemplatePreviewResult> {
   return readTemplatePreviewDataUrl(input.group_id, input.layout_id);
+}
+
+export async function getAppTemplatePlanningContext(
+  input: GetAppTemplatePlanningContextInput,
+): Promise<AppTemplatePlanningContext> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const templateDir = readSelectedTemplateDir(workspace);
+  const manifestPath = readSelectedTemplateManifestPath(workspace);
+  const catalogPath = readSelectedTemplateCatalogPath(workspace);
+  const catalog = getPlainRecord(JSON.parse(await readFile(catalogPath, "utf8")) as unknown);
+  const template =
+    workspace.template && typeof workspace.template === "object" && !Array.isArray(workspace.template)
+      ? (workspace.template as Record<string, unknown>)
+      : {};
+  const blueprints = Array.isArray(catalog.blueprints)
+    ? catalog.blueprints
+        .map(normalizePlanningBlueprint)
+        .filter((item): item is AppTemplatePlanningBlueprint => item !== null)
+    : [];
+
+  return {
+    template_group: normalizeString(catalog.group_id) || normalizeString(template.selected_template_group),
+    template_group_name:
+      normalizeString(template.selected_template_group_name) || normalizeString(catalog.group_id),
+    template_dir: templateDir,
+    manifest_path: manifestPath,
+    catalog_path: catalogPath,
+    blueprints,
+    rules: [
+      "Choose blueprint_id only from this context.",
+      "manifest.json must reference ./slides/*.tsx entries.",
+      "blueprints/ and reference-slides/ are read-only.",
+      "data/*.json stores content; slides/*.tsx owns layout and component composition.",
+    ],
+  };
 }
 
 export async function selectAppWorkspaceTemplate(
@@ -751,9 +1046,276 @@ export async function renderAppWorkspaceDeckHtml(
   };
 }
 
+function buildBlueprintLookup(context: AppTemplatePlanningContext): Map<string, AppTemplatePlanningBlueprint> {
+  return new Map(context.blueprints.map((blueprint) => [blueprint.id, blueprint]));
+}
+
+function resolveTemplateRelativePath(templateDir: string, relativePath: string): string {
+  const cleanPath = relativePath.replace(/^\.\//, "");
+  const absolutePath = path.normalize(path.join(templateDir, cleanPath));
+  const relativeToTemplate = path.relative(templateDir, absolutePath);
+  if (
+    relativeToTemplate.length === 0 ||
+    relativeToTemplate.startsWith("..") ||
+    path.isAbsolute(relativeToTemplate)
+  ) {
+    throw new Error(`Template-relative path escapes template directory: ${relativePath}`);
+  }
+  return absolutePath;
+}
+
+async function validatePagePlanAgainstTemplate(
+  workspace: AppWorkspaceResult,
+  pagePlan: AppPagePlan,
+): Promise<AppTemplatePlanningContext> {
+  const context = await getAppTemplatePlanningContext({ workspace_dir: workspace.workspace_dir });
+  const blueprintById = buildBlueprintLookup(context);
+  const outline = normalizeOutlineJson(workspace.outline);
+
+  if (outline.items.length > 0 && pagePlan.pages.length !== outline.items.length) {
+    throw new Error(
+      `page_plan.pages length (${pagePlan.pages.length}) must equal outline.items length (${outline.items.length})`,
+    );
+  }
+
+  pagePlan.pages.forEach((page, index) => {
+    if (page.index !== index) {
+      throw new Error(`page_plan.pages[${index}].index must equal ${index}`);
+    }
+
+    const blueprint = blueprintById.get(page.blueprint_id);
+    if (!blueprint) {
+      throw new Error(`Unknown blueprint_id "${page.blueprint_id}"`);
+    }
+
+    if (page.blueprint_source !== blueprint.blueprint_source) {
+      throw new Error(
+        `page_plan.pages[${index}].blueprint_source must match catalog source "${blueprint.blueprint_source}"`,
+      );
+    }
+  });
+
+  return context;
+}
+
+export async function recordAppPagePlan(input: RecordAppPagePlanInput): Promise<AppPagePlan> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const pagePlan = normalizePagePlanJson(input.page_plan);
+  const context = await validatePagePlanAgainstTemplate(workspace, pagePlan);
+  const updatedAt = new Date().toISOString();
+  const normalizedPlan: AppPagePlan = {
+    ...pagePlan,
+    status: "planned",
+    source: {
+      ...pagePlan.source,
+      template_group: pagePlan.source.template_group || context.template_group,
+      template_manifest_path: pagePlan.source.template_manifest_path || context.manifest_path,
+    },
+    updated_at: updatedAt,
+  };
+
+  await writeJsonFile(workspace.files.page_plan, normalizedPlan);
+  await touchWorkspaceTask(workspace, updatedAt);
+  return normalizedPlan;
+}
+
+export async function getAppPagePlan(input: GetAppPagePlanInput): Promise<AppPagePlan> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  return normalizePagePlanJson(workspace.page_plan);
+}
+
+function buildInitialPageData(page: AppPagePlanItem) {
+  return {
+    pageId: page.page_id,
+    title: page.title,
+    outline: page.outline,
+    speakerNote: page.outline,
+    _plan: {
+      blueprint_id: page.blueprint_id,
+      reason: page.reason,
+      status: "agent_pending",
+    },
+  };
+}
+
+function buildInitialPageProgress(pagePlan: AppPagePlan): AppPageProgress {
+  const now = new Date().toISOString();
+  return {
+    version: 1,
+    status: "prepared",
+    pages: pagePlan.pages.map((page) => ({
+      page_id: page.page_id,
+      index: page.index,
+      title: page.title,
+      status: "pending",
+      render_attempts: 0,
+      self_review_attempts: 0,
+      agent_failures: 0,
+      slide_path: page.slide_path,
+      data_path: page.data_path,
+      last_html_path: "",
+      last_screenshot_path: "",
+      last_error: "",
+      review: null,
+      updated_at: now,
+    })),
+    updated_at: now,
+  };
+}
+
+export async function prepareAppPageFiles(
+  input: PrepareAppPageFilesInput,
+): Promise<PrepareAppPageFilesResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const pagePlan = normalizePagePlanJson(workspace.page_plan);
+  const context = await validatePagePlanAgainstTemplate(workspace, pagePlan);
+  const templateDir = context.template_dir;
+  const preparedAt = new Date().toISOString();
+
+  if (pagePlan.pages.length === 0) {
+    throw new Error("page-plan.json has no pages to prepare");
+  }
+
+  for (const page of pagePlan.pages) {
+    const sourcePath = resolveTemplateRelativePath(templateDir, page.blueprint_source);
+    const slidePath = resolveTemplateRelativePath(templateDir, page.slide_path);
+    const dataPath = resolveTemplateRelativePath(templateDir, page.data_path);
+
+    await mkdir(path.dirname(slidePath), { recursive: true });
+    await mkdir(path.dirname(dataPath), { recursive: true });
+    await copyFile(sourcePath, slidePath);
+    await writeJsonFile(dataPath, buildInitialPageData(page));
+  }
+
+  const currentManifest = getPlainRecord(JSON.parse(await readFile(context.manifest_path, "utf8")) as unknown);
+  const nextManifest = {
+    ...currentManifest,
+    title: pagePlan.title || normalizeString(currentManifest.title) || "Generated Deck",
+    slides: pagePlan.pages.map((page) => ({
+      id: page.manifest_slide_id,
+      title: page.title,
+      speaker_note: page.outline,
+      source: {
+        type: "local",
+        path: page.slide_path,
+      },
+      data_path: page.data_path,
+    })),
+  };
+  const preparedPlan: AppPagePlan = {
+    ...pagePlan,
+    status: "prepared",
+    updated_at: preparedAt,
+  };
+
+  await writeJsonFile(context.manifest_path, nextManifest);
+  await writeJsonFile(workspace.files.page_plan, preparedPlan);
+  await writeJsonFile(workspace.files.page_progress, buildInitialPageProgress(preparedPlan));
+  await touchWorkspaceTask(workspace, preparedAt);
+
+  return {
+    workspace_dir: workspace.workspace_dir,
+    manifest_path: context.manifest_path,
+    page_plan_path: workspace.files.page_plan,
+    prepared_at: preparedAt,
+    pages: preparedPlan.pages.map((page) => ({
+      page_id: page.page_id,
+      index: page.index,
+      title: page.title,
+      slide_path: page.slide_path,
+      data_path: page.data_path,
+      blueprint_id: page.blueprint_id,
+      manifest_slide_id: page.manifest_slide_id,
+    })),
+  };
+}
+
+export async function getAppPageProgress(
+  input: GetAppPageProgressInput,
+): Promise<AppPageProgress> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  return normalizePageProgressJson(workspace.page_progress);
+}
+
+export async function recordAppPageProgress(
+  input: RecordAppPageProgressInput,
+): Promise<AppPageProgress> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const current = normalizePageProgressJson(workspace.page_progress);
+  const updatedAt = new Date().toISOString();
+  let found = false;
+  const nextPages = current.pages.map((page) => {
+    if (page.page_id !== input.page_id) return page;
+    found = true;
+    return normalizePageProgressItem({
+      ...page,
+      ...input.patch,
+      page_id: page.page_id,
+      index: page.index,
+      updated_at: updatedAt,
+    }) as AppPageProgressItem;
+  });
+
+  if (!found) {
+    throw new Error(`Unknown page_id "${input.page_id}" in page-progress.json`);
+  }
+
+  const nextProgress: AppPageProgress = {
+    version: 1,
+    status: normalizeString(input.patch.deck_status) || current.status || "running",
+    pages: nextPages,
+    updated_at: updatedAt,
+  };
+
+  await writeJsonFile(workspace.files.page_progress, nextProgress);
+  await touchWorkspaceTask(workspace, updatedAt);
+  return nextProgress;
+}
+
+export async function renderAppWorkspacePagePreview(
+  input: RenderAppWorkspacePagePreviewInput,
+): Promise<RenderAppWorkspacePagePreviewResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const manifestPath = readSelectedTemplateManifestPath(workspace);
+  if (!Number.isInteger(input.page_index) || input.page_index < 0) {
+    throw new Error('"page_index" must be a non-negative integer');
+  }
+
+  const pageNumber = input.page_index + 1;
+  const renderedAt = new Date().toISOString();
+  const htmlOutputDir = path.join(workspace.workspace_dir, "output", "page-preview-html");
+  const screenshotOutputDir = path.join(workspace.workspace_dir, "output", "screenshots");
+  const result = await buildDeckPageScreenshotFromManifest({
+    manifestPath,
+    outputDir: screenshotOutputDir,
+    htmlOutputDir,
+    name: `${workspace.workspace_id}-page-preview`,
+    page: pageNumber,
+  });
+
+  return {
+    workspace_dir: workspace.workspace_dir,
+    manifest_path: result.manifestPath,
+    html_path: result.htmlPath,
+    screenshot_path: result.screenshotPath,
+    page_index: input.page_index,
+    page_number: pageNumber,
+    slide_id: result.slideId,
+    layout_id: result.layoutId,
+    title: result.title,
+    rendered_at: renderedAt,
+  };
+}
+
 export type {
   AppendAppWorkspaceLogInput,
   AppendAppWorkspaceLogResult,
+  AppPagePlan,
+  AppPagePlanItem,
+  AppPageProgress,
+  AppPageProgressItem,
+  AppTemplatePlanningBlueprint,
+  AppTemplatePlanningContext,
   AppTemplateGroupSummary,
   AppTemplatePreviewRef,
   AppTemplatePreviewResult,
@@ -764,14 +1326,23 @@ export type {
   AppWorkspaceSummary,
   AppWorkspaceTemplateSelection,
   CreateAppWorkspaceInput,
+  GetAppPagePlanInput,
+  GetAppPageProgressInput,
   GetAppTemplateGroupInput,
+  GetAppTemplatePlanningContextInput,
   GetAppTemplatePreviewInput,
   GetAppWorkspaceOutlineInput,
   ListAppTemplateGroupsResult,
   ListAppWorkspacesResult,
   OpenAppWorkspaceInput,
+  PrepareAppPageFilesInput,
+  PrepareAppPageFilesResult,
+  RecordAppPagePlanInput,
+  RecordAppPageProgressInput,
   RenderAppWorkspaceDeckHtmlInput,
   RenderAppWorkspaceDeckHtmlResult,
+  RenderAppWorkspacePagePreviewInput,
+  RenderAppWorkspacePagePreviewResult,
   SelectAppWorkspaceTemplateInput,
   SelectAppWorkspaceTemplateResult,
   UpdateAppWorkspaceOutlineInput,

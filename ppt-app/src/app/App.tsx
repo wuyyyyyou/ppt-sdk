@@ -88,6 +88,8 @@ export function App() {
               selectedLookId={state.selectedLookId}
               selectLook={actions.selectLook}
               generateDeck={actions.generateDeck}
+              cancelGenerateDeck={actions.cancelGenerateDeck}
+              createDeckProgress={state.createDeckProgress}
               showToast={actions.showToast}
             />
           ) : null}

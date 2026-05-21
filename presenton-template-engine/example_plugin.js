@@ -14,7 +14,10 @@ import {
   createAppWorkspace,
   forkTemplateGroup,
   getAppTemplateGroup,
+  getAppTemplatePlanningContext,
   getAppTemplatePreview,
+  getAppPagePlan,
+  getAppPageProgress,
   getAllDiscoveredTemplateGroups,
   getAppWorkspaceOutline,
   getDiscoveredTemplateGroup,
@@ -22,7 +25,11 @@ import {
   listAppTemplateGroups,
   listDiscoveredTemplateGroupSummaries,
   openAppWorkspace,
+  prepareAppPageFiles,
+  recordAppPagePlan,
+  recordAppPageProgress,
   renderAppWorkspaceDeckHtml,
+  renderAppWorkspacePagePreview,
   runDeckValidation,
   selectAppWorkspaceTemplate,
   describeTaskStateMachine,
@@ -45,6 +52,13 @@ const TOOL_NAMES = [
   "app_get_template_group",
   "app_get_template_preview",
   "app_select_workspace_template",
+  "app_get_template_planning_context",
+  "app_record_page_plan",
+  "app_get_page_plan",
+  "app_prepare_page_files",
+  "app_get_page_progress",
+  "app_record_page_progress",
+  "app_render_workspace_page_preview",
   "app_render_deck_html",
   "listDiscoveredTemplateGroupSummaries",
   "getAllDiscoveredTemplateGroups",
@@ -153,7 +167,8 @@ const MANIFEST = {
         {
           name: "channel",
           type: "string",
-          description: "Workspace log channel. Currently supports ai-outline.",
+          description:
+            "Workspace log channel. Supports ai-outline, ai-page-plan, ai-page-agent, and ai-page-agent-stream.",
           required: true,
         },
         {
@@ -268,6 +283,121 @@ const MANIFEST = {
           name: "template_group",
           type: "string",
           description: "Builtin template group id to fork into the workspace template directory.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_get_template_planning_context",
+      description:
+        "Return the selected workspace template catalog subset used by LLM page planning.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_record_page_plan",
+      description:
+        "Validate and write page-plan.json for a workspace.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+        {
+          name: "page_plan",
+          type: "object",
+          description: "LLM-generated page plan.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_get_page_plan",
+      description:
+        "Read page-plan.json for a workspace.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_prepare_page_files",
+      description:
+        "Prepare template/slides, template/data, manifest.json, and page-progress.json from page-plan.json.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_get_page_progress",
+      description:
+        "Read page-progress.json for a workspace.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_record_page_progress",
+      description:
+        "Patch one page entry in page-progress.json.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+        {
+          name: "page_id",
+          type: "string",
+          description: "Page id from page-plan.json.",
+          required: true,
+        },
+        {
+          name: "patch",
+          type: "object",
+          description: "Partial progress fields to merge into the page entry.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_render_workspace_page_preview",
+      description:
+        "Render one workspace manifest page to lightweight HTML and PNG preview for Agent review.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+        {
+          name: "page_index",
+          type: "integer",
+          description: "Zero-based page index to render.",
           required: true,
         },
       ],
@@ -975,8 +1105,8 @@ async function toolAppAppendWorkspaceLog(args) {
 
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
   const channel = args.channel;
-  if (channel !== "ai-outline") {
-    throw new Error('"channel" must be "ai-outline"');
+  if (!["ai-outline", "ai-page-plan", "ai-page-agent", "ai-page-agent-stream"].includes(channel)) {
+    throw new Error('"channel" must be one of: ai-outline, ai-page-plan, ai-page-agent, ai-page-agent-stream');
   }
 
   const entry = args.entry;
@@ -1093,6 +1223,102 @@ async function toolAppSelectWorkspaceTemplate(args) {
     workspace_dir: workspaceDir,
     template_group: args.template_group,
   });
+}
+
+async function toolAppGetTemplatePlanningContext(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return getAppTemplatePlanningContext({ workspace_dir: workspaceDir });
+}
+
+async function toolAppRecordPagePlan(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const pagePlan = args.page_plan;
+  if (!pagePlan || typeof pagePlan !== "object" || Array.isArray(pagePlan)) {
+    throw new Error('"page_plan" must be an object');
+  }
+
+  return recordAppPagePlan({
+    workspace_dir: workspaceDir,
+    page_plan: pagePlan,
+  });
+}
+
+async function toolAppGetPagePlan(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return getAppPagePlan({ workspace_dir: workspaceDir });
+}
+
+async function toolAppPreparePageFiles(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return prepareAppPageFiles({ workspace_dir: workspaceDir });
+}
+
+async function toolAppGetPageProgress(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return getAppPageProgress({ workspace_dir: workspaceDir });
+}
+
+async function toolAppRecordPageProgress(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  if (typeof args.page_id !== "string" || args.page_id.trim().length === 0) {
+    throw new Error('"page_id" must be a non-empty string');
+  }
+  const patch = args.patch;
+  if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
+    throw new Error('"patch" must be an object');
+  }
+
+  return recordAppPageProgress({
+    workspace_dir: workspaceDir,
+    page_id: args.page_id,
+    patch,
+  });
+}
+
+async function toolAppRenderWorkspacePagePreview(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const pageIndex = Number(args.page_index);
+  if (!Number.isInteger(pageIndex) || pageIndex < 0) {
+    throw new Error('"page_index" must be a non-negative integer');
+  }
+
+  const result = await renderAppWorkspacePagePreview({
+    workspace_dir: workspaceDir,
+    page_index: pageIndex,
+  });
+
+  return {
+    ...result,
+    preview_url: await registerPreviewHtml(result.html_path),
+  };
 }
 
 async function toolAppRenderDeckHtml(args) {
@@ -1338,6 +1564,13 @@ const TOOL_DISPATCH = {
   app_get_template_group: toolAppGetTemplateGroup,
   app_get_template_preview: toolAppGetTemplatePreview,
   app_select_workspace_template: toolAppSelectWorkspaceTemplate,
+  app_get_template_planning_context: toolAppGetTemplatePlanningContext,
+  app_record_page_plan: toolAppRecordPagePlan,
+  app_get_page_plan: toolAppGetPagePlan,
+  app_prepare_page_files: toolAppPreparePageFiles,
+  app_get_page_progress: toolAppGetPageProgress,
+  app_record_page_progress: toolAppRecordPageProgress,
+  app_render_workspace_page_preview: toolAppRenderWorkspacePagePreview,
   app_render_deck_html: toolAppRenderDeckHtml,
   listDiscoveredTemplateGroupSummaries: toolListDiscoveredTemplateGroupSummaries,
   getAllDiscoveredTemplateGroups: toolGetAllDiscoveredTemplateGroups,

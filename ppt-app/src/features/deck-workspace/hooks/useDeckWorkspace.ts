@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createAgentClient, type AgentClient } from "../../../agent/agentClient";
 import { createAiClient, type AiAttemptLog, type AiClient } from "../../../ai/aiClient";
 import { createPptBackend, type PptBackend } from "../../../api/pptBackend";
+import { connectAnnaRuntime } from "../../../runtime/annaRuntime";
 import type {
   ListWorkspacesResult,
+  PageProgress,
   TemplateSummary,
   WorkspaceResult,
   WorkspaceOutline,
@@ -30,6 +33,10 @@ import type {
   PreviewMode,
   RefineScope
 } from "../types";
+import {
+  runCreateDeckFlow,
+  type CreateDeckFlowProgress,
+} from "../orchestration/createDeckFlow";
 
 export interface DeckWorkspaceActions {
   setPanelMode: (mode: PanelMode) => void;
@@ -43,6 +50,7 @@ export interface DeckWorkspaceActions {
   setPreviewMode: (mode: PreviewMode) => void;
   setRefineScope: (scope: RefineScope) => void;
   showToast: (message: string) => void;
+  cancelGenerateDeck: () => void;
   navigate: (page: PageId) => void;
   navigateMain: (stage: MainStage) => void;
   goBack: () => void;
@@ -99,11 +107,16 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     error: "",
     renderKey: ""
   });
+  const [createDeckProgress, setCreateDeckProgress] =
+    useState<CreateDeckFlowProgress | null>(null);
+  const [pageProgress, setPageProgress] = useState<PageProgress | null>(null);
   const [refineScope, setRefineScope] = useState<RefineScope>("deck");
   const [loading, setLoading] = useState<LoadingKind>("none");
   const [exportStatus, setExportStatus] = useState("");
   const [backend, setBackend] = useState<PptBackend | null>(null);
   const [aiClient, setAiClient] = useState<AiClient | null>(null);
+  const [agentClient, setAgentClient] = useState<AgentClient | null>(null);
+  const cancelCreateDeckRef = useRef(false);
   const [workspaceScan, setWorkspaceScan] = useState<ListWorkspacesResult | null>(null);
   const [currentWorkspace, setCurrentWorkspace] = useState<WorkspaceResult | null>(null);
   const [workspaceLoading, setWorkspaceLoading] = useState(true);
@@ -286,16 +299,20 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   useEffect(() => {
     let cancelled = false;
+    let nextAgentClient: AgentClient | null = null;
 
     async function initializeClients() {
       try {
-        const [nextBackend, nextAiClient] = await Promise.all([
+        const [nextBackend, nextAiClient, runtime] = await Promise.all([
           createPptBackend(),
-          createAiClient()
+          createAiClient(),
+          connectAnnaRuntime()
         ]);
+        nextAgentClient = await createAgentClient(runtime);
         if (cancelled) return;
         setBackend(nextBackend);
         setAiClient(nextAiClient);
+        setAgentClient(nextAgentClient);
         const scan = await nextBackend.listWorkspaces();
         if (cancelled) return;
         setWorkspaceScan(scan);
@@ -319,6 +336,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     return () => {
       cancelled = true;
+      void nextAgentClient?.close();
     };
   }, []);
 
@@ -465,21 +483,58 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function generateDeck() {
-    if (!backend) return;
+    if (!backend || !aiClient || !agentClient) return;
 
     try {
+      cancelCreateDeckRef.current = false;
       const workspace = await ensureCurrentWorkspace();
       if (!workspace) return;
 
-      const rendered = await renderDeckHtmlForWorkspace(workspace, "deck");
-      if (rendered) {
-        setPage("main");
-        setHistory((items) => (items.at(-1) === "main" ? items : [...items, "main"]));
-      }
+      setLoading("deck");
+      setCreateDeckProgress(null);
+      const setting = workspaceSettingsToState(workspace);
+      const result = await runCreateDeckFlow({
+        backend,
+        aiClient,
+        agentClient,
+        workspace,
+        prompt,
+        contextRows,
+        setting,
+        locale,
+        onProgress: setCreateDeckProgress,
+        isCancelled: () => cancelCreateDeckRef.current,
+      });
+      setDeckTitle(result.outline.title);
+      setOutline(result.outline.items);
+      setPageProgress(result.progress);
+      applyRenderedDeck(result.rendered);
+      setReviewRender({
+        status: "ready",
+        result: result.rendered,
+        error: "",
+        renderKey: workspaceReviewRenderKey(workspace),
+      });
+      setPage("review");
+      setHistory((items) => (items.at(-1) === "review" ? items : [...items, "review"]));
     } catch (error) {
       showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
+    } finally {
       setLoading("none");
     }
+  }
+
+  function cancelGenerateDeck() {
+    cancelCreateDeckRef.current = true;
+    setCreateDeckProgress((current) =>
+      current
+        ? {
+            ...current,
+            phase: "cancelled",
+            message: "正在停止当前生成...",
+          }
+        : current
+    );
   }
 
   async function createDeckFromOutline() {
@@ -967,6 +1022,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     outlineFeedback,
     previewMode,
     reviewRender,
+    createDeckProgress,
+    pageProgress,
     refineScope,
     loading,
     exportStatus,
@@ -992,6 +1049,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setPreviewMode,
     setRefineScope,
     showToast,
+    cancelGenerateDeck,
     navigate,
     navigateMain,
     goBack,

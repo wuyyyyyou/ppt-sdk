@@ -6,6 +6,10 @@ import {
   getExpectedSlideCount,
 } from "./outlinePrompt";
 import {
+  buildGeneratePagePlanLlmRequest,
+  parsePagePlanJson,
+} from "./pagePlanPrompt";
+import {
   OutlineValidationError,
   parseOutlineJson,
   validateGeneratedOutline,
@@ -205,8 +209,16 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         runtime,
         "generateOutline",
         buildGenerateOutlineLlmRequest(input),
-        getExpectedSlideCount(input.setting)
+        getExpectedSlideCount(input.setting, input.prompt)
       );
+    },
+
+    async generatePagePlan(input) {
+      const rawResult = await completeLlm(
+        runtime,
+        buildGeneratePagePlanLlmRequest(input)
+      );
+      return parsePagePlanJson(extractCompletionText(rawResult));
     },
 
     async generateDeck(input) {
@@ -231,7 +243,7 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         runtime,
         "reviseOutline",
         buildReviseOutlineLlmRequest(input),
-        getExpectedSlideCount(input.setting)
+        getExpectedSlideCount(input.setting, input.feedback)
       );
     },
 

@@ -37,12 +37,15 @@ import {
 import {
   buildDeckHtmlFromManifest,
   buildDeckHtmlPagesFromManifest,
+  buildDeckPageScreenshotFromManifest,
 } from "./render/build-deck-from-manifest.js";
 import { buildDeckHtml, buildStandaloneDeckHtml } from "./render/build-deck.js";
 import { renderSlideHtml } from "./render/render-slide.js";
 import type {
   BuildDeckHtmlFromManifestInput,
   BuildDeckHtmlPagesFromManifestResult,
+  BuildDeckPageScreenshotFromManifestInput,
+  BuildDeckPageScreenshotFromManifestResult,
   BuildDeckHtmlInput,
   BuildDeckHtmlSlideInput,
   BuildStandaloneDeckHtmlInput,
@@ -314,6 +317,7 @@ export {
   buildDeckHtml,
   buildDeckHtmlFromManifest,
   buildDeckHtmlPagesFromManifest,
+  buildDeckPageScreenshotFromManifest,
   buildStandaloneDeckHtml,
   convertDeckHtmlToPptxModel,
   convertDeckPageToPptxModel,

@@ -55,7 +55,7 @@ export function createMockAiClient(): AiClient {
     async generateOutline(input) {
       await sleep(900);
       const llmRequest = buildGenerateOutlineLlmRequest(input);
-      const expectedSlideCount = getExpectedSlideCount(input.setting);
+      const expectedSlideCount = getExpectedSlideCount(input.setting, input.prompt);
       const rawOutline = {
         title: input.locale === "zh" ? "AI Agent 工作流" : "AI Agent Workflows",
         items: fitOutlineCount(outlineDetails, expectedSlideCount),
@@ -84,6 +84,46 @@ export function createMockAiClient(): AiClient {
       };
     },
 
+    async generatePagePlan(input) {
+      await sleep(300);
+      const now = new Date().toISOString();
+      const blueprints = input.planningContext.blueprints;
+      const fallback = blueprints[0];
+      const cover = blueprints.find((item) => item.layout_family === "cover") ?? fallback;
+      const closing = blueprints.find((item) => item.layout_family === "closing") ?? fallback;
+      const content = blueprints.find((item) => item.layout_family === "two-column") ?? fallback;
+
+      return {
+        version: 1,
+        status: "planned",
+        title: input.outline.title,
+        source: {
+          outline_updated_at: input.outline.updated_at,
+          template_group: input.planningContext.template_group,
+          template_manifest_path: input.planningContext.manifest_path,
+          generated_by: "mock",
+        },
+        pages: input.outline.items.map((item, index) => {
+          const pageNumber = String(index + 1).padStart(2, "0");
+          const blueprint =
+            index === 0 ? cover : index === input.outline.items.length - 1 ? closing : content;
+          return {
+            page_id: `page-${pageNumber}`,
+            index,
+            title: item.title,
+            outline: item.outline,
+            blueprint_id: blueprint.id,
+            blueprint_source: blueprint.blueprint_source,
+            slide_path: `./slides/page-${pageNumber}.tsx`,
+            data_path: `./data/page-${pageNumber}.json`,
+            manifest_slide_id: `page-${pageNumber}`,
+            reason: "Mock page plan.",
+          };
+        }),
+        updated_at: now,
+      };
+    },
+
     async generateDeck(input: GenerateDeckInput) {
       await sleep(input.outlineFirst ? 900 : 1100);
       return {
@@ -96,7 +136,7 @@ export function createMockAiClient(): AiClient {
     async reviseOutline(input: ReviseOutlineInput) {
       await sleep(700);
       const llmRequest = buildReviseOutlineLlmRequest(input);
-      const expectedSlideCount = getExpectedSlideCount(input.setting);
+      const expectedSlideCount = getExpectedSlideCount(input.setting, input.feedback);
       const revisedItems = !input.feedback.trim()
         ? fitOutlineCount(input.outline, expectedSlideCount)
         : fitOutlineCount(input.outline, expectedSlideCount).map((item, index) =>

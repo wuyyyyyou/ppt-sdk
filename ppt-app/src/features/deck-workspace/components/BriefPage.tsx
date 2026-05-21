@@ -1,6 +1,7 @@
 import { File, Plus, Sparkles, Upload, X } from "lucide-react";
 import type { Messages } from "../../../i18n/messages";
 import type { ContextRow, LoadingKind } from "../types";
+import type { CreateDeckFlowProgress } from "../orchestration/createDeckFlow";
 
 interface BriefPageProps {
   t: Messages;
@@ -20,6 +21,8 @@ interface BriefPageProps {
   selectedLookId: string | null;
   selectLook: (id: string) => void;
   generateDeck: () => Promise<void>;
+  cancelGenerateDeck: () => void;
+  createDeckProgress: CreateDeckFlowProgress | null;
   showToast: (message: string) => void;
 }
 
@@ -40,8 +43,12 @@ export function BriefPage(props: BriefPageProps) {
     selectedLookId,
     selectLook,
     generateDeck,
+    cancelGenerateDeck,
+    createDeckProgress,
     showToast
   } = props;
+  const isCreating =
+    loading === "deck" || loading === "outline" || loading === "review";
 
   return (
     <section className="page active brief-page">
@@ -58,9 +65,9 @@ export function BriefPage(props: BriefPageProps) {
         <button
           className="inline-create-btn"
           onClick={generateDeck}
-          disabled={loading === "deck" || loading === "outline" || loading === "review"}
+          disabled={isCreating}
         >
-          {loading === "deck" || loading === "outline" || loading === "review" ? (
+          {isCreating ? (
             <span className="spinner small" />
           ) : (
             <Sparkles size={14} />
@@ -68,6 +75,14 @@ export function BriefPage(props: BriefPageProps) {
           {t.controls.createDeck}
         </button>
       </div>
+
+      {createDeckProgress ? (
+        <GenerationProgressPanel
+          progress={createDeckProgress}
+          onCancel={cancelGenerateDeck}
+          cancellable={isCreating && createDeckProgress.phase !== "cancelled"}
+        />
+      ) : null}
 
       <div className="brief-options">
         <div>
@@ -159,6 +174,84 @@ export function BriefPage(props: BriefPageProps) {
           </div>
         ) : null}
       </div>
+    </section>
+  );
+}
+
+function GenerationProgressPanel(props: {
+  progress: CreateDeckFlowProgress;
+  onCancel: () => void;
+  cancellable: boolean;
+}) {
+  const { progress, onCancel, cancellable } = props;
+  const completed = progress.pages.filter((page) => page.status === "accepted").length;
+  const total = progress.totalPages || progress.pages.length || 0;
+
+  return (
+    <section className="generation-progress-panel">
+      <div className="generation-progress-header">
+        <div>
+          <div className="section-label">生成进度</div>
+          <strong>{progress.message}</strong>
+          {total > 0 ? (
+            <span>
+              {completed}/{total} 页通过
+            </span>
+          ) : null}
+        </div>
+        {cancellable ? (
+          <button className="secondary-btn compact" onClick={onCancel}>
+            停止
+          </button>
+        ) : null}
+      </div>
+      <div className="generation-step-row">
+        {["outline", "page-plan", "prepare", "authoring", "render", "self-review", "final-render"].map((phase) => (
+          <span
+            key={phase}
+            className={`generation-step ${progress.phase === phase ? "active" : ""}`}
+          >
+            {phase}
+          </span>
+        ))}
+      </div>
+      {progress.stream ? (
+        <div className="generation-live-stream">
+          <div className="generation-live-header">
+            <strong>
+              第 {progress.stream.page_index + 1} 页 · {progress.stream.status}
+            </strong>
+          </div>
+          {progress.stream.activities.length > 0 ? (
+            <div className="generation-activity-list">
+              {progress.stream.activities.map((activity, index) => (
+                <span key={`${activity}-${index}`}>{activity}</span>
+              ))}
+            </div>
+          ) : null}
+          {progress.stream.lines.some((line) => line.trim()) ? (
+            <pre className="generation-stream-text">
+              {progress.stream.lines.join("\n").trim()}
+            </pre>
+          ) : null}
+        </div>
+      ) : null}
+      {progress.pages.length > 0 ? (
+        <div className="generation-page-list">
+          {progress.pages.map((page) => (
+            <div key={page.page_id} className={`generation-page-item ${page.status}`}>
+              <div>
+                <strong>{page.index + 1}. {page.title}</strong>
+                <span>{page.status}</span>
+              </div>
+              <small>
+                render {page.render_attempts}/10 · review {page.self_review_attempts}/3 · agent {page.agent_failures}/3
+              </small>
+              {page.last_error ? <p>{page.last_error}</p> : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }

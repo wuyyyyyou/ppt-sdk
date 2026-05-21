@@ -11,6 +11,8 @@ export interface AppWorkspaceFiles {
   task: string;
   setting: string;
   outline: string;
+  page_plan: string;
+  page_progress: string;
   pages: string;
   template: string;
 }
@@ -47,6 +49,8 @@ export interface AppWorkspaceResult {
   task: unknown;
   setting: unknown;
   outline: unknown;
+  page_plan: unknown;
+  page_progress: unknown;
   pages: unknown;
   template: unknown;
 }
@@ -92,7 +96,7 @@ export interface UpdateAppWorkspaceOutlineInput {
 
 export interface AppendAppWorkspaceLogInput {
   workspace_dir: string;
-  channel: "ai-outline";
+  channel: "ai-outline" | "ai-page-plan" | "ai-page-agent" | "ai-page-agent-stream";
   entry: Record<string, unknown>;
 }
 
@@ -181,6 +185,140 @@ export interface SelectAppWorkspaceTemplateResult {
 
 export interface RenderAppWorkspaceDeckHtmlInput {
   workspace_dir: string;
+}
+
+export interface AppTemplatePlanningBlueprint {
+  id: string;
+  name: string;
+  blueprint_source: string;
+  example_slide?: string;
+  layout_family?: string;
+  content_intents: string[];
+  suitable_for: string[];
+  avoid_for: string[];
+}
+
+export interface AppTemplatePlanningContext {
+  template_group: string;
+  template_group_name: string;
+  template_dir: string;
+  manifest_path: string;
+  catalog_path: string;
+  blueprints: AppTemplatePlanningBlueprint[];
+  rules: string[];
+}
+
+export interface GetAppTemplatePlanningContextInput {
+  workspace_dir: string;
+}
+
+export interface AppPagePlanItem {
+  page_id: string;
+  index: number;
+  title: string;
+  outline: string;
+  blueprint_id: string;
+  blueprint_source: string;
+  slide_path: string;
+  data_path: string;
+  manifest_slide_id: string;
+  reason: string;
+}
+
+export interface AppPagePlan {
+  version: 1;
+  status: "planned" | "prepared" | "stale";
+  title: string;
+  source: {
+    outline_updated_at: string | null;
+    template_group: string;
+    template_manifest_path: string;
+    generated_by: string;
+  };
+  pages: AppPagePlanItem[];
+  updated_at: string;
+}
+
+export interface RecordAppPagePlanInput {
+  workspace_dir: string;
+  page_plan: unknown;
+}
+
+export interface GetAppPagePlanInput {
+  workspace_dir: string;
+}
+
+export interface PrepareAppPageFilesInput {
+  workspace_dir: string;
+}
+
+export interface PrepareAppPageFilesResult {
+  workspace_dir: string;
+  manifest_path: string;
+  page_plan_path: string;
+  prepared_at: string;
+  pages: Array<{
+    page_id: string;
+    index: number;
+    title: string;
+    slide_path: string;
+    data_path: string;
+    blueprint_id: string;
+    manifest_slide_id: string;
+  }>;
+}
+
+export interface AppPageProgressItem {
+  page_id: string;
+  index: number;
+  title: string;
+  status: string;
+  render_attempts: number;
+  self_review_attempts: number;
+  agent_failures: number;
+  slide_path: string;
+  data_path: string;
+  last_html_path: string;
+  last_screenshot_path: string;
+  last_error: string;
+  review: unknown | null;
+  updated_at: string | null;
+}
+
+export interface AppPageProgress {
+  version: 1;
+  status: string;
+  pages: AppPageProgressItem[];
+  updated_at: string | null;
+}
+
+export interface GetAppPageProgressInput {
+  workspace_dir: string;
+}
+
+export interface RecordAppPageProgressInput {
+  workspace_dir: string;
+  page_id: string;
+  patch: Record<string, unknown>;
+}
+
+export interface RenderAppWorkspacePagePreviewInput {
+  workspace_dir: string;
+  page_index: number;
+}
+
+export interface RenderAppWorkspacePagePreviewResult {
+  workspace_dir: string;
+  manifest_path: string;
+  html_path: string;
+  preview_url?: string;
+  screenshot_path: string;
+  page_index: number;
+  page_number: number;
+  slide_id: string;
+  layout_id: string;
+  title: string;
+  rendered_at: string;
 }
 
 export interface AppWorkspacePageItem {

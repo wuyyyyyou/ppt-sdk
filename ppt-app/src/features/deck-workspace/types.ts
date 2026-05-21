@@ -1,11 +1,13 @@
 import type { OutlineDetail, Slide } from "../../data/mockDeck";
 import type {
   ListWorkspacesResult,
+  PageProgress,
   RenderDeckHtmlResult,
   TemplateSummary,
   WorkspaceResult,
   WorkspaceSettings
 } from "../../api/types";
+import type { CreateDeckFlowProgress } from "./orchestration/createDeckFlow";
 
 export type MainStage = "template" | "brief" | "outline" | "deck";
 export type PageId = "main" | "library" | "review" | "refine" | "export";
@@ -57,6 +59,8 @@ export interface DeckWorkspaceState {
   outlineFeedback: string;
   previewMode: PreviewMode;
   reviewRender: DeckReviewRenderState;
+  createDeckProgress: CreateDeckFlowProgress | null;
+  pageProgress: PageProgress | null;
   refineScope: RefineScope;
   loading: LoadingKind;
   exportStatus: string;

@@ -31,10 +31,62 @@ function readSettingString(setting: WorkspaceSettings | undefined, key: string):
   return typeof value === "string" ? value.trim() : "";
 }
 
-export function getExpectedSlideCount(setting?: WorkspaceSettings): number | null {
+function parseChineseInteger(value: string): number | null {
+  const digits: Record<string, number> = {
+    一: 1,
+    二: 2,
+    两: 2,
+    三: 3,
+    四: 4,
+    五: 5,
+    六: 6,
+    七: 7,
+    八: 8,
+    九: 9,
+    十: 10,
+  };
+
+  if (value === "十") return 10;
+  if (value.startsWith("十")) {
+    const tail = value.slice(1);
+    return 10 + (digits[tail] ?? 0);
+  }
+  if (value.endsWith("十")) {
+    const head = value.slice(0, -1);
+    return (digits[head] ?? 0) * 10;
+  }
+  if (value.includes("十")) {
+    const [head, tail] = value.split("十");
+    return (digits[head] ?? 0) * 10 + (digits[tail] ?? 0);
+  }
+
+  return digits[value] ?? null;
+}
+
+function parseExplicitSlideCount(text?: string): number | null {
+  if (!text) return null;
+
+  const digitMatch = text.match(/(?:^|[^\d])(\d{1,2})\s*(?:页|张|slides?|pages?)/i);
+  if (digitMatch) {
+    const parsed = Number.parseInt(digitMatch[1], 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  const chineseMatch = text.match(/([一二两三四五六七八九十]{1,3})\s*(?:页|张)/);
+  if (chineseMatch) {
+    return parseChineseInteger(chineseMatch[1]);
+  }
+
+  return null;
+}
+
+export function getExpectedSlideCount(
+  setting?: WorkspaceSettings,
+  explicitCountText?: string
+): number | null {
   const rawSlideCount = readSettingString(setting, "slide_count");
   if (!rawSlideCount || rawSlideCount.toLowerCase() === "auto") {
-    return null;
+    return parseExplicitSlideCount(explicitCountText);
   }
 
   const parsed = Number.parseInt(rawSlideCount, 10);
@@ -90,7 +142,7 @@ function buildGenerateUserPrompt(
   language: PromptLanguage
 ): string {
   return buildGenerateOutlineUserPrompt(language, {
-    expectedSlideCount: getExpectedSlideCount(input.setting),
+    expectedSlideCount: getExpectedSlideCount(input.setting, input.prompt),
     locale: input.locale,
     settingSummaryJson: JSON.stringify(buildSettingSummary(input.setting)),
     prompt: input.prompt,
@@ -103,7 +155,7 @@ function buildReviseUserPrompt(
   language: PromptLanguage
 ): string {
   return buildReviseOutlineUserPrompt(language, {
-    expectedSlideCount: getExpectedSlideCount(input.setting),
+    expectedSlideCount: getExpectedSlideCount(input.setting, input.feedback),
     locale: input.locale,
     settingSummaryJson: JSON.stringify(buildSettingSummary(input.setting)),
     title: input.title,

@@ -8,18 +8,27 @@ import type {
   GetWorkspaceOutlineInput,
   ListWorkspacesResult,
   ListTemplatesResult,
+  PagePlan,
+  PageProgress,
   OpenWorkspaceInput,
   PrepareExportModelInput,
   PrepareExportModelResult,
+  PreparePageFilesInput,
+  PreparePageFilesResult,
   ProjectResult,
   RecordDeckReviewInput,
+  RecordPagePlanInput,
+  RecordPageProgressInput,
   RecordPptxExportInput,
   RecordRequirementsInput,
   RecordOutlineInput,
   RenderDeckHtmlInput,
   RenderDeckHtmlResult,
+  RenderWorkspacePagePreviewInput,
+  RenderWorkspacePagePreviewResult,
   SelectTemplateInput,
   SelectTemplateResult,
+  TemplatePlanningContext,
   UpdateWorkspaceSettingsInput,
   UpdateWorkspaceOutlineInput,
   UpdateWorkspaceTitleInput,
@@ -46,6 +55,15 @@ export interface PptBackend {
   recordRequirements(input: RecordRequirementsInput): Promise<ProjectResult>;
   listTemplates(): Promise<ListTemplatesResult>;
   selectTemplate(input: SelectTemplateInput): Promise<SelectTemplateResult>;
+  getTemplatePlanningContext(input: { workspace_dir: string }): Promise<TemplatePlanningContext>;
+  recordPagePlan(input: RecordPagePlanInput): Promise<PagePlan>;
+  getPagePlan(input: { workspace_dir: string }): Promise<PagePlan>;
+  preparePageFiles(input: PreparePageFilesInput): Promise<PreparePageFilesResult>;
+  getPageProgress(input: { workspace_dir: string }): Promise<PageProgress>;
+  recordPageProgress(input: RecordPageProgressInput): Promise<PageProgress>;
+  renderWorkspacePagePreview(
+    input: RenderWorkspacePagePreviewInput
+  ): Promise<RenderWorkspacePagePreviewResult>;
   recordOutline(input: RecordOutlineInput): Promise<ProjectResult>;
   renderDeckHtml(input: RenderDeckHtmlInput): Promise<RenderDeckHtmlResult>;
   recordDeckReview(input: RecordDeckReviewInput): Promise<ProjectResult>;

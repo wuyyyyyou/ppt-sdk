@@ -4,12 +4,17 @@ import type {
   AppendWorkspaceLogResult,
   GeneratePptxInput,
   GeneratePptxResult,
+  PagePlan,
+  PageProgress,
   TemplateSummary,
   WorkspaceOutline,
   ListWorkspacesResult,
+  PreparePageFilesResult,
   PrepareExportModelResult,
   ProjectResult,
   RenderDeckHtmlResult,
+  RenderWorkspacePagePreviewResult,
+  TemplatePlanningContext,
   WorkspaceResult
 } from "./types";
 
@@ -103,6 +108,36 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       })),
     selectTemplate: (input) =>
       invoke(PPT_ENGINE_TOOL_ID, "app_select_workspace_template", input),
+    getTemplatePlanningContext: (input) =>
+      invoke<TemplatePlanningContext>(
+        PPT_ENGINE_TOOL_ID,
+        "app_get_template_planning_context",
+        input
+      ),
+    recordPagePlan: (input) =>
+      invoke<PagePlan>(PPT_ENGINE_TOOL_ID, "app_record_page_plan", input),
+    getPagePlan: (input) =>
+      invoke<PagePlan>(PPT_ENGINE_TOOL_ID, "app_get_page_plan", input),
+    preparePageFiles: (input) =>
+      invoke<PreparePageFilesResult>(
+        PPT_ENGINE_TOOL_ID,
+        "app_prepare_page_files",
+        input
+      ),
+    getPageProgress: (input) =>
+      invoke<PageProgress>(PPT_ENGINE_TOOL_ID, "app_get_page_progress", input),
+    recordPageProgress: (input) =>
+      invoke<PageProgress>(
+        PPT_ENGINE_TOOL_ID,
+        "app_record_page_progress",
+        input
+      ),
+    renderWorkspacePagePreview: (input) =>
+      invoke<RenderWorkspacePagePreviewResult>(
+        PPT_ENGINE_TOOL_ID,
+        "app_render_workspace_page_preview",
+        input
+      ),
     recordOutline: (input) =>
       invoke<ProjectResult>(PPT_ENGINE_TOOL_ID, "app_record_outline", input),
     renderDeckHtml: (input) =>

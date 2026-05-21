@@ -15,6 +15,8 @@ import type {
   BrowserRenderContext,
   BrowserRenderTheme,
   BuildDeckHtmlPagesFromManifestResult,
+  BuildDeckPageScreenshotFromManifestInput,
+  BuildDeckPageScreenshotFromManifestResult,
   BuildDeckHtmlFromManifestFileOutput,
   BuildDeckHtmlFromManifestInput,
   BuildDeckHtmlFromManifestResult,
@@ -826,6 +828,53 @@ export async function buildDeckHtmlPagesFromManifest(
     slideCount: prepared.slides.length,
     title: prepared.title,
     manifestPath: prepared.manifestPath,
+  };
+}
+
+export async function buildDeckPageScreenshotFromManifest(
+  input: BuildDeckPageScreenshotFromManifestInput,
+): Promise<BuildDeckPageScreenshotFromManifestResult> {
+  const outputDir = resolveAbsolutePath(input.outputDir, "outputDir");
+  const htmlOutputDir = resolveOptionalAbsolutePath(input.htmlOutputDir, "htmlOutputDir")
+    ?? outputDir;
+  const prepared = await prepareManifestDeck({
+    manifestPath: input.manifestPath,
+    outputDir,
+    name: input.name,
+    singlePage: true,
+    page: input.page,
+    cwd: input.cwd,
+  });
+  const slide = prepared.slides[prepared.singlePageIndex ?? 0];
+  const pageNumber = input.page;
+  const baseFileName = `${String(pageNumber).padStart(2, "0")}-${prepared.deckBaseName}-${sanitizeFileNamePart(
+    slide.layoutId,
+  )}`;
+
+  await mkdir(outputDir, { recursive: true });
+  await mkdir(htmlOutputDir, { recursive: true });
+
+  const htmlFileName = `${baseFileName}.html`;
+  const htmlPath = path.join(htmlOutputDir, htmlFileName);
+  const screenshotFileName = `${baseFileName}.png`;
+  const screenshotPath = path.join(outputDir, screenshotFileName);
+
+  await writeFile(htmlPath, slide.html, "utf8");
+  await writeSlideScreenshots([{ html: slide.html, outputPath: screenshotPath }]);
+
+  return {
+    manifestPath: prepared.manifestPath,
+    outputDir,
+    htmlOutputDir,
+    slideId: slide.slideId,
+    layoutId: slide.layoutId,
+    title: slide.context.title,
+    htmlFileName,
+    htmlPath,
+    screenshotFileName,
+    screenshotPath,
+    page: pageNumber,
+    slideCount: prepared.slides.length,
   };
 }
 

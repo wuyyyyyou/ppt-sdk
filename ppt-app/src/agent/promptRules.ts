@@ -1,0 +1,18 @@
+export const TSX_AUTHORING_RULES_SUMMARY = [
+  "You are editing TSX-first PPT slides, not a normal web page.",
+  "Each slide must be a fixed 1280x720 canvas and render fully without scrolling or interaction.",
+  "Every slide TSX must export Schema, default React component, layoutId, layoutName, and layoutDescription.",
+  "Use zod Schema defaults and parse data before rendering.",
+  "Keep business content in the JSON data where practical; use TSX for layout, component composition, and stable visual structure.",
+  "Manifest entries must point to ./slides/*.tsx and ./data/*.json.",
+  "Do not modify blueprints/ or reference-slides/. They are read-only references.",
+  "Keep key titles, bullets, KPI numbers, labels, and body copy as real DOM text, not canvas or image text.",
+  "Avoid fragile mixed inline text structures such as bold span plus bare text in the same paragraph; split into separate text nodes/blocks.",
+  "Do not rely on pseudo-elements for critical content or decoration.",
+  "Avoid critical gradients, opacity tricks, text-stroke, text-shadow, and transform-based alignment for important text.",
+  "Use explicit widths, heights, nowrap, and text alignment for single-line key text.",
+  "Chart-heavy or graphic-heavy regions may use data-pptx-export=\"screenshot\"; keep surrounding titles and explanations as normal text.",
+  "Use .js suffix for local component imports, for example ../components/Foo.js.",
+  "Prefer existing template components before creating new shared components.",
+  "Only edit the current page TSX/data by default; shared components/theme may be changed only with a clear reason.",
+].join("\n");

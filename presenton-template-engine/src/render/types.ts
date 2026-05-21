@@ -113,6 +113,30 @@ export interface BuildDeckHtmlFromManifestResult {
   manifestPath: string;
 }
 
+export interface BuildDeckPageScreenshotFromManifestInput {
+  manifestPath: string;
+  outputDir: string;
+  page: number;
+  name?: string | null;
+  cwd?: string | null;
+  htmlOutputDir?: string | null;
+}
+
+export interface BuildDeckPageScreenshotFromManifestResult {
+  manifestPath: string;
+  outputDir: string;
+  htmlOutputDir: string;
+  slideId: string;
+  layoutId: string;
+  title: string;
+  htmlFileName: string;
+  htmlPath: string;
+  screenshotFileName: string;
+  screenshotPath: string;
+  page: number;
+  slideCount: number;
+}
+
 export interface BuildDeckHtmlPagesFromManifestSlideOutput {
   slideId: string;
   layoutId: string;

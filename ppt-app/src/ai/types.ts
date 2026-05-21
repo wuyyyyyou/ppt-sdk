@@ -1,6 +1,7 @@
 import type { OutlineDetail, Slide } from "../data/mockDeck";
 import type { AnnaLlmCompleteInput } from "../runtime/annaRuntime";
 import type { WorkspaceSettings } from "../api/types";
+import type { PagePlan, TemplatePlanningContext, WorkspaceOutline } from "../api/types";
 import type { ContextRow } from "../features/deck-workspace/types";
 import type { Locale } from "../i18n/messages";
 
@@ -72,8 +73,15 @@ export interface OutlineGenerationResult {
   attempts: AiAttemptLog[];
 }
 
+export interface GeneratePagePlanInput {
+  outline: WorkspaceOutline;
+  planningContext: TemplatePlanningContext;
+  locale: Locale;
+}
+
 export interface AiClient {
   generateOutline(input: GenerateOutlineInput): Promise<OutlineGenerationResult>;
+  generatePagePlan(input: GeneratePagePlanInput): Promise<PagePlan>;
   generateDeck(input: GenerateDeckInput): Promise<GeneratedDeck>;
   reviseOutline(input: ReviseOutlineInput): Promise<OutlineGenerationResult>;
   generateSlidesFromOutline(

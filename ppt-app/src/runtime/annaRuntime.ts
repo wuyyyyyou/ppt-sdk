@@ -15,6 +15,19 @@ export interface AnnaLlmCompleteInput {
   maxTokens?: number;
 }
 
+export interface AnnaAgentRunFrame {
+  event: string;
+  text?: string;
+  [key: string]: unknown;
+}
+
+export interface AnnaAgentSession {
+  appSessionUuid?: string;
+  run(input: { content: string }): AsyncIterable<AnnaAgentRunFrame>;
+  history?(): Promise<unknown>;
+  delete(): Promise<unknown>;
+}
+
 export interface AnnaRuntime {
   call?<T = unknown>(
     ns: string,
@@ -27,6 +40,9 @@ export interface AnnaRuntime {
   };
   llm: {
     complete(input: AnnaLlmCompleteInput): Promise<unknown>;
+  };
+  agent: {
+    session(input: { submode: "auto" }): Promise<AnnaAgentSession>;
   };
 }
 

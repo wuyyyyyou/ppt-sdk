@@ -51,7 +51,7 @@ export function buildGenerateOutlineUserPrompt(
     return [
       "请根据用户简报创建一份演示文稿大纲。",
       input.expectedSlideCount === null
-        ? "页数要求：根据内容选择合理页数，范围为 3 到 15 页。"
+        ? "页数要求：如果用户简报明确要求页数，必须遵循；否则根据内容选择合理页数，范围为 3 到 15 页。"
         : `页数要求：items 中必须严格返回 ${input.expectedSlideCount} 页。`,
       `界面语言：${input.locale}`,
       `相关工作区配置：${input.settingSummaryJson}`,
@@ -69,7 +69,7 @@ export function buildGenerateOutlineUserPrompt(
   return [
     "Create a presentation outline from the user brief.",
     input.expectedSlideCount === null
-      ? "Slide count: choose a reasonable count between 3 and 15 pages."
+      ? "Slide count: if the user brief explicitly asks for a count, follow it; otherwise choose a reasonable count between 3 and 15 pages."
       : `Slide count: return exactly ${input.expectedSlideCount} pages in items.`,
     `Locale: ${input.locale}`,
     `Relevant workspace setting: ${input.settingSummaryJson}`,
@@ -92,7 +92,7 @@ export function buildReviseOutlineUserPrompt(
     return [
       "请根据反馈修改现有演示文稿大纲。",
       input.expectedSlideCount === null
-        ? "页数要求：保持合理页数，范围为 3 到 15 页。"
+        ? "页数要求：如果修改反馈明确要求页数，必须遵循；否则保持合理页数，范围为 3 到 15 页。"
         : `页数要求：items 中必须严格返回 ${input.expectedSlideCount} 页。`,
       `界面语言：${input.locale}`,
       `相关工作区配置：${input.settingSummaryJson}`,
@@ -111,7 +111,7 @@ export function buildReviseOutlineUserPrompt(
   return [
     "Revise the existing presentation outline according to the feedback.",
     input.expectedSlideCount === null
-      ? "Slide count: keep a reasonable count between 3 and 15 pages."
+      ? "Slide count: if the feedback explicitly asks for a count, follow it; otherwise keep a reasonable count between 3 and 15 pages."
       : `Slide count: return exactly ${input.expectedSlideCount} pages in items.`,
     `Locale: ${input.locale}`,
     `Relevant workspace setting: ${input.settingSummaryJson}`,
