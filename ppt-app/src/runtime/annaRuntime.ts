@@ -23,6 +23,8 @@ export interface AnnaAgentRunFrame {
 
 export interface AnnaAgentSession {
   appSessionUuid?: string;
+  expires_in?: number;
+  expiresIn?: number;
   run(input: { content: string }): AsyncIterable<AnnaAgentRunFrame>;
   history?(): Promise<unknown>;
   delete(): Promise<unknown>;

@@ -175,13 +175,14 @@ export function renderPresentonDeck(localResolver?: BrowserLayoutResolver) {
       throw new Error(`Missing deck slot for slide ${index}`);
     }
 
-    const layout = resolveBrowserLayout(context.layoutId, localResolver);
+    const lookupLayoutId = context.runtimeLayoutId ?? context.layoutId;
+    const layout = resolveBrowserLayout(lookupLayoutId, localResolver);
     if (!layout) {
       const root = createRoot(slot);
       flushSync(() => {
         root.render(
           <ErrorFallback
-            message={`Layout "${context.layoutId}" not found in template group "${context.templateGroup}"`}
+            message={`Layout "${lookupLayoutId}" not found in template group "${context.templateGroup}"`}
           />,
         );
       });

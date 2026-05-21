@@ -165,6 +165,7 @@ export interface BrowserRenderTheme {
 export interface BrowserRenderContext {
   templateGroup: string;
   layoutId: string;
+  runtimeLayoutId?: string;
   slideData: Record<string, unknown>;
   speakerNote: string;
   title: string;

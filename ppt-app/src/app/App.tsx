@@ -115,6 +115,8 @@ export function App() {
               setFeedback={actions.setOutlineFeedback}
               applyFeedback={actions.applyOutlineFeedback}
               createDeck={actions.createDeckFromOutline}
+              cancelGenerateDeck={actions.cancelGenerateDeck}
+              createDeckProgress={state.createDeckProgress}
               loading={state.loading}
             />
           ) : null}

@@ -2,6 +2,8 @@ import type { AnnaAgentSession, AnnaRuntime } from "../runtime/annaRuntime";
 
 const AGENT_RUN_TIMEOUT_MS = 300_000;
 const MAX_AGENT_SESSION_RETRIES = 1;
+const DEFAULT_AGENT_SESSION_EXPIRES_IN_SECONDS = 600;
+const AGENT_SESSION_RENEW_MARGIN_MS = 60_000;
 
 export interface AgentRunSummary {
   status: "ready_for_render" | "blocked";
@@ -57,6 +59,21 @@ class AgentRunStreamError extends Error {
     super(message);
     this.name = "AgentRunStreamError";
   }
+}
+
+export class AgentInfrastructureError extends Error {
+  constructor(
+    message: string,
+    public readonly code?: string,
+    public readonly activeSessionLimit = false
+  ) {
+    super(message);
+    this.name = "AgentInfrastructureError";
+  }
+}
+
+export function isAgentInfrastructureError(error: unknown): error is AgentInfrastructureError {
+  return error instanceof AgentInfrastructureError;
 }
 
 function extractJsonObject(text: string): string {
@@ -292,6 +309,41 @@ async function collectRunText(
   return { text: output, events };
 }
 
+function isActiveSessionLimitMessage(message: string) {
+  return /active session|活跃 session|session 上限|HTTP 429|session\.mint failed/i.test(message);
+}
+
+function isInfrastructureMessage(message: string) {
+  return /APP_NOT_GRANTED|invalid app_session_token|session\.mint|agent\.session|transport|HTTP 401|HTTP 429/i.test(message);
+}
+
+function toErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function toAgentInfrastructureError(error: unknown, fallbackMessage: string) {
+  if (error instanceof AgentInfrastructureError) return error;
+  const rawMessage = toErrorMessage(error) || fallbackMessage;
+  const activeSessionLimit = isActiveSessionLimitMessage(rawMessage);
+  const message = activeSessionLimit
+    ? `${rawMessage} 请先 delete/revoke 旧 Agent session，或等待服务端释放后重试。`
+    : rawMessage;
+  return new AgentInfrastructureError(
+    message,
+    error instanceof AgentRunStreamError ? error.code : undefined,
+    activeSessionLimit
+  );
+}
+
+function readSessionExpiresInSeconds(session: AnnaAgentSession): number {
+  const value = typeof session.expires_in === "number"
+    ? session.expires_in
+    : typeof session.expiresIn === "number"
+      ? session.expiresIn
+      : DEFAULT_AGENT_SESSION_EXPIRES_IN_SECONDS;
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_AGENT_SESSION_EXPIRES_IN_SECONDS;
+}
+
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   let timeoutId: number | undefined;
   const timeout = new Promise<never>((_, reject) => {
@@ -310,18 +362,26 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 }
 
 export async function createAgentClient(runtime: AnnaRuntime): Promise<AgentClient> {
-  let session: AnnaAgentSession | null = null;
-
-  async function getSession() {
-    if (!session) {
-      session = await runtime.agent.session({ submode: "auto" });
+  async function createSession() {
+    try {
+      const session = await runtime.agent.session({ submode: "auto" });
+      return {
+        session,
+        createdAtMs: Date.now(),
+        expiresInSeconds: readSessionExpiresInSeconds(session),
+      };
+    } catch (error) {
+      throw toAgentInfrastructureError(error, "Failed to create Agent session.");
     }
-    return session;
   }
 
-  async function resetSession() {
+  async function deleteSession(session: AnnaAgentSession | null) {
     await session?.delete().catch(() => undefined);
-    session = null;
+  }
+
+  function shouldRenewBeforeRun(sessionMeta: { createdAtMs: number; expiresInSeconds: number }) {
+    const expiresAtMs = sessionMeta.createdAtMs + sessionMeta.expiresInSeconds * 1000;
+    return expiresAtMs - Date.now() <= AGENT_SESSION_RENEW_MARGIN_MS;
   }
 
   async function collectWithSessionRetry(
@@ -331,9 +391,19 @@ export async function createAgentClient(runtime: AnnaRuntime): Promise<AgentClie
     let sessionRetries = 0;
 
     for (;;) {
+      let sessionMeta: Awaited<ReturnType<typeof createSession>> | null = null;
       try {
+        sessionMeta = await createSession();
+        if (shouldRenewBeforeRun(sessionMeta)) {
+          options?.onStreamEvent?.({
+            type: "activity",
+            message: "Agent session near expiry; creating a new session",
+          });
+          await deleteSession(sessionMeta.session);
+          sessionMeta = await createSession();
+        }
         const collected = await withTimeout(
-          collectRunText(await getSession(), prompt, options),
+          collectRunText(sessionMeta.session, prompt, options),
           AGENT_RUN_TIMEOUT_MS
         );
         return { ...collected, sessionRetries };
@@ -348,10 +418,20 @@ export async function createAgentClient(runtime: AnnaRuntime): Promise<AgentClie
             type: "activity",
             message: "Agent session expired; creating a new session",
           });
-          await resetSession();
           continue;
         }
+        if (
+          error instanceof AgentRunStreamError &&
+          (error.expired || error.code === "http" || isInfrastructureMessage(error.message))
+        ) {
+          throw toAgentInfrastructureError(error, "Agent session failed.");
+        }
+        if (error instanceof AgentInfrastructureError) {
+          throw error;
+        }
         throw error;
+      } finally {
+        await deleteSession(sessionMeta?.session ?? null);
       }
     }
   }
@@ -377,7 +457,7 @@ export async function createAgentClient(runtime: AnnaRuntime): Promise<AgentClie
     },
 
     async close() {
-      await resetSession();
+      // Sessions are run-scoped and deleted after each run.
     },
   };
 }

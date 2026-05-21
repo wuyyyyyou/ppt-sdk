@@ -173,12 +173,13 @@ function SlideDocument({
   context: BrowserRenderContext;
   localResolver?: BrowserLayoutResolver;
 }) {
-  const layout = resolveBrowserLayout(context.layoutId, localResolver);
+  const lookupLayoutId = context.runtimeLayoutId ?? context.layoutId;
+  const layout = resolveBrowserLayout(lookupLayoutId, localResolver);
 
   if (!layout) {
     return (
       <ErrorFallback
-        message={`Layout "${context.layoutId}" not found in template group "${context.templateGroup}"`}
+        message={`Layout "${lookupLayoutId}" not found in template group "${context.templateGroup}"`}
       />
     );
   }

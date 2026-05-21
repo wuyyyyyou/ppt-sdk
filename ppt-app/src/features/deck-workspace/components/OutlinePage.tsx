@@ -1,8 +1,10 @@
 import { ChevronDown } from "lucide-react";
 import type { OutlineDetail } from "../../../data/mockDeck";
 import type { Messages } from "../../../i18n/messages";
+import type { CreateDeckFlowProgress } from "../orchestration/createDeckFlow";
 import type { LoadingKind } from "../types";
 import { formatSlideNumber } from "../utils";
+import { GenerationProgressPanel } from "./BriefPage";
 
 interface OutlinePageProps {
   t: Messages;
@@ -14,6 +16,8 @@ interface OutlinePageProps {
   setFeedback: (value: string) => void;
   applyFeedback: () => Promise<void>;
   createDeck: () => Promise<void>;
+  cancelGenerateDeck: () => void;
+  createDeckProgress: CreateDeckFlowProgress | null;
   loading: LoadingKind;
 }
 
@@ -28,6 +32,8 @@ export function OutlinePage(props: OutlinePageProps) {
     setFeedback,
     applyFeedback,
     createDeck,
+    cancelGenerateDeck,
+    createDeckProgress,
     loading
   } = props;
 
@@ -61,6 +67,14 @@ export function OutlinePage(props: OutlinePageProps) {
           </button>
         </div>
       </div>
+
+      {createDeckProgress ? (
+        <GenerationProgressPanel
+          progress={createDeckProgress}
+          onCancel={cancelGenerateDeck}
+          cancellable={loading === "deck" && createDeckProgress.phase !== "cancelled"}
+        />
+      ) : null}
 
       <div className="outline-list-large">
         <div className="timeline-line" />

@@ -1,6 +1,40 @@
 # PPT App LLM/Agent Integration Context
 
-This file records the design decisions from the May 20, 2026 grill session for wiring `ppt-app` into real Anna LLM and local writable Agent flows.
+This file records the design decisions for wiring `ppt-app` into real Anna LLM and local writable Agent flows. Because the development machine uses a case-insensitive filesystem, do not create a separate `CONTEXT.md`; keep glossary terms and implementation notes in this file.
+
+## Language
+
+**Workspace**:
+A local project folder for one presentation generation attempt. A Workspace contains planning artifacts, page source files, logs, previews, and final review output.
+_Avoid_: Task folder, job directory
+
+**Page Plan**:
+The plan that maps each outline item to a specific generated page, including its intended template blueprint and page identity. One Page Plan has many Planned Pages.
+_Avoid_: Pages file, manifest draft
+
+**Planned Page**:
+One page entry in a Page Plan. A Planned Page owns the authoring intent for a single slide-like page before it is accepted.
+_Avoid_: Slide when discussing planning state
+
+**Page Progress**:
+The current lifecycle state for each Planned Page while the deck is being generated. Page Progress records whether a page is pending, being authored, being rendered, under review, accepted, or failed.
+_Avoid_: Page Plan, final pages
+
+**Agent Session**:
+A short-lived Anna Agent conversation used to perform local file-editing work for presentation generation. Agent Sessions are operational resources, not user-facing presentation content.
+_Avoid_: Deck session when discussing resource lifetime
+
+**Agent Run**:
+One request sent to an Agent Session for a specific authoring, repair, or visual review task. A Planned Page may require multiple Agent Runs before it is accepted.
+_Avoid_: Agent Session
+
+**Agent Infrastructure Failure**:
+A failure to create, keep, or use an Agent Session. It is distinct from a page authoring failure because it says the Agent resource was unavailable, not that the page content was bad.
+_Avoid_: Agent failure when the cause is session minting, expiry, or transport
+
+**Page Runtime Identity**:
+The identity used by the renderer to bind one Planned Page to its local TSX component at render time. It must be unique per Planned Page even when multiple pages start from the same template blueprint.
+_Avoid_: Blueprint id, layout id when uniqueness per page is required
 
 ## Goal
 
@@ -11,18 +45,19 @@ Clicking "create presentation" after selecting a template should run the full fl
 3. Use Anna LLM to create a page plan from the outline and selected template catalog.
 4. Save the plan to `page-plan.json`.
 5. Ask the backend to prepare page files from that plan.
-6. Use one local writable Agent session for the whole deck, with one or more runs per page.
+6. Use short-lived local writable Agent Sessions, with one or more Agent Runs per page.
 7. For each page, let the Agent edit workspace files, render/check the page, screenshot it, self-review it, and fix it until it passes or reaches limits.
 8. Run final HTML-only deck render and show the result in `ReviewPage`.
 
 ## Confirmed Boundaries
 
 - The Agent is a local writable Agent. It can read and modify local files.
-- The frontend starts/drives the Agent session through Anna Runtime, but the Agent itself modifies files.
+- The frontend starts/drives Agent Sessions through Anna Runtime, but the Agent itself modifies files.
 - No extra in-app authorization modal is needed; rely on Anna/Agent runtime permissions.
 - The frontend must not directly read/write local files. Backend app-facing tools handle workspace artifact writes and render/screenshot tasks.
 - `ppt-app` should use real Anna locally. The user has already run `anna-dev login`.
 - It is acceptable to test with `anna-app dev`; run `npm run build` first. If the bridge errors with `python bridge did not signal ready in 8s`, retry startup a few times.
+- Anna app-side `anna.agent.session({ submode: "auto" })` currently does not support `ttl_seconds`; session lifetime must be managed by `ppt-app`.
 
 ## Artifact Model
 
@@ -41,7 +76,7 @@ Agent and LLM calls should write local JSONL logs under the workspace `.log/` di
 
 Use two Agent log layers:
 
-- `.log/ai-page-agent.jsonl`: one structured summary per Agent run, including `run_id`, `page_id`, run kind, prompt hash or prompt summary, start/end timestamps, completed/error/expired status, final text, parsed summary or parsed review when available, changed files, error message, and token usage when available.
+- `.log/ai-page-agent.jsonl`: one structured summary per Agent Run, including `run_id`, `page_id`, run kind, prompt hash or prompt summary, start/end timestamps, completed/error/expired status, final text, parsed summary or parsed review when available, changed files, error message, and token usage when available.
 - `.log/ai-page-agent-stream.jsonl`: compressed stream events, not every protocol chunk. Record merged model content deltas, tool activity summaries such as `fs_read_file` / `fs_write_file` path and size, error events, and task completion metadata.
 
 Do not default to storing every raw `rpc.stream` chunk. Full raw streams are noisy, large, and may persist workspace paths, prompts, and file contents. A separate debug switch can be added later if exact wire-level traces are needed.
@@ -100,15 +135,21 @@ Backend validation:
 - Backend rewrites `manifest.json.slides` completely from `page-plan.json`.
 - The manifest should reference only generated `./slides/*.tsx` entries.
 - Existing demo slides/data can remain on disk but must not be referenced by manifest.
+- Runtime binding must use each manifest slide id/page id as the unique Page Runtime Identity. Do not rely on the template `layoutId` as a unique runtime key because multiple generated pages can share the same blueprint/layout id.
+- A generated page's exported `layoutId` keeps its template/blueprint meaning; it does not need to be rewritten just to make runtime registration unique.
 
 ## Agent Session Model
 
-- Use one Agent session per deck.
-- Use separate runs per page.
-- Continue repair prompts in the same deck session.
-- Each run should only work on the current page unless explicitly needed.
-- If an Agent stream reports session/token expiry, close the stale session, create a new `anna.agent.session({ submode: "auto" })`, and retry the current run with the same prompt. Count this against the current page Agent failure limit, but do not treat it as render or self-review failure.
-- Do not reuse an expired Agent session across pages. If creating a replacement session fails, record it as an Agent failure.
+- Agent Sessions are short-lived operational resources, not deck/page state.
+- Use one short-lived Agent Session per Agent Run. Authoring, self-review, self-review-fix, and render-fix each create a session, run once, then delete promptly.
+- Record session `createdAt` and returned `expires_in`; if a session has less than 60 seconds remaining, delete/recreate before starting the next run instead of waiting for a 401.
+- If an Agent stream reports session/token expiry, close the stale session, create a new `anna.agent.session({ submode: "auto" })`, and retry the current run with the same prompt.
+- Agent Infrastructure Failures such as session mint 429, token expiry, or transport/session failures must not consume the per-page `agent_failures` content-authoring limit.
+- Record Agent Infrastructure Failures separately from content authoring failures. `agent_failures` remains the content/run failure counter; infrastructure/session failures use their own status/counter.
+- A page blocked by Agent infrastructure should use a distinct progress state such as `agent_infrastructure_failed`, not `agent_failed`.
+- If session minting fails with the dev-mode active session cap, surface a session infrastructure error that tells the user old sessions must be deleted/revoked or the dev harness restarted.
+- In current `anna-app dev`, `agent.session.delete` can only delete server-side sessions while the dev process still has the minted session token cached. After restarting `anna-app dev`, unknown old session UUIDs cannot be deleted by the app-side delete call; they require server-side revoke/cleanup or whatever cleanup mechanism Anna provides.
+- Each Agent Run should only work on the current page unless explicitly needed.
 
 Default file modification scope:
 
@@ -163,15 +204,16 @@ Self-review output remains a hard JSON contract because it decides whether the p
 
 ## Render/Screenshot/Self-Review Loop
 
-- Render errors must be sent back to the same Agent session for current-page repair.
-- Screenshot self-review failures must be sent back to the same Agent session for current-page repair.
-- Final failure only occurs after limits are exhausted.
+- Render errors must be sent back to the Agent for current-page repair.
+- Screenshot self-review failures must be sent back to the Agent for current-page repair.
+- Final page failure only occurs after page-level limits are exhausted.
 
 Limits:
 
 - Render repair limit: 10 per page.
 - Visual self-review repair limit: 3 per page.
-- Agent session/run failure limit: 3 per page.
+- Agent content-authoring/run failure limit: 3 per page.
+- Agent Infrastructure Failure limit is separate from the page content-authoring limit and should be handled as an operational failure.
 
 Checks:
 

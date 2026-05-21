@@ -1,0 +1,13 @@
+{
+  "name": "anna-agent-session-test-app",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Anna app for black-box testing agent session create/delete/expiry behavior.",
+  "scripts": {
+    "dev": "anna-app dev",
+    "validate": "anna-app validate --strict"
+  },
+  "devDependencies": {
+    "@anna-ai/cli": "latest"
+  }
+}

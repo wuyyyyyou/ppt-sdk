@@ -169,12 +169,13 @@ function renderLayout(input: {
   context: BrowserRenderContext;
   localResolver?: BrowserLayoutResolver;
 }) {
-  const layout = resolveBrowserLayout(input.context.layoutId, input.localResolver);
+  const lookupLayoutId = input.context.runtimeLayoutId ?? input.context.layoutId;
+  const layout = resolveBrowserLayout(lookupLayoutId, input.localResolver);
 
   if (!layout) {
     return (
       <ErrorFallback
-        message={`Layout "${input.context.layoutId}" not found in template group "${input.context.templateGroup}"`}
+        message={`Layout "${lookupLayoutId}" not found in template group "${input.context.templateGroup}"`}
       />
     );
   }

@@ -200,6 +200,73 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     };
   }
 
+  function normalizeWorkspacePageProgress(value: unknown): PageProgress | null {
+    const progressRecord =
+      value && typeof value === "object" && !Array.isArray(value)
+        ? (value as Partial<PageProgress>)
+        : null;
+    const pages = Array.isArray(progressRecord?.pages)
+      ? progressRecord.pages.filter(
+          (page): page is PageProgress["pages"][number] =>
+            page !== null &&
+            typeof page === "object" &&
+            typeof (page as PageProgress["pages"][number]).page_id === "string"
+        )
+      : [];
+
+    if (pages.length === 0) return null;
+
+    return {
+      version: 1,
+      status: typeof progressRecord?.status === "string" ? progressRecord.status : "prepared",
+      pages,
+      updated_at:
+        typeof progressRecord?.updated_at === "string" ? progressRecord.updated_at : null
+    };
+  }
+
+  function workspacePageProgressToCreateDeckProgress(
+    storedProgress: PageProgress
+  ): CreateDeckFlowProgress {
+    const pages = [...storedProgress.pages].sort((left, right) => left.index - right.index);
+    const failedPage = pages.find((item) => /failed/i.test(item.status));
+    const activePage =
+      failedPage ??
+      [...pages].reverse().find((item) => item.status !== "pending") ??
+      pages[0] ??
+      null;
+    const acceptedCount = pages.filter((item) => item.status === "accepted").length;
+    const phase: CreateDeckFlowProgress["phase"] = failedPage
+      ? "error"
+      : acceptedCount === pages.length
+        ? "complete"
+        : "authoring";
+    const message = failedPage?.last_error
+      ? failedPage.last_error
+      : phase === "complete"
+        ? "生成完成"
+        : "已恢复上次生成进度";
+
+    return {
+      phase,
+      message,
+      currentPageIndex: activePage ? activePage.index : null,
+      totalPages: pages.length,
+      pages: pages.map((page) => ({
+        page_id: page.page_id,
+        index: page.index,
+        title: page.title,
+        status: page.status,
+        render_attempts: page.render_attempts,
+        self_review_attempts: page.self_review_attempts,
+        agent_failures: page.agent_failures,
+        agent_infrastructure_failures: page.agent_infrastructure_failures,
+        last_error: page.last_error,
+        last_screenshot_path: page.last_screenshot_path
+      }))
+    };
+  }
+
   function hasRenderedWorkspacePages(workspace: WorkspaceResult) {
     return workspacePagesToState(workspace.pages) !== null;
   }
@@ -268,6 +335,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setDeckTitle(getWorkspaceTitle(workspace));
     const workspaceOutline = workspaceOutlineToState(workspace.outline);
     const workspacePages = workspacePagesToState(workspace.pages);
+    const workspacePageProgress = normalizeWorkspacePageProgress(workspace.page_progress);
+    setPageProgress(workspacePageProgress);
+    setCreateDeckProgress(
+      !workspacePages && workspacePageProgress
+        ? workspacePageProgressToCreateDeckProgress(workspacePageProgress)
+        : null
+    );
     if (workspacePages) {
       setGenerated(true);
       setDeckTitle(workspacePages.title || getWorkspaceTitle(workspace));

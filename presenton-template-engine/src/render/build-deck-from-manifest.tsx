@@ -39,6 +39,7 @@ type PreparedManifestSlide = {
   html: string;
   slideId: string;
   layoutId: string;
+  runtimeLayoutId: string;
   fileName: string;
   outputPath: string;
   speaker_note: string;
@@ -716,6 +717,9 @@ async function prepareManifestDeck(
       const resolvedSlide = await resolveManifestSlide(slide, manifestCwd);
       const slideData = await resolveSlideData(slide, manifestCwd);
       const theme = normalizeTheme(slide.theme ?? manifest.theme);
+      const runtimeLayoutId = resolvedSlide.localEntryPath
+        ? `${resolvedSlide.templateGroup}:${slide.id}`
+        : resolvedSlide.layoutId;
       const slideTitle =
         slide.title ??
         `${resolvedSlide.templateGroup} - ${resolvedSlide.layoutName}`;
@@ -723,6 +727,7 @@ async function prepareManifestDeck(
       const context: BrowserRenderContext = {
         templateGroup: resolvedSlide.templateGroup,
         layoutId: resolvedSlide.layoutId,
+        runtimeLayoutId,
         slideData,
         speakerNote: slide.speaker_note ?? "",
         title: slideTitle,
@@ -740,6 +745,7 @@ async function prepareManifestDeck(
         html,
         slideId: slide.id,
         layoutId: resolvedSlide.layoutId,
+        runtimeLayoutId,
         fileName: slideFileName,
         outputPath: slideOutputPath,
         speaker_note: slide.speaker_note ?? "",
@@ -756,9 +762,9 @@ async function prepareManifestDeck(
             typeof slide.localEntryPath === "string" && slide.localEntryPath.length > 0,
         )
         .map((slide) => [
-          slide.layoutId,
+          slide.runtimeLayoutId,
           {
-            layoutId: slide.layoutId,
+            layoutId: slide.runtimeLayoutId,
             absolutePath: slide.localEntryPath,
           } satisfies LocalRuntimeEntry,
         ]),
@@ -890,9 +896,9 @@ export async function buildDeckHtmlFromManifest(
             typeof slide.localEntryPath === "string" && slide.localEntryPath.length > 0,
         )
         .map((slide) => [
-          slide.layoutId,
+          slide.runtimeLayoutId,
           {
-            layoutId: slide.layoutId,
+            layoutId: slide.runtimeLayoutId,
             absolutePath: slide.localEntryPath,
           } satisfies LocalRuntimeEntry,
         ]),

@@ -387,6 +387,10 @@ function normalizePageProgressItem(value: unknown): AppPageProgressItem | null {
     self_review_attempts:
       typeof record.self_review_attempts === "number" ? record.self_review_attempts : 0,
     agent_failures: typeof record.agent_failures === "number" ? record.agent_failures : 0,
+    agent_infrastructure_failures:
+      typeof record.agent_infrastructure_failures === "number"
+        ? record.agent_infrastructure_failures
+        : 0,
     slide_path: normalizeString(record.slide_path),
     data_path: normalizeString(record.data_path),
     last_html_path: normalizeString(record.last_html_path),
@@ -1151,6 +1155,7 @@ function buildInitialPageProgress(pagePlan: AppPagePlan): AppPageProgress {
       render_attempts: 0,
       self_review_attempts: 0,
       agent_failures: 0,
+      agent_infrastructure_failures: 0,
       slide_path: page.slide_path,
       data_path: page.data_path,
       last_html_path: "",

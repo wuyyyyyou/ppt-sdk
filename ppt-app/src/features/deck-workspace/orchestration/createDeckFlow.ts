@@ -1,8 +1,9 @@
-import type {
-  AgentClient,
-  AgentRunSummary,
-  AgentSelfReviewResult,
-  AgentStreamEvent,
+import {
+  isAgentInfrastructureError,
+  type AgentClient,
+  type AgentRunSummary,
+  type AgentSelfReviewResult,
+  type AgentStreamEvent,
 } from "../../../agent/agentClient";
 import { TSX_AUTHORING_RULES_SUMMARY } from "../../../agent/promptRules";
 import type { PptBackend } from "../../../api/pptBackend";
@@ -43,6 +44,7 @@ export interface CreateDeckFlowProgressPage {
   render_attempts: number;
   self_review_attempts: number;
   agent_failures: number;
+  agent_infrastructure_failures: number;
   last_error?: string;
   last_screenshot_path?: string;
 }
@@ -100,6 +102,7 @@ function mapProgress(progress: PageProgress | null): CreateDeckFlowProgressPage[
     render_attempts: page.render_attempts,
     self_review_attempts: page.self_review_attempts,
     agent_failures: page.agent_failures,
+    agent_infrastructure_failures: page.agent_infrastructure_failures,
     last_error: page.last_error,
     last_screenshot_path: page.last_screenshot_path,
   })) ?? [];
@@ -470,6 +473,7 @@ export async function runCreateDeckFlow(
     let renderAttempts = existingPageProgress?.render_attempts ?? 0;
     let selfReviewAttempts = existingPageProgress?.self_review_attempts ?? 0;
     let agentFailures = existingPageProgress?.agent_failures ?? 0;
+    let agentInfrastructureFailures = existingPageProgress?.agent_infrastructure_failures ?? 0;
     let renderError =
       existingPageProgress?.status === "render_fixing" ? existingPageProgress.last_error : "";
     let selfReview =
@@ -514,8 +518,29 @@ export async function runCreateDeckFlow(
         });
         renderError = "";
       } catch (error) {
-        agentFailures += 1;
         const message = error instanceof Error ? error.message : String(error);
+        if (isAgentInfrastructureError(error)) {
+          agentInfrastructureFailures += 1;
+          await authoringTracker.flush("error", {
+            error: message,
+            agent_infrastructure_failures: agentInfrastructureFailures,
+            active_session_limit: error.activeSessionLimit,
+          });
+          progress = await recordProgress(input, page, {
+            status: "agent_infrastructure_failed",
+            agent_infrastructure_failures: agentInfrastructureFailures,
+            last_error: message,
+          });
+          emit(input, {
+            phase: "error",
+            message,
+            currentPageIndex: page.index,
+            totalPages: pagePlan.pages.length,
+          }, progress);
+          throw error;
+        }
+
+        agentFailures += 1;
         await authoringTracker.flush("error", {
           error: message,
           agent_failures: agentFailures,
@@ -590,8 +615,29 @@ export async function runCreateDeckFlow(
           review: selfReview,
         });
       } catch (error) {
-        agentFailures += 1;
         const message = error instanceof Error ? error.message : String(error);
+        if (isAgentInfrastructureError(error)) {
+          agentInfrastructureFailures += 1;
+          await selfReviewTracker.flush("error", {
+            error: message,
+            agent_infrastructure_failures: agentInfrastructureFailures,
+            active_session_limit: error.activeSessionLimit,
+          });
+          progress = await recordProgress(input, page, {
+            status: "agent_infrastructure_failed",
+            agent_infrastructure_failures: agentInfrastructureFailures,
+            last_error: message,
+          });
+          emit(input, {
+            phase: "error",
+            message,
+            currentPageIndex: page.index,
+            totalPages: pagePlan.pages.length,
+          }, progress);
+          throw error;
+        }
+
+        agentFailures += 1;
         await selfReviewTracker.flush("error", {
           error: message,
           agent_failures: agentFailures,

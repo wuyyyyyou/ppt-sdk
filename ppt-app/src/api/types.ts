@@ -33,6 +33,8 @@ export interface WorkspaceResult {
   task: unknown;
   setting: unknown;
   outline: unknown;
+  page_plan?: unknown;
+  page_progress?: unknown;
   pages: unknown;
   template: unknown;
 }
@@ -307,6 +309,7 @@ export interface PageProgressItem {
   render_attempts: number;
   self_review_attempts: number;
   agent_failures: number;
+  agent_infrastructure_failures: number;
   slide_path: string;
   data_path: string;
   last_html_path: string;

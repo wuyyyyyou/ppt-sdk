@@ -178,7 +178,7 @@ export function BriefPage(props: BriefPageProps) {
   );
 }
 
-function GenerationProgressPanel(props: {
+export function GenerationProgressPanel(props: {
   progress: CreateDeckFlowProgress;
   onCancel: () => void;
   cancellable: boolean;
@@ -246,6 +246,7 @@ function GenerationProgressPanel(props: {
               </div>
               <small>
                 render {page.render_attempts}/10 · review {page.self_review_attempts}/3 · agent {page.agent_failures}/3
+                {page.agent_infrastructure_failures > 0 ? ` · session ${page.agent_infrastructure_failures}` : ""}
               </small>
               {page.last_error ? <p>{page.last_error}</p> : null}
             </div>

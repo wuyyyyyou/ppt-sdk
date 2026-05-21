@@ -1,0 +1,53 @@
+{
+  "schema": 2,
+  "permissions": [],
+  "required_executas": [],
+  "optional_executas": [],
+  "system_prompt_addendum": "The Agent Session Test app is open. It directly tests anna.agent.session lifecycle behavior from inside the iframe.",
+  "tags": ["test", "agent", "session"],
+  "ui": {
+    "bundle": {
+      "format": "static-spa",
+      "entry": "index.html",
+      "external_origins": []
+    },
+    "views": [
+      {
+        "name": "main",
+        "title": "Agent Session Test",
+        "default": true,
+        "entry": "index.html",
+        "min_size": { "w": 760, "h": 640 },
+        "default_size": { "w": 960, "h": 760 },
+        "resizable": true,
+        "movable": true,
+        "single_instance": true
+      }
+    ],
+    "host_api": {
+      "agent": {
+        "session": {
+          "auto": true,
+          "fixed": null
+        },
+        "tools": []
+      },
+      "llm": [],
+      "chat": [],
+      "tools": [],
+      "artifact": [],
+      "fs": [],
+      "storage": [],
+      "prefs": [],
+      "window": []
+    },
+    "csp_overrides": {
+      "script-src": ["'self'"],
+      "style-src": ["'self'"]
+    },
+    "state_merge": "last_writer_wins"
+  },
+  "dev": {
+    "user_id": 1
+  }
+}
