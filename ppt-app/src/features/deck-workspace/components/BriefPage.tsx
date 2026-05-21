@@ -1,7 +1,12 @@
 import { File, Plus, Sparkles, Upload, X } from "lucide-react";
 import type { Messages } from "../../../i18n/messages";
 import type { ContextRow, LoadingKind } from "../types";
-import type { CreateDeckFlowProgress } from "../orchestration/createDeckFlow";
+import {
+  MAX_AGENT_FAILURES,
+  MAX_RENDER_ATTEMPTS,
+  MAX_SELF_REVIEW_ATTEMPTS,
+  type CreateDeckFlowProgress
+} from "../orchestration/createDeckFlow";
 
 interface BriefPageProps {
   t: Messages;
@@ -245,7 +250,7 @@ export function GenerationProgressPanel(props: {
                 <span>{page.status}</span>
               </div>
               <small>
-                render {page.render_attempts}/10 · review {page.self_review_attempts}/3 · agent {page.agent_failures}/3
+                render {page.render_attempts}/{MAX_RENDER_ATTEMPTS} · review {page.self_review_attempts}/{MAX_SELF_REVIEW_ATTEMPTS} · agent {page.agent_failures}/{MAX_AGENT_FAILURES}
                 {page.agent_infrastructure_failures > 0 ? ` · session ${page.agent_infrastructure_failures}` : ""}
               </small>
               {page.last_error ? <p>{page.last_error}</p> : null}

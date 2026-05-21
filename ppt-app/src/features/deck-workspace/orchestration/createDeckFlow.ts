@@ -20,9 +20,9 @@ import type { AiClient } from "../../../ai/aiClient";
 import type { ContextRow } from "../types";
 import type { Locale } from "../../../i18n/messages";
 
-const MAX_RENDER_ATTEMPTS = 10;
-const MAX_SELF_REVIEW_ATTEMPTS = 5;
-const MAX_AGENT_FAILURES = 5;
+export const MAX_RENDER_ATTEMPTS = 10;
+export const MAX_SELF_REVIEW_ATTEMPTS = 5;
+export const MAX_AGENT_FAILURES = 5;
 
 export type CreateDeckFlowPhase =
   | "outline"
