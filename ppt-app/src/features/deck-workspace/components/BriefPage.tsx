@@ -1,4 +1,4 @@
-import { File, Plus, Sparkles, Upload, X } from "lucide-react";
+import { Check, File, Plus, Sparkles, Upload, X } from "lucide-react";
 import type { Messages } from "../../../i18n/messages";
 import type { ContextRow, LoadingKind } from "../types";
 import {
@@ -37,6 +37,8 @@ export function BriefPage(props: BriefPageProps) {
     prompt,
     setPrompt,
     loading,
+    reviewOutlineFirst,
+    setReviewOutlineFirst,
     contextRows,
     addContextRow,
     updateContextRow,
@@ -80,6 +82,19 @@ export function BriefPage(props: BriefPageProps) {
           {t.controls.createDeck}
         </button>
       </div>
+
+      <button
+        type="button"
+        className={`checkbox-row ${reviewOutlineFirst ? "active" : ""}`}
+        onClick={() => setReviewOutlineFirst(!reviewOutlineFirst)}
+        aria-checked={reviewOutlineFirst}
+        role="switch"
+      >
+        <span className="checkbox-custom">
+          {reviewOutlineFirst ? <Check size={11} strokeWidth={3} /> : null}
+        </span>
+        <span>{t.brief.reviewOutlineFirst}</span>
+      </button>
 
       {createDeckProgress ? (
         <GenerationProgressPanel

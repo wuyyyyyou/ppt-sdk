@@ -17,6 +17,7 @@ export interface Messages {
     updateOutline: string;
     createOutline: string;
     createDeckFromOutline: string;
+    confirmOutline: string;
     reviseOutline: string;
     refineDeck: string;
     refineSlide: string;
@@ -188,6 +189,7 @@ export const messages: Record<Locale, Messages> = {
       updateOutline: "Update outline",
       createOutline: "Create outline",
       createDeckFromOutline: "Create deck",
+      confirmOutline: "Confirm outline and continue",
       reviseOutline: "Revise outline",
       refineDeck: "Refine deck",
       refineSlide: "Refine slide",
@@ -277,7 +279,7 @@ export const messages: Record<Locale, Messages> = {
       title: "Review outline",
       helper: "Adjust the structure before Anna designs the deck.",
       feedbackPlaceholder:
-        "Add a security slide, make it more executive-facing, or reduce to 5 slides...",
+        "Enter a rewrite request, such as adding a security slide, making it more executive-facing, or reducing to 5 slides...",
       fallbackSummary: "Add supporting points and details for this slide."
     },
     deck: {
@@ -405,6 +407,7 @@ export const messages: Record<Locale, Messages> = {
       updateOutline: "更新大纲",
       createOutline: "创建大纲",
       createDeckFromOutline: "创建演示文稿",
+      confirmOutline: "确认大纲并继续",
       reviseOutline: "调整大纲",
       refineDeck: "优化整套",
       refineSlide: "优化当前页",
@@ -492,8 +495,8 @@ export const messages: Record<Locale, Messages> = {
     },
     outline: {
       title: "审阅大纲",
-      helper: "在 Anna 设计页面前调整结构。",
-      feedbackPlaceholder: "增加安全页、改成更面向高管、或缩减到 5 页...",
+      helper: "先改结构，再确认后继续生成。",
+      feedbackPlaceholder: "输入重构需求，例如增加安全页、改成更面向高管，或缩减到 5 页...",
       fallbackSummary: "为这一页补充要点和细节。"
     },
     deck: {

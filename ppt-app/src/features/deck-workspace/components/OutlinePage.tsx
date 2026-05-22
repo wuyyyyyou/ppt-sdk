@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { CheckCircle2, ChevronDown } from "lucide-react";
 import type { OutlineDetail } from "../../../data/mockDeck";
 import type { Messages } from "../../../i18n/messages";
 import type { CreateDeckFlowProgress } from "../orchestration/createDeckFlow";
@@ -60,10 +60,10 @@ export function OutlinePage(props: OutlinePageProps) {
           <button
             className="primary-btn"
             onClick={createDeck}
-            disabled={loading === "deckFromOutline"}
+            disabled={loading === "deck" || loading === "outline"}
           >
-            {loading === "deckFromOutline" ? <span className="spinner small" /> : null}
-            {t.controls.createDeckFromOutline}
+            {loading === "deck" ? <span className="spinner small" /> : <CheckCircle2 size={14} />}
+            {t.controls.confirmOutline}
           </button>
         </div>
       </div>

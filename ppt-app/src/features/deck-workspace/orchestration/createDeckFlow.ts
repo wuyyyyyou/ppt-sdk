@@ -66,17 +66,25 @@ export interface CreateDeckFlowProgress {
   stream?: CreateDeckFlowStream;
 }
 
-export interface CreateDeckFlowInput {
+interface DeckFlowContext {
   backend: PptBackend;
-  aiClient: AiClient;
   agentClient: AgentClient;
   workspace: WorkspaceResult;
-  prompt: string;
-  contextRows: ContextRow[];
-  setting: WorkspaceSettings;
   locale: Locale;
   onProgress: (progress: CreateDeckFlowProgress) => void;
   isCancelled: () => boolean;
+}
+
+export interface CreateDeckFlowInput extends DeckFlowContext {
+  aiClient: AiClient;
+  prompt: string;
+  contextRows: ContextRow[];
+  setting: WorkspaceSettings;
+}
+
+export interface CreateDeckFlowFromOutlineInput extends DeckFlowContext {
+  aiClient: AiClient;
+  outline: WorkspaceOutline;
 }
 
 export interface CreateDeckFlowResult {
@@ -109,7 +117,7 @@ function mapProgress(progress: PageProgress | null): CreateDeckFlowProgressPage[
 }
 
 function emit(
-  input: CreateDeckFlowInput,
+  input: Pick<DeckFlowContext, "onProgress">,
   value: Omit<CreateDeckFlowProgress, "pages">,
   progress: PageProgress | null,
   stream?: CreateDeckFlowStream | null
@@ -122,7 +130,7 @@ function emit(
 }
 
 async function recordProgress(
-  input: CreateDeckFlowInput,
+  input: Pick<DeckFlowContext, "backend" | "workspace">,
   page: PagePlanItem,
   patch: Record<string, unknown>
 ) {
@@ -264,7 +272,7 @@ function appendTextToLines(lines: string[], chunk: string, limit: number) {
 }
 
 function createAgentRunTracker(input: {
-  flowInput: CreateDeckFlowInput;
+  flowInput: DeckFlowContext;
   page: PagePlanItem;
   phase: CreateDeckFlowPhase;
   message: string;
@@ -361,7 +369,7 @@ function createAgentRunTracker(input: {
 }
 
 async function appendWorkspaceLogSafe(
-  input: CreateDeckFlowInput,
+  input: Pick<DeckFlowContext, "backend" | "workspace">,
   channel: "ai-outline" | "ai-page-plan" | "ai-page-agent" | "ai-page-agent-stream",
   entry: Record<string, unknown>
 ) {
@@ -376,46 +384,22 @@ async function appendWorkspaceLogSafe(
   }
 }
 
-export async function runCreateDeckFlow(
-  input: CreateDeckFlowInput
+export async function runDeckFlowFromOutline(
+  input: CreateDeckFlowFromOutlineInput
 ): Promise<CreateDeckFlowResult> {
   let progress: PageProgress | null = null;
+  const outline = input.outline;
 
-  emit(input, {
-    phase: "outline",
-    message: "正在调用 LLM 生成大纲",
-    currentPageIndex: null,
-    totalPages: 0,
-  }, progress);
-
-  const outlineResult = await input.aiClient.generateOutline({
-    prompt: input.prompt,
-    contextRows: input.contextRows,
-    locale: input.locale,
-    setting: input.setting,
-  });
-  const outline = buildOutlineArtifact(outlineResult, input);
-  await input.backend.updateWorkspaceOutline({
-    workspace_dir: input.workspace.workspace_dir,
-    outline,
-  });
-
-  if (input.isCancelled()) {
-    emit(input, {
-      phase: "cancelled",
-      message: "已停止生成",
+  emit(
+    input,
+    {
+      phase: "page-plan",
+      message: "正在规划页面和模板蓝图",
       currentPageIndex: null,
       totalPages: outline.items.length,
-    }, progress);
-    throw new Error("Deck generation cancelled.");
-  }
-
-  emit(input, {
-    phase: "page-plan",
-    message: "正在规划页面和模板蓝图",
-    currentPageIndex: null,
-    totalPages: outline.items.length,
-  }, progress);
+    },
+    progress
+  );
 
   const planningContext = await input.backend.getTemplatePlanningContext({
     workspace_dir: input.workspace.workspace_dir,
@@ -437,12 +421,16 @@ export async function runCreateDeckFlow(
     page_plan: pagePlan,
   });
 
-  emit(input, {
-    phase: "prepare",
-    message: "正在准备页面文件",
-    currentPageIndex: null,
-    totalPages: pagePlan.pages.length,
-  }, progress);
+  emit(
+    input,
+    {
+      phase: "prepare",
+      message: "正在准备页面文件",
+      currentPageIndex: null,
+      totalPages: pagePlan.pages.length,
+    },
+    progress
+  );
 
   await input.backend.preparePageFiles({
     workspace_dir: input.workspace.workspace_dir,
@@ -456,29 +444,40 @@ export async function runCreateDeckFlow(
 
     const existingPageProgress = getProgressPage(progress, page.page_id);
     if (existingPageProgress?.status === "accepted") {
-      emit(input, {
-        phase: "authoring",
-        message: `第 ${page.index + 1} 页已通过，继续下一页`,
-        currentPageIndex: page.index,
-        totalPages: pagePlan.pages.length,
-      }, progress);
+      emit(
+        input,
+        {
+          phase: "authoring",
+          message: `第 ${page.index + 1} 页已通过，继续下一页`,
+          currentPageIndex: page.index,
+          totalPages: pagePlan.pages.length,
+        },
+        progress
+      );
       continue;
     }
 
     progress = await recordProgress(input, page, { status: "authoring" });
-    emit(input, {
-      phase: "authoring",
-      message: `正在生成第 ${page.index + 1} / ${pagePlan.pages.length} 页`,
-      currentPageIndex: page.index,
-      totalPages: pagePlan.pages.length,
-    }, progress);
+    emit(
+      input,
+      {
+        phase: "authoring",
+        message: `正在生成第 ${page.index + 1} / ${pagePlan.pages.length} 页`,
+        currentPageIndex: page.index,
+        totalPages: pagePlan.pages.length,
+      },
+      progress
+    );
 
     let renderAttempts = existingPageProgress?.render_attempts ?? 0;
     let selfReviewAttempts = existingPageProgress?.self_review_attempts ?? 0;
     let agentFailures = existingPageProgress?.agent_failures ?? 0;
-    let agentInfrastructureFailures = existingPageProgress?.agent_infrastructure_failures ?? 0;
+    let agentInfrastructureFailures =
+      existingPageProgress?.agent_infrastructure_failures ?? 0;
     let renderError =
-      existingPageProgress?.status === "render_fixing" ? existingPageProgress.last_error : "";
+      existingPageProgress?.status === "render_fixing"
+        ? existingPageProgress.last_error
+        : "";
     let selfReview =
       existingPageProgress?.status === "self_review_fixing"
         ? (existingPageProgress.review as AgentSelfReviewResult | null)
@@ -534,12 +533,16 @@ export async function runCreateDeckFlow(
             agent_infrastructure_failures: agentInfrastructureFailures,
             last_error: message,
           });
-          emit(input, {
-            phase: "error",
-            message,
-            currentPageIndex: page.index,
-            totalPages: pagePlan.pages.length,
-          }, progress);
+          emit(
+            input,
+            {
+              phase: "error",
+              message,
+              currentPageIndex: page.index,
+              totalPages: pagePlan.pages.length,
+            },
+            progress
+          );
           throw error;
         }
 
@@ -559,12 +562,16 @@ export async function runCreateDeckFlow(
 
       let preview: RenderWorkspacePagePreviewResult;
       try {
-        emit(input, {
-          phase: "render",
-          message: `正在渲染第 ${page.index + 1} 页`,
-          currentPageIndex: page.index,
-          totalPages: pagePlan.pages.length,
-        }, progress);
+        emit(
+          input,
+          {
+            phase: "render",
+            message: `正在渲染第 ${page.index + 1} 页`,
+            currentPageIndex: page.index,
+            totalPages: pagePlan.pages.length,
+          },
+          progress
+        );
         preview = await input.backend.renderWorkspacePagePreview({
           workspace_dir: input.workspace.workspace_dir,
           page_index: page.index,
@@ -587,12 +594,16 @@ export async function runCreateDeckFlow(
         continue;
       }
 
-      emit(input, {
-        phase: "self-review",
-        message: `正在自评第 ${page.index + 1} 页截图`,
-        currentPageIndex: page.index,
-        totalPages: pagePlan.pages.length,
-      }, progress);
+      emit(
+        input,
+        {
+          phase: "self-review",
+          message: `正在自评第 ${page.index + 1} 页截图`,
+          currentPageIndex: page.index,
+          totalPages: pagePlan.pages.length,
+        },
+        progress
+      );
       const selfReviewPrompt = buildSelfReviewPrompt({
         page,
         screenshotPath: preview.screenshot_path,
@@ -631,12 +642,16 @@ export async function runCreateDeckFlow(
             agent_infrastructure_failures: agentInfrastructureFailures,
             last_error: message,
           });
-          emit(input, {
-            phase: "error",
-            message,
-            currentPageIndex: page.index,
-            totalPages: pagePlan.pages.length,
-          }, progress);
+          emit(
+            input,
+            {
+              phase: "error",
+              message,
+              currentPageIndex: page.index,
+              totalPages: pagePlan.pages.length,
+            },
+            progress
+          );
           throw error;
         }
 
@@ -681,12 +696,16 @@ export async function runCreateDeckFlow(
   }
 
   if (input.isCancelled()) {
-    emit(input, {
-      phase: "cancelled",
-      message: "已停止生成",
-      currentPageIndex: null,
-      totalPages: pagePlan.pages.length,
-    }, progress);
+    emit(
+      input,
+      {
+        phase: "cancelled",
+        message: "已停止生成",
+        currentPageIndex: null,
+        totalPages: pagePlan.pages.length,
+      },
+      progress
+    );
     throw new Error("Deck generation cancelled.");
   }
 
@@ -695,36 +714,48 @@ export async function runCreateDeckFlow(
   });
   const failedPage = progress.pages.find((page) => page.status !== "accepted");
   if (failedPage) {
-    emit(input, {
-      phase: "error",
-      message: `第 ${failedPage.index + 1} 页未通过：${failedPage.status}`,
-      currentPageIndex: failedPage.index,
-      totalPages: pagePlan.pages.length,
-    }, progress);
+    emit(
+      input,
+      {
+        phase: "error",
+        message: `第 ${failedPage.index + 1} 页未通过：${failedPage.status}`,
+        currentPageIndex: failedPage.index,
+        totalPages: pagePlan.pages.length,
+      },
+      progress
+    );
     throw new Error(
       failedPage.last_error ||
         `Page ${failedPage.index + 1} did not pass generation (${failedPage.status}).`
     );
   }
 
-  emit(input, {
-    phase: "final-render",
-    message: "正在生成最终预览",
-    currentPageIndex: null,
-    totalPages: pagePlan.pages.length,
-  }, progress);
+  emit(
+    input,
+    {
+      phase: "final-render",
+      message: "正在生成最终预览",
+      currentPageIndex: null,
+      totalPages: pagePlan.pages.length,
+    },
+    progress
+  );
   const rendered = await input.backend.renderDeckHtml({
     workspace_dir: input.workspace.workspace_dir,
   });
   progress = await input.backend.getPageProgress({
     workspace_dir: input.workspace.workspace_dir,
   });
-  emit(input, {
-    phase: "complete",
-    message: "演示文稿已生成",
-    currentPageIndex: null,
-    totalPages: pagePlan.pages.length,
-  }, progress);
+  emit(
+    input,
+    {
+      phase: "complete",
+      message: "演示文稿已生成",
+      currentPageIndex: null,
+      totalPages: pagePlan.pages.length,
+    },
+    progress
+  );
 
   return {
     outline,
@@ -732,4 +763,41 @@ export async function runCreateDeckFlow(
     progress,
     rendered,
   };
+}
+
+export async function runCreateDeckFlow(
+  input: CreateDeckFlowInput
+): Promise<CreateDeckFlowResult> {
+  emit(input, {
+    phase: "outline",
+    message: "正在调用 LLM 生成大纲",
+    currentPageIndex: null,
+    totalPages: 0,
+  }, null);
+
+  const outlineResult = await input.aiClient.generateOutline({
+    prompt: input.prompt,
+    contextRows: input.contextRows,
+    locale: input.locale,
+    setting: input.setting,
+  });
+  const outline = buildOutlineArtifact(outlineResult, input);
+  await input.backend.updateWorkspaceOutline({
+    workspace_dir: input.workspace.workspace_dir,
+    outline,
+  });
+
+  if (input.isCancelled()) {
+    emit(input, {
+      phase: "cancelled",
+      message: "已停止生成",
+      currentPageIndex: null,
+      totalPages: outline.items.length,
+    }, null);
+    throw new Error("Deck generation cancelled.");
+  }
+  return runDeckFlowFromOutline({
+    ...input,
+    outline,
+  });
 }
