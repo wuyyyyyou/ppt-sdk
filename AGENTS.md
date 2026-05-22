@@ -1,75 +1,67 @@
 # Agent 项目指南
 
-这是本仓库面向 coding agent 的通用入口。旧的 `CLAUDE.md`、`Agent.md` 和 `AGENT.md` 不再使用。
+这是本仓库面向 coding agent 的入口说明。旧的 `CLAUDE.md`、`Agent.md`、`AGENT.md` 不再使用。
 
-本文件只保留稳定约束、入口路径和容易踩坑的规则。具体实现状态以代码、README 和相关 docs 为准。
+## 先读这些
 
-## Agent skills
+- [`CONTEXT.md`](CONTEXT.md)
+- [`docs/adr/`](docs/adr/)
+- [`ppt-app/README.md`](ppt-app/README.md)
+- [`presenton-template-engine/README.md`](presenton-template-engine/README.md)
+- [`presenton-pptx-generator/README.md`](presenton-pptx-generator/README.md)
 
-### Issue tracker
+如果 `CONTEXT.md` 或 `docs/adr/` 暂时不存在，静默跳过即可。不要同时创建 `context.md` 和 `CONTEXT.md`；在大小写不敏感文件系统上它们会指向同一路径。
 
-这个仓库的 issue 和 PRD 放在 `.scratch/` 里的 markdown 文件中。见 `docs/agents/issue-tracker.md`。
+## 仓库概览
 
-### Triage labels
+当前主线是 [`ppt-app/`](ppt-app/)：把现有 PPT 生成链路包装成可交互的 Anna App 工作台。
 
-五个标准 triage 角色和默认标签名一一对应。见 `docs/agents/triage-labels.md`。
+相关子项目：
 
-### Domain docs
+- [`presenton-template-engine/`](presenton-template-engine/)：模板发现、HTML 渲染、PPTX model 转换、校验、任务状态机、工作区能力。
+- [`presenton-pptx-generator/`](presenton-pptx-generator/)：把 `PptxPresentationModel` 写成最终 `.pptx`。
+- [`devtools/state-machine-debugger/`](devtools/state-machine-debugger/)：只在排查任务状态机时使用。
 
-这是一个单上下文仓库，根目录下放 `CONTEXT.md` 和 `docs/adr/`。见 `docs/agents/domain.md`。
-
-如果 `CONTEXT.md` 暂时不存在，静默跳过即可。不要同时创建 `context.md` 和 `CONTEXT.md`；在大小写不敏感文件系统上它们会指向同一路径。
-
-## 当前开发重点
-
-当前重点是 [`ppt-app/`](ppt-app/)：把现有 PPT 生成工具链包装成可交互 Anna App 的工作台。
-
-旧的底层 PPT 生成链路仍然存在：
+完整链路仍然是：
 
 ```text
 manifest.json -> deck.html -> ppt-model.json -> .pptx
 ```
 
-新功能和日常开发优先围绕 `ppt-app`、Anna App runtime、app-facing tools、工作区 artifacts 和用户审阅流程展开。
+## 当前代码架构
 
-## 仓库结构
+### `ppt-app`
 
-- [`ppt-app/`](ppt-app/)：Anna App 前端，Vite + React + TypeScript。前端通过 `PptBackend` 调后端能力。
-- [`presenton-template-engine/`](presenton-template-engine/)：模板发现、HTML 渲染、PPTX model 转换，以及 `ppt-engine` app-facing tools。
-- [`presenton-pptx-generator/`](presenton-pptx-generator/)：根据 `ppt-model.json` 生成最终 `.pptx`。
-- [`anna-executa-examples/`](anna-executa-examples/)：Anna App / Executa 规范和示例。
+- `src/app/`：应用入口、路由和整体壳子。
+- `src/features/`：按业务域切分的功能层，主要有 `deck-workspace`、`outline`、`requirements`、`templates`、`review`、`export`、`task`、`pages`。
+- `src/api/`：前端后端适配层，React 页面只通过 `PptBackend` 调用。
+- `src/runtime/`：Anna runtime 连接与模式识别。
+- `src/ai/`、`src/agent/`：LLM 提示词、解析和 agent 相关逻辑。
+- `src/state/`：本地状态管理。
 
-优先阅读：
+### `presenton-template-engine`
 
-1. [`ppt-app/README.md`](ppt-app/README.md)
-2. [`ppt-app/manifest.json`](ppt-app/manifest.json)
-3. [`ppt-app/src/api/pptBackend.ts`](ppt-app/src/api/pptBackend.ts)
-4. [`ppt-app/src/api/annaPptBackend.ts`](ppt-app/src/api/annaPptBackend.ts)
-5. [`ppt-app/src/runtime/annaRuntime.ts`](ppt-app/src/runtime/annaRuntime.ts)
-6. [`presenton-template-engine/example_plugin.js`](presenton-template-engine/example_plugin.js)
-7. [`presenton-template-engine/src/app-workspace/`](presenton-template-engine/src/app-workspace/)
+- `src/app/presentation-templates/`：内置模板、蓝图和主题。
+- `src/app-workspace/`：工作区 artifact 读写和聚合。
+- `src/html-to-pptx-model/`：HTML / DOM 到 PPTX model 的抽取与转换。
+- `src/render/`：Deck / slide 渲染与运行时 bundle。
+- `src/validate/`：静态与渲染后校验。
+- `src/task-state-machine/`：任务状态机、恢复、查询与持久化。
+- `src/discovery/`、`src/local-template/`、`src/browser/`、`src/http/`、`src/cli.ts`：发现、本地模板、浏览器渲染、HTTP 和 CLI 入口。
 
-## Anna App 调用边界
+### `presenton-pptx-generator`
 
-Anna App tool 调用形态必须是：
+- `src/presenton_sdk_pptx_generator/`：Python 端的最终 `.pptx` 生成逻辑。
+- `example_plugin.py`：Anna Executa 插件入口。
 
-```ts
-await anna.tools.invoke({
-  tool_id: "tool-lightvoss_5433-ppt-engine-6443rj2a",
-  method: "app_list_workspaces",
-  args: {}
-});
-```
-
-不要把前端的 `tools.invoke` 写成插件内部 JSON-RPC envelope。底层 Executa 插件仍使用 JSON-RPC over stdio，但前端只接触 Anna Runtime SDK。
-
-职责边界：
+## 关键边界
 
 - React 页面组件只调用 `PptBackend`。
-- Anna Runtime / standalone 差异只放在 adapter 层。
+- Anna Runtime / standalone 的差异只放在 adapter 层。
 - 工作区文件读写和 gate 判断放在 `ppt-engine` app-facing tools。
 - `ppt-gener` 保持单一职责，只生成最终 `.pptx`。
 - 前端不能直接读写本地文件系统。
+- 不要把前端的 `tools.invoke` 写成插件内部 JSON-RPC envelope。
 
 ## Tool ID 不变量
 
@@ -77,7 +69,8 @@ await anna.tools.invoke({
 
 - [`ppt-app/manifest.json`](ppt-app/manifest.json) 的 `required_executas[].tool_id`
 - [`ppt-app/manifest.json`](ppt-app/manifest.json) 的 `ui.host_api.tools`
-- [`ppt-app/src/api/annaPptBackend.ts`](ppt-app/src/api/annaPptBackend.ts) 的默认 tool id，或 `.env` 里的 `VITE_PPT_*_TOOL_ID`
+- [`ppt-app/src/api/annaPptBackend.ts`](ppt-app/src/api/annaPptBackend.ts) 里的默认 tool id
+- `.env` 里的 `VITE_PPT_ENGINE_TOOL_ID` 和 `VITE_PPT_GENER_TOOL_ID`
 - [`ppt-app/executas/*/executa.json`](ppt-app/executas/)
 - 真实插件 `describe` 返回的 manifest `name`
 
@@ -88,83 +81,92 @@ ppt-engine: tool-lightvoss_5433-ppt-engine-6443rj2a
 ppt-gener:  tool-lightvoss_5433-ppt-gener-dc7ftcep
 ```
 
-## 本地运行
+## 开发与运行
 
-在 `ppt-app/` 下常用命令：
+- 默认不要自己启动 `npm run dev` 或 `anna-app dev`。
+- 一般由用户自己在本机启动 dev server，并打开 `http://localhost:5180/`。
+- 如果需要看 UI 或复现 bug，优先用 Chrome DevTools MCP 操作用户已经打开的 `http://localhost:5180/`。
+- 如果发现用户没有启动 dev server，就直接提醒用户启动，不要代为拉起。
+- 不要重新引入独立 Vite dev server proxy 路径。
 
-```bash
-npm run build
-npm run dev
-npm run dev:mock-llm
-npm run check
-npm run validate
-```
-
-`npm run dev` 实际运行 `anna-app dev`。不要重新引入独立 Vite dev server proxy 路径。
-
-没有登录 Anna LLM / Agent 时可以用：
+`ppt-app` 里常用命令是：
 
 ```bash
-npm run dev -- --no-llm
+cd ppt-app && npm run build
+cd ppt-app && npm run check
+cd ppt-app && npm run validate
+cd ppt-app && npm run dev:mock-llm
+cd ppt-app && npm run dev:mock-llm:retry
 ```
 
-但 `--no-llm` 只能检查 UI 和 tool invoke，不能验证大纲生成。确定性大纲测试优先用：
+`npm run dev` 仍然是正式的本地入口，但只在用户明确要求时配合使用。
+
+`presenton-template-engine` 里常用命令是：
 
 ```bash
-npm run build
-npm run dev:mock-llm
+cd presenton-template-engine && npm run build
+cd presenton-template-engine && npm run build:full
+cd presenton-template-engine && npm run check
+cd presenton-template-engine && npm run test:unit
+cd presenton-template-engine && npm run start
+cd presenton-template-engine && npm run start:plugin
 ```
 
-真实 LLM 模式需要先执行 `anna-app login`。
+`presenton-pptx-generator` 里常用命令是：
+
+```bash
+cd presenton-pptx-generator && uv venv .venv
+cd presenton-pptx-generator && UV_CACHE_DIR=$(pwd)/.uv-cache uv pip install --python .venv/bin/python -e .
+cd presenton-pptx-generator && .venv/bin/python example_plugin.py
+```
 
 ## 构建与验证顺序
 
-如果某些东西看起来“过期”或“没同步”，按这个顺序构建：
+如果改动涉及下游产物，优先按这个顺序：
 
-1. `cd presenton-template-engine && npm run build`。如果模板预览图变了，用 `npm run build:full`。
-2. `cd ppt-app && npm run build`。这一步会先自动运行 preview sync。
-3. `cd ppt-app && npm run validate`，确认 manifest 和 bundle 能通过 `anna-app validate --strict`。
+1. `cd presenton-template-engine && npm run build`
+2. 如果模板预览图变了，再跑 `cd presenton-template-engine && npm run build:full`
+3. `cd ppt-app && npm run build`
+4. `cd ppt-app && npm run validate`
 
-如果修改 `presenton-template-engine/src/**`，需要重新构建 engine，因为 `example_plugin.js` 从 `dist/index.js` 导入。
+如果修改了 `presenton-template-engine/src/**`，要先重建 engine，因为 `example_plugin.js` 从 `dist/index.js` 导入。
 
-## 模板预览约束
+如果改动只在 `ppt-app/src/**`，通常先跑 `npm run check`，再根据需要跑 `npm run build` 或 `npm run validate`。
 
-模板选择器使用静态图片 URL，不使用 data URL。图片字节不要走 JSON-RPC 通道。
+## 测试
 
-预览图来源：
+- `presenton-template-engine/test/**/*.test.ts` 是主要的单测入口，命令是 `npm run test:unit`。
+- `ppt-app` 目前主要靠 `npm run check`、`npm run build` 和 `npm run validate` 做回归。
+- `presenton-pptx-generator` 主要靠插件启动和 `build_binary.sh --test` 做冒烟验证。
+- 新增测试时，优先沿用现有目录和命名：`*.test.ts`。
 
-```text
-presenton-template-engine/dist/template-previews/groups/<group>/*.png
-```
+## 模板与预览
 
-前端同步目标：
+- 模板选择器使用静态图片 URL，不使用 data URL。
+- 预览图来源：`presenton-template-engine/dist/template-previews/groups/<group>/*.png`
+- 前端同步目标：`ppt-app/public/template-previews/<group>/`
+- `ppt-app/scripts/sync-template-previews.mjs` 已接到 `predev` / `prebuild`。
+- 普通 `npm run build` 不会重新生成预览图；模板预览变更时用 `npm run build:full`。
 
-```text
-ppt-app/public/template-previews/<group>/
-```
-
-`ppt-app/scripts/sync-template-previews.mjs` 已接入 `predev` / `prebuild`。普通 `npm run build` 不会重新生成预览图；模板预览变更时用 `npm run build:full`。
-
-## Anna Runtime 与 JSON-RPC 约束
+## Anna Runtime 与 tool 返回值
 
 - Anna runtime 目前还不能原生理解 `__file_transport` pointer response。
-- `ppt-app/executas/ppt-engine-local/ppt_engine_local.js` 是协议适配器，会读取 pointer file 并把 JSON 内联回 stdout。runtime 原生支持 pointer 之前不要删除它。
+- `ppt-app/executas/ppt-engine-local/ppt_engine_local.js` 会把 pointer file 内联回 stdout，原生支持 pointer 之前不要删除它。
 - 适配器有 1 MB 内联上限。超过上限的 tool response 应返回 URL / path / artifact ID。
-- 长期规则：任何超过约 64 KB 的 tool response 都应返回引用，不要返回字节本身。
-
-## Workflow 原则
-
-`ppt-app` 的工作流应是 artifact-driven，不是严格线性状态机。
-
-判断“走到哪一步”时，优先从工作区 artifacts、status JSON、输入 hash / version、更新时间和 stale 原因派生，而不是依赖单一状态字段。
-
-用户应能随时回到上游修改需求、偏好、模板、大纲、页面内容和 HTML 审阅反馈。上游 artifact 变化后，下游产物应能被判定为 stale，并引导用户重新生成或重新确认。
+- 长期规则：超过约 64 KB 的 tool response 尽量返回引用，不要返回字节本身。
 
 ## 常见坑
 
-- `AGENTS.md` 是 canonical agent guidance。不要再把新约束写进 `CLAUDE.md`、`Agent.md` 或 `AGENT.md`。
-- `MainStage` 从 `template` 开始，不是从 `brief` 开始。
-- `presenton-template-engine` 同时发布 ESM / CJS bundle；`import.meta.url` 路径需要 ESM-safe resolution，`__dirname` 路径需要 CJS-safe。
-- Puppeteer 运行慢且需要浏览器权限。`npm run build:template-previews` 在 sandbox 里可能需要提权；`npm run build` 不带 `:full` 会跳过 Puppeteer。
-- `app_get_template_preview` 服务端还存在但前端不再调用；删除前先确认 URL-based picker 在生产稳定。
+- `presenton-template-engine` 同时发布 ESM / CJS bundle；`import.meta.url` 和 `__dirname` 路径都要按各自语义处理。
+- Puppeteer 相关命令可能需要本机 Chrome / Chrome for Testing。
 - AI agent 编辑 `<workspace>/template/` 里的 TSX 时，不要复用静态图片选择器路径，也不要把未受信任的运行时代码放进 `ppt-app` 自己的 bundle 里渲染。
+- `AGENTS.md` 是本仓库 canonical 的 agent guidance；不要把新约束写回别的旧指导文件。
+
+## 术语与文档
+
+issue 和 PRD 放在 `.scratch/` 里的 markdown 文件中。相关说明见：
+
+- [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md)
+- [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md)
+- [`docs/agents/domain.md`](docs/agents/domain.md)
+
