@@ -389,6 +389,9 @@ export async function runDeckFlowFromOutline(
 ): Promise<CreateDeckFlowResult> {
   let progress: PageProgress | null = null;
   const outline = input.outline;
+  if (!outline || !Array.isArray(outline.items)) {
+    throw new Error("Missing confirmed outline for deck generation.");
+  }
 
   emit(
     input,

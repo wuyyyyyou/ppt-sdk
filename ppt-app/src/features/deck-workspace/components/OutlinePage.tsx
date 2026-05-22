@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronDown } from "lucide-react";
+import { CheckCircle2, Sparkles } from "lucide-react";
 import type { OutlineDetail } from "../../../data/mockDeck";
 import type { Messages } from "../../../i18n/messages";
 import type { CreateDeckFlowProgress } from "../orchestration/createDeckFlow";
@@ -9,9 +9,7 @@ import { GenerationProgressPanel } from "./BriefPage";
 interface OutlinePageProps {
   t: Messages;
   outline: OutlineDetail[];
-  expandedOutline: number | null;
-  setExpandedOutline: (index: number | null) => void;
-  updateOutlineItem: (index: number, title: string) => void;
+  updateOutlineItem: (index: number, patch: Partial<OutlineDetail>) => void;
   feedback: string;
   setFeedback: (value: string) => void;
   applyFeedback: () => Promise<void>;
@@ -25,8 +23,6 @@ export function OutlinePage(props: OutlinePageProps) {
   const {
     t,
     outline,
-    expandedOutline,
-    setExpandedOutline,
     updateOutlineItem,
     feedback,
     setFeedback,
@@ -46,26 +42,29 @@ export function OutlinePage(props: OutlinePageProps) {
         </div>
       </div>
 
-      <div className="feedback-box">
-        <textarea
-          className="prompt-input compact"
-          value={feedback}
-          onChange={(event) => setFeedback(event.target.value)}
-          placeholder={t.outline.feedbackPlaceholder}
-        />
-        <div className="feedback-actions">
-          <button className="secondary-btn" onClick={applyFeedback}>
-            {t.controls.reviseOutline}
-          </button>
-          <button
-            className="primary-btn"
-            onClick={createDeck}
-            disabled={loading === "deck" || loading === "outline"}
-          >
-            {loading === "deck" ? <span className="spinner small" /> : <CheckCircle2 size={14} />}
-            {t.controls.confirmOutline}
-          </button>
+      <div className="outline-review-controls">
+        <div className="feedback-box">
+          <textarea
+            className="prompt-input compact"
+            value={feedback}
+            onChange={(event) => setFeedback(event.target.value)}
+            placeholder={t.outline.feedbackPlaceholder}
+          />
+          <div className="feedback-actions">
+            <button className="primary-btn" onClick={applyFeedback} disabled={loading === "outline"}>
+              {loading === "outline" ? <span className="spinner small" /> : <Sparkles size={14} />}
+              {t.controls.reviseOutline}
+            </button>
+          </div>
         </div>
+        <button
+          className="primary-btn confirm-outline-btn"
+          onClick={createDeck}
+          disabled={loading === "deck" || loading === "outline"}
+        >
+          {loading === "deck" ? <span className="spinner small" /> : <CheckCircle2 size={14} />}
+          {t.controls.confirmOutline}
+        </button>
       </div>
 
       {createDeckProgress ? (
@@ -78,32 +77,27 @@ export function OutlinePage(props: OutlinePageProps) {
 
       <div className="outline-list-large">
         <div className="timeline-line" />
-        {outline.map((item, index) => {
-          const expanded = expandedOutline === index;
-          return (
-            <article key={`${item.title}-${index}`} className="outline-item-large">
-              <button
-                className="outline-item-head"
-                onClick={() => setExpandedOutline(expanded ? null : index)}
-              >
-                <span className="outline-num">{formatSlideNumber(index)}</span>
-                <input
-                  value={item.title}
-                  onClick={(event) => event.stopPropagation()}
-                  onChange={(event) => updateOutlineItem(index, event.target.value)}
-                />
-              </button>
-              <button
-                className="outline-summary"
-                onClick={() => setExpandedOutline(expanded ? null : index)}
-              >
-                <span>{item.outline || t.outline.fallbackSummary}</span>
-                <ChevronDown className={expanded ? "rotated" : ""} size={14} />
-              </button>
-              {expanded ? <p>{item.outline || t.outline.fallbackSummary}</p> : null}
-            </article>
-          );
-        })}
+        {outline.map((item, index) => (
+          <article key={`outline-item-${index}`} className="outline-item-large">
+            <div className="outline-item-head">
+              <span className="outline-num">{formatSlideNumber(index)}</span>
+              <input
+                value={item.title}
+                onChange={(event) =>
+                  updateOutlineItem(index, { title: event.target.value })
+                }
+              />
+            </div>
+            <textarea
+              className="outline-body-input"
+              value={item.outline}
+              onChange={(event) =>
+                updateOutlineItem(index, { outline: event.target.value })
+              }
+              placeholder={t.outline.fallbackSummary}
+            />
+          </article>
+        ))}
       </div>
     </section>
   );

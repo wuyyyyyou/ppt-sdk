@@ -47,7 +47,6 @@ export interface DeckWorkspaceActions {
   setLookPickerOpen: (value: boolean) => void;
   setDeckTitle: (value: string) => void;
   setCurrentSlide: (index: number) => void;
-  setExpandedOutline: (index: number | null) => void;
   setOutlineFeedback: (value: string) => void;
   setPreviewMode: (mode: PreviewMode) => void;
   setRefineScope: (scope: RefineScope) => void;
@@ -65,7 +64,7 @@ export interface DeckWorkspaceActions {
   generateDeck: () => Promise<void>;
   createDeckFromOutline: () => Promise<void>;
   applyOutlineFeedback: () => Promise<void>;
-  updateOutlineItem: (index: number, title: string) => void;
+  updateOutlineItem: (index: number, patch: Partial<WorkspaceOutlineItem>) => void;
   updateDeckTitle: (index: number, title: string) => void;
   moveSlide: (index: number, direction: -1 | 1) => void;
   deleteSlide: (index: number) => void;
@@ -100,7 +99,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [outline, setOutline] = useState(outlineDetails);
   const [generated, setGenerated] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [expandedOutline, setExpandedOutline] = useState<number | null>(null);
   const [outlineFeedback, setOutlineFeedback] = useState("");
   const [previewMode, setPreviewMode] = useState<PreviewMode>("grid");
   const [reviewRender, setReviewRender] = useState<DeckReviewRenderState>({
@@ -120,6 +118,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [aiClient, setAiClient] = useState<AiClient | null>(null);
   const [agentClient, setAgentClient] = useState<AgentClient | null>(null);
   const cancelCreateDeckRef = useRef(false);
+  const outlineAutosaveTimerRef = useRef<number | null>(null);
   const [workspaceScan, setWorkspaceScan] = useState<ListWorkspacesResult | null>(null);
   const [currentWorkspace, setCurrentWorkspace] = useState<WorkspaceResult | null>(null);
   const [workspaceLoading, setWorkspaceLoading] = useState(true);
@@ -451,6 +450,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     return () => {
       cancelled = true;
+      if (outlineAutosaveTimerRef.current !== null) {
+        window.clearTimeout(outlineAutosaveTimerRef.current);
+      }
       void nextAgentClient?.close();
     };
   }, []);
@@ -702,6 +704,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         aiClient,
         agentClient,
         workspace: confirmedWorkspace,
+        outline: confirmedWorkspace.outline as WorkspaceOutline,
         locale,
         onProgress: setCreateDeckProgress,
         isCancelled: () => cancelCreateDeckRef.current,
@@ -760,10 +763,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
-  function updateOutlineItem(index: number, title: string) {
+  function updateOutlineItem(index: number, patch: Partial<WorkspaceOutlineItem>) {
     setOutline((items) => {
       const next = items.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, title } : item
+        itemIndex === index ? { ...item, ...patch } : item
       );
       autosaveOutline(next);
       return next;
@@ -966,7 +969,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     title = deckTitle,
     workspaceOverride: WorkspaceResult | null = null,
     settingOverride: WorkspaceSettings | null = null,
-    status: "draft" | "confirmed" = "draft"
+    status: "draft" | "confirmed" = "draft",
+    applyWorkspaceState = true
   ) {
     if (!backend) return null;
     const workspace = workspaceOverride ?? (await ensureCurrentWorkspace());
@@ -983,18 +987,31 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         }
       }
     });
-    applyWorkspace(updatedWorkspace);
-    setWorkspaceScan(await backend.listWorkspaces());
+    if (applyWorkspaceState) {
+      applyWorkspace(updatedWorkspace);
+      setWorkspaceScan(await backend.listWorkspaces());
+    } else {
+      setCurrentWorkspace(updatedWorkspace);
+    }
     return updatedWorkspace;
   }
 
   function autosaveOutline(items: OutlineDetail[]) {
-    void saveOutlineArtifact(items).catch((error) => {
-      console.warn(
-        "Failed to autosave outline",
-        error instanceof Error ? error.message : error
+    if (outlineAutosaveTimerRef.current !== null) {
+      window.clearTimeout(outlineAutosaveTimerRef.current);
+    }
+
+    outlineAutosaveTimerRef.current = window.setTimeout(() => {
+      outlineAutosaveTimerRef.current = null;
+      void saveOutlineArtifact(items, deckTitle, null, null, "draft", false).catch(
+        (error) => {
+          console.warn(
+            "Failed to autosave outline",
+            error instanceof Error ? error.message : error
+          );
+        }
       );
-    });
+    }, 500);
   }
 
   async function scanWorkspaces() {
@@ -1332,7 +1349,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     outline,
     generated,
     currentSlide,
-    expandedOutline,
     outlineFeedback,
     previewMode,
     reviewRender,
@@ -1359,7 +1375,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setLookPickerOpen,
     setDeckTitle,
     setCurrentSlide,
-    setExpandedOutline,
     setOutlineFeedback,
     setPreviewMode,
     setRefineScope,

@@ -22,6 +22,9 @@ An outline that has been accepted for downstream generation.
 **Outline Review**:
 The user step where the outline is inspected, edited, or revised before continuing.
 
+**Rewrite Request**:
+A natural-language instruction used to revise the current outline draft as a whole.
+
 **Template**:
 The selected visual style family used to shape the deck.
 

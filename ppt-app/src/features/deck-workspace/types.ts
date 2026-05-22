@@ -61,7 +61,6 @@ export interface DeckWorkspaceState {
   outline: OutlineDetail[];
   generated: boolean;
   currentSlide: number;
-  expandedOutline: number | null;
   outlineFeedback: string;
   previewMode: PreviewMode;
   reviewRender: DeckReviewRenderState;

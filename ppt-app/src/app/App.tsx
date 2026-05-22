@@ -108,8 +108,6 @@ export function App() {
             <OutlinePage
               t={t}
               outline={state.outline}
-              expandedOutline={state.expandedOutline}
-              setExpandedOutline={actions.setExpandedOutline}
               updateOutlineItem={actions.updateOutlineItem}
               feedback={state.outlineFeedback}
               setFeedback={actions.setOutlineFeedback}
