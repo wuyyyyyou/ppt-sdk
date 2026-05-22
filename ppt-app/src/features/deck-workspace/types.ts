@@ -9,7 +9,7 @@ import type {
 } from "../../api/types";
 import type { CreateDeckFlowProgress } from "./orchestration/createDeckFlow";
 
-export type MainStage = "template" | "brief" | "outline" | "deck";
+export type MainStage = "template" | "brief" | "outline" | "generating" | "deck";
 export type PageId = "main" | "library" | "review" | "refine" | "export";
 export type PanelMode = "visible" | "minimized" | "closed";
 export type RefineScope = "deck" | "slide";
@@ -59,12 +59,15 @@ export interface DeckWorkspaceState {
   deckTitle: string;
   deck: Slide[];
   outline: OutlineDetail[];
+  outlineDraft: OutlineDetail[];
+  outlineEditMode: boolean;
   generated: boolean;
   currentSlide: number;
   outlineFeedback: string;
   previewMode: PreviewMode;
   reviewRender: DeckReviewRenderState;
   createDeckProgress: CreateDeckFlowProgress | null;
+  generationHistory: GenerationStreamSnapshot[];
   pageProgress: PageProgress | null;
   refineScope: RefineScope;
   loading: LoadingKind;
@@ -81,3 +84,16 @@ export interface DeckWorkspaceState {
 }
 
 export type { WorkspaceSettings };
+
+export interface GenerationStreamSnapshot {
+  id: string;
+  phase: string;
+  label: string;
+  page_id?: string;
+  page_index?: number;
+  status: string;
+  message: string;
+  lines: string[];
+  activities: string[];
+  updated_at: string;
+}

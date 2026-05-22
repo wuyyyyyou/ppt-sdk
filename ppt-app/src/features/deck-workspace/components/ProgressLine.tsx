@@ -9,20 +9,15 @@ interface ProgressLineProps {
 }
 
 export function ProgressLine({ stage, t, onNavigate }: ProgressLineProps) {
-  const progress =
-    stage === "template"
-      ? "0%"
-      : stage === "brief"
-        ? "33%"
-        : stage === "outline"
-          ? "66%"
-          : "100%";
+  const stages = ["template", "brief", "outline", "generating", "deck"] as MainStage[];
+  const currentIndex = Math.max(0, stages.indexOf(stage));
+  const progress = `${(currentIndex / (stages.length - 1)) * 100}%`;
 
   return (
     <div className="progress-line-container">
       <div className="progress-line-track" />
       <div className="progress-line-fill" style={{ width: progress }} />
-      {(["template", "brief", "outline", "deck"] as MainStage[]).map((item) => (
+      {stages.map((item) => (
         <button
           key={item}
           className={`progress-node ${

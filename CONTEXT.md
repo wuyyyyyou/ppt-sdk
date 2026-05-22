@@ -34,6 +34,18 @@ The slide-by-slide mapping from outline entries to planned pages.
 **Deck**:
 The finished presentation content before export.
 
+**Stale Deck**:
+A deck that was generated from an earlier outline, template, or setting and should not be presented as current until regenerated.
+
+**Deck Generation**:
+The process that turns a confirmed outline into presentation pages.
+
+**Active Deck Generation**:
+A deck generation process that is currently running; the confirmed outline is not open to edits during this period.
+
+**Generation Step**:
+A visible part of deck generation, such as planning pages, preparing files, authoring a page, rendering, self-review, or final rendering.
+
 ## Example Dialogue
 
 Dev: "The workspace has a draft outline, but not a confirmed outline yet."

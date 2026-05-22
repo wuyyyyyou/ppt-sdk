@@ -27,6 +27,7 @@ import type {
   DeckReviewRenderState,
   DeckWorkspaceState,
   ExportArtifact,
+  GenerationStreamSnapshot,
   LoadingKind,
   MainStage,
   PageId,
@@ -64,7 +65,10 @@ export interface DeckWorkspaceActions {
   generateDeck: () => Promise<void>;
   createDeckFromOutline: () => Promise<void>;
   applyOutlineFeedback: () => Promise<void>;
-  updateOutlineItem: (index: number, patch: Partial<WorkspaceOutlineItem>) => void;
+  beginOutlineEdit: () => void;
+  cancelOutlineEdit: () => void;
+  saveOutlineEdit: () => Promise<void>;
+  updateOutlineDraftItem: (index: number, patch: Partial<WorkspaceOutlineItem>) => void;
   updateDeckTitle: (index: number, title: string) => void;
   moveSlide: (index: number, direction: -1 | 1) => void;
   deleteSlide: (index: number) => void;
@@ -81,6 +85,8 @@ export interface DeckWorkspaceActions {
   refineSlide: () => Promise<void>;
   renderDeckHtml: () => Promise<void>;
   exportFile: (type: "PPTX" | "PDF") => Promise<void>;
+  returnToOutlineFromGeneration: () => void;
+  regenerateDeck: () => Promise<void>;
 }
 
 export function useDeckWorkspace(t: Messages, locale: Locale) {
@@ -97,6 +103,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [deckTitle, setDeckTitle] = useState(t.deck.title);
   const [deck, setDeck] = useState<Slide[]>(initialDeck);
   const [outline, setOutline] = useState(outlineDetails);
+  const [outlineDraft, setOutlineDraft] = useState(outlineDetails);
+  const [outlineDraftTitle, setOutlineDraftTitle] = useState(t.deck.title);
+  const [outlineEditMode, setOutlineEditMode] = useState(false);
   const [generated, setGenerated] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [outlineFeedback, setOutlineFeedback] = useState("");
@@ -109,6 +118,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   });
   const [createDeckProgress, setCreateDeckProgress] =
     useState<CreateDeckFlowProgress | null>(null);
+  const [generationHistory, setGenerationHistory] = useState<GenerationStreamSnapshot[]>([]);
   const [pageProgress, setPageProgress] = useState<PageProgress | null>(null);
   const [refineScope, setRefineScope] = useState<RefineScope>("deck");
   const [loading, setLoading] = useState<LoadingKind>("none");
@@ -273,8 +283,59 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return `file://${encodeURI(filePath)}`;
   }
 
+  function readOutlineUpdatedAt(workspace: WorkspaceResult) {
+    const outlineRecord =
+      workspace.outline && typeof workspace.outline === "object" && !Array.isArray(workspace.outline)
+        ? (workspace.outline as { updated_at?: unknown })
+        : null;
+    return typeof outlineRecord?.updated_at === "string" ? outlineRecord.updated_at : "";
+  }
+
+  function hasDownstreamArtifacts(workspace: WorkspaceResult) {
+    const pagePlanRecord =
+      workspace.page_plan && typeof workspace.page_plan === "object" && !Array.isArray(workspace.page_plan)
+        ? (workspace.page_plan as { pages?: unknown })
+        : null;
+    const progressRecord =
+      workspace.page_progress && typeof workspace.page_progress === "object" && !Array.isArray(workspace.page_progress)
+        ? (workspace.page_progress as { pages?: unknown })
+        : null;
+    const pagesRecord =
+      workspace.pages && typeof workspace.pages === "object" && !Array.isArray(workspace.pages)
+        ? (workspace.pages as { pages?: unknown })
+        : null;
+
+    return (
+      (Array.isArray(pagePlanRecord?.pages) && pagePlanRecord.pages.length > 0) ||
+      (Array.isArray(progressRecord?.pages) && progressRecord.pages.length > 0) ||
+      (Array.isArray(pagesRecord?.pages) && pagesRecord.pages.length > 0)
+    );
+  }
+
+  function isWorkspaceDeckStale(workspace: WorkspaceResult) {
+    const outlineUpdatedAt = readOutlineUpdatedAt(workspace);
+    const pagePlanRecord =
+      workspace.page_plan && typeof workspace.page_plan === "object" && !Array.isArray(workspace.page_plan)
+        ? (workspace.page_plan as { source?: { outline_updated_at?: unknown } })
+        : null;
+    const pagePlanOutlineUpdatedAt =
+      typeof pagePlanRecord?.source?.outline_updated_at === "string"
+        ? pagePlanRecord.source.outline_updated_at
+        : "";
+    const outlineRecord =
+      workspace.outline && typeof workspace.outline === "object" && !Array.isArray(workspace.outline)
+        ? (workspace.outline as { status?: unknown })
+        : null;
+
+    if (outlineUpdatedAt && pagePlanOutlineUpdatedAt) {
+      return outlineUpdatedAt !== pagePlanOutlineUpdatedAt;
+    }
+
+    return outlineRecord?.status === "draft" && hasDownstreamArtifacts(workspace);
+  }
+
   function hasRenderedWorkspacePages(workspace: WorkspaceResult) {
-    return workspacePagesToState(workspace.pages) !== null;
+    return !isWorkspaceDeckStale(workspace) && workspacePagesToState(workspace.pages) !== null;
   }
 
   function workspaceSettingsToState(workspace: WorkspaceResult | null): WorkspaceSettings {
@@ -374,11 +435,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     );
     setDeckTitle(getWorkspaceTitle(workspace));
     const workspaceOutline = workspaceOutlineToState(workspace.outline);
-    const workspacePages = workspacePagesToState(workspace.pages);
+    const staleDeck = isWorkspaceDeckStale(workspace);
+    const workspacePages = staleDeck ? null : workspacePagesToState(workspace.pages);
     const workspacePageProgress = normalizeWorkspacePageProgress(workspace.page_progress);
     setPageProgress(workspacePageProgress);
     setCreateDeckProgress(
-      !workspacePages && workspacePageProgress
+      !staleDeck && !workspacePages && workspacePageProgress
         ? workspacePageProgressToCreateDeckProgress(workspacePageProgress)
         : null
     );
@@ -392,10 +454,16 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     } else {
       setGenerated(false);
       setCurrentSlide(0);
+      if (staleDeck) {
+        setStage("outline");
+      }
     }
     if (workspaceOutline.length > 0) {
       setOutline(workspaceOutline);
-      if (!workspacePages) {
+      setOutlineDraft(workspaceOutline);
+      if (!workspacePages && workspacePageProgress && !staleDeck) {
+        setStage("generating");
+      } else if (!workspacePages) {
         setStage("outline");
       }
     }
@@ -457,6 +525,46 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     };
   }, []);
 
+  function progressHistoryId(progress: CreateDeckFlowProgress) {
+    if (progress.stream) {
+      return `${progress.phase}:${progress.stream.page_id}:${progress.stream.run_id ?? progress.stream.kind ?? progress.stream.status}`;
+    }
+    return `${progress.phase}:global`;
+  }
+
+  function progressHistoryLabel(progress: CreateDeckFlowProgress) {
+    if (progress.stream) {
+      return `第 ${progress.stream.page_index + 1} 页 · ${progress.stream.kind ?? progress.phase}`;
+    }
+    return progress.message || progress.phase;
+  }
+
+  function recordGenerationProgress(progress: CreateDeckFlowProgress) {
+    setCreateDeckProgress(progress);
+    const snapshot: GenerationStreamSnapshot = {
+      id: progressHistoryId(progress),
+      phase: progress.phase,
+      label: progressHistoryLabel(progress),
+      page_id: progress.stream?.page_id,
+      page_index: progress.stream?.page_index,
+      status: progress.stream?.status ?? progress.message,
+      message: progress.message,
+      lines: progress.stream ? [...progress.stream.lines] : [],
+      activities: progress.stream ? [...progress.stream.activities] : [],
+      updated_at: new Date().toISOString()
+    };
+    setGenerationHistory((items) => {
+      const existingIndex = items.findIndex((item) => item.id === snapshot.id);
+      if (existingIndex === -1) return [...items, snapshot];
+      return items.map((item, index) => (index === existingIndex ? snapshot : item));
+    });
+  }
+
+  function resetGenerationProgress() {
+    setCreateDeckProgress(null);
+    setGenerationHistory([]);
+  }
+
   const currentStatus = useMemo(() => {
     if (loading === "template") return t.template.loading;
     if (loading === "outline") return t.status.creatingOutline;
@@ -467,10 +575,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (loading === "refineDeck") return t.status.refiningDeck;
     if (loading === "refineSlide") return t.status.refiningSlide;
     if (loading === "export") return t.status.exporting;
+    if (stage === "generating") return createDeckProgress?.message ?? t.status.creatingDeck;
     if (stage === "outline") return t.status.outlineReady;
     if (generated) return deckReadyStatus(t, deck.length);
     return "";
-  }, [deck.length, generated, loading, stage, t]);
+  }, [createDeckProgress?.message, deck.length, generated, loading, stage, t]);
 
   function showToast(message: string) {
     setToast(message);
@@ -506,6 +615,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
     if (nextStage === "outline" && outline.length === 0) {
       showToast(t.toasts.createOutlineFirst);
+      return;
+    }
+    if (nextStage === "generating" && !createDeckProgress) {
+      showToast(t.toasts.createDeckFirst);
       return;
     }
     if (nextStage === "deck" && !generated) {
@@ -611,7 +724,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
       if (reviewOutlineFirst) {
         setLoading("outline");
-        setCreateDeckProgress(null);
+        resetGenerationProgress();
         const result = await aiClient.generateOutline({
           prompt,
           contextRows,
@@ -635,7 +748,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       }
 
       setLoading("deck");
-      setCreateDeckProgress(null);
+      resetGenerationProgress();
+      setStage("generating");
+      setPage("main");
       const result = await runCreateDeckFlow({
         backend,
         aiClient,
@@ -645,7 +760,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         contextRows,
         setting,
         locale,
-        onProgress: setCreateDeckProgress,
+        onProgress: recordGenerationProgress,
         isCancelled: () => cancelCreateDeckRef.current,
       });
       setDeckTitle(result.outline.title);
@@ -688,6 +803,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (!workspace) return;
 
     setLoading("deck");
+    resetGenerationProgress();
+    setStage("generating");
+    setPage("main");
     try {
       const setting = workspaceSettingsToState(workspace);
       const confirmedWorkspace = await saveOutlineArtifact(
@@ -698,6 +816,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         "confirmed"
       );
       if (!confirmedWorkspace) return;
+      setStage("generating");
+      setPage("main");
 
       const result = await runDeckFlowFromOutline({
         backend,
@@ -706,7 +826,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         workspace: confirmedWorkspace,
         outline: confirmedWorkspace.outline as WorkspaceOutline,
         locale,
-        onProgress: setCreateDeckProgress,
+        onProgress: recordGenerationProgress,
         isCancelled: () => cancelCreateDeckRef.current,
       });
       const refreshedWorkspace = await backend.openWorkspace({
@@ -742,17 +862,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     try {
       workspace = await ensureCurrentWorkspace();
       const setting = workspaceSettingsToState(workspace);
+      const baseTitle = outlineEditMode ? outlineDraftTitle : deckTitle;
+      const baseOutline = outlineEditMode ? outlineDraft : outline;
       const result = await aiClient.reviseOutline({
-        title: deckTitle,
-        outline,
+        title: baseTitle,
+        outline: baseOutline,
         feedback: outlineFeedback,
         locale,
         setting
       });
       await appendOutlineAiAttemptLogs(workspace, result.attempts);
-      setDeckTitle(result.outline.title);
-      setOutline(result.outline.items);
-      await saveOutlineArtifact(result.outline.items, result.outline.title, workspace, setting);
+      setOutlineDraftTitle(result.outline.title);
+      setOutlineDraft(result.outline.items);
+      setOutlineEditMode(true);
       setOutlineFeedback("");
       showToast(t.toasts.outlineUpdated);
     } catch (error) {
@@ -763,14 +885,63 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
-  function updateOutlineItem(index: number, patch: Partial<WorkspaceOutlineItem>) {
-    setOutline((items) => {
-      const next = items.map((item, itemIndex) =>
+  function beginOutlineEdit() {
+    if (loading === "deck" || loading === "deckFromOutline") {
+      showToast(t.status.creatingDeck);
+      return;
+    }
+    setOutlineDraft(outline.map((item) => ({ ...item })));
+    setOutlineDraftTitle(deckTitle);
+    setOutlineEditMode(true);
+  }
+
+  function cancelOutlineEdit() {
+    setOutlineDraft(outline.map((item) => ({ ...item })));
+    setOutlineDraftTitle(deckTitle);
+    setOutlineFeedback("");
+    setOutlineEditMode(false);
+  }
+
+  async function saveOutlineEdit() {
+    if (!outlineEditMode) return;
+    const workspace = await ensureCurrentWorkspace();
+    if (!workspace) return;
+    const setting = workspaceSettingsToState(workspace);
+    const downstreamExists = hasDownstreamArtifacts(workspace);
+    const updatedWorkspace = await saveOutlineArtifact(
+      outlineDraft,
+      outlineDraftTitle,
+      workspace,
+      setting,
+      "draft"
+    );
+    if (updatedWorkspace) {
+      setDeckTitle(outlineDraftTitle);
+      setOutline(outlineDraft);
+      setOutlineEditMode(false);
+      if (downstreamExists) {
+        setGenerated(false);
+        setReviewRender({
+          status: "idle",
+          result: null,
+          error: "",
+          renderKey: workspaceReviewRenderKey(updatedWorkspace)
+        });
+        resetGenerationProgress();
+        setStage("outline");
+        setPage("main");
+      }
+      showToast(t.toasts.outlineUpdated);
+    }
+  }
+
+  function updateOutlineDraftItem(index: number, patch: Partial<WorkspaceOutlineItem>) {
+    if (!outlineEditMode) return;
+    setOutlineDraft((items) =>
+      items.map((item, itemIndex) =>
         itemIndex === index ? { ...item, ...patch } : item
-      );
-      autosaveOutline(next);
-      return next;
-    });
+      )
+    );
   }
 
   function updateDeckTitle(index: number, title: string) {
@@ -1256,6 +1427,23 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     await renderDeckHtmlForWorkspace(workspace, "review");
   }
 
+  function returnToOutlineFromGeneration() {
+    if (outline.length === 0) {
+      navigateMain("brief");
+      return;
+    }
+    setPage("main");
+    setStage("outline");
+  }
+
+  async function regenerateDeck() {
+    if (outline.length > 0) {
+      await createDeckFromOutline();
+      return;
+    }
+    await generateDeck();
+  }
+
   async function exportFile(type: "PPTX" | "PDF") {
     if (!backend) return;
 
@@ -1347,18 +1535,21 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     deckTitle,
     deck,
     outline,
+    outlineDraft,
+    outlineEditMode,
     generated,
     currentSlide,
     outlineFeedback,
     previewMode,
     reviewRender,
     createDeckProgress,
+    generationHistory,
     pageProgress,
     refineScope,
-      loading,
-      exportStatus,
-      exportArtifact,
-      currentStatus,
+    loading,
+    exportStatus,
+    exportArtifact,
+    currentStatus,
     workspaceScan,
     currentWorkspace,
     workspaceLoading,
@@ -1392,7 +1583,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     generateDeck,
     createDeckFromOutline,
     applyOutlineFeedback,
-    updateOutlineItem,
+    beginOutlineEdit,
+    cancelOutlineEdit,
+    saveOutlineEdit,
+    updateOutlineDraftItem,
     updateDeckTitle,
     moveSlide,
     deleteSlide,
@@ -1408,7 +1602,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     refineDeck,
     refineSlide,
     renderDeckHtml,
-    exportFile
+    exportFile,
+    returnToOutlineFromGeneration,
+    regenerateDeck
   };
 
   return { state, actions };

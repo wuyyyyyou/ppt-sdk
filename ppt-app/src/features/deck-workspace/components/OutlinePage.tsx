@@ -9,7 +9,12 @@ import { GenerationProgressPanel } from "./BriefPage";
 interface OutlinePageProps {
   t: Messages;
   outline: OutlineDetail[];
-  updateOutlineItem: (index: number, patch: Partial<OutlineDetail>) => void;
+  outlineDraft: OutlineDetail[];
+  outlineEditMode: boolean;
+  beginOutlineEdit: () => void;
+  cancelOutlineEdit: () => void;
+  saveOutlineEdit: () => Promise<void>;
+  updateOutlineDraftItem: (index: number, patch: Partial<OutlineDetail>) => void;
   feedback: string;
   setFeedback: (value: string) => void;
   applyFeedback: () => Promise<void>;
@@ -23,7 +28,12 @@ export function OutlinePage(props: OutlinePageProps) {
   const {
     t,
     outline,
-    updateOutlineItem,
+    outlineDraft,
+    outlineEditMode,
+    beginOutlineEdit,
+    cancelOutlineEdit,
+    saveOutlineEdit,
+    updateOutlineDraftItem,
     feedback,
     setFeedback,
     applyFeedback,
@@ -32,6 +42,8 @@ export function OutlinePage(props: OutlinePageProps) {
     createDeckProgress,
     loading
   } = props;
+  const activeOutline = outlineEditMode ? outlineDraft : outline;
+  const generating = loading === "deck" || loading === "deckFromOutline";
 
   return (
     <section className="page active outline-page">
@@ -49,22 +61,15 @@ export function OutlinePage(props: OutlinePageProps) {
             value={feedback}
             onChange={(event) => setFeedback(event.target.value)}
             placeholder={t.outline.feedbackPlaceholder}
+            disabled={generating}
           />
           <div className="feedback-actions">
-            <button className="primary-btn" onClick={applyFeedback} disabled={loading === "outline"}>
+            <button className="primary-btn" onClick={applyFeedback} disabled={loading === "outline" || generating}>
               {loading === "outline" ? <span className="spinner small" /> : <Sparkles size={14} />}
               {t.controls.reviseOutline}
             </button>
           </div>
         </div>
-        <button
-          className="primary-btn confirm-outline-btn"
-          onClick={createDeck}
-          disabled={loading === "deck" || loading === "outline"}
-        >
-          {loading === "deck" ? <span className="spinner small" /> : <CheckCircle2 size={14} />}
-          {t.controls.confirmOutline}
-        </button>
       </div>
 
       {createDeckProgress ? (
@@ -75,30 +80,74 @@ export function OutlinePage(props: OutlinePageProps) {
         />
       ) : null}
 
-      <div className="outline-list-large">
-        <div className="timeline-line" />
-        {outline.map((item, index) => (
-          <article key={`outline-item-${index}`} className="outline-item-large">
-            <div className="outline-item-head">
-              <span className="outline-num">{formatSlideNumber(index)}</span>
-              <input
-                value={item.title}
-                onChange={(event) =>
-                  updateOutlineItem(index, { title: event.target.value })
-                }
-              />
-            </div>
-            <textarea
-              className="outline-body-input"
-              value={item.outline}
-              onChange={(event) =>
-                updateOutlineItem(index, { outline: event.target.value })
-              }
-              placeholder={t.outline.fallbackSummary}
-            />
-          </article>
-        ))}
-      </div>
+      <section className="outline-card">
+        <div className="outline-card-header">
+          <div>
+            <div className="section-label">{t.outline.cardTitle}</div>
+            <p>{outlineEditMode ? t.outline.helper : t.outline.readOnlyHint}</p>
+          </div>
+          {!outlineEditMode ? (
+            <button className="secondary-btn compact" onClick={beginOutlineEdit} disabled={generating}>
+              {t.outline.editOutline}
+            </button>
+          ) : null}
+        </div>
+        <div className="outline-list-large">
+          <div className="timeline-line" />
+          {activeOutline.map((item, index) => (
+            <article key={`outline-item-${index}`} className="outline-item-large">
+              <div className="outline-item-head">
+                <span className="outline-num">{formatSlideNumber(index)}</span>
+                {outlineEditMode ? (
+                  <input
+                    value={item.title}
+                    disabled={generating}
+                    onChange={(event) =>
+                      updateOutlineDraftItem(index, { title: event.target.value })
+                    }
+                  />
+                ) : (
+                  <strong>{item.title}</strong>
+                )}
+              </div>
+              {outlineEditMode ? (
+                <textarea
+                  className="outline-body-input"
+                  value={item.outline}
+                  disabled={generating}
+                  onChange={(event) =>
+                    updateOutlineDraftItem(index, { outline: event.target.value })
+                  }
+                  placeholder={t.outline.fallbackSummary}
+                />
+              ) : (
+                <p className="outline-body-readonly">{item.outline || t.outline.fallbackSummary}</p>
+              )}
+            </article>
+          ))}
+        </div>
+        <div className="outline-card-footer">
+          {outlineEditMode ? (
+            <>
+              <button className="secondary-btn" onClick={cancelOutlineEdit} disabled={generating}>
+                {t.outline.cancelChanges}
+              </button>
+              <button className="primary-btn" onClick={saveOutlineEdit} disabled={generating}>
+                {t.outline.saveChanges}
+              </button>
+            </>
+          ) : (
+            <button
+              className="primary-btn confirm-outline-btn"
+              onClick={createDeck}
+              disabled={loading === "deck" || loading === "outline"}
+            >
+              {loading === "deck" ? <span className="spinner small" /> : <CheckCircle2 size={14} />}
+              {t.controls.confirmOutline}
+            </button>
+          )}
+        </div>
+      </section>
     </section>
   );
 }

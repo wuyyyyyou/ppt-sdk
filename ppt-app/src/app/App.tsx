@@ -2,6 +2,7 @@ import { PanelTop } from "lucide-react";
 import { BriefPage } from "../features/deck-workspace/components/BriefPage";
 import { DeckPage } from "../features/deck-workspace/components/DeckPage";
 import { ExportPage } from "../features/deck-workspace/components/ExportPage";
+import { GeneratingPage } from "../features/deck-workspace/components/GeneratingPage";
 import { LibraryPage } from "../features/deck-workspace/components/LibraryPage";
 import { OutlinePage } from "../features/deck-workspace/components/OutlinePage";
 import { PanelHeader } from "../features/deck-workspace/components/PanelHeader";
@@ -108,7 +109,12 @@ export function App() {
             <OutlinePage
               t={t}
               outline={state.outline}
-              updateOutlineItem={actions.updateOutlineItem}
+              outlineDraft={state.outlineDraft}
+              outlineEditMode={state.outlineEditMode}
+              beginOutlineEdit={actions.beginOutlineEdit}
+              cancelOutlineEdit={actions.cancelOutlineEdit}
+              saveOutlineEdit={actions.saveOutlineEdit}
+              updateOutlineDraftItem={actions.updateOutlineDraftItem}
               feedback={state.outlineFeedback}
               setFeedback={actions.setOutlineFeedback}
               applyFeedback={actions.applyOutlineFeedback}
@@ -116,6 +122,19 @@ export function App() {
               cancelGenerateDeck={actions.cancelGenerateDeck}
               createDeckProgress={state.createDeckProgress}
               loading={state.loading}
+            />
+          ) : null}
+
+          {state.page === "main" && state.stage === "generating" ? (
+            <GeneratingPage
+              t={t}
+              loading={state.loading}
+              progress={state.createDeckProgress}
+              history={state.generationHistory}
+              onCancel={actions.cancelGenerateDeck}
+              onBackToOutline={actions.returnToOutlineFromGeneration}
+              onRegenerate={actions.regenerateDeck}
+              canBackToOutline={state.outline.length > 0}
             />
           ) : null}
 

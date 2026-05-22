@@ -50,6 +50,8 @@ export interface CreateDeckFlowProgressPage {
 }
 
 export interface CreateDeckFlowStream {
+  run_id?: string;
+  kind?: string;
   page_id: string;
   page_index: number;
   status: string;
@@ -284,6 +286,8 @@ function createAgentRunTracker(input: {
   const startedAt = new Date().toISOString();
   const runId = `${input.page.page_id}-${input.kind}-${Date.now().toString(36)}`;
   const stream: CreateDeckFlowStream = {
+    run_id: runId,
+    kind: input.kind,
     page_id: input.page.page_id,
     page_index: input.page.index,
     status: input.message,

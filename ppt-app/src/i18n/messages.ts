@@ -40,6 +40,7 @@ export interface Messages {
     template: string;
     brief: string;
     outline: string;
+    generating: string;
     deck: string;
   };
   status: {
@@ -99,8 +100,26 @@ export interface Messages {
   outline: {
     title: string;
     helper: string;
+    cardTitle: string;
+    editOutline: string;
+    saveChanges: string;
+    cancelChanges: string;
+    readOnlyHint: string;
     feedbackPlaceholder: string;
     fallbackSummary: string;
+  };
+  generating: {
+    steps: {
+      outline: string;
+      pagePlan: string;
+      prepare: string;
+      pages: string;
+      finalRender: string;
+    };
+    currentSessionStream: string;
+    waitingForStep: string;
+    noStream: string;
+    streamHint: string;
   };
   deck: {
     title: string;
@@ -189,7 +208,7 @@ export const messages: Record<Locale, Messages> = {
       updateOutline: "Update outline",
       createOutline: "Create outline",
       createDeckFromOutline: "Create deck",
-      confirmOutline: "Confirm outline and continue",
+      confirmOutline: "Confirm and generate",
       reviseOutline: "Revise outline",
       refineDeck: "Refine deck",
       refineSlide: "Refine slide",
@@ -212,6 +231,7 @@ export const messages: Record<Locale, Messages> = {
       template: "Template",
       brief: "Brief",
       outline: "Outline",
+      generating: "Generating",
       deck: "Deck"
     },
     status: {
@@ -278,9 +298,27 @@ export const messages: Record<Locale, Messages> = {
     outline: {
       title: "Review outline",
       helper: "Adjust the structure before Anna designs the deck.",
+      cardTitle: "Outline",
+      editOutline: "Modify outline",
+      saveChanges: "Save changes",
+      cancelChanges: "Cancel editing",
+      readOnlyHint: "Read-only until you choose to modify the outline.",
       feedbackPlaceholder:
         "Enter a rewrite request, such as adding a security slide, making it more executive-facing, or reducing to 5 slides...",
       fallbackSummary: "Add supporting points and details for this slide."
+    },
+    generating: {
+      steps: {
+        outline: "Outline",
+        pagePlan: "Page plan",
+        prepare: "Prepare files",
+        pages: "Pages",
+        finalRender: "Final preview"
+      },
+      currentSessionStream: "Current session stream",
+      waitingForStep: "Waiting for step output",
+      noStream: "No stream output yet",
+      streamHint: "Live output appears after the step starts."
     },
     deck: {
       title: "AI Agent Workflows",
@@ -407,7 +445,7 @@ export const messages: Record<Locale, Messages> = {
       updateOutline: "更新大纲",
       createOutline: "创建大纲",
       createDeckFromOutline: "创建演示文稿",
-      confirmOutline: "确认大纲并继续",
+      confirmOutline: "确认并生成",
       reviseOutline: "调整大纲",
       refineDeck: "优化整套",
       refineSlide: "优化当前页",
@@ -430,6 +468,7 @@ export const messages: Record<Locale, Messages> = {
       template: "模板",
       brief: "需求",
       outline: "大纲",
+      generating: "生成中",
       deck: "成稿"
     },
     status: {
@@ -496,8 +535,26 @@ export const messages: Record<Locale, Messages> = {
     outline: {
       title: "审阅大纲",
       helper: "先改结构，再确认后继续生成。",
+      cardTitle: "大纲",
+      editOutline: "修改大纲",
+      saveChanges: "保存修改",
+      cancelChanges: "取消修改",
+      readOnlyHint: "默认只读，点击修改后才能编辑大纲。",
       feedbackPlaceholder: "输入重构需求，例如增加安全页、改成更面向高管，或缩减到 5 页...",
       fallbackSummary: "为这一页补充要点和细节。"
+    },
+    generating: {
+      steps: {
+        outline: "大纲",
+        pagePlan: "页面规划",
+        prepare: "准备文件",
+        pages: "逐页生成",
+        finalRender: "最终预览"
+      },
+      currentSessionStream: "当前会话流",
+      waitingForStep: "等待步骤输出",
+      noStream: "暂无流式输出",
+      streamHint: "步骤开始后会显示实时输出。"
     },
     deck: {
       title: "AI Agent 工作流",
