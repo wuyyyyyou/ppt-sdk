@@ -1,6 +1,3 @@
-import { access } from "node:fs/promises";
-import path from "node:path";
-
 import type { BrowserLike, PageLike } from "./types/browser.js";
 import {
   createPresentationPptxModel,
@@ -14,6 +11,10 @@ import {
   type ExtractDeckPageToSlideAttributesInput,
 } from "./extract/deck-to-element-attributes.js";
 import type { PptxPresentationModel } from "./types/pptx-models.js";
+import {
+  launchManagedBrowser,
+  waitForRenderReady,
+} from "../runtime/browser-runtime.js";
 
 export * from "./types/browser.js";
 export * from "./types/element-attributes.js";
@@ -60,198 +61,12 @@ const DEFAULT_VIEWPORT = {
 const DEFAULT_DECK_SELECTOR = "#presentation-slides-wrapper";
 const DECK_VIEWER_MODE_CLASS = "presenton-viewer-mode";
 const DEBUG_HTML_TO_PPTX = process.env.PRESENTON_DEBUG_HTML_TO_PPTX === "1";
-const DEFAULT_BROWSER_ARGS = [
-  "--no-sandbox",
-  "--disable-setuid-sandbox",
-  "--disable-dev-shm-usage",
-  "--disable-gpu",
-  "--disable-web-security",
-  "--disable-background-timer-throttling",
-  "--disable-backgrounding-occluded-windows",
-  "--disable-renderer-backgrounding",
-  "--disable-features=TranslateUI",
-  "--disable-ipc-flooding-protection",
-];
-const CHROME_EXECUTABLE_ENV_KEYS = [
-  "PRESENTON_CHROME_EXECUTABLE_PATH",
-  "PUPPETEER_EXECUTABLE_PATH",
-  "CHROME_PATH",
-  "GOOGLE_CHROME_BIN",
-];
 
 function debugLog(...args: unknown[]) {
   if (!DEBUG_HTML_TO_PPTX) {
     return;
   }
   console.error("[ppt-engine html-to-model]", ...args);
-}
-
-function getNonEmptyString(value: unknown): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-function getPlatformChromeExecutableCandidates(): string[] {
-  if (process.platform === "darwin") {
-    const homeDir = getNonEmptyString(process.env.HOME);
-    return [
-      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-      homeDir
-        ? path.join(
-          homeDir,
-          "Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-        )
-        : null,
-      "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
-    ].filter((candidate): candidate is string => Boolean(candidate));
-  }
-
-  if (process.platform === "win32") {
-    const localAppData = getNonEmptyString(process.env.LOCALAPPDATA);
-    const programFiles = getNonEmptyString(process.env.PROGRAMFILES);
-    const programFilesX86 = getNonEmptyString(process.env["PROGRAMFILES(X86)"]);
-    return [
-      localAppData
-        ? path.join(localAppData, "Google/Chrome/Application/chrome.exe")
-        : null,
-      programFiles
-        ? path.join(programFiles, "Google/Chrome/Application/chrome.exe")
-        : null,
-      programFilesX86
-        ? path.join(programFilesX86, "Google/Chrome/Application/chrome.exe")
-        : null,
-    ].filter((candidate): candidate is string => Boolean(candidate));
-  }
-
-  return [
-    "/usr/bin/google-chrome-stable",
-    "/usr/bin/google-chrome",
-    "/usr/bin/chromium-browser",
-    "/usr/bin/chromium",
-  ];
-}
-
-function getConfiguredChromeExecutable(): { key: string; value: string } | null {
-  for (const key of CHROME_EXECUTABLE_ENV_KEYS) {
-    const value = getNonEmptyString(process.env[key]);
-    if (value) {
-      return { key, value };
-    }
-  }
-
-  return null;
-}
-
-function getSystemChromeExecutableCandidates(): string[] {
-  return [...new Set(getPlatformChromeExecutableCandidates())];
-}
-
-async function findFirstAccessiblePath(candidates: string[]): Promise<string | null> {
-  for (const candidate of candidates) {
-    try {
-      await access(candidate);
-      return candidate;
-    } catch {
-      // Try the next known location.
-    }
-  }
-
-  return null;
-}
-
-function formatErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function createBrowserLaunchError(
-  attempts: string[],
-  fallbackError: unknown,
-): Error {
-  const details = attempts.length > 0
-    ? ` ${attempts.join(" ")}`
-    : "";
-  return new Error(
-    `Could not launch a managed browser for convertDeckHtmlToPptxModel.${details} Puppeteer default launch also failed: ${formatErrorMessage(fallbackError)}`,
-    { cause: fallbackError instanceof Error ? fallbackError : undefined },
-  );
-}
-
-async function launchManagedBrowser(
-  puppeteer: any,
-  launchOptions?: Record<string, unknown>,
-): Promise<BrowserLike> {
-  const explicitExecutablePath = getNonEmptyString(launchOptions?.executablePath);
-  const explicitChannel = getNonEmptyString(launchOptions?.channel);
-  const normalizedLaunchOptions = {
-    headless: true,
-    dumpio: DEBUG_HTML_TO_PPTX,
-    args: DEFAULT_BROWSER_ARGS,
-    ...launchOptions,
-  };
-
-  if (explicitExecutablePath || explicitChannel) {
-    try {
-      return (await puppeteer.launch(normalizedLaunchOptions)) as BrowserLike;
-    } catch (error) {
-      const targetLabel = explicitExecutablePath
-        ? `executablePath "${explicitExecutablePath}"`
-        : `channel "${explicitChannel}"`;
-      throw new Error(
-        `Failed to launch browser for convertDeckHtmlToPptxModel using explicit ${targetLabel}: ${formatErrorMessage(error)}`,
-        { cause: error instanceof Error ? error : undefined },
-      );
-    }
-  }
-
-  const configuredExecutable = getConfiguredChromeExecutable();
-  if (configuredExecutable) {
-    try {
-      return (await puppeteer.launch({
-        ...normalizedLaunchOptions,
-        executablePath: configuredExecutable.value,
-      })) as BrowserLike;
-    } catch (error) {
-      throw new Error(
-        `Failed to launch browser for convertDeckHtmlToPptxModel using ${configuredExecutable.key}="${configuredExecutable.value}": ${formatErrorMessage(error)}`,
-        { cause: error instanceof Error ? error : undefined },
-      );
-    }
-  }
-
-  const systemCandidates = getSystemChromeExecutableCandidates();
-  const systemExecutablePath = await findFirstAccessiblePath(systemCandidates);
-  const attempts: string[] = [];
-
-  if (systemExecutablePath) {
-    try {
-      debugLog("launch.systemChrome", systemExecutablePath);
-      return (await puppeteer.launch({
-        ...normalizedLaunchOptions,
-        executablePath: systemExecutablePath,
-      })) as BrowserLike;
-    } catch (error) {
-      attempts.push(
-        `Tried system Chrome at "${systemExecutablePath}" first, but launch failed: ${formatErrorMessage(error)}.`,
-      );
-      debugLog("launch.systemChrome.error", formatErrorMessage(error));
-    }
-  } else {
-    attempts.push(
-      `No system Chrome executable was found in known locations: ${systemCandidates.join(", ")}.`,
-    );
-    debugLog("launch.systemChrome.missing", systemCandidates);
-  }
-
-  try {
-    debugLog("launch.puppeteerDefault");
-    return (await puppeteer.launch(normalizedLaunchOptions)) as BrowserLike;
-  } catch (error) {
-    throw createBrowserLaunchError(attempts, error);
-  }
 }
 
 export async function convertDeckPageToPptxModel(
@@ -391,7 +206,11 @@ async function createManagedPage(launchOptions?: Record<string, unknown>): Promi
   }
 
   const puppeteer = puppeteerModule.default ?? puppeteerModule;
-  const browser = await launchManagedBrowser(puppeteer, launchOptions);
+  const browser = await launchManagedBrowser(puppeteer, {
+    purpose: "convertDeckHtmlToPptxModel",
+    launchOptions,
+    dumpio: DEBUG_HTML_TO_PPTX,
+  }) as BrowserLike;
 
   const page = await browser.newPage();
   const debugPage = page as PageLike & {
@@ -437,40 +256,11 @@ async function waitForDeckRenderReady(
   deckSelector: string,
   timeoutMs: number,
 ): Promise<void> {
-  const startedAt = Date.now();
-
-  while (Date.now() - startedAt <= timeoutMs) {
-    const deckElement = await page.$(deckSelector);
-    if (!deckElement) {
-      debugLog("waitForDeckRenderReady.missingWrapper");
-      await delay(50);
-      continue;
-    }
-
-    const status = await deckElement.evaluate((el) =>
-      el.getAttribute("data-presenton-render-status"),
-    );
-    debugLog("waitForDeckRenderReady.status", status);
-
-    if (status === "ready") {
-      return;
-    }
-
-    if (status === "error") {
-      const message = await deckElement.evaluate((el) =>
-        el.getAttribute("data-presenton-render-message"),
-      );
-      throw new Error(
-        message
-          ? `Deck render failed: ${message}`
-          : "Deck render failed with status=error",
-      );
-    }
-
-    await delay(50);
-  }
-
-  throw new Error(
-    `Timed out waiting for deck render ready: ${deckSelector} within ${timeoutMs}ms`,
-  );
+  debugLog("waitForDeckRenderReady.start");
+  await waitForRenderReady(page, {
+    selector: deckSelector,
+    timeoutMs,
+    kindLabel: "Deck",
+  });
+  debugLog("waitForDeckRenderReady.done");
 }

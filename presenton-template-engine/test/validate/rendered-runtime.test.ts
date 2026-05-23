@@ -245,6 +245,27 @@ test("waitForDeckRenderReady returns deck wrapper when status is ready", async (
   assert.equal(status, "ready");
 });
 
+test("waitForDeckRenderReady reports render errors", async () => {
+  const errorShell = new MockElementNode(
+    "div",
+    {
+      "data-presenton-render-status": "error",
+      "data-presenton-render-message": "broken deck",
+    },
+  );
+  const page = new MockPage({
+    "#presentation-slides-wrapper": new MockElementHandle(errorShell),
+  });
+
+  await assert.rejects(
+    () => waitForDeckRenderReady(page, "#presentation-slides-wrapper", 100),
+    (error: Error) => {
+      assert.match(error.message, /Deck render failed: broken deck/);
+      return true;
+    },
+  );
+});
+
 test("collectRenderedSlideInfos extracts slide metadata from rendered shell", async () => {
   const wrapperHandle = createDeckWrapperHandle();
 
@@ -283,5 +304,38 @@ test("prepareRenderedValidationContext loads deck html into injected page and co
     assert.equal(renderedContext.slides[0]?.slideId, "slide-1");
 
     await disposeRenderedValidationContext(context);
+  });
+});
+
+test("prepareRenderedValidationArtifacts rejects illegal manifests", async () => {
+  await withDeckFixture(async ({ manifestPath, outputDir }) => {
+    await writeFile(
+      manifestPath,
+      `${JSON.stringify({
+        title: "Broken Fixture",
+        slides: [
+          {
+            id: "dup",
+            source: { type: "local", path: "./slides/Slide.tsx" },
+          },
+          {
+            id: "dup",
+            source: { type: "local", path: "./slides/Slide.tsx" },
+          },
+        ],
+      }, null, 2)}\n`,
+      "utf8",
+    );
+
+    await assert.rejects(
+      () => prepareRenderedValidationArtifacts({
+        manifestPath,
+        outputDir,
+      }),
+      (error: Error) => {
+        assert.match(error.message, /Duplicate manifest slide id "dup"/);
+        return true;
+      },
+    );
   });
 });

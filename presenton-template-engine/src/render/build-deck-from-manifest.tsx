@@ -9,8 +9,13 @@ import {
   resolveLocalModulePath,
 } from "../local-template/loader.js";
 import { buildStandaloneDeckHtml } from "./build-deck.js";
+import { prepareManifestRenderPlan } from "./manifest-render-plan.js";
 import { buildLocalBrowserRuntimeBundle, type LocalRuntimeEntry } from "./local-runtime-bundle.js";
 import { getBrowserRenderRuntimeBundle } from "./runtime-bundle.js";
+import {
+  launchManagedBrowser as launchSharedManagedBrowser,
+  waitForRenderReady,
+} from "../runtime/browser-runtime.js";
 import type {
   BrowserRenderContext,
   BrowserRenderTheme,
@@ -327,7 +332,9 @@ async function createManagedPage(): Promise<{
   }
 
   const puppeteer = puppeteerModule.default ?? puppeteerModule;
-  const browser = await launchManagedBrowser(puppeteer);
+  const browser = await launchSharedManagedBrowser(puppeteer, {
+    purpose: "buildDeckHtmlFromManifest slide screenshots",
+  }) as BrowserLike;
   const page = await browser.newPage();
 
   return {
@@ -344,40 +351,11 @@ async function waitForSlideRenderReady(
   page: PageLike,
   timeoutMs = DEFAULT_RENDER_TIMEOUT_MS,
 ): Promise<ElementHandleLike> {
-  const startedAt = Date.now();
-
-  while (Date.now() - startedAt <= timeoutMs) {
-    const slideElement = await page.$(SLIDE_RENDER_SELECTOR);
-    if (!slideElement) {
-      await delay(50);
-      continue;
-    }
-
-    const status = await slideElement.evaluate((el) =>
-      el.getAttribute("data-presenton-render-status"),
-    );
-
-    if (status === "ready") {
-      return slideElement;
-    }
-
-    if (status === "error") {
-      const message = await slideElement.evaluate((el) =>
-        el.getAttribute("data-presenton-render-message"),
-      );
-      throw new Error(
-        message
-          ? `Slide render failed: ${message}`
-          : "Slide render failed with status=error",
-      );
-    }
-
-    await delay(50);
-  }
-
-  throw new Error(
-    `Timed out waiting for slide render ready: ${SLIDE_RENDER_SELECTOR} within ${timeoutMs}ms`,
-  );
+  return (await waitForRenderReady(page, {
+    selector: SLIDE_RENDER_SELECTOR,
+    timeoutMs,
+    kindLabel: "Slide",
+  })) as ElementHandleLike;
 }
 
 async function writeSlideScreenshots(
@@ -800,7 +778,7 @@ async function prepareManifestDeck(
 export async function buildDeckHtmlPagesFromManifest(
   input: BuildDeckHtmlFromManifestInput,
 ): Promise<BuildDeckHtmlPagesFromManifestResult> {
-  const prepared = await prepareManifestDeck(input);
+  const prepared = await prepareManifestRenderPlan(input);
   const slidesToWrite =
     prepared.singlePageIndex === null
       ? prepared.slides
@@ -843,7 +821,7 @@ export async function buildDeckPageScreenshotFromManifest(
   const outputDir = resolveAbsolutePath(input.outputDir, "outputDir");
   const htmlOutputDir = resolveOptionalAbsolutePath(input.htmlOutputDir, "htmlOutputDir")
     ?? outputDir;
-  const prepared = await prepareManifestDeck({
+  const prepared = await prepareManifestRenderPlan({
     manifestPath: input.manifestPath,
     outputDir,
     name: input.name,
@@ -887,31 +865,7 @@ export async function buildDeckPageScreenshotFromManifest(
 export async function buildDeckHtmlFromManifest(
   input: BuildDeckHtmlFromManifestInput,
 ): Promise<BuildDeckHtmlFromManifestResult> {
-  const prepared = await prepareManifestDeck(input);
-  const localRuntimeEntries = Array.from(
-    new Map(
-      prepared.slides
-        .filter(
-          (slide): slide is typeof slide & { localEntryPath: string } =>
-            typeof slide.localEntryPath === "string" && slide.localEntryPath.length > 0,
-        )
-        .map((slide) => [
-          slide.runtimeLayoutId,
-          {
-            layoutId: slide.runtimeLayoutId,
-            absolutePath: slide.localEntryPath,
-          } satisfies LocalRuntimeEntry,
-        ]),
-    ).values(),
-  );
-  const localDeckRuntimeBundle =
-    localRuntimeEntries.length > 0
-      ? await buildLocalBrowserRuntimeBundle({
-        mode: "deck",
-        cwd: prepared.manifestCwd,
-        entries: localRuntimeEntries,
-      })
-      : null;
+  const prepared = await prepareManifestRenderPlan(input);
   const title = prepared.title;
   const deckFileName = `${prepared.deckBaseName}-deck.html`;
   const deckOutputPath = path.join(prepared.outputDir, deckFileName);
@@ -919,7 +873,7 @@ export async function buildDeckHtmlFromManifest(
     ? buildStandaloneDeckHtml({
       title,
       slides: prepared.slides,
-      runtimeBundle: localDeckRuntimeBundle,
+      runtimeBundle: prepared.deckRuntimeBundle,
     })
     : "";
 

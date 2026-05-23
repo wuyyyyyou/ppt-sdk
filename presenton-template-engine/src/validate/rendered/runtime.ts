@@ -1,8 +1,13 @@
 import os from "node:os";
 import path from "node:path";
-import { access, mkdtemp, readFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 
-import { buildDeckHtmlFromManifest } from "../../render/build-deck-from-manifest.js";
+import { buildStandaloneDeckHtml } from "../../render/build-deck.js";
+import { prepareManifestRenderPlan } from "../../render/manifest-render-plan.js";
+import {
+  launchManagedBrowser as launchSharedManagedBrowser,
+  waitForRenderReady,
+} from "../../runtime/browser-runtime.js";
 import type {
   RenderedSlideInfo,
   RenderedValidationArtifacts,
@@ -231,7 +236,10 @@ async function createManagedValidationPage(
   }
 
   const puppeteer = puppeteerModule.default ?? puppeteerModule;
-  const browser = await launchManagedBrowser(puppeteer, launchOptions);
+  const browser = await launchSharedManagedBrowser(puppeteer, {
+    purpose: "rendered validation",
+    launchOptions,
+  }) as ValidationBrowserLike;
 
   const page = await browser.newPage();
   return {
@@ -279,17 +287,46 @@ export async function prepareRenderedValidationArtifacts(
   }
 
   const outputDir = await resolveRenderedOutputDir(context);
-  const deckBuildResult = await buildDeckHtmlFromManifest({
+  const plan = await prepareManifestRenderPlan({
     cwd: context.cwd ?? undefined,
     manifestPath: context.manifestPath,
     outputDir,
     name: context.name ?? undefined,
   });
+  const deckFileName = `${plan.deckBaseName}-deck.html`;
+  const deckOutputPath = path.join(plan.outputDir, deckFileName);
+  const deckHtml = buildStandaloneDeckHtml({
+    title: plan.title,
+    slides: plan.slides,
+    runtimeBundle: plan.deckRuntimeBundle,
+  });
+  const deckBuildResult = {
+    deckHtml,
+    deckFileName,
+    deckOutputPath,
+    outputDir: plan.outputDir,
+    deckGenerated: true,
+    singlePage: false,
+    page: null,
+    slideFiles: plan.slides.map((slide) => ({
+      fileName: slide.fileName,
+      outputPath: slide.outputPath,
+      slideId: slide.slideId,
+      layoutId: slide.layoutId,
+      kind: "image" as const,
+      mimeType: "image/png" as const,
+    })),
+    slideCount: plan.slides.length,
+    title: plan.title,
+    manifestPath: plan.manifestPath,
+  };
+  await mkdir(plan.outputDir, { recursive: true });
+  await writeFile(deckOutputPath, deckHtml, "utf8");
 
   const nextArtifacts: RenderedValidationArtifacts = {
     ...context.renderedArtifacts,
     deckBuildResult,
-    deckHtmlPath: deckBuildResult.deckOutputPath,
+    deckHtmlPath: deckOutputPath,
   };
   context.renderedArtifacts = nextArtifacts;
   return nextArtifacts;
@@ -300,40 +337,11 @@ export async function waitForDeckRenderReady(
   deckSelector = DEFAULT_DECK_SELECTOR,
   timeoutMs = 30_000,
 ): Promise<ValidationElementHandleLike> {
-  const startedAt = Date.now();
-
-  while (Date.now() - startedAt <= timeoutMs) {
-    const deckElement = await page.$(deckSelector);
-    if (!deckElement) {
-      await delay(50);
-      continue;
-    }
-
-    const status = await deckElement.evaluate((el) =>
-      el.getAttribute("data-presenton-render-status"),
-    );
-
-    if (status === "ready") {
-      return deckElement;
-    }
-
-    if (status === "error") {
-      const message = await deckElement.evaluate((el) =>
-        el.getAttribute("data-presenton-render-message"),
-      );
-      throw new Error(
-        message
-          ? `Deck render failed: ${message}`
-          : "Deck render failed with status=error",
-      );
-    }
-
-    await delay(50);
-  }
-
-  throw new Error(
-    `Timed out waiting for deck render ready: ${deckSelector} within ${timeoutMs}ms`,
-  );
+  return (await waitForRenderReady(page, {
+    selector: deckSelector,
+    timeoutMs,
+    kindLabel: "Deck",
+  })) as ValidationElementHandleLike;
 }
 
 export async function collectRenderedSlideInfos(
