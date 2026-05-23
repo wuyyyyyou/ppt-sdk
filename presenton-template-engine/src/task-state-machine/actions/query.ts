@@ -1,5 +1,3 @@
-import path from "node:path";
-
 import {
   listDiscoveredTemplateGroupSummaries,
   type DiscoveredTemplateGroupSummaryInfo,
@@ -16,28 +14,11 @@ import type {
 import type { OpenTaskProjectResult } from "./project.js";
 import { ensureTaskPromoteDocument } from "../promote/index.js";
 import { readOptionalRequirementsRecord } from "../storage/records.js";
-
-export interface TaskRecommendedAction {
-  type:
-    | "collect_requirements"
-    | "select_template_group"
-    | "fork_template_group"
-    | "write_outline"
-    | "start_page_authoring"
-    | "author_current_page"
-    | "render_current_page"
-    | "review_page_png"
-    | "fix_current_page"
-    | "lock_current_page"
-    | "render_full_deck_html"
-    | "request_deck_html_approval"
-    | "convert_deck_html_to_model"
-    | "generate_pptx"
-    | "complete_task"
-    | "recover_from_failure";
-  summary: string;
-  requiresUserInput: boolean;
-}
+import {
+  deriveEffectiveTaskState,
+  getTaskRecommendation,
+  type TaskRecommendedAction,
+} from "../semantics/index.js";
 
 export interface TaskStateSnapshot {
   task: TaskStateRecord;
@@ -72,13 +53,17 @@ export interface RecommendedActionResult {
 }
 
 export function buildTaskStateSnapshot(result: OpenTaskProjectResult): TaskStateSnapshot {
+  const effective = deriveEffectiveTaskState({
+    projectDir: result.projectDir,
+    state: result.state,
+    currentPage: result.currentPage,
+    pagePlan: result.pagePlan,
+    pageProgress: result.pageProgress,
+  });
+
   return {
     task: result.task,
-    state: {
-      ...result.state,
-      pageState: getEffectivePageState(result) ?? result.state.pageState,
-      allowedTransitions: getEffectiveAllowedTransitions(result),
-    },
+    state: effective.state,
     currentPage: result.currentPage,
     pagePlan: result.pagePlan,
     pageProgress: result.pageProgress,
@@ -87,263 +72,51 @@ export function buildTaskStateSnapshot(result: OpenTaskProjectResult): TaskState
 }
 
 export function getTaskStateQueryResult(result: OpenTaskProjectResult): TaskStateQueryResult {
+  const effective = deriveEffectiveTaskState({
+    projectDir: result.projectDir,
+    state: result.state,
+    currentPage: result.currentPage,
+    pagePlan: result.pagePlan,
+    pageProgress: result.pageProgress,
+  });
+
   return {
     ...buildTaskStateSnapshot(result),
-    blockedBy: result.state.blockedBy,
-    allowedTransitions: getEffectiveAllowedTransitions(result),
+    blockedBy: effective.blockedBy,
+    allowedTransitions: effective.allowedOperations,
   };
-}
-
-function normalizePageState(pageState: string | undefined): TaskRuntimeStateRecord["pageState"] {
-  if (pageState === "page_rendered" || pageState === "page_review_pending") {
-    return "page_review";
-  }
-
-  return pageState as TaskRuntimeStateRecord["pageState"];
-}
-
-function getEffectivePageState(result: OpenTaskProjectResult): TaskRuntimeStateRecord["pageState"] {
-  return normalizePageState(result.currentPage?.pageState ?? result.state.pageState);
-}
-
-function getEffectiveAllowedTransitions(result: OpenTaskProjectResult): TaskRuntimeStateRecord["allowedTransitions"] {
-  if (result.state.deckState === "page_iteration_active") {
-    switch (getEffectivePageState(result)) {
-      case "page_selected":
-        return ["page_authoring"];
-      case "page_authoring":
-        return ["page_review"];
-      case "page_review":
-        return ["page_accepted", "page_fix_required"];
-      case "page_fix_required":
-        return ["page_authoring"];
-      case "page_accepted":
-        return ["page_locked"];
-      case "page_locked":
-        return [];
-      default:
-        return ["page_authoring"];
-    }
-  }
-
-  return result.state.allowedTransitions.map((operation) => {
-    const operationName = String(operation);
-    return operationName === "page_rendered" || operationName === "page_review_pending"
-      ? "page_review"
-      : operation;
-  });
-}
-
-function getDefaultRecommendedAction(result: OpenTaskProjectResult): TaskRecommendedAction {
-  const { state } = result;
-  const currentPageState = getEffectivePageState(result);
-
-  switch (state.deckState) {
-    case "initialized":
-      return {
-        type: "collect_requirements",
-        summary: "先阅读 promote/current.md，再收集并确认用户需求。",
-        requiresUserInput: true,
-      };
-    case "project_ready":
-      return {
-        type: "collect_requirements",
-        summary: "先阅读 promote/current.md，继续收集并确认需求。",
-        requiresUserInput: true,
-      };
-    case "requirements_collected":
-      return {
-        type: "select_template_group",
-        summary: "先阅读 promote/current.md，再列出全部可用模板组，让用户确认使用哪一组。",
-        requiresUserInput: true,
-      };
-    case "template_selected":
-      return {
-        type: "fork_template_group",
-        summary: "先阅读 promote/current.md，然后 fork 已选模板组到任务目录。",
-        requiresUserInput: false,
-      };
-    case "project_forked":
-      return { type: "write_outline", summary: "先阅读 promote/current.md，再写内容大纲。", requiresUserInput: true };
-    case "outline_ready":
-      return { type: "start_page_authoring", summary: "先阅读 promote/current.md，再直接开始第一页的精细生成。", requiresUserInput: false };
-    case "page_plan_ready":
-      return { type: "start_page_authoring", summary: "先阅读 promote/current.md，再开始逐页实现。", requiresUserInput: false };
-    case "page_iteration_active":
-      switch (currentPageState) {
-        case "page_selected":
-          return {
-            type: "author_current_page",
-            summary: "先阅读 promote/current.md 和当前页作业单，完成当前页 TSX、data 和 manifest 的初始实现；完成后记录 page_authoring。",
-            requiresUserInput: false,
-          };
-        case "page_authoring":
-          return {
-            type: "render_current_page",
-            summary: "先阅读 promote/current.md，再用当前页的 TSX 和 data 生成单页 HTML 与 PNG；成功后进入 page_review。",
-            requiresUserInput: false,
-          };
-        case "page_review":
-          return {
-            type: "review_page_png",
-            summary: "先阅读 promote/current.md，基于当前页 PNG 做截图审查；通过则记录 page_accepted，发现问题则记录 page_fix_required。",
-            requiresUserInput: false,
-          };
-        case "page_fix_required":
-          return {
-            type: "fix_current_page",
-            summary: "先阅读 promote/current.md 和 review_notes，修复当前页 TSX、data 或 manifest；修复完成后回到 page_authoring 再重新渲染。",
-            requiresUserInput: false,
-          };
-        case "page_accepted":
-          return {
-            type: "lock_current_page",
-            summary: "先阅读 promote/current.md，确认当前页通过自审后锁定当前页。",
-            requiresUserInput: false,
-          };
-        case "page_locked":
-          return {
-            type: "start_page_authoring",
-            summary: "当前页已锁定，先阅读 promote/current.md，然后切换到下一页继续逐页实现。",
-            requiresUserInput: false,
-          };
-        default:
-          return {
-            type: "author_current_page",
-            summary: "先阅读 promote/current.md，再继续当前页的实现、渲染和自审闭环。",
-            requiresUserInput: false,
-          };
-      }
-    case "deck_html_ready":
-      return { type: "render_full_deck_html", summary: "先阅读 promote/current.md，再生成整套 deck HTML；生成成功后进入用户审阅阶段。", requiresUserInput: false };
-    case "deck_review_pending":
-      return { type: "request_deck_html_approval", summary: "先阅读 promote/current.md，再让用户审阅整套 deck HTML；确认通过则进入 deck_reviewed，需要修改则回到页面流程。", requiresUserInput: true };
-    case "deck_reviewed":
-      return { type: "convert_deck_html_to_model", summary: "先阅读 promote/current.md，再将 HTML 转成 PPT 模型。", requiresUserInput: false };
-    case "model_ready":
-      return { type: "generate_pptx", summary: "先阅读 promote/current.md，再生成最终 PPTX。", requiresUserInput: false };
-    case "pptx_ready":
-      return { type: "complete_task", summary: "先阅读 promote/current.md，再完成任务归档。", requiresUserInput: false };
-    case "completed":
-      return { type: "complete_task", summary: "任务已完成，可先阅读 promote/current.md 复核历史。", requiresUserInput: false };
-    case "failed":
-      return { type: "recover_from_failure", summary: "先阅读 promote/current.md，再从失败状态恢复。", requiresUserInput: true };
-    default:
-      return { type: "complete_task", summary: "先阅读 promote/current.md，再继续处理任务。", requiresUserInput: false };
-  }
-}
-
-function getRequiredInputs(
-  result: OpenTaskProjectResult,
-  recommendedAction: TaskRecommendedAction,
-  requirements: Awaited<ReturnType<typeof readOptionalRequirementsRecord>>,
-): string[] {
-  if (recommendedAction.type === "collect_requirements") {
-    const requirementFields = [
-      "requirements.topic",
-      "requirements.audience",
-      "requirements.scenario",
-      "requirements.pageCount",
-    ];
-
-    if (!requirements) {
-      return requirementFields;
-    }
-
-    const payload = requirements.requirements;
-    const missing: string[] = [];
-    if (!payload.topic?.trim()) missing.push("requirements.topic");
-    if (!payload.audience?.trim()) missing.push("requirements.audience");
-    if (!payload.scenario?.trim()) missing.push("requirements.scenario");
-    if (!Number.isInteger(payload.pageCount) || payload.pageCount <= 0) missing.push("requirements.pageCount");
-    return missing.length > 0 ? missing : requirementFields;
-  }
-
-  if (recommendedAction.type === "select_template_group") {
-    return ["template_group"];
-  }
-
-  if (recommendedAction.type === "write_outline") {
-    return ["outline.narrative", "outline.sections", "outline.pages"];
-  }
-
-  if (recommendedAction.type === "author_current_page") {
-    return result.currentPage ? [] : ["current_page"];
-  }
-
-  if (recommendedAction.type === "start_page_authoring") {
-    if (result.currentPage) {
-      return [];
-    }
-
-    return result.pagePlan?.pages.length ? [] : ["current_page"];
-  }
-
-  if (recommendedAction.type === "review_page_png") {
-    return result.currentPage ? ["page_png_review_result"] : ["current_page"];
-  }
-
-  if (recommendedAction.type === "recover_from_failure") {
-    return ["recovery_decision"];
-  }
-
-  return recommendedAction.requiresUserInput ? ["user_confirmation"] : [];
-}
-
-function getExpectedArtifacts(
-  result: OpenTaskProjectResult,
-  recommendedAction: TaskRecommendedAction,
-): string[] {
-  const projectDir = result.projectDir;
-  const pageId = result.currentPage?.pageId;
-
-  switch (recommendedAction.type) {
-    case "collect_requirements":
-      return [path.join(projectDir, "task-state", "requirements.json")];
-    case "write_outline":
-      return [path.join(projectDir, "task-state", "outline.json")];
-    case "start_page_authoring":
-    case "render_current_page":
-    case "review_page_png":
-    case "fix_current_page":
-    case "lock_current_page":
-      return pageId
-        ? [path.join(projectDir, "output", "screenshots", `${pageId}.png`)]
-        : [];
-    case "render_full_deck_html":
-    case "request_deck_html_approval":
-      return [path.join(projectDir, "output", "deck.html")];
-    case "convert_deck_html_to_model":
-      return [path.join(projectDir, "output", "ppt-model.json")];
-    case "generate_pptx":
-      return [path.join(projectDir, "output", "deck.pptx")];
-    default:
-      return [];
-  }
 }
 
 export async function getRecommendedActionResult(
   result: OpenTaskProjectResult,
 ): Promise<RecommendedActionResult> {
-  const recommendedAction = getDefaultRecommendedAction(result);
   const requirements = await readOptionalRequirementsRecord(result.projectDir);
-  const requiredInputs = getRequiredInputs(result, recommendedAction, requirements);
-  const expectedArtifacts = getExpectedArtifacts(result, recommendedAction);
-  const allowedOperations = getEffectiveAllowedTransitions(result);
+  const recommendation = getTaskRecommendation({
+    projectDir: result.projectDir,
+    state: result.state,
+    currentPage: result.currentPage,
+    pagePlan: result.pagePlan,
+    pageProgress: result.pageProgress,
+    requirements,
+  });
+  const {
+    recommendedAction,
+    requiredInputs,
+    expectedArtifacts,
+    allowedOperations,
+    blockedBy,
+    effectiveState,
+  } = recommendation;
   const availableTemplateGroups = recommendedAction.type === "select_template_group"
     ? await listDiscoveredTemplateGroupSummaries({ include_builtin: true })
     : undefined;
   const effectiveResult: OpenTaskProjectResult = {
     ...result,
-    state: {
-      ...result.state,
-      pageState: getEffectivePageState(result) ?? result.state.pageState,
-      allowedTransitions: allowedOperations,
-    },
+    state: effectiveState,
     currentPage: result.currentPage
       ? {
         ...result.currentPage,
-        pageState: getEffectivePageState(result) ?? result.currentPage.pageState,
+        pageState: effectiveState.pageState ?? result.currentPage.pageState,
       }
       : result.currentPage,
   };
@@ -356,10 +129,10 @@ export async function getRecommendedActionResult(
     availableTemplateGroups,
   });
   return {
-    deckState: result.state.deckState,
-    pageState: getEffectivePageState(result) ?? result.state.pageState,
+    deckState: effectiveState.deckState,
+    pageState: effectiveState.pageState,
     recommendedAction,
-    blockedBy: result.state.blockedBy,
+    blockedBy,
     requiredInputs,
     expectedArtifacts,
     allowedOperations,

@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import type {
   TaskCurrentPageRecord,
   TaskPagePlanRecord,
-  TaskPageProgressItem,
   TaskPageProgressRecord,
   TaskRuntimeStateRecord,
 } from "../types.js";
@@ -18,6 +17,16 @@ import {
   writePageProgressRecord,
   writeStateRecord,
 } from "../storage/records.js";
+import {
+  buildCurrentPageRecord as buildSemanticCurrentPageRecord,
+  buildPageProgressFromPlan as syncPageProgressFromPlan,
+  buildRuntimeStateForPage,
+  computeAllPagesLocked,
+  getPageProgressEventType as getSemanticPageProgressEventType,
+  normalizePageState,
+  upsertPageProgressItem as upsertSemanticPageProgressItem,
+  type LegacyTaskPageProgressState,
+} from "../semantics/index.js";
 
 export interface StartPageIterationInput {
   projectDir: string;
@@ -28,15 +37,7 @@ export interface StartPageIterationInput {
 export interface RecordPageProgressInput {
   projectDir: string;
   pageId: string;
-  pageState:
-    | "page_selected"
-    | "page_authoring"
-    | "page_review"
-    | "page_rendered"
-    | "page_review_pending"
-    | "page_fix_required"
-    | "page_accepted"
-    | "page_locked";
+  pageState: LegacyTaskPageProgressState;
   summary: string;
   reviewNotes?: string;
   changedFiles?: string[];
@@ -74,95 +75,15 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function buildAllowedTransitions(
-  pageState: TaskCurrentPageRecord["pageState"],
-): TaskRuntimeStateRecord["allowedTransitions"] {
-  switch (pageState) {
-    case "page_selected":
-      return ["page_authoring"];
-    case "page_authoring":
-      return ["page_review"];
-    case "page_review":
-      return ["page_accepted", "page_fix_required"];
-    case "page_fix_required":
-      return ["page_authoring"];
-    case "page_accepted":
-      return ["page_locked"];
-    case "page_locked":
-      return [];
-  }
-}
-
-function getPageProgressEventType(
-  pageState: TaskCurrentPageRecord["pageState"],
-): "page_selected" | "page_authoring_started" | "page_rendered" | "page_reviewed" | "page_fixed" | "page_accepted" | "page_locked" {
-  switch (pageState) {
-    case "page_selected":
-      return "page_selected";
-    case "page_authoring":
-      return "page_authoring_started";
-    case "page_review":
-      return "page_rendered";
-    case "page_fix_required":
-      return "page_fixed";
-    case "page_accepted":
-      return "page_accepted";
-    case "page_locked":
-      return "page_locked";
-  }
-}
-
 function normalizePageProgressState(
   pageState: RecordPageProgressInput["pageState"],
 ): TaskCurrentPageRecord["pageState"] {
-  if (pageState === "page_rendered" || pageState === "page_review_pending") {
-    return "page_review";
+  const normalized = normalizePageState(pageState);
+  if (!normalized) {
+    throw new Error(`Unsupported page state: ${pageState}`);
   }
 
-  return pageState;
-}
-
-async function isAllPagesLocked(
-  pagePlan: TaskPagePlanRecord | null,
-  pageProgress: TaskPageProgressRecord,
-): Promise<boolean> {
-  if (!pagePlan || pagePlan.pages.length === 0) {
-    return false;
-  }
-
-  const progressByPageId = new Map(pageProgress.pages.map((page) => [page.pageId, page]));
-  return pagePlan.pages.every((page) => progressByPageId.get(page.pageId)?.locked === true);
-}
-
-function buildPageProgressFromPlan(
-  projectId: string,
-  pagePlan: TaskPagePlanRecord | null,
-  existing: TaskPageProgressRecord | null,
-): TaskPageProgressRecord {
-  const now = nowIso();
-  const existingByPageId = new Map(existing?.pages.map((page) => [page.pageId, page]) ?? []);
-  const pages = pagePlan
-    ? pagePlan.pages.map((page): TaskPageProgressItem => {
-      const existingPage = existingByPageId.get(page.pageId);
-      return {
-        pageId: page.pageId,
-        pageNumber: page.pageNumber,
-        pageState: existingPage?.pageState ?? "page_selected",
-        locked: existingPage?.locked ?? false,
-        summary: existingPage?.summary,
-        reviewNotes: existingPage?.reviewNotes,
-        lastRenderedHtmlPath: existingPage?.lastRenderedHtmlPath,
-        lastRenderedPngPath: existingPage?.lastRenderedPngPath,
-        updatedAt: existingPage?.updatedAt ?? now,
-      };
-    })
-    : [...(existing?.pages ?? [])];
-
-  return {
-    projectId,
-    updatedAt: now,
-    pages,
-  };
+  return normalized;
 }
 
 async function readSyncedPageProgress(
@@ -171,47 +92,12 @@ async function readSyncedPageProgress(
   pagePlan: TaskPagePlanRecord | null,
 ): Promise<TaskPageProgressRecord> {
   const existing = await readOptionalPageProgressRecord(projectDir);
-  return buildPageProgressFromPlan(projectId, pagePlan, existing);
-}
-
-function upsertPageProgressItem(
-  record: TaskPageProgressRecord,
-  item: TaskPageProgressItem,
-): TaskPageProgressRecord {
-  const pages = record.pages.filter((page) => page.pageId !== item.pageId);
-  pages.push(item);
-  pages.sort((left, right) => {
-    const leftNumber = left.pageNumber ?? Number.MAX_SAFE_INTEGER;
-    const rightNumber = right.pageNumber ?? Number.MAX_SAFE_INTEGER;
-    return leftNumber === rightNumber ? left.pageId.localeCompare(right.pageId) : leftNumber - rightNumber;
-  });
-
-  return {
-    ...record,
-    updatedAt: nowIso(),
-    pages,
-  };
-}
-
-function buildPageStateRecord(
-  projectId: string,
-  pageId: string,
-  pageState: TaskCurrentPageRecord["pageState"],
-  pageNumber?: number,
-  renderedHtmlPath?: string,
-  renderedPngPath?: string,
-): TaskCurrentPageRecord {
-  const now = nowIso();
-  return {
+  return syncPageProgressFromPlan({
     projectId,
-    updatedAt: now,
-    pageId,
-    pageNumber,
-    pageState,
-    locked: pageState === "page_locked",
-    lastRenderedHtmlPath: renderedHtmlPath,
-    lastRenderedPngPath: renderedPngPath,
-  };
+    pagePlan,
+    existing,
+    now: nowIso(),
+  });
 }
 
 export async function startPageIteration(
@@ -231,29 +117,26 @@ export async function startPageIteration(
   const pageProgress = await readSyncedPageProgress(input.projectDir, task.projectId, pagePlan);
   const progressPage = pageProgress.pages.find((page) => page.pageId === input.pageId);
   const pageState = progressPage?.pageState ?? "page_selected";
-  const currentPage = buildPageStateRecord(
-    task.projectId,
-    input.pageId,
+  const currentPage = buildSemanticCurrentPageRecord({
+    projectId: task.projectId,
+    pageId: input.pageId,
     pageState,
-    progressPage?.pageNumber ?? input.pageNumber,
-    progressPage?.lastRenderedHtmlPath,
-    progressPage?.lastRenderedPngPath,
-  );
+    pageNumber: progressPage?.pageNumber ?? input.pageNumber,
+    renderedHtmlPath: progressPage?.lastRenderedHtmlPath,
+    renderedPngPath: progressPage?.lastRenderedPngPath,
+    now: nowIso(),
+  });
   await writeCurrentPageRecord(input.projectDir, currentPage);
   await writePageProgressRecord(input.projectDir, pageProgress);
-  const allPagesLocked = await isAllPagesLocked(pagePlan, pageProgress);
+  const allPagesLocked = computeAllPagesLocked(pagePlan, pageProgress);
 
-  const nextState: TaskRuntimeStateRecord = {
-    ...state,
-    updatedAt: nowIso(),
-    deckState: allPagesLocked && pageState === "page_locked" ? "deck_html_ready" : "page_iteration_active",
+  const nextState = buildRuntimeStateForPage({
+    state,
+    now: nowIso(),
+    pageId: input.pageId,
     pageState,
-    currentPageId: input.pageId,
-    blockedBy: pageState === "page_review" ? ["page_png_review"] : [],
-    allowedTransitions: buildAllowedTransitions(pageState),
     allPagesLocked,
-    recoverable: true,
-  };
+  });
   await writeStateRecord(input.projectDir, nextState);
 
   const timestamp = nowIso();
@@ -300,7 +183,12 @@ export async function recordPageProgress(
   const existingProgressPage = existingProgress.pages.find((page) => page.pageId === input.pageId);
   const timestamp = nowIso();
   const currentPage = {
-    ...(existingCurrentPage ?? buildPageStateRecord(task.projectId, input.pageId, pageState)),
+    ...(existingCurrentPage ?? buildSemanticCurrentPageRecord({
+      projectId: task.projectId,
+      pageId: input.pageId,
+      pageState,
+      now: timestamp,
+    })),
     projectId: task.projectId,
     pageId: input.pageId,
     pageNumber: existingProgressPage?.pageNumber ?? existingCurrentPage?.pageNumber,
@@ -313,7 +201,7 @@ export async function recordPageProgress(
 
   await writeCurrentPageRecord(input.projectDir, currentPage);
 
-  const pageProgress = upsertPageProgressItem(existingProgress, {
+  const pageProgress = upsertSemanticPageProgressItem(existingProgress, {
     pageId: input.pageId,
     pageNumber: currentPage.pageNumber,
     pageState,
@@ -323,30 +211,22 @@ export async function recordPageProgress(
     lastRenderedHtmlPath: currentPage.lastRenderedHtmlPath,
     lastRenderedPngPath: currentPage.lastRenderedPngPath,
     updatedAt: timestamp,
-  });
+  }, timestamp);
   await writePageProgressRecord(input.projectDir, pageProgress);
 
-  const allPagesLocked = await isAllPagesLocked(pagePlan, pageProgress);
-  const nextDeckState: TaskRuntimeStateRecord["deckState"] =
-    allPagesLocked && pageState === "page_locked" ? "deck_html_ready" : "page_iteration_active";
-
-  const nextState: TaskRuntimeStateRecord = {
-    ...state,
-    updatedAt: nowIso(),
-    deckState: nextDeckState,
+  const allPagesLocked = computeAllPagesLocked(pagePlan, pageProgress);
+  const nextState = buildRuntimeStateForPage({
+    state,
+    now: nowIso(),
+    pageId: input.pageId,
     pageState,
-    currentPageId: input.pageId,
-    blockedBy:
-      pageState === "page_review" ? ["page_png_review"] : [],
-    allowedTransitions: buildAllowedTransitions(pageState),
     allPagesLocked,
-    recoverable: true,
-  };
+  });
   await writeStateRecord(input.projectDir, nextState);
 
   await appendTaskEvent(input.projectDir, {
     eventId: randomUUID(),
-    eventType: getPageProgressEventType(pageState),
+    eventType: getSemanticPageProgressEventType(pageState),
     projectId: task.projectId,
     timestamp,
     actor: "agent",
@@ -413,7 +293,7 @@ export async function recordDeckReviewFeedback(
       ? revision.reviewNotes.trim()
       : summary;
 
-    nextProgress = upsertPageProgressItem(nextProgress, {
+    nextProgress = upsertSemanticPageProgressItem(nextProgress, {
       pageId,
       pageNumber: existingProgressPage?.pageNumber ?? pagePlanItem?.pageNumber,
       pageState: "page_fix_required",
@@ -423,7 +303,7 @@ export async function recordDeckReviewFeedback(
       lastRenderedHtmlPath: existingProgressPage?.lastRenderedHtmlPath,
       lastRenderedPngPath: existingProgressPage?.lastRenderedPngPath,
       updatedAt: timestamp,
-    });
+    }, timestamp);
     targetPageIds.push(pageId);
   }
 
@@ -438,27 +318,24 @@ export async function recordDeckReviewFeedback(
     throw new Error(`page "${targetPageIds[0]}" not found after deck review feedback update`);
   }
 
-  const currentPage = buildPageStateRecord(
-    task.projectId,
-    firstPage.pageId,
-    "page_fix_required",
-    firstPage.pageNumber,
-    firstPage.lastRenderedHtmlPath,
-    firstPage.lastRenderedPngPath,
-  );
+  const currentPage = buildSemanticCurrentPageRecord({
+    projectId: task.projectId,
+    pageId: firstPage.pageId,
+    pageState: "page_fix_required",
+    pageNumber: firstPage.pageNumber,
+    renderedHtmlPath: firstPage.lastRenderedHtmlPath,
+    renderedPngPath: firstPage.lastRenderedPngPath,
+    now: timestamp,
+  });
   await writeCurrentPageRecord(input.projectDir, currentPage);
 
-  const nextState: TaskRuntimeStateRecord = {
-    ...state,
-    updatedAt: timestamp,
-    deckState: "page_iteration_active",
+  const nextState = buildRuntimeStateForPage({
+    state,
+    now: timestamp,
+    pageId: firstPage.pageId,
     pageState: "page_fix_required",
-    currentPageId: firstPage.pageId,
-    blockedBy: [],
-    allowedTransitions: buildAllowedTransitions("page_fix_required"),
     allPagesLocked: false,
-    recoverable: true,
-  };
+  });
   await writeStateRecord(input.projectDir, nextState);
 
   await appendTaskEvent(input.projectDir, {

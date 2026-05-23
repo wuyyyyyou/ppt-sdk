@@ -88,6 +88,7 @@ ppt-gener:  tool-lightvoss_5433-ppt-gener-dc7ftcep
 - 如果需要看 UI 或复现 bug，优先用 Chrome DevTools MCP 操作用户已经打开的 `http://localhost:5180/`。
 - 如果发现用户没有启动 dev server，就直接提醒用户启动，不要代为拉起。
 - 不要重新引入独立 Vite dev server proxy 路径。
+- 当前环境无法直接启动 Chrome / Puppeteer；如果必须运行相关渲染或截图测试，需要按提权流程请求用户授权。
 
 `ppt-app` 里常用命令是：
 
@@ -164,9 +165,10 @@ cd presenton-pptx-generator && .venv/bin/python example_plugin.py
 
 ## 术语与文档
 
+- 默认使用中文友好的表达；新增或更新的 markdown 文档，尤其是 `.scratch/` 下的 issue 和 PRD，应尽量使用中文。
+
 issue 和 PRD 放在 `.scratch/` 里的 markdown 文件中。相关说明见：
 
 - [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md)
 - [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md)
 - [`docs/agents/domain.md`](docs/agents/domain.md)
-

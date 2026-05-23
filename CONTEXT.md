@@ -46,6 +46,9 @@ A deck generation process that is currently running; the confirmed outline is no
 **Generation Step**:
 A visible part of deck generation, such as planning pages, preparing files, authoring a page, rendering, self-review, or final rendering.
 
+**Task State Semantics**:
+The authoritative state-meaning module for the Task State Machine. It derives effective deck/page state, allowed operations, blockers, recommendations, and page progress synchronization from Workspace artifacts such as the Page Plan and Page Progress.
+
 ## Example Dialogue
 
 Dev: "The workspace has a draft outline, but not a confirmed outline yet."

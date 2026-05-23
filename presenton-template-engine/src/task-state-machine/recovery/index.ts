@@ -30,6 +30,10 @@ import {
   writeTaskRecord,
 } from "../storage/records.js";
 import { listTaskCheckpoints, type CheckpointRecord } from "../actions/checkpoint.js";
+import {
+  buildPageProgressFromPlan,
+  deriveEffectiveTaskState,
+} from "../semantics/index.js";
 
 export interface RecoveryIssue {
   file: string;
@@ -75,28 +79,14 @@ function syncDeckStateFromArtifacts(
   pagePlan: TaskPagePlanRecord | null,
   pageProgress: TaskPageProgressRecord | null,
 ): TaskRuntimeStateRecord {
-  const progressByPageId = new Map(pageProgress?.pages.map((page) => [page.pageId, page]) ?? []);
-  const allPagesLocked = Boolean(pagePlan?.pages.length)
-    && Boolean(pagePlan?.pages.every((page) => progressByPageId.get(page.pageId)?.locked === true));
   return {
-    ...state,
-    allPagesLocked,
-    currentPageId: currentPage?.pageId ?? state.currentPageId,
-    pageState: currentPage?.pageState ?? state.pageState,
-    blockedBy:
-      currentPage?.pageState === "page_review"
-        ? ["page_png_review"]
-        : [],
-    allowedTransitions:
-      currentPage?.pageState === "page_locked"
-        ? []
-        : currentPage?.pageState === "page_review"
-          ? ["page_accepted", "page_fix_required"]
-          : currentPage?.pageState === "page_fix_required"
-            ? ["page_authoring"]
-            : currentPage?.pageState === "page_authoring"
-              ? ["page_review"]
-              : ["page_authoring"],
+    ...deriveEffectiveTaskState({
+      projectDir: state.projectId,
+      state,
+      currentPage,
+      pagePlan,
+      pageProgress,
+    }).state,
     updatedAt: nowIso(),
   };
 }
@@ -107,28 +97,13 @@ function buildPageProgressFromArtifacts(
   currentPage: TaskCurrentPageRecord | null,
   existing: TaskPageProgressRecord | null,
 ): TaskPageProgressRecord {
-  const now = nowIso();
-  const existingByPageId = new Map(existing?.pages.map((page) => [page.pageId, page]) ?? []);
-
-  return {
+  return buildPageProgressFromPlan({
     projectId: task.projectId,
-    updatedAt: now,
-    pages: (pagePlan?.pages ?? []).map((page) => {
-      const existingPage = existingByPageId.get(page.pageId);
-      const current = currentPage?.pageId === page.pageId ? currentPage : null;
-      return {
-        pageId: page.pageId,
-        pageNumber: page.pageNumber,
-        pageState: current?.pageState ?? existingPage?.pageState ?? "page_selected",
-        locked: current?.locked ?? existingPage?.locked ?? false,
-        summary: existingPage?.summary,
-        reviewNotes: existingPage?.reviewNotes,
-        lastRenderedHtmlPath: current?.lastRenderedHtmlPath ?? existingPage?.lastRenderedHtmlPath,
-        lastRenderedPngPath: current?.lastRenderedPngPath ?? existingPage?.lastRenderedPngPath,
-        updatedAt: current?.updatedAt ?? existingPage?.updatedAt ?? now,
-      };
-    }),
-  };
+    pagePlan,
+    existing,
+    currentPage,
+    now: nowIso(),
+  });
 }
 
 export async function recoverTaskProject(projectDir: string): Promise<RecoveryResult> {
