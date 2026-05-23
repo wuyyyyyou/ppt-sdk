@@ -1,7 +1,7 @@
 import { CheckCircle2, Sparkles } from "lucide-react";
 import type { OutlineDetail } from "../../../data/mockDeck";
 import type { Messages } from "../../../i18n/messages";
-import type { CreateDeckFlowProgress } from "../orchestration/createDeckFlow";
+import type { DeckGenerationProgress } from "../../deck-generation";
 import type { LoadingKind } from "../types";
 import { formatSlideNumber } from "../utils";
 import { GenerationProgressPanel } from "./BriefPage";
@@ -20,7 +20,7 @@ interface OutlinePageProps {
   applyFeedback: () => Promise<void>;
   createDeck: () => Promise<void>;
   cancelGenerateDeck: () => void;
-  createDeckProgress: CreateDeckFlowProgress | null;
+  createDeckProgress: DeckGenerationProgress | null;
   loading: LoadingKind;
 }
 
@@ -76,7 +76,7 @@ export function OutlinePage(props: OutlinePageProps) {
         <GenerationProgressPanel
           progress={createDeckProgress}
           onCancel={cancelGenerateDeck}
-          cancellable={loading === "deck" && createDeckProgress.phase !== "cancelled"}
+          cancellable={loading === "deck" && createDeckProgress.step !== "cancelled"}
         />
       ) : null}
 

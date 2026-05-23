@@ -4,52 +4,57 @@ import {
   type AgentRunSummary,
   type AgentSelfReviewResult,
   type AgentStreamEvent,
-} from "../../../agent/agentClient";
-import { TSX_AUTHORING_RULES_SUMMARY } from "../../../agent/promptRules";
-import type { PptBackend } from "../../../api/pptBackend";
+} from "../../agent/agentClient";
+import { TSX_AUTHORING_RULES_SUMMARY } from "../../agent/promptRules";
+import type { AiClient } from "../../ai/aiClient";
 import type {
   PagePlan,
   PagePlanItem,
   PageProgress,
+  RenderDeckHtmlResult,
   RenderWorkspacePagePreviewResult,
   WorkspaceOutline,
   WorkspaceResult,
-  WorkspaceSettings,
-} from "../../../api/types";
-import type { AiClient } from "../../../ai/aiClient";
-import type { ContextRow } from "../types";
-import type { Locale } from "../../../i18n/messages";
+} from "../../api/types";
+import type { PptBackend } from "../../api/pptBackend";
+import type { Locale } from "../../i18n/messages";
 
-export const MAX_RENDER_ATTEMPTS = 10;
-export const MAX_SELF_REVIEW_ATTEMPTS = 5;
-export const MAX_AGENT_FAILURES = 5;
+const ATTEMPT_LIMITS = {
+  render: 10,
+  selfReview: 5,
+  agent: 5,
+};
 
-export type CreateDeckFlowPhase =
-  | "outline"
+export type DeckGenerationStep =
   | "page-plan"
   | "prepare"
-  | "authoring"
-  | "render"
-  | "self-review"
+  | "page-authoring"
+  | "page-render"
+  | "page-review"
   | "final-render"
   | "complete"
   | "cancelled"
-  | "error";
+  | "failed";
 
-export interface CreateDeckFlowProgressPage {
+export type DeckGenerationStartMode = "restart" | "resume";
+
+export interface DeckGenerationProgressPage {
   page_id: string;
   index: number;
   title: string;
   status: string;
   render_attempts: number;
+  render_attempt_limit: number;
   self_review_attempts: number;
+  self_review_attempt_limit: number;
   agent_failures: number;
+  agent_failure_limit: number;
   agent_infrastructure_failures: number;
   last_error?: string;
   last_screenshot_path?: string;
 }
 
-export interface CreateDeckFlowStream {
+export interface DeckGenerationStream {
   run_id?: string;
   kind?: string;
   page_id: string;
@@ -59,107 +64,120 @@ export interface CreateDeckFlowStream {
   activities: string[];
 }
 
-export interface CreateDeckFlowProgress {
-  phase: CreateDeckFlowPhase;
+export interface DeckGenerationProgress {
+  step: DeckGenerationStep;
   message: string;
   currentPageIndex: number | null;
   totalPages: number;
-  pages: CreateDeckFlowProgressPage[];
-  stream?: CreateDeckFlowStream;
+  pages: DeckGenerationProgressPage[];
+  stream?: DeckGenerationStream;
 }
 
-interface DeckFlowContext {
-  backend: PptBackend;
-  agentClient: AgentClient;
-  workspace: WorkspaceResult;
-  locale: Locale;
-  onProgress: (progress: CreateDeckFlowProgress) => void;
-  isCancelled: () => boolean;
+export interface DeckGenerationStreamSnapshot {
+  id: string;
+  phase: string;
+  label: string;
+  page_id?: string;
+  page_index?: number;
+  status: string;
+  message: string;
+  lines: string[];
+  activities: string[];
+  updated_at: string;
 }
 
-export interface CreateDeckFlowInput extends DeckFlowContext {
-  aiClient: AiClient;
-  prompt: string;
-  contextRows: ContextRow[];
-  setting: WorkspaceSettings;
-}
-
-export interface CreateDeckFlowFromOutlineInput extends DeckFlowContext {
-  aiClient: AiClient;
-  outline: WorkspaceOutline;
-}
-
-export interface CreateDeckFlowResult {
+export interface DeckGenerationResult {
   outline: WorkspaceOutline;
   pagePlan: PagePlan;
   progress: PageProgress;
-  rendered: Awaited<ReturnType<PptBackend["renderDeckHtml"]>>;
+  rendered: RenderDeckHtmlResult;
 }
 
-function getWorkspaceTitle(workspace: WorkspaceResult) {
-  return workspace.task && typeof workspace.task === "object" && !Array.isArray(workspace.task)
-    && typeof (workspace.task as { title?: unknown }).title === "string"
-    ? (workspace.task as { title: string }).title
-    : workspace.workspace_id;
+export interface DeckGenerationError {
+  type:
+    | "page_failed"
+    | "agent_infrastructure"
+    | "stale_artifacts"
+    | "cancelled"
+    | "invalid_confirmed_outline";
+  message: string;
+  page_id?: string;
+  page_index?: number;
+  page_status?: string;
 }
 
-function mapProgress(progress: PageProgress | null): CreateDeckFlowProgressPage[] {
+export type DeckGenerationCompletion =
+  | { status: "completed"; result: DeckGenerationResult }
+  | { status: "cancelled"; progress: DeckGenerationProgress | null }
+  | {
+      status: "failed";
+      error: DeckGenerationError;
+      progress: DeckGenerationProgress | null;
+    };
+
+export interface RunDeckGenerationInput {
+  backend: PptBackend;
+  aiClient: AiClient;
+  agentClient: AgentClient;
+  workspace: WorkspaceResult;
+  confirmedOutline: WorkspaceOutline;
+  locale: Locale;
+  startMode?: DeckGenerationStartMode;
+  onProgress: (progress: DeckGenerationProgress) => void;
+  isCancelled: () => boolean;
+}
+
+type DeckGenerationContext = Omit<RunDeckGenerationInput, "startMode">;
+
+function mapProgress(progress: PageProgress | null): DeckGenerationProgressPage[] {
   return progress?.pages.map((page) => ({
     page_id: page.page_id,
     index: page.index,
     title: page.title,
     status: page.status,
     render_attempts: page.render_attempts,
+    render_attempt_limit: ATTEMPT_LIMITS.render,
     self_review_attempts: page.self_review_attempts,
+    self_review_attempt_limit: ATTEMPT_LIMITS.selfReview,
     agent_failures: page.agent_failures,
+    agent_failure_limit: ATTEMPT_LIMITS.agent,
     agent_infrastructure_failures: page.agent_infrastructure_failures,
     last_error: page.last_error,
     last_screenshot_path: page.last_screenshot_path,
   })) ?? [];
 }
 
-function emit(
-  input: Pick<DeckFlowContext, "onProgress">,
-  value: Omit<CreateDeckFlowProgress, "pages">,
+function createProgress(
+  value: Omit<DeckGenerationProgress, "pages">,
   progress: PageProgress | null,
-  stream?: CreateDeckFlowStream | null
-) {
-  input.onProgress({
+  stream?: DeckGenerationStream | null,
+): DeckGenerationProgress {
+  return {
     ...value,
     pages: mapProgress(progress),
     stream: stream ?? undefined,
-  });
+  };
+}
+
+function emit(
+  input: Pick<DeckGenerationContext, "onProgress">,
+  value: Omit<DeckGenerationProgress, "pages">,
+  progress: PageProgress | null,
+  stream?: DeckGenerationStream | null,
+) {
+  input.onProgress(createProgress(value, progress, stream));
 }
 
 async function recordProgress(
-  input: Pick<DeckFlowContext, "backend" | "workspace">,
+  input: Pick<DeckGenerationContext, "backend" | "workspace">,
   page: PagePlanItem,
-  patch: Record<string, unknown>
+  patch: Record<string, unknown>,
 ) {
   return input.backend.recordPageProgress({
     workspace_dir: input.workspace.workspace_dir,
     page_id: page.page_id,
     patch,
   });
-}
-
-function buildOutlineArtifact(
-  result: Awaited<ReturnType<AiClient["generateOutline"]>>,
-  input: CreateDeckFlowInput
-): WorkspaceOutline {
-  return {
-    version: 2,
-    title: result.outline.title || getWorkspaceTitle(input.workspace),
-    status: "confirmed",
-    items: result.outline.items,
-    source: {
-      prompt: input.prompt,
-      context: input.contextRows,
-      setting: input.setting,
-      kind: "llm-outline",
-    },
-    updated_at: new Date().toISOString(),
-  };
 }
 
 function buildAuthoringPrompt(input: {
@@ -200,9 +218,7 @@ function buildAuthoringPrompt(input: {
     "",
     `Full outline JSON: ${JSON.stringify(input.outline)}`,
     `Full page plan JSON: ${JSON.stringify(input.pagePlan)}`,
-    input.renderError
-      ? `Render error to fix:\n${input.renderError}`
-      : "",
+    input.renderError ? `Render error to fix:\n${input.renderError}` : "",
     input.selfReview
       ? `Visual review failed. Fix request:\n${JSON.stringify(input.selfReview)}`
       : "",
@@ -274,9 +290,9 @@ function appendTextToLines(lines: string[], chunk: string, limit: number) {
 }
 
 function createAgentRunTracker(input: {
-  flowInput: DeckFlowContext;
+  flowInput: DeckGenerationContext;
   page: PagePlanItem;
-  phase: CreateDeckFlowPhase;
+  step: DeckGenerationStep;
   message: string;
   totalPages: number;
   progress: () => PageProgress | null;
@@ -285,7 +301,7 @@ function createAgentRunTracker(input: {
 }) {
   const startedAt = new Date().toISOString();
   const runId = `${input.page.page_id}-${input.kind}-${Date.now().toString(36)}`;
-  const stream: CreateDeckFlowStream = {
+  const stream: DeckGenerationStream = {
     run_id: runId,
     kind: input.kind,
     page_id: input.page.page_id,
@@ -300,17 +316,20 @@ function createAgentRunTracker(input: {
   let usage: unknown = null;
 
   function emitStream() {
-    emit(input.flowInput, {
-      phase: input.phase,
-      message: input.message,
-      currentPageIndex: input.page.index,
-      totalPages: input.totalPages,
-    }, input.progress(), stream);
+    emit(
+      input.flowInput,
+      {
+        step: input.step,
+        message: input.message,
+        currentPageIndex: input.page.index,
+        totalPages: input.totalPages,
+      },
+      input.progress(),
+      stream,
+    );
   }
 
   return {
-    runId,
-    stream,
     onStreamEvent(event: AgentStreamEvent) {
       if (event.type === "content") {
         contentChunks.push(event.text);
@@ -366,16 +385,16 @@ function createAgentRunTracker(input: {
           },
         });
       } catch {
-        // Logging must never fail the generation flow.
+        // Logging must never fail Deck Generation.
       }
     },
   };
 }
 
 async function appendWorkspaceLogSafe(
-  input: Pick<DeckFlowContext, "backend" | "workspace">,
-  channel: "ai-outline" | "ai-page-plan" | "ai-page-agent" | "ai-page-agent-stream",
-  entry: Record<string, unknown>
+  input: Pick<DeckGenerationContext, "backend" | "workspace">,
+  channel: "ai-page-plan" | "ai-page-agent" | "ai-page-agent-stream",
+  entry: Record<string, unknown>,
 ) {
   try {
     await input.backend.appendWorkspaceLog({
@@ -384,35 +403,85 @@ async function appendWorkspaceLogSafe(
       entry,
     });
   } catch {
-    // Logging must never fail the generation flow.
+    // Logging must never fail Deck Generation.
   }
 }
 
-export async function runDeckFlowFromOutline(
-  input: CreateDeckFlowFromOutlineInput
-): Promise<CreateDeckFlowResult> {
-  let progress: PageProgress | null = null;
-  const outline = input.outline;
-  if (!outline || !Array.isArray(outline.items)) {
-    throw new Error("Missing confirmed outline for deck generation.");
+function readWorkspaceTemplate(workspace: WorkspaceResult) {
+  return workspace.template && typeof workspace.template === "object" && !Array.isArray(workspace.template)
+    ? (workspace.template as { selected_template_group?: unknown; manifest_path?: unknown })
+    : null;
+}
+
+function progressMatchesPlan(pagePlan: PagePlan, progress: PageProgress) {
+  const progressIds = new Set(progress.pages.map((page) => page.page_id));
+  return pagePlan.pages.every((page) => progressIds.has(page.page_id));
+}
+
+function pagePlanMatchesOutlineAndTemplate(
+  workspace: WorkspaceResult,
+  pagePlan: PagePlan,
+  progress: PageProgress,
+  outline: WorkspaceOutline,
+) {
+  if (
+    pagePlan.source.outline_updated_at &&
+    outline.updated_at &&
+    pagePlan.source.outline_updated_at !== outline.updated_at
+  ) {
+    return false;
   }
 
+  if (pagePlan.pages.length !== outline.items.length) {
+    return false;
+  }
+
+  const template = readWorkspaceTemplate(workspace);
+  const selectedTemplate =
+    typeof template?.selected_template_group === "string" ? template.selected_template_group : "";
+  const manifestPath = typeof template?.manifest_path === "string" ? template.manifest_path : "";
+  if (selectedTemplate && pagePlan.source.template_group !== selectedTemplate) {
+    return false;
+  }
+  if (manifestPath && pagePlan.source.template_manifest_path !== manifestPath) {
+    return false;
+  }
+
+  return progressMatchesPlan(pagePlan, progress);
+}
+
+async function loadResumeArtifacts(input: RunDeckGenerationInput) {
+  try {
+    const [pagePlan, progress] = await Promise.all([
+      input.backend.getPagePlan({ workspace_dir: input.workspace.workspace_dir }),
+      input.backend.getPageProgress({ workspace_dir: input.workspace.workspace_dir }),
+    ]);
+    if (!pagePlanMatchesOutlineAndTemplate(input.workspace, pagePlan, progress, input.confirmedOutline)) {
+      return null;
+    }
+    return { pagePlan, progress };
+  } catch {
+    return null;
+  }
+}
+
+async function createRestartArtifacts(input: RunDeckGenerationInput) {
   emit(
     input,
     {
-      phase: "page-plan",
+      step: "page-plan",
       message: "正在规划页面和模板蓝图",
       currentPageIndex: null,
-      totalPages: outline.items.length,
+      totalPages: input.confirmedOutline.items.length,
     },
-    progress
+    null,
   );
 
   const planningContext = await input.backend.getTemplatePlanningContext({
     workspace_dir: input.workspace.workspace_dir,
   });
   const pagePlan = await input.aiClient.generatePagePlan({
-    outline,
+    outline: input.confirmedOutline,
     planningContext,
     locale: input.locale,
   });
@@ -431,20 +500,179 @@ export async function runDeckFlowFromOutline(
   emit(
     input,
     {
-      phase: "prepare",
+      step: "prepare",
       message: "正在准备页面文件",
       currentPageIndex: null,
       totalPages: pagePlan.pages.length,
     },
-    progress
+    null,
   );
 
   await input.backend.preparePageFiles({
     workspace_dir: input.workspace.workspace_dir,
   });
-  progress = await input.backend.getPageProgress({
+
+  let progress = await input.backend.getPageProgress({
     workspace_dir: input.workspace.workspace_dir,
   });
+
+  for (const page of pagePlan.pages) {
+    progress = await recordProgress(input, page, {
+      status: "pending",
+      render_attempts: 0,
+      self_review_attempts: 0,
+      agent_failures: 0,
+      agent_infrastructure_failures: 0,
+      last_error: "",
+      last_html_path: "",
+      last_screenshot_path: "",
+      review: null,
+    });
+  }
+
+  return { pagePlan, progress };
+}
+
+function failedCompletion(input: {
+  error: DeckGenerationError;
+  progress: DeckGenerationProgress | null;
+}): DeckGenerationCompletion {
+  return {
+    status: "failed",
+    error: input.error,
+    progress: input.progress,
+  };
+}
+
+function createFailedPageError(page: PageProgress["pages"][number]): DeckGenerationError {
+  const type =
+    page.status === "agent_infrastructure_failed"
+      ? "agent_infrastructure"
+      : "page_failed";
+  return {
+    type,
+    message:
+      page.last_error ||
+      `第 ${page.index + 1} 页未通过：${page.status}`,
+    page_id: page.page_id,
+    page_index: page.index,
+    page_status: page.status,
+  };
+}
+
+export function pageProgressToDeckGenerationProgress(
+  storedProgress: PageProgress,
+): DeckGenerationProgress {
+  const pages = [...storedProgress.pages].sort((left, right) => left.index - right.index);
+  const failedPage = pages.find((item) =>
+    /failed/i.test(item.status) ||
+    item.status === "needs_user_review" ||
+    item.status === "agent_infrastructure_failed"
+  );
+  const activePage =
+    failedPage ??
+    [...pages].reverse().find((item) => item.status !== "pending") ??
+    pages[0] ??
+    null;
+  const acceptedCount = pages.filter((item) => item.status === "accepted").length;
+  const step: DeckGenerationStep = failedPage
+    ? "failed"
+    : acceptedCount === pages.length
+      ? "complete"
+      : "page-authoring";
+  const message = failedPage?.last_error
+    ? failedPage.last_error
+    : step === "complete"
+      ? "生成完成"
+      : "已恢复上次生成进度";
+
+  return {
+    step,
+    message,
+    currentPageIndex: activePage ? activePage.index : null,
+    totalPages: pages.length,
+    pages: mapProgress({
+      ...storedProgress,
+      pages,
+    }),
+  };
+}
+
+export function createDeckGenerationStreamSnapshot(
+  progress: DeckGenerationProgress,
+): DeckGenerationStreamSnapshot {
+  const id = progress.stream
+    ? `${progress.step}:${progress.stream.page_id}:${progress.stream.run_id ?? progress.stream.kind ?? progress.stream.status}`
+    : `${progress.step}:global`;
+  return {
+    id,
+    phase: progress.step,
+    label: progress.stream
+      ? `第 ${progress.stream.page_index + 1} 页 · ${progress.stream.kind ?? progress.step}`
+      : progress.message || progress.step,
+    page_id: progress.stream?.page_id,
+    page_index: progress.stream?.page_index,
+    status: progress.stream?.status ?? progress.message,
+    message: progress.message,
+    lines: progress.stream ? [...progress.stream.lines] : [],
+    activities: progress.stream ? [...progress.stream.activities] : [],
+    updated_at: new Date().toISOString(),
+  };
+}
+
+export async function runDeckGeneration(
+  input: RunDeckGenerationInput,
+): Promise<DeckGenerationCompletion> {
+  if (input.confirmedOutline.status !== "confirmed") {
+    const progress = createProgress(
+      {
+        step: "failed",
+        message: "Deck Generation 需要 Confirmed Outline。",
+        currentPageIndex: null,
+        totalPages: 0,
+      },
+      null,
+    );
+    input.onProgress(progress);
+    return failedCompletion({
+      progress,
+      error: {
+        type: "invalid_confirmed_outline",
+        message: progress.message,
+      },
+    });
+  }
+
+  const startMode = input.startMode ?? "restart";
+  let artifacts: { pagePlan: PagePlan; progress: PageProgress };
+
+  if (startMode === "resume") {
+    const resumeArtifacts = await loadResumeArtifacts(input);
+    if (!resumeArtifacts) {
+      const progress = createProgress(
+        {
+          step: "failed",
+          message: "无法续跑：现有 Page Plan 或 Page Progress 已过期。",
+          currentPageIndex: null,
+          totalPages: input.confirmedOutline.items.length,
+        },
+        null,
+      );
+      input.onProgress(progress);
+      return failedCompletion({
+        progress,
+        error: {
+          type: "stale_artifacts",
+          message: progress.message,
+        },
+      });
+    }
+    artifacts = resumeArtifacts;
+  } else {
+    artifacts = await createRestartArtifacts(input);
+  }
+
+  let { pagePlan, progress } = artifacts;
 
   for (const page of pagePlan.pages) {
     if (input.isCancelled()) break;
@@ -454,12 +682,12 @@ export async function runDeckFlowFromOutline(
       emit(
         input,
         {
-          phase: "authoring",
+          step: "page-authoring",
           message: `第 ${page.index + 1} 页已通过，继续下一页`,
           currentPageIndex: page.index,
           totalPages: pagePlan.pages.length,
         },
-        progress
+        progress,
       );
       continue;
     }
@@ -468,12 +696,12 @@ export async function runDeckFlowFromOutline(
     emit(
       input,
       {
-        phase: "authoring",
+        step: "page-authoring",
         message: `正在生成第 ${page.index + 1} / ${pagePlan.pages.length} 页`,
         currentPageIndex: page.index,
         totalPages: pagePlan.pages.length,
       },
-      progress
+      progress,
     );
 
     let renderAttempts = existingPageProgress?.render_attempts ?? 0;
@@ -496,7 +724,7 @@ export async function runDeckFlowFromOutline(
         workspaceDir: input.workspace.workspace_dir,
         page,
         pagePlan,
-        outline,
+        outline: input.confirmedOutline,
         attemptKind: renderError ? "render-fix" : selfReview ? "self-review-fix" : "initial",
         renderError,
         selfReview,
@@ -505,7 +733,7 @@ export async function runDeckFlowFromOutline(
       const authoringTracker = createAgentRunTracker({
         flowInput: input,
         page,
-        phase: "authoring",
+        step: "page-authoring",
         message: `Agent 正在编辑第 ${page.index + 1} 页`,
         totalPages: pagePlan.pages.length,
         progress: () => progress,
@@ -516,7 +744,7 @@ export async function runDeckFlowFromOutline(
       try {
         const authoringResult: AgentRunSummary = await input.agentClient.runAuthoringPrompt(
           authoringPrompt,
-          { onStreamEvent: authoringTracker.onStreamEvent }
+          { onStreamEvent: authoringTracker.onStreamEvent },
         );
         await authoringTracker.flush("completed", {
           parsed_summary: authoringResult.parsed_json === true,
@@ -540,17 +768,26 @@ export async function runDeckFlowFromOutline(
             agent_infrastructure_failures: agentInfrastructureFailures,
             last_error: message,
           });
-          emit(
-            input,
+          const failedProgress = createProgress(
             {
-              phase: "error",
+              step: "failed",
               message,
               currentPageIndex: page.index,
               totalPages: pagePlan.pages.length,
             },
-            progress
+            progress,
           );
-          throw error;
+          input.onProgress(failedProgress);
+          return failedCompletion({
+            progress: failedProgress,
+            error: {
+              type: "agent_infrastructure",
+              message,
+              page_id: page.page_id,
+              page_index: page.index,
+              page_status: "agent_infrastructure_failed",
+            },
+          });
         }
 
         agentFailures += 1;
@@ -559,11 +796,11 @@ export async function runDeckFlowFromOutline(
           agent_failures: agentFailures,
         });
         progress = await recordProgress(input, page, {
-          status: agentFailures >= MAX_AGENT_FAILURES ? "agent_failed" : "authoring",
+          status: agentFailures >= ATTEMPT_LIMITS.agent ? "agent_failed" : "authoring",
           agent_failures: agentFailures,
           last_error: message,
         });
-        if (agentFailures >= MAX_AGENT_FAILURES) break;
+        if (agentFailures >= ATTEMPT_LIMITS.agent) break;
         continue;
       }
 
@@ -572,12 +809,12 @@ export async function runDeckFlowFromOutline(
         emit(
           input,
           {
-            phase: "render",
+            step: "page-render",
             message: `正在渲染第 ${page.index + 1} 页`,
             currentPageIndex: page.index,
             totalPages: pagePlan.pages.length,
           },
-          progress
+          progress,
         );
         preview = await input.backend.renderWorkspacePagePreview({
           workspace_dir: input.workspace.workspace_dir,
@@ -593,23 +830,23 @@ export async function runDeckFlowFromOutline(
         renderAttempts += 1;
         renderError = error instanceof Error ? error.message : String(error);
         progress = await recordProgress(input, page, {
-          status: renderAttempts >= MAX_RENDER_ATTEMPTS ? "render_failed" : "render_fixing",
+          status: renderAttempts >= ATTEMPT_LIMITS.render ? "render_failed" : "render_fixing",
           render_attempts: renderAttempts,
           last_error: renderError,
         });
-        if (renderAttempts >= MAX_RENDER_ATTEMPTS) break;
+        if (renderAttempts >= ATTEMPT_LIMITS.render) break;
         continue;
       }
 
       emit(
         input,
         {
-          phase: "self-review",
+          step: "page-review",
           message: `正在自评第 ${page.index + 1} 页截图`,
           currentPageIndex: page.index,
           totalPages: pagePlan.pages.length,
         },
-        progress
+        progress,
       );
       const selfReviewPrompt = buildSelfReviewPrompt({
         page,
@@ -619,7 +856,7 @@ export async function runDeckFlowFromOutline(
       const selfReviewTracker = createAgentRunTracker({
         flowInput: input,
         page,
-        phase: "self-review",
+        step: "page-review",
         message: `Agent 正在自评第 ${page.index + 1} 页`,
         totalPages: pagePlan.pages.length,
         progress: () => progress,
@@ -629,7 +866,7 @@ export async function runDeckFlowFromOutline(
       try {
         selfReview = await input.agentClient.runSelfReviewPrompt(
           selfReviewPrompt,
-          { onStreamEvent: selfReviewTracker.onStreamEvent }
+          { onStreamEvent: selfReviewTracker.onStreamEvent },
         );
         await selfReviewTracker.flush("completed", {
           parsed_review: true,
@@ -649,17 +886,26 @@ export async function runDeckFlowFromOutline(
             agent_infrastructure_failures: agentInfrastructureFailures,
             last_error: message,
           });
-          emit(
-            input,
+          const failedProgress = createProgress(
             {
-              phase: "error",
+              step: "failed",
               message,
               currentPageIndex: page.index,
               totalPages: pagePlan.pages.length,
             },
-            progress
+            progress,
           );
-          throw error;
+          input.onProgress(failedProgress);
+          return failedCompletion({
+            progress: failedProgress,
+            error: {
+              type: "agent_infrastructure",
+              message,
+              page_id: page.page_id,
+              page_index: page.index,
+              page_status: "agent_infrastructure_failed",
+            },
+          });
         }
 
         agentFailures += 1;
@@ -668,11 +914,11 @@ export async function runDeckFlowFromOutline(
           agent_failures: agentFailures,
         });
         progress = await recordProgress(input, page, {
-          status: agentFailures >= MAX_AGENT_FAILURES ? "agent_failed" : "self_review",
+          status: agentFailures >= ATTEMPT_LIMITS.agent ? "agent_failed" : "self_review",
           agent_failures: agentFailures,
           last_error: message,
         });
-        if (agentFailures >= MAX_AGENT_FAILURES) break;
+        if (agentFailures >= ATTEMPT_LIMITS.agent) break;
         continue;
       }
       progress = await recordProgress(input, page, {
@@ -691,29 +937,32 @@ export async function runDeckFlowFromOutline(
       selfReviewAttempts += 1;
       progress = await recordProgress(input, page, {
         status:
-          selfReviewAttempts >= MAX_SELF_REVIEW_ATTEMPTS
+          selfReviewAttempts >= ATTEMPT_LIMITS.selfReview
             ? "needs_user_review"
             : "self_review_fixing",
         self_review_attempts: selfReviewAttempts,
         review: selfReview,
         last_error: selfReview.revision_request,
       });
-      if (selfReviewAttempts >= MAX_SELF_REVIEW_ATTEMPTS) break;
+      if (selfReviewAttempts >= ATTEMPT_LIMITS.selfReview) break;
     }
   }
 
   if (input.isCancelled()) {
-    emit(
-      input,
+    const cancelledProgress = createProgress(
       {
-        phase: "cancelled",
+        step: "cancelled",
         message: "已停止生成",
         currentPageIndex: null,
         totalPages: pagePlan.pages.length,
       },
-      progress
+      progress,
     );
-    throw new Error("Deck generation cancelled.");
+    input.onProgress(cancelledProgress);
+    return {
+      status: "cancelled",
+      progress: cancelledProgress,
+    };
   }
 
   progress = await input.backend.getPageProgress({
@@ -721,31 +970,32 @@ export async function runDeckFlowFromOutline(
   });
   const failedPage = progress.pages.find((page) => page.status !== "accepted");
   if (failedPage) {
-    emit(
-      input,
+    const error = createFailedPageError(failedPage);
+    const failedProgress = createProgress(
       {
-        phase: "error",
-        message: `第 ${failedPage.index + 1} 页未通过：${failedPage.status}`,
+        step: "failed",
+        message: error.message,
         currentPageIndex: failedPage.index,
         totalPages: pagePlan.pages.length,
       },
-      progress
+      progress,
     );
-    throw new Error(
-      failedPage.last_error ||
-        `Page ${failedPage.index + 1} did not pass generation (${failedPage.status}).`
-    );
+    input.onProgress(failedProgress);
+    return failedCompletion({
+      progress: failedProgress,
+      error,
+    });
   }
 
   emit(
     input,
     {
-      phase: "final-render",
+      step: "final-render",
       message: "正在生成最终预览",
       currentPageIndex: null,
       totalPages: pagePlan.pages.length,
     },
-    progress
+    progress,
   );
   const rendered = await input.backend.renderDeckHtml({
     workspace_dir: input.workspace.workspace_dir,
@@ -756,55 +1006,21 @@ export async function runDeckFlowFromOutline(
   emit(
     input,
     {
-      phase: "complete",
+      step: "complete",
       message: "演示文稿已生成",
       currentPageIndex: null,
       totalPages: pagePlan.pages.length,
     },
-    progress
+    progress,
   );
 
   return {
-    outline,
-    pagePlan,
-    progress,
-    rendered,
+    status: "completed",
+    result: {
+      outline: input.confirmedOutline,
+      pagePlan,
+      progress,
+      rendered,
+    },
   };
-}
-
-export async function runCreateDeckFlow(
-  input: CreateDeckFlowInput
-): Promise<CreateDeckFlowResult> {
-  emit(input, {
-    phase: "outline",
-    message: "正在调用 LLM 生成大纲",
-    currentPageIndex: null,
-    totalPages: 0,
-  }, null);
-
-  const outlineResult = await input.aiClient.generateOutline({
-    prompt: input.prompt,
-    contextRows: input.contextRows,
-    locale: input.locale,
-    setting: input.setting,
-  });
-  const outline = buildOutlineArtifact(outlineResult, input);
-  await input.backend.updateWorkspaceOutline({
-    workspace_dir: input.workspace.workspace_dir,
-    outline,
-  });
-
-  if (input.isCancelled()) {
-    emit(input, {
-      phase: "cancelled",
-      message: "已停止生成",
-      currentPageIndex: null,
-      totalPages: outline.items.length,
-    }, null);
-    throw new Error("Deck generation cancelled.");
-  }
-  return runDeckFlowFromOutline({
-    ...input,
-    outline,
-  });
 }

@@ -1,13 +1,13 @@
 import { AlertCircle, CheckCircle2, ChevronDown, Circle, RotateCcw } from "lucide-react";
 import type { Messages } from "../../../i18n/messages";
-import type { CreateDeckFlowProgress, CreateDeckFlowPhase } from "../orchestration/createDeckFlow";
+import type { DeckGenerationProgress, DeckGenerationStep } from "../../deck-generation";
 import type { GenerationStreamSnapshot, LoadingKind } from "../types";
 import { GenerationProgressPanel } from "./BriefPage";
 
 interface GeneratingPageProps {
   t: Messages;
   loading: LoadingKind;
-  progress: CreateDeckFlowProgress | null;
+  progress: DeckGenerationProgress | null;
   history: GenerationStreamSnapshot[];
   onCancel: () => void;
   onBackToOutline: () => void;
@@ -18,26 +18,25 @@ interface GeneratingPageProps {
 const majorSteps: Array<{
   id: string;
   labelKey: keyof Messages["generating"]["steps"];
-  phases: CreateDeckFlowPhase[];
+  steps: DeckGenerationStep[];
 }> = [
-  { id: "outline", labelKey: "outline", phases: ["outline"] },
-  { id: "page-plan", labelKey: "pagePlan", phases: ["page-plan"] },
-  { id: "prepare", labelKey: "prepare", phases: ["prepare"] },
+  { id: "page-plan", labelKey: "pagePlan", steps: ["page-plan"] },
+  { id: "prepare", labelKey: "prepare", steps: ["prepare"] },
   {
     id: "pages",
     labelKey: "pages",
-    phases: ["authoring", "render", "self-review", "error", "cancelled"]
+    steps: ["page-authoring", "page-render", "page-review", "failed", "cancelled"]
   },
-  { id: "final-render", labelKey: "finalRender", phases: ["final-render", "complete"] }
+  { id: "final-render", labelKey: "finalRender", steps: ["final-render", "complete"] }
 ];
 
-function majorStepIndex(phase: CreateDeckFlowPhase | null) {
-  if (!phase) return 0;
-  return Math.max(0, majorSteps.findIndex((step) => step.phases.includes(phase)));
+function majorStepIndex(step: DeckGenerationStep | null) {
+  if (!step) return 0;
+  return Math.max(0, majorSteps.findIndex((item) => item.steps.includes(step)));
 }
 
-function stepState(index: number, activeIndex: number, progress: CreateDeckFlowProgress | null) {
-  if (progress?.phase === "error" || progress?.phase === "cancelled") {
+function stepState(index: number, activeIndex: number, progress: DeckGenerationProgress | null) {
+  if (progress?.step === "failed" || progress?.step === "cancelled") {
     return index === activeIndex ? "failed" : index < activeIndex ? "done" : "pending";
   }
   if (index < activeIndex) return "done";
@@ -47,19 +46,19 @@ function stepState(index: number, activeIndex: number, progress: CreateDeckFlowP
 
 function snapshotsForStep(stepId: string, history: GenerationStreamSnapshot[]) {
   if (stepId === "pages") {
-    return history.filter((item) => ["authoring", "render", "self-review", "error", "cancelled"].includes(item.phase));
+    return history.filter((item) => ["page-authoring", "page-render", "page-review", "failed", "cancelled"].includes(item.phase));
   }
   const step = majorSteps.find((item) => item.id === stepId);
   if (!step) return [];
-  return history.filter((item) => step.phases.includes(item.phase as CreateDeckFlowPhase));
+  return history.filter((item) => step.steps.includes(item.phase as DeckGenerationStep));
 }
 
 export function GeneratingPage(props: GeneratingPageProps) {
   const { t, loading, progress, history, onCancel, onBackToOutline, onRegenerate, canBackToOutline } = props;
-  const activeIndex = majorStepIndex(progress?.phase ?? null);
+  const activeIndex = majorStepIndex(progress?.step ?? null);
   const activeStep = majorSteps[activeIndex] ?? majorSteps[0];
   const activeSnapshots = snapshotsForStep(activeStep.id, history);
-  const failed = progress?.phase === "error" || progress?.phase === "cancelled";
+  const failed = progress?.step === "failed" || progress?.step === "cancelled";
   const running = loading === "deck" || loading === "deckFromOutline";
 
   return (
@@ -87,7 +86,7 @@ export function GeneratingPage(props: GeneratingPageProps) {
         <GenerationProgressPanel
           progress={progress}
           onCancel={onCancel}
-          cancellable={running && progress.phase !== "cancelled"}
+          cancellable={running && progress.step !== "cancelled"}
         />
       ) : (
         <div className="generation-progress-panel">

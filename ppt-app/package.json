@@ -15,6 +15,7 @@
     "dev:mock-llm:retry": "anna-app dev --mock-llm fixtures/mock-outline-retry.jsonl",
     "build": "vite build --outDir bundle",
     "check": "tsc --noEmit",
+    "test:unit": "node --import tsx/esm --test tests/**/*.test.ts",
     "validate": "anna-app validate --strict"
   },
   "dependencies": {
@@ -28,6 +29,7 @@
     "@types/react": "^18.3.24",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.3.0",
+    "tsx": "^4.22.3",
     "typescript": "^5.9.2",
     "vite": "^5.4.0"
   },

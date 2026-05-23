@@ -306,8 +306,7 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
           `Context: ${JSON.stringify(input.contextRows)}`,
           `Setting: ${JSON.stringify(input.setting ?? {})}`
         ].join("\n"),
-        '{"title":"...","outline":[{"title":"...","outline":"..."}],"slides":[{"title":"...","subtitle":"..."}]}',
-        2200
+        '{"title":"...","outline":[{"title":"...","outline":"..."}],"slides":[{"title":"...","subtitle":"..."}]}'
       );
     },
 

@@ -7,7 +7,10 @@ import type {
   WorkspaceResult,
   WorkspaceSettings
 } from "../../api/types";
-import type { CreateDeckFlowProgress } from "./orchestration/createDeckFlow";
+import type {
+  DeckGenerationProgress,
+  DeckGenerationStreamSnapshot
+} from "../deck-generation";
 
 export type MainStage = "template" | "brief" | "outline" | "generating" | "deck";
 export type PageId = "main" | "library" | "review" | "refine" | "export";
@@ -66,7 +69,7 @@ export interface DeckWorkspaceState {
   outlineFeedback: string;
   previewMode: PreviewMode;
   reviewRender: DeckReviewRenderState;
-  createDeckProgress: CreateDeckFlowProgress | null;
+  createDeckProgress: DeckGenerationProgress | null;
   generationHistory: GenerationStreamSnapshot[];
   pageProgress: PageProgress | null;
   refineScope: RefineScope;
@@ -85,15 +88,4 @@ export interface DeckWorkspaceState {
 
 export type { WorkspaceSettings };
 
-export interface GenerationStreamSnapshot {
-  id: string;
-  phase: string;
-  label: string;
-  page_id?: string;
-  page_index?: number;
-  status: string;
-  message: string;
-  lines: string[];
-  activities: string[];
-  updated_at: string;
-}
+export type GenerationStreamSnapshot = DeckGenerationStreamSnapshot;

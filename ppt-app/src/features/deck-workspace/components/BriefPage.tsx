@@ -1,12 +1,7 @@
 import { Check, File, Plus, Sparkles, Upload, X } from "lucide-react";
 import type { Messages } from "../../../i18n/messages";
+import type { DeckGenerationProgress } from "../../deck-generation";
 import type { ContextRow, LoadingKind } from "../types";
-import {
-  MAX_AGENT_FAILURES,
-  MAX_RENDER_ATTEMPTS,
-  MAX_SELF_REVIEW_ATTEMPTS,
-  type CreateDeckFlowProgress
-} from "../orchestration/createDeckFlow";
 
 interface BriefPageProps {
   t: Messages;
@@ -27,7 +22,7 @@ interface BriefPageProps {
   selectLook: (id: string) => void;
   generateDeck: () => Promise<void>;
   cancelGenerateDeck: () => void;
-  createDeckProgress: CreateDeckFlowProgress | null;
+  createDeckProgress: DeckGenerationProgress | null;
   showToast: (message: string) => void;
 }
 
@@ -100,8 +95,21 @@ export function BriefPage(props: BriefPageProps) {
         <GenerationProgressPanel
           progress={createDeckProgress}
           onCancel={cancelGenerateDeck}
-          cancellable={isCreating && createDeckProgress.phase !== "cancelled"}
+          cancellable={isCreating && createDeckProgress.step !== "cancelled"}
         />
+      ) : null}
+      {!createDeckProgress && loading === "outline" && !reviewOutlineFirst ? (
+        <section className="generation-progress-panel">
+          <div className="generation-progress-header">
+            <div>
+              <div className="section-label">生成进度</div>
+              <strong>{t.status.creatingOutline}</strong>
+            </div>
+            <button className="secondary-btn compact" onClick={cancelGenerateDeck}>
+              停止
+            </button>
+          </div>
+        </section>
       ) : null}
 
       <div className="brief-options">
@@ -199,7 +207,7 @@ export function BriefPage(props: BriefPageProps) {
 }
 
 export function GenerationProgressPanel(props: {
-  progress: CreateDeckFlowProgress;
+  progress: DeckGenerationProgress;
   onCancel: () => void;
   cancellable: boolean;
 }) {
@@ -226,12 +234,12 @@ export function GenerationProgressPanel(props: {
         ) : null}
       </div>
       <div className="generation-step-row">
-        {["outline", "page-plan", "prepare", "authoring", "render", "self-review", "final-render"].map((phase) => (
+        {["page-plan", "prepare", "page-authoring", "page-render", "page-review", "final-render"].map((step) => (
           <span
-            key={phase}
-            className={`generation-step ${progress.phase === phase ? "active" : ""}`}
+            key={step}
+            className={`generation-step ${progress.step === step ? "active" : ""}`}
           >
-            {phase}
+            {step}
           </span>
         ))}
       </div>
@@ -265,7 +273,7 @@ export function GenerationProgressPanel(props: {
                 <span>{page.status}</span>
               </div>
               <small>
-                render {page.render_attempts}/{MAX_RENDER_ATTEMPTS} · review {page.self_review_attempts}/{MAX_SELF_REVIEW_ATTEMPTS} · agent {page.agent_failures}/{MAX_AGENT_FAILURES}
+                render {page.render_attempts}/{page.render_attempt_limit} · review {page.self_review_attempts}/{page.self_review_attempt_limit} · agent {page.agent_failures}/{page.agent_failure_limit}
                 {page.agent_infrastructure_failures > 0 ? ` · session ${page.agent_infrastructure_failures}` : ""}
               </small>
               {page.last_error ? <p>{page.last_error}</p> : null}

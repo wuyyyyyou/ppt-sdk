@@ -18,10 +18,18 @@ import {
   createLocalProjectDeck,
   initialDeck,
   outlineDetails,
+  type OutlineDetail,
   type Slide
 } from "../../../data/mockDeck";
 import { formatMessage, type Locale, type Messages } from "../../../i18n/messages";
 import { deckReadyStatus } from "../utils";
+import {
+  createDeckGenerationStreamSnapshot,
+  pageProgressToDeckGenerationProgress,
+  runDeckGeneration,
+  type DeckGenerationCompletion,
+  type DeckGenerationProgress,
+} from "../../deck-generation";
 import type {
   ContextRow,
   DeckReviewRenderState,
@@ -35,11 +43,6 @@ import type {
   PreviewMode,
   RefineScope
 } from "../types";
-import {
-  runCreateDeckFlow,
-  runDeckFlowFromOutline,
-  type CreateDeckFlowProgress,
-} from "../orchestration/createDeckFlow";
 
 export interface DeckWorkspaceActions {
   setPanelMode: (mode: PanelMode) => void;
@@ -117,7 +120,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     renderKey: ""
   });
   const [createDeckProgress, setCreateDeckProgress] =
-    useState<CreateDeckFlowProgress | null>(null);
+    useState<DeckGenerationProgress | null>(null);
   const [generationHistory, setGenerationHistory] = useState<GenerationStreamSnapshot[]>([]);
   const [pageProgress, setPageProgress] = useState<PageProgress | null>(null);
   const [refineScope, setRefineScope] = useState<RefineScope>("deck");
@@ -234,48 +237,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       pages,
       updated_at:
         typeof progressRecord?.updated_at === "string" ? progressRecord.updated_at : null
-    };
-  }
-
-  function workspacePageProgressToCreateDeckProgress(
-    storedProgress: PageProgress
-  ): CreateDeckFlowProgress {
-    const pages = [...storedProgress.pages].sort((left, right) => left.index - right.index);
-    const failedPage = pages.find((item) => /failed/i.test(item.status));
-    const activePage =
-      failedPage ??
-      [...pages].reverse().find((item) => item.status !== "pending") ??
-      pages[0] ??
-      null;
-    const acceptedCount = pages.filter((item) => item.status === "accepted").length;
-    const phase: CreateDeckFlowProgress["phase"] = failedPage
-      ? "error"
-      : acceptedCount === pages.length
-        ? "complete"
-        : "authoring";
-    const message = failedPage?.last_error
-      ? failedPage.last_error
-      : phase === "complete"
-        ? "生成完成"
-        : "已恢复上次生成进度";
-
-    return {
-      phase,
-      message,
-      currentPageIndex: activePage ? activePage.index : null,
-      totalPages: pages.length,
-      pages: pages.map((page) => ({
-        page_id: page.page_id,
-        index: page.index,
-        title: page.title,
-        status: page.status,
-        render_attempts: page.render_attempts,
-        self_review_attempts: page.self_review_attempts,
-        agent_failures: page.agent_failures,
-        agent_infrastructure_failures: page.agent_infrastructure_failures,
-        last_error: page.last_error,
-        last_screenshot_path: page.last_screenshot_path
-      }))
     };
   }
 
@@ -441,7 +402,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setPageProgress(workspacePageProgress);
     setCreateDeckProgress(
       !staleDeck && !workspacePages && workspacePageProgress
-        ? workspacePageProgressToCreateDeckProgress(workspacePageProgress)
+        ? pageProgressToDeckGenerationProgress(workspacePageProgress)
         : null
     );
     if (workspacePages) {
@@ -525,34 +486,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     };
   }, []);
 
-  function progressHistoryId(progress: CreateDeckFlowProgress) {
-    if (progress.stream) {
-      return `${progress.phase}:${progress.stream.page_id}:${progress.stream.run_id ?? progress.stream.kind ?? progress.stream.status}`;
-    }
-    return `${progress.phase}:global`;
-  }
-
-  function progressHistoryLabel(progress: CreateDeckFlowProgress) {
-    if (progress.stream) {
-      return `第 ${progress.stream.page_index + 1} 页 · ${progress.stream.kind ?? progress.phase}`;
-    }
-    return progress.message || progress.phase;
-  }
-
-  function recordGenerationProgress(progress: CreateDeckFlowProgress) {
+  function recordGenerationProgress(progress: DeckGenerationProgress) {
     setCreateDeckProgress(progress);
-    const snapshot: GenerationStreamSnapshot = {
-      id: progressHistoryId(progress),
-      phase: progress.phase,
-      label: progressHistoryLabel(progress),
-      page_id: progress.stream?.page_id,
-      page_index: progress.stream?.page_index,
-      status: progress.stream?.status ?? progress.message,
-      message: progress.message,
-      lines: progress.stream ? [...progress.stream.lines] : [],
-      activities: progress.stream ? [...progress.stream.activities] : [],
-      updated_at: new Date().toISOString()
-    };
+    const snapshot: GenerationStreamSnapshot =
+      createDeckGenerationStreamSnapshot(progress);
     setGenerationHistory((items) => {
       const existingIndex = items.findIndex((item) => item.id === snapshot.id);
       if (existingIndex === -1) return [...items, snapshot];
@@ -712,6 +649,37 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     });
   }
 
+  async function applyDeckGenerationCompletion(
+    completion: DeckGenerationCompletion,
+    workspace: WorkspaceResult
+  ) {
+    if (completion.status === "cancelled") {
+      return;
+    }
+
+    if (completion.status === "failed") {
+      showToast(completion.error.message);
+      return;
+    }
+
+    const refreshedWorkspace = backend
+      ? await backend.openWorkspace({ workspace_dir: workspace.workspace_dir })
+      : workspace;
+    applyWorkspace(refreshedWorkspace);
+    setDeckTitle(completion.result.outline.title);
+    setOutline(completion.result.outline.items);
+    setPageProgress(completion.result.progress);
+    applyRenderedDeck(completion.result.rendered);
+    setReviewRender({
+      status: "ready",
+      result: completion.result.rendered,
+      error: "",
+      renderKey: workspaceReviewRenderKey(refreshedWorkspace),
+    });
+    setPage("review");
+    setHistory((items) => (items.at(-1) === "review" ? items : [...items, "review"]));
+  }
+
   async function generateDeck() {
     if (!backend || !aiClient || !agentClient) return;
 
@@ -747,34 +715,50 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         return;
       }
 
-      setLoading("deck");
+      setLoading("outline");
       resetGenerationProgress();
+      const outlineResult = await aiClient.generateOutline({
+        prompt,
+        contextRows,
+        locale,
+        setting,
+      });
+      const confirmedWorkspace = await saveOutlineArtifact(
+        outlineResult.outline.items,
+        outlineResult.outline.title,
+        workspace,
+        setting,
+        "confirmed"
+      );
+      if (!confirmedWorkspace) return;
+      if (cancelCreateDeckRef.current) {
+        setCreateDeckProgress({
+          step: "cancelled",
+          message: "已停止生成",
+          currentPageIndex: null,
+          totalPages: outlineResult.outline.items.length,
+          pages: [],
+        });
+        return;
+      }
+
+      setDeckTitle(outlineResult.outline.title);
+      setOutline(outlineResult.outline.items);
+      setLoading("deck");
       setStage("generating");
       setPage("main");
-      const result = await runCreateDeckFlow({
+      const completion = await runDeckGeneration({
         backend,
         aiClient,
         agentClient,
-        workspace,
-        prompt,
-        contextRows,
-        setting,
+        workspace: confirmedWorkspace,
+        confirmedOutline: confirmedWorkspace.outline as WorkspaceOutline,
         locale,
+        startMode: "restart",
         onProgress: recordGenerationProgress,
         isCancelled: () => cancelCreateDeckRef.current,
       });
-      setDeckTitle(result.outline.title);
-      setOutline(result.outline.items);
-      setPageProgress(result.progress);
-      applyRenderedDeck(result.rendered);
-      setReviewRender({
-        status: "ready",
-        result: result.rendered,
-        error: "",
-        renderKey: workspaceReviewRenderKey(workspace),
-      });
-      setPage("review");
-      setHistory((items) => (items.at(-1) === "review" ? items : [...items, "review"]));
+      await applyDeckGenerationCompletion(completion, confirmedWorkspace);
     } catch (error) {
       showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
     } finally {
@@ -788,7 +772,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       current
         ? {
             ...current,
-            phase: "cancelled",
+            step: "cancelled",
             message: "正在停止当前生成...",
           }
         : current
@@ -819,34 +803,18 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       setStage("generating");
       setPage("main");
 
-      const result = await runDeckFlowFromOutline({
+      const completion = await runDeckGeneration({
         backend,
         aiClient,
         agentClient,
         workspace: confirmedWorkspace,
-        outline: confirmedWorkspace.outline as WorkspaceOutline,
+        confirmedOutline: confirmedWorkspace.outline as WorkspaceOutline,
         locale,
+        startMode: "restart",
         onProgress: recordGenerationProgress,
         isCancelled: () => cancelCreateDeckRef.current,
       });
-      const refreshedWorkspace = await backend.openWorkspace({
-        workspace_dir: confirmedWorkspace.workspace_dir
-      });
-      applyWorkspace(refreshedWorkspace);
-      setDeckTitle(result.outline.title);
-      setOutline(result.outline.items);
-      setPageProgress(result.progress);
-      applyRenderedDeck(result.rendered);
-      setReviewRender({
-        status: "ready",
-        result: result.rendered,
-        error: "",
-        renderKey: workspaceReviewRenderKey(refreshedWorkspace),
-      });
-      setPage("review");
-      setHistory((items) =>
-        items.at(-1) === "review" ? items : [...items, "review"]
-      );
+      await applyDeckGenerationCompletion(completion, confirmedWorkspace);
     } catch (error) {
       showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
     } finally {
