@@ -4,12 +4,12 @@
   "required_executas": [
     {
       "tool_id": "tool-lightvoss_5433-ppt-engine-6443rj2a",
-      "min_version": "1.0.0",
+      "min_version": "3.0.0",
       "version": "latest"
     },
     {
       "tool_id": "tool-lightvoss_5433-ppt-gener-dc7ftcep",
-      "min_version": "1.0.0",
+      "min_version": "2.0.0",
       "version": "latest"
     }
   ],
