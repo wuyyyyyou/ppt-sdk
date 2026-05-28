@@ -95,14 +95,12 @@ export function getExpectedSlideCount(
 
 function buildSettingSummary(setting?: WorkspaceSettings): Record<string, string> {
   return {
-    audience: readSettingString(setting, "audience"),
-    goal: readSettingString(setting, "goal"),
-    style_notes: readSettingString(setting, "style_notes"),
     language: readSettingString(setting, "language"),
     output_language: readSettingString(setting, "output_language"),
     slide_count: readSettingString(setting, "slide_count") || "auto",
     text_density: readSettingString(setting, "text_density"),
     visual_tone: readSettingString(setting, "visual_tone"),
+    typography: readSettingString(setting, "typography"),
     aspect_ratio: readSettingString(setting, "aspect_ratio"),
   };
 }

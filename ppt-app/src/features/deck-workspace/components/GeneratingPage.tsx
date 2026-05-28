@@ -84,6 +84,7 @@ export function GeneratingPage(props: GeneratingPageProps) {
 
       {progress ? (
         <GenerationProgressPanel
+          t={t}
           progress={progress}
           onCancel={onCancel}
           cancellable={running && progress.step !== "cancelled"}

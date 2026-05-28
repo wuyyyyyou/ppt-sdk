@@ -121,6 +121,20 @@ export interface UpdateWorkspaceTitleInput {
   title: string;
 }
 
+export interface UpdateWorkspacePagesInput {
+  workspace_dir: string;
+  pages: Array<{
+    page_id: string;
+    title?: string;
+  }>;
+}
+
+export interface DuplicateWorkspacePageInput {
+  workspace_dir: string;
+  page_id: string;
+  title?: string;
+}
+
 export interface GetWorkspaceOutlineInput {
   workspace_dir: string;
 }

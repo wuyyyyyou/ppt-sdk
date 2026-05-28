@@ -12,6 +12,7 @@ import {
   buildDeckHtmlFromManifest,
   convertDeckHtmlToPptxModel,
   createAppWorkspace,
+  duplicateAppWorkspacePage,
   exportAppPdf,
   forkTemplateGroup,
   getAppTemplateGroup,
@@ -39,6 +40,7 @@ import {
   describeTaskStateMachine,
   invokeTaskStateMachine,
   updateAppWorkspaceOutline,
+  updateAppWorkspacePages,
   updateAppWorkspaceSettings,
   updateAppWorkspaceTitle,
 } from "./dist/index.js";
@@ -50,6 +52,8 @@ const TOOL_NAMES = [
   "app_append_workspace_log",
   "app_get_workspace_outline",
   "app_update_workspace_outline",
+  "app_update_workspace_pages",
+  "app_duplicate_workspace_page",
   "app_update_workspace_settings",
   "app_update_workspace_title",
   "app_list_template_groups",
@@ -216,6 +220,51 @@ const MANIFEST = {
           type: "object",
           description: "Outline artifact with title, items, source, status, and updated_at fields.",
           required: true,
+        },
+      ],
+    },
+    {
+      name: "app_update_workspace_pages",
+      description:
+        "Reorder, rename, or delete rendered workspace pages and sync the selected template manifest.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+        {
+          name: "pages",
+          type: "array",
+          description:
+            "Ordered list of remaining pages. Each entry must include page_id and may include title.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_duplicate_workspace_page",
+      description:
+        "Duplicate one rendered workspace page and sync the selected template manifest plus workspace state files.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+        {
+          name: "page_id",
+          type: "string",
+          description: "Manifest slide id to duplicate.",
+          required: true,
+        },
+        {
+          name: "title",
+          type: "string",
+          description: "Optional title for the duplicated slide.",
+          required: false,
         },
       ],
     },
@@ -1233,6 +1282,40 @@ async function toolAppUpdateWorkspaceSettings(args) {
   });
 }
 
+async function toolAppUpdateWorkspacePages(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const pages = args.pages;
+  if (!Array.isArray(pages)) {
+    throw new Error('"pages" must be an array');
+  }
+
+  return updateAppWorkspacePages({
+    workspace_dir: workspaceDir,
+    pages,
+  });
+}
+
+async function toolAppDuplicateWorkspacePage(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  if (typeof args.page_id !== "string" || args.page_id.trim().length === 0) {
+    throw new Error('"page_id" must be a non-empty string');
+  }
+
+  return duplicateAppWorkspacePage({
+    workspace_dir: workspaceDir,
+    page_id: args.page_id,
+    title: typeof args.title === "string" ? args.title : undefined,
+  });
+}
+
 async function toolAppUpdateWorkspaceTitle(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -1685,6 +1768,8 @@ const TOOL_DISPATCH = {
   app_append_workspace_log: toolAppAppendWorkspaceLog,
   app_get_workspace_outline: toolAppGetWorkspaceOutline,
   app_update_workspace_outline: toolAppUpdateWorkspaceOutline,
+  app_update_workspace_pages: toolAppUpdateWorkspacePages,
+  app_duplicate_workspace_page: toolAppDuplicateWorkspacePage,
   app_update_workspace_settings: toolAppUpdateWorkspaceSettings,
   app_update_workspace_title: toolAppUpdateWorkspaceTitle,
   app_list_template_groups: toolAppListTemplateGroups,

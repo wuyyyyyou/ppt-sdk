@@ -9,6 +9,7 @@ from lxml import etree
 from PIL import Image
 from pptx import Presentation
 from pptx.dml.color import RGBColor
+from pptx.oxml.ns import qn
 from pptx.oxml.xmlchemy import OxmlElement
 from pptx.shapes.autoshape import Shape
 from pptx.slide import Slide
@@ -50,6 +51,13 @@ from .models import (
 from .text_runs import parse_html_text_to_text_runs
 
 BLANK_SLIDE_LAYOUT = 6
+DEFAULT_EAST_ASIAN_FONT = "Microsoft YaHei"
+CJK_SCRIPT_FONTS = {
+    "Hans": DEFAULT_EAST_ASIAN_FONT,
+    "Hant": DEFAULT_EAST_ASIAN_FONT,
+    "Jpan": "Yu Gothic",
+    "Hang": "Malgun Gothic",
+}
 
 
 class PptxPresentationCreator:
@@ -61,6 +69,32 @@ class PptxPresentationCreator:
         self._ppt = Presentation()
         self._ppt.slide_width = Pt(1280)
         self._ppt.slide_height = Pt(720)
+
+    def resolve_east_asian_font_name(self, font_name: Optional[str] = None) -> str:
+        del font_name
+        return DEFAULT_EAST_ASIAN_FONT
+
+    def ensure_run_typeface(self, run_properties, tag_name: str, typeface: str):
+        typeface_element = run_properties.find(qn(tag_name))
+        if typeface_element is None:
+            typeface_element = OxmlElement(tag_name)
+            run_properties.append(typeface_element)
+        typeface_element.set("typeface", typeface)
+
+    def apply_east_asian_typeface(
+        self,
+        font: Font,
+        font_name: Optional[str] = None,
+    ):
+        try:
+            run_properties = font._element
+            self.ensure_run_typeface(
+                run_properties,
+                "a:ea",
+                self.resolve_east_asian_font_name(font_name),
+            )
+        except Exception:
+            return
 
     def get_sub_element(self, parent, tagname, **kwargs):
         element = OxmlElement(tagname)
@@ -242,6 +276,62 @@ class PptxPresentationCreator:
                 if theme_path == complete_theme_path or theme_is_complete(theme_path):
                     continue
                 shutil.copyfile(complete_theme_path, theme_path)
+
+        def ensure_east_asian_theme_fonts(ppt_dir: str):
+            themes_dir = os.path.join(ppt_dir, "theme")
+            if not os.path.isdir(themes_dir):
+                return
+
+            theme_paths = [
+                os.path.join(themes_dir, file_name)
+                for file_name in os.listdir(themes_dir)
+                if file_name.startswith("theme") and file_name.endswith(".xml")
+            ]
+            for theme_path in theme_paths:
+                theme_tree = etree.parse(theme_path)
+                theme_root = theme_tree.getroot()
+                changed = False
+
+                for font_scheme_node in ("majorFont", "minorFont"):
+                    font_node = theme_root.find(
+                        f".//{{{drawing_ns}}}{font_scheme_node}"
+                    )
+                    if font_node is None:
+                        continue
+
+                    ea_font = font_node.find(f"{{{drawing_ns}}}ea")
+                    if ea_font is None:
+                        ea_font = etree.SubElement(font_node, f"{{{drawing_ns}}}ea")
+                        changed = True
+                    if ea_font.get("typeface") != DEFAULT_EAST_ASIAN_FONT:
+                        ea_font.set("typeface", DEFAULT_EAST_ASIAN_FONT)
+                        changed = True
+
+                    existing_script_fonts = {
+                        font_element.get("script"): font_element
+                        for font_element in font_node.findall(f"{{{drawing_ns}}}font")
+                        if font_element.get("script")
+                    }
+                    for script, typeface in CJK_SCRIPT_FONTS.items():
+                        script_font = existing_script_fonts.get(script)
+                        if script_font is None:
+                            script_font = etree.SubElement(
+                                font_node,
+                                f"{{{drawing_ns}}}font",
+                            )
+                            script_font.set("script", script)
+                            changed = True
+                        if script_font.get("typeface") != typeface:
+                            script_font.set("typeface", typeface)
+                            changed = True
+
+                if changed:
+                    theme_tree.write(
+                        theme_path,
+                        xml_declaration=True,
+                        encoding="UTF-8",
+                        standalone="yes",
+                    )
 
         def remove_printer_settings_parts(ppt_dir: str, targets: List[str]):
             for target in targets:
@@ -519,6 +609,7 @@ class PptxPresentationCreator:
             ensure_slide_paragraphs_end_rpr(ppt_dir)
             normalize_zero_shadows_in_pptx(extract_dir)
             normalize_incomplete_themes(ppt_dir)
+            ensure_east_asian_theme_fonts(ppt_dir)
 
             with zipfile.ZipFile(pptx_path, "w", zipfile.ZIP_DEFLATED) as new_zip:
                 for root, _, files in os.walk(extract_dir):
@@ -922,6 +1013,7 @@ class PptxPresentationCreator:
 
     def apply_font(self, font: Font, font_model: PptxFontModel):
         font.name = font_model.name
+        self.apply_east_asian_typeface(font, font_model.name)
         font.color.rgb = RGBColor.from_string(font_model.color)
         font.italic = font_model.italic
         font.size = Pt(font_model.size)

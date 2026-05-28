@@ -17,5 +17,5 @@ export function deckReadyStatus(t: Messages, count: number) {
 }
 
 export function stageOrder(stage: MainStage) {
-  return { template: 1, brief: 2, outline: 3, generating: 4, deck: 5 }[stage];
+  return { brief: 1, outline: 2, generating: 3, deck: 4 }[stage];
 }

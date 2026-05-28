@@ -3,6 +3,7 @@ import type {
   AppendWorkspaceLogResult,
   CreateProjectInput,
   CreateWorkspaceInput,
+  DuplicateWorkspacePageInput,
   GeneratePptxInput,
   GeneratePptxResult,
   GetWorkspaceOutlineInput,
@@ -34,6 +35,7 @@ import type {
   TemplatePlanningContext,
   UpdateWorkspaceSettingsInput,
   UpdateWorkspaceOutlineInput,
+  UpdateWorkspacePagesInput,
   UpdateWorkspaceTitleInput,
   WorkspaceOutline,
   WorkspaceResult
@@ -52,6 +54,8 @@ export interface PptBackend {
   updateWorkspaceSettings(
     input: UpdateWorkspaceSettingsInput
   ): Promise<WorkspaceResult>;
+  updateWorkspacePages(input: UpdateWorkspacePagesInput): Promise<WorkspaceResult>;
+  duplicateWorkspacePage(input: DuplicateWorkspacePageInput): Promise<WorkspaceResult>;
   updateWorkspaceTitle(input: UpdateWorkspaceTitleInput): Promise<WorkspaceResult>;
   createProject(input: CreateProjectInput): Promise<ProjectResult>;
   getProject(input: { projectDir: string }): Promise<ProjectResult>;

@@ -27,6 +27,7 @@ import {
   createDeckGenerationStreamSnapshot,
   pageProgressToDeckGenerationProgress,
   runDeckGeneration,
+  runDeckRefinement,
   type DeckGenerationCompletion,
   type DeckGenerationProgress,
 } from "../../deck-generation";
@@ -44,11 +45,24 @@ import type {
   RefineScope
 } from "../types";
 
+const DEFAULT_TEMPLATE_GROUP_ID = "red-finance-v3";
+
+function padDatePart(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function formatWorkspaceDate(date = new Date()) {
+  return [
+    date.getFullYear(),
+    padDatePart(date.getMonth() + 1),
+    padDatePart(date.getDate())
+  ].join("-");
+}
+
 export interface DeckWorkspaceActions {
   setPanelMode: (mode: PanelMode) => void;
   setPrompt: (value: string) => void;
   setReviewOutlineFirst: (value: boolean) => void;
-  setLookPickerOpen: (value: boolean) => void;
   setDeckTitle: (value: string) => void;
   setCurrentSlide: (index: number) => void;
   setOutlineFeedback: (value: string) => void;
@@ -63,8 +77,6 @@ export interface DeckWorkspaceActions {
   updateContextRow: (id: string, value: string) => void;
   removeContextRow: (id: string) => void;
   addStyleRow: () => void;
-  addMoreRows: () => void;
-  selectLook: (id: string) => void;
   generateDeck: () => Promise<void>;
   createDeckFromOutline: () => Promise<void>;
   applyOutlineFeedback: () => Promise<void>;
@@ -73,8 +85,9 @@ export interface DeckWorkspaceActions {
   saveOutlineEdit: () => Promise<void>;
   updateOutlineDraftItem: (index: number, patch: Partial<WorkspaceOutlineItem>) => void;
   updateDeckTitle: (index: number, title: string) => void;
-  moveSlide: (index: number, direction: -1 | 1) => void;
-  deleteSlide: (index: number) => void;
+  moveSlide: (index: number, direction: -1 | 1) => Promise<void>;
+  duplicateSlide: (index: number) => Promise<void>;
+  deleteSlide: (index: number) => Promise<void>;
   addSlide: () => void;
   openLocalProject: (projectName: string) => void;
   openWorkspace: (workspaceDir: string) => Promise<void>;
@@ -84,8 +97,8 @@ export interface DeckWorkspaceActions {
   saveWorkspaceSettings: (setting: WorkspaceSettings) => Promise<void>;
   saveWorkspaceTitle: (title: string) => Promise<void>;
   selectTemplate: (groupId: string) => Promise<void>;
-  refineDeck: () => Promise<void>;
-  refineSlide: () => Promise<void>;
+  refineDeck: (instruction: string) => Promise<void>;
+  refineSlide: (instruction: string) => Promise<void>;
   renderDeckHtml: () => Promise<void>;
   exportFile: (type: "PPTX" | "PDF") => Promise<void>;
   returnToOutlineFromGeneration: () => void;
@@ -95,14 +108,12 @@ export interface DeckWorkspaceActions {
 export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [panelMode, setPanelMode] = useState<PanelMode>("visible");
   const [page, setPage] = useState<PageId>("main");
-  const [stage, setStage] = useState<MainStage>("template");
+  const [stage, setStage] = useState<MainStage>("brief");
   const [history, setHistory] = useState<PageId[]>(["main"]);
   const [toast, setToast] = useState("");
   const [prompt, setPrompt] = useState("");
   const [reviewOutlineFirst, setReviewOutlineFirst] = useState(false);
   const [contextRows, setContextRows] = useState<ContextRow[]>([]);
-  const [selectedLookId, setSelectedLookId] = useState<string | null>(null);
-  const [lookPickerOpen, setLookPickerOpen] = useState(false);
   const [deckTitle, setDeckTitle] = useState(t.deck.title);
   const [deck, setDeck] = useState<Slide[]>(initialDeck);
   const [outline, setOutline] = useState(outlineDetails);
@@ -138,7 +149,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [workspaceError, setWorkspaceError] = useState("");
   const [workspaceSettingsSaving, setWorkspaceSettingsSaving] = useState(false);
   const [templateGroups, setTemplateGroups] = useState<TemplateSummary[]>([]);
-  const [selectedTemplateGroupId, setSelectedTemplateGroupId] = useState<string | null>(null);
+  const [selectedTemplateGroupId, setSelectedTemplateGroupId] = useState<string | null>(DEFAULT_TEMPLATE_GROUP_ID);
+
+  function getDefaultWorkspaceTitle(date = new Date()) {
+    return formatMessage(t.library.defaultWorkspaceTitle, {
+      date: formatWorkspaceDate(date)
+    });
+  }
 
   function workspaceOutlineToState(workspaceOutline: unknown) {
     const outlineRecord =
@@ -300,9 +317,15 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   function workspaceSettingsToState(workspace: WorkspaceResult | null): WorkspaceSettings {
-    return workspace?.setting && typeof workspace.setting === "object" && !Array.isArray(workspace.setting)
-      ? (workspace.setting as WorkspaceSettings)
-      : {};
+    if (!workspace?.setting || typeof workspace.setting !== "object" || Array.isArray(workspace.setting)) {
+      return {};
+    }
+
+    const setting = { ...(workspace.setting as WorkspaceSettings) };
+    delete setting.audience;
+    delete setting.goal;
+    delete setting.style_notes;
+    return setting;
   }
 
   function workspaceReviewRenderKey(workspace: WorkspaceResult) {
@@ -402,7 +425,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setPageProgress(workspacePageProgress);
     setCreateDeckProgress(
       !staleDeck && !workspacePages && workspacePageProgress
-        ? pageProgressToDeckGenerationProgress(workspacePageProgress)
+        ? pageProgressToDeckGenerationProgress(workspacePageProgress, locale)
         : null
     );
     if (workspacePages) {
@@ -432,12 +455,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       workspace.template && typeof workspace.template === "object" && !Array.isArray(workspace.template)
         ? (workspace.template as { selected_template_group?: unknown })
         : null;
-    if (typeof templateRecord?.selected_template_group === "string" && templateRecord.selected_template_group) {
-      setSelectedTemplateGroupId(templateRecord.selected_template_group);
+    const selectedTemplate =
+      typeof templateRecord?.selected_template_group === "string" && templateRecord.selected_template_group
+        ? templateRecord.selected_template_group
+        : DEFAULT_TEMPLATE_GROUP_ID;
+    if (selectedTemplate) {
+      setSelectedTemplateGroupId(selectedTemplate);
       if (!workspacePages && workspaceOutline.length === 0) {
         setStage("brief");
       }
     }
+
+    // 不再把 workspace.setting 显示或合并到可选上下文（避免 UI 重复）。
+    // workspace.setting 会在生成请求时通过 `setting` 参数直接传入 LLM 调用，保持 UI 中的 `contextRows` 仅由用户控制。
   }
 
   useEffect(() => {
@@ -489,7 +519,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   function recordGenerationProgress(progress: DeckGenerationProgress) {
     setCreateDeckProgress(progress);
     const snapshot: GenerationStreamSnapshot =
-      createDeckGenerationStreamSnapshot(progress);
+      createDeckGenerationStreamSnapshot(progress, locale);
     setGenerationHistory((items) => {
       const existingIndex = items.findIndex((item) => item.id === snapshot.id);
       if (existingIndex === -1) return [...items, snapshot];
@@ -546,10 +576,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   function navigateMain(nextStage: MainStage) {
-    if (nextStage === "brief" && !selectedTemplateGroupId) {
-      showToast(t.template.helper);
-      return;
-    }
     if (nextStage === "outline" && outline.length === 0) {
       showToast(t.toasts.createOutlineFirst);
       return;
@@ -591,7 +617,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   function removeContextRow(id: string) {
     setContextRows((rows) => rows.filter((row) => row.id !== id));
-    if (id === "look") setSelectedLookId(null);
   }
 
   function addStyleRow() {
@@ -599,53 +624,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       id: "style",
       label: t.brief.contextLabels.styleNotes,
       value: t.brief.contextDefaults.styleNotes
-    });
-  }
-
-  function addMoreRows() {
-    addContextRow({
-      id: "slides",
-      label: t.brief.contextLabels.slides,
-      value: "7",
-      type: "select",
-      options: ["Auto", "5", "7", "10"]
-    });
-    addContextRow({
-      id: "density",
-      label: t.brief.contextLabels.textPerSlide,
-      value: "Balanced",
-      type: "select",
-      options: ["Light", "Balanced", "Detailed"]
-    });
-    addContextRow({
-      id: "language",
-      label: t.brief.contextLabels.outputLanguage,
-      value: t.brief.contextDefaults.outputLanguage
-    });
-    addContextRow({
-      id: "ratio",
-      label: t.brief.contextLabels.aspectRatio,
-      value: "16:9",
-      type: "select",
-      options: ["16:9", "4:3"]
-    });
-  }
-
-  function selectLook(id: string) {
-    const look = t.looks.find((item) => item.id === id);
-    if (!look) return;
-
-    setSelectedLookId(id);
-    setLookPickerOpen(false);
-    setContextRows((rows) => {
-      const nextRow = {
-        id: "look",
-        label: t.brief.contextLabels.look,
-        value: `${look.name} · ${look.description}`
-      };
-      return rows.some((item) => item.id === "look")
-        ? rows.map((item) => (item.id === "look" ? nextRow : item))
-        : [...rows, nextRow];
     });
   }
 
@@ -687,8 +665,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       cancelCreateDeckRef.current = false;
       const workspace = await ensureCurrentWorkspace();
       if (!workspace) return;
+      if (!selectedTemplateGroupId) {
+        showToast(t.template.helper);
+        return;
+      }
+      const templateWorkspace = await ensureWorkspaceTemplate(workspace);
 
-      const setting = workspaceSettingsToState(workspace);
+      const setting = workspaceSettingsToState(templateWorkspace);
 
       if (reviewOutlineFirst) {
         setLoading("outline");
@@ -704,7 +687,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         const updatedWorkspace = await saveOutlineArtifact(
           result.outline.items,
           result.outline.title,
-          workspace,
+          templateWorkspace,
           setting,
           "draft"
         );
@@ -726,7 +709,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const confirmedWorkspace = await saveOutlineArtifact(
         outlineResult.outline.items,
         outlineResult.outline.title,
-        workspace,
+        templateWorkspace,
         setting,
         "confirmed"
       );
@@ -734,7 +717,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       if (cancelCreateDeckRef.current) {
         setCreateDeckProgress({
           step: "cancelled",
-          message: "已停止生成",
+          message: t.generating.cancelled,
           currentPageIndex: null,
           totalPages: outlineResult.outline.items.length,
           pages: [],
@@ -773,7 +756,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         ? {
             ...current,
             step: "cancelled",
-            message: "正在停止当前生成...",
+            message: t.generating.cancelling,
           }
         : current
     );
@@ -785,17 +768,22 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     cancelCreateDeckRef.current = false;
     const workspace = await ensureCurrentWorkspace();
     if (!workspace) return;
+    if (!selectedTemplateGroupId) {
+      showToast(t.template.helper);
+      return;
+    }
+    const templateWorkspace = await ensureWorkspaceTemplate(workspace);
 
     setLoading("deck");
     resetGenerationProgress();
     setStage("generating");
     setPage("main");
     try {
-      const setting = workspaceSettingsToState(workspace);
+      const setting = workspaceSettingsToState(templateWorkspace);
       const confirmedWorkspace = await saveOutlineArtifact(
         outline,
         deckTitle,
-        workspace,
+        templateWorkspace,
         setting,
         "confirmed"
       );
@@ -927,31 +915,124 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     });
   }
 
-  function moveSlide(index: number, direction: -1 | 1) {
+  async function persistRenderedPages(
+    nextDeck: Slide[],
+    nextRenderedSlides: NonNullable<DeckReviewRenderState["result"]>["slides"],
+    nextCurrentSlide: number
+  ) {
+    if (
+      !backend ||
+      !currentWorkspace ||
+      !reviewRender.result ||
+      nextRenderedSlides.length !== nextDeck.length
+    ) {
+      setDeck(nextDeck);
+      setCurrentSlide(nextCurrentSlide);
+      return;
+    }
+
+    const updatedWorkspace = await backend.updateWorkspacePages({
+      workspace_dir: currentWorkspace.workspace_dir,
+      pages: nextRenderedSlides.map((slide, index) => ({
+        page_id: slide.slide_id,
+        title: nextDeck[index]?.title ?? slide.title
+      }))
+    });
+
+    setDeck(nextDeck);
+    setOutline(
+      nextRenderedSlides.map((slide, index) => ({
+        title: nextDeck[index]?.title ?? slide.title,
+        outline: slide.speaker_note || slide.layout_id
+      }))
+    );
+    setCurrentSlide(nextCurrentSlide);
+    applyWorkspace(updatedWorkspace);
+    setWorkspaceScan(await backend.listWorkspaces());
+    await renderDeckHtmlForWorkspace(updatedWorkspace, "review");
+    setCurrentSlide(nextCurrentSlide);
+  }
+
+  async function moveSlide(index: number, direction: -1 | 1) {
     const target = index + direction;
     if (target < 0 || target >= deck.length) return;
 
-    setDeck((items) => {
-      const next = [...items];
-      [next[index], next[target]] = [next[target], next[index]];
-      return next;
-    });
-    setOutline((items) => {
-      const next = [...items];
-      [next[index], next[target]] = [next[target], next[index]];
-      autosaveOutline(next);
-      return next;
-    });
+    const nextDeck = [...deck];
+    [nextDeck[index], nextDeck[target]] = [nextDeck[target], nextDeck[index]];
+
+    const renderedSlides = reviewRender.result?.slides ?? [];
+    const nextRenderedSlides = [...renderedSlides];
+    if (nextRenderedSlides.length === deck.length) {
+      [nextRenderedSlides[index], nextRenderedSlides[target]] = [
+        nextRenderedSlides[target],
+        nextRenderedSlides[index]
+      ];
+    }
+
+    const nextCurrentSlide =
+      currentSlide === index ? target : currentSlide === target ? index : currentSlide;
+
+    try {
+      await persistRenderedPages(nextDeck, nextRenderedSlides, nextCurrentSlide);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Failed to move slide.");
+    }
   }
 
-  function deleteSlide(index: number) {
-    setDeck((items) => items.filter((_, itemIndex) => itemIndex !== index));
-    setOutline((items) => {
-      const next = items.filter((_, itemIndex) => itemIndex !== index);
-      autosaveOutline(next);
-      return next;
-    });
-    setCurrentSlide((value) => Math.max(0, Math.min(value, deck.length - 2)));
+  async function deleteSlide(index: number) {
+    if (deck.length <= 1) return;
+
+    const nextDeck = deck.filter((_, itemIndex) => itemIndex !== index);
+    const nextRenderedSlides = (reviewRender.result?.slides ?? []).filter(
+      (_, itemIndex) => itemIndex !== index
+    );
+    const nextCurrentSlide =
+      index < currentSlide
+        ? currentSlide - 1
+        : Math.max(0, Math.min(currentSlide, nextDeck.length - 1));
+
+    try {
+      await persistRenderedPages(nextDeck, nextRenderedSlides, nextCurrentSlide);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Failed to delete slide.");
+    }
+  }
+
+  async function duplicateSlide(index: number) {
+    const slide = deck[index];
+    if (!slide) return;
+
+    const duplicateTitle =
+      locale === "zh" ? `${slide.title} 副本` : `${slide.title} Copy`;
+    const nextCurrentSlide = index + 1;
+
+    if (!backend || !currentWorkspace || !reviewRender.result) {
+      const nextDeck = [
+        ...deck.slice(0, nextCurrentSlide),
+        { ...slide, title: duplicateTitle },
+        ...deck.slice(nextCurrentSlide)
+      ];
+      setDeck(nextDeck);
+      setCurrentSlide(nextCurrentSlide);
+      return;
+    }
+
+    const renderedSlide = reviewRender.result.slides[index];
+    if (!renderedSlide) return;
+
+    try {
+      const updatedWorkspace = await backend.duplicateWorkspacePage({
+        workspace_dir: currentWorkspace.workspace_dir,
+        page_id: renderedSlide.slide_id,
+        title: duplicateTitle
+      });
+      applyWorkspace(updatedWorkspace);
+      setWorkspaceScan(await backend.listWorkspaces());
+      await renderDeckHtmlForWorkspace(updatedWorkspace, "review");
+      setCurrentSlide(nextCurrentSlide);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Failed to duplicate slide.");
+    }
   }
 
   function addSlide() {
@@ -1037,10 +1118,40 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (!backend) return null;
     if (currentWorkspace) return currentWorkspace;
 
-    const workspace = await backend.createWorkspace({});
+    const workspace = await backend.createWorkspace({
+      title: getDefaultWorkspaceTitle()
+    });
     applyWorkspace(workspace);
     setWorkspaceScan(await backend.listWorkspaces());
     return workspace;
+  }
+
+  function readSelectedTemplateGroup(workspace: WorkspaceResult | null) {
+    const templateRecord =
+      workspace?.template && typeof workspace.template === "object" && !Array.isArray(workspace.template)
+        ? (workspace.template as { selected_template_group?: unknown })
+        : null;
+    return typeof templateRecord?.selected_template_group === "string"
+      ? templateRecord.selected_template_group
+      : "";
+  }
+
+  async function ensureWorkspaceTemplate(workspace: WorkspaceResult) {
+    if (!backend) return workspace;
+
+    const groupId = selectedTemplateGroupId ?? DEFAULT_TEMPLATE_GROUP_ID;
+    if (readSelectedTemplateGroup(workspace) === groupId) {
+      return workspace;
+    }
+
+    const result = await backend.selectTemplate({
+      workspace_dir: workspace.workspace_dir,
+      template_group: groupId
+    });
+    applyWorkspace(result.workspace);
+    setSelectedTemplateGroupId(result.selection.selected_template_group);
+    setWorkspaceScan(await backend.listWorkspaces());
+    return result.workspace;
   }
 
   async function appendOutlineAiLog(
@@ -1191,11 +1302,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         setHistory((items) => (items.at(-1) === "main" ? items : [...items, "main"]));
         const rendered = await renderDeckHtmlForWorkspace(workspace, "review");
         if (rendered) {
-          showToast(`已打开工作区 ${workspace.workspace_id}`);
+          showToast(formatMessage(t.toasts.workspaceOpened, { id: workspace.workspace_id }));
         }
       } else {
         setPage("main");
-        showToast(`已打开工作区 ${workspace.workspace_id}`);
+        showToast(formatMessage(t.toasts.workspaceOpened, { id: workspace.workspace_id }));
       }
     } catch (error) {
       setWorkspaceError(
@@ -1212,11 +1323,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setWorkspaceLoading(true);
     setWorkspaceError("");
     try {
-      const workspace = await backend.createWorkspace({});
+      const workspace = await backend.createWorkspace({
+        title: getDefaultWorkspaceTitle()
+      });
       applyWorkspace(workspace);
       setWorkspaceScan(await backend.listWorkspaces());
       setPage("main");
-      showToast(`已创建工作区 ${workspace.workspace_id}`);
+      showToast(formatMessage(t.toasts.workspaceCreated, { id: workspace.workspace_id }));
     } catch (error) {
       setWorkspaceError(
         error instanceof Error ? error.message : "Failed to create workspace."
@@ -1257,7 +1370,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     try {
       const workspace = await backend.updateWorkspaceSettings({
         workspace_dir: currentWorkspace.workspace_dir,
-        setting
+        setting: {
+          ...setting,
+          audience: "",
+          goal: "",
+          style_notes: ""
+        }
       });
       applyWorkspace(workspace);
       setWorkspaceScan(await backend.listWorkspaces());
@@ -1293,14 +1411,38 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
-  async function refineDeck() {
-    if (!aiClient) return;
+  async function refineDeck(instruction: string) {
+    if (!backend || !aiClient || !agentClient) return;
+    const trimmedInstruction = instruction.trim();
+    if (!trimmedInstruction) return;
 
+    cancelCreateDeckRef.current = false;
     setLoading("refineDeck");
+    resetGenerationProgress();
+    setStage("generating");
+    setPage("main");
     try {
-      setDeck(await aiClient.refineDeck({ slides: deck, locale }));
-      setPage("main");
-      showToast(t.status.deckRefined);
+      const workspace = await ensureCurrentWorkspace();
+      if (!workspace) return;
+      const refreshedWorkspace = await backend.openWorkspace({
+        workspace_dir: workspace.workspace_dir
+      });
+      const completion = await runDeckRefinement({
+        backend,
+        aiClient,
+        agentClient,
+        workspace: refreshedWorkspace,
+        confirmedOutline: refreshedWorkspace.outline as WorkspaceOutline,
+        locale,
+        instruction: trimmedInstruction,
+        scope: "deck",
+        onProgress: recordGenerationProgress,
+        isCancelled: () => cancelCreateDeckRef.current,
+      });
+      await applyDeckGenerationCompletion(completion, refreshedWorkspace);
+      if (completion.status === "completed") {
+        showToast(t.status.deckRefined);
+      }
     } catch (error) {
       showToast(error instanceof Error ? error.message : t.status.refiningDeck);
     } finally {
@@ -1308,23 +1450,42 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
-  async function refineSlide() {
-    if (!aiClient) return;
+  async function refineSlide(instruction: string) {
+    if (!backend || !aiClient || !agentClient) return;
+    const trimmedInstruction = instruction.trim();
+    if (!trimmedInstruction) return;
     const slide = deck[currentSlide];
     if (!slide) return;
 
+    cancelCreateDeckRef.current = false;
     setLoading("refineSlide");
+    resetGenerationProgress();
+    setStage("generating");
+    setPage("main");
     try {
-      const refinedSlide = await aiClient.refineSlide({
-        slide,
-        slideIndex: currentSlide,
-        locale
+      const workspace = await ensureCurrentWorkspace();
+      if (!workspace) return;
+      const refreshedWorkspace = await backend.openWorkspace({
+        workspace_dir: workspace.workspace_dir
       });
-      setDeck((items) =>
-        items.map((item, index) => (index === currentSlide ? refinedSlide : item))
-      );
-      setPage("main");
-      showToast(t.status.slideRefined);
+      const completion = await runDeckRefinement({
+        backend,
+        aiClient,
+        agentClient,
+        workspace: refreshedWorkspace,
+        confirmedOutline: refreshedWorkspace.outline as WorkspaceOutline,
+        locale,
+        instruction: trimmedInstruction,
+        scope: "slide",
+        pageIndex: currentSlide,
+        onProgress: recordGenerationProgress,
+        isCancelled: () => cancelCreateDeckRef.current,
+      });
+      await applyDeckGenerationCompletion(completion, refreshedWorkspace);
+      setCurrentSlide(currentSlide);
+      if (completion.status === "completed") {
+        showToast(t.status.slideRefined);
+      }
     } catch (error) {
       showToast(error instanceof Error ? error.message : t.status.refiningSlide);
     } finally {
@@ -1498,8 +1659,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     prompt,
     reviewOutlineFirst,
     contextRows,
-    selectedLookId,
-    lookPickerOpen,
     deckTitle,
     deck,
     outline,
@@ -1531,7 +1690,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setPanelMode,
     setPrompt,
     setReviewOutlineFirst,
-    setLookPickerOpen,
     setDeckTitle,
     setCurrentSlide,
     setOutlineFeedback,
@@ -1546,8 +1704,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     updateContextRow,
     removeContextRow,
     addStyleRow,
-    addMoreRows,
-    selectLook,
     generateDeck,
     createDeckFromOutline,
     applyOutlineFeedback,
@@ -1557,6 +1713,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     updateOutlineDraftItem,
     updateDeckTitle,
     moveSlide,
+    duplicateSlide,
     deleteSlide,
     addSlide,
     openLocalProject,

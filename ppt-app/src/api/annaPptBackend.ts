@@ -135,6 +135,18 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         "app_update_workspace_settings",
         input
       ),
+    updateWorkspacePages: (input) =>
+      invoke<WorkspaceResult>(
+        PPT_ENGINE_TOOL_ID,
+        "app_update_workspace_pages",
+        input
+      ),
+    duplicateWorkspacePage: (input) =>
+      invoke<WorkspaceResult>(
+        PPT_ENGINE_TOOL_ID,
+        "app_duplicate_workspace_page",
+        input
+      ),
     updateWorkspaceTitle: (input) =>
       invoke<WorkspaceResult>(
         PPT_ENGINE_TOOL_ID,
