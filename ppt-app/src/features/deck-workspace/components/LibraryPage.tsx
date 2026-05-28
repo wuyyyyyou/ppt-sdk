@@ -6,11 +6,12 @@ import type {
   WorkspaceSettings,
   WorkspaceSummary
 } from "../../../api/types";
-import { type Messages } from "../../../i18n/messages";
+import { formatMessage, type Locale, type Messages } from "../../../i18n/messages";
 import { PageHeader } from "./PageHeader";
 
 interface LibraryPageProps {
   t: Messages;
+  locale: Locale;
   workspaceScan: ListWorkspacesResult | null;
   currentWorkspace: WorkspaceResult | null;
   loading: boolean;
@@ -25,9 +26,6 @@ interface LibraryPageProps {
 const EMPTY_SETTINGS: Required<
   Pick<
     WorkspaceSettings,
-    | "audience"
-    | "goal"
-    | "style_notes"
     | "slide_count"
     | "text_density"
     | "output_language"
@@ -36,9 +34,6 @@ const EMPTY_SETTINGS: Required<
     | "typography"
   >
 > = {
-  audience: "",
-  goal: "",
-  style_notes: "",
   slide_count: "auto",
   text_density: "balanced",
   output_language: "中文",
@@ -62,9 +57,6 @@ function normalizeSettingValue(value: unknown, fallback: string) {
 function toEditableSettings(workspace: WorkspaceResult | null) {
   const setting = readSettings(workspace);
   return {
-    audience: normalizeSettingValue(setting.audience, EMPTY_SETTINGS.audience),
-    goal: normalizeSettingValue(setting.goal, EMPTY_SETTINGS.goal),
-    style_notes: normalizeSettingValue(setting.style_notes, EMPTY_SETTINGS.style_notes),
     slide_count: normalizeSettingValue(setting.slide_count, EMPTY_SETTINGS.slide_count),
     text_density: normalizeSettingValue(setting.text_density, EMPTY_SETTINGS.text_density),
     output_language: normalizeSettingValue(setting.output_language, EMPTY_SETTINGS.output_language),
@@ -81,26 +73,35 @@ function toEditableSettings(workspace: WorkspaceResult | null) {
   };
 }
 
-function getWorkspaceTitle(workspace: WorkspaceResult | null) {
+function localizeWorkspaceTitle(title: string, t: Messages) {
+  const match = /^(?:新建工作区|New Workspace)-(\d{4}-\d{2}-\d{2})$/.exec(title);
+  if (!match) {
+    return title;
+  }
+
+  return formatMessage(t.library.defaultWorkspaceTitle, { date: match[1] });
+}
+
+function getWorkspaceTitle(workspace: WorkspaceResult | null, t: Messages) {
   if (
     workspace?.task &&
     typeof workspace.task === "object" &&
     !Array.isArray(workspace.task) &&
     typeof (workspace.task as { title?: unknown }).title === "string"
   ) {
-    return (workspace.task as { title: string }).title;
+    return localizeWorkspaceTitle((workspace.task as { title: string }).title, t);
   }
 
-  return workspace?.workspace_id ?? "未选择工作区";
+  return workspace?.workspace_id ?? t.library.noWorkspaceSelected;
 }
 
-function formatUpdatedAt(value: string) {
+function formatUpdatedAt(value: string, locale: Locale) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return value;
   }
 
-  return date.toLocaleString(undefined, {
+  return date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -110,6 +111,7 @@ function formatUpdatedAt(value: string) {
 
 export function LibraryPage({
   t,
+  locale,
   workspaceScan,
   currentWorkspace,
   loading,
@@ -123,14 +125,14 @@ export function LibraryPage({
   const [editing, setEditing] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [draft, setDraft] = useState(toEditableSettings(currentWorkspace));
-  const [titleDraft, setTitleDraft] = useState(getWorkspaceTitle(currentWorkspace));
+  const [titleDraft, setTitleDraft] = useState(getWorkspaceTitle(currentWorkspace, t));
 
   useEffect(() => {
     setDraft(toEditableSettings(currentWorkspace));
-    setTitleDraft(getWorkspaceTitle(currentWorkspace));
+    setTitleDraft(getWorkspaceTitle(currentWorkspace, t));
     setEditing(false);
     setEditingTitle(false);
-  }, [currentWorkspace]);
+  }, [currentWorkspace, t]);
 
   async function saveSettings() {
     await onSaveSettings(draft);
@@ -153,7 +155,7 @@ export function LibraryPage({
 
       <div className="workspace-row">
         <div>
-          <span className="workspace-section-label">当前工作区</span>
+          <span className="workspace-section-label">{t.library.currentWorkspace}</span>
           {editingTitle ? (
             <span className="workspace-title-editor">
               <input
@@ -162,7 +164,7 @@ export function LibraryPage({
                 onKeyDown={(event) => {
                   if (event.key === "Enter") void saveTitle();
                   if (event.key === "Escape") {
-                    setTitleDraft(getWorkspaceTitle(currentWorkspace));
+                    setTitleDraft(getWorkspaceTitle(currentWorkspace, t));
                     setEditingTitle(false);
                   }
                 }}
@@ -174,7 +176,7 @@ export function LibraryPage({
               <button
                 className="secondary-btn compact"
                 onClick={() => {
-                  setTitleDraft(getWorkspaceTitle(currentWorkspace));
+                  setTitleDraft(getWorkspaceTitle(currentWorkspace, t));
                   setEditingTitle(false);
                 }}
                 disabled={savingSettings}
@@ -189,7 +191,7 @@ export function LibraryPage({
               disabled={!currentWorkspace}
               title={t.controls.edit}
             >
-              {getWorkspaceTitle(currentWorkspace)}
+              {getWorkspaceTitle(currentWorkspace, t)}
             </button>
           )}
           <span>{currentWorkspace?.workspace_dir ?? workspaceScan?.workspace_root ?? ""}</span>
@@ -198,7 +200,7 @@ export function LibraryPage({
 
       <div className="local-deck-list">
         {workspaces.length === 0 ? (
-          <div className="empty-library-row">暂无工作区</div>
+          <div className="empty-library-row">{t.library.empty}</div>
         ) : (
           workspaces.map((workspace) => (
             <WorkspaceRow
@@ -207,13 +209,14 @@ export function LibraryPage({
               loading={loading}
               onOpen={onOpen}
               t={t}
+              locale={locale}
             />
           ))
         )}
 
         <button className="secondary-btn create-workspace-btn" onClick={onCreateWorkspace} disabled={loading}>
           <Plus size={14} />
-          新建工作区
+          {t.library.createWorkspace}
         </button>
       </div>
 
@@ -242,24 +245,6 @@ export function LibraryPage({
         </div>
 
         <PreferenceField
-          label={t.brief.contextLabels.audience}
-          value={draft.audience}
-          editing={editing}
-          onChange={(value) => setDraft((next) => ({ ...next, audience: value }))}
-        />
-        <PreferenceField
-          label={t.brief.contextLabels.goal}
-          value={draft.goal}
-          editing={editing}
-          onChange={(value) => setDraft((next) => ({ ...next, goal: value }))}
-        />
-        <PreferenceField
-          label={t.brief.contextLabels.styleNotes}
-          value={draft.style_notes}
-          editing={editing}
-          onChange={(value) => setDraft((next) => ({ ...next, style_notes: value }))}
-        />
-        <PreferenceField
           label={t.brief.contextLabels.slides}
           value={draft.slide_count}
           editing={editing}
@@ -286,7 +271,7 @@ export function LibraryPage({
           onChange={(value) => setDraft((next) => ({ ...next, aspect_ratio: value }))}
         />
         <PreferenceField
-          label="视觉方向"
+          label={t.brief.contextLabels.look}
           value={draft.visual_tone}
           editing={editing}
           onChange={(value) => setDraft((next) => ({ ...next, visual_tone: value }))}
@@ -307,12 +292,13 @@ function WorkspaceRow(props: {
   loading: boolean;
   onOpen: (workspaceDir: string) => Promise<void>;
   t: Messages;
+  locale: Locale;
 }) {
   return (
     <article className="local-deck-row">
       <button onClick={() => props.onOpen(props.workspace.workspace_dir)} disabled={props.loading}>
-        <strong>{props.workspace.title || props.workspace.workspace_id}</strong>
-        <span>{formatUpdatedAt(props.workspace.updated_at)}</span>
+        <strong>{localizeWorkspaceTitle(props.workspace.title || props.workspace.workspace_id, props.t)}</strong>
+        <span>{formatUpdatedAt(props.workspace.updated_at, props.locale)}</span>
       </button>
       <button
         className="primary-btn compact"

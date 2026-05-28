@@ -1287,7 +1287,95 @@ async function getElementAttributes(
       return Object.keys(shadow).length > 0 ? shadow : undefined;
     }
 
-    function parseFont(computedStyles: CSSStyleDeclaration) {
+    const defaultEastAsianPptxFont = "Microsoft YaHei";
+    const cjkTextPattern = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u;
+    const genericFontNames = new Set([
+      "serif",
+      "sans-serif",
+      "monospace",
+      "cursive",
+      "fantasy",
+      "system-ui",
+      "ui-serif",
+      "ui-sans-serif",
+      "ui-monospace",
+    ]);
+
+    function splitCssFontFamilies(fontFamily: string): string[] {
+      const families: string[] = [];
+      let current = "";
+      let quote: string | undefined;
+      let parenDepth = 0;
+
+      for (const char of fontFamily) {
+        if (quote) {
+          current += char;
+          if (char === quote) {
+            quote = undefined;
+          }
+          continue;
+        }
+
+        if (char === '"' || char === "'") {
+          quote = char;
+          current += char;
+          continue;
+        }
+
+        if (char === "(") {
+          parenDepth += 1;
+          current += char;
+          continue;
+        }
+
+        if (char === ")") {
+          parenDepth = Math.max(parenDepth - 1, 0);
+          current += char;
+          continue;
+        }
+
+        if (char === "," && parenDepth === 0) {
+          if (current.trim()) {
+            families.push(current.trim());
+          }
+          current = "";
+          continue;
+        }
+
+        current += char;
+      }
+
+      if (current.trim()) {
+        families.push(current.trim());
+      }
+
+      return families;
+    }
+
+    function cleanFontFamilyName(fontFamily: string): string | undefined {
+      const cleanName = fontFamily.trim().replace(/^['"]|['"]$/g, "");
+      if (!cleanName || cleanName.toLowerCase().startsWith("var(")) {
+        return undefined;
+      }
+      if (genericFontNames.has(cleanName.toLowerCase())) {
+        return undefined;
+      }
+      return cleanName;
+    }
+
+    function resolvePptxFontName(fontFamily: string, textContent: string) {
+      const fontNames = splitCssFontFamilies(fontFamily)
+        .map(cleanFontFamilyName)
+        .filter(Boolean) as string[];
+
+      if (cjkTextPattern.test(textContent)) {
+        return defaultEastAsianPptxFont;
+      }
+
+      return fontNames[0];
+    }
+
+    function parseFont(computedStyles: CSSStyleDeclaration, node: Element) {
       const fontSize = parseFloat(computedStyles.fontSize);
       const fontWeight = parseInt(computedStyles.fontWeight, 10);
       const fontColorResult = colorToHex(computedStyles.color);
@@ -1296,7 +1384,7 @@ async function getElementAttributes(
 
       let fontName: string | undefined;
       if (fontFamily !== "initial") {
-        fontName = fontFamily.split(",")[0]?.trim().replace(/['"]/g, "");
+        fontName = resolvePptxFontName(fontFamily, node.textContent || "");
       }
 
       const font = {
@@ -1776,7 +1864,7 @@ async function getElementAttributes(
         border: parseBorder(computedStyles),
         borderSides,
         shadow: parseShadow(computedStyles),
-        font: parseFont(computedStyles),
+        font: parseFont(computedStyles, node),
         position,
         margin: parseBoxSpacing(computedStyles, "margin"),
         padding: parseBoxSpacing(computedStyles, "padding"),

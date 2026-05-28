@@ -40,6 +40,7 @@ import type {
   AppTemplatePlanningBlueprint,
   AppTemplatePlanningContext,
   CreateAppWorkspaceInput,
+  DuplicateAppWorkspacePageInput,
   GetAppPagePlanInput,
   GetAppPageProgressInput,
   GetAppTemplateGroupInput,
@@ -63,6 +64,7 @@ import type {
   RenderAppWorkspaceDeckHtmlResult,
   SelectAppWorkspaceTemplateInput,
   SelectAppWorkspaceTemplateResult,
+  UpdateAppWorkspacePagesInput,
   UpdateAppWorkspaceOutlineInput,
   UpdateAppWorkspaceSettingsInput,
   UpdateAppWorkspaceTitleInput,
@@ -748,6 +750,342 @@ export async function updateAppWorkspaceTitle(
   };
 
   await writeJsonFile(workspace.files.task, nextTask);
+  return ensureWorkspaceFiles(input.workspace_dir);
+}
+
+function readPageIdFromManifestSlide(value: unknown): string {
+  return normalizeString(getPlainRecord(value).id);
+}
+
+function writeIndexToRecord(record: Record<string, unknown>, index: number): Record<string, unknown> {
+  return {
+    ...record,
+    index,
+  };
+}
+
+function clonePlainRecord(record: Record<string, unknown>): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(record)) as Record<string, unknown>;
+}
+
+function normalizeIdSegment(value: string): string {
+  return value
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+function createUniqueId(baseId: string, existingIds: Set<string>): string {
+  const normalizedBase = normalizeIdSegment(baseId) || "page";
+  const copyBase = `${normalizedBase}-copy`;
+  if (!existingIds.has(copyBase)) return copyBase;
+
+  for (let index = 2; index < 10_000; index += 1) {
+    const candidate = `${copyBase}-${index}`;
+    if (!existingIds.has(candidate)) return candidate;
+  }
+
+  throw new Error(`Could not create a unique copy id for "${baseId}"`);
+}
+
+export async function updateAppWorkspacePages(
+  input: UpdateAppWorkspacePagesInput,
+): Promise<AppWorkspaceResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  if (!Array.isArray(input.pages) || input.pages.length === 0) {
+    throw new Error('"pages" must be a non-empty array');
+  }
+
+  const requestedPages = input.pages.map((page) => ({
+    page_id: normalizeString(page.page_id),
+    title: normalizeString(page.title),
+  }));
+  if (requestedPages.some((page) => !page.page_id)) {
+    throw new Error('Every page entry must include "page_id"');
+  }
+
+  const seenPageIds = new Set<string>();
+  for (const page of requestedPages) {
+    if (seenPageIds.has(page.page_id)) {
+      throw new Error(`Duplicate page_id "${page.page_id}"`);
+    }
+    seenPageIds.add(page.page_id);
+  }
+
+  const manifestPath = readSelectedTemplateManifestPath(workspace);
+  const manifestRecord = getPlainRecord(JSON.parse(await readFile(manifestPath, "utf8")) as unknown);
+  const manifestSlides = Array.isArray(manifestRecord.slides) ? manifestRecord.slides : [];
+  const manifestSlidesById = new Map(
+    manifestSlides.map((slide) => [readPageIdFromManifestSlide(slide), getPlainRecord(slide)]),
+  );
+  const missingPageId = requestedPages.find((page) => !manifestSlidesById.has(page.page_id))?.page_id;
+  if (missingPageId) {
+    throw new Error(`Page not found in manifest: ${missingPageId}`);
+  }
+
+  const nextManifestSlides = requestedPages.map((page) => {
+    const slide = manifestSlidesById.get(page.page_id) ?? {};
+    return page.title ? { ...slide, title: page.title } : slide;
+  });
+
+  const updatedAt = new Date().toISOString();
+  await writeJsonFile(manifestPath, {
+    ...manifestRecord,
+    slides: nextManifestSlides,
+  });
+
+  const pagesRecord = getPlainRecord(await readJsonFileIfExists(workspace.files.pages));
+  const renderedPages = Array.isArray(pagesRecord.pages) ? pagesRecord.pages : [];
+  const renderedPagesById = new Map(
+    renderedPages.map((page) => [normalizeString(getPlainRecord(page).page_id), getPlainRecord(page)]),
+  );
+  const nextRenderedPages = requestedPages
+    .map((page, index) => {
+      const existing = renderedPagesById.get(page.page_id);
+      if (!existing) return null;
+      return writeIndexToRecord(
+        {
+          ...existing,
+          title: page.title || normalizeString(existing.title),
+        },
+        index,
+      );
+    })
+    .filter((page): page is Record<string, unknown> => page !== null);
+
+  await writeJsonFile(workspace.files.pages, {
+    ...pagesRecord,
+    pages: nextRenderedPages,
+    updated_at: updatedAt,
+  });
+
+  const outlineRecord = normalizeOutlineJson(await readJsonFileIfExists(workspace.files.outline));
+  await writeJsonFile(workspace.files.outline, {
+    ...outlineRecord,
+    items: nextManifestSlides.map((slide) => ({
+      title: normalizeString(slide.title),
+      outline: normalizeString(slide.speaker_note) || normalizeString(slide.id),
+    })),
+    updated_at: updatedAt,
+  });
+
+  const pagePlanRecord = normalizePagePlanJson(await readJsonFileIfExists(workspace.files.page_plan));
+  const pagePlanByManifestId = new Map(
+    pagePlanRecord.pages.map((page) => [page.manifest_slide_id, page]),
+  );
+  const nextPagePlanPages = requestedPages
+    .map((page, index) => {
+      const existing = pagePlanByManifestId.get(page.page_id);
+      return existing
+        ? {
+            ...existing,
+            index,
+            title: page.title || existing.title,
+          }
+        : null;
+    })
+    .filter((page): page is AppPagePlan["pages"][number] => page !== null);
+  if (nextPagePlanPages.length > 0) {
+    await writeJsonFile(workspace.files.page_plan, {
+      ...pagePlanRecord,
+      source: {
+        ...pagePlanRecord.source,
+        outline_updated_at: updatedAt,
+      },
+      pages: nextPagePlanPages,
+      updated_at: updatedAt,
+    });
+  }
+
+  const pageProgressRecord = normalizePageProgressJson(await readJsonFileIfExists(workspace.files.page_progress));
+  const progressByPageId = new Map(
+    pageProgressRecord.pages.map((page) => [page.page_id, page]),
+  );
+  const nextProgressPages = nextPagePlanPages
+    .map((planPage): AppPageProgressItem | null => {
+      const existing = progressByPageId.get(planPage.page_id);
+      return existing
+        ? {
+            ...existing,
+            index: planPage.index,
+            title: planPage.title,
+            updated_at: updatedAt,
+          }
+        : null;
+    })
+    .filter((page): page is AppPageProgressItem => page !== null);
+  if (nextProgressPages.length > 0) {
+    await writeJsonFile(workspace.files.page_progress, {
+      ...pageProgressRecord,
+      pages: nextProgressPages,
+      updated_at: updatedAt,
+    });
+  }
+
+  await touchWorkspaceTask(workspace, updatedAt);
+  return ensureWorkspaceFiles(input.workspace_dir);
+}
+
+export async function duplicateAppWorkspacePage(
+  input: DuplicateAppWorkspacePageInput,
+): Promise<AppWorkspaceResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const sourcePageId = normalizeString(input.page_id);
+  if (!sourcePageId) {
+    throw new Error('"page_id" must be a non-empty string');
+  }
+
+  const manifestPath = readSelectedTemplateManifestPath(workspace);
+  const manifestRecord = getPlainRecord(JSON.parse(await readFile(manifestPath, "utf8")) as unknown);
+  const manifestSlides = Array.isArray(manifestRecord.slides)
+    ? manifestRecord.slides.map((slide) => getPlainRecord(slide))
+    : [];
+  const sourceIndex = manifestSlides.findIndex(
+    (slide) => readPageIdFromManifestSlide(slide) === sourcePageId,
+  );
+  if (sourceIndex < 0) {
+    throw new Error(`Page not found in manifest: ${sourcePageId}`);
+  }
+
+  const sourceSlide = manifestSlides[sourceIndex] ?? {};
+  const existingManifestIds = new Set(manifestSlides.map(readPageIdFromManifestSlide));
+  const copySlideId = createUniqueId(sourcePageId, existingManifestIds);
+  const copyTitle = normalizeString(input.title) || normalizeString(sourceSlide.title) || copySlideId;
+  const copySlide: Record<string, unknown> = {
+    ...clonePlainRecord(sourceSlide),
+    id: copySlideId,
+    title: copyTitle,
+  };
+  const nextManifestSlides: Record<string, unknown>[] = [
+    ...manifestSlides.slice(0, sourceIndex + 1),
+    copySlide,
+    ...manifestSlides.slice(sourceIndex + 1),
+  ];
+
+  const updatedAt = new Date().toISOString();
+  await writeJsonFile(manifestPath, {
+    ...manifestRecord,
+    slides: nextManifestSlides,
+  });
+
+  const pagesRecord = getPlainRecord(await readJsonFileIfExists(workspace.files.pages));
+  const renderedPages = Array.isArray(pagesRecord.pages)
+    ? pagesRecord.pages.map((page) => getPlainRecord(page))
+    : [];
+  const renderedSourceIndex = renderedPages.findIndex(
+    (page) => normalizeString(page.page_id) === sourcePageId,
+  );
+  if (renderedSourceIndex >= 0) {
+    const sourceRenderedPage = renderedPages[renderedSourceIndex] ?? {};
+    const copyRenderedPage = {
+      ...clonePlainRecord(sourceRenderedPage),
+      page_id: copySlideId,
+      title: copyTitle,
+    };
+    const nextRenderedPages = [
+      ...renderedPages.slice(0, renderedSourceIndex + 1),
+      copyRenderedPage,
+      ...renderedPages.slice(renderedSourceIndex + 1),
+    ].map(writeIndexToRecord);
+
+    await writeJsonFile(workspace.files.pages, {
+      ...pagesRecord,
+      pages: nextRenderedPages,
+      updated_at: updatedAt,
+    });
+  }
+
+  const outlineRecord = normalizeOutlineJson(await readJsonFileIfExists(workspace.files.outline));
+  await writeJsonFile(workspace.files.outline, {
+    ...outlineRecord,
+    items: nextManifestSlides.map((slide) => ({
+      title: normalizeString(slide.title),
+      outline: normalizeString(slide.speaker_note) || normalizeString(slide.id),
+    })),
+    updated_at: updatedAt,
+  });
+
+  const pagePlanRecord = normalizePagePlanJson(await readJsonFileIfExists(workspace.files.page_plan));
+  const pagePlanByManifestId = new Map(
+    pagePlanRecord.pages.map((page) => [page.manifest_slide_id, page]),
+  );
+  const sourcePagePlan = pagePlanByManifestId.get(sourcePageId);
+  let copyPagePlanId = "";
+  if (sourcePagePlan) {
+    const existingPagePlanIds = new Set(pagePlanRecord.pages.map((page) => page.page_id));
+    copyPagePlanId = createUniqueId(sourcePagePlan.page_id, existingPagePlanIds);
+    const nextPagePlanPages = nextManifestSlides
+      .map((slide, index) => {
+        const slideId = readPageIdFromManifestSlide(slide);
+        if (slideId === copySlideId) {
+          return {
+            ...sourcePagePlan,
+            page_id: copyPagePlanId,
+            index,
+            title: copyTitle,
+            manifest_slide_id: copySlideId,
+          };
+        }
+        const existing = pagePlanByManifestId.get(slideId);
+        return existing
+          ? {
+              ...existing,
+              index,
+            }
+          : null;
+      })
+      .filter((page): page is AppPagePlanItem => page !== null);
+
+    await writeJsonFile(workspace.files.page_plan, {
+      ...pagePlanRecord,
+      source: {
+        ...pagePlanRecord.source,
+        outline_updated_at: updatedAt,
+      },
+      pages: nextPagePlanPages,
+      updated_at: updatedAt,
+    });
+
+    const pageProgressRecord = normalizePageProgressJson(await readJsonFileIfExists(workspace.files.page_progress));
+    const progressByPageId = new Map(
+      pageProgressRecord.pages.map((page) => [page.page_id, page]),
+    );
+    const sourceProgress = progressByPageId.get(sourcePagePlan.page_id);
+    const nextProgressPages = nextPagePlanPages
+      .map((planPage): AppPageProgressItem | null => {
+        if (planPage.page_id === copyPagePlanId) {
+          return sourceProgress
+            ? {
+                ...sourceProgress,
+                page_id: copyPagePlanId,
+                index: planPage.index,
+                title: copyTitle,
+                updated_at: updatedAt,
+              }
+            : null;
+        }
+        const existing = progressByPageId.get(planPage.page_id);
+        return existing
+          ? {
+              ...existing,
+              index: planPage.index,
+              title: planPage.title,
+            }
+          : null;
+      })
+      .filter((page): page is AppPageProgressItem => page !== null);
+
+    if (nextProgressPages.length > 0) {
+      await writeJsonFile(workspace.files.page_progress, {
+        ...pageProgressRecord,
+        pages: nextProgressPages,
+        updated_at: updatedAt,
+      });
+    }
+  }
+
+  await touchWorkspaceTask(workspace, updatedAt);
   return ensureWorkspaceFiles(input.workspace_dir);
 }
 
@@ -1575,6 +1913,7 @@ export type {
   AppWorkspaceSummary,
   AppWorkspaceTemplateSelection,
   CreateAppWorkspaceInput,
+  DuplicateAppWorkspacePageInput,
   GetAppPagePlanInput,
   GetAppPageProgressInput,
   GetAppTemplateGroupInput,
@@ -1599,6 +1938,7 @@ export type {
   SelectAppWorkspaceTemplateInput,
   SelectAppWorkspaceTemplateResult,
   UpdateAppWorkspaceOutlineInput,
+  UpdateAppWorkspacePagesInput,
   UpdateAppWorkspaceSettingsInput,
   UpdateAppWorkspaceTitleInput,
 } from "./types.js";

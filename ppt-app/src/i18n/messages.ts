@@ -27,14 +27,13 @@ export interface Messages {
     applyToSlide: string;
     revealInFinder: string;
     chooseFile: string;
-    addLook: string;
-    changeLook: string;
     addSlide: string;
     duplicate: string;
     delete: string;
     pptx: string;
     pdf: string;
     useTemplate: string;
+    stop: string;
   };
   stages: {
     template: string;
@@ -60,7 +59,7 @@ export interface Messages {
     placeholder: string;
     reviewOutlineFirst: string;
     optionalContext: string;
-    chips: Record<"audience" | "goal" | "style" | "content" | "attachment" | "more", string>;
+    chips: Record<"audience" | "goal" | "style" | "content" | "attachment" | "template", string>;
     contextLabels: Record<
       | "audience"
       | "goal"
@@ -109,6 +108,9 @@ export interface Messages {
     fallbackSummary: string;
   };
   generating: {
+    progressTitle: string;
+    pagesPassed: string;
+    pageLabel: string;
     steps: {
       outline: string;
       pagePlan: string;
@@ -120,6 +122,8 @@ export interface Messages {
     waitingForStep: string;
     noStream: string;
     streamHint: string;
+    cancelled: string;
+    cancelling: string;
   };
   deck: {
     title: string;
@@ -130,6 +134,11 @@ export interface Messages {
     title: string;
     workspace: string;
     workspacePath: string;
+    currentWorkspace: string;
+    noWorkspaceSelected: string;
+    empty: string;
+    createWorkspace: string;
+    defaultWorkspaceTitle: string;
     preferences: string;
     lastEditedToday: string;
     lastEditedYesterday: string;
@@ -172,12 +181,6 @@ export interface Messages {
     preparing: string;
     ready: string;
   };
-  looks: Array<{
-    id: string;
-    name: string;
-    hint: string;
-    description: string;
-  }>;
   toasts: {
     localFolder: string;
     attachmentAdded: string;
@@ -185,6 +188,8 @@ export interface Messages {
     outlineSkipped: string;
     createOutlineFirst: string;
     createDeckFirst: string;
+    workspaceOpened: string;
+    workspaceCreated: string;
     pptxExported: string;
     pdfExported: string;
   };
@@ -218,14 +223,13 @@ export const messages: Record<Locale, Messages> = {
       applyToSlide: "Apply to current slide",
       revealInFinder: "Reveal in Finder",
       chooseFile: "Choose file",
-      addLook: "Add look",
-      changeLook: "Change look",
       addSlide: "Add slide",
       duplicate: "Duplicate",
       delete: "Delete",
       pptx: "PPTX",
       pdf: "PDF",
-      useTemplate: "Use template"
+      useTemplate: "Use style",
+      stop: "Stop"
     },
     stages: {
       template: "Template",
@@ -258,7 +262,7 @@ export const messages: Record<Locale, Messages> = {
         style: "Style",
         content: "Content",
         attachment: "Attachment",
-        more: "More options"
+        template: "Template"
       },
       contextLabels: {
         audience: "Audience",
@@ -282,14 +286,14 @@ export const messages: Record<Locale, Messages> = {
       }
     },
     template: {
-      title: "Choose a template",
-      helper: "Pick the visual system Anna should fork into this workspace.",
+      title: "Choose a style",
+      helper: "Pick the visual style Anna should use for this deck.",
       loading: "Loading templates...",
       empty: "No templates found.",
       layouts: "layouts",
-      selected: "Template selected",
+      selected: "Style selected",
       viewAll: "View all pages",
-      previewTitle: "Template preview",
+      previewTitle: "Style preview",
       pageCounter: "{current} / {total}",
       previous: "Previous",
       next: "Next",
@@ -308,6 +312,9 @@ export const messages: Record<Locale, Messages> = {
       fallbackSummary: "Add supporting points and details for this slide."
     },
     generating: {
+      progressTitle: "Generation progress",
+      pagesPassed: "{completed}/{total} pages passed",
+      pageLabel: "Page {page}",
       steps: {
         outline: "Outline",
         pagePlan: "Page plan",
@@ -318,7 +325,9 @@ export const messages: Record<Locale, Messages> = {
       currentSessionStream: "Current session stream",
       waitingForStep: "Waiting for step output",
       noStream: "No stream output yet",
-      streamHint: "Live output appears after the step starts."
+      streamHint: "Live output appears after the step starts.",
+      cancelled: "Generation stopped",
+      cancelling: "Stopping current generation..."
     },
     deck: {
       title: "AI Agent Workflows",
@@ -329,6 +338,11 @@ export const messages: Record<Locale, Messages> = {
       title: "Local decks",
       workspace: "Workspace",
       workspacePath: "Anna Workspace / Presentations",
+      currentWorkspace: "Current workspace",
+      noWorkspaceSelected: "No workspace selected",
+      empty: "No workspaces yet",
+      createWorkspace: "New workspace",
+      defaultWorkspaceTitle: "New Workspace-{date}",
       preferences: "Preferences",
       lastEditedToday: "Last edited today",
       lastEditedYesterday: "Last edited yesterday",
@@ -379,44 +393,6 @@ export const messages: Record<Locale, Messages> = {
       preparing: "Preparing...",
       ready: "{type} ready"
     },
-    looks: [
-      {
-        id: "saas",
-        name: "Minimal SaaS",
-        hint: "Clean · Airy",
-        description: "clean layout · soft neutrals"
-      },
-      {
-        id: "pitch",
-        name: "Investor Pitch",
-        hint: "Bold · Metrics",
-        description: "bold claims · metrics"
-      },
-      {
-        id: "workshop",
-        name: "Workshop",
-        hint: "Step-by-step",
-        description: "step-by-step · instructional"
-      },
-      {
-        id: "tech",
-        name: "Technical",
-        hint: "Diagrams",
-        description: "diagrams · structured"
-      },
-      {
-        id: "editorial",
-        name: "Editorial",
-        hint: "Premium",
-        description: "narrative · premium"
-      },
-      {
-        id: "dark",
-        name: "Dark Mode",
-        hint: "Cinematic",
-        description: "dark canvas · cinematic"
-      }
-    ],
     toasts: {
       localFolder: "Opening local folder...",
       attachmentAdded: "Attachment added",
@@ -424,6 +400,8 @@ export const messages: Record<Locale, Messages> = {
       outlineSkipped: "Outline was skipped for this deck",
       createOutlineFirst: "Create the outline first",
       createDeckFirst: "Create the deck first",
+      workspaceOpened: "Opened workspace {id}",
+      workspaceCreated: "Created workspace {id}",
       pptxExported: "PPTX exported",
       pdfExported: "PDF exported"
     }
@@ -455,14 +433,13 @@ export const messages: Record<Locale, Messages> = {
       applyToSlide: "应用到当前页",
       revealInFinder: "在 Finder 中显示",
       chooseFile: "选择文件",
-      addLook: "添加风格",
-      changeLook: "更换风格",
       addSlide: "添加页面",
       duplicate: "复制",
       delete: "删除",
       pptx: "PPTX",
       pdf: "PDF",
-      useTemplate: "使用模板"
+      useTemplate: "使用风格",
+      stop: "停止"
     },
     stages: {
       template: "模板",
@@ -495,7 +472,7 @@ export const messages: Record<Locale, Messages> = {
         style: "风格",
         content: "内容",
         attachment: "附件",
-        more: "更多选项"
+        template: "模板选择"
       },
       contextLabels: {
         audience: "受众",
@@ -519,14 +496,14 @@ export const messages: Record<Locale, Messages> = {
       }
     },
     template: {
-      title: "选择模板",
-      helper: "选择要 fork 到当前工作区的视觉模板。",
+      title: "选择风格",
+      helper: "选择 Anna 生成这份演示时使用的视觉风格。",
       loading: "正在加载模板...",
       empty: "没有发现可用模板。",
       layouts: "个版式",
-      selected: "已选择模板",
+      selected: "已选择风格",
       viewAll: "查看全部页面",
-      previewTitle: "模板预览",
+      previewTitle: "风格预览",
       pageCounter: "{current} / {total}",
       previous: "上一页",
       next: "下一页",
@@ -544,6 +521,9 @@ export const messages: Record<Locale, Messages> = {
       fallbackSummary: "为这一页补充要点和细节。"
     },
     generating: {
+      progressTitle: "生成进度",
+      pagesPassed: "{completed}/{total} 页通过",
+      pageLabel: "第 {page} 页",
       steps: {
         outline: "大纲",
         pagePlan: "页面规划",
@@ -554,7 +534,9 @@ export const messages: Record<Locale, Messages> = {
       currentSessionStream: "当前会话流",
       waitingForStep: "等待步骤输出",
       noStream: "暂无流式输出",
-      streamHint: "步骤开始后会显示实时输出。"
+      streamHint: "步骤开始后会显示实时输出。",
+      cancelled: "已停止生成",
+      cancelling: "正在停止当前生成..."
     },
     deck: {
       title: "AI Agent 工作流",
@@ -565,6 +547,11 @@ export const messages: Record<Locale, Messages> = {
       title: "本地演示文稿",
       workspace: "工作区",
       workspacePath: "Anna 工作区 / Presentations",
+      currentWorkspace: "当前工作区",
+      noWorkspaceSelected: "未选择工作区",
+      empty: "暂无工作区",
+      createWorkspace: "新建工作区",
+      defaultWorkspaceTitle: "新建工作区-{date}",
       preferences: "偏好设置",
       lastEditedToday: "今天编辑",
       lastEditedYesterday: "昨天编辑",
@@ -613,44 +600,6 @@ export const messages: Record<Locale, Messages> = {
       preparing: "正在准备...",
       ready: "{type} 已就绪"
     },
-    looks: [
-      {
-        id: "saas",
-        name: "极简 SaaS",
-        hint: "干净 · 留白",
-        description: "清爽版式 · 柔和中性色"
-      },
-      {
-        id: "pitch",
-        name: "投资人路演",
-        hint: "有力 · 指标",
-        description: "强主张 · 数据指标"
-      },
-      {
-        id: "workshop",
-        name: "工作坊",
-        hint: "步骤化",
-        description: "步骤清晰 · 教学说明"
-      },
-      {
-        id: "tech",
-        name: "技术说明",
-        hint: "图解",
-        description: "图表结构 · 层次清楚"
-      },
-      {
-        id: "editorial",
-        name: "编辑叙事",
-        hint: "高级感",
-        description: "叙事化 · 高级质感"
-      },
-      {
-        id: "dark",
-        name: "深色模式",
-        hint: "电影感",
-        description: "深色画布 · 电影感"
-      }
-    ],
     toasts: {
       localFolder: "正在打开本地文件夹...",
       attachmentAdded: "已添加附件",
@@ -658,6 +607,8 @@ export const messages: Record<Locale, Messages> = {
       outlineSkipped: "这份演示跳过了大纲审阅",
       createOutlineFirst: "请先创建大纲",
       createDeckFirst: "请先创建演示文稿",
+      workspaceOpened: "已打开工作区 {id}",
+      workspaceCreated: "已创建工作区 {id}",
       pptxExported: "PPTX 已导出",
       pdfExported: "PDF 已导出"
     }

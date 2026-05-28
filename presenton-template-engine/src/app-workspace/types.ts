@@ -94,6 +94,20 @@ export interface UpdateAppWorkspaceOutlineInput {
   };
 }
 
+export interface UpdateAppWorkspacePagesInput {
+  workspace_dir: string;
+  pages: Array<{
+    page_id: string;
+    title?: string;
+  }>;
+}
+
+export interface DuplicateAppWorkspacePageInput {
+  workspace_dir: string;
+  page_id: string;
+  title?: string;
+}
+
 export interface AppendAppWorkspaceLogInput {
   workspace_dir: string;
   channel: "ai-outline" | "ai-page-plan" | "ai-page-agent" | "ai-page-agent-stream";

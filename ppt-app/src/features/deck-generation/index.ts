@@ -127,7 +127,53 @@ export interface RunDeckGenerationInput {
   isCancelled: () => boolean;
 }
 
+export interface RunDeckRefinementInput extends RunDeckGenerationInput {
+  instruction: string;
+  scope: "deck" | "slide";
+  pageIndex?: number;
+}
+
 type DeckGenerationContext = Omit<RunDeckGenerationInput, "startMode">;
+
+function generationText(locale: Locale) {
+  const zh = locale === "zh";
+  return {
+    pagePlan: zh ? "正在规划页面和模板蓝图" : "Planning pages and template blueprints",
+    prepare: zh ? "正在准备页面文件" : "Preparing page files",
+    complete: zh ? "生成完成" : "Generation complete",
+    resumed: zh ? "已恢复上次生成进度" : "Resumed previous generation progress",
+    invalidOutline: zh ? "Deck Generation 需要 Confirmed Outline。" : "Deck Generation requires a confirmed outline.",
+    staleArtifacts: zh
+      ? "无法续跑：现有 Page Plan 或 Page Progress 已过期。"
+      : "Unable to resume: the existing page plan or page progress is stale.",
+    pageFailed: (page: PageProgress["pages"][number]) =>
+      page.last_error ||
+      (zh
+        ? `第 ${page.index + 1} 页未通过：${page.status}`
+        : `Page ${page.index + 1} did not pass: ${page.status}`),
+    pagePassed: (page: PagePlanItem) =>
+      zh
+        ? `第 ${page.index + 1} 页已通过，继续下一页`
+        : `Page ${page.index + 1} passed; continuing to the next page`,
+    generatingPage: (page: PagePlanItem, total: number) =>
+      zh
+        ? `正在生成第 ${page.index + 1} / ${total} 页`
+        : `Generating page ${page.index + 1} / ${total}`,
+    authoringPage: (page: PagePlanItem) =>
+      zh ? `Agent 正在编辑第 ${page.index + 1} 页` : `Agent is editing page ${page.index + 1}`,
+    renderingPage: (page: PagePlanItem) =>
+      zh ? `正在渲染第 ${page.index + 1} 页` : `Rendering page ${page.index + 1}`,
+    reviewingScreenshot: (page: PagePlanItem) =>
+      zh ? `正在自评第 ${page.index + 1} 页截图` : `Reviewing page ${page.index + 1} screenshot`,
+    reviewingPage: (page: PagePlanItem) =>
+      zh ? `Agent 正在自评第 ${page.index + 1} 页` : `Agent is reviewing page ${page.index + 1}`,
+    cancelled: zh ? "已停止生成" : "Generation stopped",
+    finalRender: zh ? "正在生成最终预览" : "Generating final preview",
+    deckReady: zh ? "演示文稿已生成" : "Deck generated",
+    streamLabel: (pageIndex: number, kind: string) =>
+      zh ? `第 ${pageIndex + 1} 页 · ${kind}` : `Page ${pageIndex + 1} · ${kind}`,
+  };
+}
 
 function mapProgress(progress: PageProgress | null): DeckGenerationProgressPage[] {
   return progress?.pages.map((page) => ({
@@ -252,6 +298,7 @@ function buildSelfReviewPrompt(input: {
 
 function selfReviewPassed(review: AgentSelfReviewResult) {
   return review.pass && review.score >= 7 && review.confidence !== "low";
+  // return true; // 先关闭自评结果中的置信度判断，后续根据实际情况再调整
 }
 
 function getProgressPage(progress: PageProgress | null, pageId: string) {
@@ -418,6 +465,17 @@ function progressMatchesPlan(pagePlan: PagePlan, progress: PageProgress) {
   return pagePlan.pages.every((page) => progressIds.has(page.page_id));
 }
 
+function pagePlanMatchesOutlineItems(pagePlan: PagePlan, outline: WorkspaceOutline) {
+  return pagePlan.pages.every((page, index) => {
+    const item = outline.items[index];
+    return (
+      item &&
+      page.title.trim() === item.title.trim() &&
+      page.outline.trim() === item.outline.trim()
+    );
+  });
+}
+
 function pagePlanMatchesOutlineAndTemplate(
   workspace: WorkspaceResult,
   pagePlan: PagePlan,
@@ -429,7 +487,9 @@ function pagePlanMatchesOutlineAndTemplate(
     outline.updated_at &&
     pagePlan.source.outline_updated_at !== outline.updated_at
   ) {
-    return false;
+    if (!pagePlanMatchesOutlineItems(pagePlan, outline)) {
+      return false;
+    }
   }
 
   if (pagePlan.pages.length !== outline.items.length) {
@@ -440,10 +500,10 @@ function pagePlanMatchesOutlineAndTemplate(
   const selectedTemplate =
     typeof template?.selected_template_group === "string" ? template.selected_template_group : "";
   const manifestPath = typeof template?.manifest_path === "string" ? template.manifest_path : "";
-  if (selectedTemplate && pagePlan.source.template_group !== selectedTemplate) {
+  if (manifestPath && pagePlan.source.template_manifest_path !== manifestPath) {
     return false;
   }
-  if (manifestPath && pagePlan.source.template_manifest_path !== manifestPath) {
+  if (!manifestPath && selectedTemplate && pagePlan.source.template_group !== selectedTemplate) {
     return false;
   }
 
@@ -466,11 +526,12 @@ async function loadResumeArtifacts(input: RunDeckGenerationInput) {
 }
 
 async function createRestartArtifacts(input: RunDeckGenerationInput) {
+  const text = generationText(input.locale);
   emit(
     input,
     {
       step: "page-plan",
-      message: "正在规划页面和模板蓝图",
+      message: text.pagePlan,
       currentPageIndex: null,
       totalPages: input.confirmedOutline.items.length,
     },
@@ -501,7 +562,7 @@ async function createRestartArtifacts(input: RunDeckGenerationInput) {
     input,
     {
       step: "prepare",
-      message: "正在准备页面文件",
+      message: text.prepare,
       currentPageIndex: null,
       totalPages: pagePlan.pages.length,
     },
@@ -544,16 +605,17 @@ function failedCompletion(input: {
   };
 }
 
-function createFailedPageError(page: PageProgress["pages"][number]): DeckGenerationError {
+function createFailedPageError(
+  page: PageProgress["pages"][number],
+  locale: Locale,
+): DeckGenerationError {
   const type =
     page.status === "agent_infrastructure_failed"
       ? "agent_infrastructure"
       : "page_failed";
   return {
     type,
-    message:
-      page.last_error ||
-      `第 ${page.index + 1} 页未通过：${page.status}`,
+    message: generationText(locale).pageFailed(page),
     page_id: page.page_id,
     page_index: page.index,
     page_status: page.status,
@@ -562,6 +624,7 @@ function createFailedPageError(page: PageProgress["pages"][number]): DeckGenerat
 
 export function pageProgressToDeckGenerationProgress(
   storedProgress: PageProgress,
+  locale: Locale = "zh",
 ): DeckGenerationProgress {
   const pages = [...storedProgress.pages].sort((left, right) => left.index - right.index);
   const failedPage = pages.find((item) =>
@@ -583,8 +646,8 @@ export function pageProgressToDeckGenerationProgress(
   const message = failedPage?.last_error
     ? failedPage.last_error
     : step === "complete"
-      ? "生成完成"
-      : "已恢复上次生成进度";
+      ? generationText(locale).complete
+      : generationText(locale).resumed;
 
   return {
     step,
@@ -600,6 +663,7 @@ export function pageProgressToDeckGenerationProgress(
 
 export function createDeckGenerationStreamSnapshot(
   progress: DeckGenerationProgress,
+  locale: Locale = "zh",
 ): DeckGenerationStreamSnapshot {
   const id = progress.stream
     ? `${progress.step}:${progress.stream.page_id}:${progress.stream.run_id ?? progress.stream.kind ?? progress.stream.status}`
@@ -608,7 +672,10 @@ export function createDeckGenerationStreamSnapshot(
     id,
     phase: progress.step,
     label: progress.stream
-      ? `第 ${progress.stream.page_index + 1} 页 · ${progress.stream.kind ?? progress.step}`
+      ? generationText(locale).streamLabel(
+          progress.stream.page_index,
+          progress.stream.kind ?? progress.step
+        )
       : progress.message || progress.step,
     page_id: progress.stream?.page_id,
     page_index: progress.stream?.page_index,
@@ -623,11 +690,12 @@ export function createDeckGenerationStreamSnapshot(
 export async function runDeckGeneration(
   input: RunDeckGenerationInput,
 ): Promise<DeckGenerationCompletion> {
+  const text = generationText(input.locale);
   if (input.confirmedOutline.status !== "confirmed") {
     const progress = createProgress(
       {
         step: "failed",
-        message: "Deck Generation 需要 Confirmed Outline。",
+        message: text.invalidOutline,
         currentPageIndex: null,
         totalPages: 0,
       },
@@ -652,7 +720,7 @@ export async function runDeckGeneration(
       const progress = createProgress(
         {
           step: "failed",
-          message: "无法续跑：现有 Page Plan 或 Page Progress 已过期。",
+          message: text.staleArtifacts,
           currentPageIndex: null,
           totalPages: input.confirmedOutline.items.length,
         },
@@ -683,7 +751,7 @@ export async function runDeckGeneration(
         input,
         {
           step: "page-authoring",
-          message: `第 ${page.index + 1} 页已通过，继续下一页`,
+          message: text.pagePassed(page),
           currentPageIndex: page.index,
           totalPages: pagePlan.pages.length,
         },
@@ -697,7 +765,7 @@ export async function runDeckGeneration(
       input,
       {
         step: "page-authoring",
-        message: `正在生成第 ${page.index + 1} / ${pagePlan.pages.length} 页`,
+        message: text.generatingPage(page, pagePlan.pages.length),
         currentPageIndex: page.index,
         totalPages: pagePlan.pages.length,
       },
@@ -734,7 +802,7 @@ export async function runDeckGeneration(
         flowInput: input,
         page,
         step: "page-authoring",
-        message: `Agent 正在编辑第 ${page.index + 1} 页`,
+        message: text.authoringPage(page),
         totalPages: pagePlan.pages.length,
         progress: () => progress,
         prompt: authoringPrompt,
@@ -810,7 +878,7 @@ export async function runDeckGeneration(
           input,
           {
             step: "page-render",
-            message: `正在渲染第 ${page.index + 1} 页`,
+            message: text.renderingPage(page),
             currentPageIndex: page.index,
             totalPages: pagePlan.pages.length,
           },
@@ -842,7 +910,7 @@ export async function runDeckGeneration(
         input,
         {
           step: "page-review",
-          message: `正在自评第 ${page.index + 1} 页截图`,
+          message: text.reviewingScreenshot(page),
           currentPageIndex: page.index,
           totalPages: pagePlan.pages.length,
         },
@@ -857,7 +925,7 @@ export async function runDeckGeneration(
         flowInput: input,
         page,
         step: "page-review",
-        message: `Agent 正在自评第 ${page.index + 1} 页`,
+        message: text.reviewingPage(page),
         totalPages: pagePlan.pages.length,
         progress: () => progress,
         prompt: selfReviewPrompt,
@@ -945,6 +1013,7 @@ export async function runDeckGeneration(
         last_error: selfReview.revision_request,
       });
       if (selfReviewAttempts >= ATTEMPT_LIMITS.selfReview) break;
+      continue;
     }
   }
 
@@ -952,7 +1021,7 @@ export async function runDeckGeneration(
     const cancelledProgress = createProgress(
       {
         step: "cancelled",
-        message: "已停止生成",
+        message: text.cancelled,
         currentPageIndex: null,
         totalPages: pagePlan.pages.length,
       },
@@ -970,7 +1039,7 @@ export async function runDeckGeneration(
   });
   const failedPage = progress.pages.find((page) => page.status !== "accepted");
   if (failedPage) {
-    const error = createFailedPageError(failedPage);
+    const error = createFailedPageError(failedPage, input.locale);
     const failedProgress = createProgress(
       {
         step: "failed",
@@ -991,7 +1060,7 @@ export async function runDeckGeneration(
     input,
     {
       step: "final-render",
-      message: "正在生成最终预览",
+      message: text.finalRender,
       currentPageIndex: null,
       totalPages: pagePlan.pages.length,
     },
@@ -1007,7 +1076,7 @@ export async function runDeckGeneration(
     input,
     {
       step: "complete",
-      message: "演示文稿已生成",
+      message: text.deckReady,
       currentPageIndex: null,
       totalPages: pagePlan.pages.length,
     },
@@ -1023,4 +1092,118 @@ export async function runDeckGeneration(
       rendered,
     },
   };
+}
+
+function buildRefinementReview(instruction: string): AgentSelfReviewResult {
+  return {
+    pass: false,
+    score: 0,
+    issues: [
+      {
+        severity: "user-request",
+        area: "refinement",
+        problem: instruction,
+        fix_hint: instruction,
+      },
+    ],
+    revision_request: instruction,
+    confidence: "high",
+  };
+}
+
+export async function runDeckRefinement(
+  input: RunDeckRefinementInput,
+): Promise<DeckGenerationCompletion> {
+  const instruction = input.instruction.trim();
+  if (!instruction) {
+    const progress = createProgress(
+      {
+        step: "failed",
+        message: input.locale === "zh" ? "请输入优化需求。" : "Enter a refinement request.",
+        currentPageIndex: input.scope === "slide" ? input.pageIndex ?? null : null,
+        totalPages: 0,
+      },
+      null,
+    );
+    input.onProgress(progress);
+    return failedCompletion({
+      progress,
+      error: {
+        type: "page_failed",
+        message: progress.message,
+      },
+    });
+  }
+
+  const [pagePlan, progress] = await Promise.all([
+    input.backend.getPagePlan({ workspace_dir: input.workspace.workspace_dir }),
+    input.backend.getPageProgress({ workspace_dir: input.workspace.workspace_dir }),
+  ]);
+  if (!pagePlanMatchesOutlineAndTemplate(input.workspace, pagePlan, progress, input.confirmedOutline)) {
+    const staleProgress = createProgress(
+      {
+        step: "failed",
+        message: generationText(input.locale).staleArtifacts,
+        currentPageIndex: input.scope === "slide" ? input.pageIndex ?? null : null,
+        totalPages: input.confirmedOutline.items.length,
+      },
+      progress,
+    );
+    input.onProgress(staleProgress);
+    return failedCompletion({
+      progress: staleProgress,
+      error: {
+        type: "stale_artifacts",
+        message: staleProgress.message,
+      },
+    });
+  }
+
+  const targetPages =
+    input.scope === "deck"
+      ? pagePlan.pages
+      : pagePlan.pages.filter((page) => page.index === input.pageIndex);
+  if (targetPages.length === 0) {
+    const missingProgress = createProgress(
+      {
+        step: "failed",
+        message: input.locale === "zh" ? "没有找到要优化的页面。" : "Could not find the slide to refine.",
+        currentPageIndex: input.scope === "slide" ? input.pageIndex ?? null : null,
+        totalPages: pagePlan.pages.length,
+      },
+      progress,
+    );
+    input.onProgress(missingProgress);
+    return failedCompletion({
+      progress: missingProgress,
+      error: {
+        type: "page_failed",
+        message: missingProgress.message,
+      },
+    });
+  }
+
+  const review = buildRefinementReview(instruction);
+  for (const page of targetPages) {
+    await recordProgress(input, page, {
+      status: "self_review_fixing",
+      render_attempts: 0,
+      self_review_attempts: 0,
+      agent_failures: 0,
+      last_error: instruction,
+      review,
+    });
+  }
+
+  return runDeckGeneration({
+    backend: input.backend,
+    aiClient: input.aiClient,
+    agentClient: input.agentClient,
+    workspace: input.workspace,
+    confirmedOutline: input.confirmedOutline,
+    locale: input.locale,
+    startMode: "resume",
+    onProgress: input.onProgress,
+    isCancelled: input.isCancelled,
+  });
 }

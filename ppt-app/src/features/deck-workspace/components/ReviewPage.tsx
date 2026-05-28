@@ -30,8 +30,9 @@ interface ReviewPageProps {
   renderDeckHtml: () => Promise<void>;
   onBack: () => void;
   updateDeckTitle: (index: number, title: string) => void;
-  moveSlide: (index: number, direction: -1 | 1) => void;
-  deleteSlide: (index: number) => void;
+  moveSlide: (index: number, direction: -1 | 1) => Promise<void>;
+  duplicateSlide: (index: number) => Promise<void>;
+  deleteSlide: (index: number) => Promise<void>;
   addSlide: () => void;
   onRefineSlide: (index: number) => void;
 }
@@ -49,6 +50,7 @@ export function ReviewPage(props: ReviewPageProps) {
     onBack,
     updateDeckTitle,
     moveSlide,
+    duplicateSlide,
     deleteSlide,
     addSlide,
     onRefineSlide
@@ -158,14 +160,33 @@ export function ReviewPage(props: ReviewPageProps) {
               <strong>{slide.title}</strong>
               <p>{slide.subtitle}</p>
               <div className="grid-card-actions">
-                <button className="grid-action-btn primary" onClick={() => onRefineSlide(index)}>
+                <button
+                  className="grid-action-btn primary"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRefineSlide(index);
+                  }}
+                >
                   {t.controls.refineSlide}
                 </button>
-                <button className="grid-action-btn">
+                <button
+                  className="grid-action-btn"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void duplicateSlide(index);
+                  }}
+                >
                   <Copy size={12} />
                   {t.controls.duplicate}
                 </button>
-                <button className="grid-action-btn" onClick={() => deleteSlide(index)}>
+                <button
+                  className="grid-action-btn"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void deleteSlide(index);
+                  }}
+                  disabled={deck.length <= 1}
+                >
                   <Trash2 size={12} />
                   {t.controls.delete}
                 </button>
@@ -185,13 +206,13 @@ export function ReviewPage(props: ReviewPageProps) {
                 onChange={(event) => updateDeckTitle(index, event.target.value)}
               />
               <div className="organize-actions">
-                <button onClick={() => moveSlide(index, -1)}>
+                <button onClick={() => void moveSlide(index, -1)} disabled={index === 0}>
                   <ChevronDown className="up" size={14} />
                 </button>
-                <button onClick={() => moveSlide(index, 1)}>
+                <button onClick={() => void moveSlide(index, 1)} disabled={index === deck.length - 1}>
                   <ChevronDown size={14} />
                 </button>
-                <button onClick={() => deleteSlide(index)}>
+                <button onClick={() => void deleteSlide(index)} disabled={deck.length <= 1}>
                   <Trash2 size={14} />
                 </button>
               </div>

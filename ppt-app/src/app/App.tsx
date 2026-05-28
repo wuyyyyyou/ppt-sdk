@@ -9,7 +9,6 @@ import { PanelHeader } from "../features/deck-workspace/components/PanelHeader";
 import { ProgressLine } from "../features/deck-workspace/components/ProgressLine";
 import { RefinePage } from "../features/deck-workspace/components/RefinePage";
 import { ReviewPage } from "../features/deck-workspace/components/ReviewPage";
-import { TemplatePage } from "../features/deck-workspace/components/TemplatePage";
 import { WorkspaceDialog } from "../features/deck-workspace/components/WorkspaceDialog";
 import { useDeckWorkspace } from "../features/deck-workspace/hooks/useDeckWorkspace";
 import { useI18n } from "../i18n/useI18n";
@@ -75,7 +74,10 @@ export function App() {
               t={t}
               prompt={state.prompt}
               setPrompt={actions.setPrompt}
+              templates={state.templateGroups}
+              selectedTemplateGroupId={state.selectedTemplateGroupId}
               loading={state.loading}
+              selectTemplate={actions.selectTemplate}
               reviewOutlineFirst={state.reviewOutlineFirst}
               setReviewOutlineFirst={actions.setReviewOutlineFirst}
               contextRows={state.contextRows}
@@ -83,25 +85,10 @@ export function App() {
               updateContextRow={actions.updateContextRow}
               removeContextRow={actions.removeContextRow}
               addStyleRow={actions.addStyleRow}
-              addMoreRows={actions.addMoreRows}
-              lookPickerOpen={state.lookPickerOpen}
-              setLookPickerOpen={actions.setLookPickerOpen}
-              selectedLookId={state.selectedLookId}
-              selectLook={actions.selectLook}
               generateDeck={actions.generateDeck}
               cancelGenerateDeck={actions.cancelGenerateDeck}
               createDeckProgress={state.createDeckProgress}
               showToast={actions.showToast}
-            />
-          ) : null}
-
-          {state.page === "main" && state.stage === "template" ? (
-            <TemplatePage
-              t={t}
-              templates={state.templateGroups}
-              selectedTemplateGroupId={state.selectedTemplateGroupId}
-              loading={state.loading}
-              selectTemplate={actions.selectTemplate}
             />
           ) : null}
 
@@ -163,6 +150,7 @@ export function App() {
           {state.page === "library" ? (
             <LibraryPage
               t={t}
+              locale={locale}
               workspaceScan={state.workspaceScan}
               currentWorkspace={state.currentWorkspace}
               loading={state.workspaceLoading}
@@ -188,6 +176,7 @@ export function App() {
               onBack={actions.goBack}
               updateDeckTitle={actions.updateDeckTitle}
               moveSlide={actions.moveSlide}
+              duplicateSlide={actions.duplicateSlide}
               deleteSlide={actions.deleteSlide}
               addSlide={actions.addSlide}
               onRefineSlide={(index) => {

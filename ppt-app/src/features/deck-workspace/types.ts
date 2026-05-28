@@ -12,7 +12,7 @@ import type {
   DeckGenerationStreamSnapshot
 } from "../deck-generation";
 
-export type MainStage = "template" | "brief" | "outline" | "generating" | "deck";
+export type MainStage = "brief" | "outline" | "generating" | "deck";
 export type PageId = "main" | "library" | "review" | "refine" | "export";
 export type PanelMode = "visible" | "minimized" | "closed";
 export type RefineScope = "deck" | "slide";
@@ -57,8 +57,6 @@ export interface DeckWorkspaceState {
   prompt: string;
   reviewOutlineFirst: boolean;
   contextRows: ContextRow[];
-  selectedLookId: string | null;
-  lookPickerOpen: boolean;
   deckTitle: string;
   deck: Slide[];
   outline: OutlineDetail[];

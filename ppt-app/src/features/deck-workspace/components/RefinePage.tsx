@@ -1,4 +1,5 @@
 import { CheckCircle2 } from "lucide-react";
+import { useState } from "react";
 import type { Slide } from "../../../data/mockDeck";
 import { formatMessage, type Messages } from "../../../i18n/messages";
 import type { LoadingKind, RefineScope } from "../types";
@@ -16,8 +17,8 @@ interface RefinePageProps {
   deckCount: number;
   loading: LoadingKind;
   onBack: () => void;
-  onRefineDeck: () => void;
-  onRefineSlide: () => void;
+  onRefineDeck: (instruction: string) => void;
+  onRefineSlide: (instruction: string) => void;
 }
 
 export function RefinePage(props: RefinePageProps) {
@@ -33,6 +34,8 @@ export function RefinePage(props: RefinePageProps) {
     onRefineDeck,
     onRefineSlide
   } = props;
+  const [deckInstruction, setDeckInstruction] = useState("");
+  const [slideInstruction, setSlideInstruction] = useState("");
 
   return (
     <section className="page active refine-page">
@@ -62,10 +65,16 @@ export function RefinePage(props: RefinePageProps) {
               name="deck-refine-prompt"
               className="refine-input"
               placeholder={t.refine.deckPlaceholder}
+              value={deckInstruction}
+              onChange={(event) => setDeckInstruction(event.target.value)}
             />
           </label>
           {loading === "refineDeck" ? <RefineSteps steps={t.refine.deckSteps} /> : null}
-          <button className="primary-btn full" onClick={onRefineDeck} disabled={loading === "refineDeck"}>
+          <button
+            className="primary-btn full"
+            onClick={() => onRefineDeck(deckInstruction)}
+            disabled={loading === "refineDeck" || !deckInstruction.trim()}
+          >
             {loading === "refineDeck" ? <span className="spinner small" /> : null}
             {t.controls.applyToDeck}
           </button>
@@ -85,13 +94,15 @@ export function RefinePage(props: RefinePageProps) {
               name="slide-refine-prompt"
               className="refine-input"
               placeholder={t.refine.slidePlaceholder}
+              value={slideInstruction}
+              onChange={(event) => setSlideInstruction(event.target.value)}
             />
           </label>
           {loading === "refineSlide" ? <RefineSteps steps={t.refine.slideSteps} /> : null}
           <button
             className="primary-btn full"
-            onClick={onRefineSlide}
-            disabled={loading === "refineSlide"}
+            onClick={() => onRefineSlide(slideInstruction)}
+            disabled={loading === "refineSlide" || !slideInstruction.trim()}
           >
             {loading === "refineSlide" ? <span className="spinner small" /> : null}
             {t.controls.applyToSlide}

@@ -74,6 +74,7 @@ export function OutlinePage(props: OutlinePageProps) {
 
       {createDeckProgress ? (
         <GenerationProgressPanel
+          t={t}
           progress={createDeckProgress}
           onCancel={cancelGenerateDeck}
           cancellable={loading === "deck" && createDeckProgress.step !== "cancelled"}

@@ -1,13 +1,19 @@
-import { Check, File, Plus, Sparkles, Upload, X } from "lucide-react";
-import type { Messages } from "../../../i18n/messages";
+import { Check, CheckCircle2, File, ImageIcon, Search, Sparkles, Upload, X } from "lucide-react";
+import { useState } from "react";
+import type { TemplateSummary } from "../../../api/types";
+import { formatMessage, type Messages } from "../../../i18n/messages";
 import type { DeckGenerationProgress } from "../../deck-generation";
 import type { ContextRow, LoadingKind } from "../types";
+import { TemplatePreviewModal } from "./TemplatePreviewModal";
 
 interface BriefPageProps {
   t: Messages;
   prompt: string;
   setPrompt: (value: string) => void;
+  templates: TemplateSummary[];
+  selectedTemplateGroupId: string | null;
   loading: LoadingKind;
+  selectTemplate: (groupId: string) => Promise<void>;
   reviewOutlineFirst: boolean;
   setReviewOutlineFirst: (value: boolean) => void;
   contextRows: ContextRow[];
@@ -15,11 +21,6 @@ interface BriefPageProps {
   updateContextRow: (id: string, value: string) => void;
   removeContextRow: (id: string) => void;
   addStyleRow: () => void;
-  addMoreRows: () => void;
-  lookPickerOpen: boolean;
-  setLookPickerOpen: (value: boolean) => void;
-  selectedLookId: string | null;
-  selectLook: (id: string) => void;
   generateDeck: () => Promise<void>;
   cancelGenerateDeck: () => void;
   createDeckProgress: DeckGenerationProgress | null;
@@ -31,7 +32,10 @@ export function BriefPage(props: BriefPageProps) {
     t,
     prompt,
     setPrompt,
+    templates,
+    selectedTemplateGroupId,
     loading,
+    selectTemplate,
     reviewOutlineFirst,
     setReviewOutlineFirst,
     contextRows,
@@ -39,16 +43,12 @@ export function BriefPage(props: BriefPageProps) {
     updateContextRow,
     removeContextRow,
     addStyleRow,
-    addMoreRows,
-    lookPickerOpen,
-    setLookPickerOpen,
-    selectedLookId,
-    selectLook,
     generateDeck,
     cancelGenerateDeck,
     createDeckProgress,
-    showToast
+  showToast
   } = props;
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const isCreating =
     loading === "deck" || loading === "outline" || loading === "review";
 
@@ -93,6 +93,7 @@ export function BriefPage(props: BriefPageProps) {
 
       {createDeckProgress ? (
         <GenerationProgressPanel
+          t={t}
           progress={createDeckProgress}
           onCancel={cancelGenerateDeck}
           cancellable={isCreating && createDeckProgress.step !== "cancelled"}
@@ -102,11 +103,11 @@ export function BriefPage(props: BriefPageProps) {
         <section className="generation-progress-panel">
           <div className="generation-progress-header">
             <div>
-              <div className="section-label">生成进度</div>
+              <div className="section-label">{t.generating.progressTitle}</div>
               <strong>{t.status.creatingOutline}</strong>
             </div>
             <button className="secondary-btn compact" onClick={cancelGenerateDeck}>
-              停止
+              {t.controls.stop}
             </button>
           </div>
         </section>
@@ -168,14 +169,27 @@ export function BriefPage(props: BriefPageProps) {
             >
               {t.brief.chips.attachment}
             </button>
-            <button className="chip-btn" onClick={addMoreRows}>
-              {t.brief.chips.more}
+            <button
+              className={`chip-btn ${templatePickerOpen ? "active" : ""}`}
+              onClick={() => setTemplatePickerOpen((value) => !value)}
+            >
+              {t.brief.chips.template}
             </button>
           </div>
         </div>
       </div>
 
       <div className="context-rows-container">
+        {templatePickerOpen ? (
+          <StyleSelection
+            t={t}
+            templates={templates}
+            selectedTemplateGroupId={selectedTemplateGroupId}
+            loading={loading}
+            selectTemplate={selectTemplate}
+          />
+        ) : null}
+
         {contextRows.map((row) => (
           <ContextRowView
             key={row.id}
@@ -186,32 +200,145 @@ export function BriefPage(props: BriefPageProps) {
             onUpload={() => showToast(t.toasts.attachmentAdded)}
           />
         ))}
-
-        {contextRows.some((row) => row.id === "style") ? (
-          <div>
-            <button className="add-context-btn" onClick={() => setLookPickerOpen(!lookPickerOpen)}>
-              <Plus size={12} />
-              {selectedLookId ? t.controls.changeLook : t.controls.addLook}
-            </button>
-            <LookPicker
-              t={t}
-              open={lookPickerOpen}
-              selectedLookId={selectedLookId}
-              selectLook={selectLook}
-            />
-          </div>
-        ) : null}
       </div>
     </section>
   );
 }
 
+function StyleSelection(props: {
+  t: Messages;
+  templates: TemplateSummary[];
+  selectedTemplateGroupId: string | null;
+  loading: LoadingKind;
+  selectTemplate: (groupId: string) => Promise<void>;
+}) {
+  const { t, templates, selectedTemplateGroupId, loading, selectTemplate } = props;
+  const [previewGroupId, setPreviewGroupId] = useState<string | null>(null);
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const previewTemplate = previewGroupId
+    ? templates.find((template) => template.group_id === previewGroupId) ?? null
+    : null;
+
+  function openPreview(groupId: string, index = 0) {
+    setPreviewGroupId(groupId);
+    setPreviewIndex(index);
+  }
+
+  function closePreview() {
+    setPreviewGroupId(null);
+  }
+
+  return (
+    <section className="style-selection-section">
+      <div className="style-selection-heading">
+        <div>
+          <div className="section-label">{t.template.title}</div>
+          <p>{t.template.helper}</p>
+        </div>
+      </div>
+
+      {templates.length === 0 ? (
+        <div className="template-empty">
+          {loading === "template" ? t.template.loading : t.template.empty}
+        </div>
+      ) : (
+        <div className="template-grid style-template-grid">
+          {templates.map((template) => (
+            <StyleTemplateCard
+              key={template.group_id}
+              t={t}
+              template={template}
+              selected={selectedTemplateGroupId === template.group_id}
+              busy={loading === "template" && selectedTemplateGroupId !== template.group_id}
+              onSelect={() => selectTemplate(template.group_id)}
+              onOpenPreview={() => openPreview(template.group_id, 0)}
+            />
+          ))}
+        </div>
+      )}
+
+      {previewTemplate && previewTemplate.previews.length > 0 ? (
+        <TemplatePreviewModal
+          t={t}
+          template={previewTemplate}
+          previews={previewTemplate.previews}
+          initialIndex={previewIndex}
+          selected={selectedTemplateGroupId === previewTemplate.group_id}
+          busy={loading === "template"}
+          onClose={closePreview}
+          onSelect={() => {
+            void selectTemplate(previewTemplate.group_id).then(closePreview);
+          }}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function StyleTemplateCard(props: {
+  t: Messages;
+  template: TemplateSummary;
+  selected: boolean;
+  busy: boolean;
+  onSelect: () => Promise<void>;
+  onOpenPreview: () => void;
+}) {
+  const { t, template, selected, busy, onSelect, onOpenPreview } = props;
+  const previewUrl = template.preview?.url;
+  const previewCount = template.previews?.length ?? 0;
+  const canOpenPreview = previewCount > 0;
+
+  return (
+    <article className={`template-card ${selected ? "active" : ""}`}>
+      <button
+        type="button"
+        className="template-preview template-preview-button"
+        onClick={onOpenPreview}
+        disabled={!canOpenPreview}
+        aria-label={t.template.viewAll}
+      >
+        {previewUrl ? (
+          <img src={previewUrl} alt="" loading="lazy" />
+        ) : (
+          <div className="template-preview-placeholder">
+            <ImageIcon size={22} />
+          </div>
+        )}
+        {selected ? (
+          <div className="template-selected-badge">
+            <CheckCircle2 size={14} />
+          </div>
+        ) : null}
+        {canOpenPreview ? (
+          <div className="template-preview-overlay">
+            <span className="template-preview-overlay-chip">
+              <Search size={13} />
+              {t.template.viewAll}
+              <em>{previewCount}</em>
+            </span>
+          </div>
+        ) : null}
+      </button>
+      <div className="template-card-body">
+        <div className="template-card-title-row">
+          <h2>{template.group_name}</h2>
+        </div>
+        <button className="template-use-btn" disabled={busy} onClick={() => void onSelect()}>
+          {busy ? <span className="spinner small" /> : <Sparkles size={14} />}
+          {t.controls.useTemplate}
+        </button>
+      </div>
+    </article>
+  );
+}
+
 export function GenerationProgressPanel(props: {
+  t: Messages;
   progress: DeckGenerationProgress;
   onCancel: () => void;
   cancellable: boolean;
 }) {
-  const { progress, onCancel, cancellable } = props;
+  const { t, progress, onCancel, cancellable } = props;
   const completed = progress.pages.filter((page) => page.status === "accepted").length;
   const total = progress.totalPages || progress.pages.length || 0;
 
@@ -219,17 +346,20 @@ export function GenerationProgressPanel(props: {
     <section className="generation-progress-panel">
       <div className="generation-progress-header">
         <div>
-          <div className="section-label">生成进度</div>
+          <div className="section-label">{t.generating.progressTitle}</div>
           <strong>{progress.message}</strong>
           {total > 0 ? (
             <span>
-              {completed}/{total} 页通过
+              {formatMessage(t.generating.pagesPassed, {
+                completed: String(completed),
+                total: String(total)
+              })}
             </span>
           ) : null}
         </div>
         {cancellable ? (
           <button className="secondary-btn compact" onClick={onCancel}>
-            停止
+            {t.controls.stop}
           </button>
         ) : null}
       </div>
@@ -247,7 +377,9 @@ export function GenerationProgressPanel(props: {
         <div className="generation-live-stream">
           <div className="generation-live-header">
             <strong>
-              第 {progress.stream.page_index + 1} 页 · {progress.stream.status}
+              {formatMessage(t.generating.pageLabel, {
+                page: String(progress.stream.page_index + 1)
+              })} · {progress.stream.status}
             </strong>
           </div>
           {progress.stream.activities.length > 0 ? (
@@ -334,42 +466,6 @@ function ContextRowView(props: {
       <button className="context-remove-btn" onClick={() => remove(row.id)}>
         <X size={12} />
       </button>
-    </div>
-  );
-}
-
-function LookPicker(props: {
-  t: Messages;
-  open: boolean;
-  selectedLookId: string | null;
-  selectLook: (id: string) => void;
-}) {
-  const { t, open, selectedLookId, selectLook } = props;
-
-  return (
-    <div className={`look-picker ${open ? "visible" : ""}`}>
-      <div className="look-picker-header">
-        <div className="look-picker-title">{t.controls.addLook}</div>
-      </div>
-      <div className="look-grid">
-        {t.looks.map((look) => (
-          <button
-            key={look.id}
-            className={`look-card ${selectedLookId === look.id ? "active" : ""}`}
-            onClick={() => selectLook(look.id)}
-          >
-            <div className={`look-card-preview preview-${look.id}`}>
-              <span />
-              <span />
-              <span />
-            </div>
-            <div className="look-card-info">
-              <div className="look-card-name">{look.name}</div>
-              <div className="look-card-hint">{look.hint}</div>
-            </div>
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
