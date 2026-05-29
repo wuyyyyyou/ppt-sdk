@@ -3,8 +3,8 @@
   "permissions": [],
   "required_executas": [],
   "optional_executas": [],
-  "system_prompt_addendum": "The Agent Session Test app is open. It directly tests anna.agent.session lifecycle behavior from inside the iframe.",
-  "tags": ["test", "agent", "session"],
+  "system_prompt_addendum": "The Frontend LLM / Agent Debug app is open. It directly tests iframe-side llm.complete and agent.session RPC calls.",
+  "tags": ["test", "llm", "agent", "frontend"],
   "ui": {
     "bundle": {
       "format": "static-spa",
@@ -14,7 +14,7 @@
     "views": [
       {
         "name": "main",
-        "title": "Agent Session Test",
+        "title": "Frontend LLM / Agent Debug",
         "default": true,
         "entry": "index.html",
         "min_size": { "w": 760, "h": 640 },
@@ -32,7 +32,7 @@
         },
         "tools": []
       },
-      "llm": [],
+      "llm": ["complete"],
       "chat": [],
       "tools": [],
       "artifact": [],

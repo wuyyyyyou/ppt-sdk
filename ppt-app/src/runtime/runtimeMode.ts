@@ -5,6 +5,13 @@ export function detectRuntimeMode(): RuntimeMode {
     return "anna";
   }
 
+  if (typeof window !== "undefined") {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("wid") && params.has("t")) {
+      return "anna";
+    }
+  }
+
   if (import.meta.env.MODE === "test") {
     return "mock";
   }

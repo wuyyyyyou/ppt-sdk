@@ -5,7 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="data:," />
     <title>PPT App</title>
-    <script src="/static/anna-apps/_sdk/0.2.0/index.js" defer></script>
+    <script type="module">
+      (async () => {
+        for (const annaRuntimeSdkUrl of [
+          "/static/anna-apps/_sdk/latest/index.js",
+          "/static/anna-apps/_sdk/0.2.0/index.js"
+        ]) {
+          try {
+            const { AnnaAppRuntime, default: defaultRuntime } = await import(annaRuntimeSdkUrl);
+            window.AnnaAppRuntime = AnnaAppRuntime ?? defaultRuntime ?? window.AnnaAppRuntime;
+            if (window.AnnaAppRuntime) break;
+          } catch {
+            // Try the next SDK path; production staging currently serves `latest`.
+          }
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
