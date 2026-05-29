@@ -101,6 +101,7 @@ export interface DeckWorkspaceActions {
   refineSlide: (instruction: string) => Promise<void>;
   renderDeckHtml: () => Promise<void>;
   exportFile: (type: "PPTX" | "PDF") => Promise<void>;
+  openExportArtifact: (artifact: ExportArtifact) => Promise<void>;
   returnToOutlineFromGeneration: () => void;
   regenerateDeck: () => Promise<void>;
 }
@@ -1077,8 +1078,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     const task = workspace.task as {
       artifacts?: {
-        pptx?: { path?: unknown; updated_at?: unknown };
-        pdf?: { path?: unknown; updated_at?: unknown };
+        pptx?: {
+          path?: unknown;
+          url?: unknown;
+          updated_at?: unknown;
+          generator_result?: { artifact_url?: unknown };
+        };
+        pdf?: { path?: unknown; url?: unknown; updated_at?: unknown };
       };
     };
     const pptx = task.artifacts?.pptx;
@@ -1087,11 +1093,18 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       {
         type: "PPTX" as const,
         path: typeof pptx?.path === "string" ? pptx.path : "",
+        href:
+          typeof pptx?.url === "string" && pptx.url
+            ? pptx.url
+            : typeof pptx?.generator_result?.artifact_url === "string"
+              ? pptx.generator_result.artifact_url
+              : "",
         updatedAt: typeof pptx?.updated_at === "string" ? pptx.updated_at : ""
       },
       {
         type: "PDF" as const,
         path: typeof pdf?.path === "string" ? pdf.path : "",
+        href: typeof pdf?.url === "string" ? pdf.url : "",
         updatedAt: typeof pdf?.updated_at === "string" ? pdf.updated_at : ""
       }
     ].filter((item) => item.path);
@@ -1110,7 +1123,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return {
       type: latest.type,
       path: latest.path,
-      href: toFileUrl(latest.path)
+      href: latest.href || toFileUrl(latest.path)
     };
   }
 
@@ -1604,40 +1617,34 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           outputPath: `${workspace.workspace_dir}/output/deck.pptx`
         });
         const pptxPath = generatorResult.pptxPath;
-        await backend.recordPptxExport({
+        const updatedWorkspace = await backend.recordPptxExport({
           workspace_dir: workspace.workspace_dir,
           pptxPath: generatorResult.pptxPath,
           generatorResult
         });
-        setExportArtifact({
+        const artifact = readWorkspaceExportArtifact(updatedWorkspace);
+        setExportArtifact(artifact ?? {
           type,
           path: pptxPath,
           href: toFileUrl(pptxPath)
         });
-        applyWorkspace(
-          await backend.openWorkspace({
-            workspace_dir: workspace.workspace_dir
-          })
-        );
+        applyWorkspace(updatedWorkspace);
       } else {
         const pdfResult = await backend.exportPdf({
           workspace_dir: workspace.workspace_dir
         });
         const pdfPath = pdfResult.pdfPath;
-        await backend.recordPdfExport({
+        const updatedWorkspace = await backend.recordPdfExport({
           workspace_dir: workspace.workspace_dir,
           pdfPath
         });
-        setExportArtifact({
+        const artifact = readWorkspaceExportArtifact(updatedWorkspace);
+        setExportArtifact(artifact ?? {
           type,
           path: pdfPath,
           href: toFileUrl(pdfPath)
         });
-        applyWorkspace(
-          await backend.openWorkspace({
-            workspace_dir: workspace.workspace_dir
-          })
-        );
+        applyWorkspace(updatedWorkspace);
       }
 
       setExportStatus(formatMessage(t.exportPage.ready, { type }));
@@ -1648,6 +1655,17 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       showToast(message);
     } finally {
       setLoading("none");
+    }
+  }
+
+  async function openExportArtifact(artifact: ExportArtifact) {
+    if (!backend) return;
+
+    try {
+      await backend.openExportArtifact({ path: artifact.path });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : artifact.href;
+      showToast(message);
     }
   }
 
@@ -1728,6 +1746,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     refineSlide,
     renderDeckHtml,
     exportFile,
+    openExportArtifact,
     returnToOutlineFromGeneration,
     regenerateDeck
   };

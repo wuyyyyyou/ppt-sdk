@@ -210,6 +210,7 @@ export function App() {
               loading={state.loading}
               onBack={actions.goBack}
               onExport={actions.exportFile}
+              onOpenArtifact={actions.openExportArtifact}
             />
           ) : null}
         </div>

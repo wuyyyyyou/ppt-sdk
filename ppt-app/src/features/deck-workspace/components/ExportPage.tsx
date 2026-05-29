@@ -11,13 +11,14 @@ interface ExportPageProps {
   loading: LoadingKind;
   onBack: () => void;
   onExport: (type: "PPTX" | "PDF") => void;
+  onOpenArtifact: (artifact: ExportArtifact) => void;
 }
 
 function fileUrlLabel(path: string) {
   return path;
 }
 
-export function ExportPage({ t, status, artifact, loading, onBack, onExport }: ExportPageProps) {
+export function ExportPage({ t, status, artifact, loading, onBack, onExport, onOpenArtifact }: ExportPageProps) {
   return (
     <section className="page active export-page">
       <PageHeader title={t.exportPage.title} onBack={onBack} t={t} />
@@ -43,6 +44,14 @@ export function ExportPage({ t, status, artifact, loading, onBack, onExport }: E
             target="_blank"
             rel="noreferrer"
             title={artifact.path}
+            onClick={(event) => {
+              if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+                return;
+              }
+
+              event.preventDefault();
+              onOpenArtifact(artifact);
+            }}
           >
             <ExternalLink size={12} />
             <span>{fileUrlLabel(artifact.path)}</span>

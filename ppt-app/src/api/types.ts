@@ -439,3 +439,12 @@ export interface RecordPdfExportInput {
   workspace_dir: string;
   pdfPath: string;
 }
+
+export interface OpenExportArtifactInput {
+  path: string;
+}
+
+export interface OpenExportArtifactResult {
+  opened: boolean;
+  path: string;
+}

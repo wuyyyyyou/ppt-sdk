@@ -8,6 +8,7 @@ import type {
   GeneratePptxResult,
   PagePlan,
   PageProgress,
+  OpenExportArtifactResult,
   TemplateSummary,
   WorkspaceOutline,
   ListWorkspacesResult,
@@ -234,7 +235,7 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         normalizeExportPdfResult
       ),
     recordPptxExport: (input) =>
-      invoke<ProjectResult>(
+      invoke<WorkspaceResult>(
         PPT_ENGINE_TOOL_ID,
         "app_record_pptx_export",
         {
@@ -244,12 +245,20 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         }
       ),
     recordPdfExport: (input: RecordPdfExportInput) =>
-      invoke<ProjectResult>(
+      invoke<WorkspaceResult>(
         PPT_ENGINE_TOOL_ID,
         "app_record_pdf_export",
         {
           workspace_dir: input.workspace_dir,
           pdf_path: input.pdfPath,
+        }
+      ),
+    openExportArtifact: (input) =>
+      invoke<OpenExportArtifactResult>(
+        PPT_ENGINE_TOOL_ID,
+        "app_open_export_artifact",
+        {
+          path: input.path,
         }
       )
   };

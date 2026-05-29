@@ -12,6 +12,8 @@ import type {
   PagePlan,
   PageProgress,
   OpenWorkspaceInput,
+  OpenExportArtifactInput,
+  OpenExportArtifactResult,
   PrepareExportModelInput,
   PrepareExportModelResult,
   PreparePageFilesInput,
@@ -79,8 +81,9 @@ export interface PptBackend {
   ): Promise<PrepareExportModelResult>;
   generatePptx(input: GeneratePptxInput): Promise<GeneratePptxResult>;
   exportPdf(input: ExportPdfInput): Promise<ExportPdfResult>;
-  recordPptxExport(input: RecordPptxExportInput): Promise<ProjectResult>;
-  recordPdfExport(input: RecordPdfExportInput): Promise<ProjectResult>;
+  recordPptxExport(input: RecordPptxExportInput): Promise<WorkspaceResult>;
+  recordPdfExport(input: RecordPdfExportInput): Promise<WorkspaceResult>;
+  openExportArtifact(input: OpenExportArtifactInput): Promise<OpenExportArtifactResult>;
 }
 
 export async function createPptBackend(): Promise<PptBackend> {
