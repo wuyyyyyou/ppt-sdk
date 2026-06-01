@@ -2,11 +2,11 @@
   "name": "tool-lightvoss-test-aps-8kvasxsg",
   "display_name": "Host Upload Test Backend",
   "version": "1.0.0",
-  "description": "Uploads generated test files through Anna Host Upload and returns the download URL.",
+  "description": "Tests Anna Host Upload and APS Files reverse-RPC operations.",
   "author": "Anna PPT SDK",
   "license": "MIT",
   "tags": ["test", "host-upload", "aps", "storage"],
-  "host_capabilities": ["host.upload"],
+  "host_capabilities": ["host.upload", "aps.files"],
   "tools": [
     {
       "name": "upload_test_file",
@@ -55,6 +55,84 @@
           "required": false,
           "default": 1
         }
+      ]
+    },
+    {
+      "name": "aps_files_upload_text",
+      "description": "Upload a generated text payload to APS Files with files/upload_begin and files/upload_complete.",
+      "timeout": 180,
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "description": "APS file path.",
+          "required": false,
+          "default": "test-aps/hello.txt"
+        },
+        {
+          "name": "scope",
+          "type": "string",
+          "description": "APS scope: app, user, or tool.",
+          "required": false,
+          "default": "user"
+        },
+        {
+          "name": "content_type",
+          "type": "string",
+          "description": "Content type.",
+          "required": false,
+          "default": "text/plain; charset=utf-8"
+        },
+        {
+          "name": "content",
+          "type": "string",
+          "description": "Text content to upload.",
+          "required": false,
+          "default": "APS Files test payload."
+        },
+        {
+          "name": "repeat",
+          "type": "integer",
+          "description": "Repeat content N times.",
+          "required": false,
+          "default": 1
+        },
+        {
+          "name": "expires_in",
+          "type": "integer",
+          "description": "Download URL TTL seconds.",
+          "required": false,
+          "default": 1800
+        }
+      ]
+    },
+    {
+      "name": "aps_files_download_url",
+      "description": "Mint a temporary download URL for an APS file.",
+      "timeout": 60,
+      "parameters": [
+        { "name": "path", "type": "string", "description": "APS file path.", "required": true },
+        { "name": "scope", "type": "string", "description": "APS scope.", "required": false, "default": "user" },
+        { "name": "expires_in", "type": "integer", "description": "URL TTL seconds.", "required": false, "default": 1800 }
+      ]
+    },
+    {
+      "name": "aps_files_list",
+      "description": "List APS files by prefix.",
+      "timeout": 60,
+      "parameters": [
+        { "name": "prefix", "type": "string", "description": "Path prefix.", "required": false, "default": "test-aps/" },
+        { "name": "scope", "type": "string", "description": "APS scope.", "required": false, "default": "user" },
+        { "name": "limit", "type": "integer", "description": "Max items.", "required": false, "default": 20 }
+      ]
+    },
+    {
+      "name": "aps_files_delete",
+      "description": "Delete an APS file.",
+      "timeout": 60,
+      "parameters": [
+        { "name": "path", "type": "string", "description": "APS file path.", "required": true },
+        { "name": "scope", "type": "string", "description": "APS scope.", "required": false, "default": "user" }
       ]
     }
   ],

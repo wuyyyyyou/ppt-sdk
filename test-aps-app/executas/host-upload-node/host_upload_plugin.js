@@ -45,7 +45,13 @@ function sendError(id, code, message) {
 function reverseRpc(method, params, timeoutMs = 120_000) {
   const id = `hu-${Date.now()}-${nextReverseId++}`;
   const frame = { jsonrpc: "2.0", id, method, params };
-  log("reverse RPC -> host", { id, method, mode: params && params.mode });
+  log("reverse RPC -> host", {
+    id,
+    method,
+    mode: params && params.mode,
+    path: params && params.path,
+    scope: params && params.scope,
+  });
   send(frame);
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -99,6 +105,42 @@ function normalizeArgs(args) {
 function makePayload({ content, repeat }) {
   const header = [
     "Host Upload 测试文件",
+    `生成时间: ${new Date().toISOString()}`,
+    `重复次数: ${repeat}`,
+    "",
+  ].join("\n");
+  return Buffer.from(header + content.repeat(repeat), "utf8");
+}
+
+function normalizeScope(value) {
+  const scope = String(value || "user").trim();
+  return ["app", "user", "tool"].includes(scope) ? scope : "user";
+}
+
+function normalizeApsCommonArgs(args) {
+  const path = String(args.path || "test-aps/hello.txt").trim() || "test-aps/hello.txt";
+  const scope = normalizeScope(args.scope);
+  const expiresRaw = Number(args.expires_in ?? 1800);
+  const expiresIn = Number.isFinite(expiresRaw)
+    ? Math.max(60, Math.min(86400, Math.trunc(expiresRaw)))
+    : 1800;
+  return { path, scope, expiresIn };
+}
+
+function normalizeApsUploadArgs(args) {
+  const common = normalizeApsCommonArgs(args);
+  const contentType = String(args.content_type || "text/plain; charset=utf-8").trim() || "text/plain; charset=utf-8";
+  const content = String(args.content || "APS Files test payload.");
+  const repeatRaw = Number(args.repeat ?? 1);
+  const repeat = Number.isFinite(repeatRaw)
+    ? Math.max(1, Math.min(20000, Math.trunc(repeatRaw)))
+    : 1;
+  return { ...common, contentType, content, repeat };
+}
+
+function makeApsPayload({ content, repeat }) {
+  const header = [
+    "APS Files 测试文件",
     `生成时间: ${new Date().toISOString()}`,
     `重复次数: ${repeat}`,
     "",
@@ -226,6 +268,154 @@ async function toolUploadTestFile(args) {
   };
 }
 
+async function apsFilesUploadText(args) {
+  backendLogBuffer.length = 0;
+  const runId = randomUUID();
+  const input = normalizeApsUploadArgs(args || {});
+  const payload = makeApsPayload(input);
+  log("aps files upload start", {
+    run_id: runId,
+    initialized,
+    path: input.path,
+    scope: input.scope,
+    content_type: input.contentType,
+    repeat: input.repeat,
+    bytes: payload.length,
+  });
+
+  const started = Date.now();
+  const begin = await reverseRpc("files/upload_begin", {
+    path: input.path,
+    scope: input.scope,
+    size_bytes: payload.length,
+    content_type: input.contentType,
+    metadata: {
+      source: "test-aps-app",
+      run_id: runId,
+    },
+  });
+  const putUrl = begin.put_url || begin.url;
+  if (!putUrl) {
+    throw new Error(`files/upload_begin missing put_url: ${safeJson(begin)}`);
+  }
+  log("aps files upload_begin complete", {
+    upload_id: begin.upload_id,
+    expires_at: begin.expires_at,
+    has_headers: !!begin.headers,
+  });
+
+  const headers = Object.assign({}, begin.headers || {});
+  if (!headers["Content-Type"] && !headers["content-type"]) {
+    headers["Content-Type"] = input.contentType;
+  }
+  log("APS PUT start", { path: input.path, bytes: payload.length });
+  const putResp = await fetch(putUrl, { method: "PUT", headers, body: payload });
+  const putText = putResp.ok ? "" : await putResp.text().catch(() => "");
+  const etag = putResp.headers.get("etag") || putResp.headers.get("ETag");
+  log("APS PUT complete", {
+    status: putResp.status,
+    ok: putResp.ok,
+    etag,
+    body: putText.slice(0, 400),
+  });
+  if (!putResp.ok) {
+    throw new Error(`APS PUT failed: HTTP ${putResp.status} ${putText}`);
+  }
+
+  const complete = await reverseRpc("files/upload_complete", {
+    path: input.path,
+    scope: input.scope,
+    etag,
+    size_bytes: payload.length,
+    content_type: input.contentType,
+  });
+  log("aps files upload_complete complete", complete);
+
+  const download = await reverseRpc("files/download_url", {
+    path: input.path,
+    scope: input.scope,
+    expires_in: input.expiresIn,
+  });
+  const durationMs = Date.now() - started;
+  log("aps files download_url complete", {
+    path: input.path,
+    has_url: !!(download && (download.url || download.download_url)),
+    duration_ms: durationMs,
+  });
+
+  return {
+    run_id: runId,
+    operation: "upload_text",
+    path: input.path,
+    scope: input.scope,
+    content_type: input.contentType,
+    bytes: payload.length,
+    duration_ms: durationMs,
+    begin,
+    complete,
+    download,
+    backend_logs: [...backendLogBuffer],
+  };
+}
+
+async function apsFilesDownloadUrl(args) {
+  backendLogBuffer.length = 0;
+  const runId = randomUUID();
+  const input = normalizeApsCommonArgs(args || {});
+  log("aps files download_url start", { run_id: runId, path: input.path, scope: input.scope });
+  const download = await reverseRpc("files/download_url", {
+    path: input.path,
+    scope: input.scope,
+    expires_in: input.expiresIn,
+  });
+  log("aps files download_url complete", { has_url: !!(download && (download.url || download.download_url)) });
+  return {
+    run_id: runId,
+    operation: "download_url",
+    path: input.path,
+    scope: input.scope,
+    download,
+    backend_logs: [...backendLogBuffer],
+  };
+}
+
+async function apsFilesList(args) {
+  backendLogBuffer.length = 0;
+  const runId = randomUUID();
+  const prefix = String((args && args.prefix) || "test-aps/").trim();
+  const scope = normalizeScope(args && args.scope);
+  const limitRaw = Number(args && args.limit);
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, Math.trunc(limitRaw))) : 20;
+  log("aps files list start", { run_id: runId, prefix, scope, limit });
+  const list = await reverseRpc("files/list", { prefix, scope, limit });
+  log("aps files list complete", { item_count: Array.isArray(list && list.items) ? list.items.length : null });
+  return {
+    run_id: runId,
+    operation: "list",
+    prefix,
+    scope,
+    list,
+    backend_logs: [...backendLogBuffer],
+  };
+}
+
+async function apsFilesDelete(args) {
+  backendLogBuffer.length = 0;
+  const runId = randomUUID();
+  const input = normalizeApsCommonArgs(args || {});
+  log("aps files delete start", { run_id: runId, path: input.path, scope: input.scope });
+  const deleted = await reverseRpc("files/delete", { path: input.path, scope: input.scope });
+  log("aps files delete complete", deleted);
+  return {
+    run_id: runId,
+    operation: "delete",
+    path: input.path,
+    scope: input.scope,
+    deleted,
+    backend_logs: [...backendLogBuffer],
+  };
+}
+
 async function handleInitialize(params) {
   initialized = true;
   const offered = params && params.protocolVersion;
@@ -238,8 +428,10 @@ async function handleInitialize(params) {
   return {
     protocolVersion,
     serverInfo: { name: TOOL_ID, version: VERSION },
-    client_capabilities: protocolVersion === "2.0" ? { upload: {} } : {},
-    capabilities: {},
+    client_capabilities: protocolVersion === "2.0"
+      ? { upload: {}, storage: { files: true } }
+      : {},
+    capabilities: { storage: { files: true } },
   };
 }
 
@@ -267,11 +459,21 @@ async function handleInvoke(params) {
     has_context: !!(params && params.context),
     context_keys: params && params.context ? Object.keys(params.context) : [],
   });
-  if (tool !== "upload_test_file") {
-    return { success: false, error: `unknown tool: ${tool}` };
-  }
   try {
-    const data = await toolUploadTestFile(args);
+    let data;
+    if (tool === "upload_test_file") {
+      data = await toolUploadTestFile(args);
+    } else if (tool === "aps_files_upload_text") {
+      data = await apsFilesUploadText(args);
+    } else if (tool === "aps_files_download_url") {
+      data = await apsFilesDownloadUrl(args);
+    } else if (tool === "aps_files_list") {
+      data = await apsFilesList(args);
+    } else if (tool === "aps_files_delete") {
+      data = await apsFilesDelete(args);
+    } else {
+      return { success: false, error: `unknown tool: ${tool}` };
+    }
     return { success: true, data };
   } catch (error) {
     log("tool invoke failed", {

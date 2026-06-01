@@ -76,6 +76,31 @@ h2 {
   white-space: nowrap;
 }
 
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tab {
+  border: 1px solid transparent;
+  border-bottom: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 10px 12px;
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+}
+
+.tab--active {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--text);
+  font-weight: 700;
+}
+
 .dot {
   width: 10px;
   height: 10px;
@@ -154,6 +179,10 @@ textarea:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.result-actions {
+  margin-bottom: 12px;
 }
 
 .btn {

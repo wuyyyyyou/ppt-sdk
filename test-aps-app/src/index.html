@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Host Upload 测试</title>
+    <title>Host Upload / APS Files 测试</title>
     <link rel="icon" type="image/svg+xml" href="icon.svg" />
     <link rel="stylesheet" href="style.css" />
   </head>
@@ -12,7 +12,7 @@
       <header class="topbar">
         <div>
           <h1>Host Upload 测试</h1>
-          <p>后端 Executa 上传，前端验证下载。所有关键步骤都会写入日志。</p>
+          <p>后端 Executa 调用 Host Upload 与 APS Files，前端验证下载。所有关键步骤都会写入日志。</p>
         </div>
         <div class="status">
           <span id="conn-dot" class="dot dot--off"></span>
@@ -20,81 +20,174 @@
         </div>
       </header>
 
-      <section class="layout">
-        <form id="upload-form" class="panel" autocomplete="off">
-          <div class="panel__head">
-            <h2>上传参数</h2>
-            <button id="reset-form" class="btn btn--ghost" type="button">重置</button>
-          </div>
+      <nav class="tabs" aria-label="测试页面">
+        <button class="tab tab--active" type="button" data-tab="host-upload" aria-selected="true">Host Upload 测试</button>
+        <button class="tab" type="button" data-tab="aps-files" aria-selected="false">APS Files 测试</button>
+      </nav>
 
-          <label class="field">
-            <span>上传模式</span>
-            <select id="mode">
-              <option value="inline">inline：小文件，base64 进 RPC</option>
-              <option value="negotiate">negotiate：后端 PUT 到 R2 后 confirm</option>
-            </select>
-          </label>
-
-          <label class="field">
-            <span>文件名</span>
-            <input id="filename" value="host-upload-test.txt" />
-          </label>
-
-          <label class="field">
-            <span>MIME 类型</span>
-            <input id="mime-type" value="text/plain" />
-          </label>
-
-          <label class="field">
-            <span>Purpose</span>
-            <select id="purpose">
-              <option value="user_artifact">user_artifact</option>
-              <option value="image_input">image_input</option>
-              <option value="image_reference">image_reference</option>
-            </select>
-          </label>
-
-          <label class="field">
-            <span>内容重复次数</span>
-            <input id="repeat" type="number" min="1" max="20000" value="1" />
-          </label>
-
-          <label class="field field--wide">
-            <span>文本内容</span>
-            <textarea id="content" rows="8">这是一份来自 Host Upload 测试 App 的后端上传文件。</textarea>
-          </label>
-
-          <div class="actions">
-            <button id="upload-btn" class="btn btn--primary" type="submit">调用后端上传</button>
-            <button id="download-btn" class="btn" type="button" disabled>前端下载验证</button>
-            <button id="open-btn" class="btn btn--ghost" type="button" disabled>直接打开 URL</button>
-          </div>
-        </form>
-
-        <section class="panel result">
-          <div class="panel__head">
-            <h2>最近一次结果</h2>
-            <button id="copy-result" class="btn btn--ghost" type="button" disabled>复制 JSON</button>
-          </div>
-          <dl class="kv">
-            <div>
-              <dt>URL</dt>
-              <dd id="result-url">-</dd>
+      <section class="tab-panel" data-panel="host-upload">
+        <section class="layout">
+          <form id="host-upload-form" class="panel" autocomplete="off">
+            <div class="panel__head">
+              <h2>Host Upload 参数</h2>
+              <button id="reset-form" class="btn btn--ghost" type="button">重置</button>
             </div>
-            <div>
-              <dt>R2 Key</dt>
-              <dd id="result-key">-</dd>
+
+            <label class="field">
+              <span>上传模式</span>
+              <select id="mode">
+                <option value="inline">inline：小文件，base64 进 RPC</option>
+                <option value="negotiate">negotiate：后端 PUT 到 R2 后 confirm</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>文件名</span>
+              <input id="filename" value="host-upload-test.txt" />
+            </label>
+
+            <label class="field">
+              <span>MIME 类型</span>
+              <input id="mime-type" value="text/plain" />
+            </label>
+
+            <label class="field">
+              <span>Purpose</span>
+              <select id="purpose">
+                <option value="user_artifact">user_artifact</option>
+                <option value="image_input">image_input</option>
+                <option value="image_reference">image_reference</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>内容重复次数</span>
+              <input id="repeat" type="number" min="1" max="20000" value="1" />
+            </label>
+
+            <label class="field field--wide">
+              <span>文本内容</span>
+              <textarea id="content" rows="8">这是一份来自 Host Upload 测试 App 的后端上传文件。</textarea>
+            </label>
+
+            <div class="actions">
+              <button id="upload-btn" class="btn btn--primary" type="submit">调用后端上传</button>
+              <button id="download-btn" class="btn" type="button" disabled>前端下载验证</button>
+              <button id="open-btn" class="btn btn--ghost" type="button" disabled>直接打开 URL</button>
             </div>
-            <div>
-              <dt>大小</dt>
-              <dd id="result-bytes">-</dd>
+          </form>
+
+          <section class="panel result">
+            <div class="panel__head">
+              <h2>最近一次结果</h2>
+              <button id="copy-result" class="btn btn--ghost" type="button" disabled>复制 JSON</button>
             </div>
-            <div>
-              <dt>过期</dt>
-              <dd id="result-expiry">-</dd>
+            <dl class="kv">
+              <div>
+                <dt>URL</dt>
+                <dd id="result-url">-</dd>
+              </div>
+              <div>
+                <dt>R2 Key</dt>
+                <dd id="result-key">-</dd>
+              </div>
+              <div>
+                <dt>大小</dt>
+                <dd id="result-bytes">-</dd>
+              </div>
+              <div>
+                <dt>过期</dt>
+                <dd id="result-expiry">-</dd>
+              </div>
+            </dl>
+            <pre id="result-json" class="json">{}</pre>
+          </section>
+        </section>
+      </section>
+
+      <section class="tab-panel" data-panel="aps-files" hidden>
+        <section class="layout">
+          <form id="aps-files-form" class="panel" autocomplete="off">
+            <div class="panel__head">
+              <h2>APS Files 参数</h2>
             </div>
-          </dl>
-          <pre id="result-json" class="json">{}</pre>
+
+            <label class="field">
+              <span>文件路径</span>
+              <input id="aps-path" value="test-aps/hello.txt" />
+            </label>
+
+            <label class="field">
+              <span>Scope</span>
+              <select id="aps-scope">
+                <option value="user">user：用户级</option>
+                <option value="app">app：应用级</option>
+                <option value="tool">tool：工具级</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Content-Type</span>
+              <input id="aps-content-type" value="text/plain; charset=utf-8" />
+            </label>
+
+            <label class="field">
+              <span>内容重复次数</span>
+              <input id="aps-repeat" type="number" min="1" max="20000" value="1" />
+            </label>
+
+            <label class="field">
+              <span>下载 URL 有效期（秒）</span>
+              <input id="aps-expires-in" type="number" min="60" max="86400" value="1800" />
+            </label>
+
+            <label class="field">
+              <span>列表 Prefix</span>
+              <input id="aps-prefix" value="test-aps/" />
+            </label>
+
+            <label class="field field--wide">
+              <span>文本内容</span>
+              <textarea id="aps-content" rows="8">这是一份来自 APS Files 测试页面的后端上传文件。</textarea>
+            </label>
+
+            <div class="actions">
+              <button id="aps-upload-btn" class="btn btn--primary" type="submit">上传到 APS Files</button>
+              <button id="aps-download-url-btn" class="btn" type="button">签下载 URL</button>
+              <button id="aps-list-btn" class="btn" type="button">列文件</button>
+              <button id="aps-delete-btn" class="btn btn--ghost" type="button">删除文件</button>
+            </div>
+          </form>
+
+          <section class="panel result">
+            <div class="panel__head">
+              <h2>APS 最近一次结果</h2>
+              <button id="aps-copy-result" class="btn btn--ghost" type="button" disabled>复制 JSON</button>
+            </div>
+            <dl class="kv">
+              <div>
+                <dt>Path</dt>
+                <dd id="aps-result-path">-</dd>
+              </div>
+              <div>
+                <dt>URL</dt>
+                <dd id="aps-result-url">-</dd>
+              </div>
+              <div>
+                <dt>ETag</dt>
+                <dd id="aps-result-etag">-</dd>
+              </div>
+              <div>
+                <dt>大小</dt>
+                <dd id="aps-result-bytes">-</dd>
+              </div>
+            </dl>
+            <div class="actions result-actions">
+              <button id="aps-download-btn" class="btn" type="button" disabled>前端下载验证</button>
+              <button id="aps-open-btn" class="btn btn--ghost" type="button" disabled>直接打开 URL</button>
+            </div>
+            <pre id="aps-result-json" class="json">{}</pre>
+          </section>
         </section>
       </section>
 

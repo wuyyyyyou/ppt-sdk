@@ -1,8 +1,13 @@
 const TOOL_ID = "tool-lightvoss-test-aps-8kvasxsg";
-const TOOL_METHOD = "upload_test_file";
+const TOOL_METHOD_HOST_UPLOAD = "upload_test_file";
 
 const els = {
-  form: document.querySelector("#upload-form"),
+  tabs: Array.from(document.querySelectorAll(".tab")),
+  panels: Array.from(document.querySelectorAll(".tab-panel")),
+  connDot: document.querySelector("#conn-dot"),
+  connLabel: document.querySelector("#conn-label"),
+
+  hostForm: document.querySelector("#host-upload-form"),
   mode: document.querySelector("#mode"),
   filename: document.querySelector("#filename"),
   mimeType: document.querySelector("#mime-type"),
@@ -13,14 +18,34 @@ const els = {
   downloadBtn: document.querySelector("#download-btn"),
   openBtn: document.querySelector("#open-btn"),
   resetForm: document.querySelector("#reset-form"),
-  connDot: document.querySelector("#conn-dot"),
-  connLabel: document.querySelector("#conn-label"),
   resultUrl: document.querySelector("#result-url"),
   resultKey: document.querySelector("#result-key"),
   resultBytes: document.querySelector("#result-bytes"),
   resultExpiry: document.querySelector("#result-expiry"),
   resultJson: document.querySelector("#result-json"),
   copyResult: document.querySelector("#copy-result"),
+
+  apsForm: document.querySelector("#aps-files-form"),
+  apsPath: document.querySelector("#aps-path"),
+  apsScope: document.querySelector("#aps-scope"),
+  apsContentType: document.querySelector("#aps-content-type"),
+  apsRepeat: document.querySelector("#aps-repeat"),
+  apsExpiresIn: document.querySelector("#aps-expires-in"),
+  apsPrefix: document.querySelector("#aps-prefix"),
+  apsContent: document.querySelector("#aps-content"),
+  apsUploadBtn: document.querySelector("#aps-upload-btn"),
+  apsDownloadUrlBtn: document.querySelector("#aps-download-url-btn"),
+  apsListBtn: document.querySelector("#aps-list-btn"),
+  apsDeleteBtn: document.querySelector("#aps-delete-btn"),
+  apsDownloadBtn: document.querySelector("#aps-download-btn"),
+  apsOpenBtn: document.querySelector("#aps-open-btn"),
+  apsCopyResult: document.querySelector("#aps-copy-result"),
+  apsResultPath: document.querySelector("#aps-result-path"),
+  apsResultUrl: document.querySelector("#aps-result-url"),
+  apsResultEtag: document.querySelector("#aps-result-etag"),
+  apsResultBytes: document.querySelector("#aps-result-bytes"),
+  apsResultJson: document.querySelector("#aps-result-json"),
+
   logs: document.querySelector("#logs"),
   clearLogs: document.querySelector("#clear-logs"),
   copyLogs: document.querySelector("#copy-logs"),
@@ -28,6 +53,7 @@ const els = {
 
 let anna = null;
 let lastResult = null;
+let lastApsResult = null;
 let logs = [];
 
 function nowTime() {
@@ -43,7 +69,7 @@ function addLog(level, source, message, detail) {
     detail: detail == null ? "" : typeof detail === "string" ? detail : JSON.stringify(detail),
   };
   logs.push(entry);
-  if (logs.length > 300) logs = logs.slice(-300);
+  if (logs.length > 400) logs = logs.slice(-400);
   renderLogs();
 }
 
@@ -76,13 +102,28 @@ function setConnection(connected, label) {
   els.connLabel.textContent = label;
 }
 
-function setBusy(busy) {
+function setHostBusy(busy) {
   els.uploadBtn.disabled = busy;
   els.uploadBtn.textContent = busy ? "上传中..." : "调用后端上传";
 }
 
+function setApsBusy(busy, label = "处理中...") {
+  for (const btn of [els.apsUploadBtn, els.apsDownloadUrlBtn, els.apsListBtn, els.apsDeleteBtn]) {
+    btn.disabled = busy;
+  }
+  if (busy) {
+    els.apsUploadBtn.dataset.oldText = els.apsUploadBtn.textContent;
+    els.apsUploadBtn.textContent = label;
+  } else if (els.apsUploadBtn.dataset.oldText) {
+    els.apsUploadBtn.textContent = els.apsUploadBtn.dataset.oldText;
+    delete els.apsUploadBtn.dataset.oldText;
+  }
+}
+
 function unwrapToolResult(raw) {
   if (raw && raw.success === false) {
+    const dataLogs = raw.data?.backend_logs || [];
+    for (const line of dataLogs) addLog("error", "backend", line);
     throw new Error(typeof raw.error === "string" ? raw.error : JSON.stringify(raw.error));
   }
   if (raw && raw.success === true && Object.prototype.hasOwnProperty.call(raw, "data")) {
@@ -100,6 +141,33 @@ function collectPayload() {
     purpose: els.purpose.value,
     content: els.content.value,
     repeat,
+  };
+}
+
+function collectApsPayload() {
+  return {
+    path: els.apsPath.value.trim() || "test-aps/hello.txt",
+    scope: els.apsScope.value,
+    content_type: els.apsContentType.value.trim() || "text/plain; charset=utf-8",
+    content: els.apsContent.value,
+    repeat: Math.max(1, Math.min(20000, Number.parseInt(els.apsRepeat.value, 10) || 1)),
+    expires_in: Math.max(60, Math.min(86400, Number.parseInt(els.apsExpiresIn.value, 10) || 1800)),
+  };
+}
+
+function collectApsLookupPayload() {
+  return {
+    path: els.apsPath.value.trim() || "test-aps/hello.txt",
+    scope: els.apsScope.value,
+    expires_in: Math.max(60, Math.min(86400, Number.parseInt(els.apsExpiresIn.value, 10) || 1800)),
+  };
+}
+
+function collectApsListPayload() {
+  return {
+    prefix: els.apsPrefix.value.trim(),
+    scope: els.apsScope.value,
+    limit: 20,
   };
 }
 
@@ -123,6 +191,29 @@ function renderResult(result) {
   els.copyResult.disabled = !result;
 }
 
+function getApsDownload(result) {
+  return result?.download || result?.complete?.download || result || {};
+}
+
+function renderApsResult(result) {
+  lastApsResult = result;
+  const download = getApsDownload(result);
+  const complete = result?.complete || {};
+  const deleted = result?.deleted || {};
+  const url = download.url || download.download_url || "";
+  const etag = complete.etag || result?.etag || deleted.etag || "";
+  const bytes = result?.bytes ?? complete.size_bytes ?? complete.bytes ?? "";
+
+  els.apsResultPath.textContent = result?.path || result?.prefix || "-";
+  els.apsResultUrl.textContent = url || "-";
+  els.apsResultEtag.textContent = etag || "-";
+  els.apsResultBytes.textContent = bytes === "" ? "-" : `${bytes} bytes`;
+  els.apsResultJson.textContent = JSON.stringify(result || {}, null, 2);
+  els.apsDownloadBtn.disabled = !url;
+  els.apsOpenBtn.disabled = !url;
+  els.apsCopyResult.disabled = !result;
+}
+
 async function connectAnna() {
   try {
     if (typeof AnnaAppRuntime === "undefined") {
@@ -132,7 +223,7 @@ async function connectAnna() {
     setConnection(true, "已连接 Anna");
     addLog("ok", "runtime", "Anna runtime 连接成功");
     try {
-      await anna.window?.set_title?.({ title: "Host Upload 测试" });
+      await anna.window?.set_title?.({ title: "Host Upload / APS Files 测试" });
     } catch (error) {
       addLog("warn", "runtime", "设置窗口标题失败", String(error?.message || error));
     }
@@ -146,8 +237,60 @@ async function connectAnna() {
 function createStandaloneAnna() {
   return {
     tools: {
-      async invoke({ args }) {
-        addLog("warn", "mock", "这是本地模拟结果，不会真实调用 Host Upload");
+      async invoke({ method, args }) {
+        addLog("warn", "mock", "这是本地模拟结果，不会真实调用后端 reverse RPC", { method });
+        if (method === "aps_files_upload_text") {
+          const blob = new Blob([args.content.repeat(args.repeat || 1)], { type: args.content_type || "text/plain" });
+          return {
+            success: true,
+            data: {
+              operation: "upload_text",
+              path: args.path,
+              scope: args.scope,
+              bytes: blob.size,
+              complete: { etag: "mock-etag", size_bytes: blob.size },
+              download: { url: URL.createObjectURL(blob), expires_at: new Date(Date.now() + 1800000).toISOString() },
+              backend_logs: ["standalone mock: no files/upload_begin call"],
+            },
+          };
+        }
+        if (method === "aps_files_download_url") {
+          return {
+            success: true,
+            data: {
+              operation: "download_url",
+              path: args.path,
+              scope: args.scope,
+              download: { url: "", note: "独立预览没有真实 APS 文件 URL" },
+              backend_logs: ["standalone mock: no files/download_url call"],
+            },
+          };
+        }
+        if (method === "aps_files_list") {
+          return {
+            success: true,
+            data: {
+              operation: "list",
+              prefix: args.prefix,
+              scope: args.scope,
+              list: { items: [{ path: `${args.prefix || "test-aps/"}mock.txt`, size_bytes: 12 }] },
+              backend_logs: ["standalone mock: no files/list call"],
+            },
+          };
+        }
+        if (method === "aps_files_delete") {
+          return {
+            success: true,
+            data: {
+              operation: "delete",
+              path: args.path,
+              scope: args.scope,
+              deleted: { deleted: true },
+              backend_logs: ["standalone mock: no files/delete call"],
+            },
+          };
+        }
+
         const encoder = new TextEncoder();
         const bytes = encoder.encode(args.content.repeat(args.repeat || 1));
         const blob = new Blob([bytes], { type: args.mime_type || "text/plain" });
@@ -176,30 +319,89 @@ function createStandaloneAnna() {
   };
 }
 
+async function invokeTool(method, args, sourceLabel) {
+  addLog("ok", sourceLabel, "开始调用后端工具", { method, args });
+  const raw = await anna.tools.invoke({ tool_id: TOOL_ID, method, args });
+  addLog("ok", "tools", "收到 tools.invoke 原始结果", raw);
+  const data = unwrapToolResult(raw);
+  for (const line of data?.backend_logs || []) {
+    addLog("ok", "backend", line);
+  }
+  return data;
+}
+
 async function upload(event) {
   event.preventDefault();
   const payload = collectPayload();
-  setBusy(true);
+  setHostBusy(true);
   renderResult(null);
-  addLog("ok", "ui", "开始调用后端上传", payload);
   try {
-    const raw = await anna.tools.invoke({
-      tool_id: TOOL_ID,
-      method: TOOL_METHOD,
-      args: payload,
-    });
-    addLog("ok", "tools", "收到 tools.invoke 原始结果", raw);
-    const data = unwrapToolResult(raw);
+    const data = await invokeTool(TOOL_METHOD_HOST_UPLOAD, payload, "host-upload");
     renderResult(data);
-    for (const line of data?.backend_logs || []) {
-      addLog("ok", "backend", line);
-    }
-    addLog("ok", "ui", "后端上传完成");
+    addLog("ok", "host-upload", "后端 Host Upload 完成");
   } catch (error) {
-    addLog("error", "ui", "后端上传失败", String(error?.message || error));
+    addLog("error", "host-upload", "后端 Host Upload 失败", String(error?.message || error));
     renderResult({ error: String(error?.message || error) });
   } finally {
-    setBusy(false);
+    setHostBusy(false);
+  }
+}
+
+async function apsUpload(event) {
+  event.preventDefault();
+  setApsBusy(true, "上传中...");
+  renderApsResult(null);
+  try {
+    const data = await invokeTool("aps_files_upload_text", collectApsPayload(), "aps-files");
+    renderApsResult(data);
+    addLog("ok", "aps-files", "APS Files 上传完成");
+  } catch (error) {
+    addLog("error", "aps-files", "APS Files 上传失败", String(error?.message || error));
+    renderApsResult({ error: String(error?.message || error) });
+  } finally {
+    setApsBusy(false);
+  }
+}
+
+async function apsDownloadUrl() {
+  setApsBusy(true, "签 URL...");
+  try {
+    const data = await invokeTool("aps_files_download_url", collectApsLookupPayload(), "aps-files");
+    renderApsResult(data);
+    addLog("ok", "aps-files", "APS Files 下载 URL 已生成");
+  } catch (error) {
+    addLog("error", "aps-files", "生成下载 URL 失败", String(error?.message || error));
+    renderApsResult({ error: String(error?.message || error) });
+  } finally {
+    setApsBusy(false);
+  }
+}
+
+async function apsList() {
+  setApsBusy(true, "列文件...");
+  try {
+    const data = await invokeTool("aps_files_list", collectApsListPayload(), "aps-files");
+    renderApsResult(data);
+    addLog("ok", "aps-files", "APS Files 列表读取完成");
+  } catch (error) {
+    addLog("error", "aps-files", "读取列表失败", String(error?.message || error));
+    renderApsResult({ error: String(error?.message || error) });
+  } finally {
+    setApsBusy(false);
+  }
+}
+
+async function apsDelete() {
+  setApsBusy(true, "删除中...");
+  try {
+    const data = await invokeTool("aps_files_delete", collectApsLookupPayload(), "aps-files");
+    renderApsResult(data);
+    addLog("ok", "aps-files", "APS Files 删除完成");
+  } catch (error) {
+    addLog("error", "aps-files", "删除文件失败", String(error?.message || error));
+    renderApsResult({ error: String(error?.message || error) });
+  } finally {
+    setApsBusy(false);
   }
 }
 
@@ -208,31 +410,42 @@ function getDownloadUrl() {
   return upload.url || upload.download_url || "";
 }
 
-async function downloadResult() {
-  const url = getDownloadUrl();
+function getApsDownloadUrl() {
+  const download = getApsDownload(lastApsResult);
+  return download.url || download.download_url || "";
+}
+
+async function downloadUrl(url, filename, source) {
   if (!url) return;
-  const filename = lastResult?.filename || els.filename.value || "host-upload-download.bin";
-  addLog("ok", "download", "开始前端 fetch 下载验证", { url, filename });
+  addLog("ok", source, "开始前端 fetch 下载验证", { url, filename });
   try {
     const response = await fetch(url);
-    addLog("ok", "download", "fetch 返回", {
+    addLog("ok", source, "fetch 返回", {
       status: response.status,
       ok: response.ok,
       contentType: response.headers.get("content-type"),
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const blob = await response.blob();
-    addLog("ok", "download", "下载为 Blob 成功", { size: blob.size, type: blob.type });
+    addLog("ok", source, "下载为 Blob 成功", { size: blob.size, type: blob.type });
     const blobUrl = URL.createObjectURL(blob);
-    triggerDownload(blobUrl, filename);
+    triggerDownload(blobUrl, filename, source);
     setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
   } catch (error) {
-    addLog("error", "download", "fetch 下载失败，尝试直接打开 URL", String(error?.message || error));
+    addLog("error", source, "fetch 下载失败，尝试直接打开 URL", String(error?.message || error));
     window.open(url, "_blank", "noopener,noreferrer");
   }
 }
 
-function triggerDownload(url, filename) {
+async function downloadResult() {
+  await downloadUrl(getDownloadUrl(), lastResult?.filename || els.filename.value || "host-upload-download.bin", "download");
+}
+
+async function downloadApsResult() {
+  await downloadUrl(getApsDownloadUrl(), lastApsResult?.path?.split("/").pop() || "aps-file-download.bin", "aps-download");
+}
+
+function triggerDownload(url, filename, source = "download") {
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
@@ -240,13 +453,20 @@ function triggerDownload(url, filename) {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  addLog("ok", "download", "已触发浏览器下载", filename);
+  addLog("ok", source, "已触发浏览器下载", filename);
 }
 
 function openUrl() {
   const url = getDownloadUrl();
   if (!url) return;
   addLog("ok", "download", "直接打开下载 URL");
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+function openApsUrl() {
+  const url = getApsDownloadUrl();
+  if (!url) return;
+  addLog("ok", "aps-download", "直接打开 APS 下载 URL");
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
@@ -266,14 +486,40 @@ function resetForm() {
   els.purpose.value = "user_artifact";
   els.repeat.value = "1";
   els.content.value = "这是一份来自 Host Upload 测试 App 的后端上传文件。";
-  addLog("ok", "ui", "表单已重置");
+  addLog("ok", "ui", "Host Upload 表单已重置");
+}
+
+function selectTab(tabName) {
+  for (const tab of els.tabs) {
+    const selected = tab.dataset.tab === tabName;
+    tab.classList.toggle("tab--active", selected);
+    tab.setAttribute("aria-selected", selected ? "true" : "false");
+  }
+  for (const panel of els.panels) {
+    panel.hidden = panel.dataset.panel !== tabName;
+  }
+  addLog("ok", "ui", "切换测试标签页", tabName);
 }
 
 function bindUi() {
-  els.form.addEventListener("submit", upload);
+  for (const tab of els.tabs) {
+    tab.addEventListener("click", () => selectTab(tab.dataset.tab));
+  }
+
+  els.hostForm.addEventListener("submit", upload);
   els.downloadBtn.addEventListener("click", downloadResult);
   els.openBtn.addEventListener("click", openUrl);
   els.resetForm.addEventListener("click", resetForm);
+  els.copyResult.addEventListener("click", () => copyText(els.resultJson.textContent, "Host Upload 结果 JSON"));
+
+  els.apsForm.addEventListener("submit", apsUpload);
+  els.apsDownloadUrlBtn.addEventListener("click", apsDownloadUrl);
+  els.apsListBtn.addEventListener("click", apsList);
+  els.apsDeleteBtn.addEventListener("click", apsDelete);
+  els.apsDownloadBtn.addEventListener("click", downloadApsResult);
+  els.apsOpenBtn.addEventListener("click", openApsUrl);
+  els.apsCopyResult.addEventListener("click", () => copyText(els.apsResultJson.textContent, "APS Files 结果 JSON"));
+
   els.clearLogs.addEventListener("click", () => {
     logs = [];
     renderLogs();
@@ -282,7 +528,6 @@ function bindUi() {
     logs.map((l) => `[${l.time}] [${l.level}] [${l.source}] ${l.message} ${l.detail}`).join("\n"),
     "日志",
   ));
-  els.copyResult.addEventListener("click", () => copyText(els.resultJson.textContent, "结果 JSON"));
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
