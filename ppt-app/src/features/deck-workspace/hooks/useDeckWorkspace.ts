@@ -29,6 +29,7 @@ import {
   pageProgressToDeckGenerationProgress,
   runDeckGeneration,
   runDeckRefinement,
+  runPageGenerationRetry,
   type DeckGenerationCompletion,
   type DeckGenerationProgress,
 } from "../../deck-generation";
@@ -108,6 +109,7 @@ export interface DeckWorkspaceActions {
   exportFile: (type: "PPTX" | "PDF") => Promise<void>;
   returnToOutlineFromGeneration: () => void;
   regenerateDeck: () => Promise<void>;
+  retryPageGeneration: (pageId: string) => Promise<void>;
 }
 
 export function useDeckWorkspace(t: Messages, locale: Locale) {
@@ -936,6 +938,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
 
     if (completion.status === "failed") {
+      if (completion.progress) {
+        setCreateDeckProgress(completion.progress);
+      }
       showToast(completion.error.message);
       return;
     }
@@ -1934,6 +1939,39 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     await generateDeck();
   }
 
+  async function retryPageGeneration(pageId: string) {
+    if (!backend || !aiClient || !agentClient) return;
+    if (loading === "deck" || loading === "deckFromOutline") return;
+
+    cancelCreateDeckRef.current = false;
+    setLoading("deckFromOutline");
+    setStage("generating");
+    setPage("main");
+    try {
+      const workspace = await ensureCurrentWorkspace();
+      if (!workspace) return;
+      const refreshedWorkspace = await backend.openWorkspace({
+        workspace_dir: workspace.workspace_dir
+      });
+      const completion = await runPageGenerationRetry({
+        backend,
+        aiClient,
+        agentClient,
+        workspace: refreshedWorkspace,
+        confirmedOutline: refreshedWorkspace.outline as WorkspaceOutline,
+        locale,
+        pageId,
+        onProgress: recordGenerationProgress,
+        isCancelled: () => cancelCreateDeckRef.current,
+      });
+      await applyDeckGenerationCompletion(completion, refreshedWorkspace);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
+    } finally {
+      setLoading("none");
+    }
+  }
+
   async function exportFile(type: "PPTX" | "PDF") {
     if (!backend) return;
 
@@ -2099,7 +2137,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     renderDeckHtml,
     exportFile,
     returnToOutlineFromGeneration,
-    regenerateDeck
+    regenerateDeck,
+    retryPageGeneration
   };
 
   return { state, actions };

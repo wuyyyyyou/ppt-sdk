@@ -24,6 +24,7 @@ const ATTEMPT_LIMITS = {
   selfReview: 5,
   agent: 5,
 };
+const PAGE_GENERATION_CONCURRENCY = 5;
 
 export type DeckGenerationStep =
   | "page-plan"
@@ -71,6 +72,7 @@ export interface DeckGenerationProgress {
   totalPages: number;
   pages: DeckGenerationProgressPage[];
   stream?: DeckGenerationStream;
+  activeStreams?: DeckGenerationStream[];
 }
 
 export interface DeckGenerationStreamSnapshot {
@@ -133,7 +135,25 @@ export interface RunDeckRefinementInput extends RunDeckGenerationInput {
   pageIndex?: number;
 }
 
+export interface RunPageGenerationRetryInput extends RunDeckGenerationInput {
+  pageId: string;
+}
+
 type DeckGenerationContext = Omit<RunDeckGenerationInput, "startMode">;
+type PageTerminalReason = "accepted" | "page_failed" | "agent_infrastructure" | "cancelled";
+
+interface PageGenerationResult {
+  page: PagePlanItem;
+  reason: PageTerminalReason;
+  progress: PageProgress;
+  error?: DeckGenerationError;
+}
+
+interface DeckGenerationRuntime extends DeckGenerationContext {
+  activeStreams: Map<string, DeckGenerationStream>;
+  getProgress: () => PageProgress | null;
+  setProgress: (progress: PageProgress) => void;
+}
 
 function generationText(locale: Locale) {
   const zh = locale === "zh";
@@ -170,6 +190,25 @@ function generationText(locale: Locale) {
     cancelled: zh ? "已停止生成" : "Generation stopped",
     finalRender: zh ? "正在生成最终预览" : "Generating final preview",
     deckReady: zh ? "演示文稿已生成" : "Deck generated",
+    activeSummary: (input: { active: number; accepted: number; failed: number; total: number }) => {
+      if (input.failed > 0) {
+        return zh
+          ? `${input.failed} 页生成失败，${input.accepted}/${input.total} 页已通过`
+          : `${input.failed} pages failed, ${input.accepted}/${input.total} accepted`;
+      }
+      if (input.active > 0) {
+        return zh
+          ? `正在生成 ${input.active} 页，${input.accepted}/${input.total} 页已通过`
+          : `Generating ${input.active} pages, ${input.accepted}/${input.total} accepted`;
+      }
+      return zh
+        ? `${input.accepted}/${input.total} 页已通过`
+        : `${input.accepted}/${input.total} pages accepted`;
+    },
+    failedSummary: (failedCount: number) =>
+      zh
+        ? `${failedCount} 页生成失败，请重跑失败页`
+        : `${failedCount} pages failed. Retry the failed pages.`,
     streamLabel: (pageIndex: number, kind: string) =>
       zh ? `第 ${pageIndex + 1} 页 · ${kind}` : `Page ${pageIndex + 1} · ${kind}`,
   };
@@ -197,11 +236,20 @@ function createProgress(
   value: Omit<DeckGenerationProgress, "pages">,
   progress: PageProgress | null,
   stream?: DeckGenerationStream | null,
+  activeStreams?: Iterable<DeckGenerationStream>,
 ): DeckGenerationProgress {
+  const activeStreamList = activeStreams
+    ? Array.from(activeStreams).sort((left, right) => left.page_index - right.page_index)
+    : [];
   return {
     ...value,
     pages: mapProgress(progress),
     stream: stream ?? undefined,
+    activeStreams: activeStreamList.length > 0 ? activeStreamList.map((item) => ({
+      ...item,
+      lines: [...item.lines],
+      activities: [...item.activities],
+    })) : undefined,
   };
 }
 
@@ -210,8 +258,9 @@ function emit(
   value: Omit<DeckGenerationProgress, "pages">,
   progress: PageProgress | null,
   stream?: DeckGenerationStream | null,
+  activeStreams?: Iterable<DeckGenerationStream>,
 ) {
-  input.onProgress(createProgress(value, progress, stream));
+  input.onProgress(createProgress(value, progress, stream, activeStreams));
 }
 
 async function recordProgress(
@@ -337,7 +386,7 @@ function appendTextToLines(lines: string[], chunk: string, limit: number) {
 }
 
 function createAgentRunTracker(input: {
-  flowInput: DeckGenerationContext;
+  flowInput: DeckGenerationRuntime;
   page: PagePlanItem;
   step: DeckGenerationStep;
   message: string;
@@ -363,16 +412,18 @@ function createAgentRunTracker(input: {
   let usage: unknown = null;
 
   function emitStream() {
+    input.flowInput.activeStreams.set(runId, stream);
     emit(
       input.flowInput,
       {
         step: input.step,
-        message: input.message,
+        message: buildDeckGenerationSummary(input.flowInput, input.progress(), input.totalPages),
         currentPageIndex: input.page.index,
         totalPages: input.totalPages,
       },
       input.progress(),
       stream,
+      input.flowInput.activeStreams.values(),
     );
   }
 
@@ -433,6 +484,22 @@ function createAgentRunTracker(input: {
         });
       } catch {
         // Logging must never fail Deck Generation.
+      } finally {
+        stream.status = status;
+        emitStream();
+        input.flowInput.activeStreams.delete(runId);
+        emit(
+          input.flowInput,
+          {
+            step: input.step,
+            message: buildDeckGenerationSummary(input.flowInput, input.progress(), input.totalPages),
+            currentPageIndex: input.page.index,
+            totalPages: input.totalPages,
+          },
+          input.progress(),
+          null,
+          input.flowInput.activeStreams.values(),
+        );
       }
     },
   };
@@ -687,6 +754,411 @@ export function createDeckGenerationStreamSnapshot(
   };
 }
 
+function isFailedPageStatus(status: string) {
+  return /failed/i.test(status) || status === "needs_user_review";
+}
+
+function isActivePageStatus(status: string) {
+  return ![
+    "pending",
+    "accepted",
+    "agent_failed",
+    "render_failed",
+    "needs_user_review",
+    "agent_infrastructure_failed",
+  ].includes(status);
+}
+
+function buildDeckGenerationSummary(
+  input: Pick<DeckGenerationContext, "locale">,
+  progress: PageProgress | null,
+  totalPages: number,
+) {
+  const pages = progress?.pages ?? [];
+  const accepted = pages.filter((page) => page.status === "accepted").length;
+  const failed = pages.filter((page) => isFailedPageStatus(page.status)).length;
+  const active = pages.filter((page) => isActivePageStatus(page.status)).length;
+  return generationText(input.locale).activeSummary({
+    active,
+    accepted,
+    failed,
+    total: totalPages,
+  });
+}
+
+function emitRuntime(
+  input: DeckGenerationRuntime,
+  value: Omit<DeckGenerationProgress, "pages">,
+  progress: PageProgress | null,
+  stream?: DeckGenerationStream | null,
+) {
+  emit(input, value, progress, stream, input.activeStreams.values());
+}
+
+async function runPageGeneration(
+  input: DeckGenerationRuntime,
+  pagePlan: PagePlan,
+  page: PagePlanItem,
+): Promise<PageGenerationResult> {
+  const text = generationText(input.locale);
+  const totalPages = pagePlan.pages.length;
+  let progress = input.getProgress();
+  const existingPageProgress = getProgressPage(progress, page.page_id);
+
+  if (existingPageProgress?.status === "accepted") {
+    emitRuntime(
+      input,
+      {
+        step: "page-authoring",
+        message: buildDeckGenerationSummary(input, progress, totalPages),
+        currentPageIndex: page.index,
+        totalPages,
+      },
+      progress,
+    );
+    return {
+      page,
+      reason: "accepted",
+      progress: progress ?? {
+        version: 1,
+        status: "running",
+        pages: [],
+        updated_at: null,
+      },
+    };
+  }
+
+  progress = await recordProgress(input, page, { status: "authoring" });
+  input.setProgress(progress);
+  emitRuntime(
+    input,
+    {
+      step: "page-authoring",
+      message: buildDeckGenerationSummary(input, progress, totalPages),
+      currentPageIndex: page.index,
+      totalPages,
+    },
+    progress,
+  );
+
+  let renderAttempts = existingPageProgress?.render_attempts ?? 0;
+  let selfReviewAttempts = existingPageProgress?.self_review_attempts ?? 0;
+  let agentFailures = existingPageProgress?.agent_failures ?? 0;
+  let agentInfrastructureFailures =
+    existingPageProgress?.agent_infrastructure_failures ?? 0;
+  let renderError =
+    existingPageProgress?.status === "render_fixing"
+      ? existingPageProgress.last_error
+      : "";
+  let selfReview =
+    existingPageProgress?.status === "self_review_fixing"
+      ? (existingPageProgress.review as AgentSelfReviewResult | null)
+      : null;
+
+  while (!input.isCancelled()) {
+    const authoringPrompt = buildAuthoringPrompt({
+      workspaceDir: input.workspace.workspace_dir,
+      page,
+      pagePlan,
+      outline: input.confirmedOutline,
+      attemptKind: renderError ? "render-fix" : selfReview ? "self-review-fix" : "initial",
+      renderError,
+      selfReview,
+    });
+    const authoringKind = renderError ? "render-fix" : selfReview ? "self-review-fix" : "authoring";
+    const authoringTracker = createAgentRunTracker({
+      flowInput: input,
+      page,
+      step: "page-authoring",
+      message: text.authoringPage(page),
+      totalPages,
+      progress: input.getProgress,
+      prompt: authoringPrompt,
+      kind: authoringKind,
+    });
+
+    try {
+      const authoringResult: AgentRunSummary = await input.agentClient.runAuthoringPrompt(
+        authoringPrompt,
+        { onStreamEvent: authoringTracker.onStreamEvent },
+      );
+      await authoringTracker.flush("completed", {
+        parsed_summary: authoringResult.parsed_json === true,
+        summary: authoringResult.summary,
+        changed_files: authoringResult.changed_files,
+        needs_render: authoringResult.needs_render,
+        session_retries: authoringResult.session_retries ?? 0,
+      });
+      renderError = "";
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (isAgentInfrastructureError(error)) {
+        agentInfrastructureFailures += 1;
+        await authoringTracker.flush("error", {
+          error: message,
+          agent_infrastructure_failures: agentInfrastructureFailures,
+          active_session_limit: error.activeSessionLimit,
+        });
+        progress = await recordProgress(input, page, {
+          status: "agent_infrastructure_failed",
+          agent_infrastructure_failures: agentInfrastructureFailures,
+          last_error: message,
+        });
+        input.setProgress(progress);
+        return {
+          page,
+          reason: "agent_infrastructure",
+          progress,
+          error: {
+            type: "agent_infrastructure",
+            message,
+            page_id: page.page_id,
+            page_index: page.index,
+            page_status: "agent_infrastructure_failed",
+          },
+        };
+      }
+
+      agentFailures += 1;
+      await authoringTracker.flush("error", {
+        error: message,
+        agent_failures: agentFailures,
+      });
+      progress = await recordProgress(input, page, {
+        status: agentFailures >= ATTEMPT_LIMITS.agent ? "agent_failed" : "authoring",
+        agent_failures: agentFailures,
+        last_error: message,
+      });
+      input.setProgress(progress);
+      if (agentFailures >= ATTEMPT_LIMITS.agent) break;
+      continue;
+    }
+
+    let preview: RenderWorkspacePagePreviewResult;
+    try {
+      progress = await recordProgress(input, page, { status: "rendering" });
+      input.setProgress(progress);
+      emitRuntime(
+        input,
+        {
+          step: "page-render",
+          message: buildDeckGenerationSummary(input, progress, totalPages),
+          currentPageIndex: page.index,
+          totalPages,
+        },
+        progress,
+      );
+      preview = await input.backend.renderWorkspacePagePreview({
+        workspace_dir: input.workspace.workspace_dir,
+        page_index: page.index,
+      });
+      progress = await recordProgress(input, page, {
+        status: "self_review",
+        last_html_path: preview.html_path,
+        last_screenshot_path: preview.screenshot_path,
+        last_error: "",
+      });
+      input.setProgress(progress);
+    } catch (error) {
+      renderAttempts += 1;
+      renderError = error instanceof Error ? error.message : String(error);
+      progress = await recordProgress(input, page, {
+        status: renderAttempts >= ATTEMPT_LIMITS.render ? "render_failed" : "render_fixing",
+        render_attempts: renderAttempts,
+        last_error: renderError,
+      });
+      input.setProgress(progress);
+      if (renderAttempts >= ATTEMPT_LIMITS.render) break;
+      continue;
+    }
+
+    emitRuntime(
+      input,
+      {
+        step: "page-review",
+        message: buildDeckGenerationSummary(input, progress, totalPages),
+        currentPageIndex: page.index,
+        totalPages,
+      },
+      progress,
+    );
+    const selfReviewPrompt = buildSelfReviewPrompt({
+      page,
+      screenshotPath: preview.screenshot_path,
+      preview,
+    });
+    const selfReviewTracker = createAgentRunTracker({
+      flowInput: input,
+      page,
+      step: "page-review",
+      message: text.reviewingPage(page),
+      totalPages,
+      progress: input.getProgress,
+      prompt: selfReviewPrompt,
+      kind: "self-review",
+    });
+    try {
+      selfReview = await input.agentClient.runSelfReviewPrompt(
+        selfReviewPrompt,
+        { onStreamEvent: selfReviewTracker.onStreamEvent },
+      );
+      await selfReviewTracker.flush("completed", {
+        parsed_review: true,
+        review: selfReview,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (isAgentInfrastructureError(error)) {
+        agentInfrastructureFailures += 1;
+        await selfReviewTracker.flush("error", {
+          error: message,
+          agent_infrastructure_failures: agentInfrastructureFailures,
+          active_session_limit: error.activeSessionLimit,
+        });
+        progress = await recordProgress(input, page, {
+          status: "agent_infrastructure_failed",
+          agent_infrastructure_failures: agentInfrastructureFailures,
+          last_error: message,
+        });
+        input.setProgress(progress);
+        return {
+          page,
+          reason: "agent_infrastructure",
+          progress,
+          error: {
+            type: "agent_infrastructure",
+            message,
+            page_id: page.page_id,
+            page_index: page.index,
+            page_status: "agent_infrastructure_failed",
+          },
+        };
+      }
+
+      agentFailures += 1;
+      await selfReviewTracker.flush("error", {
+        error: message,
+        agent_failures: agentFailures,
+      });
+      progress = await recordProgress(input, page, {
+        status: agentFailures >= ATTEMPT_LIMITS.agent ? "agent_failed" : "self_review",
+        agent_failures: agentFailures,
+        last_error: message,
+      });
+      input.setProgress(progress);
+      if (agentFailures >= ATTEMPT_LIMITS.agent) break;
+      continue;
+    }
+    progress = await recordProgress(input, page, {
+      review: selfReview,
+    });
+    input.setProgress(progress);
+
+    if (selfReviewPassed(selfReview)) {
+      progress = await recordProgress(input, page, {
+        status: "accepted",
+        review: selfReview,
+      });
+      input.setProgress(progress);
+      return {
+        page,
+        reason: "accepted",
+        progress,
+      };
+    }
+
+    selfReviewAttempts += 1;
+    progress = await recordProgress(input, page, {
+      status:
+        selfReviewAttempts >= ATTEMPT_LIMITS.selfReview
+          ? "needs_user_review"
+          : "self_review_fixing",
+      self_review_attempts: selfReviewAttempts,
+      review: selfReview,
+      last_error: selfReview.revision_request,
+    });
+    input.setProgress(progress);
+    if (selfReviewAttempts >= ATTEMPT_LIMITS.selfReview) break;
+  }
+
+  progress = input.getProgress() ?? await input.backend.getPageProgress({
+    workspace_dir: input.workspace.workspace_dir,
+  });
+
+  if (input.isCancelled()) {
+    return {
+      page,
+      reason: "cancelled",
+      progress,
+    };
+  }
+
+  const failedPage = getProgressPage(progress, page.page_id);
+  const error = failedPage
+    ? createFailedPageError(failedPage, input.locale)
+    : {
+        type: "page_failed" as const,
+        message: text.pageFailed({
+          page_id: page.page_id,
+          index: page.index,
+          title: page.title,
+          status: "failed",
+          render_attempts: 0,
+          self_review_attempts: 0,
+          agent_failures: 0,
+          agent_infrastructure_failures: 0,
+          slide_path: page.slide_path,
+          data_path: page.data_path,
+          last_html_path: "",
+          last_screenshot_path: "",
+          last_error: "",
+          review: null,
+          updated_at: null,
+        }),
+        page_id: page.page_id,
+        page_index: page.index,
+        page_status: "failed",
+      };
+
+  return {
+    page,
+    reason: "page_failed",
+    progress,
+    error,
+  };
+}
+
+async function runPagesConcurrently(
+  runtime: DeckGenerationRuntime,
+  pagePlan: PagePlan,
+): Promise<PageGenerationResult[]> {
+  const pagesToRun = pagePlan.pages.filter((page) => {
+    const pageProgress = getProgressPage(runtime.getProgress(), page.page_id);
+    return pageProgress?.status !== "accepted";
+  });
+  const results: PageGenerationResult[] = [];
+  let nextIndex = 0;
+  let stopScheduling = false;
+
+  async function worker() {
+    while (!stopScheduling && !runtime.isCancelled()) {
+      const page = pagesToRun[nextIndex];
+      nextIndex += 1;
+      if (!page) return;
+
+      const result = await runPageGeneration(runtime, pagePlan, page);
+      results.push(result);
+      if (result.reason === "agent_infrastructure") {
+        stopScheduling = true;
+      }
+    }
+  }
+
+  const workerCount = Math.min(PAGE_GENERATION_CONCURRENCY, pagesToRun.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results.sort((left, right) => left.page.index - right.page.index);
+}
+
 export async function runDeckGeneration(
   input: RunDeckGenerationInput,
 ): Promise<DeckGenerationCompletion> {
@@ -741,280 +1213,34 @@ export async function runDeckGeneration(
   }
 
   let { pagePlan, progress } = artifacts;
+  const runtime: DeckGenerationRuntime = {
+    ...input,
+    activeStreams: new Map(),
+    getProgress: () => progress,
+    setProgress: (nextProgress) => {
+      progress = nextProgress;
+    },
+  };
 
-  for (const page of pagePlan.pages) {
-    if (input.isCancelled()) break;
-
-    const existingPageProgress = getProgressPage(progress, page.page_id);
-    if (existingPageProgress?.status === "accepted") {
-      emit(
-        input,
-        {
-          step: "page-authoring",
-          message: text.pagePassed(page),
-          currentPageIndex: page.index,
-          totalPages: pagePlan.pages.length,
-        },
-        progress,
-      );
-      continue;
-    }
-
-    progress = await recordProgress(input, page, { status: "authoring" });
-    emit(
-      input,
+  const results = await runPagesConcurrently(runtime, pagePlan);
+  const infrastructureFailure = results.find((result) => result.reason === "agent_infrastructure");
+  if (infrastructureFailure?.error) {
+    const failedProgress = createProgress(
       {
-        step: "page-authoring",
-        message: text.generatingPage(page, pagePlan.pages.length),
-        currentPageIndex: page.index,
+        step: "failed",
+        message: infrastructureFailure.error.message,
+        currentPageIndex: infrastructureFailure.page.index,
         totalPages: pagePlan.pages.length,
       },
-      progress,
+      infrastructureFailure.progress,
+      null,
+      runtime.activeStreams.values(),
     );
-
-    let renderAttempts = existingPageProgress?.render_attempts ?? 0;
-    let selfReviewAttempts = existingPageProgress?.self_review_attempts ?? 0;
-    let agentFailures = existingPageProgress?.agent_failures ?? 0;
-    let agentInfrastructureFailures =
-      existingPageProgress?.agent_infrastructure_failures ?? 0;
-    let renderError =
-      existingPageProgress?.status === "render_fixing"
-        ? existingPageProgress.last_error
-        : "";
-    let selfReview =
-      existingPageProgress?.status === "self_review_fixing"
-        ? (existingPageProgress.review as AgentSelfReviewResult | null)
-        : null;
-    let accepted = false;
-
-    while (!accepted && !input.isCancelled()) {
-      const authoringPrompt = buildAuthoringPrompt({
-        workspaceDir: input.workspace.workspace_dir,
-        page,
-        pagePlan,
-        outline: input.confirmedOutline,
-        attemptKind: renderError ? "render-fix" : selfReview ? "self-review-fix" : "initial",
-        renderError,
-        selfReview,
-      });
-      const authoringKind = renderError ? "render-fix" : selfReview ? "self-review-fix" : "authoring";
-      const authoringTracker = createAgentRunTracker({
-        flowInput: input,
-        page,
-        step: "page-authoring",
-        message: text.authoringPage(page),
-        totalPages: pagePlan.pages.length,
-        progress: () => progress,
-        prompt: authoringPrompt,
-        kind: authoringKind,
-      });
-
-      try {
-        const authoringResult: AgentRunSummary = await input.agentClient.runAuthoringPrompt(
-          authoringPrompt,
-          { onStreamEvent: authoringTracker.onStreamEvent },
-        );
-        await authoringTracker.flush("completed", {
-          parsed_summary: authoringResult.parsed_json === true,
-          summary: authoringResult.summary,
-          changed_files: authoringResult.changed_files,
-          needs_render: authoringResult.needs_render,
-          session_retries: authoringResult.session_retries ?? 0,
-        });
-        renderError = "";
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (isAgentInfrastructureError(error)) {
-          agentInfrastructureFailures += 1;
-          await authoringTracker.flush("error", {
-            error: message,
-            agent_infrastructure_failures: agentInfrastructureFailures,
-            active_session_limit: error.activeSessionLimit,
-          });
-          progress = await recordProgress(input, page, {
-            status: "agent_infrastructure_failed",
-            agent_infrastructure_failures: agentInfrastructureFailures,
-            last_error: message,
-          });
-          const failedProgress = createProgress(
-            {
-              step: "failed",
-              message,
-              currentPageIndex: page.index,
-              totalPages: pagePlan.pages.length,
-            },
-            progress,
-          );
-          input.onProgress(failedProgress);
-          return failedCompletion({
-            progress: failedProgress,
-            error: {
-              type: "agent_infrastructure",
-              message,
-              page_id: page.page_id,
-              page_index: page.index,
-              page_status: "agent_infrastructure_failed",
-            },
-          });
-        }
-
-        agentFailures += 1;
-        await authoringTracker.flush("error", {
-          error: message,
-          agent_failures: agentFailures,
-        });
-        progress = await recordProgress(input, page, {
-          status: agentFailures >= ATTEMPT_LIMITS.agent ? "agent_failed" : "authoring",
-          agent_failures: agentFailures,
-          last_error: message,
-        });
-        if (agentFailures >= ATTEMPT_LIMITS.agent) break;
-        continue;
-      }
-
-      let preview: RenderWorkspacePagePreviewResult;
-      try {
-        emit(
-          input,
-          {
-            step: "page-render",
-            message: text.renderingPage(page),
-            currentPageIndex: page.index,
-            totalPages: pagePlan.pages.length,
-          },
-          progress,
-        );
-        preview = await input.backend.renderWorkspacePagePreview({
-          workspace_dir: input.workspace.workspace_dir,
-          page_index: page.index,
-        });
-        progress = await recordProgress(input, page, {
-          status: "self_review",
-          last_html_path: preview.html_path,
-          last_screenshot_path: preview.screenshot_path,
-          last_error: "",
-        });
-      } catch (error) {
-        renderAttempts += 1;
-        renderError = error instanceof Error ? error.message : String(error);
-        progress = await recordProgress(input, page, {
-          status: renderAttempts >= ATTEMPT_LIMITS.render ? "render_failed" : "render_fixing",
-          render_attempts: renderAttempts,
-          last_error: renderError,
-        });
-        if (renderAttempts >= ATTEMPT_LIMITS.render) break;
-        continue;
-      }
-
-      emit(
-        input,
-        {
-          step: "page-review",
-          message: text.reviewingScreenshot(page),
-          currentPageIndex: page.index,
-          totalPages: pagePlan.pages.length,
-        },
-        progress,
-      );
-      const selfReviewPrompt = buildSelfReviewPrompt({
-        page,
-        screenshotPath: preview.screenshot_path,
-        preview,
-      });
-      const selfReviewTracker = createAgentRunTracker({
-        flowInput: input,
-        page,
-        step: "page-review",
-        message: text.reviewingPage(page),
-        totalPages: pagePlan.pages.length,
-        progress: () => progress,
-        prompt: selfReviewPrompt,
-        kind: "self-review",
-      });
-      try {
-        selfReview = await input.agentClient.runSelfReviewPrompt(
-          selfReviewPrompt,
-          { onStreamEvent: selfReviewTracker.onStreamEvent },
-        );
-        await selfReviewTracker.flush("completed", {
-          parsed_review: true,
-          review: selfReview,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (isAgentInfrastructureError(error)) {
-          agentInfrastructureFailures += 1;
-          await selfReviewTracker.flush("error", {
-            error: message,
-            agent_infrastructure_failures: agentInfrastructureFailures,
-            active_session_limit: error.activeSessionLimit,
-          });
-          progress = await recordProgress(input, page, {
-            status: "agent_infrastructure_failed",
-            agent_infrastructure_failures: agentInfrastructureFailures,
-            last_error: message,
-          });
-          const failedProgress = createProgress(
-            {
-              step: "failed",
-              message,
-              currentPageIndex: page.index,
-              totalPages: pagePlan.pages.length,
-            },
-            progress,
-          );
-          input.onProgress(failedProgress);
-          return failedCompletion({
-            progress: failedProgress,
-            error: {
-              type: "agent_infrastructure",
-              message,
-              page_id: page.page_id,
-              page_index: page.index,
-              page_status: "agent_infrastructure_failed",
-            },
-          });
-        }
-
-        agentFailures += 1;
-        await selfReviewTracker.flush("error", {
-          error: message,
-          agent_failures: agentFailures,
-        });
-        progress = await recordProgress(input, page, {
-          status: agentFailures >= ATTEMPT_LIMITS.agent ? "agent_failed" : "self_review",
-          agent_failures: agentFailures,
-          last_error: message,
-        });
-        if (agentFailures >= ATTEMPT_LIMITS.agent) break;
-        continue;
-      }
-      progress = await recordProgress(input, page, {
-        review: selfReview,
-      });
-
-      if (selfReviewPassed(selfReview)) {
-        accepted = true;
-        progress = await recordProgress(input, page, {
-          status: "accepted",
-          review: selfReview,
-        });
-        break;
-      }
-
-      selfReviewAttempts += 1;
-      progress = await recordProgress(input, page, {
-        status:
-          selfReviewAttempts >= ATTEMPT_LIMITS.selfReview
-            ? "needs_user_review"
-            : "self_review_fixing",
-        self_review_attempts: selfReviewAttempts,
-        review: selfReview,
-        last_error: selfReview.revision_request,
-      });
-      if (selfReviewAttempts >= ATTEMPT_LIMITS.selfReview) break;
-      continue;
-    }
+    input.onProgress(failedProgress);
+    return failedCompletion({
+      progress: failedProgress,
+      error: infrastructureFailure.error,
+    });
   }
 
   if (input.isCancelled()) {
@@ -1026,6 +1252,8 @@ export async function runDeckGeneration(
         totalPages: pagePlan.pages.length,
       },
       progress,
+      null,
+      runtime.activeStreams.values(),
     );
     input.onProgress(cancelledProgress);
     return {
@@ -1040,14 +1268,17 @@ export async function runDeckGeneration(
   const failedPage = progress.pages.find((page) => page.status !== "accepted");
   if (failedPage) {
     const error = createFailedPageError(failedPage, input.locale);
+    const failedCount = progress.pages.filter((page) => page.status !== "accepted").length;
     const failedProgress = createProgress(
       {
         step: "failed",
-        message: error.message,
+        message: failedCount > 1 ? text.failedSummary(failedCount) : error.message,
         currentPageIndex: failedPage.index,
         totalPages: pagePlan.pages.length,
       },
       progress,
+      null,
+      runtime.activeStreams.values(),
     );
     input.onProgress(failedProgress);
     return failedCompletion({
@@ -1206,4 +1437,167 @@ export async function runDeckRefinement(
     onProgress: input.onProgress,
     isCancelled: input.isCancelled,
   });
+}
+
+export async function runPageGenerationRetry(
+  input: RunPageGenerationRetryInput,
+): Promise<DeckGenerationCompletion> {
+  const text = generationText(input.locale);
+  const [pagePlan, initialProgress] = await Promise.all([
+    input.backend.getPagePlan({ workspace_dir: input.workspace.workspace_dir }),
+    input.backend.getPageProgress({ workspace_dir: input.workspace.workspace_dir }),
+  ]);
+  if (!pagePlanMatchesOutlineAndTemplate(input.workspace, pagePlan, initialProgress, input.confirmedOutline)) {
+    const staleProgress = createProgress(
+      {
+        step: "failed",
+        message: text.staleArtifacts,
+        currentPageIndex: null,
+        totalPages: input.confirmedOutline.items.length,
+      },
+      initialProgress,
+    );
+    input.onProgress(staleProgress);
+    return failedCompletion({
+      progress: staleProgress,
+      error: {
+        type: "stale_artifacts",
+        message: staleProgress.message,
+      },
+    });
+  }
+
+  const page = pagePlan.pages.find((item) => item.page_id === input.pageId);
+  if (!page) {
+    const missingProgress = createProgress(
+      {
+        step: "failed",
+        message: input.locale === "zh" ? "没有找到要重跑的页面。" : "Could not find the page to retry.",
+        currentPageIndex: null,
+        totalPages: pagePlan.pages.length,
+      },
+      initialProgress,
+    );
+    input.onProgress(missingProgress);
+    return failedCompletion({
+      progress: missingProgress,
+      error: {
+        type: "page_failed",
+        message: missingProgress.message,
+      },
+    });
+  }
+
+  let progress = await recordProgress(input, page, {
+    status: "pending",
+    render_attempts: 0,
+    self_review_attempts: 0,
+    agent_failures: 0,
+    agent_infrastructure_failures: 0,
+    last_error: "",
+    review: null,
+  });
+  const runtime: DeckGenerationRuntime = {
+    ...input,
+    activeStreams: new Map(),
+    getProgress: () => progress,
+    setProgress: (nextProgress) => {
+      progress = nextProgress;
+    },
+  };
+
+  const result = await runPageGeneration(runtime, pagePlan, page);
+  if (result.reason === "agent_infrastructure" && result.error) {
+    const failedProgress = createProgress(
+      {
+        step: "failed",
+        message: result.error.message,
+        currentPageIndex: page.index,
+        totalPages: pagePlan.pages.length,
+      },
+      result.progress,
+    );
+    input.onProgress(failedProgress);
+    return failedCompletion({
+      progress: failedProgress,
+      error: result.error,
+    });
+  }
+
+  if (input.isCancelled()) {
+    const cancelledProgress = createProgress(
+      {
+        step: "cancelled",
+        message: text.cancelled,
+        currentPageIndex: null,
+        totalPages: pagePlan.pages.length,
+      },
+      progress,
+    );
+    input.onProgress(cancelledProgress);
+    return {
+      status: "cancelled",
+      progress: cancelledProgress,
+    };
+  }
+
+  progress = await input.backend.getPageProgress({
+    workspace_dir: input.workspace.workspace_dir,
+  });
+  const failedPage = progress.pages.find((item) => item.status !== "accepted");
+  if (failedPage) {
+    const error = createFailedPageError(failedPage, input.locale);
+    const failedCount = progress.pages.filter((item) => item.status !== "accepted").length;
+    const failedProgress = createProgress(
+      {
+        step: "failed",
+        message: failedCount > 1 ? text.failedSummary(failedCount) : error.message,
+        currentPageIndex: failedPage.index,
+        totalPages: pagePlan.pages.length,
+      },
+      progress,
+    );
+    input.onProgress(failedProgress);
+    return failedCompletion({
+      progress: failedProgress,
+      error,
+    });
+  }
+
+  emit(
+    input,
+    {
+      step: "final-render",
+      message: text.finalRender,
+      currentPageIndex: null,
+      totalPages: pagePlan.pages.length,
+    },
+    progress,
+  );
+  const rendered = await input.backend.renderDeckHtml({
+    workspace_dir: input.workspace.workspace_dir,
+  });
+  progress = await input.backend.getPageProgress({
+    workspace_dir: input.workspace.workspace_dir,
+  });
+  emit(
+    input,
+    {
+      step: "complete",
+      message: text.deckReady,
+      currentPageIndex: null,
+      totalPages: pagePlan.pages.length,
+    },
+    progress,
+  );
+
+  return {
+    status: "completed",
+    result: {
+      outline: input.confirmedOutline,
+      pagePlan,
+      progress,
+      rendered,
+    },
+  };
 }

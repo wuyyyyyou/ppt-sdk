@@ -30,6 +30,7 @@ export interface Messages {
     addSlide: string;
     duplicate: string;
     delete: string;
+    retryPage: string;
     pptx: string;
     pdf: string;
     useTemplate: string;
@@ -125,6 +126,7 @@ export interface Messages {
       finalRender: string;
     };
     currentSessionStream: string;
+    sessionHistory: string;
     waitingForStep: string;
     noStream: string;
     streamHint: string;
@@ -232,6 +234,7 @@ export const messages: Record<Locale, Messages> = {
       addSlide: "Add slide",
       duplicate: "Duplicate",
       delete: "Delete",
+      retryPage: "Retry page",
       pptx: "PPTX",
       pdf: "PDF",
       useTemplate: "Use style",
@@ -335,6 +338,7 @@ export const messages: Record<Locale, Messages> = {
         finalRender: "Final preview"
       },
       currentSessionStream: "Current session stream",
+      sessionHistory: "Session history",
       waitingForStep: "Waiting for step output",
       noStream: "No stream output yet",
       streamHint: "Live output appears after the step starts.",
@@ -448,6 +452,7 @@ export const messages: Record<Locale, Messages> = {
       addSlide: "添加页面",
       duplicate: "复制",
       delete: "删除",
+      retryPage: "重跑本页",
       pptx: "PPTX",
       pdf: "PDF",
       useTemplate: "使用风格",
@@ -550,6 +555,7 @@ export const messages: Record<Locale, Messages> = {
         finalRender: "最终预览"
       },
       currentSessionStream: "当前会话流",
+      sessionHistory: "会话历史",
       waitingForStep: "等待步骤输出",
       noStream: "暂无流式输出",
       streamHint: "步骤开始后会显示实时输出。",

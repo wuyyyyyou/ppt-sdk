@@ -27,6 +27,7 @@ interface BriefPageProps {
   cancelGenerateDeck: () => void;
   createDeckProgress: DeckGenerationProgress | null;
   showToast: (message: string) => void;
+  onRetryPage?: (pageId: string) => Promise<void>;
 }
 
 export function BriefPage(props: BriefPageProps) {
@@ -48,7 +49,8 @@ export function BriefPage(props: BriefPageProps) {
     generateDeck,
     cancelGenerateDeck,
     createDeckProgress,
-  showToast
+    showToast,
+    onRetryPage
   } = props;
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const isCreating =
@@ -99,6 +101,8 @@ export function BriefPage(props: BriefPageProps) {
           progress={createDeckProgress}
           onCancel={cancelGenerateDeck}
           cancellable={isCreating && createDeckProgress.step !== "cancelled"}
+          onRetryPage={onRetryPage}
+          retryDisabled={isCreating}
         />
       ) : null}
       {!createDeckProgress && loading === "outline" && !reviewOutlineFirst ? (
@@ -356,8 +360,10 @@ export function GenerationProgressPanel(props: {
   progress: DeckGenerationProgress;
   onCancel: () => void;
   cancellable: boolean;
+  onRetryPage?: (pageId: string) => Promise<void>;
+  retryDisabled?: boolean;
 }) {
-  const { t, progress, onCancel, cancellable } = props;
+  const { t, progress, onCancel, cancellable, onRetryPage, retryDisabled = false } = props;
   const completed = progress.pages.filter((page) => page.status === "accepted").length;
   const total = progress.totalPages || progress.pages.length || 0;
 
@@ -392,44 +398,29 @@ export function GenerationProgressPanel(props: {
           </span>
         ))}
       </div>
-      {progress.stream ? (
-        <div className="generation-live-stream">
-          <div className="generation-live-header">
-            <strong>
-              {formatMessage(t.generating.pageLabel, {
-                page: String(progress.stream.page_index + 1)
-              })} · {progress.stream.status}
-            </strong>
-          </div>
-          {progress.stream.activities.length > 0 ? (
-            <div className="generation-activity-list">
-              {progress.stream.activities.map((activity, index) => (
-                <span key={`${activity}-${index}`}>{activity}</span>
-              ))}
-            </div>
-          ) : null}
-          {progress.stream.lines.some((line) => line.trim()) ? (
-            <pre className="generation-stream-text">
-              {progress.stream.lines.join("\n").trim()}
-            </pre>
-          ) : null}
-        </div>
-      ) : null}
       {progress.pages.length > 0 ? (
         <div className="generation-page-list">
-          {progress.pages.map((page) => (
-            <div key={page.page_id} className={`generation-page-item ${page.status}`}>
-              <div>
-                <strong>{page.index + 1}. {page.title}</strong>
-                <span>{page.status}</span>
+          {progress.pages.map((page) => {
+            const canRetry = Boolean(onRetryPage) && !retryDisabled && ["render_failed", "agent_failed", "needs_user_review"].includes(page.status);
+            return (
+              <div key={page.page_id} className={`generation-page-item ${page.status}`}>
+                <div>
+                  <strong>{page.index + 1}. {page.title}</strong>
+                  <span>{page.status}</span>
+                </div>
+                <small>
+                  render {page.render_attempts}/{page.render_attempt_limit} · review {page.self_review_attempts}/{page.self_review_attempt_limit} · agent {page.agent_failures}/{page.agent_failure_limit}
+                  {page.agent_infrastructure_failures > 0 ? ` · session ${page.agent_infrastructure_failures}` : ""}
+                </small>
+                {page.last_error ? <p>{page.last_error}</p> : null}
+                {canRetry ? (
+                  <button className="secondary-btn compact" onClick={() => void onRetryPage?.(page.page_id)}>
+                    {t.controls.retryPage}
+                  </button>
+                ) : null}
               </div>
-              <small>
-                render {page.render_attempts}/{page.render_attempt_limit} · review {page.self_review_attempts}/{page.self_review_attempt_limit} · agent {page.agent_failures}/{page.agent_failure_limit}
-                {page.agent_infrastructure_failures > 0 ? ` · session ${page.agent_infrastructure_failures}` : ""}
-              </small>
-              {page.last_error ? <p>{page.last_error}</p> : null}
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : null}
     </section>

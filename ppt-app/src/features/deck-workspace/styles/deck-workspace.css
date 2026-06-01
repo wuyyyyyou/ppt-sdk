@@ -1303,6 +1303,11 @@ button {
   overflow-wrap: anywhere;
 }
 
+.generation-active-streams {
+  display: grid;
+  gap: 10px;
+}
+
 .generation-page-list {
   display: grid;
   gap: 8px;
@@ -1602,6 +1607,14 @@ button {
   background: rgba(255, 255, 255, 0.62);
 }
 
+details.generation-history-panel > summary {
+  list-style: none;
+}
+
+details.generation-history-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
 .outline-card-header,
 .outline-card-footer,
 .generation-history-header,
@@ -1780,6 +1793,12 @@ button {
 .generation-snapshot span {
   color: var(--text-muted);
   font-size: 11px;
+}
+
+.generation-page-error {
+  margin: 8px 0;
+  color: #b91c1c;
+  overflow-wrap: anywhere;
 }
 
 .generation-recovery-actions {

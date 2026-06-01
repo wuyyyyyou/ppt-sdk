@@ -204,6 +204,27 @@ async function writeJsonFile(filePath: string, data: unknown): Promise<void> {
   await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
 }
 
+const pageProgressWriteQueues = new Map<string, Promise<unknown>>();
+
+async function withPageProgressWriteQueue<T>(
+  workspaceDir: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const queueKey = path.normalize(workspaceDir);
+  const previous = pageProgressWriteQueues.get(queueKey) ?? Promise.resolve();
+  const run = previous.catch(() => undefined).then(operation);
+  const tail = run.catch(() => undefined);
+  pageProgressWriteQueues.set(queueKey, tail);
+
+  try {
+    return await run;
+  } finally {
+    if (pageProgressWriteQueues.get(queueKey) === tail) {
+      pageProgressWriteQueues.delete(queueKey);
+    }
+  }
+}
+
 function createPptxExportJob(
   workspaceDir: string,
   patch: Partial<AppPptxExportJob> = {},
@@ -2101,36 +2122,38 @@ export async function getAppPageProgress(
 export async function recordAppPageProgress(
   input: RecordAppPageProgressInput,
 ): Promise<AppPageProgress> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const current = normalizePageProgressJson(workspace.page_progress);
-  const updatedAt = new Date().toISOString();
-  let found = false;
-  const nextPages = current.pages.map((page) => {
-    if (page.page_id !== input.page_id) return page;
-    found = true;
-    return normalizePageProgressItem({
-      ...page,
-      ...input.patch,
-      page_id: page.page_id,
-      index: page.index,
+  return withPageProgressWriteQueue(input.workspace_dir, async () => {
+    const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+    const current = normalizePageProgressJson(workspace.page_progress);
+    const updatedAt = new Date().toISOString();
+    let found = false;
+    const nextPages = current.pages.map((page) => {
+      if (page.page_id !== input.page_id) return page;
+      found = true;
+      return normalizePageProgressItem({
+        ...page,
+        ...input.patch,
+        page_id: page.page_id,
+        index: page.index,
+        updated_at: updatedAt,
+      }) as AppPageProgressItem;
+    });
+
+    if (!found) {
+      throw new Error(`Unknown page_id "${input.page_id}" in page-progress.json`);
+    }
+
+    const nextProgress: AppPageProgress = {
+      version: 1,
+      status: normalizeString(input.patch.deck_status) || current.status || "running",
+      pages: nextPages,
       updated_at: updatedAt,
-    }) as AppPageProgressItem;
+    };
+
+    await writeJsonFile(workspace.files.page_progress, nextProgress);
+    await touchWorkspaceTask(workspace, updatedAt);
+    return nextProgress;
   });
-
-  if (!found) {
-    throw new Error(`Unknown page_id "${input.page_id}" in page-progress.json`);
-  }
-
-  const nextProgress: AppPageProgress = {
-    version: 1,
-    status: normalizeString(input.patch.deck_status) || current.status || "running",
-    pages: nextPages,
-    updated_at: updatedAt,
-  };
-
-  await writeJsonFile(workspace.files.page_progress, nextProgress);
-  await touchWorkspaceTask(workspace, updatedAt);
-  return nextProgress;
 }
 
 export async function renderAppWorkspacePagePreview(

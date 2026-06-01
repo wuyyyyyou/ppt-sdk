@@ -12,6 +12,7 @@ interface GeneratingPageProps {
   onCancel: () => void;
   onBackToOutline: () => void;
   onRegenerate: () => Promise<void>;
+  onRetryPage: (pageId: string) => Promise<void>;
   canBackToOutline: boolean;
 }
 
@@ -54,12 +55,13 @@ function snapshotsForStep(stepId: string, history: GenerationStreamSnapshot[]) {
 }
 
 export function GeneratingPage(props: GeneratingPageProps) {
-  const { t, loading, progress, history, onCancel, onBackToOutline, onRegenerate, canBackToOutline } = props;
+  const { t, loading, progress, history, onCancel, onBackToOutline, onRegenerate, onRetryPage, canBackToOutline } = props;
   const activeIndex = majorStepIndex(progress?.step ?? null);
   const activeStep = majorSteps[activeIndex] ?? majorSteps[0];
   const activeSnapshots = snapshotsForStep(activeStep.id, history);
   const failed = progress?.step === "failed" || progress?.step === "cancelled";
   const running = loading === "deck" || loading === "deckFromOutline";
+  const activeStreams = progress?.activeStreams ?? (progress?.stream ? [progress.stream] : []);
 
   return (
     <section className="page active generating-page">
@@ -88,6 +90,8 @@ export function GeneratingPage(props: GeneratingPageProps) {
           progress={progress}
           onCancel={onCancel}
           cancellable={running && progress.step !== "cancelled"}
+          onRetryPage={onRetryPage}
+          retryDisabled={running}
         />
       ) : (
         <div className="generation-progress-panel">
@@ -95,14 +99,38 @@ export function GeneratingPage(props: GeneratingPageProps) {
         </div>
       )}
 
-      <section className="generation-history-panel">
-        <div className="generation-history-header">
+      {activeStreams.length > 0 ? (
+        <section className="generation-active-streams">
+          {activeStreams.map((stream) => (
+            <article key={stream.run_id ?? `${stream.page_id}-${stream.kind}`} className="generation-live-stream">
+              <div className="generation-live-header">
+                <strong>
+                  {formatPageLabel(t.generating.pageLabel, stream.page_index)} · {stream.status}
+                </strong>
+              </div>
+              {stream.activities.length > 0 ? (
+                <div className="generation-activity-list">
+                  {stream.activities.map((activity, index) => (
+                    <span key={`${stream.page_id}-active-${index}`}>{activity}</span>
+                  ))}
+                </div>
+              ) : null}
+              {stream.lines.some((line) => line.trim()) ? (
+                <pre className="generation-stream-text">{stream.lines.join("\n").trim()}</pre>
+              ) : null}
+            </article>
+          ))}
+        </section>
+      ) : null}
+
+      <details className="generation-history-panel">
+        <summary className="generation-history-header">
           <div>
             <div className="section-label">{t.generating.steps[activeStep.labelKey]}</div>
-            <strong>{activeSnapshots.length > 0 ? t.generating.currentSessionStream : t.generating.waitingForStep}</strong>
+            <strong>{activeSnapshots.length > 0 ? t.generating.sessionHistory : t.generating.waitingForStep}</strong>
           </div>
           <ChevronDown size={16} />
-        </div>
+        </summary>
         {activeStep.id === "pages" && progress?.pages.length ? (
           <div className="generation-page-timeline">
             {progress.pages.map((page) => {
@@ -113,6 +141,7 @@ export function GeneratingPage(props: GeneratingPageProps) {
                     <strong>{page.index + 1}. {page.title}</strong>
                     <span>{page.status}</span>
                   </summary>
+                  {page.last_error ? <p className="generation-page-error">{page.last_error}</p> : null}
                   {pageSnapshots.length > 0 ? <SnapshotList snapshots={pageSnapshots} /> : <p>{t.generating.noStream}</p>}
                 </details>
               );
@@ -123,7 +152,7 @@ export function GeneratingPage(props: GeneratingPageProps) {
         ) : (
           <p className="generation-empty-stream">{t.generating.streamHint}</p>
         )}
-      </section>
+      </details>
 
       {failed ? (
         <div className="generation-recovery-actions">
@@ -138,6 +167,10 @@ export function GeneratingPage(props: GeneratingPageProps) {
       ) : null}
     </section>
   );
+}
+
+function formatPageLabel(template: string, pageIndex: number) {
+  return template.replace("{page}", String(pageIndex + 1));
 }
 
 function SnapshotList({ snapshots }: { snapshots: GenerationStreamSnapshot[] }) {

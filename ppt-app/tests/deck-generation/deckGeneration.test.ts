@@ -13,6 +13,7 @@ import type {
 } from "../../src/api/types.ts";
 import {
   runDeckGeneration,
+  runPageGenerationRetry,
   type DeckGenerationProgress,
 } from "../../src/features/deck-generation/index.ts";
 
@@ -81,6 +82,13 @@ const planningContext: TemplatePlanningContext = {
 };
 
 function makePagePlan(overrides: Partial<PagePlan> = {}): PagePlan {
+  const items = Array.from(
+    { length: overrides.pages?.length ?? outline.items.length },
+    (_, index) => outline.items[index] ?? {
+      title: `Page ${index + 1}`,
+      outline: `Outline ${index + 1}`,
+    },
+  );
   return {
     version: 1,
     status: "planned",
@@ -91,7 +99,7 @@ function makePagePlan(overrides: Partial<PagePlan> = {}): PagePlan {
       template_manifest_path: "/tmp/workspaces/demo/template/manifest.json",
       generated_by: "test",
     },
-    pages: outline.items.map((item, index) => {
+    pages: items.map((item, index) => {
       const pageNumber = String(index + 1).padStart(2, "0");
       return {
         page_id: `page-${pageNumber}`,
@@ -109,6 +117,26 @@ function makePagePlan(overrides: Partial<PagePlan> = {}): PagePlan {
     updated_at: "2026-05-23T00:00:00.000Z",
     ...overrides,
   };
+}
+
+function makePagePlanWithCount(count: number): PagePlan {
+  return makePagePlan({
+    pages: Array.from({ length: count }, (_, index) => {
+      const pageNumber = String(index + 1).padStart(2, "0");
+      return {
+        page_id: `page-${pageNumber}`,
+        index,
+        title: `Page ${index + 1}`,
+        outline: `Outline ${index + 1}`,
+        blueprint_id: "simple",
+        blueprint_source: "./blueprints/Simple.tsx",
+        slide_path: `./slides/page-${pageNumber}.tsx`,
+        data_path: `./data/page-${pageNumber}.json`,
+        manifest_slide_id: `page-${pageNumber}`,
+        reason: "test",
+      };
+    }),
+  });
 }
 
 function makeProgress(pagePlan: PagePlan, status = "pending"): PageProgress {
@@ -162,6 +190,7 @@ function createHarness(options: {
   renderFailures?: number;
   selfReviews?: Array<{ pass: boolean; score: number; revision_request?: string }>;
   authoringError?: Error;
+  authoringDelayMs?: number;
 } = {}) {
   let pagePlan = clone(options.pagePlan ?? makePagePlan());
   let progress = clone(options.existingProgress ?? makeProgress(pagePlan));
@@ -172,6 +201,9 @@ function createHarness(options: {
   const progressEvents: DeckGenerationProgress[] = [];
   let generatePagePlanCalls = 0;
   let renderCalls = 0;
+  let activeAuthoringRuns = 0;
+  let maxActiveAuthoringRuns = 0;
+  let deckRenderCalls = 0;
 
   const backend: PptBackend = {
     listWorkspaces: async () => ({ workspace_root: "", has_workspaces: false, latest_workspace: null, workspaces: [] }),
@@ -232,23 +264,26 @@ function createHarness(options: {
       return createPreview(input.page_index);
     },
     recordOutline: async () => ({ projectDir: "", state: {} }),
-    renderDeckHtml: async () => ({
-      workspace_dir: workspace.workspace_dir,
-      manifest_path: "/tmp/workspaces/demo/template/manifest.json",
-      output_dir: "/tmp/workspaces/demo/output",
-      preview_url: "file:///tmp/workspaces/demo/output/deck.html",
-      slides: pagePlan.pages.map((page) => ({
-        slide_id: page.manifest_slide_id,
-        layout_id: page.blueprint_id,
-        title: page.title,
-        html_path: `/tmp/workspaces/demo/output/${page.page_id}.html`,
-        preview_url: `file:///tmp/workspaces/demo/output/${page.page_id}.html`,
-        speaker_note: page.outline,
-      })),
-      slide_count: pagePlan.pages.length,
-      title: pagePlan.title,
-      rendered_at: "2026-05-23T00:00:00.000Z",
-    }),
+    renderDeckHtml: async () => {
+      deckRenderCalls += 1;
+      return {
+        workspace_dir: workspace.workspace_dir,
+        manifest_path: "/tmp/workspaces/demo/template/manifest.json",
+        output_dir: "/tmp/workspaces/demo/output",
+        preview_url: "file:///tmp/workspaces/demo/output/deck.html",
+        slides: pagePlan.pages.map((page) => ({
+          slide_id: page.manifest_slide_id,
+          layout_id: page.blueprint_id,
+          title: page.title,
+          html_path: `/tmp/workspaces/demo/output/${page.page_id}.html`,
+          preview_url: `file:///tmp/workspaces/demo/output/${page.page_id}.html`,
+          speaker_note: page.outline,
+        })),
+        slide_count: pagePlan.pages.length,
+        title: pagePlan.title,
+        rendered_at: "2026-05-23T00:00:00.000Z",
+      };
+    },
     recordDeckReview: async () => ({ projectDir: "", state: {} }),
     prepareExportModel: async () => ({ modelPath: "", htmlPath: "", outputDir: "" }),
     generatePptx: async () => ({ pptxPath: "" }),
@@ -272,9 +307,17 @@ function createHarness(options: {
 
   const reviewQueue = [...(options.selfReviews ?? [{ pass: true, score: 9 }])];
   const agentClient: AgentClient = {
-    runAuthoringPrompt: async (prompt) => {
+    runAuthoringPrompt: async (prompt, runOptions) => {
       authoringPrompts.push(prompt);
+      activeAuthoringRuns += 1;
+      maxActiveAuthoringRuns = Math.max(maxActiveAuthoringRuns, activeAuthoringRuns);
+      runOptions?.onStreamEvent?.({ type: "activity", message: "authoring started" });
+      if (options.authoringDelayMs) {
+        await new Promise((resolve) => setTimeout(resolve, options.authoringDelayMs));
+      }
+      activeAuthoringRuns -= 1;
       if (options.authoringError) throw options.authoringError;
+      runOptions?.onStreamEvent?.({ type: "complete" });
       return {
         status: "ready_for_render",
         changed_files: [],
@@ -311,6 +354,12 @@ function createHarness(options: {
     },
     get renderCalls() {
       return renderCalls;
+    },
+    get deckRenderCalls() {
+      return deckRenderCalls;
+    },
+    get maxActiveAuthoringRuns() {
+      return maxActiveAuthoringRuns;
     },
     get progress() {
       return clone(progress);
@@ -443,6 +492,57 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(completion.progress?.step, "failed");
   });
 
+  it("runs page generation with a maximum concurrency of five", async () => {
+    const pagePlan = makePagePlanWithCount(7);
+    const harness = createHarness({
+      pagePlan,
+      existingProgress: makeProgress(pagePlan),
+      authoringDelayMs: 25,
+    });
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: {
+        ...outline,
+        items: pagePlan.pages.map((page) => ({ title: page.title, outline: page.outline })),
+      },
+      locale: "zh",
+      startMode: "resume",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.authoringPrompts.length, 7);
+    assert.equal(harness.maxActiveAuthoringRuns, 5);
+    assert.ok(harness.progressEvents.some((progress) => (progress.activeStreams?.length ?? 0) > 1));
+  });
+
+  it("does not render the final deck until every page is accepted", async () => {
+    const pagePlan = makePagePlan();
+    const harness = createHarness({
+      pagePlan,
+      existingProgress: makeProgress(pagePlan),
+      renderFailures: 20,
+    });
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "failed");
+    assert.equal(harness.deckRenderCalls, 0);
+  });
+
   it("resumes matching progress and skips accepted pages", async () => {
     const pagePlan = makePagePlan();
     const existingProgress = makeProgress(pagePlan);
@@ -478,6 +578,10 @@ describe("Deck Generation Flow Module", () => {
         generated_by: "test",
       },
     });
+    stalePlan.pages[0] = {
+      ...stalePlan.pages[0],
+      title: "Old Intro",
+    };
     const harness = createHarness({
       pagePlan: stalePlan,
       existingProgress: makeProgress(stalePlan),
@@ -497,5 +601,46 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(completion.status, "failed");
     assert.equal(completion.error.type, "stale_artifacts");
     assert.equal(harness.generatePagePlanCalls, 0);
+  });
+
+  it("retries one failed page and renders the final deck when all pages are accepted", async () => {
+    const pagePlan = makePagePlan();
+    const existingProgress = makeProgress(pagePlan);
+    existingProgress.pages[0] = {
+      ...existingProgress.pages[0],
+      status: "accepted",
+    };
+    existingProgress.pages[1] = {
+      ...existingProgress.pages[1],
+      status: "render_failed",
+      render_attempts: 10,
+      self_review_attempts: 5,
+      agent_failures: 3,
+      last_error: "render broke",
+    };
+    const harness = createHarness({ pagePlan, existingProgress });
+
+    const completion = await runPageGenerationRetry({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      pageId: "page-02",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.generatePagePlanCalls, 0);
+    assert.equal(harness.authoringPrompts.length, 1);
+    assert.equal(harness.deckRenderCalls, 1);
+    assert.equal(harness.progress.pages[0].status, "accepted");
+    assert.equal(harness.progress.pages[1].status, "accepted");
+    assert.equal(harness.progress.pages[1].render_attempts, 0);
+    assert.equal(harness.progress.pages[1].self_review_attempts, 0);
+    assert.equal(harness.progress.pages[1].agent_failures, 0);
   });
 });

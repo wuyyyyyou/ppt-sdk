@@ -89,6 +89,7 @@ export function App() {
               cancelGenerateDeck={actions.cancelGenerateDeck}
               createDeckProgress={state.createDeckProgress}
               showToast={actions.showToast}
+              onRetryPage={actions.retryPageGeneration}
             />
           ) : null}
 
@@ -109,6 +110,7 @@ export function App() {
               cancelGenerateDeck={actions.cancelGenerateDeck}
               createDeckProgress={state.createDeckProgress}
               loading={state.loading}
+              onRetryPage={actions.retryPageGeneration}
             />
           ) : null}
 
@@ -121,6 +123,7 @@ export function App() {
               onCancel={actions.cancelGenerateDeck}
               onBackToOutline={actions.returnToOutlineFromGeneration}
               onRegenerate={actions.regenerateDeck}
+              onRetryPage={actions.retryPageGeneration}
               canBackToOutline={state.outline.length > 0}
             />
           ) : null}

@@ -22,6 +22,7 @@ interface OutlinePageProps {
   cancelGenerateDeck: () => void;
   createDeckProgress: DeckGenerationProgress | null;
   loading: LoadingKind;
+  onRetryPage?: (pageId: string) => Promise<void>;
 }
 
 export function OutlinePage(props: OutlinePageProps) {
@@ -40,7 +41,8 @@ export function OutlinePage(props: OutlinePageProps) {
     createDeck,
     cancelGenerateDeck,
     createDeckProgress,
-    loading
+    loading,
+    onRetryPage
   } = props;
   const activeOutline = outlineEditMode ? outlineDraft : outline;
   const generating = loading === "deck" || loading === "deckFromOutline";
@@ -78,6 +80,8 @@ export function OutlinePage(props: OutlinePageProps) {
           progress={createDeckProgress}
           onCancel={cancelGenerateDeck}
           cancellable={loading === "deck" && createDeckProgress.step !== "cancelled"}
+          onRetryPage={onRetryPage}
+          retryDisabled={generating}
         />
       ) : null}
 
