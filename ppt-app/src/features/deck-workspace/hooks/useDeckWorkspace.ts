@@ -260,10 +260,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     };
   }
 
-  function toFileUrl(filePath: string) {
-    return `file://${encodeURI(filePath)}`;
-  }
-
   function sleep(ms: number) {
     return new Promise((resolve) => window.setTimeout(resolve, ms));
   }
@@ -473,7 +469,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   function applyWorkspace(workspace: WorkspaceResult) {
     setCurrentWorkspace(workspace);
-    setExportArtifact(readWorkspaceExportArtifact(workspace));
+    setExportArtifact(readWorkspaceExportArtifactPath(workspace));
+    void refreshWorkspaceExportArtifact(workspace);
     const renderKey = workspaceReviewRenderKey(workspace);
     setReviewRender((current) =>
       current.renderKey === renderKey
@@ -640,6 +637,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       if (!hasCurrentRender) {
         void renderDeckHtml();
       }
+    }
+    if (nextPage === "export" && currentWorkspace) {
+      void refreshWorkspaceExportArtifact(currentWorkspace);
     }
   }
 
@@ -1138,7 +1138,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       : workspace.workspace_id;
   }
 
-  function readWorkspaceExportArtifact(workspace: WorkspaceResult): ExportArtifact | null {
+  function readWorkspaceExportArtifactPath(workspace: WorkspaceResult): ExportArtifact | null {
     if (!workspace.task || typeof workspace.task !== "object" || Array.isArray(workspace.task)) {
       return null;
     }
@@ -1178,8 +1178,39 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return {
       type: latest.type,
       path: latest.path,
-      href: toFileUrl(latest.path)
+      href: ""
     };
+  }
+
+  async function buildWorkspaceExportArtifact(workspace: WorkspaceResult): Promise<ExportArtifact | null> {
+    if (!backend) return readWorkspaceExportArtifactPath(workspace);
+
+    const artifact = readWorkspaceExportArtifactPath(workspace);
+    if (!artifact) return null;
+
+    try {
+      const result = await backend.getExportArtifactDownloadUrl({
+        workspace_dir: workspace.workspace_dir,
+        artifact_type: artifact.type.toLowerCase() as "pptx" | "pdf"
+      });
+
+      return {
+        type: result.artifact_type === "pptx" ? "PPTX" : "PDF",
+        path: result.path,
+        href: result.download_url,
+        fileName: result.filename
+      };
+    } catch (error) {
+      console.warn(
+        "Failed to register export artifact download URL",
+        error instanceof Error ? error.message : error
+      );
+      return artifact;
+    }
+  }
+
+  async function refreshWorkspaceExportArtifact(workspace: WorkspaceResult) {
+    setExportArtifact(await buildWorkspaceExportArtifact(workspace));
   }
 
   async function ensureCurrentWorkspace() {
@@ -1702,16 +1733,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           pptxPath,
           generatorResult: completed.generator_result ?? completed
         });
-        setExportArtifact({
-          type,
-          path: pptxPath,
-          href: toFileUrl(pptxPath)
+        const refreshedWorkspace = await backend.openWorkspace({
+          workspace_dir: workspace.workspace_dir
         });
-        applyWorkspace(
-          await backend.openWorkspace({
-            workspace_dir: workspace.workspace_dir
-          })
-        );
+        applyWorkspace(refreshedWorkspace);
+        await refreshWorkspaceExportArtifact(refreshedWorkspace);
       } else {
         const pdfResult = await backend.exportPdf({
           workspace_dir: workspace.workspace_dir
@@ -1721,16 +1747,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           workspace_dir: workspace.workspace_dir,
           pdfPath
         });
-        setExportArtifact({
-          type,
-          path: pdfPath,
-          href: toFileUrl(pdfPath)
+        const refreshedWorkspace = await backend.openWorkspace({
+          workspace_dir: workspace.workspace_dir
         });
-        applyWorkspace(
-          await backend.openWorkspace({
-            workspace_dir: workspace.workspace_dir
-          })
-        );
+        applyWorkspace(refreshedWorkspace);
+        await refreshWorkspaceExportArtifact(refreshedWorkspace);
       }
 
       setExportStatus(formatMessage(t.exportPage.ready, { type }));

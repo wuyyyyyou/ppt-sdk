@@ -478,3 +478,19 @@ export interface RecordPdfExportInput {
   workspace_dir: string;
   pdfPath: string;
 }
+
+export interface GetExportArtifactDownloadUrlInput {
+  workspace_dir: string;
+  artifact_type: "pptx" | "pdf";
+}
+
+export interface ExportArtifactDownloadUrlResult {
+  workspace_dir: string;
+  workspace_id: string;
+  title: string;
+  artifact_type: "pptx" | "pdf";
+  path: string;
+  filename: string;
+  updated_at: string | null;
+  download_url: string;
+}

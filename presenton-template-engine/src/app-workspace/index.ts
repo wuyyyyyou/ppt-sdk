@@ -35,6 +35,7 @@ import type {
   AppPageProgressItem,
   ExportAppPdfInput,
   ExportAppPdfResult,
+  AppExportArtifactInfo,
   AppWorkspacePages,
   AppWorkspaceTemplateSelection,
   AppTemplatePlanningBlueprint,
@@ -43,6 +44,7 @@ import type {
   DuplicateAppWorkspacePageInput,
   GetAppPagePlanInput,
   GetAppPageProgressInput,
+  GetAppExportArtifactInput,
   GetAppTemplateGroupInput,
   GetAppTemplatePlanningContextInput,
   GetAppTemplatePreviewInput,
@@ -339,6 +341,17 @@ function createDefaultOutlineJson() {
 
 function normalizeString(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function sanitizeFileNameBase(value: string): string {
+  const normalized = value
+    .normalize("NFKC")
+    .replace(/[\u0000-\u001f\u007f<>:"/\\|?*]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[. ]+$/g, "");
+
+  return normalized || "deck";
 }
 
 function normalizeOutlineItem(value: unknown): AppWorkspaceOutlineItem | null {
@@ -1807,6 +1820,51 @@ export async function recordAppPdfExport(
   return recordWorkspaceExport(workspace, "pdf", input.pdf_path);
 }
 
+export async function getAppExportArtifact(
+  input: GetAppExportArtifactInput,
+): Promise<AppExportArtifactInfo> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const artifactType = input.artifact_type;
+  if (artifactType !== "pptx" && artifactType !== "pdf") {
+    throw new Error('"artifact_type" must be "pptx" or "pdf"');
+  }
+
+  const task =
+    workspace.task && typeof workspace.task === "object" && !Array.isArray(workspace.task)
+      ? (workspace.task as Record<string, unknown>)
+      : {};
+  const artifacts =
+    task.artifacts && typeof task.artifacts === "object" && !Array.isArray(task.artifacts)
+      ? (task.artifacts as Record<string, unknown>)
+      : {};
+  const artifact =
+    artifacts[artifactType] && typeof artifacts[artifactType] === "object" && !Array.isArray(artifacts[artifactType])
+      ? (artifacts[artifactType] as Record<string, unknown>)
+      : {};
+  const artifactPath = typeof artifact.path === "string" ? path.normalize(artifact.path) : "";
+
+  if (!artifactPath) {
+    throw new Error(`No ${artifactType.toUpperCase()} export artifact is recorded for this workspace`);
+  }
+  assertAbsolutePath(artifactPath, `${artifactType}_path`);
+  const artifactStat = await stat(artifactPath);
+  if (!artifactStat.isFile()) {
+    throw new Error(`${artifactType.toUpperCase()} export artifact is not a file: ${artifactPath}`);
+  }
+
+  const workspaceTitle = (await getWorkspaceSummary(workspace.workspace_dir)).title;
+
+  return {
+    workspace_dir: workspace.workspace_dir,
+    workspace_id: workspace.workspace_id,
+    title: workspaceTitle,
+    artifact_type: artifactType,
+    path: artifactPath,
+    filename: `${sanitizeFileNameBase(workspaceTitle || workspace.workspace_id)}.${artifactType}`,
+    updated_at: typeof artifact.updated_at === "string" ? artifact.updated_at : null,
+  };
+}
+
 function buildBlueprintLookup(context: AppTemplatePlanningContext): Map<string, AppTemplatePlanningBlueprint> {
   return new Map(context.blueprints.map((blueprint) => [blueprint.id, blueprint]));
 }
@@ -2076,6 +2134,7 @@ export type {
   AppPagePlanItem,
   AppPageProgress,
   AppPageProgressItem,
+  AppExportArtifactInfo,
   ExportAppPdfInput,
   ExportAppPdfResult,
   AppTemplatePlanningBlueprint,
@@ -2108,6 +2167,7 @@ export type {
   RecordAppPageProgressInput,
   RecordAppPdfExportInput,
   RecordAppPptxExportInput,
+  GetAppExportArtifactInput,
   RenderAppWorkspaceDeckHtmlInput,
   RenderAppWorkspaceDeckHtmlResult,
   RenderAppWorkspacePagePreviewInput,

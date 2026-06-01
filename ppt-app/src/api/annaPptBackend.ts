@@ -3,6 +3,7 @@ import type { PptBackend } from "./pptBackend";
 import type {
   AppendWorkspaceLogResult,
   ExportPdfInput,
+  ExportArtifactDownloadUrlResult,
   ExportPdfResult,
   GeneratePptxInput,
   GeneratePptxResult,
@@ -280,6 +281,15 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         {
           workspace_dir: input.workspace_dir,
           pdf_path: input.pdfPath,
+        }
+      ),
+    getExportArtifactDownloadUrl: (input) =>
+      invoke<ExportArtifactDownloadUrlResult>(
+        PPT_ENGINE_TOOL_ID,
+        "app_get_export_artifact_download_url",
+        {
+          workspace_dir: input.workspace_dir,
+          artifact_type: input.artifact_type,
         }
       )
   };

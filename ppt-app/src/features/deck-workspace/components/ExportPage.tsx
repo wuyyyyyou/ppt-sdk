@@ -36,17 +36,21 @@ export function ExportPage({ t, status, artifact, loading, onBack, onExport }: E
       <div className="export-status">
         {loading === "export" ? <span className="spinner small" /> : null}
         <div className="export-status-main">{status}</div>
-        {artifact ? (
+        {artifact && artifact.href ? (
           <a
             className="export-status-link"
             href={artifact.href}
-            target="_blank"
-            rel="noreferrer"
+            download={artifact.fileName}
             title={artifact.path}
           >
             <ExternalLink size={12} />
             <span>{fileUrlLabel(artifact.path)}</span>
           </a>
+        ) : artifact ? (
+          <div className="export-status-link" title={artifact.path}>
+            <ExternalLink size={12} />
+            <span>{fileUrlLabel(artifact.path)}</span>
+          </div>
         ) : null}
       </div>
     </section>

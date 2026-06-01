@@ -6,6 +6,7 @@ import type {
   DuplicateWorkspacePageInput,
   GeneratePptxInput,
   GeneratePptxResult,
+  GetExportArtifactDownloadUrlInput,
   GetWorkspaceOutlineInput,
   ListWorkspacesResult,
   ListTemplatesResult,
@@ -20,6 +21,7 @@ import type {
   PptxExportJob,
   ExportPdfInput,
   ExportPdfResult,
+  ExportArtifactDownloadUrlResult,
   RecordDeckReviewInput,
   RecordPagePlanInput,
   RecordPageProgressInput,
@@ -87,6 +89,9 @@ export interface PptBackend {
   exportPdf(input: ExportPdfInput): Promise<ExportPdfResult>;
   recordPptxExport(input: RecordPptxExportInput): Promise<ProjectResult>;
   recordPdfExport(input: RecordPdfExportInput): Promise<ProjectResult>;
+  getExportArtifactDownloadUrl(
+    input: GetExportArtifactDownloadUrlInput
+  ): Promise<ExportArtifactDownloadUrlResult>;
 }
 
 export async function createPptBackend(): Promise<PptBackend> {

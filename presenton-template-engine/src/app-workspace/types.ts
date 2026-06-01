@@ -446,3 +446,18 @@ export interface RecordAppPdfExportInput {
   workspace_dir: string;
   pdf_path: string;
 }
+
+export interface GetAppExportArtifactInput {
+  workspace_dir: string;
+  artifact_type: "pptx" | "pdf";
+}
+
+export interface AppExportArtifactInfo {
+  workspace_dir: string;
+  workspace_id: string;
+  title: string;
+  artifact_type: "pptx" | "pdf";
+  path: string;
+  filename: string;
+  updated_at: string | null;
+}

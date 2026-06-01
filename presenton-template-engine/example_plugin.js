@@ -13,6 +13,7 @@ import {
   convertDeckHtmlToPptxModel,
   createAppWorkspace,
   duplicateAppWorkspacePage,
+  getAppExportArtifact,
   exportAppPdf,
   forkTemplateGroup,
   getAppTemplateGroup,
@@ -72,6 +73,7 @@ const TOOL_NAMES = [
   "app_render_deck_html",
   "app_start_pptx_export_model",
   "app_get_pptx_export_status",
+  "app_get_export_artifact_download_url",
   "app_prepare_export_model",
   "app_export_pdf",
   "app_record_pptx_export",
@@ -511,6 +513,25 @@ const MANIFEST = {
           name: "workspace_dir",
           type: "string",
           description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_get_export_artifact_download_url",
+      description:
+        "Register a recorded PPTX or PDF export artifact on the local download server and return a temporary HTTP download URL.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+        {
+          name: "artifact_type",
+          type: "string",
+          description: "Export artifact type. Supports pptx and pdf.",
           required: true,
         },
       ],
@@ -979,47 +1000,113 @@ function readOptionalAbsolutePathArg(args, parameterName) {
 }
 
 const previewFiles = new Map();
+const artifactFiles = new Map();
 let previewServerPromise = null;
+
+function encodeRfc5987Value(value) {
+  return encodeURIComponent(value)
+    .replace(/['()]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replace(/\*/g, "%2A");
+}
+
+function sanitizeHeaderFileName(value) {
+  const fallback = value
+    .normalize("NFKC")
+    .replace(/[\u0000-\u001f\u007f<>:"/\\|?*]+/g, " ")
+    .replace(/[^\x20-\x7e]+/g, "_")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[. ]+$/g, "");
+
+  return fallback || "deck";
+}
+
+function getArtifactContentType(artifactType) {
+  if (artifactType === "pptx") {
+    return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+  }
+  if (artifactType === "pdf") {
+    return "application/pdf";
+  }
+  return "application/octet-stream";
+}
 
 async function handlePreviewRequest(request, response) {
   const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
   const parts = requestUrl.pathname.split("/").filter(Boolean);
 
-  if (parts.length !== 3 || parts[0] !== "preview" || parts[2] !== "deck.html") {
+  if (parts.length === 3 && parts[0] === "preview" && parts[2] === "deck.html") {
+    const previewId = parts[1];
+    const htmlPath = previewFiles.get(previewId);
+    if (!htmlPath) {
+      response.writeHead(404, {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end("Preview expired or not found");
+      return;
+    }
+
+    try {
+      const html = await readFile(htmlPath, "utf8");
+      response.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      });
+      response.end(html);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to read preview HTML";
+      response.writeHead(500, {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end(message);
+    }
+    return;
+  }
+
+  if (parts.length === 3 && parts[0] === "artifact") {
+    const artifactId = parts[1];
+    const artifact = artifactFiles.get(artifactId);
+    if (!artifact) {
+      response.writeHead(404, {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end("Artifact expired or not found");
+      return;
+    }
+
+    try {
+      const fileBuffer = await readFile(artifact.path);
+      const fallbackFileName = sanitizeHeaderFileName(artifact.filename);
+      response.writeHead(200, {
+        "content-type": getArtifactContentType(artifact.artifactType),
+        "content-length": fileBuffer.byteLength,
+        "content-disposition": `attachment; filename="${fallbackFileName}"; filename*=UTF-8''${encodeRfc5987Value(artifact.filename)}`,
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      });
+      response.end(fileBuffer);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to read artifact";
+      response.writeHead(500, {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end(message);
+    }
+    return;
+  }
+
+  {
     response.writeHead(404, {
       "content-type": "text/plain; charset=utf-8",
       "cache-control": "no-store",
     });
     response.end("Not found");
     return;
-  }
-
-  const previewId = parts[1];
-  const htmlPath = previewFiles.get(previewId);
-  if (!htmlPath) {
-    response.writeHead(404, {
-      "content-type": "text/plain; charset=utf-8",
-      "cache-control": "no-store",
-    });
-    response.end("Preview expired or not found");
-    return;
-  }
-
-  try {
-    const html = await readFile(htmlPath, "utf8");
-    response.writeHead(200, {
-      "content-type": "text/html; charset=utf-8",
-      "cache-control": "no-store",
-      "x-content-type-options": "nosniff",
-    });
-    response.end(html);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to read preview HTML";
-    response.writeHead(500, {
-      "content-type": "text/plain; charset=utf-8",
-      "cache-control": "no-store",
-    });
-    response.end(message);
   }
 }
 
@@ -1061,6 +1148,25 @@ async function registerPreviewHtml(htmlPath) {
   previewFiles.set(previewId, normalizedHtmlPath);
 
   return `http://127.0.0.1:${port}/preview/${previewId}/deck.html`;
+}
+
+async function registerArtifactDownload({ path: artifactPath, filename, artifact_type: artifactType }) {
+  const normalizedArtifactPath = path.normalize(artifactPath);
+  const artifactStat = await stat(normalizedArtifactPath);
+  if (!artifactStat.isFile()) {
+    throw new Error(`Export artifact is not a file: ${normalizedArtifactPath}`);
+  }
+
+  const { port } = await ensurePreviewServer();
+  const artifactId = randomUUID();
+  const safeUrlName = encodeURIComponent(filename);
+  artifactFiles.set(artifactId, {
+    path: normalizedArtifactPath,
+    filename,
+    artifactType,
+  });
+
+  return `http://127.0.0.1:${port}/artifact/${artifactId}/${safeUrlName}`;
 }
 
 function parseRequestLine(line) {
@@ -1568,6 +1674,29 @@ async function toolAppGetPptxExportStatus(args) {
   });
 }
 
+async function toolAppGetExportArtifactDownloadUrl(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const artifactType = args.artifact_type;
+  if (artifactType !== "pptx" && artifactType !== "pdf") {
+    throw new Error('"artifact_type" must be "pptx" or "pdf"');
+  }
+
+  const artifact = await getAppExportArtifact({
+    workspace_dir: workspaceDir,
+    artifact_type: artifactType,
+  });
+  const downloadUrl = await registerArtifactDownload(artifact);
+
+  return {
+    ...artifact,
+    download_url: downloadUrl,
+  };
+}
+
 async function toolAppExportPdf(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -1838,6 +1967,7 @@ const TOOL_DISPATCH = {
   app_render_deck_html: toolAppRenderDeckHtml,
   app_start_pptx_export_model: toolAppStartPptxExportModel,
   app_get_pptx_export_status: toolAppGetPptxExportStatus,
+  app_get_export_artifact_download_url: toolAppGetExportArtifactDownloadUrl,
   app_prepare_export_model: toolAppPrepareExportModel,
   app_export_pdf: toolAppExportPdf,
   app_record_pptx_export: toolAppRecordPptxExport,

@@ -39,6 +39,7 @@ export interface ExportArtifact {
   type: "PPTX" | "PDF";
   path: string;
   href: string;
+  fileName?: string;
 }
 
 export interface ContextRow {
