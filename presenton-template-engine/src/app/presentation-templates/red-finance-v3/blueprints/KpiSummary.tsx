@@ -1,12 +1,12 @@
 import React from "react";
 import * as z from "zod";
 
-import FinanceContentFrame from "../components/FinanceContentFrame.js";
-import FinanceSectionHeading from "../components/FinanceSectionHeading.js";
-import { FinanceIcon } from "../components/FinanceIcons.js";
-import DualValueMetricCard from "../components/DualValueMetricCard.js";
-import InsightCallout from "../components/InsightCallout.js";
-import KpiMetricItem from "../components/KpiMetricItem.js";
+import FinanceContentFrame from "../components/FinanceContentFrame.tsx";
+import FinanceSectionHeading from "../components/FinanceSectionHeading.tsx";
+import { FinanceIcon } from "../components/FinanceIcons.tsx";
+import DualValueMetricCard from "../components/DualValueMetricCard.tsx";
+import InsightCallout from "../components/InsightCallout.tsx";
+import KpiMetricItem from "../components/KpiMetricItem.tsx";
 
 const MetricSchema = z.object({
   value: z.string().min(1).max(24),
@@ -16,13 +16,13 @@ const MetricSchema = z.object({
 export const Schema = z.object({
   title: z.string().min(2).max(28).default("KPI Summary"),
   metaLabel: z.string().min(2).max(48).default("BLUEPRINT / KPI"),
-  footerText: z.string().min(6).max(80).default("Red Finance V3 | KPI Summary"),
+  footerText: z.string().min(6).max(80).default("Business Professional | KPI Summary"),
   pageNumber: z.string().min(1).max(4).default("08"),
   variant: z.enum(["hero-kpi-grid", "compact-metric-board"]).default("hero-kpi-grid"),
   density: z.enum(["medium", "high"]).default("medium"),
-  heading: z.string().min(2).max(32).default("关键指标"),
-  subtitle: z.string().min(8).max(96).default("适合经营指标、目标拆解、结果复盘和状态概览。"),
-  headlineTitle: z.string().min(2).max(36).default("核心表现"),
+  heading: z.string().min(2).max(32).default("Key metrics"),
+  subtitle: z.string().min(8).max(96).default("For operating metrics, target breakdowns, reviews, and status snapshots."),
+  headlineTitle: z.string().min(2).max(36).default("Core performance"),
   leftLabel: z.string().min(2).max(18).default("Current"),
   rightLabel: z.string().min(2).max(18).default("Target"),
   leftValue: z.string().min(1).max(24).default("84"),
@@ -36,7 +36,7 @@ export const Schema = z.object({
     { value: "7", label: "Weeks left" },
   ]),
   insights: z.array(z.string().min(8).max(120)).min(1).max(3).default([
-    "数值是核心，解释只负责说明变化原因和下一步动作。",
+    "Numbers are the anchor; commentary should explain drivers and next actions.",
   ]),
 });
 

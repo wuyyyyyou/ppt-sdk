@@ -24,6 +24,7 @@ export interface ReviseOutlineInput {
   feedback: string;
   locale: Locale;
   setting?: WorkspaceSettings;
+  contextRows?: ContextRow[];
 }
 
 export interface GenerateSlidesFromOutlineInput {

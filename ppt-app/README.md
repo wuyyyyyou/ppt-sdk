@@ -103,7 +103,7 @@ The fixture format is JSONL. Each line is one canned host response:
 `match.contentIncludes` is optional. When omitted, the response is the fallback
 for the matching `ns` and `method`. `fixtures/mock-outline.jsonl` returns a valid
 outline object with `title` and `items[].{title,outline}` and 5 pages, which
-satisfies the default `setting.slide_count = auto` range of 3 to 15 pages.
+satisfies the default automatic slide-count range of 3 to 15 pages.
 
 There is also a retry fixture:
 

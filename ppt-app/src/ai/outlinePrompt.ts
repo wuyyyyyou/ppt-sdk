@@ -24,11 +24,17 @@ interface ReviseOutlinePromptInput {
   feedback: string;
   locale: Locale;
   setting?: WorkspaceSettings;
+  contextRows?: ContextRow[];
 }
 
 function readSettingString(setting: WorkspaceSettings | undefined, key: string): string {
   const value = setting?.[key];
   return typeof value === "string" ? value.trim() : "";
+}
+
+function readContextRowString(contextRows: ContextRow[] | undefined, id: string): string {
+  const row = contextRows?.find((item) => item.id === id);
+  return typeof row?.value === "string" ? row.value.trim() : "";
 }
 
 function parseChineseInteger(value: string): number | null {
@@ -82,9 +88,10 @@ function parseExplicitSlideCount(text?: string): number | null {
 
 export function getExpectedSlideCount(
   setting?: WorkspaceSettings,
-  explicitCountText?: string
+  explicitCountText?: string,
+  contextRows?: ContextRow[]
 ): number | null {
-  const rawSlideCount = readSettingString(setting, "slide_count");
+  const rawSlideCount = readContextRowString(contextRows, "slides");
   if (!rawSlideCount || rawSlideCount.toLowerCase() === "auto") {
     return parseExplicitSlideCount(explicitCountText);
   }
@@ -93,11 +100,22 @@ export function getExpectedSlideCount(
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-function buildSettingSummary(setting?: WorkspaceSettings): Record<string, string> {
+export function getExpectedSlideCountForRevision(
+  setting?: WorkspaceSettings,
+  feedback?: string,
+  contextRows?: ContextRow[]
+): number | null {
+  return parseExplicitSlideCount(feedback) ?? getExpectedSlideCount(setting, undefined, contextRows);
+}
+
+function buildSettingSummary(
+  setting?: WorkspaceSettings,
+  contextRows?: ContextRow[]
+): Record<string, string> {
   return {
     language: readSettingString(setting, "language"),
     output_language: readSettingString(setting, "output_language"),
-    slide_count: readSettingString(setting, "slide_count") || "auto",
+    slide_count: readContextRowString(contextRows, "slides") || "auto",
     text_density: readSettingString(setting, "text_density"),
     visual_tone: readSettingString(setting, "visual_tone"),
     typography: readSettingString(setting, "typography"),
@@ -140,9 +158,9 @@ function buildGenerateUserPrompt(
   language: PromptLanguage
 ): string {
   return buildGenerateOutlineUserPrompt(language, {
-    expectedSlideCount: getExpectedSlideCount(input.setting, input.prompt),
+    expectedSlideCount: getExpectedSlideCount(input.setting, input.prompt, input.contextRows),
     locale: input.locale,
-    settingSummaryJson: JSON.stringify(buildSettingSummary(input.setting)),
+    settingSummaryJson: JSON.stringify(buildSettingSummary(input.setting, input.contextRows)),
     prompt: input.prompt,
     contextRowsJson: JSON.stringify(input.contextRows),
   });
@@ -153,9 +171,10 @@ function buildReviseUserPrompt(
   language: PromptLanguage
 ): string {
   return buildReviseOutlineUserPrompt(language, {
-    expectedSlideCount: getExpectedSlideCount(input.setting, input.feedback),
+    expectedSlideCount: getExpectedSlideCountForRevision(input.setting, input.feedback, input.contextRows),
     locale: input.locale,
-    settingSummaryJson: JSON.stringify(buildSettingSummary(input.setting)),
+    settingSummaryJson: JSON.stringify(buildSettingSummary(input.setting, input.contextRows)),
+    contextRowsJson: JSON.stringify(input.contextRows ?? []),
     title: input.title,
     feedback: input.feedback,
     outlineJson: JSON.stringify(input.outline),

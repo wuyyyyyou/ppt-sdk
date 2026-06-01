@@ -1,7 +1,7 @@
 import React from "react";
 
-import { redFinanceTheme } from "../theme/tokens.js";
-import { FinanceIcon, type FinanceIconName } from "./FinanceIcons.js";
+import { redFinanceTheme } from "../theme/tokens.ts";
+import { FinanceIcon, type FinanceIconName } from "./FinanceIcons.tsx";
 
 type InsightCalloutProps = {
   text: string;

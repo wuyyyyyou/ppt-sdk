@@ -70,7 +70,9 @@ import type {
   UpdateAppWorkspaceTitleInput,
 } from "./types.js";
 
-const WORKSPACE_ROOT = path.join(os.homedir(), "anna-workspace", "ppt", "tasks");
+const WORKSPACE_ROOT = path.join(os.homedir(), "anna-workspace", "ppt");
+const LEGACY_TASK_ROOT = path.join(WORKSPACE_ROOT, "tasks");
+const WORKSPACE_SETTING_PATH = path.join(WORKSPACE_ROOT, "setting.json");
 const WORKSPACE_DIR_PATTERN = /^ppt-\d{8}-\d{6}$/;
 const WORKSPACE_FILE_NAMES = [
   "task.json",
@@ -102,7 +104,7 @@ function formatWorkspaceId(date = new Date()): string {
 
 function formatDefaultWorkspaceTitle(date = new Date()): string {
   return [
-    "新建工作区",
+    "新建任务",
     `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`,
   ].join("-");
 }
@@ -124,7 +126,7 @@ function assertWorkspaceUnderRoot(workspaceDir: string): void {
     relativePath.startsWith("..") ||
     path.isAbsolute(relativePath)
   ) {
-    throw new Error('"workspace_dir" must be under the default PPT workspace root');
+    throw new Error('"task_dir" must be under the default PPT workspace root');
   }
 }
 
@@ -173,8 +175,10 @@ function createDefaultTaskJson(workspaceDir: string, title?: string) {
   const now = new Date().toISOString();
   return {
     id: workspaceId,
+    task_id: workspaceId,
     title: title || workspaceId,
     status: "initialized",
+    task_dir: workspaceDir,
     workspace_dir: workspaceDir,
     created_at: now,
     updated_at: now,
@@ -197,7 +201,6 @@ function createDefaultSettingJson() {
     language: "zh",
     output_language: "中文",
     aspect_ratio: "16:9",
-    slide_count: "auto",
     text_density: "balanced",
     visual_tone: "",
     typography: "",
@@ -212,6 +215,7 @@ function normalizeSettingJson(setting: unknown): Record<string, unknown> {
   const nextSetting = { ...existing };
 
   delete nextSetting.content_source;
+  delete nextSetting.slide_count;
 
   if (
     nextSetting.visual_tone === "极简 SaaS · 清爽版式 · 柔和中性色" ||
@@ -225,6 +229,24 @@ function normalizeSettingJson(setting: unknown): Record<string, unknown> {
   }
 
   return nextSetting;
+}
+
+async function ensureWorkspaceSetting(): Promise<Record<string, unknown>> {
+  await mkdir(WORKSPACE_ROOT, { recursive: true });
+  const currentSetting = await readJsonFileIfExists(WORKSPACE_SETTING_PATH);
+  const currentRecord =
+    currentSetting && typeof currentSetting === "object" && !Array.isArray(currentSetting)
+      ? (currentSetting as Record<string, unknown>)
+      : {};
+  const normalizedSetting = normalizeSettingJson({
+    ...createDefaultSettingJson(),
+    ...currentRecord,
+  });
+  if (JSON.stringify(currentSetting) !== JSON.stringify(normalizedSetting)) {
+    await writeJsonFile(WORKSPACE_SETTING_PATH, normalizedSetting);
+  }
+
+  return normalizedSetting;
 }
 
 function createDefaultOutlineJson() {
@@ -270,7 +292,11 @@ function normalizeOutlineJson(outline: unknown): AppWorkspaceOutline {
     items,
     source: {
       prompt: normalizeString(source.prompt),
-      context: Array.isArray(source.context) ? source.context : [],
+      context: Array.isArray(source.task_context)
+        ? (source.task_context as unknown[])
+        : Array.isArray(source.context)
+        ? source.context
+        : [],
       setting:
         source.setting && typeof source.setting === "object" && !Array.isArray(source.setting)
           ? (source.setting as Record<string, unknown>)
@@ -484,7 +510,7 @@ function readSelectedTemplateManifestPath(workspace: AppWorkspaceResult): string
 
   if (!manifestPath) {
     throw new Error(
-      "No workspace template is selected. Select a template before rendering deck HTML.",
+      "No task template is selected. Select a template before rendering deck HTML.",
     );
   }
 
@@ -496,7 +522,7 @@ function readSelectedTemplateManifestPath(workspace: AppWorkspaceResult): string
     relativePath.startsWith("..") ||
     path.isAbsolute(relativePath)
   ) {
-    throw new Error('"template.manifest_path" must be inside the workspace directory');
+    throw new Error('"template.manifest_path" must be inside the task directory');
   }
 
   return normalizedManifestPath;
@@ -511,7 +537,7 @@ function readSelectedTemplateDir(workspace: AppWorkspaceResult): string {
 
   if (!templateDir) {
     throw new Error(
-      "No workspace template is selected. Select a template before using template planning.",
+      "No task template is selected. Select a template before using template planning.",
     );
   }
 
@@ -523,7 +549,7 @@ function readSelectedTemplateDir(workspace: AppWorkspaceResult): string {
     relativePath.startsWith("..") ||
     path.isAbsolute(relativePath)
   ) {
-    throw new Error('"template.template_dir" must be inside the workspace directory');
+    throw new Error('"template.template_dir" must be inside the task directory');
   }
 
   return normalizedTemplateDir;
@@ -548,16 +574,17 @@ async function ensureWorkspaceFiles(
   workspaceDir: string,
   options: CreateAppWorkspaceInput = {},
 ): Promise<AppWorkspaceResult> {
-  assertAbsolutePath(workspaceDir, "workspace_dir");
+  assertAbsolutePath(workspaceDir, "task_dir");
 
   const normalizedWorkspaceDir = path.normalize(workspaceDir);
   assertWorkspaceUnderRoot(normalizedWorkspaceDir);
   const workspaceName = path.basename(normalizedWorkspaceDir);
   if (!isWorkspaceDirName(workspaceName)) {
-    throw new Error('"workspace_dir" must point to a ppt-YYYYMMDD-HHmmss directory');
+    throw new Error('"task_dir" must point to a ppt-YYYYMMDD-HHmmss directory');
   }
 
   await mkdir(normalizedWorkspaceDir, { recursive: true });
+  const workspaceSetting = await ensureWorkspaceSetting();
   const files = buildWorkspaceFilePaths(normalizedWorkspaceDir);
   const createdFiles: string[] = [];
 
@@ -578,10 +605,10 @@ async function ensureWorkspaceFiles(
     }
   }
 
-  const currentSetting = await readJsonFileIfExists(files.setting);
-  const normalizedSetting = normalizeSettingJson(currentSetting);
-  if (JSON.stringify(currentSetting) !== JSON.stringify(normalizedSetting)) {
-    await writeJsonFile(files.setting, normalizedSetting);
+  const currentTaskSetting = await readJsonFileIfExists(files.setting);
+  const normalizedTaskSetting = normalizeSettingJson(currentTaskSetting);
+  if (JSON.stringify(currentTaskSetting) !== JSON.stringify(normalizedTaskSetting)) {
+    await writeJsonFile(files.setting, normalizedTaskSetting);
   }
 
   const currentOutline = await readJsonFileIfExists(files.outline);
@@ -600,14 +627,17 @@ async function ensureWorkspaceFiles(
 
   return {
     workspace_root: WORKSPACE_ROOT,
+    task_root: WORKSPACE_ROOT,
     workspace_dir: normalizedWorkspaceDir,
+    task_dir: normalizedWorkspaceDir,
     workspace_id: workspaceName,
+    task_id: workspaceName,
     initialized: missingFiles.length === 0,
     created_files: createdFiles,
     missing_files: missingFiles,
     files,
     task: await readJsonFileIfExists(files.task),
-    setting: normalizedSetting,
+    setting: workspaceSetting,
     outline: normalizedOutline,
     page_plan: await readJsonFileIfExists(files.page_plan),
     page_progress: await readJsonFileIfExists(files.page_progress),
@@ -639,7 +669,9 @@ async function getWorkspaceSummary(workspaceDir: string): Promise<AppWorkspaceSu
 
   return {
     workspace_id: workspaceName,
+    task_id: workspaceName,
     workspace_dir: workspaceDir,
+    task_dir: workspaceDir,
     title:
       typeof taskRecord.title === "string" && taskRecord.title.length > 0
         ? taskRecord.title
@@ -665,19 +697,33 @@ export function getDefaultAppWorkspaceRoot(): string {
 
 export async function listAppWorkspaces(): Promise<ListAppWorkspacesResult> {
   await mkdir(WORKSPACE_ROOT, { recursive: true });
-  const entries = await readdir(WORKSPACE_ROOT, { withFileTypes: true });
-  const workspaceDirs = entries
-    .filter((entry) => entry.isDirectory() && isWorkspaceDirName(entry.name))
-    .map((entry) => path.join(WORKSPACE_ROOT, entry.name));
+  const roots = [WORKSPACE_ROOT, LEGACY_TASK_ROOT];
+  const workspaceDirs = new Set<string>();
+  for (const root of roots) {
+    try {
+      const entries = await readdir(root, { withFileTypes: true });
+      entries
+        .filter((entry) => entry.isDirectory() && isWorkspaceDirName(entry.name))
+        .forEach((entry) => workspaceDirs.add(path.join(root, entry.name)));
+    } catch (error) {
+      if (!error || typeof error !== "object" || !("code" in error) || error.code !== "ENOENT") {
+        throw error;
+      }
+    }
+  }
 
-  const workspaces = await Promise.all(workspaceDirs.map(getWorkspaceSummary));
+  const workspaces = await Promise.all([...workspaceDirs].map(getWorkspaceSummary));
   workspaces.sort((left, right) => right.workspace_id.localeCompare(left.workspace_id));
 
   return {
     workspace_root: WORKSPACE_ROOT,
+    task_root: WORKSPACE_ROOT,
     has_workspaces: workspaces.length > 0,
+    has_tasks: workspaces.length > 0,
     latest_workspace: workspaces[0] ?? null,
+    latest_task: workspaces[0] ?? null,
     workspaces,
+    tasks: workspaces,
   };
 }
 
@@ -711,20 +757,15 @@ export async function openAppWorkspace(
 export async function updateAppWorkspaceSettings(
   input: UpdateAppWorkspaceSettingsInput,
 ): Promise<AppWorkspaceResult> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const existing =
-    workspace.setting &&
-    typeof workspace.setting === "object" &&
-    !Array.isArray(workspace.setting)
-      ? (workspace.setting as Record<string, unknown>)
-      : {};
+  await ensureWorkspaceFiles(input.workspace_dir);
+  const existing = await ensureWorkspaceSetting();
   const nextSetting = {
     ...existing,
     ...input.setting,
     updated_at: new Date().toISOString(),
   };
 
-  await writeJsonFile(workspace.files.setting, nextSetting);
+  await writeJsonFile(WORKSPACE_SETTING_PATH, nextSetting);
   return ensureWorkspaceFiles(input.workspace_dir);
 }
 

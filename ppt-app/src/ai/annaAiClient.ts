@@ -4,6 +4,7 @@ import {
   buildOutlineRepairRequest,
   buildReviseOutlineLlmRequest,
   getExpectedSlideCount,
+  getExpectedSlideCountForRevision,
 } from "./outlinePrompt";
 import {
   buildGeneratePagePlanLlmRequest,
@@ -249,7 +250,7 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         runtime,
         "generateOutline",
         buildGenerateOutlineLlmRequest(input),
-        getExpectedSlideCount(input.setting, input.prompt)
+        getExpectedSlideCount(input.setting, input.prompt, input.contextRows)
       );
     },
 
@@ -315,7 +316,7 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         runtime,
         "reviseOutline",
         buildReviseOutlineLlmRequest(input),
-        getExpectedSlideCount(input.setting, input.feedback)
+        getExpectedSlideCountForRevision(input.setting, input.feedback, input.contextRows)
       );
     },
 

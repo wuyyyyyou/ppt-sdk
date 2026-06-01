@@ -1,6 +1,6 @@
 import React from "react";
 
-import { redFinanceTheme } from "../theme/tokens.js";
+import { redFinanceTheme } from "../theme/tokens.ts";
 
 export type FinanceIconName =
   | "bank"

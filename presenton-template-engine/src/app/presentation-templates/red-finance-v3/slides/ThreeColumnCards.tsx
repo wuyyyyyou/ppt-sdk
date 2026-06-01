@@ -1,2 +1,2 @@
-export { default } from "../blueprints/ThreeColumnCards.js";
-export * from "../blueprints/ThreeColumnCards.js";
+export { default } from "../blueprints/ThreeColumnCards.tsx";
+export * from "../blueprints/ThreeColumnCards.tsx";

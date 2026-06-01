@@ -1,10 +1,10 @@
 import React from "react";
 import * as z from "zod";
 
-import FinanceSectionFocusFrame from "../components/FinanceSectionFocusFrame.js";
-import { FinanceIcon } from "../components/FinanceIcons.js";
-import HorizontalFeatureCard from "../components/HorizontalFeatureCard.js";
-import { redFinanceTheme } from "../theme/tokens.js";
+import FinanceSectionFocusFrame from "../components/FinanceSectionFocusFrame.tsx";
+import { FinanceIcon } from "../components/FinanceIcons.tsx";
+import HorizontalFeatureCard from "../components/HorizontalFeatureCard.tsx";
+import { redFinanceTheme } from "../theme/tokens.ts";
 
 const PointIconSchema = z.enum(["grid", "shuffle", "chart-line", "route", "shield"]);
 
@@ -18,13 +18,13 @@ const PointSchema = z.object({
 export const Schema = z.object({
   sectionNumber: z.string().min(1).max(3).default("01"),
   eyebrow: z.string().min(2).max(24).default("Architecture"),
-  title: z.string().min(2).max(26).default("蓝图优先架构"),
+  title: z.string().min(2).max(26).default("TSX-first Architecture"),
   subtitle: z
     .string()
     .min(8)
     .max(96)
-    .default("先确定表达结构、槽位和组件家族，再生成具体页面，降低不同 deck 之间的同质化。"),
-  footerText: z.string().min(4).max(80).default("Red Finance V3 | TSX-first Baseline"),
+    .default("Define structure, slots, and component families before generating each slide."),
+  footerText: z.string().min(4).max(80).default("Business Professional | TSX-first Baseline"),
   pageNumber: z.string().min(1).max(4).default("02"),
   variant: z.enum(["left-statement-right-cards", "minimal-statement"]).default("left-statement-right-cards"),
   density: z.enum(["low", "medium"]).default("medium"),
@@ -35,19 +35,19 @@ export const Schema = z.object({
     .default([
       {
         title: "Blueprint catalog",
-        description: "catalog 描述可用结构、适用内容类型和选择规则。",
+        description: "Catalog describes available structures, content fit, and selection rules.",
         tag: "structure",
         icon: "grid",
       },
       {
         title: "Slot contract",
-        description: "每个槽位声明允许的组件家族、密度范围和变体边界。",
+        description: "Each slot declares component families, density limits, and variant boundaries.",
         tag: "slots",
         icon: "shuffle",
       },
       {
         title: "Generic renderers",
-        description: "slides 负责稳定渲染，业务主题由数据和蓝图实例驱动。",
+        description: "Slides own stable rendering while data and blueprint instances drive the business theme.",
         tag: "render",
         icon: "chart-line",
       },

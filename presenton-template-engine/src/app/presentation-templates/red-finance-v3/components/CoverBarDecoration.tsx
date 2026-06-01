@@ -1,6 +1,6 @@
 import React from "react";
 
-import { redFinanceTheme } from "../theme/tokens.js";
+import { redFinanceTheme } from "../theme/tokens.ts";
 
 const bars = [
   { height: 120, opacity: 0.26 },

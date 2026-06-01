@@ -1,49 +1,49 @@
 {
   "title": "Two Column Insight",
   "metaLabel": "BLUEPRINT / TWO COLUMN",
-  "footerText": "Red Finance V3 | Two Column Insight",
+  "footerText": "Business Professional | Two Column Insight",
   "pageNumber": "03",
   "variant": "narrative-left-evidence-right",
   "density": "medium",
-  "narrativeTitle": "核心判断",
-  "narrativeSummary": "左侧承载主判断和解释，右侧承载证据与补充信息。",
+  "narrativeTitle": "Core judgment",
+  "narrativeSummary": "Use one side for the main argument and the other for compact supporting evidence.",
   "narrativeItems": [
     {
       "icon": "lightbulb",
-      "title": "先给结论",
-      "description": "主叙事先给出判断，再用结构化条目逐层解释。"
+      "title": "Lead with the answer",
+      "description": "State the judgment first, then explain it through structured evidence."
     },
     {
       "icon": "shield",
-      "title": "证据约束",
-      "description": "每页只承载少量证据，避免双栏同时变成大表格。"
+      "title": "Evidence discipline",
+      "description": "Keep evidence selective so the two columns do not become dense tables."
     },
     {
       "icon": "route",
-      "title": "导向清晰",
-      "description": "结尾用一条结论性 callout 收束，方便 Agent 接续下一页。"
+      "title": "Clear handoff",
+      "description": "Close with a concise callout that naturally leads into the next slide."
     }
   ],
-  "evidenceTitle": "支撑证据",
+  "evidenceTitle": "Supporting evidence",
   "evidenceCards": [
     {
       "icon": "chart-column",
-      "title": "规模变化",
-      "description": "用简洁指标卡表达变化幅度和相对位置。",
+      "title": "Scale shift",
+      "description": "Use compact metric cards to show movement and relative position.",
       "tag": "scale"
     },
     {
       "icon": "bank",
-      "title": "结构差异",
-      "description": "将复杂事实拆成 2-4 张轻量卡片。",
+      "title": "Structural gap",
+      "description": "Break complex facts into two to four lightweight evidence cards.",
       "tag": "structure"
     },
     {
       "icon": "coins",
-      "title": "经营信号",
-      "description": "避免塞入长文，把关键判断放在可编辑文本中。",
+      "title": "Operating signal",
+      "description": "Keep key judgments editable instead of burying them in long prose.",
       "tag": "signal"
     }
   ],
-  "conclusion": "适合先阐释观点，再用少量证据支撑判断的页面。"
+  "conclusion": "Use this page to explain one argument and support it with a few focused facts."
 }

@@ -1,10 +1,10 @@
 import React from "react";
 import * as z from "zod";
 
-import FinanceContentFrame from "../components/FinanceContentFrame.js";
-import FinanceSectionHeading from "../components/FinanceSectionHeading.js";
-import { FinanceIcon } from "../components/FinanceIcons.js";
-import HorizontalFeatureCard from "../components/HorizontalFeatureCard.js";
+import FinanceContentFrame from "../components/FinanceContentFrame.tsx";
+import FinanceSectionHeading from "../components/FinanceSectionHeading.tsx";
+import { FinanceIcon } from "../components/FinanceIcons.tsx";
+import HorizontalFeatureCard from "../components/HorizontalFeatureCard.tsx";
 
 const IconSchema = z.enum([
   "bank",
@@ -37,33 +37,33 @@ const CardSchema = z.object({
 export const Schema = z.object({
   title: z.string().min(2).max(28).default("Three Column Cards"),
   metaLabel: z.string().min(2).max(48).default("BLUEPRINT / THREE COLUMN"),
-  footerText: z.string().min(6).max(80).default("Red Finance V3 | Three Column Cards"),
+  footerText: z.string().min(6).max(80).default("Business Professional | Three Column Cards"),
   pageNumber: z.string().min(1).max(4).default("04"),
   variant: z.enum(["three-equal-columns", "six-compact-cards"]).default("three-equal-columns"),
   density: z.enum(["low", "medium", "high"]).default("medium"),
-  heading: z.string().min(2).max(32).default("并列支柱"),
-  subtitle: z.string().min(8).max(96).default("三列并列，适合能力、策略、问题、机会或风险分类。"),
+  heading: z.string().min(2).max(32).default("Parallel pillars"),
+  subtitle: z.string().min(8).max(96).default("Three balanced columns for capabilities, strategies, issues, opportunities, or risks."),
   cards: z.array(CardSchema).min(3).max(6).default([
     {
       icon: "chart-column",
-      title: "结构化表达",
-      description: "把同级要点拆成三列，避免页面变成长列表。",
+      title: "Structured expression",
+      description: "Split peer-level ideas into columns instead of a long list.",
       tag: "structure",
     },
     {
       icon: "shield",
-      title: "平衡密度",
-      description: "每张卡只容纳一组短说明，保持页面整洁。",
+      title: "Balanced density",
+      description: "Keep each card focused on one short explanation.",
       tag: "balance",
     },
     {
       icon: "route",
-      title: "易于延展",
-      description: "适合继续扩展到更多分组或再拆成下一页。",
+      title: "Easy extension",
+      description: "Extend into more groups or split into follow-up slides.",
       tag: "extend",
     },
   ]),
-  summary: z.string().min(8).max(120).default("适合三类并列信息，不适合单线叙事或复杂矩阵。"),
+  summary: z.string().min(8).max(120).default("Best for three parallel ideas; avoid using it for single-thread narratives or complex matrices."),
 });
 
 export const layoutId = "three-column-cards";

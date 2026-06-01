@@ -26,19 +26,15 @@ interface LibraryPageProps {
 const EMPTY_SETTINGS: Required<
   Pick<
     WorkspaceSettings,
-    | "slide_count"
     | "text_density"
     | "output_language"
     | "aspect_ratio"
-    | "visual_tone"
     | "typography"
   >
 > = {
-  slide_count: "auto",
   text_density: "balanced",
   output_language: "中文",
   aspect_ratio: "16:9",
-  visual_tone: "",
   typography: ""
 };
 
@@ -57,15 +53,9 @@ function normalizeSettingValue(value: unknown, fallback: string) {
 function toEditableSettings(workspace: WorkspaceResult | null) {
   const setting = readSettings(workspace);
   return {
-    slide_count: normalizeSettingValue(setting.slide_count, EMPTY_SETTINGS.slide_count),
     text_density: normalizeSettingValue(setting.text_density, EMPTY_SETTINGS.text_density),
     output_language: normalizeSettingValue(setting.output_language, EMPTY_SETTINGS.output_language),
     aspect_ratio: normalizeSettingValue(setting.aspect_ratio, EMPTY_SETTINGS.aspect_ratio),
-    visual_tone:
-      setting.visual_tone === "极简 SaaS · 清爽版式 · 柔和中性色" ||
-      setting.visual_tone === "professional"
-        ? EMPTY_SETTINGS.visual_tone
-        : normalizeSettingValue(setting.visual_tone, EMPTY_SETTINGS.visual_tone),
     typography:
       setting.typography === "Clean Sans"
         ? EMPTY_SETTINGS.typography
@@ -73,8 +63,8 @@ function toEditableSettings(workspace: WorkspaceResult | null) {
   };
 }
 
-function localizeWorkspaceTitle(title: string, t: Messages) {
-  const match = /^(?:新建工作区|New Workspace)-(\d{4}-\d{2}-\d{2})$/.exec(title);
+function localizeTaskTitle(title: string, t: Messages) {
+  const match = /^(?:新建工作区|新建任务|New Workspace|New Task)-(\d{4}-\d{2}-\d{2})$/.exec(title);
   if (!match) {
     return title;
   }
@@ -82,17 +72,17 @@ function localizeWorkspaceTitle(title: string, t: Messages) {
   return formatMessage(t.library.defaultWorkspaceTitle, { date: match[1] });
 }
 
-function getWorkspaceTitle(workspace: WorkspaceResult | null, t: Messages) {
+function getTaskTitle(workspace: WorkspaceResult | null, t: Messages) {
   if (
     workspace?.task &&
     typeof workspace.task === "object" &&
     !Array.isArray(workspace.task) &&
     typeof (workspace.task as { title?: unknown }).title === "string"
   ) {
-    return localizeWorkspaceTitle((workspace.task as { title: string }).title, t);
+    return localizeTaskTitle((workspace.task as { title: string }).title, t);
   }
 
-  return workspace?.workspace_id ?? t.library.noWorkspaceSelected;
+  return workspace?.task_id ?? workspace?.workspace_id ?? t.library.noWorkspaceSelected;
 }
 
 function formatUpdatedAt(value: string, locale: Locale) {
@@ -125,11 +115,11 @@ export function LibraryPage({
   const [editing, setEditing] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [draft, setDraft] = useState(toEditableSettings(currentWorkspace));
-  const [titleDraft, setTitleDraft] = useState(getWorkspaceTitle(currentWorkspace, t));
+  const [titleDraft, setTitleDraft] = useState(getTaskTitle(currentWorkspace, t));
 
   useEffect(() => {
     setDraft(toEditableSettings(currentWorkspace));
-    setTitleDraft(getWorkspaceTitle(currentWorkspace, t));
+    setTitleDraft(getTaskTitle(currentWorkspace, t));
     setEditing(false);
     setEditingTitle(false);
   }, [currentWorkspace, t]);
@@ -147,7 +137,7 @@ export function LibraryPage({
     setEditingTitle(false);
   }
 
-  const workspaces = workspaceScan?.workspaces ?? [];
+  const tasks = workspaceScan?.tasks ?? workspaceScan?.workspaces ?? [];
 
   return (
     <section className="page active library-page">
@@ -164,7 +154,7 @@ export function LibraryPage({
                 onKeyDown={(event) => {
                   if (event.key === "Enter") void saveTitle();
                   if (event.key === "Escape") {
-                    setTitleDraft(getWorkspaceTitle(currentWorkspace, t));
+                    setTitleDraft(getTaskTitle(currentWorkspace, t));
                     setEditingTitle(false);
                   }
                 }}
@@ -176,7 +166,7 @@ export function LibraryPage({
               <button
                 className="secondary-btn compact"
                 onClick={() => {
-                  setTitleDraft(getWorkspaceTitle(currentWorkspace, t));
+                  setTitleDraft(getTaskTitle(currentWorkspace, t));
                   setEditingTitle(false);
                 }}
                 disabled={savingSettings}
@@ -185,27 +175,42 @@ export function LibraryPage({
               </button>
             </span>
           ) : (
+            // <button
+            //   className="workspace-title-button"
+            //   onClick={() => setEditingTitle(true)}
+            //   disabled={!currentWorkspace}
+            //   title={t.controls.edit}
+            // >
+            //   {getTaskTitle(currentWorkspace, t)}
+            // </button>
             <button
               className="workspace-title-button"
               onClick={() => setEditingTitle(true)}
               disabled={!currentWorkspace}
               title={t.controls.edit}
             >
-              {getWorkspaceTitle(currentWorkspace, t)}
+              <span>{getTaskTitle(currentWorkspace, t)}</span>
+              <Edit3 className="workspace-title-edit-icon" size={13} />
             </button>
           )}
-          <span>{currentWorkspace?.workspace_dir ?? workspaceScan?.workspace_root ?? ""}</span>
+          <span>
+            {currentWorkspace?.task_dir ??
+              currentWorkspace?.workspace_dir ??
+              workspaceScan?.task_root ??
+              workspaceScan?.workspace_root ??
+              ""}
+          </span>
         </div>
       </div>
 
       <div className="local-deck-list">
-        {workspaces.length === 0 ? (
+        {tasks.length === 0 ? (
           <div className="empty-library-row">{t.library.empty}</div>
         ) : (
-          workspaces.map((workspace) => (
+          tasks.map((task) => (
             <WorkspaceRow
-              key={workspace.workspace_dir}
-              workspace={workspace}
+              key={task.task_dir ?? task.workspace_dir}
+              workspace={task}
               loading={loading}
               onOpen={onOpen}
               t={t}
@@ -244,12 +249,6 @@ export function LibraryPage({
           )}
         </div>
 
-        <PreferenceField
-          label={t.brief.contextLabels.slides}
-          value={draft.slide_count}
-          editing={editing}
-          onChange={(value) => setDraft((next) => ({ ...next, slide_count: value }))}
-        />
         <PreferenceSelect
           label={t.brief.contextLabels.textPerSlide}
           value={draft.text_density}
@@ -257,9 +256,10 @@ export function LibraryPage({
           editing={editing}
           onChange={(value) => setDraft((next) => ({ ...next, text_density: value }))}
         />
-        <PreferenceField
+        <PreferenceSelect
           label={t.brief.contextLabels.outputLanguage}
           value={draft.output_language}
+          options={["中文", "English"]}
           editing={editing}
           onChange={(value) => setDraft((next) => ({ ...next, output_language: value }))}
         />
@@ -269,12 +269,6 @@ export function LibraryPage({
           options={["16:9", "4:3"]}
           editing={editing}
           onChange={(value) => setDraft((next) => ({ ...next, aspect_ratio: value }))}
-        />
-        <PreferenceField
-          label={t.brief.contextLabels.look}
-          value={draft.visual_tone}
-          editing={editing}
-          onChange={(value) => setDraft((next) => ({ ...next, visual_tone: value }))}
         />
         <PreferenceField
           label={t.preferences.typography}
@@ -296,13 +290,18 @@ function WorkspaceRow(props: {
 }) {
   return (
     <article className="local-deck-row">
-      <button onClick={() => props.onOpen(props.workspace.workspace_dir)} disabled={props.loading}>
-        <strong>{localizeWorkspaceTitle(props.workspace.title || props.workspace.workspace_id, props.t)}</strong>
+      <button onClick={() => props.onOpen(props.workspace.task_dir ?? props.workspace.workspace_dir)} disabled={props.loading}>
+        <strong>
+          {localizeTaskTitle(
+            props.workspace.title || props.workspace.task_id || props.workspace.workspace_id,
+            props.t,
+          )}
+        </strong>
         <span>{formatUpdatedAt(props.workspace.updated_at, props.locale)}</span>
       </button>
       <button
         className="primary-btn compact"
-        onClick={() => props.onOpen(props.workspace.workspace_dir)}
+        onClick={() => props.onOpen(props.workspace.task_dir ?? props.workspace.workspace_dir)}
         disabled={props.loading}
       >
         {props.t.controls.open}

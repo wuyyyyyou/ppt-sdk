@@ -75,10 +75,7 @@ export function TemplatePreviewModal(props: TemplatePreviewModalProps) {
         <header className="template-preview-modal-header">
           <div className="template-preview-modal-title">
             <h2>{template.group_name}</h2>
-            <span>
-              <Layers size={13} />
-              {template.layout_count} {t.template.layouts}
-            </span>
+            {/* layout count removed per request */}
           </div>
           <button
             type="button"

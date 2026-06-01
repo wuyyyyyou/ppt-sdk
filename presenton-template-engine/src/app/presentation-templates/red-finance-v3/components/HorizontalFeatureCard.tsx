@@ -1,7 +1,7 @@
 import React, { type ReactNode } from "react";
 
-import { FinanceIcon, type FinanceIconName } from "./FinanceIcons.js";
-import { redFinanceTheme } from "../theme/tokens.js";
+import { FinanceIcon, type FinanceIconName } from "./FinanceIcons.tsx";
+import { redFinanceTheme } from "../theme/tokens.ts";
 
 type HorizontalFeatureCardTone = "default" | "accent" | "future";
 

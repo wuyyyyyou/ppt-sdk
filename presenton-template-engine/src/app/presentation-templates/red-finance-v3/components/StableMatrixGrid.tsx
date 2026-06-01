@@ -1,6 +1,6 @@
 import React, { type ReactNode } from "react";
 
-import { redFinanceTheme } from "../theme/tokens.js";
+import { redFinanceTheme } from "../theme/tokens.ts";
 
 type StableMatrixGridTone = "default" | "accent";
 type StableMatrixGridAlign = "left" | "center" | "right";

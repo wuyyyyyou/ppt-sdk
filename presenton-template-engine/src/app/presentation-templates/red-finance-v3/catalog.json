@@ -2,41 +2,41 @@
   "group_id": "red-finance-v3",
   "catalog_type": "tsx-first",
   "version": 2,
-  "purpose": "帮助 PPT AI Agent 先选择可复制的 TSX 蓝图基础页，再派生到 slides/*.tsx 并直接修改最终页面实现。",
+  "purpose": "Help the PPT AI Agent choose a copyable TSX blueprint page first, derive it into slides/*.tsx, and then edit the final slide implementation directly.",
   "directory_roles": {
     "blueprints": {
       "path": "./blueprints",
-      "role": "可直接复制的 TSX 基础页目录。",
+      "role": "Directory of copyable TSX blueprint pages.",
       "rules": [
-        "先从这里选择最接近内容结构的基础页。",
-        "复制到 ./slides 后再按具体 deck 修改。",
-        "不要把这里当运行时 JSON DSL。"
+        "Start here by selecting the blueprint page closest to the content structure.",
+        "Copy it into ./slides before adapting it for the concrete deck.",
+        "Do not treat this directory as a runtime JSON DSL."
       ]
     },
     "slides": {
       "path": "./slides",
-      "role": "具体 deck 的最终页面目录。",
+      "role": "Directory of final slide pages for the concrete deck.",
       "rules": [
-        "manifest.json 只指向这里的 TSX 文件。",
-        "AI 可以直接修改这里的 TSX 来调整布局、组件组合和内容映射。",
-        "这里的页面不应长期停留在未修改的基础页状态。"
+        "manifest.json should only point to TSX files in this directory.",
+        "AI may edit TSX here directly to adjust layout, component composition, and content mapping.",
+        "Slides here should not remain unchanged blueprint copies for long."
       ]
     },
     "reference_slides": {
       "path": "./reference-slides",
-      "role": "从 red-finance-v2 迁移来的只读参考页。",
+      "role": "Read-only reference slides for visual density, component composition, and export conventions.",
       "rules": [
-        "只用于观察视觉密度、组件组合和导出习惯。",
-        "不得写入 group.json.layouts。",
-        "不得作为 manifest.json 的 source.path。"
+        "Use them only to inspect visual density, component composition, and export conventions.",
+        "Do not add them to group.json.layouts.",
+        "Do not use them as manifest.json source.path values."
       ]
     },
     "data": {
       "path": "./data",
-      "role": "demo 或具体 deck 的页面内容数据。",
+      "role": "Content data for demo slides or concrete decks.",
       "rules": [
-        "JSON 只承载内容，不承载页面结构决策。",
-        "如果布局越界或组件不合适，应优先修改 slides/*.tsx。"
+        "JSON should carry content only, not page-structure decisions.",
+        "If layout overflows or a component is unsuitable, prefer editing slides/*.tsx."
       ]
     }
   },
@@ -48,8 +48,8 @@
       "example_slide": "./slides/CoverStatement.tsx",
       "layout_family": "cover",
       "content_intents": ["opening", "positioning", "theme-statement"],
-      "suitable_for": ["封面", "战略报告开场", "主题声明", "管理层汇报开场"],
-      "avoid_for": ["正文分析", "复杂图表", "对比矩阵", "长流程说明"]
+      "suitable_for": ["cover", "strategy report opening", "theme statement", "executive briefing opening"],
+      "avoid_for": ["body analysis", "complex charts", "comparison matrix", "long process explanation"]
     },
     {
       "id": "section-divider",
@@ -58,8 +58,8 @@
       "example_slide": "./slides/SectionDivider.tsx",
       "layout_family": "section",
       "content_intents": ["transition", "framing", "section-introduction"],
-      "suitable_for": ["章节分隔", "主题切换", "分析框架引入", "方法说明"],
-      "avoid_for": ["指标汇总", "细节对比", "长时间线", "大段正文"]
+      "suitable_for": ["section divider", "topic transition", "analysis framework introduction", "method explanation"],
+      "avoid_for": ["metric summary", "detailed comparison", "long timeline", "long body text"]
     },
     {
       "id": "two-column-insight",
@@ -68,8 +68,8 @@
       "example_slide": "./slides/TwoColumnInsight.tsx",
       "layout_family": "two-column",
       "content_intents": ["overview", "insight", "analysis", "explanation"],
-      "suitable_for": ["行业概览", "观点解释", "问题分析", "策略说明"],
-      "avoid_for": ["复杂时间线", "大规模矩阵", "多图表仪表盘", "纯封面"]
+      "suitable_for": ["industry overview", "insight explanation", "problem analysis", "strategy explanation"],
+      "avoid_for": ["complex timeline", "large matrix", "multi-chart dashboard", "pure cover"]
     },
     {
       "id": "three-column-cards",
@@ -78,8 +78,8 @@
       "example_slide": "./slides/ThreeColumnCards.tsx",
       "layout_family": "three-column",
       "content_intents": ["categorization", "pillars", "options", "recommendations"],
-      "suitable_for": ["能力支柱", "机会问题策略", "三类方案", "风险分类"],
-      "avoid_for": ["单一深度观点", "时间线", "大表格", "趋势图"]
+      "suitable_for": ["capability pillars", "opportunity/problem/strategy grouping", "three options", "risk categories"],
+      "avoid_for": ["single deep argument", "timeline", "large table", "trend chart"]
     },
     {
       "id": "chart-with-narrative",
@@ -88,8 +88,8 @@
       "example_slide": "./slides/ChartWithNarrative.tsx",
       "layout_family": "chart-narrative",
       "content_intents": ["trend", "scale", "structure-change", "evidence"],
-      "suitable_for": ["趋势分析", "规模变化", "结构变化", "预测说明"],
-      "avoid_for": ["无数据观点", "多主体大矩阵", "流程计划", "封面转场"]
+      "suitable_for": ["trend analysis", "scale change", "structural change", "forecast explanation"],
+      "avoid_for": ["data-free opinion", "large multi-entity matrix", "process plan", "cover transition"]
     },
     {
       "id": "comparison-matrix",
@@ -98,8 +98,8 @@
       "example_slide": "./slides/ComparisonMatrix.tsx",
       "layout_family": "matrix",
       "content_intents": ["comparison", "evaluation", "tradeoff", "benchmark"],
-      "suitable_for": ["中美对比", "方案对比", "能力矩阵", "市场结构比较"],
-      "avoid_for": ["单一叙事", "时间演进", "封面", "超过 6 行的大表"]
+      "suitable_for": ["China-US comparison", "option comparison", "capability matrix", "market-structure comparison"],
+      "avoid_for": ["single narrative", "time evolution", "cover", "large tables over six rows"]
     },
     {
       "id": "timeline-plan",
@@ -108,8 +108,8 @@
       "example_slide": "./slides/TimelinePlan.tsx",
       "layout_family": "timeline",
       "content_intents": ["roadmap", "execution", "phasing", "milestones"],
-      "suitable_for": ["实施路径", "战略路线图", "阶段规划", "里程碑计划"],
-      "avoid_for": ["纯指标汇总", "大矩阵", "封面", "无顺序的分类说明"]
+      "suitable_for": ["implementation path", "strategic roadmap", "phase planning", "milestone plan"],
+      "avoid_for": ["pure metric summary", "large matrix", "cover", "unordered categorization"]
     },
     {
       "id": "kpi-summary",
@@ -118,8 +118,8 @@
       "example_slide": "./slides/KpiSummary.tsx",
       "layout_family": "kpi",
       "content_intents": ["performance", "targets", "status", "dashboard"],
-      "suitable_for": ["指标汇总", "经营看板", "目标拆解", "状态速览"],
-      "avoid_for": ["长叙事", "复杂路线图", "大段解释"]
+      "suitable_for": ["metric summary", "operating dashboard", "target breakdown", "status snapshot"],
+      "avoid_for": ["long narrative", "complex roadmap", "long explanation"]
     },
     {
       "id": "closing-actions",
@@ -128,52 +128,47 @@
       "example_slide": "./slides/ClosingActions.tsx",
       "layout_family": "closing",
       "content_intents": ["closing", "actions", "decision-request", "next-steps"],
-      "suitable_for": ["总结页", "行动建议", "决策请求", "下一步计划"],
-      "avoid_for": ["正文分析", "复杂图表", "多维对比"]
+      "suitable_for": ["summary page", "action recommendations", "decision request", "next-step plan"],
+      "avoid_for": ["body analysis", "complex charts", "multi-dimensional comparison"]
     }
   ],
   "reference_examples": [
     {
       "reference_path": "./reference-slides/IndustryOverview.tsx",
-      "source_v2_path": "../red-finance-v2/slides/IndustryOverview.tsx",
-      "visual_pattern": "左侧叙事列表 + 右侧图表 + 底部强调结论",
+      "visual_pattern": "left narrative list + right chart + bottom emphasized conclusion",
       "related_blueprints": ["two-column-insight", "chart-with-narrative"],
       "do_not_copy_directly": true
     },
     {
       "reference_path": "./reference-slides/MarketTrends.tsx",
-      "source_v2_path": "../red-finance-v2/slides/MarketTrends.tsx",
-      "visual_pattern": "顶部卡片 + 底部图表面板",
+      "visual_pattern": "top cards + bottom chart panel",
       "related_blueprints": ["three-column-cards", "chart-with-narrative"],
       "do_not_copy_directly": true
     },
     {
       "reference_path": "./reference-slides/ChinaUsMarketComparison.tsx",
-      "source_v2_path": "../red-finance-v2/slides/ChinaUsMarketComparison.tsx",
-      "visual_pattern": "对比面板 + 指标",
+      "visual_pattern": "comparison panels + metrics",
       "related_blueprints": ["comparison-matrix", "kpi-summary"],
       "do_not_copy_directly": true
     },
     {
       "reference_path": "./reference-slides/StrategicRoadmap.tsx",
-      "source_v2_path": "../red-finance-v2/slides/StrategicRoadmap.tsx",
-      "visual_pattern": "支柱要点 + 路线图 + KPI",
+      "visual_pattern": "pillar points + roadmap + KPIs",
       "related_blueprints": ["timeline-plan", "kpi-summary", "three-column-cards"],
       "do_not_copy_directly": true
     },
     {
       "reference_path": "./reference-slides/ConclusionOutlook.tsx",
-      "source_v2_path": "../red-finance-v2/slides/ConclusionOutlook.tsx",
-      "visual_pattern": "总结优先级 + 行动项",
+      "visual_pattern": "summary priorities + action items",
       "related_blueprints": ["closing-actions", "three-column-cards"],
       "do_not_copy_directly": true
     }
   ],
   "agent_workflow_notes": [
-    "先读 catalog.json，选择最接近内容结构的 blueprints/*.tsx。",
-    "把选中的蓝图 TSX 复制或派生到 slides/*.tsx，再直接修改最终页面。",
-    "manifest.json 的 source.path 只指向 slides/*.tsx。",
-    "data/*.json 只承载内容；如果结构、间距或组件不合适，改 slides/*.tsx。",
-    "reference-slides/ 只读参考，不得进入生成链路。"
+    "Read catalog.json first and choose the blueprints/*.tsx file closest to the content structure.",
+    "Copy or derive the selected blueprint TSX into slides/*.tsx, then edit the final page directly.",
+    "manifest.json source.path should only point to slides/*.tsx.",
+    "data/*.json should carry content only; if structure, spacing, or components are unsuitable, edit slides/*.tsx.",
+    "reference-slides/ is read-only reference material and must not enter the generation path."
   ]
 }

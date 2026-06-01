@@ -1,7 +1,7 @@
 import React, { type ReactNode } from "react";
 
-import { redFinanceTheme } from "../theme/tokens.js";
-import IconText from "./IconText.js";
+import { redFinanceTheme } from "../theme/tokens.ts";
+import IconText from "./IconText.tsx";
 
 type DualValueMetricCardProps = {
   title: string;

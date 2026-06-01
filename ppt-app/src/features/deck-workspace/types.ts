@@ -45,6 +45,7 @@ export interface ContextRow {
   id: string;
   label: string;
   value: string;
+  placeholder?: string;
   type?: "text" | "select" | "attachment";
   options?: string[];
 }

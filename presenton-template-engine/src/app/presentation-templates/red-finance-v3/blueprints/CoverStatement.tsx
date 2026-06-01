@@ -1,30 +1,30 @@
 import React from "react";
 import * as z from "zod";
 
-import CoverBarDecoration from "../components/CoverBarDecoration.js";
-import FinanceCanvas from "../components/FinanceCanvas.js";
-import { FinanceIcon } from "../components/FinanceIcons.js";
-import IconText from "../components/IconText.js";
-import SectionPanelShell from "../components/SectionPanelShell.js";
-import { redFinanceTheme } from "../theme/tokens.js";
+import CoverBarDecoration from "../components/CoverBarDecoration.tsx";
+import FinanceCanvas from "../components/FinanceCanvas.tsx";
+import { FinanceIcon } from "../components/FinanceIcons.tsx";
+import IconText from "../components/IconText.tsx";
+import SectionPanelShell from "../components/SectionPanelShell.tsx";
+import { redFinanceTheme } from "../theme/tokens.ts";
 
 export const Schema = z.object({
   brandName: z.string().min(2).max(80).default("GLOBAL FINANCE INSIGHTS"),
   reportTag: z.string().min(4).max(60).default("TSX-first Baseline"),
-  titleLineOne: z.string().min(2).max(28).default("Red Finance V3"),
-  titleLineTwo: z.string().min(2).max(32).default("迁移基线"),
-  subtitle: z.string().min(6).max(48).default("从成品页复用切换到蓝图驱动生成"),
+  titleLineOne: z.string().min(2).max(28).default("Title"),
+  titleLineTwo: z.string().min(2).max(32).default("Baseline"),
+  subtitle: z.string().min(6).max(48).default("From finished slides to blueprint-led generation"),
   reportDate: z.string().min(6).max(24).default("2026/05/09"),
   presenter: z.string().min(2).max(40).default("Template Migration"),
   classification: z.string().min(4).max(40).default("Internal Draft"),
   variant: z.enum(["statement-notes", "statement-visual"]).default("statement-notes"),
   density: z.enum(["low", "medium"]).default("low"),
-  noteTitle: z.string().min(2).max(32).default("V3 baseline"),
+  noteTitle: z.string().min(2).max(32).default("Baseline"),
   notes: z
     .array(z.string().min(2).max(36))
     .min(2)
     .max(4)
-    .default(["独立模板组可发现", "主路径只包含通用 slide", "上一代成品页保留为参考资产"]),
+    .default(["Standalone template group discovery", "Generic slides only on the main path", "Reference pages stay read-only"]),
   showPattern: z.boolean().default(true),
   showBarDecoration: z.boolean().default(true),
 });

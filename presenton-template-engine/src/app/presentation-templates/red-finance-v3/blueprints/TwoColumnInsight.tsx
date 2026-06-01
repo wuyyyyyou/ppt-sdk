@@ -1,13 +1,13 @@
 import React from "react";
 import * as z from "zod";
 
-import FinanceContentFrame from "../components/FinanceContentFrame.js";
-import FinanceSectionHeading from "../components/FinanceSectionHeading.js";
-import { FinanceIcon } from "../components/FinanceIcons.js";
-import IconTextCard from "../components/IconTextCard.js";
-import InfoListItem from "../components/InfoListItem.js";
-import InsightCallout from "../components/InsightCallout.js";
-import { redFinanceTheme } from "../theme/tokens.js";
+import FinanceContentFrame from "../components/FinanceContentFrame.tsx";
+import FinanceSectionHeading from "../components/FinanceSectionHeading.tsx";
+import { FinanceIcon } from "../components/FinanceIcons.tsx";
+import IconTextCard from "../components/IconTextCard.tsx";
+import InfoListItem from "../components/InfoListItem.tsx";
+import InsightCallout from "../components/InsightCallout.tsx";
+import { redFinanceTheme } from "../theme/tokens.ts";
 
 const IconSchema = z.enum([
   "bank",
@@ -46,53 +46,53 @@ const EvidenceCardSchema = z.object({
 export const Schema = z.object({
   title: z.string().min(2).max(28).default("Two Column Insight"),
   metaLabel: z.string().min(2).max(48).default("BLUEPRINT / TWO COLUMN"),
-  footerText: z.string().min(6).max(80).default("Red Finance V3 | Two Column Insight"),
+  footerText: z.string().min(6).max(80).default("Business Professional | Two Column Insight"),
   pageNumber: z.string().min(1).max(4).default("03"),
   variant: z.enum(["narrative-left-evidence-right", "evidence-left-narrative-right"]).default(
     "narrative-left-evidence-right",
   ),
   density: z.enum(["low", "medium", "high"]).default("medium"),
-  narrativeTitle: z.string().min(2).max(28).default("核心判断"),
-  narrativeSummary: z.string().min(8).max(96).default("左侧承载主判断和解释，右侧承载证据与补充信息。"),
+  narrativeTitle: z.string().min(2).max(28).default("Core judgment"),
+  narrativeSummary: z.string().min(8).max(96).default("Use one side for the main argument and the other for compact supporting evidence."),
   narrativeItems: z.array(NarrativeItemSchema).min(2).max(4).default([
     {
       icon: "lightbulb",
-      title: "先给结论",
-      description: "主叙事先给出判断，再用结构化条目逐层解释。",
+      title: "Lead with the answer",
+      description: "State the judgment first, then explain it through structured evidence.",
     },
     {
       icon: "shield",
-      title: "证据约束",
-      description: "每页只承载少量证据，避免双栏同时变成大表格。",
+      title: "Evidence discipline",
+      description: "Keep evidence selective so the two columns do not become dense tables.",
     },
     {
       icon: "route",
-      title: "导向清晰",
-      description: "结尾用一条结论性 callout 收束，方便 Agent 接续下一页。",
+      title: "Clear handoff",
+      description: "Close with a concise callout that naturally leads into the next slide.",
     },
   ]),
-  evidenceTitle: z.string().min(2).max(28).default("支撑证据"),
+  evidenceTitle: z.string().min(2).max(28).default("Supporting evidence"),
   evidenceCards: z.array(EvidenceCardSchema).min(2).max(4).default([
     {
       icon: "chart-column",
-      title: "规模变化",
-      description: "用简洁指标卡表达变化幅度和相对位置。",
+      title: "Scale shift",
+      description: "Use compact metric cards to show movement and relative position.",
       tag: "scale",
     },
     {
       icon: "bank",
-      title: "结构差异",
-      description: "将复杂事实拆成 2-4 张轻量卡片。",
+      title: "Structural gap",
+      description: "Break complex facts into two to four lightweight evidence cards.",
       tag: "structure",
     },
     {
       icon: "coins",
-      title: "经营信号",
-      description: "避免塞入长文，把关键判断放在可编辑文本中。",
+      title: "Operating signal",
+      description: "Keep key judgments editable instead of burying them in long prose.",
       tag: "signal",
     },
   ]),
-  conclusion: z.string().min(8).max(120).default("适合先阐释观点，再用少量证据支撑判断的页面。"),
+  conclusion: z.string().min(8).max(120).default("Use this page to explain one argument and support it with a few focused facts."),
 });
 
 export const layoutId = "two-column-insight";

@@ -1,2 +1,2 @@
-export { default } from "../blueprints/TimelinePlan.js";
-export * from "../blueprints/TimelinePlan.js";
+export { default } from "../blueprints/TimelinePlan.tsx";
+export * from "../blueprints/TimelinePlan.tsx";

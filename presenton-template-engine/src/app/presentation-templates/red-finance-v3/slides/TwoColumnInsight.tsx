@@ -1,2 +1,2 @@
-export { default } from "../blueprints/TwoColumnInsight.js";
-export * from "../blueprints/TwoColumnInsight.js";
+export { default } from "../blueprints/TwoColumnInsight.tsx";
+export * from "../blueprints/TwoColumnInsight.tsx";

@@ -1,8 +1,8 @@
 {
   "group_id": "red-finance-v3",
-  "group_name": "Red Finance V3",
+  "group_name": "Business Professional",
   "group_description": "TSX-first finance templates for strategic reports, executive briefings, and structured analysis decks.",
-  "group_brief": "适合金融行业研究、战略分析、管理层汇报、数字货币与银行转型等正式型 PPT。V3 采用 TSX-first 架构，先让 AI Agent 选择最接近的基础页，再复制到具体页面并直接修改 TSX。",
+  "group_brief": "Suitable for formal decks on financial industry research, strategic analysis, executive briefings, digital currency, and banking transformation. V3 uses a TSX-first workflow: the AI Agent selects the closest blueprint page, copies it into a concrete slide, and edits the TSX directly.",
   "style_tags": ["finance", "editorial", "serious", "tsx-first"],
   "industry_tags": ["finance", "banking", "fintech"],
   "use_cases": ["strategy-report", "industry-analysis", "executive-brief"],
