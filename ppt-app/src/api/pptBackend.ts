@@ -17,6 +17,7 @@ import type {
   PreparePageFilesInput,
   PreparePageFilesResult,
   ProjectResult,
+  PptxExportJob,
   ExportPdfInput,
   ExportPdfResult,
   RecordDeckReviewInput,
@@ -32,6 +33,8 @@ import type {
   RenderWorkspacePagePreviewResult,
   SelectTemplateInput,
   SelectTemplateResult,
+  StartGeneratePptxInput,
+  StartPptxExportModelInput,
   TemplatePlanningContext,
   UpdateWorkspaceSettingsInput,
   UpdateWorkspaceOutlineInput,
@@ -77,7 +80,10 @@ export interface PptBackend {
   prepareExportModel(
     input: PrepareExportModelInput
   ): Promise<PrepareExportModelResult>;
+  startPptxExportModel(input: StartPptxExportModelInput): Promise<PptxExportJob>;
+  getPptxExportStatus(input: { workspace_dir: string }): Promise<PptxExportJob>;
   generatePptx(input: GeneratePptxInput): Promise<GeneratePptxResult>;
+  startGeneratePptx(input: StartGeneratePptxInput): Promise<PptxExportJob>;
   exportPdf(input: ExportPdfInput): Promise<ExportPdfResult>;
   recordPptxExport(input: RecordPptxExportInput): Promise<ProjectResult>;
   recordPdfExport(input: RecordPdfExportInput): Promise<ProjectResult>;

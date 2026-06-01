@@ -20,6 +20,7 @@ import {
   getAppTemplatePreview,
   getAppPagePlan,
   getAppPageProgress,
+  getAppPptxExportStatus,
   getAllDiscoveredTemplateGroups,
   getAppWorkspaceOutline,
   getDiscoveredTemplateGroup,
@@ -37,6 +38,7 @@ import {
   renderAppWorkspacePagePreview,
   runDeckValidation,
   selectAppWorkspaceTemplate,
+  startAppPptxExportModel,
   describeTaskStateMachine,
   invokeTaskStateMachine,
   updateAppWorkspaceOutline,
@@ -68,6 +70,8 @@ const TOOL_NAMES = [
   "app_record_page_progress",
   "app_render_workspace_page_preview",
   "app_render_deck_html",
+  "app_start_pptx_export_model",
+  "app_get_pptx_export_status",
   "app_prepare_export_model",
   "app_export_pdf",
   "app_record_pptx_export",
@@ -476,6 +480,32 @@ const MANIFEST = {
       name: "app_prepare_export_model",
       description:
         "Build the final export deck HTML for the workspace and convert it into a PPTX model JSON file.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_start_pptx_export_model",
+      description:
+        "Start preparing the PPTX export HTML and model in the background, writing progress to output/generate_ppt.json.",
+      parameters: [
+        {
+          name: "workspace_dir",
+          type: "string",
+          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          required: true,
+        },
+      ],
+    },
+    {
+      name: "app_get_pptx_export_status",
+      description:
+        "Read output/generate_ppt.json for the current PPTX export job status.",
       parameters: [
         {
           name: "workspace_dir",
@@ -1516,6 +1546,28 @@ async function toolAppPrepareExportModel(args) {
   });
 }
 
+async function toolAppStartPptxExportModel(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return startAppPptxExportModel({
+    workspace_dir: workspaceDir,
+  });
+}
+
+async function toolAppGetPptxExportStatus(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return getAppPptxExportStatus({
+    workspace_dir: workspaceDir,
+  });
+}
+
 async function toolAppExportPdf(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -1784,6 +1836,8 @@ const TOOL_DISPATCH = {
   app_record_page_progress: toolAppRecordPageProgress,
   app_render_workspace_page_preview: toolAppRenderWorkspacePagePreview,
   app_render_deck_html: toolAppRenderDeckHtml,
+  app_start_pptx_export_model: toolAppStartPptxExportModel,
+  app_get_pptx_export_status: toolAppGetPptxExportStatus,
   app_prepare_export_model: toolAppPrepareExportModel,
   app_export_pdf: toolAppExportPdf,
   app_record_pptx_export: toolAppRecordPptxExport,

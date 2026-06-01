@@ -14,6 +14,7 @@ import type {
   PreparePageFilesResult,
   PrepareExportModelResult,
   ProjectResult,
+  PptxExportJob,
   RenderDeckHtmlResult,
   RenderWorkspacePagePreviewResult,
   RecordPdfExportInput,
@@ -232,6 +233,18 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         input,
         { timeoutMs: PPTX_EXPORT_TIMEOUT_MS }
       ).then(normalizePrepareExportModelResult),
+    startPptxExportModel: (input) =>
+      invoke<PptxExportJob>(
+        PPT_ENGINE_TOOL_ID,
+        "app_start_pptx_export_model",
+        input
+      ),
+    getPptxExportStatus: (input) =>
+      invoke<PptxExportJob>(
+        PPT_ENGINE_TOOL_ID,
+        "app_get_pptx_export_status",
+        input
+      ),
     generatePptx: (input: GeneratePptxInput) =>
       invoke<GeneratePptxResult>(PPT_GENER_TOOL_ID, "generatePptx", {
         model_path: input.modelPath,
@@ -239,6 +252,13 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       }, { timeoutMs: PPTX_EXPORT_TIMEOUT_MS }).then((result) =>
         normalizeGeneratePptxResult(result, input.outputPath)
       ),
+    startGeneratePptx: (input) =>
+      invoke<PptxExportJob>(PPT_GENER_TOOL_ID, "startGeneratePptx", {
+        workspace_dir: input.workspace_dir,
+        model_path: input.modelPath,
+        output_path: input.outputPath,
+        job_id: input.job_id,
+      }),
     exportPdf: (input: ExportPdfInput) =>
       invoke<ExportPdfResult>(PPT_ENGINE_TOOL_ID, "app_export_pdf", input).then(
         normalizeExportPdfResult

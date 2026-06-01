@@ -409,6 +409,40 @@ export interface PrepareExportModelResult {
   outputDir: string;
 }
 
+export type PptxExportStatus =
+  | "idle"
+  | "preparing_model"
+  | "model_ready"
+  | "generating_pptx"
+  | "completed"
+  | "failed";
+
+export interface PptxExportJob {
+  version: 1;
+  job_id: string;
+  status: PptxExportStatus;
+  message: string;
+  percent: number;
+  workspace_dir: string;
+  status_path: string;
+  output_dir: string;
+  html_path: string;
+  model_path: string;
+  pptx_path: string;
+  started_at: string | null;
+  updated_at: string | null;
+  completed_at: string | null;
+  error: {
+    message: string;
+    stack?: string;
+  } | null;
+  generator_result?: unknown;
+}
+
+export interface StartPptxExportModelInput {
+  workspace_dir: string;
+}
+
 export interface GeneratePptxInput {
   modelPath: string;
   outputPath: string;
@@ -417,6 +451,11 @@ export interface GeneratePptxInput {
 export interface GeneratePptxResult {
   pptxPath: string;
   summary?: unknown;
+}
+
+export interface StartGeneratePptxInput extends GeneratePptxInput {
+  workspace_dir: string;
+  job_id?: string;
 }
 
 export interface RecordPptxExportInput {

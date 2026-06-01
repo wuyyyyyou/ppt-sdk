@@ -54,6 +54,7 @@ import type {
   PrepareAppPageFilesResult,
   PrepareAppExportModelInput,
   PrepareAppExportModelResult,
+  AppPptxExportJob,
   RecordAppPagePlanInput,
   RecordAppPageProgressInput,
   RecordAppPdfExportInput,
@@ -64,6 +65,7 @@ import type {
   RenderAppWorkspaceDeckHtmlResult,
   SelectAppWorkspaceTemplateInput,
   SelectAppWorkspaceTemplateResult,
+  StartAppPptxExportModelInput,
   UpdateAppWorkspacePagesInput,
   UpdateAppWorkspaceOutlineInput,
   UpdateAppWorkspaceSettingsInput,
@@ -87,6 +89,15 @@ const WORKSPACE_LOG_FILE_NAMES = {
   "ai-page-agent": "ai-page-agent.jsonl",
   "ai-page-agent-stream": "ai-page-agent-stream.jsonl",
 } as const;
+const PPTX_EXPORT_STATUS_FILE_NAME = "generate_ppt.json";
+const PPTX_EXPORT_STATUSES: AppPptxExportJob["status"][] = [
+  "idle",
+  "preparing_model",
+  "model_ready",
+  "generating_pptx",
+  "completed",
+  "failed",
+];
 
 function padDatePart(value: number): string {
   return String(value).padStart(2, "0");
@@ -128,6 +139,17 @@ function assertWorkspaceUnderRoot(workspaceDir: string): void {
   }
 }
 
+function normalizeWorkspaceDir(workspaceDir: string): string {
+  assertAbsolutePath(workspaceDir, "workspace_dir");
+  const normalizedWorkspaceDir = path.normalize(workspaceDir);
+  assertWorkspaceUnderRoot(normalizedWorkspaceDir);
+  const workspaceName = path.basename(normalizedWorkspaceDir);
+  if (!isWorkspaceDirName(workspaceName)) {
+    throw new Error('"workspace_dir" must point to a ppt-YYYYMMDD-HHmmss directory');
+  }
+  return normalizedWorkspaceDir;
+}
+
 function buildWorkspaceFilePaths(workspaceDir: string) {
   return {
     task: path.join(workspaceDir, "task.json"),
@@ -137,6 +159,16 @@ function buildWorkspaceFilePaths(workspaceDir: string) {
     page_progress: path.join(workspaceDir, "page-progress.json"),
     pages: path.join(workspaceDir, "pages.json"),
     template: path.join(workspaceDir, "template.json"),
+  };
+}
+
+function buildPptxExportPaths(workspaceDir: string) {
+  const outputDir = path.join(workspaceDir, "output");
+  return {
+    outputDir,
+    statusPath: path.join(outputDir, PPTX_EXPORT_STATUS_FILE_NAME),
+    modelPath: path.join(outputDir, "ppt-model.json"),
+    pptxPath: path.join(outputDir, "deck.pptx"),
   };
 }
 
@@ -166,6 +198,80 @@ async function fileExists(filePath: string): Promise<boolean> {
 async function writeJsonFile(filePath: string, data: unknown): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+}
+
+function createPptxExportJob(
+  workspaceDir: string,
+  patch: Partial<AppPptxExportJob> = {},
+): AppPptxExportJob {
+  const paths = buildPptxExportPaths(workspaceDir);
+  const now = new Date().toISOString();
+
+  return {
+    version: 1,
+    job_id: `${path.basename(workspaceDir)}-${Date.now()}`,
+    status: "preparing_model",
+    message: "Preparing PPTX export model.",
+    percent: 5,
+    workspace_dir: workspaceDir,
+    status_path: paths.statusPath,
+    output_dir: paths.outputDir,
+    html_path: "",
+    model_path: paths.modelPath,
+    pptx_path: paths.pptxPath,
+    started_at: now,
+    updated_at: now,
+    completed_at: null,
+    error: null,
+    ...patch,
+  };
+}
+
+function normalizePptxExportJob(
+  value: unknown,
+  workspaceDir: string,
+): AppPptxExportJob {
+  const existing =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Partial<AppPptxExportJob>)
+      : {};
+  const paths = buildPptxExportPaths(workspaceDir);
+  const status = PPTX_EXPORT_STATUSES.includes(existing.status as AppPptxExportJob["status"])
+    ? existing.status as AppPptxExportJob["status"]
+    : "idle";
+
+  return createPptxExportJob(workspaceDir, {
+    ...existing,
+    version: 1,
+    job_id: typeof existing.job_id === "string" && existing.job_id.length > 0
+      ? existing.job_id
+      : `${path.basename(workspaceDir)}-${Date.now()}`,
+    status,
+    message: typeof existing.message === "string" ? existing.message : "",
+    percent: typeof existing.percent === "number" ? existing.percent : 0,
+    workspace_dir: workspaceDir,
+    status_path: paths.statusPath,
+    output_dir: paths.outputDir,
+    html_path: typeof existing.html_path === "string" ? existing.html_path : "",
+    model_path: typeof existing.model_path === "string" ? existing.model_path : paths.modelPath,
+    pptx_path: typeof existing.pptx_path === "string" ? existing.pptx_path : paths.pptxPath,
+    started_at: typeof existing.started_at === "string" ? existing.started_at : null,
+    updated_at: typeof existing.updated_at === "string" ? existing.updated_at : null,
+    completed_at: typeof existing.completed_at === "string" ? existing.completed_at : null,
+    error:
+      existing.error && typeof existing.error === "object" && !Array.isArray(existing.error)
+        ? existing.error as AppPptxExportJob["error"]
+        : null,
+    generator_result: existing.generator_result,
+  });
+}
+
+async function writePptxExportJob(job: AppPptxExportJob): Promise<AppPptxExportJob> {
+  await writeJsonFile(job.status_path, {
+    ...job,
+    updated_at: new Date().toISOString(),
+  });
+  return getAppPptxExportStatus({ workspace_dir: job.workspace_dir });
 }
 
 function createDefaultTaskJson(workspaceDir: string, title?: string) {
@@ -548,14 +654,8 @@ async function ensureWorkspaceFiles(
   workspaceDir: string,
   options: CreateAppWorkspaceInput = {},
 ): Promise<AppWorkspaceResult> {
-  assertAbsolutePath(workspaceDir, "workspace_dir");
-
-  const normalizedWorkspaceDir = path.normalize(workspaceDir);
-  assertWorkspaceUnderRoot(normalizedWorkspaceDir);
+  const normalizedWorkspaceDir = normalizeWorkspaceDir(workspaceDir);
   const workspaceName = path.basename(normalizedWorkspaceDir);
-  if (!isWorkspaceDirName(workspaceName)) {
-    throw new Error('"workspace_dir" must point to a ppt-YYYYMMDD-HHmmss directory');
-  }
 
   await mkdir(normalizedWorkspaceDir, { recursive: true });
   const files = buildWorkspaceFilePaths(normalizedWorkspaceDir);
@@ -1568,6 +1668,83 @@ export async function prepareAppExportModel(
     output_dir: outputDir,
     prepared_at: preparedAt,
   };
+}
+
+async function runPptxExportModelJob(job: AppPptxExportJob): Promise<void> {
+  try {
+    const prepared = await prepareAppExportModel({
+      workspace_dir: job.workspace_dir,
+    });
+    await writePptxExportJob({
+      ...job,
+      status: "model_ready",
+      message: "PPTX model is ready.",
+      percent: 50,
+      html_path: prepared.html_path,
+      model_path: prepared.model_path,
+      output_dir: prepared.output_dir,
+      error: null,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error && error.stack ? error.stack : undefined;
+    await writePptxExportJob({
+      ...job,
+      status: "failed",
+      message,
+      percent: 100,
+      completed_at: new Date().toISOString(),
+      error: {
+        message,
+        ...(stack ? { stack } : {}),
+      },
+    });
+  }
+}
+
+export async function startAppPptxExportModel(
+  input: StartAppPptxExportModelInput,
+): Promise<AppPptxExportJob> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const current = await getAppPptxExportStatus({
+    workspace_dir: workspace.workspace_dir,
+  });
+
+  if (current.status === "preparing_model" || current.status === "generating_pptx") {
+    return current;
+  }
+
+  const job = createPptxExportJob(workspace.workspace_dir);
+  const written = await writePptxExportJob(job);
+
+  void runPptxExportModelJob(written);
+
+  return written;
+}
+
+export async function getAppPptxExportStatus(input: {
+  workspace_dir: string;
+}): Promise<AppPptxExportJob> {
+  const workspaceDir = normalizeWorkspaceDir(input.workspace_dir);
+  const paths = buildPptxExportPaths(workspaceDir);
+  const existing = await readJsonFileIfExists(paths.statusPath);
+
+  if (existing === null) {
+    return createPptxExportJob(workspaceDir, {
+      job_id: "",
+      status: "idle",
+      message: "",
+      percent: 0,
+      started_at: null,
+      updated_at: null,
+      status_path: paths.statusPath,
+      output_dir: paths.outputDir,
+      model_path: paths.modelPath,
+      pptx_path: paths.pptxPath,
+    });
+  }
+
+  return normalizePptxExportJob(existing, workspaceDir);
 }
 
 export async function exportAppPdf(

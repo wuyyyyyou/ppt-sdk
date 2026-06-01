@@ -6,6 +6,7 @@ import { connectAnnaRuntime } from "../../../runtime/annaRuntime";
 import type {
   ListWorkspacesResult,
   PageProgress,
+  PptxExportJob,
   TemplateSummary,
   WorkspaceResult,
   WorkspaceOutline,
@@ -46,6 +47,8 @@ import type {
 } from "../types";
 
 const DEFAULT_TEMPLATE_GROUP_ID = "red-finance-v3";
+const PPTX_EXPORT_POLL_INTERVAL_MS = 1500;
+const PPTX_EXPORT_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 
 function padDatePart(value: number) {
   return String(value).padStart(2, "0");
@@ -259,6 +262,71 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   function toFileUrl(filePath: string) {
     return `file://${encodeURI(filePath)}`;
+  }
+
+  function sleep(ms: number) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
+  }
+
+  function formatPptxExportStatus(job: PptxExportJob) {
+    if (job.error?.message) return job.error.message;
+    if (job.message) return `${job.message} ${job.percent}%`;
+
+    switch (job.status) {
+      case "preparing_model":
+        return locale === "zh" ? "正在准备 PPTX 模型..." : "Preparing PPTX model...";
+      case "model_ready":
+        return locale === "zh" ? "PPTX 模型已准备，正在生成文件..." : "PPTX model ready. Generating file...";
+      case "generating_pptx":
+        return locale === "zh" ? "正在生成 PPTX 文件..." : "Generating PPTX file...";
+      case "completed":
+        return locale === "zh" ? "PPTX 已生成" : "PPTX generated";
+      case "failed":
+        return locale === "zh" ? "PPTX 导出失败" : "PPTX export failed";
+      case "idle":
+      default:
+        return t.exportPage.preparing;
+    }
+  }
+
+  function getPptxExportErrorMessage(job: PptxExportJob) {
+    return job.error?.message || job.message || (locale === "zh" ? "PPTX 导出失败" : "PPTX export failed");
+  }
+
+  function assertPptxExportPath(value: string, name: string) {
+    if (!value) {
+      throw new Error(
+        locale === "zh"
+          ? `PPTX 导出状态缺少 ${name}`
+          : `PPTX export status is missing ${name}`
+      );
+    }
+  }
+
+  async function waitForPptxExportStatus(
+    workspaceDir: string,
+    isDone: (job: PptxExportJob) => boolean
+  ) {
+    if (!backend) {
+      throw new Error("PptBackend is not available.");
+    }
+
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < PPTX_EXPORT_POLL_TIMEOUT_MS) {
+      const job = await backend.getPptxExportStatus({
+        workspace_dir: workspaceDir
+      });
+      setExportStatus(formatPptxExportStatus(job));
+
+      if (isDone(job)) {
+        return job;
+      }
+
+      await sleep(PPTX_EXPORT_POLL_INTERVAL_MS);
+    }
+
+    throw new Error(locale === "zh" ? "PPTX 导出等待超时" : "Timed out waiting for PPTX export");
   }
 
   function readOutlineUpdatedAt(workspace: WorkspaceResult) {
@@ -1596,18 +1664,43 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       }
 
       if (type === "PPTX") {
-        const exportModel = await backend.prepareExportModel({
+        const startedModel = await backend.startPptxExportModel({
           workspace_dir: workspace.workspace_dir
         });
-        const generatorResult = await backend.generatePptx({
-          modelPath: exportModel.modelPath,
-          outputPath: `${workspace.workspace_dir}/output/deck.pptx`
+        setExportStatus(formatPptxExportStatus(startedModel));
+
+        const modelReady = await waitForPptxExportStatus(
+          workspace.workspace_dir,
+          (job) => job.status === "model_ready" || job.status === "failed"
+        );
+        if (modelReady.status === "failed") {
+          throw new Error(getPptxExportErrorMessage(modelReady));
+        }
+        assertPptxExportPath(modelReady.model_path, "model_path");
+        assertPptxExportPath(modelReady.pptx_path, "pptx_path");
+
+        const startedPptx = await backend.startGeneratePptx({
+          workspace_dir: workspace.workspace_dir,
+          job_id: modelReady.job_id,
+          modelPath: modelReady.model_path,
+          outputPath: modelReady.pptx_path
         });
-        const pptxPath = generatorResult.pptxPath;
+        setExportStatus(formatPptxExportStatus(startedPptx));
+
+        const completed = await waitForPptxExportStatus(
+          workspace.workspace_dir,
+          (job) => job.status === "completed" || job.status === "failed"
+        );
+        if (completed.status === "failed") {
+          throw new Error(getPptxExportErrorMessage(completed));
+        }
+
+        const pptxPath = completed.pptx_path;
+        assertPptxExportPath(pptxPath, "pptx_path");
         await backend.recordPptxExport({
           workspace_dir: workspace.workspace_dir,
-          pptxPath: generatorResult.pptxPath,
-          generatorResult
+          pptxPath,
+          generatorResult: completed.generator_result ?? completed
         });
         setExportArtifact({
           type,

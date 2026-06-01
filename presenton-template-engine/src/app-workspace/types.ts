@@ -380,6 +380,40 @@ export interface PrepareAppExportModelInput {
   workspace_dir: string;
 }
 
+export type AppPptxExportStatus =
+  | "idle"
+  | "preparing_model"
+  | "model_ready"
+  | "generating_pptx"
+  | "completed"
+  | "failed";
+
+export interface AppPptxExportJob {
+  version: 1;
+  job_id: string;
+  status: AppPptxExportStatus;
+  message: string;
+  percent: number;
+  workspace_dir: string;
+  status_path: string;
+  output_dir: string;
+  html_path: string;
+  model_path: string;
+  pptx_path: string;
+  started_at: string | null;
+  updated_at: string | null;
+  completed_at: string | null;
+  error: {
+    message: string;
+    stack?: string;
+  } | null;
+  generator_result?: unknown;
+}
+
+export interface StartAppPptxExportModelInput {
+  workspace_dir: string;
+}
+
 export interface PrepareAppExportModelResult {
   workspace_dir: string;
   manifest_path: string;
