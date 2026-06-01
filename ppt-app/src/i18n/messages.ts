@@ -12,6 +12,8 @@ export interface Messages {
     edit: string;
     cancel: string;
     save: string;
+    suggestContext: string;
+    suggestions: string;
     createDeck: string;
     updateDeck: string;
     updateOutline: string;
@@ -192,6 +194,9 @@ export interface Messages {
     attachmentAdded: string;
     outlineUpdated: string;
     outlineSkipped: string;
+    promptRequired: string;
+    contextSuggested: string;
+    contextSuggestionEmpty: string;
     createOutlineFirst: string;
     createDeckFirst: string;
     workspaceOpened: string;
@@ -214,6 +219,8 @@ export const messages: Record<Locale, Messages> = {
       edit: "Edit",
       cancel: "Cancel",
       save: "Save",
+      suggestContext: "Suggest context",
+      suggestions: "Suggestions",
       createDeck: "Create deck",
       updateDeck: "Update deck",
       updateOutline: "Update outline",
@@ -410,6 +417,9 @@ export const messages: Record<Locale, Messages> = {
       attachmentAdded: "Attachment added",
       outlineUpdated: "Outline revised",
       outlineSkipped: "Outline was skipped for this deck",
+      promptRequired: "Enter a prompt first",
+      contextSuggested: "Optional context updated",
+      contextSuggestionEmpty: "No context suggestions found",
       createOutlineFirst: "Create the outline first",
       createDeckFirst: "Create the deck first",
       workspaceOpened: "Opened task {id}",
@@ -430,6 +440,8 @@ export const messages: Record<Locale, Messages> = {
       edit: "编辑",
       cancel: "取消",
       save: "保存",
+      suggestContext: "补全上下文",
+      suggestions: "建议",
       createDeck: "创建演示文稿",
       updateDeck: "更新演示文稿",
       updateOutline: "更新大纲",
@@ -623,6 +635,9 @@ export const messages: Record<Locale, Messages> = {
       attachmentAdded: "已添加附件",
       outlineUpdated: "大纲已调整",
       outlineSkipped: "这份演示跳过了大纲审阅",
+      promptRequired: "请先输入 prompt",
+      contextSuggested: "可选上下文已更新",
+      contextSuggestionEmpty: "没有生成可用的上下文建议",
       createOutlineFirst: "请先创建大纲",
       createDeckFirst: "请先创建演示文稿",
       workspaceOpened: "已打开任务 {id}",
