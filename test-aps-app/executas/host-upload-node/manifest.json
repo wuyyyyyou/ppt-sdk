@@ -1,0 +1,62 @@
+{
+  "name": "tool-lightvoss-test-aps-8kvasxsg",
+  "display_name": "Host Upload Test Backend",
+  "version": "1.0.0",
+  "description": "Uploads generated test files through Anna Host Upload and returns the download URL.",
+  "author": "Anna PPT SDK",
+  "license": "MIT",
+  "tags": ["test", "host-upload", "aps", "storage"],
+  "host_capabilities": ["host.upload"],
+  "tools": [
+    {
+      "name": "upload_test_file",
+      "description": "Generate a text payload, upload it through host/uploadFile, and return the Host Upload result.",
+      "timeout": 180,
+      "parameters": [
+        {
+          "name": "mode",
+          "type": "string",
+          "description": "Upload mode: inline or negotiate.",
+          "required": false,
+          "default": "inline"
+        },
+        {
+          "name": "filename",
+          "type": "string",
+          "description": "File name to store.",
+          "required": false,
+          "default": "host-upload-test.txt"
+        },
+        {
+          "name": "mime_type",
+          "type": "string",
+          "description": "MIME type, for example text/plain.",
+          "required": false,
+          "default": "text/plain"
+        },
+        {
+          "name": "purpose",
+          "type": "string",
+          "description": "Host Upload purpose: user_artifact, image_input, image_reference.",
+          "required": false,
+          "default": "user_artifact"
+        },
+        {
+          "name": "content",
+          "type": "string",
+          "description": "Text content to upload.",
+          "required": false,
+          "default": "Host Upload test payload."
+        },
+        {
+          "name": "repeat",
+          "type": "integer",
+          "description": "Repeat content N times to create a larger payload.",
+          "required": false,
+          "default": 1
+        }
+      ]
+    }
+  ],
+  "runtime": { "type": "node", "min_version": "18.0.0" }
+}

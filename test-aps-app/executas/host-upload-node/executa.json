@@ -1,0 +1,6 @@
+{
+  "tool_id": "tool-lightvoss-test-aps-8kvasxsg",
+  "type": "node",
+  "enabled": true,
+  "_comment": "Host Upload test Executa. anna-app dev lazy-starts node host_upload_plugin.js from this directory."
+}

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Host Upload 测试</title>
+    <link rel="icon" type="image/svg+xml" href="icon.svg" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div>
+          <h1>Host Upload 测试</h1>
+          <p>后端 Executa 上传，前端验证下载。所有关键步骤都会写入日志。</p>
+        </div>
+        <div class="status">
+          <span id="conn-dot" class="dot dot--off"></span>
+          <span id="conn-label">未连接</span>
+        </div>
+      </header>
+
+      <section class="layout">
+        <form id="upload-form" class="panel" autocomplete="off">
+          <div class="panel__head">
+            <h2>上传参数</h2>
+            <button id="reset-form" class="btn btn--ghost" type="button">重置</button>
+          </div>
+
+          <label class="field">
+            <span>上传模式</span>
+            <select id="mode">
+              <option value="inline">inline：小文件，base64 进 RPC</option>
+              <option value="negotiate">negotiate：后端 PUT 到 R2 后 confirm</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>文件名</span>
+            <input id="filename" value="host-upload-test.txt" />
+          </label>
+
+          <label class="field">
+            <span>MIME 类型</span>
+            <input id="mime-type" value="text/plain" />
+          </label>
+
+          <label class="field">
+            <span>Purpose</span>
+            <select id="purpose">
+              <option value="user_artifact">user_artifact</option>
+              <option value="image_input">image_input</option>
+              <option value="image_reference">image_reference</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>内容重复次数</span>
+            <input id="repeat" type="number" min="1" max="20000" value="1" />
+          </label>
+
+          <label class="field field--wide">
+            <span>文本内容</span>
+            <textarea id="content" rows="8">这是一份来自 Host Upload 测试 App 的后端上传文件。</textarea>
+          </label>
+
+          <div class="actions">
+            <button id="upload-btn" class="btn btn--primary" type="submit">调用后端上传</button>
+            <button id="download-btn" class="btn" type="button" disabled>前端下载验证</button>
+            <button id="open-btn" class="btn btn--ghost" type="button" disabled>直接打开 URL</button>
+          </div>
+        </form>
+
+        <section class="panel result">
+          <div class="panel__head">
+            <h2>最近一次结果</h2>
+            <button id="copy-result" class="btn btn--ghost" type="button" disabled>复制 JSON</button>
+          </div>
+          <dl class="kv">
+            <div>
+              <dt>URL</dt>
+              <dd id="result-url">-</dd>
+            </div>
+            <div>
+              <dt>R2 Key</dt>
+              <dd id="result-key">-</dd>
+            </div>
+            <div>
+              <dt>大小</dt>
+              <dd id="result-bytes">-</dd>
+            </div>
+            <div>
+              <dt>过期</dt>
+              <dd id="result-expiry">-</dd>
+            </div>
+          </dl>
+          <pre id="result-json" class="json">{}</pre>
+        </section>
+      </section>
+
+      <section class="panel logs-panel">
+        <div class="panel__head">
+          <h2>前端诊断日志</h2>
+          <div class="toolbar">
+            <button id="copy-logs" class="btn btn--ghost" type="button">复制日志</button>
+            <button id="clear-logs" class="btn btn--ghost" type="button">清空</button>
+          </div>
+        </div>
+        <ol id="logs" class="logs" aria-live="polite"></ol>
+      </section>
+    </main>
+
+    <script src="/static/anna-apps/_sdk/0.1.0/index.js" defer></script>
+    <script src="app.js" defer></script>
+  </body>
+</html>
