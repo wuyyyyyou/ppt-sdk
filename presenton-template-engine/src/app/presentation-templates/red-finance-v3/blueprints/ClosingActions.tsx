@@ -1,12 +1,12 @@
 import React from "react";
 import * as z from "zod";
 
-import FinanceContentFrame from "../components/FinanceContentFrame.js";
-import FinanceSectionHeading from "../components/FinanceSectionHeading.js";
-import { FinanceIcon } from "../components/FinanceIcons.js";
-import HorizontalFeatureCard from "../components/HorizontalFeatureCard.js";
-import InfoListItem from "../components/InfoListItem.js";
-import InsightCallout from "../components/InsightCallout.js";
+import FinanceContentFrame from "../components/FinanceContentFrame.tsx";
+import FinanceSectionHeading from "../components/FinanceSectionHeading.tsx";
+import { FinanceIcon } from "../components/FinanceIcons.tsx";
+import HorizontalFeatureCard from "../components/HorizontalFeatureCard.tsx";
+import InfoListItem from "../components/InfoListItem.tsx";
+import InsightCallout from "../components/InsightCallout.tsx";
 
 const IconSchema = z.enum([
   "bank",
@@ -38,20 +38,20 @@ const ActionSchema = z.object({
 export const Schema = z.object({
   title: z.string().min(2).max(28).default("Closing Actions"),
   metaLabel: z.string().min(2).max(48).default("BLUEPRINT / CLOSING"),
-  footerText: z.string().min(6).max(80).default("Red Finance V3 | Closing Actions"),
+  footerText: z.string().min(6).max(80).default("Business Professional | Closing Actions"),
   pageNumber: z.string().min(1).max(4).default("09"),
   variant: z.enum(["conclusion-plus-actions", "decision-ask-focus"]).default("conclusion-plus-actions"),
   density: z.enum(["medium", "high"]).default("medium"),
-  heading: z.string().min(2).max(32).default("结论与行动"),
-  finalTitle: z.string().min(2).max(32).default("最终判断"),
-  finalText: z.string().min(8).max(120).default("适合用简洁结论收束整份 deck，再给出明确行动。"),
+  heading: z.string().min(2).max(32).default("Conclusion and actions"),
+  finalTitle: z.string().min(2).max(32).default("Final judgment"),
+  finalText: z.string().min(8).max(120).default("Close the deck with a concise conclusion and clear actions."),
   actions: z.array(ActionSchema).min(3).max(5).default([
-    { icon: "route", title: "Prioritize", description: "确定优先级和接下来 30 天的重点。"},
-    { icon: "shield", title: "Validate", description: "检查风险、假设和关键依赖。"},
-    { icon: "lightbulb", title: "Decide", description: "给出需要确认或授权的事项。"},
+    { icon: "route", title: "Prioritize", description: "Define priorities and the focus for the next 30 days."},
+    { icon: "shield", title: "Validate", description: "Check risks, assumptions, and critical dependencies."},
+    { icon: "lightbulb", title: "Decide", description: "Clarify what needs confirmation or authorization."},
   ]),
   decisionAsk: z.string().max(120).optional(),
-  summary: z.string().min(8).max(120).default("结尾页应明确下一步，而不是只写口号。"),
+  summary: z.string().min(8).max(120).default("A closing slide should make next steps explicit, not just repeat a slogan."),
 });
 
 export const layoutId = "closing-actions";

@@ -12,6 +12,7 @@ interface ReviseOutlinePromptMessageInput {
   expectedSlideCount: number | null;
   locale: string;
   settingSummaryJson: string;
+  contextRowsJson: string;
   title?: string;
   feedback: string;
   outlineJson: string;
@@ -91,39 +92,47 @@ export function buildReviseOutlineUserPrompt(
   if (language === "zh") {
     return [
       "请根据反馈修改现有演示文稿大纲。",
+      "优先级规则：修改反馈只覆盖它明确提到的部分；反馈未提及的部分必须严格遵循低优先级工作区配置和可选上下文行，不要自行覆盖或忽略。",
       input.expectedSlideCount === null
-        ? "页数要求：如果修改反馈明确要求页数，必须遵循；否则保持合理页数，范围为 3 到 15 页。"
+        ? "页数要求：如果修改反馈明确要求页数，必须遵循；否则严格参考可选上下文行里的页数；仍未指定时保持合理页数，范围为 3 到 15 页。"
         : `页数要求：items 中必须严格返回 ${input.expectedSlideCount} 页。`,
       `界面语言：${input.locale}`,
-      `相关工作区配置：${input.settingSummaryJson}`,
+      `低优先级工作区配置：${input.settingSummaryJson}`,
+      `可选上下文行：${input.contextRowsJson}`,
       `当前演示文稿标题：${input.title || ""}`,
-      `修改反馈：${input.feedback}`,
+      `最高优先级修改反馈：${input.feedback}`,
       `当前大纲 items：${input.outlineJson}`,
       "输出要求：",
       "- 只返回一个合法 JSON 对象。",
       "- title 必须是演示文稿标题。",
       "- items 必须是修改后的每一页大纲数组。",
       "- 每个页面 item 都必须包含 title 和 outline。",
-      "- title 和 outline 的内容语言必须遵循工作区配置中的 output_language / language。",
+      "- 如果修改反馈指定了语言、页数、内容取舍或结构，必须优先遵循修改反馈。",
+      "- 修改反馈没有指定的受众、目标、风格、内容来源、语言和页数，必须严格遵循工作区配置和可选上下文行。",
+      "- 只有当修改反馈没有指定语言时，title 和 outline 的内容语言才遵循工作区配置中的 output_language / language。",
     ].join("\n");
   }
 
   return [
     "Revise the existing presentation outline according to the feedback.",
+    "Priority rule: feedback overrides only the parts it explicitly mentions; for anything not mentioned, strictly follow the lower-priority workspace settings and optional context rows.",
     input.expectedSlideCount === null
-      ? "Slide count: if the feedback explicitly asks for a count, follow it; otherwise keep a reasonable count between 3 and 15 pages."
+      ? "Slide count: if the feedback explicitly asks for a count, follow it; otherwise strictly consult the optional context slide-count row; if still unspecified, keep a reasonable count between 3 and 15 pages."
       : `Slide count: return exactly ${input.expectedSlideCount} pages in items.`,
     `Locale: ${input.locale}`,
-    `Relevant workspace setting: ${input.settingSummaryJson}`,
+    `Lower-priority workspace setting: ${input.settingSummaryJson}`,
+    `Optional context rows: ${input.contextRowsJson}`,
     `Current presentation title: ${input.title || ""}`,
-    `Feedback: ${input.feedback}`,
+    `Highest-priority feedback: ${input.feedback}`,
     `Current outline items: ${input.outlineJson}`,
     "Output requirements:",
     "- Return one valid JSON object only.",
     "- title must be the presentation title.",
     "- items must be the revised page outline array.",
     "- Every page item must have title and outline.",
-    "- The title and outline content language must follow output_language / language in the workspace setting.",
+    "- If the feedback specifies language, slide count, content inclusion/exclusion, or structure, follow the feedback first.",
+    "- For audience, goal, style, content source, language, and slide count not specified in the feedback, strictly follow workspace settings and optional context rows.",
+    "- Only when the feedback does not specify language should title and outline language follow output_language / language in the workspace setting.",
   ].join("\n");
 }
 

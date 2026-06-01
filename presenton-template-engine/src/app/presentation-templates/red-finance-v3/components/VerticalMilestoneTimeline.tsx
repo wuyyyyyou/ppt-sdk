@@ -1,8 +1,8 @@
 import React from "react";
 
-import { redFinanceTheme } from "../theme/tokens.js";
-import HorizontalFeatureCard from "./HorizontalFeatureCard.js";
-import { type FinanceIconName } from "./FinanceIcons.js";
+import { redFinanceTheme } from "../theme/tokens.ts";
+import HorizontalFeatureCard from "./HorizontalFeatureCard.tsx";
+import { type FinanceIconName } from "./FinanceIcons.tsx";
 
 export type VerticalMilestoneTimelineItem = {
   period: string;

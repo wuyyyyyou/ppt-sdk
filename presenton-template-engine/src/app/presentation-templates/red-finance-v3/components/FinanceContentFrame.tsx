@@ -1,8 +1,8 @@
 import React, { type ReactNode } from "react";
 
-import { redFinanceTheme } from "../theme/tokens.js";
-import FinanceCanvas from "./FinanceCanvas.js";
-import IconText from "./IconText.js";
+import { redFinanceTheme } from "../theme/tokens.ts";
+import FinanceCanvas from "./FinanceCanvas.tsx";
+import IconText from "./IconText.tsx";
 
 type TitleAccent = "none" | "left" | "bottom";
 

@@ -1,13 +1,13 @@
 {
   "title": "Chart With Narrative",
   "metaLabel": "BLUEPRINT / CHART NARRATIVE",
-  "footerText": "Red Finance V3 | Chart With Narrative",
+  "footerText": "Business Professional | Chart With Narrative",
   "pageNumber": "05",
   "variant": "chart-left-narrative-right",
   "density": "high",
   "chartKind": "bar",
-  "chartTitle": "趋势与变化",
-  "chartSubtitle": "单图表配单叙事，适合趋势和结构变化。",
+  "chartTitle": "Trend and change",
+  "chartSubtitle": "One chart paired with one concise narrative.",
   "labels": ["Q1", "Q2", "Q3", "Q4"],
   "series": [
     {
@@ -24,23 +24,23 @@
   "minValue": 0,
   "maxValue": 100,
   "ticks": [0, 20, 40, 60, 80, 100],
-  "narrativeTitle": "解释要点",
+  "narrativeTitle": "Interpretation points",
   "narrativeItems": [
     {
       "icon": "lightbulb",
-      "title": "变化原因",
-      "description": "把关键驱动原因用短句拆开，而不是直接堆入图表说明。"
+      "title": "Change drivers",
+      "description": "Break key drivers into short points instead of crowding the chart."
     },
     {
       "icon": "shield",
-      "title": "口径提醒",
-      "description": "图表旁边保留口径和结论，保证导出后可编辑。"
+      "title": "Measurement note",
+      "description": "Keep definitions and conclusions editable beside the chart."
     },
     {
       "icon": "route",
-      "title": "下一步",
-      "description": "结论收束后能顺滑引出下一页分析或行动建议。"
+      "title": "Next step",
+      "description": "Use the conclusion to bridge into the next analysis or action."
     }
   ],
-  "summary": "适合单个图表加短叙事，不适合多图表仪表盘。"
+  "summary": "Best for one primary chart with concise interpretation; avoid dashboard-style chart collections."
 }

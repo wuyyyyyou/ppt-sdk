@@ -1,2 +1,2 @@
-export { default } from "../blueprints/ComparisonMatrix.js";
-export * from "../blueprints/ComparisonMatrix.js";
+export { default } from "../blueprints/ComparisonMatrix.tsx";
+export * from "../blueprints/ComparisonMatrix.tsx";

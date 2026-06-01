@@ -1,7 +1,7 @@
 import React, { type CSSProperties, type ReactNode } from "react";
 
-import { redFinanceTheme } from "../theme/tokens.js";
-import StableInlineRow from "./StableInlineRow.js";
+import { redFinanceTheme } from "../theme/tokens.ts";
+import StableInlineRow from "./StableInlineRow.tsx";
 
 type IconTextProps = {
   icon: ReactNode;

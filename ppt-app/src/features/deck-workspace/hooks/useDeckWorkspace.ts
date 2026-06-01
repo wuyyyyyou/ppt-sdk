@@ -49,6 +49,8 @@ import type {
 const DEFAULT_TEMPLATE_GROUP_ID = "red-finance-v3";
 const PPTX_EXPORT_POLL_INTERVAL_MS = 1500;
 const PPTX_EXPORT_POLL_TIMEOUT_MS = 15 * 60 * 1000;
+const SLIDE_COUNT_CONTEXT_OPTIONS = ["auto", ...Array.from({ length: 20 }, (_, index) => String(index + 1))];
+type ContextPatchId = "audience" | "goal" | "style" | "content" | "slides";
 
 function padDatePart(value: number) {
   return String(value).padStart(2, "0");
@@ -389,7 +391,105 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     delete setting.audience;
     delete setting.goal;
     delete setting.style_notes;
+    delete setting.slide_count;
     return setting;
+  }
+
+  function normalizePersistedContextRow(value: unknown): ContextRow | null {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return null;
+    }
+
+    const record = value as Partial<ContextRow>;
+    if (typeof record.id !== "string" || !record.id) {
+      return null;
+    }
+
+    const baseRow: ContextRow = {
+      id: record.id,
+      label: typeof record.label === "string" && record.label ? record.label : record.id,
+      value: typeof record.value === "string" ? record.value : "",
+      placeholder: typeof record.placeholder === "string" ? record.placeholder : undefined,
+      type:
+        record.type === "select" || record.type === "attachment" || record.type === "text"
+          ? record.type
+          : undefined,
+      options: Array.isArray(record.options)
+        ? record.options.filter((option): option is string => typeof option === "string")
+        : undefined,
+    };
+
+    switch (baseRow.id) {
+      case "audience":
+        return {
+          ...baseRow,
+          label: t.brief.contextLabels.audience,
+          placeholder: t.brief.contextPlaceholders.audience,
+        };
+      case "goal":
+        return {
+          ...baseRow,
+          label: t.brief.contextLabels.goal,
+          placeholder: t.brief.contextPlaceholders.goal,
+        };
+      case "style":
+        return {
+          ...baseRow,
+          label: t.brief.contextLabels.styleNotes,
+          placeholder: t.brief.contextPlaceholders.styleNotes,
+        };
+      case "content":
+        return {
+          ...baseRow,
+          label: t.brief.contextLabels.contentSource,
+          placeholder: t.brief.contextPlaceholders.contentSource,
+        };
+      case "attachment":
+        return {
+          ...baseRow,
+          label: t.brief.contextLabels.attachment,
+          type: "attachment",
+        };
+      case "slides":
+      case "slide_count":
+        return {
+          ...baseRow,
+          id: "slides",
+          label: t.brief.contextLabels.slides,
+          value: SLIDE_COUNT_CONTEXT_OPTIONS.includes(baseRow.value) ? baseRow.value : "auto",
+          type: "select",
+          options: SLIDE_COUNT_CONTEXT_OPTIONS,
+        };
+      default:
+        return baseRow;
+    }
+  }
+
+  function workspaceContextRowsToState(workspace: WorkspaceResult): {
+    rows: ContextRow[];
+    shouldSync: boolean;
+  } {
+    const outlineRecord =
+      workspace.outline && typeof workspace.outline === "object" && !Array.isArray(workspace.outline)
+        ? (workspace.outline as { items?: unknown; source?: { prompt?: unknown; context?: unknown; task_context?: unknown } })
+        : null;
+    const source = outlineRecord?.source;
+    const rawContext = Array.isArray(source?.task_context)
+      ? source.task_context
+      : Array.isArray(source?.context)
+      ? source.context
+      : [];
+    const rows = rawContext
+      .map(normalizePersistedContextRow)
+      .filter((row): row is ContextRow => row !== null);
+
+    return {
+      rows,
+      shouldSync:
+        rows.length > 0 ||
+        (Array.isArray(outlineRecord?.items) && outlineRecord.items.length > 0) ||
+        (typeof source?.prompt === "string" && source.prompt.length > 0),
+    };
   }
 
   function workspaceReviewRenderKey(workspace: WorkspaceResult) {
@@ -428,7 +528,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       typeof pagesRecord?.updated_at === "string" ? pagesRecord.updated_at : "",
       selectedAt,
     ];
-    return `${workspace.workspace_dir}:${manifestPath}:${updatedParts.join(":")}`;
+    return `${workspace.task_dir ?? workspace.workspace_dir}:${manifestPath}:${updatedParts.join(":")}`;
   }
 
   function buildOutlineArtifact(
@@ -442,7 +542,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       items,
       source: {
         prompt,
-        context: contextRows,
+        task_context: contextRows,
         setting: workspaceSettingsToState(currentWorkspace)
       }
     };
@@ -531,8 +631,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       }
     }
 
-    // 不再把 workspace.setting 显示或合并到可选上下文（避免 UI 重复）。
-    // workspace.setting 会在生成请求时通过 `setting` 参数直接传入 LLM 调用，保持 UI 中的 `contextRows` 仅由用户控制。
+    const persistedContextRows = workspaceContextRowsToState(workspace);
+    if (persistedContextRows.shouldSync) {
+      setContextRows(persistedContextRows.rows);
+    }
   }
 
   useEffect(() => {
@@ -560,7 +662,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       } catch (error) {
         if (!cancelled) {
           setWorkspaceError(
-            error instanceof Error ? error.message : "Failed to scan workspaces."
+            error instanceof Error ? error.message : "Failed to scan tasks."
           );
         }
       } finally {
@@ -691,8 +793,138 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     addContextRow({
       id: "style",
       label: t.brief.contextLabels.styleNotes,
-      value: t.brief.contextDefaults.styleNotes
+      value: "",
+      placeholder: t.brief.contextPlaceholders.styleNotes
     });
+  }
+
+  function parseContextSlideCount(value: string): string | null {
+    const digitMatch = value.match(/(?:^|[^\d])(\d{1,2})\s*(?:页|张|slides?|pages?)/i)
+      ?? value.match(/(?:页数|slide\s*count|slides?|pages?)[^\d一二两三四五六七八九十]{0,12}(\d{1,2}|auto)/i);
+    if (digitMatch) {
+      const parsed = digitMatch[1].toLowerCase();
+      return parsed === "auto" || SLIDE_COUNT_CONTEXT_OPTIONS.includes(parsed) ? parsed : null;
+    }
+
+    const digits: Record<string, number> = {
+      一: 1,
+      二: 2,
+      两: 2,
+      三: 3,
+      四: 4,
+      五: 5,
+      六: 6,
+      七: 7,
+      八: 8,
+      九: 9,
+      十: 10,
+    };
+    const chineseMatch = value.match(/([一二两三四五六七八九十]{1,3})\s*(?:页|张)/);
+    if (!chineseMatch) return null;
+
+    const text = chineseMatch[1];
+    const parsed = text === "十"
+      ? 10
+      : text.startsWith("十")
+        ? 10 + (digits[text.slice(1)] ?? 0)
+        : text.endsWith("十")
+          ? (digits[text.slice(0, -1)] ?? 0) * 10
+          : text.includes("十")
+            ? text.split("十").reduce((total, part, index) => {
+                if (index === 0) return (digits[part] ?? 0) * 10;
+                return total + (digits[part] ?? 0);
+              }, 0)
+            : digits[text];
+
+    return parsed && SLIDE_COUNT_CONTEXT_OPTIONS.includes(String(parsed)) ? String(parsed) : null;
+  }
+
+  function readFeedbackContextValue(feedback: string, labels: string[]): string | null {
+    const escapedLabels = labels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    const pattern = new RegExp(
+      `(?:${escapedLabels.join("|")})\\s*(?:改成|调整为|设为|设置为|是|为|:|：|to|as)?\\s*([^。；;，,\\n]+)`,
+      "i",
+    );
+    const match = pattern.exec(feedback);
+    const value = match?.[1]?.trim().replace(/[，,]$/, "");
+    return value && value.length > 0 ? value : null;
+  }
+
+  function buildContextRowFromPatch(id: ContextPatchId, value: string): ContextRow {
+    switch (id) {
+      case "audience":
+        return {
+          id,
+          label: t.brief.contextLabels.audience,
+          value,
+          placeholder: t.brief.contextPlaceholders.audience,
+        };
+      case "goal":
+        return {
+          id,
+          label: t.brief.contextLabels.goal,
+          value,
+          placeholder: t.brief.contextPlaceholders.goal,
+        };
+      case "style":
+        return {
+          id,
+          label: t.brief.contextLabels.styleNotes,
+          value,
+          placeholder: t.brief.contextPlaceholders.styleNotes,
+        };
+      case "content":
+        return {
+          id,
+          label: t.brief.contextLabels.contentSource,
+          value,
+          placeholder: t.brief.contextPlaceholders.contentSource,
+        };
+      case "slides":
+        return {
+          id,
+          label: t.brief.contextLabels.slides,
+          value,
+          type: "select",
+          options: SLIDE_COUNT_CONTEXT_OPTIONS,
+        };
+    }
+  }
+
+  function deriveContextRowsFromOutlineFeedback(rows: ContextRow[], feedback: string): ContextRow[] {
+    const patch: Partial<Record<ContextPatchId, string>> = {};
+    const slideCount = parseContextSlideCount(feedback);
+    if (slideCount) patch.slides = slideCount;
+
+    const audience = readFeedbackContextValue(feedback, ["受众", "面向对象", "面向", "audience"]);
+    if (audience) patch.audience = audience;
+
+    const goal = readFeedbackContextValue(feedback, ["目标", "目的", "goal"]);
+    if (goal) patch.goal = goal;
+
+    const style = readFeedbackContextValue(feedback, ["风格", "视觉风格", "语气", "style", "tone"]);
+    if (style) patch.style = style;
+
+    const content = readFeedbackContextValue(feedback, ["内容来源", "参考材料", "材料", "content source", "source"]);
+    if (content) patch.content = content;
+
+    const patchEntries = Object.entries(patch) as Array<[ContextPatchId, string]>;
+    if (patchEntries.length === 0) return rows;
+
+    const patchedIds = new Set(patchEntries.map(([id]) => id));
+    const nextRows = rows.map((row) =>
+      patchedIds.has(row.id as ContextPatchId)
+        ? buildContextRowFromPatch(row.id as ContextPatchId, patch[row.id as ContextPatchId] ?? row.value)
+        : row
+    );
+
+    for (const [id, value] of patchEntries) {
+      if (!nextRows.some((row) => row.id === id)) {
+        nextRows.push(buildContextRowFromPatch(id, value));
+      }
+    }
+
+    return nextRows;
   }
 
   async function applyDeckGenerationCompletion(
@@ -888,14 +1120,29 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const setting = workspaceSettingsToState(workspace);
       const baseTitle = outlineEditMode ? outlineDraftTitle : deckTitle;
       const baseOutline = outlineEditMode ? outlineDraft : outline;
+      const nextContextRows = deriveContextRowsFromOutlineFeedback(contextRows, outlineFeedback);
+      setContextRows(nextContextRows);
       const result = await aiClient.reviseOutline({
         title: baseTitle,
         outline: baseOutline,
         feedback: outlineFeedback,
         locale,
-        setting
+        setting,
+        contextRows: nextContextRows
       });
       await appendOutlineAiAttemptLogs(workspace, result.attempts);
+      await saveOutlineArtifact(
+        result.outline.items,
+        result.outline.title,
+        workspace,
+        setting,
+        "draft",
+        false,
+        nextContextRows
+      );
+      if (backend) {
+        setWorkspaceScan(await backend.listWorkspaces());
+      }
       setOutlineDraftTitle(result.outline.title);
       setOutlineDraft(result.outline.items);
       setOutlineEditMode(true);
@@ -1135,7 +1382,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       workspace.task !== null &&
       typeof (workspace.task as { title?: unknown }).title === "string"
       ? (workspace.task as { title: string }).title
-      : workspace.workspace_id;
+      : workspace.task_id ?? workspace.workspace_id;
   }
 
   function readWorkspaceExportArtifactPath(workspace: WorkspaceResult): ExportArtifact | null {
@@ -1145,8 +1392,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     const task = workspace.task as {
       artifacts?: {
-        pptx?: { path?: unknown; updated_at?: unknown };
-        pdf?: { path?: unknown; updated_at?: unknown };
+        pptx?: {
+          path?: unknown;
+          url?: unknown;
+          updated_at?: unknown;
+          generator_result?: { artifact_url?: unknown };
+        };
+        pdf?: { path?: unknown; url?: unknown; updated_at?: unknown };
       };
     };
     const pptx = task.artifacts?.pptx;
@@ -1155,11 +1407,18 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       {
         type: "PPTX" as const,
         path: typeof pptx?.path === "string" ? pptx.path : "",
+        href:
+          typeof pptx?.url === "string" && pptx.url
+            ? pptx.url
+            : typeof pptx?.generator_result?.artifact_url === "string"
+              ? pptx.generator_result.artifact_url
+              : "",
         updatedAt: typeof pptx?.updated_at === "string" ? pptx.updated_at : ""
       },
       {
         type: "PDF" as const,
         path: typeof pdf?.path === "string" ? pdf.path : "",
+        href: typeof pdf?.url === "string" ? pdf.url : "",
         updatedAt: typeof pdf?.updated_at === "string" ? pdf.updated_at : ""
       }
     ].filter((item) => item.path);
@@ -1319,7 +1578,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     workspaceOverride: WorkspaceResult | null = null,
     settingOverride: WorkspaceSettings | null = null,
     status: "draft" | "confirmed" = "draft",
-    applyWorkspaceState = true
+    applyWorkspaceState = true,
+    contextRowsOverride: ContextRow[] | null = null
   ) {
     if (!backend) return null;
     const workspace = workspaceOverride ?? (await ensureCurrentWorkspace());
@@ -1331,7 +1591,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         ...buildOutlineArtifact(items, title, status),
         source: {
           prompt,
-          context: contextRows,
+          task_context: contextRowsOverride ?? contextRows,
           setting: settingOverride ?? workspaceSettingsToState(workspace)
         }
       }
@@ -1372,7 +1632,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       setWorkspaceScan(await backend.listWorkspaces());
     } catch (error) {
       setWorkspaceError(
-        error instanceof Error ? error.message : "Failed to scan workspaces."
+        error instanceof Error ? error.message : "Failed to scan tasks."
       );
     } finally {
       setWorkspaceLoading(false);
@@ -1380,9 +1640,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function useLatestWorkspace() {
-    if (!backend || !workspaceScan?.latest_workspace) return;
+    const latestTask = workspaceScan?.latest_task ?? workspaceScan?.latest_workspace;
+    if (!backend || !latestTask) return;
 
-    await openWorkspace(workspaceScan.latest_workspace.workspace_dir);
+    await openWorkspace(latestTask.task_dir ?? latestTask.workspace_dir);
   }
 
   async function openWorkspace(workspaceDir: string) {
@@ -1401,11 +1662,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         setHistory((items) => (items.at(-1) === "main" ? items : [...items, "main"]));
         const rendered = await renderDeckHtmlForWorkspace(workspace, "review");
         if (rendered) {
-          showToast(formatMessage(t.toasts.workspaceOpened, { id: workspace.workspace_id }));
+          showToast(formatMessage(t.toasts.workspaceOpened, { id: workspace.task_id ?? workspace.workspace_id }));
         }
       } else {
         setPage("main");
-        showToast(formatMessage(t.toasts.workspaceOpened, { id: workspace.workspace_id }));
+        showToast(formatMessage(t.toasts.workspaceOpened, { id: workspace.task_id ?? workspace.workspace_id }));
       }
     } catch (error) {
       setWorkspaceError(
@@ -1428,7 +1689,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       applyWorkspace(workspace);
       setWorkspaceScan(await backend.listWorkspaces());
       setPage("main");
-      showToast(formatMessage(t.toasts.workspaceCreated, { id: workspace.workspace_id }));
+      showToast(formatMessage(t.toasts.workspaceCreated, { id: workspace.task_id ?? workspace.workspace_id }));
     } catch (error) {
       setWorkspaceError(
         error instanceof Error ? error.message : "Failed to create workspace."
@@ -1473,7 +1734,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           ...setting,
           audience: "",
           goal: "",
-          style_notes: ""
+          style_notes: "",
+          slide_count: undefined
         }
       });
       applyWorkspace(workspace);
@@ -1624,7 +1886,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       });
       void backend.listWorkspaces().then(setWorkspaceScan).catch((error) => {
         console.warn(
-          "Failed to refresh workspaces after render",
+          "Failed to refresh tasks after render",
           error instanceof Error ? error.message : error
         );
       });
@@ -1728,30 +1990,24 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
         const pptxPath = completed.pptx_path;
         assertPptxExportPath(pptxPath, "pptx_path");
-        await backend.recordPptxExport({
+        const updatedWorkspace = await backend.recordPptxExport({
           workspace_dir: workspace.workspace_dir,
           pptxPath,
           generatorResult: completed.generator_result ?? completed
         });
-        const refreshedWorkspace = await backend.openWorkspace({
-          workspace_dir: workspace.workspace_dir
-        });
-        applyWorkspace(refreshedWorkspace);
-        await refreshWorkspaceExportArtifact(refreshedWorkspace);
+        applyWorkspace(updatedWorkspace);
+        await refreshWorkspaceExportArtifact(updatedWorkspace);
       } else {
         const pdfResult = await backend.exportPdf({
           workspace_dir: workspace.workspace_dir
         });
         const pdfPath = pdfResult.pdfPath;
-        await backend.recordPdfExport({
+        const updatedWorkspace = await backend.recordPdfExport({
           workspace_dir: workspace.workspace_dir,
           pdfPath
         });
-        const refreshedWorkspace = await backend.openWorkspace({
-          workspace_dir: workspace.workspace_dir
-        });
-        applyWorkspace(refreshedWorkspace);
-        await refreshWorkspaceExportArtifact(refreshedWorkspace);
+        applyWorkspace(updatedWorkspace);
+        await refreshWorkspaceExportArtifact(updatedWorkspace);
       }
 
       setExportStatus(formatMessage(t.exportPage.ready, { type }));

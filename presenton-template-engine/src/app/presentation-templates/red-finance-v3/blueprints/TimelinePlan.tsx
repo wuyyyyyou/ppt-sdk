@@ -1,13 +1,13 @@
 import React from "react";
 import * as z from "zod";
 
-import FinanceContentFrame from "../components/FinanceContentFrame.js";
-import FinanceSectionHeading from "../components/FinanceSectionHeading.js";
-import { FinanceIcon } from "../components/FinanceIcons.js";
-import InsightCallout from "../components/InsightCallout.js";
-import KpiMetricItem from "../components/KpiMetricItem.js";
-import TimelineBoard, { type TimelineBoardItem } from "../components/TimelineBoard.js";
-import VerticalMilestoneTimeline, { type VerticalMilestoneTimelineItem } from "../components/VerticalMilestoneTimeline.js";
+import FinanceContentFrame from "../components/FinanceContentFrame.tsx";
+import FinanceSectionHeading from "../components/FinanceSectionHeading.tsx";
+import { FinanceIcon } from "../components/FinanceIcons.tsx";
+import InsightCallout from "../components/InsightCallout.tsx";
+import KpiMetricItem from "../components/KpiMetricItem.tsx";
+import TimelineBoard, { type TimelineBoardItem } from "../components/TimelineBoard.tsx";
+import VerticalMilestoneTimeline, { type VerticalMilestoneTimelineItem } from "../components/VerticalMilestoneTimeline.tsx";
 
 const PhaseSchema = z.object({
   label: z.string().min(1).max(8),
@@ -28,23 +28,23 @@ const MilestoneSchema = z.object({
 export const Schema = z.object({
   title: z.string().min(2).max(28).default("Timeline Plan"),
   metaLabel: z.string().min(2).max(48).default("BLUEPRINT / TIMELINE"),
-  footerText: z.string().min(6).max(80).default("Red Finance V3 | Timeline Plan"),
+  footerText: z.string().min(6).max(80).default("Business Professional | Timeline Plan"),
   pageNumber: z.string().min(1).max(4).default("07"),
   variant: z.enum(["horizontal-roadmap", "vertical-milestones"]).default("horizontal-roadmap"),
   density: z.enum(["low", "medium", "high"]).default("medium"),
-  heading: z.string().min(2).max(30).default("路线图"),
-  subtitle: z.string().min(8).max(96).default("按阶段表达演进路径、实施节奏或里程碑。"),
+  heading: z.string().min(2).max(30).default("Roadmap"),
+  subtitle: z.string().min(8).max(96).default("Show evolution, implementation cadence, or milestones by phase."),
   phases: z.array(PhaseSchema).min(3).max(6).default([
-    { label: "01", title: "Assess", items: ["识别问题", "定义范围"] },
-    { label: "02", title: "Design", items: ["设计方案", "对齐依赖"] },
-    { label: "03", title: "Deliver", items: ["落地执行", "跟踪结果"] },
+    { label: "01", title: "Assess", items: ["Identify issues", "Define scope"] },
+    { label: "02", title: "Design", items: ["Design solution", "Align dependencies"] },
+    { label: "03", title: "Deliver", items: ["Execute rollout", "Track outcomes"] },
   ]),
   milestones: z.array(MilestoneSchema).min(3).max(6).default([
     {
       period: "2022",
       stage: "Start",
       title: "Policy kickoff",
-      description: "起点阶段，用于表达行业或项目的启动节点。",
+      description: "Starting point for an industry shift or project kickoff.",
       icon: "calendar",
       tone: "default",
       tag: "start",
@@ -53,7 +53,7 @@ export const Schema = z.object({
       period: "2024",
       stage: "Scale",
       title: "Operational expansion",
-      description: "中期阶段，通常是扩张或整合的关键窗口。",
+      description: "Mid-stage window for expansion, integration, or scaling.",
       icon: "route",
       tone: "accent",
       tag: "scale",
@@ -62,7 +62,7 @@ export const Schema = z.object({
       period: "2026",
       stage: "Next",
       title: "Future state",
-      description: "下一步目标，用来承接规划和建议。",
+      description: "Future-state target that connects planning to recommendations.",
       icon: "lightbulb",
       tone: "future",
       tag: "future",
@@ -73,7 +73,7 @@ export const Schema = z.object({
     { value: "6", label: "months" },
     { value: "12", label: "milestones" },
   ]),
-  summary: z.string().min(8).max(120).default("适合有明显阶段和节奏的规划页面。"),
+  summary: z.string().min(8).max(120).default("Best for plans with clear phases, cadence, and milestones."),
 });
 
 export const layoutId = "timeline-plan";

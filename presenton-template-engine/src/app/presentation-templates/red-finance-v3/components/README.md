@@ -1,4 +1,4 @@
-# Red Finance V3 组件索引
+# Business Professional 组件索引
 
 本目录存放 `red-finance-v3` 模板组的可复用视觉组件。组件只负责稳定的视觉单元和导出友好的结构；页面级布局、组件编排和数据映射应优先放在 `slides/*.tsx` 中，业务内容数据可以放在 `data/*.json` 中。
 

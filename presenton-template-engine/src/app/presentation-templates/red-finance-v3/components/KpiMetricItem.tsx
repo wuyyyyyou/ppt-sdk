@@ -1,6 +1,6 @@
 import React from "react";
 
-import StableInlineRow from "./StableInlineRow.js";
+import StableInlineRow from "./StableInlineRow.tsx";
 
 type KpiMetricItemProps = {
   value: string;

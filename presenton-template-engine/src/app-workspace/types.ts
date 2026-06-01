@@ -1,6 +1,8 @@
 export interface AppWorkspaceSummary {
   workspace_id: string;
+  task_id: string;
   workspace_dir: string;
+  task_dir: string;
   title: string;
   status: string;
   created_at: string;
@@ -40,8 +42,11 @@ export interface AppWorkspaceOutline {
 
 export interface AppWorkspaceResult {
   workspace_root: string;
+  task_root: string;
   workspace_dir: string;
+  task_dir: string;
   workspace_id: string;
+  task_id: string;
   initialized: boolean;
   created_files: string[];
   missing_files: string[];
@@ -57,9 +62,13 @@ export interface AppWorkspaceResult {
 
 export interface ListAppWorkspacesResult {
   workspace_root: string;
+  task_root: string;
   has_workspaces: boolean;
+  has_tasks: boolean;
   latest_workspace: AppWorkspaceSummary | null;
+  latest_task: AppWorkspaceSummary | null;
   workspaces: AppWorkspaceSummary[];
+  tasks: AppWorkspaceSummary[];
 }
 
 export interface CreateAppWorkspaceInput {

@@ -1,2 +1,2 @@
-export { default } from "../blueprints/ChartWithNarrative.js";
-export * from "../blueprints/ChartWithNarrative.js";
+export { default } from "../blueprints/ChartWithNarrative.tsx";
+export * from "../blueprints/ChartWithNarrative.tsx";

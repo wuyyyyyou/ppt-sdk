@@ -1,12 +1,12 @@
 import React from "react";
 import * as z from "zod";
 
-import ComparisonPanel from "../components/ComparisonPanel.js";
-import FinanceContentFrame from "../components/FinanceContentFrame.js";
-import FinanceSectionHeading from "../components/FinanceSectionHeading.js";
-import { FinanceIcon, type FinanceIconName } from "../components/FinanceIcons.js";
-import InsightCallout from "../components/InsightCallout.js";
-import StableMatrixGrid from "../components/StableMatrixGrid.js";
+import ComparisonPanel from "../components/ComparisonPanel.tsx";
+import FinanceContentFrame from "../components/FinanceContentFrame.tsx";
+import FinanceSectionHeading from "../components/FinanceSectionHeading.tsx";
+import { FinanceIcon, type FinanceIconName } from "../components/FinanceIcons.tsx";
+import InsightCallout from "../components/InsightCallout.tsx";
+import StableMatrixGrid from "../components/StableMatrixGrid.tsx";
 
 const CellSchema = z.object({
   lead: z.string().min(1).max(48),
@@ -32,12 +32,12 @@ const SectionSchema = z.object({
 export const Schema = z.object({
   title: z.string().min(2).max(28).default("Comparison Matrix"),
   metaLabel: z.string().min(2).max(48).default("BLUEPRINT / MATRIX"),
-  footerText: z.string().min(6).max(80).default("Red Finance V3 | Comparison Matrix"),
+  footerText: z.string().min(6).max(80).default("Business Professional | Comparison Matrix"),
   pageNumber: z.string().min(1).max(4).default("06"),
   variant: z.enum(["entity-first", "dimension-first"]).default("entity-first"),
   density: z.enum(["medium", "high"]).default("medium"),
-  matrixTitle: z.string().min(2).max(28).default("对比矩阵"),
-  rowHeaderLabel: z.string().min(2).max(20).default("维度"),
+  matrixTitle: z.string().min(2).max(28).default("Comparison matrix"),
+  rowHeaderLabel: z.string().min(2).max(20).default("Dimension"),
   columns: z.array(ColumnSchema).min(2).max(5).default([
     { label: "China" },
     { label: "US" },
@@ -73,15 +73,15 @@ export const Schema = z.object({
     {
       badge: "01",
       title: "Key takeaway",
-      description: "矩阵页不是大表格，而是用结构化方式说明几个关键差异。",
+      description: "A matrix slide should explain a few key differences, not become a large table.",
     },
     {
       badge: "02",
       title: "Use case",
-      description: "适合中美对比、能力比较、方案比较或评分矩阵。",
+      description: "Useful for market, capability, option, or scoring comparisons.",
     },
   ]),
-  summary: z.string().min(8).max(120).default("适合多维对比，不适合单一观点说明。"),
+  summary: z.string().min(8).max(120).default("Best for multi-dimensional comparison; avoid using it for a single argument."),
 });
 
 export const layoutId = "comparison-matrix";

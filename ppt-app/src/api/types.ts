@@ -5,7 +5,9 @@ export interface ToolIds {
 
 export interface WorkspaceSummary {
   workspace_id: string;
+  task_id?: string;
   workspace_dir: string;
+  task_dir?: string;
   title: string;
   status: string;
   created_at: string;
@@ -24,8 +26,11 @@ export interface WorkspaceFiles {
 
 export interface WorkspaceResult {
   workspace_root: string;
+  task_root?: string;
   workspace_dir: string;
+  task_dir?: string;
   workspace_id: string;
+  task_id?: string;
   initialized: boolean;
   created_files: string[];
   missing_files: string[];
@@ -46,7 +51,6 @@ export interface WorkspaceSettings {
   language?: string;
   output_language?: string;
   aspect_ratio?: string;
-  slide_count?: string;
   text_density?: string;
   visual_tone?: string;
   typography?: string;
@@ -67,6 +71,7 @@ export interface WorkspaceOutline {
   source: {
     prompt: string;
     context: unknown[];
+    task_context?: unknown[];
     setting: Record<string, unknown>;
     kind?: string;
   };
@@ -98,9 +103,13 @@ export interface WorkspacePages {
 
 export interface ListWorkspacesResult {
   workspace_root: string;
+  task_root?: string;
   has_workspaces: boolean;
+  has_tasks?: boolean;
   latest_workspace: WorkspaceSummary | null;
+  latest_task?: WorkspaceSummary | null;
   workspaces: WorkspaceSummary[];
+  tasks?: WorkspaceSummary[];
 }
 
 export interface CreateWorkspaceInput {
@@ -147,7 +156,8 @@ export interface UpdateWorkspaceOutlineInput {
     items?: WorkspaceOutlineItem[];
     source?: {
       prompt: string;
-      context: unknown[];
+      context?: unknown[];
+      task_context?: unknown[];
       setting?: Record<string, unknown>;
     };
   };

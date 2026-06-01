@@ -6,6 +6,8 @@ import type { DeckGenerationProgress } from "../../deck-generation";
 import type { ContextRow, LoadingKind } from "../types";
 import { TemplatePreviewModal } from "./TemplatePreviewModal";
 
+const SLIDE_COUNT_OPTIONS = ["auto", ...Array.from({ length: 20 }, (_, index) => String(index + 1))];
+
 interface BriefPageProps {
   t: Messages;
   prompt: string;
@@ -123,7 +125,8 @@ export function BriefPage(props: BriefPageProps) {
                 addContextRow({
                   id: "audience",
                   label: t.brief.contextLabels.audience,
-                  value: t.brief.contextDefaults.audience
+                  value: "",
+                  placeholder: t.brief.contextPlaceholders.audience
                 })
               }
             >
@@ -135,7 +138,8 @@ export function BriefPage(props: BriefPageProps) {
                 addContextRow({
                   id: "goal",
                   label: t.brief.contextLabels.goal,
-                  value: t.brief.contextDefaults.goal
+                  value: "",
+                  placeholder: t.brief.contextPlaceholders.goal
                 })
               }
             >
@@ -150,11 +154,26 @@ export function BriefPage(props: BriefPageProps) {
                 addContextRow({
                   id: "content",
                   label: t.brief.contextLabels.contentSource,
-                  value: t.brief.contextDefaults.contentSource
+                  value: "",
+                  placeholder: t.brief.contextPlaceholders.contentSource
                 })
               }
             >
               {t.brief.chips.content}
+            </button>
+            <button
+              className="chip-btn"
+              onClick={() =>
+                addContextRow({
+                  id: "slides",
+                  label: t.brief.contextLabels.slides,
+                  value: "auto",
+                  type: "select",
+                  options: SLIDE_COUNT_OPTIONS
+                })
+              }
+            >
+              {t.brief.contextLabels.slides}
             </button>
             <button
               className="chip-btn"
@@ -453,7 +472,7 @@ function ContextRowView(props: {
             className="context-input"
             value={row.value}
             onChange={(event) => update(row.id, event.target.value)}
-            placeholder={t.brief.contextDefaults.attachmentPlaceholder}
+            placeholder={row.placeholder ?? t.brief.contextDefaults.attachmentPlaceholder}
           />
         </div>
       ) : (
@@ -461,6 +480,7 @@ function ContextRowView(props: {
           className="context-input"
           value={row.value}
           onChange={(event) => update(row.id, event.target.value)}
+          placeholder={row.placeholder}
         />
       )}
       <button className="context-remove-btn" onClick={() => remove(row.id)}>

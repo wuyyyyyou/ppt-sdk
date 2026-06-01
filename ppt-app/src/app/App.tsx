@@ -46,12 +46,12 @@ export function App() {
         <WorkspaceDialog
           locale={locale}
           scan={state.workspaceScan}
-          workspace={state.currentWorkspace}
+          task={state.currentWorkspace}
           loading={state.workspaceLoading}
           error={state.workspaceError}
           onUseLatest={actions.useLatestWorkspace}
           onCreate={actions.createWorkspace}
-          onRescan={actions.scanWorkspaces}
+          onOpen={actions.openWorkspace}
         />
 
         <PanelHeader

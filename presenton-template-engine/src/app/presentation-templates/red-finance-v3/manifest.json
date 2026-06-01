@@ -1,5 +1,5 @@
 {
-  "title": "Red Finance V3 Baseline Demo Deck",
+  "title": "Business Professional Demo Deck",
   "theme": {
     "company_name": "GLOBAL FINANCE INSIGHTS",
     "colors": {
@@ -14,8 +14,8 @@
   "slides": [
     {
       "id": "red-finance-v3-cover-statement",
-      "title": "Red Finance V3",
-      "speaker_note": "V3 基线封面页：用于验证 TSX-first 模板组的最小发现和渲染链路。",
+      "title": "Business Professional",
+      "speaker_note": "V3 baseline cover slide for validating minimal discovery and rendering of the TSX-first template group.",
       "source": {
         "type": "local",
         "path": "./slides/CoverStatement.tsx"
@@ -24,8 +24,8 @@
     },
     {
       "id": "red-finance-v3-section-divider",
-      "title": "TSX 优先架构",
-      "speaker_note": "V3 基线章节页：用于展示蓝图基础页、具体 slide 和组件组合的通用表达方式。",
+      "title": "TSX-first Architecture",
+      "speaker_note": "V3 baseline section slide for showing how blueprint pages, final slides, and component composition work together.",
       "source": {
         "type": "local",
         "path": "./slides/SectionDivider.tsx"
@@ -35,7 +35,7 @@
     {
       "id": "red-finance-v3-two-column-insight",
       "title": "Two Column Insight",
-      "speaker_note": "通用两栏观点页：左侧主叙事，右侧少量证据卡片。",
+      "speaker_note": "Generic two-column insight slide with the main narrative on one side and compact evidence cards on the other.",
       "source": {
         "type": "local",
         "path": "./slides/TwoColumnInsight.tsx"
@@ -45,7 +45,7 @@
     {
       "id": "red-finance-v3-three-column-cards",
       "title": "Three Column Cards",
-      "speaker_note": "通用三列卡片页：用于并列支柱、分类或策略选项。",
+      "speaker_note": "Generic three-column card slide for parallel pillars, categories, or strategic options.",
       "source": {
         "type": "local",
         "path": "./slides/ThreeColumnCards.tsx"
@@ -55,7 +55,7 @@
     {
       "id": "red-finance-v3-chart-with-narrative",
       "title": "Chart With Narrative",
-      "speaker_note": "通用图表叙事页：一张主图表搭配解释要点。",
+      "speaker_note": "Generic chart narrative slide with one primary chart and supporting interpretation points.",
       "source": {
         "type": "local",
         "path": "./slides/ChartWithNarrative.tsx"
@@ -65,7 +65,7 @@
     {
       "id": "red-finance-v3-comparison-matrix",
       "title": "Comparison Matrix",
-      "speaker_note": "通用对比矩阵页：用于多主体、多维度比较。",
+      "speaker_note": "Generic comparison matrix slide for multiple entities and dimensions.",
       "source": {
         "type": "local",
         "path": "./slides/ComparisonMatrix.tsx"
@@ -75,7 +75,7 @@
     {
       "id": "red-finance-v3-timeline-plan",
       "title": "Timeline Plan",
-      "speaker_note": "通用路线图页：用于阶段规划、里程碑或演进路径。",
+      "speaker_note": "Generic roadmap slide for phase planning, milestones, or evolution paths.",
       "source": {
         "type": "local",
         "path": "./slides/TimelinePlan.tsx"
@@ -85,7 +85,7 @@
     {
       "id": "red-finance-v3-kpi-summary",
       "title": "KPI Summary",
-      "speaker_note": "通用 KPI 汇总页：用于经营指标、目标拆解和状态速览。",
+      "speaker_note": "Generic KPI summary slide for operating metrics, target breakdowns, and status snapshots.",
       "source": {
         "type": "local",
         "path": "./slides/KpiSummary.tsx"
@@ -95,7 +95,7 @@
     {
       "id": "red-finance-v3-closing-actions",
       "title": "Closing Actions",
-      "speaker_note": "通用结尾行动页：用于总结结论、行动建议和决策请求。",
+      "speaker_note": "Generic closing action slide for conclusions, recommendations, and decision requests.",
       "source": {
         "type": "local",
         "path": "./slides/ClosingActions.tsx"

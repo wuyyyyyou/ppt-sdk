@@ -1,30 +1,30 @@
 {
   "title": "Closing Actions",
   "metaLabel": "BLUEPRINT / CLOSING",
-  "footerText": "Red Finance V3 | Closing Actions",
+  "footerText": "Business Professional | Closing Actions",
   "pageNumber": "09",
   "variant": "conclusion-plus-actions",
   "density": "medium",
-  "heading": "结论与行动",
-  "finalTitle": "最终判断",
-  "finalText": "适合用简洁结论收束整份 deck，再给出明确行动。",
+  "heading": "Conclusion and actions",
+  "finalTitle": "Final judgment",
+  "finalText": "Close the deck with a concise conclusion and clear actions.",
   "actions": [
     {
       "icon": "route",
       "title": "Prioritize",
-      "description": "确定优先级和接下来 30 天的重点。"
+      "description": "Define priorities and the focus for the next 30 days."
     },
     {
       "icon": "shield",
       "title": "Validate",
-      "description": "检查风险、假设和关键依赖。"
+      "description": "Check risks, assumptions, and critical dependencies."
     },
     {
       "icon": "lightbulb",
       "title": "Decide",
-      "description": "给出需要确认或授权的事项。"
+      "description": "Clarify what needs confirmation or authorization."
     }
   ],
-  "decisionAsk": "需要确认资源、优先级和下一阶段授权。",
-  "summary": "结尾页应明确下一步，而不是只写口号。"
+  "decisionAsk": "Confirm resources, priorities, and authorization for the next phase.",
+  "summary": "A closing slide should make next steps explicit, not just repeat a slogan."
 }

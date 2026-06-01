@@ -1,2 +1,2 @@
-export { default } from "../blueprints/KpiSummary.js";
-export * from "../blueprints/KpiSummary.js";
+export { default } from "../blueprints/KpiSummary.tsx";
+export * from "../blueprints/KpiSummary.tsx";

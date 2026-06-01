@@ -1,6 +1,6 @@
 # 参考页面
 
-这个目录保留上一代模板中选出的成品页面，用作视觉和组件编排参考。
+这个目录保留选出的成品页面，用作视觉和组件编排参考。
 
 它们不是 V3 的生成入口：
 
@@ -19,10 +19,10 @@
 
 ## 参考索引
 
-| 参考页面 | 来源 | 可提取模式 | 相关 V3 蓝图 |
-| --- | --- | --- | --- |
-| `IndustryOverview.tsx` | `red-finance-v2/slides/IndustryOverview.tsx` | 左侧叙事列表 + 右侧图表 + 底部强调结论 | `two-column-insight`, `chart-with-narrative` |
-| `MarketTrends.tsx` | `red-finance-v2/slides/MarketTrends.tsx` | 顶部卡片 + 底部图表面板 | `three-column-cards`, `chart-with-narrative` |
-| `ChinaUsMarketComparison.tsx` | `red-finance-v2/slides/ChinaUsMarketComparison.tsx` | 对比面板 + 指标 | `comparison-matrix`, `kpi-summary` |
-| `StrategicRoadmap.tsx` | `red-finance-v2/slides/StrategicRoadmap.tsx` | 支柱要点 + 路线图 + KPI | `timeline-plan`, `kpi-summary`, `three-column-cards` |
-| `ConclusionOutlook.tsx` | `red-finance-v2/slides/ConclusionOutlook.tsx` | 总结优先级 + 行动项 | `closing-actions`, `three-column-cards` |
+| 参考页面 | 可提取模式 | 相关 V3 蓝图 |
+| --- | --- | --- |
+| `IndustryOverview.tsx` | 左侧叙事列表 + 右侧图表 + 底部强调结论 | `two-column-insight`, `chart-with-narrative` |
+| `MarketTrends.tsx` | 顶部卡片 + 底部图表面板 | `three-column-cards`, `chart-with-narrative` |
+| `ChinaUsMarketComparison.tsx` | 对比面板 + 指标 | `comparison-matrix`, `kpi-summary` |
+| `StrategicRoadmap.tsx` | 支柱要点 + 路线图 + KPI | `timeline-plan`, `kpi-summary`, `three-column-cards` |
+| `ConclusionOutlook.tsx` | 总结优先级 + 行动项 | `closing-actions`, `three-column-cards` |

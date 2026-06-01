@@ -1,2 +1,2 @@
-export { default } from "../blueprints/ClosingActions.js";
-export * from "../blueprints/ClosingActions.js";
+export { default } from "../blueprints/ClosingActions.tsx";
+export * from "../blueprints/ClosingActions.tsx";

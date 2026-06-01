@@ -81,6 +81,12 @@ export interface Messages {
       attachmentPlaceholder: string;
       outputLanguage: string;
     };
+    contextPlaceholders: {
+      audience: string;
+      goal: string;
+      styleNotes: string;
+      contentSource: string;
+    };
   };
   template: {
     title: string;
@@ -277,12 +283,18 @@ export const messages: Record<Locale, Messages> = {
         look: "Look"
       },
       contextDefaults: {
-        audience: "enterprise executives",
-        goal: "explain the product and drive demo requests",
-        styleNotes: "visual, concise, premium",
-        contentSource: "Draft from scratch",
+        audience: "",
+        goal: "",
+        styleNotes: "",
+        contentSource: "",
         attachmentPlaceholder: "logo, brand style, source notes...",
         outputLanguage: "English"
+      },
+      contextPlaceholders: {
+        audience: "Who is this deck for? e.g. enterprise executives, investors, customers",
+        goal: "What should the deck achieve? e.g. explain the product, drive demo requests",
+        styleNotes: "Describe the desired style, tone, or visual direction",
+        contentSource: "Describe source material or say whether Anna should draft from scratch"
       }
     },
     template: {
@@ -337,12 +349,12 @@ export const messages: Record<Locale, Messages> = {
     library: {
       title: "Local decks",
       workspace: "Workspace",
-      workspacePath: "Anna Workspace / Presentations",
-      currentWorkspace: "Current workspace",
-      noWorkspaceSelected: "No workspace selected",
-      empty: "No workspaces yet",
-      createWorkspace: "New workspace",
-      defaultWorkspaceTitle: "New Workspace-{date}",
+      workspacePath: "Anna Workspace / PPT",
+      currentWorkspace: "Current task",
+      noWorkspaceSelected: "No task selected",
+      empty: "No tasks yet",
+      createWorkspace: "New task",
+      defaultWorkspaceTitle: "New Task-{date}",
       preferences: "Preferences",
       lastEditedToday: "Last edited today",
       lastEditedYesterday: "Last edited yesterday",
@@ -400,8 +412,8 @@ export const messages: Record<Locale, Messages> = {
       outlineSkipped: "Outline was skipped for this deck",
       createOutlineFirst: "Create the outline first",
       createDeckFirst: "Create the deck first",
-      workspaceOpened: "Opened workspace {id}",
-      workspaceCreated: "Created workspace {id}",
+      workspaceOpened: "Opened task {id}",
+      workspaceCreated: "Created task {id}",
       pptxExported: "PPTX exported",
       pdfExported: "PDF exported"
     }
@@ -487,12 +499,18 @@ export const messages: Record<Locale, Messages> = {
         look: "视觉方向"
       },
       contextDefaults: {
-        audience: "企业高管",
-        goal: "说明产品并推动预约演示",
-        styleNotes: "视觉化、简洁、高级",
-        contentSource: "从零起草",
+        audience: "",
+        goal: "",
+        styleNotes: "",
+        contentSource: "",
         attachmentPlaceholder: "logo、品牌风格、来源资料...",
         outputLanguage: "中文"
+      },
+      contextPlaceholders: {
+        audience: "这份演示面向谁？例如企业高管、投资人、客户",
+        goal: "这份演示要达成什么目标？例如说明产品、推动预约演示",
+        styleNotes: "描述希望的风格、语气或视觉方向",
+        contentSource: "描述参考材料，或说明是否由 Anna 从零起草"
       }
     },
     template: {
@@ -546,12 +564,12 @@ export const messages: Record<Locale, Messages> = {
     library: {
       title: "本地演示文稿",
       workspace: "工作区",
-      workspacePath: "Anna 工作区 / Presentations",
-      currentWorkspace: "当前工作区",
-      noWorkspaceSelected: "未选择工作区",
-      empty: "暂无工作区",
-      createWorkspace: "新建工作区",
-      defaultWorkspaceTitle: "新建工作区-{date}",
+      workspacePath: "Anna 工作区 / PPT",
+      currentWorkspace: "当前任务",
+      noWorkspaceSelected: "未选择任务",
+      empty: "暂无任务",
+      createWorkspace: "新建任务",
+      defaultWorkspaceTitle: "新建任务-{date}",
       preferences: "偏好设置",
       lastEditedToday: "今天编辑",
       lastEditedYesterday: "昨天编辑",
@@ -607,8 +625,8 @@ export const messages: Record<Locale, Messages> = {
       outlineSkipped: "这份演示跳过了大纲审阅",
       createOutlineFirst: "请先创建大纲",
       createDeckFirst: "请先创建演示文稿",
-      workspaceOpened: "已打开工作区 {id}",
-      workspaceCreated: "已创建工作区 {id}",
+      workspaceOpened: "已打开任务 {id}",
+      workspaceCreated: "已创建任务 {id}",
       pptxExported: "PPTX 已导出",
       pdfExported: "PDF 已导出"
     }

@@ -1,4 +1,5 @@
-import { FolderOpen, Plus, RefreshCw } from "lucide-react";
+import { FolderOpen, FolderPlus, X } from "lucide-react";
+import { useState } from "react";
 import type {
   ListWorkspacesResult,
   WorkspaceResult
@@ -8,113 +9,155 @@ import type { Locale } from "../../../i18n/messages";
 interface WorkspaceDialogProps {
   locale: Locale;
   scan: ListWorkspacesResult | null;
-  workspace: WorkspaceResult | null;
+  task: WorkspaceResult | null;
   loading: boolean;
   error: string;
   onUseLatest: () => void;
   onCreate: () => void;
-  onRescan: () => void;
+  onOpen: (taskDir: string) => Promise<void>;
 }
 
-function formatWorkspaceName(value: string) {
+function formatTaskName(value: string) {
   return value.replace(/^ppt-/, "PPT ");
 }
 
 const copy = {
   en: {
-    title: "Choose workspace",
-    rootPrefix: "Default workspace root",
-    loading: "Checking local workspaces...",
-    found: "Last workspace found",
-    missing: "No existing workspace found",
-    createRequired: "Create a new PPT workspace",
+    title: "Choose task",
+    rootPrefix: "Default workspace",
+    loading: "Checking local tasks...",
+    found: "Last task found",
+    missing: "No existing task found",
+    createRequired: "Create a new PPT task",
     createHint:
       "Anna will initialize task.json, setting.json, outline.json, and pages.json.",
-    rescan: "Rescan",
-    useLatest: "Use latest",
-    create: "New workspace"
+    open: "Open project",
+    recent: "Recent projects",
+    noRecent: "No recent tasks",
+    useLatest: "Open latest task",
+    create: "Create new",
+    close: "Close"
   },
   zh: {
-    title: "选择 PPT 工作区",
+    title: "选择 PPT 任务",
     rootPrefix: "默认工作目录为",
-    loading: "正在检查本地工作区...",
-    found: "找到上次的工作区",
-    missing: "没有找到已有工作区",
-    createRequired: "需要新建一个 PPT 工作区",
+    loading: "正在检查本地任务...",
+    found: "找到上次的任务",
+    missing: "没有找到已有任务",
+    createRequired: "需要新建一个 PPT 任务",
     createHint: "会自动创建 task.json、setting.json、outline.json、pages.json。",
-    rescan: "重新扫描",
-    useLatest: "使用上次工作区",
-    create: "新建工作区"
+    open: "打开项目",
+    recent: "最近项目",
+    noRecent: "暂无最近任务",
+    useLatest: "打开上次任务",
+    create: "新建任务",
+    close: "关闭"
   }
 } satisfies Record<Locale, Record<string, string>>;
 
 export function WorkspaceDialog({
   locale,
   scan,
-  workspace,
+  task,
   loading,
   error,
   onUseLatest,
   onCreate,
-  onRescan
+  onOpen
 }: WorkspaceDialogProps) {
-  if (workspace) {
+  const [openPicker, setOpenPicker] = useState(false);
+
+  if (task) {
     return null;
   }
 
-  const latest = scan?.latest_workspace ?? null;
+  const latest = scan?.latest_task ?? scan?.latest_workspace ?? null;
+  const tasks = scan?.tasks ?? scan?.workspaces ?? [];
   const text = copy[locale];
 
   return (
-    <div className="workspace-overlay" role="dialog" aria-modal="true">
-      <section className="workspace-dialog">
-        <div className="workspace-dialog-icon">
-          <FolderOpen size={22} />
-        </div>
-        <div className="workspace-dialog-copy">
+    <div className="task-overlay" role="dialog" aria-modal="true">
+      <section className="task-dialog">
+        <header className="task-dialog-copy">
           <h2>{text.title}</h2>
           <p>
             {text.rootPrefix}
-            <strong>{scan?.workspace_root ?? "~/anna-workspace/ppt/tasks"}</strong>
+            <strong>{scan?.task_root ?? scan?.workspace_root ?? "~/anna-workspace/ppt"}</strong>
           </p>
-        </div>
+        </header>
 
-        <div className="workspace-dialog-body">
+        <div className="task-dialog-body">
           {loading ? (
-            <div className="workspace-state">{text.loading}</div>
-          ) : latest ? (
-            <div className="workspace-card">
-              <span>{text.found}</span>
-              <strong>{latest.title || formatWorkspaceName(latest.workspace_id)}</strong>
-              <small>{latest.workspace_dir}</small>
-            </div>
+            <div className="task-state">{text.loading}</div>
           ) : (
-            <div className="workspace-card muted">
-              <span>{text.missing}</span>
-              <strong>{text.createRequired}</strong>
-              <small>{text.createHint}</small>
+            <div className="task-launch-grid">
+              <button className="task-launch-card" onClick={onCreate} disabled={loading}>
+                <FolderPlus size={22} />
+                <strong>{text.create}</strong>
+              </button>
+              <button
+                className="task-launch-card"
+                onClick={() => setOpenPicker(true)}
+                disabled={loading || tasks.length === 0}
+              >
+                <FolderOpen size={22} />
+                <strong>{text.open}</strong>
+              </button>
             </div>
           )}
 
-          {error ? <div className="workspace-error">{error}</div> : null}
+          {error ? <div className="task-error">{error}</div> : null}
         </div>
 
-        <div className="workspace-actions">
-          <button className="workspace-secondary-btn" onClick={onRescan} disabled={loading}>
-            <RefreshCw size={16} />
-            {text.rescan}
-          </button>
+        <section className="task-recent">
+          <div className="task-recent-header">
+            <span>{text.recent}</span>
+            {latest ? (
+              <button onClick={onUseLatest} disabled={loading}>
+                {text.useLatest}
+              </button>
+            ) : null}
+          </div>
           {latest ? (
-            <button className="workspace-primary-btn" onClick={onUseLatest} disabled={loading}>
-              <FolderOpen size={16} />
-              {text.useLatest}
+            <button className="task-recent-row" onClick={onUseLatest} disabled={loading}>
+              <strong>{latest.title || formatTaskName(latest.task_id ?? latest.workspace_id)}</strong>
+              <span>{latest.task_dir ?? latest.workspace_dir}</span>
             </button>
-          ) : null}
-          <button className="workspace-primary-btn" onClick={onCreate} disabled={loading}>
-            <Plus size={16} />
-            {text.create}
-          </button>
-        </div>
+          ) : (
+            <div className="task-recent-empty">{text.noRecent}</div>
+          )}
+        </section>
+
+        {openPicker ? (
+          <div className="task-picker-backdrop" role="dialog" aria-modal="true">
+            <section className="task-picker">
+              <div className="task-picker-header">
+                <strong>{text.open}</strong>
+                <button aria-label={text.close} onClick={() => setOpenPicker(false)}>
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="task-picker-list">
+                {tasks.map((item) => {
+                  const taskDir = item.task_dir ?? item.workspace_dir;
+                  return (
+                    <button
+                      key={taskDir}
+                      onClick={() => {
+                        setOpenPicker(false);
+                        void onOpen(taskDir);
+                      }}
+                      disabled={loading}
+                    >
+                      <strong>{item.title || formatTaskName(item.task_id ?? item.workspace_id)}</strong>
+                      <span>{taskDir}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          </div>
+        ) : null}
       </section>
     </div>
   );

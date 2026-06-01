@@ -9,6 +9,7 @@ import {
   buildGenerateOutlineLlmRequest,
   buildReviseOutlineLlmRequest,
   getExpectedSlideCount,
+  getExpectedSlideCountForRevision,
 } from "./outlinePrompt";
 import { validateGeneratedOutline } from "./outlineParser";
 import type {
@@ -55,7 +56,7 @@ export function createMockAiClient(): AiClient {
     async generateOutline(input) {
       await sleep(900);
       const llmRequest = buildGenerateOutlineLlmRequest(input);
-      const expectedSlideCount = getExpectedSlideCount(input.setting, input.prompt);
+      const expectedSlideCount = getExpectedSlideCount(input.setting, input.prompt, input.contextRows);
       const rawOutline = {
         title: input.locale === "zh" ? "AI Agent 工作流" : "AI Agent Workflows",
         items: fitOutlineCount(outlineDetails, expectedSlideCount),
@@ -136,7 +137,7 @@ export function createMockAiClient(): AiClient {
     async reviseOutline(input: ReviseOutlineInput) {
       await sleep(700);
       const llmRequest = buildReviseOutlineLlmRequest(input);
-      const expectedSlideCount = getExpectedSlideCount(input.setting, input.feedback);
+      const expectedSlideCount = getExpectedSlideCountForRevision(input.setting, input.feedback, input.contextRows);
       const revisedItems = !input.feedback.trim()
         ? fitOutlineCount(input.outline, expectedSlideCount)
         : fitOutlineCount(input.outline, expectedSlideCount).map((item, index) =>

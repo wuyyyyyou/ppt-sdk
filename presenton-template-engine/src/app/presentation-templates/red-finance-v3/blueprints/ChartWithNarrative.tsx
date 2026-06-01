@@ -1,15 +1,15 @@
 import React from "react";
 import * as z from "zod";
 
-import ChartCardShell from "../components/ChartCardShell.js";
-import FinanceBarChart, { type FinanceBarChartSeries } from "../components/FinanceBarChart.js";
-import FinanceContentFrame from "../components/FinanceContentFrame.js";
-import FinanceLineChart, { type FinanceLineChartSeries } from "../components/FinanceLineChart.js";
-import FinanceSectionHeading from "../components/FinanceSectionHeading.js";
-import { FinanceIcon } from "../components/FinanceIcons.js";
-import InfoListItem from "../components/InfoListItem.js";
-import InsightCallout from "../components/InsightCallout.js";
-import MeasuredChartArea from "../components/MeasuredChartArea.js";
+import ChartCardShell from "../components/ChartCardShell.tsx";
+import FinanceBarChart, { type FinanceBarChartSeries } from "../components/FinanceBarChart.tsx";
+import FinanceContentFrame from "../components/FinanceContentFrame.tsx";
+import FinanceLineChart, { type FinanceLineChartSeries } from "../components/FinanceLineChart.tsx";
+import FinanceSectionHeading from "../components/FinanceSectionHeading.tsx";
+import { FinanceIcon } from "../components/FinanceIcons.tsx";
+import InfoListItem from "../components/InfoListItem.tsx";
+import InsightCallout from "../components/InsightCallout.tsx";
+import MeasuredChartArea from "../components/MeasuredChartArea.tsx";
 
 const IconSchema = z.enum([
   "bank",
@@ -47,15 +47,15 @@ const SeriesSchema = z.object({
 export const Schema = z.object({
   title: z.string().min(2).max(28).default("Chart With Narrative"),
   metaLabel: z.string().min(2).max(48).default("BLUEPRINT / CHART NARRATIVE"),
-  footerText: z.string().min(6).max(80).default("Red Finance V3 | Chart With Narrative"),
+  footerText: z.string().min(6).max(80).default("Business Professional | Chart With Narrative"),
   pageNumber: z.string().min(1).max(4).default("05"),
   variant: z.enum(["chart-left-narrative-right", "chart-top-narrative-bottom"]).default(
     "chart-left-narrative-right",
   ),
   density: z.enum(["low", "medium", "high"]).default("medium"),
   chartKind: z.enum(["bar", "line"]).default("bar"),
-  chartTitle: z.string().min(2).max(36).default("趋势与变化"),
-  chartSubtitle: z.string().min(4).max(72).default("单图表配单叙事，适合趋势和结构变化。"),
+  chartTitle: z.string().min(2).max(36).default("Trend and change"),
+  chartSubtitle: z.string().min(4).max(72).default("One chart paired with one concise narrative."),
   labels: z.array(z.string().min(1).max(16)).min(2).max(8).default(["Q1", "Q2", "Q3", "Q4"]),
   series: z.array(SeriesSchema).min(1).max(3).default([
     {
@@ -72,25 +72,25 @@ export const Schema = z.object({
   minValue: z.number().default(0),
   maxValue: z.number().default(100),
   ticks: z.array(z.number()).min(2).max(8).default([0, 20, 40, 60, 80, 100]),
-  narrativeTitle: z.string().min(2).max(28).default("解释要点"),
+  narrativeTitle: z.string().min(2).max(28).default("Interpretation points"),
   narrativeItems: z.array(NarrativeItemSchema).min(2).max(4).default([
     {
       icon: "lightbulb",
-      title: "变化原因",
-      description: "把关键驱动原因用短句拆开，而不是直接堆入图表说明。",
+      title: "Change drivers",
+      description: "Break key drivers into short points instead of crowding the chart.",
     },
     {
       icon: "shield",
-      title: "口径提醒",
-      description: "图表旁边保留口径和结论，保证导出后可编辑。",
+      title: "Measurement note",
+      description: "Keep definitions and conclusions editable beside the chart.",
     },
     {
       icon: "route",
-      title: "下一步",
-      description: "结论收束后能顺滑引出下一页分析或行动建议。",
+      title: "Next step",
+      description: "Use the conclusion to bridge into the next analysis or action.",
     },
   ]),
-  summary: z.string().min(8).max(120).default("适合单个图表加短叙事，不适合多图表仪表盘。"),
+  summary: z.string().min(8).max(120).default("Best for one primary chart with concise interpretation; avoid dashboard-style chart collections."),
 });
 
 export const layoutId = "chart-with-narrative";

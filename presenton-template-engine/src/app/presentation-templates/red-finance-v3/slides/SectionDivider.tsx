@@ -1,2 +1,2 @@
-export { default } from "../blueprints/SectionDivider.js";
-export * from "../blueprints/SectionDivider.js";
+export { default } from "../blueprints/SectionDivider.tsx";
+export * from "../blueprints/SectionDivider.tsx";

@@ -155,7 +155,7 @@ const MANIFEST = {
     {
       name: "app_update_workspace_settings",
       description:
-        "Update setting.json for an existing PPT task workspace and return the refreshed workspace.",
+        "Update the PPT workspace-level setting.json and return the refreshed task workspace.",
       parameters: [
         {
           name: "workspace_dir",
@@ -166,7 +166,7 @@ const MANIFEST = {
         {
           name: "setting",
           type: "object",
-          description: "Partial settings object to merge into setting.json.",
+          description: "Partial settings object to merge into the workspace-level setting.json.",
           required: true,
         },
       ],

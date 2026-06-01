@@ -1,7 +1,7 @@
 import React, { type ReactNode } from "react";
 
-import { redFinanceTheme } from "../theme/tokens.js";
-import FinanceCanvas from "./FinanceCanvas.js";
+import { redFinanceTheme } from "../theme/tokens.ts";
+import FinanceCanvas from "./FinanceCanvas.tsx";
 
 type FinanceSectionFocusFrameProps = {
   leftContent: ReactNode;

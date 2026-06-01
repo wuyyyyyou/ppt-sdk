@@ -1,12 +1,12 @@
 {
   "title": "Comparison Matrix",
   "metaLabel": "BLUEPRINT / MATRIX",
-  "footerText": "Red Finance V3 | Comparison Matrix",
+  "footerText": "Business Professional | Comparison Matrix",
   "pageNumber": "06",
   "variant": "entity-first",
   "density": "high",
-  "matrixTitle": "对比矩阵",
-  "rowHeaderLabel": "维度",
+  "matrixTitle": "Comparison matrix",
+  "rowHeaderLabel": "Dimension",
   "columns": [
     { "label": "China" },
     { "label": "US" },
@@ -42,13 +42,13 @@
     {
       "badge": "01",
       "title": "Key takeaway",
-      "description": "矩阵页不是大表格，而是用结构化方式说明几个关键差异。"
+      "description": "A matrix slide should explain a few key differences, not become a large table."
     },
     {
       "badge": "02",
       "title": "Use case",
-      "description": "适合中美对比、能力比较、方案比较或评分矩阵。"
+      "description": "Useful for market, capability, option, or scoring comparisons."
     }
   ],
-  "summary": "适合多维对比，不适合单一观点说明。"
+  "summary": "Best for multi-dimensional comparison; avoid using it for a single argument."
 }

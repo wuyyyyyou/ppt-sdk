@@ -87,8 +87,8 @@ export interface PptBackend {
   generatePptx(input: GeneratePptxInput): Promise<GeneratePptxResult>;
   startGeneratePptx(input: StartGeneratePptxInput): Promise<PptxExportJob>;
   exportPdf(input: ExportPdfInput): Promise<ExportPdfResult>;
-  recordPptxExport(input: RecordPptxExportInput): Promise<ProjectResult>;
-  recordPdfExport(input: RecordPdfExportInput): Promise<ProjectResult>;
+  recordPptxExport(input: RecordPptxExportInput): Promise<WorkspaceResult>;
+  recordPdfExport(input: RecordPdfExportInput): Promise<WorkspaceResult>;
   getExportArtifactDownloadUrl(
     input: GetExportArtifactDownloadUrlInput
   ): Promise<ExportArtifactDownloadUrlResult>;
