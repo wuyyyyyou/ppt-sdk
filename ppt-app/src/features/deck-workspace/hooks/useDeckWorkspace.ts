@@ -83,6 +83,7 @@ export interface DeckWorkspaceActions {
   updateContextRow: (id: string, value: string) => void;
   removeContextRow: (id: string) => void;
   addStyleRow: () => void;
+  suggestContextFromPrompt: () => Promise<void>;
   generateDeck: () => Promise<void>;
   createDeckFromOutline: () => Promise<void>;
   applyOutlineFeedback: () => Promise<void>;
@@ -419,6 +420,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       options: Array.isArray(record.options)
         ? record.options.filter((option): option is string => typeof option === "string")
         : undefined,
+      allowCustomValue: record.allowCustomValue === true,
     };
 
     switch (baseRow.id) {
@@ -476,11 +478,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         ? (workspace.outline as { items?: unknown; source?: { prompt?: unknown; context?: unknown; task_context?: unknown } })
         : null;
     const source = outlineRecord?.source;
-    const rawContext = Array.isArray(source?.task_context)
-      ? source.task_context
-      : Array.isArray(source?.context)
-      ? source.context
-      : [];
+    const rawContext = Array.isArray(source?.context) ? source.context : [];
     const rows = rawContext
       .map(normalizePersistedContextRow)
       .filter((row): row is ContextRow => row !== null);
@@ -544,7 +542,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       items,
       source: {
         prompt,
-        task_context: contextRows,
+        context: contextRows,
         setting: workspaceSettingsToState(currentWorkspace)
       }
     };
@@ -569,7 +567,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setStage("deck");
   }
 
-  function applyWorkspace(workspace: WorkspaceResult) {
+  function applyWorkspace(
+    workspace: WorkspaceResult,
+    options: { syncEmptyContextRows?: boolean } = {}
+  ) {
     setCurrentWorkspace(workspace);
     setExportArtifact(readWorkspaceExportArtifactPath(workspace));
     void refreshWorkspaceExportArtifact(workspace);
@@ -634,7 +635,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
 
     const persistedContextRows = workspaceContextRowsToState(workspace);
-    if (persistedContextRows.shouldSync) {
+    if (persistedContextRows.shouldSync || options.syncEmptyContextRows) {
       setContextRows(persistedContextRows.rows);
     }
   }
@@ -798,6 +799,80 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       value: "",
       placeholder: t.brief.contextPlaceholders.styleNotes
     });
+  }
+
+  function buildSuggestedContextRow(
+    id: "audience" | "goal" | "style",
+    values: string[]
+  ): ContextRow | null {
+    const uniqueValues = values.reduce<string[]>((items, value) => {
+      const trimmed = value.trim();
+      if (trimmed && !items.includes(trimmed)) {
+        items.push(trimmed);
+      }
+      return items;
+    }, []);
+
+    if (uniqueValues.length === 0) return null;
+
+    const row = buildContextRowFromPatch(id, uniqueValues[0]);
+    if (uniqueValues.length === 1) {
+      return row;
+    }
+
+    return {
+      ...row,
+      type: "select",
+      options: uniqueValues,
+      allowCustomValue: true,
+    };
+  }
+
+  function upsertSuggestedContextRows(rows: ContextRow[]) {
+    if (rows.length === 0) return;
+    const suggestedIds = new Set(rows.map((row) => row.id));
+    setContextRows((currentRows) => [
+      ...currentRows.map((row) =>
+        suggestedIds.has(row.id)
+          ? rows.find((suggestedRow) => suggestedRow.id === row.id) ?? row
+          : row
+      ),
+      ...rows.filter((row) => !currentRows.some((currentRow) => currentRow.id === row.id)),
+    ]);
+  }
+
+  async function suggestContextFromPrompt() {
+    if (!aiClient) return;
+    const trimmedPrompt = prompt.trim();
+    if (!trimmedPrompt) {
+      showToast(t.toasts.promptRequired);
+      return;
+    }
+
+    setLoading("context");
+    try {
+      const result = await aiClient.suggestContext({
+        prompt: trimmedPrompt,
+        locale,
+      });
+      const rows = [
+        buildSuggestedContextRow("audience", result.audience),
+        buildSuggestedContextRow("goal", result.goal),
+        buildSuggestedContextRow("style", result.style),
+      ].filter((row): row is ContextRow => Boolean(row));
+
+      if (rows.length === 0) {
+        showToast(t.toasts.contextSuggestionEmpty);
+        return;
+      }
+
+      upsertSuggestedContextRows(rows);
+      showToast(t.toasts.contextSuggested);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t.toasts.contextSuggestionEmpty);
+    } finally {
+      setLoading("none");
+    }
   }
 
   function parseContextSlideCount(value: string): string | null {
@@ -1596,7 +1671,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         ...buildOutlineArtifact(items, title, status),
         source: {
           prompt,
-          task_context: contextRowsOverride ?? contextRows,
+          context: contextRowsOverride ?? contextRows,
           setting: settingOverride ?? workspaceSettingsToState(workspace)
         }
       }
@@ -1661,7 +1736,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         workspace_dir: workspaceDir
       });
       const shouldOpenDeck = hasRenderedWorkspacePages(workspace);
-      applyWorkspace(workspace);
+      applyWorkspace(workspace, { syncEmptyContextRows: true });
       if (shouldOpenDeck) {
         setPage("main");
         setHistory((items) => (items.at(-1) === "main" ? items : [...items, "main"]));
@@ -1691,7 +1766,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const workspace = await backend.createWorkspace({
         title: getDefaultWorkspaceTitle()
       });
-      applyWorkspace(workspace);
+      applyWorkspace(workspace, { syncEmptyContextRows: true });
       setWorkspaceScan(await backend.listWorkspaces());
       setPage("main");
       showToast(formatMessage(t.toasts.workspaceCreated, { id: workspace.task_id ?? workspace.workspace_id }));
@@ -2112,6 +2187,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     updateContextRow,
     removeContextRow,
     addStyleRow,
+    suggestContextFromPrompt,
     generateDeck,
     createDeckFromOutline,
     applyOutlineFeedback,

@@ -432,11 +432,7 @@ function normalizeOutlineJson(outline: unknown): AppWorkspaceOutline {
     items,
     source: {
       prompt: normalizeString(source.prompt),
-      context: Array.isArray(source.task_context)
-        ? (source.task_context as unknown[])
-        : Array.isArray(source.context)
-        ? source.context
-        : [],
+      context: Array.isArray(source.context) ? source.context : [],
       setting:
         source.setting && typeof source.setting === "object" && !Array.isArray(source.setting)
           ? (source.setting as Record<string, unknown>)

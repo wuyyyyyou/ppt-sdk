@@ -85,6 +85,7 @@ export function App() {
               updateContextRow={actions.updateContextRow}
               removeContextRow={actions.removeContextRow}
               addStyleRow={actions.addStyleRow}
+              suggestContextFromPrompt={actions.suggestContextFromPrompt}
               generateDeck={actions.generateDeck}
               cancelGenerateDeck={actions.cancelGenerateDeck}
               createDeckProgress={state.createDeckProgress}

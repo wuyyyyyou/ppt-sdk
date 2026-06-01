@@ -1140,7 +1140,7 @@ button {
 
 .prompt-input {
   min-height: 170px;
-  padding: 24px 24px 72px;
+  padding: 24px 24px 82px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.58);
   box-shadow:
@@ -1158,10 +1158,18 @@ button {
   box-shadow: none;
 }
 
-.inline-create-btn {
+.prompt-inline-actions {
   position: absolute;
   right: 18px;
   bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 36px);
+}
+
+.inline-create-btn,
+.inline-context-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1169,19 +1177,34 @@ button {
   border: 0;
   border-radius: 999px;
   padding: 0 22px;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.inline-create-btn {
   color: #fff;
   background: var(--accent);
   box-shadow: 0 10px 20px rgba(124, 108, 240, 0.25);
-  font-size: 14px;
-  font-weight: 700;
+}
+
+.inline-context-btn {
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow:
+    inset 0 0 0 1px rgba(124, 108, 240, 0.22),
+    0 10px 20px rgba(17, 24, 39, 0.06);
 }
 
 .inline-create-btn:hover,
+.inline-context-btn:hover,
 .primary-btn:hover {
+  color: #fff;
   background: var(--accent-hover);
 }
 
 .inline-create-btn:disabled,
+.inline-context-btn:disabled,
 .primary-btn:disabled {
   cursor: default;
   opacity: 0.75;
@@ -1224,6 +1247,95 @@ button {
   display: block;
   color: var(--text-main);
   font-size: 15px;
+}
+
+.thinking-status {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  gap: 7px;
+  vertical-align: middle;
+}
+
+.thinking-status-orb {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 rgba(124, 108, 240, 0.38);
+  animation: thinking-orb-pulse 1.45s ease-in-out infinite;
+}
+
+.thinking-status-text {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-main);
+  background: linear-gradient(90deg, var(--text-main) 0%, #7c6cf0 42%, var(--text-main) 78%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: thinking-text-flow 2.4s ease-in-out infinite;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thinking-status-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+
+.thinking-status-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  opacity: 0.32;
+  animation: thinking-dot 1.15s ease-in-out infinite;
+}
+
+.thinking-status-dots span:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.thinking-status-dots span:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes thinking-orb-pulse {
+  0%,
+  100% {
+    transform: scale(0.88);
+    box-shadow: 0 0 0 0 rgba(124, 108, 240, 0.34);
+  }
+  50% {
+    transform: scale(1);
+    box-shadow: 0 0 0 7px rgba(124, 108, 240, 0);
+  }
+}
+
+@keyframes thinking-text-flow {
+  0% {
+    background-position: 140% 50%;
+  }
+  100% {
+    background-position: -80% 50%;
+  }
+}
+
+@keyframes thinking-dot {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  45% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
 }
 
 .generation-progress-header span {
@@ -1486,6 +1598,77 @@ button {
   color: var(--text-main);
   background: transparent;
   font-size: 14px;
+}
+
+.context-combo {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  overflow: hidden;
+  border: 1px solid rgba(124, 108, 240, 0.14);
+  border-radius: 9px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.5));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 6px 14px rgba(17, 24, 39, 0.035);
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.context-combo:focus-within {
+  border-color: rgba(124, 108, 240, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 0 0 3px rgba(124, 108, 240, 0.08),
+    0 8px 18px rgba(17, 24, 39, 0.04);
+}
+
+.context-combo-input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: none;
+  color: var(--text-main);
+  background: transparent;
+  padding: 0 10px;
+  font-size: 14px;
+}
+
+.context-combo-select-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  min-width: 122px;
+  max-width: 42%;
+  color: var(--accent);
+  background: rgba(124, 108, 240, 0.08);
+  border-left: 1px solid rgba(124, 108, 240, 0.12);
+}
+
+.context-combo-select-wrap svg {
+  position: absolute;
+  right: 10px;
+  pointer-events: none;
+}
+
+.context-combo-select {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  outline: none;
+  color: currentColor;
+  background: transparent;
+  appearance: none;
+  padding: 0 30px 0 10px;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  text-overflow: ellipsis;
 }
 
 .context-remove-btn {
@@ -2831,6 +3014,19 @@ details.generation-history-panel > summary::-webkit-details-marker {
 
   .prompt-label {
     font-size: 24px;
+  }
+
+  .prompt-inline-actions {
+    left: 18px;
+    justify-content: flex-end;
+  }
+
+  .inline-create-btn,
+  .inline-context-btn {
+    flex: 1 1 0;
+    justify-content: center;
+    min-width: 0;
+    padding: 0 12px;
   }
 
   .preview-grid-view,

@@ -2,7 +2,7 @@ import { AlertCircle, CheckCircle2, ChevronDown, Circle, RotateCcw } from "lucid
 import type { Messages } from "../../../i18n/messages";
 import type { DeckGenerationProgress, DeckGenerationStep } from "../../deck-generation";
 import type { GenerationStreamSnapshot, LoadingKind } from "../types";
-import { GenerationProgressPanel } from "./BriefPage";
+import { GenerationProgressPanel, ThinkingStatusText } from "./BriefPage";
 
 interface GeneratingPageProps {
   t: Messages;
@@ -68,7 +68,7 @@ export function GeneratingPage(props: GeneratingPageProps) {
       <div className="page-header compact">
         <div>
           <div className="page-title">{t.stages.generating}</div>
-          <p>{progress?.message ?? t.status.creatingDeck}</p>
+          <p><ThinkingStatusText text={progress?.message ?? t.status.creatingDeck} /></p>
         </div>
       </div>
 
@@ -136,7 +136,7 @@ export function GeneratingPage(props: GeneratingPageProps) {
             {progress.pages.map((page) => {
               const pageSnapshots = history.filter((item) => item.page_id === page.page_id);
               return (
-                <details key={page.page_id} className={`generation-page-detail ${page.status}`} open={page.index === progress.currentPageIndex}>
+                <details key={page.page_id} className={`generation-page-detail ${page.status}`}>
                   <summary>
                     <strong>{page.index + 1}. {page.title}</strong>
                     <span>{page.status}</span>

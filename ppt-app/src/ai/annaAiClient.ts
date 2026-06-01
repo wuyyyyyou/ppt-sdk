@@ -23,6 +23,7 @@ import {
 import type {
   AiAttemptLog,
   AiClient,
+  ContextSuggestionResult,
   GeneratedDeck,
   OutlineGenerationResult,
 } from "./types";
@@ -163,6 +164,36 @@ async function completeJson<T>(
   throw new Error(`Anna LLM returned invalid JSON for ${label}.`);
 }
 
+function normalizeStringArray(value: unknown): string[] {
+  const rawValues = Array.isArray(value) ? value : typeof value === "string" ? [value] : [];
+  const seen = new Set<string>();
+  const values: string[] = [];
+
+  for (const item of rawValues) {
+    if (typeof item !== "string") continue;
+    const trimmed = item.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    values.push(trimmed);
+    if (values.length >= 4) break;
+  }
+
+  return values;
+}
+
+function normalizeContextSuggestions(value: unknown): ContextSuggestionResult {
+  const record =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+
+  return {
+    audience: normalizeStringArray(record.audience),
+    goal: normalizeStringArray(record.goal),
+    style: normalizeStringArray(record.style),
+  };
+}
+
 async function completeOutlineWithRetry(
   runtime: AnnaRuntime,
   operation: "generateOutline" | "reviseOutline",
@@ -252,6 +283,26 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         buildGenerateOutlineLlmRequest(input),
         getExpectedSlideCount(input.setting, input.prompt, input.contextRows)
       );
+    },
+
+    async suggestContext(input) {
+      const result = await completeJson<unknown>(
+        runtime,
+        "optional context suggestions",
+        [
+          "Infer optional context fields for a presentation from the user's prompt.",
+          "Return only a JSON object with exactly these properties: audience, goal, style.",
+          "Each property value must be an array of concise strings.",
+          "Prefer fewer options. If the prompt clearly determines a field, return a one-item array for that field.",
+          "If a field is ambiguous, return 2-3 plausible options. Do not return more than 4 items for any field.",
+          "Do not include markdown or explanation.",
+          `Locale: ${input.locale}`,
+          `Prompt: ${input.prompt}`,
+        ].join("\n"),
+        '{"audience":["..."],"goal":["..."],"style":["..."]}'
+      );
+
+      return normalizeContextSuggestions(result);
     },
 
     async generatePagePlan(input) {

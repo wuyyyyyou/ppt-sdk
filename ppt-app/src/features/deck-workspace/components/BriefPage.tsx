@@ -1,4 +1,4 @@
-import { Check, CheckCircle2, File, ImageIcon, Search, Sparkles, Upload, X } from "lucide-react";
+import { Check, CheckCircle2, ChevronDown, File, ImageIcon, Search, Sparkles, Upload, X } from "lucide-react";
 import { useState } from "react";
 import type { TemplateSummary } from "../../../api/types";
 import { formatMessage, type Messages } from "../../../i18n/messages";
@@ -23,6 +23,7 @@ interface BriefPageProps {
   updateContextRow: (id: string, value: string) => void;
   removeContextRow: (id: string) => void;
   addStyleRow: () => void;
+  suggestContextFromPrompt: () => Promise<void>;
   generateDeck: () => Promise<void>;
   cancelGenerateDeck: () => void;
   createDeckProgress: DeckGenerationProgress | null;
@@ -46,6 +47,7 @@ export function BriefPage(props: BriefPageProps) {
     updateContextRow,
     removeContextRow,
     addStyleRow,
+    suggestContextFromPrompt,
     generateDeck,
     cancelGenerateDeck,
     createDeckProgress,
@@ -55,6 +57,7 @@ export function BriefPage(props: BriefPageProps) {
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const isCreating =
     loading === "deck" || loading === "outline" || loading === "review";
+  const isSuggestingContext = loading === "context";
 
   return (
     <section className="page active brief-page">
@@ -68,18 +71,32 @@ export function BriefPage(props: BriefPageProps) {
           onChange={(event) => setPrompt(event.target.value)}
           placeholder={t.brief.placeholder}
         />
-        <button
-          className="inline-create-btn"
-          onClick={generateDeck}
-          disabled={isCreating}
-        >
-          {isCreating ? (
-            <span className="spinner small" />
-          ) : (
-            <Sparkles size={14} />
-          )}
-          {t.controls.createDeck}
-        </button>
+        <div className="prompt-inline-actions">
+          <button
+            className="inline-context-btn"
+            onClick={suggestContextFromPrompt}
+            disabled={isCreating || isSuggestingContext}
+          >
+            {isSuggestingContext ? (
+              <span className="spinner small" />
+            ) : (
+              <Sparkles size={14} />
+            )}
+            {t.controls.suggestContext}
+          </button>
+          <button
+            className="inline-create-btn"
+            onClick={generateDeck}
+            disabled={isCreating || isSuggestingContext}
+          >
+            {isCreating ? (
+              <span className="spinner small" />
+            ) : (
+              <Sparkles size={14} />
+            )}
+            {t.controls.createDeck}
+          </button>
+        </div>
       </div>
 
       <button
@@ -355,6 +372,28 @@ function StyleTemplateCard(props: {
   );
 }
 
+function isThinkingStatus(message: string) {
+  return /^(Thinking through|Checking page|正在思考|正在检查)/.test(message);
+}
+
+export function ThinkingStatusText({ text }: { text: string }) {
+  if (!isThinkingStatus(text)) {
+    return <>{text}</>;
+  }
+
+  return (
+    <span className="thinking-status" aria-label={text}>
+      <span className="thinking-status-orb" aria-hidden="true" />
+      <span className="thinking-status-text">{text}</span>
+      <span className="thinking-status-dots" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </span>
+    </span>
+  );
+}
+
 export function GenerationProgressPanel(props: {
   t: Messages;
   progress: DeckGenerationProgress;
@@ -372,7 +411,7 @@ export function GenerationProgressPanel(props: {
       <div className="generation-progress-header">
         <div>
           <div className="section-label">{t.generating.progressTitle}</div>
-          <strong>{progress.message}</strong>
+          <strong><ThinkingStatusText text={progress.message} /></strong>
           {total > 0 ? (
             <span>
               {formatMessage(t.generating.pagesPassed, {
@@ -439,7 +478,34 @@ function ContextRowView(props: {
   return (
     <div className="context-row">
       <div className="context-label">{row.label}</div>
-      {row.type === "select" ? (
+      {row.type === "select" && row.allowCustomValue ? (
+        <div className="context-combo">
+          <input
+            className="context-combo-input"
+            value={row.value}
+            onChange={(event) => update(row.id, event.target.value)}
+            placeholder={row.placeholder}
+          />
+          <label className="context-combo-select-wrap">
+            <select
+              className="context-combo-select"
+              value={row.options?.includes(row.value) ? row.value : ""}
+              onChange={(event) => update(row.id, event.target.value)}
+              aria-label={row.label}
+            >
+              {!row.options?.includes(row.value) ? (
+                <option value="" disabled>
+                  {t.controls.suggestions}
+                </option>
+              ) : null}
+              {row.options?.map((option) => (
+                <option key={option}>{option}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} aria-hidden="true" />
+          </label>
+        </div>
+      ) : row.type === "select" ? (
         <select
           className="context-select"
           value={row.value}

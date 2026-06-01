@@ -18,6 +18,17 @@ export interface GenerateDeckInput extends DeckBriefInput {
   outlineFirst: boolean;
 }
 
+export interface SuggestContextInput {
+  prompt: string;
+  locale: Locale;
+}
+
+export interface ContextSuggestionResult {
+  audience: string[];
+  goal: string[];
+  style: string[];
+}
+
 export interface ReviseOutlineInput {
   title?: string;
   outline: OutlineDetail[];
@@ -82,6 +93,7 @@ export interface GeneratePagePlanInput {
 
 export interface AiClient {
   generateOutline(input: GenerateOutlineInput): Promise<OutlineGenerationResult>;
+  suggestContext(input: SuggestContextInput): Promise<ContextSuggestionResult>;
   generatePagePlan(input: GeneratePagePlanInput): Promise<PagePlan>;
   generateDeck(input: GenerateDeckInput): Promise<GeneratedDeck>;
   reviseOutline(input: ReviseOutlineInput): Promise<OutlineGenerationResult>;

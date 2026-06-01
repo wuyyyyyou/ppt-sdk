@@ -180,13 +180,13 @@ function generationText(locale: Locale) {
         ? `正在生成第 ${page.index + 1} / ${total} 页`
         : `Generating page ${page.index + 1} / ${total}`,
     authoringPage: (page: PagePlanItem) =>
-      zh ? `Agent 正在编辑第 ${page.index + 1} 页` : `Agent is editing page ${page.index + 1}`,
+      zh ? `正在思考第 ${page.index + 1} 页的表达` : `Thinking through page ${page.index + 1}`,
     renderingPage: (page: PagePlanItem) =>
       zh ? `正在渲染第 ${page.index + 1} 页` : `Rendering page ${page.index + 1}`,
     reviewingScreenshot: (page: PagePlanItem) =>
       zh ? `正在自评第 ${page.index + 1} 页截图` : `Reviewing page ${page.index + 1} screenshot`,
     reviewingPage: (page: PagePlanItem) =>
-      zh ? `Agent 正在自评第 ${page.index + 1} 页` : `Agent is reviewing page ${page.index + 1}`,
+      zh ? `正在检查第 ${page.index + 1} 页的细节` : `Checking page ${page.index + 1}`,
     cancelled: zh ? "已停止生成" : "Generation stopped",
     finalRender: zh ? "正在生成最终预览" : "Generating final preview",
     deckReady: zh ? "演示文稿已生成" : "Deck generated",

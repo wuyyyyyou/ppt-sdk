@@ -20,6 +20,7 @@ export type PreviewMode = "grid" | "organize" | "present";
 export type LoadingKind =
   | "none"
   | "template"
+  | "context"
   | "deck"
   | "outline"
   | "deckFromOutline"
@@ -49,6 +50,7 @@ export interface ContextRow {
   placeholder?: string;
   type?: "text" | "select" | "attachment";
   options?: string[];
+  allowCustomValue?: boolean;
 }
 
 export interface DeckWorkspaceState {
