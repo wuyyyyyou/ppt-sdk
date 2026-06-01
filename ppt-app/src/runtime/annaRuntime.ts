@@ -2,6 +2,7 @@ export interface AnnaToolInvokeInput {
   tool_id: string;
   method: string;
   args: object;
+  timeoutMs?: number;
 }
 
 export interface AnnaLlmCompleteInput {
@@ -37,7 +38,10 @@ export interface AnnaRuntime {
     options?: { timeoutMs?: number }
   ): Promise<T>;
   tools: {
-    invoke(input: AnnaToolInvokeInput): Promise<unknown>;
+    invoke(
+      input: AnnaToolInvokeInput,
+      options?: { timeoutMs?: number }
+    ): Promise<unknown>;
   };
   llm: {
     complete(input: AnnaLlmCompleteInput): Promise<unknown>;

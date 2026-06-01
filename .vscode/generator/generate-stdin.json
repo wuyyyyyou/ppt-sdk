@@ -6,8 +6,8 @@
     "tool": "generatePptx",
     "arguments": {
       "cwd": "${workspaceFolder}/.vscode/generator/output",
-      "model_path": "${workspaceFolder}/.vscode/engine/output/model/red-finance-model.json",
-      "output_path": "${workspaceFolder}/.vscode/generator/output/red-finance.pptx"
+      "model_path": "/Users/leyouming/anna-workspace/ppt/tasks/ppt-20260529-144809/output/ppt-model.json",
+      "output_path": "${workspaceFolder}/.vscode/generator/output/deck.pptx"
     }
   }
 }

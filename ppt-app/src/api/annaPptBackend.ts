@@ -27,6 +27,7 @@ const PPT_ENGINE_TOOL_ID =
 const PPT_GENER_TOOL_ID =
   import.meta.env.VITE_PPT_GENER_TOOL_ID ??
   "tool-lightvoss_5433-ppt-gener-dc7ftcep";
+const PPTX_EXPORT_TIMEOUT_MS = 600_000;
 
 function unwrapToolResult<T>(result: unknown): T {
   if (
@@ -97,10 +98,16 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
   async function invoke<T>(
     toolId: string,
     method: string,
-    args: object
+    args: object,
+    options?: { timeoutMs?: number }
   ): Promise<T> {
+    const input =
+      options?.timeoutMs === undefined
+        ? { tool_id: toolId, method, args }
+        : { tool_id: toolId, method, args, timeoutMs: options.timeoutMs };
+
     return unwrapToolResult<T>(
-      await runtime.tools.invoke({ tool_id: toolId, method, args })
+      await runtime.tools.invoke(input, options)
     );
   }
 
@@ -222,13 +229,16 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invoke<PrepareExportModelResult>(
         PPT_ENGINE_TOOL_ID,
         "app_prepare_export_model",
-        input
+        input,
+        { timeoutMs: PPTX_EXPORT_TIMEOUT_MS }
       ).then(normalizePrepareExportModelResult),
     generatePptx: (input: GeneratePptxInput) =>
       invoke<GeneratePptxResult>(PPT_GENER_TOOL_ID, "generatePptx", {
         model_path: input.modelPath,
         output_path: input.outputPath,
-      }).then((result) => normalizeGeneratePptxResult(result, input.outputPath)),
+      }, { timeoutMs: PPTX_EXPORT_TIMEOUT_MS }).then((result) =>
+        normalizeGeneratePptxResult(result, input.outputPath)
+      ),
     exportPdf: (input: ExportPdfInput) =>
       invoke<ExportPdfResult>(PPT_ENGINE_TOOL_ID, "app_export_pdf", input).then(
         normalizeExportPdfResult
