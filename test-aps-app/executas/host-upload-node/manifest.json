@@ -2,11 +2,11 @@
   "name": "tool-lightvoss-test-aps-8kvasxsg",
   "display_name": "Host Upload Test Backend",
   "version": "1.0.0",
-  "description": "Tests Anna Host Upload and APS Files reverse-RPC operations.",
+  "description": "Tests Anna Host Upload, APS Files, and APS KV reverse-RPC operations.",
   "author": "Anna PPT SDK",
   "license": "MIT",
   "tags": ["test", "host-upload", "aps", "storage"],
-  "host_capabilities": ["host.upload", "aps.files"],
+  "host_capabilities": ["host.upload", "aps.files", "aps.kv"],
   "tools": [
     {
       "name": "upload_test_file",
@@ -133,6 +133,47 @@
       "parameters": [
         { "name": "path", "type": "string", "description": "APS file path.", "required": true },
         { "name": "scope", "type": "string", "description": "APS scope.", "required": false, "default": "user" }
+      ]
+    },
+    {
+      "name": "aps_kv_set",
+      "description": "Set a JSON value in APS KV with optional TTL and optimistic if_match.",
+      "timeout": 60,
+      "parameters": [
+        { "name": "key", "type": "string", "description": "APS KV key.", "required": false, "default": "test-aps/kv/demo" },
+        { "name": "scope", "type": "string", "description": "APS scope: app, user, or tool.", "required": false, "default": "user" },
+        { "name": "value", "type": "object", "description": "JSON value to store.", "required": false },
+        { "name": "ttl_seconds", "type": "integer", "description": "Optional TTL seconds.", "required": false },
+        { "name": "if_match", "type": "string", "description": "Optional ETag for optimistic concurrency.", "required": false }
+      ]
+    },
+    {
+      "name": "aps_kv_get",
+      "description": "Read a value from APS KV.",
+      "timeout": 60,
+      "parameters": [
+        { "name": "key", "type": "string", "description": "APS KV key.", "required": false, "default": "test-aps/kv/demo" },
+        { "name": "scope", "type": "string", "description": "APS scope.", "required": false, "default": "user" }
+      ]
+    },
+    {
+      "name": "aps_kv_list",
+      "description": "List APS KV entries by prefix.",
+      "timeout": 60,
+      "parameters": [
+        { "name": "prefix", "type": "string", "description": "Key prefix.", "required": false, "default": "test-aps/kv/" },
+        { "name": "scope", "type": "string", "description": "APS scope.", "required": false, "default": "user" },
+        { "name": "limit", "type": "integer", "description": "Max items.", "required": false, "default": 20 }
+      ]
+    },
+    {
+      "name": "aps_kv_delete",
+      "description": "Delete a value from APS KV with optional optimistic if_match.",
+      "timeout": 60,
+      "parameters": [
+        { "name": "key", "type": "string", "description": "APS KV key.", "required": false, "default": "test-aps/kv/demo" },
+        { "name": "scope", "type": "string", "description": "APS scope.", "required": false, "default": "user" },
+        { "name": "if_match", "type": "string", "description": "Optional ETag for optimistic concurrency.", "required": false }
       ]
     }
   ],

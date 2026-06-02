@@ -50,6 +50,8 @@ function reverseRpc(method, params, timeoutMs = 120_000) {
     method,
     mode: params && params.mode,
     path: params && params.path,
+    key: params && params.key,
+    prefix: params && params.prefix,
     scope: params && params.scope,
   });
   send(frame);
@@ -146,6 +148,31 @@ function makeApsPayload({ content, repeat }) {
     "",
   ].join("\n");
   return Buffer.from(header + content.repeat(repeat), "utf8");
+}
+
+function normalizeKvCommonArgs(args) {
+  const key = String((args && args.key) || "test-aps/kv/demo").trim() || "test-aps/kv/demo";
+  const scope = normalizeScope(args && args.scope);
+  const ifMatch = String((args && args.if_match) || "").trim();
+  return { key, scope, ifMatch: ifMatch || undefined };
+}
+
+function normalizeKvSetArgs(args) {
+  const common = normalizeKvCommonArgs(args);
+  const ttlRaw = Number(args && args.ttl_seconds);
+  const ttlSeconds = Number.isFinite(ttlRaw) && ttlRaw > 0
+    ? Math.max(1, Math.min(604800, Math.trunc(ttlRaw)))
+    : undefined;
+  const value = args && Object.prototype.hasOwnProperty.call(args, "value") ? args.value : null;
+  return { ...common, value, ttlSeconds };
+}
+
+function normalizeKvListArgs(args) {
+  const prefix = String((args && args.prefix) || "").trim();
+  const scope = normalizeScope(args && args.scope);
+  const limitRaw = Number(args && args.limit);
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, Math.trunc(limitRaw))) : 20;
+  return { prefix, scope, limit };
 }
 
 async function uploadInline(input, payload) {
@@ -416,6 +443,116 @@ async function apsFilesDelete(args) {
   };
 }
 
+async function apsKvSet(args) {
+  backendLogBuffer.length = 0;
+  const runId = randomUUID();
+  const input = normalizeKvSetArgs(args || {});
+  const params = {
+    key: input.key,
+    scope: input.scope,
+    value: input.value,
+  };
+  if (input.ttlSeconds) params.ttl_seconds = input.ttlSeconds;
+  if (input.ifMatch) params.if_match = input.ifMatch;
+
+  log("aps kv set start", {
+    run_id: runId,
+    key: input.key,
+    scope: input.scope,
+    ttl_seconds: input.ttlSeconds,
+    has_if_match: !!input.ifMatch,
+  });
+  const kv = await reverseRpc("storage/set", params);
+  log("aps kv set complete", kv);
+  return {
+    run_id: runId,
+    operation: "set",
+    key: input.key,
+    scope: input.scope,
+    kv,
+    backend_logs: [...backendLogBuffer],
+  };
+}
+
+async function apsKvGet(args) {
+  backendLogBuffer.length = 0;
+  const runId = randomUUID();
+  const input = normalizeKvCommonArgs(args || {});
+  log("aps kv get start", { run_id: runId, key: input.key, scope: input.scope });
+  const kv = await reverseRpc("storage/get", {
+    key: input.key,
+    scope: input.scope,
+  });
+  log("aps kv get complete", {
+    exists: kv && kv.exists,
+    etag: kv && kv.etag,
+  });
+  return {
+    run_id: runId,
+    operation: "get",
+    key: input.key,
+    scope: input.scope,
+    kv,
+    backend_logs: [...backendLogBuffer],
+  };
+}
+
+async function apsKvList(args) {
+  backendLogBuffer.length = 0;
+  const runId = randomUUID();
+  const input = normalizeKvListArgs(args || {});
+  log("aps kv list start", {
+    run_id: runId,
+    prefix: input.prefix,
+    scope: input.scope,
+    limit: input.limit,
+  });
+  const kv = await reverseRpc("storage/list", {
+    prefix: input.prefix,
+    scope: input.scope,
+    limit: input.limit,
+  });
+  log("aps kv list complete", {
+    item_count: Array.isArray(kv && kv.items) ? kv.items.length : null,
+  });
+  return {
+    run_id: runId,
+    operation: "list",
+    prefix: input.prefix,
+    scope: input.scope,
+    kv,
+    backend_logs: [...backendLogBuffer],
+  };
+}
+
+async function apsKvDelete(args) {
+  backendLogBuffer.length = 0;
+  const runId = randomUUID();
+  const input = normalizeKvCommonArgs(args || {});
+  const params = {
+    key: input.key,
+    scope: input.scope,
+  };
+  if (input.ifMatch) params.if_match = input.ifMatch;
+
+  log("aps kv delete start", {
+    run_id: runId,
+    key: input.key,
+    scope: input.scope,
+    has_if_match: !!input.ifMatch,
+  });
+  const kv = await reverseRpc("storage/delete", params);
+  log("aps kv delete complete", kv);
+  return {
+    run_id: runId,
+    operation: "delete",
+    key: input.key,
+    scope: input.scope,
+    kv,
+    backend_logs: [...backendLogBuffer],
+  };
+}
+
 async function handleInitialize(params) {
   initialized = true;
   const offered = params && params.protocolVersion;
@@ -429,9 +566,9 @@ async function handleInitialize(params) {
     protocolVersion,
     serverInfo: { name: TOOL_ID, version: VERSION },
     client_capabilities: protocolVersion === "2.0"
-      ? { upload: {}, storage: { files: true } }
+      ? { upload: {}, storage: { kv: true, files: true } }
       : {},
-    capabilities: { storage: { files: true } },
+    capabilities: { storage: { kv: true, files: true } },
   };
 }
 
@@ -471,6 +608,14 @@ async function handleInvoke(params) {
       data = await apsFilesList(args);
     } else if (tool === "aps_files_delete") {
       data = await apsFilesDelete(args);
+    } else if (tool === "aps_kv_set") {
+      data = await apsKvSet(args);
+    } else if (tool === "aps_kv_get") {
+      data = await apsKvGet(args);
+    } else if (tool === "aps_kv_list") {
+      data = await apsKvList(args);
+    } else if (tool === "aps_kv_delete") {
+      data = await apsKvDelete(args);
     } else {
       return { success: false, error: `unknown tool: ${tool}` };
     }

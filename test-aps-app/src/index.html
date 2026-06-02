@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Host Upload / APS Files 测试</title>
+    <title>Host Upload / APS 测试</title>
     <link rel="icon" type="image/svg+xml" href="icon.svg" />
     <link rel="stylesheet" href="style.css" />
   </head>
@@ -11,8 +11,8 @@
     <main class="app">
       <header class="topbar">
         <div>
-          <h1>Host Upload 测试</h1>
-          <p>后端 Executa 调用 Host Upload 与 APS Files，前端验证下载。所有关键步骤都会写入日志。</p>
+          <h1>Host Upload / APS 测试</h1>
+          <p>后端 Executa 调用 Host Upload、APS Files 与 APS KV，前端验证结果。所有关键步骤都会写入日志。</p>
         </div>
         <div class="status">
           <span id="conn-dot" class="dot dot--off"></span>
@@ -23,6 +23,7 @@
       <nav class="tabs" aria-label="测试页面">
         <button class="tab tab--active" type="button" data-tab="host-upload" aria-selected="true">Host Upload 测试</button>
         <button class="tab" type="button" data-tab="aps-files" aria-selected="false">APS Files 测试</button>
+        <button class="tab" type="button" data-tab="aps-kv" aria-selected="false">APS KV 测试</button>
       </nav>
 
       <section class="tab-panel" data-panel="host-upload">
@@ -187,6 +188,92 @@
               <button id="aps-open-btn" class="btn btn--ghost" type="button" disabled>直接打开 URL</button>
             </div>
             <pre id="aps-result-json" class="json">{}</pre>
+          </section>
+        </section>
+      </section>
+
+      <section class="tab-panel" data-panel="aps-kv" hidden>
+        <section class="layout">
+          <form id="aps-kv-form" class="panel" autocomplete="off">
+            <div class="panel__head">
+              <h2>APS KV 参数</h2>
+            </div>
+
+            <label class="field">
+              <span>Key</span>
+              <input id="kv-key" value="test-aps/kv/demo" />
+            </label>
+
+            <label class="field">
+              <span>Scope</span>
+              <select id="kv-scope">
+                <option value="user">user：用户级</option>
+                <option value="app">app：应用级</option>
+                <option value="tool">tool：工具级</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>TTL（秒，留空为永久）</span>
+              <input id="kv-ttl" type="number" min="1" max="604800" placeholder="例如 3600" />
+            </label>
+
+            <label class="field">
+              <span>If-Match ETag</span>
+              <input id="kv-if-match" placeholder="读取后自动回填，可留空" />
+            </label>
+
+            <label class="field">
+              <span>列表 Prefix</span>
+              <input id="kv-prefix" value="test-aps/kv/" />
+            </label>
+
+            <label class="field">
+              <span>列表数量</span>
+              <input id="kv-limit" type="number" min="1" max="100" value="20" />
+            </label>
+
+            <label class="field field--wide">
+              <span>JSON Value</span>
+              <textarea id="kv-value" rows="10">{
+  "title": "APS KV 测试",
+  "count": 1,
+  "updated_at": "2026-06-02T00:00:00Z"
+}</textarea>
+            </label>
+
+            <div class="actions">
+              <button id="kv-set-btn" class="btn btn--primary" type="submit">写入 KV</button>
+              <button id="kv-get-btn" class="btn" type="button">读取 KV</button>
+              <button id="kv-list-btn" class="btn" type="button">列 KV</button>
+              <button id="kv-delete-btn" class="btn btn--ghost" type="button">删除 KV</button>
+            </div>
+          </form>
+
+          <section class="panel result">
+            <div class="panel__head">
+              <h2>KV 最近一次结果</h2>
+              <button id="kv-copy-result" class="btn btn--ghost" type="button" disabled>复制 JSON</button>
+            </div>
+            <dl class="kv">
+              <div>
+                <dt>Key</dt>
+                <dd id="kv-result-key">-</dd>
+              </div>
+              <div>
+                <dt>Exists</dt>
+                <dd id="kv-result-exists">-</dd>
+              </div>
+              <div>
+                <dt>ETag</dt>
+                <dd id="kv-result-etag">-</dd>
+              </div>
+              <div>
+                <dt>大小</dt>
+                <dd id="kv-result-bytes">-</dd>
+              </div>
+            </dl>
+            <pre id="kv-result-json" class="json">{}</pre>
           </section>
         </section>
       </section>

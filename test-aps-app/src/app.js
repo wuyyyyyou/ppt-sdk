@@ -46,6 +46,25 @@ const els = {
   apsResultBytes: document.querySelector("#aps-result-bytes"),
   apsResultJson: document.querySelector("#aps-result-json"),
 
+  kvForm: document.querySelector("#aps-kv-form"),
+  kvKey: document.querySelector("#kv-key"),
+  kvScope: document.querySelector("#kv-scope"),
+  kvTtl: document.querySelector("#kv-ttl"),
+  kvIfMatch: document.querySelector("#kv-if-match"),
+  kvPrefix: document.querySelector("#kv-prefix"),
+  kvLimit: document.querySelector("#kv-limit"),
+  kvValue: document.querySelector("#kv-value"),
+  kvSetBtn: document.querySelector("#kv-set-btn"),
+  kvGetBtn: document.querySelector("#kv-get-btn"),
+  kvListBtn: document.querySelector("#kv-list-btn"),
+  kvDeleteBtn: document.querySelector("#kv-delete-btn"),
+  kvCopyResult: document.querySelector("#kv-copy-result"),
+  kvResultKey: document.querySelector("#kv-result-key"),
+  kvResultExists: document.querySelector("#kv-result-exists"),
+  kvResultEtag: document.querySelector("#kv-result-etag"),
+  kvResultBytes: document.querySelector("#kv-result-bytes"),
+  kvResultJson: document.querySelector("#kv-result-json"),
+
   logs: document.querySelector("#logs"),
   clearLogs: document.querySelector("#clear-logs"),
   copyLogs: document.querySelector("#copy-logs"),
@@ -54,6 +73,7 @@ const els = {
 let anna = null;
 let lastResult = null;
 let lastApsResult = null;
+let lastKvResult = null;
 let logs = [];
 
 function nowTime() {
@@ -120,6 +140,19 @@ function setApsBusy(busy, label = "处理中...") {
   }
 }
 
+function setKvBusy(busy, label = "处理中...") {
+  for (const btn of [els.kvSetBtn, els.kvGetBtn, els.kvListBtn, els.kvDeleteBtn]) {
+    btn.disabled = busy;
+  }
+  if (busy) {
+    els.kvSetBtn.dataset.oldText = els.kvSetBtn.textContent;
+    els.kvSetBtn.textContent = label;
+  } else if (els.kvSetBtn.dataset.oldText) {
+    els.kvSetBtn.textContent = els.kvSetBtn.dataset.oldText;
+    delete els.kvSetBtn.dataset.oldText;
+  }
+}
+
 function unwrapToolResult(raw) {
   if (raw && raw.success === false) {
     const dataLogs = raw.data?.backend_logs || [];
@@ -171,6 +204,42 @@ function collectApsListPayload() {
   };
 }
 
+function parseKvValue() {
+  const raw = els.kvValue.value.trim();
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`KV value 不是合法 JSON: ${error.message}`);
+  }
+}
+
+function collectKvCommonPayload() {
+  return {
+    key: els.kvKey.value.trim() || "test-aps/kv/demo",
+    scope: els.kvScope.value,
+    if_match: els.kvIfMatch.value.trim() || undefined,
+  };
+}
+
+function collectKvSetPayload() {
+  const ttlRaw = Number.parseInt(els.kvTtl.value, 10);
+  return {
+    ...collectKvCommonPayload(),
+    value: parseKvValue(),
+    ttl_seconds: Number.isFinite(ttlRaw) && ttlRaw > 0 ? Math.min(604800, ttlRaw) : undefined,
+  };
+}
+
+function collectKvListPayload() {
+  const limitRaw = Number.parseInt(els.kvLimit.value, 10);
+  return {
+    prefix: els.kvPrefix.value.trim(),
+    scope: els.kvScope.value,
+    limit: Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, limitRaw)) : 20,
+  };
+}
+
 function renderResult(result) {
   lastResult = result;
   const upload = result?.upload || result || {};
@@ -214,6 +283,25 @@ function renderApsResult(result) {
   els.apsCopyResult.disabled = !result;
 }
 
+function renderKvResult(result) {
+  lastKvResult = result;
+  const kv = result?.kv || result?.set || result?.get || result?.deleted || result?.list || result || {};
+  const exists = Object.prototype.hasOwnProperty.call(kv, "exists") ? String(kv.exists) : "-";
+  const etag = kv.etag || result?.etag || "";
+  const bytes = kv.size_bytes ?? kv.bytes ?? result?.bytes ?? "";
+
+  els.kvResultKey.textContent = result?.key || result?.prefix || "-";
+  els.kvResultExists.textContent = exists;
+  els.kvResultEtag.textContent = etag || "-";
+  els.kvResultBytes.textContent = bytes === "" ? "-" : `${bytes} bytes`;
+  els.kvResultJson.textContent = JSON.stringify(result || {}, null, 2);
+  els.kvCopyResult.disabled = !result;
+
+  if (etag && result?.operation === "get") {
+    els.kvIfMatch.value = etag;
+  }
+}
+
 async function connectAnna() {
   try {
     if (typeof AnnaAppRuntime === "undefined") {
@@ -223,7 +311,7 @@ async function connectAnna() {
     setConnection(true, "已连接 Anna");
     addLog("ok", "runtime", "Anna runtime 连接成功");
     try {
-      await anna.window?.set_title?.({ title: "Host Upload / APS Files 测试" });
+      await anna.window?.set_title?.({ title: "Host Upload / APS 测试" });
     } catch (error) {
       addLog("warn", "runtime", "设置窗口标题失败", String(error?.message || error));
     }
@@ -235,6 +323,23 @@ async function connectAnna() {
 }
 
 function createStandaloneAnna() {
+  const kvStore = new Map();
+
+  function kvId(scope, key) {
+    return `${scope}:${key}`;
+  }
+
+  function readMockKv(scope, key) {
+    const id = kvId(scope, key);
+    const item = kvStore.get(id);
+    if (!item) return null;
+    if (item.expires_at && Date.parse(item.expires_at) <= Date.now()) {
+      kvStore.delete(id);
+      return null;
+    }
+    return item;
+  }
+
   return {
     tools: {
       async invoke({ method, args }) {
@@ -287,6 +392,76 @@ function createStandaloneAnna() {
               scope: args.scope,
               deleted: { deleted: true },
               backend_logs: ["standalone mock: no files/delete call"],
+            },
+          };
+        }
+        if (method === "aps_kv_set") {
+          const valueText = JSON.stringify(args.value);
+          const item = {
+            value: args.value,
+            etag: `mock-${Date.now()}`,
+            size_bytes: new TextEncoder().encode(valueText).length,
+            expires_at: args.ttl_seconds ? new Date(Date.now() + args.ttl_seconds * 1000).toISOString() : null,
+          };
+          kvStore.set(kvId(args.scope, args.key), item);
+          return {
+            success: true,
+            data: {
+              operation: "set",
+              key: args.key,
+              scope: args.scope,
+              kv: { etag: item.etag, size_bytes: item.size_bytes, expires_at: item.expires_at },
+              backend_logs: ["standalone mock: no storage/set call"],
+            },
+          };
+        }
+        if (method === "aps_kv_get") {
+          const item = readMockKv(args.scope, args.key);
+          return {
+            success: true,
+            data: {
+              operation: "get",
+              key: args.key,
+              scope: args.scope,
+              kv: item
+                ? { value: item.value, exists: true, etag: item.etag, size_bytes: item.size_bytes, expires_at: item.expires_at }
+                : { value: null, exists: false, etag: null },
+              backend_logs: ["standalone mock: no storage/get call"],
+            },
+          };
+        }
+        if (method === "aps_kv_list") {
+          const prefix = args.prefix || "";
+          const items = [];
+          for (const [id, item] of kvStore.entries()) {
+            const [scope, ...keyParts] = id.split(":");
+            const key = keyParts.join(":");
+            if (scope === args.scope && key.startsWith(prefix) && readMockKv(scope, key)) {
+              items.push({ key, etag: item.etag, size_bytes: item.size_bytes, expires_at: item.expires_at });
+            }
+            if (items.length >= (args.limit || 20)) break;
+          }
+          return {
+            success: true,
+            data: {
+              operation: "list",
+              prefix,
+              scope: args.scope,
+              kv: { items },
+              backend_logs: ["standalone mock: no storage/list call"],
+            },
+          };
+        }
+        if (method === "aps_kv_delete") {
+          const existed = kvStore.delete(kvId(args.scope, args.key));
+          return {
+            success: true,
+            data: {
+              operation: "delete",
+              key: args.key,
+              scope: args.scope,
+              kv: { deleted: existed },
+              backend_logs: ["standalone mock: no storage/delete call"],
             },
           };
         }
@@ -405,6 +580,64 @@ async function apsDelete() {
   }
 }
 
+async function kvSet(event) {
+  event.preventDefault();
+  setKvBusy(true, "写入中...");
+  renderKvResult(null);
+  try {
+    const data = await invokeTool("aps_kv_set", collectKvSetPayload(), "aps-kv");
+    renderKvResult(data);
+    addLog("ok", "aps-kv", "APS KV 写入完成");
+  } catch (error) {
+    addLog("error", "aps-kv", "APS KV 写入失败", String(error?.message || error));
+    renderKvResult({ error: String(error?.message || error) });
+  } finally {
+    setKvBusy(false);
+  }
+}
+
+async function kvGet() {
+  setKvBusy(true, "读取中...");
+  try {
+    const data = await invokeTool("aps_kv_get", collectKvCommonPayload(), "aps-kv");
+    renderKvResult(data);
+    addLog("ok", "aps-kv", "APS KV 读取完成");
+  } catch (error) {
+    addLog("error", "aps-kv", "APS KV 读取失败", String(error?.message || error));
+    renderKvResult({ error: String(error?.message || error) });
+  } finally {
+    setKvBusy(false);
+  }
+}
+
+async function kvList() {
+  setKvBusy(true, "列 Key...");
+  try {
+    const data = await invokeTool("aps_kv_list", collectKvListPayload(), "aps-kv");
+    renderKvResult(data);
+    addLog("ok", "aps-kv", "APS KV 列表读取完成");
+  } catch (error) {
+    addLog("error", "aps-kv", "APS KV 列表读取失败", String(error?.message || error));
+    renderKvResult({ error: String(error?.message || error) });
+  } finally {
+    setKvBusy(false);
+  }
+}
+
+async function kvDelete() {
+  setKvBusy(true, "删除中...");
+  try {
+    const data = await invokeTool("aps_kv_delete", collectKvCommonPayload(), "aps-kv");
+    renderKvResult(data);
+    addLog("ok", "aps-kv", "APS KV 删除完成");
+  } catch (error) {
+    addLog("error", "aps-kv", "APS KV 删除失败", String(error?.message || error));
+    renderKvResult({ error: String(error?.message || error) });
+  } finally {
+    setKvBusy(false);
+  }
+}
+
 function getDownloadUrl() {
   const upload = lastResult?.upload || lastResult || {};
   return upload.url || upload.download_url || "";
@@ -519,6 +752,12 @@ function bindUi() {
   els.apsDownloadBtn.addEventListener("click", downloadApsResult);
   els.apsOpenBtn.addEventListener("click", openApsUrl);
   els.apsCopyResult.addEventListener("click", () => copyText(els.apsResultJson.textContent, "APS Files 结果 JSON"));
+
+  els.kvForm.addEventListener("submit", kvSet);
+  els.kvGetBtn.addEventListener("click", kvGet);
+  els.kvListBtn.addEventListener("click", kvList);
+  els.kvDeleteBtn.addEventListener("click", kvDelete);
+  els.kvCopyResult.addEventListener("click", () => copyText(els.kvResultJson.textContent, "APS KV 结果 JSON"));
 
   els.clearLogs.addEventListener("click", () => {
     logs = [];

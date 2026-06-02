@@ -40,7 +40,8 @@
       "artifact": [],
       "llm": [],
       "fs": [],
-      "storage": [],
+      "storage": ["get", "set", "list", "delete"],
+      "upload": ["inline"],
       "prefs": [],
       "window": ["set_title"]
     },
