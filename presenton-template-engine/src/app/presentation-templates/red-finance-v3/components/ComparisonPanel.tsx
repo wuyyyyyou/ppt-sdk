@@ -19,6 +19,7 @@ type ComparisonPanelProps = {
   dividerColor?: string;
   className?: string;
   density?: "normal" | "compact";
+  sectionLayout?: "natural" | "fill";
 };
 
 const ComparisonPanel = ({
@@ -30,8 +31,10 @@ const ComparisonPanel = ({
   dividerColor = "#EEEEEE",
   className,
   density = "normal",
+  sectionLayout = "natural",
 }: ComparisonPanelProps) => {
   const isCompact = density === "compact";
+  const shouldFillSections = sectionLayout === "fill";
   const headerHeight = isCompact ? 40 : 42;
   const contentPaddingX = isCompact ? 14 : 15;
   const contentPaddingY = isCompact ? 12 : 14;
@@ -82,7 +85,14 @@ const ComparisonPanel = ({
       >
         {sections.map((section, index) => (
           <React.Fragment key={`${section.badge}-${section.title}-${index}`}>
-            <div className="flex items-start gap-[10px]">
+            <div
+              className="flex gap-[10px]"
+              style={{
+                flex: shouldFillSections ? "1 1 0" : undefined,
+                minHeight: shouldFillSections ? 0 : undefined,
+                alignItems: shouldFillSections ? "center" : "flex-start",
+              }}
+            >
               <div
                 className="mt-[3px] flex flex-none items-center justify-center rounded-[2px] text-[10px] font-bold leading-none text-white"
                 style={{
@@ -118,8 +128,12 @@ const ComparisonPanel = ({
 
             {index < sections.length - 1 ? (
               <div
-                className="my-[12px] h-px flex-none"
-                style={{ backgroundColor: dividerColor }}
+                className="h-px flex-none"
+                style={{
+                  marginTop: shouldFillSections ? 0 : 12,
+                  marginBottom: shouldFillSections ? 0 : 12,
+                  backgroundColor: dividerColor,
+                }}
               />
             ) : null}
           </React.Fragment>

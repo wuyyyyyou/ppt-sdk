@@ -48,6 +48,11 @@
       "badge": "02",
       "title": "Use case",
       "description": "Useful for market, capability, option, or scoring comparisons."
+    },
+    {
+      "badge": "03",
+      "title": "Decision lens",
+      "description": "Use the final column to make the comparison actionable for the next choice."
     }
   ],
   "summary": "Best for multi-dimensional comparison; avoid using it for a single argument."

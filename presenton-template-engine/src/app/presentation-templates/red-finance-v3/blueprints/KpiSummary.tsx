@@ -7,10 +7,20 @@ import { FinanceIcon } from "../components/FinanceIcons.tsx";
 import DualValueMetricCard from "../components/DualValueMetricCard.tsx";
 import InsightCallout from "../components/InsightCallout.tsx";
 import KpiMetricItem from "../components/KpiMetricItem.tsx";
+import ProgressStatusCard from "../components/ProgressStatusCard.tsx";
+
+const StatusIconSchema = z.enum(["chart-column", "route", "shield", "wallet"]);
 
 const MetricSchema = z.object({
   value: z.string().min(1).max(24),
   label: z.string().min(2).max(24),
+});
+
+const StatusCardSchema = z.object({
+  title: z.string().min(2).max(24),
+  progress: z.number().min(0).max(100),
+  status: z.string().min(2).max(48),
+  icon: StatusIconSchema.default("chart-column"),
 });
 
 export const Schema = z.object({
@@ -35,6 +45,26 @@ export const Schema = z.object({
     { value: "3", label: "Critical risks" },
     { value: "7", label: "Weeks left" },
   ]),
+  statusCards: z.array(StatusCardSchema).min(2).max(4).default([
+    {
+      title: "Execution progress",
+      progress: 84,
+      status: "On track against current plan",
+      icon: "route",
+    },
+    {
+      title: "Risk coverage",
+      progress: 72,
+      status: "Critical risks under review",
+      icon: "shield",
+    },
+    {
+      title: "Target readiness",
+      progress: 90,
+      status: "Close to target threshold",
+      icon: "wallet",
+    },
+  ]),
   insights: z.array(z.string().min(8).max(120)).min(1).max(3).default([
     "Numbers are the anchor; commentary should explain drivers and next actions.",
   ]),
@@ -58,6 +88,7 @@ const KpiSummary = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
   const parsed = Schema.parse(data ?? {});
   const metricDensity = parsed.density === "high" ? "compact" : "normal";
   const gridClass = parsed.variant === "compact-metric-board" ? "grid-cols-4" : "grid-cols-2";
+  const isHeroKpiGrid = parsed.variant === "hero-kpi-grid";
 
   return (
     <FinanceContentFrame
@@ -70,8 +101,8 @@ const KpiSummary = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
       contentBottomInset={12}
     >
       <div className="flex h-full min-h-0 flex-col gap-[14px]">
-        <FinanceSectionHeading title={parsed.heading} subtitle={parsed.subtitle} />
-        <div className={parsed.variant === "hero-kpi-grid" ? "grid grid-cols-[1.05fr_0.95fr] gap-[18px]" : "flex flex-col gap-[18px]"}>
+        <FinanceSectionHeading title={parsed.heading} subtitle={parsed.subtitle} marginBottom={0} />
+        <div className={isHeroKpiGrid ? "grid flex-none grid-cols-[1.05fr_0.95fr] gap-[18px]" : "flex flex-none flex-col gap-[18px]"}>
           <DualValueMetricCard
             title={parsed.headlineTitle}
             icon={<FinanceIcon name="wallet" className="h-[18px] w-[18px]" />}
@@ -92,7 +123,26 @@ const KpiSummary = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
             ))}
           </div>
         </div>
-        <div className="grid gap-[10px]">
+        <div
+          className="grid min-h-0 flex-1 gap-[12px]"
+          style={{
+            gridTemplateColumns: `repeat(${parsed.statusCards.length}, minmax(0, 1fr))`,
+          }}
+        >
+          {parsed.statusCards.map((card, index) => (
+            <ProgressStatusCard
+              key={`${card.title}-${index}`}
+              title={card.title}
+              marker={<FinanceIcon name={card.icon} className="h-[18px] w-[18px]" />}
+              progress={card.progress}
+              status={card.status}
+              className="h-full justify-center"
+              minHeight={0}
+              progressColor={index === 1 ? "#1565C0" : "var(--primary-color,#B71C1C)"}
+            />
+          ))}
+        </div>
+        <div className="grid flex-none gap-[10px]">
           {parsed.insights.map((insight, index) => (
             <InsightCallout key={`${insight}-${index}`} text={insight} density={metricDensity} />
           ))}

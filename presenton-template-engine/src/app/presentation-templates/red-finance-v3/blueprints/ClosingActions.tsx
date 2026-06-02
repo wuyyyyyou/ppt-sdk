@@ -5,8 +5,8 @@ import FinanceContentFrame from "../components/FinanceContentFrame.tsx";
 import FinanceSectionHeading from "../components/FinanceSectionHeading.tsx";
 import { FinanceIcon } from "../components/FinanceIcons.tsx";
 import HorizontalFeatureCard from "../components/HorizontalFeatureCard.tsx";
-import InfoListItem from "../components/InfoListItem.tsx";
 import InsightCallout from "../components/InsightCallout.tsx";
+import SectionPanelShell from "../components/SectionPanelShell.tsx";
 
 const IconSchema = z.enum([
   "bank",
@@ -83,56 +83,58 @@ const ClosingActions = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
       contentTop={156}
       contentBottomInset={12}
     >
-      <div className="grid h-full min-h-0 grid-cols-[0.96fr_1.04fr] gap-[18px]">
-        <div className="flex h-full flex-col gap-[14px]">
-          <FinanceSectionHeading title={parsed.heading} subtitle="final wrap-up" />
-          <InsightCallout text={parsed.finalText} density={parsed.density === "high" ? "compact" : "normal"} icon="flag" />
-          <div className="rounded-[8px] border bg-white p-[14px]">
-            <div className="mb-[10px] text-[13px] font-bold uppercase tracking-[0.06em]" style={{ color: "var(--primary-color,#B71C1C)" }}>
-              {parsed.finalTitle}
-            </div>
-            <div className="text-[14px] leading-[1.55]" style={{ color: "var(--background-text,#212121)" }}>
-              {parsed.summary}
-            </div>
-          </div>
-          {parsed.variant === "decision-ask-focus" ? (
-            <div className="rounded-[8px] border bg-white p-[14px]">
-              <div className="mb-[8px] text-[13px] font-bold uppercase tracking-[0.06em]" style={{ color: "var(--primary-color,#B71C1C)" }}>
+      <div className="flex h-full min-h-0 flex-col gap-[14px]">
+        <FinanceSectionHeading title={parsed.heading} subtitle="final wrap-up" marginBottom={0} />
+
+        <div className="grid min-h-0 flex-1 grid-cols-[0.92fr_1.08fr] gap-[18px]">
+          <div className="flex h-full min-h-0 flex-col gap-[12px]">
+            <InsightCallout text={parsed.finalText} density={parsed.density === "high" ? "compact" : "normal"} icon="flag" />
+            <SectionPanelShell
+              className="min-h-0 flex-1 justify-center"
+              backgroundColor="#FFFFFF"
+              shadow="0 4px 8px rgba(0,0,0,0.03)"
+              paddingX={18}
+              paddingY={18}
+            >
+              <div className="text-[13px] font-bold uppercase tracking-[0.06em]" style={{ color: "var(--primary-color,#B71C1C)" }}>
+                {parsed.finalTitle}
+              </div>
+              <div className="mt-[10px] text-[15px] leading-[1.55]" style={{ color: "var(--background-text,#212121)" }}>
+                {parsed.summary}
+              </div>
+              <div className="my-[18px] h-px w-full" style={{ backgroundColor: "var(--stroke,#E5E7EB)" }} />
+              <div className="text-[13px] font-bold uppercase tracking-[0.06em]" style={{ color: "var(--primary-color,#B71C1C)" }}>
                 Decision ask
               </div>
-              <div className="text-[14px] leading-[1.55]" style={{ color: "var(--background-text,#212121)" }}>
+              <div className="mt-[10px] text-[15px] leading-[1.55]" style={{ color: "var(--text-muted,#616161)" }}>
                 {decisionAsk}
               </div>
-            </div>
-          ) : null}
-        </div>
+            </SectionPanelShell>
+          </div>
 
-        <div className="flex h-full flex-col gap-[12px]">
-          {parsed.actions.map((action, index) => (
-            <HorizontalFeatureCard
-              key={`${action.title}-${index}`}
-              iconName={action.icon}
-              title={action.title}
-              description={action.description}
-              tone={index === 0 ? "accent" : "default"}
-              density={actionDensity}
-              minHeight={96}
-              titleFontSize={16}
-              descriptionFontSize={13}
-              descriptionLineHeight={1.45}
-            />
-          ))}
-          {parsed.variant === "conclusion-plus-actions" ? (
-            <InfoListItem
-              icon="lightbulb"
-              title="Next step"
-              description={decisionAsk}
-              showDivider={false}
-              density={parsed.density === "high" ? "dense" : "compact"}
-              textScale={parsed.density === "high" ? "small" : "normal"}
-              descriptionMaxLines={3}
-            />
-          ) : null}
+          <div
+            className="grid h-full min-h-0 gap-[12px]"
+            style={{
+              gridTemplateRows: `repeat(${parsed.actions.length}, minmax(0, 1fr))`,
+            }}
+          >
+            {parsed.actions.map((action, index) => (
+              <HorizontalFeatureCard
+                key={`${action.title}-${index}`}
+                iconName={action.icon}
+                title={action.title}
+                description={action.description}
+                tag={`0${index + 1}`}
+                tone={index === 0 ? "accent" : "default"}
+                density={actionDensity}
+                minHeight={0}
+                className="h-full"
+                titleFontSize={16}
+                descriptionFontSize={13}
+                descriptionLineHeight={1.45}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </FinanceContentFrame>
