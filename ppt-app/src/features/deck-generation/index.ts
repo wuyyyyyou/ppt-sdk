@@ -24,7 +24,7 @@ const ATTEMPT_LIMITS = {
   selfReview: 5,
   agent: 5,
 };
-const PAGE_GENERATION_CONCURRENCY = 5;
+const PAGE_GENERATION_CONCURRENCY = 4;
 
 export type DeckGenerationStep =
   | "page-plan"

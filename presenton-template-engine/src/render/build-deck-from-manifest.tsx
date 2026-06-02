@@ -12,6 +12,7 @@ import { buildStandaloneDeckHtml } from "./build-deck.js";
 import { prepareManifestRenderPlan } from "./manifest-render-plan.js";
 import { buildLocalBrowserRuntimeBundle, type LocalRuntimeEntry } from "./local-runtime-bundle.js";
 import { getBrowserRenderRuntimeBundle } from "./runtime-bundle.js";
+import { withScreenshotRenderQueue } from "./screenshot-render-queue.js";
 import {
   launchManagedBrowser as launchSharedManagedBrowser,
   waitForRenderReady,
@@ -361,25 +362,27 @@ async function waitForSlideRenderReady(
 async function writeSlideScreenshots(
   slides: Array<{ html: string; outputPath: string }>,
 ): Promise<void> {
-  const runtime = await createManagedPage();
+  await withScreenshotRenderQueue(async () => {
+    const runtime = await createManagedPage();
 
-  try {
-    await runtime.page.setViewport?.(DEFAULT_SLIDE_SCREENSHOT_VIEWPORT);
+    try {
+      await runtime.page.setViewport?.(DEFAULT_SLIDE_SCREENSHOT_VIEWPORT);
 
-    for (const slide of slides) {
-      await runtime.page.setContent(slide.html, {
-        waitUntil: "domcontentloaded",
-        timeout: DEFAULT_RENDER_TIMEOUT_MS,
-      });
-      const slideElement = await waitForSlideRenderReady(runtime.page);
-      const screenshot = await slideElement.screenshot({ path: slide.outputPath });
-      if (!screenshot) {
-        throw new Error(`Failed to write slide screenshot: ${slide.outputPath}`);
+      for (const slide of slides) {
+        await runtime.page.setContent(slide.html, {
+          waitUntil: "domcontentloaded",
+          timeout: DEFAULT_RENDER_TIMEOUT_MS,
+        });
+        const slideElement = await waitForSlideRenderReady(runtime.page);
+        const screenshot = await slideElement.screenshot({ path: slide.outputPath });
+        if (!screenshot) {
+          throw new Error(`Failed to write slide screenshot: ${slide.outputPath}`);
+        }
       }
+    } finally {
+      await runtime.close();
     }
-  } finally {
-    await runtime.close();
-  }
+  });
 }
 
 function parseSinglePageIndex(
