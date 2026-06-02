@@ -23,16 +23,16 @@ import {
   type Slide
 } from "../../../data/mockDeck";
 import { formatMessage, type Locale, type Messages } from "../../../i18n/messages";
-import { deckReadyStatus } from "../utils";
+import { deckReadyStatus, hasDownstreamArtifacts, isWorkspaceDeckStale } from "../utils";
 import {
   createDeckGenerationStreamSnapshot,
-  pageProgressToDeckGenerationProgress,
   runDeckGeneration,
   runDeckRefinement,
   runPageGenerationRetry,
   type DeckGenerationCompletion,
   type DeckGenerationProgress,
 } from "../../deck-generation";
+import { restoreDeckGenerationProgress } from "../workspaceRecovery";
 import type {
   ContextRow,
   DeckReviewRenderState,
@@ -330,57 +330,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     throw new Error(locale === "zh" ? "PPTX 导出等待超时" : "Timed out waiting for PPTX export");
   }
 
-  function readOutlineUpdatedAt(workspace: WorkspaceResult) {
-    const outlineRecord =
-      workspace.outline && typeof workspace.outline === "object" && !Array.isArray(workspace.outline)
-        ? (workspace.outline as { updated_at?: unknown })
-        : null;
-    return typeof outlineRecord?.updated_at === "string" ? outlineRecord.updated_at : "";
-  }
-
-  function hasDownstreamArtifacts(workspace: WorkspaceResult) {
-    const pagePlanRecord =
-      workspace.page_plan && typeof workspace.page_plan === "object" && !Array.isArray(workspace.page_plan)
-        ? (workspace.page_plan as { pages?: unknown })
-        : null;
-    const progressRecord =
-      workspace.page_progress && typeof workspace.page_progress === "object" && !Array.isArray(workspace.page_progress)
-        ? (workspace.page_progress as { pages?: unknown })
-        : null;
-    const pagesRecord =
-      workspace.pages && typeof workspace.pages === "object" && !Array.isArray(workspace.pages)
-        ? (workspace.pages as { pages?: unknown })
-        : null;
-
-    return (
-      (Array.isArray(pagePlanRecord?.pages) && pagePlanRecord.pages.length > 0) ||
-      (Array.isArray(progressRecord?.pages) && progressRecord.pages.length > 0) ||
-      (Array.isArray(pagesRecord?.pages) && pagesRecord.pages.length > 0)
-    );
-  }
-
-  function isWorkspaceDeckStale(workspace: WorkspaceResult) {
-    const outlineUpdatedAt = readOutlineUpdatedAt(workspace);
-    const pagePlanRecord =
-      workspace.page_plan && typeof workspace.page_plan === "object" && !Array.isArray(workspace.page_plan)
-        ? (workspace.page_plan as { source?: { outline_updated_at?: unknown } })
-        : null;
-    const pagePlanOutlineUpdatedAt =
-      typeof pagePlanRecord?.source?.outline_updated_at === "string"
-        ? pagePlanRecord.source.outline_updated_at
-        : "";
-    const outlineRecord =
-      workspace.outline && typeof workspace.outline === "object" && !Array.isArray(workspace.outline)
-        ? (workspace.outline as { status?: unknown })
-        : null;
-
-    if (outlineUpdatedAt && pagePlanOutlineUpdatedAt) {
-      return outlineUpdatedAt !== pagePlanOutlineUpdatedAt;
-    }
-
-    return outlineRecord?.status === "draft" && hasDownstreamArtifacts(workspace);
-  }
-
   function hasRenderedWorkspacePages(workspace: WorkspaceResult) {
     return !isWorkspaceDeckStale(workspace) && workspacePagesToState(workspace.pages) !== null;
   }
@@ -592,9 +541,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const workspacePageProgress = normalizeWorkspacePageProgress(workspace.page_progress);
     setPageProgress(workspacePageProgress);
     setCreateDeckProgress(
-      !staleDeck && !workspacePages && workspacePageProgress
-        ? pageProgressToDeckGenerationProgress(workspacePageProgress, locale)
-        : null
+      restoreDeckGenerationProgress({
+        staleDeck,
+        pageProgress: workspacePageProgress,
+        locale,
+      })
     );
     if (workspacePages) {
       setGenerated(true);

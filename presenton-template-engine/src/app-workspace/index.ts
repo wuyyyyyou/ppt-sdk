@@ -1516,22 +1516,6 @@ export async function renderAppWorkspaceDeckHtml(
     html_path: slide.outputPath,
     speaker_note: slide.speakerNote,
   }));
-  const outline: AppWorkspaceOutline = {
-    version: 2,
-    title: result.title,
-    status: "confirmed",
-    items: slides.map((slide) => ({
-      title: slide.title,
-      outline: slide.speaker_note || slide.layout_id,
-    })),
-    source: {
-      prompt: "",
-      context: [],
-      setting: normalizeSettingJson(workspace.setting),
-      kind: "template-manifest",
-    },
-    updated_at: renderedAt,
-  };
   const pages: AppWorkspacePages = {
     version: 1,
     status: "rendered",
@@ -1553,7 +1537,6 @@ export async function renderAppWorkspaceDeckHtml(
     updated_at: renderedAt,
   };
 
-  await writeJsonFile(workspace.files.outline, outline);
   await writeJsonFile(workspace.files.pages, pages);
   await touchWorkspaceTask(workspace, renderedAt);
 
