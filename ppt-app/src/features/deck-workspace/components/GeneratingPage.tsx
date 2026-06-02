@@ -1,8 +1,10 @@
-import { AlertCircle, CheckCircle2, ChevronDown, Circle, RotateCcw } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronDown, Circle, LoaderCircle, RotateCcw, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Messages } from "../../../i18n/messages";
 import type { DeckGenerationProgress, DeckGenerationStep } from "../../deck-generation";
+import { buildPageGenerationStageRecords, type PageGenerationStageRecord, type PageGenerationStageRecordGroup } from "../generationStageRecords";
 import type { GenerationStreamSnapshot, LoadingKind } from "../types";
-import { GenerationProgressPanel, ThinkingStatusText } from "./BriefPage";
+import { ThinkingStatusText } from "./BriefPage";
 
 interface GeneratingPageProps {
   t: Messages;
@@ -45,23 +47,11 @@ function stepState(index: number, activeIndex: number, progress: DeckGenerationP
   return "pending";
 }
 
-function snapshotsForStep(stepId: string, history: GenerationStreamSnapshot[]) {
-  if (stepId === "pages") {
-    return history.filter((item) => ["page-authoring", "page-render", "page-review", "failed", "cancelled"].includes(item.phase));
-  }
-  const step = majorSteps.find((item) => item.id === stepId);
-  if (!step) return [];
-  return history.filter((item) => step.steps.includes(item.phase as DeckGenerationStep));
-}
-
 export function GeneratingPage(props: GeneratingPageProps) {
   const { t, loading, progress, history, onCancel, onBackToOutline, onRegenerate, onRetryPage, canBackToOutline } = props;
   const activeIndex = majorStepIndex(progress?.step ?? null);
-  const activeStep = majorSteps[activeIndex] ?? majorSteps[0];
-  const activeSnapshots = snapshotsForStep(activeStep.id, history);
   const failed = progress?.step === "failed" || progress?.step === "cancelled";
   const running = loading === "deck" || loading === "deckFromOutline";
-  const activeStreams = progress?.activeStreams ?? (progress?.stream ? [progress.stream] : []);
 
   return (
     <section className="page active generating-page">
@@ -77,7 +67,7 @@ export function GeneratingPage(props: GeneratingPageProps) {
           const state = stepState(index, activeIndex, progress);
           return (
             <button key={step.id} className={`generation-major-node ${state}`}>
-              {state === "done" ? <CheckCircle2 size={15} /> : state === "failed" ? <AlertCircle size={15} /> : <Circle size={15} />}
+              {state === "done" ? <CheckCircle2 size={15} /> : state === "failed" ? <AlertCircle size={15} /> : state === "active" ? <LoaderCircle className="generation-running-icon" size={15} /> : <Circle size={15} />}
               <span>{t.generating.steps[step.labelKey]}</span>
             </button>
           );
@@ -88,6 +78,7 @@ export function GeneratingPage(props: GeneratingPageProps) {
         <GenerationProgressPanel
           t={t}
           progress={progress}
+          history={history}
           onCancel={onCancel}
           cancellable={running && progress.step !== "cancelled"}
           onRetryPage={onRetryPage}
@@ -98,61 +89,6 @@ export function GeneratingPage(props: GeneratingPageProps) {
           <strong>{t.status.creatingDeck}</strong>
         </div>
       )}
-
-      {activeStreams.length > 0 ? (
-        <section className="generation-active-streams">
-          {activeStreams.map((stream) => (
-            <article key={stream.run_id ?? `${stream.page_id}-${stream.kind}`} className="generation-live-stream">
-              <div className="generation-live-header">
-                <strong>
-                  {formatPageLabel(t.generating.pageLabel, stream.page_index)} · {stream.status}
-                </strong>
-              </div>
-              {stream.activities.length > 0 ? (
-                <div className="generation-activity-list">
-                  {stream.activities.map((activity, index) => (
-                    <span key={`${stream.page_id}-active-${index}`}>{activity}</span>
-                  ))}
-                </div>
-              ) : null}
-              {stream.lines.some((line) => line.trim()) ? (
-                <pre className="generation-stream-text">{stream.lines.join("\n").trim()}</pre>
-              ) : null}
-            </article>
-          ))}
-        </section>
-      ) : null}
-
-      <details className="generation-history-panel">
-        <summary className="generation-history-header">
-          <div>
-            <div className="section-label">{t.generating.steps[activeStep.labelKey]}</div>
-            <strong>{activeSnapshots.length > 0 ? t.generating.sessionHistory : t.generating.waitingForStep}</strong>
-          </div>
-          <ChevronDown size={16} />
-        </summary>
-        {activeStep.id === "pages" && progress?.pages.length ? (
-          <div className="generation-page-timeline">
-            {progress.pages.map((page) => {
-              const pageSnapshots = history.filter((item) => item.page_id === page.page_id);
-              return (
-                <details key={page.page_id} className={`generation-page-detail ${page.status}`}>
-                  <summary>
-                    <strong>{page.index + 1}. {page.title}</strong>
-                    <span>{page.status}</span>
-                  </summary>
-                  {page.last_error ? <p className="generation-page-error">{page.last_error}</p> : null}
-                  {pageSnapshots.length > 0 ? <SnapshotList snapshots={pageSnapshots} /> : <p>{t.generating.noStream}</p>}
-                </details>
-              );
-            })}
-          </div>
-        ) : activeSnapshots.length > 0 ? (
-          <SnapshotList snapshots={activeSnapshots} />
-        ) : (
-          <p className="generation-empty-stream">{t.generating.streamHint}</p>
-        )}
-      </details>
 
       {failed ? (
         <div className="generation-recovery-actions">
@@ -169,31 +105,220 @@ export function GeneratingPage(props: GeneratingPageProps) {
   );
 }
 
-function formatPageLabel(template: string, pageIndex: number) {
-  return template.replace("{page}", String(pageIndex + 1));
+function GenerationProgressPanel(props: {
+  t: Messages;
+  progress: DeckGenerationProgress;
+  history: GenerationStreamSnapshot[];
+  onCancel: () => void;
+  cancellable: boolean;
+  onRetryPage?: (pageId: string) => Promise<void>;
+  retryDisabled?: boolean;
+}) {
+  const { t, progress, history, onCancel, cancellable, onRetryPage, retryDisabled = false } = props;
+  const completed = progress.pages.filter((page) => page.status === "accepted").length;
+  const total = progress.totalPages || progress.pages.length || 0;
+  const stageGroups = useMemo(
+    () => buildPageGenerationStageRecords({ t, progress, history }),
+    [t, progress, history],
+  );
+  const disclosure = useStageDisclosure(stageGroups);
+
+  return (
+    <section className="generation-progress-panel">
+      <div className="generation-progress-header">
+        <div>
+          <div className="section-label">{t.generating.progressTitle}</div>
+          <strong><ThinkingStatusText text={progress.message} active={isProgressRunning(progress)} /></strong>
+          {total > 0 ? (
+            <span className="generation-pages-passed">
+              {t.generating.pagesPassed
+                .replace("{completed}", String(completed))
+                .replace("{total}", String(total))}
+            </span>
+          ) : null}
+        </div>
+        {cancellable ? (
+          <button className="secondary-btn compact" onClick={onCancel}>
+            {t.controls.stop}
+          </button>
+        ) : null}
+      </div>
+      {stageGroups.length > 0 ? (
+        <div className="generation-page-list generation-stage-record-list">
+          {stageGroups.map((group) => (
+            <PageStageRecordGroupView
+              key={group.pageId}
+              group={group}
+              t={t}
+              disclosure={disclosure}
+              onRetryPage={onRetryPage}
+              retryDisabled={retryDisabled}
+            />
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
 }
 
-function SnapshotList({ snapshots }: { snapshots: GenerationStreamSnapshot[] }) {
+function isProgressRunning(progress: DeckGenerationProgress) {
+  return !["complete", "failed", "cancelled"].includes(progress.step);
+}
+
+function PageStageRecordGroupView(props: {
+  group: PageGenerationStageRecordGroup;
+  t: Messages;
+  disclosure: ReturnType<typeof useStageDisclosure>;
+  onRetryPage?: (pageId: string) => Promise<void>;
+  retryDisabled: boolean;
+}) {
+  const { group, t, disclosure, onRetryPage, retryDisabled } = props;
+  const canRetry = Boolean(onRetryPage) && !retryDisabled && ["render_failed", "agent_failed", "needs_user_review"].includes(group.pageStatus);
+
   return (
-    <div className="generation-snapshot-list">
-      {snapshots.map((snapshot) => (
-        <article key={snapshot.id} className="generation-snapshot">
-          <div>
-            <strong>{snapshot.label}</strong>
-            <span>{snapshot.status}</span>
-          </div>
-          {snapshot.activities.length > 0 ? (
-            <div className="generation-activity-list">
-              {snapshot.activities.map((activity, index) => (
-                <span key={`${snapshot.id}-activity-${index}`}>{activity}</span>
+    <article className={`generation-page-item generation-stage-page ${group.state} ${group.pageStatus}`}>
+      <div className="generation-page-item-header">
+        <div>
+          <strong>{group.pageIndex + 1}. {group.title}</strong>
+          <span>{group.pageStatusLabel}</span>
+        </div>
+        {canRetry ? (
+          <button className="secondary-btn compact" onClick={() => void onRetryPage?.(group.pageId)}>
+            {t.controls.retryPage}
+          </button>
+        ) : null}
+      </div>
+      {group.lastError ? <p className="generation-page-error">{group.lastError}</p> : null}
+      <div className="generation-page-stage-list">
+        {group.stages.map((stage) => (
+          <PageStageRecordView
+            key={stage.id}
+            stage={stage}
+            t={t}
+            open={disclosure.isOpen(stage)}
+            onToggle={() => disclosure.toggle(stage.id)}
+          />
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function PageStageRecordView(props: {
+  stage: PageGenerationStageRecord;
+  t: Messages;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const { stage, t, open, onToggle } = props;
+  const hasLines = stage.lines.some((line) => line.trim());
+
+  return (
+    <article className={`generation-stage-record ${stage.state}`}>
+      <button
+        className="generation-stage-summary"
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-label={open ? t.generating.stageRecords.collapse : t.generating.stageRecords.expand}
+      >
+        <span className="generation-stage-title">
+          {stage.state === "active" ? <Sparkles className="generation-stage-active-icon" size={14} /> : null}
+          <strong>
+            <ThinkingStatusText
+              text={stage.label}
+              active={stage.state === "active"}
+              showOrb={false}
+            />
+          </strong>
+        </span>
+        <span className="generation-stage-meta">
+          {stage.statusLabel}
+          <ChevronDown className="generation-stage-chevron" size={15} />
+        </span>
+      </button>
+      {open ? (
+        <div className="generation-stage-body">
+          {stage.activities.length > 0 ? (
+            <div className="generation-activity-list" aria-label={t.generating.stageRecords.activities}>
+              {stage.activities.map((activity, index) => (
+                <span key={`${stage.id}-activity-${index}`}>{activity}</span>
               ))}
             </div>
           ) : null}
-          {snapshot.lines.some((line) => line.trim()) ? (
-            <pre className="generation-stream-text">{snapshot.lines.join("\n").trim()}</pre>
+          {hasLines ? (
+            <pre className="generation-stream-text" aria-label={t.generating.stageRecords.stream}>
+              {stage.lines.join("\n").trim()}
+            </pre>
           ) : null}
-        </article>
-      ))}
-    </div>
+          {!hasLines && stage.activities.length === 0 ? (
+            <p className="generation-empty-stream">{stage.lastError ?? t.generating.stageRecords.noOutput}</p>
+          ) : null}
+        </div>
+      ) : null}
+    </article>
   );
+}
+
+function useStageDisclosure(groups: PageGenerationStageRecordGroup[]) {
+  const [openStages, setOpenStages] = useState<Record<string, boolean>>({});
+  const userTouchedRef = useRef<Set<string>>(new Set());
+  const collapseTimersRef = useRef<Map<string, number>>(new Map());
+  const stages = useMemo(() => groups.flatMap((group) => group.stages), [groups]);
+
+  useEffect(() => {
+    setOpenStages((current) => {
+      const next = { ...current };
+      stages.forEach((stage) => {
+        if (userTouchedRef.current.has(stage.id)) return;
+        if (stage.state === "active" || stage.state === "failed") {
+          next[stage.id] = true;
+        } else if (stage.state === "pending" && next[stage.id] === undefined) {
+          next[stage.id] = false;
+        }
+      });
+      return next;
+    });
+
+    const stageIds = new Set(stages.map((stage) => stage.id));
+    for (const [stageId, timer] of collapseTimersRef.current.entries()) {
+      if (!stageIds.has(stageId)) {
+        window.clearTimeout(timer);
+        collapseTimersRef.current.delete(stageId);
+      }
+    }
+
+    stages.forEach((stage) => {
+      if (
+        stage.state !== "completed" ||
+        userTouchedRef.current.has(stage.id) ||
+        collapseTimersRef.current.has(stage.id)
+      ) {
+        return;
+      }
+      const timer = window.setTimeout(() => {
+        collapseTimersRef.current.delete(stage.id);
+        if (userTouchedRef.current.has(stage.id)) return;
+        setOpenStages((current) => ({ ...current, [stage.id]: false }));
+      }, 1200);
+      collapseTimersRef.current.set(stage.id, timer);
+    });
+  }, [stages]);
+
+  useEffect(() => () => {
+    for (const timer of collapseTimersRef.current.values()) {
+      window.clearTimeout(timer);
+    }
+    collapseTimersRef.current.clear();
+  }, []);
+
+  return {
+    isOpen(stage: PageGenerationStageRecord) {
+      return openStages[stage.id] ?? (stage.state === "active" || stage.state === "failed");
+    },
+    toggle(stageId: string) {
+      userTouchedRef.current.add(stageId);
+      setOpenStages((current) => ({ ...current, [stageId]: !(current[stageId] ?? false) }));
+    },
+  };
 }

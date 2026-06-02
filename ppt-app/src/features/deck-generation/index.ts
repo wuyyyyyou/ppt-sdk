@@ -24,7 +24,7 @@ const ATTEMPT_LIMITS = {
   selfReview: 5,
   agent: 5,
 };
-const PAGE_GENERATION_CONCURRENCY = 4;
+const PAGE_GENERATION_CONCURRENCY = 5;
 
 export type DeckGenerationStep =
   | "page-plan"
@@ -78,6 +78,7 @@ export interface DeckGenerationProgress {
 export interface DeckGenerationStreamSnapshot {
   id: string;
   phase: string;
+  kind?: string;
   label: string;
   page_id?: string;
   page_index?: number;
@@ -744,6 +745,7 @@ export function createDeckGenerationStreamSnapshot(
           progress.stream.kind ?? progress.step
         )
       : progress.message || progress.step,
+    kind: progress.stream?.kind,
     page_id: progress.stream?.page_id,
     page_index: progress.stream?.page_index,
     status: progress.stream?.status ?? progress.message,

@@ -376,14 +376,22 @@ function isThinkingStatus(message: string) {
   return /^(Thinking through|Checking page|正在思考|正在检查)/.test(message);
 }
 
-export function ThinkingStatusText({ text }: { text: string }) {
-  if (!isThinkingStatus(text)) {
+export function ThinkingStatusText({
+  text,
+  active = false,
+  showOrb = true
+}: {
+  text: string;
+  active?: boolean;
+  showOrb?: boolean;
+}) {
+  if (!active && !isThinkingStatus(text)) {
     return <>{text}</>;
   }
 
   return (
     <span className="thinking-status" aria-label={text}>
-      <span className="thinking-status-orb" aria-hidden="true" />
+      {showOrb ? <span className="thinking-status-orb" aria-hidden="true" /> : null}
       <span className="thinking-status-text">{text}</span>
       <span className="thinking-status-dots" aria-hidden="true">
         <span />
@@ -413,7 +421,7 @@ export function GenerationProgressPanel(props: {
           <div className="section-label">{t.generating.progressTitle}</div>
           <strong><ThinkingStatusText text={progress.message} /></strong>
           {total > 0 ? (
-            <span>
+            <span className="generation-pages-passed">
               {formatMessage(t.generating.pagesPassed, {
                 completed: String(completed),
                 total: String(total)
@@ -426,16 +434,6 @@ export function GenerationProgressPanel(props: {
             {t.controls.stop}
           </button>
         ) : null}
-      </div>
-      <div className="generation-step-row">
-        {["page-plan", "prepare", "page-authoring", "page-render", "page-review", "final-render"].map((step) => (
-          <span
-            key={step}
-            className={`generation-step ${progress.step === step ? "active" : ""}`}
-          >
-            {step}
-          </span>
-        ))}
       </div>
       {progress.pages.length > 0 ? (
         <div className="generation-page-list">

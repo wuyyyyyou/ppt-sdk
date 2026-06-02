@@ -132,6 +132,48 @@ export interface Messages {
     waitingForStep: string;
     noStream: string;
     streamHint: string;
+    stageRecords: {
+      expand: string;
+      collapse: string;
+      noOutput: string;
+      activities: string;
+      stream: string;
+      running: string;
+      completed: string;
+      failed: string;
+      pending: string;
+      pageStatuses: Record<
+        | "pending"
+        | "authoring"
+        | "rendering"
+        | "selfReview"
+        | "renderFixing"
+        | "selfReviewFixing"
+        | "accepted"
+        | "renderFailed"
+        | "agentFailed"
+        | "needsUserReview"
+        | "agentInfrastructureFailed"
+        | "cancelled"
+        | "unknown",
+        string
+      >;
+      stages: Record<
+        | "pagePlan"
+        | "prepare"
+        | "authoring"
+        | "rendering"
+        | "selfReview"
+        | "renderFix"
+        | "selfReviewFix"
+        | "finalRender"
+        | "accepted"
+        | "failed"
+        | "pending"
+        | "unknown",
+        string
+      >;
+    };
     cancelled: string;
     cancelling: string;
   };
@@ -349,6 +391,46 @@ export const messages: Record<Locale, Messages> = {
       waitingForStep: "Waiting for step output",
       noStream: "No stream output yet",
       streamHint: "Live output appears after the step starts.",
+      stageRecords: {
+        expand: "Expand stage",
+        collapse: "Collapse stage",
+        noOutput: "No output for this stage.",
+        activities: "Activity",
+        stream: "Live output",
+        running: "Running",
+        completed: "Completed",
+        failed: "Failed",
+        pending: "Waiting",
+        pageStatuses: {
+          pending: "Waiting to start",
+          authoring: "Thinking through this page",
+          rendering: "Rendering page",
+          selfReview: "Checking page details",
+          renderFixing: "Fixing render issue",
+          selfReviewFixing: "Adjusting after review",
+          accepted: "Passed",
+          renderFailed: "Render failed",
+          agentFailed: "Generation failed",
+          needsUserReview: "Needs review",
+          agentInfrastructureFailed: "Agent session failed",
+          cancelled: "Stopped",
+          unknown: "Working"
+        },
+        stages: {
+          pagePlan: "Page planning",
+          prepare: "File preparation",
+          authoring: "Page expression",
+          rendering: "Page rendering",
+          selfReview: "Page detail check",
+          renderFix: "Render issue fix",
+          selfReviewFix: "Review adjustment",
+          finalRender: "Final preview",
+          accepted: "Page passed",
+          failed: "Stage failed",
+          pending: "Waiting to start",
+          unknown: "Working"
+        }
+      },
       cancelled: "Generation stopped",
       cancelling: "Stopping current generation..."
     },
@@ -571,6 +653,46 @@ export const messages: Record<Locale, Messages> = {
       waitingForStep: "等待步骤输出",
       noStream: "暂无流式输出",
       streamHint: "步骤开始后会显示实时输出。",
+      stageRecords: {
+        expand: "展开阶段",
+        collapse: "收起阶段",
+        noOutput: "这个阶段没有流式输出。",
+        activities: "活动",
+        stream: "实时输出",
+        running: "运行中",
+        completed: "已完成",
+        failed: "失败",
+        pending: "等待中",
+        pageStatuses: {
+          pending: "等待开始",
+          authoring: "正在思考这一页",
+          rendering: "正在渲染页面",
+          selfReview: "正在检查页面细节",
+          renderFixing: "正在修复渲染问题",
+          selfReviewFixing: "正在根据检查结果调整",
+          accepted: "已通过",
+          renderFailed: "渲染失败",
+          agentFailed: "生成失败",
+          needsUserReview: "需要人工检查",
+          agentInfrastructureFailed: "Agent 会话失败",
+          cancelled: "已停止",
+          unknown: "处理中"
+        },
+        stages: {
+          pagePlan: "页面规划",
+          prepare: "文件准备",
+          authoring: "页面表达",
+          rendering: "页面渲染",
+          selfReview: "页面细节检查",
+          renderFix: "渲染问题修复",
+          selfReviewFix: "检查后调整",
+          finalRender: "最终预览",
+          accepted: "页面已通过",
+          failed: "阶段失败",
+          pending: "等待开始",
+          unknown: "处理中"
+        }
+      },
       cancelled: "已停止生成",
       cancelling: "正在停止当前生成..."
     },

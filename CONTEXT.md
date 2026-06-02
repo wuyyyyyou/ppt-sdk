@@ -61,8 +61,12 @@ The aggregate progress of an Active Deck Generation across all Page Generation U
 **Live Page Stream**:
 The visible stream for an Active Page Generation. It shows the current page run while that page is still active.
 
+**Page Generation Stage Record**:
+The user-facing record of what happened within one Page Generation Unit across stages such as authoring, rendering, review, and fixing. It may include live or completed agent output, but it is presented as page work rather than as session history.
+
 **Generation Session History**:
 The collapsed-by-default record of completed agent runs from Deck Generation. It is historical context, not the primary place for Live Page Streams.
+_Avoid_: User-facing labels such as "Session History" when the record is really page generation work.
 
 **Failed Page Generation**:
 A Page Generation Unit that reached a terminal state without becoming accepted after its automatic recovery attempts are exhausted or manual review is required. Deck Generation may still continue other Page Generation Units, but the Deck is not finished until failed pages are retried or otherwise resolved.

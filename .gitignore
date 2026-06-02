@@ -29,3 +29,4 @@ examples/anna-app-focus-flow/executas/focus-session-go/focus-session-go
 
 **/.build/
 **/.cache/
+**/.scratch/
