@@ -1,8 +1,7 @@
 import { Check, CheckCircle2, ChevronDown, File, ImageIcon, Search, Sparkles, Upload, X } from "lucide-react";
 import { useState } from "react";
 import type { TemplateSummary } from "../../../api/types";
-import { formatMessage, type Messages } from "../../../i18n/messages";
-import type { DeckGenerationProgress } from "../../deck-generation";
+import type { Messages } from "../../../i18n/messages";
 import type { ContextRow, LoadingKind } from "../types";
 import { TemplatePreviewModal } from "./TemplatePreviewModal";
 
@@ -25,10 +24,7 @@ interface BriefPageProps {
   addStyleRow: () => void;
   suggestContextFromPrompt: () => Promise<void>;
   generateDeck: () => Promise<void>;
-  cancelGenerateDeck: () => void;
-  createDeckProgress: DeckGenerationProgress | null;
   showToast: (message: string) => void;
-  onRetryPage?: (pageId: string) => Promise<void>;
 }
 
 export function BriefPage(props: BriefPageProps) {
@@ -49,10 +45,7 @@ export function BriefPage(props: BriefPageProps) {
     addStyleRow,
     suggestContextFromPrompt,
     generateDeck,
-    cancelGenerateDeck,
-    createDeckProgress,
     showToast,
-    onRetryPage
   } = props;
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const isCreating =
@@ -111,30 +104,6 @@ export function BriefPage(props: BriefPageProps) {
         </span>
         <span>{t.brief.reviewOutlineFirst}</span>
       </button>
-
-      {createDeckProgress ? (
-        <GenerationProgressPanel
-          t={t}
-          progress={createDeckProgress}
-          onCancel={cancelGenerateDeck}
-          cancellable={isCreating && createDeckProgress.step !== "cancelled"}
-          onRetryPage={onRetryPage}
-          retryDisabled={isCreating}
-        />
-      ) : null}
-      {!createDeckProgress && loading === "outline" && !reviewOutlineFirst ? (
-        <section className="generation-progress-panel">
-          <div className="generation-progress-header">
-            <div>
-              <div className="section-label">{t.generating.progressTitle}</div>
-              <strong>{t.status.creatingOutline}</strong>
-            </div>
-            <button className="secondary-btn compact" onClick={cancelGenerateDeck}>
-              {t.controls.stop}
-            </button>
-          </div>
-        </section>
-      ) : null}
 
       <div className="brief-options">
         <div>
@@ -399,68 +368,6 @@ export function ThinkingStatusText({
         <span />
       </span>
     </span>
-  );
-}
-
-export function GenerationProgressPanel(props: {
-  t: Messages;
-  progress: DeckGenerationProgress;
-  onCancel: () => void;
-  cancellable: boolean;
-  onRetryPage?: (pageId: string) => Promise<void>;
-  retryDisabled?: boolean;
-}) {
-  const { t, progress, onCancel, cancellable, onRetryPage, retryDisabled = false } = props;
-  const completed = progress.pages.filter((page) => page.status === "accepted").length;
-  const total = progress.totalPages || progress.pages.length || 0;
-
-  return (
-    <section className="generation-progress-panel">
-      <div className="generation-progress-header">
-        <div>
-          <div className="section-label">{t.generating.progressTitle}</div>
-          <strong><ThinkingStatusText text={progress.message} /></strong>
-          {total > 0 ? (
-            <span className="generation-pages-passed">
-              {formatMessage(t.generating.pagesPassed, {
-                completed: String(completed),
-                total: String(total)
-              })}
-            </span>
-          ) : null}
-        </div>
-        {cancellable ? (
-          <button className="secondary-btn compact" onClick={onCancel}>
-            {t.controls.stop}
-          </button>
-        ) : null}
-      </div>
-      {progress.pages.length > 0 ? (
-        <div className="generation-page-list">
-          {progress.pages.map((page) => {
-            const canRetry = Boolean(onRetryPage) && !retryDisabled && ["render_failed", "agent_failed", "needs_user_review"].includes(page.status);
-            return (
-              <div key={page.page_id} className={`generation-page-item ${page.status}`}>
-                <div>
-                  <strong>{page.index + 1}. {page.title}</strong>
-                  <span>{page.status}</span>
-                </div>
-                <small>
-                  render {page.render_attempts}/{page.render_attempt_limit} · review {page.self_review_attempts}/{page.self_review_attempt_limit} · agent {page.agent_failures}/{page.agent_failure_limit}
-                  {page.agent_infrastructure_failures > 0 ? ` · session ${page.agent_infrastructure_failures}` : ""}
-                </small>
-                {page.last_error ? <p>{page.last_error}</p> : null}
-                {canRetry ? (
-                  <button className="secondary-btn compact" onClick={() => void onRetryPage?.(page.page_id)}>
-                    {t.controls.retryPage}
-                  </button>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
-    </section>
   );
 }
 

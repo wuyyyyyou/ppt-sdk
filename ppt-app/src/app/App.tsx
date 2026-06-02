@@ -87,10 +87,7 @@ export function App() {
               addStyleRow={actions.addStyleRow}
               suggestContextFromPrompt={actions.suggestContextFromPrompt}
               generateDeck={actions.generateDeck}
-              cancelGenerateDeck={actions.cancelGenerateDeck}
-              createDeckProgress={state.createDeckProgress}
               showToast={actions.showToast}
-              onRetryPage={actions.retryPageGeneration}
             />
           ) : null}
 
@@ -108,10 +105,7 @@ export function App() {
               setFeedback={actions.setOutlineFeedback}
               applyFeedback={actions.applyOutlineFeedback}
               createDeck={actions.createDeckFromOutline}
-              cancelGenerateDeck={actions.cancelGenerateDeck}
-              createDeckProgress={state.createDeckProgress}
               loading={state.loading}
-              onRetryPage={actions.retryPageGeneration}
             />
           ) : null}
 

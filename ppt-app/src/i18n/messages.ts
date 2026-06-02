@@ -118,6 +118,7 @@ export interface Messages {
   };
   generating: {
     progressTitle: string;
+    generationComplete: string;
     pagesPassed: string;
     pageLabel: string;
     steps: {
@@ -377,6 +378,7 @@ export const messages: Record<Locale, Messages> = {
     },
     generating: {
       progressTitle: "Generation progress",
+      generationComplete: "Generation complete",
       pagesPassed: "{completed}/{total} pages passed",
       pageLabel: "Page {page}",
       steps: {
@@ -639,6 +641,7 @@ export const messages: Record<Locale, Messages> = {
     },
     generating: {
       progressTitle: "生成进度",
+      generationComplete: "生成完成",
       pagesPassed: "{completed}/{total} 页通过",
       pageLabel: "第 {page} 页",
       steps: {

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Messages } from "../../../i18n/messages";
 import type { DeckGenerationProgress, DeckGenerationStep } from "../../deck-generation";
 import { buildPageGenerationStageRecords, type PageGenerationStageRecord, type PageGenerationStageRecordGroup } from "../generationStageRecords";
+import { getGenerationProgressDisplayMessage } from "../generationProgressDisplay";
 import type { GenerationStreamSnapshot, LoadingKind } from "../types";
 import { ThinkingStatusText } from "./BriefPage";
 
@@ -52,13 +53,14 @@ export function GeneratingPage(props: GeneratingPageProps) {
   const activeIndex = majorStepIndex(progress?.step ?? null);
   const failed = progress?.step === "failed" || progress?.step === "cancelled";
   const running = loading === "deck" || loading === "deckFromOutline";
+  const progressMessage = getGenerationProgressDisplayMessage(t, progress);
 
   return (
     <section className="page active generating-page">
       <div className="page-header compact">
         <div>
           <div className="page-title">{t.stages.generating}</div>
-          <p><ThinkingStatusText text={progress?.message ?? t.status.creatingDeck} /></p>
+          <p><ThinkingStatusText text={progressMessage} active={progress ? isProgressRunning(progress) : running} /></p>
         </div>
       </div>
 
@@ -117,6 +119,7 @@ function GenerationProgressPanel(props: {
   const { t, progress, history, onCancel, cancellable, onRetryPage, retryDisabled = false } = props;
   const completed = progress.pages.filter((page) => page.status === "accepted").length;
   const total = progress.totalPages || progress.pages.length || 0;
+  const progressMessage = getGenerationProgressDisplayMessage(t, progress);
   const stageGroups = useMemo(
     () => buildPageGenerationStageRecords({ t, progress, history }),
     [t, progress, history],
@@ -128,7 +131,7 @@ function GenerationProgressPanel(props: {
       <div className="generation-progress-header">
         <div>
           <div className="section-label">{t.generating.progressTitle}</div>
-          <strong><ThinkingStatusText text={progress.message} active={isProgressRunning(progress)} /></strong>
+          <strong><ThinkingStatusText text={progressMessage} active={isProgressRunning(progress)} /></strong>
           {total > 0 ? (
             <span className="generation-pages-passed">
               {t.generating.pagesPassed
@@ -174,19 +177,20 @@ function PageStageRecordGroupView(props: {
 }) {
   const { group, t, disclosure, onRetryPage, retryDisabled } = props;
   const canRetry = Boolean(onRetryPage) && !retryDisabled && ["render_failed", "agent_failed", "needs_user_review"].includes(group.pageStatus);
+  const badgeState = statusBadgeState(group.state);
 
   return (
     <article className={`generation-page-item generation-stage-page ${group.state} ${group.pageStatus}`}>
       <div className="generation-page-item-header">
         <div>
           <strong>{group.pageIndex + 1}. {group.title}</strong>
-          <span>{group.pageStatusLabel}</span>
         </div>
         {canRetry ? (
           <button className="secondary-btn compact" onClick={() => void onRetryPage?.(group.pageId)}>
             {t.controls.retryPage}
           </button>
         ) : null}
+        <span className={`generation-status-badge ${badgeState}`}>{group.pageStatusLabel}</span>
       </div>
       {group.lastError ? <p className="generation-page-error">{group.lastError}</p> : null}
       <div className="generation-page-stage-list">
@@ -212,6 +216,7 @@ function PageStageRecordView(props: {
 }) {
   const { stage, t, open, onToggle } = props;
   const hasLines = stage.lines.some((line) => line.trim());
+  const badgeState = statusBadgeState(stage.state);
 
   return (
     <article className={`generation-stage-record ${stage.state}`}>
@@ -233,7 +238,7 @@ function PageStageRecordView(props: {
           </strong>
         </span>
         <span className="generation-stage-meta">
-          {stage.statusLabel}
+          <span className={`generation-status-badge ${badgeState}`}>{stage.statusLabel}</span>
           <ChevronDown className="generation-stage-chevron" size={15} />
         </span>
       </button>
@@ -258,6 +263,13 @@ function PageStageRecordView(props: {
       ) : null}
     </article>
   );
+}
+
+function statusBadgeState(state: PageGenerationStageRecord["state"]) {
+  if (state === "completed") return "completed";
+  if (state === "active") return "active";
+  if (state === "failed") return "failed";
+  return "pending";
 }
 
 function useStageDisclosure(groups: PageGenerationStageRecordGroup[]) {
