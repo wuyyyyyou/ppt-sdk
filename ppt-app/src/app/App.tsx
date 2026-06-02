@@ -137,8 +137,7 @@ export function App() {
                 actions.navigate("refine");
               }}
               onRefineSlide={() => {
-                actions.setRefineScope("slide");
-                actions.navigate("refine");
+                void actions.openRefineSlide();
               }}
               onPreview={() => actions.navigate("review")}
               onExport={() => actions.navigate("export")}
@@ -178,9 +177,7 @@ export function App() {
               deleteSlide={actions.deleteSlide}
               addSlide={actions.addSlide}
               onRefineSlide={(index) => {
-                actions.setCurrentSlide(index);
-                actions.setRefineScope("slide");
-                actions.navigate("refine");
+                void actions.openRefineSlide(index);
               }}
             />
           ) : null}
@@ -191,8 +188,10 @@ export function App() {
               scope={state.refineScope}
               setScope={actions.setRefineScope}
               slide={selectedSlide}
+              slideIndex={state.currentSlide}
               slideNumber={formatSlideNumber(state.currentSlide)}
               deckCount={state.deck.length}
+              reviewRender={state.reviewRender}
               loading={state.loading}
               onBack={actions.goBack}
               onRefineDeck={actions.refineDeck}

@@ -104,6 +104,7 @@ export interface DeckWorkspaceActions {
   saveWorkspaceSettings: (setting: WorkspaceSettings) => Promise<void>;
   saveWorkspaceTitle: (title: string) => Promise<void>;
   selectTemplate: (groupId: string) => Promise<void>;
+  openRefineSlide: (index?: number) => Promise<void>;
   refineDeck: (instruction: string) => Promise<void>;
   refineSlide: (instruction: string) => Promise<void>;
   renderDeckHtml: () => Promise<void>;
@@ -696,6 +697,35 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
     if (nextPage === "export" && currentWorkspace) {
       void refreshWorkspaceExportArtifact(currentWorkspace);
+    }
+  }
+
+  async function openRefineSlide(index = currentSlide) {
+    if (!generated) {
+      showToast(t.toasts.createDeckFirst);
+      return;
+    }
+
+    setCurrentSlide(index);
+    setRefineScope("slide");
+    setPage("refine");
+    setHistory((items) =>
+      items.at(-1) === "refine" ? items : [...items, "refine"]
+    );
+
+    if (!currentWorkspace) return;
+
+    const renderKey = workspaceReviewRenderKey(currentWorkspace);
+    const hasCurrentSlidePreview =
+      reviewRender.status === "ready" &&
+      reviewRender.result !== null &&
+      reviewRender.renderKey === renderKey &&
+      Boolean(reviewRender.result.slides[index]?.preview_url);
+    if (hasCurrentSlidePreview) return;
+
+    const rendered = await renderDeckHtmlForWorkspace(currentWorkspace, "review");
+    if (rendered) {
+      setCurrentSlide(index);
     }
   }
 
@@ -2159,6 +2189,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     saveWorkspaceSettings,
     saveWorkspaceTitle,
     selectTemplate,
+    openRefineSlide,
     refineDeck,
     refineSlide,
     renderDeckHtml,
