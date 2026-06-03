@@ -84,6 +84,7 @@ export interface WorkspacePageItem {
   title: string;
   layout_id: string;
   html_path: string;
+  screenshot_path?: string;
   speaker_note: string;
 }
 
@@ -367,6 +368,7 @@ export interface RenderWorkspacePagePreviewResult {
   html_path: string;
   preview_url: string;
   screenshot_path: string;
+  screenshot_url?: string;
   page_index: number;
   page_number: number;
   slide_id: string;
@@ -395,6 +397,8 @@ export interface RenderDeckHtmlResult {
     title: string;
     html_path: string;
     preview_url: string;
+    screenshot_path?: string;
+    screenshot_url?: string;
     speaker_note: string;
   }>;
   slide_count: number;

@@ -20,6 +20,7 @@ import {
 import type {
   BrowserRenderContext,
   BrowserRenderTheme,
+  BuildDeckHtmlPagesAndScreenshotsFromManifestResult,
   BuildDeckHtmlPagesFromManifestResult,
   BuildDeckPageScreenshotFromManifestInput,
   BuildDeckPageScreenshotFromManifestResult,
@@ -811,6 +812,65 @@ export async function buildDeckHtmlPagesFromManifest(
       fileName: slide.fileName,
       outputPath: slide.outputPath,
       speakerNote: slide.speaker_note,
+    })),
+    slideCount: prepared.slides.length,
+    title: prepared.title,
+    manifestPath: prepared.manifestPath,
+  };
+}
+
+export async function buildDeckHtmlPagesAndScreenshotsFromManifest(
+  input: BuildDeckHtmlFromManifestInput,
+): Promise<BuildDeckHtmlPagesAndScreenshotsFromManifestResult> {
+  const prepared = await prepareManifestRenderPlan(input);
+  const slidesToWrite =
+    prepared.singlePageIndex === null
+      ? prepared.slides
+      : [prepared.slides[prepared.singlePageIndex]];
+
+  await mkdir(prepared.outputDir, { recursive: true });
+  const screenshotSlides = await Promise.all(
+    slidesToWrite.map(async (slide, index) => {
+      const pageNumber =
+        prepared.singlePageIndex === null ? index + 1 : prepared.singlePageIndex + 1;
+      const baseFileName = `${String(pageNumber).padStart(2, "0")}-${prepared.deckBaseName}-${sanitizeFileNamePart(
+        slide.layoutId,
+      )}`;
+      const htmlFileName = `${baseFileName}.html`;
+      const htmlPath = path.join(prepared.outputDir, htmlFileName);
+      const screenshotFileName = `${baseFileName}.png`;
+      const screenshotPath = path.join(prepared.outputDir, screenshotFileName);
+
+      await writeFile(htmlPath, slide.html, "utf8");
+
+      return {
+        slide,
+        htmlFileName,
+        htmlPath,
+        screenshotFileName,
+        screenshotPath,
+      };
+    }),
+  );
+
+  await writeSlideScreenshots(
+    screenshotSlides.map((slide) => ({
+      html: slide.slide.html,
+      outputPath: slide.screenshotPath,
+    })),
+  );
+
+  return {
+    outputDir: prepared.outputDir,
+    slides: screenshotSlides.map((slide) => ({
+      slideId: slide.slide.slideId,
+      layoutId: slide.slide.layoutId,
+      title: slide.slide.context.title,
+      htmlFileName: slide.htmlFileName,
+      htmlPath: slide.htmlPath,
+      screenshotFileName: slide.screenshotFileName,
+      screenshotPath: slide.screenshotPath,
+      speakerNote: slide.slide.speaker_note,
     })),
     slideCount: prepared.slides.length,
     title: prepared.title,

@@ -337,6 +337,7 @@ export interface RenderAppWorkspacePagePreviewResult {
   html_path: string;
   preview_url?: string;
   screenshot_path: string;
+  screenshot_url?: string;
   page_index: number;
   page_number: number;
   slide_id: string;
@@ -351,6 +352,7 @@ export interface AppWorkspacePageItem {
   title: string;
   layout_id: string;
   html_path: string;
+  screenshot_path?: string;
   speaker_note: string;
 }
 
@@ -377,6 +379,8 @@ export interface RenderAppWorkspaceDeckHtmlResult {
     layout_id: string;
     title: string;
     html_path: string;
+    screenshot_path: string;
+    screenshot_url?: string;
     preview_url?: string;
     speaker_note: string;
   }>;

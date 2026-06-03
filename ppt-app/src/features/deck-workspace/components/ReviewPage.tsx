@@ -16,6 +16,7 @@ import type { Messages } from "../../../i18n/messages";
 import type { DeckReviewRenderState, PreviewMode } from "../types";
 import { formatSlideNumber } from "../utils";
 import { PageHeader } from "./PageHeader";
+import { RenderedSlideImage } from "./RenderedSlideImage";
 import { SlidePreview } from "./SlidePreview";
 import { ThumbnailStrip } from "./ThumbnailStrip";
 
@@ -132,7 +133,7 @@ export function ReviewPage(props: ReviewPageProps) {
           </div>
         ) : null}
 
-        {reviewRender.status === "ready" && !selectedRenderedSlide?.preview_url ? (
+        {reviewRender.status === "ready" && !selectedRenderedSlide?.screenshot_url ? (
           <div className="deck-html-review-state">
             <span>{t.review.renderFailed}</span>
           </div>
@@ -148,13 +149,9 @@ export function ReviewPage(props: ReviewPageProps) {
               onClick={() => setCurrentSlide(index)}
             >
               <span>{formatSlideNumber(index)}</span>
-              {renderedSlides[index]?.preview_url ? (
+              {renderedSlides[index]?.screenshot_url ? (
                 <div className="grid-card-html-frame">
-                  <iframe
-                    title={renderedSlides[index].title}
-                    src={renderedSlides[index].preview_url}
-                    sandbox="allow-scripts allow-same-origin"
-                  />
+                  <RenderedSlideImage slide={renderedSlides[index]} />
                 </div>
               ) : null}
               <strong>{slide.title}</strong>
@@ -227,13 +224,9 @@ export function ReviewPage(props: ReviewPageProps) {
 
       {previewMode === "present" ? (
         <div className="preview-present-view">
-          {selectedRenderedSlide?.preview_url ? (
+          {selectedRenderedSlide?.screenshot_url ? (
             <div className="present-html-frame">
-              <iframe
-                title={selectedRenderedSlide.title}
-                src={selectedRenderedSlide.preview_url}
-                sandbox="allow-scripts allow-same-origin"
-              />
+              <RenderedSlideImage slide={selectedRenderedSlide} loading="eager" />
             </div>
           ) : (
             <SlidePreview slide={selected} index={currentSlide} large />

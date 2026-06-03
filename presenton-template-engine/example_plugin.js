@@ -115,7 +115,7 @@ const MAX_STDOUT_RESPONSE_BYTES = 512 * 1024;
 const MANIFEST = {
   name: "tool-lightvoss_5433-ppt-engine-6443rj2a",
   display_name: "ppt-engine",
-  version: "3.0.2",
+  version: "3.0.3",
   description:
     "Anna Executa plugin for Presenton template discovery, manifest-based deck HTML generation, deck HTML to PPTX model conversion, and stability validation.",
   author: "Anna Developer",
@@ -1000,6 +1000,7 @@ function readOptionalAbsolutePathArg(args, parameterName) {
 }
 
 const previewFiles = new Map();
+const previewImageFiles = new Map();
 const artifactFiles = new Map();
 let previewServerPromise = null;
 
@@ -1057,6 +1058,38 @@ async function handlePreviewRequest(request, response) {
       response.end(html);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to read preview HTML";
+      response.writeHead(500, {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end(message);
+    }
+    return;
+  }
+
+  if (parts.length === 3 && parts[0] === "preview" && parts[2] === "slide.png") {
+    const previewId = parts[1];
+    const imagePath = previewImageFiles.get(previewId);
+    if (!imagePath) {
+      response.writeHead(404, {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end("Preview image expired or not found");
+      return;
+    }
+
+    try {
+      const imageBuffer = await readFile(imagePath);
+      response.writeHead(200, {
+        "content-type": "image/png",
+        "content-length": imageBuffer.byteLength,
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      });
+      response.end(imageBuffer);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to read preview image";
       response.writeHead(500, {
         "content-type": "text/plain; charset=utf-8",
         "cache-control": "no-store",
@@ -1148,6 +1181,20 @@ async function registerPreviewHtml(htmlPath) {
   previewFiles.set(previewId, normalizedHtmlPath);
 
   return `http://127.0.0.1:${port}/preview/${previewId}/deck.html`;
+}
+
+async function registerPreviewImage(imagePath) {
+  const normalizedImagePath = path.normalize(imagePath);
+  const imageStat = await stat(normalizedImagePath);
+  if (!imageStat.isFile()) {
+    throw new Error(`Preview image is not a file: ${normalizedImagePath}`);
+  }
+
+  const { port } = await ensurePreviewServer();
+  const previewId = randomUUID();
+  previewImageFiles.set(previewId, normalizedImagePath);
+
+  return `http://127.0.0.1:${port}/preview/${previewId}/slide.png`;
 }
 
 async function registerArtifactDownload({ path: artifactPath, filename, artifact_type: artifactType }) {
@@ -1615,6 +1662,7 @@ async function toolAppRenderWorkspacePagePreview(args) {
   return {
     ...result,
     preview_url: await registerPreviewHtml(result.html_path),
+    screenshot_url: await registerPreviewImage(result.screenshot_path),
   };
 }
 
@@ -1631,6 +1679,7 @@ async function toolAppRenderDeckHtml(args) {
     result.slides.map(async (slide) => ({
       ...slide,
       preview_url: await registerPreviewHtml(slide.html_path),
+      screenshot_url: await registerPreviewImage(slide.screenshot_path),
     })),
   );
 

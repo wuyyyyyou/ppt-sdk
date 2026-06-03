@@ -5,6 +5,7 @@ import { formatMessage, type Messages } from "../../../i18n/messages";
 import type { DeckReviewRenderState, LoadingKind, RefineScope } from "../types";
 import { deckReadyStatus } from "../utils";
 import { PageHeader } from "./PageHeader";
+import { RenderedSlideImage } from "./RenderedSlideImage";
 import { RefineSteps } from "./RefineSteps";
 import { SlidePreview } from "./SlidePreview";
 
@@ -43,7 +44,7 @@ export function RefinePage(props: RefinePageProps) {
   const renderedSlides = reviewRender.result?.slides ?? [];
   const renderedSlide = renderedSlides[slideIndex] ?? null;
   const showRenderedSlide =
-    reviewRender.status === "ready" && Boolean(renderedSlide?.preview_url);
+    reviewRender.status === "ready" && Boolean(renderedSlide?.screenshot_url);
 
   return (
     <section className="page active refine-page">
@@ -91,11 +92,7 @@ export function RefinePage(props: RefinePageProps) {
         <div className="refine-content">
           {showRenderedSlide && renderedSlide ? (
             <div className="deck-stage-html-frame refine-slide-html-frame">
-              <iframe
-                title={renderedSlide.title}
-                src={renderedSlide.preview_url}
-                sandbox="allow-scripts allow-same-origin"
-              />
+              <RenderedSlideImage slide={renderedSlide} loading="eager" />
             </div>
           ) : (
             <SlidePreview slide={slide} index={slideIndex} />

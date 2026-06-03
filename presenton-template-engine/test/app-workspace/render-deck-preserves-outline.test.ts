@@ -80,9 +80,11 @@ test("renderAppWorkspaceDeckHtml preserves the confirmed outline artifact", asyn
       ],
     });
 
-    await renderAppWorkspaceDeckHtml({
+    const rendered = await renderAppWorkspaceDeckHtml({
       workspace_dir: workspaceDir,
     });
+
+    assert.match(rendered.slides[0]?.screenshot_path ?? "", /\.png$/);
 
     const outline = await readJson<{
       title: string;
@@ -93,11 +95,15 @@ test("renderAppWorkspaceDeckHtml preserves the confirmed outline artifact", asyn
     assert.equal(outline.source.prompt, "original prompt");
     assert.equal(outline.updated_at, "2026-06-02T00:00:00.000Z");
 
-    const pages = await readJson<{ title: string; pages: Array<{ title: string }> }>(
+    const pages = await readJson<{
+      title: string;
+      pages: Array<{ title: string; screenshot_path?: string }>;
+    }>(
       path.join(workspaceDir, "pages.json"),
     );
     assert.equal(pages.title, "Rendered Deck");
     assert.deepEqual(pages.pages.map((page) => page.title), ["Rendered Page"]);
+    assert.match(pages.pages[0]?.screenshot_path ?? "", /\.png$/);
   } finally {
     if (previousHome === undefined) {
       delete process.env.HOME;

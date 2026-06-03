@@ -36,6 +36,7 @@ import {
 } from "./html-to-pptx-model/index.js";
 import {
   buildDeckHtmlFromManifest,
+  buildDeckHtmlPagesAndScreenshotsFromManifest,
   buildDeckHtmlPagesFromManifest,
   buildDeckPageScreenshotFromManifest,
 } from "./render/build-deck-from-manifest.js";
@@ -43,6 +44,7 @@ import { buildDeckHtml, buildStandaloneDeckHtml } from "./render/build-deck.js";
 import { renderSlideHtml } from "./render/render-slide.js";
 import type {
   BuildDeckHtmlFromManifestInput,
+  BuildDeckHtmlPagesAndScreenshotsFromManifestResult,
   BuildDeckHtmlPagesFromManifestResult,
   BuildDeckPageScreenshotFromManifestInput,
   BuildDeckPageScreenshotFromManifestResult,
@@ -281,6 +283,7 @@ export function getTemplateGroup(groupId: string): TemplateGroupInfo | null {
 
 export type {
   BuildDeckHtmlFromManifestInput,
+  BuildDeckHtmlPagesAndScreenshotsFromManifestResult,
   BuildDeckHtmlPagesFromManifestResult,
   BuildDeckHtmlInput,
   BuildDeckHtmlSlideInput,
@@ -316,6 +319,7 @@ export type {
 export {
   buildDeckHtml,
   buildDeckHtmlFromManifest,
+  buildDeckHtmlPagesAndScreenshotsFromManifest,
   buildDeckHtmlPagesFromManifest,
   buildDeckPageScreenshotFromManifest,
   buildStandaloneDeckHtml,

@@ -2205,13 +2205,12 @@ details.generation-history-panel > summary::-webkit-details-marker {
   box-shadow: 0 14px 32px rgba(17, 24, 39, 0.08);
 }
 
-.deck-stage-html-frame iframe {
-  width: 1280px;
-  height: 720px;
-  border: 0;
+.deck-stage-html-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
   background: #fff;
-  transform: scale(0.64);
-  transform-origin: 0 0;
+  object-fit: contain;
 }
 
 .slide-num-tag {
@@ -2326,13 +2325,12 @@ details.generation-history-panel > summary::-webkit-details-marker {
   background: #fff;
 }
 
-.thumb-html-frame iframe {
-  width: 1280px;
-  height: 720px;
-  border: 0;
+.thumb-html-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  transform: scale(0.072);
-  transform-origin: 0 0;
+  object-fit: contain;
 }
 
 .thumb.active {
@@ -2728,27 +2726,18 @@ details.generation-history-panel > summary::-webkit-details-marker {
   margin: 8px 0 10px;
 }
 
-.deck-html-selected-frame iframe,
-.present-html-frame iframe,
-.grid-card-html-frame iframe {
-  width: 1280px;
-  height: 720px;
-  border: 0;
+.deck-html-selected-frame img,
+.present-html-frame img,
+.grid-card-html-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
   background: #fff;
-  transform-origin: 0 0;
+  object-fit: contain;
 }
 
-.deck-html-selected-frame iframe {
-  transform: scale(0.43);
-}
-
-.present-html-frame iframe {
-  transform: scale(0.59);
-}
-
-.grid-card-html-frame iframe {
+.grid-card-html-frame img {
   pointer-events: none;
-  transform: scale(0.16);
 }
 
 .preview-grid-view {

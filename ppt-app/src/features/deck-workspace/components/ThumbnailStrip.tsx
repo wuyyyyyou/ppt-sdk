@@ -1,6 +1,7 @@
 import type { Slide } from "../../../data/mockDeck";
 import type { RenderDeckHtmlResult } from "../../../api/types";
 import { formatSlideNumber } from "../utils";
+import { RenderedSlideImage } from "./RenderedSlideImage";
 
 interface ThumbnailStripProps {
   deck: Slide[];
@@ -23,13 +24,9 @@ export function ThumbnailStrip({
           className={`thumb ${index === currentSlide ? "active" : ""}`}
           onClick={() => setCurrentSlide(index)}
         >
-          {renderedSlides[index]?.preview_url ? (
+          {renderedSlides[index]?.screenshot_url ? (
             <div className="thumb-html-frame">
-              <iframe
-                title={renderedSlides[index].title}
-                src={renderedSlides[index].preview_url}
-                sandbox="allow-scripts allow-same-origin"
-              />
+              <RenderedSlideImage slide={renderedSlides[index]} />
             </div>
           ) : null}
           <span>{formatSlideNumber(index)}</span>

@@ -55,7 +55,13 @@
       "window": []
     },
     "csp_overrides": {
-      "img-src": ["'self'", "data:", "blob:"],
+      "img-src": [
+        "'self'",
+        "data:",
+        "blob:",
+        "http://127.0.0.1:*",
+        "http://localhost:*"
+      ],
       "font-src": ["'self'", "data:"],
       "style-src": ["'self'"],
       "script-src": ["'self'"]

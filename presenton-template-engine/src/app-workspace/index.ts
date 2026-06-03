@@ -15,7 +15,7 @@ import {
 } from "../template-previews/index.js";
 import {
   buildDeckHtmlFromManifest,
-  buildDeckHtmlPagesFromManifest,
+  buildDeckHtmlPagesAndScreenshotsFromManifest,
   buildDeckPageScreenshotFromManifest,
 } from "../render/build-deck-from-manifest.js";
 import { convertDeckHtmlToPptxModel } from "../html-to-pptx-model/index.js";
@@ -1504,7 +1504,7 @@ export async function renderAppWorkspaceDeckHtml(
   const manifestPath = readSelectedTemplateManifestPath(workspace);
   const renderedAt = new Date().toISOString();
   const outputDir = path.join(workspace.workspace_dir, "output", "app-render");
-  const result = await buildDeckHtmlPagesFromManifest({
+  const result = await buildDeckHtmlPagesAndScreenshotsFromManifest({
     manifestPath,
     outputDir,
     name: `${workspace.workspace_id}-review`,
@@ -1513,7 +1513,8 @@ export async function renderAppWorkspaceDeckHtml(
     slide_id: slide.slideId,
     layout_id: slide.layoutId,
     title: slide.title,
-    html_path: slide.outputPath,
+    html_path: slide.htmlPath,
+    screenshot_path: slide.screenshotPath,
     speaker_note: slide.speakerNote,
   }));
   const pages: AppWorkspacePages = {
@@ -1529,6 +1530,7 @@ export async function renderAppWorkspaceDeckHtml(
       title: slide.title,
       layout_id: slide.layout_id,
       html_path: slide.html_path,
+      screenshot_path: slide.screenshot_path,
       speaker_note: slide.speaker_note,
     })),
     source: {

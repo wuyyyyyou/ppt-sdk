@@ -208,6 +208,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const title = typeof record.title === "string" ? record.title : pageId;
     const layoutId = typeof record.layout_id === "string" ? record.layout_id : "";
     const htmlPath = typeof record.html_path === "string" ? record.html_path : "";
+    const screenshotPath =
+      typeof record.screenshot_path === "string" ? record.screenshot_path : "";
     const speakerNote =
       typeof record.speaker_note === "string" ? record.speaker_note : "";
     const index = typeof record.index === "number" ? record.index : 0;
@@ -222,6 +224,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       title,
       layout_id: layoutId,
       html_path: htmlPath,
+      screenshot_path: screenshotPath,
       speaker_note: speakerNote
     };
   }
@@ -718,7 +721,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       reviewRender.status === "ready" &&
       reviewRender.result !== null &&
       reviewRender.renderKey === renderKey &&
-      Boolean(reviewRender.result.slides[index]?.preview_url);
+      Boolean(reviewRender.result.slides[index]?.screenshot_url);
     if (hasCurrentSlidePreview) return;
 
     const rendered = await renderDeckHtmlForWorkspace(currentWorkspace, "review");
