@@ -5,7 +5,9 @@ import { fileURLToPath } from "node:url";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_DIR = path.resolve(SCRIPT_DIR, "..");
-const SEA_PREP_DIR = path.join(PROJECT_DIR, "sea-prep");
+const SEA_PREP_DIR = process.env.PRESENTON_TEMPLATE_ENGINE_SEA_PREP_DIR
+  ? path.resolve(process.env.PRESENTON_TEMPLATE_ENGINE_SEA_PREP_DIR)
+  : path.join(PROJECT_DIR, "sea-prep");
 const SEA_APP_DIR = path.join(SEA_PREP_DIR, "app");
 const SEA_MANIFEST_PATH = path.join(SEA_APP_DIR, ".sea-asset-manifest.json");
 const SEA_CONFIG_PATH = path.join(SEA_PREP_DIR, "sea-config.json");

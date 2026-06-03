@@ -57,7 +57,7 @@ npm run build:full
 
 ## 二进制打包
 
-当前提供基于 Node.js SEA 的本机单文件二进制打包脚本：
+当前提供基于 Node.js SEA 的 Anna Binary 分发包打包脚本：
 
 ```bash
 ./build_binary.sh --test
@@ -65,13 +65,19 @@ npm run build:full
 
 生成产物：
 
-- `bundle/<manifest.name>`
+- `bundle/<manifest.name>-v<manifest.version>-<anna-platform-key>.tar.gz`
+- `bundle/<manifest.name>-v<manifest.version>-<anna-platform-key>.tar.gz.sha256`
+- Windows 平台生成 `.zip` 和 `.zip.sha256`
 
 说明：
 
-- 这是当前平台构建。例如在 macOS 上执行，产出的是 macOS 可执行文件。
+- 这是当前平台构建。例如在 Apple Silicon macOS 上执行，产出 `darwin-arm64` 分发包。
+- `bundle/` 只保留最终 archive 和 sha256，不再保留中间裸二进制。
+- archive 内部包含 `bin/ppt-engine`、`lib/`、`data/` 和顶层 binary distribution `manifest.json`。
+- `manifest.json` 名称有两层含义：本目录下的 Executa tool manifest 是 `describe` 的来源；archive 顶层 manifest 是 Anna Binary 分发入口配置。
+- 打包脚本的 `--test` 会解压最终 archive，校验 binary distribution manifest，并调用 `bin/ppt-engine` 的 `describe` 做冒烟。
 - 二进制首次运行时会自动把内嵌的 `dist`、运行时依赖和模板资源释放到系统临时目录，再启动插件。
-- 如果后续要支持 Windows / Linux，建议在对应平台机器或 CI runner 上分别执行同一份 `build_binary.sh`。
+- 如果后续要支持 Linux，建议在对应平台 runner 上单独扩展并验证。
 
 ## 主要工具能力
 

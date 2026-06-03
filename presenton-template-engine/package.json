@@ -10,6 +10,7 @@
     "dist",
     "example_plugin.js",
     "build_binary.sh",
+    "scripts/binary-release.mjs",
     "scripts/patch-postject.mjs",
     "scripts/prepare-sea-bundle.mjs",
     "scripts/sea-bootstrap.cjs"
