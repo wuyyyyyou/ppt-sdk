@@ -42,6 +42,7 @@ def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit(f"Usage: {sys.argv[0]} <binary-path>")
 
+    manifest = json.loads((Path(__file__).resolve().parent / "manifest.json").read_text())
     binary_path = Path(sys.argv[1]).resolve()
     if not binary_path.is_file():
         raise SystemExit(f"Binary not found: {binary_path}")
@@ -50,7 +51,7 @@ def main() -> None:
         binary_path,
         {"jsonrpc": "2.0", "method": "describe", "id": 1},
     )
-    assert describe["result"]["name"] == "tool-lightvoss_5433-ppt-gener-dc7ftcep"
+    assert describe["result"]["name"] == manifest["name"]
 
     health = invoke_rpc(
         binary_path,

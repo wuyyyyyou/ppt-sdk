@@ -9,79 +9,30 @@ TOOL_NAME = "generatePptx"
 START_TOOL_NAME = "startGeneratePptx"
 STATUS_FILE_NAME = "generate_ppt.json"
 
-MANIFEST = {
-    "name": "tool-lightvoss_5433-ppt-gener-dc7ftcep",
-    "display_name": "ppt-gener",
-    "version": "2.0.2",
-    "description": "Anna Executa plugin for generating .pptx files from PptxPresentationModel JSON files.",
-    "author": "Anna Developer",
-    "tools": [
-        {
-            "name": TOOL_NAME,
-            "description": "Generate a .pptx file from a PptxPresentationModel JSON file and return the output path.",
-            "parameters": [
-                {
-                    "name": "model_path",
-                    "type": "string",
-                    "description": "Absolute path to the PptxPresentationModel JSON file.",
-                    "required": True,
-                },
-                {
-                    "name": "output_path",
-                    "type": "string",
-                    "description": "Absolute path where the generated .pptx file should be written.",
-                    "required": True,
-                },
-                {
-                    "name": "cwd",
-                    "type": "string",
-                    "description": "Optional absolute working directory retained for compatibility.",
-                    "required": False,
-                },
-            ],
-        },
-        {
-            "name": START_TOOL_NAME,
-            "description": "Start generating a .pptx file in the background and update output/generate_ppt.json.",
-            "parameters": [
-                {
-                    "name": "model_path",
-                    "type": "string",
-                    "description": "Absolute path to the PptxPresentationModel JSON file.",
-                    "required": True,
-                },
-                {
-                    "name": "output_path",
-                    "type": "string",
-                    "description": "Absolute path where the generated .pptx file should be written.",
-                    "required": True,
-                },
-                {
-                    "name": "workspace_dir",
-                    "type": "string",
-                    "description": "Absolute path to the workspace containing output/generate_ppt.json.",
-                    "required": True,
-                },
-                {
-                    "name": "job_id",
-                    "type": "string",
-                    "description": "Optional existing export job id to preserve in the status file.",
-                    "required": False,
-                },
-                {
-                    "name": "cwd",
-                    "type": "string",
-                    "description": "Optional absolute working directory retained for compatibility.",
-                    "required": False,
-                },
-            ],
-        }
-    ],
-    "runtime": {
-        "type": "uv",
-        "min_version": "1.0.0",
-    },
-}
+MANIFEST_FILE_NAME = "manifest.json"
+
+
+def read_tool_manifest() -> dict[str, Any]:
+    module_path = Path(__file__).resolve()
+    candidates = [
+        module_path.parents[1] / MANIFEST_FILE_NAME,
+        Path(sys.executable).resolve().parent / MANIFEST_FILE_NAME,
+        Path.cwd() / MANIFEST_FILE_NAME,
+    ]
+
+    seen: set[Path] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if candidate.is_file():
+            return json.loads(candidate.read_text(encoding="utf-8"))
+
+    searched = ", ".join(str(candidate) for candidate in candidates)
+    raise FileNotFoundError(f"Unable to locate {MANIFEST_FILE_NAME}; searched: {searched}")
+
+
+MANIFEST = read_tool_manifest()
 
 
 def make_response(
@@ -281,6 +232,56 @@ TOOL_DISPATCH = {
 }
 
 
+def get_manifest_tool_names() -> list[str]:
+    tools = MANIFEST.get("tools")
+    if not isinstance(tools, list):
+        raise ValueError("manifest.json must include a tools array")
+
+    tool_names: list[str] = []
+    for tool in tools:
+        if not isinstance(tool, dict):
+            raise ValueError("manifest.json tools entries must be objects")
+        name = tool.get("name")
+        if not isinstance(name, str) or not name:
+            raise ValueError("manifest.json tools entries must include non-empty name values")
+        tool_names.append(name)
+    return tool_names
+
+
+def validate_tool_manifest() -> list[str]:
+    manifest_tool_names = get_manifest_tool_names()
+    seen_tool_names: set[str] = set()
+    duplicate_tool_names: list[str] = []
+    for tool_name in manifest_tool_names:
+        if tool_name in seen_tool_names:
+            duplicate_tool_names.append(tool_name)
+            continue
+        seen_tool_names.add(tool_name)
+
+    dispatch_tool_names = set(TOOL_DISPATCH.keys())
+    missing_handlers = [
+        tool_name for tool_name in manifest_tool_names if tool_name not in dispatch_tool_names
+    ]
+    missing_manifest_entries = [
+        tool_name for tool_name in dispatch_tool_names if tool_name not in seen_tool_names
+    ]
+
+    if duplicate_tool_names or missing_handlers or missing_manifest_entries:
+        parts = ["manifest.json tool declarations do not match plugin dispatch."]
+        if duplicate_tool_names:
+            parts.append(f"duplicate tools: {', '.join(duplicate_tool_names)}")
+        if missing_handlers:
+            parts.append(f"missing handlers: {', '.join(missing_handlers)}")
+        if missing_manifest_entries:
+            parts.append(f"missing manifest entries: {', '.join(missing_manifest_entries)}")
+        raise ValueError(" ".join(parts))
+
+    return manifest_tool_names
+
+
+MANIFEST_TOOL_NAMES = validate_tool_manifest()
+
+
 def handle_invoke(request_id: Any, params: dict[str, Any]) -> dict[str, Any]:
     tool_name = params.get("tool")
     arguments = params.get("arguments", {})
@@ -298,7 +299,7 @@ def handle_invoke(request_id: Any, params: dict[str, Any]) -> dict[str, Any]:
             error={
                 "code": -32601,
                 "message": f"Unknown tool: {tool_name}",
-                "data": {"available_tools": list(TOOL_DISPATCH.keys())},
+                "data": {"available_tools": MANIFEST_TOOL_NAMES},
             },
         )
 
@@ -359,7 +360,7 @@ def handle_request(line: str) -> dict[str, Any]:
 
 def main() -> None:
     print("Presenton PPTX Generator Executa plugin started", file=sys.stderr)
-    print(f"Tools: {list(TOOL_DISPATCH.keys())}", file=sys.stderr)
+    print(f"Tools: {MANIFEST_TOOL_NAMES}", file=sys.stderr)
 
     for line in sys.stdin:
         line = line.strip()

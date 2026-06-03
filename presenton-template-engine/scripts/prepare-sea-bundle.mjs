@@ -14,6 +14,7 @@ const SEA_MAIN_PATH = path.join(PROJECT_DIR, "scripts", "sea-bootstrap.cjs");
 
 const INCLUDED_PATHS = [
   "package.json",
+  "manifest.json",
   "example_plugin.js",
   "dist",
   "node_modules",

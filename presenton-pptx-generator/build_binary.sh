@@ -5,7 +5,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-PLUGIN_NAME="tool-lightvoss_5433-ppt-gener-dc7ftcep"
 ENTRY_POINT="example_plugin.py"
 VENV_DIR="$SCRIPT_DIR/.venv"
 UV_CACHE_DIR="$SCRIPT_DIR/.uv-cache"
@@ -15,6 +14,17 @@ BUNDLE_DIR="$SCRIPT_DIR/bundle"
 CAIRO_RUNTIME_HELPER="$SCRIPT_DIR/prepare_cairo_runtime.py"
 SMOKE_TEST_SCRIPT="$SCRIPT_DIR/smoke_test_bundle.py"
 RUN_TEST=false
+
+read_manifest_name() {
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import json; print(json.load(open("manifest.json", encoding="utf-8"))["name"])'
+    return 0
+  fi
+
+  python -c 'import json; print(json.load(open("manifest.json", encoding="utf-8"))["name"])'
+}
+
+PLUGIN_NAME="$(read_manifest_name)"
 
 for arg in "$@"; do
   case "$arg" in
@@ -250,6 +260,7 @@ fi
 
 mkdir -p "$BUNDLE_ROOT"
 cp -R "$BUILD_DIST_DIR"/. "$BUNDLE_ROOT"/
+cp "$SCRIPT_DIR/manifest.json" "$BUNDLE_ROOT/manifest.json"
 stage_bundled_cairo_runtime
 chmod +x "$OUTPUT_PATH"
 codesign_bundle_if_needed

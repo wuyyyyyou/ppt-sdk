@@ -22,13 +22,14 @@ import type {
   TemplatePlanningContext,
   WorkspaceResult
 } from "./types";
+import { PPT_ENGINE_TOOL, PPT_GENER_TOOL } from "./toolManifests.generated";
 
 const PPT_ENGINE_TOOL_ID =
   import.meta.env.VITE_PPT_ENGINE_TOOL_ID ??
-  "tool-lightvoss_5433-ppt-engine-6443rj2a";
+  PPT_ENGINE_TOOL.id;
 const PPT_GENER_TOOL_ID =
   import.meta.env.VITE_PPT_GENER_TOOL_ID ??
-  "tool-lightvoss_5433-ppt-gener-dc7ftcep";
+  PPT_GENER_TOOL.id;
 const PPTX_EXPORT_TIMEOUT_MS = 600_000;
 
 function unwrapToolResult<T>(result: unknown): T {
