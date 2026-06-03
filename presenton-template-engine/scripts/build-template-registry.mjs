@@ -28,8 +28,7 @@ function stripKnownExtension(value) {
 
 function toImportSpecifier(absolutePath) {
   const relativePath = normalizePath(path.relative(templateSourceRoot, absolutePath));
-  const noExtensionPath = stripKnownExtension(relativePath);
-  return `./${noExtensionPath}`;
+  return `./${relativePath}`;
 }
 
 function sanitizeIdentifier(value) {
@@ -501,7 +500,7 @@ function buildGeneratedRegistrySource(groups) {
         },
         null,
         2,
-      )} as const;`,
+      )};`,
     );
     lines.push(
       `const ${groupSettingsVariable}: TemplateGroupSettings = {`,

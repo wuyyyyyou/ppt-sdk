@@ -4,15 +4,15 @@
 
 import { createTemplateEntry, type TemplateGroupSettings, type TemplateLayoutsWithSettings, type TemplateWithData } from "./utils.js";
 
-import red_finance_v3_CoverStatementComponent, * as red_finance_v3_CoverStatementModule from "./red-finance-v3/slides/CoverStatement";
-import red_finance_v3_SectionDividerComponent, * as red_finance_v3_SectionDividerModule from "./red-finance-v3/slides/SectionDivider";
-import red_finance_v3_TwoColumnInsightComponent, * as red_finance_v3_TwoColumnInsightModule from "./red-finance-v3/slides/TwoColumnInsight";
-import red_finance_v3_ThreeColumnCardsComponent, * as red_finance_v3_ThreeColumnCardsModule from "./red-finance-v3/slides/ThreeColumnCards";
-import red_finance_v3_ChartWithNarrativeComponent, * as red_finance_v3_ChartWithNarrativeModule from "./red-finance-v3/slides/ChartWithNarrative";
-import red_finance_v3_ComparisonMatrixComponent, * as red_finance_v3_ComparisonMatrixModule from "./red-finance-v3/slides/ComparisonMatrix";
-import red_finance_v3_TimelinePlanComponent, * as red_finance_v3_TimelinePlanModule from "./red-finance-v3/slides/TimelinePlan";
-import red_finance_v3_KpiSummaryComponent, * as red_finance_v3_KpiSummaryModule from "./red-finance-v3/slides/KpiSummary";
-import red_finance_v3_ClosingActionsComponent, * as red_finance_v3_ClosingActionsModule from "./red-finance-v3/slides/ClosingActions";
+import red_finance_v3_CoverStatementComponent, * as red_finance_v3_CoverStatementModule from "./red-finance-v3/slides/CoverStatement.tsx";
+import red_finance_v3_SectionDividerComponent, * as red_finance_v3_SectionDividerModule from "./red-finance-v3/slides/SectionDivider.tsx";
+import red_finance_v3_TwoColumnInsightComponent, * as red_finance_v3_TwoColumnInsightModule from "./red-finance-v3/slides/TwoColumnInsight.tsx";
+import red_finance_v3_ThreeColumnCardsComponent, * as red_finance_v3_ThreeColumnCardsModule from "./red-finance-v3/slides/ThreeColumnCards.tsx";
+import red_finance_v3_ChartWithNarrativeComponent, * as red_finance_v3_ChartWithNarrativeModule from "./red-finance-v3/slides/ChartWithNarrative.tsx";
+import red_finance_v3_ComparisonMatrixComponent, * as red_finance_v3_ComparisonMatrixModule from "./red-finance-v3/slides/ComparisonMatrix.tsx";
+import red_finance_v3_TimelinePlanComponent, * as red_finance_v3_TimelinePlanModule from "./red-finance-v3/slides/TimelinePlan.tsx";
+import red_finance_v3_KpiSummaryComponent, * as red_finance_v3_KpiSummaryModule from "./red-finance-v3/slides/KpiSummary.tsx";
+import red_finance_v3_ClosingActionsComponent, * as red_finance_v3_ClosingActionsModule from "./red-finance-v3/slides/ClosingActions.tsx";
 
 const red_finance_v3GroupMeta = {
   "group_id": "red-finance-v3",
@@ -50,7 +50,7 @@ const red_finance_v3GroupMeta = {
   "cover_layout_id": "red-finance-v3:cover-statement",
   "agenda_layout_id": null,
   "closing_layout_id": "red-finance-v3:closing-actions"
-} as const;
+};
 const red_finance_v3Settings: TemplateGroupSettings = {
   description: red_finance_v3GroupMeta.group_description,
   ordered: red_finance_v3GroupMeta.ordered,

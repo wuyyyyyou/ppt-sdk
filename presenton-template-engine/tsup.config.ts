@@ -7,7 +7,7 @@ export default defineConfig([
       "http/server": "src/http/server.ts",
       cli: "src/cli.ts",
     },
-    format: ["esm", "cjs"],
+    format: ["esm"],
     dts: true,
     sourcemap: true,
     clean: true,

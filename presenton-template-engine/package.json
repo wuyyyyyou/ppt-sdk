@@ -4,8 +4,6 @@
   "description": "Presenton template engine vendored into an Anna Executa plugin",
   "private": true,
   "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
     "manifest.json",
@@ -19,13 +17,11 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": "./dist/index.js"
     },
     "./server": {
       "types": "./dist/http/server.d.ts",
-      "import": "./dist/http/server.js",
-      "require": "./dist/http/server.cjs"
+      "import": "./dist/http/server.js"
     }
   },
   "bin": {
@@ -44,8 +40,7 @@
     "start": "node dist/cli.js",
     "start:plugin": "node example_plugin.js",
     "build:binary": "./build_binary.sh",
-    "test": "node -e \"console.log('No vendored automated tests in this example package')\"",
-    "prepublishOnly": "npm run build:full"
+    "test": "node -e \"console.log('No vendored automated tests in this example package')\""
   },
   "dependencies": {
     "esbuild": "^0.27.4",
@@ -67,9 +62,6 @@
   },
   "engines": {
     "node": ">=20"
-  },
-  "publishConfig": {
-    "access": "public"
   },
   "pkg": {
     "assets": [

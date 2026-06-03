@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import type { LocalTemplateGroupMetadata } from "../discovery/index.js";
 import type { DeckManifestInput, DeckManifestSlideInput } from "../render/types.js";
 
+const CURRENT_MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
+
 type ForkableGroupSlideAsset = {
   slideId: string;
   layoutId: string;
@@ -70,11 +72,7 @@ const FORKABLE_TEMPLATES_DIR_CANDIDATES = [
 let assetIndexPromise: Promise<LoadedForkableTemplatesAssets> | null = null;
 
 function getCurrentModuleDir(): string {
-  if (typeof __dirname === "string") {
-    return __dirname;
-  }
-
-  return path.dirname(fileURLToPath(import.meta.url));
+  return CURRENT_MODULE_DIR;
 }
 
 async function pathExists(candidatePath: string): Promise<boolean> {

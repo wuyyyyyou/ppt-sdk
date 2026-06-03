@@ -1,21 +1,20 @@
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, isAbsolute, join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+const CURRENT_MODULE_PATH = fileURLToPath(import.meta.url);
+const CURRENT_MODULE_DIR = dirname(CURRENT_MODULE_PATH);
 
 let runtimeBundleCache: string | null = null;
 let runtimeDeckBundleCache: string | null = null;
 
 function getCurrentModulePath(): string {
-  if (typeof __filename === "string" && isAbsolute(__filename)) {
-    return __filename;
-  }
-
-  return fileURLToPath(import.meta.url);
+  return CURRENT_MODULE_PATH;
 }
 
 function getCurrentModuleDir(): string {
-  return dirname(getCurrentModulePath());
+  return CURRENT_MODULE_DIR;
 }
 
 function bundleRuntimeFromSource(bundleFileName: string): string | null {
@@ -55,14 +54,6 @@ function getRuntimeBundle(
   }
 
   const candidateFiles = new Set<string>();
-
-  if (typeof __filename === "string" && isAbsolute(__filename)) {
-    const currentDir = dirname(__filename);
-    candidateFiles.add(join(currentDir, `browser/${bundleFileName}`));
-    candidateFiles.add(join(currentDir, `dist/browser/${bundleFileName}`));
-    candidateFiles.add(join(currentDir, `../browser/${bundleFileName}`));
-    candidateFiles.add(join(currentDir, `../dist/browser/${bundleFileName}`));
-  }
 
   const moduleDir = getCurrentModuleDir();
   candidateFiles.add(join(moduleDir, `browser/${bundleFileName}`));
