@@ -290,7 +290,23 @@
       </section>
     </main>
 
-    <script src="/static/anna-apps/_sdk/0.1.0/index.js" defer></script>
+    <script type="module">
+      (async () => {
+        for (const annaRuntimeSdkUrl of [
+          "/static/anna-apps/_sdk/latest/index.js",
+          "/static/anna-apps/_sdk/0.2.0/index.js",
+          "/static/anna-apps/_sdk/0.1.0/index.js"
+        ]) {
+          try {
+            const { AnnaAppRuntime, default: defaultRuntime } = await import(annaRuntimeSdkUrl);
+            window.AnnaAppRuntime = AnnaAppRuntime ?? defaultRuntime ?? window.AnnaAppRuntime;
+            if (window.AnnaAppRuntime) break;
+          } catch {
+            // Try the next SDK path; production staging currently serves `latest`.
+          }
+        }
+      })();
+    </script>
     <script src="app.js" defer></script>
   </body>
 </html>

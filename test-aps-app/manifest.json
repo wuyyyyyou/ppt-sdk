@@ -4,6 +4,11 @@
     "tools.invoke",
     "ui.svg"
   ],
+  "host_capabilities": [
+    "aps.kv",
+    "aps.scope.user.read",
+    "aps.scope.user.write"
+  ],
   "required_executas": [
     {
       "tool_id": "tool-lightvoss-test-aps-8kvasxsg",
@@ -41,7 +46,6 @@
       "llm": [],
       "fs": [],
       "storage": ["get", "set", "list", "delete"],
-      "upload": ["inline"],
       "prefs": [],
       "window": ["set_title"]
     },

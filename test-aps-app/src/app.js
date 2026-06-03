@@ -1,5 +1,10 @@
 const TOOL_ID = "tool-lightvoss-test-aps-8kvasxsg";
 const TOOL_METHOD_HOST_UPLOAD = "upload_test_file";
+const ANNA_RUNTIME_SDK_URLS = [
+  "/static/anna-apps/_sdk/latest/index.js",
+  "/static/anna-apps/_sdk/0.2.0/index.js",
+  "/static/anna-apps/_sdk/0.1.0/index.js",
+];
 
 const els = {
   tabs: Array.from(document.querySelectorAll(".tab")),
@@ -75,6 +80,30 @@ let lastResult = null;
 let lastApsResult = null;
 let lastKvResult = null;
 let logs = [];
+
+function getAnnaAppRuntime() {
+  return globalThis.AnnaAppRuntime || null;
+}
+
+async function loadAnnaRuntimeSdk() {
+  const existingRuntime = getAnnaAppRuntime();
+  if (existingRuntime) return existingRuntime;
+
+  for (const sdkUrl of ANNA_RUNTIME_SDK_URLS) {
+    try {
+      const runtimeModule = await import(sdkUrl);
+      const runtime = runtimeModule?.AnnaAppRuntime || runtimeModule?.default || getAnnaAppRuntime();
+      if (runtime) {
+        globalThis.AnnaAppRuntime = runtime;
+        return runtime;
+      }
+    } catch {
+      // Try the next SDK path; production staging currently serves `latest`.
+    }
+  }
+
+  return null;
+}
 
 function nowTime() {
   return new Date().toLocaleTimeString("zh-CN", { hour12: false });
@@ -304,10 +333,11 @@ function renderKvResult(result) {
 
 async function connectAnna() {
   try {
-    if (typeof AnnaAppRuntime === "undefined") {
+    const runtime = await loadAnnaRuntimeSdk();
+    if (!runtime) {
       throw new Error("AnnaAppRuntime SDK 未加载，当前是独立预览模式");
     }
-    anna = await AnnaAppRuntime.connect();
+    anna = await runtime.connect();
     setConnection(true, "已连接 Anna");
     addLog("ok", "runtime", "Anna runtime 连接成功");
     try {
