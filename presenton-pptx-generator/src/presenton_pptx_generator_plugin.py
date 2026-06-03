@@ -12,7 +12,7 @@ STATUS_FILE_NAME = "generate_ppt.json"
 MANIFEST = {
     "name": "tool-lightvoss_5433-ppt-gener-dc7ftcep",
     "display_name": "ppt-gener",
-    "version": "2.0.1",
+    "version": "2.0.2",
     "description": "Anna Executa plugin for generating .pptx files from PptxPresentationModel JSON files.",
     "author": "Anna Developer",
     "tools": [
