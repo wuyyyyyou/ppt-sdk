@@ -43,6 +43,14 @@ export interface ExportArtifact {
   fileName?: string;
 }
 
+export interface ExportProgressState {
+  type: "PPTX" | "PDF" | null;
+  mode: "idle" | "determinate" | "indeterminate" | "complete" | "error";
+  message: string;
+  percent: number;
+  active: boolean;
+}
+
 export interface ContextRow {
   id: string;
   label: string;
@@ -76,7 +84,7 @@ export interface DeckWorkspaceState {
   pageProgress: PageProgress | null;
   refineScope: RefineScope;
   loading: LoadingKind;
-  exportStatus: string;
+  exportProgress: ExportProgressState;
   exportArtifact: ExportArtifact | null;
   currentStatus: string;
   workspaceScan: ListWorkspacesResult | null;

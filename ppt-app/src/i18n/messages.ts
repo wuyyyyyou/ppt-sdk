@@ -233,6 +233,13 @@ export interface Messages {
     pdfDescription: string;
     preparing: string;
     ready: string;
+    noFile: string;
+    download: string;
+    pptxPreparingModel: string;
+    pptxModelReady: string;
+    pptxGenerating: string;
+    pptxFailed: string;
+    pdfGenerating: string;
   };
   toasts: {
     localFolder: string;
@@ -498,7 +505,14 @@ export const messages: Record<Locale, Messages> = {
       pptxDescription: "Editable PowerPoint file",
       pdfDescription: "Share-ready document",
       preparing: "Preparing...",
-      ready: "{type} ready"
+      ready: "{type} ready",
+      noFile: "No export file ready",
+      download: "Download",
+      pptxPreparingModel: "Preparing PPTX model",
+      pptxModelReady: "PPTX model ready",
+      pptxGenerating: "Generating PPTX file",
+      pptxFailed: "PPTX export failed",
+      pdfGenerating: "Generating PDF file"
     },
     toasts: {
       localFolder: "Opening local folder...",
@@ -759,7 +773,14 @@ export const messages: Record<Locale, Messages> = {
       pptxDescription: "可编辑 PowerPoint 文件",
       pdfDescription: "适合分享的文档",
       preparing: "正在准备...",
-      ready: "{type} 已就绪"
+      ready: "{type} 已就绪",
+      noFile: "暂无可下载文件",
+      download: "下载",
+      pptxPreparingModel: "正在准备 PPTX 模型",
+      pptxModelReady: "PPTX 模型已准备",
+      pptxGenerating: "正在生成 PPTX 文件",
+      pptxFailed: "PPTX 导出失败",
+      pdfGenerating: "正在生成 PDF 文件"
     },
     toasts: {
       localFolder: "正在打开本地文件夹...",

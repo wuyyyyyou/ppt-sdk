@@ -32,11 +32,19 @@ import {
   type DeckGenerationCompletion,
   type DeckGenerationProgress,
 } from "../../deck-generation";
+import {
+  createArtifactExportProgress,
+  createExportErrorProgress,
+  createExportStartProgress,
+  createIdleExportProgress,
+  createPptxJobExportProgress,
+} from "../exportProgressDisplay";
 import { restoreDeckGenerationProgress } from "../workspaceRecovery";
 import type {
   ContextRow,
   DeckReviewRenderState,
   DeckWorkspaceState,
+  ExportProgressState,
   ExportArtifact,
   GenerationStreamSnapshot,
   LoadingKind,
@@ -145,8 +153,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [pageProgress, setPageProgress] = useState<PageProgress | null>(null);
   const [refineScope, setRefineScope] = useState<RefineScope>("deck");
   const [loading, setLoading] = useState<LoadingKind>("none");
-  const [exportStatus, setExportStatus] = useState("");
+  const [exportProgress, setExportProgress] = useState<ExportProgressState>(
+    () => createIdleExportProgress(t)
+  );
   const [exportArtifact, setExportArtifact] = useState<ExportArtifact | null>(null);
+  const exportRefreshVersionRef = useRef(0);
+  const exportInFlightRef = useRef(false);
   const [backend, setBackend] = useState<PptBackend | null>(null);
   const [aiClient, setAiClient] = useState<AiClient | null>(null);
   const [agentClient, setAgentClient] = useState<AgentClient | null>(null);
@@ -270,27 +282,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return new Promise((resolve) => window.setTimeout(resolve, ms));
   }
 
-  function formatPptxExportStatus(job: PptxExportJob) {
-    if (job.error?.message) return job.error.message;
-    if (job.message) return `${job.message} ${job.percent}%`;
-
-    switch (job.status) {
-      case "preparing_model":
-        return locale === "zh" ? "正在准备 PPTX 模型..." : "Preparing PPTX model...";
-      case "model_ready":
-        return locale === "zh" ? "PPTX 模型已准备，正在生成文件..." : "PPTX model ready. Generating file...";
-      case "generating_pptx":
-        return locale === "zh" ? "正在生成 PPTX 文件..." : "Generating PPTX file...";
-      case "completed":
-        return locale === "zh" ? "PPTX 已生成" : "PPTX generated";
-      case "failed":
-        return locale === "zh" ? "PPTX 导出失败" : "PPTX export failed";
-      case "idle":
-      default:
-        return t.exportPage.preparing;
-    }
-  }
-
   function getPptxExportErrorMessage(job: PptxExportJob) {
     return job.error?.message || job.message || (locale === "zh" ? "PPTX 导出失败" : "PPTX export failed");
   }
@@ -319,7 +310,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const job = await backend.getPptxExportStatus({
         workspace_dir: workspaceDir
       });
-      setExportStatus(formatPptxExportStatus(job));
+      setExportProgress(createPptxJobExportProgress(t, job));
 
       if (isDone(job)) {
         return job;
@@ -481,6 +472,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return `${workspace.task_dir ?? workspace.workspace_dir}:${manifestPath}:${updatedParts.join(":")}`;
   }
 
+  function setExportArtifactWithProgress(artifact: ExportArtifact | null) {
+    setExportArtifact(artifact);
+    setExportProgress(createArtifactExportProgress(t, artifact));
+  }
+
   function buildOutlineArtifact(
     items = outline,
     title = deckTitle,
@@ -522,8 +518,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     options: { syncEmptyContextRows?: boolean } = {}
   ) {
     setCurrentWorkspace(workspace);
-    setExportArtifact(readWorkspaceExportArtifactPath(workspace));
-    void refreshWorkspaceExportArtifact(workspace);
+    if (!exportInFlightRef.current) {
+      setExportArtifactWithProgress(readWorkspaceExportArtifactPath(workspace));
+      void refreshWorkspaceExportArtifact(workspace, exportRefreshVersionRef.current);
+    }
     const renderKey = workspaceReviewRenderKey(workspace);
     setReviewRender((current) =>
       current.renderKey === renderKey
@@ -696,7 +694,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       }
     }
     if (nextPage === "export" && currentWorkspace) {
-      void refreshWorkspaceExportArtifact(currentWorkspace);
+      void refreshWorkspaceExportArtifact(currentWorkspace, exportRefreshVersionRef.current);
     }
   }
 
@@ -1529,8 +1527,15 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
-  async function refreshWorkspaceExportArtifact(workspace: WorkspaceResult) {
-    setExportArtifact(await buildWorkspaceExportArtifact(workspace));
+  async function refreshWorkspaceExportArtifact(
+    workspace: WorkspaceResult,
+    refreshVersion = exportRefreshVersionRef.current
+  ) {
+    const artifact = await buildWorkspaceExportArtifact(workspace);
+    if (refreshVersion !== exportRefreshVersionRef.current) {
+      return;
+    }
+    setExportArtifactWithProgress(artifact);
   }
 
   async function ensureCurrentWorkspace() {
@@ -2033,6 +2038,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     const workspace = await ensureCurrentWorkspace();
     if (!workspace) return;
+    const exportVersion = exportRefreshVersionRef.current + 1;
+    exportRefreshVersionRef.current = exportVersion;
+    exportInFlightRef.current = true;
 
     const needsFreshRender =
       reviewRender.status !== "ready" ||
@@ -2040,21 +2048,21 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       reviewRender.renderKey !== workspaceReviewRenderKey(workspace);
 
     setLoading("export");
-    setExportStatus(t.exportPage.preparing);
+    setExportProgress(createExportStartProgress(t, type));
     setExportArtifact(null);
     try {
       if (needsFreshRender) {
         const rendered = await renderDeckHtmlForWorkspace(workspace, "export");
         if (!rendered) return;
         setLoading("export");
-        setExportStatus(t.exportPage.preparing);
+        setExportProgress(createExportStartProgress(t, type));
       }
 
       if (type === "PPTX") {
         const startedModel = await backend.startPptxExportModel({
           workspace_dir: workspace.workspace_dir
         });
-        setExportStatus(formatPptxExportStatus(startedModel));
+        setExportProgress(createPptxJobExportProgress(t, startedModel));
 
         const modelReady = await waitForPptxExportStatus(
           workspace.workspace_dir,
@@ -2072,7 +2080,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           modelPath: modelReady.model_path,
           outputPath: modelReady.pptx_path
         });
-        setExportStatus(formatPptxExportStatus(startedPptx));
+        setExportProgress(createPptxJobExportProgress(t, startedPptx));
 
         const completed = await waitForPptxExportStatus(
           workspace.workspace_dir,
@@ -2090,8 +2098,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           generatorResult: completed.generator_result ?? completed
         });
         applyWorkspace(updatedWorkspace);
-        await refreshWorkspaceExportArtifact(updatedWorkspace);
+        await refreshWorkspaceExportArtifact(updatedWorkspace, exportVersion);
       } else {
+        setExportProgress(createExportStartProgress(t, "PDF"));
         const pdfResult = await backend.exportPdf({
           workspace_dir: workspace.workspace_dir
         });
@@ -2101,16 +2110,18 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           pdfPath
         });
         applyWorkspace(updatedWorkspace);
-        await refreshWorkspaceExportArtifact(updatedWorkspace);
+        await refreshWorkspaceExportArtifact(updatedWorkspace, exportVersion);
       }
 
-      setExportStatus(formatMessage(t.exportPage.ready, { type }));
       showToast(type === "PPTX" ? t.toasts.pptxExported : t.toasts.pdfExported);
     } catch (error) {
       const message = error instanceof Error ? error.message : t.status.exporting;
-      setExportStatus(message);
+      setExportProgress((current) =>
+        createExportErrorProgress(message, type, current.percent)
+      );
       showToast(message);
     } finally {
+      exportInFlightRef.current = false;
       setLoading("none");
     }
   }
@@ -2138,7 +2149,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     pageProgress,
     refineScope,
     loading,
-    exportStatus,
+    exportProgress,
     exportArtifact,
     currentStatus,
     workspaceScan,

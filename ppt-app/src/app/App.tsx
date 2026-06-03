@@ -202,7 +202,7 @@ export function App() {
           {state.page === "export" ? (
             <ExportPage
               t={t}
-              status={state.exportStatus}
+              progress={state.exportProgress}
               artifact={state.exportArtifact}
               loading={state.loading}
               onBack={actions.goBack}
