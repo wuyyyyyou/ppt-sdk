@@ -1,9 +1,11 @@
 {
-  "name": "anna-frontend-llm-agent-debug-app",
+  "name": "test-session-lifecycle-app",
   "private": true,
   "version": "0.1.0",
-  "description": "Anna app for debugging iframe-side LLM and agent runtime RPC behavior.",
+  "description": "Anna App for testing raw agent session lifecycle APIs.",
+  "type": "module",
   "scripts": {
+    "build": "node scripts/build.mjs",
     "dev": "anna-app dev",
     "validate": "anna-app validate --strict"
   },
