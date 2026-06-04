@@ -163,11 +163,12 @@ async function syncNodePackageLock(tool) {
 }
 
 export function syncPyprojectText(content, tool) {
+  const lineEnding = content.includes("\r\n") ? "\r\n" : "\n";
   let next = content.replace(
     /(^\[project\][\s\S]*?^version\s*=\s*")[^"]+(")/m,
     `$1${tool.manifest.version}$2`,
   );
-  const lines = next.split("\n");
+  const lines = next.split("\n").map((line) => line.replace(/\r$/, ""));
   const headingIndex = lines.findIndex((line) => line.trim() === "[project.scripts]");
   if (headingIndex === -1) {
     throw new Error("Unable to find [project.scripts] in pyproject.toml");
@@ -189,7 +190,7 @@ export function syncPyprojectText(content, tool) {
     "",
   ];
   lines.splice(headingIndex, endIndex - headingIndex, ...replacement);
-  return lines.join("\n");
+  return lines.join(lineEnding);
 }
 
 async function syncPyproject(tool) {
