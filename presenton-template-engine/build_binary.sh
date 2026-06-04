@@ -143,12 +143,46 @@ compress_zip() {
     return 1
   fi
 
-  STAGE_BIN_WIN="$(to_windows_path "$stage_dir/bin")" \
-  STAGE_LIB_WIN="$(to_windows_path "$stage_dir/lib")" \
-  STAGE_DATA_WIN="$(to_windows_path "$stage_dir/data")" \
-  STAGE_MANIFEST_WIN="$(to_windows_path "$stage_dir/manifest.json")" \
+  STAGE_DIR_WIN="$(to_windows_path "$stage_dir")" \
   ARCHIVE_PATH_WIN="$(to_windows_path "$archive_path")" \
-    "$powershell_bin" -NoProfile -Command 'Compress-Archive -LiteralPath $env:STAGE_BIN_WIN, $env:STAGE_LIB_WIN, $env:STAGE_DATA_WIN, $env:STAGE_MANIFEST_WIN -DestinationPath $env:ARCHIVE_PATH_WIN -Force'
+    "$powershell_bin" -NoProfile -Command '
+      $ErrorActionPreference = "Stop"
+      Add-Type -AssemblyName System.IO.Compression
+      Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+      $stageDir = [System.IO.Path]::GetFullPath($env:STAGE_DIR_WIN).TrimEnd("\", "/")
+      $archivePath = [System.IO.Path]::GetFullPath($env:ARCHIVE_PATH_WIN)
+      if (Test-Path -LiteralPath $archivePath) {
+        Remove-Item -LiteralPath $archivePath -Force
+      }
+
+      $archive = [System.IO.Compression.ZipFile]::Open($archivePath, [System.IO.Compression.ZipArchiveMode]::Create)
+      try {
+        foreach ($dirName in @("bin", "lib", "data")) {
+          $dirPath = Join-Path $stageDir $dirName
+          if (-not (Test-Path -LiteralPath $dirPath -PathType Container)) {
+            throw "Missing staged directory: $dirPath"
+          }
+          [void]$archive.CreateEntry("$dirName/")
+        }
+
+        foreach ($file in Get-ChildItem -LiteralPath $stageDir -File -Recurse) {
+          $filePath = [System.IO.Path]::GetFullPath($file.FullName)
+          $relativePath = $filePath.Substring($stageDir.Length).TrimStart("\", "/").Replace("\", "/")
+          $entry = $archive.CreateEntry($relativePath, [System.IO.Compression.CompressionLevel]::Optimal)
+          $entryStream = $entry.Open()
+          $fileStream = [System.IO.File]::OpenRead($filePath)
+          try {
+            $fileStream.CopyTo($entryStream)
+          } finally {
+            $fileStream.Dispose()
+            $entryStream.Dispose()
+          }
+        }
+      } finally {
+        $archive.Dispose()
+      }
+    '
 }
 
 extract_zip() {

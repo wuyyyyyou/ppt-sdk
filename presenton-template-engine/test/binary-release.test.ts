@@ -8,6 +8,8 @@ import { promisify } from "node:util";
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { buildDistributionManifest, verifyArchiveDirectory } from "../scripts/binary-release.mjs";
+
 const execFileAsync = promisify(execFile);
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SCRIPT_PATH = path.join(PROJECT_DIR, "scripts", "binary-release.mjs");
@@ -147,6 +149,31 @@ test("verify-archive validates structure and top-level manifest", async () => {
     "--platform-key",
     "darwin-arm64",
   ]);
+});
+
+test("verifyArchiveDirectory accepts empty lib and data directories", async () => {
+  const dir = await makeTempDir();
+  const extractDir = path.join(dir, "extract");
+  const toolManifest = {
+    name: "tool-example-ppt-engine",
+    version: "9.8.7",
+  };
+
+  await mkdir(path.join(extractDir, "bin"), { recursive: true });
+  await mkdir(path.join(extractDir, "lib"), { recursive: true });
+  await mkdir(path.join(extractDir, "data"), { recursive: true });
+  await writeFile(path.join(extractDir, "bin", "ppt-engine.exe"), "", "utf8");
+  await writeFile(
+    path.join(extractDir, "manifest.json"),
+    `${JSON.stringify(buildDistributionManifest(toolManifest), null, 2)}\n`,
+    "utf8",
+  );
+
+  await verifyArchiveDirectory({
+    toolManifest,
+    extractDir,
+    platformKey: "windows-x86_64",
+  });
 });
 
 test("verify-describe validates Executa tool identity", async () => {

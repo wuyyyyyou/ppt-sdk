@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const BINARY_NAME = "ppt-engine";
 const WINDOWS_BINARY_NAME = `${BINARY_NAME}.exe`;
@@ -64,7 +65,7 @@ async function readToolManifest(filePath) {
   return manifest;
 }
 
-function buildDistributionManifest(toolManifest) {
+export function buildDistributionManifest(toolManifest) {
   return {
     name: toolManifest.name,
     version: toolManifest.version,
@@ -131,10 +132,7 @@ async function writeSha256(options) {
   await writeFile(outputPath, `${hash}  ${path.basename(filePath)}\n`, "ascii");
 }
 
-async function verifyArchive(options) {
-  const toolManifest = await readToolManifest(requireOption(options, "tool-manifest"));
-  const extractDir = requireOption(options, "extract-dir");
-  const platformKey = requireOption(options, "platform-key");
+export async function verifyArchiveDirectory({ toolManifest, extractDir, platformKey }) {
   const expectedDistributionManifest = buildDistributionManifest(toolManifest);
 
   await assertDirectory(path.join(extractDir, "bin"), "bin");
@@ -147,6 +145,14 @@ async function verifyArchive(options) {
 
   const distributionManifest = await readJson(path.join(extractDir, "manifest.json"));
   assertDeepEqual(distributionManifest, expectedDistributionManifest, "Binary distribution manifest");
+}
+
+async function verifyArchive(options) {
+  await verifyArchiveDirectory({
+    toolManifest: await readToolManifest(requireOption(options, "tool-manifest")),
+    extractDir: requireOption(options, "extract-dir"),
+    platformKey: requireOption(options, "platform-key"),
+  });
 }
 
 async function verifyDescribe(options) {
@@ -190,7 +196,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.stack ?? error.message : String(error));
-  process.exit(1);
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.stack ?? error.message : String(error));
+    process.exit(1);
+  });
+}
