@@ -162,7 +162,7 @@ async function syncNodePackageLock(tool) {
   await writeJson(tool.packageLockPath, lock);
 }
 
-function syncPyprojectText(content, tool) {
+export function syncPyprojectText(content, tool) {
   let next = content.replace(
     /(^\[project\][\s\S]*?^version\s*=\s*")[^"]+(")/m,
     `$1${tool.manifest.version}$2`,
@@ -196,17 +196,20 @@ async function syncPyproject(tool) {
   await writeText(tool.pyprojectPath, syncPyprojectText(await readText(tool.pyprojectPath), tool));
 }
 
-async function syncUvLock(tool) {
-  const content = await readText(tool.uvLockPath);
+export function syncUvLockText(content, tool) {
   const escapedName = tool.pythonPackageName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const pattern = new RegExp(
-    `(\\[\\[package\\]\\]\\nname = "${escapedName}"\\nversion = ")[^"]+(")`,
+    `(\\[\\[package\\]\\]\\r?\\nname = "${escapedName}"\\r?\\nversion = ")[^"]+(")`,
     "m",
   );
   if (!pattern.test(content)) {
     throw new Error(`Unable to find ${tool.pythonPackageName} package entry in ${tool.uvLockPath}`);
   }
-  await writeText(tool.uvLockPath, content.replace(pattern, `$1${tool.manifest.version}$2`));
+  return content.replace(pattern, `$1${tool.manifest.version}$2`);
+}
+
+async function syncUvLock(tool) {
+  await writeText(tool.uvLockPath, syncUvLockText(await readText(tool.uvLockPath), tool));
 }
 
 async function main() {
@@ -228,7 +231,9 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.stack ?? error.message : String(error));
-  process.exit(1);
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.stack ?? error.message : String(error));
+    process.exit(1);
+  });
+}
