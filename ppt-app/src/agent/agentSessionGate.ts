@@ -63,8 +63,8 @@ export const DEFAULT_AGENT_SESSION_GATE_TIMINGS: AgentSessionGateTimings = {
   createCooldownMs: 70_000,
   runWatchdogMs: 8.5 * 60 * 1000,
   deleteRetryDelaysMs: [1_000, 3_000, 8_000],
-  maxSessionRetries: 1,
-  maxSameUuidGuardRetries: 2,
+  maxSessionRetries: 3,
+  maxSameUuidGuardRetries: 3,
 };
 
 let createGateTail: Promise<void> = Promise.resolve();
