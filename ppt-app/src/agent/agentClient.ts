@@ -3,9 +3,13 @@ import {
   buildStructuredJsonRepairPrompt,
   parseStructuredJson,
 } from "../ai/structuredJson";
+import {
+  isAgentSessionGateError,
+  runManagedAgentSession,
+  type AgentSessionGateClock,
+  type AgentSessionGateTimings,
+} from "./agentSessionGate";
 
-const AGENT_RUN_TIMEOUT_MS = 600_000;
-const MAX_AGENT_SESSION_RETRIES = 1;
 const DEFAULT_AGENT_SESSION_EXPIRES_IN_SECONDS = 600;
 const AGENT_SESSION_RENEW_MARGIN_MS = 60_000;
 
@@ -47,6 +51,11 @@ export type AgentStreamEvent =
 
 export interface AgentRunOptions {
   onStreamEvent?: (event: AgentStreamEvent) => void;
+}
+
+export interface AgentClientOptions {
+  sessionTimings?: Partial<AgentSessionGateTimings>;
+  sessionClock?: AgentSessionGateClock;
 }
 
 interface CollectedAgentRun {
@@ -304,7 +313,7 @@ function isActiveSessionLimitMessage(message: string) {
 }
 
 function isInfrastructureMessage(message: string) {
-  return /APP_NOT_GRANTED|invalid app_session_token|session\.mint|agent\.session|transport|HTTP 401|HTTP 429/i.test(message);
+  return /APP_NOT_GRANTED|invalid app_session_token|no cached app_session token|session\.mint|agent\.session|transport|HTTP 401|HTTP 429/i.test(message);
 }
 
 function toErrorMessage(error: unknown) {
@@ -320,7 +329,11 @@ function toAgentInfrastructureError(error: unknown, fallbackMessage: string) {
     : rawMessage;
   return new AgentInfrastructureError(
     message,
-    error instanceof AgentRunStreamError ? error.code : undefined,
+    error instanceof AgentRunStreamError
+      ? error.code
+      : isAgentSessionGateError(error)
+        ? error.code
+        : undefined,
     activeSessionLimit
   );
 }
@@ -334,30 +347,16 @@ function readSessionExpiresInSeconds(session: AnnaAgentSession): number {
   return Number.isFinite(value) && value > 0 ? value : DEFAULT_AGENT_SESSION_EXPIRES_IN_SECONDS;
 }
 
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  let timeoutId: number | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timeoutId = window.setTimeout(() => {
-      reject(new Error(`Agent run timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-  });
-
-  try {
-    return await Promise.race([promise, timeout]);
-  } finally {
-    if (timeoutId !== undefined) {
-      window.clearTimeout(timeoutId);
-    }
-  }
-}
-
-export async function createAgentClient(runtime: AnnaRuntime): Promise<AgentClient> {
+export async function createAgentClient(
+  runtime: AnnaRuntime,
+  clientOptions: AgentClientOptions = {},
+): Promise<AgentClient> {
   async function createSession() {
     try {
       const session = await runtime.agent.session({ submode: "auto" });
       return {
         session,
-        createdAtMs: Date.now(),
+        createdAtMs: clientOptions.sessionClock?.now() ?? Date.now(),
         expiresInSeconds: readSessionExpiresInSeconds(session),
       };
     } catch (error) {
@@ -366,50 +365,51 @@ export async function createAgentClient(runtime: AnnaRuntime): Promise<AgentClie
   }
 
   async function deleteSession(session: AnnaAgentSession | null) {
-    await session?.delete().catch(() => undefined);
+    await session?.delete();
   }
 
   function shouldRenewBeforeRun(sessionMeta: { createdAtMs: number; expiresInSeconds: number }) {
     const expiresAtMs = sessionMeta.createdAtMs + sessionMeta.expiresInSeconds * 1000;
-    return expiresAtMs - Date.now() <= AGENT_SESSION_RENEW_MARGIN_MS;
+    const nowMs = clientOptions.sessionClock?.now() ?? Date.now();
+    return expiresAtMs - nowMs <= AGENT_SESSION_RENEW_MARGIN_MS;
   }
 
   async function collectWithSessionRetry(
     prompt: string,
-    options: AgentRunOptions | undefined
+    runOptions: AgentRunOptions | undefined
   ): Promise<CollectedAgentRun & { sessionRetries: number }> {
     let sessionRetries = 0;
 
     for (;;) {
-      let sessionMeta: Awaited<ReturnType<typeof createSession>> | null = null;
       try {
-        sessionMeta = await createSession();
-        if (shouldRenewBeforeRun(sessionMeta)) {
-          options?.onStreamEvent?.({
-            type: "activity",
-            message: "Agent session near expiry; creating a new session",
-          });
-          await deleteSession(sessionMeta.session);
-          sessionMeta = await createSession();
-        }
-        const collected = await withTimeout(
-          collectRunText(sessionMeta.session, prompt, options),
-          AGENT_RUN_TIMEOUT_MS
-        );
-        return { ...collected, sessionRetries };
+        const managed = await runManagedAgentSession({
+          createSession,
+          deleteSession: (session) => deleteSession(session),
+          runSession: async (sessionMeta) => {
+            if (shouldRenewBeforeRun(sessionMeta)) {
+              runOptions?.onStreamEvent?.({
+                type: "activity",
+                message: "Agent session near expiry; creating a new session",
+              });
+              throw new AgentRunStreamError(
+                "Agent session near expiry; create a new session.",
+                true,
+              );
+            }
+            return collectRunText(sessionMeta.session, prompt, runOptions);
+          },
+          isRecoverableRunError: (error) =>
+            error instanceof AgentRunStreamError &&
+            (error.expired || error.code === "http" || isInfrastructureMessage(error.message)),
+          onActivity: (message) => {
+            runOptions?.onStreamEvent?.({ type: "activity", message });
+          },
+          timings: clientOptions.sessionTimings,
+          clock: clientOptions.sessionClock,
+        });
+        sessionRetries += managed.sessionRetries;
+        return { ...managed.result, sessionRetries };
       } catch (error) {
-        if (
-          error instanceof AgentRunStreamError &&
-          error.expired &&
-          sessionRetries < MAX_AGENT_SESSION_RETRIES
-        ) {
-          sessionRetries += 1;
-          options?.onStreamEvent?.({
-            type: "activity",
-            message: "Agent session expired; creating a new session",
-          });
-          continue;
-        }
         if (
           error instanceof AgentRunStreamError &&
           (error.expired || error.code === "http" || isInfrastructureMessage(error.message))
@@ -419,9 +419,10 @@ export async function createAgentClient(runtime: AnnaRuntime): Promise<AgentClie
         if (error instanceof AgentInfrastructureError) {
           throw error;
         }
+        if (isAgentSessionGateError(error)) {
+          throw toAgentInfrastructureError(error, "Agent session failed.");
+        }
         throw error;
-      } finally {
-        await deleteSession(sessionMeta?.session ?? null);
       }
     }
   }

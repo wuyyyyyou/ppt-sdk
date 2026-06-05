@@ -516,7 +516,7 @@ describe("Deck Generation Flow Module", () => {
 
     assert.equal(completion.status, "completed");
     assert.equal(harness.authoringPrompts.length, 7);
-    assert.equal(harness.maxActiveAuthoringRuns, 5);
+    assert.equal(harness.maxActiveAuthoringRuns, 1);
     assert.ok(harness.progressEvents.some((progress) => (progress.activeStreams?.length ?? 0) > 1));
   });
 

@@ -155,6 +155,7 @@ cd presenton-pptx-generator && .venv/bin/python example_plugin.py
 - `ppt-app/executas/ppt-engine-local/ppt_engine_local.js` 会把 pointer file 内联回 stdout，原生支持 pointer 之前不要删除它。
 - 适配器有 1 MB 内联上限。超过上限的 tool response 应返回 URL / path / artifact ID。
 - 长期规则：超过约 64 KB 的 tool response 尽量返回引用，不要返回字节本身。
+- 当前 Agent session 有平台侧临时限制：短时间重复 create 可能复用 session uuid / cached app_session token，且 session 必须在生命周期内 delete，否则可能占用 app session 上限。`ppt-app/src/agent/agentSessionGate.ts` 是上线前的临时保护：不要绕过其中的 create cooldown、run watchdog、delete retry 和 same-uuid guard；平台修复前不要恢复逐 run 直接 create/delete。
 
 ## 常见坑
 
