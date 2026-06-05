@@ -1,5 +1,6 @@
 import React from "react";
 
+import { redFinanceTheme } from "../theme/tokens.ts";
 import StableInlineRow from "./StableInlineRow.tsx";
 
 type KpiMetricItemProps = {
@@ -18,7 +19,7 @@ const KpiMetricItem = ({ value, label }: KpiMetricItemProps) => (
         lineHeight: `${KPI_ROW_HEIGHT}px`,
         fontSize: 17,
         fontWeight: 900,
-        color: "var(--primary-color,#B71C1C)",
+        color: redFinanceTheme.colors.primary,
       }}
     >
       {value}
@@ -29,7 +30,7 @@ const KpiMetricItem = ({ value, label }: KpiMetricItemProps) => (
         height: KPI_ROW_HEIGHT,
         lineHeight: `${KPI_ROW_HEIGHT}px`,
         fontSize: 12,
-        color: "var(--text-muted,#616161)",
+        color: redFinanceTheme.colors.mutedText,
       }}
     >
       {label}

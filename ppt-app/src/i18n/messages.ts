@@ -61,11 +61,12 @@ export interface Messages {
     placeholder: string;
     reviewOutlineFirst: string;
     optionalContext: string;
-    chips: Record<"audience" | "goal" | "style" | "content" | "attachment" | "template", string>;
+    chips: Record<"audience" | "goal" | "style" | "theme" | "content" | "attachment" | "template", string>;
     contextLabels: Record<
       | "audience"
       | "goal"
       | "styleNotes"
+      | "theme"
       | "contentSource"
       | "attachment"
       | "slides"
@@ -273,6 +274,7 @@ export const messages: Record<Locale, Messages> = {
         audience: "Audience",
         goal: "Goal",
         style: "Style",
+        theme: "Theme",
         content: "Content",
         attachment: "Attachment",
         template: "Template"
@@ -281,6 +283,7 @@ export const messages: Record<Locale, Messages> = {
         audience: "Audience",
         goal: "Goal",
         styleNotes: "Style notes",
+        theme: "Theme color",
         contentSource: "Content source",
         attachment: "Attachment",
         slides: "Slides",
@@ -494,6 +497,7 @@ export const messages: Record<Locale, Messages> = {
         audience: "受众",
         goal: "目标",
         style: "风格",
+        theme: "主题色",
         content: "内容",
         attachment: "附件",
         template: "模板选择"
@@ -502,6 +506,7 @@ export const messages: Record<Locale, Messages> = {
         audience: "受众",
         goal: "目标",
         styleNotes: "风格说明",
+        theme: "主题色",
         contentSource: "内容来源",
         attachment: "附件",
         slides: "页数",

@@ -7,6 +7,8 @@ import { FinanceIcon } from "../components/FinanceIcons.tsx";
 import HorizontalFeatureCard from "../components/HorizontalFeatureCard.tsx";
 import InfoListItem from "../components/InfoListItem.tsx";
 import InsightCallout from "../components/InsightCallout.tsx";
+import SectionPanelShell from "../components/SectionPanelShell.tsx";
+import { redFinanceTheme } from "../theme/tokens.ts";
 
 const IconSchema = z.enum([
   "bank",
@@ -83,24 +85,30 @@ const ClosingActions = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
       contentTop={156}
       contentBottomInset={12}
     >
-      <div className="grid h-full min-h-0 grid-cols-[0.96fr_1.04fr] gap-[18px]">
-        <div className="flex h-full flex-col gap-[14px]">
-          <FinanceSectionHeading title={parsed.heading} subtitle="final wrap-up" />
-          <InsightCallout text={parsed.finalText} density={parsed.density === "high" ? "compact" : "normal"} icon="flag" />
-          <div className="rounded-[8px] border bg-white p-[14px]">
-            <div className="mb-[10px] text-[13px] font-bold uppercase tracking-[0.06em]" style={{ color: "var(--primary-color,#B71C1C)" }}>
-              {parsed.finalTitle}
-            </div>
-            <div className="text-[14px] leading-[1.55]" style={{ color: "var(--background-text,#212121)" }}>
-              {parsed.summary}
-            </div>
-          </div>
-          {parsed.variant === "decision-ask-focus" ? (
-            <div className="rounded-[8px] border bg-white p-[14px]">
-              <div className="mb-[8px] text-[13px] font-bold uppercase tracking-[0.06em]" style={{ color: "var(--primary-color,#B71C1C)" }}>
+      <div className="flex h-full min-h-0 flex-col gap-[14px]">
+        <FinanceSectionHeading title={parsed.heading} subtitle="final wrap-up" marginBottom={0} />
+
+        <div className="grid min-h-0 flex-1 grid-cols-[0.92fr_1.08fr] gap-[18px]">
+          <div className="flex h-full min-h-0 flex-col gap-[12px]">
+            <InsightCallout text={parsed.finalText} density={parsed.density === "high" ? "compact" : "normal"} icon="flag" />
+            <SectionPanelShell
+              className="min-h-0 flex-1 justify-center"
+              backgroundColor={redFinanceTheme.colors.surface}
+              shadow="0 4px 8px rgba(0,0,0,0.03)"
+              paddingX={18}
+              paddingY={18}
+            >
+              <div className="text-[13px] font-bold uppercase tracking-[0.06em]" style={{ color: redFinanceTheme.colors.primary }}>
+                {parsed.finalTitle}
+              </div>
+              <div className="mt-[10px] text-[15px] leading-[1.55]" style={{ color: redFinanceTheme.colors.backgroundText }}>
+                {parsed.summary}
+              </div>
+              <div className="my-[18px] h-px w-full" style={{ backgroundColor: redFinanceTheme.colors.stroke }} />
+              <div className="text-[13px] font-bold uppercase tracking-[0.06em]" style={{ color: redFinanceTheme.colors.primary }}>
                 Decision ask
               </div>
-              <div className="text-[14px] leading-[1.55]" style={{ color: "var(--background-text,#212121)" }}>
+              <div className="mt-[10px] text-[15px] leading-[1.55]" style={{ color: redFinanceTheme.colors.mutedText }}>
                 {decisionAsk}
               </div>
             </div>

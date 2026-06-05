@@ -5,6 +5,7 @@ import FinanceContentFrame from "../components/FinanceContentFrame.tsx";
 import FinanceSectionHeading from "../components/FinanceSectionHeading.tsx";
 import { FinanceIcon } from "../components/FinanceIcons.tsx";
 import HorizontalFeatureCard from "../components/HorizontalFeatureCard.tsx";
+import { redFinanceTheme } from "../theme/tokens.ts";
 
 const IconSchema = z.enum([
   "bank",
@@ -115,7 +116,7 @@ const ThreeColumnCards = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
             />
           ))}
         </div>
-        <div className="text-[13px] leading-[1.45]" style={{ color: "var(--text-muted,#616161)" }}>
+        <div className="text-[13px] leading-[1.45]" style={{ color: redFinanceTheme.colors.mutedText }}>
           {parsed.summary}
         </div>
       </div>

@@ -92,11 +92,13 @@ export function createMockAiClient(): AiClient {
             audience: ["企业管理层", "业务负责人"],
             goal: ["说明 AI Agent 的能力与落地路径"],
             style: ["Business Professional"],
+            theme: ["digital-indigo"],
           }
         : {
             audience: ["Executive stakeholders", "Business owners"],
             goal: ["Explain AI Agent capabilities and adoption path"],
             style: ["Business Professional"],
+            theme: ["digital-indigo"],
           };
     },
 

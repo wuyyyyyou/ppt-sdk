@@ -16,7 +16,7 @@ type SectionPanelShellProps = {
 const SectionPanelShell = ({
   children,
   className,
-  backgroundColor = "#FAFAFA",
+  backgroundColor = redFinanceTheme.colors.panel,
   borderColor = redFinanceTheme.colors.stroke,
   shadow = "none",
   radius = 10,

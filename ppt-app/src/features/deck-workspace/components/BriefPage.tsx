@@ -1,10 +1,11 @@
-import { Check, CheckCircle2, ChevronDown, File, ImageIcon, Search, Sparkles, Upload, X } from "lucide-react";
+import { Check, CheckCircle2, ChevronDown, File, ImageIcon, Palette, Search, Sparkles, Upload, X } from "lucide-react";
 import { useState } from "react";
 import type { TemplateSummary } from "../../../api/types";
 import { formatMessage, type Messages } from "../../../i18n/messages";
 import type { DeckGenerationProgress } from "../../deck-generation";
 import type { ContextRow, LoadingKind } from "../types";
 import { TemplatePreviewModal } from "./TemplatePreviewModal";
+import { getThemePreset, THEME_PRESET_IDS } from "../themePresets";
 
 const SLIDE_COUNT_OPTIONS = ["auto", ...Array.from({ length: 20 }, (_, index) => String(index + 1))];
 
@@ -164,6 +165,21 @@ export function BriefPage(props: BriefPageProps) {
             </button>
             <button className="chip-btn" onClick={addStyleRow}>
               {t.brief.chips.style}
+            </button>
+            <button
+              className="chip-btn"
+              onClick={() =>
+                addContextRow({
+                  id: "theme",
+                  label: t.brief.contextLabels.theme,
+                  value: "finance-red-classic",
+                  type: "select",
+                  options: THEME_PRESET_IDS
+                })
+              }
+            >
+              <Palette size={13} />
+              {t.brief.chips.theme}
             </button>
             <button
               className="chip-btn"
@@ -521,7 +537,9 @@ function ContextRowView(props: {
           onChange={(event) => update(row.id, event.target.value)}
         >
           {row.options?.map((option) => (
-            <option key={option}>{option}</option>
+            <option key={option} value={option}>
+              {row.id === "theme" ? getThemePreset(option)?.theme_name ?? option : option}
+            </option>
           ))}
         </select>
       ) : row.type === "attachment" ? (

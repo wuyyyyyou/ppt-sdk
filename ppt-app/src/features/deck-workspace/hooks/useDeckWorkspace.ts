@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createAgentClient, type AgentClient } from "../../../agent/agentClient";
-import { createAiClient, type AiAttemptLog, type AiClient } from "../../../ai/aiClient";
+import { createAiClient, type AiAttemptLog, type AiClient, type LlmContextRow } from "../../../ai/aiClient";
 import { createPptBackend, type PptBackend } from "../../../api/pptBackend";
 import { connectAnnaRuntime } from "../../../runtime/annaRuntime";
 import type {
@@ -44,10 +44,11 @@ import type {
   PreviewMode,
   RefineScope
 } from "../types";
+import { getThemePreset, THEME_PRESET_IDS } from "../themePresets";
 
 const DEFAULT_TEMPLATE_GROUP_ID = "red-finance-v3";
 const SLIDE_COUNT_CONTEXT_OPTIONS = ["auto", ...Array.from({ length: 20 }, (_, index) => String(index + 1))];
-type ContextPatchId = "audience" | "goal" | "style" | "content" | "slides";
+type ContextPatchId = "audience" | "goal" | "style" | "theme" | "content" | "slides";
 
 function padDatePart(value: number) {
   return String(value).padStart(2, "0");
@@ -377,6 +378,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           label: t.brief.contextLabels.styleNotes,
           placeholder: t.brief.contextPlaceholders.styleNotes,
         };
+      case "theme":
+        return {
+          ...baseRow,
+          label: t.brief.contextLabels.theme,
+          value: getThemePreset(baseRow.value)?.theme_id ?? "finance-red-classic",
+          type: "select",
+          options: THEME_PRESET_IDS,
+        };
       case "content":
         return {
           ...baseRow,
@@ -417,7 +426,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const rows = rawContext
       .map(normalizePersistedContextRow)
       .filter((row): row is ContextRow => row !== null);
-
     return {
       rows,
       shouldSync:
@@ -466,6 +474,23 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return `${workspace.task_dir ?? workspace.workspace_dir}:${manifestPath}:${updatedParts.join(":")}`;
   }
 
+  function setExportArtifactWithProgress(artifact: ExportArtifact | null) {
+    setExportArtifact(artifact);
+    setExportProgress(createArtifactExportProgress(t, artifact));
+  }
+
+  function buildLlmContextRows(
+    rows: Array<{ id: string; value: string }> = contextRows
+  ): LlmContextRow[] {
+    return rows
+      .map((row) => {
+        const id = row.id.trim();
+        const value = row.value.trim();
+        return id && value ? { id, value } : null;
+      })
+      .filter((row): row is LlmContextRow => row !== null);
+  }
+
   function buildOutlineArtifact(
     items = outline,
     title = deckTitle,
@@ -477,7 +502,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       items,
       source: {
         prompt,
-        context: contextRows,
+        context: buildLlmContextRows(),
         setting: workspaceSettingsToState(currentWorkspace)
       }
     };
@@ -709,6 +734,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   function addContextRow(row: ContextRow) {
     setContextRows((rows) => {
       if (rows.some((item) => item.id === row.id)) return rows;
+      if (row.id === "theme") {
+        const currentThemeId = readWorkspaceThemeId(currentWorkspace) || row.value;
+        return [...rows, buildContextRowFromPatch("theme", currentThemeId)];
+      }
       return [...rows, row];
     });
   }
@@ -733,7 +762,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   function buildSuggestedContextRow(
-    id: "audience" | "goal" | "style",
+    id: "audience" | "goal" | "style" | "theme",
     values: string[]
   ): ContextRow | null {
     const uniqueValues = values.reduce<string[]>((items, value) => {
@@ -747,7 +776,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (uniqueValues.length === 0) return null;
 
     const row = buildContextRowFromPatch(id, uniqueValues[0]);
-    if (uniqueValues.length === 1) {
+    if (uniqueValues.length === 1 || id === "theme") {
       return row;
     }
 
@@ -790,6 +819,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         buildSuggestedContextRow("audience", result.audience),
         buildSuggestedContextRow("goal", result.goal),
         buildSuggestedContextRow("style", result.style),
+        buildSuggestedContextRow("theme", result.theme),
       ].filter((row): row is ContextRow => Boolean(row));
 
       if (rows.length === 0) {
@@ -881,6 +911,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           value,
           placeholder: t.brief.contextPlaceholders.styleNotes,
         };
+      case "theme":
+        return {
+          id,
+          label: t.brief.contextLabels.theme,
+          value: getThemePreset(value)?.theme_id ?? "finance-red-classic",
+          type: "select",
+          options: THEME_PRESET_IDS,
+        };
       case "content":
         return {
           id,
@@ -912,6 +950,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     const style = readFeedbackContextValue(feedback, ["风格", "视觉风格", "语气", "style", "tone"]);
     if (style) patch.style = style;
+
+    const theme = readFeedbackContextValue(feedback, ["主题色", "主题", "配色", "theme", "color theme"]);
+    if (theme && getThemePreset(theme)) patch.theme = theme;
 
     const content = readFeedbackContextValue(feedback, ["内容来源", "参考材料", "材料", "content source", "source"]);
     if (content) patch.content = content;
@@ -977,16 +1018,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         showToast(t.template.helper);
         return;
       }
-      const templateWorkspace = await ensureWorkspaceTemplate(workspace);
+      const templateWorkspace = await ensureWorkspaceTheme(
+        await ensureWorkspaceTemplate(workspace)
+      );
 
       const setting = workspaceSettingsToState(templateWorkspace);
 
       if (reviewOutlineFirst) {
         setLoading("outline");
         resetGenerationProgress();
+        const llmContextRows = buildLlmContextRows();
         const result = await aiClient.generateOutline({
           prompt,
-          contextRows,
+          contextRows: llmContextRows,
           locale,
           setting,
         });
@@ -997,7 +1041,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           result.outline.title,
           templateWorkspace,
           setting,
-          "draft"
+          "draft",
+          true,
+          llmContextRows
         );
         if (updatedWorkspace) {
           applyWorkspace(updatedWorkspace);
@@ -1008,9 +1054,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
       setLoading("outline");
       resetGenerationProgress();
+      const llmContextRows = buildLlmContextRows();
       const outlineResult = await aiClient.generateOutline({
         prompt,
-        contextRows,
+        contextRows: llmContextRows,
         locale,
         setting,
       });
@@ -1019,7 +1066,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         outlineResult.outline.title,
         templateWorkspace,
         setting,
-        "confirmed"
+        "confirmed",
+        true,
+        llmContextRows
       );
       if (!confirmedWorkspace) return;
       if (cancelCreateDeckRef.current) {
@@ -1080,7 +1129,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       showToast(t.template.helper);
       return;
     }
-    const templateWorkspace = await ensureWorkspaceTemplate(workspace);
+    const templateWorkspace = await ensureWorkspaceTheme(
+      await ensureWorkspaceTemplate(workspace)
+    );
 
     setLoading("deck");
     resetGenerationProgress();
@@ -1130,13 +1181,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const baseOutline = outlineEditMode ? outlineDraft : outline;
       const nextContextRows = deriveContextRowsFromOutlineFeedback(contextRows, outlineFeedback);
       setContextRows(nextContextRows);
+      const llmContextRows = buildLlmContextRows(nextContextRows);
       const result = await aiClient.reviseOutline({
         title: baseTitle,
         outline: baseOutline,
         feedback: outlineFeedback,
         locale,
         setting,
-        contextRows: nextContextRows
+        contextRows: llmContextRows
       });
       await appendOutlineAiAttemptLogs(workspace, result.attempts);
       await saveOutlineArtifact(
@@ -1146,7 +1198,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         setting,
         "draft",
         false,
-        nextContextRows
+        llmContextRows
       );
       if (backend) {
         setWorkspaceScan(await backend.listWorkspaces());
@@ -1471,6 +1523,39 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       : "";
   }
 
+  function readWorkspaceThemeId(workspace: WorkspaceResult | null) {
+    const setting = workspaceSettingsToState(workspace);
+    const settingThemeId = typeof setting.theme_id === "string" ? setting.theme_id : "";
+    return getThemePreset(settingThemeId)?.theme_id ?? "";
+  }
+
+  function readSelectedThemeId(rows: ContextRow[] = contextRows, workspace: WorkspaceResult | null = currentWorkspace) {
+    const rowValue = rows.find((row) => row.id === "theme")?.value;
+    const rowThemeId = getThemePreset(rowValue)?.theme_id ?? "";
+    return rowThemeId || readWorkspaceThemeId(workspace) || "finance-red-classic";
+  }
+
+  async function ensureWorkspaceTheme(workspace: WorkspaceResult, rows: ContextRow[] = contextRows) {
+    if (!backend) return workspace;
+    const themeId = readSelectedThemeId(rows, workspace);
+    const setting = workspaceSettingsToState(workspace);
+    const currentThemeId = typeof setting.theme_id === "string" ? setting.theme_id : "";
+    if (currentThemeId === themeId) {
+      return workspace;
+    }
+
+    const updatedWorkspace = await backend.updateWorkspaceSettings({
+      workspace_dir: workspace.workspace_dir,
+      setting: {
+        ...setting,
+        theme_id: themeId,
+      },
+    });
+    applyWorkspace(updatedWorkspace);
+    setWorkspaceScan(await backend.listWorkspaces());
+    return updatedWorkspace;
+  }
+
   async function ensureWorkspaceTemplate(workspace: WorkspaceResult) {
     if (!backend) return workspace;
 
@@ -1556,7 +1641,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     settingOverride: WorkspaceSettings | null = null,
     status: "draft" | "confirmed" = "draft",
     applyWorkspaceState = true,
-    contextRowsOverride: ContextRow[] | null = null
+    contextRowsOverride: Array<ContextRow | LlmContextRow> | null = null
   ) {
     if (!backend) return null;
     const workspace = workspaceOverride ?? (await ensureCurrentWorkspace());
@@ -1568,7 +1653,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         ...buildOutlineArtifact(items, title, status),
         source: {
           prompt,
-          context: contextRowsOverride ?? contextRows,
+          context: buildLlmContextRows(contextRowsOverride ?? contextRows),
           setting: settingOverride ?? workspaceSettingsToState(workspace)
         }
       }
@@ -1687,7 +1772,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         workspace_dir: workspace.workspace_dir,
         template_group: groupId
       });
-      applyWorkspace(result.workspace);
+      const themedWorkspace = await ensureWorkspaceTheme(result.workspace);
+      applyWorkspace(themedWorkspace);
       setSelectedTemplateGroupId(result.selection.selected_template_group);
       setWorkspaceScan(await backend.listWorkspaces());
       setStage("brief");
@@ -1846,11 +1932,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }));
 
     try {
+      const themedWorkspace = await ensureWorkspaceTheme(workspace);
       const result = await backend.renderDeckHtml({
-        workspace_dir: workspace.workspace_dir
+        workspace_dir: themedWorkspace.workspace_dir
       });
       const refreshedWorkspace = await backend.openWorkspace({
-        workspace_dir: workspace.workspace_dir
+        workspace_dir: themedWorkspace.workspace_dir
       });
       const renderKey = workspaceReviewRenderKey(refreshedWorkspace);
       applyWorkspace(refreshedWorkspace);

@@ -7,6 +7,10 @@ import { FinanceIcon } from "../components/FinanceIcons.tsx";
 import DualValueMetricCard from "../components/DualValueMetricCard.tsx";
 import InsightCallout from "../components/InsightCallout.tsx";
 import KpiMetricItem from "../components/KpiMetricItem.tsx";
+import ProgressStatusCard from "../components/ProgressStatusCard.tsx";
+import { redFinanceTheme } from "../theme/tokens.ts";
+
+const StatusIconSchema = z.enum(["chart-column", "route", "shield", "wallet"]);
 
 const MetricSchema = z.object({
   value: z.string().min(1).max(24),
@@ -92,7 +96,26 @@ const KpiSummary = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
             ))}
           </div>
         </div>
-        <div className="grid gap-[10px]">
+        <div
+          className="grid min-h-0 flex-1 gap-[12px]"
+          style={{
+            gridTemplateColumns: `repeat(${parsed.statusCards.length}, minmax(0, 1fr))`,
+          }}
+        >
+          {parsed.statusCards.map((card, index) => (
+            <ProgressStatusCard
+              key={`${card.title}-${index}`}
+              title={card.title}
+              marker={<FinanceIcon name={card.icon} className="h-[18px] w-[18px]" />}
+              progress={card.progress}
+              status={card.status}
+              className="h-full justify-center"
+              minHeight={0}
+              progressColor={index === 1 ? redFinanceTheme.colors.secondary : redFinanceTheme.colors.primary}
+            />
+          ))}
+        </div>
+        <div className="grid flex-none gap-[10px]">
           {parsed.insights.map((insight, index) => (
             <InsightCallout key={`${insight}-${index}`} text={insight} density={metricDensity} />
           ))}

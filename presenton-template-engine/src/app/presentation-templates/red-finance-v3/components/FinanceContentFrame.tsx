@@ -137,14 +137,14 @@ const FinanceContentFrame = ({
             className="absolute bottom-0 left-0 z-20 flex w-full items-center justify-between px-[60px] text-[12px]"
             style={{
               height: footerHeight,
-              color: "#9E9E9E",
+              color: redFinanceTheme.colors.subtleText,
               backgroundColor: redFinanceTheme.colors.background,
             }}
           >
             {showFooterDivider ? (
               <div
                 className="absolute left-0 top-0 h-px w-full"
-                style={{ backgroundColor: "#F5F5F5" }}
+                style={{ backgroundColor: redFinanceTheme.colors.stroke }}
               />
             ) : null}
             <div className="flex h-[16px] items-center whitespace-nowrap leading-[16px]">

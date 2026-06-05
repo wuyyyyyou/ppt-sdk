@@ -69,12 +69,12 @@ const FinanceSectionFocusFrame = ({
         >
           <div
             className="absolute left-[60px] right-[60px] top-0 h-px"
-            style={{ backgroundColor: "#EEEEEE" }}
+            style={{ backgroundColor: redFinanceTheme.colors.stroke }}
           />
           <div className="flex h-full items-center justify-between px-[60px]">
             <div
               className="whitespace-nowrap text-[12px] font-medium tracking-[0.08em]"
-              style={{ color: "#9E9E9E" }}
+              style={{ color: redFinanceTheme.colors.subtleText }}
             >
               {footerText}
             </div>

@@ -59,6 +59,7 @@ import type {
   TemplateRenderThemeInput,
 } from "./render/types.js";
 import {
+  getThemePreset,
   listThemePresets,
   type ThemePresetInfo,
 } from "./themes/default-theme-presets.js";
@@ -329,6 +330,7 @@ export {
   getAllDiscoveredTemplateGroups,
   getDiscoveredTemplateGroup,
   getTemplatePreviewGroup,
+  getThemePreset,
   getTemplatePreviewImage,
   getTemplatePreviewIndex,
   listDiscoveredTemplateGroupSummaries,

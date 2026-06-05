@@ -92,7 +92,7 @@ function sanitizeFileNamePart(value: string): string {
 }
 
 function normalizeTheme(input?: TemplateRenderThemeInput | null): BrowserRenderTheme {
-  const colors = input?.colors ?? input?.data?.colors ?? {};
+  const colors = { ...(input?.colors ?? {}), ...(input?.data?.colors ?? {}) };
   const font = input?.fonts?.body ?? input?.data?.fonts?.textFont ?? null;
 
   return {

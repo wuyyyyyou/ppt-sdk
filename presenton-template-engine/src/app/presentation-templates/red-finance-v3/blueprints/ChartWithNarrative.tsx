@@ -65,7 +65,7 @@ export const Schema = z.object({
     },
     {
       label: "Target",
-      color: "#1565C0",
+      color: "var(--secondary-color,var(--graph-1,#1565C0))",
       values: [40, 45, 50, 58],
     },
   ]),

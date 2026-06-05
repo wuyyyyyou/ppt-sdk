@@ -228,6 +228,7 @@ async function readBuiltinGroupJson(groupDirPath) {
     ["cover_layout_id", rawValue.cover_layout_id],
     ["agenda_layout_id", rawValue.agenda_layout_id],
     ["closing_layout_id", rawValue.closing_layout_id],
+    ["default_theme_id", rawValue.default_theme_id],
   ]) {
     if (fieldValue !== undefined && typeof fieldValue !== "string") {
       throw new Error(`group.json field "${fieldName}" must be a string: ${groupJsonPath}`);
@@ -251,6 +252,7 @@ async function readBuiltinGroupJson(groupDirPath) {
     cover_layout_id: rawValue.cover_layout_id,
     agenda_layout_id: rawValue.agenda_layout_id,
     closing_layout_id: rawValue.closing_layout_id,
+    default_theme_id: rawValue.default_theme_id,
   };
 }
 
@@ -498,6 +500,7 @@ function buildGeneratedRegistrySource(groups) {
           cover_layout_id: group.cover_layout_id ?? null,
           agenda_layout_id: group.agenda_layout_id ?? null,
           closing_layout_id: group.closing_layout_id ?? null,
+          default_theme_id: group.default_theme_id ?? null,
         },
         null,
         2,
@@ -517,6 +520,7 @@ function buildGeneratedRegistrySource(groups) {
       `  coverLayoutId: ${groupMetaVariable}.cover_layout_id ?? undefined,`,
       `  agendaLayoutId: ${groupMetaVariable}.agenda_layout_id ?? undefined,`,
       `  closingLayoutId: ${groupMetaVariable}.closing_layout_id ?? undefined,`,
+      `  defaultThemeId: ${groupMetaVariable}.default_theme_id ?? undefined,`,
       "};",
     );
     lines.push(

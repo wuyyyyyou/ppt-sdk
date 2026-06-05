@@ -54,6 +54,7 @@ export interface WorkspaceSettings {
   text_density?: string;
   visual_tone?: string;
   typography?: string;
+  theme_id?: string;
   updated_at?: string;
   [key: string]: unknown;
 }

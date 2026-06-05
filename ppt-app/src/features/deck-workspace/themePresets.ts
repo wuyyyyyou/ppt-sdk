@@ -1,18 +1,23 @@
-import type { TemplateRenderThemeInput } from "../render/types.js";
-
-export interface ThemePresetInfo extends TemplateRenderThemeInput {
+export interface ThemePreset {
   theme_id: string;
   theme_name: string;
   theme_description: string;
+  fit: string[];
+  tone: string[];
+  avoid: string[];
+  data: {
+    colors: Record<string, string>;
+  };
 }
 
-const DEFAULT_THEME_PRESETS: ThemePresetInfo[] = [
+export const THEME_PRESETS: ThemePreset[] = [
   {
     theme_id: "finance-red-classic",
     theme_name: "Finance Red Classic",
     theme_description: "Formal red, white, and neutral palette for finance, policy, banking, and executive reports.",
-    logo_url: null,
-    company_name: null,
+    fit: ["finance", "banking", "policy", "executive-report"],
+    tone: ["formal", "authoritative", "analytical"],
+    avoid: ["consumer", "playful", "youth-brand"],
     data: {
       colors: {
         primary: "#B71C1C",
@@ -53,8 +58,9 @@ const DEFAULT_THEME_PRESETS: ThemePresetInfo[] = [
     theme_id: "board-blue",
     theme_name: "Board Blue",
     theme_description: "Calm corporate blue palette for board updates, management reports, and investor-facing analysis.",
-    logo_url: null,
-    company_name: null,
+    fit: ["board", "investment", "management", "risk-control"],
+    tone: ["credible", "restrained", "professional"],
+    avoid: ["celebratory", "consumer", "high-energy-marketing"],
     data: {
       colors: {
         primary: "#0F4C81",
@@ -95,8 +101,9 @@ const DEFAULT_THEME_PRESETS: ThemePresetInfo[] = [
     theme_id: "strategy-green",
     theme_name: "Strategy Green",
     theme_description: "Measured green palette for ESG, strategy, operations, public-sector, and transformation decks.",
-    logo_url: null,
-    company_name: null,
+    fit: ["strategy", "esg", "operations", "public-sector", "transformation"],
+    tone: ["steady", "constructive", "long-term"],
+    avoid: ["urgent-crisis", "luxury", "entertainment"],
     data: {
       colors: {
         primary: "#1B5E20",
@@ -137,8 +144,9 @@ const DEFAULT_THEME_PRESETS: ThemePresetInfo[] = [
     theme_id: "graphite-gold",
     theme_name: "Graphite Gold",
     theme_description: "Premium graphite and gold palette for annual reviews, wealth, consulting, and high-stakes summaries.",
-    logo_url: null,
-    company_name: null,
+    fit: ["consulting", "wealth", "annual-review", "executive-summary"],
+    tone: ["premium", "confident", "polished"],
+    avoid: ["dense-technical", "academic", "playful"],
     data: {
       colors: {
         primary: "#A77A22",
@@ -179,8 +187,9 @@ const DEFAULT_THEME_PRESETS: ThemePresetInfo[] = [
     theme_id: "digital-indigo",
     theme_name: "Digital Indigo",
     theme_description: "Modern indigo palette for SaaS, AI, fintech, digital transformation, and product strategy.",
-    logo_url: null,
-    company_name: null,
+    fit: ["saas", "ai", "fintech", "digital-transformation", "product-strategy"],
+    tone: ["modern", "technical", "sharp"],
+    avoid: ["traditional-policy", "heritage-brand", "conservative-board"],
     data: {
       colors: {
         primary: "#4338CA",
@@ -221,8 +230,9 @@ const DEFAULT_THEME_PRESETS: ThemePresetInfo[] = [
     theme_id: "neutral-slate",
     theme_name: "Neutral Slate",
     theme_description: "General-purpose neutral palette for research, training, internal communication, and content-heavy decks.",
-    logo_url: null,
-    company_name: null,
+    fit: ["research", "training", "internal-communication", "general-business"],
+    tone: ["quiet", "clear", "balanced"],
+    avoid: ["brand-campaign", "luxury", "youthful"],
     data: {
       colors: {
         primary: "#334155",
@@ -259,203 +269,22 @@ const DEFAULT_THEME_PRESETS: ThemePresetInfo[] = [
       },
     },
   },
-  {
-    theme_id: "edge-yellow",
-    theme_name: "Edge Yellow",
-    theme_description: "Yellow and dark theme for professionalish and edge.",
-    logo_url: null,
-    company_name: null,
-    data: {
-      colors: {
-        primary: "#f5f547",
-        background: "#1f1f1f",
-        card: "#424242",
-        stroke: "#585858",
-        primary_text: "#161616",
-        background_text: "#f5f547",
-        graph_0: "#ffff54",
-        graph_1: "#f1f142",
-        graph_2: "#dada15",
-        graph_3: "#c1bf00",
-        graph_4: "#a8a600",
-        graph_5: "#908c00",
-        graph_6: "#797400",
-        graph_7: "#625c00",
-        graph_8: "#4d4500",
-        graph_9: "#382f00",
-      },
-      fonts: {
-        textFont: {
-          name: "Playfair Display",
-          url: "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400..900&display=swap",
-        },
-      },
-    },
-  },
-  {
-    theme_id: "light-rose",
-    theme_name: "Light Rose",
-    theme_description: "Rose background with punchy font",
-    logo_url: null,
-    company_name: null,
-    data: {
-      colors: {
-        primary: "#030204",
-        background: "#f69c9c",
-        card: "#ffaeb4",
-        stroke: "#bf6a6b",
-        primary_text: "#bebebe",
-        background_text: "#030202",
-        graph_0: "#2f2c32",
-        graph_1: "#444147",
-        graph_2: "#5a565d",
-        graph_3: "#706d73",
-        graph_4: "#88848b",
-        graph_5: "#a09da4",
-        graph_6: "#b9b6bd",
-        graph_7: "#d3cfd6",
-        graph_8: "#eae6ed",
-        graph_9: "#f7f3fb",
-      },
-      fonts: {
-        textFont: {
-          name: "Overpass",
-          url: "https://fonts.googleapis.com/css2?family=Overpass:wght@100..900&display=swap",
-        },
-      },
-    },
-  },
-  {
-    theme_id: "mint-blue",
-    theme_name: "Mint Blue",
-    theme_description: "Mint Greent with blue heading.",
-    logo_url: null,
-    company_name: null,
-    data: {
-      colors: {
-        primary: "#3b3172",
-        background: "#ffffff",
-        card: "#80e7cf",
-        stroke: "#d1d1d1",
-        primary_text: "#ffffff",
-        background_text: "#3b3172",
-        graph_0: "#003d2d",
-        graph_1: "#005341",
-        graph_2: "#006a57",
-        graph_3: "#00826d",
-        graph_4: "#2b9a85",
-        graph_5: "#4ab39d",
-        graph_6: "#65cdb6",
-        graph_7: "#80e7cf",
-        graph_8: "#98ffe6",
-        graph_9: "#a5fff4",
-      },
-      fonts: {
-        textFont: {
-          name: "Prompt",
-          url: "https://fonts.googleapis.com/css2?family=Prompt:wght@100..900&display=swap",
-        },
-      },
-    },
-  },
-  {
-    theme_id: "professional-blue",
-    theme_name: "Professional Blue",
-    theme_description: "Clean and professional blue theme",
-    logo_url: null,
-    company_name: null,
-    data: {
-      colors: {
-        primary: "#161616",
-        background: "#ffffff",
-        card: "#dae6ff",
-        stroke: "#d1d1d1",
-        primary_text: "#eeeaea",
-        background_text: "#000000",
-        graph_0: "#2e2e2e",
-        graph_1: "#424242",
-        graph_2: "#585858",
-        graph_3: "#6f6f6f",
-        graph_4: "#868686",
-        graph_5: "#9e9e9e",
-        graph_6: "#b7b7b7",
-        graph_7: "#d1d1d1",
-        graph_8: "#e8e8e8",
-        graph_9: "#f5f5f5",
-      },
-      fonts: {
-        textFont: {
-          name: "Inter",
-          url: "https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap",
-        },
-      },
-    },
-  },
-  {
-    theme_id: "professional-dark",
-    theme_name: "Professional Dark",
-    theme_description: "Clean and professional for dark corporate usage.",
-    logo_url: null,
-    company_name: null,
-    data: {
-      colors: {
-        primary: "#eff5f1",
-        background: "#050505",
-        card: "#424242",
-        stroke: "#585858",
-        primary_text: "#050505",
-        background_text: "#eff5f1",
-        graph_0: "#ebf6ff",
-        graph_1: "#dee8fa",
-        graph_2: "#c7d2e3",
-        graph_3: "#aeb8c9",
-        graph_4: "#959fb0",
-        graph_5: "#7d8797",
-        graph_6: "#666f7f",
-        graph_7: "#505867",
-        graph_8: "#3a4351",
-        graph_9: "#262e3c",
-      },
-      fonts: {
-        textFont: {
-          name: "Instrument Sans",
-          url: "https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap",
-        },
-      },
-    },
-  },
 ];
 
-function cloneThemePreset(theme: ThemePresetInfo): ThemePresetInfo {
-  return {
+export const THEME_PRESET_IDS = THEME_PRESETS.map((theme) => theme.theme_id);
+
+export function getThemePreset(themeId: string | null | undefined): ThemePreset | null {
+  if (!themeId) return null;
+  return THEME_PRESETS.find((theme) => theme.theme_id === themeId) ?? null;
+}
+
+export function buildThemeCatalogForPrompt() {
+  return THEME_PRESETS.map((theme) => ({
     theme_id: theme.theme_id,
-    theme_name: theme.theme_name,
-    theme_description: theme.theme_description,
-    logo_url: theme.logo_url ?? null,
-    company_name: theme.company_name ?? null,
-    data: {
-      colors: { ...(theme.data?.colors ?? {}) },
-      fonts: theme.data?.fonts?.textFont
-        ? {
-            textFont: {
-              name: theme.data.fonts.textFont.name ?? null,
-              url: theme.data.fonts.textFont.url ?? null,
-            },
-          }
-        : undefined,
-    },
-  };
-}
-
-export function listThemePresets(): ThemePresetInfo[] {
-  return DEFAULT_THEME_PRESETS.map(cloneThemePreset);
-}
-
-export function getThemePreset(themeId: string | null | undefined): ThemePresetInfo | null {
-  if (!themeId) {
-    return null;
-  }
-
-  const theme = DEFAULT_THEME_PRESETS.find((preset) => preset.theme_id === themeId);
-  return theme ? cloneThemePreset(theme) : null;
+    name: theme.theme_name,
+    description: theme.theme_description,
+    fit: theme.fit,
+    tone: theme.tone,
+    avoid: theme.avoid,
+  }));
 }
