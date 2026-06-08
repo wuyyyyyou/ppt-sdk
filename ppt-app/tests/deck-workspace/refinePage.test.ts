@@ -31,6 +31,7 @@ const readyReviewRender: DeckReviewRenderState = {
         title: slide.title,
         html_path: "/tmp/workspaces/demo/output/app-render/page-01.html",
         preview_url: "file:///tmp/workspaces/demo/output/app-render/page-01.html",
+        screenshot_url: "http://127.0.0.1:4173/preview/page-01.png",
         speaker_note: "Future timeline",
       },
     ],
@@ -64,11 +65,11 @@ function renderRefinePage(reviewRender: DeckReviewRenderState) {
 }
 
 describe("RefinePage", () => {
-  it("shows the rendered slide iframe when a preview URL is available", () => {
+  it("shows the rendered slide image when a screenshot URL is available", () => {
     const html = renderRefinePage(readyReviewRender);
 
-    assert.match(html, /<iframe/);
-    assert.match(html, /src="file:\/\/\/tmp\/workspaces\/demo\/output\/app-render\/page-01\.html"/);
+    assert.match(html, /<img/);
+    assert.match(html, /src="http:\/\/127\.0\.0\.1:4173\/preview\/page-01\.png"/);
     assert.doesNotMatch(html, /slide-preview-card/);
   });
 

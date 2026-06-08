@@ -24,7 +24,7 @@ const ATTEMPT_LIMITS = {
   selfReview: 5,
   agent: 5,
 };
-const PAGE_GENERATION_CONCURRENCY = 5;
+const PAGE_GENERATION_CONCURRENCY = 3;
 
 export type DeckGenerationStep =
   | "page-plan"
@@ -189,6 +189,9 @@ function generationText(locale: Locale) {
     reviewingPage: (page: PagePlanItem) =>
       zh ? `正在检查第 ${page.index + 1} 页的细节` : `Checking page ${page.index + 1}`,
     cancelled: zh ? "已停止生成" : "Generation stopped",
+    agentSessionCacheMissExhausted: zh
+      ? "Agent 会话重试后仍失败，请重跑这一页。"
+      : "Agent session failed after retrying. Please retry this page.",
     finalRender: zh ? "正在生成最终预览" : "Generating final preview",
     deckReady: zh ? "演示文稿已生成" : "Deck generated",
     activeSummary: (input: { active: number; accepted: number; failed: number; total: number }) => {
@@ -481,6 +484,7 @@ function createAgentRunTracker(input: {
             activities,
             errors,
             usage,
+            ...extra,
           },
         });
       } catch {
@@ -890,21 +894,29 @@ async function runPageGeneration(
         changed_files: authoringResult.changed_files,
         needs_render: authoringResult.needs_render,
         session_retries: authoringResult.session_retries ?? 0,
+        session_cache_miss_retries:
+          authoringResult.session_cache_miss_retries ?? 0,
       });
       renderError = "";
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (isAgentInfrastructureError(error)) {
+        const displayMessage = error.sessionCacheMiss
+          ? text.agentSessionCacheMissExhausted
+          : message;
         agentInfrastructureFailures += 1;
         await authoringTracker.flush("error", {
-          error: message,
+          error: displayMessage,
+          raw_error: error.rawMessage,
+          agent_session_cache_miss: error.sessionCacheMiss,
+          session_cache_miss_retries: error.sessionCacheMissRetries,
           agent_infrastructure_failures: agentInfrastructureFailures,
           active_session_limit: error.activeSessionLimit,
         });
         progress = await recordProgress(input, page, {
           status: "agent_infrastructure_failed",
           agent_infrastructure_failures: agentInfrastructureFailures,
-          last_error: message,
+          last_error: displayMessage,
         });
         input.setProgress(progress);
         return {
@@ -913,7 +925,7 @@ async function runPageGeneration(
           progress,
           error: {
             type: "agent_infrastructure",
-            message,
+            message: displayMessage,
             page_id: page.page_id,
             page_index: page.index,
             page_status: "agent_infrastructure_failed",
@@ -1007,20 +1019,28 @@ async function runPageGeneration(
       await selfReviewTracker.flush("completed", {
         parsed_review: true,
         review: selfReview,
+        session_cache_miss_retries:
+          selfReview.session_cache_miss_retries ?? 0,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (isAgentInfrastructureError(error)) {
+        const displayMessage = error.sessionCacheMiss
+          ? text.agentSessionCacheMissExhausted
+          : message;
         agentInfrastructureFailures += 1;
         await selfReviewTracker.flush("error", {
-          error: message,
+          error: displayMessage,
+          raw_error: error.rawMessage,
+          agent_session_cache_miss: error.sessionCacheMiss,
+          session_cache_miss_retries: error.sessionCacheMissRetries,
           agent_infrastructure_failures: agentInfrastructureFailures,
           active_session_limit: error.activeSessionLimit,
         });
         progress = await recordProgress(input, page, {
           status: "agent_infrastructure_failed",
           agent_infrastructure_failures: agentInfrastructureFailures,
-          last_error: message,
+          last_error: displayMessage,
         });
         input.setProgress(progress);
         return {
@@ -1029,7 +1049,7 @@ async function runPageGeneration(
           progress,
           error: {
             type: "agent_infrastructure",
-            message,
+            message: displayMessage,
             page_id: page.page_id,
             page_index: page.index,
             page_status: "agent_infrastructure_failed",

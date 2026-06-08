@@ -492,7 +492,47 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(completion.progress?.step, "failed");
   });
 
-  it("runs page generation with a maximum concurrency of five", async () => {
+  it("uses Agent infrastructure failure UX when cache miss retries are exhausted", async () => {
+    const harness = createHarness({
+      authoringError: new AgentInfrastructureError(
+        "Agent session failed after retrying. Please retry this page.",
+        undefined,
+        false,
+        true,
+        12,
+        "no cached app_session token; create a new session",
+      ),
+    });
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "failed");
+    assert.equal(completion.error.type, "agent_infrastructure");
+    assert.equal(completion.error.message, "Agent 会话重试后仍失败，请重跑这一页。");
+    assert.equal(completion.progress?.pages[0].status, "agent_infrastructure_failed");
+    assert.equal(
+      completion.progress?.pages[0].last_error,
+      "Agent 会话重试后仍失败，请重跑这一页。",
+    );
+    assert.equal(completion.progress?.pages[0].agent_infrastructure_failures, 1);
+    const streamLog = harness.logs.find((entry) => {
+      const record = entry as { channel?: string };
+      return record.channel === "ai-page-agent-stream";
+    }) as { entry?: Record<string, unknown> } | undefined;
+    assert.equal(streamLog?.entry?.session_cache_miss_retries, 12);
+    assert.equal(streamLog?.entry?.agent_session_cache_miss, true);
+  });
+
+  it("runs page generation with a maximum concurrency of three", async () => {
     const pagePlan = makePagePlanWithCount(7);
     const harness = createHarness({
       pagePlan,
@@ -516,7 +556,7 @@ describe("Deck Generation Flow Module", () => {
 
     assert.equal(completion.status, "completed");
     assert.equal(harness.authoringPrompts.length, 7);
-    assert.equal(harness.maxActiveAuthoringRuns, 5);
+    assert.equal(harness.maxActiveAuthoringRuns, 3);
     assert.ok(harness.progressEvents.some((progress) => (progress.activeStreams?.length ?? 0) > 1));
   });
 

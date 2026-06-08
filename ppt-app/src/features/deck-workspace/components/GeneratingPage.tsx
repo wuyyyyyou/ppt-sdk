@@ -176,7 +176,10 @@ function PageStageRecordGroupView(props: {
   retryDisabled: boolean;
 }) {
   const { group, t, disclosure, onRetryPage, retryDisabled } = props;
-  const canRetry = Boolean(onRetryPage) && !retryDisabled && ["render_failed", "agent_failed", "needs_user_review"].includes(group.pageStatus);
+  const canRetry =
+    Boolean(onRetryPage) &&
+    !retryDisabled &&
+    canRetryPageGenerationStatus(group.pageStatus);
   const badgeState = statusBadgeState(group.state);
 
   return (
@@ -206,6 +209,15 @@ function PageStageRecordGroupView(props: {
       </div>
     </article>
   );
+}
+
+export function canRetryPageGenerationStatus(status: string) {
+  return [
+    "render_failed",
+    "agent_failed",
+    "needs_user_review",
+    "agent_infrastructure_failed",
+  ].includes(status);
 }
 
 function PageStageRecordView(props: {

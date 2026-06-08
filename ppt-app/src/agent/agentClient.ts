@@ -3,11 +3,20 @@ import {
   buildStructuredJsonRepairPrompt,
   parseStructuredJson,
 } from "../ai/structuredJson";
+import {
+  isAgentSessionCacheMissMessage,
+  nextAgentSessionCacheMissRetry,
+  shouldReportAgentSessionCacheMissRetry,
+  type AgentSessionCacheMissRetryConfig,
+  type AgentSessionCacheMissRetryState,
+} from "./agentSessionRetry";
 
 const AGENT_RUN_TIMEOUT_MS = 600_000;
 const MAX_AGENT_SESSION_RETRIES = 1;
 const DEFAULT_AGENT_SESSION_EXPIRES_IN_SECONDS = 600;
 const AGENT_SESSION_RENEW_MARGIN_MS = 60_000;
+const AGENT_SESSION_CACHE_MISS_EXHAUSTED_MESSAGE =
+  "Agent session failed after retrying. Please retry this page.";
 
 export interface AgentRunSummary {
   status: "ready_for_render" | "blocked";
@@ -18,6 +27,7 @@ export interface AgentRunSummary {
   raw_text?: string;
   parsed_json?: boolean;
   session_retries?: number;
+  session_cache_miss_retries?: number;
 }
 
 export interface AgentSelfReviewResult {
@@ -31,6 +41,7 @@ export interface AgentSelfReviewResult {
   }>;
   revision_request: string;
   confidence: "low" | "medium" | "high";
+  session_cache_miss_retries?: number;
 }
 
 export interface AgentClient {
@@ -42,11 +53,17 @@ export interface AgentClient {
 export type AgentStreamEvent =
   | { type: "content"; text: string }
   | { type: "activity"; message: string; tool?: string; path?: string; size?: number }
-  | { type: "error"; message: string; code?: string; expired?: boolean }
+  | { type: "error"; message: string; code?: string; expired?: boolean; sessionCacheMiss?: boolean }
   | { type: "complete"; usage?: unknown };
 
 export interface AgentRunOptions {
   onStreamEvent?: (event: AgentStreamEvent) => void;
+}
+
+export interface AgentClientOptions {
+  cacheMissRetryConfig?: Partial<AgentSessionCacheMissRetryConfig>;
+  wait?: (ms: number) => Promise<void>;
+  random?: () => number;
 }
 
 interface CollectedAgentRun {
@@ -58,7 +75,8 @@ class AgentRunStreamError extends Error {
   constructor(
     message: string,
     public readonly expired = false,
-    public readonly code?: string
+    public readonly code?: string,
+    public readonly sessionCacheMiss = false,
   ) {
     super(message);
     this.name = "AgentRunStreamError";
@@ -69,7 +87,10 @@ export class AgentInfrastructureError extends Error {
   constructor(
     message: string,
     public readonly code?: string,
-    public readonly activeSessionLimit = false
+    public readonly activeSessionLimit = false,
+    public readonly sessionCacheMiss = false,
+    public readonly sessionCacheMissRetries = 0,
+    public readonly rawMessage?: string,
   ) {
     super(message);
     this.name = "AgentInfrastructureError";
@@ -109,7 +130,11 @@ function normalizeRunSummary(value: unknown): AgentRunSummary {
   };
 }
 
-function fallbackRunSummary(text: string, sessionRetries: number): AgentRunSummary {
+function fallbackRunSummary(
+  text: string,
+  sessionRetries: number,
+  sessionCacheMissRetries: number,
+): AgentRunSummary {
   return {
     status: "ready_for_render",
     changed_files: [],
@@ -119,6 +144,7 @@ function fallbackRunSummary(text: string, sessionRetries: number): AgentRunSumma
     raw_text: text,
     parsed_json: false,
     session_retries: sessionRetries,
+    session_cache_miss_retries: sessionCacheMissRetries,
   };
 }
 
@@ -213,11 +239,13 @@ function extractFrameEvents(frame: unknown): AgentStreamEvent[] {
 
   if (frame.event === "error") {
     const message = readString(frame.message) || "Agent stream error.";
+    const sessionCacheMiss = isAgentSessionCacheMissMessage(message);
     events.push({
       type: "error",
       code: readString(frame.code) || undefined,
       message,
       expired: /expired|APP_NOT_GRANTED|invalid app_session_token/i.test(message),
+      sessionCacheMiss,
     });
     return events;
   }
@@ -291,7 +319,12 @@ async function collectRunText(
       if (event.type === "content") {
         output += event.text;
       } else if (event.type === "error") {
-        throw new AgentRunStreamError(event.message, event.expired, event.code);
+        throw new AgentRunStreamError(
+          event.message,
+          event.expired,
+          event.code,
+          event.sessionCacheMiss === true,
+        );
       }
     }
   }
@@ -311,17 +344,30 @@ function toErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-function toAgentInfrastructureError(error: unknown, fallbackMessage: string) {
+function toAgentInfrastructureError(
+  error: unknown,
+  fallbackMessage: string,
+  options: {
+    sessionCacheMiss?: boolean;
+    sessionCacheMissRetries?: number;
+    rawMessage?: string;
+  } = {},
+) {
   if (error instanceof AgentInfrastructureError) return error;
   const rawMessage = toErrorMessage(error) || fallbackMessage;
   const activeSessionLimit = isActiveSessionLimitMessage(rawMessage);
-  const message = activeSessionLimit
+  const message = options.sessionCacheMiss
+    ? AGENT_SESSION_CACHE_MISS_EXHAUSTED_MESSAGE
+    : activeSessionLimit
     ? `${rawMessage} 请先 delete/revoke 旧 Agent session，或等待服务端释放后重试。`
     : rawMessage;
   return new AgentInfrastructureError(
     message,
     error instanceof AgentRunStreamError ? error.code : undefined,
-    activeSessionLimit
+    activeSessionLimit,
+    options.sessionCacheMiss === true,
+    options.sessionCacheMissRetries ?? 0,
+    options.rawMessage,
   );
 }
 
@@ -335,9 +381,9 @@ function readSessionExpiresInSeconds(session: AnnaAgentSession): number {
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  let timeoutId: number | undefined;
+  let timeoutId: ReturnType<typeof globalThis.setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timeoutId = window.setTimeout(() => {
+    timeoutId = globalThis.setTimeout(() => {
       reject(new Error(`Agent run timed out after ${timeoutMs}ms`));
     }, timeoutMs);
   });
@@ -346,12 +392,27 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
     return await Promise.race([promise, timeout]);
   } finally {
     if (timeoutId !== undefined) {
-      window.clearTimeout(timeoutId);
+      globalThis.clearTimeout(timeoutId);
     }
   }
 }
 
-export async function createAgentClient(runtime: AnnaRuntime): Promise<AgentClient> {
+function defaultWait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    globalThis.setTimeout(resolve, ms);
+  });
+}
+
+function formatCacheMissRetryMessage(retryNumber: number, delayMs: number) {
+  const delaySeconds = Math.max(1, Math.round(delayMs / 1000));
+  return `Agent session cache miss; retry ${retryNumber} after ${delaySeconds}s`;
+}
+
+export async function createAgentClient(
+  runtime: AnnaRuntime,
+  clientOptions: AgentClientOptions = {},
+): Promise<AgentClient> {
+  const wait = clientOptions.wait ?? defaultWait;
   async function createSession() {
     try {
       const session = await runtime.agent.session({ submode: "auto" });
@@ -376,16 +437,25 @@ export async function createAgentClient(runtime: AnnaRuntime): Promise<AgentClie
 
   async function collectWithSessionRetry(
     prompt: string,
-    options: AgentRunOptions | undefined
-  ): Promise<CollectedAgentRun & { sessionRetries: number }> {
+    runOptions: AgentRunOptions | undefined
+  ): Promise<
+    CollectedAgentRun & {
+      sessionRetries: number;
+      sessionCacheMissRetries: number;
+    }
+  > {
     let sessionRetries = 0;
+    const cacheMissRetryState: AgentSessionCacheMissRetryState = {
+      retries: 0,
+      totalWaitMs: 0,
+    };
 
     for (;;) {
       let sessionMeta: Awaited<ReturnType<typeof createSession>> | null = null;
       try {
         sessionMeta = await createSession();
         if (shouldRenewBeforeRun(sessionMeta)) {
-          options?.onStreamEvent?.({
+          runOptions?.onStreamEvent?.({
             type: "activity",
             message: "Agent session near expiry; creating a new session",
           });
@@ -393,18 +463,58 @@ export async function createAgentClient(runtime: AnnaRuntime): Promise<AgentClie
           sessionMeta = await createSession();
         }
         const collected = await withTimeout(
-          collectRunText(sessionMeta.session, prompt, options),
+          collectRunText(sessionMeta.session, prompt, runOptions),
           AGENT_RUN_TIMEOUT_MS
         );
-        return { ...collected, sessionRetries };
+        if (cacheMissRetryState.retries > 0) {
+          runOptions?.onStreamEvent?.({
+            type: "activity",
+            message: `Agent session recovered after ${cacheMissRetryState.retries} retries`,
+          });
+        }
+        return {
+          ...collected,
+          sessionRetries,
+          sessionCacheMissRetries: cacheMissRetryState.retries,
+        };
       } catch (error) {
+        if (error instanceof AgentRunStreamError && error.sessionCacheMiss) {
+          const decision = nextAgentSessionCacheMissRetry({
+            state: cacheMissRetryState,
+            config: clientOptions.cacheMissRetryConfig,
+            random: clientOptions.random,
+          });
+          if (decision.retry) {
+            if (shouldReportAgentSessionCacheMissRetry(decision.retryNumber)) {
+              runOptions?.onStreamEvent?.({
+                type: "activity",
+                message: formatCacheMissRetryMessage(
+                  decision.retryNumber,
+                  decision.delayMs,
+                ),
+              });
+            }
+            await wait(decision.delayMs);
+            continue;
+          }
+
+          runOptions?.onStreamEvent?.({
+            type: "activity",
+            message: `Agent session cache miss retries exhausted after ${cacheMissRetryState.retries} retries`,
+          });
+          throw toAgentInfrastructureError(error, "Agent session failed.", {
+            sessionCacheMiss: true,
+            sessionCacheMissRetries: cacheMissRetryState.retries,
+            rawMessage: error.message,
+          });
+        }
         if (
           error instanceof AgentRunStreamError &&
           error.expired &&
           sessionRetries < MAX_AGENT_SESSION_RETRIES
         ) {
           sessionRetries += 1;
-          options?.onStreamEvent?.({
+          runOptions?.onStreamEvent?.({
             type: "activity",
             message: "Agent session expired; creating a new session",
           });
@@ -435,16 +545,24 @@ export async function createAgentClient(runtime: AnnaRuntime): Promise<AgentClie
           raw_text: collected.text,
           parsed_json: true,
           session_retries: collected.sessionRetries,
+          session_cache_miss_retries: collected.sessionCacheMissRetries,
         };
       } catch {
-        return fallbackRunSummary(collected.text, collected.sessionRetries);
+        return fallbackRunSummary(
+          collected.text,
+          collected.sessionRetries,
+          collected.sessionCacheMissRetries,
+        );
       }
     },
 
     async runSelfReviewPrompt(prompt, options) {
       const collected = await collectWithSessionRetry(prompt, options);
       try {
-        return normalizeSelfReview(parseJsonObject(collected.text, "self-review"));
+        return {
+          ...normalizeSelfReview(parseJsonObject(collected.text, "self-review")),
+          session_cache_miss_retries: collected.sessionCacheMissRetries,
+        };
       } catch (error) {
         const repairPrompt = buildStructuredJsonRepairPrompt(
           collected.text,
@@ -452,7 +570,11 @@ export async function createAgentClient(runtime: AnnaRuntime): Promise<AgentClie
           error instanceof Error ? error.message : String(error)
         );
         const repaired = await collectWithSessionRetry(repairPrompt, options);
-        return normalizeSelfReview(parseJsonObject(repaired.text, "self-review"));
+        return {
+          ...normalizeSelfReview(parseJsonObject(repaired.text, "self-review")),
+          session_cache_miss_retries:
+            collected.sessionCacheMissRetries + repaired.sessionCacheMissRetries,
+        };
       }
     },
 

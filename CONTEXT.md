@@ -71,6 +71,9 @@ _Avoid_: User-facing labels such as "Session History" when the record is really 
 **Failed Page Generation**:
 A Page Generation Unit that reached a terminal state without becoming accepted after its automatic recovery attempts are exhausted or manual review is required. Deck Generation may still continue other Page Generation Units, but the Deck is not finished until failed pages are retried or otherwise resolved.
 
+**Agent Session Cache Miss**:
+A transient Agent Session infrastructure failure where the platform cannot continue an Agent run because the app session authorization is unavailable. It is treated as infrastructure failure, not as a Page Generation content or render failure.
+
 **Page Generation Retry**:
 The action of rerunning one Failed Page Generation against the current Confirmed Outline, Page Plan, and Template. It applies to the selected page only and does not imply regenerating the whole Deck.
 
