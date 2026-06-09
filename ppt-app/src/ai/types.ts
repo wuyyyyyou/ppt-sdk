@@ -2,12 +2,16 @@ import type { OutlineDetail, Slide } from "../data/mockDeck";
 import type { AnnaLlmCompleteInput } from "../runtime/annaRuntime";
 import type { WorkspaceSettings } from "../api/types";
 import type { PagePlan, TemplatePlanningContext, WorkspaceOutline } from "../api/types";
-import type { ContextRow } from "../features/deck-workspace/types";
 import type { Locale } from "../i18n/messages";
+
+export interface LlmContextRow {
+  id: string;
+  value: string;
+}
 
 export interface DeckBriefInput {
   prompt: string;
-  contextRows: ContextRow[];
+  contextRows: LlmContextRow[];
   locale: Locale;
   setting?: WorkspaceSettings;
 }
@@ -27,6 +31,7 @@ export interface ContextSuggestionResult {
   audience: string[];
   goal: string[];
   style: string[];
+  theme: string[];
 }
 
 export interface ReviseOutlineInput {
@@ -35,7 +40,7 @@ export interface ReviseOutlineInput {
   feedback: string;
   locale: Locale;
   setting?: WorkspaceSettings;
-  contextRows?: ContextRow[];
+  contextRows?: LlmContextRow[];
 }
 
 export interface GenerateSlidesFromOutlineInput {

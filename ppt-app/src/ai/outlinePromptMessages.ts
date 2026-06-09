@@ -1,3 +1,5 @@
+import { CONTENT_GROUNDING_RULES } from "./groundingRules";
+
 export type PromptLanguage = "zh" | "en";
 
 interface GenerateOutlinePromptMessageInput {
@@ -29,6 +31,7 @@ export function buildOutlineSystemPrompt(language: PromptLanguage): string {
       "每个页面元素只能包含 title 和 outline 两个字段。",
       "outline 必须是一段简洁的自然语言说明，不要使用数组，也不要写成 bullet list。",
       "除非用户明确要求，不要添加封面页、目录页、附录页或感谢页。",
+      CONTENT_GROUNDING_RULES,
     ].join("\n");
   }
 
@@ -41,6 +44,7 @@ export function buildOutlineSystemPrompt(language: PromptLanguage): string {
     "Each item must contain only title and outline.",
     "outline must be one concise natural-language paragraph, not an array and not a bullet list.",
     "Do not add cover, agenda, appendix, or thank-you slides unless the user explicitly requests them.",
+    CONTENT_GROUNDING_RULES,
   ].join("\n");
 }
 

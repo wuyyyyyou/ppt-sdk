@@ -64,7 +64,7 @@ const CoverStatement = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
                     style={{
                       marginLeft: columnIndex === 0 ? 0 : 28,
                       marginTop: 14,
-                      backgroundColor: "#E0E0E0",
+                      backgroundColor: redFinanceTheme.colors.softStroke,
                     }}
                   />
                 ))}
@@ -132,7 +132,7 @@ const CoverStatement = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
 
         {showNotes ? (
         <div className="absolute right-[80px] top-[196px] z-20 w-[320px]">
-          <SectionPanelShell paddingX={22} paddingY={22} radius={8} backgroundColor="#FFFFFF">
+          <SectionPanelShell paddingX={22} paddingY={22} radius={8} backgroundColor={redFinanceTheme.colors.surface}>
             <div
               className="mb-[18px] text-[20px] font-black uppercase leading-none"
               style={{ color: redFinanceTheme.colors.primary }}

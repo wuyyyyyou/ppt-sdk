@@ -20,6 +20,11 @@ import {
   buildStructuredJsonRepairPrompt,
   parseStructuredJson,
 } from "./structuredJson";
+import {
+  buildThemeCatalogForPrompt,
+  THEME_PRESET_IDS,
+} from "../features/deck-workspace/themePresets";
+import { CONTENT_GROUNDING_RULES } from "./groundingRules";
 import type {
   AiAttemptLog,
   AiClient,
@@ -191,6 +196,9 @@ function normalizeContextSuggestions(value: unknown): ContextSuggestionResult {
     audience: normalizeStringArray(record.audience),
     goal: normalizeStringArray(record.goal),
     style: normalizeStringArray(record.style),
+    theme: normalizeStringArray(record.theme).filter((themeId) =>
+      THEME_PRESET_IDS.includes(themeId),
+    ),
   };
 }
 
@@ -291,15 +299,17 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         "optional context suggestions",
         [
           "Infer optional context fields for a presentation from the user's prompt.",
-          "Return only a JSON object with exactly these properties: audience, goal, style.",
+          "Return only a JSON object with exactly these properties: audience, goal, style, theme.",
           "Each property value must be an array of concise strings.",
+          "For theme, choose only theme_id values from theme_catalog. Do not invent theme IDs.",
           "Prefer fewer options. If the prompt clearly determines a field, return a one-item array for that field.",
           "If a field is ambiguous, return 2-3 plausible options. Do not return more than 4 items for any field.",
           "Do not include markdown or explanation.",
+          `theme_catalog: ${JSON.stringify(buildThemeCatalogForPrompt())}`,
           `Locale: ${input.locale}`,
           `Prompt: ${input.prompt}`,
         ].join("\n"),
-        '{"audience":["..."],"goal":["..."],"style":["..."]}'
+        '{"audience":["..."],"goal":["..."],"style":["..."],"theme":["theme_id"]}'
       );
 
       return normalizeContextSuggestions(result);
@@ -353,6 +363,7 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
           "Return a JSON object with title, outline, and slides fields.",
           "outline items must have title and outline.",
           "slides must have title and subtitle.",
+          CONTENT_GROUNDING_RULES,
           `Locale: ${input.locale}`,
           `Prompt: ${input.prompt}`,
           `Context: ${JSON.stringify(input.contextRows)}`,
@@ -378,6 +389,7 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         [
           "Create slide summaries from this outline.",
           "Return only a JSON array. Each item must have title and subtitle.",
+          CONTENT_GROUNDING_RULES,
           `Locale: ${input.locale}`,
           `Outline: ${JSON.stringify(input.outline)}`
         ].join("\n"),
@@ -392,6 +404,8 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         [
           "Refine this deck. Return only a JSON array of slides.",
           "Each slide must have title and subtitle.",
+          CONTENT_GROUNDING_RULES,
+          "Do not add new factual claims during refinement unless they are already present in the provided slides.",
           `Locale: ${input.locale}`,
           `Slides: ${JSON.stringify(input.slides)}`
         ].join("\n"),
@@ -405,6 +419,8 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         "refined slide",
         [
           "Refine this single slide. Return only a JSON object with title and subtitle.",
+          CONTENT_GROUNDING_RULES,
+          "Do not add new factual claims during refinement unless they are already present in the provided slide.",
           `Locale: ${input.locale}`,
           `Slide number: ${input.slideIndex + 1}`,
           `Slide: ${JSON.stringify(input.slide)}`

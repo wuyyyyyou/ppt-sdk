@@ -35,7 +35,7 @@ const InsightCallout = ({
         padding: `${paddingY}px ${paddingX}px`,
         backgroundColor: redFinanceTheme.colors.primary,
         color: redFinanceTheme.colors.primaryText,
-        boxShadow: "0 4px 10px rgba(183, 28, 28, 0.2)",
+        boxShadow: `0 4px 10px ${redFinanceTheme.colors.shadowPrimary}`,
       }}
     >
       <div

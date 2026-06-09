@@ -8,6 +8,7 @@ import DualValueMetricCard from "../components/DualValueMetricCard.tsx";
 import InsightCallout from "../components/InsightCallout.tsx";
 import KpiMetricItem from "../components/KpiMetricItem.tsx";
 import ProgressStatusCard from "../components/ProgressStatusCard.tsx";
+import { redFinanceTheme } from "../theme/tokens.ts";
 
 const StatusIconSchema = z.enum(["chart-column", "route", "shield", "wallet"]);
 
@@ -138,7 +139,7 @@ const KpiSummary = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
               status={card.status}
               className="h-full justify-center"
               minHeight={0}
-              progressColor={index === 1 ? "#1565C0" : "var(--primary-color,#B71C1C)"}
+              progressColor={index === 1 ? redFinanceTheme.colors.secondary : redFinanceTheme.colors.primary}
             />
           ))}
         </div>

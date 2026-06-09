@@ -1,5 +1,7 @@
 import React, { type ReactNode } from "react";
 
+import { redFinanceTheme } from "../theme/tokens.ts";
+
 type ChartCardShellProps = {
   title: string;
   subtitle?: string;
@@ -22,10 +24,11 @@ const ChartCardShell = ({
   <div
     data-pptx-export="screenshot"
     data-chart-like="true"
-    className={`flex h-full flex-col rounded-[8px] border bg-[#FAFAFA] ${className ?? ""}`.trim()}
+    className={`flex h-full flex-col rounded-[8px] border ${className ?? ""}`.trim()}
     style={{
       padding,
-      borderColor: "var(--stroke,#E5E7EB)",
+      backgroundColor: redFinanceTheme.colors.panel,
+      borderColor: redFinanceTheme.colors.stroke,
       boxShadow: "0 4px 6px rgba(0,0,0,0.02)",
     }}
   >
@@ -37,11 +40,11 @@ const ChartCardShell = ({
         <div className="flex min-w-0 items-center gap-[10px]">
           <div
             className="h-[18px] w-[3px] rounded-full"
-            style={{ backgroundColor: "var(--primary-color,#B71C1C)" }}
+            style={{ backgroundColor: redFinanceTheme.colors.primary }}
           />
           <h3
             className="min-w-0 truncate text-[16px] font-bold"
-            style={{ color: "var(--background-text,#212121)" }}
+            style={{ color: redFinanceTheme.colors.backgroundText }}
           >
             {title}
           </h3>
@@ -49,7 +52,7 @@ const ChartCardShell = ({
         {subtitle ? (
           <div
             className="mt-[6px] pl-[13px] text-[12px]"
-            style={{ color: "var(--text-muted,#616161)" }}
+            style={{ color: redFinanceTheme.colors.mutedText }}
           >
             {subtitle}
           </div>
@@ -60,9 +63,9 @@ const ChartCardShell = ({
         <div
           className="flex-none rounded-[4px] border px-[8px] py-[2px] text-[12px]"
           style={{
-            borderColor: "var(--stroke,#E5E7EB)",
-            color: "#616161",
-            backgroundColor: "#FFFFFF",
+            borderColor: redFinanceTheme.colors.stroke,
+            color: redFinanceTheme.colors.mutedText,
+            backgroundColor: redFinanceTheme.colors.surface,
           }}
         >
           {rightMeta}

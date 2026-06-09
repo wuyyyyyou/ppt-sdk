@@ -4,6 +4,7 @@ import {
   FinanceIcon,
   type FinanceIconName,
 } from "./FinanceIcons.js";
+import { redFinanceTheme } from "../theme/tokens.js";
 import SectionPanelShell from "./SectionPanelShell.js";
 import StableInlineRow from "./StableInlineRow.js";
 
@@ -46,8 +47,8 @@ const PillarBulletCard = ({
   icon,
   title,
   items,
-  accentColor = "var(--primary-color,#B71C1C)",
-  iconBackgroundColor = "#FFEBEE",
+  accentColor = redFinanceTheme.colors.primary,
+  iconBackgroundColor = redFinanceTheme.colors.paleRed,
   density = "normal",
   titlePlacement = "below",
   showWatermark = true,
@@ -97,7 +98,7 @@ const PillarBulletCard = ({
   const titleLineHeight = isHeaderTight ? 1.12 : 1.2;
   const bulletSize = isXSmallText ? 5 : 6;
   const bulletLineHeight = isXSmallText ? 17 : isSmallText ? 18 : BULLET_ITEM_LINE_HEIGHT;
-  const dividerColor = "var(--stroke,#E5E7EB)";
+  const dividerColor = redFinanceTheme.colors.stroke;
   const { segment: dividerSegmentLength, gap: dividerGap } = parseDividerDash(dividerDash);
   const dividerSegmentCount =
     dividerStyle === "dashed"
@@ -113,8 +114,8 @@ const PillarBulletCard = ({
   return (
     <SectionPanelShell
       className="relative h-full min-h-0 rounded-[8px]"
-      backgroundColor="var(--background-color,#FFFFFF)"
-      borderColor="var(--stroke,#E5E7EB)"
+      backgroundColor={redFinanceTheme.colors.background}
+      borderColor={redFinanceTheme.colors.stroke}
       shadow="0 4px 6px rgba(0,0,0,0.02)"
       radius={8}
       paddingX={cardPaddingX}
@@ -135,7 +136,7 @@ const PillarBulletCard = ({
       {showWatermark && resolvedWatermarkText ? (
         <div
           className="absolute right-[16px] top-[14px] text-[42px] font-black leading-none"
-          style={{ color: "#FDEBEC" }}
+          style={{ color: redFinanceTheme.colors.paleRed }}
         >
           {resolvedWatermarkText}
         </div>
@@ -175,7 +176,7 @@ const PillarBulletCard = ({
         <h2
           className="font-bold"
           style={{
-            color: "var(--background-text,#212121)",
+            color: redFinanceTheme.colors.backgroundText,
             fontSize: titleFontSize,
             lineHeight: titleLineHeight,
           }}
@@ -253,7 +254,7 @@ const PillarBulletCard = ({
                 style={{
                   fontSize: leadFontSize,
                   fontWeight: 700,
-                  color: "var(--background-text,#212121)",
+                  color: redFinanceTheme.colors.backgroundText,
                 }}
               >
                 <span>{item.lead}：</span>
@@ -263,7 +264,7 @@ const PillarBulletCard = ({
                 style={{
                   fontSize: bodyFontSize,
                   lineHeight: bodyLineHeight,
-                  color: "var(--text-muted,#616161)",
+                  color: redFinanceTheme.colors.mutedText,
                 }}
               >
                 {item.body}

@@ -1,8 +1,8 @@
 import type { AnnaLlmCompleteInput } from "../runtime/annaRuntime";
 import type { WorkspaceSettings } from "../api/types";
-import type { ContextRow } from "../features/deck-workspace/types";
 import type { Locale } from "../i18n/messages";
 import type { OutlineDetail } from "../data/mockDeck";
+import type { LlmContextRow } from "./types";
 import {
   buildGenerateOutlineUserPrompt,
   buildOutlineRepairPrompt,
@@ -13,7 +13,7 @@ import {
 
 interface GenerateOutlinePromptInput {
   prompt: string;
-  contextRows: ContextRow[];
+  contextRows: LlmContextRow[];
   locale: Locale;
   setting?: WorkspaceSettings;
 }
@@ -24,7 +24,7 @@ interface ReviseOutlinePromptInput {
   feedback: string;
   locale: Locale;
   setting?: WorkspaceSettings;
-  contextRows?: ContextRow[];
+  contextRows?: LlmContextRow[];
 }
 
 function readSettingString(setting: WorkspaceSettings | undefined, key: string): string {
@@ -32,7 +32,7 @@ function readSettingString(setting: WorkspaceSettings | undefined, key: string):
   return typeof value === "string" ? value.trim() : "";
 }
 
-function readContextRowString(contextRows: ContextRow[] | undefined, id: string): string {
+function readContextRowString(contextRows: LlmContextRow[] | undefined, id: string): string {
   const row = contextRows?.find((item) => item.id === id);
   return typeof row?.value === "string" ? row.value.trim() : "";
 }
@@ -89,7 +89,7 @@ function parseExplicitSlideCount(text?: string): number | null {
 export function getExpectedSlideCount(
   setting?: WorkspaceSettings,
   explicitCountText?: string,
-  contextRows?: ContextRow[]
+  contextRows?: LlmContextRow[]
 ): number | null {
   const rawSlideCount = readContextRowString(contextRows, "slides");
   if (!rawSlideCount || rawSlideCount.toLowerCase() === "auto") {
@@ -103,14 +103,14 @@ export function getExpectedSlideCount(
 export function getExpectedSlideCountForRevision(
   setting?: WorkspaceSettings,
   feedback?: string,
-  contextRows?: ContextRow[]
+  contextRows?: LlmContextRow[]
 ): number | null {
   return parseExplicitSlideCount(feedback) ?? getExpectedSlideCount(setting, undefined, contextRows);
 }
 
 function buildSettingSummary(
   setting?: WorkspaceSettings,
-  contextRows?: ContextRow[]
+  contextRows?: LlmContextRow[]
 ): Record<string, string> {
   return {
     language: readSettingString(setting, "language"),

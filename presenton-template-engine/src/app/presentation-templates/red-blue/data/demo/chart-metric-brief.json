@@ -1,0 +1,62 @@
+{
+  "title": "Performance Signal",
+  "subtitle": "Combine one evidence chart with KPI rows and a headline result for fast reading.",
+  "footerText": "Red Blue Professional | Chart Metric Brief",
+  "pageNumber": "04",
+  "chartTitle": "Indexed Market Position",
+  "chartSubtitle": "Relative index scores for slide-level comparison; replace with validated source data.",
+  "chartUnit": "Index score",
+  "maxValue": 100,
+  "series": [
+    {
+      "label": "China",
+      "value": 84,
+      "tone": "china"
+    },
+    {
+      "label": "Japan",
+      "value": 68,
+      "tone": "japan"
+    },
+    {
+      "label": "Korea",
+      "value": 72,
+      "tone": "korea"
+    }
+  ],
+  "metricTitle": "KPI Readout",
+  "metrics": [
+    {
+      "label": "China",
+      "value": "84%",
+      "share": 84,
+      "tone": "china"
+    },
+    {
+      "label": "Japan",
+      "value": "68%",
+      "share": 68,
+      "tone": "japan"
+    },
+    {
+      "label": "Korea",
+      "value": "72%",
+      "share": 72,
+      "tone": "korea"
+    }
+  ],
+  "callouts": [
+    {
+      "value": "84%",
+      "label": "China lead signal",
+      "description": "Use this card for the primary measured position.",
+      "tone": "china"
+    },
+    {
+      "value": "68%",
+      "label": "Japan benchmark",
+      "description": "Use this card for the comparison benchmark.",
+      "tone": "japan"
+    }
+  ]
+}

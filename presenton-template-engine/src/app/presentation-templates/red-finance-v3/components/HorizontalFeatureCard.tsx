@@ -43,8 +43,8 @@ const toneDefaults = (tone: HorizontalFeatureCardTone) => {
         railColor: redFinanceTheme.colors.primary,
         iconBackgroundColor: redFinanceTheme.colors.paleRed,
         iconStroke: redFinanceTheme.colors.primary,
-        tagBorderColor: "#F1CACA",
-        tagBackgroundColor: "#FFF4F4",
+        tagBorderColor: redFinanceTheme.colors.accentBorder,
+        tagBackgroundColor: redFinanceTheme.colors.accentTint,
         tagTextColor: redFinanceTheme.colors.primary,
       };
     case "future":
@@ -52,17 +52,17 @@ const toneDefaults = (tone: HorizontalFeatureCardTone) => {
         railColor: redFinanceTheme.colors.primary,
         iconBackgroundColor: redFinanceTheme.colors.paleRed,
         iconStroke: redFinanceTheme.colors.primary,
-        tagBorderColor: "#F1CACA",
-        tagBackgroundColor: "#FFF4F4",
+        tagBorderColor: redFinanceTheme.colors.accentBorder,
+        tagBackgroundColor: redFinanceTheme.colors.accentTint,
         tagTextColor: redFinanceTheme.colors.primary,
       };
     default:
       return {
-        railColor: "#D8DCE2",
+        railColor: redFinanceTheme.colors.iconMuted,
         iconBackgroundColor: redFinanceTheme.colors.paleRed,
         iconStroke: redFinanceTheme.colors.primary,
         tagBorderColor: redFinanceTheme.colors.stroke,
-        tagBackgroundColor: "#FAFAFA",
+        tagBackgroundColor: redFinanceTheme.colors.panel,
         tagTextColor: redFinanceTheme.colors.mutedText,
       };
   }

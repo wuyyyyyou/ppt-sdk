@@ -92,7 +92,7 @@ const FinanceDonutChart = ({
         cy={centerY}
         r={radius}
         fill="none"
-        stroke="#F2F2F2"
+        stroke={redFinanceTheme.colors.softStroke}
         strokeWidth={strokeWidth}
       />
       {arcNodes}

@@ -4,7 +4,7 @@ import type { AiClient } from "./types";
 import { connectAnnaRuntime } from "../runtime/annaRuntime";
 import { detectRuntimeMode } from "../runtime/runtimeMode";
 
-export type { AiAttemptLog, AiClient } from "./types";
+export type { AiAttemptLog, AiClient, LlmContextRow } from "./types";
 
 export async function createAiClient(): Promise<AiClient> {
   if (detectRuntimeMode() === "anna") {

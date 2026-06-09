@@ -98,12 +98,12 @@ const StableMatrixGrid = ({
   columns,
   rows,
   density = "normal",
-  outerBorderColor = "#E0E0E0",
+  outerBorderColor = redFinanceTheme.colors.softStroke,
   headerBackgroundColor = redFinanceTheme.colors.primary,
   headerTextColor = redFinanceTheme.colors.primaryText,
   rowDividerColor = redFinanceTheme.colors.stroke,
-  stripeColors = ["#FFFFFF", "#FAFAFA"],
-  rowHeaderBackgroundColor = "#FFFFFF",
+  stripeColors = [redFinanceTheme.colors.surface, redFinanceTheme.colors.panel],
+  rowHeaderBackgroundColor = redFinanceTheme.colors.surface,
   shadow = "0 4px 6px rgba(0,0,0,0.03)",
   borderRadius = 8,
   rowHeaderAlign = "center",
@@ -237,7 +237,7 @@ const StableMatrixGrid = ({
                       paddingBottom: cellPaddingY,
                       backgroundColor:
                         cell.backgroundColor ??
-                        (tone === "accent" ? "rgba(183, 28, 28, 0.03)" : baseRowBackground),
+                        (tone === "accent" ? redFinanceTheme.colors.rowAccent : baseRowBackground),
                       borderTop: rowBorderTop,
                     }}
                   >
@@ -273,7 +273,9 @@ const StableMatrixGrid = ({
                                 fontSize: cellSupportFontSize,
                                 color:
                                   cell.supportColor ??
-                                  (tone === "accent" ? "#9D2E2E" : "#8F8F8F"),
+                                  (tone === "accent"
+                                    ? redFinanceTheme.colors.accentSubtleText
+                                    : redFinanceTheme.colors.subtleText),
                               }}
                             >
                               {cell.support}

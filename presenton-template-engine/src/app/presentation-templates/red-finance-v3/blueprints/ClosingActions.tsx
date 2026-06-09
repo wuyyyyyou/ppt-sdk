@@ -7,6 +7,7 @@ import { FinanceIcon } from "../components/FinanceIcons.tsx";
 import HorizontalFeatureCard from "../components/HorizontalFeatureCard.tsx";
 import InsightCallout from "../components/InsightCallout.tsx";
 import SectionPanelShell from "../components/SectionPanelShell.tsx";
+import { redFinanceTheme } from "../theme/tokens.ts";
 
 const IconSchema = z.enum([
   "bank",
@@ -91,22 +92,22 @@ const ClosingActions = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
             <InsightCallout text={parsed.finalText} density={parsed.density === "high" ? "compact" : "normal"} icon="flag" />
             <SectionPanelShell
               className="min-h-0 flex-1 justify-center"
-              backgroundColor="#FFFFFF"
+              backgroundColor={redFinanceTheme.colors.surface}
               shadow="0 4px 8px rgba(0,0,0,0.03)"
               paddingX={18}
               paddingY={18}
             >
-              <div className="text-[13px] font-bold uppercase tracking-[0.06em]" style={{ color: "var(--primary-color,#B71C1C)" }}>
+              <div className="text-[13px] font-bold uppercase tracking-[0.06em]" style={{ color: redFinanceTheme.colors.primary }}>
                 {parsed.finalTitle}
               </div>
-              <div className="mt-[10px] text-[15px] leading-[1.55]" style={{ color: "var(--background-text,#212121)" }}>
+              <div className="mt-[10px] text-[15px] leading-[1.55]" style={{ color: redFinanceTheme.colors.backgroundText }}>
                 {parsed.summary}
               </div>
-              <div className="my-[18px] h-px w-full" style={{ backgroundColor: "var(--stroke,#E5E7EB)" }} />
-              <div className="text-[13px] font-bold uppercase tracking-[0.06em]" style={{ color: "var(--primary-color,#B71C1C)" }}>
+              <div className="my-[18px] h-px w-full" style={{ backgroundColor: redFinanceTheme.colors.stroke }} />
+              <div className="text-[13px] font-bold uppercase tracking-[0.06em]" style={{ color: redFinanceTheme.colors.primary }}>
                 Decision ask
               </div>
-              <div className="mt-[10px] text-[15px] leading-[1.55]" style={{ color: "var(--text-muted,#616161)" }}>
+              <div className="mt-[10px] text-[15px] leading-[1.55]" style={{ color: redFinanceTheme.colors.mutedText }}>
                 {decisionAsk}
               </div>
             </SectionPanelShell>

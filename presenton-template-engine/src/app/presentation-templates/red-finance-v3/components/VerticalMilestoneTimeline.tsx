@@ -35,11 +35,13 @@ const VerticalMilestoneTimeline = ({
   const connectorGap = isCompact ? 12 : 14;
   const dotSize = isCompact ? 14 : 16;
   const dotBorderWidth = isCompact ? 2.5 : 3;
-  const dotHalo = isCompact ? "0 0 0 3px rgba(255,255,255,1)" : "0 0 0 4px rgba(255,255,255,1)";
+  const dotHalo = isCompact
+    ? `0 0 0 3px ${redFinanceTheme.colors.surface}`
+    : `0 0 0 4px ${redFinanceTheme.colors.surface}`;
   const cardMinHeight = isCompact ? 68 : 76;
   const periodFontSize = isCompact ? 22 : 24;
   const stageFontSize = isCompact ? 11 : 12;
-  const timelineStroke = "#E0E0E0";
+  const timelineStroke = redFinanceTheme.colors.softStroke;
 
   return (
     <div className={["relative h-full overflow-hidden", className].filter(Boolean).join(" ")}>
@@ -108,7 +110,7 @@ const VerticalMilestoneTimeline = ({
                       : redFinanceTheme.colors.primary,
                     backgroundColor: isFuture
                       ? redFinanceTheme.colors.primary
-                      : "#FFFFFF",
+                      : redFinanceTheme.colors.surface,
                     boxShadow: dotHalo,
                   }}
                 />

@@ -54,6 +54,7 @@ export interface WorkspaceSettings {
   text_density?: string;
   visual_tone?: string;
   typography?: string;
+  theme_id?: string;
   updated_at?: string;
   [key: string]: unknown;
 }
@@ -333,6 +334,7 @@ export interface PageProgressItem {
   status: string;
   render_attempts: number;
   self_review_attempts: number;
+  fact_review_attempts?: number;
   agent_failures: number;
   agent_infrastructure_failures: number;
   slide_path: string;

@@ -76,6 +76,21 @@ function applyThemeVariables(
     ["--stroke", colors.stroke],
     ["--primary-text", colors.primary_text],
     ["--background-text", colors.background_text],
+    ["--secondary-color", colors.secondary],
+    ["--text-muted", colors.text_muted],
+    ["--text-subtle", colors.text_subtle],
+    ["--stroke-soft", colors.stroke_soft],
+    ["--axis-color", colors.axis],
+    ["--icon-muted", colors.icon_muted],
+    ["--panel-color", colors.panel],
+    ["--surface-color", colors.surface],
+    ["--accent-soft", colors.accent_soft],
+    ["--accent-tint", colors.accent_tint],
+    ["--accent-border", colors.accent_border],
+    ["--accent-subtle-text", colors.accent_subtle_text],
+    ["--primary-dark", colors.primary_dark],
+    ["--shadow-primary", colors.shadow_primary],
+    ["--row-accent", colors.row_accent],
   ];
 
   GRAPH_COLOR_KEYS.forEach((index) => {

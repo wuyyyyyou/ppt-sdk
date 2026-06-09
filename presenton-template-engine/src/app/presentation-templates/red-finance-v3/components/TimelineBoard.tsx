@@ -49,7 +49,7 @@ const TimelineBoard = ({
         {showConnectorLine ? (
           <div
             className="absolute left-[56px] right-[56px] top-[20px] h-[2px] rounded-full"
-            style={{ backgroundColor: "#E0E0E0" }}
+            style={{ backgroundColor: redFinanceTheme.colors.softStroke }}
           />
         ) : null}
         {phases.map((phase) => (
@@ -61,7 +61,7 @@ const TimelineBoard = ({
               paddingRight: cardPaddingX,
               paddingTop: cardPaddingTop,
               paddingBottom: cardPaddingBottom,
-              backgroundColor: "#FFFFFF",
+              backgroundColor: redFinanceTheme.colors.surface,
               borderColor: redFinanceTheme.colors.stroke,
               boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
             }}
@@ -72,8 +72,8 @@ const TimelineBoard = ({
                 width: nodeSize,
                 height: nodeSize,
                 backgroundColor: redFinanceTheme.colors.primary,
-                color: "#FFFFFF",
-                boxShadow: "0 3px 6px rgba(183,28,28,0.2)",
+                color: redFinanceTheme.colors.primaryText,
+                boxShadow: `0 3px 6px ${redFinanceTheme.colors.shadowPrimary}`,
               }}
             >
               {phase.label}

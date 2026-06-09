@@ -26,6 +26,7 @@ export interface TemplateGroupMetadata {
     coverLayoutId?: string;
     agendaLayoutId?: string;
     closingLayoutId?: string;
+    defaultThemeId?: string;
 }
 
 /**

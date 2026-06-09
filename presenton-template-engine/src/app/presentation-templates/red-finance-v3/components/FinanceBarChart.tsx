@@ -117,9 +117,9 @@ const FinanceBarChart = ({
           />
           <XAxis
             dataKey="label"
-            axisLine={{ stroke: "#D0D0D0", strokeWidth: 1 }}
+            axisLine={{ stroke: redFinanceTheme.colors.axis, strokeWidth: 1 }}
             tickLine={false}
-            tick={{ fill: "#616161", fontSize: labelFontSize }}
+            tick={{ fill: redFinanceTheme.colors.mutedText, fontSize: labelFontSize }}
             interval={0}
             height={defaultXAxisReserve}
           />
@@ -130,7 +130,7 @@ const FinanceBarChart = ({
             axisLine={false}
             tickLine={false}
             tickFormatter={(value) => tickFormatter(Number(value))}
-            tick={{ fill: "#9E9E9E", fontSize: 10 }}
+            tick={{ fill: redFinanceTheme.colors.subtleText, fontSize: 10 }}
           />
           {series.map((entry) => (
             <Bar

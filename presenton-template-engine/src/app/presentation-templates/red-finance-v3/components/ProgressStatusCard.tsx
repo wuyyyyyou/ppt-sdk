@@ -28,7 +28,7 @@ const ProgressStatusCard = ({
   progress,
   status,
   progressColor = redFinanceTheme.colors.primary,
-  trackColor = "#E0E0E0",
+  trackColor = redFinanceTheme.colors.softStroke,
   titleColor = redFinanceTheme.colors.backgroundText,
   statusColor = redFinanceTheme.colors.mutedText,
   minHeight = 96,
@@ -39,14 +39,15 @@ const ProgressStatusCard = ({
   return (
     <div
       className={[
-        "flex flex-col overflow-hidden rounded-[10px] border bg-white px-[16px] pb-[12px] pt-[14px]",
+        "flex flex-col overflow-hidden rounded-[10px] border px-[16px] pb-[12px] pt-[14px]",
         className,
       ]
         .filter(Boolean)
         .join(" ")}
       style={{
         minHeight,
-        borderColor: "#E3E3E3",
+        backgroundColor: redFinanceTheme.colors.surface,
+        borderColor: redFinanceTheme.colors.stroke,
         boxShadow: "0 6px 14px rgba(0,0,0,0.04)",
       }}
     >

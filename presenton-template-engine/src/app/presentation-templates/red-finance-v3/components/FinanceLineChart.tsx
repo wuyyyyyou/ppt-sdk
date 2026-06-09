@@ -105,9 +105,9 @@ const FinanceLineChart = ({
           />
           <XAxis
             dataKey="label"
-            axisLine={{ stroke: "#D0D0D0", strokeWidth: 1 }}
+            axisLine={{ stroke: redFinanceTheme.colors.axis, strokeWidth: 1 }}
             tickLine={false}
-            tick={{ fill: "#616161", fontSize: 11, fontWeight: 700 }}
+            tick={{ fill: redFinanceTheme.colors.mutedText, fontSize: 11, fontWeight: 700 }}
             interval={0}
             height={defaultXAxisReserve}
             padding={{ left: 6, right: 18 }}
@@ -119,7 +119,7 @@ const FinanceLineChart = ({
             axisLine={false}
             tickLine={false}
             tickFormatter={(value) => tickFormatter(Number(value))}
-            tick={{ fill: "#9E9E9E", fontSize: 10 }}
+            tick={{ fill: redFinanceTheme.colors.subtleText, fontSize: 10 }}
           />
           {series.map((entry) => (
             <Line
@@ -128,7 +128,7 @@ const FinanceLineChart = ({
               dataKey={entry.label}
               stroke={entry.color}
               strokeWidth={3}
-              dot={{ r: 4, strokeWidth: 2, fill: "#FFFFFF" }}
+              dot={{ r: 4, strokeWidth: 2, fill: redFinanceTheme.colors.surface }}
               activeDot={{ r: 5 }}
               isAnimationActive={false}
             />

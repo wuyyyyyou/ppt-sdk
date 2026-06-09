@@ -1,11 +1,13 @@
 import {
   isAgentInfrastructureError,
   type AgentClient,
+  type AgentFactReviewResult,
   type AgentRunSummary,
   type AgentSelfReviewResult,
   type AgentStreamEvent,
 } from "../../agent/agentClient";
 import { TSX_AUTHORING_RULES_SUMMARY } from "../../agent/promptRules";
+import { CONTENT_GROUNDING_RULES } from "../../ai/groundingRules";
 import type { AiClient } from "../../ai/aiClient";
 import type {
   PagePlan,
@@ -22,6 +24,7 @@ import type { Locale } from "../../i18n/messages";
 const ATTEMPT_LIMITS = {
   render: 10,
   selfReview: 5,
+  factReview: 3,
   agent: 5,
 };
 const PAGE_GENERATION_CONCURRENCY = 3;
@@ -30,6 +33,7 @@ export type DeckGenerationStep =
   | "page-plan"
   | "prepare"
   | "page-authoring"
+  | "fact-review"
   | "page-render"
   | "page-review"
   | "final-render"
@@ -48,6 +52,8 @@ export interface DeckGenerationProgressPage {
   render_attempt_limit: number;
   self_review_attempts: number;
   self_review_attempt_limit: number;
+  fact_review_attempts: number;
+  fact_review_attempt_limit: number;
   agent_failures: number;
   agent_failure_limit: number;
   agent_infrastructure_failures: number;
@@ -186,6 +192,10 @@ function generationText(locale: Locale) {
       zh ? `正在渲染第 ${page.index + 1} 页` : `Rendering page ${page.index + 1}`,
     reviewingScreenshot: (page: PagePlanItem) =>
       zh ? `正在自评第 ${page.index + 1} 页截图` : `Reviewing page ${page.index + 1} screenshot`,
+    reviewingFacts: (page: PagePlanItem) =>
+      zh ? `正在审查第 ${page.index + 1} 页事实依据` : `Reviewing page ${page.index + 1} grounding`,
+    fixingFacts: (page: PagePlanItem) =>
+      zh ? `正在修正第 ${page.index + 1} 页不受支持的内容` : `Fixing unsupported content on page ${page.index + 1}`,
     reviewingPage: (page: PagePlanItem) =>
       zh ? `正在检查第 ${page.index + 1} 页的细节` : `Checking page ${page.index + 1}`,
     cancelled: zh ? "已停止生成" : "Generation stopped",
@@ -228,6 +238,8 @@ function mapProgress(progress: PageProgress | null): DeckGenerationProgressPage[
     render_attempt_limit: ATTEMPT_LIMITS.render,
     self_review_attempts: page.self_review_attempts,
     self_review_attempt_limit: ATTEMPT_LIMITS.selfReview,
+    fact_review_attempts: page.fact_review_attempts ?? 0,
+    fact_review_attempt_limit: ATTEMPT_LIMITS.factReview,
     agent_failures: page.agent_failures,
     agent_failure_limit: ATTEMPT_LIMITS.agent,
     agent_infrastructure_failures: page.agent_infrastructure_failures,
@@ -284,9 +296,10 @@ function buildAuthoringPrompt(input: {
   page: PagePlanItem;
   pagePlan: PagePlan;
   outline: WorkspaceOutline;
-  attemptKind: "initial" | "render-fix" | "self-review-fix";
+  attemptKind: "initial" | "render-fix" | "self-review-fix" | "fact-review-fix";
   renderError?: string;
   selfReview?: AgentSelfReviewResult | null;
+  factReview?: AgentFactReviewResult | null;
 }) {
   return [
     "You are a local file-editing Agent generating one PPT slide in a TSX-first template workspace.",
@@ -315,15 +328,61 @@ function buildAuthoringPrompt(input: {
     "Rules summary:",
     TSX_AUTHORING_RULES_SUMMARY,
     "",
+    CONTENT_GROUNDING_RULES,
+    "",
+    "When editing slide TSX/data, remove or soften unsupported specifics. Use neutral business language or TBD for missing details.",
+    "If render-fix or self-review-fix asks for visual changes, fix visuals without adding new factual claims.",
+    "",
     `Full outline JSON: ${JSON.stringify(input.outline)}`,
     `Full page plan JSON: ${JSON.stringify(input.pagePlan)}`,
     input.renderError ? `Render error to fix:\n${input.renderError}` : "",
     input.selfReview
       ? `Visual review failed. Fix request:\n${JSON.stringify(input.selfReview)}`
       : "",
+    input.factReview
+      ? [
+          "Content grounding review failed. Rewrite request:",
+          JSON.stringify(input.factReview),
+          "Remove, soften, or mark unsupported concrete claims as TBD. Do not replace them with new unsupported specifics.",
+        ].join("\n")
+      : "",
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function buildFactReviewPrompt(input: {
+  workspaceDir: string;
+  page: PagePlanItem;
+  pagePlan: PagePlan;
+  outline: WorkspaceOutline;
+}) {
+  return [
+    "You are a factual grounding reviewer for one generated PPT slide.",
+    "Your job is to identify concrete factual claims that are not supported by the provided workspace context.",
+    "Do not use your own world knowledge to approve a claim. Judge support only from the user prompt, context rows, uploaded/source material, outline, page plan, and current slide/data files.",
+    "Read these files before judging:",
+    `- ${input.workspaceDir}/template/${input.page.slide_path.replace(/^\.\//, "")}`,
+    `- ${input.workspaceDir}/template/${input.page.data_path.replace(/^\.\//, "")}`,
+    `- ${input.workspaceDir}/outline.json`,
+    `- ${input.workspaceDir}/page-plan.json`,
+    `- ${input.workspaceDir}/setting.json`,
+    `- ${input.workspaceDir}/task.json`,
+    "",
+    CONTENT_GROUNDING_RULES,
+    "",
+    "Treat these as unsupported unless explicitly present in the workspace context: numbers, dates, market sizes, growth rates, customer names, case studies, product capabilities, URLs, citations, quotes, rankings, regulatory/legal claims, geography-specific facts, and claims about competitors or named organizations.",
+    "Generic business phrasing can pass if it is clearly not presented as a concrete fact.",
+    "Return only one JSON object matching this shape:",
+    '{"pass":true,"score":8,"unsupported_claims":[{"claim":"...","reason":"...","severity":"high","rewrite_suggestion":"..."}],"rewrite_request":"","confidence":"medium"}',
+    "Do not include markdown, code fences, explanations, or any extra text.",
+    "",
+    "Use score 0-10. pass=true requires score >= 7, no high-severity unsupported claims, and confidence not low.",
+    `Current page title: ${input.page.title}`,
+    `Current page outline: ${input.page.outline}`,
+    `Full outline JSON: ${JSON.stringify(input.outline)}`,
+    `Full page plan JSON: ${JSON.stringify(input.pagePlan)}`,
+  ].join("\n");
 }
 
 function buildSelfReviewPrompt(input: {
@@ -352,6 +411,13 @@ function buildSelfReviewPrompt(input: {
 function selfReviewPassed(review: AgentSelfReviewResult) {
   return review.pass && review.score >= 7 && review.confidence !== "low";
   // return true; // 先关闭自评结果中的置信度判断，后续根据实际情况再调整
+}
+
+function factReviewPassed(review: AgentFactReviewResult) {
+  const hasHighSeverityClaim = review.unsupported_claims.some((claim) =>
+    /high|critical|严重|高/i.test(claim.severity ?? "")
+  );
+  return review.pass && review.score >= 7 && review.confidence !== "low" && !hasHighSeverityClaim;
 }
 
 function getProgressPage(progress: PageProgress | null, pageId: string) {
@@ -654,6 +720,7 @@ async function createRestartArtifacts(input: RunDeckGenerationInput) {
       status: "pending",
       render_attempts: 0,
       self_review_attempts: 0,
+      fact_review_attempts: 0,
       agent_failures: 0,
       agent_infrastructure_failures: 0,
       last_error: "",
@@ -849,6 +916,7 @@ async function runPageGeneration(
 
   let renderAttempts = existingPageProgress?.render_attempts ?? 0;
   let selfReviewAttempts = existingPageProgress?.self_review_attempts ?? 0;
+  let factReviewAttempts = existingPageProgress?.fact_review_attempts ?? 0;
   let agentFailures = existingPageProgress?.agent_failures ?? 0;
   let agentInfrastructureFailures =
     existingPageProgress?.agent_infrastructure_failures ?? 0;
@@ -860,18 +928,30 @@ async function runPageGeneration(
     existingPageProgress?.status === "self_review_fixing"
       ? (existingPageProgress.review as AgentSelfReviewResult | null)
       : null;
+  let factReview =
+    existingPageProgress?.status === "fact_review_fixing"
+      ? (existingPageProgress.review as AgentFactReviewResult | null)
+      : null;
 
   while (!input.isCancelled()) {
+    const attemptKind = renderError
+      ? "render-fix"
+      : factReview
+        ? "fact-review-fix"
+        : selfReview
+          ? "self-review-fix"
+          : "initial";
     const authoringPrompt = buildAuthoringPrompt({
       workspaceDir: input.workspace.workspace_dir,
       page,
       pagePlan,
       outline: input.confirmedOutline,
-      attemptKind: renderError ? "render-fix" : selfReview ? "self-review-fix" : "initial",
+      attemptKind,
       renderError,
       selfReview,
+      factReview,
     });
-    const authoringKind = renderError ? "render-fix" : selfReview ? "self-review-fix" : "authoring";
+    const authoringKind = attemptKind === "initial" ? "authoring" : attemptKind;
     const authoringTracker = createAgentRunTracker({
       flowInput: input,
       page,
@@ -898,6 +978,8 @@ async function runPageGeneration(
           authoringResult.session_cache_miss_retries ?? 0,
       });
       renderError = "";
+      selfReview = null;
+      factReview = null;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (isAgentInfrastructureError(error)) {
@@ -948,6 +1030,128 @@ async function runPageGeneration(
       continue;
     }
 
+    progress = await recordProgress(input, page, {
+      status: "fact_review",
+      last_error: "",
+    });
+    input.setProgress(progress);
+    emitRuntime(
+      input,
+      {
+        step: "fact-review",
+        message: buildDeckGenerationSummary(input, progress, totalPages),
+        currentPageIndex: page.index,
+        totalPages,
+      },
+      progress,
+    );
+    const factReviewPrompt = buildFactReviewPrompt({
+      workspaceDir: input.workspace.workspace_dir,
+      page,
+      pagePlan,
+      outline: input.confirmedOutline,
+    });
+    const factReviewTracker = createAgentRunTracker({
+      flowInput: input,
+      page,
+      step: "fact-review",
+      message: text.reviewingFacts(page),
+      totalPages,
+      progress: input.getProgress,
+      prompt: factReviewPrompt,
+      kind: "fact-review",
+    });
+    try {
+      factReview = await input.agentClient.runFactReviewPrompt(
+        factReviewPrompt,
+        { onStreamEvent: factReviewTracker.onStreamEvent },
+      );
+      await factReviewTracker.flush("completed", {
+        parsed_review: true,
+        review: factReview,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (isAgentInfrastructureError(error)) {
+        agentInfrastructureFailures += 1;
+        await factReviewTracker.flush("error", {
+          error: message,
+          agent_infrastructure_failures: agentInfrastructureFailures,
+          active_session_limit: error.activeSessionLimit,
+        });
+        progress = await recordProgress(input, page, {
+          status: "agent_infrastructure_failed",
+          agent_infrastructure_failures: agentInfrastructureFailures,
+          last_error: message,
+        });
+        input.setProgress(progress);
+        return {
+          page,
+          reason: "agent_infrastructure",
+          progress,
+          error: {
+            type: "agent_infrastructure",
+            message,
+            page_id: page.page_id,
+            page_index: page.index,
+            page_status: "agent_infrastructure_failed",
+          },
+        };
+      }
+
+      agentFailures += 1;
+      await factReviewTracker.flush("error", {
+        error: message,
+        agent_failures: agentFailures,
+      });
+      progress = await recordProgress(input, page, {
+        status: agentFailures >= ATTEMPT_LIMITS.agent ? "agent_failed" : "fact_review",
+        agent_failures: agentFailures,
+        last_error: message,
+      });
+      input.setProgress(progress);
+      if (agentFailures >= ATTEMPT_LIMITS.agent) break;
+      continue;
+    }
+
+    progress = await recordProgress(input, page, {
+      review: factReview,
+    });
+    input.setProgress(progress);
+
+    if (!factReviewPassed(factReview)) {
+      factReviewAttempts += 1;
+      const rewriteRequest =
+        factReview.rewrite_request ||
+        factReview.unsupported_claims
+          .map((claim) => `${claim.claim}: ${claim.reason}`)
+          .join("\n") ||
+        "Fact review failed; remove unsupported claims.";
+      progress = await recordProgress(input, page, {
+        status:
+          factReviewAttempts >= ATTEMPT_LIMITS.factReview
+            ? "needs_user_review"
+            : "fact_review_fixing",
+        fact_review_attempts: factReviewAttempts,
+        review: factReview,
+        last_error: rewriteRequest,
+      });
+      input.setProgress(progress);
+      emitRuntime(
+        input,
+        {
+          step: "fact-review",
+          message: buildDeckGenerationSummary(input, progress, totalPages),
+          currentPageIndex: page.index,
+          totalPages,
+        },
+        progress,
+      );
+      if (factReviewAttempts >= ATTEMPT_LIMITS.factReview) break;
+      continue;
+    }
+
+    factReview = null;
     let preview: RenderWorkspacePagePreviewResult;
     try {
       progress = await recordProgress(input, page, { status: "rendering" });
@@ -1348,6 +1552,13 @@ export async function runDeckGeneration(
 }
 
 function buildRefinementReview(instruction: string): AgentSelfReviewResult {
+  const groundedInstruction = [
+    instruction,
+    "",
+    CONTENT_GROUNDING_RULES,
+    "Apply the refinement without adding unsupported facts. If the requested improvement needs missing facts, use neutral wording or TBD.",
+  ].join("\n");
+
   return {
     pass: false,
     score: 0,
@@ -1355,11 +1566,11 @@ function buildRefinementReview(instruction: string): AgentSelfReviewResult {
       {
         severity: "user-request",
         area: "refinement",
-        problem: instruction,
-        fix_hint: instruction,
+        problem: groundedInstruction,
+        fix_hint: groundedInstruction,
       },
     ],
-    revision_request: instruction,
+    revision_request: groundedInstruction,
     confidence: "high",
   };
 }
@@ -1442,6 +1653,7 @@ export async function runDeckRefinement(
       status: "self_review_fixing",
       render_attempts: 0,
       self_review_attempts: 0,
+      fact_review_attempts: 0,
       agent_failures: 0,
       last_error: instruction,
       review,

@@ -1,4 +1,5 @@
-import { ChevronLeft, ChevronRight, Edit3, MessageCircle } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Edit3, LayoutTemplate, MessageCircle, Wand2 } from "lucide-react";
+import { useState } from "react";
 import type { Slide } from "../../../data/mockDeck";
 import { formatMessage, type Messages } from "../../../i18n/messages";
 import type { DeckReviewRenderState } from "../types";
@@ -15,11 +16,16 @@ interface DeckPageProps {
   currentSlide: number;
   setCurrentSlide: (index: number) => void;
   reviewRender: DeckReviewRenderState;
+  loading: string;
   onRefineDeck: () => void;
   onRefineSlide: () => void;
+  onRewriteSlide: () => void;
+  onChangeSlideLayout: (mode: SlideLayoutMode) => void;
   onPreview: () => void;
   onExport: () => void;
 }
+
+export type SlideLayoutMode = "simpler" | "visual" | "comparison" | "process" | "report";
 
 export function DeckPage(props: DeckPageProps) {
   const {
@@ -30,14 +36,26 @@ export function DeckPage(props: DeckPageProps) {
     currentSlide,
     setCurrentSlide,
     reviewRender,
+    loading,
     onRefineDeck,
     onRefineSlide,
+    onRewriteSlide,
+    onChangeSlideLayout,
     onPreview,
     onExport
   } = props;
+  const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
   const slide = deck[currentSlide] ?? deck[0];
   const renderedSlides = reviewRender.result?.slides ?? [];
   const selectedRenderedSlide = renderedSlides[currentSlide] ?? renderedSlides[0];
+  const localAiDisabled = loading === "refineSlide" || loading === "refineDeck" || loading === "deck";
+  const layoutOptions: Array<{ mode: SlideLayoutMode; label: string }> = [
+    { mode: "simpler", label: t.controls.layoutSimpler },
+    { mode: "visual", label: t.controls.layoutVisual },
+    { mode: "comparison", label: t.controls.layoutComparison },
+    { mode: "process", label: t.controls.layoutProcess },
+    { mode: "report", label: t.controls.layoutReport },
+  ];
 
   return (
     <section className="page active deck-page">
@@ -84,10 +102,46 @@ export function DeckPage(props: DeckPageProps) {
         >
           <ChevronRight size={16} />
         </button>
-        <button className="secondary-btn refine-slide-btn" onClick={onRefineSlide}>
-          <MessageCircle size={14} />
-          {t.controls.refineSlide}
-        </button>
+        <div className="slide-ai-actions">
+          <button className="secondary-btn compact" onClick={onRefineSlide} disabled={localAiDisabled}>
+            <MessageCircle size={14} />
+            {t.controls.refineSlide}
+          </button>
+          <button className="secondary-btn compact" onClick={onRewriteSlide} disabled={localAiDisabled}>
+            <Wand2 size={14} />
+            {t.controls.rewriteSlide}
+          </button>
+          <div className="layout-switcher">
+            <button
+              className="secondary-btn compact"
+              onClick={() => setLayoutMenuOpen((open) => !open)}
+              disabled={localAiDisabled}
+              aria-haspopup="menu"
+              aria-expanded={layoutMenuOpen}
+            >
+              <LayoutTemplate size={14} />
+              {t.controls.changeLayout}
+              <ChevronDown size={13} />
+            </button>
+            {layoutMenuOpen ? (
+              <div className="layout-switcher-menu" role="menu">
+                {layoutOptions.map((option) => (
+                  <button
+                    key={option.mode}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setLayoutMenuOpen(false);
+                      onChangeSlideLayout(option.mode);
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
       </div>
 
       <ThumbnailStrip

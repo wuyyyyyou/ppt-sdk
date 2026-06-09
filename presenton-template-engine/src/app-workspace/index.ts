@@ -13,6 +13,7 @@ import {
   readTemplatePreviewDataUrl,
   type TemplatePreviewImage,
 } from "../template-previews/index.js";
+import { getThemePreset } from "../themes/default-theme-presets.js";
 import {
   buildDeckHtmlFromManifest,
   buildDeckHtmlPagesAndScreenshotsFromManifest,
@@ -333,6 +334,7 @@ function createDefaultSettingJson() {
     text_density: "balanced",
     visual_tone: "",
     typography: "",
+    theme_id: "finance-red-classic",
   };
 }
 
@@ -358,6 +360,40 @@ function normalizeSettingJson(setting: unknown): Record<string, unknown> {
   }
 
   return nextSetting;
+}
+
+async function applyWorkspaceThemeToManifest(
+  workspace: AppWorkspaceResult,
+  setting: Record<string, unknown>,
+): Promise<void> {
+  const themeId = typeof setting.theme_id === "string" ? setting.theme_id.trim() : "";
+  const theme = getThemePreset(themeId);
+  if (!theme) {
+    return;
+  }
+
+  let manifestPath: string;
+  try {
+    manifestPath = readSelectedTemplateManifestPath(workspace);
+  } catch {
+    return;
+  }
+
+  const manifestRecord = getPlainRecord(JSON.parse(await readFile(manifestPath, "utf8")) as unknown);
+  const colors = { ...(theme.data?.colors ?? {}) };
+  await writeJsonFile(manifestPath, {
+    ...manifestRecord,
+    theme: {
+      logo_url: theme.logo_url ?? null,
+      company_name: theme.company_name ?? null,
+      colors,
+      fonts: theme.fonts,
+      data: {
+        colors,
+        fonts: theme.data?.fonts,
+      },
+    },
+  });
 }
 
 async function ensureWorkspaceSetting(): Promise<Record<string, unknown>> {
@@ -887,7 +923,7 @@ export async function openAppWorkspace(
 export async function updateAppWorkspaceSettings(
   input: UpdateAppWorkspaceSettingsInput,
 ): Promise<AppWorkspaceResult> {
-  await ensureWorkspaceFiles(input.workspace_dir);
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
   const existing = await ensureWorkspaceSetting();
   const nextSetting = {
     ...existing,
@@ -896,6 +932,7 @@ export async function updateAppWorkspaceSettings(
   };
 
   await writeJsonFile(WORKSPACE_SETTING_PATH, nextSetting);
+  await applyWorkspaceThemeToManifest(workspace, nextSetting);
   return ensureWorkspaceFiles(input.workspace_dir);
 }
 

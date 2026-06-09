@@ -27,8 +27,8 @@ const ComparisonPanel = ({
   icon,
   sections,
   headerBackgroundColor = redFinanceTheme.colors.backgroundText,
-  headerTextColor = "#FFFFFF",
-  dividerColor = "#EEEEEE",
+  headerTextColor = redFinanceTheme.colors.primaryText,
+  dividerColor = redFinanceTheme.colors.stroke,
   className,
   density = "normal",
   sectionLayout = "natural",
@@ -49,7 +49,7 @@ const ComparisonPanel = ({
         .filter(Boolean)
         .join(" ")}
       style={{
-        backgroundColor: "#FFFFFF",
+        backgroundColor: redFinanceTheme.colors.surface,
         borderColor: redFinanceTheme.colors.stroke,
         boxShadow: "0 4px 6px rgba(0,0,0,0.02)",
       }}

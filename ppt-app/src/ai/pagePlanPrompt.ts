@@ -2,6 +2,7 @@ import type { PagePlan, TemplatePlanningContext, WorkspaceOutline } from "../api
 import type { AnnaLlmCompleteInput } from "../runtime/annaRuntime";
 import type { Locale } from "../i18n/messages";
 import { parseStructuredJson } from "./structuredJson";
+import { CONTENT_GROUNDING_RULES } from "./groundingRules";
 
 function readOutputLanguage(outline: WorkspaceOutline, locale: Locale) {
   const setting = outline.source?.setting ?? {};
@@ -46,6 +47,7 @@ export function buildGeneratePagePlanLlmRequest(input: {
             "Choose one blueprint_id for every outline item from the provided blueprint list.",
             "Do not invent blueprint ids.",
             "The JSON must be parseable by JSON.parse.",
+            CONTENT_GROUNDING_RULES,
           ].join("\n"),
         },
       },
@@ -71,6 +73,7 @@ export function buildGeneratePagePlanLlmRequest(input: {
             "- manifest_slide_id must be unique.",
             "- blueprint_source must match the selected blueprint exactly.",
             "- Use first page cover and last page closing only when they fit the outline; do not force them.",
+            "- Do not add unsupported facts or details while rewriting outline content into page titles/outlines.",
           ].join("\n"),
         },
       },

@@ -19,7 +19,7 @@ const AgendaCard = ({
   const textColor = highlighted
     ? redFinanceTheme.colors.primary
     : redFinanceTheme.colors.backgroundText;
-  const iconStroke = highlighted ? redFinanceTheme.colors.primary : "#D6D6D6";
+  const iconStroke = highlighted ? redFinanceTheme.colors.primary : redFinanceTheme.colors.iconMuted;
 
   return (
     <div

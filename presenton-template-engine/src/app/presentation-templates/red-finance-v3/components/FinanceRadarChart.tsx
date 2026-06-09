@@ -112,7 +112,7 @@ const FinanceRadarChart = ({
         >
           <PolarGrid
             gridType="polygon"
-            stroke="#D6D6D6"
+            stroke={redFinanceTheme.colors.iconMuted}
             radialLines
             polarRadius={polarRadius}
           />
@@ -131,7 +131,7 @@ const FinanceRadarChart = ({
             domain={[minValue, maxValue]}
             tickCount={ticks.length}
             tick={{
-              fill: "#9E9E9E",
+              fill: redFinanceTheme.colors.subtleText,
               fontSize: 9,
             }}
             tickFormatter={(value) => tickFormatter(Number(value))}
@@ -151,7 +151,7 @@ const FinanceRadarChart = ({
               dot={{
                 r: 3.5,
                 strokeWidth: 2,
-                fill: "#FFFFFF",
+                fill: redFinanceTheme.colors.surface,
               }}
               isAnimationActive={false}
             />
