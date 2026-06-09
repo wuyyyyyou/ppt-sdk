@@ -6,6 +6,7 @@
   "variant": "entity-first",
   "density": "high",
   "matrixTitle": "Comparison matrix",
+  "matrixSubtitle": "structured comparison",
   "rowHeaderLabel": "Dimension",
   "columns": [
     { "label": "China" },
@@ -55,5 +56,6 @@
       "description": "Use the final column to make the comparison actionable for the next choice."
     }
   ],
+  "interpretationTitle": "Interpretation",
   "summary": "Best for multi-dimensional comparison; avoid using it for a single argument."
 }

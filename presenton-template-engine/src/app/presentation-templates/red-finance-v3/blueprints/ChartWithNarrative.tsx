@@ -74,6 +74,7 @@ export const Schema = z.object({
   maxValue: z.number().default(100),
   ticks: z.array(z.number()).min(2).max(8).default([0, 20, 40, 60, 80, 100]),
   narrativeTitle: z.string().min(2).max(28).default("Interpretation points"),
+  narrativeSubtitle: z.string().max(72).optional(),
   narrativeItems: z.array(NarrativeItemSchema).min(2).max(4).default([
     {
       icon: "lightbulb",
@@ -147,7 +148,7 @@ const ChartWithNarrative = ({ data }: { data: Partial<z.infer<typeof Schema>> })
     <div className="flex h-full min-h-0 flex-col gap-[12px]">
       <FinanceSectionHeading
         title={parsed.narrativeTitle}
-        subtitle="short interpretation"
+        subtitle={parsed.narrativeSubtitle}
         marginBottom={0}
       />
       <div

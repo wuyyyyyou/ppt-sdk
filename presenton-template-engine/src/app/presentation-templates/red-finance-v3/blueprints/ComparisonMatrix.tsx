@@ -38,6 +38,7 @@ export const Schema = z.object({
   variant: z.enum(["entity-first", "dimension-first"]).default("entity-first"),
   density: z.enum(["medium", "high"]).default("medium"),
   matrixTitle: z.string().min(2).max(28).default("Comparison matrix"),
+  matrixSubtitle: z.string().max(72).optional(),
   rowHeaderLabel: z.string().min(2).max(20).default("Dimension"),
   columns: z.array(ColumnSchema).min(2).max(5).default([
     { label: "China" },
@@ -87,6 +88,7 @@ export const Schema = z.object({
       description: "Use the final column to make the comparison actionable for the next choice.",
     },
   ]),
+  interpretationTitle: z.string().max(32).optional(),
   summary: z.string().min(8).max(120).default("Best for multi-dimensional comparison; avoid using it for a single argument."),
 });
 
@@ -123,7 +125,7 @@ const ComparisonMatrix = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
       contentBottomInset={12}
     >
       <div className="flex h-full min-h-0 flex-col gap-[14px]">
-        <FinanceSectionHeading title={parsed.matrixTitle} subtitle="structured comparison" />
+        <FinanceSectionHeading title={parsed.matrixTitle} subtitle={parsed.matrixSubtitle} />
         <div className="grid flex-1 min-h-0 grid-cols-[1.25fr_1fr] gap-[18px]">
           <StableMatrixGrid
             rowHeaderLabel={parsed.rowHeaderLabel}
@@ -134,7 +136,7 @@ const ComparisonMatrix = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
           />
           <div className="flex h-full min-h-0 flex-col gap-[14px]">
             <ComparisonPanel
-              title="Interpretation"
+              title={parsed.interpretationTitle}
               icon={<FinanceIcon name="chart-column" className="h-[18px] w-[18px]" />}
               sections={sections}
               density={parsed.density === "high" ? "compact" : "normal"}

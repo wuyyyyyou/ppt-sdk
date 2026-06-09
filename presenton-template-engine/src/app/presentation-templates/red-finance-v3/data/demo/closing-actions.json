@@ -6,6 +6,7 @@
   "variant": "conclusion-plus-actions",
   "density": "medium",
   "heading": "Conclusion and actions",
+  "headingSubtitle": "final wrap-up",
   "finalTitle": "Final judgment",
   "finalText": "Close the deck with a concise conclusion and clear actions.",
   "actions": [
@@ -26,5 +27,6 @@
     }
   ],
   "decisionAsk": "Confirm resources, priorities, and authorization for the next phase.",
+  "decisionAskTitle": "Decision ask",
   "summary": "A closing slide should make next steps explicit, not just repeat a slogan."
 }

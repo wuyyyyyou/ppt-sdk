@@ -11,7 +11,7 @@ export type ComparisonPanelSection = {
 };
 
 type ComparisonPanelProps = {
-  title: string;
+  title?: string;
   icon?: ReactNode;
   sections: ComparisonPanelSection[];
   headerBackgroundColor?: string;
@@ -54,25 +54,27 @@ const ComparisonPanel = ({
         boxShadow: "0 4px 6px rgba(0,0,0,0.02)",
       }}
     >
-      <div
-        className="flex flex-none items-center gap-[10px] px-[14px]"
-        style={{
-          height: headerHeight,
-          backgroundColor: headerBackgroundColor,
-          color: headerTextColor,
-        }}
-      >
-        <IconText
-          icon={icon ?? <></>}
-          label={title}
-          height={headerHeight}
-          iconSize={18}
-          gap={10}
-          fontSize={14}
-          fontWeight={700}
-          textColor={headerTextColor}
-        />
-      </div>
+      {title ? (
+        <div
+          className="flex flex-none items-center gap-[10px] px-[14px]"
+          style={{
+            height: headerHeight,
+            backgroundColor: headerBackgroundColor,
+            color: headerTextColor,
+          }}
+        >
+          <IconText
+            icon={icon ?? <></>}
+            label={title}
+            height={headerHeight}
+            iconSize={18}
+            gap={10}
+            fontSize={14}
+            fontWeight={700}
+            textColor={headerTextColor}
+          />
+        </div>
+      ) : null}
 
       <div
         className="flex min-h-0 flex-1 flex-col"

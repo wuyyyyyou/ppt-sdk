@@ -73,6 +73,7 @@ export const Schema = z.object({
     },
   ]),
   evidenceTitle: z.string().min(2).max(28).default("Supporting evidence"),
+  evidenceSubtitle: z.string().max(72).optional(),
   evidenceCards: z.array(EvidenceCardSchema).min(2).max(4).default([
     {
       icon: "chart-column",
@@ -155,7 +156,7 @@ const TwoColumnInsight = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
     <div className="flex h-full min-h-0 flex-col gap-[12px]">
       <FinanceSectionHeading
         title={parsed.evidenceTitle}
-        subtitle={parsed.variant === "narrative-left-evidence-right" ? "cards / metrics / compact evidence" : "evidence first"}
+        subtitle={parsed.evidenceSubtitle}
         marginBottom={0}
       />
       <div

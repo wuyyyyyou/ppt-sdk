@@ -45,6 +45,7 @@ export const Schema = z.object({
   variant: z.enum(["conclusion-plus-actions", "decision-ask-focus"]).default("conclusion-plus-actions"),
   density: z.enum(["medium", "high"]).default("medium"),
   heading: z.string().min(2).max(32).default("Conclusion and actions"),
+  headingSubtitle: z.string().max(72).optional(),
   finalTitle: z.string().min(2).max(32).default("Final judgment"),
   finalText: z.string().min(8).max(120).default("Close the deck with a concise conclusion and clear actions."),
   actions: z.array(ActionSchema).min(3).max(5).default([
@@ -53,6 +54,7 @@ export const Schema = z.object({
     { icon: "lightbulb", title: "Decide", description: "Clarify what needs confirmation or authorization."},
   ]),
   decisionAsk: z.string().max(120).optional(),
+  decisionAskTitle: z.string().max(32).optional(),
   summary: z.string().min(8).max(120).default("A closing slide should make next steps explicit, not just repeat a slogan."),
 });
 
@@ -86,7 +88,7 @@ const ClosingActions = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
       contentBottomInset={12}
     >
       <div className="flex h-full min-h-0 flex-col gap-[14px]">
-        <FinanceSectionHeading title={parsed.heading} subtitle="final wrap-up" marginBottom={0} />
+        <FinanceSectionHeading title={parsed.heading} subtitle={parsed.headingSubtitle} marginBottom={0} />
 
         <div className="grid min-h-0 flex-1 grid-cols-[0.92fr_1.08fr] gap-[18px]">
           <div className="flex h-full min-h-0 flex-col gap-[12px]">
@@ -105,12 +107,16 @@ const ClosingActions = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
                 {parsed.summary}
               </div>
               <div className="my-[18px] h-px w-full" style={{ backgroundColor: redFinanceTheme.colors.stroke }} />
-              <div className="text-[13px] font-bold uppercase tracking-[0.06em]" style={{ color: redFinanceTheme.colors.primary }}>
-                Decision ask
-              </div>
-              <div className="mt-[10px] text-[15px] leading-[1.55]" style={{ color: redFinanceTheme.colors.mutedText }}>
-                {decisionAsk}
-              </div>
+              {parsed.decisionAskTitle ? (
+                <div className="text-[13px] font-bold uppercase tracking-[0.06em]" style={{ color: redFinanceTheme.colors.primary }}>
+                  {parsed.decisionAskTitle}
+                </div>
+              ) : null}
+              {decisionAsk ? (
+                <div className="mt-[10px] text-[15px] leading-[1.55]" style={{ color: redFinanceTheme.colors.mutedText }}>
+                  {decisionAsk}
+                </div>
+              ) : null}
             </SectionPanelShell>
           </div>
 
