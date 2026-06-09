@@ -186,6 +186,23 @@ function normalizeStringArray(value: unknown): string[] {
   return values;
 }
 
+function normalizeSlideCountValue(value: unknown): string {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  if (typeof rawValue !== "string" && typeof rawValue !== "number") {
+    return "auto";
+  }
+
+  const normalized = String(rawValue).trim().toLowerCase();
+  if (normalized === "auto") {
+    return "auto";
+  }
+
+  const parsed = Number.parseInt(normalized, 10);
+  return Number.isFinite(parsed) && parsed > 0 && String(parsed) === normalized
+    ? String(parsed)
+    : "auto";
+}
+
 function normalizeContextSuggestions(value: unknown): ContextSuggestionResult {
   const record =
     value && typeof value === "object" && !Array.isArray(value)
@@ -199,6 +216,7 @@ function normalizeContextSuggestions(value: unknown): ContextSuggestionResult {
     theme: normalizeStringArray(record.theme).filter((themeId) =>
       THEME_PRESET_IDS.includes(themeId),
     ),
+    slides: normalizeSlideCountValue(record.slides),
   };
 }
 
@@ -206,7 +224,7 @@ async function completeOutlineWithRetry(
   runtime: AnnaRuntime,
   operation: "generateOutline" | "reviseOutline",
   initialRequest: AnnaLlmCompleteInput,
-  expectedSlideCount: number | null
+  validationSlideCount: number | null
 ): Promise<OutlineGenerationResult> {
   const attempts: AiAttemptLog[] = [];
   let request = initialRequest;
@@ -219,7 +237,7 @@ async function completeOutlineWithRetry(
 
       try {
         const parsed = parseOutlineJson(rawText);
-        const outline = validateGeneratedOutline(parsed, expectedSlideCount);
+        const outline = validateGeneratedOutline(parsed, validationSlideCount);
         attempts.push({
           operation,
           attempt,
@@ -299,17 +317,18 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         "optional context suggestions",
         [
           "Infer optional context fields for a presentation from the user's prompt.",
-          "Return only a JSON object with exactly these properties: audience, goal, style, theme.",
-          "Each property value must be an array of concise strings.",
+          "Return only a JSON object with exactly these properties: audience, goal, style, theme, slides.",
+          "audience, goal, style, and theme must be arrays of concise strings.",
+          "slides must be a string: use a positive integer such as \"8\" when a concrete page count is reasonable, or \"auto\" when the count should be left open.",
           "For theme, choose only theme_id values from theme_catalog. Do not invent theme IDs.",
           "Prefer fewer options. If the prompt clearly determines a field, return a one-item array for that field.",
-          "If a field is ambiguous, return 2-3 plausible options. Do not return more than 4 items for any field.",
+          "If an array field is ambiguous, return 2-3 plausible options. Do not return more than 4 items for any array field.",
           "Do not include markdown or explanation.",
           `theme_catalog: ${JSON.stringify(buildThemeCatalogForPrompt())}`,
           `Locale: ${input.locale}`,
           `Prompt: ${input.prompt}`,
         ].join("\n"),
-        '{"audience":["..."],"goal":["..."],"style":["..."],"theme":["theme_id"]}'
+        '{"audience":["..."],"goal":["..."],"style":["..."],"theme":["theme_id"],"slides":"auto"}'
       );
 
       return normalizeContextSuggestions(result);

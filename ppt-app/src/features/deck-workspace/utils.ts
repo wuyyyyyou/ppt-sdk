@@ -1,6 +1,8 @@
 import type { Messages } from "../../i18n/messages";
 import type { WorkspaceResult } from "../../api/types";
-import type { MainStage } from "./types";
+import type { ContextRow, MainStage } from "./types";
+
+const SLIDE_COUNT_CONTEXT_OPTIONS = ["auto", ...Array.from({ length: 20 }, (_, index) => String(index + 1))];
 
 export const sleep = (ms: number) =>
   new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -19,6 +21,28 @@ export function deckReadyStatus(t: Messages, count: number) {
 
 export function stageOrder(stage: MainStage) {
   return { brief: 1, outline: 2, generating: 3, deck: 4 }[stage];
+}
+
+export function syncSlideCountContextRow(
+  rows: Array<Pick<ContextRow, "id" | "value"> & Partial<ContextRow>>,
+  slideCount: number,
+  label: string
+): ContextRow[] {
+  const value = String(Math.max(1, slideCount));
+  const syncedRow: ContextRow = {
+    id: "slides",
+    label,
+    value,
+    type: "select",
+    options: SLIDE_COUNT_CONTEXT_OPTIONS,
+    allowCustomValue: true,
+  };
+  const hasSlidesRow = rows.some((row) => row.id === "slides");
+  const contextRows = rows as ContextRow[];
+
+  return hasSlidesRow
+    ? contextRows.map((row) => (row.id === "slides" ? syncedRow : row))
+    : [...contextRows, syncedRow];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

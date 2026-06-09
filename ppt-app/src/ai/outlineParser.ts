@@ -25,6 +25,7 @@ export function validateGeneratedOutline(
   value: unknown,
   expectedSlideCount: number | null
 ): GeneratedOutline {
+  void expectedSlideCount;
   const errors: string[] = [];
 
   if (!isRecord(value)) {
@@ -43,14 +44,6 @@ export function validateGeneratedOutline(
   const rawItems = Array.isArray(value.items) ? value.items : [];
   if (rawItems.length === 0) {
     errors.push("items must contain at least one page");
-  }
-
-  if (expectedSlideCount !== null && rawItems.length !== expectedSlideCount) {
-    errors.push(`items must contain exactly ${expectedSlideCount} pages`);
-  }
-
-  if (expectedSlideCount === null && (rawItems.length < 3 || rawItems.length > 15)) {
-    errors.push("items must contain between 3 and 15 pages when slide_count is auto");
   }
 
   const items: OutlineDetail[] = rawItems.map((item, index) => {

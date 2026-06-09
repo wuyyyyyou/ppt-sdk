@@ -3,7 +3,7 @@ import { CONTENT_GROUNDING_RULES } from "./groundingRules";
 export type PromptLanguage = "zh" | "en";
 
 interface GenerateOutlinePromptMessageInput {
-  expectedSlideCount: number | null;
+  slideCountContext: string;
   locale: string;
   settingSummaryJson: string;
   prompt: string;
@@ -11,7 +11,7 @@ interface GenerateOutlinePromptMessageInput {
 }
 
 interface ReviseOutlinePromptMessageInput {
-  expectedSlideCount: number | null;
+  slideCountContext: string;
   locale: string;
   settingSummaryJson: string;
   contextRowsJson: string;
@@ -55,9 +55,8 @@ export function buildGenerateOutlineUserPrompt(
   if (language === "zh") {
     return [
       "请根据用户简报创建一份演示文稿大纲。",
-      input.expectedSlideCount === null
-        ? "页数要求：如果用户简报明确要求页数，必须遵循；否则根据内容选择合理页数，范围为 3 到 15 页。"
-        : `页数要求：items 中必须严格返回 ${input.expectedSlideCount} 页。`,
+      `页数上下文：contextRows.slides = ${input.slideCountContext}。`,
+      "页数优先级：必须完全按照用户简报里的页数意图来；只有当用户简报没有表达页数相关要求时，才参考 contextRows.slides；如果 contextRows.slides 为 auto 或缺失，则根据内容选择合理页数。",
       `界面语言：${input.locale}`,
       `相关工作区配置：${input.settingSummaryJson}`,
       `用户简报：${input.prompt}`,
@@ -73,9 +72,8 @@ export function buildGenerateOutlineUserPrompt(
 
   return [
     "Create a presentation outline from the user brief.",
-    input.expectedSlideCount === null
-      ? "Slide count: if the user brief explicitly asks for a count, follow it; otherwise choose a reasonable count between 3 and 15 pages."
-      : `Slide count: return exactly ${input.expectedSlideCount} pages in items.`,
+    `Slide count context: contextRows.slides = ${input.slideCountContext}.`,
+    "Slide count priority: follow the page-count intent in the user brief exactly; only consult contextRows.slides when the user brief does not express any page-count requirement; if contextRows.slides is auto or missing, choose a reasonable count based on the content.",
     `Locale: ${input.locale}`,
     `Relevant workspace setting: ${input.settingSummaryJson}`,
     `User brief: ${input.prompt}`,
@@ -97,9 +95,8 @@ export function buildReviseOutlineUserPrompt(
     return [
       "请根据反馈修改现有演示文稿大纲。",
       "优先级规则：修改反馈只覆盖它明确提到的部分；反馈未提及的部分必须严格遵循低优先级工作区配置和可选上下文行，不要自行覆盖或忽略。",
-      input.expectedSlideCount === null
-        ? "页数要求：如果修改反馈明确要求页数，必须遵循；否则严格参考可选上下文行里的页数；仍未指定时保持合理页数，范围为 3 到 15 页。"
-        : `页数要求：items 中必须严格返回 ${input.expectedSlideCount} 页。`,
+      `页数上下文：contextRows.slides = ${input.slideCountContext}。`,
+      "页数优先级：必须完全按照最高优先级修改反馈里的页数意图来；只有当修改反馈没有表达页数相关要求时，才参考 contextRows.slides；如果 contextRows.slides 为 auto 或缺失，则根据当前大纲和反馈选择合理页数。",
       `界面语言：${input.locale}`,
       `低优先级工作区配置：${input.settingSummaryJson}`,
       `可选上下文行：${input.contextRowsJson}`,
@@ -120,9 +117,8 @@ export function buildReviseOutlineUserPrompt(
   return [
     "Revise the existing presentation outline according to the feedback.",
     "Priority rule: feedback overrides only the parts it explicitly mentions; for anything not mentioned, strictly follow the lower-priority workspace settings and optional context rows.",
-    input.expectedSlideCount === null
-      ? "Slide count: if the feedback explicitly asks for a count, follow it; otherwise strictly consult the optional context slide-count row; if still unspecified, keep a reasonable count between 3 and 15 pages."
-      : `Slide count: return exactly ${input.expectedSlideCount} pages in items.`,
+    `Slide count context: contextRows.slides = ${input.slideCountContext}.`,
+    "Slide count priority: follow the page-count intent in the highest-priority feedback exactly; only consult contextRows.slides when the feedback does not express any page-count requirement; if contextRows.slides is auto or missing, choose a reasonable count based on the current outline and feedback.",
     `Locale: ${input.locale}`,
     `Lower-priority workspace setting: ${input.settingSummaryJson}`,
     `Optional context rows: ${input.contextRowsJson}`,

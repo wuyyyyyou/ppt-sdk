@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { WorkspaceResult } from "../../src/api/types.ts";
-import { isWorkspaceDeckStale } from "../../src/features/deck-workspace/utils.ts";
+import {
+  isWorkspaceDeckStale,
+  syncSlideCountContextRow,
+} from "../../src/features/deck-workspace/utils.ts";
 
 function makeWorkspace(overrides: Partial<WorkspaceResult> = {}): WorkspaceResult {
   return {
@@ -134,5 +137,38 @@ describe("Workspace Deck Staleness", () => {
     });
 
     assert.equal(isWorkspaceDeckStale(workspace), true);
+  });
+});
+
+describe("Workspace outline context rows", () => {
+  it("adds a slides context row from the current outline page count", () => {
+    const rows = syncSlideCountContextRow(
+      [{ id: "audience", label: "Audience", value: "Executives" }],
+      3,
+      "Slides",
+    );
+
+    assert.deepEqual(rows.map((row) => [row.id, row.value]), [
+      ["audience", "Executives"],
+      ["slides", "3"],
+    ]);
+    assert.equal(rows[1]?.allowCustomValue, true);
+  });
+
+  it("overwrites an existing slides context row unconditionally", () => {
+    const rows = syncSlideCountContextRow(
+      [
+        { id: "slides", label: "Slides", value: "7", type: "select" },
+        { id: "goal", label: "Goal", value: "Explain the plan" },
+      ],
+      4,
+      "Slides",
+    );
+
+    assert.deepEqual(rows.map((row) => [row.id, row.value]), [
+      ["slides", "4"],
+      ["goal", "Explain the plan"],
+    ]);
+    assert.equal(rows[0]?.allowCustomValue, true);
   });
 });

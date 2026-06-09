@@ -23,7 +23,12 @@ import {
   type Slide
 } from "../../../data/mockDeck";
 import { formatMessage, type Locale, type Messages } from "../../../i18n/messages";
-import { deckReadyStatus, hasDownstreamArtifacts, isWorkspaceDeckStale } from "../utils";
+import {
+  deckReadyStatus,
+  hasDownstreamArtifacts,
+  isWorkspaceDeckStale,
+  syncSlideCountContextRow,
+} from "../utils";
 import {
   createDeckGenerationStreamSnapshot,
   runDeckGeneration,
@@ -72,6 +77,15 @@ function formatWorkspaceDate(date = new Date()) {
     padDatePart(date.getMonth() + 1),
     padDatePart(date.getDate())
   ].join("-");
+}
+
+function normalizeSlideCountContextValue(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "auto") return "auto";
+  const parsed = Number.parseInt(normalized, 10);
+  return Number.isFinite(parsed) && parsed > 0 && String(parsed) === normalized
+    ? String(parsed)
+    : "auto";
 }
 
 export interface DeckWorkspaceActions {
@@ -427,9 +441,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           ...baseRow,
           id: "slides",
           label: t.brief.contextLabels.slides,
-          value: SLIDE_COUNT_CONTEXT_OPTIONS.includes(baseRow.value) ? baseRow.value : "auto",
+          value: normalizeSlideCountContextValue(baseRow.value),
           type: "select",
           options: SLIDE_COUNT_CONTEXT_OPTIONS,
+          allowCustomValue: true,
         };
       default:
         return baseRow;
@@ -508,10 +523,22 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return rows
       .map((row) => {
         const id = row.id.trim();
-        const value = row.value.trim();
+        const value =
+          id === "slides" ? normalizeSlideCountContextValue(row.value) : row.value.trim();
         return id && value ? { id, value } : null;
       })
       .filter((row): row is LlmContextRow => row !== null);
+  }
+
+  function syncContextRowsToOutlineCount(
+    rows: Array<ContextRow | LlmContextRow>,
+    items: OutlineDetail[]
+  ): ContextRow[] {
+    return syncSlideCountContextRow(
+      rows,
+      items.length,
+      t.brief.contextLabels.slides
+    );
   }
 
   function buildOutlineArtifact(
@@ -880,6 +907,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         buildSuggestedContextRow("goal", result.goal),
         buildSuggestedContextRow("style", result.style),
         buildSuggestedContextRow("theme", result.theme),
+        buildContextRowFromPatch("slides", result.slides),
       ].filter((row): row is ContextRow => Boolean(row));
 
       if (rows.length === 0) {
@@ -894,47 +922,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     } finally {
       setLoading("none");
     }
-  }
-
-  function parseContextSlideCount(value: string): string | null {
-    const digitMatch = value.match(/(?:^|[^\d])(\d{1,2})\s*(?:页|张|slides?|pages?)/i)
-      ?? value.match(/(?:页数|slide\s*count|slides?|pages?)[^\d一二两三四五六七八九十]{0,12}(\d{1,2}|auto)/i);
-    if (digitMatch) {
-      const parsed = digitMatch[1].toLowerCase();
-      return parsed === "auto" || SLIDE_COUNT_CONTEXT_OPTIONS.includes(parsed) ? parsed : null;
-    }
-
-    const digits: Record<string, number> = {
-      一: 1,
-      二: 2,
-      两: 2,
-      三: 3,
-      四: 4,
-      五: 5,
-      六: 6,
-      七: 7,
-      八: 8,
-      九: 9,
-      十: 10,
-    };
-    const chineseMatch = value.match(/([一二两三四五六七八九十]{1,3})\s*(?:页|张)/);
-    if (!chineseMatch) return null;
-
-    const text = chineseMatch[1];
-    const parsed = text === "十"
-      ? 10
-      : text.startsWith("十")
-        ? 10 + (digits[text.slice(1)] ?? 0)
-        : text.endsWith("十")
-          ? (digits[text.slice(0, -1)] ?? 0) * 10
-          : text.includes("十")
-            ? text.split("十").reduce((total, part, index) => {
-                if (index === 0) return (digits[part] ?? 0) * 10;
-                return total + (digits[part] ?? 0);
-              }, 0)
-            : digits[text];
-
-    return parsed && SLIDE_COUNT_CONTEXT_OPTIONS.includes(String(parsed)) ? String(parsed) : null;
   }
 
   function readFeedbackContextValue(feedback: string, labels: string[]): string | null {
@@ -990,17 +977,16 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         return {
           id,
           label: t.brief.contextLabels.slides,
-          value,
+          value: normalizeSlideCountContextValue(value),
           type: "select",
           options: SLIDE_COUNT_CONTEXT_OPTIONS,
+          allowCustomValue: true,
         };
     }
   }
 
   function deriveContextRowsFromOutlineFeedback(rows: ContextRow[], feedback: string): ContextRow[] {
     const patch: Partial<Record<ContextPatchId, string>> = {};
-    const slideCount = parseContextSlideCount(feedback);
-    if (slideCount) patch.slides = slideCount;
 
     const audience = readFeedbackContextValue(feedback, ["受众", "面向对象", "面向", "audience"]);
     if (audience) patch.audience = audience;
@@ -1097,6 +1083,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           locale,
           setting,
         });
+        const syncedContextRows = syncContextRowsToOutlineCount(
+          contextRows,
+          result.outline.items
+        );
+        setContextRows(syncedContextRows);
         setDeckTitle(result.outline.title);
         setOutline(result.outline.items);
         const updatedWorkspace = await saveOutlineArtifact(
@@ -1106,7 +1097,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           setting,
           "draft",
           true,
-          llmContextRows
+          syncedContextRows
         );
         if (updatedWorkspace) {
           applyWorkspace(updatedWorkspace);
@@ -1124,6 +1115,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         locale,
         setting,
       });
+      const syncedContextRows = syncContextRowsToOutlineCount(
+        contextRows,
+        outlineResult.outline.items
+      );
+      setContextRows(syncedContextRows);
       const confirmedWorkspace = await saveOutlineArtifact(
         outlineResult.outline.items,
         outlineResult.outline.title,
@@ -1131,7 +1127,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         setting,
         "confirmed",
         true,
-        llmContextRows
+        syncedContextRows
       );
       if (!confirmedWorkspace) return;
       if (cancelCreateDeckRef.current) {
@@ -1267,6 +1263,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         contextRows: llmContextRows
       });
       await appendOutlineAiAttemptLogs(workspace, result.attempts);
+      const syncedContextRows = syncContextRowsToOutlineCount(
+        nextContextRows,
+        result.outline.items
+      );
+      setContextRows(syncedContextRows);
       await saveOutlineArtifact(
         result.outline.items,
         result.outline.title,
@@ -1274,7 +1275,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         setting,
         "draft",
         false,
-        llmContextRows
+        syncedContextRows
       );
       if (backend) {
         setWorkspaceScan(await backend.listWorkspaces());
@@ -1315,12 +1316,16 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (!workspace) return;
     const setting = workspaceSettingsToState(workspace);
     const downstreamExists = hasDownstreamArtifacts(workspace);
+    const syncedContextRows = syncContextRowsToOutlineCount(contextRows, outlineDraft);
+    setContextRows(syncedContextRows);
     const updatedWorkspace = await saveOutlineArtifact(
       outlineDraft,
       outlineDraftTitle,
       workspace,
       setting,
-      "draft"
+      "draft",
+      true,
+      syncedContextRows
     );
     if (updatedWorkspace) {
       setDeckTitle(outlineDraftTitle);

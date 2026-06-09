@@ -175,7 +175,8 @@ export function BriefPage(props: BriefPageProps) {
                   label: t.brief.contextLabels.slides,
                   value: "auto",
                   type: "select",
-                  options: SLIDE_COUNT_OPTIONS
+                  options: SLIDE_COUNT_OPTIONS,
+                  allowCustomValue: true
                 })
               }
             >

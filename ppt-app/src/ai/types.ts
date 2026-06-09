@@ -32,6 +32,7 @@ export interface ContextSuggestionResult {
   goal: string[];
   style: string[];
   theme: string[];
+  slides: string;
 }
 
 export interface ReviseOutlineInput {
