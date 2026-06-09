@@ -328,8 +328,7 @@ function createDefaultSettingJson() {
     audience: "",
     goal: "",
     style_notes: "",
-    language: "zh",
-    output_language: "中文",
+    output_language: "auto",
     aspect_ratio: "16:9",
     text_density: "balanced",
     visual_tone: "",
@@ -347,6 +346,13 @@ function normalizeSettingJson(setting: unknown): Record<string, unknown> {
 
   delete nextSetting.content_source;
   delete nextSetting.slide_count;
+  delete nextSetting.language;
+
+  if (typeof nextSetting.output_language !== "string" || nextSetting.output_language.trim().length === 0) {
+    nextSetting.output_language = "auto";
+  } else {
+    nextSetting.output_language = nextSetting.output_language.trim();
+  }
 
   if (
     nextSetting.visual_tone === "极简 SaaS · 清爽版式 · 柔和中性色" ||
@@ -414,6 +420,10 @@ async function ensureWorkspaceSetting(): Promise<Record<string, unknown>> {
   return normalizedSetting;
 }
 
+async function readGlobalWorkspaceDefaults(): Promise<Record<string, unknown>> {
+  return ensureWorkspaceSetting();
+}
+
 function createDefaultOutlineJson() {
   return normalizeOutlineJson(null);
 }
@@ -464,6 +474,7 @@ function normalizeOutlineJson(outline: unknown): AppWorkspaceOutline {
   return {
     version: 2,
     title: normalizeString(existing.title),
+    output_language: normalizeString(existing.output_language) || "auto",
     status: existing.status === "confirmed" ? "confirmed" : "draft",
     items,
     source: {
@@ -750,13 +761,16 @@ async function ensureWorkspaceFiles(
   const workspaceName = path.basename(normalizedWorkspaceDir);
 
   await mkdir(normalizedWorkspaceDir, { recursive: true });
-  const workspaceSetting = await ensureWorkspaceSetting();
+  const workspaceSettingDefaults = await readGlobalWorkspaceDefaults();
   const files = buildWorkspaceFilePaths(normalizedWorkspaceDir);
   const createdFiles: string[] = [];
 
   const defaults = {
     task: createDefaultTaskJson(normalizedWorkspaceDir, options.title),
-    setting: createDefaultSettingJson(),
+    setting: normalizeSettingJson({
+      ...createDefaultSettingJson(),
+      ...workspaceSettingDefaults,
+    }),
     outline: createDefaultOutlineJson(),
     page_plan: createDefaultPagePlanJson(),
     page_progress: createDefaultPageProgressJson(),
@@ -803,7 +817,7 @@ async function ensureWorkspaceFiles(
     missing_files: missingFiles,
     files,
     task: await readJsonFileIfExists(files.task),
-    setting: workspaceSetting,
+    setting: normalizedTaskSetting,
     outline: normalizedOutline,
     page_plan: await readJsonFileIfExists(files.page_plan),
     page_progress: await readJsonFileIfExists(files.page_progress),
@@ -924,14 +938,16 @@ export async function updateAppWorkspaceSettings(
   input: UpdateAppWorkspaceSettingsInput,
 ): Promise<AppWorkspaceResult> {
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const existing = await ensureWorkspaceSetting();
+  const existing = normalizeSettingJson(await readJsonFileIfExists(workspace.files.setting));
   const nextSetting = {
-    ...existing,
-    ...input.setting,
+    ...normalizeSettingJson({
+      ...existing,
+      ...input.setting,
+    }),
     updated_at: new Date().toISOString(),
   };
 
-  await writeJsonFile(WORKSPACE_SETTING_PATH, nextSetting);
+  await writeJsonFile(workspace.files.setting, nextSetting);
   await applyWorkspaceThemeToManifest(workspace, nextSetting);
   return ensureWorkspaceFiles(input.workspace_dir);
 }

@@ -3,21 +3,11 @@ import type { AnnaLlmCompleteInput } from "../runtime/annaRuntime";
 import type { Locale } from "../i18n/messages";
 import { parseStructuredJson } from "./structuredJson";
 import { CONTENT_GROUNDING_RULES } from "./groundingRules";
+import { readOutlineOutputLanguage } from "./outputLanguage";
 
 function readOutputLanguage(outline: WorkspaceOutline, locale: Locale) {
-  const setting = outline.source?.setting ?? {};
-  const outputLanguage = setting.output_language;
-  const language = setting.language;
-
-  if (typeof outputLanguage === "string" && outputLanguage.trim()) {
-    return outputLanguage.trim();
-  }
-
-  if (typeof language === "string" && language.trim()) {
-    return language.trim();
-  }
-
-  return locale === "zh" ? "中文" : "English";
+  void locale;
+  return readOutlineOutputLanguage(outline);
 }
 
 export function buildGeneratePagePlanLlmRequest(input: {

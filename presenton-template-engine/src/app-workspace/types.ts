@@ -34,6 +34,7 @@ export interface AppWorkspaceOutlineSource {
 export interface AppWorkspaceOutline {
   version: 2;
   title: string;
+  output_language: string;
   status: "draft" | "confirmed";
   items: AppWorkspaceOutlineItem[];
   source: AppWorkspaceOutlineSource;
@@ -97,6 +98,7 @@ export interface UpdateAppWorkspaceOutlineInput {
   workspace_dir: string;
   outline: {
     title?: string;
+    output_language?: string;
     status?: string;
     items?: unknown;
     source?: unknown;

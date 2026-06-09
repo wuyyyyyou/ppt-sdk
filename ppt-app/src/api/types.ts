@@ -48,7 +48,6 @@ export interface WorkspaceSettings {
   audience?: string;
   goal?: string;
   style_notes?: string;
-  language?: string;
   output_language?: string;
   aspect_ratio?: string;
   text_density?: string;
@@ -67,6 +66,7 @@ export interface WorkspaceOutlineItem {
 export interface WorkspaceOutline {
   version: 2;
   title: string;
+  output_language: string;
   status: "draft" | "confirmed";
   items: WorkspaceOutlineItem[];
   source: {
@@ -154,6 +154,7 @@ export interface UpdateWorkspaceOutlineInput {
   workspace_dir: string;
   outline: {
     title?: string;
+    output_language?: string;
     status?: "draft" | "confirmed";
     items?: WorkspaceOutlineItem[];
     source?: {

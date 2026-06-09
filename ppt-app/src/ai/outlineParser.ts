@@ -37,6 +37,11 @@ export function validateGeneratedOutline(
     errors.push("title must be a non-empty string");
   }
 
+  const outputLanguage = normalizeNonEmptyString(value.output_language);
+  if (!outputLanguage) {
+    errors.push("output_language must be a non-empty string");
+  }
+
   if (!Array.isArray(value.items)) {
     errors.push("items must be an array");
   }
@@ -79,6 +84,7 @@ export function validateGeneratedOutline(
 
   return {
     title,
+    output_language: outputLanguage,
     items,
   };
 }

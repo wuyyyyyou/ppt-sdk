@@ -26,7 +26,7 @@ export function buildOutlineSystemPrompt(language: PromptLanguage): string {
       "你是一名资深演示文稿策划专家。",
       "请生成可以被 JSON.parse 直接解析的结构化演示大纲。",
       "只返回 JSON。不要输出 Markdown、代码块、注释、解释或任何额外文字。",
-      'JSON 结构必须严格为：{"title":"...","items":[{"title":"...","outline":"..."}]}。',
+      'JSON 结构必须严格为：{"title":"...","output_language":"...","items":[{"title":"...","outline":"..."}]}。',
       "每个 items 元素代表一页幻灯片/页面。",
       "每个页面元素只能包含 title 和 outline 两个字段。",
       "outline 必须是一段简洁的自然语言说明，不要使用数组，也不要写成 bullet list。",
@@ -39,7 +39,7 @@ export function buildOutlineSystemPrompt(language: PromptLanguage): string {
     "You are a senior presentation strategist.",
     "Generate structured presentation outlines that can be parsed by JSON.parse.",
     "Return JSON only. Do not include markdown, code fences, comments, explanations, or extra text.",
-    'The JSON shape must be exactly: {"title":"...","items":[{"title":"...","outline":"..."}]}.',
+    'The JSON shape must be exactly: {"title":"...","output_language":"...","items":[{"title":"...","outline":"..."}]}.',
     "Each item represents one slide/page.",
     "Each item must contain only title and outline.",
     "outline must be one concise natural-language paragraph, not an array and not a bullet list.",
@@ -64,9 +64,10 @@ export function buildGenerateOutlineUserPrompt(
       "输出要求：",
       "- 只返回一个合法 JSON 对象。",
       "- title 必须是演示文稿标题。",
+      "- output_language 必须是最终内容语言；如果工作区配置 output_language 是 auto 或缺失，请根据用户简报和补充上下文判断。",
       "- items 必须是每一页的大纲数组。",
       "- 每个页面 item 都必须包含 title 和 outline。",
-      "- title 和 outline 的内容语言必须遵循工作区配置中的 output_language / language。",
+      "- 如果工作区配置 output_language 不是 auto，title 和 outline 的内容语言必须遵循该值。",
     ].join("\n");
   }
 
@@ -81,9 +82,10 @@ export function buildGenerateOutlineUserPrompt(
     "Output requirements:",
     "- Return one valid JSON object only.",
     "- title must be the presentation title.",
+    "- output_language must be the final content language; if workspace output_language is auto or missing, infer it from the user brief and additional context.",
     "- items must be the page outline array.",
     "- Every page item must have title and outline.",
-    "- The title and outline content language must follow output_language / language in the workspace setting.",
+    "- If workspace output_language is not auto, title and outline content language must follow that value.",
   ].join("\n");
 }
 
@@ -106,11 +108,12 @@ export function buildReviseOutlineUserPrompt(
       "输出要求：",
       "- 只返回一个合法 JSON 对象。",
       "- title 必须是演示文稿标题。",
+      "- output_language 必须是最终内容语言；如果修改反馈指定语言，使用反馈指定的语言；否则沿用或判断工作区 output_language。",
       "- items 必须是修改后的每一页大纲数组。",
       "- 每个页面 item 都必须包含 title 和 outline。",
       "- 如果修改反馈指定了语言、页数、内容取舍或结构，必须优先遵循修改反馈。",
       "- 修改反馈没有指定的受众、目标、风格、内容来源、语言和页数，必须严格遵循工作区配置和可选上下文行。",
-      "- 只有当修改反馈没有指定语言时，title 和 outline 的内容语言才遵循工作区配置中的 output_language / language。",
+      "- 如果工作区配置 output_language 是 auto 或缺失，请根据用户简报、当前大纲和补充上下文判断内容语言。",
     ].join("\n");
   }
 
@@ -128,11 +131,12 @@ export function buildReviseOutlineUserPrompt(
     "Output requirements:",
     "- Return one valid JSON object only.",
     "- title must be the presentation title.",
+    "- output_language must be the final content language; if feedback specifies language, use that language; otherwise keep or infer workspace output_language.",
     "- items must be the revised page outline array.",
     "- Every page item must have title and outline.",
     "- If the feedback specifies language, slide count, content inclusion/exclusion, or structure, follow the feedback first.",
     "- For audience, goal, style, content source, language, and slide count not specified in the feedback, strictly follow workspace settings and optional context rows.",
-    "- Only when the feedback does not specify language should title and outline language follow output_language / language in the workspace setting.",
+    "- If workspace output_language is auto or missing, infer the content language from the user brief, current outline, and optional context rows.",
   ].join("\n");
 }
 

@@ -73,6 +73,8 @@ export interface DeckWorkspaceState {
   deck: Slide[];
   outline: OutlineDetail[];
   outlineDraft: OutlineDetail[];
+  outlineOutputLanguage: string;
+  outlineDraftOutputLanguage: string;
   outlineEditMode: boolean;
   generated: boolean;
   currentSlide: number;

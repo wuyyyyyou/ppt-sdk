@@ -20,6 +20,7 @@ import {
 const outline: WorkspaceOutline = {
   version: 2,
   title: "Demo Deck",
+  output_language: "English",
   status: "confirmed",
   items: [
     { title: "Intro", outline: "Set context" },
@@ -28,7 +29,7 @@ const outline: WorkspaceOutline = {
   source: {
     prompt: "make a deck",
     context: [],
-    setting: {},
+    setting: { output_language: "English" },
   },
   updated_at: "2026-05-23T00:00:00.000Z",
 };
@@ -293,13 +294,14 @@ function createHarness(options: {
   };
 
   const aiClient: AiClient = {
-    generateOutline: async () => ({ outline: { title: outline.title, items: outline.items }, attempts: [] }),
+    generateOutline: async () => ({ outline: { title: outline.title, output_language: "English", items: outline.items }, attempts: [] }),
+    detectOutputLanguage: async () => ({ output_language: "English" }),
     generatePagePlan: async () => {
       generatePagePlanCalls += 1;
       return clone(pagePlan);
     },
     generateDeck: async () => ({ title: "", outline: [], slides: [] }),
-    reviseOutline: async () => ({ outline: { title: outline.title, items: outline.items }, attempts: [] }),
+    reviseOutline: async () => ({ outline: { title: outline.title, output_language: "English", items: outline.items }, attempts: [] }),
     generateSlidesFromOutline: async () => [],
     refineDeck: async () => [],
     refineSlide: async () => ({ title: "", subtitle: "" }),
@@ -338,6 +340,13 @@ function createHarness(options: {
         confidence: "medium",
       };
     },
+    runFactReviewPrompt: async () => ({
+      pass: true,
+      score: 9,
+      unsupported_claims: [],
+      rewrite_request: "",
+      confidence: "medium",
+    }),
     close: async () => undefined,
   };
 

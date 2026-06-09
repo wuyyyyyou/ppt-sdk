@@ -51,6 +51,11 @@ function fitOutlineCount(outline: OutlineDetail[], count: number | null): Outlin
   return next;
 }
 
+function readOutputLanguage(value: unknown, fallback: string): string {
+  const language = typeof value === "string" && value.trim() ? value.trim() : "auto";
+  return language === "auto" ? fallback : language;
+}
+
 export function createMockAiClient(): AiClient {
   return {
     async generateOutline(input) {
@@ -59,6 +64,10 @@ export function createMockAiClient(): AiClient {
       const expectedSlideCount = getExpectedSlideCount(input.setting, input.prompt, input.contextRows);
       const rawOutline = {
         title: input.locale === "zh" ? "AI Agent 工作流" : "AI Agent Workflows",
+        output_language: readOutputLanguage(
+          input.setting?.output_language,
+          input.locale === "zh" ? "中文" : "English"
+        ),
         items: fitOutlineCount(outlineDetails, expectedSlideCount),
       };
       const outline = validateGeneratedOutline(rawOutline, expectedSlideCount);
@@ -82,6 +91,16 @@ export function createMockAiClient(): AiClient {
             },
           },
         ],
+      };
+    },
+
+    async detectOutputLanguage(input) {
+      await sleep(200);
+      return {
+        output_language: readOutputLanguage(
+          input.setting?.output_language,
+          input.locale === "zh" ? "中文" : "English"
+        ),
       };
     },
 
@@ -168,6 +187,10 @@ export function createMockAiClient(): AiClient {
         title:
           input.title ||
           (input.locale === "zh" ? "AI Agent 工作流" : "AI Agent Workflows"),
+        output_language: readOutputLanguage(
+          input.setting?.output_language,
+          input.locale === "zh" ? "中文" : "English"
+        ),
         items: revisedItems,
       };
       const outline = validateGeneratedOutline(rawOutline, expectedSlideCount);

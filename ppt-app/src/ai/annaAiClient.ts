@@ -311,6 +311,37 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
       );
     },
 
+    async detectOutputLanguage(input) {
+      const result = await completeJson<unknown>(
+        runtime,
+        "output language",
+        [
+          "Decide the content language for a presentation.",
+          "Return only one JSON object with exactly one property: output_language.",
+          "Use the user's brief, optional context rows, current outline, and workspace setting.",
+          "If workspace output_language is a concrete language and not auto, return that exact value.",
+          "If workspace output_language is auto or missing, infer the best content language from the brief and outline.",
+          "Do not rewrite the outline. Do not include markdown or explanation.",
+          `Locale: ${input.locale}`,
+          `Prompt: ${input.prompt}`,
+          `Context: ${JSON.stringify(input.contextRows)}`,
+          `Setting: ${JSON.stringify(input.setting ?? {})}`,
+          `Outline title: ${input.title ?? ""}`,
+          `Outline items: ${JSON.stringify(input.outline ?? [])}`,
+        ].join("\n"),
+        '{"output_language":"中文"}'
+      );
+      const record =
+        result && typeof result === "object" && !Array.isArray(result)
+          ? (result as Record<string, unknown>)
+          : {};
+      const outputLanguage =
+        typeof record.output_language === "string"
+          ? record.output_language.trim()
+          : "";
+      return { output_language: outputLanguage || "auto" };
+    },
+
     async suggestContext(input) {
       const result = await completeJson<unknown>(
         runtime,

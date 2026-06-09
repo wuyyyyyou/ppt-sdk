@@ -1,18 +1,22 @@
-import { CheckCircle2, Sparkles } from "lucide-react";
+import { CheckCircle2, ChevronDown, Sparkles } from "lucide-react";
 import type { OutlineDetail } from "../../../data/mockDeck";
 import type { Messages } from "../../../i18n/messages";
 import type { LoadingKind } from "../types";
 import { formatSlideNumber } from "../utils";
+import { DEFAULT_OUTPUT_LANGUAGE_OPTIONS } from "../../../ai/outputLanguage";
 
 interface OutlinePageProps {
   t: Messages;
   outline: OutlineDetail[];
   outlineDraft: OutlineDetail[];
+  outputLanguage: string;
+  outputLanguageDraft: string;
   outlineEditMode: boolean;
   beginOutlineEdit: () => void;
   cancelOutlineEdit: () => void;
   saveOutlineEdit: () => Promise<void>;
   updateOutlineDraftItem: (index: number, patch: Partial<OutlineDetail>) => void;
+  setOutputLanguageDraft: (value: string) => void;
   feedback: string;
   setFeedback: (value: string) => void;
   applyFeedback: () => Promise<void>;
@@ -25,11 +29,14 @@ export function OutlinePage(props: OutlinePageProps) {
     t,
     outline,
     outlineDraft,
+    outputLanguage,
+    outputLanguageDraft,
     outlineEditMode,
     beginOutlineEdit,
     cancelOutlineEdit,
     saveOutlineEdit,
     updateOutlineDraftItem,
+    setOutputLanguageDraft,
     feedback,
     setFeedback,
     applyFeedback,
@@ -37,6 +44,11 @@ export function OutlinePage(props: OutlinePageProps) {
     loading,
   } = props;
   const activeOutline = outlineEditMode ? outlineDraft : outline;
+  const languageOptions = DEFAULT_OUTPUT_LANGUAGE_OPTIONS.includes(
+    outputLanguageDraft as (typeof DEFAULT_OUTPUT_LANGUAGE_OPTIONS)[number]
+  )
+    ? [...DEFAULT_OUTPUT_LANGUAGE_OPTIONS]
+    : [...DEFAULT_OUTPUT_LANGUAGE_OPTIONS, outputLanguageDraft];
   const generating = loading === "deck" || loading === "deckFromOutline";
 
   return (
@@ -72,11 +84,34 @@ export function OutlinePage(props: OutlinePageProps) {
             <div className="section-label">{t.outline.cardTitle}</div>
             <p>{outlineEditMode ? t.outline.helper : t.outline.readOnlyHint}</p>
           </div>
-          {!outlineEditMode ? (
-            <button className="secondary-btn compact" onClick={beginOutlineEdit} disabled={generating}>
-              {t.outline.editOutline}
-            </button>
-          ) : null}
+          <div className="outline-card-actions">
+            <label className="outline-language-field">
+              <span>{t.brief.contextLabels.outputLanguage}</span>
+              {outlineEditMode ? (
+                <span className="outline-language-select-wrap">
+                  <select
+                    value={outputLanguageDraft}
+                    onChange={(event) => setOutputLanguageDraft(event.target.value)}
+                    disabled={generating}
+                  >
+                    {languageOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} />
+                </span>
+              ) : (
+                <strong>{outputLanguage || "auto"}</strong>
+              )}
+            </label>
+            {!outlineEditMode ? (
+              <button className="secondary-btn compact" onClick={beginOutlineEdit} disabled={generating}>
+                {t.outline.editOutline}
+              </button>
+            ) : null}
+          </div>
         </div>
         <div className="outline-list-large">
           <div className="timeline-line" />

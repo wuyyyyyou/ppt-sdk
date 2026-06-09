@@ -99,12 +99,41 @@ describe("outline prompt slide count handling", () => {
     const outline = validateGeneratedOutline(
       {
         title: "One Page",
+        output_language: "English",
         items: [{ title: "Only", outline: "A focused one-page outline." }],
       },
       12,
     );
 
     assert.equal(outline.items.length, 1);
+  });
+
+  it("requires generated outlines to include output_language", () => {
+    assert.throws(
+      () =>
+        validateGeneratedOutline(
+          {
+            title: "Missing Language",
+            items: [{ title: "Only", outline: "A focused one-page outline." }],
+          },
+          null,
+        ),
+      /output_language/,
+    );
+  });
+
+  it("asks the model to infer output language when setting is auto", () => {
+    const request = buildGenerateOutlineLlmRequest({
+      prompt: "帮我做一份发布会复盘",
+      contextRows: [],
+      locale: "en",
+      setting: { output_language: "auto" },
+    });
+    const userPrompt = request.messages[1]?.content.text ?? "";
+
+    assert.match(userPrompt, /output_language/);
+    assert.match(userPrompt, /auto/);
+    assert.doesNotMatch(userPrompt, /Locale: en[\s\S]*content language must be English/);
   });
 });
 

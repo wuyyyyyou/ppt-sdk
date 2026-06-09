@@ -8,6 +8,7 @@ import {
 } from "../../agent/agentClient";
 import { TSX_AUTHORING_RULES_SUMMARY } from "../../agent/promptRules";
 import { CONTENT_GROUNDING_RULES } from "../../ai/groundingRules";
+import { readOutlineOutputLanguage } from "../../ai/outputLanguage";
 import type { AiClient } from "../../ai/aiClient";
 import type {
   PagePlan,
@@ -312,6 +313,7 @@ function buildAuthoringPrompt(input: {
     `Current page id: ${input.page.page_id}`,
     `Current page title: ${input.page.title}`,
     `Current page outline: ${input.page.outline}`,
+    `Output content language: ${readOutlineOutputLanguage(input.outline)}`,
     `Current slide path: ${input.workspaceDir}/template/${input.page.slide_path.replace(/^\.\//, "")}`,
     `Current data path: ${input.workspaceDir}/template/${input.page.data_path.replace(/^\.\//, "")}`,
     `Selected blueprint id: ${input.page.blueprint_id}`,

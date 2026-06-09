@@ -96,11 +96,14 @@ export function App() {
               t={t}
               outline={state.outline}
               outlineDraft={state.outlineDraft}
+              outputLanguage={state.outlineOutputLanguage}
+              outputLanguageDraft={state.outlineDraftOutputLanguage}
               outlineEditMode={state.outlineEditMode}
               beginOutlineEdit={actions.beginOutlineEdit}
               cancelOutlineEdit={actions.cancelOutlineEdit}
               saveOutlineEdit={actions.saveOutlineEdit}
               updateOutlineDraftItem={actions.updateOutlineDraftItem}
+              setOutputLanguageDraft={actions.setOutlineDraftOutputLanguage}
               feedback={state.outlineFeedback}
               setFeedback={actions.setOutlineFeedback}
               applyFeedback={actions.applyOutlineFeedback}

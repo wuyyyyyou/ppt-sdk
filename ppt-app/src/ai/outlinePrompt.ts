@@ -61,7 +61,6 @@ function buildSettingSummary(
   contextRows?: LlmContextRow[]
 ): Record<string, string> {
   return {
-    language: readSettingString(setting, "language"),
     output_language: readSettingString(setting, "output_language"),
     slide_count: readContextRowString(contextRows, "slides") || "auto",
     text_density: readSettingString(setting, "text_density"),
@@ -81,7 +80,6 @@ function getPromptLanguage(
 ): PromptLanguage {
   const configuredLanguage = [
     readSettingString(setting, "output_language"),
-    readSettingString(setting, "language"),
   ]
     .join(" ")
     .toLowerCase();

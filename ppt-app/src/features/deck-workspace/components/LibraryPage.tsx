@@ -7,6 +7,10 @@ import type {
   WorkspaceSummary
 } from "../../../api/types";
 import { formatMessage, type Locale, type Messages } from "../../../i18n/messages";
+import {
+  AUTO_OUTPUT_LANGUAGE,
+  DEFAULT_OUTPUT_LANGUAGE_OPTIONS,
+} from "../../../ai/outputLanguage";
 import { PageHeader } from "./PageHeader";
 
 interface LibraryPageProps {
@@ -33,7 +37,7 @@ const EMPTY_SETTINGS: Required<
   >
 > = {
   text_density: "balanced",
-  output_language: "中文",
+  output_language: AUTO_OUTPUT_LANGUAGE,
   aspect_ratio: "16:9",
   typography: ""
 };
@@ -259,7 +263,13 @@ export function LibraryPage({
         <PreferenceSelect
           label={t.brief.contextLabels.outputLanguage}
           value={draft.output_language}
-          options={["中文", "English"]}
+          options={
+            DEFAULT_OUTPUT_LANGUAGE_OPTIONS.includes(
+              draft.output_language as (typeof DEFAULT_OUTPUT_LANGUAGE_OPTIONS)[number]
+            )
+              ? [...DEFAULT_OUTPUT_LANGUAGE_OPTIONS]
+              : [...DEFAULT_OUTPUT_LANGUAGE_OPTIONS, draft.output_language]
+          }
           editing={editing}
           onChange={(value) => setDraft((next) => ({ ...next, output_language: value }))}
         />

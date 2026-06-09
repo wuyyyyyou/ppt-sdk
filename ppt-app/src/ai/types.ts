@@ -68,6 +68,7 @@ export interface GeneratedDeck {
 
 export interface GeneratedOutline {
   title: string;
+  output_language: string;
   items: OutlineDetail[];
 }
 
@@ -99,6 +100,10 @@ export interface GeneratePagePlanInput {
 
 export interface AiClient {
   generateOutline(input: GenerateOutlineInput): Promise<OutlineGenerationResult>;
+  detectOutputLanguage(input: GenerateOutlineInput & {
+    title?: string;
+    outline?: OutlineDetail[];
+  }): Promise<{ output_language: string }>;
   suggestContext(input: SuggestContextInput): Promise<ContextSuggestionResult>;
   generatePagePlan(input: GeneratePagePlanInput): Promise<PagePlan>;
   generateDeck(input: GenerateDeckInput): Promise<GeneratedDeck>;

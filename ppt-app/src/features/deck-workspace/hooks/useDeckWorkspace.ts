@@ -3,6 +3,11 @@ import { createAgentClient, type AgentClient } from "../../../agent/agentClient"
 import { createAiClient, type AiAttemptLog, type AiClient, type LlmContextRow } from "../../../ai/aiClient";
 import { createPptBackend, type PptBackend } from "../../../api/pptBackend";
 import { connectAnnaRuntime } from "../../../runtime/annaRuntime";
+import {
+  AUTO_OUTPUT_LANGUAGE,
+  normalizeOutputLanguage,
+  readSettingOutputLanguage,
+} from "../../../ai/outputLanguage";
 import type {
   ListWorkspacesResult,
   PageProgress,
@@ -114,6 +119,7 @@ export interface DeckWorkspaceActions {
   cancelOutlineEdit: () => void;
   saveOutlineEdit: () => Promise<void>;
   updateOutlineDraftItem: (index: number, patch: Partial<WorkspaceOutlineItem>) => void;
+  setOutlineDraftOutputLanguage: (value: string) => void;
   updateDeckTitle: (index: number, title: string) => void;
   moveSlide: (index: number, direction: -1 | 1) => Promise<void>;
   duplicateSlide: (index: number) => Promise<void>;
@@ -153,6 +159,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [outline, setOutline] = useState(outlineDetails);
   const [outlineDraft, setOutlineDraft] = useState(outlineDetails);
   const [outlineDraftTitle, setOutlineDraftTitle] = useState(t.deck.title);
+  const [outlineOutputLanguage, setOutlineOutputLanguage] =
+    useState<string>(AUTO_OUTPUT_LANGUAGE);
+  const [outlineDraftOutputLanguage, setOutlineDraftOutputLanguage] =
+    useState<string>(AUTO_OUTPUT_LANGUAGE);
   const [outlineEditMode, setOutlineEditMode] = useState(false);
   const [generated, setGenerated] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -273,6 +283,79 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     };
   }
 
+  function workspaceOutlineOutputLanguage(workspace: WorkspaceResult | null) {
+    const outlineRecord =
+      workspace?.outline && typeof workspace.outline === "object" && !Array.isArray(workspace.outline)
+        ? (workspace.outline as { output_language?: unknown })
+        : null;
+    const outlineLanguage = normalizeOutputLanguage(outlineRecord?.output_language);
+    if (outlineLanguage !== AUTO_OUTPUT_LANGUAGE) return outlineLanguage;
+
+    return readSettingOutputLanguage(workspaceSettingsToState(workspace));
+  }
+
+  function withOutputLanguage(
+    setting: WorkspaceSettings,
+    outputLanguage: string
+  ): WorkspaceSettings {
+    return {
+      ...setting,
+      output_language: normalizeOutputLanguage(outputLanguage),
+    };
+  }
+
+  async function persistWorkspaceOutputLanguage(
+    workspace: WorkspaceResult,
+    outputLanguage: string,
+    settingOverride: WorkspaceSettings | null = null
+  ) {
+    if (!backend) return workspace;
+    return backend.updateWorkspaceSettings({
+      workspace_dir: workspace.workspace_dir,
+      setting: withOutputLanguage(
+        settingOverride ?? workspaceSettingsToState(workspace),
+        outputLanguage
+      ),
+    });
+  }
+
+  async function resolveOutputLanguageForOutline(input: {
+    workspace: WorkspaceResult;
+    setting: WorkspaceSettings;
+    title: string;
+    items: OutlineDetail[];
+  }) {
+    const currentLanguage = normalizeOutputLanguage(input.setting.output_language);
+    if (currentLanguage !== AUTO_OUTPUT_LANGUAGE || !aiClient) {
+      return {
+        workspace: input.workspace,
+        setting: withOutputLanguage(input.setting, currentLanguage),
+        outputLanguage: currentLanguage,
+      };
+    }
+
+    const result = await aiClient.detectOutputLanguage({
+      prompt,
+      contextRows: buildLlmContextRows(),
+      locale,
+      setting: input.setting,
+      title: input.title,
+      outline: input.items,
+    });
+    const outputLanguage = normalizeOutputLanguage(result.output_language);
+    const workspace = await persistWorkspaceOutputLanguage(
+      input.workspace,
+      outputLanguage,
+      input.setting
+    );
+
+    return {
+      workspace,
+      setting: withOutputLanguage(input.setting, outputLanguage),
+      outputLanguage,
+    };
+  }
+
   function normalizeWorkspacePageProgress(value: unknown): PageProgress | null {
     const progressRecord =
       value && typeof value === "object" && !Array.isArray(value)
@@ -357,18 +440,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     delete setting.style_notes;
     delete setting.slide_count;
     return setting;
-  }
-
-  function readExplicitOutputLanguage(value: string): string | null {
-    const normalized = value.trim().toLowerCase();
-    if (!normalized) return null;
-    if (/(中文|汉语|简体中文|繁体中文|chinese|mandarin|\bzh\b)/i.test(normalized)) {
-      return "Chinese";
-    }
-    if (/(英文|英语|english|\ben\b)/i.test(normalized)) {
-      return "English";
-    }
-    return null;
   }
 
   function normalizePersistedContextRow(value: unknown): ContextRow | null {
@@ -544,10 +615,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   function buildOutlineArtifact(
     items = outline,
     title = deckTitle,
+    outputLanguage = outlineOutputLanguage,
     status: "draft" | "confirmed" = "draft"
   ) {
     return {
       title,
+      output_language: normalizeOutputLanguage(outputLanguage),
       status,
       items,
       source: {
@@ -598,6 +671,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           }
     );
     setDeckTitle(getWorkspaceTitle(workspace));
+    const workspaceOutputLanguage = workspaceOutlineOutputLanguage(workspace);
+    setOutlineOutputLanguage(workspaceOutputLanguage);
+    setOutlineDraftOutputLanguage(workspaceOutputLanguage);
     const workspaceOutline = workspaceOutlineToState(workspace.outline);
     const staleDeck = isWorkspaceDeckStale(workspace);
     const workspacePages = staleDeck ? null : workspacePagesToState(workspace.pages);
@@ -615,6 +691,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       setDeckTitle(workspacePages.title || getWorkspaceTitle(workspace));
       setDeck(workspacePages.deck);
       setOutline(workspaceOutline.length > 0 ? workspaceOutline : workspacePages.outline);
+      setOutlineDraft(workspaceOutline.length > 0 ? workspaceOutline : workspacePages.outline);
       setCurrentSlide(0);
       setStage("deck");
     } else {
@@ -1087,14 +1164,23 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           contextRows,
           result.outline.items
         );
+        const outputLanguage = normalizeOutputLanguage(result.outline.output_language);
+        const languageWorkspace = await persistWorkspaceOutputLanguage(
+          templateWorkspace,
+          outputLanguage,
+          setting
+        );
+        const languageSetting = withOutputLanguage(setting, outputLanguage);
         setContextRows(syncedContextRows);
         setDeckTitle(result.outline.title);
         setOutline(result.outline.items);
+        setOutlineOutputLanguage(outputLanguage);
         const updatedWorkspace = await saveOutlineArtifact(
           result.outline.items,
           result.outline.title,
-          templateWorkspace,
-          setting,
+          outputLanguage,
+          languageWorkspace,
+          languageSetting,
           "draft",
           true,
           syncedContextRows
@@ -1119,12 +1205,20 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         contextRows,
         outlineResult.outline.items
       );
+      const outputLanguage = normalizeOutputLanguage(outlineResult.outline.output_language);
+      const languageWorkspace = await persistWorkspaceOutputLanguage(
+        templateWorkspace,
+        outputLanguage,
+        setting
+      );
+      const languageSetting = withOutputLanguage(setting, outputLanguage);
       setContextRows(syncedContextRows);
       const confirmedWorkspace = await saveOutlineArtifact(
         outlineResult.outline.items,
         outlineResult.outline.title,
-        templateWorkspace,
-        setting,
+        outputLanguage,
+        languageWorkspace,
+        languageSetting,
         "confirmed",
         true,
         syncedContextRows
@@ -1143,6 +1237,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
       setDeckTitle(outlineResult.outline.title);
       setOutline(outlineResult.outline.items);
+      setOutlineOutputLanguage(outputLanguage);
       setLoading("deck");
       setStage("generating");
       setPage("main");
@@ -1198,14 +1293,22 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setPage("main");
     try {
       const setting = workspaceSettingsToState(templateWorkspace);
+      const resolved = await resolveOutputLanguageForOutline({
+        workspace: templateWorkspace,
+        setting,
+        title: deckTitle,
+        items: outline,
+      });
       const confirmedWorkspace = await saveOutlineArtifact(
         outline,
         deckTitle,
-        templateWorkspace,
-        setting,
+        resolved.outputLanguage,
+        resolved.workspace,
+        resolved.setting,
         "confirmed"
       );
       if (!confirmedWorkspace) return;
+      setOutlineOutputLanguage(resolved.outputLanguage);
       setStage("generating");
       setPage("main");
 
@@ -1237,18 +1340,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       workspace = await ensureCurrentWorkspace();
       if (!workspace) return;
       let setting = workspaceSettingsToState(workspace);
-      const explicitOutputLanguage = readExplicitOutputLanguage(outlineFeedback);
-      if (explicitOutputLanguage && backend) {
-        workspace = await backend.updateWorkspaceSettings({
-          workspace_dir: workspace.workspace_dir,
-          setting: {
-            ...setting,
-            output_language: explicitOutputLanguage,
-          },
-        });
-        applyWorkspace(workspace);
-        setting = workspaceSettingsToState(workspace);
-      }
       const baseTitle = outlineEditMode ? outlineDraftTitle : deckTitle;
       const baseOutline = outlineEditMode ? outlineDraft : outline;
       const nextContextRows = deriveContextRowsFromOutlineFeedback(contextRows, outlineFeedback);
@@ -1267,10 +1358,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         nextContextRows,
         result.outline.items
       );
+      const outputLanguage = normalizeOutputLanguage(result.outline.output_language);
+      workspace = await persistWorkspaceOutputLanguage(workspace, outputLanguage, setting);
+      setting = withOutputLanguage(setting, outputLanguage);
       setContextRows(syncedContextRows);
       await saveOutlineArtifact(
         result.outline.items,
         result.outline.title,
+        outputLanguage,
         workspace,
         setting,
         "draft",
@@ -1282,6 +1377,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       }
       setOutlineDraftTitle(result.outline.title);
       setOutlineDraft(result.outline.items);
+      setOutlineDraftOutputLanguage(outputLanguage);
       setOutlineEditMode(true);
       setOutlineFeedback("");
       showToast(t.toasts.outlineUpdated);
@@ -1300,12 +1396,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
     setOutlineDraft(outline.map((item) => ({ ...item })));
     setOutlineDraftTitle(deckTitle);
+    setOutlineDraftOutputLanguage(outlineOutputLanguage);
     setOutlineEditMode(true);
   }
 
   function cancelOutlineEdit() {
     setOutlineDraft(outline.map((item) => ({ ...item })));
     setOutlineDraftTitle(deckTitle);
+    setOutlineDraftOutputLanguage(outlineOutputLanguage);
     setOutlineFeedback("");
     setOutlineEditMode(false);
   }
@@ -1315,14 +1413,22 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const workspace = await ensureCurrentWorkspace();
     if (!workspace) return;
     const setting = workspaceSettingsToState(workspace);
+    const outputLanguage = normalizeOutputLanguage(outlineDraftOutputLanguage);
+    const languageWorkspace = await persistWorkspaceOutputLanguage(
+      workspace,
+      outputLanguage,
+      setting
+    );
+    const languageSetting = withOutputLanguage(setting, outputLanguage);
     const downstreamExists = hasDownstreamArtifacts(workspace);
     const syncedContextRows = syncContextRowsToOutlineCount(contextRows, outlineDraft);
     setContextRows(syncedContextRows);
     const updatedWorkspace = await saveOutlineArtifact(
       outlineDraft,
       outlineDraftTitle,
-      workspace,
-      setting,
+      outputLanguage,
+      languageWorkspace,
+      languageSetting,
       "draft",
       true,
       syncedContextRows
@@ -1330,6 +1436,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (updatedWorkspace) {
       setDeckTitle(outlineDraftTitle);
       setOutline(outlineDraft);
+      setOutlineOutputLanguage(outputLanguage);
       setOutlineEditMode(false);
       if (downstreamExists) {
         setGenerated(false);
@@ -1756,6 +1863,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function saveOutlineArtifact(
     items = outline,
     title = deckTitle,
+    outputLanguage = outlineOutputLanguage,
     workspaceOverride: WorkspaceResult | null = null,
     settingOverride: WorkspaceSettings | null = null,
     status: "draft" | "confirmed" = "draft",
@@ -1769,11 +1877,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const updatedWorkspace = await backend.updateWorkspaceOutline({
       workspace_dir: workspace.workspace_dir,
       outline: {
-        ...buildOutlineArtifact(items, title, status),
+        ...buildOutlineArtifact(items, title, outputLanguage, status),
         source: {
           prompt,
           context: buildLlmContextRows(contextRowsOverride ?? contextRows),
-          setting: settingOverride ?? workspaceSettingsToState(workspace)
+          setting: withOutputLanguage(
+            settingOverride ?? workspaceSettingsToState(workspace),
+            outputLanguage
+          )
         }
       }
     });
@@ -1793,7 +1904,15 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     outlineAutosaveTimerRef.current = window.setTimeout(() => {
       outlineAutosaveTimerRef.current = null;
-      void saveOutlineArtifact(items, deckTitle, null, null, "draft", false).catch(
+      void saveOutlineArtifact(
+        items,
+        deckTitle,
+        outlineOutputLanguage,
+        null,
+        null,
+        "draft",
+        false
+      ).catch(
         (error) => {
           console.warn(
             "Failed to autosave outline",
@@ -2301,6 +2420,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     deck,
     outline,
     outlineDraft,
+    outlineOutputLanguage,
+    outlineDraftOutputLanguage,
     outlineEditMode,
     generated,
     currentSlide,
@@ -2350,6 +2471,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     cancelOutlineEdit,
     saveOutlineEdit,
     updateOutlineDraftItem,
+    setOutlineDraftOutputLanguage,
     updateDeckTitle,
     moveSlide,
     duplicateSlide,
