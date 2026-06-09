@@ -49,6 +49,10 @@ The process that turns a confirmed outline into presentation pages; it does not 
 **Active Deck Generation**:
 A deck generation process that is currently running; the confirmed outline is not open to edits during this period.
 
+**Interrupted Deck Generation**:
+A Deck Generation that is neither running nor finished, holding one or more Interrupted Page Generations (and possibly pending pages) with no page actively authoring. It can be resumed to finish the unfinished pages while keeping accepted pages.
+_Avoid_: Cancelled Deck — cancellation is the user action that leads here, not the resulting state.
+
 **Generation Step**:
 A visible part of deck generation, such as planning pages, preparing files, authoring a page, content review, rendering, visual review, or final rendering.
 
@@ -84,11 +88,19 @@ _Avoid_: User-facing labels such as "Session History" when the record is really 
 **Failed Page Generation**:
 A Page Generation Unit that reached a terminal state without becoming accepted after its automatic recovery attempts are exhausted or manual review is required. Deck Generation may still continue other Page Generation Units, but the Deck is not finished until failed pages are retried or otherwise resolved.
 
+**Interrupted Page Generation**:
+A Page Generation Unit that was Active but whose run is no longer owned by any process, because the user stopped Deck Generation or the app exited before the unit reached an accepted or failed verdict. It is unfinished in intent but terminal in fact: no run is advancing it, so it must be explicitly resumed or retried. It is defined by ownership, not by cause, so a user stop and an app exit produce the same state.
+_Avoid_: Stopped Page, Cancelled Page — cancellation is a deck-level user action, not a page state. Distinguish from Failed Page Generation, which exhausted recovery or needs review.
+
 **Agent Session Cache Miss**:
 A transient Agent Session infrastructure failure where the platform cannot continue an Agent run because the app session authorization is unavailable. It is treated as infrastructure failure, not as a Page Generation content or render failure.
 
 **Page Generation Retry**:
-The action of rerunning one Failed Page Generation against the current Confirmed Outline, Page Plan, and Template. It applies to the selected page only and does not imply regenerating the whole Deck.
+The action of rerunning one Failed or Interrupted Page Generation against the current Confirmed Outline, Page Plan, and Template, with a fresh attempt budget. It applies to the selected page only and does not imply regenerating the whole Deck.
+
+**Deck Generation Resume**:
+The user action that continues an Interrupted Deck Generation by re-running its Interrupted Page Generations, pending pages, and pages whose only failure was infrastructure (e.g. an Agent Session Cache Miss), while keeping accepted pages and leaving genuinely Failed Page Generations (content, render, or needs-review) untouched. Those are re-attempted only through Page Generation Retry.
+_Avoid_: Regenerate, Restart — those discard accepted pages and start the whole Deck over.
 
 **Deck Generation Cancellation**:
 The user action that stops an Active Deck Generation from starting more Page Generation Units. Work already inside a Page Generation Unit may finish its current step before cancellation is reflected.

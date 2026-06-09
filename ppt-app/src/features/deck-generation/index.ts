@@ -1,5 +1,6 @@
 import {
   isAgentInfrastructureError,
+  isAgentRunCancelledError,
   type AgentClient,
   type AgentPageContentReviewResult,
   type AgentRunSummary,
@@ -25,6 +26,11 @@ import type {
 } from "../../api/types";
 import type { PptBackend } from "../../api/pptBackend";
 import type { Locale } from "../../i18n/messages";
+import {
+  isActivePageGenerationStatus,
+  isGenuinelyFailedPageGenerationStatus,
+  isResumablePageGenerationStatus,
+} from "./pageStatusPolicy";
 
 const ATTEMPT_LIMITS = {
   render: 10,
@@ -43,6 +49,7 @@ export type DeckGenerationStep =
   | "page-visual-review"
   | "final-render"
   | "complete"
+  | "interrupted"
   | "cancelled"
   | "failed";
 
@@ -141,6 +148,7 @@ export interface RunDeckGenerationInput {
   startMode?: DeckGenerationStartMode;
   onProgress: (progress: DeckGenerationProgress) => void;
   isCancelled: () => boolean;
+  cancelSignal?: AbortSignal;
 }
 
 export interface RunDeckRefinementInput extends RunDeckGenerationInput {
@@ -176,6 +184,7 @@ function generationText(locale: Locale) {
     prepare: zh ? "正在准备页面文件" : "Preparing page files",
     complete: zh ? "生成完成" : "Generation complete",
     resumed: zh ? "已恢复上次生成进度" : "Resumed previous generation progress",
+    interrupted: zh ? "生成已中断，可继续生成" : "Generation interrupted. You can resume.",
     invalidOutline: zh ? "Deck Generation 需要 Confirmed Outline。" : "Deck Generation requires a confirmed outline.",
     staleArtifacts: zh
       ? "无法续跑：现有 Page Plan 或 Page Progress 已过期。"
@@ -819,26 +828,31 @@ export function pageProgressToDeckGenerationProgress(
   locale: Locale = "zh",
 ): DeckGenerationProgress {
   const pages = [...storedProgress.pages].sort((left, right) => left.index - right.index);
-  const failedPage = pages.find((item) =>
-    /failed/i.test(item.status) ||
-    item.status === "needs_user_review" ||
-    item.status === "agent_infrastructure_failed"
-  );
+  const resumablePage = pages.find((item) => isResumablePageGenerationStatus(item.status));
+  const failedPage = pages.find((item) => isGenuinelyFailedPageGenerationStatus(item.status));
+  const activePageCandidate = pages.find((item) => isActivePageGenerationStatus(item.status));
   const activePage =
+    resumablePage ??
     failedPage ??
+    activePageCandidate ??
     [...pages].reverse().find((item) => item.status !== "pending") ??
     pages[0] ??
     null;
   const acceptedCount = pages.filter((item) => item.status === "accepted").length;
-  const step: DeckGenerationStep = failedPage
-    ? "failed"
-    : acceptedCount === pages.length
+  const allAccepted = pages.length > 0 && acceptedCount === pages.length;
+  const step: DeckGenerationStep = allAccepted
       ? "complete"
-      : "page-authoring";
-  const message = failedPage?.last_error
-    ? failedPage.last_error
-    : step === "complete"
+      : resumablePage
+        ? "interrupted"
+        : failedPage && !activePageCandidate
+          ? "failed"
+          : "page-authoring";
+  const message = step === "complete"
       ? generationText(locale).complete
+      : step === "interrupted"
+        ? generationText(locale).interrupted
+        : failedPage?.last_error
+          ? failedPage.last_error
       : generationText(locale).resumed;
 
   return {
@@ -880,21 +894,6 @@ export function createDeckGenerationStreamSnapshot(
   };
 }
 
-function isFailedPageStatus(status: string) {
-  return /failed/i.test(status) || status === "needs_user_review";
-}
-
-function isActivePageStatus(status: string) {
-  return ![
-    "pending",
-    "accepted",
-    "agent_failed",
-    "render_failed",
-    "needs_user_review",
-    "agent_infrastructure_failed",
-  ].includes(status);
-}
-
 function buildDeckGenerationSummary(
   input: Pick<DeckGenerationContext, "locale">,
   progress: PageProgress | null,
@@ -902,8 +901,8 @@ function buildDeckGenerationSummary(
 ) {
   const pages = progress?.pages ?? [];
   const accepted = pages.filter((page) => page.status === "accepted").length;
-  const failed = pages.filter((page) => isFailedPageStatus(page.status)).length;
-  const active = pages.filter((page) => isActivePageStatus(page.status)).length;
+  const failed = pages.filter((page) => isGenuinelyFailedPageGenerationStatus(page.status)).length;
+  const active = pages.filter((page) => isActivePageGenerationStatus(page.status)).length;
   return generationText(input.locale).activeSummary({
     active,
     accepted,
@@ -919,6 +918,17 @@ function emitRuntime(
   stream?: DeckGenerationStream | null,
 ) {
   emit(input, value, progress, stream, input.activeStreams.values());
+}
+
+function buildAgentRunOptions(
+  input: DeckGenerationRuntime,
+  onStreamEvent: (event: AgentStreamEvent) => void,
+) {
+  return {
+    onStreamEvent,
+    signal: input.cancelSignal,
+    isCancelled: input.isCancelled,
+  };
 }
 
 async function runPageGeneration(
@@ -1019,7 +1029,7 @@ async function runPageGeneration(
     try {
       const authoringResult: AgentRunSummary = await input.agentClient.runAuthoringPrompt(
         authoringPrompt,
-        { onStreamEvent: authoringTracker.onStreamEvent },
+        buildAgentRunOptions(input, authoringTracker.onStreamEvent),
       );
       await authoringTracker.flush("completed", {
         parsed_summary: authoringResult.parsed_json === true,
@@ -1035,6 +1045,14 @@ async function runPageGeneration(
       contentReview = null;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      if (isAgentRunCancelledError(error)) {
+        await authoringTracker.flush("error", { cancelled: true });
+        return {
+          page,
+          reason: "cancelled",
+          progress: input.getProgress() ?? progress,
+        };
+      }
       if (isAgentInfrastructureError(error)) {
         const displayMessage = error.sessionCacheMiss
           ? text.agentSessionCacheMissExhausted
@@ -1117,7 +1135,7 @@ async function runPageGeneration(
     try {
       contentReview = await input.agentClient.runPageContentReviewPrompt(
         contentReviewPrompt,
-        { onStreamEvent: contentReviewTracker.onStreamEvent },
+        buildAgentRunOptions(input, contentReviewTracker.onStreamEvent),
       );
       await contentReviewTracker.flush("completed", {
         parsed_review: true,
@@ -1125,6 +1143,14 @@ async function runPageGeneration(
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      if (isAgentRunCancelledError(error)) {
+        await contentReviewTracker.flush("error", { cancelled: true });
+        return {
+          page,
+          reason: "cancelled",
+          progress: input.getProgress() ?? progress,
+        };
+      }
       if (isAgentInfrastructureError(error)) {
         agentInfrastructureFailures += 1;
         await contentReviewTracker.flush("error", {
@@ -1271,7 +1297,7 @@ async function runPageGeneration(
     try {
       visualReview = await input.agentClient.runPageVisualReviewPrompt(
         visualReviewPrompt,
-        { onStreamEvent: visualReviewTracker.onStreamEvent },
+        buildAgentRunOptions(input, visualReviewTracker.onStreamEvent),
       );
       await visualReviewTracker.flush("completed", {
         parsed_review: true,
@@ -1281,6 +1307,14 @@ async function runPageGeneration(
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      if (isAgentRunCancelledError(error)) {
+        await visualReviewTracker.flush("error", { cancelled: true });
+        return {
+          page,
+          reason: "cancelled",
+          progress: input.getProgress() ?? progress,
+        };
+      }
       if (isAgentInfrastructureError(error)) {
         const displayMessage = error.sessionCacheMiss
           ? text.agentSessionCacheMissExhausted
@@ -1414,7 +1448,8 @@ async function runPagesConcurrently(
 ): Promise<PageGenerationResult[]> {
   const pagesToRun = pagePlan.pages.filter((page) => {
     const pageProgress = getProgressPage(runtime.getProgress(), page.page_id);
-    return pageProgress?.status !== "accepted";
+    return pageProgress?.status === "visual_review_fixing" ||
+      isResumablePageGenerationStatus(pageProgress?.status ?? "pending");
   });
   const results: PageGenerationResult[] = [];
   let nextIndex = 0;

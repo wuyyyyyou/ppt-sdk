@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   AgentInfrastructureError,
+  isAgentRunCancelledError,
   createAgentClient,
   type AgentStreamEvent,
 } from "../../src/agent/agentClient.ts";
@@ -36,6 +37,43 @@ function createRuntime(runs: AnnaAgentRunFrame[][]) {
                 yield frame;
               }
             })(),
+          delete: async () => {
+            sessionDeletes += 1;
+          },
+        };
+        return session;
+      },
+    },
+  };
+
+  return {
+    runtime,
+    get sessionCreations() {
+      return sessionCreations;
+    },
+    get sessionDeletes() {
+      return sessionDeletes;
+    },
+  };
+}
+
+function createRuntimeFromStreams(streams: Array<() => AsyncIterable<AnnaAgentRunFrame>>) {
+  let sessionCreations = 0;
+  let sessionDeletes = 0;
+
+  const runtime: AnnaRuntime = {
+    tools: {
+      invoke: async () => ({}),
+    },
+    llm: {
+      complete: async () => ({}),
+    },
+    agent: {
+      session: async () => {
+        const run = streams[sessionCreations] ?? streams.at(-1);
+        sessionCreations += 1;
+        const session: AnnaAgentSession = {
+          run: () => run?.() ?? (async function* () {})(),
           delete: async () => {
             sessionDeletes += 1;
           },
@@ -148,5 +186,86 @@ describe("AgentClient cache miss retry", () => {
     );
     assert.equal(harness.sessionCreations, 3);
     assert.equal(harness.sessionDeletes, 3);
+  });
+
+  it("rebuilds one session after stream idle timeout and then succeeds", async () => {
+    const harness = createRuntimeFromStreams([
+      async function* () {
+        await new Promise(() => undefined);
+      },
+      async function* () {
+        for (const frame of authoringSuccessFrames()) yield frame;
+      },
+    ]);
+    const events: AgentStreamEvent[] = [];
+    const client = await createAgentClient(harness.runtime, {
+      streamIdleTimeoutMs: 5,
+    });
+
+    const result = await client.runAuthoringPrompt("write a page", {
+      onStreamEvent: (event) => events.push(event),
+    });
+
+    assert.equal(result.status, "ready_for_render");
+    assert.equal(harness.sessionCreations, 2);
+    assert.equal(harness.sessionDeletes, 2);
+    assert.equal(
+      events.some(
+        (event) =>
+          event.type === "activity" &&
+          event.message.includes("Agent unresponsive; rebuilding session"),
+      ),
+      true,
+    );
+  });
+
+  it("throws AgentInfrastructureError when stream idle retry is exhausted", async () => {
+    const harness = createRuntimeFromStreams([
+      async function* () {
+        await new Promise(() => undefined);
+      },
+      async function* () {
+        await new Promise(() => undefined);
+      },
+    ]);
+    const client = await createAgentClient(harness.runtime, {
+      streamIdleTimeoutMs: 5,
+    });
+
+    await assert.rejects(
+      () => client.runAuthoringPrompt("write a page"),
+      (error) => {
+        assert.equal(error instanceof AgentInfrastructureError, true);
+        assert.equal((error as AgentInfrastructureError).code, "idle_timeout");
+        return true;
+      },
+    );
+    assert.equal(harness.sessionCreations, 2);
+    assert.equal(harness.sessionDeletes, 2);
+  });
+
+  it("maps cancellation to AgentRunCancelledError and deletes the session", async () => {
+    const harness = createRuntimeFromStreams([
+      async function* () {
+        await new Promise(() => undefined);
+      },
+    ]);
+    const controller = new AbortController();
+    const client = await createAgentClient(harness.runtime, {
+      streamIdleTimeoutMs: 100,
+    });
+    const result = client.runAuthoringPrompt("write a page", {
+      signal: controller.signal,
+    });
+    controller.abort();
+
+    await assert.rejects(
+      () => result,
+      (error) => {
+        assert.equal(isAgentRunCancelledError(error), true);
+        return true;
+      },
+    );
+    assert.equal(harness.sessionDeletes, 1);
   });
 });

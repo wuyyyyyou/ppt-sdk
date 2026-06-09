@@ -122,6 +122,7 @@ export function App() {
               history={state.generationHistory}
               onCancel={actions.cancelGenerateDeck}
               onBackToOutline={actions.returnToOutlineFromGeneration}
+              onResume={actions.resumeDeckGeneration}
               onRegenerate={actions.regenerateDeck}
               onRetryPage={actions.retryPageGeneration}
               canBackToOutline={state.outline.length > 0}

@@ -1,7 +1,8 @@
-import { AlertCircle, CheckCircle2, ChevronDown, Circle, LoaderCircle, RotateCcw, Sparkles } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronDown, Circle, LoaderCircle, Play, RotateCcw, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Messages } from "../../../i18n/messages";
 import type { DeckGenerationProgress, DeckGenerationStep } from "../../deck-generation";
+import { isRetryablePageGenerationStatus } from "../../deck-generation/pageStatusPolicy";
 import { buildPageGenerationStageRecords, type PageGenerationStageRecord, type PageGenerationStageRecordGroup } from "../generationStageRecords";
 import { getGenerationProgressDisplayMessage } from "../generationProgressDisplay";
 import type { GenerationStreamSnapshot, LoadingKind } from "../types";
@@ -14,6 +15,7 @@ interface GeneratingPageProps {
   history: GenerationStreamSnapshot[];
   onCancel: () => void;
   onBackToOutline: () => void;
+  onResume: () => Promise<void>;
   onRegenerate: () => Promise<void>;
   onRetryPage: (pageId: string) => Promise<void>;
   canBackToOutline: boolean;
@@ -29,7 +31,7 @@ const majorSteps: Array<{
   {
     id: "pages",
     labelKey: "pages",
-    steps: ["page-authoring", "page-content-review", "page-render", "page-visual-review", "failed", "cancelled"]
+    steps: ["page-authoring", "page-content-review", "page-render", "page-visual-review", "interrupted", "failed", "cancelled"]
   },
   { id: "final-render", labelKey: "finalRender", steps: ["final-render", "complete"] }
 ];
@@ -40,7 +42,7 @@ function majorStepIndex(step: DeckGenerationStep | null) {
 }
 
 function stepState(index: number, activeIndex: number, progress: DeckGenerationProgress | null) {
-  if (progress?.step === "failed" || progress?.step === "cancelled") {
+  if (progress?.step === "failed" || progress?.step === "cancelled" || progress?.step === "interrupted") {
     return index === activeIndex ? "failed" : index < activeIndex ? "done" : "pending";
   }
   if (index < activeIndex) return "done";
@@ -49,9 +51,10 @@ function stepState(index: number, activeIndex: number, progress: DeckGenerationP
 }
 
 export function GeneratingPage(props: GeneratingPageProps) {
-  const { t, loading, progress, history, onCancel, onBackToOutline, onRegenerate, onRetryPage, canBackToOutline } = props;
+  const { t, loading, progress, history, onCancel, onBackToOutline, onResume, onRegenerate, onRetryPage, canBackToOutline } = props;
   const activeIndex = majorStepIndex(progress?.step ?? null);
   const failed = progress?.step === "failed" || progress?.step === "cancelled";
+  const interrupted = progress?.step === "interrupted";
   const running = loading === "deck" || loading === "deckFromOutline";
   const progressMessage = getGenerationProgressDisplayMessage(t, progress);
 
@@ -92,7 +95,17 @@ export function GeneratingPage(props: GeneratingPageProps) {
         </div>
       )}
 
-      {failed ? (
+      {interrupted ? (
+        <div className="generation-recovery-actions">
+          <button className="secondary-btn" onClick={onBackToOutline} disabled={!canBackToOutline || running}>
+            {t.stages.outline}
+          </button>
+          <button className="primary-btn" onClick={() => void onResume()} disabled={running}>
+            <Play size={14} />
+            {t.controls.resumeGeneration}
+          </button>
+        </div>
+      ) : failed ? (
         <div className="generation-recovery-actions">
           <button className="secondary-btn" onClick={onBackToOutline} disabled={!canBackToOutline}>
             {t.stages.outline}
@@ -169,7 +182,7 @@ function GenerationProgressPanel(props: {
 }
 
 function isProgressRunning(progress: DeckGenerationProgress) {
-  return !["complete", "failed", "cancelled"].includes(progress.step);
+  return !["complete", "interrupted", "failed", "cancelled"].includes(progress.step);
 }
 
 function PageStageRecordGroupView(props: {
@@ -216,12 +229,7 @@ function PageStageRecordGroupView(props: {
 }
 
 export function canRetryPageGenerationStatus(status: string) {
-  return [
-    "render_failed",
-    "agent_failed",
-    "needs_user_review",
-    "agent_infrastructure_failed",
-  ].includes(status);
+  return isRetryablePageGenerationStatus(status);
 }
 
 function PageStageRecordView(props: {

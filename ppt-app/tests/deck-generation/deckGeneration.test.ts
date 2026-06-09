@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { AgentInfrastructureError, type AgentClient } from "../../src/agent/agentClient.ts";
+import {
+  AgentInfrastructureError,
+  AgentRunCancelledError,
+  type AgentClient,
+} from "../../src/agent/agentClient.ts";
 import type { AiClient } from "../../src/ai/aiClient.ts";
 import type { PptBackend } from "../../src/api/pptBackend.ts";
 import type {
@@ -565,11 +569,35 @@ describe("Deck Generation Flow Module", () => {
       locale: "zh",
       startMode: "restart",
       onProgress: (progress) => harness.progressEvents.push(progress),
-      isCancelled: () => true,
+      isCancelled: () => harness.authoringPrompts.length > 0,
     });
 
     assert.equal(completion.status, "cancelled");
     assert.equal(completion.progress?.step, "cancelled");
+  });
+
+  it("does not count cancelled Agent runs as Agent failures", async () => {
+    const harness = createHarness({
+      authoringError: new AgentRunCancelledError(),
+    });
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => true,
+    });
+
+    assert.equal(completion.status, "cancelled");
+    assert.equal(harness.progress.pages.some((page) => page.status === "agent_failed"), false);
+    assert.deepEqual(
+      harness.progress.pages.map((page) => page.agent_failures),
+      [0, 0],
+    );
   });
 
   it("returns failed completion when render retry is exhausted", async () => {
@@ -728,6 +756,73 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.generatePagePlanCalls, 0);
     assert.equal(harness.authoringPrompts.length, 1);
     assert.ok(harness.progressEvents.some((progress) => progress.message.includes("已通过")));
+  });
+
+  it("resumes only resumable pages and skips genuinely failed pages", async () => {
+    const pagePlan = makePagePlanWithCount(5);
+    const existingProgress = makeProgress(pagePlan);
+    existingProgress.pages[0] = { ...existingProgress.pages[0], status: "accepted" };
+    existingProgress.pages[1] = { ...existingProgress.pages[1], status: "render_failed" };
+    existingProgress.pages[2] = { ...existingProgress.pages[2], status: "interrupted" };
+    existingProgress.pages[3] = { ...existingProgress.pages[3], status: "pending" };
+    existingProgress.pages[4] = { ...existingProgress.pages[4], status: "agent_infrastructure_failed" };
+    const harness = createHarness({ pagePlan, existingProgress });
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: {
+        ...outline,
+        items: pagePlan.pages.map((page) => ({ title: page.title, outline: page.outline })),
+      },
+      locale: "zh",
+      startMode: "resume",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "failed");
+    assert.equal(harness.authoringPrompts.length, 3);
+    assert.equal(harness.progress.pages[0].status, "accepted");
+    assert.equal(harness.progress.pages[1].status, "render_failed");
+    assert.equal(harness.progress.pages[2].status, "accepted");
+    assert.equal(harness.progress.pages[3].status, "accepted");
+    assert.equal(harness.progress.pages[4].status, "accepted");
+    assert.equal(harness.deckRenderCalls, 0);
+  });
+
+  it("still resumes visual review fixing pages for deck refinement", async () => {
+    const pagePlan = makePagePlan();
+    const existingProgress = makeProgress(pagePlan);
+    existingProgress.pages[0] = { ...existingProgress.pages[0], status: "accepted" };
+    existingProgress.pages[1] = {
+      ...existingProgress.pages[1],
+      status: "visual_review_fixing",
+      review: {
+        pass: false,
+        score: 0,
+        issues: [{ problem: "user refinement" }],
+        revision_request: "Make the slide clearer.",
+        confidence: "high",
+      },
+    };
+    const harness = createHarness({ pagePlan, existingProgress });
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.authoringPrompts.length, 1);
+    assert.ok(harness.authoringPrompts[0]?.includes("Visual review failed"));
   });
 
   it("fails resume when artifacts are stale", async () => {

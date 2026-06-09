@@ -10,9 +10,16 @@ import {
   type AgentSessionCacheMissRetryConfig,
   type AgentSessionCacheMissRetryState,
 } from "./agentSessionRetry";
+import {
+  guardStreamLiveness,
+  isStreamCancelledError,
+  isStreamIdleTimeoutError,
+} from "./streamLivenessGuard";
 
 const AGENT_RUN_TIMEOUT_MS = 600_000;
+const AGENT_STREAM_IDLE_TIMEOUT_MS = 180_000;
 const MAX_AGENT_SESSION_RETRIES = 1;
+const MAX_AGENT_STREAM_IDLE_RETRIES = 1;
 const DEFAULT_AGENT_SESSION_EXPIRES_IN_SECONDS = 600;
 const AGENT_SESSION_RENEW_MARGIN_MS = 60_000;
 const AGENT_SESSION_CACHE_MISS_EXHAUSTED_MESSAGE =
@@ -73,12 +80,15 @@ export type AgentStreamEvent =
 
 export interface AgentRunOptions {
   onStreamEvent?: (event: AgentStreamEvent) => void;
+  signal?: AbortSignal;
+  isCancelled?: () => boolean;
 }
 
 export interface AgentClientOptions {
   cacheMissRetryConfig?: Partial<AgentSessionCacheMissRetryConfig>;
   wait?: (ms: number) => Promise<void>;
   random?: () => number;
+  streamIdleTimeoutMs?: number;
 }
 
 interface CollectedAgentRun {
@@ -114,6 +124,17 @@ export class AgentInfrastructureError extends Error {
 
 export function isAgentInfrastructureError(error: unknown): error is AgentInfrastructureError {
   return error instanceof AgentInfrastructureError;
+}
+
+export class AgentRunCancelledError extends Error {
+  constructor() {
+    super("Agent run cancelled");
+    this.name = "AgentRunCancelledError";
+  }
+}
+
+export function isAgentRunCancelledError(error: unknown): error is AgentRunCancelledError {
+  return error instanceof AgentRunCancelledError;
 }
 
 function parseJsonObject<T>(text: string, label: string): T {
@@ -347,12 +368,17 @@ function extractFrameEvents(frame: unknown): AgentStreamEvent[] {
 async function collectRunText(
   session: AnnaAgentSession,
   content: string,
-  options: AgentRunOptions | undefined
+  options: AgentRunOptions | undefined,
+  clientOptions: AgentClientOptions,
 ): Promise<CollectedAgentRun> {
   let output = "";
   const events: AgentStreamEvent[] = [];
 
-  const stream = session.run({ content });
+  const stream = guardStreamLiveness(session.run({ content }), {
+    idleMs: clientOptions.streamIdleTimeoutMs ?? AGENT_STREAM_IDLE_TIMEOUT_MS,
+    signal: options?.signal,
+    isCancelled: options?.isCancelled,
+  });
   for await (const frame of stream) {
     if (frame.event === "complete") {
       break;
@@ -409,7 +435,11 @@ function toAgentInfrastructureError(
     : rawMessage;
   return new AgentInfrastructureError(
     message,
-    error instanceof AgentRunStreamError ? error.code : undefined,
+    error instanceof AgentRunStreamError
+      ? error.code
+      : isStreamIdleTimeoutError(error)
+        ? "idle_timeout"
+        : undefined,
     activeSessionLimit,
     options.sessionCacheMiss === true,
     options.sessionCacheMissRetries ?? 0,
@@ -454,6 +484,10 @@ function formatCacheMissRetryMessage(retryNumber: number, delayMs: number) {
   return `Agent session cache miss; retry ${retryNumber} after ${delaySeconds}s`;
 }
 
+function formatIdleRetryMessage() {
+  return "Agent unresponsive; rebuilding session and retrying";
+}
+
 export async function createAgentClient(
   runtime: AnnaRuntime,
   clientOptions: AgentClientOptions = {},
@@ -491,6 +525,7 @@ export async function createAgentClient(
     }
   > {
     let sessionRetries = 0;
+    let streamIdleRetries = 0;
     const cacheMissRetryState: AgentSessionCacheMissRetryState = {
       retries: 0,
       totalWaitMs: 0,
@@ -509,7 +544,7 @@ export async function createAgentClient(
           sessionMeta = await createSession();
         }
         const collected = await withTimeout(
-          collectRunText(sessionMeta.session, prompt, runOptions),
+          collectRunText(sessionMeta.session, prompt, runOptions, clientOptions),
           AGENT_RUN_TIMEOUT_MS
         );
         if (cacheMissRetryState.retries > 0) {
@@ -524,6 +559,22 @@ export async function createAgentClient(
           sessionCacheMissRetries: cacheMissRetryState.retries,
         };
       } catch (error) {
+        if (isStreamCancelledError(error)) {
+          throw new AgentRunCancelledError();
+        }
+        if (isStreamIdleTimeoutError(error)) {
+          if (streamIdleRetries < MAX_AGENT_STREAM_IDLE_RETRIES) {
+            streamIdleRetries += 1;
+            runOptions?.onStreamEvent?.({
+              type: "activity",
+              message: formatIdleRetryMessage(),
+            });
+            continue;
+          }
+          throw toAgentInfrastructureError(error, "Agent stream idle timeout.", {
+            rawMessage: error.message,
+          });
+        }
         if (error instanceof AgentRunStreamError && error.sessionCacheMiss) {
           const decision = nextAgentSessionCacheMissRetry({
             state: cacheMissRetryState,

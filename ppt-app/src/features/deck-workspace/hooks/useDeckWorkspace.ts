@@ -42,6 +42,7 @@ import {
   type DeckGenerationCompletion,
   type DeckGenerationProgress,
 } from "../../deck-generation";
+import { reconcileInterruptedPageProgress } from "../../deck-generation/interruptedReconciliation";
 import {
   createArtifactExportProgress,
   createExportErrorProgress,
@@ -142,6 +143,7 @@ export interface DeckWorkspaceActions {
   exportFile: (type: "PPTX" | "PDF") => Promise<void>;
   returnToOutlineFromGeneration: () => void;
   regenerateDeck: () => Promise<void>;
+  resumeDeckGeneration: () => Promise<void>;
   retryPageGeneration: (pageId: string) => Promise<void>;
 }
 
@@ -190,6 +192,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [aiClient, setAiClient] = useState<AiClient | null>(null);
   const [agentClient, setAgentClient] = useState<AgentClient | null>(null);
   const cancelCreateDeckRef = useRef(false);
+  const cancelCreateDeckAbortRef = useRef<AbortController | null>(null);
   const outlineAutosaveTimerRef = useRef<number | null>(null);
   const [workspaceScan, setWorkspaceScan] = useState<ListWorkspacesResult | null>(null);
   const [currentWorkspace, setCurrentWorkspace] = useState<WorkspaceResult | null>(null);
@@ -378,6 +381,29 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       pages,
       updated_at:
         typeof progressRecord?.updated_at === "string" ? progressRecord.updated_at : null
+    };
+  }
+
+  async function reconcileWorkspaceInterruptedPages(workspace: WorkspaceResult): Promise<WorkspaceResult> {
+    if (!backend) return workspace;
+    const progress = normalizeWorkspacePageProgress(workspace.page_progress);
+    if (!progress) return workspace;
+
+    const reconciliation = reconcileInterruptedPageProgress(progress);
+    if (reconciliation.patches.length === 0) return workspace;
+
+    let persistedProgress = reconciliation.progress;
+    for (const patch of reconciliation.patches) {
+      persistedProgress = await backend.recordPageProgress({
+        workspace_dir: workspace.workspace_dir,
+        page_id: patch.pageId,
+        patch: patch.patch,
+      });
+    }
+
+    return {
+      ...workspace,
+      page_progress: persistedProgress,
     };
   }
 
@@ -793,6 +819,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setGenerationHistory([]);
   }
 
+  function beginCancellableGeneration() {
+    cancelCreateDeckRef.current = false;
+    cancelCreateDeckAbortRef.current?.abort();
+    const controller = new AbortController();
+    cancelCreateDeckAbortRef.current = controller;
+    return controller.signal;
+  }
+
   const currentStatus = useMemo(() => {
     if (loading === "template") return t.template.loading;
     if (loading === "outline") return t.status.creatingOutline;
@@ -1104,6 +1138,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     workspace: WorkspaceResult
   ) {
     if (completion.status === "cancelled") {
+      const latestWorkspace = backend
+        ? await backend.openWorkspace({ workspace_dir: workspace.workspace_dir })
+        : workspace;
+      const reconciledWorkspace = await reconcileWorkspaceInterruptedPages(latestWorkspace);
+      applyWorkspace(reconciledWorkspace);
+      setStage("generating");
+      setPage("main");
       return;
     }
 
@@ -1137,7 +1178,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (!backend || !aiClient || !agentClient) return;
 
     try {
-      cancelCreateDeckRef.current = false;
+      const cancelSignal = beginCancellableGeneration();
       const workspace = await ensureCurrentWorkspace();
       if (!workspace) return;
       if (!selectedTemplateGroupId) {
@@ -1251,6 +1292,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         startMode: "restart",
         onProgress: recordGenerationProgress,
         isCancelled: () => cancelCreateDeckRef.current,
+        cancelSignal,
       });
       await applyDeckGenerationCompletion(completion, confirmedWorkspace);
     } catch (error) {
@@ -1262,6 +1304,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   function cancelGenerateDeck() {
     cancelCreateDeckRef.current = true;
+    cancelCreateDeckAbortRef.current?.abort();
     setCreateDeckProgress((current) =>
       current
         ? {
@@ -1276,7 +1319,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function createDeckFromOutline() {
     if (!backend || !aiClient || !agentClient) return;
 
-    cancelCreateDeckRef.current = false;
+    const cancelSignal = beginCancellableGeneration();
     const workspace = await ensureCurrentWorkspace();
     if (!workspace) return;
     if (!selectedTemplateGroupId) {
@@ -1322,6 +1365,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         startMode: "restart",
         onProgress: recordGenerationProgress,
         isCancelled: () => cancelCreateDeckRef.current,
+        cancelSignal,
       });
       await applyDeckGenerationCompletion(completion, confirmedWorkspace);
     } catch (error) {
@@ -1952,9 +1996,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setWorkspaceLoading(true);
     setWorkspaceError("");
     try {
-      const workspace = await backend.openWorkspace({
+      const openedWorkspace = await backend.openWorkspace({
         workspace_dir: workspaceDir
       });
+      const workspace = await reconcileWorkspaceInterruptedPages(openedWorkspace);
       const shouldOpenDeck = hasRenderedWorkspacePages(workspace);
       applyWorkspace(workspace, { syncEmptyContextRows: true });
       if (shouldOpenDeck) {
@@ -2078,7 +2123,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const trimmedInstruction = instruction.trim();
     if (!trimmedInstruction) return;
 
-    cancelCreateDeckRef.current = false;
+    const cancelSignal = beginCancellableGeneration();
     setLoading("refineDeck");
     resetGenerationProgress();
     setStage("generating");
@@ -2100,6 +2145,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         scope: "deck",
         onProgress: recordGenerationProgress,
         isCancelled: () => cancelCreateDeckRef.current,
+        cancelSignal,
       });
       await applyDeckGenerationCompletion(completion, refreshedWorkspace);
       if (completion.status === "completed") {
@@ -2119,7 +2165,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const slide = deck[currentSlide];
     if (!slide) return;
 
-    cancelCreateDeckRef.current = false;
+    const cancelSignal = beginCancellableGeneration();
     setLoading("refineSlide");
     resetGenerationProgress();
     setStage("generating");
@@ -2142,6 +2188,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         pageIndex: currentSlide,
         onProgress: recordGenerationProgress,
         isCancelled: () => cancelCreateDeckRef.current,
+        cancelSignal,
       });
       await applyDeckGenerationCompletion(completion, refreshedWorkspace);
       setCurrentSlide(currentSlide);
@@ -2282,11 +2329,48 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     await generateDeck();
   }
 
+  async function resumeDeckGeneration() {
+    if (!backend || !aiClient || !agentClient) return;
+    if (loading === "deck" || loading === "deckFromOutline") return;
+
+    const cancelSignal = beginCancellableGeneration();
+    setLoading("deckFromOutline");
+    setStage("generating");
+    setPage("main");
+    try {
+      const workspace = await ensureCurrentWorkspace();
+      if (!workspace) return;
+      const refreshedWorkspace = await reconcileWorkspaceInterruptedPages(
+        await backend.openWorkspace({
+          workspace_dir: workspace.workspace_dir,
+        }),
+      );
+      applyWorkspace(refreshedWorkspace);
+      const completion = await runDeckGeneration({
+        backend,
+        aiClient,
+        agentClient,
+        workspace: refreshedWorkspace,
+        confirmedOutline: refreshedWorkspace.outline as WorkspaceOutline,
+        locale,
+        startMode: "resume",
+        onProgress: recordGenerationProgress,
+        isCancelled: () => cancelCreateDeckRef.current,
+        cancelSignal,
+      });
+      await applyDeckGenerationCompletion(completion, refreshedWorkspace);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
+    } finally {
+      setLoading("none");
+    }
+  }
+
   async function retryPageGeneration(pageId: string) {
     if (!backend || !aiClient || !agentClient) return;
     if (loading === "deck" || loading === "deckFromOutline") return;
 
-    cancelCreateDeckRef.current = false;
+    const cancelSignal = beginCancellableGeneration();
     setLoading("deckFromOutline");
     setStage("generating");
     setPage("main");
@@ -2306,6 +2390,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         pageId,
         onProgress: recordGenerationProgress,
         isCancelled: () => cancelCreateDeckRef.current,
+        cancelSignal,
       });
       await applyDeckGenerationCompletion(completion, refreshedWorkspace);
     } catch (error) {
@@ -2494,6 +2579,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     exportFile,
     returnToOutlineFromGeneration,
     regenerateDeck,
+    resumeDeckGeneration,
     retryPageGeneration
   };
 

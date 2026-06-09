@@ -40,6 +40,7 @@ export interface Messages {
     duplicate: string;
     delete: string;
     retryPage: string;
+    resumeGeneration: string;
     pptx: string;
     pdf: string;
     useTemplate: string;
@@ -166,6 +167,7 @@ export interface Messages {
         | "agentFailed"
         | "needsUserReview"
         | "agentInfrastructureFailed"
+        | "interrupted"
         | "cancelled"
         | "unknown",
         string
@@ -312,6 +314,7 @@ export const messages: Record<Locale, Messages> = {
       duplicate: "Duplicate",
       delete: "Delete",
       retryPage: "Retry page",
+      resumeGeneration: "Resume generation",
       pptx: "PPTX",
       pdf: "PDF",
       useTemplate: "Use style",
@@ -447,6 +450,7 @@ export const messages: Record<Locale, Messages> = {
           agentFailed: "Generation failed",
           needsUserReview: "Needs review",
           agentInfrastructureFailed: "Agent session failed",
+          interrupted: "Interrupted",
           cancelled: "Stopped",
           unknown: "Working"
         },
@@ -597,6 +601,7 @@ export const messages: Record<Locale, Messages> = {
       duplicate: "复制",
       delete: "删除",
       retryPage: "重跑本页",
+      resumeGeneration: "继续生成",
       pptx: "PPTX",
       pdf: "PDF",
       useTemplate: "使用风格",
@@ -731,6 +736,7 @@ export const messages: Record<Locale, Messages> = {
           agentFailed: "生成失败",
           needsUserReview: "需要人工检查",
           agentInfrastructureFailed: "Agent 会话失败",
+          interrupted: "已中断",
           cancelled: "已停止",
           unknown: "处理中"
         },

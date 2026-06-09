@@ -8,6 +8,10 @@ describe("GeneratingPage retry eligibility", () => {
     assert.equal(canRetryPageGenerationStatus("agent_infrastructure_failed"), true);
   });
 
+  it("allows retrying interrupted pages", () => {
+    assert.equal(canRetryPageGenerationStatus("interrupted"), true);
+  });
+
   it("keeps accepted and active pages out of retry eligibility", () => {
     assert.equal(canRetryPageGenerationStatus("accepted"), false);
     assert.equal(canRetryPageGenerationStatus("authoring"), false);

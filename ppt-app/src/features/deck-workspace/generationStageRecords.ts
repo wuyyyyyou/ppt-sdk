@@ -5,6 +5,10 @@ import type {
   DeckGenerationStep,
   DeckGenerationStream,
 } from "../deck-generation";
+import {
+  isActivePageGenerationStatus,
+  isGenuinelyFailedPageGenerationStatus,
+} from "../deck-generation/pageStatusPolicy";
 import type { GenerationStreamSnapshot } from "./types";
 
 type StageLabelKey =
@@ -37,6 +41,7 @@ type PageStatusLabelKey =
   | "agentFailed"
   | "needsUserReview"
   | "agentInfrastructureFailed"
+  | "interrupted"
   | "cancelled"
   | "unknown";
 
@@ -293,6 +298,7 @@ function stageLabelKey(
     case "agent_failed":
     case "needs_user_review":
     case "agent_infrastructure_failed":
+    case "interrupted":
       return "failed";
     default:
       return "unknown";
@@ -327,6 +333,8 @@ function pageStatusLabelKey(status: string): PageStatusLabelKey {
       return "needsUserReview";
     case "agent_infrastructure_failed":
       return "agentInfrastructureFailed";
+    case "interrupted":
+      return "interrupted";
     case "cancelled":
       return "cancelled";
     default:
@@ -340,14 +348,14 @@ function pageStatusState(status: string): PageStageRecordState {
       return "pending";
     case "accepted":
       return "completed";
-    case "render_failed":
-    case "agent_failed":
-    case "needs_user_review":
-    case "agent_infrastructure_failed":
     case "cancelled":
       return "failed";
+    case "interrupted":
+    case "agent_infrastructure_failed":
+      return "pending";
     default:
-      return "active";
+      if (isGenuinelyFailedPageGenerationStatus(status)) return "failed";
+      return isActivePageGenerationStatus(status) ? "active" : "pending";
   }
 }
 
