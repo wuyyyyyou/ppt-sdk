@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import FinanceSectionFocusFrame from "../components/FinanceSectionFocusFrame.tsx";
 import { FinanceIcon } from "../components/FinanceIcons.tsx";
@@ -71,7 +72,7 @@ export const visualWeight = "balanced";
 export const editableTextPriority = "high";
 
 const SectionDivider = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = Schema.parse(data ?? {});
+  const parsed = readTemplateData(Schema, data);
   const showCards = parsed.variant === "left-statement-right-cards";
   const titleFontSize = parsed.density === "low" ? 70 : 64;
 

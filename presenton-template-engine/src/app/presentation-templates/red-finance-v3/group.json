@@ -17,7 +17,6 @@
     "slides/CoverStatement.tsx",
     "slides/SectionDivider.tsx",
     "slides/TwoColumnInsight.tsx",
-    "slides/ThreeColumnCards.tsx",
     "slides/ChartWithNarrative.tsx",
     "slides/ComparisonMatrix.tsx",
     "slides/TimelinePlan.tsx",

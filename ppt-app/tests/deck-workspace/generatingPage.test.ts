@@ -11,6 +11,6 @@ describe("GeneratingPage retry eligibility", () => {
   it("keeps accepted and active pages out of retry eligibility", () => {
     assert.equal(canRetryPageGenerationStatus("accepted"), false);
     assert.equal(canRetryPageGenerationStatus("authoring"), false);
-    assert.equal(canRetryPageGenerationStatus("self_review"), false);
+    assert.equal(canRetryPageGenerationStatus("visual_review"), false);
   });
 });

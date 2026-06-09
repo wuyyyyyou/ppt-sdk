@@ -72,16 +72,6 @@
       "avoid_for": ["complex timeline", "large matrix", "multi-chart dashboard", "pure cover"]
     },
     {
-      "id": "three-column-cards",
-      "name": "Three Column Cards",
-      "blueprint_source": "./blueprints/ThreeColumnCards.tsx",
-      "example_slide": "./slides/ThreeColumnCards.tsx",
-      "layout_family": "three-column",
-      "content_intents": ["categorization", "pillars", "options", "recommendations"],
-      "suitable_for": ["capability pillars", "opportunity/problem/strategy grouping", "three options", "risk categories"],
-      "avoid_for": ["single deep argument", "timeline", "large table", "trend chart"]
-    },
-    {
       "id": "chart-with-narrative",
       "name": "Chart With Narrative",
       "blueprint_source": "./blueprints/ChartWithNarrative.tsx",
@@ -142,7 +132,7 @@
     {
       "reference_path": "./reference-slides/MarketTrends.tsx",
       "visual_pattern": "top cards + bottom chart panel",
-      "related_blueprints": ["three-column-cards", "chart-with-narrative"],
+      "related_blueprints": ["chart-with-narrative"],
       "do_not_copy_directly": true
     },
     {
@@ -154,13 +144,13 @@
     {
       "reference_path": "./reference-slides/StrategicRoadmap.tsx",
       "visual_pattern": "pillar points + roadmap + KPIs",
-      "related_blueprints": ["timeline-plan", "kpi-summary", "three-column-cards"],
+      "related_blueprints": ["timeline-plan", "kpi-summary"],
       "do_not_copy_directly": true
     },
     {
       "reference_path": "./reference-slides/ConclusionOutlook.tsx",
       "visual_pattern": "summary priorities + action items",
-      "related_blueprints": ["closing-actions", "three-column-cards"],
+      "related_blueprints": ["closing-actions"],
       "do_not_copy_directly": true
     }
   ],

@@ -195,7 +195,26 @@ function extractTopLevelSchemaKeys(
   return keys;
 }
 
-function collectSchemaParseVariableNames(sourceFile: ts.SourceFile): Set<string> {
+function isSchemaParseCall(node: ts.CallExpression): boolean {
+  return (
+    ts.isPropertyAccessExpression(node.expression) &&
+    ts.isIdentifier(node.expression.expression) &&
+    node.expression.expression.text === "Schema" &&
+    node.expression.name.text === "parse"
+  );
+}
+
+function isTemplateDataContractReadCall(node: ts.CallExpression): boolean {
+  return (
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === "readTemplateData" &&
+    node.arguments.length > 0 &&
+    ts.isIdentifier(node.arguments[0]) &&
+    node.arguments[0].text === "Schema"
+  );
+}
+
+function collectTemplateDataVariableNames(sourceFile: ts.SourceFile): Set<string> {
   const names = new Set<string>();
 
   walk(sourceFile, (node) => {
@@ -203,13 +222,8 @@ function collectSchemaParseVariableNames(sourceFile: ts.SourceFile): Set<string>
       return;
     }
 
-    if (
-      ts.isCallExpression(node.initializer) &&
-      ts.isPropertyAccessExpression(node.initializer.expression) &&
-      ts.isIdentifier(node.initializer.expression.expression) &&
-      node.initializer.expression.expression.text === "Schema" &&
-      node.initializer.expression.name.text === "parse"
-    ) {
+    if (ts.isCallExpression(node.initializer) &&
+      (isSchemaParseCall(node.initializer) || isTemplateDataContractReadCall(node.initializer))) {
       names.add(node.name.text);
     }
   });
@@ -218,7 +232,7 @@ function collectSchemaParseVariableNames(sourceFile: ts.SourceFile): Set<string>
 }
 
 function collectUsedFieldNames(sourceFile: ts.SourceFile): Set<string> {
-  const parsedAliases = collectSchemaParseVariableNames(sourceFile);
+  const parsedAliases = collectTemplateDataVariableNames(sourceFile);
   const fields = new Set<string>();
 
   walk(sourceFile, (node) => {
@@ -247,7 +261,7 @@ function collectUsedFieldNames(sourceFile: ts.SourceFile): Set<string> {
   return fields;
 }
 
-function hasSchemaParseOnData(sourceFile: ts.SourceFile): boolean {
+function hasTemplateDataContractReadOnData(sourceFile: ts.SourceFile): boolean {
   let found = false;
 
   walk(sourceFile, (node) => {
@@ -255,14 +269,11 @@ function hasSchemaParseOnData(sourceFile: ts.SourceFile): boolean {
       return;
     }
 
-    if (
-      ts.isPropertyAccessExpression(node.expression) &&
-      ts.isIdentifier(node.expression.expression) &&
-      node.expression.expression.text === "Schema" &&
-      node.expression.name.text === "parse"
-    ) {
-      const argumentText = node.arguments[0].getText(sourceFile);
-      if (argumentText.includes("data")) {
+    if (isSchemaParseCall(node) || isTemplateDataContractReadCall(node)) {
+      const readsData = node.arguments.some((argument) =>
+        argument.getText(sourceFile).includes("data")
+      );
+      if (readsData) {
         found = true;
       }
     }
@@ -391,7 +402,7 @@ export const ZOD_SCHEMA_RULE: StabilityRule = {
 
 export const SCHEMA_PARSE_RULE: StabilityRule = {
   id: "STATIC-006",
-  title: "Local slide components must call Schema.parse(data ?? {})",
+  title: "Local slide components must read data through the Template Data Contract",
   phase: "static",
   severity: "error",
   docs: [
@@ -412,10 +423,10 @@ export const SCHEMA_PARSE_RULE: StabilityRule = {
       }
 
       const parsedSource = await loadParsedSourceFile(resolution.absolutePath);
-      if (!hasSchemaParseOnData(parsedSource.sourceFile)) {
+      if (!hasTemplateDataContractReadOnData(parsedSource.sourceFile)) {
         diagnostics.push(createRuleDiagnostic(this, {
-          message: `Local slide "${slideRef.slideId}" does not call Schema.parse on data input`,
-          suggestion: "Parse incoming data with Schema.parse(data ?? {}) before reading slide fields.",
+          message: `Local slide "${slideRef.slideId}" does not read data through Schema or a Template Data Contract helper`,
+          suggestion: "Read incoming data with Schema.parse(data ?? {}) or a template helper such as readTemplateData(Schema, data) before reading slide fields.",
           locations: [{
             filePath: resolution.absolutePath,
             slideId: slideRef.slideId,

@@ -29,7 +29,7 @@ const majorSteps: Array<{
   {
     id: "pages",
     labelKey: "pages",
-    steps: ["page-authoring", "page-render", "page-review", "failed", "cancelled"]
+    steps: ["page-authoring", "page-content-review", "page-render", "page-visual-review", "failed", "cancelled"]
   },
   { id: "final-render", labelKey: "finalRender", steps: ["final-render", "complete"] }
 ];

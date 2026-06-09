@@ -11,10 +11,12 @@ type StageLabelKey =
   | "pagePlan"
   | "prepare"
   | "authoring"
+  | "contentReview"
+  | "contentReviewFix"
   | "rendering"
-  | "selfReview"
   | "renderFix"
-  | "selfReviewFix"
+  | "visualReview"
+  | "visualReviewFix"
   | "finalRender"
   | "accepted"
   | "failed"
@@ -24,10 +26,12 @@ type StageLabelKey =
 type PageStatusLabelKey =
   | "pending"
   | "authoring"
+  | "contentReview"
+  | "contentReviewFixing"
   | "rendering"
-  | "selfReview"
   | "renderFixing"
-  | "selfReviewFixing"
+  | "visualReview"
+  | "visualReviewFixing"
   | "accepted"
   | "renderFailed"
   | "agentFailed"
@@ -207,10 +211,12 @@ function sortStageRecords(records: PageGenerationStageRecord[]) {
   const order: StageLabelKey[] = [
     "pending",
     "authoring",
+    "contentReview",
+    "contentReviewFix",
     "renderFix",
     "rendering",
-    "selfReview",
-    "selfReviewFix",
+    "visualReview",
+    "visualReviewFix",
     "accepted",
     "failed",
   ];
@@ -233,14 +239,17 @@ function stageLabelKey(
 ): StageLabelKey {
   if (kind === "authoring") return "authoring";
   if (kind === "render-fix") return "renderFix";
-  if (kind === "self-review") return "selfReview";
-  if (kind === "self-review-fix") return "selfReviewFix";
+  if (kind === "content-review-fix") return "contentReviewFix";
+  if (kind === "visual-review-fix") return "visualReviewFix";
+  if (kind === "page-content-review") return "contentReview";
+  if (kind === "page-visual-review") return "visualReview";
 
   if (phase === "page-plan") return "pagePlan";
   if (phase === "prepare") return "prepare";
   if (phase === "page-authoring") return "authoring";
+  if (phase === "page-content-review") return "contentReview";
   if (phase === "page-render") return "rendering";
-  if (phase === "page-review") return "selfReview";
+  if (phase === "page-visual-review") return "visualReview";
   if (phase === "final-render") return "finalRender";
 
   switch (pageStatus) {
@@ -248,14 +257,18 @@ function stageLabelKey(
       return "pending";
     case "authoring":
       return "authoring";
+    case "content_review":
+      return "contentReview";
+    case "content_review_fixing":
+      return "contentReviewFix";
     case "rendering":
       return "rendering";
-    case "self_review":
-      return "selfReview";
     case "render_fixing":
       return "renderFix";
-    case "self_review_fixing":
-      return "selfReviewFix";
+    case "visual_review":
+      return "visualReview";
+    case "visual_review_fixing":
+      return "visualReviewFix";
     case "accepted":
       return "accepted";
     case "render_failed":
@@ -274,14 +287,18 @@ function pageStatusLabelKey(status: string): PageStatusLabelKey {
       return "pending";
     case "authoring":
       return "authoring";
+    case "content_review":
+      return "contentReview";
+    case "content_review_fixing":
+      return "contentReviewFixing";
     case "rendering":
       return "rendering";
-    case "self_review":
-      return "selfReview";
     case "render_fixing":
       return "renderFixing";
-    case "self_review_fixing":
-      return "selfReviewFixing";
+    case "visual_review":
+      return "visualReview";
+    case "visual_review_fixing":
+      return "visualReviewFixing";
     case "accepted":
       return "accepted";
     case "render_failed":

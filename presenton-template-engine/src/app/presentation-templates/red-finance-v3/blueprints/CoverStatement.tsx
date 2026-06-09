@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import CoverBarDecoration from "../components/CoverBarDecoration.tsx";
 import FinanceCanvas from "../components/FinanceCanvas.tsx";
@@ -46,7 +47,7 @@ export const visualWeight = "visual-heavy";
 export const editableTextPriority = "high";
 
 const CoverStatement = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = Schema.parse(data ?? {});
+  const parsed = readTemplateData(Schema, data);
   const showNotes = parsed.variant === "statement-notes";
   const titleFontSize = parsed.density === "medium" ? 68 : 76;
 

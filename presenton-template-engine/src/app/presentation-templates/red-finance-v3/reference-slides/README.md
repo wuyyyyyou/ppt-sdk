@@ -22,7 +22,7 @@
 | 参考页面 | 可提取模式 | 相关 V3 蓝图 |
 | --- | --- | --- |
 | `IndustryOverview.tsx` | 左侧叙事列表 + 右侧图表 + 底部强调结论 | `two-column-insight`, `chart-with-narrative` |
-| `MarketTrends.tsx` | 顶部卡片 + 底部图表面板 | `three-column-cards`, `chart-with-narrative` |
+| `MarketTrends.tsx` | 顶部卡片 + 底部图表面板 | `chart-with-narrative` |
 | `ChinaUsMarketComparison.tsx` | 对比面板 + 指标 | `comparison-matrix`, `kpi-summary` |
-| `StrategicRoadmap.tsx` | 支柱要点 + 路线图 + KPI | `timeline-plan`, `kpi-summary`, `three-column-cards` |
-| `ConclusionOutlook.tsx` | 总结优先级 + 行动项 | `closing-actions`, `three-column-cards` |
+| `StrategicRoadmap.tsx` | 支柱要点 + 路线图 + KPI | `timeline-plan`, `kpi-summary` |
+| `ConclusionOutlook.tsx` | 总结优先级 + 行动项 | `closing-actions` |

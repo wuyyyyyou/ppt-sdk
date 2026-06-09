@@ -58,16 +58,6 @@
       "data_path": "./data/demo/two-column-insight.json"
     },
     {
-      "id": "red-finance-v3-three-column-cards",
-      "title": "Three Column Cards",
-      "speaker_note": "Generic three-column card slide for parallel pillars, categories, or strategic options.",
-      "source": {
-        "type": "local",
-        "path": "./slides/ThreeColumnCards.tsx"
-      },
-      "data_path": "./data/demo/three-column-cards.json"
-    },
-    {
       "id": "red-finance-v3-chart-with-narrative",
       "title": "Chart With Narrative",
       "speaker_note": "Generic chart narrative slide with one primary chart and supporting interpretation points.",

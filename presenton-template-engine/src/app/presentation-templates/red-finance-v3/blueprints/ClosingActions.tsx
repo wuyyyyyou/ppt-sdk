@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import FinanceContentFrame from "../components/FinanceContentFrame.tsx";
 import FinanceSectionHeading from "../components/FinanceSectionHeading.tsx";
@@ -70,7 +71,7 @@ export const visualWeight = "balanced";
 export const editableTextPriority = "high";
 
 const ClosingActions = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = Schema.parse(data ?? {});
+  const parsed = readTemplateData(Schema, data);
   const actionDensity = parsed.density === "high" ? "dense" : "compact";
   const decisionAsk = parsed.decisionAsk ?? parsed.summary;
 

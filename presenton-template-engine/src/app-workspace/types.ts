@@ -299,7 +299,8 @@ export interface AppPageProgressItem {
   title: string;
   status: string;
   render_attempts: number;
-  self_review_attempts: number;
+  visual_review_attempts: number;
+  content_review_attempts: number;
   agent_failures: number;
   agent_infrastructure_failures: number;
   slide_path: string;

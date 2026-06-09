@@ -20,8 +20,10 @@ function makeProgress(overrides: Partial<DeckGenerationProgress> = {}): DeckGene
         status: "rendering",
         render_attempts: 0,
         render_attempt_limit: 10,
-        self_review_attempts: 0,
-        self_review_attempt_limit: 5,
+        visual_review_attempts: 0,
+        visual_review_attempt_limit: 5,
+        content_review_attempts: 0,
+        content_review_attempt_limit: 5,
         agent_failures: 0,
         agent_failure_limit: 5,
         agent_infrastructure_failures: 0,
@@ -33,8 +35,10 @@ function makeProgress(overrides: Partial<DeckGenerationProgress> = {}): DeckGene
         status: "authoring",
         render_attempts: 0,
         render_attempt_limit: 10,
-        self_review_attempts: 0,
-        self_review_attempt_limit: 5,
+        visual_review_attempts: 0,
+        visual_review_attempt_limit: 5,
+        content_review_attempts: 0,
+        content_review_attempt_limit: 5,
         agent_failures: 0,
         agent_failure_limit: 5,
         agent_infrastructure_failures: 0,
@@ -61,10 +65,10 @@ describe("Page Generation Stage Records", () => {
     });
     const history: GenerationStreamSnapshot[] = [
       {
-        id: "page-review:page-01:review-1",
-        phase: "page-review",
-        kind: "self-review",
-        label: "第 1 页 · self-review",
+        id: "page-visual-review:page-01:review-1",
+        phase: "page-visual-review",
+        kind: "page-visual-review",
+        label: "第 1 页 · page-visual-review",
         page_id: "page-01",
         page_index: 0,
         status: "completed",
@@ -83,7 +87,7 @@ describe("Page Generation Stage Records", () => {
 
     assert.deepEqual(records.map((record) => record.pageId), ["page-01", "page-02"]);
     assert.equal(records[0].stages.some((stage) => stage.label === "正在思考第 1 页的表达"), true);
-    assert.equal(records[0].stages.some((stage) => stage.label === "页面细节检查"), true);
+    assert.equal(records[0].stages.some((stage) => stage.label === "页面视觉检查"), true);
     assert.equal(records[0].stages.some((stage) => stage.lines.includes("writing")), true);
     assert.equal(records[0].stages.some((stage) => stage.lines.includes("reviewed")), true);
   });

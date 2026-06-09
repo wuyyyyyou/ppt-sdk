@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import ComparisonPanel from "../components/ComparisonPanel.tsx";
 import FinanceContentFrame from "../components/FinanceContentFrame.tsx";
@@ -104,7 +105,7 @@ export const visualWeight = "balanced";
 export const editableTextPriority = "high";
 
 const ComparisonMatrix = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = Schema.parse(data ?? {});
+  const parsed = readTemplateData(Schema, data);
   const density = parsed.density === "high" ? "dense" : "compact";
   const sections =
     parsed.variant === "dimension-first"

@@ -18,10 +18,14 @@
 - `slides/*.tsx`：具体 deck 的最终页面，Agent 可以直接修改。
 - `data/*.json`：只承载内容数据，不承载页面结构决策。
 - `reference-slides/*.tsx`：只读参考，不进入生成链路。
+- `Schema` 是 Template Data Contract：用于说明推荐数据结构、生成 catalog/schemaJSON/sampleData，并帮助 Agent 理解字段，不是默认渲染硬门禁。
+- 默认渲染不执行 Zod 数据校验；如果需要恢复硬校验，修改 `../utils/templateData.ts` 中的 `VALIDATE_TEMPLATE_DATA`。
+
+关闭默认校验并不表示页面能接受任意脏数据。Agent 仍应尽量生成完整的 `data/*.json`，尤其是组件会直接使用的数组、图表序列、列表和标题字段。缺少必要结构时，页面仍可能因为真实运行时错误进入修复循环。
 
 ## 蓝图 TSX 应包含
 
-- `Schema`：页面数据校验结构。
+- `Schema`：页面数据推荐结构。
 - `layoutId`：稳定的蓝图 id。
 - `layoutName`、`layoutDescription`：页面职责说明。
 - `layoutTags`、`layoutRole`、`contentElements`：目录和发现用 metadata。

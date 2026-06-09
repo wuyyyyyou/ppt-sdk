@@ -150,7 +150,8 @@ function makeProgress(pagePlan: PagePlan, status = "pending"): PageProgress {
       title: page.title,
       status,
       render_attempts: 0,
-      self_review_attempts: 0,
+      visual_review_attempts: 0,
+      content_review_attempts: 0,
       agent_failures: 0,
       agent_infrastructure_failures: 0,
       slide_path: page.slide_path,
@@ -189,7 +190,19 @@ function createHarness(options: {
   pagePlan?: PagePlan;
   existingProgress?: PageProgress;
   renderFailures?: number;
-  selfReviews?: Array<{ pass: boolean; score: number; revision_request?: string }>;
+  visualReviews?: Array<{ pass: boolean; score: number; revision_request?: string }>;
+  contentReviews?: Array<{
+    pass: boolean;
+    score: number;
+    rewrite_request?: string;
+    issues?: Array<{
+      type: "language" | "outline_alignment" | "grounding";
+      severity?: string;
+      evidence: string;
+      reason: string;
+      fix_hint?: string;
+    }>;
+  }>;
   authoringError?: Error;
   authoringDelayMs?: number;
 } = {}) {
@@ -197,7 +210,8 @@ function createHarness(options: {
   let progress = clone(options.existingProgress ?? makeProgress(pagePlan));
   let renderFailures = options.renderFailures ?? 0;
   const authoringPrompts: string[] = [];
-  const selfReviewPrompts: string[] = [];
+  const visualReviewPrompts: string[] = [];
+  const contentReviewPrompts: string[] = [];
   const logs: unknown[] = [];
   const progressEvents: DeckGenerationProgress[] = [];
   let generatePagePlanCalls = 0;
@@ -307,7 +321,8 @@ function createHarness(options: {
     refineSlide: async () => ({ title: "", subtitle: "" }),
   };
 
-  const reviewQueue = [...(options.selfReviews ?? [{ pass: true, score: 9 }])];
+  const visualReviewQueue = [...(options.visualReviews ?? [{ pass: true, score: 9 }])];
+  const contentReviewQueue = [...(options.contentReviews ?? [{ pass: true, score: 9 }])];
   const agentClient: AgentClient = {
     runAuthoringPrompt: async (prompt, runOptions) => {
       authoringPrompts.push(prompt);
@@ -329,9 +344,9 @@ function createHarness(options: {
         parsed_json: true,
       };
     },
-    runSelfReviewPrompt: async (prompt) => {
-      selfReviewPrompts.push(prompt);
-      const next = reviewQueue.shift() ?? { pass: true, score: 9 };
+    runPageVisualReviewPrompt: async (prompt) => {
+      visualReviewPrompts.push(prompt);
+      const next = visualReviewQueue.shift() ?? { pass: true, score: 9 };
       return {
         pass: next.pass,
         score: next.score,
@@ -340,13 +355,17 @@ function createHarness(options: {
         confidence: "medium",
       };
     },
-    runFactReviewPrompt: async () => ({
-      pass: true,
-      score: 9,
-      unsupported_claims: [],
-      rewrite_request: "",
-      confidence: "medium",
-    }),
+    runPageContentReviewPrompt: async (prompt) => {
+      contentReviewPrompts.push(prompt);
+      const next = contentReviewQueue.shift() ?? { pass: true, score: 9 };
+      return {
+        pass: next.pass,
+        score: next.score,
+        issues: next.issues ?? [],
+        rewrite_request: next.rewrite_request ?? "",
+        confidence: "medium",
+      };
+    },
     close: async () => undefined,
   };
 
@@ -355,7 +374,8 @@ function createHarness(options: {
     aiClient,
     agentClient,
     authoringPrompts,
-    selfReviewPrompts,
+    visualReviewPrompts,
+    contentReviewPrompts,
     logs,
     progressEvents,
     get generatePagePlanCalls() {
@@ -418,9 +438,9 @@ describe("Deck Generation Flow Module", () => {
     assert.ok(harness.progressEvents.some((progress) => progress.step === "page-render"));
   });
 
-  it("uses self-review-fix authoring after a failed self-review", async () => {
+  it("uses visual-review-fix authoring after a failed visual review", async () => {
     const harness = createHarness({
-      selfReviews: [
+      visualReviews: [
         { pass: false, score: 4, revision_request: "Fix overlap" },
         { pass: true, score: 9 },
       ],
@@ -439,7 +459,99 @@ describe("Deck Generation Flow Module", () => {
 
     assert.equal(completion.status, "completed");
     assert.ok(harness.authoringPrompts.some((prompt) => prompt.includes("Visual review failed")));
-    assert.ok(harness.progressEvents.some((progress) => progress.step === "page-review"));
+    assert.ok(harness.progressEvents.some((progress) => progress.step === "page-visual-review"));
+  });
+
+  it("uses content-review-fix authoring after a failed page content review", async () => {
+    const harness = createHarness({
+      contentReviews: [
+        {
+          pass: false,
+          score: 4,
+          rewrite_request: "Rewrite this page in English and remove unsupported metrics.",
+          issues: [
+            {
+              type: "language",
+              severity: "high",
+              evidence: "中文标题",
+              reason: "The confirmed outline requires English.",
+              fix_hint: "Rewrite the visible text in English.",
+            },
+          ],
+        },
+        { pass: true, score: 9 },
+      ],
+    });
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.ok(harness.authoringPrompts.some((prompt) => prompt.includes("Page Content Review failed")));
+    assert.ok(harness.authoringPrompts.some((prompt) => prompt.includes("content-review-fix")));
+    assert.ok(harness.progressEvents.some((progress) => progress.step === "page-content-review"));
+  });
+
+  it("uses setting output language for content review when outline language is auto", async () => {
+    const autoOutline: WorkspaceOutline = {
+      ...outline,
+      output_language: "auto",
+      source: {
+        ...outline.source,
+        setting: { output_language: "中文" },
+      },
+    };
+    const harness = createHarness();
+
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: autoOutline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.ok(harness.contentReviewPrompts.some((prompt) => prompt.includes("Expected output language: 中文")));
+  });
+
+  it("passes language checking by default when outline and setting languages are auto", async () => {
+    const autoOutline: WorkspaceOutline = {
+      ...outline,
+      output_language: "auto",
+      source: {
+        ...outline.source,
+        setting: { output_language: "auto" },
+      },
+    };
+    const harness = createHarness();
+
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: autoOutline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.ok(harness.contentReviewPrompts.some((prompt) => prompt.includes("Language check passes by default")));
   });
 
   it("returns cancelled completion without throwing", async () => {
@@ -663,7 +775,8 @@ describe("Deck Generation Flow Module", () => {
       ...existingProgress.pages[1],
       status: "render_failed",
       render_attempts: 10,
-      self_review_attempts: 5,
+      visual_review_attempts: 5,
+      content_review_attempts: 5,
       agent_failures: 3,
       last_error: "render broke",
     };
@@ -689,7 +802,8 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.progress.pages[0].status, "accepted");
     assert.equal(harness.progress.pages[1].status, "accepted");
     assert.equal(harness.progress.pages[1].render_attempts, 0);
-    assert.equal(harness.progress.pages[1].self_review_attempts, 0);
+    assert.equal(harness.progress.pages[1].visual_review_attempts, 0);
+    assert.equal(harness.progress.pages[1].content_review_attempts, 0);
     assert.equal(harness.progress.pages[1].agent_failures, 0);
   });
 });

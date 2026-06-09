@@ -604,8 +604,10 @@ function normalizePageProgressItem(value: unknown): AppPageProgressItem | null {
     title: normalizeString(record.title) || pageId,
     status: normalizeString(record.status) || "pending",
     render_attempts: typeof record.render_attempts === "number" ? record.render_attempts : 0,
-    self_review_attempts:
-      typeof record.self_review_attempts === "number" ? record.self_review_attempts : 0,
+    visual_review_attempts:
+      typeof record.visual_review_attempts === "number" ? record.visual_review_attempts : 0,
+    content_review_attempts:
+      typeof record.content_review_attempts === "number" ? record.content_review_attempts : 0,
     agent_failures: typeof record.agent_failures === "number" ? record.agent_failures : 0,
     agent_infrastructure_failures:
       typeof record.agent_infrastructure_failures === "number"
@@ -2064,7 +2066,8 @@ function buildInitialPageProgress(pagePlan: AppPagePlan): AppPageProgress {
       title: page.title,
       status: "pending",
       render_attempts: 0,
-      self_review_attempts: 0,
+      visual_review_attempts: 0,
+      content_review_attempts: 0,
       agent_failures: 0,
       agent_infrastructure_failures: 0,
       slide_path: page.slide_path,

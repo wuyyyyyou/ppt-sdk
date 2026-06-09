@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import FinanceContentFrame from "../components/FinanceContentFrame.tsx";
 import FinanceSectionHeading from "../components/FinanceSectionHeading.tsx";
@@ -110,7 +111,7 @@ export const visualWeight = "balanced";
 export const editableTextPriority = "high";
 
 const TwoColumnInsight = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = Schema.parse(data ?? {});
+  const parsed = readTemplateData(Schema, data);
   const isEvidenceFirst = parsed.variant === "evidence-left-narrative-right";
   const density = parsed.density === "low" ? "compact" : parsed.density === "high" ? "dense" : "normal";
   const cardColumns = parsed.density === "high" ? "grid-cols-2" : "grid-cols-1";

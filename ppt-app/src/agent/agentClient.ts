@@ -30,7 +30,7 @@ export interface AgentRunSummary {
   session_cache_miss_retries?: number;
 }
 
-export interface AgentSelfReviewResult {
+export interface AgentPageVisualReviewResult {
   pass: boolean;
   score: number;
   issues: Array<{
@@ -44,14 +44,15 @@ export interface AgentSelfReviewResult {
   session_cache_miss_retries?: number;
 }
 
-export interface AgentFactReviewResult {
+export interface AgentPageContentReviewResult {
   pass: boolean;
   score: number;
-  unsupported_claims: Array<{
-    claim: string;
-    reason: string;
+  issues: Array<{
+    type: "language" | "outline_alignment" | "grounding";
     severity?: string;
-    rewrite_suggestion?: string;
+    evidence: string;
+    reason: string;
+    fix_hint?: string;
   }>;
   rewrite_request: string;
   confidence: "low" | "medium" | "high";
@@ -59,8 +60,8 @@ export interface AgentFactReviewResult {
 
 export interface AgentClient {
   runAuthoringPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentRunSummary>;
-  runSelfReviewPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentSelfReviewResult>;
-  runFactReviewPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentFactReviewResult>;
+  runPageVisualReviewPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentPageVisualReviewResult>;
+  runPageContentReviewPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentPageContentReviewResult>;
   close(): Promise<void>;
 }
 
@@ -162,9 +163,9 @@ function fallbackRunSummary(
   };
 }
 
-function normalizeSelfReview(value: unknown): AgentSelfReviewResult {
+function normalizePageVisualReview(value: unknown): AgentPageVisualReviewResult {
   const record = value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Partial<AgentSelfReviewResult>)
+    ? (value as Partial<AgentPageVisualReviewResult>)
     : {};
 
   return {
@@ -172,7 +173,7 @@ function normalizeSelfReview(value: unknown): AgentSelfReviewResult {
     score: typeof record.score === "number" ? record.score : 0,
     issues: Array.isArray(record.issues)
       ? record.issues
-          .filter((item): item is AgentSelfReviewResult["issues"][number] =>
+          .filter((item): item is AgentPageVisualReviewResult["issues"][number] =>
             Boolean(item) &&
             typeof item === "object" &&
             !Array.isArray(item) &&
@@ -188,23 +189,27 @@ function normalizeSelfReview(value: unknown): AgentSelfReviewResult {
   };
 }
 
-function normalizeFactReview(value: unknown): AgentFactReviewResult {
+function normalizePageContentReview(value: unknown): AgentPageContentReviewResult {
   const record = value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Partial<AgentFactReviewResult>)
+    ? (value as Partial<AgentPageContentReviewResult>)
     : {};
 
   return {
     pass: record.pass === true,
     score: typeof record.score === "number" ? record.score : 0,
-    unsupported_claims: Array.isArray(record.unsupported_claims)
-      ? record.unsupported_claims
-          .filter((item): item is AgentFactReviewResult["unsupported_claims"][number] =>
-            Boolean(item) &&
-            typeof item === "object" &&
-            !Array.isArray(item) &&
-            typeof (item as { claim?: unknown }).claim === "string" &&
-            typeof (item as { reason?: unknown }).reason === "string"
-          )
+    issues: Array.isArray(record.issues)
+      ? record.issues
+          .filter((item): item is AgentPageContentReviewResult["issues"][number] => {
+            if (!item || typeof item !== "object" || Array.isArray(item)) return false;
+            const issue = item as { type?: unknown; evidence?: unknown; reason?: unknown };
+            return (
+              (issue.type === "language" ||
+                issue.type === "outline_alignment" ||
+                issue.type === "grounding") &&
+              typeof issue.evidence === "string" &&
+              typeof issue.reason === "string"
+            );
+          })
       : [],
     rewrite_request:
       typeof record.rewrite_request === "string" ? record.rewrite_request : "",
@@ -597,11 +602,11 @@ export async function createAgentClient(
       }
     },
 
-    async runSelfReviewPrompt(prompt, options) {
+    async runPageVisualReviewPrompt(prompt, options) {
       const collected = await collectWithSessionRetry(prompt, options);
       try {
         return {
-          ...normalizeSelfReview(parseJsonObject(collected.text, "self-review")),
+          ...normalizePageVisualReview(parseJsonObject(collected.text, "page visual review")),
           session_cache_miss_retries: collected.sessionCacheMissRetries,
         };
       } catch (error) {
@@ -612,25 +617,25 @@ export async function createAgentClient(
         );
         const repaired = await collectWithSessionRetry(repairPrompt, options);
         return {
-          ...normalizeSelfReview(parseJsonObject(repaired.text, "self-review")),
+          ...normalizePageVisualReview(parseJsonObject(repaired.text, "page visual review")),
           session_cache_miss_retries:
             collected.sessionCacheMissRetries + repaired.sessionCacheMissRetries,
         };
       }
     },
 
-    async runFactReviewPrompt(prompt, options) {
+    async runPageContentReviewPrompt(prompt, options) {
       const collected = await collectWithSessionRetry(prompt, options);
       try {
-        return normalizeFactReview(parseJsonObject(collected.text, "fact-review"));
+        return normalizePageContentReview(parseJsonObject(collected.text, "page content review"));
       } catch (error) {
         const repairPrompt = buildStructuredJsonRepairPrompt(
           collected.text,
-          '{"pass":true,"score":8,"unsupported_claims":[],"rewrite_request":"","confidence":"medium"}',
+          '{"pass":true,"score":8,"issues":[],"rewrite_request":"","confidence":"medium"}',
           error instanceof Error ? error.message : String(error)
         );
         const repaired = await collectWithSessionRetry(repairPrompt, options);
-        return normalizeFactReview(parseJsonObject(repaired.text, "fact-review"));
+        return normalizePageContentReview(parseJsonObject(repaired.text, "page content review"));
       }
     },
 

@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import ChartCardShell from "../components/ChartCardShell.tsx";
 import FinanceBarChart, { type FinanceBarChartSeries } from "../components/FinanceBarChart.tsx";
@@ -108,7 +109,7 @@ export const visualWeight = "balanced";
 export const editableTextPriority = "high";
 
 const ChartWithNarrative = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = Schema.parse(data ?? {});
+  const parsed = readTemplateData(Schema, data);
   const chartDensity = parsed.density === "high" ? "dense" : parsed.density === "low" ? "compact" : "normal";
   const isTopChart = parsed.variant === "chart-top-narrative-bottom";
 

@@ -101,6 +101,19 @@ test("missing Schema.parse call reports STATIC-006", async () => {
   );
 });
 
+test("Template Data Contract helper satisfies STATIC-006", async () => {
+  await withDeckFixture(
+    VALID_SLIDE.replace(
+      "const parsed = Schema.parse(data ?? {});",
+      "const parsed = readTemplateData(Schema, data);",
+    ),
+    async (manifestPath) => {
+      const diagnostics = await runStaticRules({ manifestPath });
+      assert.equal(diagnostics.some((diagnostic) => diagnostic.ruleId === "STATIC-006"), false);
+    },
+  );
+});
+
 test("fields read outside Schema report STATIC-007", async () => {
   await withDeckFixture(
     VALID_SLIDE.replace(

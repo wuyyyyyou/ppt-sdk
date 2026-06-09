@@ -1,14 +1,18 @@
 import {
   isAgentInfrastructureError,
   type AgentClient,
-  type AgentFactReviewResult,
+  type AgentPageContentReviewResult,
   type AgentRunSummary,
-  type AgentSelfReviewResult,
+  type AgentPageVisualReviewResult,
   type AgentStreamEvent,
 } from "../../agent/agentClient";
 import { TSX_AUTHORING_RULES_SUMMARY } from "../../agent/promptRules";
 import { CONTENT_GROUNDING_RULES } from "../../ai/groundingRules";
-import { readOutlineOutputLanguage } from "../../ai/outputLanguage";
+import {
+  AUTO_OUTPUT_LANGUAGE,
+  normalizeOutputLanguage,
+  readOutlineOutputLanguage,
+} from "../../ai/outputLanguage";
 import type { AiClient } from "../../ai/aiClient";
 import type {
   PagePlan,
@@ -24,8 +28,8 @@ import type { Locale } from "../../i18n/messages";
 
 const ATTEMPT_LIMITS = {
   render: 10,
-  selfReview: 5,
-  factReview: 3,
+  visualReview: 5,
+  contentReview: 5,
   agent: 5,
 };
 const PAGE_GENERATION_CONCURRENCY = 3;
@@ -34,9 +38,9 @@ export type DeckGenerationStep =
   | "page-plan"
   | "prepare"
   | "page-authoring"
-  | "fact-review"
+  | "page-content-review"
   | "page-render"
-  | "page-review"
+  | "page-visual-review"
   | "final-render"
   | "complete"
   | "cancelled"
@@ -51,10 +55,10 @@ export interface DeckGenerationProgressPage {
   status: string;
   render_attempts: number;
   render_attempt_limit: number;
-  self_review_attempts: number;
-  self_review_attempt_limit: number;
-  fact_review_attempts: number;
-  fact_review_attempt_limit: number;
+  visual_review_attempts: number;
+  visual_review_attempt_limit: number;
+  content_review_attempts: number;
+  content_review_attempt_limit: number;
   agent_failures: number;
   agent_failure_limit: number;
   agent_infrastructure_failures: number;
@@ -191,14 +195,12 @@ function generationText(locale: Locale) {
       zh ? `正在思考第 ${page.index + 1} 页的表达` : `Thinking through page ${page.index + 1}`,
     renderingPage: (page: PagePlanItem) =>
       zh ? `正在渲染第 ${page.index + 1} 页` : `Rendering page ${page.index + 1}`,
-    reviewingScreenshot: (page: PagePlanItem) =>
-      zh ? `正在自评第 ${page.index + 1} 页截图` : `Reviewing page ${page.index + 1} screenshot`,
-    reviewingFacts: (page: PagePlanItem) =>
-      zh ? `正在审查第 ${page.index + 1} 页事实依据` : `Reviewing page ${page.index + 1} grounding`,
-    fixingFacts: (page: PagePlanItem) =>
-      zh ? `正在修正第 ${page.index + 1} 页不受支持的内容` : `Fixing unsupported content on page ${page.index + 1}`,
-    reviewingPage: (page: PagePlanItem) =>
-      zh ? `正在检查第 ${page.index + 1} 页的细节` : `Checking page ${page.index + 1}`,
+    reviewingContent: (page: PagePlanItem) =>
+      zh ? `正在检查第 ${page.index + 1} 页内容` : `Reviewing page ${page.index + 1} content`,
+    fixingContent: (page: PagePlanItem) =>
+      zh ? `正在修正第 ${page.index + 1} 页内容问题` : `Fixing content issues on page ${page.index + 1}`,
+    reviewingVisuals: (page: PagePlanItem) =>
+      zh ? `正在检查第 ${page.index + 1} 页视觉效果` : `Reviewing page ${page.index + 1} visuals`,
     cancelled: zh ? "已停止生成" : "Generation stopped",
     agentSessionCacheMissExhausted: zh
       ? "Agent 会话重试后仍失败，请重跑这一页。"
@@ -237,10 +239,10 @@ function mapProgress(progress: PageProgress | null): DeckGenerationProgressPage[
     status: page.status,
     render_attempts: page.render_attempts,
     render_attempt_limit: ATTEMPT_LIMITS.render,
-    self_review_attempts: page.self_review_attempts,
-    self_review_attempt_limit: ATTEMPT_LIMITS.selfReview,
-    fact_review_attempts: page.fact_review_attempts ?? 0,
-    fact_review_attempt_limit: ATTEMPT_LIMITS.factReview,
+    visual_review_attempts: page.visual_review_attempts,
+    visual_review_attempt_limit: ATTEMPT_LIMITS.visualReview,
+    content_review_attempts: page.content_review_attempts ?? 0,
+    content_review_attempt_limit: ATTEMPT_LIMITS.contentReview,
     agent_failures: page.agent_failures,
     agent_failure_limit: ATTEMPT_LIMITS.agent,
     agent_infrastructure_failures: page.agent_infrastructure_failures,
@@ -297,10 +299,10 @@ function buildAuthoringPrompt(input: {
   page: PagePlanItem;
   pagePlan: PagePlan;
   outline: WorkspaceOutline;
-  attemptKind: "initial" | "render-fix" | "self-review-fix" | "fact-review-fix";
+  attemptKind: "initial" | "render-fix" | "visual-review-fix" | "content-review-fix";
   renderError?: string;
-  selfReview?: AgentSelfReviewResult | null;
-  factReview?: AgentFactReviewResult | null;
+  visualReview?: AgentPageVisualReviewResult | null;
+  contentReview?: AgentPageContentReviewResult | null;
 }) {
   return [
     "You are a local file-editing Agent generating one PPT slide in a TSX-first template workspace.",
@@ -333,18 +335,21 @@ function buildAuthoringPrompt(input: {
     CONTENT_GROUNDING_RULES,
     "",
     "When editing slide TSX/data, remove or soften unsupported specifics. Use neutral business language or TBD for missing details.",
-    "If render-fix or self-review-fix asks for visual changes, fix visuals without adding new factual claims.",
+    "If content-review-fix asks for content changes, edit only the current data JSON by default. Edit the current slide TSX only when visible hardcoded text, schema constraints, or rendering logic prevent a data-only fix.",
+    "If render-fix or visual-review-fix asks for visual changes, fix visuals without adding new factual claims.",
     "",
     `Full outline JSON: ${JSON.stringify(input.outline)}`,
     `Full page plan JSON: ${JSON.stringify(input.pagePlan)}`,
     input.renderError ? `Render error to fix:\n${input.renderError}` : "",
-    input.selfReview
-      ? `Visual review failed. Fix request:\n${JSON.stringify(input.selfReview)}`
+    input.visualReview
+      ? `Visual review failed. Fix request:\n${JSON.stringify(input.visualReview)}`
       : "",
-    input.factReview
+    input.contentReview
       ? [
-          "Content grounding review failed. Rewrite request:",
-          JSON.stringify(input.factReview),
+          "Page Content Review failed. Rewrite request:",
+          JSON.stringify(input.contentReview),
+          "Fix language, outline-alignment, and grounding issues by editing the current page data JSON first.",
+          "Do not modify page-plan.json, outline.json, other pages, or unrelated shared files.",
           "Remove, soften, or mark unsupported concrete claims as TBD. Do not replace them with new unsupported specifics.",
         ].join("\n")
       : "",
@@ -353,33 +358,72 @@ function buildAuthoringPrompt(input: {
     .join("\n");
 }
 
-function buildFactReviewPrompt(input: {
+function resolveReviewExpectedOutputLanguage(
+  outline: WorkspaceOutline,
+): string | null {
+  const outlineLanguage = normalizeOutputLanguage(outline.output_language);
+  if (outlineLanguage !== AUTO_OUTPUT_LANGUAGE) {
+    return outlineLanguage;
+  }
+
+  const settingLanguage = normalizeOutputLanguage(outline.source?.setting?.output_language);
+  return settingLanguage !== AUTO_OUTPUT_LANGUAGE ? settingLanguage : null;
+}
+
+function buildPageContentReviewPrompt(input: {
   workspaceDir: string;
   page: PagePlanItem;
   pagePlan: PagePlan;
   outline: WorkspaceOutline;
 }) {
+  const expectedOutputLanguage = resolveReviewExpectedOutputLanguage(input.outline);
+  const languageInstruction = expectedOutputLanguage
+    ? [
+        `Expected output language: ${expectedOutputLanguage}`,
+        "Fail with a language issue when the current page's main visible textual content is not in the expected output language.",
+      ].join("\n")
+    : "No explicit expected output language is available. Language check passes by default; do not fail this review for language.";
+
   return [
-    "You are a factual grounding reviewer for one generated PPT slide.",
-    "Your job is to identify concrete factual claims that are not supported by the provided workspace context.",
-    "Do not use your own world knowledge to approve a claim. Judge support only from the user prompt, context rows, uploaded/source material, outline, page plan, and current slide/data files.",
-    "Read these files before judging:",
-    `- ${input.workspaceDir}/template/${input.page.slide_path.replace(/^\.\//, "")}`,
-    `- ${input.workspaceDir}/template/${input.page.data_path.replace(/^\.\//, "")}`,
-    `- ${input.workspaceDir}/outline.json`,
-    `- ${input.workspaceDir}/page-plan.json`,
-    `- ${input.workspaceDir}/setting.json`,
-    `- ${input.workspaceDir}/task.json`,
+    "You are a Page Content Review agent for one generated PPT slide.",
+    "Review only the current page's visible textual content. Do not judge visual layout quality.",
+    "Read these files before judging, in this order:",
+    `1. Current data JSON: ${input.workspaceDir}/template/${input.page.data_path.replace(/^\.\//, "")}`,
+    `2. Current slide TSX for visibility/schema interpretation: ${input.workspaceDir}/template/${input.page.slide_path.replace(/^\.\//, "")}`,
+    `3. Workspace outline: ${input.workspaceDir}/outline.json`,
+    `4. Workspace page plan: ${input.workspaceDir}/page-plan.json`,
+    `5. Workspace setting: ${input.workspaceDir}/setting.json`,
+    `6. Workspace task metadata: ${input.workspaceDir}/task.json`,
+    "",
+    "Data field scope:",
+    "- Judge user-visible string values in the current data JSON.",
+    "- Use the current slide TSX to distinguish visible content fields from control/configuration fields.",
+    "- Do not judge JSON keys, internal _plan fields, enum/control values, file paths, ids, booleans, or non-visible template configuration as language/content issues.",
+    "- Allow proper nouns, brand names, product names, organization names, acronyms, numbers, dates, units, and user-provided source terms.",
+    "",
+    "Language check:",
+    languageInstruction,
+    "",
+    "Outline alignment check:",
+    "- The current page's Page Plan entry is the primary content boundary.",
+    "- Fail with an outline_alignment issue when main titles, body text, lists, chart narrative, or speaker notes clearly belong to another page or contradict the current page outline.",
+    "- Allow light deck-level connective text.",
+    "- Allow cover, agenda, and closing pages to summarize the deck when that fits the current page role.",
+    "",
+    "Grounding check:",
+    "Do not use your own world knowledge to approve a claim.",
+    "Judge support only from workspace artifacts: current data, current slide, current page plan entry, Confirmed Outline and its source prompt/context/task_context, workspace settings, and uploaded/source material represented in workspace artifacts.",
     "",
     CONTENT_GROUNDING_RULES,
     "",
-    "Treat these as unsupported unless explicitly present in the workspace context: numbers, dates, market sizes, growth rates, customer names, case studies, product capabilities, URLs, citations, quotes, rankings, regulatory/legal claims, geography-specific facts, and claims about competitors or named organizations.",
+    "Treat these as unsupported unless explicitly present in the workspace artifacts: numbers, dates, market sizes, growth rates, customer names, case studies, product capabilities, URLs, citations, quotes, rankings, regulatory/legal claims, geography-specific facts, and claims about competitors or named organizations.",
     "Generic business phrasing can pass if it is clearly not presented as a concrete fact.",
     "Return only one JSON object matching this shape:",
-    '{"pass":true,"score":8,"unsupported_claims":[{"claim":"...","reason":"...","severity":"high","rewrite_suggestion":"..."}],"rewrite_request":"","confidence":"medium"}',
+    '{"pass":true,"score":8,"issues":[{"type":"language","severity":"high","evidence":"...","reason":"...","fix_hint":"..."},{"type":"outline_alignment","severity":"medium","evidence":"...","reason":"...","fix_hint":"..."},{"type":"grounding","severity":"high","evidence":"...","reason":"...","fix_hint":"..."}],"rewrite_request":"","confidence":"medium"}',
     "Do not include markdown, code fences, explanations, or any extra text.",
     "",
-    "Use score 0-10. pass=true requires score >= 7, no high-severity unsupported claims, and confidence not low.",
+    "Use score 0-10. pass=true requires score >= 7, confidence not low, no language or outline_alignment failure, and no high or medium severity grounding issue.",
+    "Low severity issues may be advisory. High and medium severity issues require a concrete rewrite_request.",
     `Current page title: ${input.page.title}`,
     `Current page outline: ${input.page.outline}`,
     `Full outline JSON: ${JSON.stringify(input.outline)}`,
@@ -387,13 +431,15 @@ function buildFactReviewPrompt(input: {
   ].join("\n");
 }
 
-function buildSelfReviewPrompt(input: {
+function buildPageVisualReviewPrompt(input: {
   page: PagePlanItem;
   screenshotPath: string;
   preview: RenderWorkspacePagePreviewResult;
 }) {
   return [
-    "Review the generated PPT slide screenshot for visual quality.",
+    "You are a Page Visual Review agent for one generated PPT slide.",
+    "Review only the generated PPT slide screenshot for visual quality.",
+    "Do not judge output language, outline alignment, factual grounding, unsupported claims, or content correctness.",
     "First use `upload_local_file` on the screenshot path, then inspect that uploaded image with `analyze_image` before making a visual judgment.",
     "If image analysis is unavailable or inconclusive, use the rendered HTML path as fallback context and still return a JSON review.",
     "Return only one JSON object matching this shape:",
@@ -401,25 +447,24 @@ function buildSelfReviewPrompt(input: {
     "Do not include markdown, code fences, explanations, or any extra text.",
     "",
     `Screenshot path: ${input.screenshotPath}`,
-    `Page title: ${input.page.title}`,
-    `Page outline: ${input.page.outline}`,
+    `Page title for identification only: ${input.page.title}`,
     `Rendered HTML path: ${input.preview.html_path}`,
     "",
-    "Pass only if the slide follows the outline, looks like a complete PPT page, has no obvious overlap/cutoff/blank errors, uses readable text, and fits the selected template style.",
+    "Pass only if the slide looks like a complete PPT page, has no obvious overlap/cutoff/blank errors, uses readable text, renders all intended visual regions, and fits the selected template style.",
     "Use score 0-10. pass=true requires score >= 7.",
   ].join("\n");
 }
 
-function selfReviewPassed(review: AgentSelfReviewResult) {
+function visualReviewPassed(review: AgentPageVisualReviewResult) {
   return review.pass && review.score >= 7 && review.confidence !== "low";
   // return true; // 先关闭自评结果中的置信度判断，后续根据实际情况再调整
 }
 
-function factReviewPassed(review: AgentFactReviewResult) {
-  const hasHighSeverityClaim = review.unsupported_claims.some((claim) =>
-    /high|critical|严重|高/i.test(claim.severity ?? "")
+function contentReviewPassed(review: AgentPageContentReviewResult) {
+  const hasFailingIssue = review.issues.some((issue) =>
+    !/low|minor|低/i.test(issue.severity ?? "")
   );
-  return review.pass && review.score >= 7 && review.confidence !== "low" && !hasHighSeverityClaim;
+  return review.pass && review.score >= 7 && review.confidence !== "low" && !hasFailingIssue;
 }
 
 function getProgressPage(progress: PageProgress | null, pageId: string) {
@@ -721,8 +766,8 @@ async function createRestartArtifacts(input: RunDeckGenerationInput) {
     progress = await recordProgress(input, page, {
       status: "pending",
       render_attempts: 0,
-      self_review_attempts: 0,
-      fact_review_attempts: 0,
+      visual_review_attempts: 0,
+      content_review_attempts: 0,
       agent_failures: 0,
       agent_infrastructure_failures: 0,
       last_error: "",
@@ -917,8 +962,8 @@ async function runPageGeneration(
   );
 
   let renderAttempts = existingPageProgress?.render_attempts ?? 0;
-  let selfReviewAttempts = existingPageProgress?.self_review_attempts ?? 0;
-  let factReviewAttempts = existingPageProgress?.fact_review_attempts ?? 0;
+  let visualReviewAttempts = existingPageProgress?.visual_review_attempts ?? 0;
+  let contentReviewAttempts = existingPageProgress?.content_review_attempts ?? 0;
   let agentFailures = existingPageProgress?.agent_failures ?? 0;
   let agentInfrastructureFailures =
     existingPageProgress?.agent_infrastructure_failures ?? 0;
@@ -926,22 +971,22 @@ async function runPageGeneration(
     existingPageProgress?.status === "render_fixing"
       ? existingPageProgress.last_error
       : "";
-  let selfReview =
-    existingPageProgress?.status === "self_review_fixing"
-      ? (existingPageProgress.review as AgentSelfReviewResult | null)
+  let visualReview =
+    existingPageProgress?.status === "visual_review_fixing"
+      ? (existingPageProgress.review as AgentPageVisualReviewResult | null)
       : null;
-  let factReview =
-    existingPageProgress?.status === "fact_review_fixing"
-      ? (existingPageProgress.review as AgentFactReviewResult | null)
+  let contentReview =
+    existingPageProgress?.status === "content_review_fixing"
+      ? (existingPageProgress.review as AgentPageContentReviewResult | null)
       : null;
 
   while (!input.isCancelled()) {
     const attemptKind = renderError
       ? "render-fix"
-      : factReview
-        ? "fact-review-fix"
-        : selfReview
-          ? "self-review-fix"
+      : contentReview
+        ? "content-review-fix"
+        : visualReview
+          ? "visual-review-fix"
           : "initial";
     const authoringPrompt = buildAuthoringPrompt({
       workspaceDir: input.workspace.workspace_dir,
@@ -950,8 +995,8 @@ async function runPageGeneration(
       outline: input.confirmedOutline,
       attemptKind,
       renderError,
-      selfReview,
-      factReview,
+      visualReview,
+      contentReview,
     });
     const authoringKind = attemptKind === "initial" ? "authoring" : attemptKind;
     const authoringTracker = createAgentRunTracker({
@@ -980,8 +1025,8 @@ async function runPageGeneration(
           authoringResult.session_cache_miss_retries ?? 0,
       });
       renderError = "";
-      selfReview = null;
-      factReview = null;
+      visualReview = null;
+      contentReview = null;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (isAgentInfrastructureError(error)) {
@@ -1033,50 +1078,50 @@ async function runPageGeneration(
     }
 
     progress = await recordProgress(input, page, {
-      status: "fact_review",
+      status: "content_review",
       last_error: "",
     });
     input.setProgress(progress);
     emitRuntime(
       input,
       {
-        step: "fact-review",
+        step: "page-content-review",
         message: buildDeckGenerationSummary(input, progress, totalPages),
         currentPageIndex: page.index,
         totalPages,
       },
       progress,
     );
-    const factReviewPrompt = buildFactReviewPrompt({
+    const contentReviewPrompt = buildPageContentReviewPrompt({
       workspaceDir: input.workspace.workspace_dir,
       page,
       pagePlan,
       outline: input.confirmedOutline,
     });
-    const factReviewTracker = createAgentRunTracker({
+    const contentReviewTracker = createAgentRunTracker({
       flowInput: input,
       page,
-      step: "fact-review",
-      message: text.reviewingFacts(page),
+      step: "page-content-review",
+      message: text.reviewingContent(page),
       totalPages,
       progress: input.getProgress,
-      prompt: factReviewPrompt,
-      kind: "fact-review",
+      prompt: contentReviewPrompt,
+      kind: "page-content-review",
     });
     try {
-      factReview = await input.agentClient.runFactReviewPrompt(
-        factReviewPrompt,
-        { onStreamEvent: factReviewTracker.onStreamEvent },
+      contentReview = await input.agentClient.runPageContentReviewPrompt(
+        contentReviewPrompt,
+        { onStreamEvent: contentReviewTracker.onStreamEvent },
       );
-      await factReviewTracker.flush("completed", {
+      await contentReviewTracker.flush("completed", {
         parsed_review: true,
-        review: factReview,
+        review: contentReview,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (isAgentInfrastructureError(error)) {
         agentInfrastructureFailures += 1;
-        await factReviewTracker.flush("error", {
+        await contentReviewTracker.flush("error", {
           error: message,
           agent_infrastructure_failures: agentInfrastructureFailures,
           active_session_limit: error.activeSessionLimit,
@@ -1102,12 +1147,12 @@ async function runPageGeneration(
       }
 
       agentFailures += 1;
-      await factReviewTracker.flush("error", {
+      await contentReviewTracker.flush("error", {
         error: message,
         agent_failures: agentFailures,
       });
       progress = await recordProgress(input, page, {
-        status: agentFailures >= ATTEMPT_LIMITS.agent ? "agent_failed" : "fact_review",
+        status: agentFailures >= ATTEMPT_LIMITS.agent ? "agent_failed" : "content_review",
         agent_failures: agentFailures,
         last_error: message,
       });
@@ -1117,43 +1162,43 @@ async function runPageGeneration(
     }
 
     progress = await recordProgress(input, page, {
-      review: factReview,
+      review: contentReview,
     });
     input.setProgress(progress);
 
-    if (!factReviewPassed(factReview)) {
-      factReviewAttempts += 1;
+    if (!contentReviewPassed(contentReview)) {
+      contentReviewAttempts += 1;
       const rewriteRequest =
-        factReview.rewrite_request ||
-        factReview.unsupported_claims
-          .map((claim) => `${claim.claim}: ${claim.reason}`)
+        contentReview.rewrite_request ||
+        contentReview.issues
+          .map((issue) => `${issue.type}: ${issue.evidence}: ${issue.reason}`)
           .join("\n") ||
-        "Fact review failed; remove unsupported claims.";
+        "Page Content Review failed; fix language, outline alignment, or grounding issues.";
       progress = await recordProgress(input, page, {
         status:
-          factReviewAttempts >= ATTEMPT_LIMITS.factReview
+          contentReviewAttempts >= ATTEMPT_LIMITS.contentReview
             ? "needs_user_review"
-            : "fact_review_fixing",
-        fact_review_attempts: factReviewAttempts,
-        review: factReview,
+            : "content_review_fixing",
+        content_review_attempts: contentReviewAttempts,
+        review: contentReview,
         last_error: rewriteRequest,
       });
       input.setProgress(progress);
       emitRuntime(
         input,
         {
-          step: "fact-review",
+          step: "page-content-review",
           message: buildDeckGenerationSummary(input, progress, totalPages),
           currentPageIndex: page.index,
           totalPages,
         },
         progress,
       );
-      if (factReviewAttempts >= ATTEMPT_LIMITS.factReview) break;
+      if (contentReviewAttempts >= ATTEMPT_LIMITS.contentReview) break;
       continue;
     }
 
-    factReview = null;
+    contentReview = null;
     let preview: RenderWorkspacePagePreviewResult;
     try {
       progress = await recordProgress(input, page, { status: "rendering" });
@@ -1173,7 +1218,7 @@ async function runPageGeneration(
         page_index: page.index,
       });
       progress = await recordProgress(input, page, {
-        status: "self_review",
+        status: "visual_review",
         last_html_path: preview.html_path,
         last_screenshot_path: preview.screenshot_path,
         last_error: "",
@@ -1195,38 +1240,38 @@ async function runPageGeneration(
     emitRuntime(
       input,
       {
-        step: "page-review",
+        step: "page-visual-review",
         message: buildDeckGenerationSummary(input, progress, totalPages),
         currentPageIndex: page.index,
         totalPages,
       },
       progress,
     );
-    const selfReviewPrompt = buildSelfReviewPrompt({
+    const visualReviewPrompt = buildPageVisualReviewPrompt({
       page,
       screenshotPath: preview.screenshot_path,
       preview,
     });
-    const selfReviewTracker = createAgentRunTracker({
+    const visualReviewTracker = createAgentRunTracker({
       flowInput: input,
       page,
-      step: "page-review",
-      message: text.reviewingPage(page),
+      step: "page-visual-review",
+      message: text.reviewingVisuals(page),
       totalPages,
       progress: input.getProgress,
-      prompt: selfReviewPrompt,
-      kind: "self-review",
+      prompt: visualReviewPrompt,
+      kind: "page-visual-review",
     });
     try {
-      selfReview = await input.agentClient.runSelfReviewPrompt(
-        selfReviewPrompt,
-        { onStreamEvent: selfReviewTracker.onStreamEvent },
+      visualReview = await input.agentClient.runPageVisualReviewPrompt(
+        visualReviewPrompt,
+        { onStreamEvent: visualReviewTracker.onStreamEvent },
       );
-      await selfReviewTracker.flush("completed", {
+      await visualReviewTracker.flush("completed", {
         parsed_review: true,
-        review: selfReview,
+        review: visualReview,
         session_cache_miss_retries:
-          selfReview.session_cache_miss_retries ?? 0,
+          visualReview.session_cache_miss_retries ?? 0,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1235,7 +1280,7 @@ async function runPageGeneration(
           ? text.agentSessionCacheMissExhausted
           : message;
         agentInfrastructureFailures += 1;
-        await selfReviewTracker.flush("error", {
+        await visualReviewTracker.flush("error", {
           error: displayMessage,
           raw_error: error.rawMessage,
           agent_session_cache_miss: error.sessionCacheMiss,
@@ -1264,12 +1309,12 @@ async function runPageGeneration(
       }
 
       agentFailures += 1;
-      await selfReviewTracker.flush("error", {
+      await visualReviewTracker.flush("error", {
         error: message,
         agent_failures: agentFailures,
       });
       progress = await recordProgress(input, page, {
-        status: agentFailures >= ATTEMPT_LIMITS.agent ? "agent_failed" : "self_review",
+        status: agentFailures >= ATTEMPT_LIMITS.agent ? "agent_failed" : "visual_review",
         agent_failures: agentFailures,
         last_error: message,
       });
@@ -1278,14 +1323,14 @@ async function runPageGeneration(
       continue;
     }
     progress = await recordProgress(input, page, {
-      review: selfReview,
+      review: visualReview,
     });
     input.setProgress(progress);
 
-    if (selfReviewPassed(selfReview)) {
+    if (visualReviewPassed(visualReview)) {
       progress = await recordProgress(input, page, {
         status: "accepted",
-        review: selfReview,
+        review: visualReview,
       });
       input.setProgress(progress);
       return {
@@ -1295,18 +1340,18 @@ async function runPageGeneration(
       };
     }
 
-    selfReviewAttempts += 1;
+    visualReviewAttempts += 1;
     progress = await recordProgress(input, page, {
       status:
-        selfReviewAttempts >= ATTEMPT_LIMITS.selfReview
+        visualReviewAttempts >= ATTEMPT_LIMITS.visualReview
           ? "needs_user_review"
-          : "self_review_fixing",
-      self_review_attempts: selfReviewAttempts,
-      review: selfReview,
-      last_error: selfReview.revision_request,
+          : "visual_review_fixing",
+      visual_review_attempts: visualReviewAttempts,
+      review: visualReview,
+      last_error: visualReview.revision_request,
     });
     input.setProgress(progress);
-    if (selfReviewAttempts >= ATTEMPT_LIMITS.selfReview) break;
+    if (visualReviewAttempts >= ATTEMPT_LIMITS.visualReview) break;
   }
 
   progress = input.getProgress() ?? await input.backend.getPageProgress({
@@ -1332,7 +1377,8 @@ async function runPageGeneration(
           title: page.title,
           status: "failed",
           render_attempts: 0,
-          self_review_attempts: 0,
+          visual_review_attempts: 0,
+          content_review_attempts: 0,
           agent_failures: 0,
           agent_infrastructure_failures: 0,
           slide_path: page.slide_path,
@@ -1553,7 +1599,7 @@ export async function runDeckGeneration(
   };
 }
 
-function buildRefinementReview(instruction: string): AgentSelfReviewResult {
+function buildRefinementReview(instruction: string): AgentPageVisualReviewResult {
   const groundedInstruction = [
     instruction,
     "",
@@ -1652,10 +1698,10 @@ export async function runDeckRefinement(
   const review = buildRefinementReview(instruction);
   for (const page of targetPages) {
     await recordProgress(input, page, {
-      status: "self_review_fixing",
+      status: "visual_review_fixing",
       render_attempts: 0,
-      self_review_attempts: 0,
-      fact_review_attempts: 0,
+      visual_review_attempts: 0,
+      content_review_attempts: 0,
       agent_failures: 0,
       last_error: instruction,
       review,
@@ -1727,7 +1773,8 @@ export async function runPageGenerationRetry(
   let progress = await recordProgress(input, page, {
     status: "pending",
     render_attempts: 0,
-    self_review_attempts: 0,
+    visual_review_attempts: 0,
+    content_review_attempts: 0,
     agent_failures: 0,
     agent_infrastructure_failures: 0,
     last_error: "",

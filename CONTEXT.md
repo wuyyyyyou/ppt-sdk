@@ -31,6 +31,9 @@ A natural-language instruction used to revise the current outline draft as a who
 **Template**:
 The selected visual style family used to shape the deck.
 
+**Template Data Contract**:
+The recommended data shape for a Template layout. It guides authoring and tooling, but it is not necessarily a render-time gate.
+
 **Page Plan**:
 The slide-by-slide mapping from outline entries to planned pages.
 
@@ -47,10 +50,10 @@ The process that turns a confirmed outline into presentation pages; it does not 
 A deck generation process that is currently running; the confirmed outline is not open to edits during this period.
 
 **Generation Step**:
-A visible part of deck generation, such as planning pages, preparing files, authoring a page, rendering, self-review, or final rendering.
+A visible part of deck generation, such as planning pages, preparing files, authoring a page, content review, rendering, visual review, or final rendering.
 
 **Page Generation Unit**:
-One planned page being authored, rendered, and self-reviewed as an independent part of Deck Generation. It owns only that page's content and page-level assets; shared deck structure and template-wide assets belong outside the unit.
+One planned page being authored, content-reviewed, rendered, and visual-reviewed as an independent part of Deck Generation. It owns only that page's content and page-level assets; shared deck structure and template-wide assets belong outside the unit.
 
 **Active Page Generation**:
 A Page Generation Unit that has started and has not yet reached an accepted, failed, or cancelled terminal state. Its live stream may be shown while it is active.
@@ -63,6 +66,16 @@ The visible stream for an Active Page Generation. It shows the current page run 
 
 **Page Generation Stage Record**:
 The user-facing record of what happened within one Page Generation Unit across stages such as authoring, rendering, review, and fixing. It may include live or completed agent output, but it is presented as page work rather than as session history.
+
+**Page Content Review**:
+The Page Generation check that judges whether a generated page's visible textual content is grounded in the Workspace context, follows the Page Plan and Confirmed Outline, and uses the expected output language.
+It treats the current page's Page Plan entry as the primary content boundary while allowing light deck-level connective text where the page role calls for it.
+It may report language, outline-alignment, or grounding issues.
+_Avoid_: Fact Review when referring to the full content check.
+
+**Page Visual Review**:
+The Page Generation check that judges whether a rendered page screenshot is visually usable as a PPT page, including layout completeness, readability, overlap, cutoff, blank areas, and fit with the selected Template.
+_Avoid_: Self Review when referring to the visual-only screenshot check.
 
 **Generation Session History**:
 The collapsed-by-default record of completed agent runs from Deck Generation. It is historical context, not the primary place for Live Page Streams.
