@@ -72,6 +72,7 @@ export interface WorkspaceOutline {
   source: {
     prompt: string;
     context: unknown[];
+    task_context?: unknown[];
     setting: Record<string, unknown>;
     kind?: string;
   };
@@ -84,6 +85,7 @@ export interface WorkspacePageItem {
   title: string;
   layout_id: string;
   html_path: string;
+  screenshot_path?: string;
   speaker_note: string;
 }
 
@@ -156,7 +158,8 @@ export interface UpdateWorkspaceOutlineInput {
     items?: WorkspaceOutlineItem[];
     source?: {
       prompt: string;
-      context: unknown[];
+      context?: unknown[];
+      task_context?: unknown[];
       setting?: Record<string, unknown>;
     };
   };
@@ -366,6 +369,7 @@ export interface RenderWorkspacePagePreviewResult {
   html_path: string;
   preview_url: string;
   screenshot_path: string;
+  screenshot_url?: string;
   page_index: number;
   page_number: number;
   slide_id: string;
@@ -394,6 +398,8 @@ export interface RenderDeckHtmlResult {
     title: string;
     html_path: string;
     preview_url: string;
+    screenshot_path?: string;
+    screenshot_url?: string;
     speaker_note: string;
   }>;
   slide_count: number;
@@ -418,6 +424,40 @@ export interface PrepareExportModelResult {
   outputDir: string;
 }
 
+export type PptxExportStatus =
+  | "idle"
+  | "preparing_model"
+  | "model_ready"
+  | "generating_pptx"
+  | "completed"
+  | "failed";
+
+export interface PptxExportJob {
+  version: 1;
+  job_id: string;
+  status: PptxExportStatus;
+  message: string;
+  percent: number;
+  workspace_dir: string;
+  status_path: string;
+  output_dir: string;
+  html_path: string;
+  model_path: string;
+  pptx_path: string;
+  started_at: string | null;
+  updated_at: string | null;
+  completed_at: string | null;
+  error: {
+    message: string;
+    stack?: string;
+  } | null;
+  generator_result?: unknown;
+}
+
+export interface StartPptxExportModelInput {
+  workspace_dir: string;
+}
+
 export interface GeneratePptxInput {
   modelPath: string;
   outputPath: string;
@@ -426,6 +466,11 @@ export interface GeneratePptxInput {
 export interface GeneratePptxResult {
   pptxPath: string;
   summary?: unknown;
+}
+
+export interface StartGeneratePptxInput extends GeneratePptxInput {
+  workspace_dir: string;
+  job_id?: string;
 }
 
 export interface RecordPptxExportInput {
@@ -449,11 +494,18 @@ export interface RecordPdfExportInput {
   pdfPath: string;
 }
 
-export interface OpenExportArtifactInput {
-  path: string;
+export interface GetExportArtifactDownloadUrlInput {
+  workspace_dir: string;
+  artifact_type: "pptx" | "pdf";
 }
 
-export interface OpenExportArtifactResult {
-  opened: boolean;
+export interface ExportArtifactDownloadUrlResult {
+  workspace_dir: string;
+  workspace_id: string;
+  title: string;
+  artifact_type: "pptx" | "pdf";
   path: string;
+  filename: string;
+  updated_at: string | null;
+  download_url: string;
 }

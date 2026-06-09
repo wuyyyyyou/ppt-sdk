@@ -3,31 +3,34 @@ import type { PptBackend } from "./pptBackend";
 import type {
   AppendWorkspaceLogResult,
   ExportPdfInput,
+  ExportArtifactDownloadUrlResult,
   ExportPdfResult,
   GeneratePptxInput,
   GeneratePptxResult,
   PagePlan,
   PageProgress,
-  OpenExportArtifactResult,
   TemplateSummary,
   WorkspaceOutline,
   ListWorkspacesResult,
   PreparePageFilesResult,
   PrepareExportModelResult,
   ProjectResult,
+  PptxExportJob,
   RenderDeckHtmlResult,
   RenderWorkspacePagePreviewResult,
   RecordPdfExportInput,
   TemplatePlanningContext,
   WorkspaceResult
 } from "./types";
+import { PPT_ENGINE_TOOL, PPT_GENER_TOOL } from "./toolManifests.generated";
 
 const PPT_ENGINE_TOOL_ID =
   import.meta.env.VITE_PPT_ENGINE_TOOL_ID ??
-  "tool-lightvoss_5433-ppt-engine-6443rj2a";
+  PPT_ENGINE_TOOL.id;
 const PPT_GENER_TOOL_ID =
   import.meta.env.VITE_PPT_GENER_TOOL_ID ??
-  "tool-lightvoss_5433-ppt-gener-dc7ftcep";
+  PPT_GENER_TOOL.id;
+const PPTX_EXPORT_TIMEOUT_MS = 600_000;
 
 function unwrapToolResult<T>(result: unknown): T {
   if (
@@ -98,10 +101,16 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
   async function invoke<T>(
     toolId: string,
     method: string,
-    args: object
+    args: object,
+    options?: { timeoutMs?: number }
   ): Promise<T> {
+    const input =
+      options?.timeoutMs === undefined
+        ? { tool_id: toolId, method, args }
+        : { tool_id: toolId, method, args, timeoutMs: options.timeoutMs };
+
     return unwrapToolResult<T>(
-      await runtime.tools.invoke({ tool_id: toolId, method, args })
+      await runtime.tools.invoke(input, options)
     );
   }
 
@@ -223,13 +232,35 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invoke<PrepareExportModelResult>(
         PPT_ENGINE_TOOL_ID,
         "app_prepare_export_model",
-        input
+        input,
+        { timeoutMs: PPTX_EXPORT_TIMEOUT_MS }
       ).then(normalizePrepareExportModelResult),
+    startPptxExportModel: (input) =>
+      invoke<PptxExportJob>(
+        PPT_ENGINE_TOOL_ID,
+        "app_start_pptx_export_model",
+        input
+      ),
+    getPptxExportStatus: (input) =>
+      invoke<PptxExportJob>(
+        PPT_ENGINE_TOOL_ID,
+        "app_get_pptx_export_status",
+        input
+      ),
     generatePptx: (input: GeneratePptxInput) =>
       invoke<GeneratePptxResult>(PPT_GENER_TOOL_ID, "generatePptx", {
         model_path: input.modelPath,
         output_path: input.outputPath,
-      }).then((result) => normalizeGeneratePptxResult(result, input.outputPath)),
+      }, { timeoutMs: PPTX_EXPORT_TIMEOUT_MS }).then((result) =>
+        normalizeGeneratePptxResult(result, input.outputPath)
+      ),
+    startGeneratePptx: (input) =>
+      invoke<PptxExportJob>(PPT_GENER_TOOL_ID, "startGeneratePptx", {
+        workspace_dir: input.workspace_dir,
+        model_path: input.modelPath,
+        output_path: input.outputPath,
+        job_id: input.job_id,
+      }),
     exportPdf: (input: ExportPdfInput) =>
       invoke<ExportPdfResult>(PPT_ENGINE_TOOL_ID, "app_export_pdf", input).then(
         normalizeExportPdfResult
@@ -253,12 +284,13 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
           pdf_path: input.pdfPath,
         }
       ),
-    openExportArtifact: (input) =>
-      invoke<OpenExportArtifactResult>(
+    getExportArtifactDownloadUrl: (input) =>
+      invoke<ExportArtifactDownloadUrlResult>(
         PPT_ENGINE_TOOL_ID,
-        "app_open_export_artifact",
+        "app_get_export_artifact_download_url",
         {
-          path: input.path,
+          workspace_dir: input.workspace_dir,
+          artifact_type: input.artifact_type,
         }
       )
   };

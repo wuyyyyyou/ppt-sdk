@@ -80,6 +80,11 @@ export const Schema = z.object({
       title: "Use case",
       description: "Useful for market, capability, option, or scoring comparisons.",
     },
+    {
+      badge: "03",
+      title: "Decision lens",
+      description: "Use the final column to make the comparison actionable for the next choice.",
+    },
   ]),
   summary: z.string().min(8).max(120).default("Best for multi-dimensional comparison; avoid using it for a single argument."),
 });
@@ -126,14 +131,18 @@ const ComparisonMatrix = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
             rows={parsed.rows}
             density={density}
           />
-          <div className="flex flex-col gap-[14px]">
+          <div className="flex h-full min-h-0 flex-col gap-[14px]">
             <ComparisonPanel
               title="Interpretation"
               icon={<FinanceIcon name="chart-column" className="h-[18px] w-[18px]" />}
               sections={sections}
               density={parsed.density === "high" ? "compact" : "normal"}
+              sectionLayout="fill"
+              className="min-h-0 flex-1"
             />
-            <InsightCallout text={parsed.summary} density={parsed.density === "high" ? "compact" : "normal"} />
+            <div className="flex-none">
+              <InsightCallout text={parsed.summary} density={parsed.density === "high" ? "compact" : "normal"} />
+            </div>
           </div>
         </div>
       </div>

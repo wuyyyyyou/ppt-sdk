@@ -4,7 +4,7 @@ import { constants as fsConstants, realpathSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import type { Plugin } from "esbuild";
 import type React from "react";
@@ -46,8 +46,7 @@ export const ALLOWED_LOCAL_EXTENSIONS = new Set([
   ".cts",
 ]);
 
-const currentModulePath =
-  typeof __filename === "string" ? __filename : import.meta.url;
+const currentModulePath = fileURLToPath(import.meta.url);
 const engineRequire = createRequire(currentModulePath);
 const LOCAL_TEMPLATE_RUNTIME_ALLOWED_PACKAGES = new Set([
   "react",

@@ -1,0 +1,1200 @@
+{
+  "name": "tool-lightvoss_5433-ppt-engine-6443rj2a",
+  "display_name": "ppt-engine",
+  "version": "3.1.0",
+  "description": "Anna Executa plugin for Presenton template discovery, manifest-based deck HTML generation, deck HTML to PPTX model conversion, and stability validation.",
+  "author": "Anna Developer",
+  "tools": [
+    {
+      "name": "app_list_workspaces",
+      "description": "Scan the default PPT task workspace root and return existing ppt-YYYYMMDD-HHmmss workspaces.",
+      "parameters": []
+    },
+    {
+      "name": "app_create_workspace",
+      "description": "Create a new PPT task workspace under the default workspace root and initialize core JSON files.",
+      "parameters": [
+        {
+          "name": "title",
+          "type": "string",
+          "description": "Optional project title. Defaults to the generated workspace id.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "app_open_workspace",
+      "description": "Open an existing PPT task workspace and initialize any missing core JSON files.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_update_workspace_settings",
+      "description": "Update the PPT workspace-level setting.json and return the refreshed task workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "setting",
+          "type": "object",
+          "description": "Partial settings object to merge into the workspace-level setting.json.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_append_workspace_log",
+      "description": "Append one JSONL log entry under an existing PPT task workspace .log directory.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "channel",
+          "type": "string",
+          "description": "Workspace log channel. Supports ai-outline, ai-page-plan, ai-page-agent, and ai-page-agent-stream.",
+          "required": true
+        },
+        {
+          "name": "entry",
+          "type": "object",
+          "description": "JSON-serializable log entry to append.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_workspace_outline",
+      "description": "Read and normalize outline.json for an existing PPT task workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_update_workspace_outline",
+      "description": "Write outline.json for an existing PPT task workspace and return the refreshed workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "outline",
+          "type": "object",
+          "description": "Outline artifact with title, items, source, status, and updated_at fields.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_update_workspace_pages",
+      "description": "Reorder, rename, or delete rendered workspace pages and sync the selected template manifest.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "pages",
+          "type": "array",
+          "description": "Ordered list of remaining pages. Each entry must include page_id and may include title.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_duplicate_workspace_page",
+      "description": "Duplicate one rendered workspace page and sync the selected template manifest plus workspace state files.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "page_id",
+          "type": "string",
+          "description": "Manifest slide id to duplicate.",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "description": "Optional title for the duplicated slide.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "app_update_workspace_title",
+      "description": "Update task.json title for an existing PPT task workspace and return the refreshed workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "description": "New workspace title.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_list_template_groups",
+      "description": "List builtin PPT template groups with static preview metadata for the app template picker.",
+      "parameters": []
+    },
+    {
+      "name": "app_get_template_group",
+      "description": "Return one builtin PPT template group with layout details for the app template picker.",
+      "parameters": [
+        {
+          "name": "group_id",
+          "type": "string",
+          "description": "Template group id, such as red-finance-v3.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_template_preview",
+      "description": "Return one static template preview image as a data URL.",
+      "parameters": [
+        {
+          "name": "group_id",
+          "type": "string",
+          "description": "Template group id.",
+          "required": true
+        },
+        {
+          "name": "layout_id",
+          "type": "string",
+          "description": "Optional full layout id. Defaults to the group's primary preview.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "app_select_workspace_template",
+      "description": "Select a template group for an app workspace and fork it into workspace/template.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "template_group",
+          "type": "string",
+          "description": "Builtin template group id to fork into the workspace template directory.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_template_planning_context",
+      "description": "Return the selected workspace template catalog subset used by LLM page planning.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_record_page_plan",
+      "description": "Validate and write page-plan.json for a workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "page_plan",
+          "type": "object",
+          "description": "LLM-generated page plan.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_page_plan",
+      "description": "Read page-plan.json for a workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_prepare_page_files",
+      "description": "Prepare template/slides, template/data, manifest.json, and page-progress.json from page-plan.json.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_page_progress",
+      "description": "Read page-progress.json for a workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_record_page_progress",
+      "description": "Patch one page entry in page-progress.json.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "page_id",
+          "type": "string",
+          "description": "Page id from page-plan.json.",
+          "required": true
+        },
+        {
+          "name": "patch",
+          "type": "object",
+          "description": "Partial progress fields to merge into the page entry.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_render_workspace_page_preview",
+      "description": "Render one workspace manifest page to lightweight HTML and PNG preview for Agent review.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "page_index",
+          "type": "integer",
+          "description": "Zero-based page index to render.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_render_deck_html",
+      "description": "Render the selected workspace template manifest to reviewable deck HTML and return a local preview URL.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_prepare_export_model",
+      "description": "Build the final export deck HTML for the workspace and convert it into a PPTX model JSON file.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_start_pptx_export_model",
+      "description": "Start preparing the PPTX export HTML and model in the background, writing progress to output/generate_ppt.json.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_pptx_export_status",
+      "description": "Read output/generate_ppt.json for the current PPTX export job status.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_export_artifact_download_url",
+      "description": "Register a recorded PPTX or PDF export artifact on the local download server and return a temporary HTTP download URL.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "artifact_type",
+          "type": "string",
+          "description": "Export artifact type. Supports pptx and pdf.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_export_pdf",
+      "description": "Render the workspace deck into a share-ready PDF file.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_record_pptx_export",
+      "description": "Record the generated PPTX export path in the workspace artifacts.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "pptx_path",
+          "type": "string",
+          "description": "Absolute path to the generated PPTX file.",
+          "required": true
+        },
+        {
+          "name": "generator_result",
+          "type": "object",
+          "description": "Optional raw generator result to store with the export record.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "app_record_pdf_export",
+      "description": "Record the generated PDF export path in the workspace artifacts.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "pdf_path",
+          "type": "string",
+          "description": "Absolute path to the generated PDF file.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "listDiscoveredTemplateGroupSummaries",
+      "description": "List discovered template group summaries from builtin and optional local template roots.",
+      "parameters": [
+        {
+          "name": "include_builtin",
+          "type": "boolean",
+          "description": "Whether to include builtin template groups. Defaults to true.",
+          "required": false,
+          "default": true
+        },
+        {
+          "name": "local_roots",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional list of absolute local template root directories.",
+          "required": false
+        },
+        {
+          "name": "cwd",
+          "type": "string",
+          "description": "Optional absolute working directory used by local template discovery.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "getAllDiscoveredTemplateGroups",
+      "description": "Return all discovered template groups with full layout details from builtin and optional local roots.",
+      "parameters": [
+        {
+          "name": "include_builtin",
+          "type": "boolean",
+          "description": "Whether to include builtin template groups. Defaults to true.",
+          "required": false,
+          "default": true
+        },
+        {
+          "name": "local_roots",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional list of absolute local template root directories.",
+          "required": false
+        },
+        {
+          "name": "cwd",
+          "type": "string",
+          "description": "Optional absolute working directory used by local template discovery.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "getDiscoveredTemplateGroup",
+      "description": "Return one discovered template group with layouts from builtin and optional local roots.",
+      "parameters": [
+        {
+          "name": "group_id",
+          "type": "string",
+          "description": "Template group id to look up.",
+          "required": true
+        },
+        {
+          "name": "include_builtin",
+          "type": "boolean",
+          "description": "Whether to include builtin template groups. Defaults to true.",
+          "required": false,
+          "default": true
+        },
+        {
+          "name": "local_roots",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional list of absolute local template root directories.",
+          "required": false
+        },
+        {
+          "name": "cwd",
+          "type": "string",
+          "description": "Optional absolute working directory used by local template discovery.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "buildDeckHtmlFromManifest",
+      "description": "Build a deck viewer HTML and one rendered PNG image per slide from a manifest JSON file, write them to an output directory, and return the generated file paths.",
+      "parameters": [
+        {
+          "name": "manifest_path",
+          "type": "string",
+          "description": "Absolute path to a manifest JSON file.",
+          "required": true
+        },
+        {
+          "name": "cwd",
+          "type": "string",
+          "description": "Optional absolute working directory retained for compatibility.",
+          "required": false
+        },
+        {
+          "name": "output_dir",
+          "type": "string",
+          "description": "Absolute directory where the generated deck HTML and per-slide PNG images should be written.",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Optional base name for generated files. Defaults to manifest.title after filename sanitization.",
+          "required": false
+        },
+        {
+          "name": "single_page",
+          "type": "boolean",
+          "description": "Whether to generate only one slide PNG image. Defaults to false.",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "page",
+          "type": "integer",
+          "description": "1-based page number to generate when single_page is true.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "validateDeckFromManifest",
+      "description": "Run static and optional rendered stability validation on a manifest deck and return structured diagnostics.",
+      "parameters": [
+        {
+          "name": "manifest_path",
+          "type": "string",
+          "description": "Absolute path to a manifest JSON file.",
+          "required": true
+        },
+        {
+          "name": "output_dir",
+          "type": "string",
+          "description": "Absolute output directory used for generated validation artifacts when rendered checks need to build deck HTML.",
+          "required": true
+        },
+        {
+          "name": "cwd",
+          "type": "string",
+          "description": "Optional absolute working directory retained for compatibility.",
+          "required": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Optional presentation name forwarded to the validation engine.",
+          "required": false
+        },
+        {
+          "name": "single_page",
+          "type": "boolean",
+          "description": "Whether to validate only one slide from the manifest. Defaults to false.",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "page",
+          "type": "integer",
+          "description": "1-based page number to validate when single_page is true.",
+          "required": false
+        },
+        {
+          "name": "include_rendered_checks",
+          "type": "boolean",
+          "description": "Whether to run browser-based rendered validation. Defaults to false.",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "deck_html_path",
+          "type": "string",
+          "description": "Optional absolute prebuilt deck HTML path to reuse instead of rebuilding during rendered validation.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "convertDeckHtmlToPptxModel",
+      "description": "Convert a rendered deck HTML file into a PptxPresentationModel JSON file and return the output path.",
+      "parameters": [
+        {
+          "name": "html_path",
+          "type": "string",
+          "description": "Absolute path to the rendered deck HTML file to convert.",
+          "required": true
+        },
+        {
+          "name": "output_path",
+          "type": "string",
+          "description": "Absolute path where the generated PPTX model JSON file should be written.",
+          "required": true
+        },
+        {
+          "name": "cwd",
+          "type": "string",
+          "description": "Optional absolute working directory retained for compatibility.",
+          "required": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Optional presentation name to store in the generated model.",
+          "required": false
+        },
+        {
+          "name": "settle_time_ms",
+          "type": "integer",
+          "description": "Optional delay after render-ready before DOM extraction.",
+          "required": false
+        },
+        {
+          "name": "screenshots_dir",
+          "type": "string",
+          "description": "Optional absolute directory for screenshot fallback assets used during extraction.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "forkTemplateGroup",
+      "description": "Fork a builtin template group into a target local directory with TSX slides, group.json, manifest.json, catalog.json, and data assets.",
+      "parameters": [
+        {
+          "name": "template_group",
+          "type": "string",
+          "description": "Builtin template group id to fork, such as general or red-finance.",
+          "required": true
+        },
+        {
+          "name": "out_dir",
+          "type": "string",
+          "description": "Absolute target directory for the forked template group.",
+          "required": true
+        },
+        {
+          "name": "manifest_title",
+          "type": "string",
+          "description": "Optional title to write into the generated manifest.json.",
+          "required": false
+        },
+        {
+          "name": "overwrite",
+          "type": "boolean",
+          "description": "Whether to replace a non-empty output directory. Defaults to false.",
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "cwd",
+          "type": "string",
+          "description": "Optional absolute working directory retained for compatibility.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "create_task_project",
+      "description": "Create a new task project and initialize task-state files.",
+      "parameters": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "required": false,
+          "description": "Optional absolute working directory used for file transport output."
+        },
+        {
+          "name": "project_dir",
+          "type": "string",
+          "required": true,
+          "description": "Absolute project directory."
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": false,
+          "description": "Optional project title."
+        },
+        {
+          "name": "initial_request",
+          "type": "string",
+          "required": false,
+          "description": "Optional seed request."
+        }
+      ]
+    },
+    {
+      "name": "open_task_project",
+      "description": "Open an existing task project and read current task-state data.",
+      "parameters": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "required": false,
+          "description": "Optional absolute working directory used for file transport output."
+        },
+        {
+          "name": "project_dir",
+          "type": "string",
+          "required": true,
+          "description": "Absolute project directory."
+        }
+      ]
+    },
+    {
+      "name": "query_task_state",
+      "description": "Query current state, generate promote guidance docs, and return the recommended next action.",
+      "parameters": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "required": false,
+          "description": "Optional absolute working directory used for file transport output."
+        },
+        {
+          "name": "project_dir",
+          "type": "string",
+          "required": true,
+          "description": "Absolute project directory."
+        },
+        {
+          "name": "response_mode",
+          "type": "string",
+          "required": false,
+          "description": "compact or full. Defaults to compact for PPT AI Agent context efficiency."
+        }
+      ]
+    },
+    {
+      "name": "record_requirements",
+      "description": "Persist user requirements.",
+      "parameters": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "required": false,
+          "description": "Optional absolute working directory used for file transport output."
+        },
+        {
+          "name": "project_dir",
+          "type": "string",
+          "required": true,
+          "description": "Absolute project directory."
+        },
+        {
+          "name": "mode",
+          "type": "string",
+          "required": false,
+          "description": "merge or replace_all. Defaults to merge."
+        },
+        {
+          "name": "requirements",
+          "type": "object",
+          "required": true,
+          "description": "Requirements payload. Partial payloads are allowed in merge mode."
+        },
+        {
+          "name": "source",
+          "type": "string",
+          "required": false,
+          "description": "Source of the requirements."
+        }
+      ]
+    },
+    {
+      "name": "record_template_selection",
+      "description": "Record the user-confirmed template group, fork it into project template/, and advance to project_forked.",
+      "parameters": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "required": false,
+          "description": "Optional absolute working directory used for file transport output."
+        },
+        {
+          "name": "project_dir",
+          "type": "string",
+          "required": true,
+          "description": "Absolute project directory."
+        },
+        {
+          "name": "template_group",
+          "type": "string",
+          "required": true,
+          "description": "Selected template group id from listDiscoveredTemplateGroupSummaries."
+        },
+        {
+          "name": "selection_reason",
+          "type": "string",
+          "required": false,
+          "description": "Why the template group was selected."
+        },
+        {
+          "name": "source",
+          "type": "string",
+          "required": false,
+          "description": "Source of the selection. Defaults to user."
+        }
+      ]
+    },
+    {
+      "name": "record_outline",
+      "description": "Persist the content outline.",
+      "parameters": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "required": false,
+          "description": "Optional absolute working directory used for file transport output."
+        },
+        {
+          "name": "project_dir",
+          "type": "string",
+          "required": true,
+          "description": "Absolute project directory."
+        },
+        {
+          "name": "outline",
+          "type": "object",
+          "required": true,
+          "description": "Outline payload."
+        }
+      ]
+    },
+    {
+      "name": "record_page_plan",
+      "description": "Persist or patch the page plan.",
+      "parameters": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "required": false,
+          "description": "Optional absolute working directory used for file transport output."
+        },
+        {
+          "name": "project_dir",
+          "type": "string",
+          "required": true,
+          "description": "Absolute project directory."
+        },
+        {
+          "name": "mode",
+          "type": "string",
+          "required": true,
+          "description": "replace_all or update_page."
+        },
+        {
+          "name": "page_plan",
+          "type": "object",
+          "required": true,
+          "description": "Page plan payload."
+        }
+      ]
+    },
+    {
+      "name": "start_page_iteration",
+      "description": "Select a page and begin page-level authoring.",
+      "parameters": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "required": false,
+          "description": "Optional absolute working directory used for file transport output."
+        },
+        {
+          "name": "project_dir",
+          "type": "string",
+          "required": true,
+          "description": "Absolute project directory."
+        },
+        {
+          "name": "page_id",
+          "type": "string",
+          "required": true,
+          "description": "Target page id."
+        },
+        {
+          "name": "page_number",
+          "type": "integer",
+          "required": false,
+          "description": "Optional page number."
+        }
+      ]
+    },
+    {
+      "name": "record_page_progress",
+      "description": "Persist one page progress state transition.",
+      "parameters": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "required": false,
+          "description": "Optional absolute working directory used for file transport output."
+        },
+        {
+          "name": "project_dir",
+          "type": "string",
+          "required": true,
+          "description": "Absolute project directory."
+        },
+        {
+          "name": "page_id",
+          "type": "string",
+          "required": true,
+          "description": "Target page id."
+        },
+        {
+          "name": "page_state",
+          "type": "string",
+          "required": true,
+          "description": "Page state."
+        },
+        {
+          "name": "summary",
+          "type": "string",
+          "required": true,
+          "description": "Progress summary."
+        },
+        {
+          "name": "review_notes",
+          "type": "string",
+          "required": false,
+          "description": "Review notes."
+        }
+      ]
+    },
+    {
+      "name": "record_deck_review_feedback",
+      "description": "Record deck HTML review feedback, unlock requested pages, and return to the first page fix flow.",
+      "parameters": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "required": false,
+          "description": "Optional absolute working directory used for file transport output."
+        },
+        {
+          "name": "project_dir",
+          "type": "string",
+          "required": true,
+          "description": "Absolute project directory."
+        },
+        {
+          "name": "pages",
+          "type": "array",
+          "required": true,
+          "description": "Pages to revise. Each item accepts page_id, summary, and review_notes."
+        }
+      ]
+    },
+    {
+      "name": "advance_task_state",
+      "description": "Advance deck state and create a checkpoint.",
+      "parameters": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "required": false,
+          "description": "Optional absolute working directory used for file transport output."
+        },
+        {
+          "name": "project_dir",
+          "type": "string",
+          "required": true,
+          "description": "Absolute project directory."
+        },
+        {
+          "name": "target_deck_state",
+          "type": "string",
+          "required": false,
+          "description": "Target deck state."
+        },
+        {
+          "name": "target_page_state",
+          "type": "string",
+          "required": false,
+          "description": "Target page state."
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true,
+          "description": "Advance reason."
+        },
+        {
+          "name": "related_artifacts",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "required": false,
+          "description": "Related artifact paths, such as generated deck HTML."
+        },
+        {
+          "name": "related_checkpoint",
+          "type": "string",
+          "required": false,
+          "description": "Related checkpoint id."
+        }
+      ]
+    },
+    {
+      "name": "rewind_task_state",
+      "description": "Rewind to a prior checkpoint or safe deck state.",
+      "parameters": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "required": false,
+          "description": "Optional absolute working directory used for file transport output."
+        },
+        {
+          "name": "project_dir",
+          "type": "string",
+          "required": true,
+          "description": "Absolute project directory."
+        },
+        {
+          "name": "target_state",
+          "type": "string",
+          "required": false,
+          "description": "Target deck state."
+        },
+        {
+          "name": "checkpoint_id",
+          "type": "string",
+          "required": false,
+          "description": "Checkpoint id."
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true,
+          "description": "Rewind reason."
+        }
+      ]
+    },
+    {
+      "name": "branch_task_project",
+      "description": "Create a project branch from the current or specified checkpoint.",
+      "parameters": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "required": false,
+          "description": "Optional absolute working directory used for file transport output."
+        },
+        {
+          "name": "project_dir",
+          "type": "string",
+          "required": true,
+          "description": "Absolute project directory."
+        },
+        {
+          "name": "checkpoint_id",
+          "type": "string",
+          "required": false,
+          "description": "Checkpoint id."
+        },
+        {
+          "name": "branch_name",
+          "type": "string",
+          "required": false,
+          "description": "Branch name."
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "required": true,
+          "description": "Branch reason."
+        }
+      ]
+    },
+    {
+      "name": "list_task_checkpoints",
+      "description": "List checkpoints and branches.",
+      "parameters": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "required": false,
+          "description": "Optional absolute working directory used for file transport output."
+        },
+        {
+          "name": "project_dir",
+          "type": "string",
+          "required": true,
+          "description": "Absolute project directory."
+        },
+        {
+          "name": "include_branches",
+          "type": "boolean",
+          "required": false,
+          "description": "Whether to include branches."
+        }
+      ]
+    },
+    {
+      "name": "recover_task_project",
+      "description": "Recover a project by rebuilding missing or broken task-state files.",
+      "parameters": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "required": false,
+          "description": "Optional absolute working directory used for file transport output."
+        },
+        {
+          "name": "project_dir",
+          "type": "string",
+          "required": true,
+          "description": "Absolute project directory."
+        }
+      ]
+    },
+    {
+      "name": "validate_task_project",
+      "description": "Validate task-state files without modifying them.",
+      "parameters": [
+        {
+          "name": "cwd",
+          "type": "string",
+          "required": false,
+          "description": "Optional absolute working directory used for file transport output."
+        },
+        {
+          "name": "project_dir",
+          "type": "string",
+          "required": true,
+          "description": "Absolute project directory."
+        }
+      ]
+    }
+  ],
+  "runtime": {
+    "type": "npm",
+    "min_version": "1.0.0"
+  }
+}

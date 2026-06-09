@@ -1,4 +1,5 @@
 import type { Messages } from "../../i18n/messages";
+import type { WorkspaceResult } from "../../api/types";
 import type { MainStage } from "./types";
 
 export const sleep = (ms: number) =>
@@ -18,4 +19,76 @@ export function deckReadyStatus(t: Messages, count: number) {
 
 export function stageOrder(stage: MainStage) {
   return { brief: 1, outline: 2, generating: 3, deck: 4 }[stage];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function readString(record: Record<string, unknown> | null, key: string) {
+  const value = record?.[key];
+  return typeof value === "string" ? value : "";
+}
+
+function readPagePlanSourceOutlineUpdatedAt(pagePlanRecord: Record<string, unknown> | null) {
+  const source = isRecord(pagePlanRecord?.source) ? pagePlanRecord.source : null;
+  return readString(source, "outline_updated_at");
+}
+
+export function hasDownstreamArtifacts(workspace: WorkspaceResult) {
+  const pagePlanRecord = isRecord(workspace.page_plan) ? workspace.page_plan : null;
+  const progressRecord = isRecord(workspace.page_progress) ? workspace.page_progress : null;
+  const pagesRecord = isRecord(workspace.pages) ? workspace.pages : null;
+
+  return (
+    (Array.isArray(pagePlanRecord?.pages) && pagePlanRecord.pages.length > 0) ||
+    (Array.isArray(progressRecord?.pages) && progressRecord.pages.length > 0) ||
+    (Array.isArray(pagesRecord?.pages) && pagesRecord.pages.length > 0)
+  );
+}
+
+function outlineMatchesPagePlan(
+  outlineRecord: Record<string, unknown> | null,
+  pagePlanRecord: Record<string, unknown> | null
+) {
+  const outlineItems = Array.isArray(outlineRecord?.items) ? outlineRecord.items : [];
+  const pagePlanPages = Array.isArray(pagePlanRecord?.pages) ? pagePlanRecord.pages : [];
+
+  if (outlineItems.length !== pagePlanPages.length) {
+    return false;
+  }
+
+  const outlineTitle = readString(outlineRecord, "title").trim();
+  const pagePlanTitle = readString(pagePlanRecord, "title").trim();
+  if (outlineTitle && pagePlanTitle && outlineTitle !== pagePlanTitle) {
+    return false;
+  }
+
+  return pagePlanPages.every((page, index) => {
+    if (!isRecord(page)) return false;
+    const item = outlineItems[index];
+    if (!isRecord(item)) return false;
+
+    return (
+      readString(page, "title").trim() === readString(item, "title").trim() &&
+      readString(page, "outline").trim() === readString(item, "outline").trim()
+    );
+  });
+}
+
+export function isWorkspaceDeckStale(workspace: WorkspaceResult) {
+  const outlineRecord = isRecord(workspace.outline) ? workspace.outline : null;
+  const pagePlanRecord = isRecord(workspace.page_plan) ? workspace.page_plan : null;
+  const outlineUpdatedAt = readString(outlineRecord, "updated_at");
+  const pagePlanOutlineUpdatedAt = readPagePlanSourceOutlineUpdatedAt(pagePlanRecord);
+
+  if (readString(outlineRecord, "status") === "draft" && hasDownstreamArtifacts(workspace)) {
+    return true;
+  }
+
+  if (outlineUpdatedAt && pagePlanOutlineUpdatedAt && outlineUpdatedAt !== pagePlanOutlineUpdatedAt) {
+    return !outlineMatchesPagePlan(outlineRecord, pagePlanRecord);
+  }
+
+  return false;
 }

@@ -1,6 +1,7 @@
 dist
 node_modules
 bundle
+.build
 sea-prep
 .pkg-cache
 src/app/presentation-templates/generated-registry-manifest.json

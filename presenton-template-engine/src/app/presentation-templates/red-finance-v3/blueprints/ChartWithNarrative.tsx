@@ -143,9 +143,18 @@ const ChartWithNarrative = ({ data }: { data: Partial<z.infer<typeof Schema>> })
   );
 
   const narrativePane = (
-    <div className="flex h-full flex-col gap-[14px]">
-      <FinanceSectionHeading title={parsed.narrativeTitle} subtitle="short interpretation" />
-      <div className="flex flex-col gap-[2px]">
+    <div className="flex h-full min-h-0 flex-col gap-[12px]">
+      <FinanceSectionHeading
+        title={parsed.narrativeTitle}
+        subtitle="short interpretation"
+        marginBottom={0}
+      />
+      <div
+        className="grid min-h-0 flex-1"
+        style={{
+          gridTemplateRows: `repeat(${parsed.narrativeItems.length}, minmax(0, 1fr))`,
+        }}
+      >
         {parsed.narrativeItems.map((item, index) => (
           <InfoListItem
             key={`${item.title}-${index}`}
@@ -156,10 +165,14 @@ const ChartWithNarrative = ({ data }: { data: Partial<z.infer<typeof Schema>> })
             density={chartDensity}
             textScale={parsed.density === "high" ? "small" : "normal"}
             descriptionMaxLines={2}
+            fillHeight
+            verticalAlign="center"
           />
         ))}
       </div>
-      <InsightCallout text={parsed.summary} density={chartDensity} icon="lightbulb" />
+      <div className="flex-none">
+        <InsightCallout text={parsed.summary} density={chartDensity} icon="lightbulb" />
+      </div>
     </div>
   );
 

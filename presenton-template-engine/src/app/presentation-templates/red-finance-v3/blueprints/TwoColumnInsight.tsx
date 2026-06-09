@@ -116,9 +116,19 @@ const TwoColumnInsight = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
   const cardColumns = parsed.density === "high" ? "grid-cols-2" : "grid-cols-1";
 
   const narrativePane = (
-    <div className="flex h-full flex-col gap-[14px]">
-      <FinanceSectionHeading title={parsed.narrativeTitle} subtitle={parsed.narrativeSummary} />
-      <div className="flex flex-col gap-[2px]">
+    <div className="flex h-full min-h-0 flex-col gap-[12px]">
+      <FinanceSectionHeading
+        title={parsed.narrativeTitle}
+        subtitle={parsed.narrativeSummary}
+        marginBottom={0}
+        subtitleLayout="stacked"
+      />
+      <div
+        className="grid min-h-0 flex-1"
+        style={{
+          gridTemplateRows: `repeat(${parsed.narrativeItems.length}, minmax(0, 1fr))`,
+        }}
+      >
         {parsed.narrativeItems.map((item, index) => (
           <InfoListItem
             key={`${item.title}-${index}`}
@@ -129,20 +139,33 @@ const TwoColumnInsight = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
             density={density}
             textScale={parsed.density === "high" ? "small" : "normal"}
             descriptionMaxLines={parsed.density === "high" ? 2 : 3}
+            fillHeight
+            verticalAlign="center"
           />
         ))}
       </div>
-      <InsightCallout text={parsed.conclusion} density={density} icon="lightbulb" />
+      <div className="flex-none">
+        <InsightCallout text={parsed.conclusion} density={density} icon="lightbulb" />
+      </div>
     </div>
   );
 
   const evidencePane = (
-    <div className="flex h-full flex-col gap-[14px]">
+    <div className="flex h-full min-h-0 flex-col gap-[12px]">
       <FinanceSectionHeading
         title={parsed.evidenceTitle}
         subtitle={parsed.variant === "narrative-left-evidence-right" ? "cards / metrics / compact evidence" : "evidence first"}
+        marginBottom={0}
       />
-      <div className={`grid ${cardColumns} gap-[12px]`}>
+      <div
+        className={`grid min-h-0 flex-1 ${cardColumns} gap-[12px]`}
+        style={{
+          gridTemplateRows:
+            parsed.density === "high"
+              ? undefined
+              : `repeat(${parsed.evidenceCards.length}, minmax(0, 1fr))`,
+        }}
+      >
         {parsed.evidenceCards.map((card) => (
           <IconTextCard
             key={card.title}

@@ -2,9 +2,10 @@ import { CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import type { Slide } from "../../../data/mockDeck";
 import { formatMessage, type Messages } from "../../../i18n/messages";
-import type { LoadingKind, RefineScope } from "../types";
+import type { DeckReviewRenderState, LoadingKind, RefineScope } from "../types";
 import { deckReadyStatus } from "../utils";
 import { PageHeader } from "./PageHeader";
+import { RenderedSlideImage } from "./RenderedSlideImage";
 import { RefineSteps } from "./RefineSteps";
 import { SlidePreview } from "./SlidePreview";
 
@@ -13,8 +14,10 @@ interface RefinePageProps {
   scope: RefineScope;
   setScope: (scope: RefineScope) => void;
   slide: Slide;
+  slideIndex: number;
   slideNumber: string;
   deckCount: number;
+  reviewRender: DeckReviewRenderState;
   loading: LoadingKind;
   onBack: () => void;
   onRefineDeck: (instruction: string) => void;
@@ -27,8 +30,10 @@ export function RefinePage(props: RefinePageProps) {
     scope,
     setScope,
     slide,
+    slideIndex,
     slideNumber,
     deckCount,
+    reviewRender,
     loading,
     onBack,
     onRefineDeck,
@@ -36,6 +41,10 @@ export function RefinePage(props: RefinePageProps) {
   } = props;
   const [deckInstruction, setDeckInstruction] = useState("");
   const [slideInstruction, setSlideInstruction] = useState("");
+  const renderedSlides = reviewRender.result?.slides ?? [];
+  const renderedSlide = renderedSlides[slideIndex] ?? null;
+  const showRenderedSlide =
+    reviewRender.status === "ready" && Boolean(renderedSlide?.screenshot_url);
 
   return (
     <section className="page active refine-page">
@@ -81,7 +90,13 @@ export function RefinePage(props: RefinePageProps) {
         </div>
       ) : (
         <div className="refine-content">
-          <SlidePreview slide={slide} index={Number(slideNumber) - 1} />
+          {showRenderedSlide && renderedSlide ? (
+            <div className="deck-stage-html-frame refine-slide-html-frame">
+              <RenderedSlideImage slide={renderedSlide} loading="eager" />
+            </div>
+          ) : (
+            <SlidePreview slide={slide} index={slideIndex} />
+          )}
           <p>
             {formatMessage(t.refine.slideHelper, {
               number: slideNumber

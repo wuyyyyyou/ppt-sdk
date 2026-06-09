@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Session 生命周期测试</title>
+    <link rel="icon" type="image/svg+xml" href="icon.svg" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div>
+          <h1>Session 生命周期测试</h1>
+          <p>使用 raw agent.session.create / run / delete 测试 app_session_uuid 的创建、持有、持久化和复用行为。</p>
+        </div>
+        <div class="status">
+          <span id="conn-dot" class="dot dot--off"></span>
+          <span id="conn-label">未连接</span>
+        </div>
+      </header>
+
+      <section class="layout">
+        <section class="panel controls">
+          <div class="panel__head">
+            <h2>Session 操作</h2>
+            <button id="refresh-runtime" class="btn btn--ghost" type="button">重新连接</button>
+          </div>
+
+          <div class="actions">
+            <button id="create-session" class="btn btn--primary" type="button" disabled>创建 session</button>
+            <button id="delete-selected" class="btn" type="button" disabled>删除选中</button>
+            <button id="delete-all" class="btn btn--danger" type="button" disabled>清理全部</button>
+          </div>
+
+          <label class="field">
+            <span>手动输入 / 持久化恢复的 app_session_uuid</span>
+            <input id="manual-session-id" placeholder="例如 aps_xxx，用于测试 raw run/delete" />
+          </label>
+
+          <div class="actions">
+            <button id="attach-manual" class="btn" type="button" disabled>加入持有列表</button>
+            <button id="save-selected" class="btn" type="button" disabled>保存选中 ID</button>
+            <button id="clear-saved" class="btn btn--ghost" type="button">清空持久化 ID</button>
+          </div>
+
+          <section class="subpanel">
+            <div class="panel__head">
+              <h2>当前持有的 sessions</h2>
+              <span id="session-count" class="pill">0</span>
+            </div>
+            <ul id="session-list" class="session-list" aria-label="当前 session 列表"></ul>
+          </section>
+
+          <section class="subpanel">
+            <div class="panel__head">
+              <h2>localStorage 中的 ID</h2>
+              <span id="saved-count" class="pill">0</span>
+            </div>
+            <ul id="saved-list" class="session-list" aria-label="持久化 session id 列表"></ul>
+          </section>
+        </section>
+
+        <section class="panel run-panel">
+          <div class="panel__head">
+            <h2>session.run 测试</h2>
+            <button id="copy-result" class="btn btn--ghost" type="button" disabled>复制最近结果</button>
+          </div>
+
+          <dl class="kv">
+            <div>
+              <dt>选中 ID</dt>
+              <dd id="selected-session-id">-</dd>
+            </div>
+            <div>
+              <dt>来源</dt>
+              <dd id="selected-session-source">-</dd>
+            </div>
+            <div>
+              <dt>状态</dt>
+              <dd id="selected-session-state">-</dd>
+            </div>
+          </dl>
+
+          <label class="field">
+            <span>Prompt</span>
+            <textarea id="run-content" rows="8">请用一句中文说明你收到了这个 session.run 请求，并返回当前可见的 session 上下文摘要。</textarea>
+          </label>
+
+          <div class="actions">
+            <button id="run-selected" class="btn btn--primary" type="button" disabled>运行选中 session</button>
+            <button id="run-manual" class="btn" type="button" disabled>运行手动 ID</button>
+          </div>
+
+          <pre id="result-json" class="json">{}</pre>
+        </section>
+      </section>
+
+      <section class="panel logs-panel">
+        <div class="panel__head">
+          <h2>详细日志</h2>
+          <div class="actions">
+            <button id="copy-logs" class="btn btn--ghost" type="button">复制日志</button>
+            <button id="clear-logs" class="btn btn--ghost" type="button">清空日志</button>
+          </div>
+        </div>
+        <ol id="logs" class="logs" aria-label="详细日志"></ol>
+      </section>
+    </main>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

@@ -5,7 +5,6 @@ import FinanceContentFrame from "../components/FinanceContentFrame.tsx";
 import FinanceSectionHeading from "../components/FinanceSectionHeading.tsx";
 import { FinanceIcon } from "../components/FinanceIcons.tsx";
 import HorizontalFeatureCard from "../components/HorizontalFeatureCard.tsx";
-import InfoListItem from "../components/InfoListItem.tsx";
 import InsightCallout from "../components/InsightCallout.tsx";
 import SectionPanelShell from "../components/SectionPanelShell.tsx";
 import { redFinanceTheme } from "../theme/tokens.ts";
@@ -111,36 +110,32 @@ const ClosingActions = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
               <div className="mt-[10px] text-[15px] leading-[1.55]" style={{ color: redFinanceTheme.colors.mutedText }}>
                 {decisionAsk}
               </div>
-            </div>
-          ) : null}
-        </div>
+            </SectionPanelShell>
+          </div>
 
-        <div className="flex h-full flex-col gap-[12px]">
-          {parsed.actions.map((action, index) => (
-            <HorizontalFeatureCard
-              key={`${action.title}-${index}`}
-              iconName={action.icon}
-              title={action.title}
-              description={action.description}
-              tone={index === 0 ? "accent" : "default"}
-              density={actionDensity}
-              minHeight={96}
-              titleFontSize={16}
-              descriptionFontSize={13}
-              descriptionLineHeight={1.45}
-            />
-          ))}
-          {parsed.variant === "conclusion-plus-actions" ? (
-            <InfoListItem
-              icon="lightbulb"
-              title="Next step"
-              description={decisionAsk}
-              showDivider={false}
-              density={parsed.density === "high" ? "dense" : "compact"}
-              textScale={parsed.density === "high" ? "small" : "normal"}
-              descriptionMaxLines={3}
-            />
-          ) : null}
+          <div
+            className="grid h-full min-h-0 gap-[12px]"
+            style={{
+              gridTemplateRows: `repeat(${parsed.actions.length}, minmax(0, 1fr))`,
+            }}
+          >
+            {parsed.actions.map((action, index) => (
+              <HorizontalFeatureCard
+                key={`${action.title}-${index}`}
+                iconName={action.icon}
+                title={action.title}
+                description={action.description}
+                tag={`0${index + 1}`}
+                tone={index === 0 ? "accent" : "default"}
+                density={actionDensity}
+                minHeight={0}
+                className="h-full"
+                titleFontSize={16}
+                descriptionFontSize={13}
+                descriptionLineHeight={1.45}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </FinanceContentFrame>

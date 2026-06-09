@@ -3,6 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import readline from "node:readline";
+import { readFileSync } from "node:fs";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -13,6 +14,7 @@ import {
   convertDeckHtmlToPptxModel,
   createAppWorkspace,
   duplicateAppWorkspacePage,
+  getAppExportArtifact,
   exportAppPdf,
   forkTemplateGroup,
   getAppTemplateGroup,
@@ -20,6 +22,7 @@ import {
   getAppTemplatePreview,
   getAppPagePlan,
   getAppPageProgress,
+  getAppPptxExportStatus,
   getAllDiscoveredTemplateGroups,
   getAppWorkspaceOutline,
   getDiscoveredTemplateGroup,
@@ -37,7 +40,7 @@ import {
   renderAppWorkspacePagePreview,
   runDeckValidation,
   selectAppWorkspaceTemplate,
-  describeTaskStateMachine,
+  startAppPptxExportModel,
   invokeTaskStateMachine,
   updateAppWorkspaceOutline,
   updateAppWorkspacePages,
@@ -45,41 +48,6 @@ import {
   updateAppWorkspaceTitle,
 } from "./dist/index.js";
 
-const TOOL_NAMES = [
-  "app_list_workspaces",
-  "app_create_workspace",
-  "app_open_workspace",
-  "app_append_workspace_log",
-  "app_get_workspace_outline",
-  "app_update_workspace_outline",
-  "app_update_workspace_pages",
-  "app_duplicate_workspace_page",
-  "app_update_workspace_settings",
-  "app_update_workspace_title",
-  "app_list_template_groups",
-  "app_get_template_group",
-  "app_get_template_preview",
-  "app_select_workspace_template",
-  "app_get_template_planning_context",
-  "app_record_page_plan",
-  "app_get_page_plan",
-  "app_prepare_page_files",
-  "app_get_page_progress",
-  "app_record_page_progress",
-  "app_render_workspace_page_preview",
-  "app_render_deck_html",
-  "app_prepare_export_model",
-  "app_export_pdf",
-  "app_record_pptx_export",
-  "app_record_pdf_export",
-  "listDiscoveredTemplateGroupSummaries",
-  "getAllDiscoveredTemplateGroups",
-  "getDiscoveredTemplateGroup",
-  "buildDeckHtmlFromManifest",
-  "convertDeckHtmlToPptxModel",
-  "validateDeckFromManifest",
-  "forkTemplateGroup",
-];
 const TASK_STATE_MACHINE_TOOL_NAMES = [
   "create_task_project",
   "open_task_project",
@@ -106,733 +74,11 @@ const FILE_TRANSPORT_FALLBACK_DIR = path.join(
 );
 const MAX_STDOUT_RESPONSE_BYTES = 512 * 1024;
 
-const MANIFEST = {
-  name: "tool-lightvoss_5433-ppt-engine-6443rj2a",
-  display_name: "ppt-engine",
-  version: "2.0.0",
-  description:
-    "Anna Executa plugin for Presenton template discovery, manifest-based deck HTML generation, deck HTML to PPTX model conversion, and stability validation.",
-  author: "Anna Developer",
-  tools: [
-    {
-      name: "app_list_workspaces",
-      description:
-        "Scan the default PPT task workspace root and return existing ppt-YYYYMMDD-HHmmss workspaces.",
-      parameters: [],
-    },
-    {
-      name: "app_create_workspace",
-      description:
-        "Create a new PPT task workspace under the default workspace root and initialize core JSON files.",
-      parameters: [
-        {
-          name: "title",
-          type: "string",
-          description: "Optional project title. Defaults to the generated workspace id.",
-          required: false,
-        },
-      ],
-    },
-    {
-      name: "app_open_workspace",
-      description:
-        "Open an existing PPT task workspace and initialize any missing core JSON files.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_update_workspace_settings",
-      description:
-        "Update the PPT workspace-level setting.json and return the refreshed task workspace.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-        {
-          name: "setting",
-          type: "object",
-          description: "Partial settings object to merge into the workspace-level setting.json.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_append_workspace_log",
-      description:
-        "Append one JSONL log entry under an existing PPT task workspace .log directory.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-        {
-          name: "channel",
-          type: "string",
-          description:
-            "Workspace log channel. Supports ai-outline, ai-page-plan, ai-page-agent, and ai-page-agent-stream.",
-          required: true,
-        },
-        {
-          name: "entry",
-          type: "object",
-          description: "JSON-serializable log entry to append.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_get_workspace_outline",
-      description:
-        "Read and normalize outline.json for an existing PPT task workspace.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_update_workspace_outline",
-      description:
-        "Write outline.json for an existing PPT task workspace and return the refreshed workspace.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-        {
-          name: "outline",
-          type: "object",
-          description: "Outline artifact with title, items, source, status, and updated_at fields.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_update_workspace_pages",
-      description:
-        "Reorder, rename, or delete rendered workspace pages and sync the selected template manifest.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-        {
-          name: "pages",
-          type: "array",
-          description:
-            "Ordered list of remaining pages. Each entry must include page_id and may include title.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_duplicate_workspace_page",
-      description:
-        "Duplicate one rendered workspace page and sync the selected template manifest plus workspace state files.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-        {
-          name: "page_id",
-          type: "string",
-          description: "Manifest slide id to duplicate.",
-          required: true,
-        },
-        {
-          name: "title",
-          type: "string",
-          description: "Optional title for the duplicated slide.",
-          required: false,
-        },
-      ],
-    },
-    {
-      name: "app_update_workspace_title",
-      description:
-        "Update task.json title for an existing PPT task workspace and return the refreshed workspace.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-        {
-          name: "title",
-          type: "string",
-          description: "New workspace title.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_list_template_groups",
-      description:
-        "List builtin PPT template groups with static preview metadata for the app template picker.",
-      parameters: [],
-    },
-    {
-      name: "app_get_template_group",
-      description:
-        "Return one builtin PPT template group with layout details for the app template picker.",
-      parameters: [
-        {
-          name: "group_id",
-          type: "string",
-          description: "Template group id, such as red-finance-v3.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_get_template_preview",
-      description:
-        "Return one static template preview image as a data URL.",
-      parameters: [
-        {
-          name: "group_id",
-          type: "string",
-          description: "Template group id.",
-          required: true,
-        },
-        {
-          name: "layout_id",
-          type: "string",
-          description: "Optional full layout id. Defaults to the group's primary preview.",
-          required: false,
-        },
-      ],
-    },
-    {
-      name: "app_select_workspace_template",
-      description:
-        "Select a template group for an app workspace and fork it into workspace/template.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-        {
-          name: "template_group",
-          type: "string",
-          description: "Builtin template group id to fork into the workspace template directory.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_get_template_planning_context",
-      description:
-        "Return the selected workspace template catalog subset used by LLM page planning.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_record_page_plan",
-      description:
-        "Validate and write page-plan.json for a workspace.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-        {
-          name: "page_plan",
-          type: "object",
-          description: "LLM-generated page plan.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_get_page_plan",
-      description:
-        "Read page-plan.json for a workspace.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_prepare_page_files",
-      description:
-        "Prepare template/slides, template/data, manifest.json, and page-progress.json from page-plan.json.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_get_page_progress",
-      description:
-        "Read page-progress.json for a workspace.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_record_page_progress",
-      description:
-        "Patch one page entry in page-progress.json.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-        {
-          name: "page_id",
-          type: "string",
-          description: "Page id from page-plan.json.",
-          required: true,
-        },
-        {
-          name: "patch",
-          type: "object",
-          description: "Partial progress fields to merge into the page entry.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_render_workspace_page_preview",
-      description:
-        "Render one workspace manifest page to lightweight HTML and PNG preview for Agent review.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-        {
-          name: "page_index",
-          type: "integer",
-          description: "Zero-based page index to render.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_render_deck_html",
-      description:
-        "Render the selected workspace template manifest to reviewable deck HTML and return a local preview URL.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_prepare_export_model",
-      description:
-        "Build the final export deck HTML for the workspace and convert it into a PPTX model JSON file.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_export_pdf",
-      description:
-        "Render the workspace deck into a share-ready PDF file.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "app_record_pptx_export",
-      description:
-        "Record the generated PPTX export path in the workspace artifacts.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-        {
-          name: "pptx_path",
-          type: "string",
-          description: "Absolute path to the generated PPTX file.",
-          required: true,
-        },
-        {
-          name: "generator_result",
-          type: "object",
-          description: "Optional raw generator result to store with the export record.",
-          required: false,
-        },
-      ],
-    },
-    {
-      name: "app_record_pdf_export",
-      description:
-        "Record the generated PDF export path in the workspace artifacts.",
-      parameters: [
-        {
-          name: "workspace_dir",
-          type: "string",
-          description: "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          required: true,
-        },
-        {
-          name: "pdf_path",
-          type: "string",
-          description: "Absolute path to the generated PDF file.",
-          required: true,
-        },
-      ],
-    },
-    {
-      name: "listDiscoveredTemplateGroupSummaries",
-      description:
-        "List discovered template group summaries from builtin and optional local template roots.",
-      parameters: [
-        {
-          name: "include_builtin",
-          type: "boolean",
-          description: "Whether to include builtin template groups. Defaults to true.",
-          required: false,
-          default: true,
-        },
-        {
-          name: "local_roots",
-          type: "array",
-          items: { type: "string" },
-          description: "Optional list of absolute local template root directories.",
-          required: false,
-        },
-        {
-          name: "cwd",
-          type: "string",
-          description: "Optional absolute working directory used by local template discovery.",
-          required: false,
-        },
-      ],
-    },
-    {
-      name: "getAllDiscoveredTemplateGroups",
-      description:
-        "Return all discovered template groups with full layout details from builtin and optional local roots.",
-      parameters: [
-        {
-          name: "include_builtin",
-          type: "boolean",
-          description: "Whether to include builtin template groups. Defaults to true.",
-          required: false,
-          default: true,
-        },
-        {
-          name: "local_roots",
-          type: "array",
-          items: { type: "string" },
-          description: "Optional list of absolute local template root directories.",
-          required: false,
-        },
-        {
-          name: "cwd",
-          type: "string",
-          description: "Optional absolute working directory used by local template discovery.",
-          required: false,
-        },
-      ],
-    },
-    {
-      name: "getDiscoveredTemplateGroup",
-      description:
-        "Return one discovered template group with layouts from builtin and optional local roots.",
-      parameters: [
-        {
-          name: "group_id",
-          type: "string",
-          description: "Template group id to look up.",
-          required: true,
-        },
-        {
-          name: "include_builtin",
-          type: "boolean",
-          description: "Whether to include builtin template groups. Defaults to true.",
-          required: false,
-          default: true,
-        },
-        {
-          name: "local_roots",
-          type: "array",
-          items: { type: "string" },
-          description: "Optional list of absolute local template root directories.",
-          required: false,
-        },
-        {
-          name: "cwd",
-          type: "string",
-          description: "Optional absolute working directory used by local template discovery.",
-          required: false,
-        },
-      ],
-    },
-    {
-      name: "buildDeckHtmlFromManifest",
-      description:
-        "Build a deck viewer HTML and one rendered PNG image per slide from a manifest JSON file, write them to an output directory, and return the generated file paths.",
-      parameters: [
-        {
-          name: "manifest_path",
-          type: "string",
-          description:
-            "Absolute path to a manifest JSON file.",
-          required: true,
-        },
-        {
-          name: "cwd",
-          type: "string",
-          description:
-            "Optional absolute working directory retained for compatibility.",
-          required: false,
-        },
-        {
-          name: "output_dir",
-          type: "string",
-          description:
-            "Absolute directory where the generated deck HTML and per-slide PNG images should be written.",
-          required: true,
-        },
-        {
-          name: "name",
-          type: "string",
-          description:
-            "Optional base name for generated files. Defaults to manifest.title after filename sanitization.",
-          required: false,
-        },
-        {
-          name: "single_page",
-          type: "boolean",
-          description:
-            "Whether to generate only one slide PNG image. Defaults to false.",
-          required: false,
-          default: false,
-        },
-        {
-          name: "page",
-          type: "integer",
-          description:
-            "1-based page number to generate when single_page is true.",
-          required: false,
-        },
-      ],
-    },
-    {
-      name: "validateDeckFromManifest",
-      description:
-        "Run static and optional rendered stability validation on a manifest deck and return structured diagnostics.",
-      parameters: [
-        {
-          name: "manifest_path",
-          type: "string",
-          description:
-            "Absolute path to a manifest JSON file.",
-          required: true,
-        },
-        {
-          name: "output_dir",
-          type: "string",
-          description:
-            "Absolute output directory used for generated validation artifacts when rendered checks need to build deck HTML.",
-          required: true,
-        },
-        {
-          name: "cwd",
-          type: "string",
-          description:
-            "Optional absolute working directory retained for compatibility.",
-          required: false,
-        },
-        {
-          name: "name",
-          type: "string",
-          description: "Optional presentation name forwarded to the validation engine.",
-          required: false,
-        },
-        {
-          name: "single_page",
-          type: "boolean",
-          description:
-            "Whether to validate only one slide from the manifest. Defaults to false.",
-          required: false,
-          default: false,
-        },
-        {
-          name: "page",
-          type: "integer",
-          description:
-            "1-based page number to validate when single_page is true.",
-          required: false,
-        },
-        {
-          name: "include_rendered_checks",
-          type: "boolean",
-          description:
-            "Whether to run browser-based rendered validation. Defaults to false.",
-          required: false,
-          default: false,
-        },
-        {
-          name: "deck_html_path",
-          type: "string",
-          description:
-            "Optional absolute prebuilt deck HTML path to reuse instead of rebuilding during rendered validation.",
-          required: false,
-        },
-      ],
-    },
-    {
-      name: "convertDeckHtmlToPptxModel",
-      description:
-        "Convert a rendered deck HTML file into a PptxPresentationModel JSON file and return the output path.",
-      parameters: [
-        {
-          name: "html_path",
-          type: "string",
-          description: "Absolute path to the rendered deck HTML file to convert.",
-          required: true,
-        },
-        {
-          name: "output_path",
-          type: "string",
-          description: "Absolute path where the generated PPTX model JSON file should be written.",
-          required: true,
-        },
-        {
-          name: "cwd",
-          type: "string",
-          description: "Optional absolute working directory retained for compatibility.",
-          required: false,
-        },
-        {
-          name: "name",
-          type: "string",
-          description: "Optional presentation name to store in the generated model.",
-          required: false,
-        },
-        {
-          name: "settle_time_ms",
-          type: "integer",
-          description: "Optional delay after render-ready before DOM extraction.",
-          required: false,
-        },
-        {
-          name: "screenshots_dir",
-          type: "string",
-          description:
-            "Optional absolute directory for screenshot fallback assets used during extraction.",
-          required: false,
-        },
-      ],
-    },
-    {
-      name: "forkTemplateGroup",
-      description:
-        "Fork a builtin template group into a target local directory with TSX slides, group.json, manifest.json, catalog.json, and data assets.",
-      parameters: [
-        {
-          name: "template_group",
-          type: "string",
-          description: "Builtin template group id to fork, such as general or red-finance.",
-          required: true,
-        },
-        {
-          name: "out_dir",
-          type: "string",
-          description:
-            "Absolute target directory for the forked template group.",
-          required: true,
-        },
-        {
-          name: "manifest_title",
-          type: "string",
-          description: "Optional title to write into the generated manifest.json.",
-          required: false,
-        },
-        {
-          name: "overwrite",
-          type: "boolean",
-          description:
-            "Whether to replace a non-empty output directory. Defaults to false.",
-          required: false,
-          default: false,
-        },
-        {
-          name: "cwd",
-          type: "string",
-          description: "Optional absolute working directory retained for compatibility.",
-          required: false,
-        },
-      ],
-    },
-  ],
-  runtime: {
-    type: "npm",
-    min_version: "1.0.0",
-  },
-};
+function readToolManifest() {
+  return JSON.parse(readFileSync(new URL("./manifest.json", import.meta.url), "utf8"));
+}
+
+const MANIFEST = readToolManifest();
 
 function makeResponse(id, result, error) {
   const response = { jsonrpc: "2.0", id };
@@ -949,47 +195,146 @@ function readOptionalAbsolutePathArg(args, parameterName) {
 }
 
 const previewFiles = new Map();
+const previewImageFiles = new Map();
+const artifactFiles = new Map();
 let previewServerPromise = null;
+
+function encodeRfc5987Value(value) {
+  return encodeURIComponent(value)
+    .replace(/['()]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replace(/\*/g, "%2A");
+}
+
+function sanitizeHeaderFileName(value) {
+  const fallback = value
+    .normalize("NFKC")
+    .replace(/[\u0000-\u001f\u007f<>:"/\\|?*]+/g, " ")
+    .replace(/[^\x20-\x7e]+/g, "_")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[. ]+$/g, "");
+
+  return fallback || "deck";
+}
+
+function getArtifactContentType(artifactType) {
+  if (artifactType === "pptx") {
+    return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+  }
+  if (artifactType === "pdf") {
+    return "application/pdf";
+  }
+  return "application/octet-stream";
+}
 
 async function handlePreviewRequest(request, response) {
   const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
   const parts = requestUrl.pathname.split("/").filter(Boolean);
 
-  if (parts.length !== 3 || parts[0] !== "preview" || parts[2] !== "deck.html") {
+  if (parts.length === 3 && parts[0] === "preview" && parts[2] === "deck.html") {
+    const previewId = parts[1];
+    const htmlPath = previewFiles.get(previewId);
+    if (!htmlPath) {
+      response.writeHead(404, {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end("Preview expired or not found");
+      return;
+    }
+
+    try {
+      const html = await readFile(htmlPath, "utf8");
+      response.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      });
+      response.end(html);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to read preview HTML";
+      response.writeHead(500, {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end(message);
+    }
+    return;
+  }
+
+  if (parts.length === 3 && parts[0] === "preview" && parts[2] === "slide.png") {
+    const previewId = parts[1];
+    const imagePath = previewImageFiles.get(previewId);
+    if (!imagePath) {
+      response.writeHead(404, {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end("Preview image expired or not found");
+      return;
+    }
+
+    try {
+      const imageBuffer = await readFile(imagePath);
+      response.writeHead(200, {
+        "content-type": "image/png",
+        "content-length": imageBuffer.byteLength,
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      });
+      response.end(imageBuffer);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to read preview image";
+      response.writeHead(500, {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end(message);
+    }
+    return;
+  }
+
+  if (parts.length === 3 && parts[0] === "artifact") {
+    const artifactId = parts[1];
+    const artifact = artifactFiles.get(artifactId);
+    if (!artifact) {
+      response.writeHead(404, {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end("Artifact expired or not found");
+      return;
+    }
+
+    try {
+      const fileBuffer = await readFile(artifact.path);
+      const fallbackFileName = sanitizeHeaderFileName(artifact.filename);
+      response.writeHead(200, {
+        "content-type": getArtifactContentType(artifact.artifactType),
+        "content-length": fileBuffer.byteLength,
+        "content-disposition": `attachment; filename="${fallbackFileName}"; filename*=UTF-8''${encodeRfc5987Value(artifact.filename)}`,
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      });
+      response.end(fileBuffer);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to read artifact";
+      response.writeHead(500, {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end(message);
+    }
+    return;
+  }
+
+  {
     response.writeHead(404, {
       "content-type": "text/plain; charset=utf-8",
       "cache-control": "no-store",
     });
     response.end("Not found");
     return;
-  }
-
-  const previewId = parts[1];
-  const htmlPath = previewFiles.get(previewId);
-  if (!htmlPath) {
-    response.writeHead(404, {
-      "content-type": "text/plain; charset=utf-8",
-      "cache-control": "no-store",
-    });
-    response.end("Preview expired or not found");
-    return;
-  }
-
-  try {
-    const html = await readFile(htmlPath, "utf8");
-    response.writeHead(200, {
-      "content-type": "text/html; charset=utf-8",
-      "cache-control": "no-store",
-      "x-content-type-options": "nosniff",
-    });
-    response.end(html);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to read preview HTML";
-    response.writeHead(500, {
-      "content-type": "text/plain; charset=utf-8",
-      "cache-control": "no-store",
-    });
-    response.end(message);
   }
 }
 
@@ -1031,6 +376,39 @@ async function registerPreviewHtml(htmlPath) {
   previewFiles.set(previewId, normalizedHtmlPath);
 
   return `http://127.0.0.1:${port}/preview/${previewId}/deck.html`;
+}
+
+async function registerPreviewImage(imagePath) {
+  const normalizedImagePath = path.normalize(imagePath);
+  const imageStat = await stat(normalizedImagePath);
+  if (!imageStat.isFile()) {
+    throw new Error(`Preview image is not a file: ${normalizedImagePath}`);
+  }
+
+  const { port } = await ensurePreviewServer();
+  const previewId = randomUUID();
+  previewImageFiles.set(previewId, normalizedImagePath);
+
+  return `http://127.0.0.1:${port}/preview/${previewId}/slide.png`;
+}
+
+async function registerArtifactDownload({ path: artifactPath, filename, artifact_type: artifactType }) {
+  const normalizedArtifactPath = path.normalize(artifactPath);
+  const artifactStat = await stat(normalizedArtifactPath);
+  if (!artifactStat.isFile()) {
+    throw new Error(`Export artifact is not a file: ${normalizedArtifactPath}`);
+  }
+
+  const { port } = await ensurePreviewServer();
+  const artifactId = randomUUID();
+  const safeUrlName = encodeURIComponent(filename);
+  artifactFiles.set(artifactId, {
+    path: normalizedArtifactPath,
+    filename,
+    artifactType,
+  });
+
+  return `http://127.0.0.1:${port}/artifact/${artifactId}/${safeUrlName}`;
 }
 
 function parseRequestLine(line) {
@@ -1479,6 +857,7 @@ async function toolAppRenderWorkspacePagePreview(args) {
   return {
     ...result,
     preview_url: await registerPreviewHtml(result.html_path),
+    screenshot_url: await registerPreviewImage(result.screenshot_path),
   };
 }
 
@@ -1495,6 +874,7 @@ async function toolAppRenderDeckHtml(args) {
     result.slides.map(async (slide) => ({
       ...slide,
       preview_url: await registerPreviewHtml(slide.html_path),
+      screenshot_url: await registerPreviewImage(slide.screenshot_path),
     })),
   );
 
@@ -1514,6 +894,51 @@ async function toolAppPrepareExportModel(args) {
   return prepareAppExportModel({
     workspace_dir: workspaceDir,
   });
+}
+
+async function toolAppStartPptxExportModel(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return startAppPptxExportModel({
+    workspace_dir: workspaceDir,
+  });
+}
+
+async function toolAppGetPptxExportStatus(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return getAppPptxExportStatus({
+    workspace_dir: workspaceDir,
+  });
+}
+
+async function toolAppGetExportArtifactDownloadUrl(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const artifactType = args.artifact_type;
+  if (artifactType !== "pptx" && artifactType !== "pdf") {
+    throw new Error('"artifact_type" must be "pptx" or "pdf"');
+  }
+
+  const artifact = await getAppExportArtifact({
+    workspace_dir: workspaceDir,
+    artifact_type: artifactType,
+  });
+  const downloadUrl = await registerArtifactDownload(artifact);
+
+  return {
+    ...artifact,
+    download_url: downloadUrl,
+  };
 }
 
 async function toolAppExportPdf(args) {
@@ -1784,6 +1209,9 @@ const TOOL_DISPATCH = {
   app_record_page_progress: toolAppRecordPageProgress,
   app_render_workspace_page_preview: toolAppRenderWorkspacePagePreview,
   app_render_deck_html: toolAppRenderDeckHtml,
+  app_start_pptx_export_model: toolAppStartPptxExportModel,
+  app_get_pptx_export_status: toolAppGetPptxExportStatus,
+  app_get_export_artifact_download_url: toolAppGetExportArtifactDownloadUrl,
   app_prepare_export_model: toolAppPrepareExportModel,
   app_export_pdf: toolAppExportPdf,
   app_record_pptx_export: toolAppRecordPptxExport,
@@ -1796,6 +1224,52 @@ const TOOL_DISPATCH = {
   convertDeckHtmlToPptxModel: toolConvertDeckHtmlToPptxModel,
   forkTemplateGroup: toolForkTemplateGroup,
 };
+
+function getManifestToolNames() {
+  if (!Array.isArray(MANIFEST.tools)) {
+    throw new Error("manifest.json must include a tools array");
+  }
+
+  return MANIFEST.tools.map((tool) => {
+    if (!tool || typeof tool !== "object" || typeof tool.name !== "string" || tool.name.length === 0) {
+      throw new Error("manifest.json tools entries must include non-empty name values");
+    }
+    return tool.name;
+  });
+}
+
+function validateToolManifest() {
+  const manifestToolNames = getManifestToolNames();
+  const seenToolNames = new Set();
+  const duplicateToolNames = manifestToolNames.filter((toolName) => {
+    if (seenToolNames.has(toolName)) {
+      return true;
+    }
+    seenToolNames.add(toolName);
+    return false;
+  });
+  const routedToolNames = new Set([
+    ...Object.keys(TOOL_DISPATCH),
+    ...TASK_STATE_MACHINE_TOOL_NAMES,
+  ]);
+  const missingHandlers = manifestToolNames.filter((toolName) => !routedToolNames.has(toolName));
+  const missingManifestEntries = Array.from(routedToolNames).filter(
+    (toolName) => !seenToolNames.has(toolName),
+  );
+
+  if (duplicateToolNames.length > 0 || missingHandlers.length > 0 || missingManifestEntries.length > 0) {
+    throw new Error([
+      "manifest.json tool declarations do not match plugin dispatch.",
+      duplicateToolNames.length > 0 ? `duplicate tools: ${duplicateToolNames.join(", ")}` : "",
+      missingHandlers.length > 0 ? `missing handlers: ${missingHandlers.join(", ")}` : "",
+      missingManifestEntries.length > 0 ? `missing manifest entries: ${missingManifestEntries.join(", ")}` : "",
+    ].filter(Boolean).join(" "));
+  }
+
+  return manifestToolNames;
+}
+
+const MANIFEST_TOOL_NAMES = validateToolManifest();
 
 async function handleInvoke(id, params = {}) {
   const tool = params.tool;
@@ -1810,7 +1284,7 @@ async function handleInvoke(id, params = {}) {
     return makeResponse(id, undefined, {
       code: -32601,
       message: `Unknown tool: ${tool}`,
-      data: { available_tools: TOOL_NAMES },
+      data: { available_tools: MANIFEST_TOOL_NAMES },
     });
   }
 
@@ -1842,14 +1316,7 @@ async function handleRequest(request) {
 
   switch (method) {
     case "describe": {
-      const stateMachineManifest = await describeTaskStateMachine();
-      return makeResponse(id, {
-        ...MANIFEST,
-        tools: [
-          ...MANIFEST.tools,
-          ...stateMachineManifest.tools,
-        ],
-      });
+      return makeResponse(id, MANIFEST);
     }
     case "invoke":
       return TASK_STATE_MACHINE_TOOL_NAMES.includes(params?.tool)
@@ -1860,7 +1327,7 @@ async function handleRequest(request) {
         status: "healthy",
         timestamp: new Date().toISOString(),
         version: MANIFEST.version,
-        tools_count: MANIFEST.tools.length + TASK_STATE_MACHINE_TOOL_NAMES.length,
+        tools_count: MANIFEST.tools.length,
       });
     default:
       return makeResponse(id, undefined, {
@@ -1893,7 +1360,7 @@ function shutdown(signal) {
 }
 
 process.stderr.write("🔌 Presenton template engine Executa plugin started\n");
-process.stderr.write(`   Tools: ${[...TOOL_NAMES, ...TASK_STATE_MACHINE_TOOL_NAMES].join(", ")}\n`);
+process.stderr.write(`   Tools: ${MANIFEST_TOOL_NAMES.join(", ")}\n`);
 
 rl.on("line", async (line) => {
   const trimmed = line.trim();

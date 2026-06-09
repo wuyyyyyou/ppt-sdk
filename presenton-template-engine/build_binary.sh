@@ -5,9 +5,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-PLUGIN_NAME="tool-lightvoss_5433-ppt-engine-6443rj2a"
+PLUGIN_NAME="$(node -e "const fs=require('node:fs'); console.log(JSON.parse(fs.readFileSync('manifest.json','utf8')).name)")"
+PLUGIN_VERSION="$(node -e "const fs=require('node:fs'); console.log(JSON.parse(fs.readFileSync('manifest.json','utf8')).version)")"
+BINARY_NAME="ppt-engine"
+WINDOWS_BINARY_NAME="${BINARY_NAME}.exe"
 BUNDLE_DIR="$SCRIPT_DIR/bundle"
-SEA_PREP_DIR="$SCRIPT_DIR/sea-prep"
+BUILD_DIR="$SCRIPT_DIR/.build"
+RAW_BINARY_DIR="$BUILD_DIR/binary"
+RELEASE_STAGE_DIR="$BUILD_DIR/release-stage"
+TEST_EXTRACT_DIR="$BUILD_DIR/test-extract"
+SEA_PREP_DIR="$BUILD_DIR/sea-prep"
 RUN_TEST=false
 
 for arg in "$@"; do
@@ -25,10 +32,10 @@ for arg in "$@"; do
 done
 
 detect_output_name() {
-  if [[ "$(detect_platform)" == "windows" ]]; then
-    echo "${PLUGIN_NAME}.exe"
+  if [[ "$PLATFORM" == "windows" ]]; then
+    echo "$WINDOWS_BINARY_NAME"
   else
-    echo "${PLUGIN_NAME}"
+    echo "$BINARY_NAME"
   fi
 }
 
@@ -40,6 +47,36 @@ detect_platform() {
     Darwin) echo "darwin" ;;
     MINGW*|MSYS*|CYGWIN*) echo "windows" ;;
     *) echo "other" ;;
+  esac
+}
+
+detect_arch() {
+  local arch
+  arch="$(uname -m)"
+
+  case "$arch" in
+    x86_64|amd64) echo "x86_64" ;;
+    arm64|aarch64) echo "arm64" ;;
+    *)
+      echo "Unsupported architecture for Anna Binary packaging: $arch" >&2
+      return 1
+      ;;
+  esac
+}
+
+detect_platform_key() {
+  local platform="$1"
+  local arch="$2"
+
+  case "$platform:$arch" in
+    darwin:x86_64) echo "darwin-x86_64" ;;
+    darwin:arm64) echo "darwin-arm64" ;;
+    windows:x86_64) echo "windows-x86_64" ;;
+    windows:arm64) echo "windows-arm64" ;;
+    *)
+      echo "Unsupported platform for Anna Binary packaging: $platform:$arch" >&2
+      return 1
+      ;;
   esac
 }
 
@@ -81,6 +118,89 @@ remove_windows_signature() {
     powershell.exe -NoProfile -Command '& { & $env:SIGNTOOL_PATH remove /s $env:OUTPUT_PATH_WIN }'
 }
 
+find_powershell() {
+  if command -v pwsh >/dev/null 2>&1; then
+    command -v pwsh
+    return 0
+  fi
+
+  if command -v powershell.exe >/dev/null 2>&1; then
+    command -v powershell.exe
+    return 0
+  fi
+
+  return 1
+}
+
+compress_zip() {
+  local stage_dir="$1"
+  local archive_path="$2"
+  local powershell_bin
+
+  powershell_bin="$(find_powershell)"
+  if [[ -z "$powershell_bin" ]]; then
+    echo "PowerShell is required to create zip archives on Windows." >&2
+    return 1
+  fi
+
+  STAGE_DIR_WIN="$(to_windows_path "$stage_dir")" \
+  ARCHIVE_PATH_WIN="$(to_windows_path "$archive_path")" \
+    "$powershell_bin" -NoProfile -Command '
+      $ErrorActionPreference = "Stop"
+      Add-Type -AssemblyName System.IO.Compression
+      Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+      $stageDir = [System.IO.Path]::GetFullPath($env:STAGE_DIR_WIN).TrimEnd("\", "/")
+      $archivePath = [System.IO.Path]::GetFullPath($env:ARCHIVE_PATH_WIN)
+      if (Test-Path -LiteralPath $archivePath) {
+        Remove-Item -LiteralPath $archivePath -Force
+      }
+
+      $archive = [System.IO.Compression.ZipFile]::Open($archivePath, [System.IO.Compression.ZipArchiveMode]::Create)
+      try {
+        foreach ($dirName in @("bin", "lib", "data")) {
+          $dirPath = Join-Path $stageDir $dirName
+          if (-not (Test-Path -LiteralPath $dirPath -PathType Container)) {
+            throw "Missing staged directory: $dirPath"
+          }
+          [void]$archive.CreateEntry("$dirName/")
+        }
+
+        foreach ($file in Get-ChildItem -LiteralPath $stageDir -File -Recurse) {
+          $filePath = [System.IO.Path]::GetFullPath($file.FullName)
+          $relativePath = $filePath.Substring($stageDir.Length).TrimStart("\", "/").Replace("\", "/")
+          $entry = $archive.CreateEntry($relativePath, [System.IO.Compression.CompressionLevel]::Optimal)
+          $entryStream = $entry.Open()
+          $fileStream = [System.IO.File]::OpenRead($filePath)
+          try {
+            $fileStream.CopyTo($entryStream)
+          } finally {
+            $fileStream.Dispose()
+            $entryStream.Dispose()
+          }
+        }
+      } finally {
+        $archive.Dispose()
+      }
+    '
+}
+
+extract_zip() {
+  local archive_path="$1"
+  local extract_dir="$2"
+  local powershell_bin
+
+  powershell_bin="$(find_powershell)"
+  if [[ -z "$powershell_bin" ]]; then
+    echo "PowerShell is required to extract zip archives on Windows." >&2
+    return 1
+  fi
+
+  ARCHIVE_PATH_WIN="$(to_windows_path "$archive_path")" \
+  EXTRACT_DIR_WIN="$(to_windows_path "$extract_dir")" \
+    "$powershell_bin" -NoProfile -Command 'Expand-Archive -LiteralPath $env:ARCHIVE_PATH_WIN -DestinationPath $env:EXTRACT_DIR_WIN -Force'
+}
+
 NODE_MAJOR="$(node -p 'process.versions.node.split(`.`)[0]')"
 if [[ "$NODE_MAJOR" -lt 20 ]]; then
   echo "Node.js 20+ is required for SEA builds. Current version: $(node -v)" >&2
@@ -97,23 +217,31 @@ if [[ ! -x "$SCRIPT_DIR/node_modules/.bin/postject" ]]; then
   exit 1
 fi
 
-OUTPUT_NAME="$(detect_output_name)"
-OUTPUT_PATH="$BUNDLE_DIR/$OUTPUT_NAME"
 PLATFORM="$(detect_platform)"
+ARCH="$(detect_arch)"
+PLATFORM_KEY="$(detect_platform_key "$PLATFORM" "$ARCH")"
+OUTPUT_NAME="$(detect_output_name)"
+OUTPUT_PATH="$RAW_BINARY_DIR/$OUTPUT_NAME"
+ARCHIVE_EXT="tar.gz"
+if [[ "$PLATFORM" == "windows" ]]; then
+  ARCHIVE_EXT="zip"
+fi
+ARCHIVE_NAME="${PLUGIN_NAME}-v${PLUGIN_VERSION}-${PLATFORM_KEY}.${ARCHIVE_EXT}"
+ARCHIVE_PATH="$BUNDLE_DIR/$ARCHIVE_NAME"
 
-mkdir -p "$BUNDLE_DIR"
-rm -f "$OUTPUT_PATH"
+rm -rf "$BUNDLE_DIR" "$RAW_BINARY_DIR" "$RELEASE_STAGE_DIR" "$TEST_EXTRACT_DIR"
+mkdir -p "$BUNDLE_DIR" "$RAW_BINARY_DIR"
 
-echo "[1/5] Building dist artifacts..."
+echo "[1/7] Building dist artifacts..."
 npm run build
 
-echo "[2/5] Preparing SEA app bundle..."
-node ./scripts/prepare-sea-bundle.mjs
+echo "[2/7] Preparing SEA app bundle..."
+PRESENTON_TEMPLATE_ENGINE_SEA_PREP_DIR="$SEA_PREP_DIR" node ./scripts/prepare-sea-bundle.mjs
 
-echo "[3/5] Generating SEA blob..."
+echo "[3/7] Generating SEA blob..."
 node --experimental-sea-config "$SEA_PREP_DIR/sea-config.json"
 
-echo "[4/5] Injecting blob into Node runtime..."
+echo "[4/7] Injecting blob into Node runtime..."
 node ./scripts/patch-postject.mjs
 if [[ "$PLATFORM" == "windows" ]]; then
   node -e "require('node:fs').copyFileSync(process.execPath, process.argv[1])" "$OUTPUT_PATH"
@@ -150,14 +278,51 @@ if [[ "$PLATFORM" == "darwin" ]]; then
   codesign --force --sign - "$OUTPUT_PATH" >/dev/null 2>&1 || true
 fi
 
-echo "[5/5] Validation"
+echo "[5/7] Staging Anna Binary distribution package..."
+mkdir -p "$RELEASE_STAGE_DIR/bin" "$RELEASE_STAGE_DIR/lib" "$RELEASE_STAGE_DIR/data"
+cp "$OUTPUT_PATH" "$RELEASE_STAGE_DIR/bin/$OUTPUT_NAME"
+chmod 755 "$RELEASE_STAGE_DIR/bin/$OUTPUT_NAME" || true
+node ./scripts/binary-release.mjs write-manifest \
+  --tool-manifest "$SCRIPT_DIR/manifest.json" \
+  --output "$RELEASE_STAGE_DIR/manifest.json"
+
+echo "[6/7] Creating release archive..."
+if [[ "$PLATFORM" == "windows" ]]; then
+  compress_zip "$RELEASE_STAGE_DIR" "$ARCHIVE_PATH"
+else
+  tar -C "$RELEASE_STAGE_DIR" -czf "$ARCHIVE_PATH" bin lib data manifest.json
+fi
+node ./scripts/binary-release.mjs write-sha256 \
+  --file "$ARCHIVE_PATH" \
+  --output "$ARCHIVE_PATH.sha256"
+
+echo "[7/7] Validation"
 echo "Binary created at: $OUTPUT_PATH"
 ls -lh "$OUTPUT_PATH"
+echo "Release archive created at: $ARCHIVE_PATH"
+ls -lh "$ARCHIVE_PATH" "$ARCHIVE_PATH.sha256"
 
 if [[ "$RUN_TEST" == "true" ]]; then
-  RESULT="$(printf '%s\n' '{"jsonrpc":"2.0","method":"describe","id":1}' | "$OUTPUT_PATH" 2>/dev/null)"
-  echo "$RESULT" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const r=JSON.parse(d);process.exit(r.result&&r.result.name==='tool-lightvoss_5433-ppt-engine-6443rj2a'?0:1)})"
-  echo "describe validation passed"
+  echo "Validating release archive..."
+  rm -rf "$TEST_EXTRACT_DIR"
+  mkdir -p "$TEST_EXTRACT_DIR"
+  if [[ "$PLATFORM" == "windows" ]]; then
+    extract_zip "$ARCHIVE_PATH" "$TEST_EXTRACT_DIR"
+  else
+    tar -C "$TEST_EXTRACT_DIR" -xzf "$ARCHIVE_PATH"
+  fi
+
+  node ./scripts/binary-release.mjs verify-archive \
+    --tool-manifest "$SCRIPT_DIR/manifest.json" \
+    --extract-dir "$TEST_EXTRACT_DIR" \
+    --platform-key "$PLATFORM_KEY"
+
+  TEST_BINARY_PATH="$TEST_EXTRACT_DIR/bin/$OUTPUT_NAME"
+  chmod +x "$TEST_BINARY_PATH" || true
+  RESULT="$(printf '%s\n' '{"jsonrpc":"2.0","method":"describe","id":1}' | "$TEST_BINARY_PATH" 2>/dev/null)"
+  echo "$RESULT" | node ./scripts/binary-release.mjs verify-describe \
+    --tool-manifest "$SCRIPT_DIR/manifest.json"
+  echo "archive validation passed"
 else
-  echo "skip (use --test to validate describe)"
+  echo "skip (use --test to validate release archive)"
 fi

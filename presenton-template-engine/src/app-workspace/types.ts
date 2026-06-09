@@ -337,6 +337,7 @@ export interface RenderAppWorkspacePagePreviewResult {
   html_path: string;
   preview_url?: string;
   screenshot_path: string;
+  screenshot_url?: string;
   page_index: number;
   page_number: number;
   slide_id: string;
@@ -351,6 +352,7 @@ export interface AppWorkspacePageItem {
   title: string;
   layout_id: string;
   html_path: string;
+  screenshot_path?: string;
   speaker_note: string;
 }
 
@@ -377,6 +379,8 @@ export interface RenderAppWorkspaceDeckHtmlResult {
     layout_id: string;
     title: string;
     html_path: string;
+    screenshot_path: string;
+    screenshot_url?: string;
     preview_url?: string;
     speaker_note: string;
   }>;
@@ -386,6 +390,40 @@ export interface RenderAppWorkspaceDeckHtmlResult {
 }
 
 export interface PrepareAppExportModelInput {
+  workspace_dir: string;
+}
+
+export type AppPptxExportStatus =
+  | "idle"
+  | "preparing_model"
+  | "model_ready"
+  | "generating_pptx"
+  | "completed"
+  | "failed";
+
+export interface AppPptxExportJob {
+  version: 1;
+  job_id: string;
+  status: AppPptxExportStatus;
+  message: string;
+  percent: number;
+  workspace_dir: string;
+  status_path: string;
+  output_dir: string;
+  html_path: string;
+  model_path: string;
+  pptx_path: string;
+  started_at: string | null;
+  updated_at: string | null;
+  completed_at: string | null;
+  error: {
+    message: string;
+    stack?: string;
+  } | null;
+  generator_result?: unknown;
+}
+
+export interface StartAppPptxExportModelInput {
   workspace_dir: string;
 }
 
@@ -420,4 +458,19 @@ export interface RecordAppPptxExportInput {
 export interface RecordAppPdfExportInput {
   workspace_dir: string;
   pdf_path: string;
+}
+
+export interface GetAppExportArtifactInput {
+  workspace_dir: string;
+  artifact_type: "pptx" | "pdf";
+}
+
+export interface AppExportArtifactInfo {
+  workspace_dir: string;
+  workspace_id: string;
+  title: string;
+  artifact_type: "pptx" | "pdf";
+  path: string;
+  filename: string;
+  updated_at: string | null;
 }

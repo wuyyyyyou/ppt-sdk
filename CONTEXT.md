@@ -49,6 +49,34 @@ A deck generation process that is currently running; the confirmed outline is no
 **Generation Step**:
 A visible part of deck generation, such as planning pages, preparing files, authoring a page, rendering, self-review, or final rendering.
 
+**Page Generation Unit**:
+One planned page being authored, rendered, and self-reviewed as an independent part of Deck Generation. It owns only that page's content and page-level assets; shared deck structure and template-wide assets belong outside the unit.
+
+**Active Page Generation**:
+A Page Generation Unit that has started and has not yet reached an accepted, failed, or cancelled terminal state. Its live stream may be shown while it is active.
+
+**Deck Generation Progress**:
+The aggregate progress of an Active Deck Generation across all Page Generation Units. It describes counts and overall state rather than naming one current page.
+
+**Live Page Stream**:
+The visible stream for an Active Page Generation. It shows the current page run while that page is still active.
+
+**Page Generation Stage Record**:
+The user-facing record of what happened within one Page Generation Unit across stages such as authoring, rendering, review, and fixing. It may include live or completed agent output, but it is presented as page work rather than as session history.
+
+**Generation Session History**:
+The collapsed-by-default record of completed agent runs from Deck Generation. It is historical context, not the primary place for Live Page Streams.
+_Avoid_: User-facing labels such as "Session History" when the record is really page generation work.
+
+**Failed Page Generation**:
+A Page Generation Unit that reached a terminal state without becoming accepted after its automatic recovery attempts are exhausted or manual review is required. Deck Generation may still continue other Page Generation Units, but the Deck is not finished until failed pages are retried or otherwise resolved.
+
+**Page Generation Retry**:
+The action of rerunning one Failed Page Generation against the current Confirmed Outline, Page Plan, and Template. It applies to the selected page only and does not imply regenerating the whole Deck.
+
+**Deck Generation Cancellation**:
+The user action that stops an Active Deck Generation from starting more Page Generation Units. Work already inside a Page Generation Unit may finish its current step before cancellation is reflected.
+
 **Task State Semantics**:
 The authoritative state-meaning module for the Task State Machine. It derives effective deck/page state, allowed operations, blockers, recommendations, and page progress synchronization from Workspace artifacts such as the Page Plan and Page Progress.
 

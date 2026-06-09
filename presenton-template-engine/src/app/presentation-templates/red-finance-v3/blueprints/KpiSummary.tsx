@@ -17,6 +17,13 @@ const MetricSchema = z.object({
   label: z.string().min(2).max(24),
 });
 
+const StatusCardSchema = z.object({
+  title: z.string().min(2).max(24),
+  progress: z.number().min(0).max(100),
+  status: z.string().min(2).max(48),
+  icon: StatusIconSchema.default("chart-column"),
+});
+
 export const Schema = z.object({
   title: z.string().min(2).max(28).default("KPI Summary"),
   metaLabel: z.string().min(2).max(48).default("BLUEPRINT / KPI"),
@@ -38,6 +45,26 @@ export const Schema = z.object({
     { value: "12", label: "Open items" },
     { value: "3", label: "Critical risks" },
     { value: "7", label: "Weeks left" },
+  ]),
+  statusCards: z.array(StatusCardSchema).min(2).max(4).default([
+    {
+      title: "Execution progress",
+      progress: 84,
+      status: "On track against current plan",
+      icon: "route",
+    },
+    {
+      title: "Risk coverage",
+      progress: 72,
+      status: "Critical risks under review",
+      icon: "shield",
+    },
+    {
+      title: "Target readiness",
+      progress: 90,
+      status: "Close to target threshold",
+      icon: "wallet",
+    },
   ]),
   insights: z.array(z.string().min(8).max(120)).min(1).max(3).default([
     "Numbers are the anchor; commentary should explain drivers and next actions.",
@@ -62,6 +89,7 @@ const KpiSummary = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
   const parsed = Schema.parse(data ?? {});
   const metricDensity = parsed.density === "high" ? "compact" : "normal";
   const gridClass = parsed.variant === "compact-metric-board" ? "grid-cols-4" : "grid-cols-2";
+  const isHeroKpiGrid = parsed.variant === "hero-kpi-grid";
 
   return (
     <FinanceContentFrame
@@ -74,8 +102,8 @@ const KpiSummary = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
       contentBottomInset={12}
     >
       <div className="flex h-full min-h-0 flex-col gap-[14px]">
-        <FinanceSectionHeading title={parsed.heading} subtitle={parsed.subtitle} />
-        <div className={parsed.variant === "hero-kpi-grid" ? "grid grid-cols-[1.05fr_0.95fr] gap-[18px]" : "flex flex-col gap-[18px]"}>
+        <FinanceSectionHeading title={parsed.heading} subtitle={parsed.subtitle} marginBottom={0} />
+        <div className={isHeroKpiGrid ? "grid flex-none grid-cols-[1.05fr_0.95fr] gap-[18px]" : "flex flex-none flex-col gap-[18px]"}>
           <DualValueMetricCard
             title={parsed.headlineTitle}
             icon={<FinanceIcon name="wallet" className="h-[18px] w-[18px]" />}

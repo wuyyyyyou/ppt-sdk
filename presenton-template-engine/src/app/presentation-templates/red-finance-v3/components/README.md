@@ -61,7 +61,7 @@
 - `IconText` 是 `图标 + 单行文本` 的语义封装，适合品牌、日期、作者、密级、短标签。
 - `StatusPill` 用于状态、阶段、风险等级等短 badge。
 - `KpiMetricItem` 用于紧凑 KPI，不负责外层卡片背景。
-- `FinanceSectionHeading` 用于内容区小节标题，不用于页面主标题。
+- `FinanceSectionHeading` 用于内容区小节标题，不用于页面主标题；窄列里可用 `subtitleLayout="stacked"` 让副标题落到标题下方，避免左右挤压。
 
 ### 3. 容器壳
 
@@ -79,7 +79,7 @@
 - `PillarBulletCard`：战略支柱或能力模块卡，内部承载多条 bullet。
 - `DualValueMetricCard`：两个主体或两个状态的指标对比。
 - `ProgressStatusCard`：单主体进度、成熟度、覆盖度状态。
-- `ComparisonPanel`：结构化文本对比，适合国家、渠道、方案、市场等多段比较。
+- `ComparisonPanel`：结构化文本对比，适合国家、渠道、方案、市场等多段比较；面板需要吃满固定高度时可用 `sectionLayout="fill"` 均分 section。
 
 ### 5. 图形组件
 

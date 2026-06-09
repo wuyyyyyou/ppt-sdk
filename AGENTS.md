@@ -158,7 +158,7 @@ cd presenton-pptx-generator && .venv/bin/python example_plugin.py
 
 ## 常见坑
 
-- `presenton-template-engine` 同时发布 ESM / CJS bundle；`import.meta.url` 和 `__dirname` 路径都要按各自语义处理。
+- `presenton-template-engine` runtime/SDK 产物采用 ESM-only 构建；路径解析优先使用 `import.meta.url`，不要为这些产物重新引入 CJS 输出兼容。`scripts/sea-bootstrap.cjs` 是 Node SEA 启动器例外，不代表包级 CommonJS 支持。
 - Puppeteer 相关命令可能需要本机 Chrome / Chrome for Testing。
 - AI agent 编辑 `<workspace>/template/` 里的 TSX 时，不要复用静态图片选择器路径，也不要把未受信任的运行时代码放进 `ppt-app` 自己的 bundle 里渲染。
 - `AGENTS.md` 是本仓库 canonical 的 agent guidance；不要把新约束写回别的旧指导文件。

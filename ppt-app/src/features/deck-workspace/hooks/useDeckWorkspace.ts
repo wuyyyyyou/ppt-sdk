@@ -6,6 +6,7 @@ import { connectAnnaRuntime } from "../../../runtime/annaRuntime";
 import type {
   ListWorkspacesResult,
   PageProgress,
+  PptxExportJob,
   TemplateSummary,
   WorkspaceResult,
   WorkspaceOutline,
@@ -22,19 +23,28 @@ import {
   type Slide
 } from "../../../data/mockDeck";
 import { formatMessage, type Locale, type Messages } from "../../../i18n/messages";
-import { deckReadyStatus } from "../utils";
+import { deckReadyStatus, hasDownstreamArtifacts, isWorkspaceDeckStale } from "../utils";
 import {
   createDeckGenerationStreamSnapshot,
-  pageProgressToDeckGenerationProgress,
   runDeckGeneration,
   runDeckRefinement,
+  runPageGenerationRetry,
   type DeckGenerationCompletion,
   type DeckGenerationProgress,
 } from "../../deck-generation";
+import {
+  createArtifactExportProgress,
+  createExportErrorProgress,
+  createExportStartProgress,
+  createIdleExportProgress,
+  createPptxJobExportProgress,
+} from "../exportProgressDisplay";
+import { restoreDeckGenerationProgress } from "../workspaceRecovery";
 import type {
   ContextRow,
   DeckReviewRenderState,
   DeckWorkspaceState,
+  ExportProgressState,
   ExportArtifact,
   GenerationStreamSnapshot,
   LoadingKind,
@@ -47,6 +57,8 @@ import type {
 import { getThemePreset, THEME_PRESET_IDS } from "../themePresets";
 
 const DEFAULT_TEMPLATE_GROUP_ID = "red-finance-v3";
+const PPTX_EXPORT_POLL_INTERVAL_MS = 1500;
+const PPTX_EXPORT_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 const SLIDE_COUNT_CONTEXT_OPTIONS = ["auto", ...Array.from({ length: 20 }, (_, index) => String(index + 1))];
 type ContextPatchId = "audience" | "goal" | "style" | "theme" | "content" | "slides";
 
@@ -101,13 +113,14 @@ export interface DeckWorkspaceActions {
   saveWorkspaceSettings: (setting: WorkspaceSettings) => Promise<void>;
   saveWorkspaceTitle: (title: string) => Promise<void>;
   selectTemplate: (groupId: string) => Promise<void>;
+  openRefineSlide: (index?: number) => Promise<void>;
   refineDeck: (instruction: string) => Promise<void>;
   refineSlide: (instruction: string) => Promise<void>;
   renderDeckHtml: () => Promise<void>;
   exportFile: (type: "PPTX" | "PDF") => Promise<void>;
-  openExportArtifact: (artifact: ExportArtifact) => Promise<void>;
   returnToOutlineFromGeneration: () => void;
   regenerateDeck: () => Promise<void>;
+  retryPageGeneration: (pageId: string) => Promise<void>;
 }
 
 export function useDeckWorkspace(t: Messages, locale: Locale) {
@@ -141,8 +154,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [pageProgress, setPageProgress] = useState<PageProgress | null>(null);
   const [refineScope, setRefineScope] = useState<RefineScope>("deck");
   const [loading, setLoading] = useState<LoadingKind>("none");
-  const [exportStatus, setExportStatus] = useState("");
+  const [exportProgress, setExportProgress] = useState<ExportProgressState>(
+    () => createIdleExportProgress(t)
+  );
   const [exportArtifact, setExportArtifact] = useState<ExportArtifact | null>(null);
+  const exportRefreshVersionRef = useRef(0);
+  const exportInFlightRef = useRef(false);
   const [backend, setBackend] = useState<PptBackend | null>(null);
   const [aiClient, setAiClient] = useState<AiClient | null>(null);
   const [agentClient, setAgentClient] = useState<AgentClient | null>(null);
@@ -192,6 +209,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const title = typeof record.title === "string" ? record.title : pageId;
     const layoutId = typeof record.layout_id === "string" ? record.layout_id : "";
     const htmlPath = typeof record.html_path === "string" ? record.html_path : "";
+    const screenshotPath =
+      typeof record.screenshot_path === "string" ? record.screenshot_path : "";
     const speakerNote =
       typeof record.speaker_note === "string" ? record.speaker_note : "";
     const index = typeof record.index === "number" ? record.index : 0;
@@ -206,6 +225,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       title,
       layout_id: layoutId,
       html_path: htmlPath,
+      screenshot_path: screenshotPath,
       speaker_note: speakerNote
     };
   }
@@ -262,59 +282,48 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     };
   }
 
-  function toFileUrl(filePath: string) {
-    return `file://${encodeURI(filePath)}`;
+  function sleep(ms: number) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
   }
 
-  function readOutlineUpdatedAt(workspace: WorkspaceResult) {
-    const outlineRecord =
-      workspace.outline && typeof workspace.outline === "object" && !Array.isArray(workspace.outline)
-        ? (workspace.outline as { updated_at?: unknown })
-        : null;
-    return typeof outlineRecord?.updated_at === "string" ? outlineRecord.updated_at : "";
+  function getPptxExportErrorMessage(job: PptxExportJob) {
+    return job.error?.message || job.message || (locale === "zh" ? "PPTX 导出失败" : "PPTX export failed");
   }
 
-  function hasDownstreamArtifacts(workspace: WorkspaceResult) {
-    const pagePlanRecord =
-      workspace.page_plan && typeof workspace.page_plan === "object" && !Array.isArray(workspace.page_plan)
-        ? (workspace.page_plan as { pages?: unknown })
-        : null;
-    const progressRecord =
-      workspace.page_progress && typeof workspace.page_progress === "object" && !Array.isArray(workspace.page_progress)
-        ? (workspace.page_progress as { pages?: unknown })
-        : null;
-    const pagesRecord =
-      workspace.pages && typeof workspace.pages === "object" && !Array.isArray(workspace.pages)
-        ? (workspace.pages as { pages?: unknown })
-        : null;
-
-    return (
-      (Array.isArray(pagePlanRecord?.pages) && pagePlanRecord.pages.length > 0) ||
-      (Array.isArray(progressRecord?.pages) && progressRecord.pages.length > 0) ||
-      (Array.isArray(pagesRecord?.pages) && pagesRecord.pages.length > 0)
-    );
+  function assertPptxExportPath(value: string, name: string) {
+    if (!value) {
+      throw new Error(
+        locale === "zh"
+          ? `PPTX 导出状态缺少 ${name}`
+          : `PPTX export status is missing ${name}`
+      );
+    }
   }
 
-  function isWorkspaceDeckStale(workspace: WorkspaceResult) {
-    const outlineUpdatedAt = readOutlineUpdatedAt(workspace);
-    const pagePlanRecord =
-      workspace.page_plan && typeof workspace.page_plan === "object" && !Array.isArray(workspace.page_plan)
-        ? (workspace.page_plan as { source?: { outline_updated_at?: unknown } })
-        : null;
-    const pagePlanOutlineUpdatedAt =
-      typeof pagePlanRecord?.source?.outline_updated_at === "string"
-        ? pagePlanRecord.source.outline_updated_at
-        : "";
-    const outlineRecord =
-      workspace.outline && typeof workspace.outline === "object" && !Array.isArray(workspace.outline)
-        ? (workspace.outline as { status?: unknown })
-        : null;
-
-    if (outlineUpdatedAt && pagePlanOutlineUpdatedAt) {
-      return outlineUpdatedAt !== pagePlanOutlineUpdatedAt;
+  async function waitForPptxExportStatus(
+    workspaceDir: string,
+    isDone: (job: PptxExportJob) => boolean
+  ) {
+    if (!backend) {
+      throw new Error("PptBackend is not available.");
     }
 
-    return outlineRecord?.status === "draft" && hasDownstreamArtifacts(workspace);
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt < PPTX_EXPORT_POLL_TIMEOUT_MS) {
+      const job = await backend.getPptxExportStatus({
+        workspace_dir: workspaceDir
+      });
+      setExportProgress(createPptxJobExportProgress(t, job));
+
+      if (isDone(job)) {
+        return job;
+      }
+
+      await sleep(PPTX_EXPORT_POLL_INTERVAL_MS);
+    }
+
+    throw new Error(locale === "zh" ? "PPTX 导出等待超时" : "Timed out waiting for PPTX export");
   }
 
   function hasRenderedWorkspacePages(workspace: WorkspaceResult) {
@@ -419,7 +428,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   } {
     const outlineRecord =
       workspace.outline && typeof workspace.outline === "object" && !Array.isArray(workspace.outline)
-        ? (workspace.outline as { items?: unknown; source?: { prompt?: unknown; context?: unknown } })
+        ? (workspace.outline as { items?: unknown; source?: { prompt?: unknown; context?: unknown; task_context?: unknown } })
         : null;
     const source = outlineRecord?.source;
     const rawContext = Array.isArray(source?.context) ? source.context : [];
@@ -532,7 +541,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     options: { syncEmptyContextRows?: boolean } = {}
   ) {
     setCurrentWorkspace(workspace);
-    setExportArtifact(readWorkspaceExportArtifact(workspace));
+    if (!exportInFlightRef.current) {
+      setExportArtifactWithProgress(readWorkspaceExportArtifactPath(workspace));
+      void refreshWorkspaceExportArtifact(workspace, exportRefreshVersionRef.current);
+    }
     const renderKey = workspaceReviewRenderKey(workspace);
     setReviewRender((current) =>
       current.renderKey === renderKey
@@ -551,9 +563,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const workspacePageProgress = normalizeWorkspacePageProgress(workspace.page_progress);
     setPageProgress(workspacePageProgress);
     setCreateDeckProgress(
-      !staleDeck && !workspacePages && workspacePageProgress
-        ? pageProgressToDeckGenerationProgress(workspacePageProgress, locale)
-        : null
+      restoreDeckGenerationProgress({
+        staleDeck,
+        pageProgress: workspacePageProgress,
+        locale,
+      })
     );
     if (workspacePages) {
       setGenerated(true);
@@ -701,6 +715,38 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       if (!hasCurrentRender) {
         void renderDeckHtml();
       }
+    }
+    if (nextPage === "export" && currentWorkspace) {
+      void refreshWorkspaceExportArtifact(currentWorkspace, exportRefreshVersionRef.current);
+    }
+  }
+
+  async function openRefineSlide(index = currentSlide) {
+    if (!generated) {
+      showToast(t.toasts.createDeckFirst);
+      return;
+    }
+
+    setCurrentSlide(index);
+    setRefineScope("slide");
+    setPage("refine");
+    setHistory((items) =>
+      items.at(-1) === "refine" ? items : [...items, "refine"]
+    );
+
+    if (!currentWorkspace) return;
+
+    const renderKey = workspaceReviewRenderKey(currentWorkspace);
+    const hasCurrentSlidePreview =
+      reviewRender.status === "ready" &&
+      reviewRender.result !== null &&
+      reviewRender.renderKey === renderKey &&
+      Boolean(reviewRender.result.slides[index]?.screenshot_url);
+    if (hasCurrentSlidePreview) return;
+
+    const rendered = await renderDeckHtmlForWorkspace(currentWorkspace, "review");
+    if (rendered) {
+      setCurrentSlide(index);
     }
   }
 
@@ -985,6 +1031,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
 
     if (completion.status === "failed") {
+      if (completion.progress) {
+        setCreateDeckProgress(completion.progress);
+      }
       showToast(completion.error.message);
       return;
     }
@@ -1445,7 +1494,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       : workspace.task_id ?? workspace.workspace_id;
   }
 
-  function readWorkspaceExportArtifact(workspace: WorkspaceResult): ExportArtifact | null {
+  function readWorkspaceExportArtifactPath(workspace: WorkspaceResult): ExportArtifact | null {
     if (!workspace.task || typeof workspace.task !== "object" || Array.isArray(workspace.task)) {
       return null;
     }
@@ -1497,8 +1546,46 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return {
       type: latest.type,
       path: latest.path,
-      href: latest.href || toFileUrl(latest.path)
+      href: ""
     };
+  }
+
+  async function buildWorkspaceExportArtifact(workspace: WorkspaceResult): Promise<ExportArtifact | null> {
+    if (!backend) return readWorkspaceExportArtifactPath(workspace);
+
+    const artifact = readWorkspaceExportArtifactPath(workspace);
+    if (!artifact) return null;
+
+    try {
+      const result = await backend.getExportArtifactDownloadUrl({
+        workspace_dir: workspace.workspace_dir,
+        artifact_type: artifact.type.toLowerCase() as "pptx" | "pdf"
+      });
+
+      return {
+        type: result.artifact_type === "pptx" ? "PPTX" : "PDF",
+        path: result.path,
+        href: result.download_url,
+        fileName: result.filename
+      };
+    } catch (error) {
+      console.warn(
+        "Failed to register export artifact download URL",
+        error instanceof Error ? error.message : error
+      );
+      return artifact;
+    }
+  }
+
+  async function refreshWorkspaceExportArtifact(
+    workspace: WorkspaceResult,
+    refreshVersion = exportRefreshVersionRef.current
+  ) {
+    const artifact = await buildWorkspaceExportArtifact(workspace);
+    if (refreshVersion !== exportRefreshVersionRef.current) {
+      return;
+    }
+    setExportArtifactWithProgress(artifact);
   }
 
   async function ensureCurrentWorkspace() {
@@ -1998,11 +2085,47 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     await generateDeck();
   }
 
+  async function retryPageGeneration(pageId: string) {
+    if (!backend || !aiClient || !agentClient) return;
+    if (loading === "deck" || loading === "deckFromOutline") return;
+
+    cancelCreateDeckRef.current = false;
+    setLoading("deckFromOutline");
+    setStage("generating");
+    setPage("main");
+    try {
+      const workspace = await ensureCurrentWorkspace();
+      if (!workspace) return;
+      const refreshedWorkspace = await backend.openWorkspace({
+        workspace_dir: workspace.workspace_dir
+      });
+      const completion = await runPageGenerationRetry({
+        backend,
+        aiClient,
+        agentClient,
+        workspace: refreshedWorkspace,
+        confirmedOutline: refreshedWorkspace.outline as WorkspaceOutline,
+        locale,
+        pageId,
+        onProgress: recordGenerationProgress,
+        isCancelled: () => cancelCreateDeckRef.current,
+      });
+      await applyDeckGenerationCompletion(completion, refreshedWorkspace);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
+    } finally {
+      setLoading("none");
+    }
+  }
+
   async function exportFile(type: "PPTX" | "PDF") {
     if (!backend) return;
 
     const workspace = await ensureCurrentWorkspace();
     if (!workspace) return;
+    const exportVersion = exportRefreshVersionRef.current + 1;
+    exportRefreshVersionRef.current = exportVersion;
+    exportInFlightRef.current = true;
 
     const needsFreshRender =
       reviewRender.status !== "ready" ||
@@ -2010,38 +2133,59 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       reviewRender.renderKey !== workspaceReviewRenderKey(workspace);
 
     setLoading("export");
-    setExportStatus(t.exportPage.preparing);
+    setExportProgress(createExportStartProgress(t, type));
     setExportArtifact(null);
     try {
       if (needsFreshRender) {
         const rendered = await renderDeckHtmlForWorkspace(workspace, "export");
         if (!rendered) return;
         setLoading("export");
-        setExportStatus(t.exportPage.preparing);
+        setExportProgress(createExportStartProgress(t, type));
       }
 
       if (type === "PPTX") {
-        const exportModel = await backend.prepareExportModel({
+        const startedModel = await backend.startPptxExportModel({
           workspace_dir: workspace.workspace_dir
         });
-        const generatorResult = await backend.generatePptx({
-          modelPath: exportModel.modelPath,
-          outputPath: `${workspace.workspace_dir}/output/deck.pptx`
+        setExportProgress(createPptxJobExportProgress(t, startedModel));
+
+        const modelReady = await waitForPptxExportStatus(
+          workspace.workspace_dir,
+          (job) => job.status === "model_ready" || job.status === "failed"
+        );
+        if (modelReady.status === "failed") {
+          throw new Error(getPptxExportErrorMessage(modelReady));
+        }
+        assertPptxExportPath(modelReady.model_path, "model_path");
+        assertPptxExportPath(modelReady.pptx_path, "pptx_path");
+
+        const startedPptx = await backend.startGeneratePptx({
+          workspace_dir: workspace.workspace_dir,
+          job_id: modelReady.job_id,
+          modelPath: modelReady.model_path,
+          outputPath: modelReady.pptx_path
         });
-        const pptxPath = generatorResult.pptxPath;
+        setExportProgress(createPptxJobExportProgress(t, startedPptx));
+
+        const completed = await waitForPptxExportStatus(
+          workspace.workspace_dir,
+          (job) => job.status === "completed" || job.status === "failed"
+        );
+        if (completed.status === "failed") {
+          throw new Error(getPptxExportErrorMessage(completed));
+        }
+
+        const pptxPath = completed.pptx_path;
+        assertPptxExportPath(pptxPath, "pptx_path");
         const updatedWorkspace = await backend.recordPptxExport({
           workspace_dir: workspace.workspace_dir,
-          pptxPath: generatorResult.pptxPath,
-          generatorResult
-        });
-        const artifact = readWorkspaceExportArtifact(updatedWorkspace);
-        setExportArtifact(artifact ?? {
-          type,
-          path: pptxPath,
-          href: toFileUrl(pptxPath)
+          pptxPath,
+          generatorResult: completed.generator_result ?? completed
         });
         applyWorkspace(updatedWorkspace);
+        await refreshWorkspaceExportArtifact(updatedWorkspace, exportVersion);
       } else {
+        setExportProgress(createExportStartProgress(t, "PDF"));
         const pdfResult = await backend.exportPdf({
           workspace_dir: workspace.workspace_dir
         });
@@ -2050,34 +2194,20 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           workspace_dir: workspace.workspace_dir,
           pdfPath
         });
-        const artifact = readWorkspaceExportArtifact(updatedWorkspace);
-        setExportArtifact(artifact ?? {
-          type,
-          path: pdfPath,
-          href: toFileUrl(pdfPath)
-        });
         applyWorkspace(updatedWorkspace);
+        await refreshWorkspaceExportArtifact(updatedWorkspace, exportVersion);
       }
 
-      setExportStatus(formatMessage(t.exportPage.ready, { type }));
       showToast(type === "PPTX" ? t.toasts.pptxExported : t.toasts.pdfExported);
     } catch (error) {
       const message = error instanceof Error ? error.message : t.status.exporting;
-      setExportStatus(message);
+      setExportProgress((current) =>
+        createExportErrorProgress(message, type, current.percent)
+      );
       showToast(message);
     } finally {
+      exportInFlightRef.current = false;
       setLoading("none");
-    }
-  }
-
-  async function openExportArtifact(artifact: ExportArtifact) {
-    if (!backend) return;
-
-    try {
-      await backend.openExportArtifact({ path: artifact.path });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : artifact.href;
-      showToast(message);
     }
   }
 
@@ -2104,7 +2234,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     pageProgress,
     refineScope,
     loading,
-    exportStatus,
+    exportProgress,
     exportArtifact,
     currentStatus,
     workspaceScan,
@@ -2155,13 +2285,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     saveWorkspaceSettings,
     saveWorkspaceTitle,
     selectTemplate,
+    openRefineSlide,
     refineDeck,
     refineSlide,
     renderDeckHtml,
     exportFile,
-    openExportArtifact,
     returnToOutlineFromGeneration,
-    regenerateDeck
+    regenerateDeck,
+    retryPageGeneration
   };
 
   return { state, actions };

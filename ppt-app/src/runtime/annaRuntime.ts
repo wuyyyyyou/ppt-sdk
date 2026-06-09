@@ -2,6 +2,7 @@ export interface AnnaToolInvokeInput {
   tool_id: string;
   method: string;
   args: object;
+  timeoutMs?: number;
 }
 
 export interface AnnaLlmCompleteInput {
@@ -37,7 +38,10 @@ export interface AnnaRuntime {
     options?: { timeoutMs?: number }
   ): Promise<T>;
   tools: {
-    invoke(input: AnnaToolInvokeInput): Promise<unknown>;
+    invoke(
+      input: AnnaToolInvokeInput,
+      options?: { timeoutMs?: number }
+    ): Promise<unknown>;
   };
   llm: {
     complete(input: AnnaLlmCompleteInput): Promise<unknown>;
@@ -55,7 +59,38 @@ declare global {
   }
 }
 
+interface AnnaRuntimeModule {
+  AnnaAppRuntime?: {
+    connect(): Promise<AnnaRuntime>;
+  };
+  default?: {
+    connect(): Promise<AnnaRuntime>;
+  };
+}
+
+const ANNA_RUNTIME_SDK_URLS = [
+  "/static/anna-apps/_sdk/latest/index.js",
+  "/static/anna-apps/_sdk/0.2.0/index.js"
+];
+
+async function loadAnnaRuntimeSdk(): Promise<AnnaRuntimeModule | null> {
+  for (const sdkUrl of ANNA_RUNTIME_SDK_URLS) {
+    try {
+      return await import(/* @vite-ignore */ sdkUrl);
+    } catch {
+      // Try the next SDK path; production staging currently serves `latest`.
+    }
+  }
+  return null;
+}
+
 export async function connectAnnaRuntime(): Promise<AnnaRuntime> {
+  if (!window.AnnaAppRuntime) {
+    const runtimeModule = await loadAnnaRuntimeSdk();
+    window.AnnaAppRuntime =
+      runtimeModule?.AnnaAppRuntime ?? runtimeModule?.default ?? window.AnnaAppRuntime;
+  }
+
   if (!window.AnnaAppRuntime) {
     throw new Error("AnnaAppRuntime is not available in this environment.");
   }

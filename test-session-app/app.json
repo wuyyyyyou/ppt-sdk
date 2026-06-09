@@ -1,0 +1,10 @@
+{
+  "slug": "test-session-lifecycle",
+  "name": "Session 生命周期测试",
+  "tagline": "测试 Anna Agent session 的创建、运行、持有、持久化和删除。",
+  "description": "用于开发环境中验证前端 raw agent.session.create/run/delete 调用和 app_session_uuid 复用行为。",
+  "category": "developer-tools",
+  "homepage_url": "https://staging.anna.partners/developers/tools/session-lifecycle",
+  "support_url": "https://staging.anna.partners/developers/tools/session-lifecycle",
+  "pricing_model": "free"
+}

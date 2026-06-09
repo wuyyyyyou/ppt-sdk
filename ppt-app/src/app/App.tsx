@@ -87,8 +87,6 @@ export function App() {
               addStyleRow={actions.addStyleRow}
               suggestContextFromPrompt={actions.suggestContextFromPrompt}
               generateDeck={actions.generateDeck}
-              cancelGenerateDeck={actions.cancelGenerateDeck}
-              createDeckProgress={state.createDeckProgress}
               showToast={actions.showToast}
             />
           ) : null}
@@ -107,8 +105,6 @@ export function App() {
               setFeedback={actions.setOutlineFeedback}
               applyFeedback={actions.applyOutlineFeedback}
               createDeck={actions.createDeckFromOutline}
-              cancelGenerateDeck={actions.cancelGenerateDeck}
-              createDeckProgress={state.createDeckProgress}
               loading={state.loading}
             />
           ) : null}
@@ -122,6 +118,7 @@ export function App() {
               onCancel={actions.cancelGenerateDeck}
               onBackToOutline={actions.returnToOutlineFromGeneration}
               onRegenerate={actions.regenerateDeck}
+              onRetryPage={actions.retryPageGeneration}
               canBackToOutline={state.outline.length > 0}
             />
           ) : null}
@@ -140,8 +137,7 @@ export function App() {
                 actions.navigate("refine");
               }}
               onRefineSlide={() => {
-                actions.setRefineScope("slide");
-                actions.navigate("refine");
+                void actions.openRefineSlide();
               }}
               onPreview={() => actions.navigate("review")}
               onExport={() => actions.navigate("export")}
@@ -181,9 +177,7 @@ export function App() {
               deleteSlide={actions.deleteSlide}
               addSlide={actions.addSlide}
               onRefineSlide={(index) => {
-                actions.setCurrentSlide(index);
-                actions.setRefineScope("slide");
-                actions.navigate("refine");
+                void actions.openRefineSlide(index);
               }}
             />
           ) : null}
@@ -194,8 +188,10 @@ export function App() {
               scope={state.refineScope}
               setScope={actions.setRefineScope}
               slide={selectedSlide}
+              slideIndex={state.currentSlide}
               slideNumber={formatSlideNumber(state.currentSlide)}
               deckCount={state.deck.length}
+              reviewRender={state.reviewRender}
               loading={state.loading}
               onBack={actions.goBack}
               onRefineDeck={actions.refineDeck}
@@ -206,12 +202,11 @@ export function App() {
           {state.page === "export" ? (
             <ExportPage
               t={t}
-              status={state.exportStatus}
+              progress={state.exportProgress}
               artifact={state.exportArtifact}
               loading={state.loading}
               onBack={actions.goBack}
               onExport={actions.exportFile}
-              onOpenArtifact={actions.openExportArtifact}
             />
           ) : null}
         </div>

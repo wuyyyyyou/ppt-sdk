@@ -8,6 +8,9 @@ import { fileURLToPath } from "node:url";
 
 import { resolveLocalTemplateTsconfigPath } from "../local-template/loader.js";
 
+const CURRENT_MODULE_PATH = fileURLToPath(import.meta.url);
+const CURRENT_MODULE_DIR = path.dirname(CURRENT_MODULE_PATH);
+
 export type LocalRuntimeEntry = {
   layoutId: string;
   absolutePath: string;
@@ -15,20 +18,14 @@ export type LocalRuntimeEntry = {
 
 type LocalRuntimeBundleMode = "deck" | "slide";
 
-const currentModulePath =
-  typeof __filename === "string" ? __filename : fileURLToPath(import.meta.url);
-const engineRequire = createRequire(currentModulePath);
+const engineRequire = createRequire(CURRENT_MODULE_PATH);
 
 function normalizePathForImport(value: string): string {
   return value.replace(/\\/g, "/");
 }
 
 function getCurrentModuleDir(): string {
-  if (typeof __dirname === "string") {
-    return __dirname;
-  }
-
-  return path.dirname(fileURLToPath(import.meta.url));
+  return CURRENT_MODULE_DIR;
 }
 
 function resolveBrowserRenderEntry(mode: LocalRuntimeBundleMode): string {

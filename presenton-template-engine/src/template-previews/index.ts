@@ -2,6 +2,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+const CURRENT_MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
+
 export interface TemplatePreviewImage {
   group_id: string;
   layout_id: string;
@@ -48,11 +50,7 @@ let previewIndexPromise: Promise<{
 }> | null = null;
 
 function getCurrentModuleDir(): string {
-  if (typeof __dirname === "string") {
-    return __dirname;
-  }
-
-  return path.dirname(fileURLToPath(import.meta.url));
+  return CURRENT_MODULE_DIR;
 }
 
 async function readPreviewIndexFrom(rootDir: string): Promise<TemplatePreviewIndex | null> {

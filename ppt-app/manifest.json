@@ -1,20 +1,26 @@
 {
   "schema": 2,
-  "permissions": ["tools.invoke"],
+  "permissions": [
+    "tools.invoke"
+  ],
   "required_executas": [
     {
       "tool_id": "tool-lightvoss_5433-ppt-engine-6443rj2a",
-      "min_version": "1.0.0",
+      "min_version": "3.0.1",
       "version": "latest"
     },
     {
       "tool_id": "tool-lightvoss_5433-ppt-gener-dc7ftcep",
-      "min_version": "1.0.0",
+      "min_version": "2.0.1",
       "version": "latest"
     }
   ],
   "optional_executas": [],
-  "tags": ["presentation", "ppt", "workflow"],
+  "tags": [
+    "presentation",
+    "ppt",
+    "workflow"
+  ],
   "ui": {
     "bundle": {
       "format": "static-spa",
@@ -27,8 +33,14 @@
         "title": "PPT App",
         "default": true,
         "entry": "index.html",
-        "min_size": { "w": 900, "h": 720 },
-        "default_size": { "w": 1080, "h": 760 },
+        "min_size": {
+          "w": 900,
+          "h": 720
+        },
+        "default_size": {
+          "w": 1080,
+          "h": 760
+        },
         "resizable": true,
         "movable": true,
         "single_instance": true
@@ -41,7 +53,9 @@
       ],
       "chat": [],
       "artifact": [],
-      "llm": ["complete"],
+      "llm": [
+        "complete"
+      ],
       "agent": {
         "session": {
           "auto": true,
@@ -55,10 +69,23 @@
       "window": []
     },
     "csp_overrides": {
-      "img-src": ["'self'", "data:", "blob:"],
-      "font-src": ["'self'", "data:"],
-      "style-src": ["'self'"],
-      "script-src": ["'self'"]
+      "img-src": [
+        "'self'",
+        "data:",
+        "blob:",
+        "http://127.0.0.1:*",
+        "http://localhost:*"
+      ],
+      "font-src": [
+        "'self'",
+        "data:"
+      ],
+      "style-src": [
+        "'self'"
+      ],
+      "script-src": [
+        "'self'"
+      ]
     }
   }
 }

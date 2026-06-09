@@ -16,7 +16,7 @@ import {
 import { getThemePreset } from "../themes/default-theme-presets.js";
 import {
   buildDeckHtmlFromManifest,
-  buildDeckHtmlPagesFromManifest,
+  buildDeckHtmlPagesAndScreenshotsFromManifest,
   buildDeckPageScreenshotFromManifest,
 } from "../render/build-deck-from-manifest.js";
 import { convertDeckHtmlToPptxModel } from "../html-to-pptx-model/index.js";
@@ -36,6 +36,7 @@ import type {
   AppPageProgressItem,
   ExportAppPdfInput,
   ExportAppPdfResult,
+  AppExportArtifactInfo,
   AppWorkspacePages,
   AppWorkspaceTemplateSelection,
   AppTemplatePlanningBlueprint,
@@ -44,6 +45,7 @@ import type {
   DuplicateAppWorkspacePageInput,
   GetAppPagePlanInput,
   GetAppPageProgressInput,
+  GetAppExportArtifactInput,
   GetAppTemplateGroupInput,
   GetAppTemplatePlanningContextInput,
   GetAppTemplatePreviewInput,
@@ -55,6 +57,7 @@ import type {
   PrepareAppPageFilesResult,
   PrepareAppExportModelInput,
   PrepareAppExportModelResult,
+  AppPptxExportJob,
   RecordAppPagePlanInput,
   RecordAppPageProgressInput,
   RecordAppPdfExportInput,
@@ -65,6 +68,7 @@ import type {
   RenderAppWorkspaceDeckHtmlResult,
   SelectAppWorkspaceTemplateInput,
   SelectAppWorkspaceTemplateResult,
+  StartAppPptxExportModelInput,
   UpdateAppWorkspacePagesInput,
   UpdateAppWorkspaceOutlineInput,
   UpdateAppWorkspaceSettingsInput,
@@ -90,6 +94,15 @@ const WORKSPACE_LOG_FILE_NAMES = {
   "ai-page-agent": "ai-page-agent.jsonl",
   "ai-page-agent-stream": "ai-page-agent-stream.jsonl",
 } as const;
+const PPTX_EXPORT_STATUS_FILE_NAME = "generate_ppt.json";
+const PPTX_EXPORT_STATUSES: AppPptxExportJob["status"][] = [
+  "idle",
+  "preparing_model",
+  "model_ready",
+  "generating_pptx",
+  "completed",
+  "failed",
+];
 
 function padDatePart(value: number): string {
   return String(value).padStart(2, "0");
@@ -131,6 +144,17 @@ function assertWorkspaceUnderRoot(workspaceDir: string): void {
   }
 }
 
+function normalizeWorkspaceDir(workspaceDir: string): string {
+  assertAbsolutePath(workspaceDir, "workspace_dir");
+  const normalizedWorkspaceDir = path.normalize(workspaceDir);
+  assertWorkspaceUnderRoot(normalizedWorkspaceDir);
+  const workspaceName = path.basename(normalizedWorkspaceDir);
+  if (!isWorkspaceDirName(workspaceName)) {
+    throw new Error('"workspace_dir" must point to a ppt-YYYYMMDD-HHmmss directory');
+  }
+  return normalizedWorkspaceDir;
+}
+
 function buildWorkspaceFilePaths(workspaceDir: string) {
   return {
     task: path.join(workspaceDir, "task.json"),
@@ -140,6 +164,16 @@ function buildWorkspaceFilePaths(workspaceDir: string) {
     page_progress: path.join(workspaceDir, "page-progress.json"),
     pages: path.join(workspaceDir, "pages.json"),
     template: path.join(workspaceDir, "template.json"),
+  };
+}
+
+function buildPptxExportPaths(workspaceDir: string) {
+  const outputDir = path.join(workspaceDir, "output");
+  return {
+    outputDir,
+    statusPath: path.join(outputDir, PPTX_EXPORT_STATUS_FILE_NAME),
+    modelPath: path.join(outputDir, "ppt-model.json"),
+    pptxPath: path.join(outputDir, "deck.pptx"),
   };
 }
 
@@ -169,6 +203,101 @@ async function fileExists(filePath: string): Promise<boolean> {
 async function writeJsonFile(filePath: string, data: unknown): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+}
+
+const pageProgressWriteQueues = new Map<string, Promise<unknown>>();
+
+async function withPageProgressWriteQueue<T>(
+  workspaceDir: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const queueKey = path.normalize(workspaceDir);
+  const previous = pageProgressWriteQueues.get(queueKey) ?? Promise.resolve();
+  const run = previous.catch(() => undefined).then(operation);
+  const tail = run.catch(() => undefined);
+  pageProgressWriteQueues.set(queueKey, tail);
+
+  try {
+    return await run;
+  } finally {
+    if (pageProgressWriteQueues.get(queueKey) === tail) {
+      pageProgressWriteQueues.delete(queueKey);
+    }
+  }
+}
+
+function createPptxExportJob(
+  workspaceDir: string,
+  patch: Partial<AppPptxExportJob> = {},
+): AppPptxExportJob {
+  const paths = buildPptxExportPaths(workspaceDir);
+  const now = new Date().toISOString();
+
+  return {
+    version: 1,
+    job_id: `${path.basename(workspaceDir)}-${Date.now()}`,
+    status: "preparing_model",
+    message: "Preparing PPTX export model.",
+    percent: 5,
+    workspace_dir: workspaceDir,
+    status_path: paths.statusPath,
+    output_dir: paths.outputDir,
+    html_path: "",
+    model_path: paths.modelPath,
+    pptx_path: paths.pptxPath,
+    started_at: now,
+    updated_at: now,
+    completed_at: null,
+    error: null,
+    ...patch,
+  };
+}
+
+function normalizePptxExportJob(
+  value: unknown,
+  workspaceDir: string,
+): AppPptxExportJob {
+  const existing =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Partial<AppPptxExportJob>)
+      : {};
+  const paths = buildPptxExportPaths(workspaceDir);
+  const status = PPTX_EXPORT_STATUSES.includes(existing.status as AppPptxExportJob["status"])
+    ? existing.status as AppPptxExportJob["status"]
+    : "idle";
+
+  return createPptxExportJob(workspaceDir, {
+    ...existing,
+    version: 1,
+    job_id: typeof existing.job_id === "string" && existing.job_id.length > 0
+      ? existing.job_id
+      : `${path.basename(workspaceDir)}-${Date.now()}`,
+    status,
+    message: typeof existing.message === "string" ? existing.message : "",
+    percent: typeof existing.percent === "number" ? existing.percent : 0,
+    workspace_dir: workspaceDir,
+    status_path: paths.statusPath,
+    output_dir: paths.outputDir,
+    html_path: typeof existing.html_path === "string" ? existing.html_path : "",
+    model_path: typeof existing.model_path === "string" ? existing.model_path : paths.modelPath,
+    pptx_path: typeof existing.pptx_path === "string" ? existing.pptx_path : paths.pptxPath,
+    started_at: typeof existing.started_at === "string" ? existing.started_at : null,
+    updated_at: typeof existing.updated_at === "string" ? existing.updated_at : null,
+    completed_at: typeof existing.completed_at === "string" ? existing.completed_at : null,
+    error:
+      existing.error && typeof existing.error === "object" && !Array.isArray(existing.error)
+        ? existing.error as AppPptxExportJob["error"]
+        : null,
+    generator_result: existing.generator_result,
+  });
+}
+
+async function writePptxExportJob(job: AppPptxExportJob): Promise<AppPptxExportJob> {
+  await writeJsonFile(job.status_path, {
+    ...job,
+    updated_at: new Date().toISOString(),
+  });
+  return getAppPptxExportStatus({ workspace_dir: job.workspace_dir });
 }
 
 function createDefaultTaskJson(workspaceDir: string, title?: string) {
@@ -291,6 +420,17 @@ function createDefaultOutlineJson() {
 
 function normalizeString(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function sanitizeFileNameBase(value: string): string {
+  const normalized = value
+    .normalize("NFKC")
+    .replace(/[\u0000-\u001f\u007f<>:"/\\|?*]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[. ]+$/g, "");
+
+  return normalized || "deck";
 }
 
 function normalizeOutlineItem(value: unknown): AppWorkspaceOutlineItem | null {
@@ -606,14 +746,8 @@ async function ensureWorkspaceFiles(
   workspaceDir: string,
   options: CreateAppWorkspaceInput = {},
 ): Promise<AppWorkspaceResult> {
-  assertAbsolutePath(workspaceDir, "task_dir");
-
-  const normalizedWorkspaceDir = path.normalize(workspaceDir);
-  assertWorkspaceUnderRoot(normalizedWorkspaceDir);
+  const normalizedWorkspaceDir = normalizeWorkspaceDir(workspaceDir);
   const workspaceName = path.basename(normalizedWorkspaceDir);
-  if (!isWorkspaceDirName(workspaceName)) {
-    throw new Error('"task_dir" must point to a ppt-YYYYMMDD-HHmmss directory');
-  }
 
   await mkdir(normalizedWorkspaceDir, { recursive: true });
   const workspaceSetting = await ensureWorkspaceSetting();
@@ -1407,7 +1541,7 @@ export async function renderAppWorkspaceDeckHtml(
   const manifestPath = readSelectedTemplateManifestPath(workspace);
   const renderedAt = new Date().toISOString();
   const outputDir = path.join(workspace.workspace_dir, "output", "app-render");
-  const result = await buildDeckHtmlPagesFromManifest({
+  const result = await buildDeckHtmlPagesAndScreenshotsFromManifest({
     manifestPath,
     outputDir,
     name: `${workspace.workspace_id}-review`,
@@ -1416,25 +1550,10 @@ export async function renderAppWorkspaceDeckHtml(
     slide_id: slide.slideId,
     layout_id: slide.layoutId,
     title: slide.title,
-    html_path: slide.outputPath,
+    html_path: slide.htmlPath,
+    screenshot_path: slide.screenshotPath,
     speaker_note: slide.speakerNote,
   }));
-  const outline: AppWorkspaceOutline = {
-    version: 2,
-    title: result.title,
-    status: "confirmed",
-    items: slides.map((slide) => ({
-      title: slide.title,
-      outline: slide.speaker_note || slide.layout_id,
-    })),
-    source: {
-      prompt: "",
-      context: [],
-      setting: normalizeSettingJson(workspace.setting),
-      kind: "template-manifest",
-    },
-    updated_at: renderedAt,
-  };
   const pages: AppWorkspacePages = {
     version: 1,
     status: "rendered",
@@ -1448,6 +1567,7 @@ export async function renderAppWorkspaceDeckHtml(
       title: slide.title,
       layout_id: slide.layout_id,
       html_path: slide.html_path,
+      screenshot_path: slide.screenshot_path,
       speaker_note: slide.speaker_note,
     })),
     source: {
@@ -1456,7 +1576,6 @@ export async function renderAppWorkspaceDeckHtml(
     updated_at: renderedAt,
   };
 
-  await writeJsonFile(workspace.files.outline, outline);
   await writeJsonFile(workspace.files.pages, pages);
   await touchWorkspaceTask(workspace, renderedAt);
 
@@ -1644,6 +1763,83 @@ export async function prepareAppExportModel(
   };
 }
 
+async function runPptxExportModelJob(job: AppPptxExportJob): Promise<void> {
+  try {
+    const prepared = await prepareAppExportModel({
+      workspace_dir: job.workspace_dir,
+    });
+    await writePptxExportJob({
+      ...job,
+      status: "model_ready",
+      message: "PPTX model is ready.",
+      percent: 50,
+      html_path: prepared.html_path,
+      model_path: prepared.model_path,
+      output_dir: prepared.output_dir,
+      error: null,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error && error.stack ? error.stack : undefined;
+    await writePptxExportJob({
+      ...job,
+      status: "failed",
+      message,
+      percent: 100,
+      completed_at: new Date().toISOString(),
+      error: {
+        message,
+        ...(stack ? { stack } : {}),
+      },
+    });
+  }
+}
+
+export async function startAppPptxExportModel(
+  input: StartAppPptxExportModelInput,
+): Promise<AppPptxExportJob> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const current = await getAppPptxExportStatus({
+    workspace_dir: workspace.workspace_dir,
+  });
+
+  if (current.status === "preparing_model" || current.status === "generating_pptx") {
+    return current;
+  }
+
+  const job = createPptxExportJob(workspace.workspace_dir);
+  const written = await writePptxExportJob(job);
+
+  void runPptxExportModelJob(written);
+
+  return written;
+}
+
+export async function getAppPptxExportStatus(input: {
+  workspace_dir: string;
+}): Promise<AppPptxExportJob> {
+  const workspaceDir = normalizeWorkspaceDir(input.workspace_dir);
+  const paths = buildPptxExportPaths(workspaceDir);
+  const existing = await readJsonFileIfExists(paths.statusPath);
+
+  if (existing === null) {
+    return createPptxExportJob(workspaceDir, {
+      job_id: "",
+      status: "idle",
+      message: "",
+      percent: 0,
+      started_at: null,
+      updated_at: null,
+      status_path: paths.statusPath,
+      output_dir: paths.outputDir,
+      model_path: paths.modelPath,
+      pptx_path: paths.pptxPath,
+    });
+  }
+
+  return normalizePptxExportJob(existing, workspaceDir);
+}
+
 export async function exportAppPdf(
   input: ExportAppPdfInput,
 ): Promise<ExportAppPdfResult> {
@@ -1702,6 +1898,51 @@ export async function recordAppPdfExport(
 ): Promise<AppWorkspaceResult> {
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
   return recordWorkspaceExport(workspace, "pdf", input.pdf_path);
+}
+
+export async function getAppExportArtifact(
+  input: GetAppExportArtifactInput,
+): Promise<AppExportArtifactInfo> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const artifactType = input.artifact_type;
+  if (artifactType !== "pptx" && artifactType !== "pdf") {
+    throw new Error('"artifact_type" must be "pptx" or "pdf"');
+  }
+
+  const task =
+    workspace.task && typeof workspace.task === "object" && !Array.isArray(workspace.task)
+      ? (workspace.task as Record<string, unknown>)
+      : {};
+  const artifacts =
+    task.artifacts && typeof task.artifacts === "object" && !Array.isArray(task.artifacts)
+      ? (task.artifacts as Record<string, unknown>)
+      : {};
+  const artifact =
+    artifacts[artifactType] && typeof artifacts[artifactType] === "object" && !Array.isArray(artifacts[artifactType])
+      ? (artifacts[artifactType] as Record<string, unknown>)
+      : {};
+  const artifactPath = typeof artifact.path === "string" ? path.normalize(artifact.path) : "";
+
+  if (!artifactPath) {
+    throw new Error(`No ${artifactType.toUpperCase()} export artifact is recorded for this workspace`);
+  }
+  assertAbsolutePath(artifactPath, `${artifactType}_path`);
+  const artifactStat = await stat(artifactPath);
+  if (!artifactStat.isFile()) {
+    throw new Error(`${artifactType.toUpperCase()} export artifact is not a file: ${artifactPath}`);
+  }
+
+  const workspaceTitle = (await getWorkspaceSummary(workspace.workspace_dir)).title;
+
+  return {
+    workspace_dir: workspace.workspace_dir,
+    workspace_id: workspace.workspace_id,
+    title: workspaceTitle,
+    artifact_type: artifactType,
+    path: artifactPath,
+    filename: `${sanitizeFileNameBase(workspaceTitle || workspace.workspace_id)}.${artifactType}`,
+    updated_at: typeof artifact.updated_at === "string" ? artifact.updated_at : null,
+  };
 }
 
 function buildBlueprintLookup(context: AppTemplatePlanningContext): Map<string, AppTemplatePlanningBlueprint> {
@@ -1899,36 +2140,38 @@ export async function getAppPageProgress(
 export async function recordAppPageProgress(
   input: RecordAppPageProgressInput,
 ): Promise<AppPageProgress> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const current = normalizePageProgressJson(workspace.page_progress);
-  const updatedAt = new Date().toISOString();
-  let found = false;
-  const nextPages = current.pages.map((page) => {
-    if (page.page_id !== input.page_id) return page;
-    found = true;
-    return normalizePageProgressItem({
-      ...page,
-      ...input.patch,
-      page_id: page.page_id,
-      index: page.index,
+  return withPageProgressWriteQueue(input.workspace_dir, async () => {
+    const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+    const current = normalizePageProgressJson(workspace.page_progress);
+    const updatedAt = new Date().toISOString();
+    let found = false;
+    const nextPages = current.pages.map((page) => {
+      if (page.page_id !== input.page_id) return page;
+      found = true;
+      return normalizePageProgressItem({
+        ...page,
+        ...input.patch,
+        page_id: page.page_id,
+        index: page.index,
+        updated_at: updatedAt,
+      }) as AppPageProgressItem;
+    });
+
+    if (!found) {
+      throw new Error(`Unknown page_id "${input.page_id}" in page-progress.json`);
+    }
+
+    const nextProgress: AppPageProgress = {
+      version: 1,
+      status: normalizeString(input.patch.deck_status) || current.status || "running",
+      pages: nextPages,
       updated_at: updatedAt,
-    }) as AppPageProgressItem;
+    };
+
+    await writeJsonFile(workspace.files.page_progress, nextProgress);
+    await touchWorkspaceTask(workspace, updatedAt);
+    return nextProgress;
   });
-
-  if (!found) {
-    throw new Error(`Unknown page_id "${input.page_id}" in page-progress.json`);
-  }
-
-  const nextProgress: AppPageProgress = {
-    version: 1,
-    status: normalizeString(input.patch.deck_status) || current.status || "running",
-    pages: nextPages,
-    updated_at: updatedAt,
-  };
-
-  await writeJsonFile(workspace.files.page_progress, nextProgress);
-  await touchWorkspaceTask(workspace, updatedAt);
-  return nextProgress;
 }
 
 export async function renderAppWorkspacePagePreview(
@@ -1973,6 +2216,7 @@ export type {
   AppPagePlanItem,
   AppPageProgress,
   AppPageProgressItem,
+  AppExportArtifactInfo,
   ExportAppPdfInput,
   ExportAppPdfResult,
   AppTemplatePlanningBlueprint,
@@ -2005,6 +2249,7 @@ export type {
   RecordAppPageProgressInput,
   RecordAppPdfExportInput,
   RecordAppPptxExportInput,
+  GetAppExportArtifactInput,
   RenderAppWorkspaceDeckHtmlInput,
   RenderAppWorkspaceDeckHtmlResult,
   RenderAppWorkspacePagePreviewInput,

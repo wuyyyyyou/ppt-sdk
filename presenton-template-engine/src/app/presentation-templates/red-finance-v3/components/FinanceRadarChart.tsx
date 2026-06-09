@@ -130,7 +130,6 @@ const FinanceRadarChart = ({
             angle={90}
             domain={[minValue, maxValue]}
             tickCount={ticks.length}
-            ticks={ticks}
             tick={{
               fill: redFinanceTheme.colors.subtleText,
               fontSize: 9,

@@ -3,6 +3,7 @@ import type { Slide } from "../../../data/mockDeck";
 import { formatMessage, type Messages } from "../../../i18n/messages";
 import type { DeckReviewRenderState } from "../types";
 import { formatSlideCount, formatSlideNumber } from "../utils";
+import { RenderedSlideImage } from "./RenderedSlideImage";
 import { SlidePreview } from "./SlidePreview";
 import { ThumbnailStrip } from "./ThumbnailStrip";
 
@@ -46,13 +47,9 @@ export function DeckPage(props: DeckPageProps) {
         </button>
       </div>
 
-      {reviewRender.status === "ready" && selectedRenderedSlide?.preview_url ? (
+      {reviewRender.status === "ready" && selectedRenderedSlide?.screenshot_url ? (
         <div className="deck-stage-html-frame">
-          <iframe
-            title={selectedRenderedSlide.title}
-            src={selectedRenderedSlide.preview_url}
-            sandbox="allow-scripts allow-same-origin"
-          />
+          <RenderedSlideImage slide={selectedRenderedSlide} loading="eager" />
         </div>
       ) : (
         <SlidePreview slide={slide} index={currentSlide} large />
