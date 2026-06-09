@@ -24,6 +24,7 @@ import {
   buildThemeCatalogForPrompt,
   THEME_PRESET_IDS,
 } from "../features/deck-workspace/themePresets";
+import { CONTENT_GROUNDING_RULES } from "./groundingRules";
 import type {
   AiAttemptLog,
   AiClient,
@@ -362,6 +363,7 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
           "Return a JSON object with title, outline, and slides fields.",
           "outline items must have title and outline.",
           "slides must have title and subtitle.",
+          CONTENT_GROUNDING_RULES,
           `Locale: ${input.locale}`,
           `Prompt: ${input.prompt}`,
           `Context: ${JSON.stringify(input.contextRows)}`,
@@ -387,6 +389,7 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         [
           "Create slide summaries from this outline.",
           "Return only a JSON array. Each item must have title and subtitle.",
+          CONTENT_GROUNDING_RULES,
           `Locale: ${input.locale}`,
           `Outline: ${JSON.stringify(input.outline)}`
         ].join("\n"),
@@ -401,6 +404,8 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         [
           "Refine this deck. Return only a JSON array of slides.",
           "Each slide must have title and subtitle.",
+          CONTENT_GROUNDING_RULES,
+          "Do not add new factual claims during refinement unless they are already present in the provided slides.",
           `Locale: ${input.locale}`,
           `Slides: ${JSON.stringify(input.slides)}`
         ].join("\n"),
@@ -414,6 +419,8 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         "refined slide",
         [
           "Refine this single slide. Return only a JSON object with title and subtitle.",
+          CONTENT_GROUNDING_RULES,
+          "Do not add new factual claims during refinement unless they are already present in the provided slide.",
           `Locale: ${input.locale}`,
           `Slide number: ${input.slideIndex + 1}`,
           `Slide: ${JSON.stringify(input.slide)}`

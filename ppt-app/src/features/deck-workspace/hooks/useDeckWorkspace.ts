@@ -116,6 +116,8 @@ export interface DeckWorkspaceActions {
   openRefineSlide: (index?: number) => Promise<void>;
   refineDeck: (instruction: string) => Promise<void>;
   refineSlide: (instruction: string) => Promise<void>;
+  rewriteCurrentSlide: () => Promise<void>;
+  changeCurrentSlideLayout: (mode: "simpler" | "visual" | "comparison" | "process" | "report") => Promise<void>;
   renderDeckHtml: () => Promise<void>;
   exportFile: (type: "PPTX" | "PDF") => Promise<void>;
   returnToOutlineFromGeneration: () => void;
@@ -341,6 +343,18 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     delete setting.style_notes;
     delete setting.slide_count;
     return setting;
+  }
+
+  function readExplicitOutputLanguage(value: string): string | null {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return null;
+    if (/(中文|汉语|简体中文|繁体中文|chinese|mandarin|\bzh\b)/i.test(normalized)) {
+      return "Chinese";
+    }
+    if (/(英文|英语|english|\ben\b)/i.test(normalized)) {
+      return "English";
+    }
+    return null;
   }
 
   function normalizePersistedContextRow(value: unknown): ContextRow | null {
@@ -1225,7 +1239,20 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     let workspace: WorkspaceResult | null = null;
     try {
       workspace = await ensureCurrentWorkspace();
-      const setting = workspaceSettingsToState(workspace);
+      if (!workspace) return;
+      let setting = workspaceSettingsToState(workspace);
+      const explicitOutputLanguage = readExplicitOutputLanguage(outlineFeedback);
+      if (explicitOutputLanguage && backend) {
+        workspace = await backend.updateWorkspaceSettings({
+          workspace_dir: workspace.workspace_dir,
+          setting: {
+            ...setting,
+            output_language: explicitOutputLanguage,
+          },
+        });
+        applyWorkspace(workspace);
+        setting = workspaceSettingsToState(workspace);
+      }
       const baseTitle = outlineEditMode ? outlineDraftTitle : deckTitle;
       const baseOutline = outlineEditMode ? outlineDraft : outline;
       const nextContextRows = deriveContextRowsFromOutlineFeedback(contextRows, outlineFeedback);
@@ -2004,6 +2031,52 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
+  function buildRewriteCurrentSlideInstruction() {
+    return [
+      "Rewrite only the current slide for clarity, impact, and executive readability.",
+      "Keep the current slide purpose, key message, factual content, and evidence.",
+      "Do not add unsupported facts, numbers, dates, names, citations, examples, or claims.",
+      "Prefer concise wording, stronger hierarchy, and cleaner slide-level narrative.",
+      "Do not change other pages.",
+    ].join("\n");
+  }
+
+  function buildChangeCurrentSlideLayoutInstruction(
+    mode: "simpler" | "visual" | "comparison" | "process" | "report",
+  ) {
+    const modeInstruction = {
+      simpler:
+        "Make the slide simpler: reduce density, clarify the hierarchy, and keep only the essential message and support.",
+      visual:
+        "Make the slide more visual: use stronger visual grouping, callouts, metrics, or diagram-like structure where appropriate.",
+      comparison:
+        "Make the slide better for comparison: organize content into clear side-by-side dimensions, tradeoffs, or benchmark structure.",
+      process:
+        "Make the slide better for process explanation: organize content into stages, sequence, flow, or roadmap structure.",
+      report:
+        "Make the slide better for an executive report: emphasize conclusion-first structure, concise evidence, and decision-ready framing.",
+    }[mode];
+
+    return [
+      "Change only the current slide layout direction while preserving its factual content and key message.",
+      modeInstruction,
+      "You may restructure the current slide TSX and data, and you may reference available blueprints/components for layout ideas.",
+      "Do not modify page-plan.json, manifest slide ids, other pages, or unrelated shared files.",
+      "Do not add unsupported facts, numbers, dates, names, citations, examples, or claims.",
+      "If content does not fit the requested layout, prioritize truthful omission or TBD / 待补充 over invention.",
+    ].join("\n");
+  }
+
+  async function rewriteCurrentSlide() {
+    await refineSlide(buildRewriteCurrentSlideInstruction());
+  }
+
+  async function changeCurrentSlideLayout(
+    mode: "simpler" | "visual" | "comparison" | "process" | "report",
+  ) {
+    await refineSlide(buildChangeCurrentSlideLayoutInstruction(mode));
+  }
+
   async function renderDeckHtmlForWorkspace(
     workspace: WorkspaceResult,
     loadingKind: LoadingKind
@@ -2288,6 +2361,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     openRefineSlide,
     refineDeck,
     refineSlide,
+    rewriteCurrentSlide,
+    changeCurrentSlideLayout,
     renderDeckHtml,
     exportFile,
     returnToOutlineFromGeneration,

@@ -1,0 +1,44 @@
+{
+  "title": "Comparison Overview",
+  "subtitle": "A structured view of the pillars shaping East Asia's market position and trajectory.",
+  "footerText": "Red Blue Professional | Agenda",
+  "pageNumber": "02",
+  "items": [
+    {
+      "number": "01",
+      "title": "Economy",
+      "description": "Compare GDP size, growth direction, economic structure, and global ranking.",
+      "tone": "china"
+    },
+    {
+      "number": "02",
+      "title": "Demographics",
+      "description": "Review population scale, aging pressure, workforce challenges, and urbanization.",
+      "tone": "japan"
+    },
+    {
+      "number": "03",
+      "title": "Technology",
+      "description": "Assess R&D intensity, AI development, robotics, chips, and patent output.",
+      "tone": "korea"
+    },
+    {
+      "number": "04",
+      "title": "Trade",
+      "description": "Map bilateral flows, export categories, supply-chain links, and dependencies.",
+      "tone": "purple"
+    },
+    {
+      "number": "05",
+      "title": "History",
+      "description": "Trace key milestones shaping current diplomatic and market conditions.",
+      "tone": "neutral"
+    },
+    {
+      "number": "06",
+      "title": "Culture",
+      "description": "Compare social values, business norms, and soft-power influence.",
+      "tone": "purple"
+    }
+  ]
+}

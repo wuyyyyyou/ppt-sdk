@@ -132,6 +132,7 @@ export function App() {
               currentSlide={state.currentSlide}
               setCurrentSlide={actions.setCurrentSlide}
               reviewRender={state.reviewRender}
+              loading={state.loading}
               onRefineDeck={() => {
                 actions.setRefineScope("deck");
                 actions.navigate("refine");
@@ -139,6 +140,8 @@ export function App() {
               onRefineSlide={() => {
                 void actions.openRefineSlide();
               }}
+              onRewriteSlide={actions.rewriteCurrentSlide}
+              onChangeSlideLayout={actions.changeCurrentSlideLayout}
               onPreview={() => actions.navigate("review")}
               onExport={() => actions.navigate("export")}
             />

@@ -1,0 +1,49 @@
+{
+  "title": "Performance Signal",
+  "subtitle": "Combine one evidence chart with KPI rows and a headline result for fast reading.",
+  "footerText": "Red Blue Professional | Chart Metric Brief",
+  "pageNumber": "04",
+  "chartTitle": "Indexed Market Position",
+  "chartSubtitle": "Relative index scores for slide-level comparison; replace with validated source data.",
+  "series": [
+    {
+      "label": "China",
+      "value": 84,
+      "tone": "china"
+    },
+    {
+      "label": "Japan",
+      "value": 68,
+      "tone": "japan"
+    },
+    {
+      "label": "Korea",
+      "value": 72,
+      "tone": "korea"
+    }
+  ],
+  "metricTitle": "KPI Readout",
+  "metrics": [
+    {
+      "label": "China",
+      "value": "84%",
+      "share": 84,
+      "tone": "china"
+    },
+    {
+      "label": "Japan",
+      "value": "68%",
+      "share": 68,
+      "tone": "japan"
+    },
+    {
+      "label": "Korea",
+      "value": "72%",
+      "share": 72,
+      "tone": "korea"
+    }
+  ],
+  "calloutValue": "84%",
+  "calloutLabel": "Lead signal",
+  "calloutDescription": "Use the callout to focus attention on the strongest measured position or key caveat."
+}

@@ -1,5 +1,5 @@
 import { Check, CheckCircle2, ChevronDown, File, ImageIcon, Palette, Search, Sparkles, Upload, X } from "lucide-react";
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import type { TemplateSummary } from "../../../api/types";
 import type { Messages } from "../../../i18n/messages";
 import type { ContextRow, LoadingKind } from "../types";
@@ -426,6 +426,8 @@ function ContextRowView(props: {
             <ChevronDown size={14} aria-hidden="true" />
           </label>
         </div>
+      ) : row.type === "select" && row.id === "theme" ? (
+        <ThemeSwatchPicker row={row} update={update} />
       ) : row.type === "select" ? (
         <select
           className="context-select"
@@ -466,6 +468,47 @@ function ContextRowView(props: {
       <button className="context-remove-btn" onClick={() => remove(row.id)}>
         <X size={12} />
       </button>
+    </div>
+  );
+}
+
+function ThemeSwatchPicker(props: {
+  row: ContextRow;
+  update: (id: string, value: string) => void;
+}) {
+  const { row, update } = props;
+  const options = row.options ?? THEME_PRESET_IDS;
+
+  return (
+    <div className="theme-swatch-list" role="radiogroup" aria-label={row.label}>
+      {options.map((themeId) => {
+        const theme = getThemePreset(themeId);
+        const colors = theme?.data.colors ?? {};
+        const selected = row.value === themeId;
+        const primaryColor = colors.primary ?? "#64748B";
+
+        return (
+          <button
+            key={themeId}
+            type="button"
+            className={`theme-swatch-btn ${selected ? "active" : ""}`}
+            style={
+              {
+                "--theme-primary": primaryColor,
+                "--theme-stroke": colors.stroke ?? "rgba(17,24,39,0.12)",
+              } as CSSProperties
+            }
+            title={theme?.theme_name ?? themeId}
+            aria-label={theme?.theme_name ?? themeId}
+            aria-checked={selected}
+            role="radio"
+            onClick={() => update(row.id, themeId)}
+          >
+            <span className="theme-swatch-color" aria-hidden="true" />
+            {selected ? <Check size={13} strokeWidth={3} aria-hidden="true" /> : null}
+          </button>
+        );
+      })}
     </div>
   );
 }

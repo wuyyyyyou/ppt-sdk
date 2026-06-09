@@ -1,0 +1,27 @@
+{
+  "group_id": "red-blue",
+  "group_name": "Red Blue Professional",
+  "group_description": "TSX-first red and blue comparison template components for comparison, KPI, chart, timeline, and executive report decks.",
+  "group_brief": "TSX-first red-blue template based on the local HTML reference deck, with reusable components and blueprint layouts for covers, agendas, comparison cards, charts, timelines, and closing pages.",
+  "style_tags": ["comparison", "red-blue", "professional", "tsx-first"],
+  "industry_tags": ["general-business", "market-analysis", "public-policy"],
+  "use_cases": ["country-comparison", "competitor-analysis", "market-research", "executive-brief"],
+  "audience_tags": ["management", "client", "research"],
+  "tone_tags": ["professional", "analytical", "balanced"],
+  "default_theme_id": "red-blue",
+  "ordered": true,
+  "default": false,
+  "registry_order": 93,
+  "cover_layout_id": "red-blue:cover-statement",
+  "closing_layout_id": "red-blue:closing-summary",
+  "layouts": [
+    "slides/CoverStatement.tsx",
+    "slides/AgendaOverview.tsx",
+    "slides/ThreeTopicCards.tsx",
+    "slides/ChartMetricBrief.tsx",
+    "slides/CountryComparison.tsx",
+    "slides/TimelineRoadmap.tsx",
+    "slides/ClosingSummary.tsx",
+    "slides/ComponentGallery.tsx"
+  ]
+}

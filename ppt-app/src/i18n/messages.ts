@@ -23,6 +23,13 @@ export interface Messages {
     reviseOutline: string;
     refineDeck: string;
     refineSlide: string;
+    rewriteSlide: string;
+    changeLayout: string;
+    layoutSimpler: string;
+    layoutVisual: string;
+    layoutComparison: string;
+    layoutProcess: string;
+    layoutReport: string;
     preview: string;
     export: string;
     applyToDeck: string;
@@ -283,6 +290,13 @@ export const messages: Record<Locale, Messages> = {
       reviseOutline: "Revise outline",
       refineDeck: "Refine deck",
       refineSlide: "Refine slide",
+      rewriteSlide: "Rewrite slide",
+      changeLayout: "Change layout",
+      layoutSimpler: "Simpler",
+      layoutVisual: "More visual",
+      layoutComparison: "Comparison",
+      layoutProcess: "Process",
+      layoutReport: "Report",
       preview: "Preview",
       export: "Export",
       applyToDeck: "Apply to deck",
@@ -556,6 +570,13 @@ export const messages: Record<Locale, Messages> = {
       reviseOutline: "调整大纲",
       refineDeck: "优化整套",
       refineSlide: "优化当前页",
+      rewriteSlide: "重写本页",
+      changeLayout: "换 Layout",
+      layoutSimpler: "更简洁",
+      layoutVisual: "更视觉化",
+      layoutComparison: "适合对比",
+      layoutProcess: "适合流程",
+      layoutReport: "适合汇报",
       preview: "预览",
       export: "导出",
       applyToDeck: "应用到整套",

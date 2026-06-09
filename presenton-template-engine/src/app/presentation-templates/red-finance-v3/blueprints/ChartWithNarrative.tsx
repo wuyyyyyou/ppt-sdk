@@ -40,7 +40,7 @@ const NarrativeItemSchema = z.object({
 
 const SeriesSchema = z.object({
   label: z.string().min(2).max(24),
-  color: z.string().min(3).max(32),
+  color: z.string().min(3).max(64),
   values: z.array(z.number().finite()).min(2).max(8),
 });
 

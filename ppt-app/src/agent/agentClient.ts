@@ -33,9 +33,23 @@ export interface AgentSelfReviewResult {
   confidence: "low" | "medium" | "high";
 }
 
+export interface AgentFactReviewResult {
+  pass: boolean;
+  score: number;
+  unsupported_claims: Array<{
+    claim: string;
+    reason: string;
+    severity?: string;
+    rewrite_suggestion?: string;
+  }>;
+  rewrite_request: string;
+  confidence: "low" | "medium" | "high";
+}
+
 export interface AgentClient {
   runAuthoringPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentRunSummary>;
   runSelfReviewPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentSelfReviewResult>;
+  runFactReviewPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentFactReviewResult>;
   close(): Promise<void>;
 }
 
@@ -141,6 +155,33 @@ function normalizeSelfReview(value: unknown): AgentSelfReviewResult {
       : [],
     revision_request:
       typeof record.revision_request === "string" ? record.revision_request : "",
+    confidence:
+      record.confidence === "high" || record.confidence === "low"
+        ? record.confidence
+        : "medium",
+  };
+}
+
+function normalizeFactReview(value: unknown): AgentFactReviewResult {
+  const record = value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Partial<AgentFactReviewResult>)
+    : {};
+
+  return {
+    pass: record.pass === true,
+    score: typeof record.score === "number" ? record.score : 0,
+    unsupported_claims: Array.isArray(record.unsupported_claims)
+      ? record.unsupported_claims
+          .filter((item): item is AgentFactReviewResult["unsupported_claims"][number] =>
+            Boolean(item) &&
+            typeof item === "object" &&
+            !Array.isArray(item) &&
+            typeof (item as { claim?: unknown }).claim === "string" &&
+            typeof (item as { reason?: unknown }).reason === "string"
+          )
+      : [],
+    rewrite_request:
+      typeof record.rewrite_request === "string" ? record.rewrite_request : "",
     confidence:
       record.confidence === "high" || record.confidence === "low"
         ? record.confidence
@@ -453,6 +494,21 @@ export async function createAgentClient(runtime: AnnaRuntime): Promise<AgentClie
         );
         const repaired = await collectWithSessionRetry(repairPrompt, options);
         return normalizeSelfReview(parseJsonObject(repaired.text, "self-review"));
+      }
+    },
+
+    async runFactReviewPrompt(prompt, options) {
+      const collected = await collectWithSessionRetry(prompt, options);
+      try {
+        return normalizeFactReview(parseJsonObject(collected.text, "fact-review"));
+      } catch (error) {
+        const repairPrompt = buildStructuredJsonRepairPrompt(
+          collected.text,
+          '{"pass":true,"score":8,"unsupported_claims":[],"rewrite_request":"","confidence":"medium"}',
+          error instanceof Error ? error.message : String(error)
+        );
+        const repaired = await collectWithSessionRetry(repairPrompt, options);
+        return normalizeFactReview(parseJsonObject(repaired.text, "fact-review"));
       }
     },
 
