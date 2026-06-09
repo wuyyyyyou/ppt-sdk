@@ -19,6 +19,7 @@ import {
   buildDeckHtmlPagesAndScreenshotsFromManifest,
   buildDeckPageScreenshotFromManifest,
 } from "../render/build-deck-from-manifest.js";
+import { launchManagedBrowser } from "../runtime/browser-runtime.js";
 import { convertDeckHtmlToPptxModel } from "../html-to-pptx-model/index.js";
 import type {
   AppendAppWorkspaceLogInput,
@@ -1611,9 +1612,8 @@ export async function renderAppWorkspaceDeckHtml(
 async function launchPdfBrowser(): Promise<any> {
   const puppeteerModule = await import("puppeteer");
   const puppeteer = puppeteerModule.default ?? puppeteerModule;
-  return puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+  return launchManagedBrowser(puppeteer, {
+    purpose: "app PDF export",
   });
 }
 
