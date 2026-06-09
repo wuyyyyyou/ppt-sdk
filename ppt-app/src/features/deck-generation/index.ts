@@ -74,6 +74,8 @@ export interface DeckGenerationStream {
   status: string;
   lines: string[];
   activities: string[];
+  started_at?: string;
+  updated_at?: string;
 }
 
 export interface DeckGenerationProgress {
@@ -522,6 +524,8 @@ function createAgentRunTracker(input: {
     status: input.message,
     lines: [],
     activities: [],
+    started_at: startedAt,
+    updated_at: startedAt,
   };
   const contentChunks: string[] = [];
   const activities: Array<Record<string, unknown>> = [];
@@ -529,6 +533,7 @@ function createAgentRunTracker(input: {
   let usage: unknown = null;
 
   function emitStream() {
+    stream.updated_at = new Date().toISOString();
     input.flowInput.activeStreams.set(runId, stream);
     emit(
       input.flowInput,
@@ -604,6 +609,7 @@ function createAgentRunTracker(input: {
         // Logging must never fail Deck Generation.
       } finally {
         stream.status = status;
+        stream.updated_at = endedAt;
         emitStream();
         input.flowInput.activeStreams.delete(runId);
         emit(

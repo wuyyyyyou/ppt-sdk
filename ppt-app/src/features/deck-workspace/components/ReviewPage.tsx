@@ -13,11 +13,13 @@ import {
 } from "lucide-react";
 import type { Slide } from "../../../data/mockDeck";
 import type { Messages } from "../../../i18n/messages";
+import { visibleSlideSubtitle } from "../slideDisplay";
 import type { DeckReviewRenderState, PreviewMode } from "../types";
 import { formatSlideNumber } from "../utils";
 import { PageHeader } from "./PageHeader";
 import { RenderedSlideImage } from "./RenderedSlideImage";
 import { SlidePreview } from "./SlidePreview";
+import { SlidePreviewLoading } from "./SlidePreviewLoading";
 import { ThumbnailStrip } from "./ThumbnailStrip";
 
 interface ReviewPageProps {
@@ -59,6 +61,7 @@ export function ReviewPage(props: ReviewPageProps) {
   const selected = deck[currentSlide] ?? deck[0];
   const renderedSlides = reviewRender.result?.slides ?? [];
   const selectedRenderedSlide = renderedSlides[currentSlide] ?? renderedSlides[0];
+  const loadingPreviews = reviewRender.status === "loading";
 
   return (
     <section className="page active review-page">
@@ -142,20 +145,27 @@ export function ReviewPage(props: ReviewPageProps) {
 
       {previewMode === "grid" ? (
         <div className="preview-grid-view">
-          {deck.map((slide, index) => (
-            <article
-              key={`${slide.title}-${index}`}
-              className={`grid-card ${index === currentSlide ? "active" : ""}`}
-              onClick={() => setCurrentSlide(index)}
-            >
+          {deck.map((slide, index) => {
+            const renderedSlide = renderedSlides[index];
+            const subtitle = visibleSlideSubtitle(slide);
+            return (
+              <article
+                key={`${slide.title}-${index}`}
+                className={`grid-card ${index === currentSlide ? "active" : ""}`}
+                onClick={() => setCurrentSlide(index)}
+              >
               <span>{formatSlideNumber(index)}</span>
-              {renderedSlides[index]?.screenshot_url ? (
+              {renderedSlide?.screenshot_url ? (
                 <div className="grid-card-html-frame">
-                  <RenderedSlideImage slide={renderedSlides[index]} />
+                  <RenderedSlideImage slide={renderedSlide} />
+                </div>
+              ) : loadingPreviews ? (
+                <div className="grid-card-html-frame">
+                  <SlidePreviewLoading compact />
                 </div>
               ) : null}
               <strong>{slide.title}</strong>
-              <p>{slide.subtitle}</p>
+              {subtitle ? <p>{subtitle}</p> : null}
               <div className="grid-card-actions">
                 <button
                   className="grid-action-btn primary"
@@ -188,8 +198,9 @@ export function ReviewPage(props: ReviewPageProps) {
                   {t.controls.delete}
                 </button>
               </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       ) : null}
 
@@ -228,6 +239,10 @@ export function ReviewPage(props: ReviewPageProps) {
             <div className="present-html-frame">
               <RenderedSlideImage slide={selectedRenderedSlide} loading="eager" />
             </div>
+          ) : loadingPreviews ? (
+            <div className="present-html-frame">
+              <SlidePreviewLoading />
+            </div>
           ) : (
             <SlidePreview slide={selected} index={currentSlide} large />
           )}
@@ -236,6 +251,7 @@ export function ReviewPage(props: ReviewPageProps) {
             currentSlide={currentSlide}
             setCurrentSlide={setCurrentSlide}
             renderedSlides={renderedSlides}
+            loadingPreviews={loadingPreviews}
           />
         </div>
       ) : null}

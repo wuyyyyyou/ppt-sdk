@@ -60,8 +60,10 @@ export function App() {
           setLocale={setLocale}
           status={state.currentStatus}
           onLibrary={() => actions.navigate("library")}
-          onMinimize={() => actions.setPanelMode("minimized")}
-          onClose={() => actions.setPanelMode("closed")}
+          libraryDisabled={
+            state.stage === "generating" &&
+            (state.loading === "deck" || state.loading === "deckFromOutline")
+          }
         />
 
         {state.page === "main" ? (
@@ -129,8 +131,6 @@ export function App() {
           {state.page === "main" && state.stage === "deck" ? (
             <DeckPage
               t={t}
-              deckTitle={state.deckTitle}
-              setDeckTitle={actions.setDeckTitle}
               deck={state.deck}
               currentSlide={state.currentSlide}
               setCurrentSlide={actions.setCurrentSlide}

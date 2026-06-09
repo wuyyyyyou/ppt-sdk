@@ -52,6 +52,7 @@ export interface PageGenerationStageRecord {
   activities: string[];
   hasStream: boolean;
   lastError?: string;
+  startedAt?: string;
   updatedAt?: string;
 }
 
@@ -158,6 +159,8 @@ function buildActiveStageRecord(
     lines: [...stream.lines],
     activities: [...stream.activities],
     hasStream: true,
+    startedAt: stream.started_at,
+    updatedAt: stream.updated_at,
   };
 }
 
@@ -222,6 +225,14 @@ function sortStageRecords(records: PageGenerationStageRecord[]) {
   ];
 
   return [...records].sort((left, right) => {
+    const leftTime = stageSortTime(left);
+    const rightTime = stageSortTime(right);
+    if (leftTime !== null && rightTime !== null && leftTime !== rightTime) {
+      return leftTime - rightTime;
+    }
+    if (leftTime !== null && rightTime === null) return -1;
+    if (leftTime === null && rightTime !== null) return 1;
+
     const leftIndex = order.indexOf(left.stageKey);
     const rightIndex = order.indexOf(right.stageKey);
     if (leftIndex === rightIndex) {
@@ -230,6 +241,13 @@ function sortStageRecords(records: PageGenerationStageRecord[]) {
     return (leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex)
       - (rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex);
   });
+}
+
+function stageSortTime(record: PageGenerationStageRecord) {
+  const timestamp = record.startedAt ?? record.updatedAt;
+  if (!timestamp) return null;
+  const value = Date.parse(timestamp);
+  return Number.isNaN(value) ? null : value;
 }
 
 function stageLabelKey(

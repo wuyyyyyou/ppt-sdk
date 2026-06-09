@@ -1,4 +1,5 @@
 import type { Slide } from "../../../data/mockDeck";
+import { visibleSlideSubtitle } from "../slideDisplay";
 import { formatSlideNumber } from "../utils";
 
 interface SlidePreviewProps {
@@ -8,11 +9,13 @@ interface SlidePreviewProps {
 }
 
 export function SlidePreview({ slide, index, large }: SlidePreviewProps) {
+  const subtitle = visibleSlideSubtitle(slide);
+
   return (
     <div className={`slide-preview-card ${large ? "large" : ""}`}>
       <div className="slide-num-tag">{formatSlideNumber(index)}</div>
       <div className="slide-title-large">{slide.title}</div>
-      <div className="slide-subtitle-large">{slide.subtitle}</div>
+      {subtitle ? <div className="slide-subtitle-large">{subtitle}</div> : null}
     </div>
   );
 }

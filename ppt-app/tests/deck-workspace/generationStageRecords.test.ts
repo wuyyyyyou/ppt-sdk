@@ -164,4 +164,82 @@ describe("Page Generation Stage Records", () => {
     assert.notEqual(zhRecords[0].pageStatusLabel, "authoring");
     assert.notEqual(enRecords[0].pageStatusLabel, "authoring");
   });
+
+  it("orders repeated review and fix stages by their actual timeline", () => {
+    const progress = makeProgress({
+      step: "page-visual-review",
+      message: "正在生成 1 页，0/1 页已通过",
+      totalPages: 1,
+      pages: [
+        {
+          page_id: "page-01",
+          index: 0,
+          title: "First",
+          status: "visual_review",
+          render_attempts: 0,
+          render_attempt_limit: 10,
+          visual_review_attempts: 1,
+          visual_review_attempt_limit: 5,
+          content_review_attempts: 0,
+          content_review_attempt_limit: 5,
+          agent_failures: 0,
+          agent_failure_limit: 5,
+          agent_infrastructure_failures: 0,
+        },
+      ],
+      activeStreams: [
+        {
+          run_id: "page-01-page-visual-review-run-2",
+          kind: "page-visual-review",
+          page_id: "page-01",
+          page_index: 0,
+          status: "正在检查页面视觉",
+          lines: ["reviewing again"],
+          activities: [],
+          started_at: "2026-06-02T00:00:03.000Z",
+          updated_at: "2026-06-02T00:00:04.000Z",
+        },
+      ],
+    });
+    const history: GenerationStreamSnapshot[] = [
+      {
+        id: "page-visual-review:page-01:run-1",
+        phase: "page-visual-review",
+        kind: "page-visual-review",
+        label: "第 1 页 · page-visual-review",
+        page_id: "page-01",
+        page_index: 0,
+        status: "completed",
+        message: "done",
+        lines: ["first review"],
+        activities: [],
+        updated_at: "2026-06-02T00:00:01.000Z",
+      },
+      {
+        id: "page-authoring:page-01:fix-1",
+        phase: "page-authoring",
+        kind: "visual-review-fix",
+        label: "第 1 页 · visual-review-fix",
+        page_id: "page-01",
+        page_index: 0,
+        status: "completed",
+        message: "done",
+        lines: ["fixed visuals"],
+        activities: [],
+        updated_at: "2026-06-02T00:00:02.000Z",
+      },
+    ];
+
+    const records = buildPageGenerationStageRecords({
+      t: messages.zh,
+      progress,
+      history,
+    });
+
+    assert.deepEqual(
+      records[0].stages.map((stage) => stage.stageKey),
+      ["visualReview", "visualReviewFix", "visualReview"],
+    );
+    assert.equal(records[0].stages.at(-1)?.state, "active");
+  });
 });

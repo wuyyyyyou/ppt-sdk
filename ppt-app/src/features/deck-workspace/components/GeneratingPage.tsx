@@ -125,13 +125,17 @@ function GenerationProgressPanel(props: {
     [t, progress, history],
   );
   const disclosure = useStageDisclosure(stageGroups);
+  const running = isProgressRunning(progress);
 
   return (
     <section className="generation-progress-panel">
       <div className="generation-progress-header">
         <div>
           <div className="section-label">{t.generating.progressTitle}</div>
-          <strong><ThinkingStatusText text={progressMessage} active={isProgressRunning(progress)} /></strong>
+          <strong><ThinkingStatusText text={progressMessage} active={running} /></strong>
+          {running ? (
+            <span className="generation-stay-hint">{t.generating.stayOnPageHint}</span>
+          ) : null}
           {total > 0 ? (
             <span className="generation-pages-passed">
               {t.generating.pagesPassed

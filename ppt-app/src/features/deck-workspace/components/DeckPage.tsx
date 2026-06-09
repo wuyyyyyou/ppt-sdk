@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Edit3, LayoutTemplate, MessageCircle, Wand2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, LayoutTemplate, MessageCircle, Wand2 } from "lucide-react";
 import { useState } from "react";
 import type { Slide } from "../../../data/mockDeck";
 import { formatMessage, type Messages } from "../../../i18n/messages";
@@ -6,12 +6,11 @@ import type { DeckReviewRenderState } from "../types";
 import { formatSlideCount, formatSlideNumber } from "../utils";
 import { RenderedSlideImage } from "./RenderedSlideImage";
 import { SlidePreview } from "./SlidePreview";
+import { SlidePreviewLoading } from "./SlidePreviewLoading";
 import { ThumbnailStrip } from "./ThumbnailStrip";
 
 interface DeckPageProps {
   t: Messages;
-  deckTitle: string;
-  setDeckTitle: (value: string) => void;
   deck: Slide[];
   currentSlide: number;
   setCurrentSlide: (index: number) => void;
@@ -30,8 +29,6 @@ export type SlideLayoutMode = "simpler" | "visual" | "comparison" | "process" | 
 export function DeckPage(props: DeckPageProps) {
   const {
     t,
-    deckTitle,
-    setDeckTitle,
     deck,
     currentSlide,
     setCurrentSlide,
@@ -69,19 +66,15 @@ export function DeckPage(props: DeckPageProps) {
         <div className="deck-stage-html-frame">
           <RenderedSlideImage slide={selectedRenderedSlide} loading="eager" />
         </div>
+      ) : reviewRender.status === "loading" ? (
+        <div className="deck-stage-html-frame">
+          <SlidePreviewLoading />
+        </div>
       ) : (
         <SlidePreview slide={slide} index={currentSlide} large />
       )}
 
       <div className="preview-controls">
-        <label className="deck-title-editor">
-          <input
-            value={deckTitle}
-            onChange={(event) => setDeckTitle(event.target.value)}
-            aria-label="Deck title"
-          />
-          <Edit3 size={14} />
-        </label>
         <button
           className="nav-arrow"
           disabled={currentSlide === 0}
@@ -149,6 +142,7 @@ export function DeckPage(props: DeckPageProps) {
         currentSlide={currentSlide}
         setCurrentSlide={setCurrentSlide}
         renderedSlides={renderedSlides}
+        loadingPreviews={reviewRender.status === "loading"}
       />
 
       <div className="action-bar">
