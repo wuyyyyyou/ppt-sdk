@@ -8,6 +8,7 @@ type RedBlueNumberCalloutProps = {
   description?: string;
   tone?: RedBlueTone;
   icon?: ReactNode;
+  density?: "normal" | "compact";
 };
 
 const RedBlueNumberCallout = ({
@@ -16,12 +17,15 @@ const RedBlueNumberCallout = ({
   description,
   tone = "purple",
   icon,
+  density = "normal",
 }: RedBlueNumberCalloutProps) => {
   const color = getToneColor(tone);
+  const compact = density === "compact";
   return (
     <div
-      className="relative overflow-hidden rounded-[18px] bg-white p-[22px]"
+      className="relative overflow-hidden rounded-[18px] bg-white"
       style={{
+        padding: compact ? 16 : 22,
         border: `1px solid ${redBlueTheme.colors.softStroke}`,
         boxShadow: `0 8px 24px ${redBlueTheme.colors.shadow}`,
       }}
@@ -33,15 +37,34 @@ const RedBlueNumberCallout = ({
       ) : null}
       <div
         className="text-[52px] font-black leading-none"
-        style={{ color, fontFamily: redBlueTheme.fonts.heading }}
+        style={{
+          color,
+          fontFamily: redBlueTheme.fonts.heading,
+          fontSize: compact ? 38 : 52,
+        }}
       >
         {value}
       </div>
-      <div className="mt-[10px] text-[16px] font-extrabold" style={{ color: redBlueTheme.colors.backgroundText }}>
+      <div
+        className="font-extrabold"
+        style={{
+          color: redBlueTheme.colors.backgroundText,
+          fontSize: compact ? 14 : 16,
+          marginTop: compact ? 8 : 10,
+        }}
+      >
         {label}
       </div>
       {description ? (
-        <div className="mt-[6px] text-[13px] font-medium leading-[18px]" style={{ color: redBlueTheme.colors.mutedText }}>
+        <div
+          className="font-medium"
+          style={{
+            color: redBlueTheme.colors.mutedText,
+            fontSize: compact ? 11 : 13,
+            lineHeight: compact ? "15px" : "18px",
+            marginTop: compact ? 5 : 6,
+          }}
+        >
           {description}
         </div>
       ) : null}

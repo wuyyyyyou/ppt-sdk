@@ -327,7 +327,7 @@ function buildAuthoringPrompt(input: {
     "",
     CONTENT_GROUNDING_RULES,
     "",
-    "When editing slide TSX/data, remove or soften unsupported specifics. Use neutral business language or TBD / 待补充 for missing details.",
+    "When editing slide TSX/data, remove or soften unsupported specifics. Use neutral business language or TBD for missing details.",
     "If render-fix or self-review-fix asks for visual changes, fix visuals without adding new factual claims.",
     "",
     `Full outline JSON: ${JSON.stringify(input.outline)}`,
@@ -340,7 +340,7 @@ function buildAuthoringPrompt(input: {
       ? [
           "Content grounding review failed. Rewrite request:",
           JSON.stringify(input.factReview),
-          "Remove, soften, or mark unsupported concrete claims as TBD / 待补充. Do not replace them with new unsupported specifics.",
+          "Remove, soften, or mark unsupported concrete claims as TBD. Do not replace them with new unsupported specifics.",
         ].join("\n")
       : "",
   ]
@@ -1536,7 +1536,7 @@ function buildRefinementReview(instruction: string): AgentSelfReviewResult {
     instruction,
     "",
     CONTENT_GROUNDING_RULES,
-    "Apply the refinement without adding unsupported facts. If the requested improvement needs missing facts, use neutral wording or TBD / 待补充.",
+    "Apply the refinement without adding unsupported facts. If the requested improvement needs missing facts, use neutral wording or TBD.",
   ].join("\n");
 
   return {

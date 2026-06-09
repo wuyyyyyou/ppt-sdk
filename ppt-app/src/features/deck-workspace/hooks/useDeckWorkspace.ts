@@ -2063,7 +2063,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       "You may restructure the current slide TSX and data, and you may reference available blueprints/components for layout ideas.",
       "Do not modify page-plan.json, manifest slide ids, other pages, or unrelated shared files.",
       "Do not add unsupported facts, numbers, dates, names, citations, examples, or claims.",
-      "If content does not fit the requested layout, prioritize truthful omission or TBD / 待补充 over invention.",
+      "If content does not fit the requested layout, prioritize truthful omission or TBD over invention.",
     ].join("\n");
   }
 

@@ -5,6 +5,8 @@
   "pageNumber": "04",
   "chartTitle": "Indexed Market Position",
   "chartSubtitle": "Relative index scores for slide-level comparison; replace with validated source data.",
+  "chartUnit": "Index score",
+  "maxValue": 100,
   "series": [
     {
       "label": "China",
@@ -43,7 +45,18 @@
       "tone": "korea"
     }
   ],
-  "calloutValue": "84%",
-  "calloutLabel": "Lead signal",
-  "calloutDescription": "Use the callout to focus attention on the strongest measured position or key caveat."
+  "callouts": [
+    {
+      "value": "84%",
+      "label": "China lead signal",
+      "description": "Use this card for the primary measured position.",
+      "tone": "china"
+    },
+    {
+      "value": "68%",
+      "label": "Japan benchmark",
+      "description": "Use this card for the comparison benchmark.",
+      "tone": "japan"
+    }
+  ]
 }

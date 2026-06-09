@@ -10,7 +10,7 @@ const ToneSchema = z.enum(["china", "japan", "korea", "purple", "neutral"]);
 const CardSchema = z.object({
   number: z.string().min(1).max(4),
   title: z.string().min(2).max(32),
-  description: z.string().min(8).max(120),
+  description: z.string().min(8),
   tone: ToneSchema.default("purple"),
 });
 
