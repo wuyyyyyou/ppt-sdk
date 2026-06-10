@@ -15,7 +15,12 @@ import type {
 
 const CACHE_MISS_MESSAGE = "no cached app_session token; create a new session";
 
-function createRuntime(runs: AnnaAgentRunFrame[][]) {
+function createRuntime(
+  runs: AnnaAgentRunFrame[][],
+  options: {
+    sessionPatch?: Partial<AnnaAgentSession>;
+  } = {},
+) {
   let sessionCreations = 0;
   let sessionDeletes = 0;
 
@@ -31,6 +36,7 @@ function createRuntime(runs: AnnaAgentRunFrame[][]) {
         const frames = runs[sessionCreations] ?? [];
         sessionCreations += 1;
         const session: AnnaAgentSession = {
+          ...options.sessionPatch,
           run: () =>
             (async function* () {
               for (const frame of frames) {
@@ -115,6 +121,75 @@ function authoringSuccessFrames(): AnnaAgentRunFrame[] {
 }
 
 describe("AgentClient cache miss retry", () => {
+  it("throws AgentInfrastructureError when session create resolves no tools", async () => {
+    const harness = createRuntime([authoringSuccessFrames()], {
+      sessionPatch: {
+        granted_tools: [],
+        inherit_host_tools: false,
+      },
+    });
+    const client = await createAgentClient(harness.runtime);
+
+    await assert.rejects(
+      () => client.runAuthoringPrompt("write a page"),
+      (error) => {
+        assert.equal(error instanceof AgentInfrastructureError, true);
+        const infrastructureError = error as AgentInfrastructureError;
+        assert.equal(infrastructureError.code, "NO_TOOLS_AVAILABLE");
+        assert.equal(infrastructureError.noToolsAvailable, true);
+        assert.match(infrastructureError.message, /cannot use executable tools/);
+        return true;
+      },
+    );
+    assert.equal(harness.sessionCreations, 1);
+    assert.equal(harness.sessionDeletes, 1);
+  });
+
+  it("keeps older runtimes compatible when session create omits tool surface", async () => {
+    const harness = createRuntime([authoringSuccessFrames()]);
+    const client = await createAgentClient(harness.runtime);
+
+    await client.checkToolAccess();
+    const result = await client.runAuthoringPrompt("write a page");
+
+    assert.equal(result.status, "ready_for_render");
+    assert.equal(harness.sessionCreations, 2);
+    assert.equal(harness.sessionDeletes, 2);
+  });
+
+  it("throws AgentInfrastructureError when run_meta reports no tools", async () => {
+    const harness = createRuntime([
+      [
+        {
+          event: "run_meta",
+          granted_tools: [],
+          inherit_host_tools: false,
+          warnings: [
+            {
+              code: "NO_TOOLS_AVAILABLE",
+              message: "This agent session resolved ZERO executable tools.",
+            },
+          ],
+        },
+        ...authoringSuccessFrames(),
+      ],
+    ]);
+    const client = await createAgentClient(harness.runtime);
+
+    await assert.rejects(
+      () => client.runAuthoringPrompt("write a page"),
+      (error) => {
+        assert.equal(error instanceof AgentInfrastructureError, true);
+        const infrastructureError = error as AgentInfrastructureError;
+        assert.equal(infrastructureError.code, "NO_TOOLS_AVAILABLE");
+        assert.equal(infrastructureError.noToolsAvailable, true);
+        return true;
+      },
+    );
+    assert.equal(harness.sessionCreations, 1);
+    assert.equal(harness.sessionDeletes, 1);
+  });
+
   it("recovers a logical Agent run after Agent Session Cache Miss retries", async () => {
     const harness = createRuntime([
       cacheMissFrames(),

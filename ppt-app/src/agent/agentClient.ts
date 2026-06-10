@@ -1,5 +1,11 @@
 import type { AnnaAgentSession, AnnaRuntime } from "../runtime/annaRuntime";
 import {
+  AGENT_TOOLS_UNAVAILABLE_MESSAGE,
+  getAgentToolAccessWarning,
+  NO_TOOLS_AVAILABLE_CODE,
+  type AgentToolAccessWarning,
+} from "./agentToolAccess";
+import {
   buildStructuredJsonRepairPrompt,
   parseStructuredJson,
 } from "../ai/structuredJson";
@@ -67,6 +73,7 @@ export interface AgentPageContentReviewResult {
 }
 
 export interface AgentClient {
+  checkToolAccess(): Promise<void>;
   runAuthoringPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentRunSummary>;
   runPageVisualReviewPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentPageVisualReviewResult>;
   runPageContentReviewPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentPageContentReviewResult>;
@@ -118,6 +125,7 @@ export class AgentInfrastructureError extends Error {
     public readonly sessionCacheMiss = false,
     public readonly sessionCacheMissRetries = 0,
     public readonly rawMessage?: string,
+    public readonly noToolsAvailable = false,
   ) {
     super(message);
     this.name = "AgentInfrastructureError";
@@ -307,6 +315,17 @@ function extractFrameEvents(frame: unknown): AgentStreamEvent[] {
   if (!isRecord(frame)) return [];
   const events: AgentStreamEvent[] = [];
 
+  const toolAccessWarning = getAgentToolAccessWarning(frame);
+  if (toolAccessWarning) {
+    events.push({
+      type: "error",
+      code: toolAccessWarning.code,
+      message: AGENT_TOOLS_UNAVAILABLE_MESSAGE,
+      sessionCacheMiss: false,
+    });
+    return events;
+  }
+
   if (frame.event === "error") {
     const message = readString(frame.message) || "Agent stream error.";
     const sessionCacheMiss = isAgentSessionCacheMissMessage(message);
@@ -426,6 +445,7 @@ function toAgentInfrastructureError(
     sessionCacheMiss?: boolean;
     sessionCacheMissRetries?: number;
     rawMessage?: string;
+    noToolsAvailable?: boolean;
   } = {},
 ) {
   if (error instanceof AgentInfrastructureError) return error;
@@ -433,6 +453,8 @@ function toAgentInfrastructureError(
   const activeSessionLimit = isActiveSessionLimitMessage(rawMessage);
   const message = options.sessionCacheMiss
     ? AGENT_SESSION_CACHE_MISS_EXHAUSTED_MESSAGE
+    : options.noToolsAvailable
+    ? AGENT_TOOLS_UNAVAILABLE_MESSAGE
     : activeSessionLimit
     ? `${rawMessage} 请先 delete/revoke 旧 Agent session，或等待服务端释放后重试。`
     : rawMessage;
@@ -447,6 +469,21 @@ function toAgentInfrastructureError(
     options.sessionCacheMiss === true,
     options.sessionCacheMissRetries ?? 0,
     options.rawMessage,
+    options.noToolsAvailable === true,
+  );
+}
+
+function createNoToolsAvailableError(
+  warning: AgentToolAccessWarning,
+): AgentInfrastructureError {
+  return new AgentInfrastructureError(
+    AGENT_TOOLS_UNAVAILABLE_MESSAGE,
+    warning.code,
+    false,
+    false,
+    0,
+    warning.message,
+    true,
   );
 }
 
@@ -518,6 +555,11 @@ export async function createAgentClient(
   async function createSession() {
     try {
       const session = await runtime.agent.session({ submode: "auto" });
+      const toolAccessWarning = getAgentToolAccessWarning(session);
+      if (toolAccessWarning) {
+        await session.delete().catch(() => undefined);
+        throw createNoToolsAvailableError(toolAccessWarning);
+      }
       return {
         session,
         createdAtMs: Date.now(),
@@ -665,6 +707,15 @@ export async function createAgentClient(
         }
         if (
           error instanceof AgentRunStreamError &&
+          error.code === NO_TOOLS_AVAILABLE_CODE
+        ) {
+          throw toAgentInfrastructureError(error, "Agent session has no executable tools.", {
+            noToolsAvailable: true,
+            rawMessage: error.message,
+          });
+        }
+        if (
+          error instanceof AgentRunStreamError &&
           error.expired &&
           sessionRetries < MAX_AGENT_SESSION_RETRIES
         ) {
@@ -692,6 +743,11 @@ export async function createAgentClient(
   }
 
   return {
+    async checkToolAccess() {
+      const sessionMeta = await createSession();
+      await deleteSession(sessionMeta.session);
+    },
+
     async runAuthoringPrompt(prompt, options) {
       const collected = await collectWithSessionRetry(prompt, options);
       try {

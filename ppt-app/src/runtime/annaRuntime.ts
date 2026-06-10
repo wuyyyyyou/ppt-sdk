@@ -18,6 +18,12 @@ export interface AnnaLlmCompleteInput {
 export interface AnnaAgentRunFrame {
   event: string;
   text?: string;
+  granted_tools?: string[];
+  inherit_host_tools?: boolean;
+  warnings?: Array<{
+    code?: string;
+    message?: string;
+  }>;
   [key: string]: unknown;
 }
 
@@ -25,6 +31,8 @@ export interface AnnaAgentSession {
   appSessionUuid?: string;
   expires_in?: number;
   expiresIn?: number;
+  granted_tools?: string[];
+  inherit_host_tools?: boolean;
   run(input: { content: string }): AsyncIterable<AnnaAgentRunFrame>;
   history?(): Promise<unknown>;
   delete(): Promise<unknown>;

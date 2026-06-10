@@ -1,6 +1,7 @@
 import {
   isAgentInfrastructureError,
   isAgentRunCancelledError,
+  type AgentInfrastructureError,
   type AgentClient,
   type AgentPageContentReviewResult,
   type AgentRunSummary,
@@ -218,6 +219,9 @@ function generationText(locale: Locale) {
     agentSessionCacheMissExhausted: zh
       ? "Agent 会话重试后仍失败，请重跑这一页。"
       : "Agent session failed after retrying. Please retry this page.",
+    agentToolsUnavailable: zh
+      ? "Agent 会话没有可执行工具权限，无法读取或编辑本地 PPT 工作区文件。请在 app grants drawer 中开启 “Let agent sessions use my tools”，然后重试本页或继续生成。"
+      : "Agent sessions cannot use executable tools, so they cannot read or edit local PPT workspace files. Enable “Let agent sessions use my tools” in the app grants drawer, then retry this page or resume generation.",
     finalRender: zh ? "正在生成最终预览" : "Generating final preview",
     deckReady: zh ? "演示文稿已生成" : "Deck generated",
     activeSummary: (input: { active: number; accepted: number; failed: number; total: number }) => {
@@ -908,6 +912,50 @@ function failedCompletion(input: {
   };
 }
 
+function localizeAgentInfrastructureMessage(
+  error: AgentInfrastructureError,
+  locale: Locale,
+): string {
+  const text = generationText(locale);
+  if (error.sessionCacheMiss) return text.agentSessionCacheMissExhausted;
+  if (error.noToolsAvailable) return text.agentToolsUnavailable;
+  return error.message;
+}
+
+async function preflightAgentToolAccess(input: {
+  agentClient: AgentClient;
+  locale: Locale;
+  onProgress: (progress: DeckGenerationProgress) => void;
+  progress: PageProgress | null;
+  totalPages: number;
+  currentPageIndex: number | null;
+}): Promise<DeckGenerationCompletion | null> {
+  try {
+    await input.agentClient.checkToolAccess();
+    return null;
+  } catch (error) {
+    if (!isAgentInfrastructureError(error)) throw error;
+    const message = localizeAgentInfrastructureMessage(error, input.locale);
+    const progress = createProgress(
+      {
+        step: "failed",
+        message,
+        currentPageIndex: input.currentPageIndex,
+        totalPages: input.totalPages,
+      },
+      input.progress,
+    );
+    input.onProgress(progress);
+    return failedCompletion({
+      progress,
+      error: {
+        type: "agent_infrastructure",
+        message,
+      },
+    });
+  }
+}
+
 function createFailedPageError(
   page: PageProgress["pages"][number],
   locale: Locale,
@@ -1179,9 +1227,7 @@ async function runPageGeneration(
         };
       }
       if (isAgentInfrastructureError(error)) {
-        const displayMessage = error.sessionCacheMiss
-          ? text.agentSessionCacheMissExhausted
-          : message;
+        const displayMessage = localizeAgentInfrastructureMessage(error, input.locale);
         agentInfrastructureFailures += 1;
         await authoringTracker.flush("error", {
           error: displayMessage,
@@ -1277,16 +1323,17 @@ async function runPageGeneration(
         };
       }
       if (isAgentInfrastructureError(error)) {
+        const displayMessage = localizeAgentInfrastructureMessage(error, input.locale);
         agentInfrastructureFailures += 1;
         await contentReviewTracker.flush("error", {
-          error: message,
+          error: displayMessage,
           agent_infrastructure_failures: agentInfrastructureFailures,
           active_session_limit: error.activeSessionLimit,
         });
         progress = await recordProgress(input, page, {
           status: "agent_infrastructure_failed",
           agent_infrastructure_failures: agentInfrastructureFailures,
-          last_error: message,
+          last_error: displayMessage,
         });
         input.setProgress(progress);
         return {
@@ -1295,7 +1342,7 @@ async function runPageGeneration(
           progress,
           error: {
             type: "agent_infrastructure",
-            message,
+            message: displayMessage,
             page_id: page.page_id,
             page_index: page.index,
             page_status: "agent_infrastructure_failed",
@@ -1443,9 +1490,7 @@ async function runPageGeneration(
         };
       }
       if (isAgentInfrastructureError(error)) {
-        const displayMessage = error.sessionCacheMiss
-          ? text.agentSessionCacheMissExhausted
-          : message;
+        const displayMessage = localizeAgentInfrastructureMessage(error, input.locale);
         agentInfrastructureFailures += 1;
         await visualReviewTracker.flush("error", {
           error: displayMessage,
@@ -1654,8 +1699,26 @@ export async function runDeckGeneration(
         },
       });
     }
+    const preflightFailure = await preflightAgentToolAccess({
+      agentClient: input.agentClient,
+      locale: input.locale,
+      onProgress: input.onProgress,
+      progress: resumeArtifacts.progress,
+      totalPages: resumeArtifacts.pagePlan.pages.length,
+      currentPageIndex: null,
+    });
+    if (preflightFailure) return preflightFailure;
     artifacts = resumeArtifacts;
   } else {
+    const preflightFailure = await preflightAgentToolAccess({
+      agentClient: input.agentClient,
+      locale: input.locale,
+      onProgress: input.onProgress,
+      progress: null,
+      totalPages: input.confirmedOutline.items.length,
+      currentPageIndex: null,
+    });
+    if (preflightFailure) return preflightFailure;
     artifacts = await createRestartArtifacts(input);
   }
 
@@ -1868,6 +1931,16 @@ export async function runDeckRefinement(
     });
   }
 
+  const preflightFailure = await preflightAgentToolAccess({
+    agentClient: input.agentClient,
+    locale: input.locale,
+    onProgress: input.onProgress,
+    progress,
+    totalPages: pagePlan.pages.length,
+    currentPageIndex: input.scope === "slide" ? input.pageIndex ?? null : null,
+  });
+  if (preflightFailure) return preflightFailure;
+
   const review = buildRefinementReview(instruction);
   for (const page of targetPages) {
     await recordProgress(input, page, {
@@ -1944,6 +2017,16 @@ export async function runPageGenerationRetry(
       },
     });
   }
+
+  const preflightFailure = await preflightAgentToolAccess({
+    agentClient: input.agentClient,
+    locale: input.locale,
+    onProgress: input.onProgress,
+    progress: initialProgress,
+    totalPages: pagePlan.pages.length,
+    currentPageIndex: page.index,
+  });
+  if (preflightFailure) return preflightFailure;
 
   let progress = await recordProgress(input, page, {
     status: "pending",

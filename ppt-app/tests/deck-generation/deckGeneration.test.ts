@@ -210,6 +210,7 @@ function createHarness(options: {
     }>;
   }>;
   authoringError?: Error;
+  toolAccessError?: Error;
   authoringDelayMs?: number;
 } = {}) {
   let pagePlan = clone(options.pagePlan ?? makePagePlan());
@@ -225,6 +226,7 @@ function createHarness(options: {
   let activeAuthoringRuns = 0;
   let maxActiveAuthoringRuns = 0;
   let deckRenderCalls = 0;
+  let checkToolAccessCalls = 0;
 
   const backend: PptBackend = {
     listWorkspaces: async () => ({ workspace_root: "", has_workspaces: false, latest_workspace: null, workspaces: [] }),
@@ -330,6 +332,10 @@ function createHarness(options: {
   const visualReviewQueue = [...(options.visualReviews ?? [{ pass: true, score: 9 }])];
   const contentReviewQueue = [...(options.contentReviews ?? [{ pass: true, score: 9 }])];
   const agentClient: AgentClient = {
+    checkToolAccess: async () => {
+      checkToolAccessCalls += 1;
+      if (options.toolAccessError) throw options.toolAccessError;
+    },
     runAuthoringPrompt: async (prompt, runOptions) => {
       authoringPrompts.push(prompt);
       activeAuthoringRuns += 1;
@@ -392,6 +398,9 @@ function createHarness(options: {
     },
     get deckRenderCalls() {
       return deckRenderCalls;
+    },
+    get checkToolAccessCalls() {
+      return checkToolAccessCalls;
     },
     get maxActiveAuthoringRuns() {
       return maxActiveAuthoringRuns;
@@ -849,6 +858,39 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(completion.status, "failed");
     assert.equal(completion.error.type, "agent_infrastructure");
     assert.equal(completion.progress?.step, "failed");
+  });
+
+  it("fails before restart artifacts when Agent tools are not granted", async () => {
+    const harness = createHarness({
+      toolAccessError: new AgentInfrastructureError(
+        "Agent sessions cannot use executable tools.",
+        "NO_TOOLS_AVAILABLE",
+        false,
+        false,
+        0,
+        "host reported no tools",
+        true,
+      ),
+    });
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "failed");
+    assert.equal(completion.error.type, "agent_infrastructure");
+    assert.match(completion.error.message, /Agent 会话没有可执行工具权限/);
+    assert.equal(completion.progress?.step, "failed");
+    assert.equal(harness.checkToolAccessCalls, 1);
+    assert.equal(harness.generatePagePlanCalls, 0);
+    assert.equal(harness.progress.pages.every((page) => page.status === "pending"), true);
   });
 
   it("uses Agent infrastructure failure UX when cache miss retries are exhausted", async () => {
