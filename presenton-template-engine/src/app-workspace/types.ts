@@ -121,8 +121,17 @@ export interface DuplicateAppWorkspacePageInput {
 
 export interface AppendAppWorkspaceLogInput {
   workspace_dir: string;
-  channel: "ai-outline" | "ai-page-plan" | "ai-page-agent" | "ai-page-agent-stream";
+  channel:
+    | "ai-outline"
+    | "ai-outline-interactions"
+    | "ai-page-plan"
+    | "ai-page-plan-interactions"
+    | "ai-page-agent"
+    | "ai-page-agent-interactions"
+    | "ai-page-agent-stream";
   entry: Record<string, unknown>;
+  payload_keys?: string[];
+  inline_payload_max_bytes?: number;
 }
 
 export interface AppendAppWorkspaceLogResult {

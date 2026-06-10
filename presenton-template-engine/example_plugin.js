@@ -610,19 +610,37 @@ async function toolAppAppendWorkspaceLog(args) {
 
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
   const channel = args.channel;
-  if (!["ai-outline", "ai-page-plan", "ai-page-agent", "ai-page-agent-stream"].includes(channel)) {
-    throw new Error('"channel" must be one of: ai-outline, ai-page-plan, ai-page-agent, ai-page-agent-stream');
+  const supportedChannels = [
+    "ai-outline",
+    "ai-outline-interactions",
+    "ai-page-plan",
+    "ai-page-plan-interactions",
+    "ai-page-agent",
+    "ai-page-agent-interactions",
+    "ai-page-agent-stream",
+  ];
+  if (!supportedChannels.includes(channel)) {
+    throw new Error(`"channel" must be one of: ${supportedChannels.join(", ")}`);
   }
 
   const entry = args.entry;
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
     throw new Error('"entry" must be an object');
   }
+  const payloadKeys = Array.isArray(args.payload_keys)
+    ? args.payload_keys.filter((key) => typeof key === "string" && key.length > 0)
+    : undefined;
+  const inlinePayloadMaxBytes =
+    typeof args.inline_payload_max_bytes === "number"
+      ? args.inline_payload_max_bytes
+      : undefined;
 
   return appendAppWorkspaceLog({
     workspace_dir: workspaceDir,
     channel,
     entry,
+    payload_keys: payloadKeys,
+    inline_payload_max_bytes: inlinePayloadMaxBytes,
   });
 }
 

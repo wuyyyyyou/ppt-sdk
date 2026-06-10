@@ -3,6 +3,7 @@ import {
   buildStructuredJsonRepairPrompt,
   parseStructuredJson,
 } from "../ai/structuredJson";
+import type { AiOperationLogContext } from "../ai/interactionLog";
 import {
   isAgentSessionCacheMissMessage,
   nextAgentSessionCacheMissRetry,
@@ -82,6 +83,7 @@ export interface AgentRunOptions {
   onStreamEvent?: (event: AgentStreamEvent) => void;
   signal?: AbortSignal;
   isCancelled?: () => boolean;
+  logContext?: AiOperationLogContext;
 }
 
 export interface AgentClientOptions {
@@ -488,6 +490,25 @@ function formatIdleRetryMessage() {
   return "Agent unresponsive; rebuilding session and retrying";
 }
 
+function readCompletionUsage(events: AgentStreamEvent[]): unknown {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.type === "complete") {
+      return event.usage;
+    }
+  }
+  return undefined;
+}
+
+async function readSessionHistory(session: AnnaAgentSession | null): Promise<unknown> {
+  if (typeof session?.history !== "function") return undefined;
+  try {
+    return await session.history();
+  } catch {
+    return undefined;
+  }
+}
+
 export async function createAgentClient(
   runtime: AnnaRuntime,
   clientOptions: AgentClientOptions = {},
@@ -533,6 +554,16 @@ export async function createAgentClient(
 
     for (;;) {
       let sessionMeta: Awaited<ReturnType<typeof createSession>> | null = null;
+      const interactionHandle = runOptions?.logContext?.logger
+        ? await runOptions.logContext.logger.startInteraction(runOptions.logContext, {
+            prompt,
+            extra: {
+              session_retries: sessionRetries,
+              session_cache_miss_retries: cacheMissRetryState.retries,
+              stream_idle_retries: streamIdleRetries,
+            },
+          })
+        : null;
       try {
         sessionMeta = await createSession();
         if (shouldRenewBeforeRun(sessionMeta)) {
@@ -547,6 +578,20 @@ export async function createAgentClient(
           collectRunText(sessionMeta.session, prompt, runOptions, clientOptions),
           AGENT_RUN_TIMEOUT_MS
         );
+        if (interactionHandle) {
+          await runOptions?.logContext?.logger?.finishInteraction(interactionHandle, {
+            status: "succeeded",
+            output: collected.text,
+            usage: readCompletionUsage(collected.events),
+            session_history: await readSessionHistory(sessionMeta.session),
+            extra: {
+              events: collected.events,
+              session_retries: sessionRetries,
+              session_cache_miss_retries: cacheMissRetryState.retries,
+              stream_idle_retries: streamIdleRetries,
+            },
+          });
+        }
         if (cacheMissRetryState.retries > 0) {
           runOptions?.onStreamEvent?.({
             type: "activity",
@@ -559,6 +604,18 @@ export async function createAgentClient(
           sessionCacheMissRetries: cacheMissRetryState.retries,
         };
       } catch (error) {
+        if (interactionHandle) {
+          await runOptions?.logContext?.logger?.finishInteraction(interactionHandle, {
+            status: isStreamCancelledError(error) ? "cancelled" : "failed",
+            error,
+            session_history: await readSessionHistory(sessionMeta?.session ?? null),
+            extra: {
+              session_retries: sessionRetries,
+              session_cache_miss_retries: cacheMissRetryState.retries,
+              stream_idle_retries: streamIdleRetries,
+            },
+          });
+        }
         if (isStreamCancelledError(error)) {
           throw new AgentRunCancelledError();
         }

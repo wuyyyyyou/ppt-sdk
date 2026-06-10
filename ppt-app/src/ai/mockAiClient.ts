@@ -20,6 +20,27 @@ import type {
   RefineSlideInput,
   ReviseOutlineInput
 } from "./types";
+import type { AiOperationLogContext } from "./interactionLog";
+
+async function logMockInteraction(
+  logContext: AiOperationLogContext | undefined,
+  request: unknown,
+  response: unknown
+) {
+  if (!logContext?.logger) return;
+  const context = {
+    ...logContext,
+    provider: "mock",
+    runtime_mode: "mock",
+  };
+  const handle = await logContext.logger.startInteraction(context, { request });
+  await logContext.logger.finishInteraction(handle, {
+    status: "succeeded",
+    response,
+    output: typeof response === "string" ? response : JSON.stringify(response),
+    model: "mock",
+  });
+}
 
 function cloneOutline(outline: OutlineDetail[]): OutlineDetail[] {
   return outline.map((item) => ({
@@ -70,6 +91,14 @@ export function createMockAiClient(): AiClient {
         ),
         items: fitOutlineCount(outlineDetails, expectedSlideCount),
       };
+      const llmRawResponse = {
+        content: {
+          type: "text",
+          text: JSON.stringify(rawOutline),
+        },
+        model: "mock",
+      };
+      await logMockInteraction(input.logContext, llmRequest, llmRawResponse);
       const outline = validateGeneratedOutline(rawOutline, expectedSlideCount);
       return {
         outline,
@@ -79,12 +108,7 @@ export function createMockAiClient(): AiClient {
             attempt: 1,
             status: "success",
             llmRequest,
-            llmRawResponse: {
-              content: {
-                type: "text",
-                text: JSON.stringify(rawOutline),
-              },
-            },
+            llmRawResponse,
             validation: {
               ok: true,
               errors: [],
@@ -96,17 +120,19 @@ export function createMockAiClient(): AiClient {
 
     async detectOutputLanguage(input) {
       await sleep(200);
-      return {
+      const result = {
         output_language: readOutputLanguage(
           input.setting?.output_language,
           input.locale === "zh" ? "中文" : "English"
         ),
       };
+      await logMockInteraction(input.logContext, { method: "detectOutputLanguage", input }, result);
+      return result;
     },
 
     async suggestContext(input) {
       await sleep(500);
-      return input.locale === "zh"
+      const result = input.locale === "zh"
         ? {
             audience: ["企业管理层", "业务负责人"],
             goal: ["说明 AI Agent 的能力与落地路径"],
@@ -121,6 +147,8 @@ export function createMockAiClient(): AiClient {
             theme: ["digital-indigo"],
             slides: "7",
           };
+      await logMockInteraction(input.logContext, { method: "suggestContext", input }, result);
+      return result;
     },
 
     async generatePagePlan(input) {
@@ -132,9 +160,9 @@ export function createMockAiClient(): AiClient {
       const closing = blueprints.find((item) => item.layout_family === "closing") ?? fallback;
       const content = blueprints.find((item) => item.layout_family === "two-column") ?? fallback;
 
-      return {
-        version: 1,
-        status: "planned",
+      const plan = {
+        version: 1 as const,
+        status: "planned" as const,
         title: input.outline.title,
         source: {
           outline_updated_at: input.outline.updated_at,
@@ -161,15 +189,19 @@ export function createMockAiClient(): AiClient {
         }),
         updated_at: now,
       };
+      await logMockInteraction(input.logContext, { method: "generatePagePlan", input }, plan);
+      return plan;
     },
 
     async generateDeck(input: GenerateDeckInput) {
       await sleep(input.outlineFirst ? 900 : 1100);
-      return {
+      const deck = {
         title: input.locale === "zh" ? "AI Agent 工作流" : "AI Agent Workflows",
         outline: cloneOutline(outlineDetails),
         slides: cloneSlides(initialDeck)
       };
+      await logMockInteraction(input.logContext, { method: "generateDeck", input }, deck);
+      return deck;
     },
 
     async reviseOutline(input: ReviseOutlineInput) {
@@ -193,6 +225,14 @@ export function createMockAiClient(): AiClient {
         ),
         items: revisedItems,
       };
+      const llmRawResponse = {
+        content: {
+          type: "text",
+          text: JSON.stringify(rawOutline),
+        },
+        model: "mock",
+      };
+      await logMockInteraction(input.logContext, llmRequest, llmRawResponse);
       const outline = validateGeneratedOutline(rawOutline, expectedSlideCount);
 
       return {
@@ -203,12 +243,7 @@ export function createMockAiClient(): AiClient {
             attempt: 1,
             status: "success",
             llmRequest,
-            llmRawResponse: {
-              content: {
-                type: "text",
-                text: JSON.stringify(rawOutline),
-              },
-            },
+            llmRawResponse,
             validation: {
               ok: true,
               errors: [],
@@ -220,30 +255,36 @@ export function createMockAiClient(): AiClient {
 
     async generateSlidesFromOutline(input: GenerateSlidesFromOutlineInput) {
       await sleep(1200);
-      return input.outline.map((item) => ({
+      const slides = input.outline.map((item) => ({
         title: item.title,
         subtitle: item.outline
       }));
+      await logMockInteraction(input.logContext, { method: "generateSlidesFromOutline", input }, slides);
+      return slides;
     },
 
     async refineDeck(input: RefineDeckInput) {
       await sleep(1600);
-      return input.slides.map((slide) => ({
+      const slides = input.slides.map((slide) => ({
         ...slide,
         title: slide.title.includes("Refined")
           ? slide.title
           : `${slide.title} (Refined)`
       }));
+      await logMockInteraction(input.logContext, { method: "refineDeck", input }, slides);
+      return slides;
     },
 
     async refineSlide(input: RefineSlideInput) {
       await sleep(1200);
-      return {
+      const slide = {
         ...input.slide,
         title: input.slide.title.includes("Updated")
           ? input.slide.title
           : `${input.slide.title} (Updated)`
       };
+      await logMockInteraction(input.logContext, { method: "refineSlide", input }, slide);
+      return slide;
     }
   };
 }

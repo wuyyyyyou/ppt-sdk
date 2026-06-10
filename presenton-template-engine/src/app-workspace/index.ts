@@ -1,5 +1,6 @@
 import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { appendFile, copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import {
@@ -91,10 +92,14 @@ const WORKSPACE_FILE_NAMES = [
 ] as const;
 const WORKSPACE_LOG_FILE_NAMES = {
   "ai-outline": "ai-outline.jsonl",
+  "ai-outline-interactions": "ai-outline-interactions.jsonl",
   "ai-page-plan": "ai-page-plan.jsonl",
+  "ai-page-plan-interactions": "ai-page-plan-interactions.jsonl",
   "ai-page-agent": "ai-page-agent.jsonl",
+  "ai-page-agent-interactions": "ai-page-agent-interactions.jsonl",
   "ai-page-agent-stream": "ai-page-agent-stream.jsonl",
 } as const;
+const WORKSPACE_LOG_INLINE_PAYLOAD_MAX_BYTES = 64 * 1024;
 const PPTX_EXPORT_STATUS_FILE_NAME = "generate_ppt.json";
 const PPTX_EXPORT_STATUSES: AppPptxExportJob["status"][] = [
   "idle",
@@ -122,6 +127,23 @@ function formatDefaultWorkspaceTitle(date = new Date()): string {
     "新建任务",
     `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`,
   ].join("-");
+}
+
+function sha256Hex(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function sanitizePayloadKey(key: string): string {
+  const sanitized = key.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+  return sanitized.length > 0 ? sanitized : "payload";
+}
+
+function readInlinePayloadMaxBytes(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return WORKSPACE_LOG_INLINE_PAYLOAD_MAX_BYTES;
+  }
+
+  return Math.max(1024, Math.floor(value));
 }
 
 function isWorkspaceDirName(name: string): boolean {
@@ -1338,8 +1360,38 @@ export async function appendAppWorkspaceLog(
     timestamp: new Date().toISOString(),
     ...input.entry,
   };
+  const payloadKeys = Array.isArray(input.payload_keys)
+    ? input.payload_keys.filter((key): key is string => typeof key === "string" && key.length > 0)
+    : [];
+  const inlinePayloadMaxBytes = readInlinePayloadMaxBytes(input.inline_payload_max_bytes);
 
   await mkdir(logDir, { recursive: true });
+  for (const key of payloadKeys) {
+    if (!Object.prototype.hasOwnProperty.call(entry, key)) continue;
+    const value = entry[key as keyof typeof entry];
+    const serialized = `${JSON.stringify(value, null, 2)}\n`;
+    const size = Buffer.byteLength(serialized, "utf8");
+    if (size <= inlinePayloadMaxBytes) continue;
+
+    const sha256 = sha256Hex(serialized);
+    const payloadDir = path.join(logDir, "payloads", input.channel);
+    const payloadFileName = [
+      entry.timestamp.replace(/[:.]/g, "-"),
+      sanitizePayloadKey(key),
+      sha256.slice(0, 16),
+    ].join("-");
+    const payloadFile = path.join(payloadDir, `${payloadFileName}.json`);
+
+    await mkdir(payloadDir, { recursive: true });
+    await writeFile(payloadFile, serialized, "utf8");
+    entry[key as keyof typeof entry] = {
+      __workspace_log_payload: true,
+      path: payloadFile,
+      relative_path: path.relative(workspace.workspace_dir, payloadFile),
+      size,
+      sha256,
+    } as never;
+  }
   await appendFile(logFile, `${JSON.stringify(entry)}\n`, "utf8");
 
   return {

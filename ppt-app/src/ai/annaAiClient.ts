@@ -25,6 +25,7 @@ import {
   THEME_PRESET_IDS,
 } from "../features/deck-workspace/themePresets";
 import { CONTENT_GROUNDING_RULES } from "./groundingRules";
+import type { AiOperationLogContext } from "./interactionLog";
 import type {
   AiAttemptLog,
   AiClient,
@@ -102,22 +103,51 @@ function parseJsonResult<T>(text: string, label: string): T {
 
 function completeLlm(
   runtime: AnnaRuntime,
-  input: AnnaLlmCompleteInput
+  input: AnnaLlmCompleteInput,
+  logContext?: AiOperationLogContext
 ): Promise<unknown> {
-  if (typeof runtime.call === "function") {
-    return runtime.call("llm", "complete", input, {
-      timeoutMs: LLM_COMPLETE_TIMEOUT_MS,
-    });
-  }
+  return completeLlmLogged(runtime, input, logContext);
+}
 
-  return runtime.llm.complete(input);
+async function completeLlmLogged(
+  runtime: AnnaRuntime,
+  input: AnnaLlmCompleteInput,
+  logContext?: AiOperationLogContext
+): Promise<unknown> {
+  const handle = logContext?.logger
+    ? await logContext.logger.startInteraction(logContext, { request: input })
+    : null;
+
+  try {
+    const result =
+      typeof runtime.call === "function"
+        ? await runtime.call("llm", "complete", input, {
+            timeoutMs: LLM_COMPLETE_TIMEOUT_MS,
+          })
+        : await runtime.llm.complete(input);
+    await logContext?.logger?.finishInteraction(handle!, {
+      status: "succeeded",
+      response: result,
+      output: extractCompletionText(result),
+    });
+    return result;
+  } catch (error) {
+    if (handle) {
+      await logContext?.logger?.finishInteraction(handle, {
+        status: "failed",
+        error,
+      });
+    }
+    throw error;
+  }
 }
 
 async function completeJson<T>(
   runtime: AnnaRuntime,
   label: string,
   prompt: string,
-  expectedShape: string
+  expectedShape: string,
+  logContext?: AiOperationLogContext
 ): Promise<T> {
   let request: AnnaLlmCompleteInput = {
     messages: [
@@ -132,7 +162,7 @@ async function completeJson<T>(
   };
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
-    const result = await completeLlm(runtime, request);
+    const result = await completeLlm(runtime, request, logContext);
     const rawText = extractCompletionText(result);
 
     try {
@@ -224,7 +254,8 @@ async function completeOutlineWithRetry(
   runtime: AnnaRuntime,
   operation: "generateOutline" | "reviseOutline",
   initialRequest: AnnaLlmCompleteInput,
-  validationSlideCount: number | null
+  validationSlideCount: number | null,
+  logContext?: AiOperationLogContext
 ): Promise<OutlineGenerationResult> {
   const attempts: AiAttemptLog[] = [];
   let request = initialRequest;
@@ -232,7 +263,7 @@ async function completeOutlineWithRetry(
 
   for (let attempt = 1; attempt <= MAX_OUTLINE_ATTEMPTS; attempt += 1) {
     try {
-      const rawResult = await completeLlm(runtime, request);
+      const rawResult = await completeLlm(runtime, request, logContext);
       const rawText = extractCompletionText(rawResult);
 
       try {
@@ -307,7 +338,8 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         runtime,
         "generateOutline",
         buildGenerateOutlineLlmRequest(input),
-        getExpectedSlideCount(input.setting, input.prompt, input.contextRows)
+        getExpectedSlideCount(input.setting, input.prompt, input.contextRows),
+        input.logContext
       );
     },
 
@@ -329,7 +361,8 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
           `Outline title: ${input.title ?? ""}`,
           `Outline items: ${JSON.stringify(input.outline ?? [])}`,
         ].join("\n"),
-        '{"output_language":"中文"}'
+        '{"output_language":"中文"}',
+        input.logContext
       );
       const record =
         result && typeof result === "object" && !Array.isArray(result)
@@ -359,7 +392,8 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
           `Locale: ${input.locale}`,
           `Prompt: ${input.prompt}`,
         ].join("\n"),
-        '{"audience":["..."],"goal":["..."],"style":["..."],"theme":["theme_id"],"slides":"auto"}'
+        '{"audience":["..."],"goal":["..."],"style":["..."],"theme":["theme_id"],"slides":"auto"}',
+        input.logContext
       );
 
       return normalizeContextSuggestions(result);
@@ -368,7 +402,7 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
     async generatePagePlan(input) {
       let request = buildGeneratePagePlanLlmRequest(input);
       for (let attempt = 1; attempt <= 2; attempt += 1) {
-        const rawResult = await completeLlm(runtime, request);
+        const rawResult = await completeLlm(runtime, request, input.logContext);
         const rawText = extractCompletionText(rawResult);
 
         try {
@@ -419,7 +453,8 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
           `Context: ${JSON.stringify(input.contextRows)}`,
           `Setting: ${JSON.stringify(input.setting ?? {})}`
         ].join("\n"),
-        '{"title":"...","outline":[{"title":"...","outline":"..."}],"slides":[{"title":"...","subtitle":"..."}]}'
+        '{"title":"...","outline":[{"title":"...","outline":"..."}],"slides":[{"title":"...","subtitle":"..."}]}',
+        input.logContext
       );
     },
 
@@ -428,7 +463,8 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         runtime,
         "reviseOutline",
         buildReviseOutlineLlmRequest(input),
-        getExpectedSlideCountForRevision(input.setting, input.feedback, input.contextRows)
+        getExpectedSlideCountForRevision(input.setting, input.feedback, input.contextRows),
+        input.logContext
       );
     },
 
@@ -443,7 +479,8 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
           `Locale: ${input.locale}`,
           `Outline: ${JSON.stringify(input.outline)}`
         ].join("\n"),
-        '[{"title":"...","subtitle":"..."}]'
+        '[{"title":"...","subtitle":"..."}]',
+        input.logContext
       );
     },
 
@@ -459,7 +496,8 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
           `Locale: ${input.locale}`,
           `Slides: ${JSON.stringify(input.slides)}`
         ].join("\n"),
-        '[{"title":"...","subtitle":"..."}]'
+        '[{"title":"...","subtitle":"..."}]',
+        input.logContext
       );
     },
 
@@ -475,7 +513,8 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
           `Slide number: ${input.slideIndex + 1}`,
           `Slide: ${JSON.stringify(input.slide)}`
         ].join("\n"),
-        '{"title":"...","subtitle":"..."}'
+        '{"title":"...","subtitle":"..."}',
+        input.logContext
       );
     }
   };

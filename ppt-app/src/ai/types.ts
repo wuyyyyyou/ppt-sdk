@@ -3,6 +3,7 @@ import type { AnnaLlmCompleteInput } from "../runtime/annaRuntime";
 import type { WorkspaceSettings } from "../api/types";
 import type { PagePlan, TemplatePlanningContext, WorkspaceOutline } from "../api/types";
 import type { Locale } from "../i18n/messages";
+import type { AiOperationLogContext } from "./interactionLog";
 
 export interface LlmContextRow {
   id: string;
@@ -14,6 +15,7 @@ export interface DeckBriefInput {
   contextRows: LlmContextRow[];
   locale: Locale;
   setting?: WorkspaceSettings;
+  logContext?: AiOperationLogContext;
 }
 
 export interface GenerateOutlineInput extends DeckBriefInput {}
@@ -25,6 +27,7 @@ export interface GenerateDeckInput extends DeckBriefInput {
 export interface SuggestContextInput {
   prompt: string;
   locale: Locale;
+  logContext?: AiOperationLogContext;
 }
 
 export interface ContextSuggestionResult {
@@ -42,22 +45,26 @@ export interface ReviseOutlineInput {
   locale: Locale;
   setting?: WorkspaceSettings;
   contextRows?: LlmContextRow[];
+  logContext?: AiOperationLogContext;
 }
 
 export interface GenerateSlidesFromOutlineInput {
   outline: OutlineDetail[];
   locale: Locale;
+  logContext?: AiOperationLogContext;
 }
 
 export interface RefineDeckInput {
   slides: Slide[];
   locale: Locale;
+  logContext?: AiOperationLogContext;
 }
 
 export interface RefineSlideInput {
   slide: Slide;
   slideIndex: number;
   locale: Locale;
+  logContext?: AiOperationLogContext;
 }
 
 export interface GeneratedDeck {
@@ -96,6 +103,7 @@ export interface GeneratePagePlanInput {
   outline: WorkspaceOutline;
   planningContext: TemplatePlanningContext;
   locale: Locale;
+  logContext?: AiOperationLogContext;
 }
 
 export interface AiClient {

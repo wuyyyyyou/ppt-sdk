@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createAgentClient, type AgentClient } from "../../../agent/agentClient";
 import { createAiClient, type AiAttemptLog, type AiClient, type LlmContextRow } from "../../../ai/aiClient";
+import {
+  createAiInteractionLogger,
+  type AiOperationLogContext,
+} from "../../../ai/interactionLog";
 import { createPptBackend, type PptBackend } from "../../../api/pptBackend";
 import { connectAnnaRuntime } from "../../../runtime/annaRuntime";
 import {
@@ -202,11 +206,35 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [workspaceSettingsSaving, setWorkspaceSettingsSaving] = useState(false);
   const [templateGroups, setTemplateGroups] = useState<TemplateSummary[]>([]);
   const [selectedTemplateGroupId, setSelectedTemplateGroupId] = useState<string | null>(DEFAULT_TEMPLATE_GROUP_ID);
+  const aiLogger = useMemo(() => backend ? createAiInteractionLogger(backend) : null, [backend]);
 
   function getDefaultWorkspaceTitle(date = new Date()) {
     return formatMessage(t.library.defaultWorkspaceTitle, {
       date: formatWorkspaceDate(date)
     });
+  }
+
+  function buildAiLogContext(
+    workspace: WorkspaceResult,
+    domain: "outline" | "page_plan" | "page_agent",
+    operation: string,
+    extra: {
+      page_id?: string;
+      page_index?: number;
+      kind?: string;
+      operation_id?: string;
+    } = {}
+  ) {
+    if (!aiLogger) return undefined;
+    return {
+      logger: aiLogger,
+      workspace_dir: workspace.workspace_dir,
+      domain,
+      operation,
+      provider: "anna",
+      runtime_mode: "anna",
+      ...extra,
+    };
   }
 
   function workspaceOutlineToState(workspaceOutline: unknown) {
@@ -345,6 +373,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       setting: input.setting,
       title: input.title,
       outline: input.items,
+      logContext: buildAiLogContext(input.workspace, "outline", "detect_output_language"),
     });
     const outputLanguage = normalizeOutputLanguage(result.output_language);
     const workspace = await persistWorkspaceOutputLanguage(
@@ -1010,9 +1039,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     setLoading("context");
     try {
+      const workspace = await ensureCurrentWorkspace();
+      if (!workspace) return;
       const result = await aiClient.suggestContext({
         prompt: trimmedPrompt,
         locale,
+        logContext: buildAiLogContext(workspace, "outline", "suggest_context"),
       });
       const rows = [
         buildSuggestedContextRow("audience", result.audience),
@@ -1196,12 +1228,15 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         setLoading("outline");
         resetGenerationProgress();
         const llmContextRows = buildLlmContextRows();
+        const outlineLogContext = buildAiLogContext(templateWorkspace, "outline", "generate_outline");
         const result = await aiClient.generateOutline({
           prompt,
           contextRows: llmContextRows,
           locale,
           setting,
+          logContext: outlineLogContext,
         });
+        await appendOutlineAiAttemptLogs(templateWorkspace, result.attempts, outlineLogContext);
         const syncedContextRows = syncContextRowsToOutlineCount(
           contextRows,
           result.outline.items
@@ -1237,12 +1272,15 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       setLoading("outline");
       resetGenerationProgress();
       const llmContextRows = buildLlmContextRows();
+      const outlineLogContext = buildAiLogContext(templateWorkspace, "outline", "generate_outline");
       const outlineResult = await aiClient.generateOutline({
         prompt,
         contextRows: llmContextRows,
         locale,
         setting,
+        logContext: outlineLogContext,
       });
+      await appendOutlineAiAttemptLogs(templateWorkspace, outlineResult.attempts, outlineLogContext);
       const syncedContextRows = syncContextRowsToOutlineCount(
         contextRows,
         outlineResult.outline.items
@@ -1287,6 +1325,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         backend,
         aiClient,
         agentClient,
+        aiLogger,
         workspace: confirmedWorkspace,
         confirmedOutline: confirmedWorkspace.outline as WorkspaceOutline,
         locale,
@@ -1360,6 +1399,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         backend,
         aiClient,
         agentClient,
+        aiLogger,
         workspace: confirmedWorkspace,
         confirmedOutline: confirmedWorkspace.outline as WorkspaceOutline,
         locale,
@@ -1390,15 +1430,17 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const nextContextRows = deriveContextRowsFromOutlineFeedback(contextRows, outlineFeedback);
       setContextRows(nextContextRows);
       const llmContextRows = buildLlmContextRows(nextContextRows);
+      const outlineLogContext = buildAiLogContext(workspace, "outline", "revise_outline");
       const result = await aiClient.reviseOutline({
         title: baseTitle,
         outline: baseOutline,
         feedback: outlineFeedback,
         locale,
         setting,
-        contextRows: llmContextRows
+        contextRows: llmContextRows,
+        logContext: outlineLogContext,
       });
-      await appendOutlineAiAttemptLogs(workspace, result.attempts);
+      await appendOutlineAiAttemptLogs(workspace, result.attempts, outlineLogContext);
       const syncedContextRows = syncContextRowsToOutlineCount(
         nextContextRows,
         result.outline.items
@@ -1867,12 +1909,20 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   async function appendOutlineAiAttemptLogs(
     workspace: WorkspaceResult | null,
-    attempts: AiAttemptLog[]
+    attempts: AiAttemptLog[],
+    logContext?: AiOperationLogContext
   ) {
     for (const attempt of attempts) {
       await appendOutlineAiLog(workspace, {
         event: `ai.outline.${attempt.operation}.attempt`,
-        ...attempt
+        schema_version: 1,
+        operation_id: logContext?.operation_id,
+        interaction_ids: logContext?.interaction_ids ?? [],
+        operation: attempt.operation,
+        attempt: attempt.attempt,
+        status: attempt.status,
+        validation: attempt.validation,
+        error: attempt.error,
       });
     }
   }
@@ -2151,6 +2201,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         backend,
         aiClient,
         agentClient,
+        aiLogger,
         workspace: refreshedWorkspace,
         confirmedOutline: refreshedWorkspace.outline as WorkspaceOutline,
         locale,
@@ -2193,6 +2244,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         backend,
         aiClient,
         agentClient,
+        aiLogger,
         workspace: refreshedWorkspace,
         confirmedOutline: refreshedWorkspace.outline as WorkspaceOutline,
         locale,
@@ -2363,6 +2415,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         backend,
         aiClient,
         agentClient,
+        aiLogger,
         workspace: refreshedWorkspace,
         confirmedOutline: refreshedWorkspace.outline as WorkspaceOutline,
         locale,
@@ -2397,6 +2450,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         backend,
         aiClient,
         agentClient,
+        aiLogger,
         workspace: refreshedWorkspace,
         confirmedOutline: refreshedWorkspace.outline as WorkspaceOutline,
         locale,

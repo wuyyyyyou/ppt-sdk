@@ -65,7 +65,7 @@
         {
           "name": "channel",
           "type": "string",
-          "description": "Workspace log channel. Supports ai-outline, ai-page-plan, ai-page-agent, and ai-page-agent-stream.",
+          "description": "Workspace log channel. Supports ai-outline, ai-outline-interactions, ai-page-plan, ai-page-plan-interactions, ai-page-agent, ai-page-agent-interactions, and ai-page-agent-stream.",
           "required": true
         },
         {
@@ -73,6 +73,18 @@
           "type": "object",
           "description": "JSON-serializable log entry to append.",
           "required": true
+        },
+        {
+          "name": "payload_keys",
+          "type": "array",
+          "description": "Optional entry keys that may be moved to sidecar payload files when they exceed the inline payload threshold.",
+          "required": false
+        },
+        {
+          "name": "inline_payload_max_bytes",
+          "type": "number",
+          "description": "Optional max UTF-8 byte size before a payload key is moved to a sidecar file.",
+          "required": false
         }
       ]
     },

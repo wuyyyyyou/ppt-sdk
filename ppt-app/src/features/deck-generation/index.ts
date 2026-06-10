@@ -15,6 +15,7 @@ import {
   readOutlineOutputLanguage,
 } from "../../ai/outputLanguage";
 import type { AiClient } from "../../ai/aiClient";
+import type { AiInteractionLogger, AiOperationLogContext } from "../../ai/interactionLog";
 import type {
   PagePlan,
   PagePlanItem,
@@ -142,6 +143,7 @@ export interface RunDeckGenerationInput {
   backend: PptBackend;
   aiClient: AiClient;
   agentClient: AgentClient;
+  aiLogger?: AiInteractionLogger | null;
   workspace: WorkspaceResult;
   confirmedOutline: WorkspaceOutline;
   locale: Locale;
@@ -540,9 +542,25 @@ function createAgentRunTracker(input: {
   kind: string;
 }) {
   const startedAt = new Date().toISOString();
-  const runId = `${input.page.page_id}-${input.kind}-${Date.now().toString(36)}`;
+  const operationId = input.flowInput.aiLogger
+    ? input.flowInput.aiLogger.createOperationId("page_agent", input.kind)
+    : `${input.page.page_id}-${input.kind}-${Date.now().toString(36)}`;
+  const logContext: AiOperationLogContext | undefined = input.flowInput.aiLogger
+    ? {
+        logger: input.flowInput.aiLogger,
+        workspace_dir: input.flowInput.workspace.workspace_dir,
+        domain: "page_agent" as const,
+        operation: input.kind,
+        operation_id: operationId,
+        page_id: input.page.page_id,
+        page_index: input.page.index,
+        kind: input.kind,
+        provider: "anna",
+        runtime_mode: "anna",
+      }
+    : undefined;
   const stream: DeckGenerationStream = {
-    run_id: runId,
+    run_id: operationId,
     kind: input.kind,
     page_id: input.page.page_id,
     page_index: input.page.index,
@@ -552,14 +570,15 @@ function createAgentRunTracker(input: {
     started_at: startedAt,
     updated_at: startedAt,
   };
-  const contentChunks: string[] = [];
   const activities: Array<Record<string, unknown>> = [];
   const errors: Array<Record<string, unknown>> = [];
+  const streamEvents: Array<Record<string, unknown>> = [];
+  let flushedStreamEventCount = 0;
   let usage: unknown = null;
 
   function emitStream() {
     stream.updated_at = new Date().toISOString();
-    input.flowInput.activeStreams.set(runId, stream);
+    input.flowInput.activeStreams.set(operationId, stream);
     emit(
       input.flowInput,
       {
@@ -574,10 +593,33 @@ function createAgentRunTracker(input: {
     );
   }
 
+  async function flushStreamBatch(force = false) {
+    if (!input.flowInput.aiLogger || !logContext) return;
+    const pending = streamEvents.slice(flushedStreamEventCount);
+    if (pending.length === 0) return;
+    if (!force && pending.length < 10) return;
+    flushedStreamEventCount = streamEvents.length;
+    await input.flowInput.aiLogger.appendStreamBatch(logContext, {
+      operation_id: operationId,
+      interaction_id: logContext.interaction_ids?.at(-1),
+      events: pending,
+    });
+  }
+
+  function recordStreamEvent(event: AgentStreamEvent) {
+    streamEvents.push({
+      timestamp: new Date().toISOString(),
+      ...event,
+    });
+    if (streamEvents.length - flushedStreamEventCount >= 10) {
+      void flushStreamBatch();
+    }
+  }
+
   return {
     onStreamEvent(event: AgentStreamEvent) {
+      recordStreamEvent(event);
       if (event.type === "content") {
-        contentChunks.push(event.text);
         appendTextToLines(stream.lines, event.text, 30);
       } else if (event.type === "activity") {
         activities.push(event);
@@ -591,12 +633,15 @@ function createAgentRunTracker(input: {
       }
       emitStream();
     },
+    logContext,
+    operationId,
     async flush(status: "completed" | "error", extra: Record<string, unknown>) {
       const endedAt = new Date().toISOString();
-      const finalText = contentChunks.join("");
       const baseEntry = {
-        event: "ai.page_agent.run",
-        run_id: runId,
+        event: "ai.page_agent.operation.finished",
+        schema_version: 1,
+        operation_id: operationId,
+        interaction_ids: logContext?.interaction_ids ?? [],
         page_id: input.page.page_id,
         page_index: input.page.index,
         kind: input.kind,
@@ -604,7 +649,6 @@ function createAgentRunTracker(input: {
         prompt_hash: shortHash(input.prompt),
         started_at: startedAt,
         ended_at: endedAt,
-        final_text: finalText,
         usage,
         ...extra,
       };
@@ -614,29 +658,14 @@ function createAgentRunTracker(input: {
           channel: "ai-page-agent",
           entry: baseEntry,
         });
-        await input.flowInput.backend.appendWorkspaceLog({
-          workspace_dir: input.flowInput.workspace.workspace_dir,
-          channel: "ai-page-agent-stream",
-          entry: {
-            event: "ai.page_agent.stream",
-            run_id: runId,
-            page_id: input.page.page_id,
-            kind: input.kind,
-            status,
-            content: finalText,
-            activities,
-            errors,
-            usage,
-            ...extra,
-          },
-        });
+        await flushStreamBatch(true);
       } catch {
         // Logging must never fail Deck Generation.
       } finally {
         stream.status = status;
         stream.updated_at = endedAt;
         emitStream();
-        input.flowInput.activeStreams.delete(runId);
+        input.flowInput.activeStreams.delete(operationId);
         emit(
           input.flowInput,
           {
@@ -757,19 +786,52 @@ async function createRestartArtifacts(input: RunDeckGenerationInput) {
   const planningContext = await input.backend.getTemplatePlanningContext({
     workspace_dir: input.workspace.workspace_dir,
   });
+  const pagePlanLogContext: AiOperationLogContext | undefined = input.aiLogger
+    ? {
+        logger: input.aiLogger,
+        workspace_dir: input.workspace.workspace_dir,
+        domain: "page_plan" as const,
+        operation: "generate_page_plan",
+        operation_id: input.aiLogger.createOperationId("page_plan", "generate_page_plan"),
+        provider: "anna",
+        runtime_mode: "anna",
+      }
+    : undefined;
   const pagePlan = await input.aiClient.generatePagePlan({
     outline: input.confirmedOutline,
     planningContext,
     locale: input.locale,
+    logContext: pagePlanLogContext,
   });
   const alignedPagePlan = alignPagePlanWithOutline(pagePlan, input.confirmedOutline);
-  await appendWorkspaceLogSafe(input, "ai-page-plan", {
-    event: "ai.page_plan.generated",
-    title: alignedPagePlan.title,
-    page_count: alignedPagePlan.pages.length,
-    template_group: alignedPagePlan.source.template_group,
-    plan: alignedPagePlan,
-  });
+  if (input.aiLogger && pagePlanLogContext) {
+    await input.aiLogger.appendSemanticLog(pagePlanLogContext, {
+      event: "ai.page_plan.operation.finished",
+      status: "succeeded",
+      title: alignedPagePlan.title,
+      page_count: alignedPagePlan.pages.length,
+      template_group: alignedPagePlan.source.template_group,
+      interaction_ids: pagePlanLogContext.interaction_ids ?? [],
+      artifact: {
+        kind: "page_plan",
+        path: "page-plan.json",
+      },
+    });
+  } else {
+    await appendWorkspaceLogSafe(input, "ai-page-plan", {
+      event: "ai.page_plan.operation.finished",
+      schema_version: 1,
+      operation: "generate_page_plan",
+      status: "succeeded",
+      title: alignedPagePlan.title,
+      page_count: alignedPagePlan.pages.length,
+      template_group: alignedPagePlan.source.template_group,
+      artifact: {
+        kind: "page_plan",
+        path: "page-plan.json",
+      },
+    });
+  }
   await input.backend.recordPagePlan({
     workspace_dir: input.workspace.workspace_dir,
     page_plan: alignedPagePlan,
@@ -961,11 +1023,13 @@ function emitRuntime(
 function buildAgentRunOptions(
   input: DeckGenerationRuntime,
   onStreamEvent: (event: AgentStreamEvent) => void,
+  logContext?: AiOperationLogContext,
 ) {
   return {
     onStreamEvent,
     signal: input.cancelSignal,
     isCancelled: input.isCancelled,
+    logContext,
   };
 }
 
@@ -1067,7 +1131,7 @@ async function runPageGeneration(
     try {
       const authoringResult: AgentRunSummary = await input.agentClient.runAuthoringPrompt(
         authoringPrompt,
-        buildAgentRunOptions(input, authoringTracker.onStreamEvent),
+        buildAgentRunOptions(input, authoringTracker.onStreamEvent, authoringTracker.logContext),
       );
       await authoringTracker.flush("completed", {
         parsed_summary: authoringResult.parsed_json === true,
@@ -1173,7 +1237,7 @@ async function runPageGeneration(
     try {
       contentReview = await input.agentClient.runPageContentReviewPrompt(
         contentReviewPrompt,
-        buildAgentRunOptions(input, contentReviewTracker.onStreamEvent),
+        buildAgentRunOptions(input, contentReviewTracker.onStreamEvent, contentReviewTracker.logContext),
       );
       await contentReviewTracker.flush("completed", {
         parsed_review: true,
@@ -1335,7 +1399,7 @@ async function runPageGeneration(
     try {
       visualReview = await input.agentClient.runPageVisualReviewPrompt(
         visualReviewPrompt,
-        buildAgentRunOptions(input, visualReviewTracker.onStreamEvent),
+        buildAgentRunOptions(input, visualReviewTracker.onStreamEvent, visualReviewTracker.logContext),
       );
       await visualReviewTracker.flush("completed", {
         parsed_review: true,

@@ -85,6 +85,10 @@ _Avoid_: Self Review when referring to the visual-only screenshot check.
 The collapsed-by-default record of completed agent runs from Deck Generation. It is historical context, not the primary place for Live Page Streams.
 _Avoid_: User-facing labels such as "Session History" when the record is really page generation work.
 
+**AI Interaction Log**:
+A Workspace-owned diagnostic record of each LLM completion or Agent run used to produce, revise, inspect, or repair deck artifacts. It is for troubleshooting and auditability, separate from user-facing Generation Session History.
+_Avoid_: Session History, Live Page Stream
+
 **Failed Page Generation**:
 A Page Generation Unit that reached a terminal state without becoming accepted after its automatic recovery attempts are exhausted or manual review is required. Deck Generation may still continue other Page Generation Units, but the Deck is not finished until failed pages are retried or otherwise resolved.
 

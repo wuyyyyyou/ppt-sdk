@@ -466,13 +466,11 @@ describe("Deck Generation Flow Module", () => {
       outline.items,
     );
     const pagePlanLog = harness.logs.find((entry) =>
-      (entry as { entry?: { event?: string } }).entry?.event === "ai.page_plan.generated"
-    ) as { entry?: { title?: string; plan?: PagePlan } } | undefined;
+      (entry as { entry?: { event?: string } }).entry?.event === "ai.page_plan.operation.finished"
+    ) as { entry?: { title?: string; page_count?: number; plan?: PagePlan } } | undefined;
     assert.equal(pagePlanLog?.entry?.title, outline.title);
-    assert.deepEqual(
-      pagePlanLog?.entry?.plan?.pages.map((page) => ({ title: page.title, outline: page.outline })),
-      outline.items,
-    );
+    assert.equal(pagePlanLog?.entry?.page_count, outline.items.length);
+    assert.equal(pagePlanLog?.entry?.plan, undefined);
   });
 
   it("uses render-fix authoring after a render failure", async () => {
@@ -725,12 +723,13 @@ describe("Deck Generation Flow Module", () => {
       "Agent 会话重试后仍失败，请重跑这一页。",
     );
     assert.equal(completion.progress?.pages[0].agent_infrastructure_failures, 1);
-    const streamLog = harness.logs.find((entry) => {
+    const agentLog = harness.logs.find((entry) => {
       const record = entry as { channel?: string };
-      return record.channel === "ai-page-agent-stream";
+      return record.channel === "ai-page-agent";
     }) as { entry?: Record<string, unknown> } | undefined;
-    assert.equal(streamLog?.entry?.session_cache_miss_retries, 12);
-    assert.equal(streamLog?.entry?.agent_session_cache_miss, true);
+    assert.equal(agentLog?.entry?.session_cache_miss_retries, 12);
+    assert.equal(agentLog?.entry?.agent_session_cache_miss, true);
+    assert.equal(agentLog?.entry?.final_text, undefined);
   });
 
   it("runs page generation with a maximum concurrency of three", async () => {
