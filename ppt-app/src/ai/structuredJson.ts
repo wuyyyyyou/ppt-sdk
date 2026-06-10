@@ -1,7 +1,3 @@
-function isLikelyChineseText(text: string) {
-  return /[\u4e00-\u9fff]/.test(text);
-}
-
 function isOpeningBracket(char: string) {
   return char === "{" || char === "[";
 }
@@ -114,15 +110,7 @@ export function buildStructuredJsonRepairPrompt(
   expectedShape: string,
   parseError: string
 ) {
-  if (isLikelyChineseText(sourceText)) {
-    return [
-      "上一次回复不是合法 JSON。",
-      `解析错误：${parseError}`,
-      "请只返回一个 JSON 值，并且不要输出 Markdown、代码块、解释或任何额外文字。",
-      "请严格使用下面的结构：",
-      expectedShape,
-    ].join("\n");
-  }
+  void sourceText;
 
   return [
     "The previous response was not valid JSON.",

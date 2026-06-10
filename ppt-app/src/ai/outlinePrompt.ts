@@ -8,7 +8,6 @@ import {
   buildOutlineRepairPrompt,
   buildOutlineSystemPrompt,
   buildReviseOutlineUserPrompt,
-  type PromptLanguage,
 } from "./outlinePromptMessages";
 
 interface GenerateOutlinePromptInput {
@@ -74,40 +73,8 @@ function buildSlideCountContext(contextRows?: LlmContextRow[]): string {
   return readContextRowString(contextRows, "slides") || "auto";
 }
 
-function getPromptLanguage(
-  setting: WorkspaceSettings | undefined,
-  locale: Locale
-): PromptLanguage {
-  const configuredLanguage = [
-    readSettingString(setting, "output_language"),
-  ]
-    .join(" ")
-    .toLowerCase();
-
-  if (
-    configuredLanguage.includes("中文") ||
-    configuredLanguage.includes("chinese") ||
-    configuredLanguage.includes("zh")
-  ) {
-    return "zh";
-  }
-
-  if (
-    configuredLanguage.includes("英文") ||
-    configuredLanguage.includes("english") ||
-    configuredLanguage.includes("en")
-  ) {
-    return "en";
-  }
-
-  return locale === "zh" ? "zh" : "en";
-}
-
-function buildGenerateUserPrompt(
-  input: GenerateOutlinePromptInput,
-  language: PromptLanguage
-): string {
-  return buildGenerateOutlineUserPrompt(language, {
+function buildGenerateUserPrompt(input: GenerateOutlinePromptInput): string {
+  return buildGenerateOutlineUserPrompt({
     slideCountContext: buildSlideCountContext(input.contextRows),
     locale: input.locale,
     settingSummaryJson: JSON.stringify(buildSettingSummary(input.setting, input.contextRows)),
@@ -116,11 +83,8 @@ function buildGenerateUserPrompt(
   });
 }
 
-function buildReviseUserPrompt(
-  input: ReviseOutlinePromptInput,
-  language: PromptLanguage
-): string {
-  return buildReviseOutlineUserPrompt(language, {
+function buildReviseUserPrompt(input: ReviseOutlinePromptInput): string {
+  return buildReviseOutlineUserPrompt({
     slideCountContext: buildSlideCountContext(input.contextRows),
     locale: input.locale,
     settingSummaryJson: JSON.stringify(buildSettingSummary(input.setting, input.contextRows)),
@@ -134,21 +98,20 @@ function buildReviseUserPrompt(
 export function buildGenerateOutlineLlmRequest(
   input: GenerateOutlinePromptInput
 ): AnnaLlmCompleteInput {
-  const language = getPromptLanguage(input.setting, input.locale);
   return {
     messages: [
       {
         role: "system",
         content: {
           type: "text",
-          text: buildOutlineSystemPrompt(language),
+          text: buildOutlineSystemPrompt(),
         },
       },
       {
         role: "user",
         content: {
           type: "text",
-          text: buildGenerateUserPrompt(input, language),
+          text: buildGenerateUserPrompt(input),
         },
       },
     ],
@@ -158,31 +121,24 @@ export function buildGenerateOutlineLlmRequest(
 export function buildReviseOutlineLlmRequest(
   input: ReviseOutlinePromptInput
 ): AnnaLlmCompleteInput {
-  const language = getPromptLanguage(input.setting, input.locale);
   return {
     messages: [
       {
         role: "system",
         content: {
           type: "text",
-          text: buildOutlineSystemPrompt(language),
+          text: buildOutlineSystemPrompt(),
         },
       },
       {
         role: "user",
         content: {
           type: "text",
-          text: buildReviseUserPrompt(input, language),
+          text: buildReviseUserPrompt(input),
         },
       },
     ],
   };
-}
-
-function getRepairPromptLanguage(request: AnnaLlmCompleteInput): PromptLanguage {
-  const systemText = request.messages.find((message) => message.role === "system")
-    ?.content.text;
-  return systemText?.includes("资深演示文稿策划专家") ? "zh" : "en";
 }
 
 export function buildOutlineRepairRequest(
@@ -190,7 +146,6 @@ export function buildOutlineRepairRequest(
   rawResponse: string,
   errors: string[]
 ): AnnaLlmCompleteInput {
-  const language = getRepairPromptLanguage(previousRequest);
   return {
     ...previousRequest,
     messages: [
@@ -206,7 +161,7 @@ export function buildOutlineRepairRequest(
         role: "user",
         content: {
           type: "text",
-          text: buildOutlineRepairPrompt(language, errors),
+          text: buildOutlineRepairPrompt(errors),
         },
       },
     ],
