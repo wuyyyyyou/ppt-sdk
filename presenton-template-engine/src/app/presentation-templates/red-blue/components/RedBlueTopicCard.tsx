@@ -32,15 +32,14 @@ const RedBlueTopicCard = ({
       }}
     >
       <div
-        className="absolute right-[-20px] top-[-20px] rounded-full"
+        className="pointer-events-none absolute right-[-34px] top-[-34px] z-0 rounded-full"
         style={{
-          width: compact ? 68 : 86,
-          height: compact ? 68 : 86,
-          backgroundColor: color,
-          opacity: 0.08,
+          width: compact ? 72 : 96,
+          height: compact ? 72 : 96,
+          backgroundColor: `${color}18`,
         }}
       />
-      <div className="flex items-start justify-between gap-[16px]">
+      <div className="relative z-[1] flex items-start justify-between gap-[16px]">
         <div
           className="flex items-center justify-center rounded-[14px] font-black"
           style={{
@@ -67,7 +66,7 @@ const RedBlueTopicCard = ({
           </div>
         ) : null}
       </div>
-      <div>
+      <div className="relative z-[1]">
         <div
           className="mt-[20px] text-[20px] font-extrabold leading-[24px]"
           style={{

@@ -361,6 +361,18 @@ button {
   color: var(--accent);
 }
 
+.header-home-btn {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.header-home-btn:hover .app-title {
+  color: var(--accent);
+}
+
 .app-title {
   color: var(--text-main);
   font-size: 14px;
@@ -2368,6 +2380,32 @@ details.generation-history-panel > summary::-webkit-details-marker {
   object-fit: contain;
 }
 
+.deck-stage-loading {
+  display: flex;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 220px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 12px;
+  color: var(--text-muted);
+  background: #fff;
+  box-shadow: 0 14px 32px rgba(17, 24, 39, 0.08);
+}
+
+.deck-stage-loading svg {
+  animation: spin 1s linear infinite;
+}
+
+.deck-stage-loading span {
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .slide-num-tag {
   position: absolute;
   left: 18px;
@@ -2906,6 +2944,40 @@ details.generation-history-panel > summary::-webkit-details-marker {
   width: 100%;
   height: 118px;
   margin: 8px 0 10px;
+}
+
+.preview-loading-frame {
+  display: flex;
+  width: 100%;
+  height: 430px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 12px;
+  color: var(--text-muted);
+  background: #fff;
+}
+
+.preview-loading-frame.compact {
+  height: 118px;
+  margin: 8px 0 10px;
+  gap: 8px;
+  border-radius: 10px;
+}
+
+.preview-loading-frame svg {
+  animation: spin 1s linear infinite;
+}
+
+.preview-loading-frame span {
+  max-width: 80%;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .deck-html-selected-frame img,

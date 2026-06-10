@@ -239,7 +239,13 @@ function PageStageRecordView(props: {
   onToggle: () => void;
 }) {
   const { stage, t, open, onToggle } = props;
-  const hasLines = stage.lines.some((line) => line.trim());
+  const displayActivities = stage.activities
+    .map((activity) => sanitizeGenerationDebugText(activity))
+    .filter((activity) => activity.length > 0);
+  const displayLines = stage.lines
+    .map((line) => sanitizeGenerationDebugText(line))
+    .filter((line) => line.length > 0);
+  const hasLines = displayLines.some((line) => line.trim());
   const badgeState = statusBadgeState(stage.state);
 
   return (
@@ -268,25 +274,34 @@ function PageStageRecordView(props: {
       </button>
       {open ? (
         <div className="generation-stage-body">
-          {stage.activities.length > 0 ? (
+          {displayActivities.length > 0 ? (
             <div className="generation-activity-list" aria-label={t.generating.stageRecords.activities}>
-              {stage.activities.map((activity, index) => (
+              {displayActivities.map((activity, index) => (
                 <span key={`${stage.id}-activity-${index}`}>{activity}</span>
               ))}
             </div>
           ) : null}
           {hasLines ? (
             <pre className="generation-stream-text" aria-label={t.generating.stageRecords.stream}>
-              {stage.lines.join("\n").trim()}
+              {displayLines.join("\n").trim()}
             </pre>
           ) : null}
-          {!hasLines && stage.activities.length === 0 ? (
+          {!hasLines && displayActivities.length === 0 ? (
             <p className="generation-empty-stream">{stage.lastError ?? t.generating.stageRecords.noOutput}</p>
           ) : null}
         </div>
       ) : null}
     </article>
   );
+}
+
+function sanitizeGenerationDebugText(text: string) {
+  return text
+    .replace(/["']?\b(?:template|layout|blueprint|component|page)[_-]?id["']?\s*[:=]\s*["']?[a-z0-9:_-]+["']?,?/gi, "")
+    .replace(/\b(?:template|layout|blueprint|component):[a-z0-9_-]+\b/gi, "")
+    .replace(/\btemplate:[a-z0-9_-]+\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function statusBadgeState(state: PageGenerationStageRecord["state"]) {

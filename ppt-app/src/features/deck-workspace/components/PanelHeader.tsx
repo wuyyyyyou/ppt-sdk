@@ -7,25 +7,40 @@ interface PanelHeaderProps {
   setLocale: (locale: Locale) => void;
   status: string;
   onLibrary: () => void;
-  libraryDisabled?: boolean;
+  navigationDisabled?: boolean;
+  onHome: () => void;
 }
 
 export function PanelHeader(props: PanelHeaderProps) {
-  const { t, locale, setLocale, status, onLibrary, libraryDisabled = false } = props;
+  const {
+    t,
+    locale,
+    setLocale,
+    status,
+    onLibrary,
+    navigationDisabled = false,
+    onHome,
+  } = props;
 
   return (
     <header className="panel-header">
-      <div className="header-left">
+      <button
+        className="header-left header-home-btn"
+        type="button"
+        onClick={onHome}
+        title={t.appName}
+        disabled={navigationDisabled}
+      >
         <PanelTop size={18} />
         <div className="app-title">{t.appName}</div>
         {status ? <div className="status-pill">{status}</div> : null}
-      </div>
+      </button>
       <div className="header-controls">
         <button
           className="control-btn text"
           onClick={onLibrary}
           title={t.controls.library}
-          disabled={libraryDisabled}
+          disabled={navigationDisabled}
         >
           <BookOpen size={14} />
           {t.controls.library}

@@ -18,8 +18,6 @@ import type { DeckReviewRenderState, PreviewMode } from "../types";
 import { formatSlideNumber } from "../utils";
 import { PageHeader } from "./PageHeader";
 import { RenderedSlideImage } from "./RenderedSlideImage";
-import { SlidePreview } from "./SlidePreview";
-import { SlidePreviewLoading } from "./SlidePreviewLoading";
 import { ThumbnailStrip } from "./ThumbnailStrip";
 
 interface ReviewPageProps {
@@ -61,7 +59,7 @@ export function ReviewPage(props: ReviewPageProps) {
   const selected = deck[currentSlide] ?? deck[0];
   const renderedSlides = reviewRender.result?.slides ?? [];
   const selectedRenderedSlide = renderedSlides[currentSlide] ?? renderedSlides[0];
-  const loadingPreviews = reviewRender.status === "loading";
+  const renderWaiting = reviewRender.status === "loading";
 
   return (
     <section className="page active review-page">
@@ -159,10 +157,8 @@ export function ReviewPage(props: ReviewPageProps) {
                 <div className="grid-card-html-frame">
                   <RenderedSlideImage slide={renderedSlide} />
                 </div>
-              ) : loadingPreviews ? (
-                <div className="grid-card-html-frame">
-                  <SlidePreviewLoading compact />
-                </div>
+              ) : renderWaiting ? (
+                <PreviewLoadingFrame compact label={t.review.rendering} />
               ) : null}
               <strong>{slide.title}</strong>
               {subtitle ? <p>{subtitle}</p> : null}
@@ -239,22 +235,29 @@ export function ReviewPage(props: ReviewPageProps) {
             <div className="present-html-frame">
               <RenderedSlideImage slide={selectedRenderedSlide} loading="eager" />
             </div>
-          ) : loadingPreviews ? (
-            <div className="present-html-frame">
-              <SlidePreviewLoading />
-            </div>
+          ) : renderWaiting ? (
+            <PreviewLoadingFrame label={t.review.rendering} />
           ) : (
-            <SlidePreview slide={selected} index={currentSlide} large />
+            <PreviewLoadingFrame label={selected?.title ?? t.review.rendering} />
           )}
           <ThumbnailStrip
             deck={deck}
             currentSlide={currentSlide}
             setCurrentSlide={setCurrentSlide}
             renderedSlides={renderedSlides}
-            loadingPreviews={loadingPreviews}
+            loadingPreviews={renderWaiting}
           />
         </div>
       ) : null}
     </section>
+  );
+}
+
+function PreviewLoadingFrame(props: { label: string; compact?: boolean }) {
+  return (
+    <div className={`preview-loading-frame ${props.compact ? "compact" : ""}`} role="status" aria-live="polite">
+      <LoaderCircle size={props.compact ? 18 : 28} />
+      <span>{props.label}</span>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, LayoutTemplate, MessageCircle, Wand2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Edit3, LayoutTemplate, LoaderCircle, MessageCircle, Wand2 } from "lucide-react";
 import { useState } from "react";
 import type { Slide } from "../../../data/mockDeck";
 import { formatMessage, type Messages } from "../../../i18n/messages";
@@ -6,11 +6,13 @@ import type { DeckReviewRenderState } from "../types";
 import { formatSlideCount, formatSlideNumber } from "../utils";
 import { RenderedSlideImage } from "./RenderedSlideImage";
 import { SlidePreview } from "./SlidePreview";
-import { SlidePreviewLoading } from "./SlidePreviewLoading";
 import { ThumbnailStrip } from "./ThumbnailStrip";
 
 interface DeckPageProps {
   t: Messages;
+  deckTitle: string;
+  setDeckTitle: (value: string) => void;
+  onSaveDeckTitle: (value: string) => Promise<void>;
   deck: Slide[];
   currentSlide: number;
   setCurrentSlide: (index: number) => void;
@@ -29,6 +31,9 @@ export type SlideLayoutMode = "simpler" | "visual" | "comparison" | "process" | 
 export function DeckPage(props: DeckPageProps) {
   const {
     t,
+    deckTitle,
+    setDeckTitle,
+    onSaveDeckTitle,
     deck,
     currentSlide,
     setCurrentSlide,
@@ -46,6 +51,7 @@ export function DeckPage(props: DeckPageProps) {
   const renderedSlides = reviewRender.result?.slides ?? [];
   const selectedRenderedSlide = renderedSlides[currentSlide] ?? renderedSlides[0];
   const localAiDisabled = loading === "refineSlide" || loading === "refineDeck" || loading === "deck";
+  const showPreviewLoading = reviewRender.status === "loading";
   const layoutOptions: Array<{ mode: SlideLayoutMode; label: string }> = [
     { mode: "simpler", label: t.controls.layoutSimpler },
     { mode: "visual", label: t.controls.layoutVisual },
@@ -53,6 +59,14 @@ export function DeckPage(props: DeckPageProps) {
     { mode: "process", label: t.controls.layoutProcess },
     { mode: "report", label: t.controls.layoutReport },
   ];
+  const saveDeckTitle = () => {
+    const title = deckTitle.trim();
+    if (!title) return;
+    if (title !== deckTitle) {
+      setDeckTitle(title);
+    }
+    void onSaveDeckTitle(title);
+  };
 
   return (
     <section className="page active deck-page">
@@ -66,15 +80,30 @@ export function DeckPage(props: DeckPageProps) {
         <div className="deck-stage-html-frame">
           <RenderedSlideImage slide={selectedRenderedSlide} loading="eager" />
         </div>
-      ) : reviewRender.status === "loading" ? (
-        <div className="deck-stage-html-frame">
-          <SlidePreviewLoading />
+      ) : showPreviewLoading ? (
+        <div className="deck-stage-loading" role="status" aria-live="polite">
+          <LoaderCircle size={28} />
+          <span>{t.review.rendering}</span>
         </div>
       ) : (
         <SlidePreview slide={slide} index={currentSlide} large />
       )}
 
       <div className="preview-controls">
+        <label className="deck-title-editor">
+          <input
+            value={deckTitle}
+            onChange={(event) => setDeckTitle(event.target.value)}
+            onBlur={saveDeckTitle}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.currentTarget.blur();
+              }
+            }}
+            aria-label="Deck title"
+          />
+          <Edit3 size={14} />
+        </label>
         <button
           className="nav-arrow"
           disabled={currentSlide === 0}
