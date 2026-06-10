@@ -82,6 +82,8 @@ export function buildReviseOutlineUserPrompt(
   return [
     "Revise the existing presentation outline according to the feedback.",
     "Priority rule: feedback overrides only the parts it explicitly mentions; for anything not mentioned, strictly follow the lower-priority workspace settings and optional context rows.",
+    "Preservation rule: keep the current presentation title, slide count, page order, and every outline item unchanged unless the feedback explicitly asks to change them.",
+    "Only edit the specific pages, fields, language, structure, or slide count requested by the feedback; copy all unrelated title and outline values from the current outline.",
     `Slide count context: contextRows.slides = ${input.slideCountContext}.`,
     "Slide count priority: follow the page-count intent in the highest-priority feedback exactly; only consult contextRows.slides when the feedback does not express any page-count requirement; if contextRows.slides is auto or missing, choose a reasonable count based on the current outline and feedback.",
     `Locale: ${input.locale}`,

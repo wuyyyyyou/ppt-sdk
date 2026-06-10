@@ -31,3 +31,4 @@ examples/anna-app-focus-flow/executas/focus-session-go/focus-session-go
 **/.cache/
 **/.scratch/
 **/.skill
+**/.tmp/

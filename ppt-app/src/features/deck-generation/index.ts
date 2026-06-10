@@ -746,16 +746,17 @@ async function createRestartArtifacts(input: RunDeckGenerationInput) {
     planningContext,
     locale: input.locale,
   });
+  const alignedPagePlan = alignPagePlanWithOutline(pagePlan, input.confirmedOutline);
   await appendWorkspaceLogSafe(input, "ai-page-plan", {
     event: "ai.page_plan.generated",
-    title: pagePlan.title,
-    page_count: pagePlan.pages.length,
-    template_group: pagePlan.source.template_group,
-    plan: pagePlan,
+    title: alignedPagePlan.title,
+    page_count: alignedPagePlan.pages.length,
+    template_group: alignedPagePlan.source.template_group,
+    plan: alignedPagePlan,
   });
   await input.backend.recordPagePlan({
     workspace_dir: input.workspace.workspace_dir,
-    page_plan: pagePlan,
+    page_plan: alignedPagePlan,
   });
 
   emit(
@@ -764,7 +765,7 @@ async function createRestartArtifacts(input: RunDeckGenerationInput) {
       step: "prepare",
       message: text.prepare,
       currentPageIndex: null,
-      totalPages: pagePlan.pages.length,
+      totalPages: alignedPagePlan.pages.length,
     },
     null,
   );
@@ -777,7 +778,7 @@ async function createRestartArtifacts(input: RunDeckGenerationInput) {
     workspace_dir: input.workspace.workspace_dir,
   });
 
-  for (const page of pagePlan.pages) {
+  for (const page of alignedPagePlan.pages) {
     progress = await recordProgress(input, page, {
       status: "pending",
       render_attempts: 0,
@@ -792,7 +793,7 @@ async function createRestartArtifacts(input: RunDeckGenerationInput) {
     });
   }
 
-  return { pagePlan, progress };
+  return { pagePlan: alignedPagePlan, progress };
 }
 
 function failedCompletion(input: {
@@ -820,6 +821,27 @@ function createFailedPageError(
     page_id: page.page_id,
     page_index: page.index,
     page_status: page.status,
+  };
+}
+
+function alignPagePlanWithOutline(pagePlan: PagePlan, outline: WorkspaceOutline): PagePlan {
+  return {
+    ...pagePlan,
+    title: outline.title,
+    source: {
+      ...pagePlan.source,
+      outline_updated_at: outline.updated_at,
+    },
+    pages: pagePlan.pages.map((page, index) => {
+      const outlineItem = outline.items[index];
+      if (!outlineItem) return page;
+
+      return {
+        ...page,
+        title: outlineItem.title,
+        outline: outlineItem.outline,
+      };
+    }),
   };
 }
 

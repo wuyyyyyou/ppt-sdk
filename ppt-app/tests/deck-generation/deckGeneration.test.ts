@@ -397,6 +397,9 @@ function createHarness(options: {
     get progress() {
       return clone(progress);
     },
+    get pagePlan() {
+      return clone(pagePlan);
+    },
   };
 }
 
@@ -421,6 +424,55 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.progressEvents[0]?.step, "page-plan");
     assert.equal(harness.progressEvents.at(-1)?.step, "complete");
     assert.ok(!harness.progressEvents.some((progress) => progress.step === "failed"));
+  });
+
+  it("keeps confirmed outline text when the LLM rewrites page plan text", async () => {
+    const rewrittenPlan = makePagePlan({
+      title: "LLM Rewritten Deck Title",
+      source: {
+        outline_updated_at: null,
+        template_group: "default",
+        template_manifest_path: "/tmp/workspaces/demo/template/manifest.json",
+        generated_by: "test",
+      },
+      pages: makePagePlan().pages.map((page, index) => ({
+        ...page,
+        title: `LLM Rewritten Page ${index + 1}`,
+        outline: `LLM rewritten outline ${index + 1}`,
+      })),
+    });
+    const harness = createHarness({ pagePlan: rewrittenPlan });
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.pagePlan.title, outline.title);
+    assert.equal(harness.pagePlan.source.outline_updated_at, outline.updated_at);
+    assert.deepEqual(
+      harness.pagePlan.pages.map((page) => ({ title: page.title, outline: page.outline })),
+      outline.items,
+    );
+    assert.deepEqual(
+      completion.result.pagePlan.pages.map((page) => ({ title: page.title, outline: page.outline })),
+      outline.items,
+    );
+    const pagePlanLog = harness.logs.find((entry) =>
+      (entry as { entry?: { event?: string } }).entry?.event === "ai.page_plan.generated"
+    ) as { entry?: { title?: string; plan?: PagePlan } } | undefined;
+    assert.equal(pagePlanLog?.entry?.title, outline.title);
+    assert.deepEqual(
+      pagePlanLog?.entry?.plan?.pages.map((page) => ({ title: page.title, outline: page.outline })),
+      outline.items,
+    );
   });
 
   it("uses render-fix authoring after a render failure", async () => {
