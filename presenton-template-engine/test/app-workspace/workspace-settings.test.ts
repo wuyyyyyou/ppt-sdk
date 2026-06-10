@@ -19,7 +19,7 @@ function createWorkspaceDir(homeDir: string) {
   return path.join(homeDir, "anna-workspace", "ppt", "tasks", `ppt-20260609-${suffix}`);
 }
 
-test("workspace settings are stored per workspace and do not keep language alias", async () => {
+test("workspace settings can be saved as defaults for newly created workspaces", async () => {
   const previousHome = process.env.HOME;
   const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-workspace-settings-home-"));
   process.env.HOME = homeDir;
@@ -56,6 +56,28 @@ test("workspace settings are stored per workspace and do not keep language alias
     assert.equal(updatedFirstSetting.output_language, "中文");
     assert.equal(globalSetting.output_language, "English");
 
+    await updateAppWorkspaceSettings({
+      workspace_dir: first.workspace_dir,
+      persist_as_default: true,
+      setting: {
+        output_language: "中文",
+        text_density: "light",
+      },
+    });
+
+    const updatedGlobalSetting = await readJson<Record<string, unknown>>(
+      path.join(homeDir, "anna-workspace", "ppt", "setting.json"),
+    );
+
+    assert.equal(updatedGlobalSetting.output_language, "中文");
+    assert.equal(updatedGlobalSetting.text_density, "light");
+
+    const inherited = await createAppWorkspace({ title: "Inherited" });
+    const inheritedSetting = await readJson<Record<string, unknown>>(path.join(inherited.workspace_dir, "setting.json"));
+
+    assert.equal(inheritedSetting.output_language, "中文");
+    assert.equal(inheritedSetting.text_density, "light");
+
     const secondWorkspaceDir = createWorkspaceDir(homeDir);
     const second = await updateAppWorkspaceSettings({
       workspace_dir: secondWorkspaceDir,
@@ -64,9 +86,12 @@ test("workspace settings are stored per workspace and do not keep language alias
       },
     });
     const secondSetting = await readJson<Record<string, unknown>>(path.join(second.workspace_dir, "setting.json"));
+    const finalGlobalSetting = await readJson<Record<string, unknown>>(
+      path.join(homeDir, "anna-workspace", "ppt", "setting.json"),
+    );
 
     assert.equal(secondSetting.output_language, "auto");
-    assert.equal(globalSetting.output_language, "English");
+    assert.equal(finalGlobalSetting.output_language, "中文");
   } finally {
     if (previousHome === undefined) {
       delete process.env.HOME;
@@ -76,4 +101,3 @@ test("workspace settings are stored per workspace and do not keep language alias
     await rm(homeDir, { recursive: true, force: true });
   }
 });
-

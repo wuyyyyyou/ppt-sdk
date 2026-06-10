@@ -83,6 +83,7 @@ export interface OpenAppWorkspaceInput {
 export interface UpdateAppWorkspaceSettingsInput {
   workspace_dir: string;
   setting: Record<string, unknown>;
+  persist_as_default?: boolean;
 }
 
 export interface UpdateAppWorkspaceTitleInput {

@@ -49,6 +49,12 @@
           "type": "object",
           "description": "Partial settings object to merge into the workspace-level setting.json.",
           "required": true
+        },
+        {
+          "name": "persist_as_default",
+          "type": "boolean",
+          "description": "When true, also merge these settings into the global PPT defaults used by newly created workspaces.",
+          "required": false
         }
       ]
     },

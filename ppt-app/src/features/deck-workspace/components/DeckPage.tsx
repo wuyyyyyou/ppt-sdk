@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Edit3, LayoutTemplate, LoaderCircle, MessageCircle, Wand2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, LayoutTemplate, LoaderCircle, MessageCircle, Wand2 } from "lucide-react";
 import { useState } from "react";
 import type { Slide } from "../../../data/mockDeck";
 import { formatMessage, type Messages } from "../../../i18n/messages";
@@ -10,9 +10,6 @@ import { ThumbnailStrip } from "./ThumbnailStrip";
 
 interface DeckPageProps {
   t: Messages;
-  deckTitle: string;
-  setDeckTitle: (value: string) => void;
-  onSaveDeckTitle: (value: string) => Promise<void>;
   deck: Slide[];
   currentSlide: number;
   setCurrentSlide: (index: number) => void;
@@ -31,9 +28,6 @@ export type SlideLayoutMode = "simpler" | "visual" | "comparison" | "process" | 
 export function DeckPage(props: DeckPageProps) {
   const {
     t,
-    deckTitle,
-    setDeckTitle,
-    onSaveDeckTitle,
     deck,
     currentSlide,
     setCurrentSlide,
@@ -59,15 +53,6 @@ export function DeckPage(props: DeckPageProps) {
     { mode: "process", label: t.controls.layoutProcess },
     { mode: "report", label: t.controls.layoutReport },
   ];
-  const saveDeckTitle = () => {
-    const title = deckTitle.trim();
-    if (!title) return;
-    if (title !== deckTitle) {
-      setDeckTitle(title);
-    }
-    void onSaveDeckTitle(title);
-  };
-
   return (
     <section className="page active deck-page">
       <div className="deck-top-actions">
@@ -90,20 +75,6 @@ export function DeckPage(props: DeckPageProps) {
       )}
 
       <div className="preview-controls">
-        <label className="deck-title-editor">
-          <input
-            value={deckTitle}
-            onChange={(event) => setDeckTitle(event.target.value)}
-            onBlur={saveDeckTitle}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.currentTarget.blur();
-              }
-            }}
-            aria-label="Deck title"
-          />
-          <Edit3 size={14} />
-        </label>
         <button
           className="nav-arrow"
           disabled={currentSlide === 0}

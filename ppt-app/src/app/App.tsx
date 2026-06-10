@@ -133,9 +133,6 @@ export function App() {
           {state.page === "main" && state.stage === "deck" ? (
             <DeckPage
               t={t}
-              deckTitle={state.deckTitle}
-              setDeckTitle={actions.setDeckTitle}
-              onSaveDeckTitle={actions.saveWorkspaceTitle}
               deck={state.deck}
               currentSlide={state.currentSlide}
               setCurrentSlide={actions.setCurrentSlide}

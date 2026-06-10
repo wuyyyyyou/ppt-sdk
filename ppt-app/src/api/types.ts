@@ -125,6 +125,7 @@ export interface OpenWorkspaceInput {
 export interface UpdateWorkspaceSettingsInput {
   workspace_dir: string;
   setting: WorkspaceSettings;
+  persist_as_default?: boolean;
 }
 
 export interface UpdateWorkspaceTitleInput {

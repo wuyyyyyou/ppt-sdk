@@ -675,6 +675,7 @@ async function toolAppUpdateWorkspaceSettings(args) {
   return updateAppWorkspaceSettings({
     workspace_dir: workspaceDir,
     setting,
+    persist_as_default: args.persist_as_default === true,
   });
 }
 

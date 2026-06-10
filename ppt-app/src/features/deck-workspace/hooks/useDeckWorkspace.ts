@@ -2135,6 +2135,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     try {
       const workspace = await backend.updateWorkspaceSettings({
         workspace_dir: currentWorkspace.workspace_dir,
+        persist_as_default: true,
         setting: {
           ...setting,
           audience: "",

@@ -447,6 +447,22 @@ async function readGlobalWorkspaceDefaults(): Promise<Record<string, unknown>> {
   return ensureWorkspaceSetting();
 }
 
+async function updateGlobalWorkspaceDefaults(
+  setting: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const existing = await ensureWorkspaceSetting();
+  const nextSetting = {
+    ...normalizeSettingJson({
+      ...existing,
+      ...setting,
+    }),
+    updated_at: new Date().toISOString(),
+  };
+
+  await writeJsonFile(WORKSPACE_SETTING_PATH, nextSetting);
+  return nextSetting;
+}
+
 function createDefaultOutlineJson() {
   return normalizeOutlineJson(null);
 }
@@ -975,6 +991,9 @@ export async function updateAppWorkspaceSettings(
   };
 
   await writeJsonFile(workspace.files.setting, nextSetting);
+  if (input.persist_as_default === true) {
+    await updateGlobalWorkspaceDefaults(input.setting);
+  }
   await applyWorkspaceThemeToManifest(workspace, nextSetting);
   return ensureWorkspaceFiles(input.workspace_dir);
 }
