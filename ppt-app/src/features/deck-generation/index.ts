@@ -315,6 +315,8 @@ function buildAuthoringPrompt(input: {
   visualReview?: AgentPageVisualReviewResult | null;
   contentReview?: AgentPageContentReviewResult | null;
 }) {
+  const hasFailureFix = Boolean(input.renderError || input.visualReview || input.contentReview);
+
   return [
     "You are a local file-editing Agent generating one PPT slide in a TSX-first template workspace.",
     "Edit files directly on disk. Work only on the current page unless a shared component/theme change is truly necessary.",
@@ -345,12 +347,21 @@ function buildAuthoringPrompt(input: {
     "",
     CONTENT_GROUNDING_RULES,
     "",
+    "Before editing, think through a concise page-specific design direction, then implement it directly. In the final summary or notes, mention the main design decisions you made.",
     "When editing slide TSX/data, remove or soften unsupported specifics. Use neutral business language or TBD for missing details.",
     "If content-review-fix asks for content changes, edit only the current data JSON by default. Edit the current slide TSX only when visible hardcoded text, schema constraints, or rendering logic prevent a data-only fix.",
     "If render-fix or visual-review-fix asks for visual changes, fix visuals without adding new factual claims.",
     "",
     `Full outline JSON: ${JSON.stringify(input.outline)}`,
     `Full page plan JSON: ${JSON.stringify(input.pagePlan)}`,
+    hasFailureFix
+      ? [
+          "Failure-fix priority:",
+          "A failure report is provided for this pass. Fix the reported failure first.",
+          "Make only the design or content changes that support the fix.",
+          "Do not introduce unrelated redesigns, new content, or broad refactors during a fix pass.",
+        ].join("\n")
+      : "",
     input.renderError ? `Render error to fix:\n${input.renderError}` : "",
     input.visualReview
       ? `Visual review failed. Fix request:\n${JSON.stringify(input.visualReview)}`
@@ -397,7 +408,7 @@ function buildPageContentReviewPrompt(input: {
 
   return [
     "You are a Page Content Review agent for one generated PPT slide.",
-    "Review only the current page's visible textual content. Do not judge visual layout quality.",
+    "Review only the current page's user-facing textual content: visible slide text plus speaker notes when they are part of the generated page data. Do not judge visual layout quality.",
     "Read these files before judging, in this order:",
     `1. Current data JSON: ${input.workspaceDir}/template/${input.page.data_path.replace(/^\.\//, "")}`,
     `2. Current slide TSX for visibility/schema interpretation: ${input.workspaceDir}/template/${input.page.slide_path.replace(/^\.\//, "")}`,
@@ -408,6 +419,8 @@ function buildPageContentReviewPrompt(input: {
     "",
     "Data field scope:",
     "- Judge user-visible string values in the current data JSON.",
+    "- Judge speaker note string values when they are present in the current data JSON.",
+    "- Also judge visible hardcoded strings in the current slide TSX when they render as user-facing slide content.",
     "- Use the current slide TSX to distinguish visible content fields from control/configuration fields.",
     "- Do not judge JSON keys, internal _plan fields, enum/control values, file paths, ids, booleans, or non-visible template configuration as language/content issues.",
     "- Allow proper nouns, brand names, product names, organization names, acronyms, numbers, dates, units, and user-provided source terms.",
@@ -418,6 +431,7 @@ function buildPageContentReviewPrompt(input: {
     "Outline alignment check:",
     "- The current page's Page Plan entry is the primary content boundary.",
     "- Fail with an outline_alignment issue when main titles, body text, lists, chart narrative, or speaker notes clearly belong to another page or contradict the current page outline.",
+    "- Do not fail minor wording differences, concise paraphrases, or light connective context when they preserve the current page's intent.",
     "- Allow light deck-level connective text.",
     "- Allow cover, agenda, and closing pages to summarize the deck when that fits the current page role.",
     "",
@@ -429,6 +443,8 @@ function buildPageContentReviewPrompt(input: {
     "",
     "Treat these as unsupported unless explicitly present in the workspace artifacts: numbers, dates, market sizes, growth rates, customer names, case studies, product capabilities, URLs, citations, quotes, rankings, regulatory/legal claims, geography-specific facts, and claims about competitors or named organizations.",
     "Generic business phrasing can pass if it is clearly not presented as a concrete fact.",
+    "For each issue, evidence should quote the problematic text and include the data field path or TSX location when available.",
+    "rewrite_request must be actionable for the authoring agent, scoped to the current page, and should name the exact text or field to change when possible.",
     "Return only one JSON object matching this shape:",
     '{"pass":true,"score":8,"issues":[{"type":"language","severity":"high","evidence":"...","reason":"...","fix_hint":"..."},{"type":"outline_alignment","severity":"medium","evidence":"...","reason":"...","fix_hint":"..."},{"type":"grounding","severity":"high","evidence":"...","reason":"...","fix_hint":"..."}],"rewrite_request":"","confidence":"medium"}',
     "Do not include markdown, code fences, explanations, or any extra text.",

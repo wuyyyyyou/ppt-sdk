@@ -14,5 +14,8 @@ export const TSX_AUTHORING_RULES_SUMMARY = [
   "Chart-heavy or graphic-heavy regions may use data-pptx-export=\"screenshot\"; keep surrounding titles and explanations as normal text.",
   "Use .js suffix for local component imports, for example ../components/Foo.js.",
   "Prefer existing template components before creating new shared components.",
+  "Treat the selected blueprint as a starting point, not a finished slide to copy mechanically.",
+  "Think through the current page's message, audience, and outline, then adapt composition, hierarchy, spacing, emphasis, and component choices when it improves the slide.",
+  "Favor meaningful page-specific design decisions over generic blueprint cloning, while reusing existing components and template patterns for export stability.",
   "Only edit the current page TSX/data by default; shared components/theme may be changed only with a clear reason.",
 ].join("\n");
