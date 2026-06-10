@@ -108,6 +108,7 @@ export interface DeckWorkspaceActions {
   openLocalProject: (projectName: string) => void;
   openWorkspace: (workspaceDir: string) => Promise<void>;
   scanWorkspaces: () => Promise<void>;
+  showWorkspacePicker: () => Promise<void>;
   useLatestWorkspace: () => Promise<void>;
   createWorkspace: () => Promise<void>;
   saveWorkspaceSettings: (setting: WorkspaceSettings) => Promise<void>;
@@ -250,11 +251,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       title: typeof pagesRecord?.title === "string" ? pagesRecord.title : "",
       deck: pages.map((page) => ({
         title: page.title,
-        subtitle: page.layout_id
+        subtitle: ""
       })),
       outline: pages.map((page) => ({
         title: page.title,
-        outline: page.speaker_note || page.layout_id
+        outline: page.speaker_note
       }))
     };
   }
@@ -537,13 +538,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setDeck(
       result.slides.map((slide) => ({
         title: slide.title,
-        subtitle: slide.layout_id
+        subtitle: ""
       }))
     );
     setOutline(
       result.slides.map((slide) => ({
         title: slide.title,
-        outline: slide.speaker_note || slide.layout_id
+        outline: slide.speaker_note
       }))
     );
     setCurrentSlide(0);
@@ -585,7 +586,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     );
     if (workspacePages) {
       setGenerated(true);
-      setDeckTitle(workspacePages.title || getWorkspaceTitle(workspace));
+      setDeckTitle(getWorkspaceTitle(workspace));
       setDeck(workspacePages.deck);
       setOutline(workspaceOutline.length > 0 ? workspaceOutline : workspacePages.outline);
       setCurrentSlide(0);
@@ -1394,7 +1395,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setOutline(
       nextRenderedSlides.map((slide, index) => ({
         title: nextDeck[index]?.title ?? slide.title,
-        outline: slide.speaker_note || slide.layout_id
+        outline: slide.speaker_note
       }))
     );
     setCurrentSlide(nextCurrentSlide);
@@ -1822,6 +1823,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     await openWorkspace(latestTask.task_dir ?? latestTask.workspace_dir);
   }
 
+  async function showWorkspacePicker() {
+    setCurrentWorkspace(null);
+    setPage("main");
+    setStage("brief");
+    setHistory((items) => (items.at(-1) === "main" ? items : [...items, "main"]));
+    await scanWorkspaces();
+  }
+
   async function openWorkspace(workspaceDir: string) {
     if (!backend) return;
 
@@ -1930,14 +1939,18 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function saveWorkspaceTitle(title: string) {
     if (!backend || !currentWorkspace) return;
 
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle || trimmedTitle === getWorkspaceTitle(currentWorkspace)) return;
+
     setWorkspaceSettingsSaving(true);
     setWorkspaceError("");
     try {
       const workspace = await backend.updateWorkspaceTitle({
         workspace_dir: currentWorkspace.workspace_dir,
-        title
+        title: trimmedTitle
       });
       applyWorkspace(workspace);
+      setDeckTitle(trimmedTitle);
       setWorkspaceScan(await backend.listWorkspaces());
       showToast(t.status.settingsSaved);
     } catch (error) {
@@ -2353,6 +2366,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     openLocalProject,
     openWorkspace,
     scanWorkspaces,
+    showWorkspacePicker,
     useLatestWorkspace,
     createWorkspace,
     saveWorkspaceSettings,

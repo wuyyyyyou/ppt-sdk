@@ -17,7 +17,6 @@ import type { DeckReviewRenderState, PreviewMode } from "../types";
 import { formatSlideNumber } from "../utils";
 import { PageHeader } from "./PageHeader";
 import { RenderedSlideImage } from "./RenderedSlideImage";
-import { SlidePreview } from "./SlidePreview";
 import { ThumbnailStrip } from "./ThumbnailStrip";
 
 interface ReviewPageProps {
@@ -59,6 +58,7 @@ export function ReviewPage(props: ReviewPageProps) {
   const selected = deck[currentSlide] ?? deck[0];
   const renderedSlides = reviewRender.result?.slides ?? [];
   const selectedRenderedSlide = renderedSlides[currentSlide] ?? renderedSlides[0];
+  const renderWaiting = reviewRender.status === "loading";
 
   return (
     <section className="page active review-page">
@@ -153,9 +153,11 @@ export function ReviewPage(props: ReviewPageProps) {
                 <div className="grid-card-html-frame">
                   <RenderedSlideImage slide={renderedSlides[index]} />
                 </div>
+              ) : renderWaiting ? (
+                <PreviewLoadingFrame compact label={t.review.rendering} />
               ) : null}
               <strong>{slide.title}</strong>
-              <p>{slide.subtitle}</p>
+              {slide.subtitle ? <p>{slide.subtitle}</p> : null}
               <div className="grid-card-actions">
                 <button
                   className="grid-action-btn primary"
@@ -228,8 +230,10 @@ export function ReviewPage(props: ReviewPageProps) {
             <div className="present-html-frame">
               <RenderedSlideImage slide={selectedRenderedSlide} loading="eager" />
             </div>
+          ) : renderWaiting ? (
+            <PreviewLoadingFrame label={t.review.rendering} />
           ) : (
-            <SlidePreview slide={selected} index={currentSlide} large />
+            <PreviewLoadingFrame label={selected?.title ?? t.review.rendering} />
           )}
           <ThumbnailStrip
             deck={deck}
@@ -240,5 +244,14 @@ export function ReviewPage(props: ReviewPageProps) {
         </div>
       ) : null}
     </section>
+  );
+}
+
+function PreviewLoadingFrame(props: { label: string; compact?: boolean }) {
+  return (
+    <div className={`preview-loading-frame ${props.compact ? "compact" : ""}`} role="status" aria-live="polite">
+      <LoaderCircle size={props.compact ? 18 : 28} />
+      <span>{props.label}</span>
+    </div>
   );
 }

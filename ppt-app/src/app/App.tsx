@@ -60,8 +60,7 @@ export function App() {
           setLocale={setLocale}
           status={state.currentStatus}
           onLibrary={() => actions.navigate("library")}
-          onMinimize={() => actions.setPanelMode("minimized")}
-          onClose={() => actions.setPanelMode("closed")}
+          onHome={() => void actions.showWorkspacePicker()}
         />
 
         {state.page === "main" ? (
@@ -128,6 +127,7 @@ export function App() {
               t={t}
               deckTitle={state.deckTitle}
               setDeckTitle={actions.setDeckTitle}
+              onSaveDeckTitle={actions.saveWorkspaceTitle}
               deck={state.deck}
               currentSlide={state.currentSlide}
               setCurrentSlide={actions.setCurrentSlide}

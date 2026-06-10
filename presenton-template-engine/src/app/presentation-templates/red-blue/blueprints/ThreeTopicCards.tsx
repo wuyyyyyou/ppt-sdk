@@ -25,7 +25,7 @@ export const Schema = z.object({
     { number: "03", title: "Momentum", description: "Show the forward-looking trend or strategic direction.", tone: "purple" },
   ]),
   insightTitle: z.string().min(2).max(40).default("Decision note"),
-  insightText: z.string().min(8).max(180).default("Use this layout when the slide should be easy to scan before the audience reads detailed evidence."),
+  insightText: z.string().min(8).default("Use this layout when the slide should be easy to scan before the audience reads detailed evidence."),
 });
 
 export const layoutId = "three-topic-cards";

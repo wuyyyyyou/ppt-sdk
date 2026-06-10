@@ -41,15 +41,19 @@ const RedBlueMetricCard = ({
         {rows.map((row) => {
           const color = getToneColor(row.tone ?? "neutral");
           return (
-            <div key={`${row.label}-${row.value}`} className="flex items-center gap-[12px]">
-              <div className="flex w-[78px] items-center gap-[7px] text-[14px] font-extrabold" style={{ color }}>
-                <span className="h-[10px] w-[10px] rounded-full" style={{ backgroundColor: color }} />
-                {row.label}
+            <div
+              key={`${row.label}-${row.value}`}
+              className="grid items-center gap-[10px]"
+              style={{ gridTemplateColumns: "minmax(104px, 0.82fr) minmax(84px, 1fr) 58px" }}
+            >
+              <div className="flex min-w-0 items-center gap-[7px] text-[13px] font-extrabold leading-[15px]" style={{ color }}>
+                <span className="h-[10px] w-[10px] flex-none rounded-full" style={{ backgroundColor: color }} />
+                <span className="min-w-0 whitespace-normal break-words">{row.label}</span>
               </div>
               <div className="h-[12px] flex-1 overflow-hidden rounded-full" style={{ backgroundColor: "#F1F2F6" }}>
                 <div className="h-full rounded-full" style={{ width: `${clampShare(row.share)}%`, backgroundColor: color }} />
               </div>
-              <div className="w-[84px] text-right text-[16px] font-black" style={{ color }}>
+              <div className="text-right text-[14px] font-black" style={{ color }}>
                 {row.value}
               </div>
             </div>
