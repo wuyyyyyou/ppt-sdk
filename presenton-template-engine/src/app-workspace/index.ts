@@ -641,6 +641,8 @@ function normalizePageProgressItem(value: unknown): AppPageProgressItem | null {
     last_html_path: normalizeString(record.last_html_path),
     last_screenshot_path: normalizeString(record.last_screenshot_path),
     last_error: normalizeString(record.last_error),
+    content_review: record.content_review ?? null,
+    visual_review: record.visual_review ?? null,
     review: record.review ?? null,
     updated_at: typeof record.updated_at === "string" ? record.updated_at : null,
   };
@@ -2127,6 +2129,8 @@ function buildInitialPageProgress(pagePlan: AppPagePlan): AppPageProgress {
       last_html_path: "",
       last_screenshot_path: "",
       last_error: "",
+      content_review: null,
+      visual_review: null,
       review: null,
       updated_at: now,
     })),

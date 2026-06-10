@@ -317,6 +317,8 @@ export interface AppPageProgressItem {
   last_html_path: string;
   last_screenshot_path: string;
   last_error: string;
+  content_review?: unknown | null;
+  visual_review?: unknown | null;
   review: unknown | null;
   updated_at: string | null;
 }

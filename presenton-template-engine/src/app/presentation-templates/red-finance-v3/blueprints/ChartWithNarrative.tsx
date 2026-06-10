@@ -45,6 +45,8 @@ const SeriesSchema = z.object({
   values: z.array(z.number().finite()).min(2).max(8),
 });
 
+const ValueFormatSchema = z.enum(["number", "percent"]);
+
 export const Schema = z.object({
   title: z.string().min(2).max(28).default("Chart With Narrative"),
   metaLabel: z.string().min(2).max(48).default("BLUEPRINT / CHART NARRATIVE"),
@@ -55,6 +57,7 @@ export const Schema = z.object({
   ),
   density: z.enum(["low", "medium", "high"]).default("medium"),
   chartKind: z.enum(["bar", "line"]).default("bar"),
+  valueFormat: ValueFormatSchema.default("number"),
   chartTitle: z.string().min(2).max(36).default("Trend and change"),
   chartSubtitle: z.string().min(4).max(72).default("One chart paired with one concise narrative."),
   labels: z.array(z.string().min(1).max(16)).min(2).max(8).default(["Q1", "Q2", "Q3", "Q4"]),
@@ -109,10 +112,17 @@ export const density = "high";
 export const visualWeight = "balanced";
 export const editableTextPriority = "high";
 
+const formatNumberTick = (value: number) =>
+  Number.isInteger(value) ? String(value) : value.toFixed(1);
+
+const formatPercentTick = (value: number) =>
+  `${Number.isInteger(value) ? value : value.toFixed(1)}%`;
+
 const ChartWithNarrative = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
   const parsed = readTemplateData(Schema, data);
   const chartDensity = parsed.density === "high" ? "dense" : parsed.density === "low" ? "compact" : "normal";
   const isTopChart = parsed.variant === "chart-top-narrative-bottom";
+  const tickFormatter = parsed.valueFormat === "percent" ? formatPercentTick : formatNumberTick;
 
   const chartPane = (
     <ChartCardShell title={parsed.chartTitle} subtitle={parsed.chartSubtitle} rightMeta={parsed.chartKind.toUpperCase()}>
@@ -127,6 +137,7 @@ const ChartWithNarrative = ({ data }: { data: Partial<z.infer<typeof Schema>> })
               ticks={parsed.ticks}
               width={width}
               height={height}
+              tickFormatter={tickFormatter}
             />
           ) : (
             <FinanceBarChart
@@ -137,6 +148,7 @@ const ChartWithNarrative = ({ data }: { data: Partial<z.infer<typeof Schema>> })
               ticks={parsed.ticks}
               width={width}
               height={height}
+              tickFormatter={tickFormatter}
             />
           )
         }

@@ -352,6 +352,7 @@ function buildAuthoringPrompt(input: {
     "Before editing, think through a concise page-specific design direction, then implement it directly. In the final summary or notes, mention the main design decisions you made.",
     "When editing slide TSX/data, remove or soften unsupported specifics. Use neutral business language or TBD for missing details.",
     "If content-review-fix asks for content changes, edit only the current data JSON by default. Edit the current slide TSX only when visible hardcoded text, schema constraints, or rendering logic prevent a data-only fix.",
+    "If a content-review-fix request asks you to add real facts, numbers, dates, or source-backed data that are not present in workspace files, treat that request as conflicting with the grounding rules. Do not add the facts; instead remove the unsupported detail, soften it, or mark it as TBD / 待补充.",
     "If render-fix or visual-review-fix asks for visual changes, fix visuals without adding new factual claims.",
     "",
     `Full outline JSON: ${JSON.stringify(input.outline)}`,
@@ -375,6 +376,7 @@ function buildAuthoringPrompt(input: {
           "Fix language, outline-alignment, and grounding issues by editing the current page data JSON first.",
           "Do not modify page-plan.json, outline.json, other pages, or unrelated shared files.",
           "Remove, soften, or mark unsupported concrete claims as TBD. Do not replace them with new unsupported specifics.",
+          "Never satisfy a rewrite request by inventing or approximating real-world numbers, years, citations, rankings, named-organization facts, or chart data. If the review asks for real data but the workspace has no source for it, keep or add a clear TBD / 待补充 marker instead.",
         ].join("\n")
       : "",
   ]
@@ -444,15 +446,19 @@ function buildPageContentReviewPrompt(input: {
     CONTENT_GROUNDING_RULES,
     "",
     "Treat these as unsupported unless explicitly present in the workspace artifacts: numbers, dates, market sizes, growth rates, customer names, case studies, product capabilities, URLs, citations, quotes, rankings, regulatory/legal claims, geography-specific facts, and claims about competitors or named organizations.",
+    "Clear placeholders such as TBD, 待补充, 待确认, 暂无数据, or 数据待补充 are acceptable grounding treatments when the workspace lacks source material. Do not report them as grounding issues solely because the page openly marks a fact or chart as pending.",
+    "Chart or table placeholder values such as all-zero series can pass grounding when the visible chart title, subtitle, note, or nearby text clearly marks the data as TBD / 待补充. If you need to mention them, use type placeholder_quality with low severity, not type grounding.",
+    "Unsupported concrete facts, numbers, dates, years, chart data, or named-organization claims that are not present in workspace artifacts must be reported as type grounding, must set pass=false, and must include a concrete rewrite_request. Never downgrade unsupported concrete facts to placeholder_quality or low-severity advisory issues.",
+    "Never ask the authoring agent to replace placeholders with real facts, numbers, dates, or chart data unless you can point to the exact workspace artifact that provides those facts. Without such a source, rewrite_request must ask to remove, soften, generalize, or mark the content as TBD / 待补充.",
     "Generic business phrasing can pass if it is clearly not presented as a concrete fact.",
     "For each issue, evidence should quote the problematic text and include the data field path or TSX location when available.",
     "rewrite_request must be actionable for the authoring agent, scoped to the current page, and should name the exact text or field to change when possible.",
     "Return only one JSON object matching this shape:",
-    '{"pass":true,"score":8,"issues":[{"type":"language","severity":"high","evidence":"...","reason":"...","fix_hint":"..."},{"type":"outline_alignment","severity":"medium","evidence":"...","reason":"...","fix_hint":"..."},{"type":"grounding","severity":"high","evidence":"...","reason":"...","fix_hint":"..."}],"rewrite_request":"","confidence":"medium"}',
+    '{"pass":true,"score":8,"issues":[{"type":"language","severity":"high","evidence":"...","reason":"...","fix_hint":"..."},{"type":"outline_alignment","severity":"medium","evidence":"...","reason":"...","fix_hint":"..."},{"type":"grounding","severity":"high","evidence":"...","reason":"...","fix_hint":"..."},{"type":"placeholder_quality","severity":"low","evidence":"...","reason":"...","fix_hint":"..."}],"rewrite_request":"","confidence":"medium"}',
     "Do not include markdown, code fences, explanations, or any extra text.",
     "",
-    "Use score 0-10. pass=true requires score >= 7, confidence not low, no language or outline_alignment failure, and no high or medium severity grounding issue.",
-    "Low severity issues may be advisory. High and medium severity issues require a concrete rewrite_request.",
+    "Use score 0-10. pass=true requires score >= 7, confidence not low, no language, outline_alignment, or grounding issues.",
+    "placeholder_quality issues are advisory and may pass when score and confidence are sufficient. language, outline_alignment, and grounding issues require pass=false and a concrete rewrite_request.",
     `Current page title: ${input.page.title}`,
     `Current page outline: ${input.page.outline}`,
     `Full outline JSON: ${JSON.stringify(input.outline)}`,
@@ -469,6 +475,7 @@ function buildPageVisualReviewPrompt(input: {
     "You are a Page Visual Review agent for one generated PPT slide.",
     "Review only the generated PPT slide screenshot for visual quality.",
     "Do not judge output language, outline alignment, factual grounding, unsupported claims, or content correctness.",
+    "Do not fail a slide merely because some content is explicitly marked TBD / 待补充; judge only whether the placeholder is visually clear, readable, and does not break the layout.",
     "First use `upload_local_file` on the screenshot path, then inspect that uploaded image with `analyze_image` before making a visual judgment.",
     "If image analysis is unavailable or inconclusive, use the rendered HTML path as fallback context and still return a JSON review.",
     "Return only one JSON object matching this shape:",
@@ -489,15 +496,29 @@ function visualReviewPassed(review: AgentPageVisualReviewResult) {
   // return true; // 先关闭自评结果中的置信度判断，后续根据实际情况再调整
 }
 
+function contentReviewIssueBlocksPass(issue: AgentPageContentReviewResult["issues"][number]) {
+  return issue.type !== "placeholder_quality";
+}
+
 function contentReviewPassed(review: AgentPageContentReviewResult) {
-  const hasFailingIssue = review.issues.some((issue) =>
-    !/low|minor|低/i.test(issue.severity ?? "")
-  );
+  const hasFailingIssue = review.issues.some(contentReviewIssueBlocksPass);
   return review.pass && review.score >= 7 && review.confidence !== "low" && !hasFailingIssue;
 }
 
 function getProgressPage(progress: PageProgress | null, pageId: string) {
   return progress?.pages.find((page) => page.page_id === pageId) ?? null;
+}
+
+function getStoredVisualReview(
+  page: PageProgress["pages"][number] | null | undefined,
+): AgentPageVisualReviewResult | null {
+  return (page?.visual_review ?? page?.review ?? null) as AgentPageVisualReviewResult | null;
+}
+
+function getStoredContentReview(
+  page: PageProgress["pages"][number] | null | undefined,
+): AgentPageContentReviewResult | null {
+  return (page?.content_review ?? page?.review ?? null) as AgentPageContentReviewResult | null;
 }
 
 function shortHash(value: string) {
@@ -867,6 +888,8 @@ async function createRestartArtifacts(input: RunDeckGenerationInput) {
       last_error: "",
       last_html_path: "",
       last_screenshot_path: "",
+      content_review: null,
+      visual_review: null,
       review: null,
     });
   }
@@ -1091,11 +1114,11 @@ async function runPageGeneration(
       : "";
   let visualReview =
     existingPageProgress?.status === "visual_review_fixing"
-      ? (existingPageProgress.review as AgentPageVisualReviewResult | null)
+      ? getStoredVisualReview(existingPageProgress)
       : null;
   let contentReview =
     existingPageProgress?.status === "content_review_fixing"
-      ? (existingPageProgress.review as AgentPageContentReviewResult | null)
+      ? getStoredContentReview(existingPageProgress)
       : null;
 
   while (!input.isCancelled()) {
@@ -1296,6 +1319,7 @@ async function runPageGeneration(
     }
 
     progress = await recordProgress(input, page, {
+      content_review: contentReview,
       review: contentReview,
     });
     input.setProgress(progress);
@@ -1314,6 +1338,7 @@ async function runPageGeneration(
             ? "needs_user_review"
             : "content_review_fixing",
         content_review_attempts: contentReviewAttempts,
+        content_review: contentReview,
         review: contentReview,
         last_error: rewriteRequest,
       });
@@ -1465,6 +1490,7 @@ async function runPageGeneration(
       continue;
     }
     progress = await recordProgress(input, page, {
+      visual_review: visualReview,
       review: visualReview,
     });
     input.setProgress(progress);
@@ -1472,6 +1498,7 @@ async function runPageGeneration(
     if (visualReviewPassed(visualReview)) {
       progress = await recordProgress(input, page, {
         status: "accepted",
+        visual_review: visualReview,
         review: visualReview,
       });
       input.setProgress(progress);
@@ -1489,6 +1516,7 @@ async function runPageGeneration(
           ? "needs_user_review"
           : "visual_review_fixing",
       visual_review_attempts: visualReviewAttempts,
+      visual_review: visualReview,
       review: visualReview,
       last_error: visualReview.revision_request,
     });
@@ -1528,6 +1556,8 @@ async function runPageGeneration(
           last_html_path: "",
           last_screenshot_path: "",
           last_error: "",
+          content_review: null,
+          visual_review: null,
           review: null,
           updated_at: null,
         }),
@@ -1847,6 +1877,8 @@ export async function runDeckRefinement(
       content_review_attempts: 0,
       agent_failures: 0,
       last_error: instruction,
+      content_review: null,
+      visual_review: review,
       review,
     });
   }
@@ -1921,6 +1953,8 @@ export async function runPageGenerationRetry(
     agent_failures: 0,
     agent_infrastructure_failures: 0,
     last_error: "",
+    content_review: null,
+    visual_review: null,
     review: null,
   });
   const runtime: DeckGenerationRuntime = {

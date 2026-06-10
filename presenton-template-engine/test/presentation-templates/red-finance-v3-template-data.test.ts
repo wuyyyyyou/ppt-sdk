@@ -24,3 +24,9 @@ test("red-finance-v3 blueprints treat Schema as an advisory data contract by def
   assert.throws(() => ChartWithNarrativeSchema.parse(invalidData));
   assert.doesNotThrow(() => ChartWithNarrative({ data: invalidData }));
 });
+
+test("chart-with-narrative defaults chart values to plain numbers", () => {
+  assert.equal(ChartWithNarrativeSchema.parse({}).valueFormat, "number");
+  assert.equal(ChartWithNarrativeSchema.parse({ valueFormat: "percent" }).valueFormat, "percent");
+  assert.throws(() => ChartWithNarrativeSchema.parse({ valueFormat: "currency" }));
+});

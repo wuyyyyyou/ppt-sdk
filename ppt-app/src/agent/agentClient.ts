@@ -56,7 +56,7 @@ export interface AgentPageContentReviewResult {
   pass: boolean;
   score: number;
   issues: Array<{
-    type: "language" | "outline_alignment" | "grounding";
+    type: "language" | "outline_alignment" | "grounding" | "placeholder_quality";
     severity?: string;
     evidence: string;
     reason: string;
@@ -228,7 +228,8 @@ function normalizePageContentReview(value: unknown): AgentPageContentReviewResul
             return (
               (issue.type === "language" ||
                 issue.type === "outline_alignment" ||
-                issue.type === "grounding") &&
+                issue.type === "grounding" ||
+                issue.type === "placeholder_quality") &&
               typeof issue.evidence === "string" &&
               typeof issue.reason === "string"
             );

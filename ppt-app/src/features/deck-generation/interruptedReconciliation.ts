@@ -19,6 +19,8 @@ const INTERRUPTED_PATCH: Record<string, unknown> = {
   agent_failures: 0,
   agent_infrastructure_failures: 0,
   last_error: "",
+  content_review: null,
+  visual_review: null,
   review: null,
 };
 

@@ -163,6 +163,8 @@ function makeProgress(pagePlan: PagePlan, status = "pending"): PageProgress {
       last_html_path: "",
       last_screenshot_path: "",
       last_error: "",
+      content_review: null,
+      visual_review: null,
       review: null,
       updated_at: null,
     })),
@@ -200,7 +202,7 @@ function createHarness(options: {
     score: number;
     rewrite_request?: string;
     issues?: Array<{
-      type: "language" | "outline_alignment" | "grounding";
+      type: "language" | "outline_alignment" | "grounding" | "placeholder_quality";
       severity?: string;
       evidence: string;
       reason: string;
@@ -552,6 +554,164 @@ describe("Deck Generation Flow Module", () => {
     assert.ok(harness.authoringPrompts.some((prompt) => prompt.includes("Page Content Review failed")));
     assert.ok(harness.authoringPrompts.some((prompt) => prompt.includes("content-review-fix")));
     assert.ok(harness.progressEvents.some((progress) => progress.step === "page-content-review"));
+  });
+
+  it("treats explicit TBD placeholders as grounded review targets", async () => {
+    const harness = createHarness();
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    const prompt = harness.contentReviewPrompts.join("\n");
+    assert.match(prompt, /Do not report them as grounding issues solely because the page openly marks a fact or chart as pending/);
+    assert.match(prompt, /use type placeholder_quality with low severity/);
+    assert.match(prompt, /Never ask the authoring agent to replace placeholders with real facts/);
+  });
+
+  it("guards content-review-fix against unsupported real-data requests", async () => {
+    const harness = createHarness({
+      contentReviews: [
+        {
+          pass: false,
+          score: 4,
+          rewrite_request: "请使用真实的星巴克中国门店增长数值替换目前的零值占位符。",
+          issues: [
+            {
+              type: "grounding",
+              severity: "high",
+              evidence: "data.series[0].values: [0, 0, 0]",
+              reason: "数据待补充。",
+              fix_hint: "不要编造数据。",
+            },
+          ],
+        },
+        { pass: true, score: 9 },
+      ],
+    });
+
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    const fixPrompt = harness.authoringPrompts.find((prompt) =>
+      prompt.includes("Page Content Review failed")
+    );
+    assert.ok(fixPrompt);
+    assert.match(fixPrompt, /Never satisfy a rewrite request by inventing or approximating real-world numbers/);
+    assert.match(fixPrompt, /TBD \/ 待补充/);
+  });
+
+  it("stores content and visual reviews separately while keeping review compatible", async () => {
+    const harness = createHarness();
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    const firstPage = harness.progress.pages[0];
+    assert.ok(firstPage);
+    assert.equal((firstPage.content_review as { pass?: boolean } | null)?.pass, true);
+    assert.equal((firstPage.visual_review as { pass?: boolean } | null)?.pass, true);
+    assert.equal((firstPage.review as { revision_request?: string } | null)?.revision_request, "");
+  });
+
+  it("blocks low-severity grounding issues when they describe unsupported concrete data", async () => {
+    const harness = createHarness({
+      contentReviews: [
+        {
+          pass: true,
+          score: 9,
+          issues: [
+            {
+              type: "grounding",
+              severity: "low",
+              evidence: "series[0].values: [33833, 35711, 38038, 40000]",
+              reason: "页面数据中包含具体门店数量，而工作区工件仅提供定性描述，严格意义上属于外部知识。",
+              fix_hint: "移除具体数字或标注为待补充。",
+            },
+          ],
+        },
+        { pass: true, score: 9 },
+      ],
+    });
+
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.ok(harness.authoringPrompts.some((prompt) => prompt.includes("Page Content Review failed")));
+    assert.equal(harness.progress.pages[0]?.content_review_attempts, 1);
+  });
+
+  it("allows placeholder-quality issues for explicit placeholder data", async () => {
+    const harness = createHarness({
+      contentReviews: [
+        {
+          pass: true,
+          score: 9,
+          issues: [
+            {
+              type: "placeholder_quality",
+              severity: "low",
+              evidence: "chartTitle: 数据待补充; series[0].values: [0, 0, 0]",
+              reason: "图表明确标注为待补充，占位数据没有伪装为真实事实。",
+              fix_hint: "可在获得原始素材后补充。",
+            },
+          ],
+        },
+      ],
+    });
+
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.authoringPrompts.some((prompt) => prompt.includes("Page Content Review failed")), false);
+    assert.equal(harness.progress.pages[0]?.content_review_attempts, 0);
   });
 
   it("uses setting output language for content review when outline language is auto", async () => {
