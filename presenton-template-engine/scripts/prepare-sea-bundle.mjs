@@ -27,13 +27,24 @@ function toPosixPath(value) {
 }
 
 function shouldSkipProjectPath(relativePath) {
+  // Match on a posix-normalized path so the skip list also works on Windows
+  // build runners, where path.relative yields backslash separators.
+  const posixPath = toPosixPath(relativePath);
   return (
-    relativePath === "node_modules/.package-lock.json" ||
-    relativePath.startsWith(`node_modules/.bin${path.sep}`) ||
-    relativePath === `node_modules/@types` ||
-    relativePath.startsWith(`node_modules/@types${path.sep}`) ||
-    relativePath === `node_modules/postject` ||
-    relativePath.startsWith(`node_modules/postject${path.sep}`)
+    posixPath === "node_modules/.package-lock.json" ||
+    posixPath.startsWith("node_modules/.bin/") ||
+    // Keep @types/* in the SEA bundle. The runtime pre-render TypeScript check
+    // (assertLocalTemplateTypecheck) resolves React/JSX types from @types/react
+    // and recharts' chart types from @types/d3-*. Without them, valid React such
+    // as `<Component key={...} />` inside a .map() fails with TS2322
+    // "Property 'key' does not exist", which the render-fix agent cannot repair
+    // and loops on forever. Only @types/node is dropped: local templates are
+    // forbidden from importing node builtins, and it is by far the largest
+    // @types package (~2.3MB).
+    posixPath === "node_modules/@types/node" ||
+    posixPath.startsWith("node_modules/@types/node/") ||
+    posixPath === "node_modules/postject" ||
+    posixPath.startsWith("node_modules/postject/")
   );
 }
 
