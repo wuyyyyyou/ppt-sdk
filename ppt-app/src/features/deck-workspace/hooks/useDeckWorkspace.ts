@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createAgentClient, type AgentClient } from "../../../agent/agentClient";
+import { resolveAgentToolAccessPolicy } from "../../../agent/agentToolAccessPolicy";
 import { createAiClient, type AiAttemptLog, type AiClient, type LlmContextRow } from "../../../ai/aiClient";
 import {
   createAiInteractionLogger,
@@ -78,6 +79,10 @@ import type {
 import { getThemePreset, THEME_PRESET_IDS } from "../themePresets";
 
 const DEFAULT_TEMPLATE_GROUP_ID = "red-finance-v3";
+const AGENT_TOOL_ACCESS_POLICY = resolveAgentToolAccessPolicy(
+  import.meta.env.VITE_AGENT_TOOL_ACCESS_POLICY,
+  { warn: (message) => console.warn(message) },
+);
 const PPTX_EXPORT_POLL_INTERVAL_MS = 1500;
 const PPTX_EXPORT_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 const SLIDE_COUNT_CONTEXT_OPTIONS = ["auto", ...Array.from({ length: 20 }, (_, index) => String(index + 1))];
@@ -813,7 +818,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           createAiClient(),
           connectAnnaRuntime()
         ]);
-        nextAgentClient = await createAgentClient(runtime);
+        nextAgentClient = await createAgentClient(runtime, {
+          toolAccessPolicy: AGENT_TOOL_ACCESS_POLICY,
+        });
         if (cancelled) return;
         setBackend(nextBackend);
         setAiClient(nextAiClient);

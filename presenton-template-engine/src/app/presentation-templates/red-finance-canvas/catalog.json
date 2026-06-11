@@ -1,0 +1,83 @@
+{
+  "group_id": "red-finance-canvas",
+  "catalog_type": "tsx-first-canvas",
+  "version": 1,
+  "purpose": "Help the PPT AI Agent start from a branded canvas instead of a finished blueprint, then compose every final slide from template/components based on the page plan.",
+  "directory_roles": {
+    "blueprints": {
+      "path": "./blueprints",
+      "role": "Directory of copyable canvas TSX blueprint pages.",
+      "rules": [
+        "Do not treat the canvas files as finished slide structures.",
+        "Copy or derive the selected canvas blueprint into ./slides before adapting it for the concrete deck.",
+        "Use the canvas page only as a branded frame before composing real content.",
+        "Read ./components/README.md before editing any final slide."
+      ]
+    },
+    "slides": {
+      "path": "./slides",
+      "role": "Directory of final slide pages for the concrete deck.",
+      "rules": [
+        "manifest.json should only point to TSX files in this directory.",
+        "AI must replace canvas slot guides with component compositions tailored to the page title, outline, audience, and grounded content.",
+        "Slides here should not remain unchanged canvas copies in a final deck."
+      ]
+    },
+    "components": {
+      "path": "./components",
+      "role": "Reusable red finance component library.",
+      "rules": [
+        "Read components/README.md before choosing components.",
+        "Choose component families from page semantics, not from visual convenience.",
+        "Prefer composing existing components before adding new components."
+      ]
+    },
+    "data": {
+      "path": "./data",
+      "role": "Optional content data for concrete decks.",
+      "rules": [
+        "JSON should carry content only, not page-structure decisions.",
+        "If layout or component choice is wrong, edit slides/*.tsx."
+      ]
+    }
+  },
+  "blueprints": [
+    {
+      "id": "cover-canvas",
+      "name": "Cover Canvas",
+      "blueprint_source": "./blueprints/CoverCanvas.tsx",
+      "example_slide": "./slides/CoverCanvas.tsx",
+      "layout_family": "cover-canvas",
+      "content_intents": ["opening", "positioning", "custom-cover"],
+      "suitable_for": ["cover", "strategy report opening", "executive briefing opening", "custom branded opening"],
+      "avoid_for": ["body analysis", "charts", "comparison matrix", "unchanged final slide"]
+    },
+    {
+      "id": "content-canvas",
+      "name": "Content Canvas",
+      "blueprint_source": "./blueprints/ContentCanvas.tsx",
+      "example_slide": "./slides/ContentCanvas.tsx",
+      "layout_family": "content-canvas",
+      "content_intents": ["overview", "analysis", "evidence", "custom-composition"],
+      "suitable_for": ["ordinary content page", "analysis page", "component-composed evidence page", "custom layout"],
+      "avoid_for": ["cover", "section divider", "unchanged final slide"]
+    },
+    {
+      "id": "section-focus-canvas",
+      "name": "Section Focus Canvas",
+      "blueprint_source": "./blueprints/SectionFocusCanvas.tsx",
+      "example_slide": "./slides/SectionFocusCanvas.tsx",
+      "layout_family": "section-canvas",
+      "content_intents": ["transition", "framing", "section-introduction", "strategic-focus"],
+      "suitable_for": ["section divider", "topic transition", "analysis framework introduction", "strategic focus page"],
+      "avoid_for": ["large matrix", "dense chart page", "long body text", "unchanged final slide"]
+    }
+  ],
+  "agent_workflow_notes": [
+    "This template group intentionally provides canvas-level starting points, not finished page designs.",
+    "Before editing slides/*.tsx, read components/README.md and identify the component families that fit the page plan.",
+    "Use CoverCanvas for only the opening page, SectionFocusCanvas for section transitions, and ContentCanvas for ordinary content pages.",
+    "Replace slot guides with concrete component composition; do not leave guide labels in the final deck.",
+    "If a page resembles a finished blueprint page too closely, restructure it by composing lower-level components instead."
+  ]
+}

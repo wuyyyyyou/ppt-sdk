@@ -15,6 +15,10 @@ const registryManifestPath = path.join(
   "generated-registry-manifest.json",
 );
 const outputRoot = path.join(projectDir, "dist", "forkable-templates");
+const workspaceAssetTemplateGroups = new Set([
+  "red-finance-canvas",
+  "red-finance-v3",
+]);
 const knownExtensions = [".tsx", ".ts", ".jsx", ".js", ".mts", ".cts", ".mjs", ".cjs"];
 const packageNamePattern = /^(@[^/]+\/[^/]+|[^/]+)/;
 const builtinPackageNames = new Set(
@@ -432,7 +436,7 @@ async function main() {
     }
 
     await copyOptionalGroupAssets(groupRoot, groupOutputDir, {
-      includeWorkspaceAssets: group.group_id === "red-finance-v3",
+      includeWorkspaceAssets: workspaceAssetTemplateGroups.has(group.group_id),
     });
 
     const dependencyVersions = groupPackageJson?.dependencies

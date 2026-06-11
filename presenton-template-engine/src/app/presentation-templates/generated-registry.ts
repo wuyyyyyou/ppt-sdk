@@ -4,6 +4,9 @@
 
 import { createTemplateEntry, type TemplateGroupSettings, type TemplateLayoutsWithSettings, type TemplateWithData } from "./utils.js";
 
+import red_finance_canvas_CoverCanvasComponent, * as red_finance_canvas_CoverCanvasModule from "./red-finance-canvas/slides/CoverCanvas.tsx";
+import red_finance_canvas_ContentCanvasComponent, * as red_finance_canvas_ContentCanvasModule from "./red-finance-canvas/slides/ContentCanvas.tsx";
+import red_finance_canvas_SectionFocusCanvasComponent, * as red_finance_canvas_SectionFocusCanvasModule from "./red-finance-canvas/slides/SectionFocusCanvas.tsx";
 import red_finance_v3_CoverStatementComponent, * as red_finance_v3_CoverStatementModule from "./red-finance-v3/slides/CoverStatement.tsx";
 import red_finance_v3_SectionDividerComponent, * as red_finance_v3_SectionDividerModule from "./red-finance-v3/slides/SectionDivider.tsx";
 import red_finance_v3_TwoColumnInsightComponent, * as red_finance_v3_TwoColumnInsightModule from "./red-finance-v3/slides/TwoColumnInsight.tsx";
@@ -20,6 +23,66 @@ import red_blue_CountryComparisonComponent, * as red_blue_CountryComparisonModul
 import red_blue_TimelineRoadmapComponent, * as red_blue_TimelineRoadmapModule from "./red-blue/slides/TimelineRoadmap.tsx";
 import red_blue_ClosingSummaryComponent, * as red_blue_ClosingSummaryModule from "./red-blue/slides/ClosingSummary.tsx";
 import red_blue_ComponentGalleryComponent, * as red_blue_ComponentGalleryModule from "./red-blue/slides/ComponentGallery.tsx";
+
+const red_finance_canvasGroupMeta = {
+  "group_id": "red-finance-canvas",
+  "group_name": "Red Finance Canvas",
+  "group_description": "Component-first red finance canvas templates for building custom executive finance decks from reusable TSX components.",
+  "ordered": true,
+  "default": false,
+  "group_brief": "Suitable when the deck should keep the red finance brand system but avoid finished blueprint copies. This group provides only canvas-level cover, content, and section frames; the AI Agent must read components/README.md and compose each final slide from template components.",
+  "style_tags": [
+    "finance",
+    "canvas",
+    "component-first",
+    "tsx-first"
+  ],
+  "industry_tags": [
+    "finance",
+    "banking",
+    "fintech"
+  ],
+  "use_cases": [
+    "strategy-report",
+    "industry-analysis",
+    "executive-brief",
+    "custom-composition"
+  ],
+  "audience_tags": [
+    "management",
+    "board",
+    "client"
+  ],
+  "tone_tags": [
+    "professional",
+    "formal",
+    "analytical"
+  ],
+  "cover_layout_id": "red-finance-canvas:cover-canvas",
+  "agenda_layout_id": null,
+  "closing_layout_id": null,
+  "default_theme_id": null
+};
+const red_finance_canvasSettings: TemplateGroupSettings = {
+  description: red_finance_canvasGroupMeta.group_description,
+  ordered: red_finance_canvasGroupMeta.ordered,
+  default: red_finance_canvasGroupMeta.default,
+  groupBrief: red_finance_canvasGroupMeta.group_brief ?? undefined,
+  styleTags: red_finance_canvasGroupMeta.style_tags ? [...red_finance_canvasGroupMeta.style_tags] : undefined,
+  industryTags: red_finance_canvasGroupMeta.industry_tags ? [...red_finance_canvasGroupMeta.industry_tags] : undefined,
+  useCases: red_finance_canvasGroupMeta.use_cases ? [...red_finance_canvasGroupMeta.use_cases] : undefined,
+  audienceTags: red_finance_canvasGroupMeta.audience_tags ? [...red_finance_canvasGroupMeta.audience_tags] : undefined,
+  toneTags: red_finance_canvasGroupMeta.tone_tags ? [...red_finance_canvasGroupMeta.tone_tags] : undefined,
+  coverLayoutId: red_finance_canvasGroupMeta.cover_layout_id ?? undefined,
+  agendaLayoutId: red_finance_canvasGroupMeta.agenda_layout_id ?? undefined,
+  closingLayoutId: red_finance_canvasGroupMeta.closing_layout_id ?? undefined,
+  defaultThemeId: red_finance_canvasGroupMeta.default_theme_id ?? undefined,
+};
+const red_finance_canvasLayouts: TemplateWithData[] = [
+  createTemplateEntry(red_finance_canvas_CoverCanvasComponent, red_finance_canvas_CoverCanvasModule.Schema, red_finance_canvas_CoverCanvasModule.layoutId, red_finance_canvas_CoverCanvasModule.layoutName, red_finance_canvas_CoverCanvasModule.layoutDescription, "red-finance-canvas", "CoverCanvas", {"sampleData":{"brandName":"GLOBAL FINANCE INSIGHTS","canvasLabel":"Cover Canvas","title":"Build a Distinct Opening","subtitle":"Use this branded canvas as a starting point, then compose the cover from template components.","reportDate":"2026","presenter":"Authoring Workspace","showSlotGuides":true},"layoutTags":["cover","canvas","finance","component-first","tsx-first"],"layoutRole":"cover","contentElements":["brand","headline-slot","subtitle-slot","meta-slot","decoration-slot"],"useCases":["cover","opening","custom-composition","executive-brief"],"suitableFor":"Suitable as a starting canvas for a custom cover when the final layout should be composed from reusable components instead of copied from a finished blueprint.","avoidFor":"Avoid leaving this canvas unchanged in a final deck; it is an authoring base, not a finished production slide.","density":"low","visualWeight":"visual-heavy","editableTextPriority":"high"}),
+  createTemplateEntry(red_finance_canvas_ContentCanvasComponent, red_finance_canvas_ContentCanvasModule.Schema, red_finance_canvas_ContentCanvasModule.layoutId, red_finance_canvas_ContentCanvasModule.layoutName, red_finance_canvas_ContentCanvasModule.layoutDescription, "red-finance-canvas", "ContentCanvas", {"sampleData":{"title":"Content Canvas","metaLabel":"COMPONENT-FIRST","footerText":"Red Finance Canvas | Component-first Workspace","pageNumber":"02","guideTitle":"Compose page-specific components here","guideText":"Read components/README.md, choose the right component families, and replace this guide with the final TSX composition.","showSlotGuides":true},"layoutTags":["content","canvas","finance","component-first","tsx-first"],"layoutRole":"content","contentElements":["page-title","meta","content-slot","footer-meta"],"useCases":["analysis","overview","custom-composition","component-layout"],"suitableFor":"Suitable as the default starting frame for ordinary content pages that should be composed from finance components based on the actual page intent.","avoidFor":"Avoid using it unchanged as a final page; the content slot must be replaced with concrete component composition.","density":"medium","visualWeight":"balanced","editableTextPriority":"high"}),
+  createTemplateEntry(red_finance_canvas_SectionFocusCanvasComponent, red_finance_canvas_SectionFocusCanvasModule.Schema, red_finance_canvas_SectionFocusCanvasModule.layoutId, red_finance_canvas_SectionFocusCanvasModule.layoutName, red_finance_canvas_SectionFocusCanvasModule.layoutDescription, "red-finance-canvas", "SectionFocusCanvas", {"sampleData":{"sectionNumber":"01","eyebrow":"Section Canvas","title":"Shape the Transition","subtitle":"Use the focus frame for section dividers, strategic emphasis, or topic transitions with custom right-side components.","rightGuideTitle":"Compose focus modules","rightGuideText":"Replace this guide with cards, metrics, timelines, or a compact evidence module from components/.","footerText":"Red Finance Canvas | Section Focus","pageNumber":"03","showSlotGuides":true},"layoutTags":["section","transition","canvas","finance","component-first","tsx-first"],"layoutRole":"section-divider","contentElements":["section-number","headline","subtitle","focus-slot","footer-meta"],"useCases":["section-divider","transition","strategic-focus","custom-composition"],"suitableFor":"Suitable for section dividers and focus pages where the right side should be tailored from existing finance components.","avoidFor":"Avoid using it for dense charts, large matrices, or as an unchanged final slide.","density":"medium","visualWeight":"balanced","editableTextPriority":"high"}),
+];
 
 const red_finance_v3GroupMeta = {
   "group_id": "red-finance-v3",
@@ -151,6 +214,13 @@ const red_blueLayouts: TemplateWithData[] = [
 ];
 
 export const templates: TemplateLayoutsWithSettings[] = [
+  {
+    id: red_finance_canvasGroupMeta.group_id,
+    name: red_finance_canvasGroupMeta.group_name,
+    description: red_finance_canvasGroupMeta.group_description,
+    settings: red_finance_canvasSettings,
+    layouts: red_finance_canvasLayouts,
+  },
   {
     id: red_finance_v3GroupMeta.group_id,
     name: red_finance_v3GroupMeta.group_name,

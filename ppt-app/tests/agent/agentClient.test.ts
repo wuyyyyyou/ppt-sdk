@@ -157,6 +157,50 @@ describe("AgentClient cache miss retry", () => {
     assert.equal(harness.sessionDeletes, 2);
   });
 
+  it("continues when session create resolves no tools in warn policy", async () => {
+    const harness = createRuntime([authoringSuccessFrames()], {
+      sessionPatch: {
+        granted_tools: [],
+        inherit_host_tools: false,
+      },
+    });
+    const client = await createAgentClient(harness.runtime, {
+      toolAccessPolicy: "warn",
+    });
+
+    await client.checkToolAccess();
+    const result = await client.runAuthoringPrompt("write a page");
+
+    assert.equal(result.status, "ready_for_render");
+    assert.equal(harness.sessionCreations, 2);
+    assert.equal(harness.sessionDeletes, 2);
+  });
+
+  it("ignores session create tool access surface in off policy", async () => {
+    const harness = createRuntime([authoringSuccessFrames()], {
+      sessionPatch: {
+        granted_tools: [],
+        inherit_host_tools: false,
+        warnings: [
+          {
+            code: "NO_TOOLS_AVAILABLE",
+            message: "This agent session resolved ZERO executable tools.",
+          },
+        ],
+      },
+    });
+    const client = await createAgentClient(harness.runtime, {
+      toolAccessPolicy: "off",
+    });
+
+    await client.checkToolAccess();
+    const result = await client.runAuthoringPrompt("write a page");
+
+    assert.equal(result.status, "ready_for_render");
+    assert.equal(harness.sessionCreations, 2);
+    assert.equal(harness.sessionDeletes, 2);
+  });
+
   it("throws AgentInfrastructureError when run_meta reports no tools", async () => {
     const harness = createRuntime([
       [
@@ -185,6 +229,84 @@ describe("AgentClient cache miss retry", () => {
         assert.equal(infrastructureError.noToolsAvailable, true);
         return true;
       },
+    );
+    assert.equal(harness.sessionCreations, 1);
+    assert.equal(harness.sessionDeletes, 1);
+  });
+
+  it("emits activity and continues when run_meta reports no tools in warn policy", async () => {
+    const harness = createRuntime([
+      [
+        {
+          event: "run_meta",
+          granted_tools: [],
+          inherit_host_tools: false,
+          warnings: [
+            {
+              code: "NO_TOOLS_AVAILABLE",
+              message: "This agent session resolved ZERO executable tools.",
+            },
+          ],
+        },
+        ...authoringSuccessFrames(),
+      ],
+    ]);
+    const events: AgentStreamEvent[] = [];
+    const client = await createAgentClient(harness.runtime, {
+      toolAccessPolicy: "warn",
+    });
+
+    const result = await client.runAuthoringPrompt("write a page", {
+      onStreamEvent: (event) => events.push(event),
+    });
+
+    assert.equal(result.status, "ready_for_render");
+    assert.equal(
+      events.some(
+        (event) =>
+          event.type === "activity" &&
+          event.message.includes("Agent tool access warning"),
+      ),
+      true,
+    );
+    assert.equal(harness.sessionCreations, 1);
+    assert.equal(harness.sessionDeletes, 1);
+  });
+
+  it("ignores run_meta tool access surface in off policy", async () => {
+    const harness = createRuntime([
+      [
+        {
+          event: "run_meta",
+          granted_tools: [],
+          inherit_host_tools: false,
+          warnings: [
+            {
+              code: "NO_TOOLS_AVAILABLE",
+              message: "This agent session resolved ZERO executable tools.",
+            },
+          ],
+        },
+        ...authoringSuccessFrames(),
+      ],
+    ]);
+    const events: AgentStreamEvent[] = [];
+    const client = await createAgentClient(harness.runtime, {
+      toolAccessPolicy: "off",
+    });
+
+    const result = await client.runAuthoringPrompt("write a page", {
+      onStreamEvent: (event) => events.push(event),
+    });
+
+    assert.equal(result.status, "ready_for_render");
+    assert.equal(
+      events.some(
+        (event) =>
+          event.type === "activity" &&
+          event.message.includes("Agent tool access warning"),
+      ),
+      false,
     );
     assert.equal(harness.sessionCreations, 1);
     assert.equal(harness.sessionDeletes, 1);

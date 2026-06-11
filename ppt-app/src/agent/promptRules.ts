@@ -18,12 +18,14 @@ export const TSX_AUTHORING_RULES_SUMMARY = [
 
 export const AUTHORING_COMPOSITION_STRATEGY = [
   "Authoring composition strategy:",
-  "- The current slide TSX/data you receive is based on the selected blueprint. Treat it as a starting canvas, not a finished slide.",
-  "- Build the page primarily by composing existing template components and blueprint-local patterns. Do not hand-code bespoke page sections, cards, KPI blocks, charts, or decorative structures when an existing component can express the same intent.",
-  "- Keep business content in the current data JSON where practical, and pass it into components through props. Use TSX mainly to compose, arrange, add, remove, or configure components.",
-  "- Adapt the current page structure to the page message, audience, outline, and available grounded content. Add, remove, reorder, resize, or reconfigure components when it improves clarity, hierarchy, or fit.",
-  "- Avoid mechanically cloning the selected blueprint structure across pages. Each page should make page-specific composition decisions instead of only filling the blueprint's existing slots.",
-  "- Prefer existing shared/template components for export stability. Create page-local markup only when no suitable component exists, and create or modify shared components/theme only with a clear reason.",
+  "- The current slide TSX/data you receive is based on the selected blueprint. Treat the blueprint as a starting canvas, not the final page structure and not a slot template that must be preserved.",
+  "- Before editing, read template/components/README.md and use it as the component index for the current template group. Understand the available components, component boundaries, suitable slot types, text capacity, and recommended combinations.",
+  "- Before editing, choose the component families that best fit the current page title, outline, Page Plan reason, audience, and available grounded content. Decide how the page should be expressed with template components before changing TSX/data.",
+  "- Build the page primarily by composing existing template/components building blocks and blueprint-local patterns. Do not hand-code bespoke page sections, cards, KPI blocks, charts, tables, or decorative structures when an existing component can express the same intent.",
+  "- If the blueprint's default structure does not fit the page message, actively restructure the current slides/*.tsx implementation. Add, remove, reorder, resize, replace, or reconfigure components when it improves clarity, hierarchy, or fit.",
+  "- Avoid mechanically cloning the selected blueprint structure across pages. Do not only fill the blueprint's existing fields. Each page should make page-specific composition decisions so the structure serves that page's message.",
+  "- Keep business content in the current data JSON where practical, and pass it into components through props. Use TSX mainly for component composition, layout, hierarchy, data mapping, and stable visual structure.",
+  "- Prefer existing shared/template components for export stability. Create page-local markup only when no suitable component exists, and create or modify shared components/theme only when multiple pages need the same new visual unit or there is another clear reason.",
   "- If a failure report is provided, prioritize fixing the reported failure. Do not perform broad page-structure redesigns during render-fix, visual-review-fix, or content-review-fix unless the failure cannot be fixed without changing structure.",
 ].join("\n");
 

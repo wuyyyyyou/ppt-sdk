@@ -6,6 +6,10 @@ import {
   type AgentToolAccessWarning,
 } from "./agentToolAccess";
 import {
+  DEFAULT_AGENT_TOOL_ACCESS_POLICY,
+  type AgentToolAccessPolicy,
+} from "./agentToolAccessPolicy";
+import {
   buildStructuredJsonRepairPrompt,
   parseStructuredJson,
 } from "../ai/structuredJson";
@@ -98,6 +102,7 @@ export interface AgentClientOptions {
   wait?: (ms: number) => Promise<void>;
   random?: () => number;
   streamIdleTimeoutMs?: number;
+  toolAccessPolicy?: AgentToolAccessPolicy;
 }
 
 interface CollectedAgentRun {
@@ -311,19 +316,35 @@ function getPathFromInput(input: unknown): string | undefined {
   return isRecord(input) ? readString(input.path) || undefined : undefined;
 }
 
-function extractFrameEvents(frame: unknown): AgentStreamEvent[] {
+function buildAgentToolAccessWarningMessage(warning: AgentToolAccessWarning) {
+  return `Agent tool access warning: ${warning.message}`;
+}
+
+function extractFrameEvents(
+  frame: unknown,
+  toolAccessPolicy: AgentToolAccessPolicy,
+): AgentStreamEvent[] {
   if (!isRecord(frame)) return [];
   const events: AgentStreamEvent[] = [];
 
-  const toolAccessWarning = getAgentToolAccessWarning(frame);
-  if (toolAccessWarning) {
-    events.push({
-      type: "error",
-      code: toolAccessWarning.code,
-      message: AGENT_TOOLS_UNAVAILABLE_MESSAGE,
-      sessionCacheMiss: false,
-    });
-    return events;
+  if (toolAccessPolicy !== "off") {
+    const toolAccessWarning = getAgentToolAccessWarning(frame);
+    if (toolAccessWarning) {
+      if (toolAccessPolicy === "warn") {
+        events.push({
+          type: "activity",
+          message: buildAgentToolAccessWarningMessage(toolAccessWarning),
+        });
+      } else {
+        events.push({
+          type: "error",
+          code: toolAccessWarning.code,
+          message: AGENT_TOOLS_UNAVAILABLE_MESSAGE,
+          sessionCacheMiss: false,
+        });
+        return events;
+      }
+    }
   }
 
   if (frame.event === "error") {
@@ -392,6 +413,7 @@ async function collectRunText(
   content: string,
   options: AgentRunOptions | undefined,
   clientOptions: AgentClientOptions,
+  toolAccessPolicy: AgentToolAccessPolicy,
 ): Promise<CollectedAgentRun> {
   let output = "";
   const events: AgentStreamEvent[] = [];
@@ -406,7 +428,7 @@ async function collectRunText(
       break;
     }
 
-    const frameEvents = extractFrameEvents(frame);
+    const frameEvents = extractFrameEvents(frame, toolAccessPolicy);
     for (const event of frameEvents) {
       events.push(event);
       options?.onStreamEvent?.(event);
@@ -552,13 +574,21 @@ export async function createAgentClient(
   clientOptions: AgentClientOptions = {},
 ): Promise<AgentClient> {
   const wait = clientOptions.wait ?? defaultWait;
+  const toolAccessPolicy =
+    clientOptions.toolAccessPolicy ?? DEFAULT_AGENT_TOOL_ACCESS_POLICY;
   async function createSession() {
     try {
       const session = await runtime.agent.session({ submode: "auto" });
-      const toolAccessWarning = getAgentToolAccessWarning(session);
-      if (toolAccessWarning) {
-        await session.delete().catch(() => undefined);
-        throw createNoToolsAvailableError(toolAccessWarning);
+      if (toolAccessPolicy !== "off") {
+        const toolAccessWarning = getAgentToolAccessWarning(session);
+        if (toolAccessWarning) {
+          if (toolAccessPolicy === "warn") {
+            console.warn(buildAgentToolAccessWarningMessage(toolAccessWarning));
+          } else {
+            await session.delete().catch(() => undefined);
+            throw createNoToolsAvailableError(toolAccessWarning);
+          }
+        }
       }
       return {
         session,
@@ -618,7 +648,13 @@ export async function createAgentClient(
           sessionMeta = await createSession();
         }
         const collected = await withTimeout(
-          collectRunText(sessionMeta.session, prompt, runOptions, clientOptions),
+          collectRunText(
+            sessionMeta.session,
+            prompt,
+            runOptions,
+            clientOptions,
+            toolAccessPolicy,
+          ),
           AGENT_RUN_TIMEOUT_MS
         );
         if (interactionHandle) {

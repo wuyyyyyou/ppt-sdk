@@ -1,0 +1,20 @@
+{
+  "group_id": "red-finance-canvas",
+  "group_name": "Red Finance Canvas",
+  "group_description": "Component-first red finance canvas templates for building custom executive finance decks from reusable TSX components.",
+  "group_brief": "Suitable when the deck should keep the red finance brand system but avoid finished blueprint copies. This group provides only canvas-level cover, content, and section frames; the AI Agent must read components/README.md and compose each final slide from template components.",
+  "style_tags": ["finance", "canvas", "component-first", "tsx-first"],
+  "industry_tags": ["finance", "banking", "fintech"],
+  "use_cases": ["strategy-report", "industry-analysis", "executive-brief", "custom-composition"],
+  "audience_tags": ["management", "board", "client"],
+  "tone_tags": ["professional", "formal", "analytical"],
+  "cover_layout_id": "red-finance-canvas:cover-canvas",
+  "ordered": true,
+  "default": false,
+  "registry_order": 91,
+  "layouts": [
+    "slides/CoverCanvas.tsx",
+    "slides/ContentCanvas.tsx",
+    "slides/SectionFocusCanvas.tsx"
+  ]
+}

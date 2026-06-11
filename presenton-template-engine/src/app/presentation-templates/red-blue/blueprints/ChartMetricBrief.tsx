@@ -73,7 +73,7 @@ const toneColor = (tone: z.infer<typeof ToneSchema>) => {
   if (tone === "japan") return redBlueTheme.colors.japan;
   if (tone === "korea") return redBlueTheme.colors.korea;
   if (tone === "purple") return redBlueTheme.colors.purple;
-  return redBlueTheme.colors.neutral;
+  return redBlueTheme.colors.mutedText;
 };
 
 const ChartMetricBrief = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
