@@ -5,13 +5,13 @@
   ],
   "required_executas": [
     {
-      "tool_id": "tool-youming_5703-ppt-engine-fmkv9ru7",
-      "min_version": "3.1.5",
+      "tool_id": "tool-lightvoss_5433-ppt-engine-6443rj2a",
+      "min_version": "3.1.0",
       "version": "latest"
     },
     {
-      "tool_id": "tool-youming_5703-ppt-gener-ahzv8re6",
-      "min_version": "3.0.0",
+      "tool_id": "tool-lightvoss_5433-ppt-gener-dc7ftcep",
+      "min_version": "2.0.0",
       "version": "latest"
     }
   ],
@@ -48,8 +48,8 @@
     ],
     "host_api": {
       "tools": [
-        "required:tool-youming_5703-ppt-engine-fmkv9ru7",
-        "required:tool-youming_5703-ppt-gener-ahzv8re6"
+        "required:tool-lightvoss_5433-ppt-engine-6443rj2a",
+        "required:tool-lightvoss_5433-ppt-gener-dc7ftcep"
       ],
       "chat": [],
       "artifact": [],
