@@ -3,7 +3,7 @@
 
 export const PPT_ENGINE_TOOL = {
   id: "tool-lightvoss_5433-ppt-engine-6443rj2a",
-  version: "3.1.3",
+  version: "3.1.4",
   displayName: "ppt-engine",
 } as const;
 
