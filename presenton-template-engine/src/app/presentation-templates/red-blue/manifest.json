@@ -87,16 +87,6 @@
         "path": "./slides/ClosingSummary.tsx"
       },
       "data_path": "./data/demo/closing-summary.json"
-    },
-    {
-      "id": "red-blue-component-gallery",
-      "title": "Component Gallery",
-      "speaker_note": "Component preview page for validating the red-blue TSX-first component foundation.",
-      "source": {
-        "type": "local",
-        "path": "./slides/ComponentGallery.tsx"
-      },
-      "data_path": "./data/demo/component-gallery.json"
     }
   ]
 }

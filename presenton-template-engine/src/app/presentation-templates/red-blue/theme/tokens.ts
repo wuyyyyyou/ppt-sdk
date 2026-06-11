@@ -8,6 +8,7 @@ export const redBlueTheme = {
     softStroke: "var(--stroke-soft,#EEF1F5)",
     mutedText: "var(--text-muted,#636E72)",
     subtleText: "var(--text-subtle,#7F8C8D)",
+    neutral: "var(--neutral-color,#636E72)",
     china: "var(--primary-color,#FF4757)",
     chinaText: "var(--primary-text,#FFFFFF)",
     japan: "var(--secondary-color,var(--graph-1,#2E86DE))",
@@ -21,8 +22,8 @@ export const redBlueTheme = {
     shadow: "var(--shadow-color,rgba(15,23,42,0.08))",
   },
   fonts: {
-    body: 'var(--body-font-family,Inter),"Noto Sans SC","Microsoft YaHei","PingFang SC",Arial,sans-serif',
-    heading: 'var(--heading-font-family,Montserrat),Inter,"Noto Sans SC","Microsoft YaHei","PingFang SC",Arial,sans-serif',
+    body: 'var(--body-font-family,Inter),"Noto Sans CJK SC","Noto Sans SC","Microsoft YaHei","PingFang SC",Arial,sans-serif',
+    heading: 'var(--heading-font-family,Montserrat),Inter,"Noto Sans CJK SC","Noto Sans SC","Microsoft YaHei","PingFang SC",Arial,sans-serif',
   },
 } as const;
 

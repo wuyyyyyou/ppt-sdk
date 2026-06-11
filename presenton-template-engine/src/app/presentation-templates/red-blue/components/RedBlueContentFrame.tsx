@@ -50,6 +50,7 @@ const RedBlueContentFrame = ({
         {children}
       </div>
       <div
+        data-pptx-no-text-aggregate="true"
         className="absolute bottom-0 left-0 flex h-[48px] w-full items-center justify-between px-[60px] text-[12px] font-semibold"
         style={{
           color: redBlueTheme.colors.subtleText,

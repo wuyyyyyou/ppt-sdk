@@ -379,6 +379,8 @@ function buildAuthoringPrompt(input: {
     `Selected blueprint source: ${input.workspaceDir}/template/${input.page.blueprint_source.replace(/^\.\//, "")}`,
     "",
     "Read these workspace files before editing:",
+    `- ${input.workspaceDir}/template/${input.page.slide_path.replace(/^\.\//, "")}`,
+    `- ${input.workspaceDir}/template/${input.page.data_path.replace(/^\.\//, "")}`,
     `- ${input.workspaceDir}/template/catalog.json`,
     `- ${input.workspaceDir}/template/blueprints/README.md`,
     `- ${input.workspaceDir}/template/components/README.md`,
@@ -416,6 +418,7 @@ function buildAuthoringPrompt(input: {
     `Full page plan JSON: ${JSON.stringify(input.pagePlan)}`,
     hasFailureFix
       ? [
+<<<<<<< Updated upstream
           "Failure-fix priority:",
           "A failure report is provided for this pass. Fix the reported failure first.",
           "Make only the design or content changes that support the fix.",
@@ -434,6 +437,15 @@ function buildAuthoringPrompt(input: {
           "Do not modify page-plan.json, outline.json, other pages, or unrelated shared files.",
           "Remove, soften, or mark unsupported concrete claims as TBD. Do not replace them with new unsupported specifics.",
           "Never satisfy a rewrite request by inventing or approximating real-world numbers, years, citations, rankings, named-organization facts, or chart data. If the review asks for real data but the workspace has no source for it, keep or add a clear TBD / 待补充 marker instead.",
+=======
+          "Content grounding review failed. Rewrite request:",
+          JSON.stringify(input.factReview),
+          "You must edit the current slide/data files to address every unsupported_claim.",
+          "Search the current data JSON and TSX for each claim text, numeric value, and nearby label.",
+          "Prefer editing the current data JSON when the unsupported content is data-driven.",
+          "Remove, soften, or mark unsupported concrete claims as TBD. Do not replace them with new unsupported specifics.",
+          "After editing, re-read the current slide/data files and verify the unsupported values are gone.",
+>>>>>>> Stashed changes
         ].join("\n")
       : "",
   ]
@@ -556,12 +568,20 @@ function buildPageVisualReviewPrompt(input: {
   preview: RenderWorkspacePagePreviewResult;
 }) {
   return [
+<<<<<<< Updated upstream
     "You are a Page Visual Review agent for one generated PPT slide.",
     "Review only the generated PPT slide screenshot for visual quality.",
     "Do not judge output language, outline alignment, factual grounding, unsupported claims, or content correctness.",
     "Do not fail a slide merely because some content is explicitly marked TBD / 待补充; judge only whether the placeholder is visually clear, readable, and does not break the layout.",
+=======
+    "Review the generated PPT slide screenshot for visual quality only.",
+>>>>>>> Stashed changes
     "First use `upload_local_file` on the screenshot path, then inspect that uploaded image with `analyze_image` before making a visual judgment.",
     "If image analysis is unavailable or inconclusive, use the rendered HTML path as fallback context and still return a JSON review.",
+    "Do not review factual correctness, source support, business accuracy, or whether the slide has enough claims; the separate grounding reviewer owns those judgments.",
+    "Do not fail the slide because content was softened, marked TBD, or made less specific for grounding reasons, as long as the visual layout is complete.",
+    "If you request changes, revision_request must be limited to visual/layout fixes: overlap, cutoff, blank areas, unreadable text, broken alignment, spacing, sizing, contrast, or template-style mismatch.",
+    "Do not request adding new numbers, dates, rankings, customer names, market facts, citations, competitors, product capabilities, or other concrete factual claims.",
     "Return only one JSON object matching this shape:",
     '{"pass":true,"score":8,"issues":[],"revision_request":"","confidence":"medium"}',
     "Do not include markdown, code fences, explanations, or any extra text.",
@@ -570,7 +590,11 @@ function buildPageVisualReviewPrompt(input: {
     `Page title for identification only: ${input.page.title}`,
     `Rendered HTML path: ${input.preview.html_path}`,
     "",
+<<<<<<< Updated upstream
     "Pass only if the slide looks like a complete PPT page, has no obvious overlap/cutoff/blank errors, uses readable text, renders all intended visual regions, and fits the selected template style.",
+=======
+    "Pass only if the slide looks like a complete PPT page, has no obvious overlap/cutoff/blank errors, uses readable text, and fits the selected template style.",
+>>>>>>> Stashed changes
     "Use score 0-10. pass=true requires score >= 7.",
   ].join("\n");
 }

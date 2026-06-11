@@ -1,9 +1,11 @@
 {
   "eyebrow": "China | Japan | Korea",
   "title": "East Asia Market Comparison",
+  "accentText": "Comparison",
   "subtitle": "A red-blue analytical deck comparing market scale, innovation capacity, trade structure, and strategic outlook across East Asia.",
   "author": "Prepared for executive discussion",
   "date": "2026",
+  "indicatorLabel": "Executive Briefing",
   "highlights": [
     "Market and demographic baseline",
     "Evidence-led comparison pages",

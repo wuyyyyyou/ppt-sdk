@@ -1,71 +1,149 @@
 # Red Blue 组件索引
 
-本目录把 `~/红蓝主题` 中的 26 个 HTML 参考页抽象成 TSX-first 可复用组件。组件只承载稳定视觉结构；具体页面布局、字段映射和业务文案应放在 `slides/*.tsx` 或后续 `blueprints/*.tsx` 中。
-
-## 视觉语言
-
-- 固定画布：1280 x 720，白色背景。
-- 主色：红色代表一侧主体，蓝色代表另一侧主体，紫色作为连接、标题强调和中性判断色。
-- 常见元素：柔和圆形背景、点阵底纹、圆角白卡、数值 callout、对比条、图表壳、时间线、SWOT 卡片。
-- 参考 HTML 中的 FontAwesome 图标不直接依赖 CDN；组件保留 `icon?: ReactNode` 插槽，由页面传入文本、SVG 或本地 icon。
-
-## 组件总览
-
-| 组件 | 用途 | 对应参考页 |
-| --- | --- | --- |
-| `RedBlueCanvas` | 固定画布、背景点阵和红蓝紫装饰圆 | 全部页面 |
-| `RedBlueContentFrame` | 普通内容页标题、内容区、页脚页码 | 3-10, 12-16, 18-25 |
-| `RedBlueCoverBackdrop` | 封面、章节页、Thank You 页背景装饰 | 1, 17, 26 |
-| `RedBlueSectionHeading` | 大标题 + 紫色短横线 | 多数内容页标题区 |
-| `RedBlueLegend` | 红/蓝/紫图例 | 1, 3, 6-8, 13, 20 |
-| `RedBlueTopicCard` | 议程卡、主题卡、建议卡 | 2, 18, 23, 25 |
-| `RedBlueMetricCard` | 双主体横向数值条对比 | 3, 5, 10, 19 |
-| `RedBlueNumberCallout` | 大数字指标卡 | 3, 6, 8, 9, 20, 22 |
-| `RedBlueCountryCard` | 国家/主体 KPI 卡 | 5, 12, 19 |
-| `RedBlueChartShell` | 图表容器、标题、副标题、图例区 | 3, 4, 6-10, 13, 20 |
-| `RedBlueTimeline` | 交替式里程碑时间线 | 11 |
-| `RedBlueGanttRoadmap` | 甘特/项目进度路线图 | 15 |
-| `RedBlueSwotGrid` | SWOT 四象限卡片 | 14 |
-| `RedBlueInsightCard` | 侧边洞察、结论、风险提示 | 6-10, 13, 16, 20, 24 |
-| `RedBlueStatHero` | 单页大数字/关键统计 | 22 |
+本目录存放 `red-blue` 模板组的可复用视觉组件。组件只负责稳定的视觉单元和导出友好的结构；页面级布局、组件编排和字段映射应优先放在 `slides/*.tsx` 中，默认演示内容可以放在对应蓝图的 `sampleData` 或 `data/*.json` 中。
 
 ## 使用原则
 
-- 页面级结构优先放在 `slides/*.tsx`，组件只负责稳定视觉单元。
-- 需要换 layout 时，优先改当前 slide TSX 的组件组合，不要把结构塞进 JSON。
-- `data/*.json` 只承载内容，不承载列宽、卡片数量、图表类型等版式决策。
-- 图表本体后续可以接入 Recharts 或本地 SVG；当前 `RedBlueChartShell` 只提供图表外壳。
-- 所有关键文本、数字和表格内容应保持真实 DOM 文本，避免截图化。
-- 如果多个页面重复出现新的稳定视觉单元，再新增组件；不要为单页小差异创建特化组件。
+- 页面主结构放在 `slides/*.tsx`，不要把整页业务逻辑塞进组件。
+- 新页面通常先从 `blueprints/*.tsx` 派生，再在 `slides/*.tsx` 中直接修改。
+- 多页复用的视觉单元放在 `components/*.tsx`，保持轻量、纯渲染。
+- 颜色、字体、阴影等常量优先来自 `theme/tokens.ts`。
+- 关键文字、数字和表格内容保持真实文本节点，避免整块截图化。
+- 图表本体可以由 SVG、Recharts 或截图兜底承载，但标题、说明、结论和 KPI 数值仍应保持可编辑文本。
+- 红色、蓝色和紫色分别用于两侧主体、对照主体和中性连接；不要为单页临时引入新的主色体系。
 
-## 推荐组合
+## 组件总览
+
+| 组件 | 分层 | 主要用途 | 常见依赖 |
+| --- | --- | --- | --- |
+| `RedBlueCanvas` | 画布基础 | 固定 1280x720 页面画布、背景、基础字体、装饰氛围 | `theme/tokens` |
+| `RedBlueContentFrame` | 页面框架 | 普通内容页标题、正文区域、页脚和页码 | `RedBlueCanvas` |
+| `RedBlueCoverBackdrop` | 页面框架 | 封面、章节页、收束页的沉浸式背景结构 | `RedBlueCanvas` |
+| `RedBlueSectionHeading` | 基础原语 | 小节标题、短说明和强调线 | `theme/tokens` |
+| `RedBlueLegend` | 基础原语 | 红蓝紫图例、主体标识和短标签 | `theme/tokens` |
+| `RedBlueTopicCard` | 卡片 | 议程、主题、建议和行动项卡片 | `theme/tokens` |
+| `RedBlueMetricCard` | 卡片 | 双主体横向数值对比 | `theme/tokens` |
+| `RedBlueNumberCallout` | 卡片 | 大数字指标、关键结论和强调数值 | `theme/tokens` |
+| `RedBlueCountryCard` | 卡片 | 国家、市场或主体 KPI 摘要卡 | `RedBlueLegend` |
+| `RedBlueInsightCard` | 卡片 | 侧边洞察、风险提示、结论说明 | `theme/tokens` |
+| `RedBlueChartShell` | 容器壳 | 图表标题、副标题、图例区和图表内容壳 | `RedBlueLegend` |
+| `RedBlueTimeline` | 结构化组件 | 交替式里程碑时间线 | `theme/tokens` |
+| `RedBlueGanttRoadmap` | 结构化组件 | 甘特式阶段路线图和执行路径 | `theme/tokens` |
+| `RedBlueSwotGrid` | 结构化组件 | SWOT 四象限分析网格 | `theme/tokens` |
+| `RedBlueStatHero` | 结构化组件 | 收束页的大数字主视觉和关键判断 | `theme/tokens` |
+
+## 分层说明
+
+### 1. 页面框架与画布
+
+- `RedBlueCanvas` 是最低层画布。特殊页可以直接使用；普通内容页优先通过 `RedBlueContentFrame` 获得一致的标题区、内容区和页脚。
+- `RedBlueContentFrame` 是内容页首选框架，适合 agenda、对比、图表、路线图和总结类页面。
+- `RedBlueCoverBackdrop` 用于封面、章节过渡和强视觉收束页，不承载复杂表格或多列正文。
+
+### 2. 基础原语
+
+- `RedBlueSectionHeading` 用于内容区小节标题，不用于页面主标题；页面主标题应由 slide 或页面框架控制。
+- `RedBlueLegend` 用于解释红蓝紫语义，适合图表、对比卡和页脚补充信息。
+
+### 3. 卡片组件
+
+- `RedBlueTopicCard`：承载主题项、议程项和建议项。当前 agenda 页面支持 2-12 个 topic，卡片尺寸应由页面网格决定。
+- `RedBlueMetricCard`：表达两个主体的指标对比，适合紧凑横向读数。
+- `RedBlueNumberCallout`：强调单个关键数字或短结论，避免塞入长正文。
+- `RedBlueCountryCard`：用于国家、市场、区域或业务主体概览，不限定只能用于国家语义。
+- `RedBlueInsightCard`：用于解释、风险、行动建议和边栏洞察，可承载比 topic card 更完整的说明。
+
+### 4. 图表与结构化组件
+
+- `RedBlueChartShell` 只负责图表外壳和标题区，不负责具体图表绘制。
+- `RedBlueTimeline` 适合有明确先后关系的里程碑，不适合无序分类。
+- `RedBlueGanttRoadmap` 适合阶段计划、跨季度推进和执行路线。
+- `RedBlueSwotGrid` 适合四象限判断；如果内容不是 SWOT 语义，优先在 slide 中组合普通卡片。
+- `RedBlueStatHero` 适合 closing 或 executive takeaway 页，文字容量应保持克制。
+
+## Slot 类型与组件家族
+
+Agent 先选 `blueprints/*.tsx` 基础页，再在 `slides/*.tsx` 中直接组合组件。组件选择必须从页面语义出发，不要只凭组件名拼接。
+
+| Slot 类型 | 推荐组件家族 | 典型组件 | 不适合 |
+| --- | --- | --- | --- |
+| `page-title` | `page-shell` | `RedBlueContentFrame`, `RedBlueCoverBackdrop` | 长正文、图表本体 |
+| `section-heading` | `heading` | `RedBlueSectionHeading` | KPI 网格、大表格 |
+| `agenda-topic` | `card` | `RedBlueTopicCard` | 大段正文、复杂图表 |
+| `comparison` | `card`, `chart-shell` | `RedBlueCountryCard`, `RedBlueMetricCard`, `RedBlueChartShell` | 单一观点页 |
+| `metric` | `card` | `RedBlueMetricCard`, `RedBlueNumberCallout`, `RedBlueStatHero` | 长解释文本 |
+| `chart` | `chart-shell` | `RedBlueChartShell` | 非数据装饰 |
+| `timeline` | `timeline` | `RedBlueTimeline`, `RedBlueGanttRoadmap` | 无先后顺序的分类 |
+| `callout` | `card` | `RedBlueInsightCard`, `RedBlueNumberCallout` | 大段正文 |
+| `legend` | `primitive` | `RedBlueLegend` | 正文段落 |
+| `decoration` | `page-shell` | `RedBlueCanvas`, `RedBlueCoverBackdrop` | 承载关键事实 |
+
+## 组件边界
+
+| 组件 | 适合 slot | 不适合 slot | 文本容量 | 截图策略 | 跨页复用 |
+| --- | --- | --- | --- | --- | --- |
+| `RedBlueCanvas` | `page-title`, `decoration` | `narrative-text`, `chart` | 不承载正文 | 不整页截图 | 是 |
+| `RedBlueContentFrame` | `page-title`, `footer-meta` | `chart`, `matrix` | 标题 32 字以内 | 框架不单独截图 | 是 |
+| `RedBlueCoverBackdrop` | `page-title`, `decoration` | `matrix`, `timeline` | 标题 36 字以内，导语 120 字以内 | 背景可截图，文字保留 | 是 |
+| `RedBlueSectionHeading` | `section-heading` | `chart`, `timeline` | 标题 28 字以内 | 必须保持文本 | 是 |
+| `RedBlueLegend` | `legend`, `footer-meta` | `narrative-text` | 单项 24 字以内 | 必须保持文本 | 是 |
+| `RedBlueTopicCard` | `agenda-topic`, `card` | `chart`, `timeline` | 标题 30 字以内，正文 120 字以内 | 必须保持文本 | 是 |
+| `RedBlueMetricCard` | `metric`, `comparison` | `narrative-text` | 双值 + 短标签 | 数值必须保持文本 | 是 |
+| `RedBlueNumberCallout` | `metric`, `callout` | `matrix`, `timeline` | 大数字 + 1 段短说明 | 数值必须保持文本 | 是 |
+| `RedBlueCountryCard` | `comparison`, `metric` | `chart` | 3-5 个短指标 | 必须保持文本 | 是 |
+| `RedBlueInsightCard` | `callout`, `narrative-text` | `chart`, `matrix` | 标题 28 字以内，正文 140 字以内 | 必须保持文本 | 是 |
+| `RedBlueChartShell` | `chart` | `narrative-text` | 标题 36 字以内 | 图表区域可截图 | 是 |
+| `RedBlueTimeline` | `timeline` | `comparison`, `chart` | 6 个节点以内 | 连接线可截图，文字保留 | 是 |
+| `RedBlueGanttRoadmap` | `timeline` | `metric`, `callout` | 6 个阶段以内 | 轨道可截图，文字保留 | 是 |
+| `RedBlueSwotGrid` | `matrix`, `comparison` | `timeline`, `chart` | 四象限短文本 | 必须保持文本 | 是 |
+| `RedBlueStatHero` | `metric`, `callout` | `matrix`, `chart` | 1 个主数字 + 2-3 条支撑 | 数值必须保持文本 | 是 |
+
+## 依赖关系
+
+常见组合方式：
 
 ```text
-Cover / Section
 RedBlueCanvas
+├─ RedBlueContentFrame
+│  ├─ RedBlueSectionHeading
+│  ├─ RedBlueLegend
+│  └─ RedBlueTopicCard / RedBlueInsightCard
 └─ RedBlueCoverBackdrop
-   ├─ RedBlueSectionHeading
    └─ RedBlueLegend
 
-Chart + Metrics
-RedBlueContentFrame
-├─ RedBlueChartShell
-└─ RedBlueMetricCard / RedBlueNumberCallout
+RedBlueChartShell
+├─ RedBlueLegend
+└─ 图表本体或本地 SVG
 
-Comparison
-RedBlueContentFrame
+Comparison Page
 ├─ RedBlueCountryCard
 ├─ RedBlueMetricCard
 └─ RedBlueInsightCard
 
-Timeline / Roadmap
-RedBlueContentFrame
+Roadmap Page
 ├─ RedBlueTimeline
 └─ RedBlueGanttRoadmap
 
-Summary / Recommendation
-RedBlueContentFrame
-├─ RedBlueTopicCard
-├─ RedBlueInsightCard
-└─ RedBlueStatHero
+Closing Page
+├─ RedBlueStatHero
+└─ RedBlueInsightCard
 ```
+
+依赖选择规则：
+
+- 需要整页框架：先选 `RedBlueContentFrame` 或 `RedBlueCoverBackdrop`。
+- 需要多项主题卡：优先用 `RedBlueTopicCard`，由 slide 控制网格数量和高度。
+- 需要图表：`RedBlueChartShell` 负责外壳，具体图表只负责绘制。
+- 需要对比：先判断是主体对比、指标对比还是结论对比，再选择 country、metric 或 insight 组件。
+- 需要路线图：有阶段跨度选 `RedBlueGanttRoadmap`，有事件顺序选 `RedBlueTimeline`。
+
+## AI 修改规则
+
+- 改某一页的布局、列宽、卡片数量、数据映射：优先改 `slides/*.tsx`。
+- JSON 只能解决内容替换，不能解决结构不合适、越界或组件组合错误。
+- 改某一页的默认内容：同步更新对应 `Schema`、`sampleData` 和 demo data。
+- 改多个页面共享的视觉单元：再改 `components/*.tsx`。
+- 改颜色、字体、阴影、边框：优先改 `theme/tokens.ts`。
+- 不要在组件里硬编码业务文案，默认内容应来自 slide schema、blueprint sample data 或 data JSON。
+- 不要新增与现有卡片语义高度重叠的特化组件；只有出现新的稳定视觉语义时才新增组件。
+- 纯装饰可以截图化；核心标题、表格文字、KPI 数值和说明文字应保持可编辑。

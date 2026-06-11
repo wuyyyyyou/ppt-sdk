@@ -23,6 +23,6 @@ export const redFinanceTheme = {
     rowAccent: "var(--row-accent,rgba(183,28,28,0.03))",
   },
   fonts: {
-    body: 'var(--body-font-family,Roboto,"Noto Sans SC",sans-serif)',
+    body: 'var(--body-font-family,Roboto,"Noto Sans CJK SC","Noto Sans SC",sans-serif)',
   },
 } as const;

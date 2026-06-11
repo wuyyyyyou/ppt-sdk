@@ -6,10 +6,10 @@
   "directory_roles": {
     "components": {
       "path": "./components",
-      "role": "Reusable TSX visual components extracted from the red-blue HTML reference pages.",
+      "role": "Reusable TSX visual components for the red-blue template group.",
       "rules": [
         "Use these components when building blueprints and concrete slides.",
-        "Do not copy raw HTML, inline scripts, Chart.js, ECharts, or external CDN dependencies into final slides.",
+        "Do not copy raw external snippets, inline scripts, Chart.js, ECharts, or external CDN dependencies into final slides.",
         "Keep component props content-oriented and let slides/*.tsx control page-specific layout."
       ]
     },
@@ -64,7 +64,6 @@
       "blueprint_source": "./blueprints/CoverStatement.tsx",
       "example_slide": "./slides/CoverStatement.tsx",
       "example_data": "./data/demo/cover-statement.json",
-      "reference_pages": ["./reference-html/1.html", "~/红蓝主题/1.html"],
       "layout_family": "cover",
       "content_intents": ["opening", "comparison-positioning", "theme-statement"],
       "suitable_for": ["cover", "market comparison opening", "country comparison opening", "executive briefing opening"],
@@ -76,10 +75,9 @@
       "blueprint_source": "./blueprints/AgendaOverview.tsx",
       "example_slide": "./slides/AgendaOverview.tsx",
       "example_data": "./data/demo/agenda-overview.json",
-      "reference_pages": ["./reference-html/2.html", "~/红蓝主题/2.html"],
       "layout_family": "agenda",
       "content_intents": ["agenda", "section-map", "topic-overview"],
-      "suitable_for": ["agenda page", "section overview", "six-part analysis map", "comparison pillar setup"],
+      "suitable_for": ["agenda page", "section overview", "two-to-twelve topic map", "comparison pillar setup"],
       "avoid_for": ["single deep insight", "large chart", "timeline", "closing"]
     },
     {
@@ -88,7 +86,6 @@
       "blueprint_source": "./blueprints/ThreeTopicCards.tsx",
       "example_slide": "./slides/ThreeTopicCards.tsx",
       "example_data": "./data/demo/three-topic-cards.json",
-      "reference_pages": ["~/红蓝主题/2.html", "~/红蓝主题/5.html", "~/红蓝主题/23.html", "~/红蓝主题/25.html"],
       "layout_family": "three-card",
       "content_intents": ["categorization", "comparison-lens", "pillars", "executive-summary"],
       "suitable_for": ["three comparison dimensions", "three strategic options", "three findings", "three recommendations"],
@@ -100,7 +97,6 @@
       "blueprint_source": "./blueprints/ChartMetricBrief.tsx",
       "example_slide": "./slides/ChartMetricBrief.tsx",
       "example_data": "./data/demo/chart-metric-brief.json",
-      "reference_pages": ["~/红蓝主题/3.html", "~/红蓝主题/4.html", "~/红蓝主题/6.html", "~/红蓝主题/7.html", "~/红蓝主题/8.html", "~/红蓝主题/9.html", "~/红蓝主题/10.html", "~/红蓝主题/13.html", "~/红蓝主题/20.html"],
       "layout_family": "chart-metric",
       "content_intents": ["evidence", "trend", "performance", "benchmark", "metric-readout"],
       "suitable_for": ["one primary chart with interpretation", "KPI benchmark", "trade flow summary", "forecast or trend page", "innovation profile summary"],
@@ -112,7 +108,6 @@
       "blueprint_source": "./blueprints/CountryComparison.tsx",
       "example_slide": "./slides/CountryComparison.tsx",
       "example_data": "./data/demo/country-comparison.json",
-      "reference_pages": ["~/红蓝主题/12.html", "~/红蓝主题/18.html", "~/红蓝主题/19.html"],
       "layout_family": "country-card-comparison",
       "content_intents": ["comparison", "country-profile", "matched-kpi-fields", "benchmark"],
       "suitable_for": ["two-country comparison", "three-country comparison", "market profile cards", "country capability benchmark"],
@@ -124,7 +119,6 @@
       "blueprint_source": "./blueprints/TimelineRoadmap.tsx",
       "example_slide": "./slides/TimelineRoadmap.tsx",
       "example_data": "./data/demo/timeline-roadmap.json",
-      "reference_pages": ["~/红蓝主题/11.html", "~/红蓝主题/15.html"],
       "layout_family": "timeline",
       "content_intents": ["history", "sequence", "roadmap", "milestones"],
       "suitable_for": ["historical timeline", "implementation roadmap", "phase plan", "relationship evolution"],
@@ -136,68 +130,10 @@
       "blueprint_source": "./blueprints/ClosingSummary.tsx",
       "example_slide": "./slides/ClosingSummary.tsx",
       "example_data": "./data/demo/closing-summary.json",
-      "reference_pages": ["~/红蓝主题/22.html", "~/红蓝主题/26.html"],
       "layout_family": "closing",
       "content_intents": ["closing", "summary", "decision-request", "next-steps"],
-      "suitable_for": ["thank-you page", "decision summary", "next-step page", "final action request"],
+      "suitable_for": ["decision summary", "next-step page", "final action request"],
       "avoid_for": ["dense evidence", "multi-country matrix", "long narrative"]
-    },
-    {
-      "id": "component-gallery",
-      "name": "Component Gallery",
-      "blueprint_source": "./blueprints/ComponentGallery.tsx",
-      "example_slide": "./slides/ComponentGallery.tsx",
-      "example_data": "./data/demo/component-gallery.json",
-      "reference_pages": ["~/红蓝主题/red-blue.json"],
-      "layout_family": "internal-preview",
-      "content_intents": ["component-preview", "visual-audit", "template-foundation"],
-      "suitable_for": ["internal validation", "component preview", "template development"],
-      "avoid_for": ["production deck page", "client-facing content", "AI-selected final slide"]
-    }
-  ],
-  "reference_examples": [
-    {
-      "reference_path": "~/红蓝主题/1.html",
-      "visual_pattern": "large comparison cover with red/blue circular decoration and central comparison identity",
-      "related_blueprints": ["cover-statement"],
-      "do_not_copy_directly": true
-    },
-    {
-      "reference_path": "~/红蓝主题/2.html",
-      "visual_pattern": "six numbered topic cards for agenda and comparison pillars",
-      "related_blueprints": ["agenda-overview", "three-topic-cards"],
-      "do_not_copy_directly": true
-    },
-    {
-      "reference_path": "~/红蓝主题/10.html",
-      "visual_pattern": "large chart card with side statistics column and insight block",
-      "related_blueprints": ["chart-metric-brief"],
-      "do_not_copy_directly": true
-    },
-    {
-      "reference_path": "~/红蓝主题/11.html",
-      "visual_pattern": "horizontal milestone timeline with alternating content and diamond markers",
-      "related_blueprints": ["timeline-roadmap"],
-      "do_not_copy_directly": true
-    },
-    {
-      "reference_path": "~/红蓝主题/12.html",
-      "visual_pattern": "matched China/Japan comparison columns with repeated feature cards",
-      "related_blueprints": ["country-comparison"],
-      "do_not_copy_directly": true
-    },
-    {
-      "reference_path": "~/红蓝主题/14.html",
-      "visual_pattern": "four-quadrant SWOT grid with colored cards",
-      "related_blueprints": [],
-      "do_not_copy_directly": true,
-      "status": "component exists; blueprint pending"
-    },
-    {
-      "reference_path": "~/红蓝主题/22.html",
-      "visual_pattern": "central statistic hero with minimal supporting text",
-      "related_blueprints": ["closing-summary"],
-      "do_not_copy_directly": true
     }
   ],
   "agent_workflow_notes": [
@@ -205,7 +141,6 @@
     "Copy or derive the selected blueprint TSX into slides/*.tsx, then edit the final page directly.",
     "manifest.json source.path should only point to slides/*.tsx.",
     "data/*.json should carry content only; if structure, spacing, or components are unsuitable, edit slides/*.tsx.",
-    "The component-gallery layout is for development preview and should not be selected for production deck pages.",
     "Preserve red/blue subject contrast and purple connective accents.",
     "When content includes factual claims, use source-backed data or clearly mark placeholders; do not invent unknown values."
   ]

@@ -49,7 +49,20 @@ export const Schema = z.object({
     { label: "Japan", value: "68%", share: 68, tone: "japan" },
     { label: "Korea", value: "72%", share: 72, tone: "korea" },
   ]),
-  callouts: z.array(CalloutSchema).min(1).max(2).optional(),
+  callouts: z.array(CalloutSchema).min(1).max(2).default([
+    {
+      value: "84%",
+      label: "China lead signal",
+      description: "Use this card for the primary measured position.",
+      tone: "china",
+    },
+    {
+      value: "68%",
+      label: "Japan benchmark",
+      description: "Use this card for the comparison benchmark.",
+      tone: "japan",
+    },
+  ]),
   calloutValue: z.string().min(1).max(18).default("84%"),
   calloutLabel: z.string().min(2).max(36).default("Lead signal"),
   calloutDescription: z.string().min(4).max(96).default("Use the callout to focus attention on the most important measured result."),
@@ -67,6 +80,45 @@ export const avoidFor = "Avoid for pure narrative or agenda pages.";
 export const density = "high";
 export const visualWeight = "visual-heavy";
 export const editableTextPriority = "medium";
+
+export const sampleData = {
+  title: "Performance Signal",
+  subtitle: "Combine one evidence chart with KPI rows and headline results for fast reading.",
+  footerText: "Red Blue Professional | Chart Metric Brief",
+  pageNumber: "04",
+  chartTitle: "Indexed Market Position",
+  chartSubtitle: "Relative index scores for slide-level comparison; replace with validated source data.",
+  chartUnit: "Index score",
+  maxValue: 100,
+  series: [
+    { label: "China", value: 84, tone: "china" },
+    { label: "Japan", value: 68, tone: "japan" },
+    { label: "Korea", value: 72, tone: "korea" },
+  ],
+  metricTitle: "KPI Readout",
+  metrics: [
+    { label: "China", value: "84%", share: 84, tone: "china" },
+    { label: "Japan", value: "68%", share: 68, tone: "japan" },
+    { label: "Korea", value: "72%", share: 72, tone: "korea" },
+  ],
+  callouts: [
+    {
+      value: "84%",
+      label: "China lead signal",
+      description: "Use this card for the primary measured position.",
+      tone: "china",
+    },
+    {
+      value: "68%",
+      label: "Japan benchmark",
+      description: "Use this card for the comparison benchmark.",
+      tone: "japan",
+    },
+  ],
+  calloutValue: "84%",
+  calloutLabel: "China lead signal",
+  calloutDescription: "Use this card for the primary measured position.",
+} satisfies z.infer<typeof Schema>;
 
 const toneColor = (tone: z.infer<typeof ToneSchema>) => {
   if (tone === "china") return redBlueTheme.colors.china;

@@ -59,6 +59,7 @@ export interface PptxFontModel {
   font_weight: number;
   italic: boolean;
   color: string;
+  opacity?: number;
   underline?: boolean;
   strike?: boolean;
 }

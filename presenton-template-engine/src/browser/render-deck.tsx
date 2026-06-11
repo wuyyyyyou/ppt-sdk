@@ -19,6 +19,8 @@ export type BrowserLayoutResolver = (layoutId: string) => TemplateWithData | und
 export type BrowserLocalLayoutRegistry = Record<string, TemplateWithData>;
 
 const GRAPH_COLOR_KEYS = Array.from({ length: 10 }, (_, index) => index);
+const CJK_FONT_FALLBACK =
+  '"Noto Sans CJK SC", "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif';
 
 function ensureFont(theme: BrowserRenderContext["theme"]) {
   if (!theme.fontName || !theme.fontUrl) {
@@ -99,9 +101,10 @@ function applyThemeVariables(
   }
 
   if (theme.fontName) {
-    container.style.setProperty("font-family", `"${theme.fontName}"`);
-    container.style.setProperty("--heading-font-family", `"${theme.fontName}"`);
-    container.style.setProperty("--body-font-family", `"${theme.fontName}"`);
+    const fontFamily = `"${theme.fontName}", ${CJK_FONT_FALLBACK}`;
+    container.style.setProperty("font-family", fontFamily);
+    container.style.setProperty("--heading-font-family", fontFamily);
+    container.style.setProperty("--body-font-family", fontFamily);
   }
 }
 

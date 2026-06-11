@@ -1015,6 +1015,7 @@ class PptxPresentationCreator:
         font.name = font_model.name
         self.apply_east_asian_typeface(font, font_model.name)
         font.color.rgb = RGBColor.from_string(font_model.color)
+        self.apply_font_opacity(font, font_model.opacity)
         font.italic = font_model.italic
         font.size = Pt(font_model.size)
         font.bold = (
@@ -1024,6 +1025,32 @@ class PptxPresentationCreator:
             font.underline = bool(font_model.underline)
         if font_model.strike is not None:
             self.apply_strike_to_font(font, font_model.strike)
+
+    def apply_font_opacity(self, font: Font, opacity: Optional[float]):
+        if opacity is None or opacity >= 1.0:
+            return
+
+        alpha = int(max(0.0, min(1.0, opacity)) * 100000)
+        try:
+            run_properties = font._element
+            solid_fill = run_properties.find(qn("a:solidFill"))
+            if solid_fill is None:
+                solid_fill = OxmlElement("a:solidFill")
+                run_properties.append(solid_fill)
+
+            srgb = solid_fill.find(qn("a:srgbClr"))
+            if srgb is None:
+                srgb = OxmlElement("a:srgbClr")
+                solid_fill.append(srgb)
+
+            srgb.set("val", str(font.color.rgb))
+            alpha_element = srgb.find(qn("a:alpha"))
+            if alpha_element is None:
+                alpha_element = OxmlElement("a:alpha")
+                srgb.append(alpha_element)
+            alpha_element.set("val", str(alpha))
+        except Exception:
+            return
 
     def apply_strike_to_font(self, font: Font, strike: Optional[bool]):
         try:

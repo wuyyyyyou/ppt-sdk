@@ -27,7 +27,6 @@ const RedBlueMetricCard = ({
     <div
       className="rounded-[14px] bg-white p-[18px]"
       style={{
-        borderLeft: `5px solid ${getToneColor(accentTone)}`,
         boxShadow: `0 4px 18px ${redBlueTheme.colors.shadow}`,
       }}
     >

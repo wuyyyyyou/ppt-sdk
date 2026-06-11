@@ -2,8 +2,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   AgentInfrastructureError,
+<<<<<<< Updated upstream
   AgentRunCancelledError,
   type AgentClient,
+=======
+  type AgentClient,
+  type AgentFactReviewResult,
+>>>>>>> Stashed changes
 } from "../../src/agent/agentClient.ts";
 import type { AiClient } from "../../src/ai/aiClient.ts";
 import type { PptBackend } from "../../src/api/pptBackend.ts";
@@ -197,6 +202,7 @@ function createHarness(options: {
   pagePlan?: PagePlan;
   existingProgress?: PageProgress;
   renderFailures?: number;
+<<<<<<< Updated upstream
   visualReviews?: Array<{ pass: boolean; score: number; revision_request?: string }>;
   contentReviews?: Array<{
     pass: boolean;
@@ -210,6 +216,10 @@ function createHarness(options: {
       fix_hint?: string;
     }>;
   }>;
+=======
+  selfReviews?: Array<{ pass: boolean; score: number; revision_request?: string }>;
+  factReviews?: AgentFactReviewResult[];
+>>>>>>> Stashed changes
   authoringError?: Error;
   toolAccessError?: Error;
   authoringDelayMs?: number;
@@ -336,8 +346,19 @@ function createHarness(options: {
     refineSlide: async () => ({ title: "", subtitle: "" }),
   };
 
+<<<<<<< Updated upstream
   const visualReviewQueue = [...(options.visualReviews ?? [{ pass: true, score: 9 }])];
   const contentReviewQueue = [...(options.contentReviews ?? [{ pass: true, score: 9 }])];
+=======
+  const reviewQueue = [...(options.selfReviews ?? [{ pass: true, score: 9 }])];
+  const factReviewQueue = [...(options.factReviews ?? [{
+    pass: true,
+    score: 9,
+    unsupported_claims: [],
+    rewrite_request: "",
+    confidence: "medium" as const,
+  }])];
+>>>>>>> Stashed changes
   const agentClient: AgentClient = {
     checkToolAccess: async () => {
       checkToolAccessCalls += 1;
@@ -374,6 +395,7 @@ function createHarness(options: {
         confidence: "medium",
       };
     },
+<<<<<<< Updated upstream
     runPageContentReviewPrompt: async (prompt) => {
       contentReviewPrompts.push(prompt);
       const next = contentReviewQueue.shift() ?? { pass: true, score: 9 };
@@ -384,6 +406,14 @@ function createHarness(options: {
         rewrite_request: next.rewrite_request ?? "",
         confidence: "medium",
       };
+=======
+    runFactReviewPrompt: async () => factReviewQueue.shift() ?? {
+      pass: true,
+      score: 9,
+      unsupported_claims: [],
+      rewrite_request: "",
+      confidence: "medium",
+>>>>>>> Stashed changes
     },
     close: async () => undefined,
   };
@@ -1124,6 +1154,84 @@ describe("Deck Generation Flow Module", () => {
 
     assert.equal(completion.status, "completed");
     assert.ok(harness.contentReviewPrompts.some((prompt) => prompt.includes("Language check passes by default")));
+  });
+
+  it("keeps screenshot self-review scoped to visual issues", async () => {
+    const harness = createHarness();
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.selfReviewPrompts.length, 2);
+    for (const prompt of harness.selfReviewPrompts) {
+      assert.match(prompt, /visual quality only/);
+      assert.match(prompt, /Do not review factual correctness/);
+      assert.match(prompt, /separate grounding reviewer owns those judgments/);
+      assert.match(prompt, /revision_request must be limited to visual\/layout fixes/);
+      assert.match(prompt, /Do not request adding new numbers/);
+      assert.doesNotMatch(prompt, /follows the outline/);
+    }
+  });
+
+  it("uses actionable fact-review-fix authoring after unsupported claims", async () => {
+    const harness = createHarness({
+      factReviews: [
+        {
+          pass: false,
+          score: 2,
+          unsupported_claims: [
+            {
+              claim: "渠道综合覆盖率：当前 92%，年度目标 100%",
+              reason: "workspace context does not support the KPI values",
+              severity: "high",
+              rewrite_suggestion: "Use TBD or neutral wording",
+            },
+          ],
+          rewrite_request: "Remove unsupported KPI values.",
+          confidence: "high",
+        },
+        {
+          pass: true,
+          score: 9,
+          unsupported_claims: [],
+          rewrite_request: "",
+          confidence: "medium",
+        },
+      ],
+    });
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    const factFixPrompt = harness.authoringPrompts.find((prompt) =>
+      prompt.includes("Content grounding review failed"),
+    );
+    assert.ok(factFixPrompt);
+    assert.match(factFixPrompt, /Current slide path: \/tmp\/workspaces\/demo\/template\/slides\/page-01\.tsx/);
+    assert.match(factFixPrompt, /Current data path: \/tmp\/workspaces\/demo\/template\/data\/page-01\.json/);
+    assert.match(factFixPrompt, /Read these workspace files before editing:[\s\S]*template\/slides\/page-01\.tsx/);
+    assert.match(factFixPrompt, /Read these workspace files before editing:[\s\S]*template\/data\/page-01\.json/);
+    assert.match(factFixPrompt, /You must edit the current slide\/data files to address every unsupported_claim/);
+    assert.match(factFixPrompt, /渠道综合覆盖率：当前 92%，年度目标 100%/);
+    assert.match(factFixPrompt, /Search the current data JSON and TSX for each claim text/);
   });
 
   it("returns cancelled completion without throwing", async () => {

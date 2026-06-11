@@ -57,6 +57,7 @@ class PptxFontModel(BaseModel):
     size: int = 16
     italic: bool = False
     color: str = "000000"
+    opacity: Optional[float] = None
     font_weight: Optional[int] = 400
     underline: Optional[bool] = None
     strike: Optional[bool] = None

@@ -148,6 +148,12 @@ function isLikelySingleLineText(element: ElementAttributes): boolean {
   return element.position.height <= maxSingleLineHeight;
 }
 
+function isTitleLikeText(element: ElementAttributes): boolean {
+  const tagName = element.tagName.toLowerCase();
+  const fontSize = element.font?.size ?? 16;
+  return ["h1", "h2", "h3"].includes(tagName) || fontSize >= 44;
+}
+
 function getSingleLineSafetyPadding(
   element: ElementAttributes,
   isCompactPageNumber: boolean,
@@ -272,44 +278,63 @@ function getAdjustedTextBoxPosition(
   const position = toRoundedPosition(element);
   const alignment = resolveParagraphAlignment(element);
   const isCompactPageNumber = isCompactPageNumberText(element.innerText);
-  const shouldProtectSingleLineWidth = isCompactPageNumber
+  const isTitleLike = isTitleLikeText(element);
+  const fontSize = element.font?.size ?? 16;
+  const minSafeHeight = Math.ceil(
+    Math.max(
+      position.height,
+      element.lineHeight ?? fontSize * 1.2,
+    ) + Math.max(2, fontSize * 0.08),
+  );
+  const heightSafePosition =
+    !isTitleLike || position.height >= minSafeHeight
+      ? position
+      : {
+          ...position,
+          height: minSafeHeight,
+        };
+  const measuredWidthOverflows =
+    isTitleLike &&
+    element.measuredTextWidth !== undefined &&
+    element.measuredTextWidth > position.width;
+  const shouldProtectWidth = isCompactPageNumber
     ? true
-    : isLikelySingleLineText(element);
+    : isLikelySingleLineText(element) || measuredWidthOverflows;
 
   if (
-    !shouldProtectSingleLineWidth ||
+    !shouldProtectWidth ||
     element.measuredTextWidth === undefined
   ) {
-    return position;
+    return heightSafePosition;
   }
 
   const minSafeWidth =
     Math.ceil(element.measuredTextWidth) +
     getSingleLineSafetyPadding(element, isCompactPageNumber);
 
-  if (position.width >= minSafeWidth) {
-    return position;
+  if (heightSafePosition.width >= minSafeWidth) {
+    return heightSafePosition;
   }
 
-  const widthDelta = minSafeWidth - position.width;
+  const widthDelta = minSafeWidth - heightSafePosition.width;
   if (alignment === PptxAlignment.RIGHT) {
     return {
-      ...position,
-      left: position.left - widthDelta,
+      ...heightSafePosition,
+      left: heightSafePosition.left - widthDelta,
       width: minSafeWidth,
     };
   }
 
   if (alignment === PptxAlignment.CENTER) {
     return {
-      ...position,
-      left: position.left - Math.round(widthDelta / 2),
+      ...heightSafePosition,
+      left: heightSafePosition.left - Math.round(widthDelta / 2),
       width: minSafeWidth,
     };
   }
 
   return {
-    ...position,
+    ...heightSafePosition,
     width: minSafeWidth,
   };
 }
@@ -325,6 +350,7 @@ function toFont(element: ElementAttributes): PptxFontModel | undefined {
     font_weight: element.font.weight ?? 400,
     italic: element.font.italic ?? false,
     color: element.font.color ?? "000000",
+    opacity: element.font.opacity ?? element.opacity,
   };
 }
 

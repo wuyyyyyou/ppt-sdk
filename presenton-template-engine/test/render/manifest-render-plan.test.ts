@@ -141,6 +141,41 @@ test("prepareManifestRenderPlan resolves local slides, data paths, and theme nor
   });
 });
 
+test("prepareManifestRenderPlan emits CJK font fallbacks in slide HTML", async () => {
+  await withFixture(async ({ manifestPath, outputDir, deckDir }) => {
+    await writeFile(path.join(deckDir, "slides", "LocalSlide.tsx"), LOCAL_SLIDE, "utf8");
+    await writeFile(
+      manifestPath,
+      `${JSON.stringify({
+        title: "Chinese Font Deck",
+        slides: [
+          {
+            id: "zh-1",
+            title: "中文标题",
+            source: {
+              type: "local",
+              path: "./slides/LocalSlide.tsx",
+            },
+            data: {
+              title: "中文内容",
+            },
+          },
+        ],
+      }, null, 2)}\n`,
+      "utf8",
+    );
+
+    const plan = await prepareManifestRenderPlan({
+      manifestPath,
+      outputDir,
+    });
+
+    const html = plan.slides[0]?.html ?? "";
+    assert.match(html, /font-family: system-ui, "Noto Sans CJK SC"/);
+    assert.match(html, /"Noto Sans SC", "Microsoft YaHei", "PingFang SC"/);
+  });
+});
+
 test("prepareManifestRenderPlan keeps full plan in single-page mode", async () => {
   await withFixture(async ({ manifestPath, outputDir, deckDir }) => {
     await writeFile(path.join(deckDir, "slides", "LocalSlide.tsx"), LOCAL_SLIDE, "utf8");

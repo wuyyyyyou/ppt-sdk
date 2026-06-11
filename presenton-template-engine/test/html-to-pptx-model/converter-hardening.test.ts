@@ -57,6 +57,16 @@ test("semantic rich text only accepts supported tags without attributes", () => 
 
   assert.equal(supportsSemanticInlineRichTextNode({
     tagName: "span",
+  }), true);
+
+  assert.equal(supportsSemanticInlineRichTextNode({
+    tagName: "span",
+    attributeNames: ["style"],
+  }), true);
+
+  assert.equal(supportsSemanticInlineRichTextNode({
+    tagName: "span",
+    attributeNames: ["data-x"],
   }), false);
 
   assert.equal(supportsSemanticInlineRichTextNode({
@@ -92,6 +102,91 @@ test("center alignment hints remain on textbox paragraphs and width protection s
   assert.equal(textShape?.paragraphs[0]?.alignment, PptxAlignment.CENTER);
   assert.equal(textShape?.position.width, 230);
   assert.equal(textShape?.position.left, 145);
+});
+
+test("title-sized text boxes get height and measured-width safety", () => {
+  const slide = convertSlideElementAttributesToPptxSlideModel({
+    elements: [
+      createElementAttributes({
+        innerText: "AI Agent",
+        textHtml: '<span style="color: #5038A6">AI Agent</span>',
+        measuredTextWidth: 360,
+        lineHeight: 88,
+        font: {
+          name: "Inter",
+          size: 80,
+          weight: 800,
+          color: "111111",
+        },
+        position: {
+          left: 220,
+          top: 150,
+          width: 180,
+          height: 80,
+        },
+      }),
+    ],
+  });
+
+  const textShape = slide.shapes[0];
+  assert.equal(textShape?.shape_type, "textbox");
+  assert.equal(textShape?.paragraphs[0]?.text, '<span style="color: #5038A6">AI Agent</span>');
+  assert.ok(textShape?.position.width && textShape.position.width > 360);
+  assert.ok(textShape?.position.height && textShape.position.height > 88);
+});
+
+test("text opacity survives conversion to ppt font model", () => {
+  const slide = convertSlideElementAttributesToPptxSlideModel({
+    elements: [
+      createElementAttributes({
+        innerText: "01",
+        font: {
+          name: "Inter",
+          size: 150,
+          weight: 900,
+          color: "000000",
+          opacity: 0.03,
+        },
+      }),
+    ],
+  });
+
+  const textShape = slide.shapes[0];
+  assert.equal(textShape?.shape_type, "textbox");
+  assert.equal(textShape?.paragraphs[0]?.font?.color, "000000");
+  assert.equal(textShape?.paragraphs[0]?.font?.opacity, 0.03);
+});
+
+test("non-title measured text keeps original box position", () => {
+  const slide = convertSlideElementAttributesToPptxSlideModel({
+    elements: [
+      createElementAttributes({
+        innerText: "100",
+        textAlignHint: "center",
+        measuredTextWidth: 48,
+        lineHeight: 16,
+        font: {
+          name: "Inter",
+          size: 14,
+          weight: 400,
+          color: "111111",
+        },
+        position: {
+          left: 430,
+          top: 320,
+          width: 20,
+          height: 20,
+        },
+      }),
+    ],
+  });
+
+  const textShape = slide.shapes[0];
+  assert.equal(textShape?.shape_type, "textbox");
+  assert.equal(textShape?.position.left, 430);
+  assert.equal(textShape?.position.top, 320);
+  assert.equal(textShape?.position.width, 20);
+  assert.equal(textShape?.position.height, 20);
 });
 
 test("simple single-side borders can be recognized as connector candidates", () => {

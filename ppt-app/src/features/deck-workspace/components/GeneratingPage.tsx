@@ -196,7 +196,11 @@ function PageStageRecordGroupView(props: {
   const canRetry =
     Boolean(onRetryPage) &&
     !retryDisabled &&
+<<<<<<< Updated upstream
     canRetryPageGenerationStatus(group.pageStatus);
+=======
+    ["render_failed", "agent_failed", "needs_user_review", "agent_infrastructure_failed"].includes(group.pageStatus);
+>>>>>>> Stashed changes
   const badgeState = statusBadgeState(group.state);
 
   return (

@@ -152,7 +152,7 @@ function buildDeckSharedStyles(): string[] {
     "    }",
     "    body {",
     "      position: relative;",
-    "      font-family: system-ui, sans-serif;",
+    '      font-family: system-ui, "Noto Sans CJK SC", "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif;',
     "    }",
     `    .${DECK_VIEWER_SHELL_CLASS} {`,
     `      width: ${SLIDE_WIDTH}px;`,

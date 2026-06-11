@@ -42,6 +42,7 @@ const DEFAULT_DECK_SELECTOR = "#presentation-slides-wrapper";
 const DEFAULT_SLIDE_SELECTOR = ":scope > div > div";
 const DEBUG_HTML_TO_PPTX = process.env.PRESENTON_DEBUG_HTML_TO_PPTX === "1";
 const SUPPORTED_SEMANTIC_INLINE_RICH_TEXT_TAGS = [
+  "span",
   "strong",
   "b",
   "em",
@@ -380,7 +381,14 @@ export function supportsSemanticInlineRichTextNode(input: {
     return false;
   }
 
-  return (input.attributeNames ?? []).length === 0;
+  const attributeNames = input.attributeNames ?? [];
+  if (tagName === "span") {
+    return attributeNames.every((name) =>
+      ["class", "style"].includes(name.toLowerCase()),
+    );
+  }
+
+  return attributeNames.length === 0;
 }
 
 export function shouldSkipChildTraversal(
@@ -739,6 +747,7 @@ async function getElementAttributes(
     }
 
     const supportedInlineTextTags = new Set([
+      "span",
       "strong",
       "b",
       "em",
@@ -815,6 +824,9 @@ async function getElementAttributes(
     ): "row" | "icon-text" | "status-pill" | undefined {
       const compositionType = node?.getAttribute("data-pptx-inline-composition");
       if (!compositionType || !supportedInlineCompositionTypes.has(compositionType)) {
+        if (node instanceof HTMLElement && looksLikeInlineIconTextRow(node)) {
+          return "icon-text";
+        }
         return undefined;
       }
       return compositionType as "row" | "icon-text" | "status-pill";
@@ -825,9 +837,55 @@ async function getElementAttributes(
     ): "label" | "leading" | undefined {
       const role = node?.getAttribute("data-pptx-inline-role");
       if (!role || !supportedInlineCompositionRoles.has(role)) {
+        if (node instanceof HTMLElement && node.parentElement && looksLikeInlineIconTextRow(node.parentElement)) {
+          return looksLikeInlineLeadingMarker(node) ? "leading" : "label";
+        }
         return undefined;
       }
       return role as "label" | "leading";
+    }
+
+    function looksLikeInlineLeadingMarker(node: Element): boolean {
+      if (!(node instanceof HTMLElement)) {
+        return false;
+      }
+
+      const rect = node.getBoundingClientRect();
+      const styles = window.getComputedStyle(node);
+      const hasPaint =
+        colorToHex(styles.backgroundColor).hex !== undefined ||
+        styles.borderTopStyle === "dashed" ||
+        styles.borderTopStyle === "solid";
+      return (
+        getNormalizedTextLength(node.textContent) === 0 &&
+        rect.width > 0 &&
+        rect.height >= 0 &&
+        rect.width <= 40 &&
+        rect.height <= 20 &&
+        hasPaint
+      );
+    }
+
+    function looksLikeInlineIconTextRow(node: Element): boolean {
+      if (!(node instanceof HTMLElement)) {
+        return false;
+      }
+
+      const styles = window.getComputedStyle(node);
+      if (styles.display !== "flex" && styles.display !== "inline-flex") {
+        return false;
+      }
+
+      const children = Array.from(node.children);
+      if (children.length !== 2) {
+        return false;
+      }
+
+      const [leading, label] = children;
+      return (
+        looksLikeInlineLeadingMarker(leading) &&
+        getNormalizedTextLength(label.textContent) > 0
+      );
     }
 
     function isSmallInlineLeadingNode(node: Element): boolean {
@@ -965,7 +1023,17 @@ async function getElementAttributes(
         return false;
       }
 
-      if (node.getAttributeNames().length > 0) {
+      const attributeNames = node.getAttributeNames();
+      if (
+        tagName === "span" &&
+        !attributeNames.every((name) =>
+          ["class", "style"].includes(name.toLowerCase()),
+        )
+      ) {
+        return false;
+      }
+
+      if (tagName !== "span" && attributeNames.length > 0) {
         return false;
       }
 
@@ -981,6 +1049,28 @@ async function getElementAttributes(
         return false;
       }
 
+      if (node.getAttribute("data-pptx-no-text-aggregate") === "true") {
+        return false;
+      }
+
+      const rect = node.getBoundingClientRect();
+      const computedStyles = window.getComputedStyle(node);
+      const isFooterLikeSplitRow =
+        (computedStyles.display === "flex" ||
+          computedStyles.display === "inline-flex") &&
+        computedStyles.justifyContent === "space-between" &&
+        rect.top >= 640 &&
+        rect.height > 0 &&
+        rect.height <= 80 &&
+        node.children.length >= 2;
+      if (isFooterLikeSplitRow) {
+        return false;
+      }
+
+      if (looksLikeInlineIconTextRow(node)) {
+        return false;
+      }
+
       const tagName = node.tagName.toLowerCase();
       if (!supportedTextContainers.has(tagName)) {
         return false;
@@ -991,6 +1081,13 @@ async function getElementAttributes(
       }
 
       if (getNormalizedTextLength(node.textContent) === 0) {
+        return false;
+      }
+
+      if (
+        (rect.height > 0 && rect.height <= 2 && rect.width >= 24) ||
+        (rect.width > 0 && rect.width <= 2 && rect.height >= 24)
+      ) {
         return false;
       }
 
@@ -1392,6 +1489,7 @@ async function getElementAttributes(
         size: Number.isNaN(fontSize) ? undefined : fontSize,
         weight: Number.isNaN(fontWeight) ? undefined : fontWeight,
         color: fontColorResult.hex,
+        opacity: fontColorResult.opacity,
         italic: fontStyle === "italic",
       };
 

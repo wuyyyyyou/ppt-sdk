@@ -1,28 +1,41 @@
 {
-  "title": "Strategic Comparison Lens",
-  "subtitle": "Summarize the comparison through three dimensions before detailed evidence.",
+  "title": "Key Insights & Recommendations",
+  "subtitle": "Strategic directions for navigating the East Asian economic landscape.",
   "footerText": "Red Blue Professional | Three Topic Cards",
   "pageNumber": "03",
   "cards": [
     {
       "number": "01",
-      "title": "Scale Advantage",
-      "description": "China anchors the comparison with a larger consumer base, manufacturing depth, and broad domestic demand.",
-      "tone": "china"
+      "title": "Strategy",
+      "icon": "N",
+      "points": [
+        "Focus on high value-add sectors to combat commoditization.",
+        "Diversify markets regionally to reduce dependency.",
+        "Accelerate digital transformation across traditional industries."
+      ],
+      "tone": "purple"
     },
     {
       "number": "02",
-      "title": "Maturity Signal",
-      "description": "Japan provides a benchmark for quality, advanced manufacturing, and institutional market maturity.",
-      "tone": "japan"
+      "title": "Risks",
+      "icon": "!",
+      "points": [
+        "Geopolitical friction impacting trade flows and stability.",
+        "Demographic headwinds shrinking the labor force.",
+        "Technology barriers and decoupling in critical sectors."
+      ],
+      "tone": "china"
     },
     {
       "number": "03",
-      "title": "Innovation Momentum",
-      "description": "Korea highlights high R&D intensity, semiconductor leadership, and fast global cultural diffusion.",
-      "tone": "korea"
+      "title": "Actions",
+      "icon": "^",
+      "points": [
+        "Strengthen R&D investment and global talent acquisition.",
+        "Optimize supply chains for dual circulation resilience.",
+        "Enhance ESG standards and regulatory compliance."
+      ],
+      "tone": "green"
     }
-  ],
-  "insightTitle": "Decision note",
-  "insightText": "Use this page when the audience needs the comparison logic before reviewing detailed evidence."
+  ]
 }

@@ -54,6 +54,7 @@ export interface ElementAttributes {
     size?: number;
     weight?: number;
     color?: string;
+    opacity?: number;
     italic?: boolean;
   };
   position?: {

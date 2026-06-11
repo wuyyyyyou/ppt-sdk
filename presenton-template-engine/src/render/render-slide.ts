@@ -95,7 +95,7 @@ function buildDocumentHtml(context: BrowserRenderContext): string {
     "    }",
     "    body {",
     "      position: relative;",
-    "      font-family: system-ui, sans-serif;",
+    '      font-family: system-ui, "Noto Sans CJK SC", "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif;',
     "    }",
     "    #presentation-slides-wrapper {",
     "      width: 1280px;",

@@ -1,43 +1,49 @@
 {
   "title": "Comparison Overview",
-  "subtitle": "A structured view of the pillars shaping East Asia's market position and trajectory.",
+  "subtitle": "A deep dive into the key pillars defining the relationship and competition between Asia's two largest economies, exploring their strengths, challenges, and future trajectories.",
   "footerText": "Red Blue Professional | Agenda",
   "pageNumber": "02",
   "items": [
     {
       "number": "01",
       "title": "Economy",
-      "description": "Compare GDP size, growth direction, economic structure, and global ranking.",
+      "description": "Comparative analysis of GDP size, growth rates, economic structure, and global rankings.",
+      "icon": "$",
       "tone": "china"
     },
     {
       "number": "02",
       "title": "Demographics",
-      "description": "Review population scale, aging pressure, workforce challenges, and urbanization.",
+      "description": "Examination of population trends, aging societies, workforce challenges, and urbanization rates.",
+      "icon": "P",
       "tone": "japan"
     },
     {
       "number": "03",
-      "title": "Technology",
-      "description": "Assess R&D intensity, AI development, robotics, chips, and patent output.",
+      "title": "Technology & Innovation",
+      "description": "Insights into R&D spending, AI development, robotics leadership, and patent output.",
+      "icon": "AI",
       "tone": "korea"
     },
     {
       "number": "04",
-      "title": "Trade",
-      "description": "Map bilateral flows, export categories, supply-chain links, and dependencies.",
+      "title": "Trade & Investment",
+      "description": "Breakdown of bilateral import/export flows, key industries, and economic interdependence.",
+      "icon": "<>",
       "tone": "purple"
     },
     {
       "number": "05",
       "title": "History",
-      "description": "Trace key milestones shaping current diplomatic and market conditions.",
+      "description": "Timeline of key historical milestones, conflicts, and diplomatic normalization events.",
+      "icon": "H",
       "tone": "neutral"
     },
     {
       "number": "06",
       "title": "Culture",
-      "description": "Compare social values, business norms, and soft-power influence.",
+      "description": "Exploration of societal values, business etiquette, art, and modern soft power influence.",
+      "icon": "C",
       "tone": "purple"
     }
   ]

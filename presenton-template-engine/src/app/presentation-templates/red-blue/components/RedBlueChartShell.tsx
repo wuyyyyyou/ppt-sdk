@@ -46,12 +46,18 @@ const RedBlueChartShell = ({
         {legend.length > 0 ? (
           <div className="flex max-w-[220px] flex-none flex-wrap justify-end gap-x-[14px] gap-y-[6px]">
             {legend.map((item) => (
-              <div key={item.label} className="flex min-w-[62px] items-center gap-[7px] text-[11px] font-bold" style={{ color: redBlueTheme.colors.mutedText }}>
+              <div
+                key={item.label}
+                data-pptx-inline-composition="icon-text"
+                className="flex min-w-[62px] items-center gap-[7px] text-[11px] font-bold"
+                style={{ color: redBlueTheme.colors.mutedText }}
+              >
                 <span
+                  data-pptx-inline-role="leading"
                   className={item.dashed ? "h-0 w-[20px] flex-none border-t-[2px] border-dashed" : "h-[10px] w-[10px] flex-none rounded-full"}
                   style={item.dashed ? { borderColor: item.color } : { backgroundColor: item.color }}
                 />
-                <span className="min-w-0 whitespace-nowrap">{item.label}</span>
+                <span data-pptx-inline-role="label" className="min-w-0 whitespace-nowrap">{item.label}</span>
               </div>
             ))}
           </div>
