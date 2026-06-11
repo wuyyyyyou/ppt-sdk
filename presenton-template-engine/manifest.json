@@ -1,7 +1,7 @@
 {
-  "name": "tool-lightvoss_5433-ppt-engine-6443rj2a",
+  "name": "tool-youming_5703-ppt-engine-fmkv9ru7",
   "display_name": "ppt-engine",
-  "version": "4.0.2",
+  "version": "3.1.6",
   "description": "Anna Executa plugin for Presenton template discovery, manifest-based deck HTML generation, deck HTML to PPTX model conversion, and stability validation.",
   "author": "Anna Developer",
   "tools": [
