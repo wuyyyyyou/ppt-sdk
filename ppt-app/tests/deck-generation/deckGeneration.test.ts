@@ -586,6 +586,92 @@ describe("Deck Generation Flow Module", () => {
     assert.match(prompt, /Never ask the authoring agent to replace placeholders with real facts/);
   });
 
+  it("prevents authoring from inventing unsupported chart and KPI numbers", async () => {
+    const harness = createHarness();
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    const prompt = harness.authoringPrompts[0] ?? "";
+    assert.match(prompt, /Authoring composition strategy/);
+    assert.match(prompt, /current slide TSX\/data you receive is based on the selected blueprint/);
+    assert.match(prompt, /starting canvas, not a finished slide/);
+    assert.match(prompt, /Build the page primarily by composing existing template components/);
+    assert.match(prompt, /Do not hand-code bespoke page sections, cards, KPI blocks, charts, or decorative structures/);
+    assert.match(prompt, /Add, remove, reorder, resize, or reconfigure components/);
+    assert.match(prompt, /Avoid mechanically cloning the selected blueprint structure across pages/);
+    assert.match(prompt, /Authoring grounding source rules/);
+    assert.match(prompt, /current slide TSX and current data JSON as editable draft content, not as sources of truth/);
+    assert.match(prompt, /must not be used as evidence for new factual claims, numbers, dates, chart data, KPIs/);
+    assert.match(prompt, /Analytical conclusions must be clearly derived from provided facts/);
+    assert.match(prompt, /requires external knowledge and no source material is available/);
+    assert.doesNotMatch(prompt, /Content grounding and anti-hallucination rules/);
+    assert.doesNotMatch(prompt, /generated slide data already present in the workspace/);
+    assert.doesNotMatch(prompt, /edit only the current data JSON by default/);
+    assert.match(prompt, /Numeric and chart authoring rules/);
+    assert.match(prompt, /Do not invent, estimate, approximate, or make up plausible-looking numbers/);
+    assert.match(prompt, /set chart series values to all zeros/);
+    assert.match(prompt, /数据待补充 \/ 示意 \/ 待确认/);
+    assert.match(prompt, /do not use real-looking time labels such as FY20-FY23/);
+  });
+
+  it("keeps authored page content out of content-review grounding evidence sources", async () => {
+    const harness = createHarness();
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    const prompt = harness.contentReviewPrompts.join("\n");
+    assert.match(prompt, /Outline alignment check is intentionally disabled/);
+    assert.match(prompt, /Do not return outline_alignment issues/);
+    assert.doesNotMatch(prompt, /"type":"outline_alignment"/);
+    assert.match(prompt, /Review targets: current data JSON and current slide TSX visible content/);
+    assert.match(prompt, /Not evidence sources: current page data JSON, current page slide TSX/);
+    assert.match(prompt, /The fact that a value appears in current data JSON or current slide TSX never makes it grounded by itself/);
+  });
+
+  it("requires content review to scrutinize chart and KPI numbers as factual claims", async () => {
+    const harness = createHarness();
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    const prompt = harness.contentReviewPrompts.join("\n");
+    assert.match(prompt, /Numeric and chart data rules/);
+    assert.match(prompt, /series\[\]\.values/);
+    assert.match(prompt, /KPI values/);
+    assert.match(prompt, /revenue, cash flow, ROE/);
+    assert.match(prompt, /Chart data is not grounded merely because the selected blueprint expects a chart/);
+    assert.match(prompt, /Chart ticks, minValue, and maxValue can be treated as visual scale controls only when they do not assert a real value range/);
+  });
+
   it("guards content-review-fix against unsupported real-data requests", async () => {
     const harness = createHarness({
       contentReviews: [
@@ -624,6 +710,7 @@ describe("Deck Generation Flow Module", () => {
       prompt.includes("Page Content Review failed")
     );
     assert.ok(fixPrompt);
+    assert.match(fixPrompt, /Do not perform broad page-structure redesigns during render-fix, visual-review-fix, or content-review-fix/);
     assert.match(fixPrompt, /Never satisfy a rewrite request by inventing or approximating real-world numbers/);
     assert.match(fixPrompt, /TBD \/ 待补充/);
   });
