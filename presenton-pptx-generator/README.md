@@ -40,17 +40,17 @@ echo '{"jsonrpc":"2.0","method":"describe","id":1}' | .venv/bin/python example_p
 
 ## 打包二进制
 
-使用 Nuitka 打包，产物会写到 `bundle/` 目录下的 standalone bundle：
+使用 Nuitka 打包，产物会写到 `bundle/` 目录下的 Anna Binary 分发包：
 
 ```bash
-cd /Users/leyouming/company_program/anna/anna-executa-examples/presenton-pptx-generator
+cd presenton-pptx-generator
 ./build_binary.sh
 ```
 
 如果希望构建后顺手做一次协议和真实生成自测：
 
 ```bash
-cd /Users/leyouming/company_program/anna/anna-executa-examples/presenton-pptx-generator
+cd presenton-pptx-generator
 ./build_binary.sh --test
 ```
 
@@ -60,13 +60,24 @@ cd /Users/leyouming/company_program/anna/anna-executa-examples/presenton-pptx-ge
 
 ```text
 bundle/
-  ppt-gener/
-    ppt-gener
-    cairo/
-    ...
+  ppt-gener-v2.0.2-darwin-arm64.tar.gz
+  ppt-gener-v2.0.2-darwin-arm64.tar.gz.sha256
 ```
 
-其中主程序文件名保持固定，运行时依赖的 Cairo 动态库会随 bundle 一起分发。
+包内结构类似：
+
+```text
+bin/
+  ppt-gener
+  manifest.json
+  cairo/
+  ...
+lib/
+data/
+manifest.json
+```
+
+根目录的 `manifest.json` 是 Anna Binary 分发入口配置；`bin/manifest.json` 是插件 `describe` 返回的 Executa tool manifest。需要手动调用二进制时，先解压当前平台 archive，再调用 `bin/ppt-gener`；Windows 平台入口是 `bin/ppt-gener.exe`。
 
 ### `generatePptx`
 

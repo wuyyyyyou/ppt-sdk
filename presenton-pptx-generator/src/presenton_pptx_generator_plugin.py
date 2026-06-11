@@ -12,13 +12,25 @@ STATUS_FILE_NAME = "generate_ppt.json"
 MANIFEST_FILE_NAME = "manifest.json"
 
 
-def read_tool_manifest() -> dict[str, Any]:
-    module_path = Path(__file__).resolve()
-    candidates = [
-        module_path.parents[1] / MANIFEST_FILE_NAME,
-        Path(sys.executable).resolve().parent / MANIFEST_FILE_NAME,
-        Path.cwd() / MANIFEST_FILE_NAME,
+def build_tool_manifest_candidates(
+    *,
+    module_path: Path,
+    executable_path: Path,
+    cwd: Path,
+) -> list[Path]:
+    return [
+        executable_path.resolve().parent / MANIFEST_FILE_NAME,
+        module_path.resolve().parents[1] / MANIFEST_FILE_NAME,
+        cwd / MANIFEST_FILE_NAME,
     ]
+
+
+def read_tool_manifest() -> dict[str, Any]:
+    candidates = build_tool_manifest_candidates(
+        module_path=Path(__file__),
+        executable_path=Path(sys.executable),
+        cwd=Path.cwd(),
+    )
 
     seen: set[Path] = set()
     for candidate in candidates:

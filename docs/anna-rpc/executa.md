@@ -25,11 +25,17 @@ set PPT_ENGINE_BIN /tmp/ppt-engine-binary/bin/ppt-engine
 
 Windows 平台 archive 是 `.zip`，包内入口是 `bin/ppt-engine.exe`。archive 顶层的 `manifest.json` 是 Anna Binary 分发入口配置；插件 `describe` 返回的 Executa tool manifest 仍来自 engine 包内嵌的 tool manifest。
 
-`presenton-pptx-generator` 当前脚本定义的二进制路径是：
+`presenton-pptx-generator` 也打包成 Anna Binary 分发 archive。`--test` 会自动解压 archive 并做协议和真实生成冒烟；如果要手工执行下面的 Generator 命令，先解压当前平台 archive 并设置 `PPT_GENER_BIN`：
 
-- `./presenton-pptx-generator/bundle/ppt-gener/ppt-gener`
+```fish
+set generator_archive (ls ./presenton-pptx-generator/bundle/ppt-gener-v*-*.tar.gz | head -n 1)
+rm -rf /tmp/ppt-gener-binary
+mkdir -p /tmp/ppt-gener-binary
+tar -C /tmp/ppt-gener-binary -xzf $generator_archive
+set PPT_GENER_BIN /tmp/ppt-gener-binary/bin/ppt-gener
+```
 
-如果你本地 `presenton-pptx-generator/bundle/` 里还是旧的 `presenton-pptx-generator-plugin/` 目录，说明那是历史产物；先重新执行一次当前的 `./presenton-pptx-generator/build_binary.sh`，再按这份文档里的 `ppt-gener` 路径调用。
+Windows 平台 archive 是 `.zip`，包内入口是 `bin/ppt-gener.exe`。archive 顶层的 `manifest.json` 是 Anna Binary 分发入口配置；`bin/manifest.json` 是插件 `describe` 返回的 Executa tool manifest。
 
 ## 约定
 
@@ -322,7 +328,7 @@ jq -nc \
 
 ```fish
 jq -nc '{jsonrpc:"2.0",method:"describe",id:1}' \
-| ./presenton-pptx-generator/bundle/ppt-gener/ppt-gener \
+| $PPT_GENER_BIN \
 | jq
 ```
 
@@ -330,7 +336,7 @@ jq -nc '{jsonrpc:"2.0",method:"describe",id:1}' \
 
 ```fish
 jq -nc '{jsonrpc:"2.0",method:"health",id:1}' \
-| ./presenton-pptx-generator/bundle/ppt-gener/ppt-gener \
+| $PPT_GENER_BIN \
 | jq
 ```
 
@@ -354,7 +360,7 @@ jq -nc \
       }
     }
   }' \
-| ./presenton-pptx-generator/bundle/ppt-gener/ppt-gener \
+| $PPT_GENER_BIN \
 | jq
 ```
 

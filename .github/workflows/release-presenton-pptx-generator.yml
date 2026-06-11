@@ -2,11 +2,6 @@ name: Release presenton-pptx-generator
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: Optional release version override. Defaults to pyproject.toml version.
-        required: false
-        type: string
 
 permissions:
   contents: write
@@ -18,9 +13,6 @@ jobs:
       version: ${{ steps.meta.outputs.version }}
       release_tag: ${{ steps.meta.outputs.release_tag }}
       release_name: ${{ steps.meta.outputs.release_name }}
-      plugin_name: ${{ steps.meta.outputs.plugin_name }}
-      binary_name: ${{ steps.meta.outputs.binary_name }}
-      asset_prefix: ${{ steps.meta.outputs.asset_prefix }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -31,31 +23,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          version="${{ github.event.inputs.version }}"
-          describe_version="$(python3 -c "import tomllib; print(tomllib.load(open('presenton-pptx-generator/pyproject.toml', 'rb'))['project']['version'])")"
-          if [[ -z "$version" ]]; then
-            version="$describe_version"
-          fi
-          version="${version#v}"
-          version="${version#presenton-pptx-generator-v}"
-          if [[ "$version" != "$describe_version" ]]; then
-            echo "Release version '$version' must match describe version '$describe_version'." >&2
-            exit 1
-          fi
-
+          version="$(python3 -c "import json; print(json.load(open('presenton-pptx-generator/manifest.json', encoding='utf-8'))['version'])")"
           release_tag="presenton-pptx-generator-v${version}"
           release_name="presenton-pptx-generator v${version}"
-          plugin_name="$(python3 -c "import tomllib; project = tomllib.load(open('presenton-pptx-generator/pyproject.toml', 'rb'))['project']; scripts = project.get('scripts', {}); candidates = [name for name in scripts if name != 'presenton-pptx-generator']; assert len(candidates) == 1, f'Expected exactly one plugin script entry, found: {candidates}'; print(candidates[0])")"
-          binary_name="ppt-gener"
-          asset_prefix="${binary_name}-v${version}"
 
           {
             echo "version=$version"
             echo "release_tag=$release_tag"
             echo "release_name=$release_name"
-            echo "plugin_name=$plugin_name"
-            echo "binary_name=$binary_name"
-            echo "asset_prefix=$asset_prefix"
           } >> "$GITHUB_OUTPUT"
 
   build:
@@ -66,16 +41,13 @@ jobs:
       matrix:
         include:
           - runner: macos-15-intel
-            asset_suffix: darwin-amd64
-            archive_format: tar.gz
+            asset_suffix: darwin-x86_64
             cairo_runtime_dir: /usr/local/opt/cairo/lib
           - runner: macos-15
             asset_suffix: darwin-arm64
-            archive_format: tar.gz
             cairo_runtime_dir: /opt/homebrew/opt/cairo/lib
           - runner: windows-2025
-            asset_suffix: windows-amd64
-            archive_format: zip
+            asset_suffix: windows-x86_64
             cairo_runtime_dir: C:/msys64/mingw64/bin
     defaults:
       run:
@@ -108,235 +80,32 @@ jobs:
           install: >-
             mingw-w64-x86_64-cairo
 
-      - name: Build standalone bundle
+      - name: Verify tool manifest synchronization
+        run: |
+          set -euo pipefail
+          node scripts/sync-tool-manifests.mjs
+          git diff --exit-code
+
+      - name: Build and validate binary release package
         working-directory: ${{ env.PROJECT_DIR }}
         env:
           CAIRO_RUNTIME_DIR: ${{ matrix.cairo_runtime_dir }}
         run: ./build_binary.sh --test
-
-      - name: Package Unix release assets
-        if: ${{ matrix.archive_format == 'tar.gz' }}
-        working-directory: ${{ env.PROJECT_DIR }}
-        env:
-          PLUGIN_NAME: ${{ needs.prepare.outputs.plugin_name }}
-          BINARY_NAME: ${{ needs.prepare.outputs.binary_name }}
-          ASSET_PREFIX: ${{ needs.prepare.outputs.asset_prefix }}
-          ASSET_SUFFIX: ${{ matrix.asset_suffix }}
-          VERSION: ${{ needs.prepare.outputs.version }}
-          RELEASE_DIR: ${{ runner.temp }}/release-assets
-        run: |
-          set -euo pipefail
-
-          stage_dir="$RELEASE_DIR/stage"
-          rm -rf "$stage_dir"
-          mkdir -p "$stage_dir/bin" "$stage_dir/lib" "$stage_dir/data"
-          cp -R "bundle/$PLUGIN_NAME"/. "$stage_dir/bin"/
-          mv "$stage_dir/bin/$PLUGIN_NAME" "$stage_dir/bin/$BINARY_NAME"
-          chmod 755 "$stage_dir/bin/$BINARY_NAME"
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-          
-          manifest = {
-              "name": os.environ["PLUGIN_NAME"],
-              "version": os.environ["VERSION"],
-              "runtime": {
-                  "binary": {
-                      "entrypoint": {
-                          "default": f"bin/{os.environ['BINARY_NAME']}",
-                          "windows-x86_64": f"bin/{os.environ['BINARY_NAME']}.exe",
-                          "windows-arm64": f"bin/{os.environ['BINARY_NAME']}.exe",
-                      },
-                      "lib_dirs": ["lib"],
-                      "data_dirs": ["data"],
-                      "permissions": {f"bin/{os.environ['BINARY_NAME']}": "0o755"},
-                  }
-              },
-          }
-          Path(os.environ["RELEASE_DIR"], "stage", "manifest.json").write_text(
-              json.dumps(manifest, indent=2) + "\n",
-              encoding="utf-8",
-          )
-          PY
-
-          archive_name="${ASSET_PREFIX}-${ASSET_SUFFIX}.tar.gz"
-          tar -C "$stage_dir" -czf "$RELEASE_DIR/$archive_name" bin lib data manifest.json
-          (
-            cd "$RELEASE_DIR"
-            shasum -a 256 "$archive_name" > "$archive_name.sha256"
-          )
-
-      - name: Package Windows release assets
-        if: ${{ matrix.archive_format == 'zip' }}
-        shell: pwsh
-        env:
-          PROJECT_PATH: ${{ github.workspace }}/presenton-pptx-generator
-          PLUGIN_NAME: ${{ needs.prepare.outputs.plugin_name }}
-          BINARY_NAME: ${{ needs.prepare.outputs.binary_name }}
-          ASSET_PREFIX: ${{ needs.prepare.outputs.asset_prefix }}
-          ASSET_SUFFIX: ${{ matrix.asset_suffix }}
-          VERSION: ${{ needs.prepare.outputs.version }}
-          RELEASE_DIR: ${{ runner.temp }}/release-assets
-        run: |
-          $releaseDir = $env:RELEASE_DIR
-          $stageDir = Join-Path $releaseDir "stage"
-          New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
-          Remove-Item -LiteralPath $stageDir -Recurse -Force -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Force -Path (Join-Path $stageDir "bin") | Out-Null
-          New-Item -ItemType Directory -Force -Path (Join-Path $stageDir "lib") | Out-Null
-          New-Item -ItemType Directory -Force -Path (Join-Path $stageDir "data") | Out-Null
-
-          $sourceDir = Join-Path $env:PROJECT_PATH "bundle/$env:PLUGIN_NAME"
-          Get-ChildItem -LiteralPath $sourceDir -Force | ForEach-Object {
-            Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $stageDir "bin") -Recurse -Force
-          }
-          Rename-Item -LiteralPath (Join-Path (Join-Path $stageDir "bin") "$env:PLUGIN_NAME.exe") -NewName "$env:BINARY_NAME.exe" -Force
-
-          $manifest = [ordered]@{
-            name = $env:PLUGIN_NAME
-            version = $env:VERSION
-            runtime = [ordered]@{
-              binary = [ordered]@{
-                entrypoint = [ordered]@{
-                  default = "bin/$env:BINARY_NAME"
-                  "windows-x86_64" = "bin/$env:BINARY_NAME.exe"
-                  "windows-arm64" = "bin/$env:BINARY_NAME.exe"
-                }
-                lib_dirs = @("lib")
-                data_dirs = @("data")
-                permissions = [ordered]@{
-                  "bin/$env:BINARY_NAME" = "0o755"
-                }
-              }
-            }
-          }
-          $manifest | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $stageDir "manifest.json") -Encoding utf8
-
-          $archiveName = "$env:ASSET_PREFIX-$env:ASSET_SUFFIX.zip"
-          $archivePath = Join-Path $releaseDir $archiveName
-          Compress-Archive -LiteralPath (Join-Path $stageDir "bin"), (Join-Path $stageDir "lib"), (Join-Path $stageDir "data"), (Join-Path $stageDir "manifest.json") -DestinationPath $archivePath -Force
-
-          $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
-          Set-Content -LiteralPath "$archivePath.sha256" -Value "$hash  $archiveName" -Encoding ascii
 
       - name: Upload packaged assets
         uses: actions/upload-artifact@v4
         with:
           name: release-assets-${{ matrix.asset_suffix }}
           path: |
-            ${{ runner.temp }}/release-assets/*.tar.gz
-            ${{ runner.temp }}/release-assets/*.zip
-            ${{ runner.temp }}/release-assets/*.sha256
+            presenton-pptx-generator/bundle/*.tar.gz
+            presenton-pptx-generator/bundle/*.zip
+            presenton-pptx-generator/bundle/*.sha256
           if-no-files-found: error
-
-  smoke-test:
-    needs:
-      - prepare
-      - build
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-15-intel
-            asset_suffix: darwin-amd64
-            archive_format: tar.gz
-          - runner: macos-15
-            asset_suffix: darwin-arm64
-            archive_format: tar.gz
-          - runner: windows-2025
-            asset_suffix: windows-amd64
-            archive_format: zip
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Download packaged assets
-        uses: actions/download-artifact@v4
-        with:
-          name: release-assets-${{ matrix.asset_suffix }}
-          path: ${{ runner.temp }}/release-assets
-
-      - name: Extract Unix bundle
-        if: ${{ matrix.archive_format == 'tar.gz' }}
-        shell: bash
-        env:
-          ASSET_PREFIX: ${{ needs.prepare.outputs.asset_prefix }}
-          ASSET_SUFFIX: ${{ matrix.asset_suffix }}
-          EXTRACT_DIR: ${{ runner.temp }}/smoke
-        run: |
-          set -euo pipefail
-
-          archive_path="$RUNNER_TEMP/release-assets/${ASSET_PREFIX}-${ASSET_SUFFIX}.tar.gz"
-          mkdir -p "$EXTRACT_DIR"
-          tar -C "$EXTRACT_DIR" -xzf "$archive_path"
-
-      - name: Verify macOS dylib relocation
-        if: ${{ startsWith(matrix.runner, 'macos-') }}
-        shell: bash
-        env:
-          EXTRACT_DIR: ${{ runner.temp }}/smoke
-        run: |
-          set -euo pipefail
-
-          if otool -L "$EXTRACT_DIR"/bin/cairo/*.dylib | grep -E '/usr/local|/opt/homebrew'; then
-            echo "Found absolute Homebrew references in bundled Cairo dylibs" >&2
-            exit 1
-          fi
-
-      - name: Smoke test Unix bundle
-        if: ${{ matrix.archive_format == 'tar.gz' }}
-        shell: bash
-        env:
-          BINARY_NAME: ${{ needs.prepare.outputs.binary_name }}
-          EXTRACT_DIR: ${{ runner.temp }}/smoke
-        run: |
-          set -euo pipefail
-
-          binary_path="$EXTRACT_DIR/bin/$BINARY_NAME"
-          chmod +x "$binary_path"
-          unset DYLD_LIBRARY_PATH DYLD_FALLBACK_LIBRARY_PATH CAIROCFFI_DLL_DIRECTORIES
-          python3 presenton-pptx-generator/smoke_test_bundle.py "$binary_path"
-
-      - name: Extract Windows bundle
-        if: ${{ matrix.archive_format == 'zip' }}
-        shell: pwsh
-        env:
-          ASSET_PREFIX: ${{ needs.prepare.outputs.asset_prefix }}
-          ASSET_SUFFIX: ${{ matrix.asset_suffix }}
-          EXTRACT_DIR: ${{ runner.temp }}/smoke
-          RELEASE_DIR: ${{ runner.temp }}/release-assets
-        run: |
-          $archivePath = Join-Path $env:RELEASE_DIR "$env:ASSET_PREFIX-$env:ASSET_SUFFIX.zip"
-          New-Item -ItemType Directory -Force -Path $env:EXTRACT_DIR | Out-Null
-          Expand-Archive -LiteralPath $archivePath -DestinationPath $env:EXTRACT_DIR -Force
-
-      - name: Smoke test Windows bundle
-        if: ${{ matrix.archive_format == 'zip' }}
-        shell: pwsh
-        env:
-          BINARY_NAME: ${{ needs.prepare.outputs.binary_name }}
-          EXTRACT_DIR: ${{ runner.temp }}/smoke
-        run: |
-          $pythonExe = Join-Path $env:pythonLocation "python.exe"
-          $env:PATH = [System.String]::Join(';', @(
-            [System.Environment]::GetEnvironmentVariable('SystemRoot', 'Process'),
-            (Join-Path $env:SystemRoot 'System32')
-          ))
-          Remove-Item Env:CAIROCFFI_DLL_DIRECTORIES -ErrorAction SilentlyContinue
-          $binaryPath = Join-Path (Join-Path $env:EXTRACT_DIR "bin") "$env:BINARY_NAME.exe"
-          & $pythonExe presenton-pptx-generator/smoke_test_bundle.py $binaryPath
 
   release:
     needs:
       - prepare
-      - smoke-test
+      - build
     runs-on: ubuntu-latest
     steps:
       - name: Download packaged assets

@@ -1051,7 +1051,7 @@ wheels = [
 
 [[package]]
 name = "presenton-pptx-generator-executa"
-version = "2.0.2"
+version = "3.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
