@@ -2,13 +2,13 @@
 // Do not edit it by hand.
 
 export const PPT_ENGINE_TOOL = {
-  id: "tool-lightvoss_5433-ppt-engine-6443rj2a",
+  id: "tool-youming_5703-ppt-engine-fmkv9ru7",
   version: "3.1.5",
   displayName: "ppt-engine",
 } as const;
 
 export const PPT_GENER_TOOL = {
-  id: "tool-lightvoss_5433-ppt-gener-dc7ftcep",
+  id: "tool-youming_5703-ppt-gener-ahzv8re6",
   version: "3.0.0",
   displayName: "ppt-gener",
 } as const;
