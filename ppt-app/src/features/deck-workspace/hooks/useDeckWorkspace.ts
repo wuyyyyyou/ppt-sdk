@@ -1221,8 +1221,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       error: "",
       renderKey: workspaceReviewRenderKey(refreshedWorkspace),
     });
-    setPage("review");
-    setHistory((items) => (items.at(-1) === "review" ? items : [...items, "review"]));
+    setPage("main");
+    setHistory((items) => (items.at(-1) === "main" ? items : [...items, "main"]));
   }
 
   async function generateDeck() {

@@ -1241,7 +1241,8 @@ button {
   border-top: 1px solid rgba(17, 24, 39, 0.07);
 }
 
-.brief-page > .checkbox-row {
+.brief-page > .checkbox-row,
+.brief-page > .checkbox-row-with-help > .checkbox-row {
   min-height: 40px;
   padding: 0 2px;
   margin-bottom: 0;
