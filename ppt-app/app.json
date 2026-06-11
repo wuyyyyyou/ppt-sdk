@@ -1,8 +1,8 @@
 {
-  "name": "PPT App",
-  "slug": "anna-presenton",
-  "tagline": "A review-first Anna workspace for generating PowerPoint decks.",
-  "description": "PPT App wraps the existing PPT engine and generator tools in an Anna App workflow. It keeps task state in the engine, presents review checkpoints in the UI, and exports PPTX only after the HTML deck has been reviewed.",
+  "name": "Anna Deck",
+  "slug": "annadeck",
+  "tagline": "Shape rough ideas into polished decks.",
+  "description": "Turns notes, docs, and half-formed thoughts into a structured presentation flow, with reviewable outlines and editable slide direction.",
   "category": "productivity",
   "homepage_url": "https://example.com/ppt-app",
   "support_url": "https://example.com/ppt-app/support",

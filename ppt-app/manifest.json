@@ -6,12 +6,12 @@
   "required_executas": [
     {
       "tool_id": "tool-youming_5703-ppt-engine-fmkv9ru7",
-      "min_version": "3.1.3",
+      "min_version": "3.1.5",
       "version": "latest"
     },
     {
       "tool_id": "tool-youming_5703-ppt-gener-ahzv8re6",
-      "min_version": "2.0.1",
+      "min_version": "3.0.0",
       "version": "latest"
     }
   ],
