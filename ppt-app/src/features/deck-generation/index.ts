@@ -14,7 +14,6 @@ import {
   AUTHORING_NUMERIC_CHART_RULES,
   TSX_AUTHORING_RULES_SUMMARY,
 } from "../../agent/promptRules";
-import { CONTENT_GROUNDING_RULES } from "../../ai/groundingRules";
 import {
   AUTO_OUTPUT_LANGUAGE,
   normalizeOutputLanguage,
@@ -157,6 +156,7 @@ export interface RunDeckGenerationInput {
   onProgress: (progress: DeckGenerationProgress) => void;
   isCancelled: () => boolean;
   cancelSignal?: AbortSignal;
+  pageRefinementRequests?: Record<string, string>;
 }
 
 export interface RunDeckRefinementInput extends RunDeckGenerationInput {
@@ -321,12 +321,14 @@ function buildAuthoringPrompt(input: {
   page: PagePlanItem;
   pagePlan: PagePlan;
   outline: WorkspaceOutline;
-  attemptKind: "initial" | "render-fix" | "visual-review-fix" | "content-review-fix";
+  attemptKind: "initial" | "page-refinement" | "render-fix" | "visual-review-fix" | "content-review-fix";
+  pageRefinementRequest?: string;
   renderError?: string;
   visualReview?: AgentPageVisualReviewResult | null;
   contentReview?: AgentPageContentReviewResult | null;
 }) {
   const hasFailureFix = Boolean(input.renderError || input.visualReview || input.contentReview);
+  const pageRefinementRequest = input.pageRefinementRequest?.trim() ?? "";
 
   return [
     "You are a local file-editing Agent generating one PPT slide in a TSX-first template workspace.",
@@ -339,6 +341,7 @@ function buildAuthoringPrompt(input: {
     `Current page id: ${input.page.page_id}`,
     `Current page title: ${input.page.title}`,
     `Current page outline: ${input.page.outline}`,
+    `Authoring mode: ${input.attemptKind}`,
     `Output content language: ${readOutlineOutputLanguage(input.outline)}`,
     `Current slide path: ${input.workspaceDir}/template/${input.page.slide_path.replace(/^\.\//, "")}`,
     `Current data path: ${input.workspaceDir}/template/${input.page.data_path.replace(/^\.\//, "")}`,
@@ -364,6 +367,18 @@ function buildAuthoringPrompt(input: {
     "",
     "Before editing, think through a concise page-specific design direction, then implement it directly. In the final summary or notes, mention the main design decisions you made.",
     "When editing slide TSX/data, remove or soften unsupported specifics. Use neutral business language or TBD for missing details.",
+    pageRefinementRequest
+      ? [
+          "Page Refinement Request:",
+          pageRefinementRequest,
+          "This is a user-requested Page Refinement for the current page, not a Page Visual Review failure and not a Page Generation Retry.",
+          "Apply the request to the current page only while preserving the current Confirmed Outline, Page Plan, and Template.",
+          "Facts, numbers, dates, names, and claims explicitly stated in this Page Refinement Request may be used for this refinement run only.",
+          "Do not infer adjacent facts, complete missing time series, derive unstated metrics, or treat existing generated page content as grounded.",
+          "You may adjust page structure, component composition, hierarchy, and layout when it directly supports the Page Refinement Request.",
+          "Preserve existing grounded content unless the Page Refinement Request explicitly changes it.",
+        ].join("\n")
+      : "",
     "If a content-review-fix request asks you to add real facts, numbers, dates, or source-backed data that are not present in workspace files, treat that request as conflicting with the grounding rules. Do not add the facts; instead remove the unsupported detail, soften it, or mark it as TBD / 待补充.",
     "If render-fix or visual-review-fix asks for visual changes, fix visuals without adding new factual claims.",
     "",
@@ -413,8 +428,10 @@ function buildPageContentReviewPrompt(input: {
   page: PagePlanItem;
   pagePlan: PagePlan;
   outline: WorkspaceOutline;
+  pageRefinementRequest?: string;
 }) {
   const expectedOutputLanguage = resolveReviewExpectedOutputLanguage(input.outline);
+  const pageRefinementRequest = input.pageRefinementRequest?.trim() ?? "";
   const languageInstruction = expectedOutputLanguage
     ? [
         `Expected output language: ${expectedOutputLanguage}`,
@@ -452,9 +469,21 @@ function buildPageContentReviewPrompt(input: {
     "Do not use your own world knowledge to approve a claim.",
     "Separate review targets from evidence sources:",
     "- Review targets: current data JSON and current slide TSX visible content. These are the claims being checked.",
-    "- Evidence sources: user prompt, context rows, task_context, uploaded/source material represented in workspace artifacts, Confirmed Outline source prompt/context/task_context, Confirmed Outline text, and the current Page Plan title/outline/reason only when they restate or derive from the Confirmed Outline.",
+    pageRefinementRequest
+      ? "- Evidence sources: user prompt, context rows, task_context, uploaded/source material represented in workspace artifacts, Confirmed Outline source prompt/context/task_context, Confirmed Outline text, current Page Refinement Request facts explicitly stated below, and the current Page Plan title/outline/reason only when they restate or derive from the Confirmed Outline."
+      : "- Evidence sources: user prompt, context rows, task_context, uploaded/source material represented in workspace artifacts, Confirmed Outline source prompt/context/task_context, Confirmed Outline text, and the current Page Plan title/outline/reason only when they restate or derive from the Confirmed Outline.",
     "- Not evidence sources: current page data JSON, current page slide TSX, rendered HTML, screenshots, generated pages, generated slide data, Agent summaries, visual review output, or any content created during the current page authoring run.",
     "A claim is grounded only when it can be traced to an evidence source above. The fact that a value appears in current data JSON or current slide TSX never makes it grounded by itself.",
+    pageRefinementRequest
+      ? [
+          "",
+          "Current Page Refinement Request evidence:",
+          pageRefinementRequest,
+          "For this review pass, only facts, numbers, dates, names, and claims explicitly stated in this Page Refinement Request are grounded by it.",
+          "Do not treat the Page Refinement Request as permission to infer adjacent facts, complete missing time series, derive unstated metrics, fabricate related data, or approve generated page content that the request did not explicitly state.",
+          "A vague request such as 'use real data' or 'make the numbers accurate' is not evidence for any concrete number.",
+        ].join("\n")
+      : "",
     "",
     "Anti-hallucination rules:",
     "- Do not approve invented facts, numbers, dates, names, case studies, market sizes, citations, URLs, quotes, rankings, regulatory claims, product capabilities, company/customer details, or chart/table data.",
@@ -1189,6 +1218,8 @@ async function runPageGeneration(
     existingPageProgress?.status === "content_review_fixing"
       ? getStoredContentReview(existingPageProgress)
       : null;
+  const pageRefinementRequest =
+    input.pageRefinementRequests?.[page.page_id]?.trim() || "";
 
   while (!input.isCancelled()) {
     const attemptKind = renderError
@@ -1197,13 +1228,16 @@ async function runPageGeneration(
         ? "content-review-fix"
         : visualReview
           ? "visual-review-fix"
-          : "initial";
+          : pageRefinementRequest
+            ? "page-refinement"
+            : "initial";
     const authoringPrompt = buildAuthoringPrompt({
       workspaceDir: input.workspace.workspace_dir,
       page,
       pagePlan,
       outline: input.confirmedOutline,
       attemptKind,
+      pageRefinementRequest,
       renderError,
       visualReview,
       contentReview,
@@ -1313,6 +1347,7 @@ async function runPageGeneration(
       page,
       pagePlan,
       outline: input.confirmedOutline,
+      pageRefinementRequest,
     });
     const contentReviewTracker = createAgentRunTracker({
       flowInput: input,
@@ -1856,30 +1891,6 @@ export async function runDeckGeneration(
   };
 }
 
-function buildRefinementReview(instruction: string): AgentPageVisualReviewResult {
-  const groundedInstruction = [
-    instruction,
-    "",
-    CONTENT_GROUNDING_RULES,
-    "Apply the refinement without adding unsupported facts. If the requested improvement needs missing facts, use neutral wording or TBD.",
-  ].join("\n");
-
-  return {
-    pass: false,
-    score: 0,
-    issues: [
-      {
-        severity: "user-request",
-        area: "refinement",
-        problem: groundedInstruction,
-        fix_hint: groundedInstruction,
-      },
-    ],
-    revision_request: groundedInstruction,
-    confidence: "high",
-  };
-}
-
 export async function runDeckRefinement(
   input: RunDeckRefinementInput,
 ): Promise<DeckGenerationCompletion> {
@@ -1962,18 +1973,20 @@ export async function runDeckRefinement(
   });
   if (preflightFailure) return preflightFailure;
 
-  const review = buildRefinementReview(instruction);
+  const pageRefinementRequests: Record<string, string> = {};
   for (const page of targetPages) {
+    pageRefinementRequests[page.page_id] = instruction;
     await recordProgress(input, page, {
-      status: "visual_review_fixing",
+      status: "pending",
       render_attempts: 0,
       visual_review_attempts: 0,
       content_review_attempts: 0,
       agent_failures: 0,
+      agent_infrastructure_failures: 0,
       last_error: instruction,
       content_review: null,
-      visual_review: review,
-      review,
+      visual_review: null,
+      review: null,
     });
   }
 
@@ -1987,6 +2000,8 @@ export async function runDeckRefinement(
     startMode: "resume",
     onProgress: input.onProgress,
     isCancelled: input.isCancelled,
+    cancelSignal: input.cancelSignal,
+    pageRefinementRequests,
   });
 }
 

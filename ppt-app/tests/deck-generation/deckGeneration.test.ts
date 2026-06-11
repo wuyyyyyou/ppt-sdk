@@ -17,6 +17,7 @@ import type {
 } from "../../src/api/types.ts";
 import {
   runDeckGeneration,
+  runDeckRefinement,
   runPageGenerationRetry,
   type DeckGenerationProgress,
 } from "../../src/features/deck-generation/index.ts";
@@ -219,6 +220,7 @@ function createHarness(options: {
   const authoringPrompts: string[] = [];
   const visualReviewPrompts: string[] = [];
   const contentReviewPrompts: string[] = [];
+  const recordPageProgressInputs: Array<{ page_id: string; patch: Record<string, unknown> }> = [];
   const logs: unknown[] = [];
   const progressEvents: DeckGenerationProgress[] = [];
   let generatePagePlanCalls = 0;
@@ -269,6 +271,10 @@ function createHarness(options: {
     }),
     getPageProgress: async () => clone(progress),
     recordPageProgress: async (input) => {
+      recordPageProgressInputs.push({
+        page_id: input.page_id,
+        patch: clone(input.patch),
+      });
       progress = {
         ...progress,
         pages: progress.pages.map((page) =>
@@ -388,6 +394,7 @@ function createHarness(options: {
     authoringPrompts,
     visualReviewPrompts,
     contentReviewPrompts,
+    recordPageProgressInputs,
     logs,
     progressEvents,
     get generatePagePlanCalls() {
@@ -670,6 +677,152 @@ describe("Deck Generation Flow Module", () => {
     assert.match(prompt, /revenue, cash flow, ROE/);
     assert.match(prompt, /Chart data is not grounded merely because the selected blueprint expects a chart/);
     assert.match(prompt, /Chart ticks, minValue, and maxValue can be treated as visual scale controls only when they do not assert a real value range/);
+  });
+
+  it("uses Page Refinement authoring instead of fake visual review failure", async () => {
+    const pagePlan = makePagePlan();
+    const existingProgress = makeProgress(pagePlan, "accepted");
+    const harness = createHarness({ pagePlan, existingProgress });
+    const instruction = "Use FY23 revenue of $36.0B and operating cash flow of $6.0B.";
+
+    const completion = await runDeckRefinement({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      instruction,
+      scope: "slide",
+      pageIndex: 0,
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.authoringPrompts.length, 1);
+    const authoringPrompt = harness.authoringPrompts[0] ?? "";
+    assert.match(authoringPrompt, /page-refinement/);
+    assert.match(authoringPrompt, /Page Refinement Request/);
+    assert.match(authoringPrompt, /\$36\.0B/);
+    assert.match(authoringPrompt, /\$6\.0B/);
+    assert.match(authoringPrompt, /not a Page Visual Review failure/);
+    assert.match(authoringPrompt, /You may adjust page structure/);
+    assert.doesNotMatch(authoringPrompt, /Visual review failed\. Fix request/);
+    assert.equal(harness.progress.pages[0]?.status, "accepted");
+    assert.equal(harness.progress.pages[1]?.status, "accepted");
+  });
+
+  it("carries Page Refinement Request into content-review evidence sources", async () => {
+    const pagePlan = makePagePlan();
+    const existingProgress = makeProgress(pagePlan, "accepted");
+    const harness = createHarness({ pagePlan, existingProgress });
+    const instruction = "Replace placeholders with FY23 revenue of $36.0B; do not add FY20-FY22.";
+
+    const completion = await runDeckRefinement({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      instruction,
+      scope: "slide",
+      pageIndex: 0,
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    const prompt = harness.contentReviewPrompts[0] ?? "";
+    assert.match(prompt, /Current Page Refinement Request evidence/);
+    assert.match(prompt, /FY23 revenue of \$36\.0B/);
+    assert.match(prompt, /only facts, numbers, dates, names, and claims explicitly stated/);
+    assert.match(prompt, /Do not treat the Page Refinement Request as permission to infer adjacent facts/);
+    assert.match(prompt, /complete missing time series/);
+    assert.match(prompt, /A vague request such as 'use real data'/);
+    assert.match(prompt, /Review targets: current data JSON and current slide TSX visible content/);
+    assert.match(prompt, /Not evidence sources: current page data JSON, current page slide TSX/);
+  });
+
+  it("keeps Page Refinement Request run-scoped without page-progress schema changes", async () => {
+    const pagePlan = makePagePlan();
+    const existingProgress = makeProgress(pagePlan, "accepted");
+    const harness = createHarness({ pagePlan, existingProgress });
+
+    const completion = await runDeckRefinement({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      instruction: "Use FY23 revenue of $36.0B.",
+      scope: "slide",
+      pageIndex: 0,
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    const refinementReset = harness.recordPageProgressInputs.find(
+      (input) => input.page_id === "page-01" && input.patch.status === "pending",
+    );
+    assert.ok(refinementReset);
+    assert.equal(Object.hasOwn(refinementReset.patch, "pageRefinementRequest"), false);
+    assert.equal(Object.hasOwn(refinementReset.patch, "refinement_request"), false);
+    assert.equal(refinementReset.patch.visual_review, null);
+    assert.equal(refinementReset.patch.review, null);
+    assert.equal(
+      harness.recordPageProgressInputs.some((input) =>
+        Object.hasOwn(input.patch, "refinement_request") ||
+        Object.hasOwn(input.patch, "pageRefinementRequest")
+      ),
+      false,
+    );
+  });
+
+  it("routes quick slide refinement instructions through Page Refinement semantics", async () => {
+    const pagePlan = makePagePlan();
+    const existingProgress = makeProgress(pagePlan, "accepted");
+    const harness = createHarness({ pagePlan, existingProgress });
+    const instruction = [
+      "Change only the current slide layout direction while preserving its factual content and key message.",
+      "Make the slide better for an executive report: emphasize conclusion-first structure, concise evidence, and decision-ready framing.",
+      "You may restructure the current slide TSX and data, and you may reference available blueprints/components for layout ideas.",
+      "Do not modify page-plan.json, manifest slide ids, other pages, or unrelated shared files.",
+      "Do not add unsupported facts, numbers, dates, names, citations, examples, or claims.",
+      "If content does not fit the requested layout, prioritize truthful omission or TBD over invention.",
+    ].join("\n");
+
+    const completion = await runDeckRefinement({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      instruction,
+      scope: "slide",
+      pageIndex: 0,
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    const authoringPrompt = harness.authoringPrompts[0] ?? "";
+    assert.match(authoringPrompt, /Authoring mode: page-refinement/);
+    assert.match(authoringPrompt, /Page Refinement Request/);
+    assert.match(authoringPrompt, /preserving its factual content and key message/);
+    assert.match(authoringPrompt, /Do not add unsupported facts, numbers, dates, names, citations, examples, or claims/);
+    assert.doesNotMatch(authoringPrompt, /Visual review failed\. Fix request/);
+    assert.ok(harness.contentReviewPrompts.length > 0);
+    assert.ok(harness.visualReviewPrompts.length > 0);
+    assert.equal(harness.deckRenderCalls, 1);
   });
 
   it("guards content-review-fix against unsupported real-data requests", async () => {
@@ -1132,7 +1285,7 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.deckRenderCalls, 0);
   });
 
-  it("still resumes visual review fixing pages for deck refinement", async () => {
+  it("resumes existing visual review fixing pages as visual-review-fix", async () => {
     const pagePlan = makePagePlan();
     const existingProgress = makeProgress(pagePlan);
     existingProgress.pages[0] = { ...existingProgress.pages[0], status: "accepted" };

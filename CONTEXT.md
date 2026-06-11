@@ -102,6 +102,14 @@ A transient Agent Session infrastructure failure where the platform cannot conti
 **Page Generation Retry**:
 The action of rerunning one Failed or Interrupted Page Generation against the current Confirmed Outline, Page Plan, and Template, with a fresh attempt budget. It applies to the selected page only and does not imply regenerating the whole Deck.
 
+**Page Refinement**:
+A user-requested revision of one accepted Page Generation Unit after Deck Generation, using the user's refinement request as the active instruction for that page while preserving the current Confirmed Outline, Page Plan, and Template.
+_Avoid_: Page Generation Retry, Page Visual Review, Visual Review Fix
+
+**Page Refinement Request**:
+The user's active instruction for a Page Refinement during the current run. It is an evidence source only for facts, numbers, dates, names, and claims explicitly stated in the request, and does not authorize inferred adjacent facts or generated page content as grounded.
+_Avoid_: Visual Review Issue, Rewrite Request
+
 **Deck Generation Resume**:
 The user action that continues an Interrupted Deck Generation by re-running its Interrupted Page Generations, pending pages, and pages whose only failure was infrastructure (e.g. an Agent Session Cache Miss), while keeping accepted pages and leaving genuinely Failed Page Generations (content, render, or needs-review) untouched. Those are re-attempted only through Page Generation Retry.
 _Avoid_: Regenerate, Restart — those discard accepted pages and start the whole Deck over.
