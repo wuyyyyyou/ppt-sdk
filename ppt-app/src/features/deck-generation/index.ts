@@ -10,6 +10,7 @@ import {
 } from "../../agent/agentClient";
 import {
   AUTHORING_COMPOSITION_STRATEGY,
+  COMPONENT_SOURCE_CONTRACT_RULES,
   AUTHORING_GROUNDING_SOURCE_RULES,
   AUTHORING_NUMERIC_CHART_RULES,
   TSX_AUTHORING_RULES_SUMMARY,
@@ -46,6 +47,15 @@ const ATTEMPT_LIMITS = {
   agent: 5,
 };
 const PAGE_GENERATION_CONCURRENCY = 3;
+
+type RenderFailurePhase = "pre-render-typecheck" | "render";
+
+interface RenderFailureHistoryItem {
+  attempt: number;
+  phase: RenderFailurePhase;
+  error: string;
+  timestamp: string;
+}
 
 export type DeckGenerationStep =
   | "page-plan"
@@ -354,11 +364,13 @@ function buildAuthoringPrompt(input: {
   attemptKind: "initial" | "page-refinement" | "render-fix" | "visual-review-fix" | "content-review-fix";
   pageRefinementRequest?: string;
   renderError?: string;
+  renderFailureHistory?: RenderFailureHistoryItem[];
   visualReview?: AgentPageVisualReviewResult | null;
   contentReview?: AgentPageContentReviewResult | null;
 }) {
   const hasFailureFix = Boolean(input.renderError || input.visualReview || input.contentReview);
   const pageRefinementRequest = input.pageRefinementRequest?.trim() ?? "";
+  const renderFailureHistory = (input.renderFailureHistory ?? []).slice(-10);
 
   return [
     "You are a local file-editing Agent generating one PPT slide in a TSX-first template workspace.",
@@ -399,6 +411,8 @@ function buildAuthoringPrompt(input: {
     "",
     AUTHORING_COMPOSITION_STRATEGY,
     "",
+    COMPONENT_SOURCE_CONTRACT_RULES,
+    "",
     AUTHORING_GROUNDING_SOURCE_RULES,
     "",
     AUTHORING_NUMERIC_CHART_RULES,
@@ -428,6 +442,13 @@ function buildAuthoringPrompt(input: {
           "A failure report is provided for this pass. Fix the reported failure first.",
           "Make only the design or content changes that support the fix.",
           "Do not introduce unrelated redesigns, new content, or broad refactors during a fix pass.",
+        ].join("\n")
+      : "",
+    input.renderError && renderFailureHistory.length > 0
+      ? [
+          "Consecutive render failure history:",
+          "The following JSON array contains consecutive render failures for this page in the current run. Each item is one failed render or pre-render check attempt. Use it to avoid repeating the same failed fix.",
+          JSON.stringify(renderFailureHistory, null, 2),
         ].join("\n")
       : "",
     input.renderError ? `Render error to fix:\n${input.renderError}` : "",
@@ -642,6 +663,12 @@ function appendTextToLines(lines: string[], chunk: string, limit: number) {
   if (lines.length > limit) {
     lines.splice(0, lines.length - limit);
   }
+}
+
+function classifyRenderFailurePhase(message: string): RenderFailurePhase {
+  return message.includes("Pre-render TypeScript check failed")
+    ? "pre-render-typecheck"
+    : "render";
 }
 
 function createAgentRunTracker(input: {
@@ -1254,6 +1281,14 @@ async function runPageGeneration(
     existingPageProgress?.status === "render_fixing"
       ? existingPageProgress.last_error
       : "";
+  let renderFailureHistory: RenderFailureHistoryItem[] = renderError
+    ? [{
+        attempt: renderAttempts,
+        phase: classifyRenderFailurePhase(renderError),
+        error: renderError,
+        timestamp: existingPageProgress?.updated_at ?? new Date().toISOString(),
+      }]
+    : [];
   let visualReview =
     reviewSettings.visualReviewEnabled && existingPageProgress?.status === "visual_review_fixing"
       ? getStoredVisualReview(existingPageProgress)
@@ -1283,6 +1318,7 @@ async function runPageGeneration(
       attemptKind,
       pageRefinementRequest,
       renderError,
+      renderFailureHistory,
       visualReview,
       contentReview,
     });
@@ -1539,9 +1575,16 @@ async function runPageGeneration(
         last_error: "",
       });
       input.setProgress(progress);
+      renderFailureHistory = [];
     } catch (error) {
       renderAttempts += 1;
       renderError = error instanceof Error ? error.message : String(error);
+      renderFailureHistory.push({
+        attempt: renderAttempts,
+        phase: classifyRenderFailurePhase(renderError),
+        error: renderError,
+        timestamp: new Date().toISOString(),
+      });
       progress = await recordProgress(input, page, {
         status: renderAttempts >= attemptLimits.render ? "render_failed" : "render_fixing",
         render_attempts: renderAttempts,

@@ -20,6 +20,9 @@ import {
   buildDeckHtmlPagesAndScreenshotsFromManifest,
   buildDeckPageScreenshotFromManifest,
 } from "../render/build-deck-from-manifest.js";
+import type { DeckManifestInput, DeckManifestSlideInput } from "../render/types.js";
+import { resolveLocalModulePath } from "../local-template/loader.js";
+import { assertLocalTemplateTypecheck } from "../local-template/typecheck.js";
 import { launchManagedBrowser } from "../runtime/browser-runtime.js";
 import { convertDeckHtmlToPptxModel } from "../html-to-pptx-model/index.js";
 import type {
@@ -110,6 +113,10 @@ const PPTX_EXPORT_STATUSES: AppPptxExportJob["status"][] = [
   "completed",
   "failed",
 ];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
 
 function padDatePart(value: number): string {
   return String(value).padStart(2, "0");
@@ -782,6 +789,37 @@ function readSelectedTemplateManifestPath(workspace: AppWorkspaceResult): string
   }
 
   return normalizedManifestPath;
+}
+
+async function readManifestLocalSlideSourcePath(input: {
+  manifestPath: string;
+  pageIndex: number;
+}): Promise<{ absolutePath: string; slideId: string } | null> {
+  const manifestDir = path.dirname(input.manifestPath);
+  const rawValue = JSON.parse(await readFile(input.manifestPath, "utf8")) as unknown;
+  if (!isRecord(rawValue)) {
+    throw new Error("Selected template manifest root must be a JSON object");
+  }
+
+  const manifest = rawValue as unknown as DeckManifestInput;
+  const slide = manifest.slides?.[input.pageIndex] as DeckManifestSlideInput | undefined;
+  if (!slide) {
+    throw new Error(`Manifest does not contain page index ${input.pageIndex}`);
+  }
+
+  if (slide.source?.type !== "local") {
+    return null;
+  }
+
+  const absolutePath = await resolveLocalModulePath(
+    slide.source.path,
+    manifestDir,
+    `Slide "${slide.id}"`,
+  );
+  return {
+    absolutePath,
+    slideId: slide.id,
+  };
 }
 
 function readSelectedTemplateDir(workspace: AppWorkspaceResult): string {
@@ -2311,6 +2349,17 @@ export async function renderAppWorkspacePagePreview(
   const renderedAt = new Date().toISOString();
   const htmlOutputDir = path.join(workspace.workspace_dir, "output", "page-preview-html");
   const screenshotOutputDir = path.join(workspace.workspace_dir, "output", "screenshots");
+  const localSlide = await readManifestLocalSlideSourcePath({
+    manifestPath,
+    pageIndex: input.page_index,
+  });
+  if (localSlide) {
+    await assertLocalTemplateTypecheck({
+      entryPath: localSlide.absolutePath,
+      cwd: path.dirname(manifestPath),
+      label: `slide "${localSlide.slideId}"`,
+    });
+  }
   const result = await buildDeckPageScreenshotFromManifest({
     manifestPath,
     outputDir: screenshotOutputDir,

@@ -508,7 +508,40 @@ describe("Deck Generation Flow Module", () => {
 
     assert.equal(completion.status, "completed");
     assert.ok(harness.authoringPrompts.some((prompt) => prompt.includes("Render error to fix")));
+    assert.ok(harness.authoringPrompts.some((prompt) =>
+      prompt.includes("Read the component source file, not only components/README.md")
+    ));
     assert.ok(harness.progressEvents.some((progress) => progress.step === "page-render"));
+  });
+
+  it("includes consecutive render failure history in repeated render-fix prompts", async () => {
+    const harness = createHarness({
+      pagePlan: makePagePlanWithCount(1),
+      renderFailures: 2,
+    });
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    const historyPrompts = harness.authoringPrompts.filter((prompt) =>
+      prompt.includes("Consecutive render failure history")
+    );
+    const promptWithHistory = historyPrompts.at(-1);
+    assert.ok(promptWithHistory);
+    assert.match(promptWithHistory, /Each item is one failed render or pre-render check attempt/);
+    assert.match(promptWithHistory, /"attempt": 1/);
+    assert.match(promptWithHistory, /"attempt": 2/);
+    assert.match(promptWithHistory, /"phase": "render"/);
+    assert.match(promptWithHistory, /render broke/);
   });
 
   it("uses visual-review-fix authoring after a failed visual review", async () => {
