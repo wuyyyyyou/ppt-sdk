@@ -232,8 +232,33 @@ ARCHIVE_PATH="$BUNDLE_DIR/$ARCHIVE_NAME"
 rm -rf "$BUNDLE_DIR" "$RAW_BINARY_DIR" "$RELEASE_STAGE_DIR" "$TEST_EXTRACT_DIR"
 mkdir -p "$BUNDLE_DIR" "$RAW_BINARY_DIR"
 
-echo "[1/7] Building dist artifacts..."
-npm run build
+echo "[1/7] Building dist artifacts and template previews..."
+npm run build:full
+
+node -e '
+const fs = require("node:fs");
+const path = require("node:path");
+
+const indexPath = path.join(process.cwd(), "dist", "template-previews", "index.json");
+const index = JSON.parse(fs.readFileSync(indexPath, "utf8"));
+const groups = Object.values(index.groups || {});
+const imageCount = groups.reduce((count, group) => count + (Array.isArray(group.images) ? group.images.length : 0), 0);
+
+if (groups.length === 0 || imageCount === 0) {
+  throw new Error(`Template preview index is empty: ${indexPath}`);
+}
+
+for (const group of groups) {
+  for (const image of group.images || []) {
+    const imagePath = path.join(process.cwd(), "dist", "template-previews", image.relative_path);
+    if (!fs.statSync(imagePath).isFile()) {
+      throw new Error(`Template preview image is missing: ${imagePath}`);
+    }
+  }
+}
+
+console.log(`Verified ${imageCount} template preview image(s) across ${groups.length} group(s).`);
+'
 
 echo "[2/7] Preparing SEA app bundle..."
 PRESENTON_TEMPLATE_ENGINE_SEA_PREP_DIR="$SEA_PREP_DIR" node ./scripts/prepare-sea-bundle.mjs
