@@ -43,6 +43,7 @@ import type {
   UpdateWorkspacePagesInput,
   UpdateWorkspaceTitleInput,
   WorkspaceOutline,
+  WorkspaceDefaultsResult,
   WorkspaceResult
 } from "./types";
 import { createAnnaPptBackend } from "./annaPptBackend";
@@ -51,6 +52,7 @@ import { detectRuntimeMode } from "../runtime/runtimeMode";
 
 export interface PptBackend {
   listWorkspaces(): Promise<ListWorkspacesResult>;
+  getWorkspaceDefaults(): Promise<WorkspaceDefaultsResult>;
   createWorkspace(input: CreateWorkspaceInput): Promise<WorkspaceResult>;
   openWorkspace(input: OpenWorkspaceInput): Promise<WorkspaceResult>;
   appendWorkspaceLog(input: AppendWorkspaceLogInput): Promise<AppendWorkspaceLogResult>;

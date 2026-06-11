@@ -55,6 +55,12 @@ import {
   createPptxJobExportProgress,
 } from "../exportProgressDisplay";
 import { restoreDeckGenerationProgress } from "../workspaceRecovery";
+import {
+  DEFAULT_PAGE_REVIEW_SETTINGS,
+  pageReviewSettingsToWorkspaceSettings,
+  readPageReviewSettings,
+  type PageReviewSettings,
+} from "../reviewSettings";
 import type {
   ContextRow,
   DeckReviewRenderState,
@@ -102,6 +108,7 @@ export interface DeckWorkspaceActions {
   setPanelMode: (mode: PanelMode) => void;
   setPrompt: (value: string) => void;
   setReviewOutlineFirst: (value: boolean) => void;
+  setFastMode: (enabled: boolean) => Promise<void>;
   setDeckTitle: (value: string) => void;
   setCurrentSlide: (index: number) => void;
   setOutlineFeedback: (value: string) => void;
@@ -160,6 +167,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [toast, setToast] = useState("");
   const [prompt, setPrompt] = useState("");
   const [reviewOutlineFirst, setReviewOutlineFirst] = useState(false);
+  const [pageReviewSettings, setPageReviewSettings] = useState<PageReviewSettings>(
+    DEFAULT_PAGE_REVIEW_SETTINGS
+  );
   const [contextRows, setContextRows] = useState<ContextRow[]>([]);
   const [deckTitle, setDeckTitle] = useState(t.deck.title);
   const [deck, setDeck] = useState<Slide[]>(initialDeck);
@@ -498,6 +508,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return setting;
   }
 
+  function workspacePageReviewSettings(workspace: WorkspaceResult | null) {
+    return readPageReviewSettings(workspaceSettingsToState(workspace));
+  }
+
   function normalizePersistedContextRow(value: unknown): ContextRow | null {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       return null;
@@ -711,6 +725,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     options: { syncEmptyContextRows?: boolean } = {}
   ) {
     setCurrentWorkspace(workspace);
+    setPageReviewSettings(workspacePageReviewSettings(workspace));
     if (!exportInFlightRef.current) {
       setExportArtifactWithProgress(readWorkspaceExportArtifactPath(workspace));
       void refreshWorkspaceExportArtifact(workspace, exportRefreshVersionRef.current);
@@ -806,6 +821,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         const scan = await nextBackend.listWorkspaces();
         if (cancelled) return;
         setWorkspaceScan(scan);
+        const defaults = await nextBackend.getWorkspaceDefaults();
+        if (cancelled) return;
+        setPageReviewSettings(readPageReviewSettings(defaults.setting));
         const templates = await nextBackend.listTemplates();
         if (cancelled) return;
         setTemplateGroups(templates.templates);
@@ -1212,7 +1230,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     try {
       const cancelSignal = beginCancellableGeneration();
-      const workspace = await ensureCurrentWorkspace();
+      const workspace = await refreshCurrentWorkspaceSnapshot();
       if (!workspace) return;
       if (!selectedTemplateGroupId) {
         showToast(t.template.helper);
@@ -1360,7 +1378,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (!backend || !aiClient || !agentClient) return;
 
     const cancelSignal = beginCancellableGeneration();
-    const workspace = await ensureCurrentWorkspace();
+    const workspace = await refreshCurrentWorkspaceSnapshot();
     if (!workspace) return;
     if (!selectedTemplateGroupId) {
       showToast(t.template.helper);
@@ -1826,6 +1844,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return workspace;
   }
 
+  async function refreshCurrentWorkspaceSnapshot() {
+    if (!backend) return null;
+    const workspace = await ensureCurrentWorkspace();
+    if (!workspace) return null;
+
+    const refreshedWorkspace = await backend.openWorkspace({
+      workspace_dir: workspace.workspace_dir,
+    });
+    setCurrentWorkspace(refreshedWorkspace);
+    setPageReviewSettings(workspacePageReviewSettings(refreshedWorkspace));
+    return refreshedWorkspace;
+  }
+
   function readSelectedTemplateGroup(workspace: WorkspaceResult | null) {
     const templateRecord =
       workspace?.template && typeof workspace.template === "object" && !Array.isArray(workspace.template)
@@ -2156,6 +2187,41 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
+  async function setFastMode(enabled: boolean) {
+    if (!backend) return;
+
+    setWorkspaceSettingsSaving(true);
+    setWorkspaceError("");
+    try {
+      const workspace = await ensureCurrentWorkspace();
+      if (!workspace) return;
+      const setting = workspaceSettingsToState(workspace);
+      const currentReviewSettings = readPageReviewSettings(setting);
+      const nextReviewSettings: PageReviewSettings = {
+        ...currentReviewSettings,
+        contentReviewEnabled: !enabled,
+        visualReviewEnabled: !enabled,
+      };
+      const updatedWorkspace = await backend.updateWorkspaceSettings({
+        workspace_dir: workspace.workspace_dir,
+        persist_as_default: true,
+        setting: {
+          ...setting,
+          ...pageReviewSettingsToWorkspaceSettings(nextReviewSettings),
+        },
+      });
+      applyWorkspace(updatedWorkspace);
+      setWorkspaceScan(await backend.listWorkspaces());
+      showToast(t.status.settingsSaved);
+    } catch (error) {
+      setWorkspaceError(
+        error instanceof Error ? error.message : "Failed to save settings."
+      );
+    } finally {
+      setWorkspaceSettingsSaving(false);
+    }
+  }
+
   async function saveWorkspaceTitle(title: string) {
     if (!backend || !currentWorkspace) return;
 
@@ -2193,11 +2259,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setStage("generating");
     setPage("main");
     try {
-      const workspace = await ensureCurrentWorkspace();
-      if (!workspace) return;
-      const refreshedWorkspace = await backend.openWorkspace({
-        workspace_dir: workspace.workspace_dir
-      });
+      const refreshedWorkspace = await refreshCurrentWorkspaceSnapshot();
+      if (!refreshedWorkspace) return;
       const completion = await runDeckRefinement({
         backend,
         aiClient,
@@ -2236,11 +2299,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setStage("generating");
     setPage("main");
     try {
-      const workspace = await ensureCurrentWorkspace();
-      if (!workspace) return;
-      const refreshedWorkspace = await backend.openWorkspace({
-        workspace_dir: workspace.workspace_dir
-      });
+      const refreshedWorkspace = await refreshCurrentWorkspaceSnapshot();
+      if (!refreshedWorkspace) return;
       const completion = await runDeckRefinement({
         backend,
         aiClient,
@@ -2404,13 +2464,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setStage("generating");
     setPage("main");
     try {
-      const workspace = await ensureCurrentWorkspace();
+      const workspace = await refreshCurrentWorkspaceSnapshot();
       if (!workspace) return;
-      const refreshedWorkspace = await reconcileWorkspaceInterruptedPages(
-        await backend.openWorkspace({
-          workspace_dir: workspace.workspace_dir,
-        }),
-      );
+      const refreshedWorkspace = await reconcileWorkspaceInterruptedPages(workspace);
       applyWorkspace(refreshedWorkspace);
       const completion = await runDeckGeneration({
         backend,
@@ -2442,11 +2498,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setStage("generating");
     setPage("main");
     try {
-      const workspace = await ensureCurrentWorkspace();
-      if (!workspace) return;
-      const refreshedWorkspace = await backend.openWorkspace({
-        workspace_dir: workspace.workspace_dir
-      });
+      const refreshedWorkspace = await refreshCurrentWorkspaceSnapshot();
+      if (!refreshedWorkspace) return;
       const completion = await runPageGenerationRetry({
         backend,
         aiClient,
@@ -2568,6 +2621,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     toast,
     prompt,
     reviewOutlineFirst,
+    pageReviewSettings,
     contextRows,
     deckTitle,
     deck,
@@ -2602,6 +2656,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setPanelMode,
     setPrompt,
     setReviewOutlineFirst,
+    setFastMode,
     setDeckTitle,
     setCurrentSlide,
     setOutlineFeedback,

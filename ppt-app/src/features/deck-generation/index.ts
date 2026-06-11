@@ -32,6 +32,7 @@ import type {
 } from "../../api/types";
 import type { PptBackend } from "../../api/pptBackend";
 import type { Locale } from "../../i18n/messages";
+import { readPageReviewSettings } from "../deck-workspace/reviewSettings";
 import {
   isActivePageGenerationStatus,
   isGenuinelyFailedPageGenerationStatus,
@@ -253,24 +254,46 @@ function generationText(locale: Locale) {
   };
 }
 
-function mapProgress(progress: PageProgress | null): DeckGenerationProgressPage[] {
+function mapProgress(
+  progress: PageProgress | null,
+  attemptLimits: typeof ATTEMPT_LIMITS = ATTEMPT_LIMITS,
+): DeckGenerationProgressPage[] {
   return progress?.pages.map((page) => ({
     page_id: page.page_id,
     index: page.index,
     title: page.title,
     status: page.status,
     render_attempts: page.render_attempts,
-    render_attempt_limit: ATTEMPT_LIMITS.render,
+    render_attempt_limit: attemptLimits.render,
     visual_review_attempts: page.visual_review_attempts,
-    visual_review_attempt_limit: ATTEMPT_LIMITS.visualReview,
+    visual_review_attempt_limit: attemptLimits.visualReview,
     content_review_attempts: page.content_review_attempts ?? 0,
-    content_review_attempt_limit: ATTEMPT_LIMITS.contentReview,
+    content_review_attempt_limit: attemptLimits.contentReview,
     agent_failures: page.agent_failures,
-    agent_failure_limit: ATTEMPT_LIMITS.agent,
+    agent_failure_limit: attemptLimits.agent,
     agent_infrastructure_failures: page.agent_infrastructure_failures,
     last_error: page.last_error,
     last_screenshot_path: page.last_screenshot_path,
   })) ?? [];
+}
+
+function readWorkspaceSetting(workspace: WorkspaceResult): Record<string, unknown> {
+  return workspace.setting && typeof workspace.setting === "object" && !Array.isArray(workspace.setting)
+    ? (workspace.setting as Record<string, unknown>)
+    : {};
+}
+
+function getAttemptLimits(input: { workspace: WorkspaceResult }) {
+  const settings = readPageReviewSettings(readWorkspaceSetting(input.workspace));
+  return {
+    ...ATTEMPT_LIMITS,
+    contentReview: settings.contentReviewFailureLimit,
+    visualReview: settings.visualReviewFailureLimit,
+  };
+}
+
+function getReviewSettings(input: { workspace: WorkspaceResult }) {
+  return readPageReviewSettings(readWorkspaceSetting(input.workspace));
 }
 
 function createProgress(
@@ -278,13 +301,14 @@ function createProgress(
   progress: PageProgress | null,
   stream?: DeckGenerationStream | null,
   activeStreams?: Iterable<DeckGenerationStream>,
+  attemptLimits: typeof ATTEMPT_LIMITS = ATTEMPT_LIMITS,
 ): DeckGenerationProgress {
   const activeStreamList = activeStreams
     ? Array.from(activeStreams).sort((left, right) => left.page_index - right.page_index)
     : [];
   return {
     ...value,
-    pages: mapProgress(progress),
+    pages: mapProgress(progress, attemptLimits),
     stream: stream ?? undefined,
     activeStreams: activeStreamList.length > 0 ? activeStreamList.map((item) => ({
       ...item,
@@ -295,13 +319,19 @@ function createProgress(
 }
 
 function emit(
-  input: Pick<DeckGenerationContext, "onProgress">,
+  input: Pick<DeckGenerationContext, "onProgress"> & Partial<Pick<DeckGenerationContext, "workspace">>,
   value: Omit<DeckGenerationProgress, "pages">,
   progress: PageProgress | null,
   stream?: DeckGenerationStream | null,
   activeStreams?: Iterable<DeckGenerationStream>,
 ) {
-  input.onProgress(createProgress(value, progress, stream, activeStreams));
+  input.onProgress(createProgress(
+    value,
+    progress,
+    stream,
+    activeStreams,
+    input.workspace ? getAttemptLimits({ workspace: input.workspace }) : ATTEMPT_LIMITS,
+  ));
 }
 
 async function recordProgress(
@@ -977,6 +1007,7 @@ async function preflightAgentToolAccess(input: {
   locale: Locale;
   onProgress: (progress: DeckGenerationProgress) => void;
   progress: PageProgress | null;
+  attemptLimits?: typeof ATTEMPT_LIMITS;
   totalPages: number;
   currentPageIndex: number | null;
 }): Promise<DeckGenerationCompletion | null> {
@@ -994,6 +1025,9 @@ async function preflightAgentToolAccess(input: {
         totalPages: input.totalPages,
       },
       input.progress,
+      undefined,
+      undefined,
+      input.attemptLimits,
     );
     input.onProgress(progress);
     return failedCompletion({
@@ -1161,6 +1195,8 @@ async function runPageGeneration(
 ): Promise<PageGenerationResult> {
   const text = generationText(input.locale);
   const totalPages = pagePlan.pages.length;
+  const reviewSettings = getReviewSettings(input);
+  const attemptLimits = getAttemptLimits(input);
   let progress = input.getProgress();
   const existingPageProgress = getProgressPage(progress, page.page_id);
 
@@ -1211,11 +1247,11 @@ async function runPageGeneration(
       ? existingPageProgress.last_error
       : "";
   let visualReview =
-    existingPageProgress?.status === "visual_review_fixing"
+    reviewSettings.visualReviewEnabled && existingPageProgress?.status === "visual_review_fixing"
       ? getStoredVisualReview(existingPageProgress)
       : null;
   let contentReview =
-    existingPageProgress?.status === "content_review_fixing"
+    reviewSettings.contentReviewEnabled && existingPageProgress?.status === "content_review_fixing"
       ? getStoredContentReview(existingPageProgress)
       : null;
   const pageRefinementRequest =
@@ -1318,132 +1354,19 @@ async function runPageGeneration(
         agent_failures: agentFailures,
       });
       progress = await recordProgress(input, page, {
-        status: agentFailures >= ATTEMPT_LIMITS.agent ? "agent_failed" : "authoring",
+        status: agentFailures >= attemptLimits.agent ? "agent_failed" : "authoring",
         agent_failures: agentFailures,
         last_error: message,
       });
       input.setProgress(progress);
-      if (agentFailures >= ATTEMPT_LIMITS.agent) break;
+      if (agentFailures >= attemptLimits.agent) break;
       continue;
     }
 
-    progress = await recordProgress(input, page, {
-      status: "content_review",
-      last_error: "",
-    });
-    input.setProgress(progress);
-    emitRuntime(
-      input,
-      {
-        step: "page-content-review",
-        message: buildDeckGenerationSummary(input, progress, totalPages),
-        currentPageIndex: page.index,
-        totalPages,
-      },
-      progress,
-    );
-    const contentReviewPrompt = buildPageContentReviewPrompt({
-      workspaceDir: input.workspace.workspace_dir,
-      page,
-      pagePlan,
-      outline: input.confirmedOutline,
-      pageRefinementRequest,
-    });
-    const contentReviewTracker = createAgentRunTracker({
-      flowInput: input,
-      page,
-      step: "page-content-review",
-      message: text.reviewingContent(page),
-      totalPages,
-      progress: input.getProgress,
-      prompt: contentReviewPrompt,
-      kind: "page-content-review",
-    });
-    try {
-      contentReview = await input.agentClient.runPageContentReviewPrompt(
-        contentReviewPrompt,
-        buildAgentRunOptions(input, contentReviewTracker.onStreamEvent, contentReviewTracker.logContext),
-      );
-      await contentReviewTracker.flush("completed", {
-        parsed_review: true,
-        review: contentReview,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (isAgentRunCancelledError(error)) {
-        await contentReviewTracker.flush("error", { cancelled: true });
-        return {
-          page,
-          reason: "cancelled",
-          progress: input.getProgress() ?? progress,
-        };
-      }
-      if (isAgentInfrastructureError(error)) {
-        const displayMessage = localizeAgentInfrastructureMessage(error, input.locale);
-        agentInfrastructureFailures += 1;
-        await contentReviewTracker.flush("error", {
-          error: displayMessage,
-          agent_infrastructure_failures: agentInfrastructureFailures,
-          active_session_limit: error.activeSessionLimit,
-        });
-        progress = await recordProgress(input, page, {
-          status: "agent_infrastructure_failed",
-          agent_infrastructure_failures: agentInfrastructureFailures,
-          last_error: displayMessage,
-        });
-        input.setProgress(progress);
-        return {
-          page,
-          reason: "agent_infrastructure",
-          progress,
-          error: {
-            type: "agent_infrastructure",
-            message: displayMessage,
-            page_id: page.page_id,
-            page_index: page.index,
-            page_status: "agent_infrastructure_failed",
-          },
-        };
-      }
-
-      agentFailures += 1;
-      await contentReviewTracker.flush("error", {
-        error: message,
-        agent_failures: agentFailures,
-      });
+    if (reviewSettings.contentReviewEnabled) {
       progress = await recordProgress(input, page, {
-        status: agentFailures >= ATTEMPT_LIMITS.agent ? "agent_failed" : "content_review",
-        agent_failures: agentFailures,
-        last_error: message,
-      });
-      input.setProgress(progress);
-      if (agentFailures >= ATTEMPT_LIMITS.agent) break;
-      continue;
-    }
-
-    progress = await recordProgress(input, page, {
-      content_review: contentReview,
-      review: contentReview,
-    });
-    input.setProgress(progress);
-
-    if (!contentReviewPassed(contentReview)) {
-      contentReviewAttempts += 1;
-      const rewriteRequest =
-        contentReview.rewrite_request ||
-        contentReview.issues
-          .map((issue) => `${issue.type}: ${issue.evidence}: ${issue.reason}`)
-          .join("\n") ||
-        "Page Content Review failed; fix language, outline alignment, or grounding issues.";
-      progress = await recordProgress(input, page, {
-        status:
-          contentReviewAttempts >= ATTEMPT_LIMITS.contentReview
-            ? "needs_user_review"
-            : "content_review_fixing",
-        content_review_attempts: contentReviewAttempts,
-        content_review: contentReview,
-        review: contentReview,
-        last_error: rewriteRequest,
+        status: "content_review",
+        last_error: "",
       });
       input.setProgress(progress);
       emitRuntime(
@@ -1456,11 +1379,133 @@ async function runPageGeneration(
         },
         progress,
       );
-      if (contentReviewAttempts >= ATTEMPT_LIMITS.contentReview) break;
-      continue;
-    }
+      const contentReviewPrompt = buildPageContentReviewPrompt({
+        workspaceDir: input.workspace.workspace_dir,
+        page,
+        pagePlan,
+        outline: input.confirmedOutline,
+        pageRefinementRequest,
+      });
+      const contentReviewTracker = createAgentRunTracker({
+        flowInput: input,
+        page,
+        step: "page-content-review",
+        message: text.reviewingContent(page),
+        totalPages,
+        progress: input.getProgress,
+        prompt: contentReviewPrompt,
+        kind: "page-content-review",
+      });
+      try {
+        contentReview = await input.agentClient.runPageContentReviewPrompt(
+          contentReviewPrompt,
+          buildAgentRunOptions(input, contentReviewTracker.onStreamEvent, contentReviewTracker.logContext),
+        );
+        await contentReviewTracker.flush("completed", {
+          parsed_review: true,
+          review: contentReview,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (isAgentRunCancelledError(error)) {
+          await contentReviewTracker.flush("error", { cancelled: true });
+          return {
+            page,
+            reason: "cancelled",
+            progress: input.getProgress() ?? progress,
+          };
+        }
+        if (isAgentInfrastructureError(error)) {
+          const displayMessage = localizeAgentInfrastructureMessage(error, input.locale);
+          agentInfrastructureFailures += 1;
+          await contentReviewTracker.flush("error", {
+            error: displayMessage,
+            agent_infrastructure_failures: agentInfrastructureFailures,
+            active_session_limit: error.activeSessionLimit,
+          });
+          progress = await recordProgress(input, page, {
+            status: "agent_infrastructure_failed",
+            agent_infrastructure_failures: agentInfrastructureFailures,
+            last_error: displayMessage,
+          });
+          input.setProgress(progress);
+          return {
+            page,
+            reason: "agent_infrastructure",
+            progress,
+            error: {
+              type: "agent_infrastructure",
+              message: displayMessage,
+              page_id: page.page_id,
+              page_index: page.index,
+              page_status: "agent_infrastructure_failed",
+            },
+          };
+        }
 
-    contentReview = null;
+        agentFailures += 1;
+        await contentReviewTracker.flush("error", {
+          error: message,
+          agent_failures: agentFailures,
+        });
+        progress = await recordProgress(input, page, {
+          status: agentFailures >= attemptLimits.agent ? "agent_failed" : "content_review",
+          agent_failures: agentFailures,
+          last_error: message,
+        });
+        input.setProgress(progress);
+        if (agentFailures >= attemptLimits.agent) break;
+        continue;
+      }
+
+      progress = await recordProgress(input, page, {
+        content_review: contentReview,
+        review: contentReview,
+      });
+      input.setProgress(progress);
+
+      if (!contentReviewPassed(contentReview)) {
+        contentReviewAttempts += 1;
+        const rewriteRequest =
+          contentReview.rewrite_request ||
+          contentReview.issues
+            .map((issue) => `${issue.type}: ${issue.evidence}: ${issue.reason}`)
+            .join("\n") ||
+          "Page Content Review failed; fix language, outline alignment, or grounding issues.";
+        progress = await recordProgress(input, page, {
+          status:
+            contentReviewAttempts >= attemptLimits.contentReview
+              ? "needs_user_review"
+              : "content_review_fixing",
+          content_review_attempts: contentReviewAttempts,
+          content_review: contentReview,
+          review: contentReview,
+          last_error: rewriteRequest,
+        });
+        input.setProgress(progress);
+        emitRuntime(
+          input,
+          {
+            step: "page-content-review",
+            message: buildDeckGenerationSummary(input, progress, totalPages),
+            currentPageIndex: page.index,
+            totalPages,
+          },
+          progress,
+        );
+        if (contentReviewAttempts >= attemptLimits.contentReview) break;
+        continue;
+      }
+
+      contentReview = null;
+    } else {
+      progress = await recordProgress(input, page, {
+        content_review: null,
+        review: null,
+        last_error: "",
+      });
+      input.setProgress(progress);
+    }
     let preview: RenderWorkspacePagePreviewResult;
     try {
       progress = await recordProgress(input, page, { status: "rendering" });
@@ -1490,13 +1535,27 @@ async function runPageGeneration(
       renderAttempts += 1;
       renderError = error instanceof Error ? error.message : String(error);
       progress = await recordProgress(input, page, {
-        status: renderAttempts >= ATTEMPT_LIMITS.render ? "render_failed" : "render_fixing",
+        status: renderAttempts >= attemptLimits.render ? "render_failed" : "render_fixing",
         render_attempts: renderAttempts,
         last_error: renderError,
       });
       input.setProgress(progress);
-      if (renderAttempts >= ATTEMPT_LIMITS.render) break;
+      if (renderAttempts >= attemptLimits.render) break;
       continue;
+    }
+
+    if (!reviewSettings.visualReviewEnabled) {
+      progress = await recordProgress(input, page, {
+        status: "accepted",
+        visual_review: null,
+        last_error: "",
+      });
+      input.setProgress(progress);
+      return {
+        page,
+        reason: "accepted",
+        progress,
+      };
     }
 
     emitRuntime(
@@ -1582,12 +1641,12 @@ async function runPageGeneration(
         agent_failures: agentFailures,
       });
       progress = await recordProgress(input, page, {
-        status: agentFailures >= ATTEMPT_LIMITS.agent ? "agent_failed" : "visual_review",
+        status: agentFailures >= attemptLimits.agent ? "agent_failed" : "visual_review",
         agent_failures: agentFailures,
         last_error: message,
       });
       input.setProgress(progress);
-      if (agentFailures >= ATTEMPT_LIMITS.agent) break;
+      if (agentFailures >= attemptLimits.agent) break;
       continue;
     }
     progress = await recordProgress(input, page, {
@@ -1613,7 +1672,7 @@ async function runPageGeneration(
     visualReviewAttempts += 1;
     progress = await recordProgress(input, page, {
       status:
-        visualReviewAttempts >= ATTEMPT_LIMITS.visualReview
+        visualReviewAttempts >= attemptLimits.visualReview
           ? "needs_user_review"
           : "visual_review_fixing",
       visual_review_attempts: visualReviewAttempts,
@@ -1622,7 +1681,7 @@ async function runPageGeneration(
       last_error: visualReview.revision_request,
     });
     input.setProgress(progress);
-    if (visualReviewAttempts >= ATTEMPT_LIMITS.visualReview) break;
+    if (visualReviewAttempts >= attemptLimits.visualReview) break;
   }
 
   progress = input.getProgress() ?? await input.backend.getPageProgress({
@@ -1711,6 +1770,7 @@ export async function runDeckGeneration(
   input: RunDeckGenerationInput,
 ): Promise<DeckGenerationCompletion> {
   const text = generationText(input.locale);
+  const attemptLimits = getAttemptLimits(input);
   if (input.confirmedOutline.status !== "confirmed") {
     const progress = createProgress(
       {
@@ -1720,6 +1780,9 @@ export async function runDeckGeneration(
         totalPages: 0,
       },
       null,
+      undefined,
+      undefined,
+      attemptLimits,
     );
     input.onProgress(progress);
     return failedCompletion({
@@ -1745,6 +1808,9 @@ export async function runDeckGeneration(
           totalPages: input.confirmedOutline.items.length,
         },
         null,
+        undefined,
+        undefined,
+        attemptLimits,
       );
       input.onProgress(progress);
       return failedCompletion({
@@ -1760,6 +1826,7 @@ export async function runDeckGeneration(
       locale: input.locale,
       onProgress: input.onProgress,
       progress: resumeArtifacts.progress,
+      attemptLimits,
       totalPages: resumeArtifacts.pagePlan.pages.length,
       currentPageIndex: null,
     });
@@ -1771,6 +1838,7 @@ export async function runDeckGeneration(
       locale: input.locale,
       onProgress: input.onProgress,
       progress: null,
+      attemptLimits,
       totalPages: input.confirmedOutline.items.length,
       currentPageIndex: null,
     });
@@ -1801,6 +1869,7 @@ export async function runDeckGeneration(
       infrastructureFailure.progress,
       null,
       runtime.activeStreams.values(),
+      attemptLimits,
     );
     input.onProgress(failedProgress);
     return failedCompletion({
@@ -1820,6 +1889,7 @@ export async function runDeckGeneration(
       progress,
       null,
       runtime.activeStreams.values(),
+      attemptLimits,
     );
     input.onProgress(cancelledProgress);
     return {
@@ -1845,6 +1915,7 @@ export async function runDeckGeneration(
       progress,
       null,
       runtime.activeStreams.values(),
+      attemptLimits,
     );
     input.onProgress(failedProgress);
     return failedCompletion({
@@ -1894,6 +1965,7 @@ export async function runDeckGeneration(
 export async function runDeckRefinement(
   input: RunDeckRefinementInput,
 ): Promise<DeckGenerationCompletion> {
+  const attemptLimits = getAttemptLimits(input);
   const instruction = input.instruction.trim();
   if (!instruction) {
     const progress = createProgress(
@@ -1904,6 +1976,9 @@ export async function runDeckRefinement(
         totalPages: 0,
       },
       null,
+      undefined,
+      undefined,
+      attemptLimits,
     );
     input.onProgress(progress);
     return failedCompletion({
@@ -1928,6 +2003,9 @@ export async function runDeckRefinement(
         totalPages: input.confirmedOutline.items.length,
       },
       progress,
+      undefined,
+      undefined,
+      attemptLimits,
     );
     input.onProgress(staleProgress);
     return failedCompletion({
@@ -1952,6 +2030,9 @@ export async function runDeckRefinement(
         totalPages: pagePlan.pages.length,
       },
       progress,
+      undefined,
+      undefined,
+      attemptLimits,
     );
     input.onProgress(missingProgress);
     return failedCompletion({
@@ -1968,6 +2049,7 @@ export async function runDeckRefinement(
     locale: input.locale,
     onProgress: input.onProgress,
     progress,
+    attemptLimits,
     totalPages: pagePlan.pages.length,
     currentPageIndex: input.scope === "slide" ? input.pageIndex ?? null : null,
   });
@@ -2009,6 +2091,7 @@ export async function runPageGenerationRetry(
   input: RunPageGenerationRetryInput,
 ): Promise<DeckGenerationCompletion> {
   const text = generationText(input.locale);
+  const attemptLimits = getAttemptLimits(input);
   const [pagePlan, initialProgress] = await Promise.all([
     input.backend.getPagePlan({ workspace_dir: input.workspace.workspace_dir }),
     input.backend.getPageProgress({ workspace_dir: input.workspace.workspace_dir }),
@@ -2022,6 +2105,9 @@ export async function runPageGenerationRetry(
         totalPages: input.confirmedOutline.items.length,
       },
       initialProgress,
+      undefined,
+      undefined,
+      attemptLimits,
     );
     input.onProgress(staleProgress);
     return failedCompletion({
@@ -2043,6 +2129,9 @@ export async function runPageGenerationRetry(
         totalPages: pagePlan.pages.length,
       },
       initialProgress,
+      undefined,
+      undefined,
+      attemptLimits,
     );
     input.onProgress(missingProgress);
     return failedCompletion({
@@ -2059,6 +2148,7 @@ export async function runPageGenerationRetry(
     locale: input.locale,
     onProgress: input.onProgress,
     progress: initialProgress,
+    attemptLimits,
     totalPages: pagePlan.pages.length,
     currentPageIndex: page.index,
   });
@@ -2095,6 +2185,9 @@ export async function runPageGenerationRetry(
         totalPages: pagePlan.pages.length,
       },
       result.progress,
+      undefined,
+      undefined,
+      attemptLimits,
     );
     input.onProgress(failedProgress);
     return failedCompletion({
@@ -2112,6 +2205,9 @@ export async function runPageGenerationRetry(
         totalPages: pagePlan.pages.length,
       },
       progress,
+      undefined,
+      undefined,
+      attemptLimits,
     );
     input.onProgress(cancelledProgress);
     return {
@@ -2135,6 +2231,9 @@ export async function runPageGenerationRetry(
         totalPages: pagePlan.pages.length,
       },
       progress,
+      undefined,
+      undefined,
+      attemptLimits,
     );
     input.onProgress(failedProgress);
     return failedCompletion({

@@ -54,6 +54,10 @@ export interface WorkspaceSettings {
   visual_tone?: string;
   typography?: string;
   theme_id?: string;
+  content_review_enabled?: boolean;
+  content_review_failure_limit?: number;
+  visual_review_enabled?: boolean;
+  visual_review_failure_limit?: number;
   updated_at?: string;
   [key: string]: unknown;
 }
@@ -126,6 +130,11 @@ export interface UpdateWorkspaceSettingsInput {
   workspace_dir: string;
   setting: WorkspaceSettings;
   persist_as_default?: boolean;
+}
+
+export interface WorkspaceDefaultsResult {
+  workspace_root: string;
+  setting: WorkspaceSettings;
 }
 
 export interface UpdateWorkspaceTitleInput {

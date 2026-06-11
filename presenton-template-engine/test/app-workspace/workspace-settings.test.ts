@@ -24,7 +24,11 @@ test("workspace settings can be saved as defaults for newly created workspaces",
   const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-workspace-settings-home-"));
   process.env.HOME = homeDir;
 
-  const { createAppWorkspace, updateAppWorkspaceSettings } = await import("../../src/app-workspace/index.ts");
+  const {
+    createAppWorkspace,
+    getAppWorkspaceDefaults,
+    updateAppWorkspaceSettings,
+  } = await import("../../src/app-workspace/index.ts");
 
   try {
     await writeJson(path.join(homeDir, "anna-workspace", "ppt", "setting.json"), {
@@ -39,6 +43,10 @@ test("workspace settings can be saved as defaults for newly created workspaces",
 
     assert.equal(firstSetting.output_language, "English");
     assert.equal(firstSetting.text_density, "detailed");
+    assert.equal(firstSetting.content_review_enabled, true);
+    assert.equal(firstSetting.content_review_failure_limit, 5);
+    assert.equal(firstSetting.visual_review_enabled, true);
+    assert.equal(firstSetting.visual_review_failure_limit, 5);
     assert.equal("language" in firstSetting, false);
 
     await updateAppWorkspaceSettings({
@@ -62,21 +70,35 @@ test("workspace settings can be saved as defaults for newly created workspaces",
       setting: {
         output_language: "中文",
         text_density: "light",
+        content_review_enabled: false,
+        content_review_failure_limit: 99,
+        visual_review_enabled: false,
+        visual_review_failure_limit: -1,
       },
     });
 
+    const defaults = await getAppWorkspaceDefaults();
     const updatedGlobalSetting = await readJson<Record<string, unknown>>(
       path.join(homeDir, "anna-workspace", "ppt", "setting.json"),
     );
 
+    assert.deepEqual(defaults.setting, updatedGlobalSetting);
     assert.equal(updatedGlobalSetting.output_language, "中文");
     assert.equal(updatedGlobalSetting.text_density, "light");
+    assert.equal(updatedGlobalSetting.content_review_enabled, false);
+    assert.equal(updatedGlobalSetting.content_review_failure_limit, 10);
+    assert.equal(updatedGlobalSetting.visual_review_enabled, false);
+    assert.equal(updatedGlobalSetting.visual_review_failure_limit, 0);
 
     const inherited = await createAppWorkspace({ title: "Inherited" });
     const inheritedSetting = await readJson<Record<string, unknown>>(path.join(inherited.workspace_dir, "setting.json"));
 
     assert.equal(inheritedSetting.output_language, "中文");
     assert.equal(inheritedSetting.text_density, "light");
+    assert.equal(inheritedSetting.content_review_enabled, false);
+    assert.equal(inheritedSetting.content_review_failure_limit, 10);
+    assert.equal(inheritedSetting.visual_review_enabled, false);
+    assert.equal(inheritedSetting.visual_review_failure_limit, 0);
 
     const secondWorkspaceDir = createWorkspaceDir(homeDir);
     const second = await updateAppWorkspaceSettings({

@@ -17,6 +17,7 @@ import {
   getAppExportArtifact,
   exportAppPdf,
   forkTemplateGroup,
+  getAppWorkspaceDefaults,
   getAppTemplateGroup,
   getAppTemplatePlanningContext,
   getAppTemplatePreview,
@@ -570,6 +571,10 @@ async function toolListDiscoveredTemplateGroupSummaries(args) {
 
 async function toolAppListWorkspaces() {
   return listAppWorkspaces();
+}
+
+async function toolAppGetWorkspaceDefaults() {
+  return getAppWorkspaceDefaults();
 }
 
 async function toolAppCreateWorkspace(args) {
@@ -1207,6 +1212,7 @@ async function toolForkTemplateGroup(args) {
 
 const TOOL_DISPATCH = {
   app_list_workspaces: toolAppListWorkspaces,
+  app_get_workspace_defaults: toolAppGetWorkspaceDefaults,
   app_create_workspace: toolAppCreateWorkspace,
   app_open_workspace: toolAppOpenWorkspace,
   app_append_workspace_log: toolAppAppendWorkspaceLog,

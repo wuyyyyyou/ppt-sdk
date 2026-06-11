@@ -232,6 +232,7 @@ function createHarness(options: {
 
   const backend: PptBackend = {
     listWorkspaces: async () => ({ workspace_root: "", has_workspaces: false, latest_workspace: null, workspaces: [] }),
+    getWorkspaceDefaults: async () => ({ workspace_root: workspace.workspace_root, setting: {} }),
     createWorkspace: async () => workspace,
     openWorkspace: async () => workspace,
     appendWorkspaceLog: async (input) => {
@@ -570,6 +571,114 @@ describe("Deck Generation Flow Module", () => {
     assert.ok(harness.authoringPrompts.some((prompt) => prompt.includes("Page Content Review failed")));
     assert.ok(harness.authoringPrompts.some((prompt) => prompt.includes("content-review-fix")));
     assert.ok(harness.progressEvents.some((progress) => progress.step === "page-content-review"));
+  });
+
+  it("skips content and visual reviews in fast mode while still rendering pages", async () => {
+    const harness = createHarness();
+    const fastWorkspace: WorkspaceResult = {
+      ...workspace,
+      setting: {
+        content_review_enabled: false,
+        visual_review_enabled: false,
+      },
+    };
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace: fastWorkspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.contentReviewPrompts.length, 0);
+    assert.equal(harness.visualReviewPrompts.length, 0);
+    assert.equal(harness.renderCalls, 2);
+    assert.ok(harness.progress.pages.every((page) => page.status === "accepted"));
+    assert.ok(harness.progressEvents.some((progress) => progress.step === "page-render"));
+    assert.ok(!harness.progressEvents.some((progress) => progress.step === "page-content-review"));
+    assert.ok(!harness.progressEvents.some((progress) => progress.step === "page-visual-review"));
+  });
+
+  it("honors configured visual review failure limit", async () => {
+    const pagePlan = makePagePlanWithCount(1);
+    const harness = createHarness({
+      pagePlan,
+      visualReviews: [{ pass: false, score: 4, revision_request: "Fix overlap" }],
+    });
+    const limitedWorkspace: WorkspaceResult = {
+      ...workspace,
+      setting: {
+        visual_review_failure_limit: 1,
+      },
+    };
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace: limitedWorkspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "failed");
+    assert.equal(harness.visualReviewPrompts.length, 1);
+    assert.equal(harness.authoringPrompts.filter((prompt) => prompt.includes("Authoring mode: visual-review-fix")).length, 0);
+    assert.equal(harness.progress.pages[0]?.status, "needs_user_review");
+    assert.equal(harness.progressEvents.at(-1)?.pages[0]?.visual_review_attempt_limit, 1);
+  });
+
+  it("honors configured content review failure limit", async () => {
+    const pagePlan = makePagePlanWithCount(1);
+    const harness = createHarness({
+      pagePlan,
+      contentReviews: [
+        {
+          pass: false,
+          score: 4,
+          rewrite_request: "Fix unsupported claim",
+          issues: [
+            {
+              type: "grounding",
+              severity: "high",
+              evidence: "Unsupported claim",
+              reason: "No supporting source was provided.",
+            },
+          ],
+        },
+      ],
+    });
+    const limitedWorkspace: WorkspaceResult = {
+      ...workspace,
+      setting: {
+        content_review_failure_limit: 1,
+      },
+    };
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace: limitedWorkspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "failed");
+    assert.equal(harness.contentReviewPrompts.length, 1);
+    assert.equal(harness.authoringPrompts.filter((prompt) => prompt.includes("Authoring mode: content-review-fix")).length, 0);
+    assert.equal(harness.renderCalls, 0);
+    assert.equal(harness.progress.pages[0]?.status, "needs_user_review");
+    assert.equal(harness.progressEvents.at(-1)?.pages[0]?.content_review_attempt_limit, 1);
   });
 
   it("treats explicit TBD placeholders as grounded review targets", async () => {

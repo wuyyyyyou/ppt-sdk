@@ -1,10 +1,11 @@
-import { Check, CheckCircle2, ChevronDown, File, ImageIcon, Palette, Search, Sparkles, Upload, X } from "lucide-react";
+import { Check, CheckCircle2, ChevronDown, File, HelpCircle, ImageIcon, Palette, Search, Sparkles, Upload, X } from "lucide-react";
 import { useState, type CSSProperties } from "react";
 import type { TemplateSummary } from "../../../api/types";
 import type { Messages } from "../../../i18n/messages";
 import type { ContextRow, LoadingKind } from "../types";
 import { TemplatePreviewModal } from "./TemplatePreviewModal";
 import { getThemePreset, THEME_PRESET_IDS } from "../themePresets";
+import { isFastModeEnabled, type PageReviewSettings } from "../reviewSettings";
 
 const SLIDE_COUNT_OPTIONS = ["auto", ...Array.from({ length: 20 }, (_, index) => String(index + 1))];
 
@@ -18,6 +19,8 @@ interface BriefPageProps {
   selectTemplate: (groupId: string) => Promise<void>;
   reviewOutlineFirst: boolean;
   setReviewOutlineFirst: (value: boolean) => void;
+  pageReviewSettings: PageReviewSettings;
+  setFastMode: (enabled: boolean) => Promise<void>;
   contextRows: ContextRow[];
   addContextRow: (row: ContextRow) => void;
   updateContextRow: (id: string, value: string) => void;
@@ -39,6 +42,8 @@ export function BriefPage(props: BriefPageProps) {
     selectTemplate,
     reviewOutlineFirst,
     setReviewOutlineFirst,
+    pageReviewSettings,
+    setFastMode,
     contextRows,
     addContextRow,
     updateContextRow,
@@ -52,6 +57,7 @@ export function BriefPage(props: BriefPageProps) {
   const isCreating =
     loading === "deck" || loading === "outline" || loading === "review";
   const isSuggestingContext = loading === "context";
+  const fastMode = isFastModeEnabled(pageReviewSettings);
 
   return (
     <section className="page active brief-page">
@@ -105,6 +111,26 @@ export function BriefPage(props: BriefPageProps) {
         </span>
         <span>{t.brief.reviewOutlineFirst}</span>
       </button>
+
+      <div className="checkbox-row-with-help">
+        <button
+          type="button"
+          className={`checkbox-row ${fastMode ? "active" : ""}`}
+          onClick={() => void setFastMode(!fastMode)}
+          aria-checked={fastMode}
+          role="switch"
+          disabled={isCreating || isSuggestingContext}
+        >
+          <span className="checkbox-custom">
+            {fastMode ? <Check size={11} strokeWidth={3} /> : null}
+          </span>
+          <span>{t.brief.fastMode}</span>
+        </button>
+        <span className="help-tooltip" tabIndex={0} aria-label={t.brief.fastModeHelp}>
+          <HelpCircle size={15} />
+          <span className="help-tooltip-content">{t.brief.fastModeHelp}</span>
+        </span>
+      </div>
 
       <div className="brief-options">
         <div>

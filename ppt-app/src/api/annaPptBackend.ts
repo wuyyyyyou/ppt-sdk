@@ -20,6 +20,7 @@ import type {
   RenderWorkspacePagePreviewResult,
   RecordPdfExportInput,
   TemplatePlanningContext,
+  WorkspaceDefaultsResult,
   WorkspaceResult
 } from "./types";
 import { PPT_ENGINE_TOOL, PPT_GENER_TOOL } from "./toolManifests.generated";
@@ -117,6 +118,8 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
   return {
     listWorkspaces: () =>
       invoke<ListWorkspacesResult>(PPT_ENGINE_TOOL_ID, "app_list_workspaces", {}),
+    getWorkspaceDefaults: () =>
+      invoke<WorkspaceDefaultsResult>(PPT_ENGINE_TOOL_ID, "app_get_workspace_defaults", {}),
     createWorkspace: (input) =>
       invoke<WorkspaceResult>(PPT_ENGINE_TOOL_ID, "app_create_workspace", input),
     openWorkspace: (input) =>

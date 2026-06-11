@@ -11,6 +11,7 @@ import type {
   DeckGenerationProgress,
   DeckGenerationStreamSnapshot
 } from "../deck-generation";
+import type { PageReviewSettings } from "./reviewSettings";
 
 export type MainStage = "brief" | "outline" | "generating" | "deck";
 export type PageId = "main" | "library" | "review" | "refine" | "export";
@@ -68,6 +69,7 @@ export interface DeckWorkspaceState {
   toast: string;
   prompt: string;
   reviewOutlineFirst: boolean;
+  pageReviewSettings: PageReviewSettings;
   contextRows: ContextRow[];
   deckTitle: string;
   deck: Slide[];

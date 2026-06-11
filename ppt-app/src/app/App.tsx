@@ -83,6 +83,8 @@ export function App() {
               selectTemplate={actions.selectTemplate}
               reviewOutlineFirst={state.reviewOutlineFirst}
               setReviewOutlineFirst={actions.setReviewOutlineFirst}
+              pageReviewSettings={state.pageReviewSettings}
+              setFastMode={actions.setFastMode}
               contextRows={state.contextRows}
               addContextRow={actions.addContextRow}
               updateContextRow={actions.updateContextRow}
@@ -160,6 +162,7 @@ export function App() {
               currentWorkspace={state.currentWorkspace}
               loading={state.workspaceLoading}
               savingSettings={state.workspaceSettingsSaving}
+              pageReviewSettings={state.pageReviewSettings}
               onBack={actions.goBack}
               onOpen={actions.openWorkspace}
               onCreateWorkspace={actions.createWorkspace}

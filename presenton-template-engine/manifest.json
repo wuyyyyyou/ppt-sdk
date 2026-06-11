@@ -1,13 +1,18 @@
 {
   "name": "tool-lightvoss_5433-ppt-engine-6443rj2a",
   "display_name": "ppt-engine",
-  "version": "3.1.3",
+  "version": "3.1.4",
   "description": "Anna Executa plugin for Presenton template discovery, manifest-based deck HTML generation, deck HTML to PPTX model conversion, and stability validation.",
   "author": "Anna Developer",
   "tools": [
     {
       "name": "app_list_workspaces",
       "description": "Scan the default PPT task workspace root and return existing ppt-YYYYMMDD-HHmmss workspaces.",
+      "parameters": []
+    },
+    {
+      "name": "app_get_workspace_defaults",
+      "description": "Read global PPT workspace defaults used by newly created workspaces without creating a workspace.",
       "parameters": []
     },
     {

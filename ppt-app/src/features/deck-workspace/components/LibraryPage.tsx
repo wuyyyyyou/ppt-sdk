@@ -11,6 +11,13 @@ import {
   AUTO_OUTPUT_LANGUAGE,
   DEFAULT_OUTPUT_LANGUAGE_OPTIONS,
 } from "../../../ai/outputLanguage";
+import {
+  pageReviewSettingsToWorkspaceSettings,
+  readPageReviewSettings,
+  REVIEW_FAILURE_LIMIT_MAX,
+  REVIEW_FAILURE_LIMIT_MIN,
+  type PageReviewSettings,
+} from "../reviewSettings";
 import { PageHeader } from "./PageHeader";
 
 interface LibraryPageProps {
@@ -20,6 +27,7 @@ interface LibraryPageProps {
   currentWorkspace: WorkspaceResult | null;
   loading: boolean;
   savingSettings: boolean;
+  pageReviewSettings: PageReviewSettings;
   onBack: () => void;
   onOpen: (workspaceDir: string) => Promise<void>;
   onCreateWorkspace: () => Promise<void>;
@@ -63,7 +71,8 @@ function toEditableSettings(workspace: WorkspaceResult | null) {
     typography:
       setting.typography === "Clean Sans"
         ? EMPTY_SETTINGS.typography
-        : normalizeSettingValue(setting.typography, EMPTY_SETTINGS.typography)
+        : normalizeSettingValue(setting.typography, EMPTY_SETTINGS.typography),
+    ...pageReviewSettingsToWorkspaceSettings(readPageReviewSettings(setting))
   };
 }
 
@@ -110,6 +119,7 @@ export function LibraryPage({
   currentWorkspace,
   loading,
   savingSettings,
+  pageReviewSettings,
   onBack,
   onOpen,
   onCreateWorkspace,
@@ -122,11 +132,14 @@ export function LibraryPage({
   const [titleDraft, setTitleDraft] = useState(getTaskTitle(currentWorkspace, t));
 
   useEffect(() => {
-    setDraft(toEditableSettings(currentWorkspace));
+    setDraft({
+      ...toEditableSettings(currentWorkspace),
+      ...pageReviewSettingsToWorkspaceSettings(pageReviewSettings)
+    });
     setTitleDraft(getTaskTitle(currentWorkspace, t));
     setEditing(false);
     setEditingTitle(false);
-  }, [currentWorkspace, t]);
+  }, [currentWorkspace, pageReviewSettings, t]);
 
   async function saveSettings() {
     await onSaveSettings(draft);
@@ -286,6 +299,32 @@ export function LibraryPage({
           editing={editing}
           onChange={(value) => setDraft((next) => ({ ...next, typography: value }))}
         />
+        <PreferenceSwitch
+          label={t.preferences.contentReviewEnabled}
+          value={draft.content_review_enabled !== false}
+          editing={editing}
+          t={t}
+          onChange={(value) => setDraft((next) => ({ ...next, content_review_enabled: value }))}
+        />
+        <PreferenceNumber
+          label={t.preferences.contentReviewFailureLimit}
+          value={Number(draft.content_review_failure_limit ?? 5)}
+          editing={editing}
+          onChange={(value) => setDraft((next) => ({ ...next, content_review_failure_limit: value }))}
+        />
+        <PreferenceSwitch
+          label={t.preferences.visualReviewEnabled}
+          value={draft.visual_review_enabled !== false}
+          editing={editing}
+          t={t}
+          onChange={(value) => setDraft((next) => ({ ...next, visual_review_enabled: value }))}
+        />
+        <PreferenceNumber
+          label={t.preferences.visualReviewFailureLimit}
+          value={Number(draft.visual_review_failure_limit ?? 5)}
+          editing={editing}
+          onChange={(value) => setDraft((next) => ({ ...next, visual_review_failure_limit: value }))}
+        />
       </div>
     </section>
   );
@@ -317,6 +356,61 @@ function WorkspaceRow(props: {
         {props.t.controls.open}
       </button>
     </article>
+  );
+}
+
+function clampReviewFailureLimit(value: number) {
+  if (!Number.isFinite(value)) return 5;
+  return Math.max(REVIEW_FAILURE_LIMIT_MIN, Math.min(REVIEW_FAILURE_LIMIT_MAX, Math.floor(value)));
+}
+
+function PreferenceSwitch(props: {
+  label: string;
+  value: boolean;
+  editing: boolean;
+  t: Messages;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <label className="pref-row">
+      <span>{props.label}</span>
+      {props.editing ? (
+        <input
+          type="checkbox"
+          checked={props.value}
+          onChange={(event) => props.onChange(event.target.checked)}
+        />
+      ) : (
+        <strong>{props.value ? props.t.preferences.enabled : props.t.preferences.disabled}</strong>
+      )}
+    </label>
+  );
+}
+
+function PreferenceNumber(props: {
+  label: string;
+  value: number;
+  editing: boolean;
+  onChange: (value: number) => void;
+}) {
+  const value = clampReviewFailureLimit(props.value);
+
+  return (
+    <label className="pref-row">
+      <span>{props.label}</span>
+      {props.editing ? (
+        <input
+          type="number"
+          min={REVIEW_FAILURE_LIMIT_MIN}
+          max={REVIEW_FAILURE_LIMIT_MAX}
+          step={1}
+          value={value}
+          onChange={(event) => props.onChange(clampReviewFailureLimit(Number(event.target.value)))}
+        />
+      ) : (
+        <strong>{value}</strong>
+      )}
+    </label>
   );
 }
 

@@ -48,6 +48,7 @@ import type {
   GetAppPagePlanInput,
   GetAppPageProgressInput,
   GetAppExportArtifactInput,
+  GetAppWorkspaceDefaultsResult,
   GetAppTemplateGroupInput,
   GetAppTemplatePlanningContextInput,
   GetAppTemplatePreviewInput,
@@ -357,7 +358,20 @@ function createDefaultSettingJson() {
     visual_tone: "",
     typography: "",
     theme_id: "finance-red-classic",
+    content_review_enabled: true,
+    content_review_failure_limit: 5,
+    visual_review_enabled: true,
+    visual_review_failure_limit: 5,
   };
+}
+
+function normalizeReviewFailureLimit(value: unknown): number {
+  const numericValue = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return 5;
+  }
+
+  return Math.max(0, Math.min(10, Math.floor(numericValue)));
 }
 
 function normalizeSettingJson(setting: unknown): Record<string, unknown> {
@@ -387,6 +401,15 @@ function normalizeSettingJson(setting: unknown): Record<string, unknown> {
   if (nextSetting.typography === "Clean Sans") {
     nextSetting.typography = "";
   }
+
+  nextSetting.content_review_enabled = nextSetting.content_review_enabled !== false;
+  nextSetting.visual_review_enabled = nextSetting.visual_review_enabled !== false;
+  nextSetting.content_review_failure_limit = normalizeReviewFailureLimit(
+    nextSetting.content_review_failure_limit,
+  );
+  nextSetting.visual_review_failure_limit = normalizeReviewFailureLimit(
+    nextSetting.visual_review_failure_limit,
+  );
 
   return nextSetting;
 }
@@ -445,6 +468,13 @@ async function ensureWorkspaceSetting(): Promise<Record<string, unknown>> {
 
 async function readGlobalWorkspaceDefaults(): Promise<Record<string, unknown>> {
   return ensureWorkspaceSetting();
+}
+
+export async function getAppWorkspaceDefaults(): Promise<GetAppWorkspaceDefaultsResult> {
+  return {
+    workspace_root: WORKSPACE_ROOT,
+    setting: await readGlobalWorkspaceDefaults(),
+  };
 }
 
 async function updateGlobalWorkspaceDefaults(

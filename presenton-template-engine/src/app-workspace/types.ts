@@ -86,6 +86,11 @@ export interface UpdateAppWorkspaceSettingsInput {
   persist_as_default?: boolean;
 }
 
+export interface GetAppWorkspaceDefaultsResult {
+  workspace_root: string;
+  setting: Record<string, unknown>;
+}
+
 export interface UpdateAppWorkspaceTitleInput {
   workspace_dir: string;
   title: string;

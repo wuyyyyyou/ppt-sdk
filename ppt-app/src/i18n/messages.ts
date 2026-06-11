@@ -69,6 +69,8 @@ export interface Messages {
     title: string;
     placeholder: string;
     reviewOutlineFirst: string;
+    fastMode: string;
+    fastModeHelp: string;
     optionalContext: string;
     chips: Record<"audience" | "goal" | "style" | "theme" | "content" | "attachment" | "template", string>;
     contextLabels: Record<
@@ -218,6 +220,12 @@ export interface Messages {
     textDensity: string;
     visualTone: string;
     typography: string;
+    contentReviewEnabled: string;
+    contentReviewFailureLimit: string;
+    visualReviewEnabled: string;
+    visualReviewFailureLimit: string;
+    enabled: string;
+    disabled: string;
   };
   review: {
     title: string;
@@ -344,6 +352,9 @@ export const messages: Record<Locale, Messages> = {
       placeholder:
         "Create a 7-slide investor deck about AI agent workflows. Keep it visual, concise, and premium.",
       reviewOutlineFirst: "Review outline first",
+      fastMode: "Fast mode",
+      fastModeHelp:
+        "Fast mode skips content fact checks and visual checks, reducing self-review and repair rounds to generate PPTs faster and save tokens. Render error checks still run to avoid pages that cannot preview.",
       optionalContext: "Optional context",
       chips: {
         audience: "Audience",
@@ -498,7 +509,13 @@ export const messages: Record<Locale, Messages> = {
       defaultLanguage: "Default language",
       textDensity: "Text density",
       visualTone: "Visual tone",
-      typography: "Typography"
+      typography: "Typography",
+      contentReviewEnabled: "Content fact check",
+      contentReviewFailureLimit: "Content check failure limit",
+      visualReviewEnabled: "Visual check",
+      visualReviewFailureLimit: "Visual check failure limit",
+      enabled: "On",
+      disabled: "Off"
     },
     review: {
       title: "Preview deck",
@@ -631,6 +648,9 @@ export const messages: Record<Locale, Messages> = {
       placeholder:
         "创建一份 7 页的 AI Agent 工作流投资人演示，要求视觉化、简洁、有高级感。",
       reviewOutlineFirst: "先审阅大纲",
+      fastMode: "快速模式",
+      fastModeHelp:
+        "快速模式会跳过内容事实检查和视觉检查，减少自检与修复轮次，以更快生成 PPT 并节省 token。渲染错误检查仍会保留，避免生成无法预览的页面。",
       optionalContext: "可选上下文",
       chips: {
         audience: "受众",
@@ -784,7 +804,13 @@ export const messages: Record<Locale, Messages> = {
       defaultLanguage: "默认语言",
       textDensity: "文字密度",
       visualTone: "视觉语气",
-      typography: "字体风格"
+      typography: "字体风格",
+      contentReviewEnabled: "内容事实检查",
+      contentReviewFailureLimit: "内容检查失败次数上限",
+      visualReviewEnabled: "视觉检查",
+      visualReviewFailureLimit: "视觉检查失败次数上限",
+      enabled: "开启",
+      disabled: "关闭"
     },
     review: {
       title: "预览演示文稿",
