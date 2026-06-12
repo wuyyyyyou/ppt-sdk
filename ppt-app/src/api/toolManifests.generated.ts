@@ -9,6 +9,6 @@ export const PPT_ENGINE_TOOL = {
 
 export const PPT_GENER_TOOL = {
   id: "tool-youming_5703-ppt-gener-ahzv8re6",
-  version: "2.0.2",
+  version: "3.0.2",
   displayName: "ppt-gener",
 } as const;

@@ -18,6 +18,8 @@ TEST_EXTRACT_DIR="$BUILD_DIR/test-extract"
 BUNDLE_DIR="$SCRIPT_DIR/bundle"
 CAIRO_RUNTIME_HELPER="$SCRIPT_DIR/prepare_cairo_runtime.py"
 BINARY_RELEASE_HELPER="$SCRIPT_DIR/scripts/binary_release.py"
+EMBED_MANIFEST_HELPER="$SCRIPT_DIR/scripts/embed_manifest.py"
+EMBEDDED_MANIFEST_MODULE="$SCRIPT_DIR/src/presenton_sdk_pptx_generator/_embedded_manifest.py"
 SMOKE_TEST_SCRIPT="$SCRIPT_DIR/smoke_test_bundle.py"
 RUN_TEST=false
 
@@ -414,6 +416,9 @@ rm -rf "$BUNDLE_DIR" "$NUITKA_BUILD_DIR" "$RELEASE_STAGE_DIR" "$TEST_EXTRACT_DIR
 mkdir -p "$BUNDLE_DIR" "$NUITKA_BUILD_DIR" "$NUITKA_CACHE_DIR" "$RELEASE_STAGE_DIR/bin" "$RELEASE_STAGE_DIR/lib" "$RELEASE_STAGE_DIR/data"
 
 echo "[5/8] Building standalone bundle with Nuitka..."
+"$PYTHON_BIN" "$EMBED_MANIFEST_HELPER" \
+  --manifest "$SCRIPT_DIR/manifest.json" \
+  --output "$EMBEDDED_MANIFEST_MODULE"
 NUITKA_CACHE_DIR="$NUITKA_CACHE_DIR" "$PYTHON_BIN" -m nuitka \
   --standalone \
   --disable-ccache \
@@ -438,7 +443,8 @@ fi
 
 echo "[6/8] Staging Anna Binary distribution package..."
 cp -R "$BUILD_DIST_DIR"/. "$RELEASE_STAGE_DIR/bin"/
-cp "$SCRIPT_DIR/manifest.json" "$RELEASE_STAGE_DIR/bin/manifest.json"
+# The tool manifest is compiled into the binary (see scripts/embed_manifest.py),
+# so the archive ships only the root distribution manifest -- no bin/manifest.json.
 stage_bundled_cairo_runtime "$RELEASE_STAGE_DIR/bin/cairo"
 if [[ "$NUITKA_OUTPUT_NAME" != "$OUTPUT_NAME" ]]; then
   rm -f "$OUTPUT_PATH"

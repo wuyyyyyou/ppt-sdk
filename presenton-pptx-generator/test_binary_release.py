@@ -56,7 +56,9 @@ class BinaryReleaseTest(unittest.TestCase):
             },
         )
 
-    def test_verify_archive_requires_root_and_bundled_manifests(self) -> None:
+    def test_verify_archive_requires_root_manifest_without_bundled_manifest(self) -> None:
+        # The tool manifest is embedded in the binary, so the archive ships only the
+        # root distribution manifest -- verify_archive must pass without bin/manifest.json.
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             tool_manifest_path = root / "tool-manifest.json"
@@ -66,10 +68,6 @@ class BinaryReleaseTest(unittest.TestCase):
             (extract_dir / "data").mkdir()
             (extract_dir / "bin" / "ppt-gener").write_text("", encoding="utf-8")
             tool_manifest_path.write_text(
-                f"{json.dumps(TOOL_MANIFEST)}\n",
-                encoding="utf-8",
-            )
-            (extract_dir / "bin" / "manifest.json").write_text(
                 f"{json.dumps(TOOL_MANIFEST)}\n",
                 encoding="utf-8",
             )
@@ -91,6 +89,16 @@ class BinaryReleaseTest(unittest.TestCase):
                     platform_key="darwin-x86_64",
                 ),
             )
+
+    def test_read_tool_manifest_prefers_embedded_manifest(self) -> None:
+        # When the codegen module is present, the plugin must use it and ignore
+        # any on-disk manifest.json, so binary builds need no bin/manifest.json.
+        original = plugin.EMBEDDED_MANIFEST
+        try:
+            plugin.EMBEDDED_MANIFEST = {"name": "embedded", "version": "9.9.9", "tools": []}
+            self.assertEqual(plugin.read_tool_manifest(), plugin.EMBEDDED_MANIFEST)
+        finally:
+            plugin.EMBEDDED_MANIFEST = original
 
     def test_tool_manifest_candidates_prefer_binary_directory(self) -> None:
         candidates = plugin.build_tool_manifest_candidates(

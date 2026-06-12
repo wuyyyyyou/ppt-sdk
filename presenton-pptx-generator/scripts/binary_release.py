@@ -92,7 +92,6 @@ def verify_archive(args: argparse.Namespace) -> None:
     assert_directory(extract_dir / "lib", "lib directory")
     assert_directory(extract_dir / "data", "data directory")
     assert_file(extract_dir / "manifest.json", "distribution manifest")
-    assert_file(extract_dir / "bin" / "manifest.json", "tool manifest")
 
     binary_file_name = (
         f"{args.binary_name}.exe"
@@ -108,10 +107,9 @@ def verify_archive(args: argparse.Namespace) -> None:
             f"expected {expected_distribution_manifest}, got {actual_distribution_manifest}",
         )
 
-    bundled_tool_manifest = read_tool_manifest(extract_dir / "bin" / "manifest.json")
-    for key in ("name", "version", "tools"):
-        if bundled_tool_manifest.get(key) != tool_manifest.get(key):
-            raise AssertionError(f"Bundled tool manifest {key} mismatch")
+    # The tool manifest is embedded in the binary, not shipped as bin/manifest.json.
+    # Its correctness is verified end-to-end by smoke_test_bundle.py, which invokes
+    # the binary's `describe` method and checks the returned name/version.
 
 
 def main() -> None:

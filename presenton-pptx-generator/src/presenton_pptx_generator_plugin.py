@@ -11,6 +11,15 @@ STATUS_FILE_NAME = "generate_ppt.json"
 
 MANIFEST_FILE_NAME = "manifest.json"
 
+# Binary builds bake the tool manifest into this module (see
+# scripts/embed_manifest.py) so the distribution archive no longer needs to ship
+# a separate bin/manifest.json. When running from source the module is absent and
+# we fall back to the on-disk manifest search below.
+try:
+    from presenton_sdk_pptx_generator._embedded_manifest import EMBEDDED_MANIFEST
+except Exception:  # pragma: no cover - codegen module only exists in binary builds
+    EMBEDDED_MANIFEST = None
+
 
 def build_tool_manifest_candidates(
     *,
@@ -26,6 +35,9 @@ def build_tool_manifest_candidates(
 
 
 def read_tool_manifest() -> dict[str, Any]:
+    if EMBEDDED_MANIFEST is not None:
+        return EMBEDDED_MANIFEST
+
     candidates = build_tool_manifest_candidates(
         module_path=Path(__file__),
         executable_path=Path(sys.executable),
