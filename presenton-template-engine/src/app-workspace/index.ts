@@ -365,9 +365,9 @@ function createDefaultSettingJson() {
     visual_tone: "",
     typography: "",
     theme_id: "finance-red-classic",
-    content_review_enabled: true,
+    content_review_enabled: false,
     content_review_failure_limit: 5,
-    visual_review_enabled: true,
+    visual_review_enabled: false,
     visual_review_failure_limit: 5,
   };
 }
@@ -409,8 +409,8 @@ function normalizeSettingJson(setting: unknown): Record<string, unknown> {
     nextSetting.typography = "";
   }
 
-  nextSetting.content_review_enabled = nextSetting.content_review_enabled !== false;
-  nextSetting.visual_review_enabled = nextSetting.visual_review_enabled !== false;
+  nextSetting.content_review_enabled = nextSetting.content_review_enabled === true;
+  nextSetting.visual_review_enabled = nextSetting.visual_review_enabled === true;
   nextSetting.content_review_failure_limit = normalizeReviewFailureLimit(
     nextSetting.content_review_failure_limit,
   );

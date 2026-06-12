@@ -1602,6 +1602,66 @@ button {
   transform: translate(-50%, 0);
 }
 
+.strict-review-confirm-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(8px);
+}
+
+.strict-review-confirm-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 16px;
+  width: min(520px, 100%);
+  padding: 22px;
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.28);
+}
+
+.strict-review-confirm-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  color: #b45309;
+  background: #fff7ed;
+}
+
+.strict-review-confirm-copy {
+  min-width: 0;
+}
+
+.strict-review-confirm-copy h2 {
+  margin: 0 0 8px;
+  color: var(--text-main);
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
+.strict-review-confirm-copy p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.strict-review-confirm-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+
 .section-label {
   margin-bottom: 10px;
   color: var(--text-muted);

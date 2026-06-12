@@ -84,7 +84,7 @@ export function App() {
               reviewOutlineFirst={state.reviewOutlineFirst}
               setReviewOutlineFirst={actions.setReviewOutlineFirst}
               pageReviewSettings={state.pageReviewSettings}
-              setFastMode={actions.setFastMode}
+              setStrictReviewMode={actions.setStrictReviewMode}
               contextRows={state.contextRows}
               addContextRow={actions.addContextRow}
               updateContextRow={actions.updateContextRow}

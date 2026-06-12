@@ -2,9 +2,9 @@ import type { WorkspaceSettings } from "../../api/types";
 
 export const REVIEW_FAILURE_LIMIT_MIN = 0;
 export const REVIEW_FAILURE_LIMIT_MAX = 10;
-export const DEFAULT_CONTENT_REVIEW_ENABLED = true;
+export const DEFAULT_CONTENT_REVIEW_ENABLED = false;
 export const DEFAULT_CONTENT_REVIEW_FAILURE_LIMIT = 5;
-export const DEFAULT_VISUAL_REVIEW_ENABLED = true;
+export const DEFAULT_VISUAL_REVIEW_ENABLED = false;
 export const DEFAULT_VISUAL_REVIEW_FAILURE_LIMIT = 5;
 
 export interface PageReviewSettings {
@@ -39,13 +39,13 @@ export function readPageReviewSettings(
 ): PageReviewSettings {
   return {
     contentReviewEnabled:
-      setting?.content_review_enabled !== false,
+      setting?.content_review_enabled === true,
     contentReviewFailureLimit: normalizeReviewFailureLimit(
       setting?.content_review_failure_limit,
       DEFAULT_CONTENT_REVIEW_FAILURE_LIMIT,
     ),
     visualReviewEnabled:
-      setting?.visual_review_enabled !== false,
+      setting?.visual_review_enabled === true,
     visualReviewFailureLimit: normalizeReviewFailureLimit(
       setting?.visual_review_failure_limit,
       DEFAULT_VISUAL_REVIEW_FAILURE_LIMIT,
@@ -70,6 +70,6 @@ export function pageReviewSettingsToWorkspaceSettings(
   };
 }
 
-export function isFastModeEnabled(reviewSettings: PageReviewSettings) {
-  return !reviewSettings.contentReviewEnabled && !reviewSettings.visualReviewEnabled;
+export function isStrictReviewModeEnabled(reviewSettings: PageReviewSettings) {
+  return reviewSettings.contentReviewEnabled && reviewSettings.visualReviewEnabled;
 }

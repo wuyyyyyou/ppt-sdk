@@ -43,11 +43,23 @@ test("workspace settings can be saved as defaults for newly created workspaces",
 
     assert.equal(firstSetting.output_language, "English");
     assert.equal(firstSetting.text_density, "detailed");
-    assert.equal(firstSetting.content_review_enabled, true);
+    assert.equal(firstSetting.content_review_enabled, false);
     assert.equal(firstSetting.content_review_failure_limit, 5);
-    assert.equal(firstSetting.visual_review_enabled, true);
+    assert.equal(firstSetting.visual_review_enabled, false);
     assert.equal(firstSetting.visual_review_failure_limit, 5);
     assert.equal("language" in firstSetting, false);
+
+    await writeJson(path.join(homeDir, "anna-workspace", "ppt", "setting.json"), {
+      output_language: "English",
+      content_review_enabled: true,
+      visual_review_enabled: true,
+    });
+    const strictDefault = await createAppWorkspace({ title: "Strict default" });
+    const strictDefaultSetting = await readJson<Record<string, unknown>>(
+      path.join(strictDefault.workspace_dir, "setting.json"),
+    );
+    assert.equal(strictDefaultSetting.content_review_enabled, true);
+    assert.equal(strictDefaultSetting.visual_review_enabled, true);
 
     await updateAppWorkspaceSettings({
       workspace_dir: first.workspace_dir,

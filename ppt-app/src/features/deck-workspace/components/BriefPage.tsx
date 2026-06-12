@@ -1,11 +1,11 @@
-import { Check, CheckCircle2, ChevronDown, File, HelpCircle, ImageIcon, Palette, Search, Sparkles, Upload, X } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, ChevronDown, File, HelpCircle, ImageIcon, Palette, Search, Sparkles, Upload, X } from "lucide-react";
 import { useState, type CSSProperties } from "react";
 import type { TemplateSummary } from "../../../api/types";
 import type { Messages } from "../../../i18n/messages";
 import type { ContextRow, LoadingKind } from "../types";
 import { TemplatePreviewModal } from "./TemplatePreviewModal";
 import { getThemePreset, THEME_PRESET_IDS } from "../themePresets";
-import { isFastModeEnabled, type PageReviewSettings } from "../reviewSettings";
+import { isStrictReviewModeEnabled, type PageReviewSettings } from "../reviewSettings";
 
 const SLIDE_COUNT_OPTIONS = ["auto", ...Array.from({ length: 20 }, (_, index) => String(index + 1))];
 
@@ -20,7 +20,7 @@ interface BriefPageProps {
   reviewOutlineFirst: boolean;
   setReviewOutlineFirst: (value: boolean) => void;
   pageReviewSettings: PageReviewSettings;
-  setFastMode: (enabled: boolean) => Promise<void>;
+  setStrictReviewMode: (enabled: boolean) => Promise<void>;
   contextRows: ContextRow[];
   addContextRow: (row: ContextRow) => void;
   updateContextRow: (id: string, value: string) => void;
@@ -43,7 +43,7 @@ export function BriefPage(props: BriefPageProps) {
     reviewOutlineFirst,
     setReviewOutlineFirst,
     pageReviewSettings,
-    setFastMode,
+    setStrictReviewMode,
     contextRows,
     addContextRow,
     updateContextRow,
@@ -54,10 +54,25 @@ export function BriefPage(props: BriefPageProps) {
     showToast,
   } = props;
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [strictReviewConfirmOpen, setStrictReviewConfirmOpen] = useState(false);
   const isCreating =
     loading === "deck" || loading === "outline" || loading === "review";
   const isSuggestingContext = loading === "context";
-  const fastMode = isFastModeEnabled(pageReviewSettings);
+  const strictReviewMode = isStrictReviewModeEnabled(pageReviewSettings);
+
+  function toggleStrictReviewMode() {
+    if (strictReviewMode) {
+      void setStrictReviewMode(false);
+      return;
+    }
+
+    setStrictReviewConfirmOpen(true);
+  }
+
+  function confirmStrictReviewMode() {
+    setStrictReviewConfirmOpen(false);
+    void setStrictReviewMode(true);
+  }
 
   return (
     <section className="page active brief-page">
@@ -115,22 +130,63 @@ export function BriefPage(props: BriefPageProps) {
       <div className="checkbox-row-with-help">
         <button
           type="button"
-          className={`checkbox-row ${fastMode ? "active" : ""}`}
-          onClick={() => void setFastMode(!fastMode)}
-          aria-checked={fastMode}
+          className={`checkbox-row ${strictReviewMode ? "active" : ""}`}
+          onClick={toggleStrictReviewMode}
+          aria-checked={strictReviewMode}
           role="switch"
           disabled={isCreating || isSuggestingContext}
         >
           <span className="checkbox-custom">
-            {fastMode ? <Check size={11} strokeWidth={3} /> : null}
+            {strictReviewMode ? <Check size={11} strokeWidth={3} /> : null}
           </span>
-          <span>{t.brief.fastMode}</span>
+          <span>{t.brief.strictReviewMode}</span>
         </button>
-        <span className="help-tooltip" tabIndex={0} aria-label={t.brief.fastModeHelp}>
+        <span className="help-tooltip" tabIndex={0} aria-label={t.brief.strictReviewModeHelp}>
           <HelpCircle size={15} />
-          <span className="help-tooltip-content">{t.brief.fastModeHelp}</span>
+          <span className="help-tooltip-content">{t.brief.strictReviewModeHelp}</span>
         </span>
       </div>
+
+      {strictReviewConfirmOpen ? (
+        <div
+          className="strict-review-confirm-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="strict-review-confirm-title"
+          onClick={() => setStrictReviewConfirmOpen(false)}
+        >
+          <section
+            className="strict-review-confirm-card"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="strict-review-confirm-icon">
+              <AlertTriangle size={22} />
+            </div>
+            <div className="strict-review-confirm-copy">
+              <h2 id="strict-review-confirm-title">
+                {t.brief.strictReviewConfirmTitle}
+              </h2>
+              <p>{t.brief.strictReviewConfirmBody}</p>
+            </div>
+            <footer className="strict-review-confirm-actions">
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => setStrictReviewConfirmOpen(false)}
+              >
+                {t.controls.cancel}
+              </button>
+              <button
+                type="button"
+                className="primary-btn"
+                onClick={confirmStrictReviewMode}
+              >
+                {t.brief.strictReviewConfirmAction}
+              </button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
 
       <div className="brief-options">
         <div>

@@ -69,8 +69,11 @@ export interface Messages {
     title: string;
     placeholder: string;
     reviewOutlineFirst: string;
-    fastMode: string;
-    fastModeHelp: string;
+    strictReviewMode: string;
+    strictReviewModeHelp: string;
+    strictReviewConfirmTitle: string;
+    strictReviewConfirmBody: string;
+    strictReviewConfirmAction: string;
     optionalContext: string;
     chips: Record<"audience" | "goal" | "style" | "theme" | "content" | "attachment" | "template", string>;
     contextLabels: Record<
@@ -352,9 +355,13 @@ export const messages: Record<Locale, Messages> = {
       placeholder:
         "Create a 7-slide investor deck about AI agent workflows. Keep it visual, concise, and premium.",
       reviewOutlineFirst: "Review outline first",
-      fastMode: "Fast mode",
-      fastModeHelp:
-        "Fast mode skips content fact checks and visual checks, reducing self-review and repair rounds to generate PPTs faster and save tokens. Render error checks still run to avoid pages that cannot preview.",
+      strictReviewMode: "Strict review mode",
+      strictReviewModeHelp:
+        "Strict review mode runs extra content and visual checks after each page is generated. It may substantially increase generation time and token usage.",
+      strictReviewConfirmTitle: "Enable strict review mode?",
+      strictReviewConfirmBody:
+        "When enabled, Anna will call the model again after each page is generated to check page content and visual quality. This may substantially increase PPT generation time and token usage, and the review quality depends on the default model's capabilities. Are you sure you want to enable it?",
+      strictReviewConfirmAction: "Enable strict review",
       optionalContext: "Optional context",
       chips: {
         audience: "Audience",
@@ -648,9 +655,13 @@ export const messages: Record<Locale, Messages> = {
       placeholder:
         "创建一份 7 页的 AI Agent 工作流投资人演示，要求视觉化、简洁、有高级感。",
       reviewOutlineFirst: "先审阅大纲",
-      fastMode: "快速模式",
-      fastModeHelp:
-        "快速模式会跳过内容事实检查和视觉检查，减少自检与修复轮次，以更快生成 PPT 并节省 token。渲染错误检查仍会保留，避免生成无法预览的页面。",
+      strictReviewMode: "严格审查模式",
+      strictReviewModeHelp:
+        "开启后会在每页生成后额外进行内容和视觉检查，可能显著增加生成时间和 token 消耗。",
+      strictReviewConfirmTitle: "开启严格审查模式？",
+      strictReviewConfirmBody:
+        "开启后，Anna 会在每页生成后再次调用大模型检查页面内容和视觉效果。这可能显著延长 PPT 生成时间，并消耗更多 token；检查质量也会受默认模型能力影响。确定要开启吗？",
+      strictReviewConfirmAction: "开启严格审查",
       optionalContext: "可选上下文",
       chips: {
         audience: "受众",

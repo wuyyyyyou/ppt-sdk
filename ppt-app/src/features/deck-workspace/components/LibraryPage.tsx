@@ -301,7 +301,7 @@ export function LibraryPage({
         />
         <PreferenceSwitch
           label={t.preferences.contentReviewEnabled}
-          value={draft.content_review_enabled !== false}
+          value={draft.content_review_enabled === true}
           editing={editing}
           t={t}
           onChange={(value) => setDraft((next) => ({ ...next, content_review_enabled: value }))}
@@ -314,7 +314,7 @@ export function LibraryPage({
         />
         <PreferenceSwitch
           label={t.preferences.visualReviewEnabled}
-          value={draft.visual_review_enabled !== false}
+          value={draft.visual_review_enabled === true}
           editing={editing}
           t={t}
           onChange={(value) => setDraft((next) => ({ ...next, visual_review_enabled: value }))}

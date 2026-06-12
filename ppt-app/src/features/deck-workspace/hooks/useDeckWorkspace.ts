@@ -113,7 +113,7 @@ export interface DeckWorkspaceActions {
   setPanelMode: (mode: PanelMode) => void;
   setPrompt: (value: string) => void;
   setReviewOutlineFirst: (value: boolean) => void;
-  setFastMode: (enabled: boolean) => Promise<void>;
+  setStrictReviewMode: (enabled: boolean) => Promise<void>;
   setDeckTitle: (value: string) => void;
   setCurrentSlide: (index: number) => void;
   setOutlineFeedback: (value: string) => void;
@@ -2194,7 +2194,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
-  async function setFastMode(enabled: boolean) {
+  async function setStrictReviewMode(enabled: boolean) {
     if (!backend) return;
 
     setWorkspaceSettingsSaving(true);
@@ -2206,8 +2206,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const currentReviewSettings = readPageReviewSettings(setting);
       const nextReviewSettings: PageReviewSettings = {
         ...currentReviewSettings,
-        contentReviewEnabled: !enabled,
-        visualReviewEnabled: !enabled,
+        contentReviewEnabled: enabled,
+        visualReviewEnabled: enabled,
       };
       const updatedWorkspace = await backend.updateWorkspaceSettings({
         workspace_dir: workspace.workspace_dir,
@@ -2663,7 +2663,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setPanelMode,
     setPrompt,
     setReviewOutlineFirst,
-    setFastMode,
+    setStrictReviewMode,
     setDeckTitle,
     setCurrentSlide,
     setOutlineFeedback,

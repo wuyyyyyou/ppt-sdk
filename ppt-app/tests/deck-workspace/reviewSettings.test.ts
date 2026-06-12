@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
-  isFastModeEnabled,
+  isStrictReviewModeEnabled,
   pageReviewSettingsToWorkspaceSettings,
   readPageReviewSettings,
 } from "../../src/features/deck-workspace/reviewSettings.ts";
@@ -10,9 +10,9 @@ import {
 describe("deck workspace review settings", () => {
   it("reads defaults when settings are missing", () => {
     assert.deepEqual(readPageReviewSettings({}), {
-      contentReviewEnabled: true,
+      contentReviewEnabled: false,
       contentReviewFailureLimit: 5,
-      visualReviewEnabled: true,
+      visualReviewEnabled: false,
       visualReviewFailureLimit: 5,
     });
   });
@@ -45,12 +45,12 @@ describe("deck workspace review settings", () => {
     });
   });
 
-  it("treats fast mode as both reviews disabled", () => {
-    assert.equal(isFastModeEnabled(readPageReviewSettings({
-      content_review_enabled: false,
-      visual_review_enabled: false,
+  it("treats strict review mode as both reviews enabled", () => {
+    assert.equal(isStrictReviewModeEnabled(readPageReviewSettings({
+      content_review_enabled: true,
+      visual_review_enabled: true,
     })), true);
-    assert.equal(isFastModeEnabled(readPageReviewSettings({
+    assert.equal(isStrictReviewModeEnabled(readPageReviewSettings({
       content_review_enabled: false,
       visual_review_enabled: true,
     })), false);

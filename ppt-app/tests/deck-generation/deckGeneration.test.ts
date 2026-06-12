@@ -39,6 +39,11 @@ const outline: WorkspaceOutline = {
   updated_at: "2026-05-23T00:00:00.000Z",
 };
 
+const STRICT_REVIEW_SETTING = {
+  content_review_enabled: true,
+  visual_review_enabled: true,
+};
+
 const workspace: WorkspaceResult = {
   workspace_root: "/tmp/workspaces",
   workspace_dir: "/tmp/workspaces/demo",
@@ -56,7 +61,7 @@ const workspace: WorkspaceResult = {
     template: "template",
   },
   task: { title: "Demo Deck" },
-  setting: {},
+  setting: STRICT_REVIEW_SETTING,
   outline,
   page_plan: null,
   page_progress: null,
@@ -606,9 +611,9 @@ describe("Deck Generation Flow Module", () => {
     assert.ok(harness.progressEvents.some((progress) => progress.step === "page-content-review"));
   });
 
-  it("skips content and visual reviews in fast mode while still rendering pages", async () => {
+  it("skips content and visual reviews when review settings are disabled", async () => {
     const harness = createHarness();
-    const fastWorkspace: WorkspaceResult = {
+    const reviewDisabledWorkspace: WorkspaceResult = {
       ...workspace,
       setting: {
         content_review_enabled: false,
@@ -619,7 +624,7 @@ describe("Deck Generation Flow Module", () => {
       backend: harness.backend,
       aiClient: harness.aiClient,
       agentClient: harness.agentClient,
-      workspace: fastWorkspace,
+      workspace: reviewDisabledWorkspace,
       confirmedOutline: outline,
       locale: "zh",
       startMode: "restart",
@@ -637,6 +642,30 @@ describe("Deck Generation Flow Module", () => {
     assert.ok(!harness.progressEvents.some((progress) => progress.step === "page-visual-review"));
   });
 
+  it("skips content and visual reviews when review settings are missing", async () => {
+    const harness = createHarness();
+    const defaultWorkspace: WorkspaceResult = {
+      ...workspace,
+      setting: {},
+    };
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace: defaultWorkspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.contentReviewPrompts.length, 0);
+    assert.equal(harness.visualReviewPrompts.length, 0);
+    assert.ok(harness.progress.pages.every((page) => page.status === "accepted"));
+  });
+
   it("honors configured visual review failure limit", async () => {
     const pagePlan = makePagePlanWithCount(1);
     const harness = createHarness({
@@ -646,6 +675,7 @@ describe("Deck Generation Flow Module", () => {
     const limitedWorkspace: WorkspaceResult = {
       ...workspace,
       setting: {
+        ...STRICT_REVIEW_SETTING,
         visual_review_failure_limit: 1,
       },
     };
@@ -691,6 +721,7 @@ describe("Deck Generation Flow Module", () => {
     const limitedWorkspace: WorkspaceResult = {
       ...workspace,
       setting: {
+        ...STRICT_REVIEW_SETTING,
         content_review_failure_limit: 1,
       },
     };
