@@ -40,6 +40,15 @@ import {
   syncSlideCountContextRow,
 } from "../utils";
 import {
+  buildContextRowFromPatch as buildContextRowFromPatchBase,
+  buildContextRowsFromSuggestion,
+  mergeSuggestedContextRows,
+  normalizeSlideCountContextValue,
+  shouldSuggestContextBeforeGeneration,
+  SLIDE_COUNT_CONTEXT_OPTIONS,
+  type ContextPatchId,
+} from "../contextSuggestion";
+import {
   createDeckGenerationStreamSnapshot,
   runDeckGeneration,
   runDeckRefinement,
@@ -92,8 +101,6 @@ const AGENT_TOOL_ACCESS_POLICY = resolveAgentToolAccessPolicy(
 );
 const PPTX_EXPORT_POLL_INTERVAL_MS = 1500;
 const PPTX_EXPORT_POLL_TIMEOUT_MS = 15 * 60 * 1000;
-const SLIDE_COUNT_CONTEXT_OPTIONS = ["auto", ...Array.from({ length: 20 }, (_, index) => String(index + 1))];
-type ContextPatchId = "audience" | "goal" | "style" | "theme" | "content" | "slides";
 
 function padDatePart(value: number) {
   return String(value).padStart(2, "0");
@@ -105,15 +112,6 @@ function formatWorkspaceDate(date = new Date()) {
     padDatePart(date.getMonth() + 1),
     padDatePart(date.getDate())
   ].join("-");
-}
-
-function normalizeSlideCountContextValue(value: string) {
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "auto") return "auto";
-  const parsed = Number.parseInt(normalized, 10);
-  return Number.isFinite(parsed) && parsed > 0 && String(parsed) === normalized
-    ? String(parsed)
-    : "auto";
 }
 
 export interface DeckWorkspaceActions {
@@ -1078,44 +1076,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     });
   }
 
-  function buildSuggestedContextRow(
-    id: "audience" | "goal" | "style" | "theme",
-    values: string[]
-  ): ContextRow | null {
-    const uniqueValues = values.reduce<string[]>((items, value) => {
-      const trimmed = value.trim();
-      if (trimmed && !items.includes(trimmed)) {
-        items.push(trimmed);
-      }
-      return items;
-    }, []);
-
-    if (uniqueValues.length === 0) return null;
-
-    const row = buildContextRowFromPatch(id, uniqueValues[0]);
-    if (uniqueValues.length === 1 || id === "theme") {
-      return row;
-    }
-
-    return {
-      ...row,
-      type: "select",
-      options: uniqueValues,
-      allowCustomValue: true,
-    };
+  function buildContextRowFromPatch(id: ContextPatchId, value: string): ContextRow {
+    return buildContextRowFromPatchBase(id, value, t);
   }
 
   function upsertSuggestedContextRows(rows: ContextRow[]) {
     if (rows.length === 0) return;
-    const suggestedIds = new Set(rows.map((row) => row.id));
-    setContextRows((currentRows) => [
-      ...currentRows.map((row) =>
-        suggestedIds.has(row.id)
-          ? rows.find((suggestedRow) => suggestedRow.id === row.id) ?? row
-          : row
-      ),
-      ...rows.filter((row) => !currentRows.some((currentRow) => currentRow.id === row.id)),
-    ]);
+    setContextRows((currentRows) => mergeSuggestedContextRows(currentRows, rows));
   }
 
   async function suggestContextFromPrompt() {
@@ -1135,13 +1102,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         locale,
         logContext: buildAiLogContext(workspace, "outline", "suggest_context"),
       });
-      const rows = [
-        buildSuggestedContextRow("audience", result.audience),
-        buildSuggestedContextRow("goal", result.goal),
-        buildSuggestedContextRow("style", result.style),
-        buildSuggestedContextRow("theme", result.theme),
-        buildContextRowFromPatch("slides", result.slides),
-      ].filter((row): row is ContextRow => Boolean(row));
+      const rows = buildContextRowsFromSuggestion(result, t);
 
       if (rows.length === 0) {
         showToast(t.toasts.contextSuggestionEmpty);
@@ -1157,6 +1118,34 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
+  async function suggestContextRowsForGeneration(
+    workspace: WorkspaceResult,
+    currentRows: ContextRow[]
+  ): Promise<ContextRow[]> {
+    if (!aiClient || !shouldSuggestContextBeforeGeneration(currentRows)) {
+      return currentRows;
+    }
+    const trimmedPrompt = prompt.trim();
+    if (!trimmedPrompt) {
+      throw new Error(t.toasts.promptRequired);
+    }
+
+    setLoading("context");
+    const result = await aiClient.suggestContext({
+      prompt: trimmedPrompt,
+      locale,
+      logContext: buildAiLogContext(workspace, "outline", "suggest_context"),
+    });
+    const suggestedRows = buildContextRowsFromSuggestion(result, t);
+    if (suggestedRows.length === 0) {
+      return currentRows;
+    }
+
+    const nextRows = mergeSuggestedContextRows(currentRows, suggestedRows);
+    setContextRows(nextRows);
+    return nextRows;
+  }
+
   function readFeedbackContextValue(feedback: string, labels: string[]): string | null {
     const escapedLabels = labels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
     const pattern = new RegExp(
@@ -1166,56 +1155,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const match = pattern.exec(feedback);
     const value = match?.[1]?.trim().replace(/[，,]$/, "");
     return value && value.length > 0 ? value : null;
-  }
-
-  function buildContextRowFromPatch(id: ContextPatchId, value: string): ContextRow {
-    switch (id) {
-      case "audience":
-        return {
-          id,
-          label: t.brief.contextLabels.audience,
-          value,
-          placeholder: t.brief.contextPlaceholders.audience,
-        };
-      case "goal":
-        return {
-          id,
-          label: t.brief.contextLabels.goal,
-          value,
-          placeholder: t.brief.contextPlaceholders.goal,
-        };
-      case "style":
-        return {
-          id,
-          label: t.brief.contextLabels.styleNotes,
-          value,
-          placeholder: t.brief.contextPlaceholders.styleNotes,
-        };
-      case "theme":
-        return {
-          id,
-          label: t.brief.contextLabels.theme,
-          value: getThemePreset(value)?.theme_id ?? "finance-red-classic",
-          type: "select",
-          options: THEME_PRESET_IDS,
-        };
-      case "content":
-        return {
-          id,
-          label: t.brief.contextLabels.contentSource,
-          value,
-          placeholder: t.brief.contextPlaceholders.contentSource,
-        };
-      case "slides":
-        return {
-          id,
-          label: t.brief.contextLabels.slides,
-          value: normalizeSlideCountContextValue(value),
-          type: "select",
-          options: SLIDE_COUNT_CONTEXT_OPTIONS,
-          allowCustomValue: true,
-        };
-    }
   }
 
   function deriveContextRowsFromOutlineFeedback(rows: ContextRow[], feedback: string): ContextRow[] {
@@ -1321,23 +1260,30 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     let shouldReconcileActiveRun = false;
     try {
       const cancelSignal = beginCancellableGeneration();
+      setLoading(shouldSuggestContextBeforeGeneration(contextRows) ? "context" : "outline");
+      resetGenerationProgress();
       const workspace = await refreshCurrentWorkspaceSnapshot();
       if (!workspace) return;
       if (!selectedTemplateGroupId) {
         showToast(t.template.helper);
         return;
       }
-      const templateWorkspace = await ensureWorkspaceTheme(
-        await ensureWorkspaceTemplate(workspace)
+      const templateWorkspace = await ensureWorkspaceTemplate(workspace);
+      const generationContextRows = await suggestContextRowsForGeneration(
+        templateWorkspace,
+        contextRows
+      );
+      const themedWorkspace = await ensureWorkspaceTheme(
+        templateWorkspace,
+        generationContextRows
       );
 
-      const setting = workspaceSettingsToState(templateWorkspace);
+      const setting = workspaceSettingsToState(themedWorkspace);
 
       if (reviewOutlineFirst) {
         setLoading("outline");
-        resetGenerationProgress();
-        const llmContextRows = buildLlmContextRows();
-        const outlineLogContext = buildAiLogContext(templateWorkspace, "outline", "generate_outline");
+        const llmContextRows = buildLlmContextRows(generationContextRows);
+        const outlineLogContext = buildAiLogContext(themedWorkspace, "outline", "generate_outline");
         const result = await aiClient.generateOutline({
           prompt,
           contextRows: llmContextRows,
@@ -1345,14 +1291,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           setting,
           logContext: outlineLogContext,
         });
-        await appendOutlineAiAttemptLogs(templateWorkspace, result.attempts, outlineLogContext);
+        await appendOutlineAiAttemptLogs(themedWorkspace, result.attempts, outlineLogContext);
         const syncedContextRows = syncContextRowsToOutlineCount(
-          contextRows,
+          generationContextRows,
           result.outline.items
         );
         const outputLanguage = normalizeOutputLanguage(result.outline.output_language);
         const languageWorkspace = await persistWorkspaceOutputLanguage(
-          templateWorkspace,
+          themedWorkspace,
           outputLanguage,
           setting
         );
@@ -1379,9 +1325,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       }
 
       setLoading("outline");
-      resetGenerationProgress();
-      const llmContextRows = buildLlmContextRows();
-      const outlineLogContext = buildAiLogContext(templateWorkspace, "outline", "generate_outline");
+      const llmContextRows = buildLlmContextRows(generationContextRows);
+      const outlineLogContext = buildAiLogContext(themedWorkspace, "outline", "generate_outline");
       const outlineResult = await aiClient.generateOutline({
         prompt,
         contextRows: llmContextRows,
@@ -1389,14 +1334,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         setting,
         logContext: outlineLogContext,
       });
-      await appendOutlineAiAttemptLogs(templateWorkspace, outlineResult.attempts, outlineLogContext);
+      await appendOutlineAiAttemptLogs(themedWorkspace, outlineResult.attempts, outlineLogContext);
       const syncedContextRows = syncContextRowsToOutlineCount(
-        contextRows,
+        generationContextRows,
         outlineResult.outline.items
       );
       const outputLanguage = normalizeOutputLanguage(outlineResult.outline.output_language);
       const languageWorkspace = await persistWorkspaceOutputLanguage(
-        templateWorkspace,
+        themedWorkspace,
         outputLanguage,
         setting
       );

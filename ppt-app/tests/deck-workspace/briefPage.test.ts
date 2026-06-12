@@ -8,7 +8,7 @@ import {
   BriefPage,
   StyleSelection,
 } from "../../src/features/deck-workspace/components/BriefPage.tsx";
-import type { ContextRow } from "../../src/features/deck-workspace/types.ts";
+import type { ContextRow, LoadingKind } from "../../src/features/deck-workspace/types.ts";
 import { messages } from "../../src/i18n/messages.ts";
 
 function makeTemplate(groupId: string, groupName: string): TemplateSummary {
@@ -24,7 +24,7 @@ function makeTemplate(groupId: string, groupName: string): TemplateSummary {
   };
 }
 
-function renderBriefPage() {
+function renderBriefPage(options: { loading?: LoadingKind } = {}) {
   return renderToStaticMarkup(
     createElement(BriefPage, {
       t: messages.zh,
@@ -36,7 +36,7 @@ function renderBriefPage() {
         makeTemplate("red-blue", "Red Blue Professional"),
       ],
       selectedTemplateGroupId: "red-finance-v3",
-      loading: "none",
+      loading: options.loading ?? "none",
       selectTemplate: async () => undefined,
       reviewOutlineFirst: false,
       setReviewOutlineFirst: () => undefined,
@@ -88,5 +88,12 @@ describe("BriefPage", () => {
     assert.match(html, /Red Finance Canvas/);
     assert.match(html, /Business Professional/);
     assert.doesNotMatch(html, /Red Blue Professional/);
+  });
+
+  it("shows the create button loading state while context is being suggested", () => {
+    const html = renderBriefPage({ loading: "context" });
+
+    assert.match(html, /inline-create-btn/);
+    assert.match(html, /spinner small/);
   });
 });

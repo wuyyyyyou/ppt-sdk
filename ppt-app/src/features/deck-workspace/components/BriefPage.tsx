@@ -59,6 +59,7 @@ export function BriefPage(props: BriefPageProps) {
   const isCreating =
     loading === "deck" || loading === "outline" || loading === "review";
   const isSuggestingContext = loading === "context";
+  const isCreateButtonLoading = isCreating || isSuggestingContext;
   const strictReviewMode = isStrictReviewModeEnabled(pageReviewSettings);
 
   function toggleStrictReviewMode() {
@@ -105,7 +106,7 @@ export function BriefPage(props: BriefPageProps) {
             onClick={generateDeck}
             disabled={isCreating || isSuggestingContext}
           >
-            {isCreating ? (
+            {isCreateButtonLoading ? (
               <span className="spinner small" />
             ) : (
               <Sparkles size={14} />
