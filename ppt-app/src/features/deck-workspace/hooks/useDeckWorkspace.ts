@@ -83,6 +83,7 @@ import {
   type ActiveGenerationRun,
   type ActiveGenerationRunKind,
 } from "../generationViewState";
+import { isSelectableTemplateGroup } from "../templateSelectionPolicy";
 
 const DEFAULT_TEMPLATE_GROUP_ID = "red-finance-v3";
 const AGENT_TOOL_ACCESS_POLICY = resolveAgentToolAccessPolicy(
@@ -2252,6 +2253,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   async function selectTemplate(groupId: string) {
     if (!backend) return;
+    if (!isSelectableTemplateGroup(groupId)) {
+      showToast(t.template.empty);
+      return;
+    }
 
     setLoading("template");
     try {

@@ -6,6 +6,7 @@ import type { ContextRow, LoadingKind } from "../types";
 import { TemplatePreviewModal } from "./TemplatePreviewModal";
 import { getThemePreset, THEME_PRESET_IDS } from "../themePresets";
 import { isStrictReviewModeEnabled, type PageReviewSettings } from "../reviewSettings";
+import { filterSelectableTemplates } from "../templateSelectionPolicy";
 
 const SLIDE_COUNT_OPTIONS = ["auto", ...Array.from({ length: 20 }, (_, index) => String(index + 1))];
 
@@ -265,19 +266,6 @@ export function BriefPage(props: BriefPageProps) {
               {t.brief.contextLabels.slides}
             </button>
             <button
-              className="chip-btn"
-              onClick={() =>
-                addContextRow({
-                  id: "attachment",
-                  label: t.brief.contextLabels.attachment,
-                  value: "",
-                  type: "attachment"
-                })
-              }
-            >
-              {t.brief.chips.attachment}
-            </button>
-            <button
               className={`chip-btn ${templatePickerOpen ? "active" : ""}`}
               onClick={() => setTemplatePickerOpen((value) => !value)}
             >
@@ -313,7 +301,7 @@ export function BriefPage(props: BriefPageProps) {
   );
 }
 
-function StyleSelection(props: {
+export function StyleSelection(props: {
   t: Messages;
   templates: TemplateSummary[];
   selectedTemplateGroupId: string | null;
@@ -321,10 +309,11 @@ function StyleSelection(props: {
   selectTemplate: (groupId: string) => Promise<void>;
 }) {
   const { t, templates, selectedTemplateGroupId, loading, selectTemplate } = props;
+  const selectableTemplates = filterSelectableTemplates(templates);
   const [previewGroupId, setPreviewGroupId] = useState<string | null>(null);
   const [previewIndex, setPreviewIndex] = useState(0);
   const previewTemplate = previewGroupId
-    ? templates.find((template) => template.group_id === previewGroupId) ?? null
+    ? selectableTemplates.find((template) => template.group_id === previewGroupId) ?? null
     : null;
 
   function openPreview(groupId: string, index = 0) {
@@ -345,13 +334,13 @@ function StyleSelection(props: {
         </div>
       </div>
 
-      {templates.length === 0 ? (
+      {selectableTemplates.length === 0 ? (
         <div className="template-empty">
           {loading === "template" ? t.template.loading : t.template.empty}
         </div>
       ) : (
         <div className="template-grid style-template-grid">
-          {templates.map((template) => (
+          {selectableTemplates.map((template) => (
             <StyleTemplateCard
               key={template.group_id}
               t={t}
