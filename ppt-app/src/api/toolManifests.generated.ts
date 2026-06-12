@@ -3,7 +3,7 @@
 
 export const PPT_ENGINE_TOOL = {
   id: "tool-youming_5703-ppt-engine-fmkv9ru7",
-  version: "3.1.6",
+  version: "3.1.7",
   displayName: "ppt-engine",
 } as const;
 
