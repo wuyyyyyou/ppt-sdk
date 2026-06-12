@@ -45,6 +45,7 @@ import {
   runDeckRefinement,
   runPageGenerationRetry,
   type DeckGenerationCompletion,
+  type DeckGenerationError,
   type DeckGenerationProgress,
 } from "../../deck-generation";
 import { reconcileInterruptedPageProgress } from "../../deck-generation/interruptedReconciliation";
@@ -77,6 +78,11 @@ import type {
   RefineScope
 } from "../types";
 import { getThemePreset, THEME_PRESET_IDS } from "../themePresets";
+import {
+  buildGenerationViewState,
+  type ActiveGenerationRun,
+  type ActiveGenerationRunKind,
+} from "../generationViewState";
 
 const DEFAULT_TEMPLATE_GROUP_ID = "red-finance-v3";
 const AGENT_TOOL_ACCESS_POLICY = resolveAgentToolAccessPolicy(
@@ -202,6 +208,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [pageProgress, setPageProgress] = useState<PageProgress | null>(null);
   const [refineScope, setRefineScope] = useState<RefineScope>("deck");
   const [loading, setLoading] = useState<LoadingKind>("none");
+  const [activeGenerationRun, setActiveGenerationRun] =
+    useState<ActiveGenerationRun | null>(null);
+  const [generationUnresumable, setGenerationUnresumable] = useState(false);
+  const [generationResumeAllowed, setGenerationResumeAllowed] = useState(true);
   const [exportProgress, setExportProgress] = useState<ExportProgressState>(
     () => createIdleExportProgress(t)
   );
@@ -872,6 +882,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   function resetGenerationProgress() {
     setCreateDeckProgress(null);
     setGenerationHistory([]);
+    resetGenerationUiState();
+  }
+
+  function resetGenerationUiState() {
+    setGenerationUnresumable(false);
+    setGenerationResumeAllowed(true);
   }
 
   function beginCancellableGeneration() {
@@ -882,11 +898,58 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return controller.signal;
   }
 
+  function beginActiveGenerationRun(kind: ActiveGenerationRunKind) {
+    setGenerationUnresumable(false);
+    setGenerationResumeAllowed(kind === "deck-generation");
+    setActiveGenerationRun({ kind, stopping: false });
+  }
+
+  async function finishActiveGenerationRun(options: {
+    workspaceDir?: string;
+    reconcileInterrupted?: boolean;
+  } = {}) {
+    setActiveGenerationRun(null);
+    if (!options.reconcileInterrupted || !backend) return;
+    const workspaceDir = options.workspaceDir ?? currentWorkspace?.workspace_dir;
+    if (!workspaceDir) return;
+    try {
+      const refreshedWorkspace = await backend.openWorkspace({
+        workspace_dir: workspaceDir,
+      });
+      const reconciledWorkspace = await reconcileWorkspaceInterruptedPages(refreshedWorkspace);
+      applyWorkspace(reconciledWorkspace);
+    } catch (error) {
+      console.warn(
+        "Failed to reconcile interrupted pages after generation finished",
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
+  const generationViewState = useMemo(
+    () =>
+      buildGenerationViewState({
+        loading,
+        progress: createDeckProgress,
+        activeRun: activeGenerationRun,
+        unresumable: generationUnresumable,
+        resumeAllowed: generationResumeAllowed,
+      }),
+    [activeGenerationRun, createDeckProgress, generationResumeAllowed, generationUnresumable, loading],
+  );
+
   const currentStatus = useMemo(() => {
     if (loading === "template") return t.template.loading;
     if (loading === "outline") return t.status.creatingOutline;
-    if (loading === "deck" || loading === "deckFromOutline") {
+    if (generationViewState.status === "running") {
       return t.status.creatingDeck;
+    }
+    if (generationViewState.status === "stopping") return t.generating.cancelling;
+    if (stage === "generating" && generationViewState.status === "interrupted") {
+      return t.generating.interruptedTitle;
+    }
+    if (stage === "generating" && generationViewState.status === "unresumable") {
+      return t.generating.unresumableTitle;
     }
     if (loading === "review") return t.review.rendering;
     if (loading === "refineDeck") return t.status.refiningDeck;
@@ -896,7 +959,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (stage === "outline") return t.status.outlineReady;
     if (generated) return deckReadyStatus(t, deck.length);
     return "";
-  }, [createDeckProgress?.message, deck.length, generated, loading, stage, t]);
+  }, [createDeckProgress?.message, deck.length, generated, generationViewState.status, loading, stage, t]);
 
   function showToast(message: string) {
     setToast(message);
@@ -1191,11 +1254,20 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return nextRows;
   }
 
+  function isUnresumableDeckGenerationError(error: DeckGenerationError) {
+    return error.type === "stale_artifacts" || error.type === "invalid_confirmed_outline";
+  }
+
   async function applyDeckGenerationCompletion(
     completion: DeckGenerationCompletion,
-    workspace: WorkspaceResult
+    workspace: WorkspaceResult,
+    options: { resumeAllowedOnRecoverableStop?: boolean } = {},
   ) {
+    const resumeAllowedOnRecoverableStop =
+      options.resumeAllowedOnRecoverableStop !== false;
+
     if (completion.status === "cancelled") {
+      setGenerationResumeAllowed(resumeAllowedOnRecoverableStop);
       const latestWorkspace = backend
         ? await backend.openWorkspace({ workspace_dir: workspace.workspace_dir })
         : workspace;
@@ -1210,10 +1282,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       if (completion.progress) {
         setCreateDeckProgress(completion.progress);
       }
+      setGenerationUnresumable(isUnresumableDeckGenerationError(completion.error));
+      setGenerationResumeAllowed(
+        resumeAllowedOnRecoverableStop &&
+          !isUnresumableDeckGenerationError(completion.error)
+      );
+      setStage("generating");
+      setPage("main");
       showToast(completion.error.message);
       return;
     }
 
+    setGenerationUnresumable(false);
+    setGenerationResumeAllowed(false);
     const refreshedWorkspace = backend
       ? await backend.openWorkspace({ workspace_dir: workspace.workspace_dir })
       : workspace;
@@ -1235,6 +1316,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function generateDeck() {
     if (!backend || !aiClient || !agentClient) return;
 
+    let activeRunWorkspaceDir: string | undefined;
+    let shouldReconcileActiveRun = false;
     try {
       const cancelSignal = beginCancellableGeneration();
       const workspace = await refreshCurrentWorkspaceSnapshot();
@@ -1343,6 +1426,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       setDeckTitle(outlineResult.outline.title);
       setOutline(outlineResult.outline.items);
       setOutlineOutputLanguage(outputLanguage);
+      beginActiveGenerationRun("deck-generation");
+      activeRunWorkspaceDir = confirmedWorkspace.workspace_dir;
+      shouldReconcileActiveRun = true;
       setLoading("deck");
       setStage("generating");
       setPage("main");
@@ -1360,16 +1446,24 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         cancelSignal,
       });
       await applyDeckGenerationCompletion(completion, confirmedWorkspace);
+      shouldReconcileActiveRun = false;
     } catch (error) {
       showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
     } finally {
       setLoading("none");
+      await finishActiveGenerationRun({
+        workspaceDir: activeRunWorkspaceDir,
+        reconcileInterrupted: shouldReconcileActiveRun,
+      });
     }
   }
 
   function cancelGenerateDeck() {
     cancelCreateDeckRef.current = true;
     cancelCreateDeckAbortRef.current?.abort();
+    setActiveGenerationRun((current) =>
+      current ? { ...current, stopping: true } : current
+    );
     setCreateDeckProgress((current) =>
       current
         ? {
@@ -1384,6 +1478,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function createDeckFromOutline() {
     if (!backend || !aiClient || !agentClient) return;
 
+    let activeRunWorkspaceDir: string | undefined;
+    let shouldReconcileActiveRun = false;
     const cancelSignal = beginCancellableGeneration();
     const workspace = await refreshCurrentWorkspaceSnapshot();
     if (!workspace) return;
@@ -1395,10 +1491,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       await ensureWorkspaceTemplate(workspace)
     );
 
-    setLoading("deck");
+    setLoading("outline");
     resetGenerationProgress();
-    setStage("generating");
-    setPage("main");
     try {
       const setting = workspaceSettingsToState(templateWorkspace);
       const resolved = await resolveOutputLanguageForOutline({
@@ -1416,7 +1510,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         "confirmed"
       );
       if (!confirmedWorkspace) return;
+      beginActiveGenerationRun("deck-generation");
+      activeRunWorkspaceDir = confirmedWorkspace.workspace_dir;
+      shouldReconcileActiveRun = true;
       setOutlineOutputLanguage(resolved.outputLanguage);
+      setLoading("deck");
       setStage("generating");
       setPage("main");
 
@@ -1434,10 +1532,15 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         cancelSignal,
       });
       await applyDeckGenerationCompletion(completion, confirmedWorkspace);
+      shouldReconcileActiveRun = false;
     } catch (error) {
       showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
     } finally {
       setLoading("none");
+      await finishActiveGenerationRun({
+        workspaceDir: activeRunWorkspaceDir,
+        reconcileInterrupted: shouldReconcileActiveRun,
+      });
     }
   }
 
@@ -1859,9 +1962,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const refreshedWorkspace = await backend.openWorkspace({
       workspace_dir: workspace.workspace_dir,
     });
-    setCurrentWorkspace(refreshedWorkspace);
-    setPageReviewSettings(workspacePageReviewSettings(refreshedWorkspace));
-    return refreshedWorkspace;
+    const workspaceSnapshot = activeGenerationRun
+      ? refreshedWorkspace
+      : await reconcileWorkspaceInterruptedPages(refreshedWorkspace);
+    setCurrentWorkspace(workspaceSnapshot);
+    setPageReviewSettings(workspacePageReviewSettings(workspaceSnapshot));
+    return workspaceSnapshot;
   }
 
   function readSelectedTemplateGroup(workspace: WorkspaceResult | null) {
@@ -2080,6 +2186,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function showWorkspacePicker() {
+    resetGenerationUiState();
     setCurrentWorkspace(null);
     setPage("main");
     setStage("brief");
@@ -2090,6 +2197,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function openWorkspace(workspaceDir: string) {
     if (!backend) return;
 
+    resetGenerationUiState();
     setWorkspaceLoading(true);
     setWorkspaceError("");
     try {
@@ -2122,6 +2230,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function createWorkspace() {
     if (!backend) return;
 
+    resetGenerationUiState();
     setWorkspaceLoading(true);
     setWorkspaceError("");
     try {
@@ -2260,14 +2369,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const trimmedInstruction = instruction.trim();
     if (!trimmedInstruction) return;
 
+    let activeRunWorkspaceDir: string | undefined;
+    let shouldReconcileActiveRun = false;
     const cancelSignal = beginCancellableGeneration();
     setLoading("refineDeck");
     resetGenerationProgress();
-    setStage("generating");
-    setPage("main");
     try {
       const refreshedWorkspace = await refreshCurrentWorkspaceSnapshot();
       if (!refreshedWorkspace) return;
+      beginActiveGenerationRun("page-refinement");
+      activeRunWorkspaceDir = refreshedWorkspace.workspace_dir;
+      shouldReconcileActiveRun = true;
+      setStage("generating");
+      setPage("main");
       const completion = await runDeckRefinement({
         backend,
         aiClient,
@@ -2282,7 +2396,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         isCancelled: () => cancelCreateDeckRef.current,
         cancelSignal,
       });
-      await applyDeckGenerationCompletion(completion, refreshedWorkspace);
+      await applyDeckGenerationCompletion(completion, refreshedWorkspace, {
+        resumeAllowedOnRecoverableStop: false,
+      });
+      shouldReconcileActiveRun = false;
       if (completion.status === "completed") {
         showToast(t.status.deckRefined);
       }
@@ -2290,6 +2407,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       showToast(error instanceof Error ? error.message : t.status.refiningDeck);
     } finally {
       setLoading("none");
+      await finishActiveGenerationRun({
+        workspaceDir: activeRunWorkspaceDir,
+        reconcileInterrupted: shouldReconcileActiveRun,
+      });
     }
   }
 
@@ -2300,14 +2421,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const slide = deck[currentSlide];
     if (!slide) return;
 
+    let activeRunWorkspaceDir: string | undefined;
+    let shouldReconcileActiveRun = false;
     const cancelSignal = beginCancellableGeneration();
     setLoading("refineSlide");
     resetGenerationProgress();
-    setStage("generating");
-    setPage("main");
     try {
       const refreshedWorkspace = await refreshCurrentWorkspaceSnapshot();
       if (!refreshedWorkspace) return;
+      beginActiveGenerationRun("page-refinement");
+      activeRunWorkspaceDir = refreshedWorkspace.workspace_dir;
+      shouldReconcileActiveRun = true;
+      setStage("generating");
+      setPage("main");
       const completion = await runDeckRefinement({
         backend,
         aiClient,
@@ -2323,7 +2449,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         isCancelled: () => cancelCreateDeckRef.current,
         cancelSignal,
       });
-      await applyDeckGenerationCompletion(completion, refreshedWorkspace);
+      await applyDeckGenerationCompletion(completion, refreshedWorkspace, {
+        resumeAllowedOnRecoverableStop: false,
+      });
+      shouldReconcileActiveRun = false;
       setCurrentSlide(currentSlide);
       if (completion.status === "completed") {
         showToast(t.status.slideRefined);
@@ -2332,6 +2461,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       showToast(error instanceof Error ? error.message : t.status.refiningSlide);
     } finally {
       setLoading("none");
+      await finishActiveGenerationRun({
+        workspaceDir: activeRunWorkspaceDir,
+        reconcileInterrupted: shouldReconcileActiveRun,
+      });
     }
   }
 
@@ -2446,6 +2579,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   function returnToOutlineFromGeneration() {
+    setGenerationUnresumable(false);
     if (outline.length === 0) {
       navigateMain("brief");
       return;
@@ -2466,15 +2600,20 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (!backend || !aiClient || !agentClient) return;
     if (loading === "deck" || loading === "deckFromOutline") return;
 
+    let activeRunWorkspaceDir: string | undefined;
+    let shouldReconcileActiveRun = false;
     const cancelSignal = beginCancellableGeneration();
     setLoading("deckFromOutline");
-    setStage("generating");
-    setPage("main");
     try {
       const workspace = await refreshCurrentWorkspaceSnapshot();
       if (!workspace) return;
       const refreshedWorkspace = await reconcileWorkspaceInterruptedPages(workspace);
       applyWorkspace(refreshedWorkspace);
+      beginActiveGenerationRun("deck-generation");
+      activeRunWorkspaceDir = refreshedWorkspace.workspace_dir;
+      shouldReconcileActiveRun = true;
+      setStage("generating");
+      setPage("main");
       const completion = await runDeckGeneration({
         backend,
         aiClient,
@@ -2489,10 +2628,15 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         cancelSignal,
       });
       await applyDeckGenerationCompletion(completion, refreshedWorkspace);
+      shouldReconcileActiveRun = false;
     } catch (error) {
       showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
     } finally {
       setLoading("none");
+      await finishActiveGenerationRun({
+        workspaceDir: activeRunWorkspaceDir,
+        reconcileInterrupted: shouldReconcileActiveRun,
+      });
     }
   }
 
@@ -2500,13 +2644,18 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (!backend || !aiClient || !agentClient) return;
     if (loading === "deck" || loading === "deckFromOutline") return;
 
+    let activeRunWorkspaceDir: string | undefined;
+    let shouldReconcileActiveRun = false;
     const cancelSignal = beginCancellableGeneration();
     setLoading("deckFromOutline");
-    setStage("generating");
-    setPage("main");
     try {
       const refreshedWorkspace = await refreshCurrentWorkspaceSnapshot();
       if (!refreshedWorkspace) return;
+      beginActiveGenerationRun("deck-generation");
+      activeRunWorkspaceDir = refreshedWorkspace.workspace_dir;
+      shouldReconcileActiveRun = true;
+      setStage("generating");
+      setPage("main");
       const completion = await runPageGenerationRetry({
         backend,
         aiClient,
@@ -2521,10 +2670,15 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         cancelSignal,
       });
       await applyDeckGenerationCompletion(completion, refreshedWorkspace);
+      shouldReconcileActiveRun = false;
     } catch (error) {
       showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
     } finally {
       setLoading("none");
+      await finishActiveGenerationRun({
+        workspaceDir: activeRunWorkspaceDir,
+        reconcileInterrupted: shouldReconcileActiveRun,
+      });
     }
   }
 
@@ -2647,6 +2801,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     pageProgress,
     refineScope,
     loading,
+    activeGenerationRun,
+    generationViewState,
     exportProgress,
     exportArtifact,
     currentStatus,

@@ -62,7 +62,7 @@ export function App() {
           onLibrary={() => actions.navigate("library")}
           navigationDisabled={
             state.stage === "generating" &&
-            (state.loading === "deck" || state.loading === "deckFromOutline")
+            state.generationViewState.isActive
           }
           onHome={() => void actions.showWorkspacePicker()}
         />
@@ -120,14 +120,12 @@ export function App() {
           {state.page === "main" && state.stage === "generating" ? (
             <GeneratingPage
               t={t}
-              loading={state.loading}
+              viewState={state.generationViewState}
               progress={state.createDeckProgress}
               history={state.generationHistory}
               onCancel={actions.cancelGenerateDeck}
               onBackToOutline={actions.returnToOutlineFromGeneration}
               onResume={actions.resumeDeckGeneration}
-              onRegenerate={actions.regenerateDeck}
-              onRetryPage={actions.retryPageGeneration}
               canBackToOutline={state.outline.length > 0}
             />
           ) : null}

@@ -133,6 +133,9 @@ export interface Messages {
   generating: {
     progressTitle: string;
     generationComplete: string;
+    interruptedTitle: string;
+    unresumableTitle: string;
+    stoppingTitle: string;
     stayOnPageHint: string;
     pagesPassed: string;
     pageLabel: string;
@@ -429,6 +432,9 @@ export const messages: Record<Locale, Messages> = {
     generating: {
       progressTitle: "Generation progress",
       generationComplete: "Generation complete",
+      interruptedTitle: "Generation interrupted",
+      unresumableTitle: "Unable to resume generation",
+      stoppingTitle: "Stopping generation",
       stayOnPageHint: "Please do not leave this page.",
       pagesPassed: "{completed}/{total} pages passed",
       pageLabel: "Page {page}",
@@ -728,6 +734,9 @@ export const messages: Record<Locale, Messages> = {
     generating: {
       progressTitle: "生成进度",
       generationComplete: "生成完成",
+      interruptedTitle: "生成中断",
+      unresumableTitle: "无法继续生成",
+      stoppingTitle: "正在停止",
       stayOnPageHint: "请勿离开此页面",
       pagesPassed: "{completed}/{total} 页通过",
       pageLabel: "第 {page} 页",

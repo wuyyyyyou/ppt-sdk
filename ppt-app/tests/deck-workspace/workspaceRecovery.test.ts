@@ -64,25 +64,25 @@ describe("Workspace Recovery", () => {
     assert.equal(progress?.currentPageIndex, 1);
   });
 
-  it("restores failed progress when only genuinely failed pages remain", () => {
+  it("restores interrupted progress when genuinely failed pages remain", () => {
     const progress = restoreDeckGenerationProgress({
       staleDeck: false,
       pageProgress: makeProgress(["accepted", "render_failed"]),
       locale: "zh",
     });
 
-    assert.equal(progress?.step, "failed");
+    assert.equal(progress?.step, "interrupted");
     assert.equal(progress?.currentPageIndex, 1);
   });
 
-  it("restores running progress for active page generation statuses", () => {
+  it("restores interrupted progress for orphaned active page generation statuses", () => {
     const progress = restoreDeckGenerationProgress({
       staleDeck: false,
       pageProgress: makeProgress(["accepted", "visual_review"]),
       locale: "zh",
     });
 
-    assert.equal(progress?.step, "page-authoring");
+    assert.equal(progress?.step, "interrupted");
     assert.equal(progress?.currentPageIndex, 1);
   });
 });

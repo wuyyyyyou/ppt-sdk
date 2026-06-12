@@ -2243,6 +2243,11 @@ details.generation-history-panel > summary::-webkit-details-marker {
   background: rgba(220, 38, 38, 0.08);
 }
 
+.generation-major-node.interrupted {
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.12);
+}
+
 .generation-page-timeline,
 .generation-snapshot-list {
   display: grid;

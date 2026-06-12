@@ -38,6 +38,7 @@ import {
   isActivePageGenerationStatus,
   isGenuinelyFailedPageGenerationStatus,
   isResumablePageGenerationStatus,
+  shouldResumePageGenerationStatus,
 } from "./pageStatusPolicy";
 
 const ATTEMPT_LIMITS = {
@@ -137,6 +138,7 @@ export interface DeckGenerationError {
   type:
     | "page_failed"
     | "agent_infrastructure"
+    | "final_render_failed"
     | "stale_artifacts"
     | "cancelled"
     | "invalid_confirmed_outline";
@@ -1121,7 +1123,9 @@ export function pageProgressToDeckGenerationProgress(
   const resumablePage = pages.find((item) => isResumablePageGenerationStatus(item.status));
   const failedPage = pages.find((item) => isGenuinelyFailedPageGenerationStatus(item.status));
   const activePageCandidate = pages.find((item) => isActivePageGenerationStatus(item.status));
+  const unfinishedPage = pages.find((item) => item.status !== "accepted");
   const activePage =
+    unfinishedPage ??
     resumablePage ??
     failedPage ??
     activePageCandidate ??
@@ -1132,18 +1136,14 @@ export function pageProgressToDeckGenerationProgress(
   const allAccepted = pages.length > 0 && acceptedCount === pages.length;
   const step: DeckGenerationStep = allAccepted
       ? "complete"
-      : resumablePage
+      : unfinishedPage
         ? "interrupted"
-        : failedPage && !activePageCandidate
-          ? "failed"
-          : "page-authoring";
+        : "page-authoring";
   const message = step === "complete"
       ? generationText(locale).complete
       : step === "interrupted"
-        ? generationText(locale).interrupted
-        : failedPage?.last_error
-          ? failedPage.last_error
-      : generationText(locale).resumed;
+        ? failedPage?.last_error || generationText(locale).interrupted
+        : generationText(locale).resumed;
 
   return {
     step,
@@ -1791,9 +1791,24 @@ async function runPagesConcurrently(
 ): Promise<PageGenerationResult[]> {
   const pagesToRun = pagePlan.pages.filter((page) => {
     const pageProgress = getProgressPage(runtime.getProgress(), page.page_id);
-    return pageProgress?.status === "visual_review_fixing" ||
-      isResumablePageGenerationStatus(pageProgress?.status ?? "pending");
+    return shouldResumePageGenerationStatus(pageProgress?.status ?? "pending");
   });
+  let progress = runtime.getProgress();
+  for (const page of pagesToRun) {
+    progress = await recordProgress(runtime, page, {
+      status: "pending",
+      render_attempts: 0,
+      visual_review_attempts: 0,
+      content_review_attempts: 0,
+      agent_failures: 0,
+      agent_infrastructure_failures: 0,
+      last_error: "",
+      content_review: null,
+      visual_review: null,
+      review: null,
+    });
+    runtime.setProgress(progress);
+  }
   const results: PageGenerationResult[] = [];
   let nextIndex = 0;
   let stopScheduling = false;
@@ -1985,9 +2000,34 @@ export async function runDeckGeneration(
     },
     progress,
   );
-  const rendered = await input.backend.renderDeckHtml({
-    workspace_dir: input.workspace.workspace_dir,
-  });
+  let rendered: RenderDeckHtmlResult;
+  try {
+    rendered = await input.backend.renderDeckHtml({
+      workspace_dir: input.workspace.workspace_dir,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const failedProgress = createProgress(
+      {
+        step: "final-render",
+        message,
+        currentPageIndex: null,
+        totalPages: pagePlan.pages.length,
+      },
+      progress,
+      null,
+      runtime.activeStreams.values(),
+      attemptLimits,
+    );
+    input.onProgress(failedProgress);
+    return failedCompletion({
+      progress: failedProgress,
+      error: {
+        type: "final_render_failed",
+        message,
+      },
+    });
+  }
   progress = await input.backend.getPageProgress({
     workspace_dir: input.workspace.workspace_dir,
   });

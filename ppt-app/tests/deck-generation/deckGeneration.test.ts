@@ -202,6 +202,7 @@ function createHarness(options: {
   pagePlan?: PagePlan;
   existingProgress?: PageProgress;
   renderFailures?: number;
+  deckRenderError?: Error;
   visualReviews?: Array<{ pass: boolean; score: number; revision_request?: string }>;
   contentReviews?: Array<{
     pass: boolean;
@@ -301,6 +302,9 @@ function createHarness(options: {
     recordOutline: async () => ({ projectDir: "", state: {} }),
     renderDeckHtml: async () => {
       deckRenderCalls += 1;
+      if (options.deckRenderError) {
+        throw options.deckRenderError;
+      }
       return {
         workspace_dir: workspace.workspace_dir,
         manifest_path: "/tmp/workspaces/demo/template/manifest.json",
@@ -1424,11 +1428,20 @@ describe("Deck Generation Flow Module", () => {
     assert.ok(harness.progressEvents.some((progress) => progress.message.includes("已通过")));
   });
 
-  it("resumes only resumable pages and skips genuinely failed pages", async () => {
+  it("resumes all unfinished pages and skips only accepted pages", async () => {
     const pagePlan = makePagePlanWithCount(5);
     const existingProgress = makeProgress(pagePlan);
     existingProgress.pages[0] = { ...existingProgress.pages[0], status: "accepted" };
-    existingProgress.pages[1] = { ...existingProgress.pages[1], status: "render_failed" };
+    existingProgress.pages[1] = {
+      ...existingProgress.pages[1],
+      status: "render_failed",
+      render_attempts: 10,
+      visual_review_attempts: 5,
+      content_review_attempts: 5,
+      agent_failures: 4,
+      last_error: "render broke",
+      review: { pass: false },
+    };
     existingProgress.pages[2] = { ...existingProgress.pages[2], status: "interrupted" };
     existingProgress.pages[3] = { ...existingProgress.pages[3], status: "pending" };
     existingProgress.pages[4] = { ...existingProgress.pages[4], status: "agent_infrastructure_failed" };
@@ -1448,17 +1461,21 @@ describe("Deck Generation Flow Module", () => {
       isCancelled: () => false,
     });
 
-    assert.equal(completion.status, "failed");
-    assert.equal(harness.authoringPrompts.length, 3);
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.authoringPrompts.length, 4);
     assert.equal(harness.progress.pages[0].status, "accepted");
-    assert.equal(harness.progress.pages[1].status, "render_failed");
+    assert.equal(harness.progress.pages[1].status, "accepted");
     assert.equal(harness.progress.pages[2].status, "accepted");
     assert.equal(harness.progress.pages[3].status, "accepted");
     assert.equal(harness.progress.pages[4].status, "accepted");
-    assert.equal(harness.deckRenderCalls, 0);
+    assert.equal(harness.progress.pages[1].render_attempts, 0);
+    assert.equal(harness.progress.pages[1].visual_review_attempts, 0);
+    assert.equal(harness.progress.pages[1].content_review_attempts, 0);
+    assert.equal(harness.progress.pages[1].agent_failures, 0);
+    assert.equal(harness.deckRenderCalls, 1);
   });
 
-  it("resumes existing visual review fixing pages as visual-review-fix", async () => {
+  it("resets existing visual review fixing pages to a fresh authoring attempt on resume", async () => {
     const pagePlan = makePagePlan();
     const existingProgress = makeProgress(pagePlan);
     existingProgress.pages[0] = { ...existingProgress.pages[0], status: "accepted" };
@@ -1488,7 +1505,9 @@ describe("Deck Generation Flow Module", () => {
 
     assert.equal(completion.status, "completed");
     assert.equal(harness.authoringPrompts.length, 1);
-    assert.ok(harness.authoringPrompts[0]?.includes("Visual review failed"));
+    assert.ok(harness.authoringPrompts[0]?.includes("Authoring mode: initial"));
+    assert.equal(harness.authoringPrompts[0]?.includes("Visual review failed"), false);
+    assert.equal(harness.progress.pages[1].visual_review_attempts, 0);
   });
 
   it("fails resume when artifacts are stale", async () => {
@@ -1566,5 +1585,32 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.progress.pages[1].visual_review_attempts, 0);
     assert.equal(harness.progress.pages[1].content_review_attempts, 0);
     assert.equal(harness.progress.pages[1].agent_failures, 0);
+  });
+
+  it("returns a recoverable final-render failure after all pages are accepted", async () => {
+    const pagePlan = makePagePlan();
+    const harness = createHarness({
+      pagePlan,
+      existingProgress: makeProgress(pagePlan, "accepted"),
+      deckRenderError: new Error("deck render broke"),
+    });
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "failed");
+    assert.equal(completion.error.type, "final_render_failed");
+    assert.equal(completion.progress?.step, "final-render");
+    assert.equal(harness.authoringPrompts.length, 0);
+    assert.equal(harness.deckRenderCalls, 1);
+    assert.equal(harness.progress.pages.every((page) => page.status === "accepted"), true);
   });
 });

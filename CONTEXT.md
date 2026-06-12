@@ -50,8 +50,12 @@ The process that turns a confirmed outline into presentation pages; it does not 
 A deck generation process that is currently running; the confirmed outline is not open to edits during this period.
 
 **Interrupted Deck Generation**:
-A Deck Generation that is neither running nor finished, holding one or more Interrupted Page Generations (and possibly pending pages) with no page actively authoring. It can be resumed to finish the unfinished pages while keeping accepted pages.
+A Deck Generation that is neither running nor finished, with one or more Page Generation Units not yet accepted or with final Deck artifacts not yet ready, and no page actively authoring. It can be resumed to finish the unfinished work while keeping accepted pages.
 _Avoid_: Cancelled Deck — cancellation is the user action that leads here, not the resulting state.
+
+**Unresumable Deck Generation**:
+A Deck Generation that is not running and cannot be safely resumed because required Workspace artifacts are missing, stale, invalid, or inconsistent with the Confirmed Outline or Template.
+_Avoid_: Failed Deck when the issue is an artifact or state blocker rather than a Page Generation failure.
 
 **Generation Step**:
 A visible part of deck generation, such as planning pages, preparing files, authoring a page, content review, rendering, visual review, or final rendering.
@@ -100,7 +104,7 @@ _Avoid_: Stopped Page, Cancelled Page — cancellation is a deck-level user acti
 A transient Agent Session infrastructure failure where the platform cannot continue an Agent run because the app session authorization is unavailable. It is treated as infrastructure failure, not as a Page Generation content or render failure.
 
 **Page Generation Retry**:
-The action of rerunning one Failed or Interrupted Page Generation against the current Confirmed Outline, Page Plan, and Template, with a fresh attempt budget. It applies to the selected page only and does not imply regenerating the whole Deck.
+The action of rerunning one Page Generation Unit against the current Confirmed Outline, Page Plan, and Template with a fresh attempt budget. It is a lower-level recovery concept; the user-facing recovery action for unfinished deck work is Deck Generation Resume.
 
 **Page Refinement**:
 A user-requested revision of one accepted Page Generation Unit after Deck Generation, using the user's refinement request as the active instruction for that page while preserving the current Confirmed Outline, Page Plan, and Template.
@@ -111,11 +115,11 @@ The user's active instruction for a Page Refinement during the current run. It i
 _Avoid_: Visual Review Issue, Rewrite Request
 
 **Deck Generation Resume**:
-The user action that continues an Interrupted Deck Generation by re-running its Interrupted Page Generations, pending pages, and pages whose only failure was infrastructure (e.g. an Agent Session Cache Miss), while keeping accepted pages and leaving genuinely Failed Page Generations (content, render, or needs-review) untouched. Those are re-attempted only through Page Generation Retry.
+The user action that continues unfinished Deck Generation by re-running any Page Generation Unit that is not accepted yet, including Interrupted Page Generations, pending pages, infrastructure failures, and Failed Page Generations. It keeps accepted pages and does not restart the whole Deck.
 _Avoid_: Regenerate, Restart — those discard accepted pages and start the whole Deck over.
 
 **Deck Generation Cancellation**:
-The user action that stops an Active Deck Generation from starting more Page Generation Units. Work already inside a Page Generation Unit may finish its current step before cancellation is reflected.
+The user action that stops an Active Deck Generation from starting more Page Generation Units. Work already inside a Page Generation Unit may finish its current step before cancellation is reflected; after cancellation settles, unfinished deck work is represented as an Interrupted Deck Generation.
 
 **Task State Semantics**:
 The authoritative state-meaning module for the Task State Machine. It derives effective deck/page state, allowed operations, blockers, recommendations, and page progress synchronization from Workspace artifacts such as the Page Plan and Page Progress.

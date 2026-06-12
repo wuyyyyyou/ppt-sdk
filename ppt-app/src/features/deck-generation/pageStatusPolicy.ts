@@ -36,6 +36,14 @@ export function isResumablePageGenerationStatus(status: string) {
   return RESUMABLE_PAGE_STATUSES.has(status);
 }
 
+export function isUnfinishedPageGenerationStatus(status: string) {
+  return status !== "accepted";
+}
+
+export function shouldResumePageGenerationStatus(status: string) {
+  return isUnfinishedPageGenerationStatus(status);
+}
+
 export function isGenuinelyFailedPageGenerationStatus(status: string) {
   return GENUINELY_FAILED_PAGE_STATUSES.has(status);
 }

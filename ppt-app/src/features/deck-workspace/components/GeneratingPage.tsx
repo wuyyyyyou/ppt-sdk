@@ -1,23 +1,21 @@
-import { AlertCircle, CheckCircle2, ChevronDown, Circle, LoaderCircle, Play, RotateCcw, Sparkles } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronDown, Circle, LoaderCircle, Play, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Messages } from "../../../i18n/messages";
 import type { DeckGenerationProgress, DeckGenerationStep } from "../../deck-generation";
-import { isRetryablePageGenerationStatus } from "../../deck-generation/pageStatusPolicy";
 import { buildPageGenerationStageRecords, type PageGenerationStageRecord, type PageGenerationStageRecordGroup } from "../generationStageRecords";
 import { getGenerationProgressDisplayMessage } from "../generationProgressDisplay";
-import type { GenerationStreamSnapshot, LoadingKind } from "../types";
+import type { GenerationStreamSnapshot } from "../types";
+import type { GenerationViewState } from "../generationViewState";
 import { ThinkingStatusText } from "./BriefPage";
 
 interface GeneratingPageProps {
   t: Messages;
-  loading: LoadingKind;
+  viewState: GenerationViewState;
   progress: DeckGenerationProgress | null;
   history: GenerationStreamSnapshot[];
   onCancel: () => void;
   onBackToOutline: () => void;
   onResume: () => Promise<void>;
-  onRegenerate: () => Promise<void>;
-  onRetryPage: (pageId: string) => Promise<void>;
   canBackToOutline: boolean;
 }
 
@@ -41,8 +39,22 @@ function majorStepIndex(step: DeckGenerationStep | null) {
   return Math.max(0, majorSteps.findIndex((item) => item.steps.includes(step)));
 }
 
-function stepState(index: number, activeIndex: number, progress: DeckGenerationProgress | null) {
-  if (progress?.step === "failed" || progress?.step === "cancelled" || progress?.step === "interrupted") {
+function stepState(
+  index: number,
+  activeIndex: number,
+  progress: DeckGenerationProgress | null,
+  viewStatus: GenerationViewState["status"],
+) {
+  if (viewStatus === "interrupted") {
+    return index === activeIndex ? "interrupted" : index < activeIndex ? "done" : "pending";
+  }
+  if (viewStatus === "unresumable") {
+    return index === activeIndex ? "failed" : index < activeIndex ? "done" : "pending";
+  }
+  if (progress?.step === "interrupted") {
+    return index === activeIndex ? "interrupted" : index < activeIndex ? "done" : "pending";
+  }
+  if (progress?.step === "failed" || progress?.step === "cancelled") {
     return index === activeIndex ? "failed" : index < activeIndex ? "done" : "pending";
   }
   if (index < activeIndex) return "done";
@@ -51,28 +63,26 @@ function stepState(index: number, activeIndex: number, progress: DeckGenerationP
 }
 
 export function GeneratingPage(props: GeneratingPageProps) {
-  const { t, loading, progress, history, onCancel, onBackToOutline, onResume, onRegenerate, onRetryPage, canBackToOutline } = props;
+  const { t, viewState, progress, history, onCancel, onBackToOutline, onResume, canBackToOutline } = props;
   const activeIndex = majorStepIndex(progress?.step ?? null);
-  const failed = progress?.step === "failed" || progress?.step === "cancelled";
-  const interrupted = progress?.step === "interrupted";
-  const running = loading === "deck" || loading === "deckFromOutline";
   const progressMessage = getGenerationProgressDisplayMessage(t, progress);
+  const pageTitle = generationPageTitle(t, viewState.status);
 
   return (
     <section className="page active generating-page">
       <div className="page-header compact">
         <div>
-          <div className="page-title">{t.stages.generating}</div>
-          <p><ThinkingStatusText text={progressMessage} active={progress ? isProgressRunning(progress) : running} /></p>
+          <div className="page-title">{pageTitle}</div>
+          <p><ThinkingStatusText text={progressMessage} active={viewState.status === "running"} /></p>
         </div>
       </div>
 
       <div className="generation-major-timeline">
         {majorSteps.map((step, index) => {
-          const state = stepState(index, activeIndex, progress);
+          const state = stepState(index, activeIndex, progress, viewState.status);
           return (
             <button key={step.id} className={`generation-major-node ${state}`}>
-              {state === "done" ? <CheckCircle2 size={15} /> : state === "failed" ? <AlertCircle size={15} /> : state === "active" ? <LoaderCircle className="generation-running-icon" size={15} /> : <Circle size={15} />}
+              {state === "done" ? <CheckCircle2 size={15} /> : state === "failed" || state === "interrupted" ? <AlertCircle size={15} /> : state === "active" ? <LoaderCircle className="generation-running-icon" size={15} /> : <Circle size={15} />}
               <span>{t.generating.steps[step.labelKey]}</span>
             </button>
           );
@@ -85,9 +95,8 @@ export function GeneratingPage(props: GeneratingPageProps) {
           progress={progress}
           history={history}
           onCancel={onCancel}
-          cancellable={running && progress.step !== "cancelled"}
-          onRetryPage={onRetryPage}
-          retryDisabled={running}
+          showStop={viewState.showStop}
+          canStop={viewState.canStop}
         />
       ) : (
         <div className="generation-progress-panel">
@@ -95,24 +104,17 @@ export function GeneratingPage(props: GeneratingPageProps) {
         </div>
       )}
 
-      {interrupted ? (
+      {viewState.showResume ? (
         <div className="generation-recovery-actions">
-          <button className="secondary-btn" onClick={onBackToOutline} disabled={!canBackToOutline || running}>
-            {t.stages.outline}
-          </button>
-          <button className="primary-btn" onClick={() => void onResume()} disabled={running}>
+          <button className="primary-btn" onClick={() => void onResume()} disabled={!viewState.canResume}>
             <Play size={14} />
             {t.controls.resumeGeneration}
           </button>
         </div>
-      ) : failed ? (
+      ) : viewState.showBackToOutline ? (
         <div className="generation-recovery-actions">
           <button className="secondary-btn" onClick={onBackToOutline} disabled={!canBackToOutline}>
             {t.stages.outline}
-          </button>
-          <button className="primary-btn" onClick={onRegenerate}>
-            <RotateCcw size={14} />
-            {t.controls.createDeck}
           </button>
         </div>
       ) : null}
@@ -125,11 +127,10 @@ function GenerationProgressPanel(props: {
   progress: DeckGenerationProgress;
   history: GenerationStreamSnapshot[];
   onCancel: () => void;
-  cancellable: boolean;
-  onRetryPage?: (pageId: string) => Promise<void>;
-  retryDisabled?: boolean;
+  showStop: boolean;
+  canStop: boolean;
 }) {
-  const { t, progress, history, onCancel, cancellable, onRetryPage, retryDisabled = false } = props;
+  const { t, progress, history, onCancel, showStop, canStop } = props;
   const completed = progress.pages.filter((page) => page.status === "accepted").length;
   const total = progress.totalPages || progress.pages.length || 0;
   const progressMessage = getGenerationProgressDisplayMessage(t, progress);
@@ -157,8 +158,8 @@ function GenerationProgressPanel(props: {
             </span>
           ) : null}
         </div>
-        {cancellable ? (
-          <button className="secondary-btn compact" onClick={onCancel}>
+        {showStop ? (
+          <button className="secondary-btn compact" onClick={onCancel} disabled={!canStop}>
             {t.controls.stop}
           </button>
         ) : null}
@@ -171,8 +172,6 @@ function GenerationProgressPanel(props: {
               group={group}
               t={t}
               disclosure={disclosure}
-              onRetryPage={onRetryPage}
-              retryDisabled={retryDisabled}
             />
           ))}
         </div>
@@ -189,14 +188,8 @@ function PageStageRecordGroupView(props: {
   group: PageGenerationStageRecordGroup;
   t: Messages;
   disclosure: ReturnType<typeof useStageDisclosure>;
-  onRetryPage?: (pageId: string) => Promise<void>;
-  retryDisabled: boolean;
 }) {
-  const { group, t, disclosure, onRetryPage, retryDisabled } = props;
-  const canRetry =
-    Boolean(onRetryPage) &&
-    !retryDisabled &&
-    canRetryPageGenerationStatus(group.pageStatus);
+  const { group, t, disclosure } = props;
   const badgeState = statusBadgeState(group.state);
 
   return (
@@ -205,11 +198,6 @@ function PageStageRecordGroupView(props: {
         <div>
           <strong>{group.pageIndex + 1}. {group.title}</strong>
         </div>
-        {canRetry ? (
-          <button className="secondary-btn compact" onClick={() => void onRetryPage?.(group.pageId)}>
-            {t.controls.retryPage}
-          </button>
-        ) : null}
         <span className={`generation-status-badge ${badgeState}`}>{group.pageStatusLabel}</span>
       </div>
       {group.lastError ? <p className="generation-page-error">{group.lastError}</p> : null}
@@ -226,10 +214,6 @@ function PageStageRecordGroupView(props: {
       </div>
     </article>
   );
-}
-
-export function canRetryPageGenerationStatus(status: string) {
-  return isRetryablePageGenerationStatus(status);
 }
 
 function PageStageRecordView(props: {
@@ -293,6 +277,21 @@ function PageStageRecordView(props: {
       ) : null}
     </article>
   );
+}
+
+function generationPageTitle(t: Messages, status: GenerationViewState["status"]) {
+  switch (status) {
+    case "running":
+      return t.stages.generating;
+    case "stopping":
+      return t.generating.stoppingTitle;
+    case "interrupted":
+      return t.generating.interruptedTitle;
+    case "unresumable":
+      return t.generating.unresumableTitle;
+    case "complete":
+      return t.generating.generationComplete;
+  }
 }
 
 function sanitizeGenerationDebugText(text: string) {

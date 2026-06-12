@@ -4,8 +4,10 @@ import { describe, it } from "node:test";
 import {
   isActivePageGenerationStatus,
   isGenuinelyFailedPageGenerationStatus,
+  isUnfinishedPageGenerationStatus,
   isResumablePageGenerationStatus,
   isRetryablePageGenerationStatus,
+  shouldResumePageGenerationStatus,
 } from "../../src/features/deck-generation/pageStatusPolicy.ts";
 
 describe("Page Status Policy", () => {
@@ -47,5 +49,22 @@ describe("Page Status Policy", () => {
     assert.equal(isRetryablePageGenerationStatus("agent_infrastructure_failed"), true);
     assert.equal(isRetryablePageGenerationStatus("pending"), false);
     assert.equal(isRetryablePageGenerationStatus("accepted"), false);
+  });
+
+  it("classifies all unfinished statuses as resume targets", () => {
+    for (const status of [
+      "pending",
+      "interrupted",
+      "agent_infrastructure_failed",
+      "render_failed",
+      "agent_failed",
+      "needs_user_review",
+    ]) {
+      assert.equal(shouldResumePageGenerationStatus(status), true, status);
+      assert.equal(isUnfinishedPageGenerationStatus(status), true, status);
+    }
+
+    assert.equal(shouldResumePageGenerationStatus("accepted"), false);
+    assert.equal(isUnfinishedPageGenerationStatus("accepted"), false);
   });
 });

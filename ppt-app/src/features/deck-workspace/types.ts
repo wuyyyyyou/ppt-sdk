@@ -11,6 +11,7 @@ import type {
   DeckGenerationProgress,
   DeckGenerationStreamSnapshot
 } from "../deck-generation";
+import type { ActiveGenerationRun, GenerationViewState } from "./generationViewState";
 import type { PageReviewSettings } from "./reviewSettings";
 
 export type MainStage = "brief" | "outline" | "generating" | "deck";
@@ -88,6 +89,8 @@ export interface DeckWorkspaceState {
   pageProgress: PageProgress | null;
   refineScope: RefineScope;
   loading: LoadingKind;
+  activeGenerationRun: ActiveGenerationRun | null;
+  generationViewState: GenerationViewState;
   exportProgress: ExportProgressState;
   exportArtifact: ExportArtifact | null;
   currentStatus: string;
