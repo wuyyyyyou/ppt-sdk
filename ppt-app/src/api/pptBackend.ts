@@ -17,8 +17,12 @@ import type {
   PrepareExportModelResult,
   PreparePageFilesInput,
   PreparePageFilesResult,
+  PrepareResearchWorkspaceResult,
   ProjectResult,
   PptxExportJob,
+  ResearchEvidenceIndex,
+  ResearchPlan,
+  ResearchStatus,
   ExportPdfInput,
   ExportPdfResult,
   ExportArtifactDownloadUrlResult,
@@ -37,6 +41,10 @@ import type {
   SelectTemplateResult,
   StartGeneratePptxInput,
   StartPptxExportModelInput,
+  WebFetchResult,
+  WebSearchResult,
+  ImageFetchResult,
+  ImageSearchResult,
   TemplatePlanningContext,
   UpdateWorkspaceSettingsInput,
   UpdateWorkspaceOutlineInput,
@@ -73,6 +81,40 @@ export interface PptBackend {
   recordPagePlan(input: RecordPagePlanInput): Promise<PagePlan>;
   getPagePlan(input: { workspace_dir: string }): Promise<PagePlan>;
   preparePageFiles(input: PreparePageFilesInput): Promise<PreparePageFilesResult>;
+  prepareResearchWorkspace(input: { workspace_dir: string }): Promise<PrepareResearchWorkspaceResult>;
+  recordResearchPlan(input: { workspace_dir: string; research_plan: ResearchPlan }): Promise<ResearchPlan>;
+  getResearchPlan(input: { workspace_dir: string }): Promise<ResearchPlan>;
+  recordResearchEvidence(input: { workspace_dir: string; evidence: ResearchEvidenceIndex }): Promise<ResearchEvidenceIndex>;
+  getResearchEvidence(input: { workspace_dir: string }): Promise<ResearchEvidenceIndex>;
+  recordResearchStatus(input: { workspace_dir: string; status: ResearchStatus }): Promise<ResearchStatus>;
+  getResearchStatus(input: { workspace_dir: string }): Promise<ResearchStatus>;
+  webSearch(input: {
+    query: string;
+    max_results?: number;
+    safesearch?: "off" | "moderate" | "strict";
+    timelimit?: "d" | "w" | "m" | "y";
+  }): Promise<WebSearchResult>;
+  webFetch(input: {
+    urls: string[];
+    output_dir?: string;
+    format?: "text_markdown" | "text_plain" | "text_rich";
+    max_chars?: number;
+  }): Promise<WebFetchResult>;
+  imageSearch(input: {
+    query: string;
+    max_results?: number;
+    safesearch?: "off" | "moderate" | "strict";
+    timelimit?: "d" | "w" | "m" | "y";
+    size?: string;
+    color?: string;
+    type_image?: string;
+    layout?: string;
+  }): Promise<ImageSearchResult>;
+  imageFetch(input: {
+    urls: string[];
+    output_dir?: string;
+    max_bytes?: number;
+  }): Promise<ImageFetchResult>;
   getPageProgress(input: { workspace_dir: string }): Promise<PageProgress>;
   recordPageProgress(input: RecordPageProgressInput): Promise<PageProgress>;
   renderWorkspacePagePreview(

@@ -76,7 +76,7 @@
         {
           "name": "channel",
           "type": "string",
-          "description": "Workspace log channel. Supports ai-outline, ai-outline-interactions, ai-page-plan, ai-page-plan-interactions, ai-page-agent, ai-page-agent-interactions, and ai-page-agent-stream.",
+          "description": "Workspace log channel. Supports ai-outline, ai-outline-interactions, ai-page-plan, ai-page-plan-interactions, ai-page-agent, ai-page-agent-interactions, ai-page-agent-stream, ai-research, and ai-research-interactions.",
           "required": true
         },
         {
@@ -299,6 +299,108 @@
     {
       "name": "app_get_page_progress",
       "description": "Read page-progress.json for a workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_prepare_research_workspace",
+      "description": "Prepare workspace research directories and initialize research plan, evidence, and status artifacts.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_record_research_plan",
+      "description": "Write the deck-level Research Plan artifact for a workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "research_plan",
+          "type": "object",
+          "description": "Research Plan artifact.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_research_plan",
+      "description": "Read the deck-level Research Plan artifact for a workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_record_research_evidence",
+      "description": "Write the Research Evidence index artifact for a workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "evidence",
+          "type": "object",
+          "description": "Research Evidence index artifact.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_research_evidence",
+      "description": "Read the Research Evidence index artifact for a workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_record_research_status",
+      "description": "Write the Research Collection and Research Curation status artifact for a workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "object",
+          "description": "Research status artifact.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_research_status",
+      "description": "Read the Research Collection and Research Curation status artifact for a workspace.",
       "parameters": [
         {
           "name": "workspace_dir",

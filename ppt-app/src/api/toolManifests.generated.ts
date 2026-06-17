@@ -12,3 +12,9 @@ export const PPT_GENER_TOOL = {
   version: "3.0.2",
   displayName: "ppt-gener",
 } as const;
+
+export const ANNA_SEARCH_TOOL = {
+  id: "tool-anna-search-local",
+  version: "0.1.0",
+  displayName: "Anna Search",
+} as const;

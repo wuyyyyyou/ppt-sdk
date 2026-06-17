@@ -182,6 +182,9 @@ export interface Messages {
       >;
       stages: Record<
         | "pagePlan"
+        | "researchPlanning"
+        | "researchCollection"
+        | "researchCuration"
         | "prepare"
         | "authoring"
         | "contentReview"
@@ -480,6 +483,9 @@ export const messages: Record<Locale, Messages> = {
         },
         stages: {
           pagePlan: "Page planning",
+          researchPlanning: "Research planning",
+          researchCollection: "Collecting sources",
+          researchCuration: "Curating evidence",
           prepare: "File preparation",
           authoring: "Page expression",
           contentReview: "Page content review",
@@ -782,6 +788,9 @@ export const messages: Record<Locale, Messages> = {
         },
         stages: {
           pagePlan: "页面规划",
+          researchPlanning: "检索需求规划",
+          researchCollection: "搜索并抓取资料",
+          researchCuration: "筛选事实和图片",
           prepare: "文件准备",
           authoring: "页面表达",
           contentReview: "页面内容检查",

@@ -27,6 +27,12 @@ const TOOLS = [
     pythonScriptTarget: "presenton_pptx_generator_plugin:main",
     pythonPackageName: "presenton-pptx-generator-executa",
   },
+  {
+    key: "annaSearch",
+    manifestPath: "../anna-search-executa/manifest.json",
+    localExecutaPath: "ppt-app/executas/anna-search-local/executa.json",
+    generatedConstName: "ANNA_SEARCH_TOOL",
+  },
 ];
 
 function resolveRepoPath(relativePath) {
@@ -99,6 +105,7 @@ async function syncPptAppManifest(tools) {
 
 async function syncLocalExecutas(tools) {
   for (const tool of tools) {
+    if (!tool.localExecutaPath) continue;
     const executa = await readJson(tool.localExecutaPath);
     executa.tool_id = tool.manifest.name;
     await writeJson(tool.localExecutaPath, executa);
@@ -127,6 +134,7 @@ async function syncGeneratedFrontendConstants(tools) {
 async function syncEnvExample(tools) {
   let content = await readText("ppt-app/.env.example");
   for (const tool of tools) {
+    if (!tool.envName) continue;
     const linePattern = new RegExp(`^${tool.envName}=.*$`, "m");
     const nextLine = `${tool.envName}=${tool.manifest.name}`;
     content = linePattern.test(content)

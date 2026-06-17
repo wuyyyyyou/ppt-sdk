@@ -185,7 +185,9 @@ export interface AppendWorkspaceLogInput {
     | "ai-page-plan-interactions"
     | "ai-page-agent"
     | "ai-page-agent-interactions"
-    | "ai-page-agent-stream";
+    | "ai-page-agent-stream"
+    | "ai-research"
+    | "ai-research-interactions";
   entry: Record<string, unknown>;
   payload_keys?: string[];
   inline_payload_max_bytes?: number;
@@ -345,6 +347,173 @@ export interface PreparePageFilesResult {
     blueprint_id: string;
     manifest_slide_id: string;
   }>;
+}
+
+export interface ResearchPaths {
+  root_dir: string;
+  raw_dir: string;
+  raw_web_dir: string;
+  raw_images_dir: string;
+  evidence_dir: string;
+  evidence_pages_dir: string;
+  evidence_images_dir: string;
+  research_plan_path: string;
+  evidence_index_path: string;
+  status_path: string;
+}
+
+export interface PrepareResearchWorkspaceResult extends ResearchPaths {
+  workspace_dir: string;
+  prepared_at: string;
+}
+
+export type ResearchSourceType = "user_provided" | "web_source" | "image_source";
+
+export interface ResearchRequirement {
+  page_id: string;
+  index: number;
+  title: string;
+  web_research_needed: boolean;
+  image_research_needed: boolean;
+  query_intents: string[];
+  image_query_intents: string[];
+  evidence_needs: string[];
+  visual_needs: string[];
+  gap_strategy: string;
+  reason: string;
+}
+
+export interface ResearchPlan {
+  version: 1;
+  status: "planned" | "empty" | "stale";
+  title: string;
+  source: {
+    outline_updated_at: string | null;
+    page_plan_updated_at: string | null;
+    template_group: string;
+    generated_by: string;
+  };
+  pages: ResearchRequirement[];
+  shared: {
+    web_research_needed: boolean;
+    image_research_needed: boolean;
+    query_intents: string[];
+  };
+  updated_at: string;
+}
+
+export interface ResearchEvidenceFact {
+  id: string;
+  claim: string;
+  source_type: ResearchSourceType;
+  source_title?: string;
+  source_url?: string;
+  source_file?: string;
+  retrieved_at?: string;
+  excerpt?: string;
+  source_note?: string;
+  confidence?: "low" | "medium" | "high";
+}
+
+export interface VisualResearchEvidence {
+  id: string;
+  file_path: string;
+  original_raw_path?: string;
+  image_url?: string;
+  page_url?: string;
+  sha256?: string;
+  reason: string;
+  visual_summary: string;
+}
+
+export interface ResearchEvidencePage {
+  page_id: string;
+  status: "curated" | "gap" | "error" | "skipped";
+  facts: ResearchEvidenceFact[];
+  visual_assets: VisualResearchEvidence[];
+  derived_insights: Array<{
+    id: string;
+    insight: string;
+    supporting_fact_ids: string[];
+  }>;
+  gaps: string[];
+  rejected_material: Array<{
+    source?: string;
+    reason: string;
+  }>;
+  markdown_path?: string;
+  updated_at: string;
+}
+
+export interface ResearchEvidenceIndex {
+  version: 1;
+  status: "empty" | "partial" | "curated";
+  pages: ResearchEvidencePage[];
+  shared: {
+    facts: ResearchEvidenceFact[];
+    visual_assets: VisualResearchEvidence[];
+    gaps: string[];
+  };
+  updated_at: string;
+}
+
+export interface ResearchStatus {
+  version: 1;
+  status: "idle" | "planning" | "collecting" | "curating" | "ready" | "gap" | "error";
+  pages: Array<{
+    page_id: string;
+    status: string;
+    message?: string;
+    evidence_path?: string;
+    updated_at?: string;
+  }>;
+  updated_at: string;
+}
+
+export interface SearchResultItem {
+  title: string;
+  url: string;
+  snippet: string;
+  source?: string;
+}
+
+export interface WebSearchResult {
+  query: string;
+  provider: string;
+  results: SearchResultItem[];
+  count: number;
+}
+
+export interface WebFetchResult {
+  output_dir: string;
+  index_path: string;
+  format: string;
+  max_chars: number;
+  results: Array<Record<string, unknown>>;
+  count: number;
+}
+
+export interface ImageSearchResult {
+  query: string;
+  provider: string;
+  results: Array<{
+    title: string;
+    image_url: string;
+    thumbnail_url?: string;
+    page_url?: string;
+    width?: number;
+    height?: number;
+    source?: string;
+  }>;
+  count: number;
+}
+
+export interface ImageFetchResult {
+  output_dir: string;
+  index_path: string;
+  max_bytes: number;
+  results: Array<Record<string, unknown>>;
+  count: number;
 }
 
 export interface PageProgressItem {

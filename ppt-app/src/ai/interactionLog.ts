@@ -1,6 +1,6 @@
 import type { AppendWorkspaceLogInput } from "../api/types";
 
-export type AiLogDomain = "outline" | "page_plan" | "page_agent";
+export type AiLogDomain = "outline" | "page_plan" | "page_agent" | "research";
 export type AiInteractionStatus =
   | "started"
   | "succeeded"
@@ -51,12 +51,14 @@ const INTERACTION_CHANNELS = {
   outline: "ai-outline-interactions",
   page_plan: "ai-page-plan-interactions",
   page_agent: "ai-page-agent-interactions",
+  research: "ai-research-interactions",
 } as const satisfies Record<AiLogDomain, AppendWorkspaceLogInput["channel"]>;
 
 const SEMANTIC_CHANNELS = {
   outline: "ai-outline",
   page_plan: "ai-page-plan",
   page_agent: "ai-page-agent",
+  research: "ai-research",
 } as const satisfies Record<AiLogDomain, AppendWorkspaceLogInput["channel"]>;
 
 function nowIso() {
@@ -102,6 +104,7 @@ function createInteractionId(domain: AiLogDomain, operation: string) {
 }
 
 function domainEventPrefix(domain: AiLogDomain) {
+  if (domain === "research") return "ai.research";
   if (domain === "page_plan") return "ai.page_plan";
   if (domain === "page_agent") return "ai.page_agent";
   return "ai.outline";

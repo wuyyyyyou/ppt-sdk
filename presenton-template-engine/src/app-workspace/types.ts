@@ -17,6 +17,9 @@ export interface AppWorkspaceFiles {
   page_progress: string;
   pages: string;
   template: string;
+  research_plan: string;
+  research_evidence: string;
+  research_status: string;
 }
 
 export interface AppWorkspaceOutlineItem {
@@ -134,7 +137,9 @@ export interface AppendAppWorkspaceLogInput {
     | "ai-page-plan-interactions"
     | "ai-page-agent"
     | "ai-page-agent-interactions"
-    | "ai-page-agent-stream";
+    | "ai-page-agent-stream"
+    | "ai-research"
+    | "ai-research-interactions";
   entry: Record<string, unknown>;
   payload_keys?: string[];
   inline_payload_max_bytes?: number;
@@ -144,6 +149,55 @@ export interface AppendAppWorkspaceLogResult {
   workspace_dir: string;
   log_file: string;
   appended: true;
+}
+
+export interface AppResearchPaths {
+  root_dir: string;
+  raw_dir: string;
+  raw_web_dir: string;
+  raw_images_dir: string;
+  evidence_dir: string;
+  evidence_pages_dir: string;
+  evidence_images_dir: string;
+  research_plan_path: string;
+  evidence_index_path: string;
+  status_path: string;
+}
+
+export interface PrepareAppResearchWorkspaceInput {
+  workspace_dir: string;
+}
+
+export interface PrepareAppResearchWorkspaceResult extends AppResearchPaths {
+  workspace_dir: string;
+  prepared_at: string;
+}
+
+export interface RecordAppResearchPlanInput {
+  workspace_dir: string;
+  research_plan: unknown;
+}
+
+export interface GetAppResearchPlanInput {
+  workspace_dir: string;
+}
+
+export interface RecordAppResearchEvidenceInput {
+  workspace_dir: string;
+  evidence: unknown;
+}
+
+export interface GetAppResearchEvidenceInput {
+  workspace_dir: string;
+}
+
+export interface RecordAppResearchStatusInput {
+  workspace_dir: string;
+  status: unknown;
+}
+
+export interface GetAppResearchStatusInput {
+  workspace_dir: string;
 }
 
 export interface AppTemplatePreviewRef {

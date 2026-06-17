@@ -13,6 +13,9 @@ import type { GenerationStreamSnapshot } from "./types";
 
 type StageLabelKey =
   | "pagePlan"
+  | "researchPlanning"
+  | "researchCollection"
+  | "researchCuration"
   | "prepare"
   | "authoring"
   | "contentReview"
@@ -218,6 +221,9 @@ function buildPageStatusStageRecord(
 function sortStageRecords(records: PageGenerationStageRecord[]) {
   const order: StageLabelKey[] = [
     "pending",
+    "researchPlanning",
+    "researchCollection",
+    "researchCuration",
     "authoring",
     "contentReview",
     "contentReviewFix",
@@ -266,8 +272,12 @@ function stageLabelKey(
   if (kind === "visual-review-fix") return "visualReviewFix";
   if (kind === "page-content-review") return "contentReview";
   if (kind === "page-visual-review") return "visualReview";
+  if (kind === "research-curation") return "researchCuration";
 
   if (phase === "page-plan") return "pagePlan";
+  if (phase === "research-planning") return "researchPlanning";
+  if (phase === "research-collection") return "researchCollection";
+  if (phase === "research-curation") return "researchCuration";
   if (phase === "prepare") return "prepare";
   if (phase === "page-authoring") return "authoring";
   if (phase === "page-content-review") return "contentReview";

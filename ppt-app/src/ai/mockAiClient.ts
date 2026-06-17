@@ -11,6 +11,7 @@ import {
   getExpectedSlideCount,
   getExpectedSlideCountForRevision,
 } from "./outlinePrompt";
+import { buildGenerateResearchPlanLlmRequest } from "./researchPlanPrompt";
 import { validateGeneratedOutline } from "./outlineParser";
 import type {
   AiClient,
@@ -190,6 +191,49 @@ export function createMockAiClient(): AiClient {
         updated_at: now,
       };
       await logMockInteraction(input.logContext, { method: "generatePagePlan", input }, plan);
+      return plan;
+    },
+
+    async generateResearchPlan(input) {
+      await sleep(250);
+      const now = new Date().toISOString();
+      const request = buildGenerateResearchPlanLlmRequest(input);
+      const plan = {
+        version: 1 as const,
+        status: "planned" as const,
+        title: input.pagePlan.title,
+        source: {
+          outline_updated_at: input.outline.updated_at,
+          page_plan_updated_at: input.pagePlan.updated_at,
+          template_group: input.pagePlan.source.template_group,
+          generated_by: "mock",
+        },
+        pages: input.pagePlan.pages.map((page) => {
+          const text = `${page.title} ${page.outline}`.toLowerCase();
+          const webNeeded = /data|market|case|latest|trend|数据|市场|案例|最新|趋势|排名|规模/.test(text);
+          const imageNeeded = /image|photo|visual|product|logo|图片|照片|视觉|产品|标志/.test(text);
+          return {
+            page_id: page.page_id,
+            index: page.index,
+            title: page.title,
+            web_research_needed: webNeeded,
+            image_research_needed: imageNeeded,
+            query_intents: webNeeded ? [page.title] : [],
+            image_query_intents: imageNeeded ? [page.title] : [],
+            evidence_needs: webNeeded ? ["Source-backed facts for this page."] : [],
+            visual_needs: imageNeeded ? ["A relevant non-template visual asset."] : [],
+            gap_strategy: "Generalize unsupported concrete details or mark data slots as TBD / 待补充.",
+            reason: webNeeded || imageNeeded ? "Mock detected research-sensitive page intent." : "Mock detected no external research need.",
+          };
+        }),
+        shared: {
+          web_research_needed: false,
+          image_research_needed: false,
+          query_intents: [],
+        },
+        updated_at: now,
+      };
+      await logMockInteraction(input.logContext, request, plan);
       return plan;
     },
 

@@ -7,6 +7,8 @@ import type {
   ExportPdfResult,
   GeneratePptxInput,
   GeneratePptxResult,
+  ImageFetchResult,
+  ImageSearchResult,
   PagePlan,
   PageProgress,
   TemplateSummary,
@@ -16,14 +18,18 @@ import type {
   PrepareExportModelResult,
   ProjectResult,
   PptxExportJob,
+  ResearchEvidenceIndex,
+  ResearchPlan,
+  ResearchStatus,
   RenderDeckHtmlResult,
   RenderWorkspacePagePreviewResult,
   RecordPdfExportInput,
   TemplatePlanningContext,
   WorkspaceDefaultsResult,
-  WorkspaceResult
+  WorkspaceResult,
 } from "./types";
-import { PPT_ENGINE_TOOL, PPT_GENER_TOOL } from "./toolManifests.generated";
+import { ANNA_SEARCH_TOOL, PPT_ENGINE_TOOL, PPT_GENER_TOOL } from "./toolManifests.generated";
+import { createSearchAdapter } from "./searchAdapter";
 
 const PPT_ENGINE_TOOL_ID =
   import.meta.env.VITE_PPT_ENGINE_TOOL_ID ??
@@ -31,6 +37,9 @@ const PPT_ENGINE_TOOL_ID =
 const PPT_GENER_TOOL_ID =
   import.meta.env.VITE_PPT_GENER_TOOL_ID ??
   PPT_GENER_TOOL.id;
+const ANNA_SEARCH_TOOL_ID =
+  import.meta.env.VITE_ANNA_SEARCH_TOOL_ID ??
+  ANNA_SEARCH_TOOL.id;
 const PPTX_EXPORT_TIMEOUT_MS = 600_000;
 
 function unwrapToolResult<T>(result: unknown): T {
@@ -114,6 +123,10 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       await runtime.tools.invoke(input, options)
     );
   }
+  const searchAdapter = createSearchAdapter({
+    runtime,
+    toolId: ANNA_SEARCH_TOOL_ID,
+  });
 
   return {
     listWorkspaces: () =>
@@ -203,6 +216,32 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         "app_prepare_page_files",
         input
       ),
+    prepareResearchWorkspace: (input) =>
+      invoke(PPT_ENGINE_TOOL_ID, "app_prepare_research_workspace", input),
+    recordResearchPlan: (input) =>
+      invoke<ResearchPlan>(PPT_ENGINE_TOOL_ID, "app_record_research_plan", input),
+    getResearchPlan: (input) =>
+      invoke<ResearchPlan>(PPT_ENGINE_TOOL_ID, "app_get_research_plan", input),
+    recordResearchEvidence: (input) =>
+      invoke<ResearchEvidenceIndex>(
+        PPT_ENGINE_TOOL_ID,
+        "app_record_research_evidence",
+        input
+      ),
+    getResearchEvidence: (input) =>
+      invoke<ResearchEvidenceIndex>(
+        PPT_ENGINE_TOOL_ID,
+        "app_get_research_evidence",
+        input
+      ),
+    recordResearchStatus: (input) =>
+      invoke<ResearchStatus>(PPT_ENGINE_TOOL_ID, "app_record_research_status", input),
+    getResearchStatus: (input) =>
+      invoke<ResearchStatus>(PPT_ENGINE_TOOL_ID, "app_get_research_status", input),
+    webSearch: searchAdapter.webSearch,
+    webFetch: searchAdapter.webFetch,
+    imageSearch: searchAdapter.imageSearch,
+    imageFetch: searchAdapter.imageFetch,
     getPageProgress: (input) =>
       invoke<PageProgress>(PPT_ENGINE_TOOL_ID, "app_get_page_progress", input),
     recordPageProgress: (input) =>

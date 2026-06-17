@@ -37,6 +37,38 @@ The recommended data shape for a Template layout. It guides authoring and toolin
 **Page Plan**:
 The slide-by-slide mapping from outline entries to planned pages.
 
+**Research Collection**:
+The process of collecting external material for a Page Generation Unit after the page intent is known. It produces candidate material for review, not presentation content by itself.
+
+**Research Requirement**:
+The decision that a Page Generation Unit needs external material before authoring because its intended content depends on real-world facts, current information, source-backed data, or non-template visual assets. Pages without a Research Requirement should not collect external material by default.
+
+**Research Evidence Gap**:
+A case where a Page Generation Unit has a Research Requirement but Research Collection or Research Curation does not produce enough Research Evidence. It does not block Page Generation; unsupported concrete details must be omitted, generalized, or marked as TBD / 待补充.
+
+**Research Planning**:
+The step that decides which Page Generation Units have a Research Requirement and what external material they need. It is separate from Page Plan because it plans evidence needs rather than slide structure.
+
+**Raw Research Material**:
+External material collected by search, fetch, or image lookup before cleanup or selection. It is not grounding evidence until promoted into Research Evidence.
+_Avoid_: Evidence, source of truth
+
+**Research Curation**:
+The step that turns Raw Research Material into Research Evidence by selecting relevant facts, sources, and visual assets for a Page Generation Unit.
+
+**Research Log**:
+A Workspace-owned diagnostic record of Research Planning, Research Collection, and Research Curation activity. It is separate from Page Generation Stage Records and is used for troubleshooting evidence decisions.
+
+**Research Evidence**:
+Curated facts, sources, and visual assets selected from Raw Research Material for use in Page Generation. It is an allowed grounding source for generated page content.
+_Avoid_: Raw search results, raw crawl output
+
+**Visual Research Evidence**:
+A curated visual asset selected for a Page Generation Unit because it fits the page intent and is visually usable. Text, charts, or claims visible inside the asset are not grounded facts unless separately captured as Research Evidence.
+
+**Shared Research Evidence**:
+Curated deck-level material that can support multiple Page Generation Units without belonging exclusively to one page.
+
 **Deck**:
 The finished presentation content before export.
 

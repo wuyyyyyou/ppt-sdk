@@ -13,6 +13,10 @@
       "tool_id": "tool-youming_5703-ppt-gener-ahzv8re6",
       "min_version": "2.0.0",
       "version": "latest"
+    },
+    {
+      "tool_id": "tool-anna-search-local",
+      "version": "latest"
     }
   ],
   "optional_executas": [],
@@ -49,7 +53,8 @@
     "host_api": {
       "tools": [
         "required:tool-youming_5703-ppt-engine-fmkv9ru7",
-        "required:tool-youming_5703-ppt-gener-ahzv8re6"
+        "required:tool-youming_5703-ppt-gener-ahzv8re6",
+        "required:tool-anna-search-local"
       ],
       "chat": [],
       "artifact": [],

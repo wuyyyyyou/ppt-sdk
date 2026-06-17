@@ -24,6 +24,9 @@ import {
   getAppPagePlan,
   getAppPageProgress,
   getAppPptxExportStatus,
+  getAppResearchEvidence,
+  getAppResearchPlan,
+  getAppResearchStatus,
   getAllDiscoveredTemplateGroups,
   getAppWorkspaceOutline,
   getDiscoveredTemplateGroup,
@@ -33,10 +36,14 @@ import {
   openAppWorkspace,
   prepareAppPageFiles,
   prepareAppExportModel,
+  prepareAppResearchWorkspace,
   recordAppPagePlan,
   recordAppPageProgress,
   recordAppPdfExport,
   recordAppPptxExport,
+  recordAppResearchEvidence,
+  recordAppResearchPlan,
+  recordAppResearchStatus,
   renderAppWorkspaceDeckHtml,
   renderAppWorkspacePagePreview,
   runDeckValidation,
@@ -623,6 +630,8 @@ async function toolAppAppendWorkspaceLog(args) {
     "ai-page-agent",
     "ai-page-agent-interactions",
     "ai-page-agent-stream",
+    "ai-research",
+    "ai-research-interactions",
   ];
   if (!supportedChannels.includes(channel)) {
     throw new Error(`"channel" must be one of: ${supportedChannels.join(", ")}`);
@@ -839,6 +848,81 @@ async function toolAppGetPageProgress(args) {
 
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
   return getAppPageProgress({ workspace_dir: workspaceDir });
+}
+
+async function toolAppPrepareResearchWorkspace(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return prepareAppResearchWorkspace({ workspace_dir: workspaceDir });
+}
+
+async function toolAppRecordResearchPlan(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const researchPlan = args.research_plan;
+  if (!researchPlan || typeof researchPlan !== "object" || Array.isArray(researchPlan)) {
+    throw new Error('"research_plan" must be an object');
+  }
+  return recordAppResearchPlan({ workspace_dir: workspaceDir, research_plan: researchPlan });
+}
+
+async function toolAppGetResearchPlan(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return getAppResearchPlan({ workspace_dir: workspaceDir });
+}
+
+async function toolAppRecordResearchEvidence(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const evidence = args.evidence;
+  if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) {
+    throw new Error('"evidence" must be an object');
+  }
+  return recordAppResearchEvidence({ workspace_dir: workspaceDir, evidence });
+}
+
+async function toolAppGetResearchEvidence(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return getAppResearchEvidence({ workspace_dir: workspaceDir });
+}
+
+async function toolAppRecordResearchStatus(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const status = args.status;
+  if (!status || typeof status !== "object" || Array.isArray(status)) {
+    throw new Error('"status" must be an object');
+  }
+  return recordAppResearchStatus({ workspace_dir: workspaceDir, status });
+}
+
+async function toolAppGetResearchStatus(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return getAppResearchStatus({ workspace_dir: workspaceDir });
 }
 
 async function toolAppRecordPageProgress(args) {
@@ -1231,6 +1315,13 @@ const TOOL_DISPATCH = {
   app_get_page_plan: toolAppGetPagePlan,
   app_prepare_page_files: toolAppPreparePageFiles,
   app_get_page_progress: toolAppGetPageProgress,
+  app_prepare_research_workspace: toolAppPrepareResearchWorkspace,
+  app_record_research_plan: toolAppRecordResearchPlan,
+  app_get_research_plan: toolAppGetResearchPlan,
+  app_record_research_evidence: toolAppRecordResearchEvidence,
+  app_get_research_evidence: toolAppGetResearchEvidence,
+  app_record_research_status: toolAppRecordResearchStatus,
+  app_get_research_status: toolAppGetResearchStatus,
   app_record_page_progress: toolAppRecordPageProgress,
   app_render_workspace_page_preview: toolAppRenderWorkspacePagePreview,
   app_render_deck_html: toolAppRenderDeckHtml,

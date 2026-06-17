@@ -20,12 +20,16 @@ import {
   normalizeOutputLanguage,
   readOutlineOutputLanguage,
 } from "../../ai/outputLanguage";
+import { assertResearchPlanAligned } from "../../ai/researchPlanPrompt";
 import type { AiClient } from "../../ai/aiClient";
 import type { AiInteractionLogger, AiOperationLogContext } from "../../ai/interactionLog";
 import type {
   PagePlan,
   PagePlanItem,
   PageProgress,
+  ResearchEvidenceIndex,
+  ResearchPlan,
+  ResearchRequirement,
   RenderDeckHtmlResult,
   RenderWorkspacePagePreviewResult,
   WorkspaceOutline,
@@ -60,6 +64,9 @@ interface RenderFailureHistoryItem {
 
 export type DeckGenerationStep =
   | "page-plan"
+  | "research-planning"
+  | "research-collection"
+  | "research-curation"
   | "prepare"
   | "page-authoring"
   | "page-content-review"
@@ -202,6 +209,11 @@ function generationText(locale: Locale) {
   const zh = locale === "zh";
   return {
     pagePlan: zh ? "正在规划页面和模板蓝图" : "Planning pages and template blueprints",
+    researchPlanning: zh ? "正在规划检索需求" : "Planning research needs",
+    collectingSources: (page: PagePlanItem) =>
+      zh ? `正在搜索并抓取第 ${page.index + 1} 页资料` : `Collecting sources for page ${page.index + 1}`,
+    curatingEvidence: (page: PagePlanItem) =>
+      zh ? `正在筛选第 ${page.index + 1} 页事实和图片` : `Curating evidence for page ${page.index + 1}`,
     prepare: zh ? "正在准备页面文件" : "Preparing page files",
     complete: zh ? "生成完成" : "Generation complete",
     resumed: zh ? "已恢复上次生成进度" : "Resumed previous generation progress",
@@ -399,6 +411,8 @@ function buildAuthoringPrompt(input: {
     `- ${input.workspaceDir}/template/slides/README.md`,
     `- ${input.workspaceDir}/outline.json`,
     `- ${input.workspaceDir}/page-plan.json`,
+    `- ${input.workspaceDir}/research/evidence-index.json if it exists`,
+    `- ${input.workspaceDir}/research/evidence/pages/${input.page.page_id}.md if it exists`,
     "",
     [
       "Component decision process before editing:",
@@ -418,6 +432,16 @@ function buildAuthoringPrompt(input: {
     AUTHORING_GROUNDING_SOURCE_RULES,
     "",
     AUTHORING_NUMERIC_CHART_RULES,
+    "",
+    [
+      "Research Evidence rules:",
+      "- Use current-page Research Evidence and Shared Research Evidence as grounding sources when present.",
+      "- Do not read Raw Research Material by default, and do not use raw search/fetch output as evidence unless it has been curated into Research Evidence.",
+      "- Do not use evidence scoped to other pages unless it is explicitly Shared Research Evidence.",
+      "- Do not call search tools directly during Page Authoring.",
+      "- If Research Evidence is missing or marked as a gap, omit unsupported concrete details, generalize them, or mark explicit data slots as TBD / 待补充.",
+      "- Visual Research Evidence can be used as a visual asset, but text, chart data, or claims inside the image are not grounded facts unless separately listed as facts in Research Evidence.",
+    ].join("\n"),
     "",
     "Before editing, think through a concise page-specific design direction, then implement it directly. In the final summary or notes, mention the main design decisions you made.",
     "When editing slide TSX/data, remove or soften unsupported specifics. Use neutral business language or TBD for missing details.",
@@ -508,8 +532,10 @@ function buildPageContentReviewPrompt(input: {
     `2. Current slide TSX for visibility/schema interpretation: ${input.workspaceDir}/template/${input.page.slide_path.replace(/^\.\//, "")}`,
     `3. Workspace outline: ${input.workspaceDir}/outline.json`,
     `4. Workspace page plan: ${input.workspaceDir}/page-plan.json`,
-    `5. Workspace setting: ${input.workspaceDir}/setting.json`,
-    `6. Workspace task metadata: ${input.workspaceDir}/task.json`,
+    `5. Workspace research evidence index if present: ${input.workspaceDir}/research/evidence-index.json`,
+    `6. Current page research evidence markdown if present: ${input.workspaceDir}/research/evidence/pages/${input.page.page_id}.md`,
+    `7. Workspace setting: ${input.workspaceDir}/setting.json`,
+    `8. Workspace task metadata: ${input.workspaceDir}/task.json`,
     "",
     "Data field scope:",
     "- Judge user-visible string values in the current data JSON.",
@@ -531,9 +557,9 @@ function buildPageContentReviewPrompt(input: {
     "Separate review targets from evidence sources:",
     "- Review targets: current data JSON and current slide TSX visible content. These are the claims being checked.",
     pageRefinementRequest
-      ? "- Evidence sources: user prompt, context rows, task_context, uploaded/source material represented in workspace artifacts, Confirmed Outline source prompt/context/task_context, Confirmed Outline text, current Page Refinement Request facts explicitly stated below, and the current Page Plan title/outline/reason only when they restate or derive from the Confirmed Outline."
-      : "- Evidence sources: user prompt, context rows, task_context, uploaded/source material represented in workspace artifacts, Confirmed Outline source prompt/context/task_context, Confirmed Outline text, and the current Page Plan title/outline/reason only when they restate or derive from the Confirmed Outline.",
-    "- Not evidence sources: current page data JSON, current page slide TSX, rendered HTML, screenshots, generated pages, generated slide data, Agent summaries, visual review output, or any content created during the current page authoring run.",
+      ? "- Evidence sources: user prompt, context rows, task_context, uploaded/source material represented in workspace artifacts, Confirmed Outline source prompt/context/task_context, Confirmed Outline text, current-page Research Evidence, Shared Research Evidence, current Page Refinement Request facts explicitly stated below, and the current Page Plan title/outline/reason only when they restate or derive from the Confirmed Outline."
+      : "- Evidence sources: user prompt, context rows, task_context, uploaded/source material represented in workspace artifacts, Confirmed Outline source prompt/context/task_context, Confirmed Outline text, current-page Research Evidence, Shared Research Evidence, and the current Page Plan title/outline/reason only when they restate or derive from the Confirmed Outline.",
+    "- Not evidence sources: current page data JSON, current page slide TSX, Raw Research Material, stale Research Evidence, other pages' Research Evidence, rendered HTML, screenshots, generated pages, generated slide data, Agent summaries, visual review output, or any content created during the current page authoring run.",
     "A claim is grounded only when it can be traced to an evidence source above. The fact that a value appears in current data JSON or current slide TSX never makes it grounded by itself.",
     pageRefinementRequest
       ? [
@@ -685,13 +711,16 @@ function createAgentRunTracker(input: {
 }) {
   const startedAt = new Date().toISOString();
   const operationId = input.flowInput.aiLogger
-    ? input.flowInput.aiLogger.createOperationId("page_agent", input.kind)
+    ? input.flowInput.aiLogger.createOperationId(
+        input.kind === "research-curation" ? "research" : "page_agent",
+        input.kind,
+      )
     : `${input.page.page_id}-${input.kind}-${Date.now().toString(36)}`;
   const logContext: AiOperationLogContext | undefined = input.flowInput.aiLogger
     ? {
         logger: input.flowInput.aiLogger,
         workspace_dir: input.flowInput.workspace.workspace_dir,
-        domain: "page_agent" as const,
+        domain: (input.kind === "research-curation" ? "research" : "page_agent") as AiOperationLogContext["domain"],
         operation: input.kind,
         operation_id: operationId,
         page_id: input.page.page_id,
@@ -780,7 +809,9 @@ function createAgentRunTracker(input: {
     async flush(status: "completed" | "error", extra: Record<string, unknown>) {
       const endedAt = new Date().toISOString();
       const baseEntry = {
-        event: "ai.page_agent.operation.finished",
+        event: input.kind === "research-curation"
+          ? "ai.research.curation.operation.finished"
+          : "ai.page_agent.operation.finished",
         schema_version: 1,
         operation_id: operationId,
         interaction_ids: logContext?.interaction_ids ?? [],
@@ -797,7 +828,7 @@ function createAgentRunTracker(input: {
       try {
         await input.flowInput.backend.appendWorkspaceLog({
           workspace_dir: input.flowInput.workspace.workspace_dir,
-          channel: "ai-page-agent",
+          channel: input.kind === "research-curation" ? "ai-research" : "ai-page-agent",
           entry: baseEntry,
         });
         await flushStreamBatch(true);
@@ -897,6 +928,472 @@ function pagePlanMatchesOutlineAndTemplate(
   return progressMatchesPlan(pagePlan, progress);
 }
 
+function createEmptyResearchPlan(input: {
+  outline: WorkspaceOutline;
+  pagePlan: PagePlan;
+  generatedBy: string;
+}): ResearchPlan {
+  return {
+    version: 1,
+    status: "planned",
+    title: input.pagePlan.title,
+    source: {
+      outline_updated_at: input.outline.updated_at,
+      page_plan_updated_at: input.pagePlan.updated_at,
+      template_group: input.pagePlan.source.template_group,
+      generated_by: input.generatedBy,
+    },
+    pages: input.pagePlan.pages.map((page) => ({
+      page_id: page.page_id,
+      index: page.index,
+      title: page.title,
+      web_research_needed: false,
+      image_research_needed: false,
+      query_intents: [],
+      image_query_intents: [],
+      evidence_needs: [],
+      visual_needs: [],
+      gap_strategy: "Generalize unsupported concrete details or mark data slots as TBD / 待补充.",
+      reason: "Research Planning unavailable or no external research needed.",
+    })),
+    shared: {
+      web_research_needed: false,
+      image_research_needed: false,
+      query_intents: [],
+    },
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function getResearchRequirement(researchPlan: ResearchPlan | null, page: PagePlanItem): ResearchRequirement | null {
+  return researchPlan?.pages.find((item) => item.page_id === page.page_id) ?? null;
+}
+
+function researchNeeded(requirement: ResearchRequirement | null): boolean {
+  return Boolean(requirement?.web_research_needed || requirement?.image_research_needed);
+}
+
+function buildResearchCurationPrompt(input: {
+  workspaceDir: string;
+  page: PagePlanItem;
+  requirement: ResearchRequirement;
+  rawWebIndexPaths: string[];
+  rawImageIndexPaths: string[];
+  evidenceMarkdownPath: string;
+  evidenceIndexPath: string;
+}) {
+  return [
+    "You are a Research Curation Agent for one PPT Page Generation Unit.",
+    "Read Raw Research Material, select only useful facts, sources, and visual assets, and write Research Evidence files.",
+    "Do not edit slide TSX, page data JSON, manifest, outline, or page-plan files.",
+    "",
+    `Workspace directory: ${input.workspaceDir}`,
+    `Current page id: ${input.page.page_id}`,
+    `Current page title: ${input.page.title}`,
+    `Current page outline: ${input.page.outline}`,
+    `Research requirement: ${JSON.stringify(input.requirement)}`,
+    `Raw web index paths: ${JSON.stringify(input.rawWebIndexPaths)}`,
+    `Raw image index paths: ${JSON.stringify(input.rawImageIndexPaths)}`,
+    "",
+    "Source quality rules:",
+    "- Prefer official websites, company reports, government/regulatory sources, industry associations, recognized research institutions, authoritative media, and documentation.",
+    "- Reject obvious SEO, source-less, low-quality, forum-like, or unrelated material as factual evidence.",
+    "- If sources conflict, record the conflict instead of guessing.",
+    "- Material without a publication date must not be presented as latest.",
+    "",
+    "Image rules:",
+    "- For downloaded image candidates, first use upload_local_file on the local image path, then analyze_image before selecting it.",
+    "- Select an image only if it fits the current page intent and is visually usable.",
+    "- Text, chart data, or claims visible inside a selected image are not grounded facts unless separately captured as facts.",
+    "",
+    "Tool boundary:",
+    "- Do not call search, browser, or network tools during Research Curation.",
+    "- Do not use nats_ddg_search, browser_create_instance, web search, image search, or ad-hoc network access.",
+    "- Curate only from the Raw Research Material index paths listed above and existing workspace/user-provided artifacts.",
+    "- If the listed raw index paths are empty, missing, or insufficient, write a Research Evidence Gap instead of searching yourself.",
+    "",
+    "Write these files:",
+    `1. Current page markdown evidence summary: ${input.evidenceMarkdownPath}`,
+    `2. Update the workspace evidence index JSON: ${input.evidenceIndexPath}`,
+    "",
+    "Evidence JSON page entry shape:",
+    '{"page_id":"...","status":"curated","facts":[{"id":"fact-1","claim":"...","source_type":"web_source","source_title":"...","source_url":"...","source_file":"...","excerpt":"...","confidence":"medium"}],"visual_assets":[{"id":"image-1","file_path":"...","original_raw_path":"...","image_url":"...","page_url":"...","sha256":"...","reason":"...","visual_summary":"..."}],"derived_insights":[{"id":"insight-1","insight":"...","supporting_fact_ids":["fact-1"]}],"gaps":["..."],"rejected_material":[{"source":"...","reason":"..."}],"markdown_path":"...","updated_at":"..."}',
+    "If evidence is insufficient, write status gap and explain gaps. Page Generation will continue.",
+    "Final response must be a short JSON object: {\"status\":\"curated\",\"summary\":\"...\",\"gaps\":[\"...\"]}",
+  ].join("\n");
+}
+
+async function appendResearchLogSafe(
+  input: Pick<DeckGenerationContext, "backend" | "workspace">,
+  entry: Record<string, unknown>,
+) {
+  try {
+    await input.backend.appendWorkspaceLog({
+      workspace_dir: input.workspace.workspace_dir,
+      channel: "ai-research",
+      entry,
+    });
+  } catch {
+    // Research logging must never fail Deck Generation.
+  }
+}
+
+async function recordResearchGapForPage(input: {
+  flowInput: DeckGenerationRuntime;
+  page: PagePlanItem;
+  evidenceMarkdownPath: string;
+  gaps: string[];
+}) {
+  const currentEvidence = await input.flowInput.backend.getResearchEvidence({
+    workspace_dir: input.flowInput.workspace.workspace_dir,
+  });
+  const withoutPage = currentEvidence.pages.filter((item) => item.page_id !== input.page.page_id);
+  await input.flowInput.backend.recordResearchEvidence({
+    workspace_dir: input.flowInput.workspace.workspace_dir,
+    evidence: {
+      ...currentEvidence,
+      status: currentEvidence.status === "curated" ? "partial" : currentEvidence.status,
+      pages: [
+        ...withoutPage,
+        {
+          page_id: input.page.page_id,
+          status: "gap",
+          facts: [],
+          visual_assets: [],
+          derived_insights: [],
+          gaps: input.gaps,
+          rejected_material: [],
+          markdown_path: input.evidenceMarkdownPath,
+          updated_at: new Date().toISOString(),
+        },
+      ],
+      updated_at: new Date().toISOString(),
+    },
+  });
+}
+
+async function generateAndRecordResearchPlan(
+  input: RunDeckGenerationInput,
+  pagePlan: PagePlan,
+): Promise<ResearchPlan> {
+  const text = generationText(input.locale);
+  emit(
+    input,
+    {
+      step: "research-planning",
+      message: text.researchPlanning,
+      currentPageIndex: null,
+      totalPages: pagePlan.pages.length,
+    },
+    null,
+  );
+
+  await input.backend.prepareResearchWorkspace({
+    workspace_dir: input.workspace.workspace_dir,
+  });
+
+  const logContext: AiOperationLogContext | undefined = input.aiLogger
+    ? {
+        logger: input.aiLogger,
+        workspace_dir: input.workspace.workspace_dir,
+        domain: "page_plan" as const,
+        operation: "generate_research_plan",
+        operation_id: input.aiLogger.createOperationId("page_plan", "generate_research_plan"),
+        provider: "anna",
+        runtime_mode: "anna",
+      }
+    : undefined;
+
+  let researchPlan: ResearchPlan;
+  try {
+    researchPlan = assertResearchPlanAligned({
+      researchPlan: await input.aiClient.generateResearchPlan({
+        outline: input.confirmedOutline,
+        pagePlan,
+        locale: input.locale,
+        logContext,
+      }),
+      pagePlan,
+    });
+  } catch (error) {
+    researchPlan = createEmptyResearchPlan({
+      outline: input.confirmedOutline,
+      pagePlan,
+      generatedBy: "fallback",
+    });
+    await appendResearchLogSafe(input, {
+      event: "ai.research.planning.failed",
+      schema_version: 1,
+      status: "gap",
+      error: error instanceof Error ? error.message : String(error),
+      fallback: "empty_research_plan",
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  const recorded = await input.backend.recordResearchPlan({
+    workspace_dir: input.workspace.workspace_dir,
+    research_plan: researchPlan,
+  });
+  await input.backend.recordResearchStatus({
+    workspace_dir: input.workspace.workspace_dir,
+    status: {
+      version: 1,
+      status: "ready",
+      pages: recorded.pages.map((page) => ({
+        page_id: page.page_id,
+        status: researchNeeded(page) ? "planned" : "skipped",
+        message: page.reason,
+        updated_at: new Date().toISOString(),
+      })),
+      updated_at: new Date().toISOString(),
+    },
+  });
+  return recorded;
+}
+
+async function collectAndCurateResearchForPage(
+  input: DeckGenerationRuntime,
+  pagePlan: PagePlan,
+  page: PagePlanItem,
+): Promise<void> {
+  const researchPlan = await input.backend.getResearchPlan({
+    workspace_dir: input.workspace.workspace_dir,
+  });
+  const requirement = getResearchRequirement(researchPlan, page);
+  if (!researchNeeded(requirement)) return;
+  const pageRequirement = requirement as ResearchRequirement;
+  const currentEvidence = await input.backend.getResearchEvidence({
+    workspace_dir: input.workspace.workspace_dir,
+  });
+  const existingEvidence = currentEvidence.pages.find((item) => item.page_id === page.page_id);
+  if (existingEvidence?.status === "curated") {
+    await appendResearchLogSafe(input, {
+      event: "ai.research.page.reused",
+      schema_version: 1,
+      page_id: page.page_id,
+      page_index: page.index,
+      evidence_path: existingEvidence.markdown_path,
+      status: "curated",
+      updated_at: new Date().toISOString(),
+    });
+    return;
+  }
+
+  const text = generationText(input.locale);
+  const paths = await input.backend.prepareResearchWorkspace({
+    workspace_dir: input.workspace.workspace_dir,
+  });
+  emitRuntime(
+    input,
+    {
+      step: "research-collection",
+      message: text.collectingSources(page),
+      currentPageIndex: page.index,
+      totalPages: pagePlan.pages.length,
+    },
+    input.getProgress(),
+  );
+
+  const rawWebIndexPaths: string[] = [];
+  const rawImageIndexPaths: string[] = [];
+  const gaps: string[] = [];
+
+  if (pageRequirement.web_research_needed) {
+    for (const query of pageRequirement.query_intents.slice(0, 3)) {
+      try {
+        const search = await input.backend.webSearch({
+          query,
+          max_results: 6,
+          safesearch: "moderate",
+        });
+        const urls = search.results.map((item) => item.url).filter(Boolean).slice(0, 5);
+        if (urls.length === 0) {
+          gaps.push(`No web search results for: ${query}`);
+          continue;
+        }
+        const fetched = await input.backend.webFetch({
+          urls,
+          output_dir: paths.raw_web_dir,
+          format: "text_markdown",
+          max_chars: 12000,
+        });
+        if (fetched.index_path) {
+          rawWebIndexPaths.push(fetched.index_path);
+        } else {
+          gaps.push(`Web fetch did not return an index path for: ${query}`);
+        }
+      } catch (error) {
+        gaps.push(`Web research failed for "${query}": ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+
+  if (pageRequirement.image_research_needed) {
+    for (const query of pageRequirement.image_query_intents.slice(0, 2)) {
+      try {
+        const search = await input.backend.imageSearch({
+          query,
+          max_results: 8,
+          safesearch: "moderate",
+        });
+        const urls = search.results
+          .filter((item) => !item.width || !item.height || (item.width >= 480 && item.height >= 270))
+          .map((item) => item.image_url)
+          .filter(Boolean)
+          .slice(0, 4);
+        if (urls.length === 0) {
+          gaps.push(`No image search results for: ${query}`);
+          continue;
+        }
+        const fetched = await input.backend.imageFetch({
+          urls,
+          output_dir: paths.raw_images_dir,
+        });
+        if (fetched.index_path) {
+          rawImageIndexPaths.push(fetched.index_path);
+        } else {
+          gaps.push(`Image fetch did not return an index path for: ${query}`);
+        }
+      } catch (error) {
+        gaps.push(`Image research failed for "${query}": ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+
+  const evidenceMarkdownPath = `${paths.evidence_pages_dir}/${page.page_id}.md`;
+  if (pageRequirement.web_research_needed && rawWebIndexPaths.length === 0) {
+    gaps.push("No raw web material was collected for this page.");
+  }
+  if (pageRequirement.image_research_needed && rawImageIndexPaths.length === 0) {
+    gaps.push("No raw image material was collected for this page.");
+  }
+  if (rawWebIndexPaths.length === 0 && rawImageIndexPaths.length === 0) {
+    await recordResearchGapForPage({
+      flowInput: input,
+      page,
+      evidenceMarkdownPath,
+      gaps,
+    });
+    await appendResearchLogSafe(input, {
+      event: "ai.research.page.finished",
+      schema_version: 1,
+      page_id: page.page_id,
+      page_index: page.index,
+      raw_web_index_paths: rawWebIndexPaths,
+      raw_image_index_paths: rawImageIndexPaths,
+      gaps,
+      status: "gap",
+      updated_at: new Date().toISOString(),
+    });
+    const latestStatus = await input.backend.getResearchStatus({
+      workspace_dir: input.workspace.workspace_dir,
+    });
+    await input.backend.recordResearchStatus({
+      workspace_dir: input.workspace.workspace_dir,
+      status: {
+        ...latestStatus,
+        status: "gap",
+        pages: [
+          ...latestStatus.pages.filter((item) => item.page_id !== page.page_id),
+          {
+            page_id: page.page_id,
+            status: "gap",
+            message: gaps.join("\n"),
+            evidence_path: evidenceMarkdownPath,
+            updated_at: new Date().toISOString(),
+          },
+        ],
+        updated_at: new Date().toISOString(),
+      },
+    });
+    return;
+  }
+
+  emitRuntime(
+    input,
+    {
+      step: "research-curation",
+      message: text.curatingEvidence(page),
+      currentPageIndex: page.index,
+      totalPages: pagePlan.pages.length,
+    },
+    input.getProgress(),
+  );
+
+  const prompt = buildResearchCurationPrompt({
+    workspaceDir: input.workspace.workspace_dir,
+    page,
+    requirement: pageRequirement,
+    rawWebIndexPaths,
+    rawImageIndexPaths,
+    evidenceMarkdownPath,
+    evidenceIndexPath: paths.evidence_index_path,
+  });
+
+  try {
+    const tracker = createAgentRunTracker({
+      flowInput: input,
+      page,
+      kind: "research-curation",
+      step: "research-curation",
+      message: text.curatingEvidence(page),
+      prompt,
+      totalPages: pagePlan.pages.length,
+      progress: input.getProgress,
+    });
+    await input.agentClient.runAuthoringPrompt(
+      prompt,
+      buildAgentRunOptions(input, tracker.onStreamEvent, tracker.logContext),
+    );
+    await tracker.flush("completed", { gaps });
+  } catch (error) {
+    gaps.push(`Research Curation failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  if (gaps.length > 0) {
+    await recordResearchGapForPage({
+      flowInput: input,
+      page,
+      evidenceMarkdownPath,
+      gaps,
+    });
+  }
+
+  await appendResearchLogSafe(input, {
+    event: "ai.research.page.finished",
+    schema_version: 1,
+    page_id: page.page_id,
+    page_index: page.index,
+    raw_web_index_paths: rawWebIndexPaths,
+    raw_image_index_paths: rawImageIndexPaths,
+    gaps,
+    status: gaps.length > 0 ? "gap" : "curated",
+    updated_at: new Date().toISOString(),
+  });
+  const latestStatus = await input.backend.getResearchStatus({
+    workspace_dir: input.workspace.workspace_dir,
+  });
+  await input.backend.recordResearchStatus({
+    workspace_dir: input.workspace.workspace_dir,
+    status: {
+      ...latestStatus,
+      status: gaps.length > 0 ? "gap" : "ready",
+      pages: [
+        ...latestStatus.pages.filter((item) => item.page_id !== page.page_id),
+        {
+          page_id: page.page_id,
+          status: gaps.length > 0 ? "gap" : "curated",
+          message: gaps.join("\n"),
+          evidence_path: evidenceMarkdownPath,
+          updated_at: new Date().toISOString(),
+        },
+      ],
+      updated_at: new Date().toISOString(),
+    },
+  });
+}
+
 async function loadResumeArtifacts(input: RunDeckGenerationInput) {
   try {
     const [pagePlan, progress] = await Promise.all([
@@ -978,6 +1475,8 @@ async function createRestartArtifacts(input: RunDeckGenerationInput) {
     workspace_dir: input.workspace.workspace_dir,
     page_plan: alignedPagePlan,
   });
+
+  await generateAndRecordResearchPlan(input, alignedPagePlan);
 
   emit(
     input,
@@ -1257,6 +1756,8 @@ async function runPageGeneration(
       },
     };
   }
+
+  await collectAndCurateResearchForPage(input, pagePlan, page);
 
   progress = await recordProgress(input, page, { status: "authoring" });
   input.setProgress(progress);

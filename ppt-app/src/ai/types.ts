@@ -2,6 +2,7 @@ import type { OutlineDetail, Slide } from "../data/mockDeck";
 import type { AnnaLlmCompleteInput } from "../runtime/annaRuntime";
 import type { WorkspaceSettings } from "../api/types";
 import type { PagePlan, TemplatePlanningContext, WorkspaceOutline } from "../api/types";
+import type { ResearchPlan } from "../api/types";
 import type { Locale } from "../i18n/messages";
 import type { AiOperationLogContext } from "./interactionLog";
 
@@ -106,6 +107,13 @@ export interface GeneratePagePlanInput {
   logContext?: AiOperationLogContext;
 }
 
+export interface GenerateResearchPlanInput {
+  outline: WorkspaceOutline;
+  pagePlan: PagePlan;
+  locale: Locale;
+  logContext?: AiOperationLogContext;
+}
+
 export interface AiClient {
   generateOutline(input: GenerateOutlineInput): Promise<OutlineGenerationResult>;
   detectOutputLanguage(input: GenerateOutlineInput & {
@@ -114,6 +122,7 @@ export interface AiClient {
   }): Promise<{ output_language: string }>;
   suggestContext(input: SuggestContextInput): Promise<ContextSuggestionResult>;
   generatePagePlan(input: GeneratePagePlanInput): Promise<PagePlan>;
+  generateResearchPlan(input: GenerateResearchPlanInput): Promise<ResearchPlan>;
   generateDeck(input: GenerateDeckInput): Promise<GeneratedDeck>;
   reviseOutline(input: ReviseOutlineInput): Promise<OutlineGenerationResult>;
   generateSlidesFromOutline(

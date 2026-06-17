@@ -165,6 +165,31 @@ describe("Page Generation Stage Records", () => {
     assert.notEqual(enRecords[0].pageStatusLabel, "authoring");
   });
 
+  it("labels research curation streams as evidence curation stages", () => {
+    const records = buildPageGenerationStageRecords({
+      t: messages.zh,
+      progress: makeProgress({
+        step: "research-curation",
+        activeStreams: [
+          {
+            run_id: "research-1",
+            kind: "research-curation",
+            page_id: "page-01",
+            page_index: 0,
+            status: "正在筛选第 1 页事实和图片",
+            lines: ["curating"],
+            activities: ["analyzed image"],
+          },
+        ],
+      }),
+      history: [],
+    });
+
+    const researchStage = records[0].stages.find((stage) => stage.stageKey === "researchCuration");
+    assert.equal(researchStage?.label, "正在筛选第 1 页事实和图片");
+    assert.deepEqual(researchStage?.activities, ["analyzed image"]);
+  });
+
   it("orders repeated review and fix stages by their actual timeline", () => {
     const progress = makeProgress({
       step: "page-visual-review",

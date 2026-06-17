@@ -64,10 +64,19 @@ import type {
   PrepareAppExportModelInput,
   PrepareAppExportModelResult,
   AppPptxExportJob,
+  AppResearchPaths,
   RecordAppPagePlanInput,
   RecordAppPageProgressInput,
   RecordAppPdfExportInput,
   RecordAppPptxExportInput,
+  GetAppResearchEvidenceInput,
+  GetAppResearchPlanInput,
+  GetAppResearchStatusInput,
+  PrepareAppResearchWorkspaceInput,
+  PrepareAppResearchWorkspaceResult,
+  RecordAppResearchEvidenceInput,
+  RecordAppResearchPlanInput,
+  RecordAppResearchStatusInput,
   RenderAppWorkspacePagePreviewInput,
   RenderAppWorkspacePagePreviewResult,
   RenderAppWorkspaceDeckHtmlInput,
@@ -102,6 +111,8 @@ const WORKSPACE_LOG_FILE_NAMES = {
   "ai-page-agent": "ai-page-agent.jsonl",
   "ai-page-agent-interactions": "ai-page-agent-interactions.jsonl",
   "ai-page-agent-stream": "ai-page-agent-stream.jsonl",
+  "ai-research": "ai-research.jsonl",
+  "ai-research-interactions": "ai-research-interactions.jsonl",
 } as const;
 const WORKSPACE_LOG_INLINE_PAYLOAD_MAX_BYTES = 64 * 1024;
 const PPTX_EXPORT_STATUS_FILE_NAME = "generate_ppt.json";
@@ -195,7 +206,45 @@ function buildWorkspaceFilePaths(workspaceDir: string) {
     page_progress: path.join(workspaceDir, "page-progress.json"),
     pages: path.join(workspaceDir, "pages.json"),
     template: path.join(workspaceDir, "template.json"),
+    research_plan: path.join(workspaceDir, "research", "research-plan.json"),
+    research_evidence: path.join(workspaceDir, "research", "evidence-index.json"),
+    research_status: path.join(workspaceDir, "research", "research-status.json"),
   };
+}
+
+function buildResearchPaths(workspaceDir: string): AppResearchPaths {
+  const rootDir = path.join(workspaceDir, "research");
+  const rawDir = path.join(rootDir, "raw");
+  const evidenceDir = path.join(rootDir, "evidence");
+  return {
+    root_dir: rootDir,
+    raw_dir: rawDir,
+    raw_web_dir: path.join(rawDir, "web"),
+    raw_images_dir: path.join(rawDir, "images"),
+    evidence_dir: evidenceDir,
+    evidence_pages_dir: path.join(evidenceDir, "pages"),
+    evidence_images_dir: path.join(evidenceDir, "images"),
+    research_plan_path: path.join(rootDir, "research-plan.json"),
+    evidence_index_path: path.join(rootDir, "evidence-index.json"),
+    status_path: path.join(rootDir, "research-status.json"),
+  };
+}
+
+function assertPathUnderWorkspace(workspaceDir: string, targetPath: string, parameterName: string): void {
+  const relativePath = path.relative(workspaceDir, targetPath);
+  if (
+    relativePath.length === 0 ||
+    relativePath.startsWith("..") ||
+    path.isAbsolute(relativePath)
+  ) {
+    throw new Error(`"${parameterName}" must stay inside the workspace directory`);
+  }
+}
+
+function assertResearchPathUnderWorkspace(workspaceDir: string, targetPath: string, parameterName: string): void {
+  const researchRoot = buildResearchPaths(workspaceDir).root_dir;
+  const normalizedTarget = path.normalize(targetPath);
+  assertPathUnderWorkspace(researchRoot, normalizedTarget, parameterName);
 }
 
 function buildPptxExportPaths(workspaceDir: string) {
@@ -889,9 +938,10 @@ async function ensureWorkspaceFiles(
     template: createDefaultTemplateJson(),
   };
 
-  for (const [key, filePath] of Object.entries(files)) {
+  for (const [key, defaultValue] of Object.entries(defaults)) {
+    const filePath = files[key as keyof typeof defaults];
     if (!(await fileExists(filePath))) {
-      await writeJsonFile(filePath, defaults[key as keyof typeof defaults]);
+      await writeJsonFile(filePath, defaultValue);
       createdFiles.push(path.basename(filePath));
     }
   }
@@ -1488,6 +1538,176 @@ export async function appendAppWorkspaceLog(
     log_file: logFile,
     appended: true,
   };
+}
+
+function createDefaultResearchPlanJson(workspace: AppWorkspaceResult) {
+  const now = new Date().toISOString();
+  return {
+    version: 1,
+    status: "empty",
+    title: "",
+    source: {
+      outline_updated_at: normalizeString((normalizeOutlineJson(workspace.outline).updated_at)),
+      page_plan_updated_at: normalizeString(getPlainRecord(workspace.page_plan).updated_at),
+      template_group: normalizeString(getPlainRecord(workspace.template).selected_template_group),
+      generated_by: "system",
+    },
+    pages: [],
+    shared: {
+      web_research_needed: false,
+      image_research_needed: false,
+      query_intents: [],
+    },
+    updated_at: now,
+  };
+}
+
+function createDefaultResearchEvidenceJson() {
+  return {
+    version: 1,
+    status: "empty",
+    pages: [],
+    shared: {
+      facts: [],
+      visual_assets: [],
+      gaps: [],
+    },
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function createDefaultResearchStatusJson() {
+  return {
+    version: 1,
+    status: "idle",
+    pages: [],
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function ensureResearchDirectories(workspaceDir: string): Promise<AppResearchPaths> {
+  const paths = buildResearchPaths(workspaceDir);
+  await Promise.all([
+    mkdir(paths.raw_web_dir, { recursive: true }),
+    mkdir(paths.raw_images_dir, { recursive: true }),
+    mkdir(paths.evidence_pages_dir, { recursive: true }),
+    mkdir(paths.evidence_images_dir, { recursive: true }),
+  ]);
+  return paths;
+}
+
+export async function prepareAppResearchWorkspace(
+  input: PrepareAppResearchWorkspaceInput,
+): Promise<PrepareAppResearchWorkspaceResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureResearchDirectories(workspace.workspace_dir);
+  const preparedAt = new Date().toISOString();
+
+  if (!(await fileExists(paths.research_plan_path))) {
+    await writeJsonFile(paths.research_plan_path, createDefaultResearchPlanJson(workspace));
+  }
+  if (!(await fileExists(paths.evidence_index_path))) {
+    await writeJsonFile(paths.evidence_index_path, createDefaultResearchEvidenceJson());
+  }
+  if (!(await fileExists(paths.status_path))) {
+    await writeJsonFile(paths.status_path, createDefaultResearchStatusJson());
+  }
+
+  await touchWorkspaceTask(workspace, preparedAt);
+
+  return {
+    workspace_dir: workspace.workspace_dir,
+    ...paths,
+    prepared_at: preparedAt,
+  };
+}
+
+function normalizeResearchArtifact(value: unknown, fallbackStatus: string): Record<string, unknown> {
+  const record = getPlainRecord(value);
+  return {
+    version: typeof record.version === "number" ? record.version : 1,
+    status: normalizeString(record.status) || fallbackStatus,
+    ...record,
+    updated_at: typeof record.updated_at === "string" ? record.updated_at : new Date().toISOString(),
+  };
+}
+
+export async function recordAppResearchPlan(input: RecordAppResearchPlanInput): Promise<Record<string, unknown>> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureResearchDirectories(workspace.workspace_dir);
+  const updatedAt = new Date().toISOString();
+  const plan = normalizeResearchArtifact(input.research_plan, "planned");
+  const next = {
+    ...plan,
+    updated_at: updatedAt,
+  };
+  await writeJsonFile(paths.research_plan_path, next);
+  await touchWorkspaceTask(workspace, updatedAt);
+  return next;
+}
+
+export async function getAppResearchPlan(input: GetAppResearchPlanInput): Promise<Record<string, unknown>> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureResearchDirectories(workspace.workspace_dir);
+  const existing = await readJsonFileIfExists(paths.research_plan_path);
+  if (existing === null) {
+    const defaultPlan = createDefaultResearchPlanJson(workspace);
+    await writeJsonFile(paths.research_plan_path, defaultPlan);
+    return defaultPlan;
+  }
+  return normalizeResearchArtifact(existing, "empty");
+}
+
+export async function recordAppResearchEvidence(input: RecordAppResearchEvidenceInput): Promise<Record<string, unknown>> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureResearchDirectories(workspace.workspace_dir);
+  const updatedAt = new Date().toISOString();
+  const evidence = normalizeResearchArtifact(input.evidence, "curated");
+  const next = {
+    ...evidence,
+    updated_at: updatedAt,
+  };
+  await writeJsonFile(paths.evidence_index_path, next);
+  await touchWorkspaceTask(workspace, updatedAt);
+  return next;
+}
+
+export async function getAppResearchEvidence(input: GetAppResearchEvidenceInput): Promise<Record<string, unknown>> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureResearchDirectories(workspace.workspace_dir);
+  const existing = await readJsonFileIfExists(paths.evidence_index_path);
+  if (existing === null) {
+    const defaultEvidence = createDefaultResearchEvidenceJson();
+    await writeJsonFile(paths.evidence_index_path, defaultEvidence);
+    return defaultEvidence;
+  }
+  return normalizeResearchArtifact(existing, "empty");
+}
+
+export async function recordAppResearchStatus(input: RecordAppResearchStatusInput): Promise<Record<string, unknown>> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureResearchDirectories(workspace.workspace_dir);
+  const updatedAt = new Date().toISOString();
+  const status = normalizeResearchArtifact(input.status, "running");
+  const next = {
+    ...status,
+    updated_at: updatedAt,
+  };
+  await writeJsonFile(paths.status_path, next);
+  await touchWorkspaceTask(workspace, updatedAt);
+  return next;
+}
+
+export async function getAppResearchStatus(input: GetAppResearchStatusInput): Promise<Record<string, unknown>> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureResearchDirectories(workspace.workspace_dir);
+  const existing = await readJsonFileIfExists(paths.status_path);
+  if (existing === null) {
+    const defaultStatus = createDefaultResearchStatusJson();
+    await writeJsonFile(paths.status_path, defaultStatus);
+    return defaultStatus;
+  }
+  return normalizeResearchArtifact(existing, "idle");
 }
 
 export async function updateAppWorkspaceOutline(
