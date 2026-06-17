@@ -12,6 +12,8 @@ export type SearchInvoker = (
   args: Record<string, unknown>,
 ) => Promise<unknown>;
 
+const SEARCH_TOOL_TIMEOUT_MS = 600_000;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -127,7 +129,15 @@ export function createSearchAdapter(input: {
   toolId: string;
 }) {
   const invoke: SearchInvoker = async (method, args) =>
-    input.runtime.tools.invoke({ tool_id: input.toolId, method, args });
+    input.runtime.tools.invoke(
+      {
+        tool_id: input.toolId,
+        method,
+        args,
+        timeoutMs: SEARCH_TOOL_TIMEOUT_MS,
+      },
+      { timeoutMs: SEARCH_TOOL_TIMEOUT_MS },
+    );
 
   return {
     webSearch(args: {

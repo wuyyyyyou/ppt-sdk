@@ -973,6 +973,29 @@ function researchNeeded(requirement: ResearchRequirement | null): boolean {
   return Boolean(requirement?.web_research_needed || requirement?.image_research_needed);
 }
 
+function normalizeResearchEvidenceIndex(value: ResearchEvidenceIndex | null | undefined): ResearchEvidenceIndex {
+  const record = value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : null;
+  const shared = record?.shared && typeof record.shared === "object" && !Array.isArray(record.shared)
+    ? record.shared
+    : null;
+  return {
+    version: 1,
+    status:
+      record?.status === "partial" || record?.status === "curated"
+        ? record.status
+        : "empty",
+    pages: Array.isArray(record?.pages) ? record.pages : [],
+    shared: {
+      facts: Array.isArray(shared?.facts) ? shared.facts : [],
+      visual_assets: Array.isArray(shared?.visual_assets) ? shared.visual_assets : [],
+      gaps: Array.isArray(shared?.gaps) ? shared.gaps : [],
+    },
+    updated_at: typeof record?.updated_at === "string" ? record.updated_at : new Date().toISOString(),
+  };
+}
+
 function buildResearchCurationPrompt(input: {
   workspaceDir: string;
   page: PagePlanItem;
@@ -1016,7 +1039,12 @@ function buildResearchCurationPrompt(input: {
     `1. Current page markdown evidence summary: ${input.evidenceMarkdownPath}`,
     `2. Update the workspace evidence index JSON: ${input.evidenceIndexPath}`,
     "",
-    "Evidence JSON page entry shape:",
+    "Evidence index JSON shape:",
+    '{"version":1,"status":"partial","pages":[{"page_id":"...","status":"curated","facts":[{"id":"fact-1","claim":"...","source_type":"web_source","source_title":"...","source_url":"...","source_file":"...","excerpt":"...","confidence":"medium"}],"visual_assets":[{"id":"image-1","file_path":"...","original_raw_path":"...","image_url":"...","page_url":"...","sha256":"...","reason":"...","visual_summary":"..."}],"derived_insights":[{"id":"insight-1","insight":"...","supporting_fact_ids":["fact-1"]}],"gaps":["..."],"rejected_material":[{"source":"...","reason":"..."}],"markdown_path":"...","updated_at":"..."}],"shared":{"facts":[],"visual_assets":[],"gaps":[]},"updated_at":"..."}',
+    "Do not replace evidence-index.json with an object keyed by page id. It must always be the full evidence index JSON shape above.",
+    "Fact source_type must be exactly one of: user_provided, web_source, image_source.",
+    "Image analysis may support visual_assets.reason or visual_assets.visual_summary, but it is not a valid fact source_type.",
+    "Current page entry shape:",
     '{"page_id":"...","status":"curated","facts":[{"id":"fact-1","claim":"...","source_type":"web_source","source_title":"...","source_url":"...","source_file":"...","excerpt":"...","confidence":"medium"}],"visual_assets":[{"id":"image-1","file_path":"...","original_raw_path":"...","image_url":"...","page_url":"...","sha256":"...","reason":"...","visual_summary":"..."}],"derived_insights":[{"id":"insight-1","insight":"...","supporting_fact_ids":["fact-1"]}],"gaps":["..."],"rejected_material":[{"source":"...","reason":"..."}],"markdown_path":"...","updated_at":"..."}',
     "If evidence is insufficient, write status gap and explain gaps. Page Generation will continue.",
     "Final response must be a short JSON object: {\"status\":\"curated\",\"summary\":\"...\",\"gaps\":[\"...\"]}",
@@ -1044,9 +1072,11 @@ async function recordResearchGapForPage(input: {
   evidenceMarkdownPath: string;
   gaps: string[];
 }) {
-  const currentEvidence = await input.flowInput.backend.getResearchEvidence({
-    workspace_dir: input.flowInput.workspace.workspace_dir,
-  });
+  const currentEvidence = normalizeResearchEvidenceIndex(
+    await input.flowInput.backend.getResearchEvidence({
+      workspace_dir: input.flowInput.workspace.workspace_dir,
+    }),
+  );
   const withoutPage = currentEvidence.pages.filter((item) => item.page_id !== input.page.page_id);
   await input.flowInput.backend.recordResearchEvidence({
     workspace_dir: input.flowInput.workspace.workspace_dir,
@@ -1163,9 +1193,11 @@ async function collectAndCurateResearchForPage(
   const requirement = getResearchRequirement(researchPlan, page);
   if (!researchNeeded(requirement)) return;
   const pageRequirement = requirement as ResearchRequirement;
-  const currentEvidence = await input.backend.getResearchEvidence({
-    workspace_dir: input.workspace.workspace_dir,
-  });
+  const currentEvidence = normalizeResearchEvidenceIndex(
+    await input.backend.getResearchEvidence({
+      workspace_dir: input.workspace.workspace_dir,
+    }),
+  );
   const existingEvidence = currentEvidence.pages.find((item) => item.page_id === page.page_id);
   if (existingEvidence?.status === "curated") {
     await appendResearchLogSafe(input, {
@@ -1184,6 +1216,8 @@ async function collectAndCurateResearchForPage(
   const paths = await input.backend.prepareResearchWorkspace({
     workspace_dir: input.workspace.workspace_dir,
   });
+  let progress = await recordProgress(input, page, { status: "research_collecting" });
+  input.setProgress(progress);
   emitRuntime(
     input,
     {
@@ -1192,7 +1226,7 @@ async function collectAndCurateResearchForPage(
       currentPageIndex: page.index,
       totalPages: pagePlan.pages.length,
     },
-    input.getProgress(),
+    progress,
   );
 
   const rawWebIndexPaths: string[] = [];
@@ -1310,6 +1344,8 @@ async function collectAndCurateResearchForPage(
     return;
   }
 
+  progress = await recordProgress(input, page, { status: "research_curating" });
+  input.setProgress(progress);
   emitRuntime(
     input,
     {
@@ -1318,7 +1354,7 @@ async function collectAndCurateResearchForPage(
       currentPageIndex: page.index,
       totalPages: pagePlan.pages.length,
     },
-    input.getProgress(),
+    progress,
   );
 
   const prompt = buildResearchCurationPrompt({
@@ -1347,6 +1383,18 @@ async function collectAndCurateResearchForPage(
       buildAgentRunOptions(input, tracker.onStreamEvent, tracker.logContext),
     );
     await tracker.flush("completed", { gaps });
+    const evidenceAfterCuration = normalizeResearchEvidenceIndex(
+      await input.backend.getResearchEvidence({
+        workspace_dir: input.workspace.workspace_dir,
+      }),
+    );
+    const hasCurrentPageEvidence = evidenceAfterCuration.pages.some((item) =>
+      item.page_id === page.page_id &&
+      (item.status === "curated" || item.status === "gap" || item.status === "error" || item.status === "skipped")
+    );
+    if (!hasCurrentPageEvidence) {
+      gaps.push("Research Curation did not write a valid current-page evidence entry.");
+    }
   } catch (error) {
     gaps.push(`Research Curation failed: ${error instanceof Error ? error.message : String(error)}`);
   }

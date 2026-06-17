@@ -1,4 +1,6 @@
 const ACTIVE_PAGE_STATUSES = new Set([
+  "research_collecting",
+  "research_curating",
   "authoring",
   "content_review",
   "content_review_fixing",

@@ -7,10 +7,12 @@ import type { AnnaRuntime } from "../../src/runtime/annaRuntime.ts";
 function createRuntime(handler: (input: { method: string; args: Record<string, unknown> }) => unknown): AnnaRuntime {
   return {
     tools: {
-      invoke: async (input) => handler({
+      invoke: async (input, options) => handler({
         method: input.method,
         args: input.args as Record<string, unknown>,
-      }),
+        timeoutMs: input.timeoutMs,
+        optionTimeoutMs: options?.timeoutMs,
+      } as never),
     },
     llm: { complete: async () => ({}) },
     agent: { session: async () => { throw new Error("not used"); } },
@@ -49,6 +51,24 @@ describe("Search Adapter", () => {
     assert.equal(receivedArgs.timelimit, "m");
     assert.equal(result.count, 1);
     assert.equal(result.results[0].url, "https://example.com");
+  });
+
+  it("uses a 600 second timeout for local search tools", async () => {
+    let timeoutMs: unknown = null;
+    let optionTimeoutMs: unknown = null;
+    const adapter = createSearchAdapter({
+      toolId: "tool-anna-search-local",
+      runtime: createRuntime((input) => {
+        timeoutMs = (input as { timeoutMs?: unknown }).timeoutMs;
+        optionTimeoutMs = (input as { optionTimeoutMs?: unknown }).optionTimeoutMs;
+        return { success: true, data: { query: "slow", provider: "ddgs", results: [], count: 0 } };
+      }),
+    });
+
+    await adapter.webSearch({ query: "slow" });
+
+    assert.equal(timeoutMs, 600_000);
+    assert.equal(optionTimeoutMs, 600_000);
   });
 
   it("normalizes no-result and malformed web search responses", async () => {

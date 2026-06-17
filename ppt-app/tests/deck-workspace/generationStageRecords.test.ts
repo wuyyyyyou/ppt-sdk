@@ -190,6 +190,36 @@ describe("Page Generation Stage Records", () => {
     assert.deepEqual(researchStage?.activities, ["analyzed image"]);
   });
 
+  it("shows page-level research collection status instead of waiting", () => {
+    const records = buildPageGenerationStageRecords({
+      t: messages.zh,
+      progress: makeProgress({
+        pages: [
+          {
+            page_id: "page-03",
+            index: 2,
+            title: "Research page",
+            status: "research_collecting",
+            render_attempts: 0,
+            render_attempt_limit: 10,
+            visual_review_attempts: 0,
+            visual_review_attempt_limit: 5,
+            content_review_attempts: 0,
+            content_review_attempt_limit: 5,
+            agent_failures: 0,
+            agent_failure_limit: 5,
+            agent_infrastructure_failures: 0,
+          },
+        ],
+      }),
+      history: [],
+    });
+
+    assert.equal(records[0].pageStatusLabel, "正在搜索并抓取资料");
+    assert.equal(records[0].stages[0].stageKey, "researchCollection");
+    assert.equal(records[0].stages[0].state, "active");
+  });
+
   it("orders repeated review and fix stages by their actual timeline", () => {
     const progress = makeProgress({
       step: "page-visual-review",

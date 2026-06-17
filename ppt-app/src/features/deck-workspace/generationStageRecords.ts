@@ -32,6 +32,8 @@ type StageLabelKey =
 
 type PageStatusLabelKey =
   | "pending"
+  | "researchCollecting"
+  | "researchCurating"
   | "authoring"
   | "contentReview"
   | "contentReviewFixing"
@@ -286,6 +288,10 @@ function stageLabelKey(
   if (phase === "final-render") return "finalRender";
 
   switch (pageStatus) {
+    case "research_collecting":
+      return "researchCollection";
+    case "research_curating":
+      return "researchCuration";
     case "pending":
       return "pending";
     case "authoring":
@@ -317,6 +323,10 @@ function stageLabelKey(
 
 function pageStatusLabelKey(status: string): PageStatusLabelKey {
   switch (status) {
+    case "research_collecting":
+      return "researchCollecting";
+    case "research_curating":
+      return "researchCurating";
     case "pending":
       return "pending";
     case "authoring":

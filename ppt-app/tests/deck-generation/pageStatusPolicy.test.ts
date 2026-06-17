@@ -13,6 +13,8 @@ import {
 describe("Page Status Policy", () => {
   it("classifies active page generation statuses", () => {
     for (const status of [
+      "research_collecting",
+      "research_curating",
       "authoring",
       "content_review",
       "content_review_fixing",

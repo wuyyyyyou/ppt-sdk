@@ -163,6 +163,8 @@ export interface Messages {
       pending: string;
       pageStatuses: Record<
         | "pending"
+        | "researchCollecting"
+        | "researchCurating"
         | "authoring"
         | "contentReview"
         | "contentReviewFixing"
@@ -465,6 +467,8 @@ export const messages: Record<Locale, Messages> = {
         pending: "Waiting",
         pageStatuses: {
           pending: "Waiting to start",
+          researchCollecting: "Collecting sources",
+          researchCurating: "Curating evidence",
           authoring: "Thinking through this page",
           contentReview: "Checking page content",
           contentReviewFixing: "Adjusting content after review",
@@ -770,6 +774,8 @@ export const messages: Record<Locale, Messages> = {
         pending: "等待中",
         pageStatuses: {
           pending: "等待开始",
+          researchCollecting: "正在搜索并抓取资料",
+          researchCurating: "正在筛选事实和图片",
           authoring: "正在思考这一页",
           contentReview: "正在检查页面内容",
           contentReviewFixing: "正在根据内容检查调整",
