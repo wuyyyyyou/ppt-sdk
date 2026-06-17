@@ -9,7 +9,7 @@ function readInitialLocale(): Locale {
     return stored;
   }
 
-  return navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
+  return "en";
 }
 
 export function useI18n() {
