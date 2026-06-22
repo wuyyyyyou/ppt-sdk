@@ -9,13 +9,6 @@ import {
   type AgentStreamEvent,
 } from "../../agent/agentClient";
 import {
-  AUTHORING_COMPOSITION_STRATEGY,
-  COMPONENT_SOURCE_CONTRACT_RULES,
-  AUTHORING_GROUNDING_SOURCE_RULES,
-  AUTHORING_NUMERIC_CHART_RULES,
-  TSX_AUTHORING_RULES_SUMMARY,
-} from "../../agent/promptRules";
-import {
   AUTO_OUTPUT_LANGUAGE,
   normalizeOutputLanguage,
   readOutlineOutputLanguage,
@@ -394,112 +387,208 @@ function buildAuthoringPrompt(input: {
   const hasFailureFix = Boolean(input.renderError || input.visualReview || input.contentReview);
   const pageRefinementRequest = input.pageRefinementRequest?.trim() ?? "";
   const renderFailureHistory = (input.renderFailureHistory ?? []).slice(-10);
+  const relativeSlidePath = `template/${input.page.slide_path.replace(/^\.\//, "")}`;
+  const relativeDataPath = `template/${input.page.data_path.replace(/^\.\//, "")}`;
+  const slidePath = `${input.workspaceDir}/${relativeSlidePath}`;
+  const dataPath = `${input.workspaceDir}/${relativeDataPath}`;
+  const blueprintSourcePath = `${input.workspaceDir}/template/${input.page.blueprint_source.replace(/^\.\//, "")}`;
+  const currentPageEvidencePath = `${input.workspaceDir}/research/evidence/pages/${input.page.page_id}.md`;
+  const evidenceIndexPath = `${input.workspaceDir}/research/evidence-index.json`;
+  const neighborPageTitles = input.pagePlan.pages
+    .filter((page) => page.page_id !== input.page.page_id && Math.abs(page.index - input.page.index) <= 1)
+    .sort((left, right) => left.index - right.index)
+    .map((page) => `- Page ${page.index + 1}: ${page.title}`)
+    .join("\n") || "- No neighbor pages";
+  const modeSpecificPriority = input.renderError
+    ? [
+        "This is a render-fix pass. Fix the render error first, and make only design or code changes that support that fix.",
+        "Do not introduce unrelated redesigns, new content, or broad refactors during render-fix.",
+      ].join("\n")
+    : input.contentReview
+      ? [
+          "This is a content-review-fix pass. Fix the language, alignment, or grounding issues reported by Page Content Review first.",
+          "Prefer editing the current page data JSON. Do not modify outline.json, page-plan.json, other pages, or unrelated shared files.",
+          "Do not replace unsupported claims with new unsupported claims. If source support is missing, remove, generalize, or mark the content as TBD / 待补充.",
+        ].join("\n")
+      : input.visualReview
+        ? [
+            "This is a visual-review-fix pass. Fix the visual issue reported by Page Visual Review first.",
+            "Make only necessary visual and layout changes, and do not add new factual claims.",
+          ].join("\n")
+        : pageRefinementRequest
+          ? [
+              "This is a page-refinement pass. Apply the user's current-page refinement request to this page.",
+              "Preserve the Confirmed Outline, Page Plan, and Template boundaries. Treat only facts, numbers, dates, names, and claims explicitly stated in the request as grounding for this refinement run.",
+            ].join("\n")
+          : "This is an initial authoring pass. Create the best version of this page from the current page plan, template components, and available grounded evidence.";
 
   return [
-    "You are a local file-editing Agent generating one PPT slide in a TSX-first template workspace.",
-    "Edit files directly on disk. Work only on the current page unless a shared component/theme change is truly necessary.",
-    "After editing, summarize briefly. A JSON object is preferred but not required. Preferred shape:",
-    '{"status":"ready_for_render","changed_files":["template/slides/page-01.tsx"],"summary":"...","needs_render":true,"notes":[]}',
+    "You are a local file-editing Agent authoring one TSX-first PPT slide.",
+    "Edit files directly on disk. Work only on the current page unless a shared component or theme change is truly necessary.",
     "",
-    `Workspace directory: ${input.workspaceDir}`,
-    `Current page index: ${input.page.index}`,
-    `Current page id: ${input.page.page_id}`,
-    `Current page title: ${input.page.title}`,
-    `Current page outline: ${input.page.outline}`,
     `Authoring mode: ${input.attemptKind}`,
-    `Output content language: ${readOutlineOutputLanguage(input.outline)}`,
-    `Current slide path: ${input.workspaceDir}/template/${input.page.slide_path.replace(/^\.\//, "")}`,
-    `Current data path: ${input.workspaceDir}/template/${input.page.data_path.replace(/^\.\//, "")}`,
-    `Selected blueprint id: ${input.page.blueprint_id}`,
-    `Selected blueprint source: ${input.workspaceDir}/template/${input.page.blueprint_source.replace(/^\.\//, "")}`,
     "",
-    "Read these workspace files before editing:",
-    `- ${input.workspaceDir}/template/catalog.json`,
-    `- ${input.workspaceDir}/template/blueprints/README.md`,
-    `- ${input.workspaceDir}/template/components/README.md`,
-    `- ${input.workspaceDir}/template/slides/README.md`,
-    `- ${input.workspaceDir}/outline.json`,
-    `- ${input.workspaceDir}/page-plan.json`,
-    `- ${input.workspaceDir}/research/evidence-index.json if it exists`,
-    `- ${input.workspaceDir}/research/evidence/pages/${input.page.page_id}.md if it exists`,
+    "Highest priority:",
+    modeSpecificPriority,
     "",
-    [
-      "Component decision process before editing:",
-      "1. After reading template/components/README.md, identify 2-4 components or component families that fit this page.",
-      "2. Judge whether the selected blueprint's default structure fits the current page message.",
-      "3. If it does not fit, do not only fill existing fields. Restructure the current slide TSX by composing better-suited template components.",
-      "4. In the final summary or notes, mention the main components you used or kept, why they fit this page, and whether you departed from the blueprint default structure.",
-    ].join("\n"),
-    "",
-    "Rules summary:",
-    TSX_AUTHORING_RULES_SUMMARY,
-    "",
-    AUTHORING_COMPOSITION_STRATEGY,
-    "",
-    COMPONENT_SOURCE_CONTRACT_RULES,
-    "",
-    AUTHORING_GROUNDING_SOURCE_RULES,
-    "",
-    AUTHORING_NUMERIC_CHART_RULES,
-    "",
-    [
-      "Research Evidence rules:",
-      "- Use current-page Research Evidence and Shared Research Evidence as grounding sources when present.",
-      "- Do not read Raw Research Material by default, and do not use raw search/fetch output as evidence unless it has been curated into Research Evidence.",
-      "- Do not use evidence scoped to other pages unless it is explicitly Shared Research Evidence.",
-      "- Do not call search tools directly during Page Authoring.",
-      "- If Research Evidence is missing or marked as a gap, omit unsupported concrete details, generalize them, or mark explicit data slots as TBD / 待补充.",
-      "- Visual Research Evidence can be used as a visual asset, but text, chart data, or claims inside the image are not grounded facts unless separately listed as facts in Research Evidence.",
-    ].join("\n"),
-    "",
-    "Before editing, think through a concise page-specific design direction, then implement it directly. In the final summary or notes, mention the main design decisions you made.",
-    "When editing slide TSX/data, remove or soften unsupported specifics. Use neutral business language or TBD for missing details.",
+    hasFailureFix
+      ? [
+          "Failure-fix input:",
+          input.renderError && renderFailureHistory.length > 0
+            ? [
+                "Consecutive render failure history:",
+                "The following JSON array records consecutive render or pre-render check failures for this page in the current run. Use it to avoid repeating the same failed fix.",
+                JSON.stringify(renderFailureHistory, null, 2),
+              ].join("\n")
+            : "",
+          input.renderError ? `Render error to fix:\n${input.renderError}` : "",
+          input.visualReview ? `Visual review failed. Fix request:\n${JSON.stringify(input.visualReview)}` : "",
+          input.contentReview
+            ? [
+                "Page Content Review failed. Rewrite request:",
+                JSON.stringify(input.contentReview),
+                "If the review asks for real facts, numbers, dates, or source-backed data that are not present in workspace files, do not add those facts. Remove, generalize, or mark them as TBD / 待补充.",
+              ].join("\n")
+            : "",
+        ].filter(Boolean).join("\n")
+      : "",
     pageRefinementRequest
       ? [
           "Page Refinement Request:",
           pageRefinementRequest,
           "This is a user-requested Page Refinement for the current page, not a Page Visual Review failure and not a Page Generation Retry.",
-          "Apply the request to the current page only while preserving the current Confirmed Outline, Page Plan, and Template.",
-          "Facts, numbers, dates, names, and claims explicitly stated in this Page Refinement Request may be used for this refinement run only.",
-          "Do not infer adjacent facts, complete missing time series, derive unstated metrics, or treat existing generated page content as grounded.",
-          "You may adjust page structure, component composition, hierarchy, and layout when it directly supports the Page Refinement Request.",
-          "Preserve existing grounded content unless the Page Refinement Request explicitly changes it.",
+          "Adjust only the current page. Preserve existing grounded content unless the request explicitly changes it.",
+          "Do not infer adjacent facts, complete missing time series, derive unstated metrics, or treat existing generated content as grounding.",
         ].join("\n")
       : "",
-    "If a content-review-fix request asks you to add real facts, numbers, dates, or source-backed data that are not present in workspace files, treat that request as conflicting with the grounding rules. Do not add the facts; instead remove the unsupported detail, soften it, or mark it as TBD / 待补充.",
-    "If render-fix or visual-review-fix asks for visual changes, fix visuals without adding new factual claims.",
     "",
-    `Full outline JSON: ${JSON.stringify(input.outline)}`,
-    `Full page plan JSON: ${JSON.stringify(input.pagePlan)}`,
-    hasFailureFix
-      ? [
-          "Failure-fix priority:",
-          "A failure report is provided for this pass. Fix the reported failure first.",
-          "Make only the design or content changes that support the fix.",
-          "Do not introduce unrelated redesigns, new content, or broad refactors during a fix pass.",
-        ].join("\n")
-      : "",
-    input.renderError && renderFailureHistory.length > 0
-      ? [
-          "Consecutive render failure history:",
-          "The following JSON array contains consecutive render failures for this page in the current run. Each item is one failed render or pre-render check attempt. Use it to avoid repeating the same failed fix.",
-          JSON.stringify(renderFailureHistory, null, 2),
-        ].join("\n")
-      : "",
-    input.renderError ? `Render error to fix:\n${input.renderError}` : "",
-    input.visualReview
-      ? `Visual review failed. Fix request:\n${JSON.stringify(input.visualReview)}`
-      : "",
-    input.contentReview
-      ? [
-          "Page Content Review failed. Rewrite request:",
-          JSON.stringify(input.contentReview),
-          "Fix language, outline-alignment, and grounding issues by editing the current page data JSON first.",
-          "Do not modify page-plan.json, outline.json, other pages, or unrelated shared files.",
-          "Remove, soften, or mark unsupported concrete claims as TBD. Do not replace them with new unsupported specifics.",
-          "Never satisfy a rewrite request by inventing or approximating real-world numbers, years, citations, rankings, named-organization facts, or chart data. If the review asks for real data but the workspace has no source for it, keep or add a clear TBD / 待补充 marker instead.",
-        ].join("\n")
-      : "",
+    "Current page context:",
+    `- Workspace directory: ${input.workspaceDir}`,
+    `- Deck title: ${input.outline.title || input.pagePlan.title}`,
+    `- Output content language: ${readOutlineOutputLanguage(input.outline)}`,
+    `- Current page index: ${input.page.index}`,
+    `- Current page id: ${input.page.page_id}`,
+    `- Current page title: ${input.page.title}`,
+    `- Current page outline: ${input.page.outline}`,
+    `- Current page Page Plan reason: ${input.page.reason}`,
+    `- Current slide TSX path: ${slidePath}`,
+    `- Current data JSON path: ${dataPath}`,
+    `- Selected blueprint id: ${input.page.blueprint_id}`,
+    `- Selected blueprint source: ${blueprintSourcePath}`,
+    "",
+    [
+      "Neighbor pages:",
+      neighborPageTitles,
+    ].join("\n"),
+    "",
+    [
+      "Before editing, read these files in order:",
+      `1. Current slide TSX: ${slidePath}`,
+      `2. Current data JSON: ${dataPath}`,
+      `3. Current blueprint source: ${blueprintSourcePath}`,
+      `4. Workspace outline: ${input.workspaceDir}/outline.json`,
+      `5. Workspace page plan: ${input.workspaceDir}/page-plan.json`,
+      `6. Template component guide: ${input.workspaceDir}/template/components/README.md`,
+      `7. Slide authoring guide: ${input.workspaceDir}/template/slides/README.md`,
+      `8. REQUIRED when present, current-page Research Evidence: ${currentPageEvidencePath}`,
+      `9. REQUIRED when present, deck-level Research Evidence index: ${evidenceIndexPath}`,
+      "10. Before using any component from template/components, read that component's source file.",
+    ].join("\n"),
+    "",
+    [
+      "Grounding rules:",
+      "- Treat the current slide TSX and current data JSON as editable draft content, not as factual sources.",
+      "- Allowed grounding sources are only: the user's original prompt; context rows; task_context; uploaded or source material represented in workspace artifacts; Confirmed Outline source prompt/context/task_context; Confirmed Outline text; current Page Plan title/outline/reason when they restate or directly derive from the Confirmed Outline; current-page Research Evidence; Shared Research Evidence; and, in page-refinement mode, facts, numbers, dates, names, and claims explicitly stated in the current Page Refinement Request.",
+      "- Not grounding sources: current generated data JSON or slide TSX; generated pages; rendered HTML; screenshots; visual review output; Agent summaries; Raw Research Material; and other pages' Research Evidence unless it is explicitly Shared Research Evidence.",
+      "- Do not call search tools during Page Authoring.",
+      "- If source support is missing, remove the detail, generalize it, or mark it as TBD / 待补充 / 待确认.",
+      "- Do not invent facts, numbers, years, rankings, citations, URLs, organization names, market data, customer cases, or chart data for completeness, polish, or realism.",
+    ].join("\n"),
+    "",
+    [
+      "Research Evidence rules:",
+      "- Current-page Research Evidence markdown may contain these sections:",
+      "  - ## Facts: factual claims you may use on this page.",
+      "  - ## Derived Insights: conclusions you may use only when they trace back to supporting fact ids.",
+      "  - ## Visual Assets: curated local image assets for this page. Each asset usually includes an id and file_path.",
+      "  - ## Gaps: missing or insufficient evidence. Do not fill these gaps yourself.",
+      "- Use only content promoted into Research Evidence. Do not read or use raw research files by default.",
+      "- If Research Evidence contains gaps, the corresponding concrete details must be omitted, generalized, or marked as TBD / 待补充.",
+    ].join("\n"),
+    "",
+    [
+      "Visual asset decision rules:",
+      "- If the current-page Research Evidence contains ## Visual Assets, evaluate those assets before deciding the layout.",
+      "- If the current page outline or Page Plan asks for photos, logos, cities, stadiums, products, people, places, or other real-world visuals, use at least one relevant Visual Asset by default.",
+      "- When using an image, prefer the Visual Asset local file_path. Use image_url only when no file_path is available.",
+      "- Skip all Visual Assets only when they are irrelevant to the page intent, visually unusable, unavailable by path, or likely to mislead.",
+      "- If you skip Visual Assets, explain why in final JSON visual_assets_skipped_reason.",
+      "- Visual Assets are visual evidence only. Text, charts, rankings, numbers, or claims visible inside an image are not grounded facts unless separately listed under ## Facts.",
+      "- Image captions, labels, and surrounding explanations must be grounded in ## Facts, Confirmed Outline, or Page Plan.",
+    ].join("\n"),
+    "",
+    [
+      "Authoring process:",
+      "1. Read the required files.",
+      "2. Extract usable facts, derived insights, visual assets, and gaps from current-page Research Evidence.",
+      "3. Decide the page-specific message from the current page title, outline, Page Plan reason, available evidence, and output language.",
+      "4. Choose 2-4 suitable components or component families from template/components.",
+      "5. Judge whether the selected blueprint's default structure fits the current page. If it does not, restructure the current page TSX instead of mechanically filling blueprint fields.",
+      "6. Edit the current data JSON and slide TSX.",
+      "7. Keep content grounded, layout stable, and export-friendly.",
+      "8. Return the required final JSON.",
+    ].join("\n"),
+    "",
+    [
+      "Component rules:",
+      "- Prefer composing existing template components and blueprint-local patterns.",
+      "- Do not hand-code new cards, KPIs, tables, matrices, charts, or decorative structures when an existing component can express the same intent.",
+      "- Before using or modifying any component from template/components, read the component source file, not only README.",
+      "- Treat exported TypeScript props as the component API contract.",
+      "- Do not invent prop names from component names or README descriptions.",
+      "- Every JSX component call must provide required props with the correct shape.",
+      "- Modify shared components or theme only when multiple pages need the same new visual unit or another clear reason exists.",
+    ].join("\n"),
+    "",
+    [
+      "TSX hard rules:",
+      "- Each slide must be a fixed 1280x720 canvas, with no scrolling and no required interaction.",
+      "- Every slide TSX must export Schema, default React component, layoutId, layoutName, and layoutDescription.",
+      "- Use zod Schema defaults and parse data before rendering.",
+      "- Keep business content in the current data JSON where practical. Use TSX mainly for layout, component composition, hierarchy, data mapping, and stable visual structure.",
+      "- Manifest entries must point to ./slides/*.tsx and ./data/*.json.",
+      "- Local component imports must use the .js suffix, for example ../components/Foo.js.",
+      "- Do not modify blueprints/ or reference-slides/. They are read-only references.",
+      "- Keep key titles, body copy, labels, KPIs, and chart explanations as real DOM text, not images or canvas.",
+      "- Chart-heavy or graphic-heavy regions may use data-pptx-export=\"screenshot\"; keep surrounding titles and explanations as normal text.",
+      "- Follow template/slides/README.md for PPTX export stability guidance.",
+      "- Edit only the current page TSX/data by default. Change shared components or theme only when clearly necessary.",
+    ].join("\n"),
+    "",
+    [
+      "Numeric and chart rules:",
+      "- Do not invent, estimate, approximate, or complete plausible-looking numbers. This includes revenue, cash flow, profit, margins, ROE, growth rates, percentages, target ranges, rankings, market share, store counts, user counts, customer counts, years, currency values, chart series values, and table data.",
+      "- If an evidence source does not provide a concrete number, do not create one for polish, realism, visual balance, or blueprint field needs.",
+      "- If a chart, table, or KPI layout is useful but source data is missing, use explicit placeholders: KPI values should be TBD / 待补充 / 待确认; chart series values may be all zero; chart titles, notes, or nearby text must clearly say 数据待补充 / 示意 / 待确认.",
+      "- Without source data, do not use realistic-looking time or metric labels such as FY20-FY23, recent years, quarterly labels, or target lines. Prefer neutral labels such as Phase 1, Phase 2, Phase 3 or Item 1, Item 2.",
+      "- chart ticks, minValue, and maxValue may be visual scale controls, but they must not imply real measured ranges unless evidence explicitly supports them.",
+      "- Do not describe placeholder numbers as design decisions in final summary notes. If placeholders are used, say that source data is pending.",
+    ].join("\n"),
+    "",
+    [
+      "Final response must be a JSON object and must include these fields:",
+      JSON.stringify({
+        status: "ready_for_render",
+        changed_files: [relativeSlidePath, relativeDataPath],
+        summary: "...",
+        needs_render: true,
+        research_evidence_read: true,
+        visual_assets_used: ["image-id"],
+        visual_assets_skipped_reason: "",
+        components_used: ["ComponentName"],
+        notes: [],
+      }, null, 2),
+    ].join("\n"),
   ]
     .filter(Boolean)
     .join("\n");
