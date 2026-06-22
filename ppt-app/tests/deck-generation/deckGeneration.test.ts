@@ -292,6 +292,7 @@ function createHarness(options: {
   let researchPlan = clone(options.researchPlan ?? makeResearchPlan(pagePlan));
   let researchEvidence = clone(options.existingResearchEvidence ?? makeEmptyResearchEvidence());
   let researchStatus = makeResearchStatus();
+  const researchDrafts = new Map<string, Record<string, unknown>>();
   let renderFailures = options.renderFailures ?? 0;
   const authoringPrompts: string[] = [];
   const visualReviewPrompts: string[] = [];
@@ -363,6 +364,7 @@ function createHarness(options: {
         evidence_dir: `${workspace.workspace_dir}/research/evidence`,
         evidence_pages_dir: `${workspace.workspace_dir}/research/evidence/pages`,
         evidence_images_dir: `${workspace.workspace_dir}/research/evidence/images`,
+        evidence_drafts_dir: `${workspace.workspace_dir}/research/evidence/drafts`,
         research_plan_path: `${workspace.workspace_dir}/research/research-plan.json`,
         evidence_index_path: `${workspace.workspace_dir}/research/evidence-index.json`,
         status_path: `${workspace.workspace_dir}/research/research-status.json`,
@@ -379,6 +381,25 @@ function createHarness(options: {
       return clone(researchEvidence);
     },
     getResearchEvidence: async () => clone(researchEvidence),
+    recordResearchCurationDraft: async (input) => {
+      researchDrafts.set(`${input.page_id}:${input.draft_type}`, clone(input.draft));
+      return clone(input.draft);
+    },
+    getResearchCurationDraft: async (input) => ({
+      ...(researchDrafts.get(`${input.page_id}:${input.draft_type}`) ?? {
+        version: 1,
+        status: "empty",
+        page_id: input.page_id,
+        draft_type: input.draft_type,
+        updated_at: "2026-05-23T00:00:00.000Z",
+      }),
+    }),
+    recordResearchEvidencePageMarkdown: async (input) => ({
+      workspace_dir: input.workspace_dir,
+      page_id: input.page_id,
+      markdown_path: `${workspace.workspace_dir}/research/evidence/pages/${input.page_id}.md`,
+      updated_at: "2026-05-23T00:00:00.000Z",
+    }),
     recordResearchStatus: async (input) => {
       researchStatus = clone(input.status);
       return clone(researchStatus);
@@ -525,6 +546,48 @@ function createHarness(options: {
       }
       activeAuthoringRuns -= 1;
       if (options.authoringError) throw options.authoringError;
+      const pageMatch = prompt.match(/Current page id: (page-\d+)/);
+      const promptPageId = pageMatch?.[1] ?? pagePlan.pages[0]?.page_id ?? "page-01";
+      if (prompt.includes("Web Research Curation Draft Agent")) {
+        researchDrafts.set(`${promptPageId}:web`, {
+          version: 1,
+          page_id: promptPageId,
+          status: "curated",
+          facts: [
+            {
+              id: "fact-1",
+              claim: "Collected web fact",
+              source_type: "web_source",
+              source_title: "Source",
+              source_url: "https://example.com/source",
+            },
+          ],
+          derived_insights: [],
+          gaps: [],
+          rejected_material: [],
+          source_summary: "Useful web source.",
+          updated_at: "2026-05-23T00:00:00.000Z",
+        });
+      }
+      if (prompt.includes("Visual Research Curation Draft Agent")) {
+        researchDrafts.set(`${promptPageId}:visual`, {
+          version: 1,
+          page_id: promptPageId,
+          status: "curated",
+          visual_assets: [
+            {
+              id: "image-1",
+              file_path: `${workspace.workspace_dir}/research/raw/images/image.jpg`,
+              reason: "Relevant visual",
+              visual_summary: "A relevant image.",
+            },
+          ],
+          gaps: [],
+          rejected_material: [],
+          visual_summary: "Useful image.",
+          updated_at: "2026-05-23T00:00:00.000Z",
+        });
+      }
       runOptions?.onStreamEvent?.({ type: "complete" });
       return {
         status: "ready_for_render",
@@ -1851,6 +1914,18 @@ describe("Deck Generation Flow Module", () => {
     assert.ok(harness.progressEvents.some((progress) => progress.step === "research-collection"));
     assert.ok(harness.progressEvents.some((progress) => progress.step === "research-curation"));
     assert.ok(harness.authoringPrompts.some((prompt) =>
+      prompt.includes("Web Research Curation Draft Agent") &&
+      prompt.includes("Do not include visual_assets in this draft")
+    ));
+    assert.ok(harness.authoringPrompts.some((prompt) =>
+      prompt.includes("Visual Research Curation Draft Agent") &&
+      prompt.includes("Do not emit facts or derived_insights in this draft")
+    ));
+    const evidencePage = harness.researchEvidence.pages.find((page) => page.page_id === "page-01");
+    assert.equal(evidencePage?.status, "curated");
+    assert.equal(evidencePage?.facts.length, 1);
+    assert.equal(evidencePage?.visual_assets.length, 1);
+    assert.ok(harness.authoringPrompts.some((prompt) =>
       prompt.includes("You are a local file-editing Agent generating one PPT slide") &&
       prompt.includes("/research/evidence-index.json if it exists")
     ));
@@ -1858,6 +1933,20 @@ describe("Deck Generation Flow Module", () => {
       prompt.includes("You are a local file-editing Agent generating one PPT slide") &&
       prompt.includes("/research/evidence/pages/page-01.md if it exists")
     ));
+    const pageAuthoringPrompt = harness.authoringPrompts.find((prompt) =>
+      prompt.includes("You are a local file-editing Agent generating one PPT slide") &&
+      prompt.includes("Current page id: page-01")
+    );
+    assert.ok(pageAuthoringPrompt);
+    assert.equal(pageAuthoringPrompt.includes("/research/evidence/drafts/"), false);
+    assert.equal(pageAuthoringPrompt.includes("Raw Research Material") && pageAuthoringPrompt.includes("as evidence unless it has been curated"), true);
+    const contentReviewPrompt = harness.contentReviewPrompts.find((prompt) =>
+      prompt.includes("Current data JSON") &&
+      prompt.includes("research/evidence/pages/page-01.md")
+    );
+    assert.ok(contentReviewPrompt);
+    assert.equal(contentReviewPrompt.includes("/research/evidence/drafts/"), false);
+    assert.match(contentReviewPrompt, /Raw Research Material/);
   });
 
   it("records a non-blocking research gap when search fails", async () => {
@@ -1891,7 +1980,50 @@ describe("Deck Generation Flow Module", () => {
     const gapPage = harness.researchEvidence.pages.find((page) => page.page_id === "page-01");
     assert.equal(gapPage?.status, "gap");
     assert.ok(gapPage?.gaps.some((gap) => gap.includes("search unavailable")));
+    assert.equal(harness.authoringPrompts.some((prompt) => prompt.includes("Web Research Curation Draft Agent")), false);
     assert.equal(harness.progress.pages[0].status, "accepted");
+  });
+
+  it("records a final curated page when web succeeds but image raw material is missing", async () => {
+    const pagePlan = makePagePlan();
+    const researchPlan = makeResearchPlan(pagePlan);
+    researchPlan.pages[0] = {
+      ...researchPlan.pages[0],
+      web_research_needed: true,
+      image_research_needed: true,
+      query_intents: ["source"],
+      image_query_intents: ["missing image"],
+    };
+    const harness = createHarness({
+      pagePlan,
+      researchPlan,
+      imageSearchResults: [],
+    });
+
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.webSearchCalls, 1);
+    assert.equal(harness.imageSearchCalls, 1);
+    assert.equal(harness.imageFetchCalls, 0);
+    assert.ok(harness.authoringPrompts.some((prompt) => prompt.includes("Web Research Curation Draft Agent")));
+    assert.equal(harness.authoringPrompts.some((prompt) => prompt.includes("Visual Research Curation Draft Agent")), false);
+    const evidencePage = harness.researchEvidence.pages.find((item) => item.page_id === "page-01");
+    assert.equal(evidencePage?.status, "curated");
+    assert.equal(evidencePage?.facts.length, 1);
+    assert.equal(evidencePage?.visual_assets.length, 0);
+    assert.ok(evidencePage?.gaps.some((gap) => gap.includes("No image search results")));
+    assert.ok(evidencePage?.gaps.some((gap) => gap.includes("No raw image material")));
   });
 
   it("reuses curated evidence on retry without rerunning search", async () => {

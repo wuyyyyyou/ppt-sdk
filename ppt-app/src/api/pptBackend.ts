@@ -21,8 +21,10 @@ import type {
   ProjectResult,
   PptxExportJob,
   ResearchEvidenceIndex,
+  VisualResearchCurationDraft,
   ResearchPlan,
   ResearchStatus,
+  WebResearchCurationDraft,
   ExportPdfInput,
   ExportPdfResult,
   ExportArtifactDownloadUrlResult,
@@ -86,6 +88,32 @@ export interface PptBackend {
   getResearchPlan(input: { workspace_dir: string }): Promise<ResearchPlan>;
   recordResearchEvidence(input: { workspace_dir: string; evidence: ResearchEvidenceIndex }): Promise<ResearchEvidenceIndex>;
   getResearchEvidence(input: { workspace_dir: string }): Promise<ResearchEvidenceIndex>;
+  recordResearchCurationDraft(input: {
+    workspace_dir: string;
+    page_id: string;
+    draft_type: "web";
+    draft: WebResearchCurationDraft;
+  } | {
+    workspace_dir: string;
+    page_id: string;
+    draft_type: "visual";
+    draft: VisualResearchCurationDraft;
+  }): Promise<WebResearchCurationDraft | VisualResearchCurationDraft>;
+  getResearchCurationDraft(input: {
+    workspace_dir: string;
+    page_id: string;
+    draft_type: "web" | "visual";
+  }): Promise<WebResearchCurationDraft | VisualResearchCurationDraft | Record<string, unknown>>;
+  recordResearchEvidencePageMarkdown(input: {
+    workspace_dir: string;
+    page_id: string;
+    markdown: string;
+  }): Promise<{
+    workspace_dir: string;
+    page_id: string;
+    markdown_path: string;
+    updated_at: string;
+  }>;
   recordResearchStatus(input: { workspace_dir: string; status: ResearchStatus }): Promise<ResearchStatus>;
   getResearchStatus(input: { workspace_dir: string }): Promise<ResearchStatus>;
   webSearch(input: {

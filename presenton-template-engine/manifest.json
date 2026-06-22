@@ -381,6 +381,84 @@
       ]
     },
     {
+      "name": "app_record_research_curation_draft",
+      "description": "Write a page-level Web or Visual Research Curation Draft artifact for a workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "page_id",
+          "type": "string",
+          "description": "Page Generation Unit id, for example page-01.",
+          "required": true
+        },
+        {
+          "name": "draft_type",
+          "type": "string",
+          "description": "Draft type: web or visual.",
+          "required": true
+        },
+        {
+          "name": "draft",
+          "type": "object",
+          "description": "Research Curation Draft artifact.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_research_curation_draft",
+      "description": "Read a page-level Web or Visual Research Curation Draft artifact for a workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "page_id",
+          "type": "string",
+          "description": "Page Generation Unit id, for example page-01.",
+          "required": true
+        },
+        {
+          "name": "draft_type",
+          "type": "string",
+          "description": "Draft type: web or visual.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_record_research_evidence_page_markdown",
+      "description": "Write the current-page Research Evidence markdown summary for a workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "page_id",
+          "type": "string",
+          "description": "Page Generation Unit id, for example page-01.",
+          "required": true
+        },
+        {
+          "name": "markdown",
+          "type": "string",
+          "description": "Markdown content to write.",
+          "required": true
+        }
+      ]
+    },
+    {
       "name": "app_record_research_status",
       "description": "Write the Research Collection and Research Curation status artifact for a workspace.",
       "parameters": [

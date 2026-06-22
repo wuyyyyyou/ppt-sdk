@@ -234,6 +234,24 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         "app_get_research_evidence",
         input
       ),
+    recordResearchCurationDraft: (input) =>
+      invoke(
+        PPT_ENGINE_TOOL_ID,
+        "app_record_research_curation_draft",
+        input
+      ),
+    getResearchCurationDraft: (input) =>
+      invoke(
+        PPT_ENGINE_TOOL_ID,
+        "app_get_research_curation_draft",
+        input
+      ),
+    recordResearchEvidencePageMarkdown: (input) =>
+      invoke(
+        PPT_ENGINE_TOOL_ID,
+        "app_record_research_evidence_page_markdown",
+        input
+      ),
     recordResearchStatus: (input) =>
       invoke<ResearchStatus>(PPT_ENGINE_TOOL_ID, "app_record_research_status", input),
     getResearchStatus: (input) =>

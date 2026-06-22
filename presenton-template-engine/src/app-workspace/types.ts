@@ -159,6 +159,7 @@ export interface AppResearchPaths {
   evidence_dir: string;
   evidence_pages_dir: string;
   evidence_images_dir: string;
+  evidence_drafts_dir: string;
   research_plan_path: string;
   evidence_index_path: string;
   status_path: string;
@@ -189,6 +190,32 @@ export interface RecordAppResearchEvidenceInput {
 
 export interface GetAppResearchEvidenceInput {
   workspace_dir: string;
+}
+
+export interface RecordAppResearchCurationDraftInput {
+  workspace_dir: string;
+  page_id: string;
+  draft_type: "web" | "visual";
+  draft: unknown;
+}
+
+export interface GetAppResearchCurationDraftInput {
+  workspace_dir: string;
+  page_id: string;
+  draft_type: "web" | "visual";
+}
+
+export interface RecordAppResearchEvidencePageMarkdownInput {
+  workspace_dir: string;
+  page_id: string;
+  markdown: string;
+}
+
+export interface RecordAppResearchEvidencePageMarkdownResult {
+  workspace_dir: string;
+  page_id: string;
+  markdown_path: string;
+  updated_at: string;
 }
 
 export interface RecordAppResearchStatusInput {

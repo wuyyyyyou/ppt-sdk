@@ -74,7 +74,11 @@ import type {
   GetAppResearchStatusInput,
   PrepareAppResearchWorkspaceInput,
   PrepareAppResearchWorkspaceResult,
+  GetAppResearchCurationDraftInput,
   RecordAppResearchEvidenceInput,
+  RecordAppResearchCurationDraftInput,
+  RecordAppResearchEvidencePageMarkdownInput,
+  RecordAppResearchEvidencePageMarkdownResult,
   RecordAppResearchPlanInput,
   RecordAppResearchStatusInput,
   RenderAppWorkspacePagePreviewInput,
@@ -224,6 +228,7 @@ function buildResearchPaths(workspaceDir: string): AppResearchPaths {
     evidence_dir: evidenceDir,
     evidence_pages_dir: path.join(evidenceDir, "pages"),
     evidence_images_dir: path.join(evidenceDir, "images"),
+    evidence_drafts_dir: path.join(evidenceDir, "drafts"),
     research_plan_path: path.join(rootDir, "research-plan.json"),
     evidence_index_path: path.join(rootDir, "evidence-index.json"),
     status_path: path.join(rootDir, "research-status.json"),
@@ -1592,6 +1597,7 @@ async function ensureResearchDirectories(workspaceDir: string): Promise<AppResea
     mkdir(paths.raw_images_dir, { recursive: true }),
     mkdir(paths.evidence_pages_dir, { recursive: true }),
     mkdir(paths.evidence_images_dir, { recursive: true }),
+    mkdir(paths.evidence_drafts_dir, { recursive: true }),
   ]);
   return paths;
 }
@@ -1682,6 +1688,96 @@ export async function getAppResearchEvidence(input: GetAppResearchEvidenceInput)
     return defaultEvidence;
   }
   return normalizeResearchArtifact(existing, "empty");
+}
+
+function normalizeResearchDraftType(value: string): "web" | "visual" {
+  if (value === "web" || value === "visual") {
+    return value;
+  }
+  throw new Error('"draft_type" must be either "web" or "visual"');
+}
+
+function normalizeResearchDraftPageId(value: string): string {
+  const pageId = normalizeString(value);
+  if (!pageId) {
+    throw new Error('"page_id" must be a non-empty string');
+  }
+  if (!/^[a-zA-Z0-9_-]+$/.test(pageId)) {
+    throw new Error('"page_id" may only contain letters, numbers, underscores, and hyphens');
+  }
+  return pageId;
+}
+
+function buildResearchDraftPath(paths: AppResearchPaths, pageId: string, draftType: "web" | "visual"): string {
+  return path.join(paths.evidence_drafts_dir, `${pageId}-${draftType}.json`);
+}
+
+export async function recordAppResearchCurationDraft(
+  input: RecordAppResearchCurationDraftInput,
+): Promise<Record<string, unknown>> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureResearchDirectories(workspace.workspace_dir);
+  const pageId = normalizeResearchDraftPageId(input.page_id);
+  const draftType = normalizeResearchDraftType(input.draft_type);
+  const draftPath = buildResearchDraftPath(paths, pageId, draftType);
+  assertResearchPathUnderWorkspace(workspace.workspace_dir, draftPath, "draft_path");
+  const updatedAt = new Date().toISOString();
+  const draft = normalizeResearchArtifact(input.draft, "curated");
+  const next = {
+    ...draft,
+    page_id: pageId,
+    draft_type: draftType,
+    draft_path: draftPath,
+    updated_at: updatedAt,
+  };
+  await writeJsonFile(draftPath, next);
+  await touchWorkspaceTask(workspace, updatedAt);
+  return next;
+}
+
+export async function getAppResearchCurationDraft(
+  input: GetAppResearchCurationDraftInput,
+): Promise<Record<string, unknown>> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureResearchDirectories(workspace.workspace_dir);
+  const pageId = normalizeResearchDraftPageId(input.page_id);
+  const draftType = normalizeResearchDraftType(input.draft_type);
+  const draftPath = buildResearchDraftPath(paths, pageId, draftType);
+  assertResearchPathUnderWorkspace(workspace.workspace_dir, draftPath, "draft_path");
+  const existing = await readJsonFileIfExists(draftPath);
+  if (existing === null) {
+    return {
+      version: 1,
+      status: "empty",
+      page_id: pageId,
+      draft_type: draftType,
+      draft_path: draftPath,
+      updated_at: new Date().toISOString(),
+    };
+  }
+  return normalizeResearchArtifact(existing, "empty");
+}
+
+export async function recordAppResearchEvidencePageMarkdown(
+  input: RecordAppResearchEvidencePageMarkdownInput,
+): Promise<RecordAppResearchEvidencePageMarkdownResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureResearchDirectories(workspace.workspace_dir);
+  const pageId = normalizeResearchDraftPageId(input.page_id);
+  if (typeof input.markdown !== "string") {
+    throw new Error('"markdown" must be a string');
+  }
+  const markdownPath = path.join(paths.evidence_pages_dir, `${pageId}.md`);
+  assertResearchPathUnderWorkspace(workspace.workspace_dir, markdownPath, "markdown_path");
+  const updatedAt = new Date().toISOString();
+  await writeFile(markdownPath, input.markdown, "utf8");
+  await touchWorkspaceTask(workspace, updatedAt);
+  return {
+    workspace_dir: workspace.workspace_dir,
+    page_id: pageId,
+    markdown_path: markdownPath,
+    updated_at: updatedAt,
+  };
 }
 
 export async function recordAppResearchStatus(input: RecordAppResearchStatusInput): Promise<Record<string, unknown>> {

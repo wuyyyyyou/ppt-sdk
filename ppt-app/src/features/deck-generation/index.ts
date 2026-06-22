@@ -30,6 +30,8 @@ import type {
   ResearchEvidenceIndex,
   ResearchPlan,
   ResearchRequirement,
+  VisualResearchCurationDraft,
+  WebResearchCurationDraft,
   RenderDeckHtmlResult,
   RenderWorkspacePagePreviewResult,
   WorkspaceOutline,
@@ -44,6 +46,13 @@ import {
   isResumablePageGenerationStatus,
   shouldResumePageGenerationStatus,
 } from "./pageStatusPolicy";
+import {
+  createVisualResearchCurationGapDraft,
+  createWebResearchCurationGapDraft,
+  mergeResearchCurationDrafts,
+  validateVisualResearchCurationDraft,
+  validateWebResearchCurationDraft,
+} from "./researchCurationDrafts";
 
 const ATTEMPT_LIMITS = {
   render: 10,
@@ -996,19 +1005,18 @@ function normalizeResearchEvidenceIndex(value: ResearchEvidenceIndex | null | un
   };
 }
 
-function buildResearchCurationPrompt(input: {
+function buildWebResearchCurationPrompt(input: {
   workspaceDir: string;
   page: PagePlanItem;
   requirement: ResearchRequirement;
   rawWebIndexPaths: string[];
-  rawImageIndexPaths: string[];
-  evidenceMarkdownPath: string;
-  evidenceIndexPath: string;
+  draftPath: string;
 }) {
   return [
-    "You are a Research Curation Agent for one PPT Page Generation Unit.",
-    "Read Raw Research Material, select only useful facts, sources, and visual assets, and write Research Evidence files.",
+    "You are a Web Research Curation Draft Agent for one PPT Page Generation Unit.",
+    "Read Raw web material, select only useful facts, source judgments, derived insights, rejected material, and gaps, then write a Web Research Curation Draft JSON file.",
     "Do not edit slide TSX, page data JSON, manifest, outline, or page-plan files.",
+    "Do not edit the final evidence-index.json or current-page evidence markdown. Final Research Evidence is merged by app code after this draft.",
     "",
     `Workspace directory: ${input.workspaceDir}`,
     `Current page id: ${input.page.page_id}`,
@@ -1016,7 +1024,7 @@ function buildResearchCurationPrompt(input: {
     `Current page outline: ${input.page.outline}`,
     `Research requirement: ${JSON.stringify(input.requirement)}`,
     `Raw web index paths: ${JSON.stringify(input.rawWebIndexPaths)}`,
-    `Raw image index paths: ${JSON.stringify(input.rawImageIndexPaths)}`,
+    `Web draft JSON path to write: ${input.draftPath}`,
     "",
     "Source quality rules:",
     "- Prefer official websites, company reports, government/regulatory sources, industry associations, recognized research institutions, authoritative media, and documentation.",
@@ -1024,29 +1032,58 @@ function buildResearchCurationPrompt(input: {
     "- If sources conflict, record the conflict instead of guessing.",
     "- Material without a publication date must not be presented as latest.",
     "",
+    "Tool boundary:",
+    "- Do not call search, browser, or network tools during Web Research Curation.",
+    "- Do not use nats_ddg_search, browser_create_instance, web search, image search, or ad-hoc network access.",
+    "- Curate only from the Raw web index paths listed above and existing workspace/user-provided artifacts.",
+    "- If the listed raw index paths are empty, missing, or insufficient, write a Research Evidence Gap instead of searching yourself.",
+    "",
+    "Write exactly one JSON object to the Web draft JSON path. Draft JSON shape:",
+    '{"version":1,"page_id":"...","status":"curated","facts":[{"id":"fact-1","claim":"...","source_type":"web_source","source_title":"...","source_url":"...","source_file":"...","excerpt":"...","confidence":"medium"}],"derived_insights":[{"id":"insight-1","insight":"...","supporting_fact_ids":["fact-1"]}],"gaps":["..."],"rejected_material":[{"source":"...","reason":"..."}],"source_summary":"...","updated_at":"..."}',
+    "Fact source_type must be exactly one of: user_provided, web_source, image_source.",
+    "Do not include visual_assets in this draft.",
+    "If factual evidence is insufficient, write status gap and explain gaps. Page Generation will continue.",
+    "Final response must be a short JSON object: {\"status\":\"curated\",\"summary\":\"...\",\"gaps\":[\"...\"]}",
+  ].join("\n");
+}
+
+function buildVisualResearchCurationPrompt(input: {
+  workspaceDir: string;
+  page: PagePlanItem;
+  requirement: ResearchRequirement;
+  rawImageIndexPaths: string[];
+  draftPath: string;
+}) {
+  return [
+    "You are a Visual Research Curation Draft Agent for one PPT Page Generation Unit.",
+    "Read Raw image material, select only useful visual assets, visual judgments, rejected material, and gaps, then write a Visual Research Curation Draft JSON file.",
+    "Do not edit slide TSX, page data JSON, manifest, outline, or page-plan files.",
+    "Do not edit the final evidence-index.json or current-page evidence markdown. Final Research Evidence is merged by app code after this draft.",
+    "",
+    `Workspace directory: ${input.workspaceDir}`,
+    `Current page id: ${input.page.page_id}`,
+    `Current page title: ${input.page.title}`,
+    `Current page outline: ${input.page.outline}`,
+    `Research requirement: ${JSON.stringify(input.requirement)}`,
+    `Raw image index paths: ${JSON.stringify(input.rawImageIndexPaths)}`,
+    `Visual draft JSON path to write: ${input.draftPath}`,
+    "",
     "Image rules:",
     "- For downloaded image candidates, first use upload_local_file on the local image path, then analyze_image before selecting it.",
     "- Select an image only if it fits the current page intent and is visually usable.",
-    "- Text, chart data, or claims visible inside a selected image are not grounded facts unless separately captured as facts.",
+    "- Text, chart data, rankings, or claims visible inside a selected image are not grounded facts.",
+    "- Do not emit facts or derived_insights in this draft.",
     "",
     "Tool boundary:",
-    "- Do not call search, browser, or network tools during Research Curation.",
+    "- Do not call search, browser, or network tools during Visual Research Curation.",
     "- Do not use nats_ddg_search, browser_create_instance, web search, image search, or ad-hoc network access.",
-    "- Curate only from the Raw Research Material index paths listed above and existing workspace/user-provided artifacts.",
+    "- Curate only from the Raw image index paths listed above and existing workspace/user-provided artifacts.",
     "- If the listed raw index paths are empty, missing, or insufficient, write a Research Evidence Gap instead of searching yourself.",
     "",
-    "Write these files:",
-    `1. Current page markdown evidence summary: ${input.evidenceMarkdownPath}`,
-    `2. Update the workspace evidence index JSON: ${input.evidenceIndexPath}`,
-    "",
-    "Evidence index JSON shape:",
-    '{"version":1,"status":"partial","pages":[{"page_id":"...","status":"curated","facts":[{"id":"fact-1","claim":"...","source_type":"web_source","source_title":"...","source_url":"...","source_file":"...","excerpt":"...","confidence":"medium"}],"visual_assets":[{"id":"image-1","file_path":"...","original_raw_path":"...","image_url":"...","page_url":"...","sha256":"...","reason":"...","visual_summary":"..."}],"derived_insights":[{"id":"insight-1","insight":"...","supporting_fact_ids":["fact-1"]}],"gaps":["..."],"rejected_material":[{"source":"...","reason":"..."}],"markdown_path":"...","updated_at":"..."}],"shared":{"facts":[],"visual_assets":[],"gaps":[]},"updated_at":"..."}',
-    "Do not replace evidence-index.json with an object keyed by page id. It must always be the full evidence index JSON shape above.",
-    "Fact source_type must be exactly one of: user_provided, web_source, image_source.",
+    "Write exactly one JSON object to the Visual draft JSON path. Draft JSON shape:",
+    '{"version":1,"page_id":"...","status":"curated","visual_assets":[{"id":"image-1","file_path":"...","original_raw_path":"...","image_url":"...","page_url":"...","sha256":"...","reason":"...","visual_summary":"..."}],"gaps":["..."],"rejected_material":[{"source":"...","reason":"..."}],"visual_summary":"...","updated_at":"..."}',
     "Image analysis may support visual_assets.reason or visual_assets.visual_summary, but it is not a valid fact source_type.",
-    "Current page entry shape:",
-    '{"page_id":"...","status":"curated","facts":[{"id":"fact-1","claim":"...","source_type":"web_source","source_title":"...","source_url":"...","source_file":"...","excerpt":"...","confidence":"medium"}],"visual_assets":[{"id":"image-1","file_path":"...","original_raw_path":"...","image_url":"...","page_url":"...","sha256":"...","reason":"...","visual_summary":"..."}],"derived_insights":[{"id":"insight-1","insight":"...","supporting_fact_ids":["fact-1"]}],"gaps":["..."],"rejected_material":[{"source":"...","reason":"..."}],"markdown_path":"...","updated_at":"..."}',
-    "If evidence is insufficient, write status gap and explain gaps. Page Generation will continue.",
+    "If visual evidence is insufficient, write status gap and explain gaps. Page Generation will continue.",
     "Final response must be a short JSON object: {\"status\":\"curated\",\"summary\":\"...\",\"gaps\":[\"...\"]}",
   ].join("\n");
 }
@@ -1100,6 +1137,96 @@ async function recordResearchGapForPage(input: {
       updated_at: new Date().toISOString(),
     },
   });
+}
+
+async function runResearchDraftAgent(input: {
+  flowInput: DeckGenerationRuntime;
+  pagePlan: PagePlan;
+  page: PagePlanItem;
+  kind: "web" | "visual";
+  prompt: string;
+  draftPath: string;
+  currentGaps: string[];
+}): Promise<WebResearchCurationDraft | VisualResearchCurationDraft | null> {
+  const { flowInput, page, pagePlan, kind, prompt } = input;
+  const tracker = createAgentRunTracker({
+    flowInput,
+    page,
+    kind: "research-curation",
+    step: "research-curation",
+    message: generationText(flowInput.locale).curatingEvidence(page),
+    prompt,
+    totalPages: pagePlan.pages.length,
+    progress: flowInput.getProgress,
+  });
+
+  try {
+    await appendResearchLogSafe(flowInput, {
+      event: `ai.research.${kind}_curation.started`,
+      schema_version: 1,
+      page_id: page.page_id,
+      page_index: page.index,
+      draft_path: input.draftPath,
+      updated_at: new Date().toISOString(),
+    });
+    await flowInput.agentClient.runAuthoringPrompt(
+      prompt,
+      buildAgentRunOptions(flowInput, tracker.onStreamEvent, tracker.logContext),
+    );
+    await tracker.flush("completed", { draft_type: kind });
+    const rawDraft = await flowInput.backend.getResearchCurationDraft({
+      workspace_dir: flowInput.workspace.workspace_dir,
+      page_id: page.page_id,
+      draft_type: kind,
+    });
+    const validation = kind === "web"
+      ? validateWebResearchCurationDraft(rawDraft, page.page_id)
+      : validateVisualResearchCurationDraft(rawDraft, page.page_id);
+    if (!validation.draft) {
+      input.currentGaps.push(...validation.gaps);
+      await appendResearchLogSafe(flowInput, {
+        event: `ai.research.${kind}_curation.invalid`,
+        schema_version: 1,
+        page_id: page.page_id,
+        page_index: page.index,
+        draft_path: input.draftPath,
+        gaps: validation.gaps,
+        updated_at: new Date().toISOString(),
+      });
+      return null;
+    }
+    await flowInput.backend.recordResearchCurationDraft({
+      workspace_dir: flowInput.workspace.workspace_dir,
+      page_id: page.page_id,
+      draft_type: kind,
+      draft: validation.draft as never,
+    });
+    await appendResearchLogSafe(flowInput, {
+      event: `ai.research.${kind}_curation.finished`,
+      schema_version: 1,
+      page_id: page.page_id,
+      page_index: page.index,
+      draft_path: input.draftPath,
+      status: validation.draft.status,
+      gaps: validation.draft.gaps,
+      updated_at: new Date().toISOString(),
+    });
+    return validation.draft;
+  } catch (error) {
+    await tracker.flush("error", { draft_type: kind, error: error instanceof Error ? error.message : String(error) });
+    const message = `${kind === "web" ? "Web" : "Visual"} Research Curation failed: ${error instanceof Error ? error.message : String(error)}`;
+    input.currentGaps.push(message);
+    await appendResearchLogSafe(flowInput, {
+      event: `ai.research.${kind}_curation.failed`,
+      schema_version: 1,
+      page_id: page.page_id,
+      page_index: page.index,
+      draft_path: input.draftPath,
+      error: message,
+      updated_at: new Date().toISOString(),
+    });
+    return null;
+  }
 }
 
 async function generateAndRecordResearchPlan(
@@ -1296,52 +1423,13 @@ async function collectAndCurateResearchForPage(
   }
 
   const evidenceMarkdownPath = `${paths.evidence_pages_dir}/${page.page_id}.md`;
+  const webDraftPath = `${paths.evidence_drafts_dir}/${page.page_id}-web.json`;
+  const visualDraftPath = `${paths.evidence_drafts_dir}/${page.page_id}-visual.json`;
   if (pageRequirement.web_research_needed && rawWebIndexPaths.length === 0) {
     gaps.push("No raw web material was collected for this page.");
   }
   if (pageRequirement.image_research_needed && rawImageIndexPaths.length === 0) {
     gaps.push("No raw image material was collected for this page.");
-  }
-  if (rawWebIndexPaths.length === 0 && rawImageIndexPaths.length === 0) {
-    await recordResearchGapForPage({
-      flowInput: input,
-      page,
-      evidenceMarkdownPath,
-      gaps,
-    });
-    await appendResearchLogSafe(input, {
-      event: "ai.research.page.finished",
-      schema_version: 1,
-      page_id: page.page_id,
-      page_index: page.index,
-      raw_web_index_paths: rawWebIndexPaths,
-      raw_image_index_paths: rawImageIndexPaths,
-      gaps,
-      status: "gap",
-      updated_at: new Date().toISOString(),
-    });
-    const latestStatus = await input.backend.getResearchStatus({
-      workspace_dir: input.workspace.workspace_dir,
-    });
-    await input.backend.recordResearchStatus({
-      workspace_dir: input.workspace.workspace_dir,
-      status: {
-        ...latestStatus,
-        status: "gap",
-        pages: [
-          ...latestStatus.pages.filter((item) => item.page_id !== page.page_id),
-          {
-            page_id: page.page_id,
-            status: "gap",
-            message: gaps.join("\n"),
-            evidence_path: evidenceMarkdownPath,
-            updated_at: new Date().toISOString(),
-          },
-        ],
-        updated_at: new Date().toISOString(),
-      },
-    });
-    return;
   }
 
   progress = await recordProgress(input, page, { status: "research_curating" });
@@ -1357,56 +1445,95 @@ async function collectAndCurateResearchForPage(
     progress,
   );
 
-  const prompt = buildResearchCurationPrompt({
-    workspaceDir: input.workspace.workspace_dir,
+  let webDraft: WebResearchCurationDraft | null = null;
+  let visualDraft: VisualResearchCurationDraft | null = null;
+
+  if (pageRequirement.web_research_needed) {
+    if (rawWebIndexPaths.length > 0) {
+      webDraft = await runResearchDraftAgent({
+        flowInput: input,
+        pagePlan,
+        page,
+        kind: "web",
+        prompt: buildWebResearchCurationPrompt({
+          workspaceDir: input.workspace.workspace_dir,
+          page,
+          requirement: pageRequirement,
+          rawWebIndexPaths,
+          draftPath: webDraftPath,
+        }),
+        draftPath: webDraftPath,
+        currentGaps: gaps,
+      }) as WebResearchCurationDraft | null;
+    } else {
+      webDraft = createWebResearchCurationGapDraft({
+        pageId: page.page_id,
+        gaps: ["No raw web material was collected for this page."],
+      });
+      await input.backend.recordResearchCurationDraft({
+        workspace_dir: input.workspace.workspace_dir,
+        page_id: page.page_id,
+        draft_type: "web",
+        draft: webDraft,
+      });
+    }
+  }
+
+  if (pageRequirement.image_research_needed) {
+    if (rawImageIndexPaths.length > 0) {
+      visualDraft = await runResearchDraftAgent({
+        flowInput: input,
+        pagePlan,
+        page,
+        kind: "visual",
+        prompt: buildVisualResearchCurationPrompt({
+          workspaceDir: input.workspace.workspace_dir,
+          page,
+          requirement: pageRequirement,
+          rawImageIndexPaths,
+          draftPath: visualDraftPath,
+        }),
+        draftPath: visualDraftPath,
+        currentGaps: gaps,
+      }) as VisualResearchCurationDraft | null;
+    } else {
+      visualDraft = createVisualResearchCurationGapDraft({
+        pageId: page.page_id,
+        gaps: ["No raw image material was collected for this page."],
+      });
+      await input.backend.recordResearchCurationDraft({
+        workspace_dir: input.workspace.workspace_dir,
+        page_id: page.page_id,
+        draft_type: "visual",
+        draft: visualDraft,
+      });
+    }
+  }
+
+  const currentEvidenceBeforeMerge = normalizeResearchEvidenceIndex(
+    await input.backend.getResearchEvidence({
+      workspace_dir: input.workspace.workspace_dir,
+    }),
+  );
+  const merged = mergeResearchCurationDrafts({
+    currentEvidence: currentEvidenceBeforeMerge,
     page,
     requirement: pageRequirement,
-    rawWebIndexPaths,
-    rawImageIndexPaths,
     evidenceMarkdownPath,
-    evidenceIndexPath: paths.evidence_index_path,
+    webDraft,
+    visualDraft,
+    gaps,
   });
 
-  try {
-    const tracker = createAgentRunTracker({
-      flowInput: input,
-      page,
-      kind: "research-curation",
-      step: "research-curation",
-      message: text.curatingEvidence(page),
-      prompt,
-      totalPages: pagePlan.pages.length,
-      progress: input.getProgress,
-    });
-    await input.agentClient.runAuthoringPrompt(
-      prompt,
-      buildAgentRunOptions(input, tracker.onStreamEvent, tracker.logContext),
-    );
-    await tracker.flush("completed", { gaps });
-    const evidenceAfterCuration = normalizeResearchEvidenceIndex(
-      await input.backend.getResearchEvidence({
-        workspace_dir: input.workspace.workspace_dir,
-      }),
-    );
-    const hasCurrentPageEvidence = evidenceAfterCuration.pages.some((item) =>
-      item.page_id === page.page_id &&
-      (item.status === "curated" || item.status === "gap" || item.status === "error" || item.status === "skipped")
-    );
-    if (!hasCurrentPageEvidence) {
-      gaps.push("Research Curation did not write a valid current-page evidence entry.");
-    }
-  } catch (error) {
-    gaps.push(`Research Curation failed: ${error instanceof Error ? error.message : String(error)}`);
-  }
-
-  if (gaps.length > 0) {
-    await recordResearchGapForPage({
-      flowInput: input,
-      page,
-      evidenceMarkdownPath,
-      gaps,
-    });
-  }
+  await input.backend.recordResearchEvidencePageMarkdown({
+    workspace_dir: input.workspace.workspace_dir,
+    page_id: page.page_id,
+    markdown: merged.markdown,
+  });
+  await input.backend.recordResearchEvidence({
+    workspace_dir: input.workspace.workspace_dir,
+    evidence: merged.evidence,
+  });
 
   await appendResearchLogSafe(input, {
     event: "ai.research.page.finished",
@@ -1415,8 +1542,8 @@ async function collectAndCurateResearchForPage(
     page_index: page.index,
     raw_web_index_paths: rawWebIndexPaths,
     raw_image_index_paths: rawImageIndexPaths,
-    gaps,
-    status: gaps.length > 0 ? "gap" : "curated",
+    gaps: merged.pageEvidence.gaps,
+    status: merged.pageEvidence.status,
     updated_at: new Date().toISOString(),
   });
   const latestStatus = await input.backend.getResearchStatus({
@@ -1426,14 +1553,14 @@ async function collectAndCurateResearchForPage(
     workspace_dir: input.workspace.workspace_dir,
     status: {
       ...latestStatus,
-      status: gaps.length > 0 ? "gap" : "ready",
+      status: merged.pageEvidence.status === "gap" ? "gap" : "ready",
       pages: [
         ...latestStatus.pages.filter((item) => item.page_id !== page.page_id),
         {
           page_id: page.page_id,
-          status: gaps.length > 0 ? "gap" : "curated",
-          message: gaps.join("\n"),
-          evidence_path: evidenceMarkdownPath,
+        status: merged.pageEvidence.status,
+        message: merged.pageEvidence.gaps.join("\n"),
+        evidence_path: evidenceMarkdownPath,
           updated_at: new Date().toISOString(),
         },
       ],

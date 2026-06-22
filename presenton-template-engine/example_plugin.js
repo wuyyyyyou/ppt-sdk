@@ -24,6 +24,7 @@ import {
   getAppPagePlan,
   getAppPageProgress,
   getAppPptxExportStatus,
+  getAppResearchCurationDraft,
   getAppResearchEvidence,
   getAppResearchPlan,
   getAppResearchStatus,
@@ -41,7 +42,9 @@ import {
   recordAppPageProgress,
   recordAppPdfExport,
   recordAppPptxExport,
+  recordAppResearchCurationDraft,
   recordAppResearchEvidence,
+  recordAppResearchEvidencePageMarkdown,
   recordAppResearchPlan,
   recordAppResearchStatus,
   renderAppWorkspaceDeckHtml,
@@ -903,6 +906,74 @@ async function toolAppGetResearchEvidence(args) {
   return getAppResearchEvidence({ workspace_dir: workspaceDir });
 }
 
+async function toolAppRecordResearchCurationDraft(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const pageId = args.page_id;
+  const draftType = args.draft_type;
+  const draft = args.draft;
+  if (typeof pageId !== "string" || pageId.length === 0) {
+    throw new Error('"page_id" must be a non-empty string');
+  }
+  if (draftType !== "web" && draftType !== "visual") {
+    throw new Error('"draft_type" must be either "web" or "visual"');
+  }
+  if (!draft || typeof draft !== "object" || Array.isArray(draft)) {
+    throw new Error('"draft" must be an object');
+  }
+  return recordAppResearchCurationDraft({
+    workspace_dir: workspaceDir,
+    page_id: pageId,
+    draft_type: draftType,
+    draft,
+  });
+}
+
+async function toolAppGetResearchCurationDraft(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const pageId = args.page_id;
+  const draftType = args.draft_type;
+  if (typeof pageId !== "string" || pageId.length === 0) {
+    throw new Error('"page_id" must be a non-empty string');
+  }
+  if (draftType !== "web" && draftType !== "visual") {
+    throw new Error('"draft_type" must be either "web" or "visual"');
+  }
+  return getAppResearchCurationDraft({
+    workspace_dir: workspaceDir,
+    page_id: pageId,
+    draft_type: draftType,
+  });
+}
+
+async function toolAppRecordResearchEvidencePageMarkdown(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const pageId = args.page_id;
+  const markdown = args.markdown;
+  if (typeof pageId !== "string" || pageId.length === 0) {
+    throw new Error('"page_id" must be a non-empty string');
+  }
+  if (typeof markdown !== "string") {
+    throw new Error('"markdown" must be a string');
+  }
+  return recordAppResearchEvidencePageMarkdown({
+    workspace_dir: workspaceDir,
+    page_id: pageId,
+    markdown,
+  });
+}
+
 async function toolAppRecordResearchStatus(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -1320,6 +1391,9 @@ const TOOL_DISPATCH = {
   app_get_research_plan: toolAppGetResearchPlan,
   app_record_research_evidence: toolAppRecordResearchEvidence,
   app_get_research_evidence: toolAppGetResearchEvidence,
+  app_record_research_curation_draft: toolAppRecordResearchCurationDraft,
+  app_get_research_curation_draft: toolAppGetResearchCurationDraft,
+  app_record_research_evidence_page_markdown: toolAppRecordResearchEvidencePageMarkdown,
   app_record_research_status: toolAppRecordResearchStatus,
   app_get_research_status: toolAppGetResearchStatus,
   app_record_page_progress: toolAppRecordPageProgress,

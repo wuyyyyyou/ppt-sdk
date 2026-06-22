@@ -357,6 +357,7 @@ export interface ResearchPaths {
   evidence_dir: string;
   evidence_pages_dir: string;
   evidence_images_dir: string;
+  evidence_drafts_dir: string;
   research_plan_path: string;
   evidence_index_path: string;
   status_path: string;
@@ -442,6 +443,40 @@ export interface ResearchEvidencePage {
     reason: string;
   }>;
   markdown_path?: string;
+  updated_at: string;
+}
+
+export type ResearchCurationDraftStatus = "curated" | "gap" | "error" | "skipped";
+
+export interface ResearchCurationRejectedMaterial {
+  source?: string;
+  reason: string;
+}
+
+export interface WebResearchCurationDraft {
+  version: 1;
+  page_id: string;
+  status: ResearchCurationDraftStatus;
+  facts: ResearchEvidenceFact[];
+  derived_insights: Array<{
+    id: string;
+    insight: string;
+    supporting_fact_ids: string[];
+  }>;
+  gaps: string[];
+  rejected_material: ResearchCurationRejectedMaterial[];
+  source_summary?: string;
+  updated_at: string;
+}
+
+export interface VisualResearchCurationDraft {
+  version: 1;
+  page_id: string;
+  status: ResearchCurationDraftStatus;
+  visual_assets: VisualResearchEvidence[];
+  gaps: string[];
+  rejected_material: ResearchCurationRejectedMaterial[];
+  visual_summary?: string;
   updated_at: string;
 }
 

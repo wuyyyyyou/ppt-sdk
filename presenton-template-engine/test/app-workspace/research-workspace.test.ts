@@ -28,6 +28,9 @@ test("workspace research tools prepare directories and persist metadata", async 
     getAppResearchPlan,
     recordAppResearchEvidence,
     getAppResearchEvidence,
+    recordAppResearchCurationDraft,
+    getAppResearchCurationDraft,
+    recordAppResearchEvidencePageMarkdown,
     recordAppResearchStatus,
     getAppResearchStatus,
   } = await import("../../src/app-workspace/index.ts");
@@ -43,6 +46,7 @@ test("workspace research tools prepare directories and persist metadata", async 
       prepared.raw_images_dir,
       prepared.evidence_pages_dir,
       prepared.evidence_images_dir,
+      prepared.evidence_drafts_dir,
     ]) {
       assert.equal((await stat(dirPath)).isDirectory(), true);
       assert.equal(path.relative(prepared.root_dir, dirPath).startsWith(".."), false);
@@ -70,6 +74,40 @@ test("workspace research tools prepare directories and persist metadata", async 
     });
     assert.equal(evidence.status, "partial");
     assert.deepEqual((await getAppResearchEvidence({ workspace_dir: workspace.workspace_dir })).pages, evidence.pages);
+
+    const draft = await recordAppResearchCurationDraft({
+      workspace_dir: workspace.workspace_dir,
+      page_id: "page-01",
+      draft_type: "web",
+      draft: {
+        version: 1,
+        status: "curated",
+        facts: [{ id: "fact-1", claim: "Claim", source_type: "web_source" }],
+        derived_insights: [],
+        gaps: [],
+        rejected_material: [],
+      },
+    });
+    assert.equal(draft.status, "curated");
+    assert.equal(draft.page_id, "page-01");
+    assert.equal(draft.draft_type, "web");
+    assert.equal(path.basename(String(draft.draft_path)), "page-01-web.json");
+    assert.deepEqual(
+      (await getAppResearchCurationDraft({
+        workspace_dir: workspace.workspace_dir,
+        page_id: "page-01",
+        draft_type: "web",
+      })).facts,
+      draft.facts,
+    );
+
+    const markdown = await recordAppResearchEvidencePageMarkdown({
+      workspace_dir: workspace.workspace_dir,
+      page_id: "page-01",
+      markdown: "# Evidence\n",
+    });
+    assert.equal(path.basename(markdown.markdown_path), "page-01.md");
+    assert.equal(await readFile(markdown.markdown_path, "utf8"), "# Evidence\n");
 
     const status = await recordAppResearchStatus({
       workspace_dir: workspace.workspace_dir,

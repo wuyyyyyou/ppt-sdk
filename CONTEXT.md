@@ -56,6 +56,15 @@ _Avoid_: Evidence, source of truth
 **Research Curation**:
 The step that turns Raw Research Material into Research Evidence by selecting relevant facts, sources, and visual assets for a Page Generation Unit.
 
+**Research Curation Draft**:
+An intermediate curation result for a Page Generation Unit that has been selected from Raw Research Material but has not yet been promoted into Research Evidence.
+
+**Web Research Curation Draft**:
+A Research Curation Draft that contains candidate factual evidence, source judgments, derived insights, rejected material, and gaps from web material.
+
+**Visual Research Curation Draft**:
+A Research Curation Draft that contains candidate visual assets, visual judgments, rejected material, and gaps from image material.
+
 **Research Log**:
 A Workspace-owned diagnostic record of Research Planning, Research Collection, and Research Curation activity. It is separate from Page Generation Stage Records and is used for troubleshooting evidence decisions.
 
