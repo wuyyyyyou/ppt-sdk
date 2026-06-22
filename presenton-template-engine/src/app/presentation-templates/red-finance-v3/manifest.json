@@ -98,6 +98,16 @@
       "data_path": "./data/demo/kpi-summary.json"
     },
     {
+      "id": "red-finance-v3-image-narrative-showcase",
+      "title": "Image Narrative Showcase",
+      "speaker_note": "Generic image-first slide for one visual asset with concise supporting interpretation.",
+      "source": {
+        "type": "local",
+        "path": "./slides/ImageNarrativeShowcase.tsx"
+      },
+      "data_path": "./data/demo/image-narrative-showcase.json"
+    },
+    {
       "id": "red-finance-v3-closing-actions",
       "title": "Closing Actions",
       "speaker_note": "Generic closing action slide for conclusions, recommendations, and decision requests.",

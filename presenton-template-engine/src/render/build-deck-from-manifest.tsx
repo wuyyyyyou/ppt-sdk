@@ -1,4 +1,5 @@
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 
 import { getLayoutByLayoutId } from "../app/presentation-templates/index.js";
@@ -78,6 +79,10 @@ type PageLike = {
     html: string,
     options?: { waitUntil?: string | string[]; timeout?: number },
   ) => Promise<void>;
+  goto?: (
+    url: string,
+    options?: { waitUntil?: string | string[]; timeout?: number },
+  ) => Promise<unknown>;
   $: (selector: string) => Promise<ElementHandleLike | null>;
   close?: () => Promise<void>;
 };
@@ -361,7 +366,7 @@ async function waitForSlideRenderReady(
 }
 
 async function writeSlideScreenshots(
-  slides: Array<{ html: string; outputPath: string }>,
+  slides: Array<{ html: string; outputPath: string; htmlPath?: string }>,
 ): Promise<void> {
   await withScreenshotRenderQueue(async () => {
     const runtime = await createManagedPage();
@@ -370,10 +375,17 @@ async function writeSlideScreenshots(
       await runtime.page.setViewport?.(DEFAULT_SLIDE_SCREENSHOT_VIEWPORT);
 
       for (const slide of slides) {
-        await runtime.page.setContent(slide.html, {
-          waitUntil: "domcontentloaded",
-          timeout: DEFAULT_RENDER_TIMEOUT_MS,
-        });
+        if (slide.htmlPath && runtime.page.goto) {
+          await runtime.page.goto(pathToFileURL(slide.htmlPath).href, {
+            waitUntil: "domcontentloaded",
+            timeout: DEFAULT_RENDER_TIMEOUT_MS,
+          });
+        } else {
+          await runtime.page.setContent(slide.html, {
+            waitUntil: "domcontentloaded",
+            timeout: DEFAULT_RENDER_TIMEOUT_MS,
+          });
+        }
         const slideElement = await waitForSlideRenderReady(runtime.page);
         const screenshot = await slideElement.screenshot({ path: slide.outputPath });
         if (!screenshot) {
@@ -856,6 +868,7 @@ export async function buildDeckHtmlPagesAndScreenshotsFromManifest(
   await writeSlideScreenshots(
     screenshotSlides.map((slide) => ({
       html: slide.slide.html,
+      htmlPath: slide.htmlPath,
       outputPath: slide.screenshotPath,
     })),
   );
@@ -907,7 +920,7 @@ export async function buildDeckPageScreenshotFromManifest(
   const screenshotPath = path.join(outputDir, screenshotFileName);
 
   await writeFile(htmlPath, slide.html, "utf8");
-  await writeSlideScreenshots([{ html: slide.html, outputPath: screenshotPath }]);
+  await writeSlideScreenshots([{ html: slide.html, htmlPath, outputPath: screenshotPath }]);
 
   return {
     manifestPath: prepared.manifestPath,
@@ -948,7 +961,19 @@ export async function buildDeckHtmlFromManifest(
     prepared.singlePageIndex === null
       ? prepared.slides
       : [prepared.slides[prepared.singlePageIndex]];
-  await writeSlideScreenshots(slidesToWrite);
+  const screenshotSlides = await Promise.all(
+    slidesToWrite.map(async (slide) => {
+      const htmlFileName = slide.fileName.replace(/\.png$/, ".html");
+      const htmlPath = path.join(prepared.outputDir, htmlFileName);
+      await writeFile(htmlPath, slide.html, "utf8");
+      return {
+        html: slide.html,
+        htmlPath,
+        outputPath: slide.outputPath,
+      };
+    }),
+  );
+  await writeSlideScreenshots(screenshotSlides);
 
   return {
     deckHtml,

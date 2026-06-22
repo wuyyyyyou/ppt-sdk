@@ -23,6 +23,7 @@ export type FinanceIconName =
   | "flag"
   | "globe"
   | "health"
+  | "image"
   | "leaf"
   | "lightbulb"
   | "laptop-code"
@@ -201,6 +202,20 @@ export const FinanceIcon = ({
           <rect x="13.3" y="4.5" width="6.2" height="6.2" rx="1.2" stroke={stroke} strokeWidth="1.8" />
           <rect x="4.5" y="13.3" width="6.2" height="6.2" rx="1.2" stroke={stroke} strokeWidth="1.8" />
           <rect x="13.3" y="13.3" width="6.2" height="6.2" rx="1.2" stroke={stroke} strokeWidth="1.8" />
+        </svg>
+      );
+    case "image":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+          <rect x="4.5" y="5" width="15" height="14" rx="2" stroke={stroke} strokeWidth="1.8" />
+          <circle cx="9" cy="9.4" r="1.5" stroke={stroke} strokeWidth="1.8" />
+          <path
+            d="m5.4 16.4 4.2-4.2a1.4 1.4 0 0 1 2 0l1.2 1.2 2-2a1.4 1.4 0 0 1 2 0l2.3 2.3"
+            stroke={stroke}
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       );
     case "laptop-code":

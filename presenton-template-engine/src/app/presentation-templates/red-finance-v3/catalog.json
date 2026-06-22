@@ -112,6 +112,16 @@
       "avoid_for": ["long narrative", "complex roadmap", "long explanation"]
     },
     {
+      "id": "image-narrative-showcase",
+      "name": "Image Narrative Showcase",
+      "blueprint_source": "./blueprints/ImageNarrativeShowcase.tsx",
+      "example_slide": "./slides/ImageNarrativeShowcase.tsx",
+      "layout_family": "image-narrative",
+      "content_intents": ["visual-evidence", "image-showcase", "asset-explanation", "photo-narrative"],
+      "suitable_for": ["primary image page", "product screenshot", "map explanation", "visual evidence", "photo with interpretation"],
+      "avoid_for": ["multiple unrelated images", "dense text page", "dashboard", "large comparison matrix"]
+    },
+    {
       "id": "closing-actions",
       "name": "Closing Actions",
       "blueprint_source": "./blueprints/ClosingActions.tsx",

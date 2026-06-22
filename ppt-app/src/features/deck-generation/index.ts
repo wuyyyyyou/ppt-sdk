@@ -521,6 +521,7 @@ function buildAuthoringPrompt(input: {
       "- If the current-page Research Evidence contains ## Visual Assets, evaluate those assets before deciding the layout.",
       "- If the current page outline or Page Plan asks for photos, logos, cities, stadiums, products, people, places, or other real-world visuals, use at least one relevant Visual Asset by default.",
       "- When using an image, prefer the Visual Asset local file_path. Use image_url only when no file_path is available.",
+      "- When writing a local Visual Asset path into slide data or an <img src>, convert the local filesystem path to a file:// URL, for example file:///Users/name/workspace/research/evidence/images/asset.png. Do not write raw relative paths or bare absolute filesystem paths into image URL fields unless the component explicitly expects a filesystem path.",
       "- Skip all Visual Assets only when they are irrelevant to the page intent, visually unusable, unavailable by path, or likely to mislead.",
       "- If you skip Visual Assets, explain why in final JSON visual_assets_skipped_reason.",
       "- Visual Assets are visual evidence only. Text, charts, rankings, numbers, or claims visible inside an image are not grounded facts unless separately listed under ## Facts.",

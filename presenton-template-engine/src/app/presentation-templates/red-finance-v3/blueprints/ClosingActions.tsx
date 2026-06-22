@@ -41,7 +41,7 @@ export const Schema = z.object({
   title: z.string().min(2).max(28).default("Closing Actions"),
   metaLabel: z.string().min(2).max(48).default("BLUEPRINT / CLOSING"),
   footerText: z.string().min(6).max(80).default("Business Professional | Closing Actions"),
-  pageNumber: z.string().min(1).max(4).default("09"),
+  pageNumber: z.string().min(1).max(4).default("10"),
   variant: z.enum(["conclusion-plus-actions", "decision-ask-focus"]).default("conclusion-plus-actions"),
   density: z.enum(["medium", "high"]).default("medium"),
   heading: z.string().min(2).max(32).default("Conclusion and actions"),

@@ -21,6 +21,7 @@
     "slides/ComparisonMatrix.tsx",
     "slides/TimelinePlan.tsx",
     "slides/KpiSummary.tsx",
+    "slides/ImageNarrativeShowcase.tsx",
     "slides/ClosingActions.tsx"
   ]
 }

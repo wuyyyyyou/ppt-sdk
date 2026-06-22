@@ -30,6 +30,7 @@
 | `FinanceSectionHeading` | 基础原语 | 红色短竖条 + 小节标题 | `theme/tokens` |
 | `SectionPanelShell` | 容器壳 | 通用浅色内容面板 | `theme/tokens` |
 | `ChartCardShell` | 容器壳 | 图表标题、副标题、标签和内容壳 | - |
+| `ImageShowcasePanel` | 容器壳 | 单图展示、可选标题、说明和来源 | `FinanceIcon` |
 | `MeasuredChartArea` | 图表辅助 | 测量容器尺寸后再渲染图表 | `use-resize-observer` |
 | `AgendaCard` | 卡片 | 目录页章节卡片 | `FinanceIcon` |
 | `InfoListItem` | 卡片 | 图标 + 标题 + 描述的信息条 | `FinanceIcon` |
@@ -70,6 +71,7 @@
 
 - `SectionPanelShell` 是通用浅色面板壳，适合作为复杂卡片或页面局部面板的底座。
 - `ChartCardShell` 只负责图表外壳和标题区，不负责具体图表。
+- `ImageShowcasePanel` 只负责单张图片展示、可选标题、说明和来源；页面布局和旁侧解读应放在 `slides/*.tsx` 中。
 - `MeasuredChartArea` 是图表尺寸桥接层，通常放在 `ChartCardShell` 内，再渲染具体图表。
 
 ### 4. 卡片组件
@@ -109,6 +111,7 @@
 | `metric` | `primitive`, `kpi`, `card` | `KpiMetricItem`, `DualValueMetricCard`, `ProgressStatusCard` | 长解释文本 |
 | `kpi-strip` | `primitive`, `kpi` | `KpiMetricItem`, `DualValueMetricCard` | 多段叙事 |
 | `chart` | `chart` | `ChartCardShell`, `MeasuredChartArea`, `FinanceBarChart`, `FinanceLineChart` | 非数据装饰 |
+| `image` | `image`, `card` | `ImageShowcasePanel` | 多图相册、长正文 |
 | `matrix` | `matrix` | `StableMatrixGrid` | 纯趋势图、长段正文 |
 | `comparison` | `matrix`, `card` | `StableMatrixGrid`, `ComparisonPanel`, `DualValueMetricCard` | 单一观点页 |
 | `timeline` | `timeline` | `TimelineBoard`, `VerticalMilestoneTimeline` | 无先后顺序的分类 |
@@ -134,6 +137,7 @@
 | `ProgressStatusCard` | `metric`, `kpi-strip` | `narrative-text` | 标题 24 字以内 | 进度条可截图，文字保留 | 是 |
 | `ComparisonPanel` | `comparison`, `narrative-text` | `chart`, `timeline` | 4 段以内 | 必须保持文本 | 是 |
 | `ChartCardShell` | `chart` | `narrative-text` | 标题 36 字以内 | 图表区域可截图 | 是 |
+| `ImageShowcasePanel` | `image` | `chart`, `matrix`, `timeline` | 标题 44 字以内，说明 120 字以内 | 图片本体保持图片对象，标题说明保持文本 | 是 |
 | `MeasuredChartArea` | `chart` | 其他 slot | 不承载文本 | 可截图 | 是 |
 | `FinanceBarChart` / `FinanceLineChart` / `FinanceRadarChart` / `FinanceDonutChart` | `chart` | `narrative-text` | 标签短文本 | 图表本体可截图 | 是 |
 | `StableMatrixGrid` | `matrix`, `comparison` | `chart`, `timeline` | 6 行以内，单元格短文本 | 尽量保持文本 | 是 |
@@ -158,6 +162,9 @@ ChartCardShell
    ├─ FinanceRadarChart
    └─ FinanceDonutChart
 
+ImageShowcasePanel
+└─ FinanceIcon
+
 SectionPanelShell
 └─ PillarBulletCard
    └─ StableInlineRow
@@ -176,6 +183,7 @@ IconText
 - 需要整页框架：先选 `FinanceContentFrame` 或 `FinanceSectionFocusFrame`。
 - 需要稳定单行对齐：先选 `StableInlineRow`，有明确图标文本语义时选 `IconText`。
 - 需要图表：`ChartCardShell` 负责外壳，`MeasuredChartArea` 负责尺寸，具体图表只负责绘制。
+- 需要单张图片展示：用 `ImageShowcasePanel`，图片 URL 放在数据里，组件 props 或 slide 决定尺寸和位置。
 - 需要卡片：优先复用已有卡片；只有出现新的稳定语义时才新增组件。
 - 需要表格/矩阵：优先用 `StableMatrixGrid`，不要在 slide 中临时拼一套表格样式。
 
