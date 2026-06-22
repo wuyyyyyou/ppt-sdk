@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { cp, mkdir, readdir, rm, stat } from "node:fs/promises";
+import { copyFile, mkdir, readdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -36,6 +36,23 @@ async function pathExists(target) {
   }
 }
 
+async function syncGroupPreviewImages(fromGroupDir, toGroupDir) {
+  await mkdir(toGroupDir, { recursive: true });
+  const files = await readdir(fromGroupDir, { withFileTypes: true });
+  let copiedFiles = 0;
+
+  for (const file of files) {
+    if (!file.isFile() || path.extname(file.name).toLowerCase() !== ".png") {
+      continue;
+    }
+
+    await copyFile(path.join(fromGroupDir, file.name), path.join(toGroupDir, file.name));
+    copiedFiles += 1;
+  }
+
+  return copiedFiles;
+}
+
 async function main() {
   if (!(await pathExists(sourceDir))) {
     logWarn(
@@ -59,10 +76,9 @@ async function main() {
   for (const groupEntry of groupDirs) {
     const fromGroupDir = path.join(sourceDir, groupEntry.name);
     const toGroupDir = path.join(targetDir, groupEntry.name);
-    await cp(fromGroupDir, toGroupDir, { recursive: true });
+    const groupCopiedFiles = await syncGroupPreviewImages(fromGroupDir, toGroupDir);
     copiedGroups += 1;
-    const files = await readdir(fromGroupDir, { withFileTypes: true });
-    copiedFiles += files.filter((entry) => entry.isFile()).length;
+    copiedFiles += groupCopiedFiles;
   }
 
   logInfo(
