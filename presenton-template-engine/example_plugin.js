@@ -44,9 +44,11 @@ import {
   recordAppPptxExport,
   recordAppResearchCurationDraft,
   recordAppResearchEvidence,
+  recordAppResearchEvidencePage,
   recordAppResearchEvidencePageMarkdown,
   recordAppResearchPlan,
   recordAppResearchStatus,
+  recordAppResearchStatusPage,
   renderAppWorkspaceDeckHtml,
   renderAppWorkspacePagePreview,
   runDeckValidation,
@@ -897,6 +899,22 @@ async function toolAppRecordResearchEvidence(args) {
   return recordAppResearchEvidence({ workspace_dir: workspaceDir, evidence });
 }
 
+async function toolAppRecordResearchEvidencePage(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const pageEvidence = args.page_evidence;
+  if (!pageEvidence || typeof pageEvidence !== "object" || Array.isArray(pageEvidence)) {
+    throw new Error('"page_evidence" must be an object');
+  }
+  return recordAppResearchEvidencePage({
+    workspace_dir: workspaceDir,
+    page_evidence: pageEvidence,
+  });
+}
+
 async function toolAppGetResearchEvidence(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -985,6 +1003,22 @@ async function toolAppRecordResearchStatus(args) {
     throw new Error('"status" must be an object');
   }
   return recordAppResearchStatus({ workspace_dir: workspaceDir, status });
+}
+
+async function toolAppRecordResearchStatusPage(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const pageStatus = args.page_status;
+  if (!pageStatus || typeof pageStatus !== "object" || Array.isArray(pageStatus)) {
+    throw new Error('"page_status" must be an object');
+  }
+  return recordAppResearchStatusPage({
+    workspace_dir: workspaceDir,
+    page_status: pageStatus,
+  });
 }
 
 async function toolAppGetResearchStatus(args) {
@@ -1390,11 +1424,13 @@ const TOOL_DISPATCH = {
   app_record_research_plan: toolAppRecordResearchPlan,
   app_get_research_plan: toolAppGetResearchPlan,
   app_record_research_evidence: toolAppRecordResearchEvidence,
+  app_record_research_evidence_page: toolAppRecordResearchEvidencePage,
   app_get_research_evidence: toolAppGetResearchEvidence,
   app_record_research_curation_draft: toolAppRecordResearchCurationDraft,
   app_get_research_curation_draft: toolAppGetResearchCurationDraft,
   app_record_research_evidence_page_markdown: toolAppRecordResearchEvidencePageMarkdown,
   app_record_research_status: toolAppRecordResearchStatus,
+  app_record_research_status_page: toolAppRecordResearchStatusPage,
   app_get_research_status: toolAppGetResearchStatus,
   app_record_page_progress: toolAppRecordPageProgress,
   app_render_workspace_page_preview: toolAppRenderWorkspacePagePreview,

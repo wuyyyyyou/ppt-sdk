@@ -27,11 +27,13 @@ test("workspace research tools prepare directories and persist metadata", async 
     recordAppResearchPlan,
     getAppResearchPlan,
     recordAppResearchEvidence,
+    recordAppResearchEvidencePage,
     getAppResearchEvidence,
     recordAppResearchCurationDraft,
     getAppResearchCurationDraft,
     recordAppResearchEvidencePageMarkdown,
     recordAppResearchStatus,
+    recordAppResearchStatusPage,
     getAppResearchStatus,
   } = await import("../../src/app-workspace/index.ts");
 
@@ -119,6 +121,69 @@ test("workspace research tools prepare directories and persist metadata", async 
     });
     assert.equal(status.status, "gap");
     assert.deepEqual((await getAppResearchStatus({ workspace_dir: workspace.workspace_dir })).pages, status.pages);
+
+    const evidenceAfterPageUpserts = await recordAppResearchEvidencePage({
+      workspace_dir: workspace.workspace_dir,
+      page_evidence: {
+        page_id: "page-02",
+        status: "curated",
+        facts: [{ id: "fact-2", claim: "Another claim", source_type: "web_source" }],
+        visual_assets: [],
+        derived_insights: [],
+        gaps: [],
+        rejected_material: [],
+        markdown_path: path.join(prepared.evidence_pages_dir, "page-02.md"),
+      },
+    });
+    assert.equal(evidenceAfterPageUpserts.status, "partial");
+    assert.deepEqual(
+      evidenceAfterPageUpserts.pages.map((page) => page.page_id).sort(),
+      ["page-01", "page-02"],
+    );
+
+    const replacementEvidence = await recordAppResearchEvidencePage({
+      workspace_dir: workspace.workspace_dir,
+      page_evidence: {
+        page_id: "page-01",
+        status: "curated",
+        facts: [{ id: "fact-1b", claim: "Replacement claim", source_type: "web_source" }],
+        visual_assets: [],
+        derived_insights: [],
+        gaps: [],
+        rejected_material: [],
+        markdown_path: path.join(prepared.evidence_pages_dir, "page-01.md"),
+      },
+    });
+    assert.equal(replacementEvidence.status, "curated");
+    assert.equal(replacementEvidence.pages.length, 2);
+    assert.equal(
+      replacementEvidence.pages.find((page) => page.page_id === "page-01")?.facts?.[0]?.id,
+      "fact-1b",
+    );
+
+    const statusAfterPageUpserts = await recordAppResearchStatusPage({
+      workspace_dir: workspace.workspace_dir,
+      page_status: {
+        page_id: "page-02",
+        status: "curated",
+        evidence_path: path.join(prepared.evidence_pages_dir, "page-02.md"),
+      },
+    });
+    assert.equal(statusAfterPageUpserts.status, "gap");
+    assert.deepEqual(
+      statusAfterPageUpserts.pages.map((page) => page.page_id).sort(),
+      ["page-01", "page-02"],
+    );
+
+    const readyStatus = await recordAppResearchStatusPage({
+      workspace_dir: workspace.workspace_dir,
+      page_status: {
+        page_id: "page-01",
+        status: "curated",
+        evidence_path: path.join(prepared.evidence_pages_dir, "page-01.md"),
+      },
+    });
+    assert.equal(readyStatus.status, "ready");
   } finally {
     if (previousHome === undefined) {
       delete process.env.HOME;

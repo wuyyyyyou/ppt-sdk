@@ -311,6 +311,10 @@ function createHarness(options: {
   let webFetchCalls = 0;
   let imageSearchCalls = 0;
   let imageFetchCalls = 0;
+  let recordResearchEvidenceCalls = 0;
+  let recordResearchEvidencePageCalls = 0;
+  let recordResearchStatusCalls = 0;
+  let recordResearchStatusPageCalls = 0;
 
   const backend: PptBackend = {
     listWorkspaces: async () => ({ workspace_root: "", has_workspaces: false, latest_workspace: null, workspaces: [] }),
@@ -377,7 +381,28 @@ function createHarness(options: {
     },
     getResearchPlan: async () => clone(researchPlan),
     recordResearchEvidence: async (input) => {
+      recordResearchEvidenceCalls += 1;
       researchEvidence = clone(input.evidence);
+      return clone(researchEvidence);
+    },
+    recordResearchEvidencePage: async (input) => {
+      recordResearchEvidencePageCalls += 1;
+      const pageEvidence = clone(input.page_evidence);
+      const existingIndex = researchEvidence.pages.findIndex((page) => page.page_id === pageEvidence.page_id);
+      researchEvidence = {
+        ...researchEvidence,
+        status: "partial",
+        pages: existingIndex >= 0
+          ? researchEvidence.pages.map((page, index) => index === existingIndex ? pageEvidence : page)
+          : [...researchEvidence.pages, pageEvidence],
+        updated_at: "2026-05-23T00:00:00.000Z",
+      };
+      researchEvidence.status = researchEvidence.pages.length > 0 &&
+        researchEvidence.pages.every((page) => page.status === "curated" || page.status === "skipped")
+        ? "curated"
+        : researchEvidence.pages.length > 0
+          ? "partial"
+          : "empty";
       return clone(researchEvidence);
     },
     getResearchEvidence: async () => clone(researchEvidence),
@@ -401,7 +426,27 @@ function createHarness(options: {
       updated_at: "2026-05-23T00:00:00.000Z",
     }),
     recordResearchStatus: async (input) => {
+      recordResearchStatusCalls += 1;
       researchStatus = clone(input.status);
+      return clone(researchStatus);
+    },
+    recordResearchStatusPage: async (input) => {
+      recordResearchStatusPageCalls += 1;
+      const pageStatus = clone(input.page_status);
+      const existingIndex = researchStatus.pages.findIndex((page) => page.page_id === pageStatus.page_id);
+      const pages = existingIndex >= 0
+        ? researchStatus.pages.map((page, index) => index === existingIndex ? pageStatus : page)
+        : [...researchStatus.pages, pageStatus];
+      researchStatus = {
+        ...researchStatus,
+        status: pages.some((page) => page.status === "error")
+          ? "error"
+          : pages.some((page) => page.status === "gap")
+            ? "gap"
+            : "ready",
+        pages,
+        updated_at: "2026-05-23T00:00:00.000Z",
+      };
       return clone(researchStatus);
     },
     getResearchStatus: async () => clone(researchStatus),
@@ -659,6 +704,18 @@ function createHarness(options: {
     },
     get imageFetchCalls() {
       return imageFetchCalls;
+    },
+    get recordResearchEvidenceCalls() {
+      return recordResearchEvidenceCalls;
+    },
+    get recordResearchEvidencePageCalls() {
+      return recordResearchEvidencePageCalls;
+    },
+    get recordResearchStatusCalls() {
+      return recordResearchStatusCalls;
+    },
+    get recordResearchStatusPageCalls() {
+      return recordResearchStatusPageCalls;
     },
     get maxActiveAuthoringRuns() {
       return maxActiveAuthoringRuns;
@@ -1911,6 +1968,10 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.webFetchCalls, 1);
     assert.equal(harness.imageSearchCalls, 1);
     assert.equal(harness.imageFetchCalls, 1);
+    assert.equal(harness.recordResearchEvidenceCalls, 0);
+    assert.equal(harness.recordResearchEvidencePageCalls, 1);
+    assert.equal(harness.recordResearchStatusCalls, 1);
+    assert.equal(harness.recordResearchStatusPageCalls, 1);
     assert.ok(harness.progressEvents.some((progress) => progress.step === "research-collection"));
     assert.ok(harness.progressEvents.some((progress) => progress.step === "research-curation"));
     assert.ok(harness.authoringPrompts.some((prompt) =>
@@ -1925,6 +1986,8 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(evidencePage?.status, "curated");
     assert.equal(evidencePage?.facts.length, 1);
     assert.equal(evidencePage?.visual_assets.length, 1);
+    assert.equal(harness.researchStatus.status, "ready");
+    assert.equal(harness.researchStatus.pages.find((page) => page.page_id === "page-01")?.status, "curated");
     assert.ok(harness.authoringPrompts.some((prompt) =>
       prompt.includes("You are a local file-editing Agent generating one PPT slide") &&
       prompt.includes("/research/evidence-index.json if it exists")
@@ -1977,9 +2040,14 @@ describe("Deck Generation Flow Module", () => {
 
     assert.equal(completion.status, "completed");
     assert.equal(harness.webSearchCalls, 1);
+    assert.equal(harness.recordResearchEvidenceCalls, 0);
+    assert.equal(harness.recordResearchEvidencePageCalls, 1);
+    assert.equal(harness.recordResearchStatusPageCalls, 1);
     const gapPage = harness.researchEvidence.pages.find((page) => page.page_id === "page-01");
     assert.equal(gapPage?.status, "gap");
     assert.ok(gapPage?.gaps.some((gap) => gap.includes("search unavailable")));
+    assert.equal(harness.researchStatus.status, "gap");
+    assert.equal(harness.researchStatus.pages.find((page) => page.page_id === "page-01")?.status, "gap");
     assert.equal(harness.authoringPrompts.some((prompt) => prompt.includes("Web Research Curation Draft Agent")), false);
     assert.equal(harness.progress.pages[0].status, "accepted");
   });

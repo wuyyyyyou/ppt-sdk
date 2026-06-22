@@ -228,6 +228,12 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         "app_record_research_evidence",
         input
       ),
+    recordResearchEvidencePage: (input) =>
+      invoke<ResearchEvidenceIndex>(
+        PPT_ENGINE_TOOL_ID,
+        "app_record_research_evidence_page",
+        input
+      ),
     getResearchEvidence: (input) =>
       invoke<ResearchEvidenceIndex>(
         PPT_ENGINE_TOOL_ID,
@@ -254,6 +260,8 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       ),
     recordResearchStatus: (input) =>
       invoke<ResearchStatus>(PPT_ENGINE_TOOL_ID, "app_record_research_status", input),
+    recordResearchStatusPage: (input) =>
+      invoke<ResearchStatus>(PPT_ENGINE_TOOL_ID, "app_record_research_status_page", input),
     getResearchStatus: (input) =>
       invoke<ResearchStatus>(PPT_ENGINE_TOOL_ID, "app_get_research_status", input),
     webSearch: searchAdapter.webSearch,

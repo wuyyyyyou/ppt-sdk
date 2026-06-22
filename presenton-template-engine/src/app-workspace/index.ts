@@ -76,11 +76,13 @@ import type {
   PrepareAppResearchWorkspaceResult,
   GetAppResearchCurationDraftInput,
   RecordAppResearchEvidenceInput,
+  RecordAppResearchEvidencePageInput,
   RecordAppResearchCurationDraftInput,
   RecordAppResearchEvidencePageMarkdownInput,
   RecordAppResearchEvidencePageMarkdownResult,
   RecordAppResearchPlanInput,
   RecordAppResearchStatusInput,
+  RecordAppResearchStatusPageInput,
   RenderAppWorkspacePagePreviewInput,
   RenderAppWorkspacePagePreviewResult,
   RenderAppWorkspaceDeckHtmlInput,
@@ -1638,6 +1640,51 @@ function normalizeResearchArtifact(value: unknown, fallbackStatus: string): Reco
   };
 }
 
+function normalizeResearchPageRecord(value: unknown, label: string): Record<string, unknown> {
+  const record = getPlainRecord(value);
+  const pageId = normalizeString(record.page_id);
+  if (pageId.length === 0) {
+    throw new Error(`"${label}.page_id" must be a non-empty string`);
+  }
+  return {
+    ...record,
+    page_id: pageId,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function upsertResearchPage(
+  pages: unknown,
+  pageRecord: Record<string, unknown>,
+): Array<Record<string, unknown>> {
+  const existingPages = Array.isArray(pages) ? pages.map(getPlainRecord) : [];
+  const index = existingPages.findIndex((page) => normalizeString(page.page_id) === pageRecord.page_id);
+  if (index < 0) {
+    return [...existingPages, pageRecord];
+  }
+  return existingPages.map((page, pageIndex) => pageIndex === index ? pageRecord : page);
+}
+
+function computeResearchEvidenceStatus(pages: Array<Record<string, unknown>>): string {
+  if (pages.length === 0) {
+    return "empty";
+  }
+  if (pages.every((page) => normalizeString(page.status) === "curated" || normalizeString(page.status) === "skipped")) {
+    return "curated";
+  }
+  return "partial";
+}
+
+function computeResearchAggregateStatus(pages: Array<Record<string, unknown>>): string {
+  if (pages.some((page) => normalizeString(page.status) === "error")) {
+    return "error";
+  }
+  if (pages.some((page) => normalizeString(page.status) === "gap")) {
+    return "gap";
+  }
+  return "ready";
+}
+
 export async function recordAppResearchPlan(input: RecordAppResearchPlanInput): Promise<Record<string, unknown>> {
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
   const paths = await ensureResearchDirectories(workspace.workspace_dir);
@@ -1671,6 +1718,39 @@ export async function recordAppResearchEvidence(input: RecordAppResearchEvidence
   const evidence = normalizeResearchArtifact(input.evidence, "curated");
   const next = {
     ...evidence,
+    updated_at: updatedAt,
+  };
+  await writeJsonFile(paths.evidence_index_path, next);
+  await touchWorkspaceTask(workspace, updatedAt);
+  return next;
+}
+
+export async function recordAppResearchEvidencePage(
+  input: RecordAppResearchEvidencePageInput,
+): Promise<Record<string, unknown>> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureResearchDirectories(workspace.workspace_dir);
+  const updatedAt = new Date().toISOString();
+  const current = normalizeResearchArtifact(
+    await readJsonFileIfExists(paths.evidence_index_path) ?? createDefaultResearchEvidenceJson(),
+    "empty",
+  );
+  const pageEvidence = normalizeResearchPageRecord(input.page_evidence, "page_evidence");
+  const pages = upsertResearchPage(current.pages, {
+    ...pageEvidence,
+    updated_at: updatedAt,
+  });
+  const shared = getPlainRecord(current.shared);
+  const next = {
+    ...current,
+    version: 1,
+    status: computeResearchEvidenceStatus(pages),
+    pages,
+    shared: {
+      facts: Array.isArray(shared.facts) ? shared.facts : [],
+      visual_assets: Array.isArray(shared.visual_assets) ? shared.visual_assets : [],
+      gaps: Array.isArray(shared.gaps) ? shared.gaps : [],
+    },
     updated_at: updatedAt,
   };
   await writeJsonFile(paths.evidence_index_path, next);
@@ -1787,6 +1867,33 @@ export async function recordAppResearchStatus(input: RecordAppResearchStatusInpu
   const status = normalizeResearchArtifact(input.status, "running");
   const next = {
     ...status,
+    updated_at: updatedAt,
+  };
+  await writeJsonFile(paths.status_path, next);
+  await touchWorkspaceTask(workspace, updatedAt);
+  return next;
+}
+
+export async function recordAppResearchStatusPage(
+  input: RecordAppResearchStatusPageInput,
+): Promise<Record<string, unknown>> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureResearchDirectories(workspace.workspace_dir);
+  const updatedAt = new Date().toISOString();
+  const current = normalizeResearchArtifact(
+    await readJsonFileIfExists(paths.status_path) ?? createDefaultResearchStatusJson(),
+    "idle",
+  );
+  const pageStatus = normalizeResearchPageRecord(input.page_status, "page_status");
+  const pages = upsertResearchPage(current.pages, {
+    ...pageStatus,
+    updated_at: updatedAt,
+  });
+  const next = {
+    ...current,
+    version: 1,
+    status: computeResearchAggregateStatus(pages),
+    pages,
     updated_at: updatedAt,
   };
   await writeJsonFile(paths.status_path, next);

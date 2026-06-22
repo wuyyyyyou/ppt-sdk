@@ -1109,32 +1109,26 @@ async function recordResearchGapForPage(input: {
   evidenceMarkdownPath: string;
   gaps: string[];
 }) {
-  const currentEvidence = normalizeResearchEvidenceIndex(
-    await input.flowInput.backend.getResearchEvidence({
-      workspace_dir: input.flowInput.workspace.workspace_dir,
-    }),
-  );
-  const withoutPage = currentEvidence.pages.filter((item) => item.page_id !== input.page.page_id);
-  await input.flowInput.backend.recordResearchEvidence({
+  await input.flowInput.backend.recordResearchEvidencePage({
     workspace_dir: input.flowInput.workspace.workspace_dir,
-    evidence: {
-      ...currentEvidence,
-      status: currentEvidence.status === "curated" ? "partial" : currentEvidence.status,
-      pages: [
-        ...withoutPage,
-        {
-          page_id: input.page.page_id,
-          status: "gap",
-          facts: [],
-          visual_assets: [],
-          derived_insights: [],
-          gaps: input.gaps,
-          rejected_material: [],
-          markdown_path: input.evidenceMarkdownPath,
-          updated_at: new Date().toISOString(),
-        },
-      ],
-      updated_at: new Date().toISOString(),
+    page_evidence: {
+      page_id: input.page.page_id,
+      status: "gap",
+      facts: [],
+      visual_assets: [],
+      derived_insights: [],
+      gaps: input.gaps,
+      rejected_material: [],
+      markdown_path: input.evidenceMarkdownPath,
+    },
+  });
+  await input.flowInput.backend.recordResearchStatusPage({
+    workspace_dir: input.flowInput.workspace.workspace_dir,
+    page_status: {
+      page_id: input.page.page_id,
+      status: "gap",
+      message: input.gaps.join("\n"),
+      evidence_path: input.evidenceMarkdownPath,
     },
   });
 }
@@ -1510,13 +1504,8 @@ async function collectAndCurateResearchForPage(
     }
   }
 
-  const currentEvidenceBeforeMerge = normalizeResearchEvidenceIndex(
-    await input.backend.getResearchEvidence({
-      workspace_dir: input.workspace.workspace_dir,
-    }),
-  );
   const merged = mergeResearchCurationDrafts({
-    currentEvidence: currentEvidenceBeforeMerge,
+    currentEvidence: normalizeResearchEvidenceIndex(null),
     page,
     requirement: pageRequirement,
     evidenceMarkdownPath,
@@ -1530,9 +1519,9 @@ async function collectAndCurateResearchForPage(
     page_id: page.page_id,
     markdown: merged.markdown,
   });
-  await input.backend.recordResearchEvidence({
+  await input.backend.recordResearchEvidencePage({
     workspace_dir: input.workspace.workspace_dir,
-    evidence: merged.evidence,
+    page_evidence: merged.pageEvidence,
   });
 
   await appendResearchLogSafe(input, {
@@ -1546,25 +1535,13 @@ async function collectAndCurateResearchForPage(
     status: merged.pageEvidence.status,
     updated_at: new Date().toISOString(),
   });
-  const latestStatus = await input.backend.getResearchStatus({
+  await input.backend.recordResearchStatusPage({
     workspace_dir: input.workspace.workspace_dir,
-  });
-  await input.backend.recordResearchStatus({
-    workspace_dir: input.workspace.workspace_dir,
-    status: {
-      ...latestStatus,
-      status: merged.pageEvidence.status === "gap" ? "gap" : "ready",
-      pages: [
-        ...latestStatus.pages.filter((item) => item.page_id !== page.page_id),
-        {
-          page_id: page.page_id,
-        status: merged.pageEvidence.status,
-        message: merged.pageEvidence.gaps.join("\n"),
-        evidence_path: evidenceMarkdownPath,
-          updated_at: new Date().toISOString(),
-        },
-      ],
-      updated_at: new Date().toISOString(),
+    page_status: {
+      page_id: page.page_id,
+      status: merged.pageEvidence.status,
+      message: merged.pageEvidence.gaps.join("\n"),
+      evidence_path: evidenceMarkdownPath,
     },
   });
 }

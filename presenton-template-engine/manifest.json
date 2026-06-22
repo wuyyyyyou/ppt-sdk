@@ -369,6 +369,24 @@
       ]
     },
     {
+      "name": "app_record_research_evidence_page",
+      "description": "Upsert one page-level Research Evidence record into the workspace Research Evidence index.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "page_evidence",
+          "type": "object",
+          "description": "One page-level Research Evidence record with page_id.",
+          "required": true
+        }
+      ]
+    },
+    {
       "name": "app_get_research_evidence",
       "description": "Read the Research Evidence index artifact for a workspace.",
       "parameters": [
@@ -472,6 +490,24 @@
           "name": "status",
           "type": "object",
           "description": "Research status artifact.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_record_research_status_page",
+      "description": "Upsert one page-level Research Status record and recompute the workspace Research Status aggregate.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "page_status",
+          "type": "object",
+          "description": "One page-level Research Status record with page_id.",
           "required": true
         }
       ]

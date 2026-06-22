@@ -87,6 +87,12 @@ export interface PptBackend {
   recordResearchPlan(input: { workspace_dir: string; research_plan: ResearchPlan }): Promise<ResearchPlan>;
   getResearchPlan(input: { workspace_dir: string }): Promise<ResearchPlan>;
   recordResearchEvidence(input: { workspace_dir: string; evidence: ResearchEvidenceIndex }): Promise<ResearchEvidenceIndex>;
+  recordResearchEvidencePage(input: {
+    workspace_dir: string;
+    page_evidence: Omit<ResearchEvidenceIndex["pages"][number], "updated_at"> & {
+      updated_at?: string;
+    };
+  }): Promise<ResearchEvidenceIndex>;
   getResearchEvidence(input: { workspace_dir: string }): Promise<ResearchEvidenceIndex>;
   recordResearchCurationDraft(input: {
     workspace_dir: string;
@@ -115,6 +121,10 @@ export interface PptBackend {
     updated_at: string;
   }>;
   recordResearchStatus(input: { workspace_dir: string; status: ResearchStatus }): Promise<ResearchStatus>;
+  recordResearchStatusPage(input: {
+    workspace_dir: string;
+    page_status: ResearchStatus["pages"][number];
+  }): Promise<ResearchStatus>;
   getResearchStatus(input: { workspace_dir: string }): Promise<ResearchStatus>;
   webSearch(input: {
     query: string;

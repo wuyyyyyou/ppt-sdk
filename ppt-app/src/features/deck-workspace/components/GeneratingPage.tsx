@@ -24,12 +24,22 @@ const majorSteps: Array<{
   labelKey: keyof Messages["generating"]["steps"];
   steps: DeckGenerationStep[];
 }> = [
-  { id: "page-plan", labelKey: "pagePlan", steps: ["page-plan"] },
+  { id: "page-plan", labelKey: "pagePlan", steps: ["page-plan", "research-planning"] },
   { id: "prepare", labelKey: "prepare", steps: ["prepare"] },
   {
     id: "pages",
     labelKey: "pages",
-    steps: ["page-authoring", "page-content-review", "page-render", "page-visual-review", "interrupted", "failed", "cancelled"]
+    steps: [
+      "research-collection",
+      "research-curation",
+      "page-authoring",
+      "page-content-review",
+      "page-render",
+      "page-visual-review",
+      "interrupted",
+      "failed",
+      "cancelled",
+    ],
   },
   { id: "final-render", labelKey: "finalRender", steps: ["final-render", "complete"] }
 ];

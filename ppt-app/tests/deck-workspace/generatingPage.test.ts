@@ -125,4 +125,25 @@ describe("GeneratingPage controls", () => {
     assert.match(html, />大纲</);
     assert.doesNotMatch(html, />继续生成</);
   });
+
+  it("keeps research planning in the page planning major step", () => {
+    const html = renderPage(
+      makeViewState({ status: "running" }),
+      makeProgress("research-planning", "pending"),
+    );
+
+    assert.match(html, /<button class="generation-major-node active">[\s\S]*?<span>页面规划<\/span><\/button>/);
+    assert.match(html, /<button class="generation-major-node pending">[\s\S]*?<span>逐页生成<\/span><\/button>/);
+  });
+
+  it("shows page-level research collection in the page generation major step", () => {
+    const html = renderPage(
+      makeViewState({ status: "running" }),
+      makeProgress("research-collection", "research_collecting"),
+    );
+
+    assert.match(html, /<button class="generation-major-node done">[\s\S]*?<span>页面规划<\/span><\/button>/);
+    assert.match(html, /<button class="generation-major-node done">[\s\S]*?<span>准备文件<\/span><\/button>/);
+    assert.match(html, /<button class="generation-major-node active">[\s\S]*?<span>逐页生成<\/span><\/button>/);
+  });
 });

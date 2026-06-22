@@ -188,6 +188,11 @@ export interface RecordAppResearchEvidenceInput {
   evidence: unknown;
 }
 
+export interface RecordAppResearchEvidencePageInput {
+  workspace_dir: string;
+  page_evidence: unknown;
+}
+
 export interface GetAppResearchEvidenceInput {
   workspace_dir: string;
 }
@@ -221,6 +226,11 @@ export interface RecordAppResearchEvidencePageMarkdownResult {
 export interface RecordAppResearchStatusInput {
   workspace_dir: string;
   status: unknown;
+}
+
+export interface RecordAppResearchStatusPageInput {
+  workspace_dir: string;
+  page_status: unknown;
 }
 
 export interface GetAppResearchStatusInput {
