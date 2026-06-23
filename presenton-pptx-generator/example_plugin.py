@@ -44,6 +44,28 @@ def _prepend_env_path(name: str, value: str) -> None:
     os.environ[name] = os.pathsep.join([value, current])
 
 
+def _load_shared_libraries(paths: list[Path]) -> None:
+    pending = list(dict.fromkeys(path for path in paths if path.is_file()))
+    last_error: OSError | None = None
+
+    while pending:
+        next_pending: list[Path] = []
+        loaded_count = 0
+        for library in pending:
+            try:
+                _LOADED_SHARED_LIBRARIES.append(
+                    ctypes.CDLL(str(library), mode=getattr(ctypes, "RTLD_GLOBAL", 0))
+                )
+                loaded_count += 1
+            except OSError as error:
+                last_error = error
+                next_pending.append(library)
+
+        if loaded_count == 0:
+            raise last_error or OSError("Failed to load bundled shared libraries")
+        pending = next_pending
+
+
 def _bootstrap_cairo_runtime() -> None:
     cairo_runtime_dir = _resolve_cairo_runtime_dir()
     if cairo_runtime_dir is None:
@@ -65,10 +87,13 @@ def _bootstrap_cairo_runtime() -> None:
     if sys.platform == "darwin":
         _prepend_env_path("DYLD_FALLBACK_LIBRARY_PATH", runtime_dir)
         dylibs = sorted(cairo_runtime_dir.glob("*.dylib"))
-        for dylib in dylibs:
-            _LOADED_SHARED_LIBRARIES.append(
-                ctypes.CDLL(str(dylib), mode=getattr(ctypes, "RTLD_GLOBAL", 0))
-            )
+        _load_shared_libraries(dylibs)
+        return
+
+    if sys.platform.startswith("linux"):
+        _prepend_env_path("LD_LIBRARY_PATH", runtime_dir)
+        shared_libraries = sorted(cairo_runtime_dir.glob("*.so*"))
+        _load_shared_libraries(shared_libraries)
 
 
 _bootstrap_cairo_runtime()

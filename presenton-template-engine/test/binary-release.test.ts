@@ -176,6 +176,31 @@ test("verifyArchiveDirectory accepts empty lib and data directories", async () =
   });
 });
 
+test("verifyArchiveDirectory accepts Linux platform keys", async () => {
+  const dir = await makeTempDir();
+  const extractDir = path.join(dir, "extract");
+  const toolManifest = {
+    name: "tool-example-ppt-engine",
+    version: "9.8.7",
+  };
+
+  await mkdir(path.join(extractDir, "bin"), { recursive: true });
+  await mkdir(path.join(extractDir, "lib"), { recursive: true });
+  await mkdir(path.join(extractDir, "data"), { recursive: true });
+  await writeFile(path.join(extractDir, "bin", "ppt-engine"), "", "utf8");
+  await writeFile(
+    path.join(extractDir, "manifest.json"),
+    `${JSON.stringify(buildDistributionManifest(toolManifest), null, 2)}\n`,
+    "utf8",
+  );
+
+  await verifyArchiveDirectory({
+    toolManifest,
+    extractDir,
+    platformKey: "linux-aarch64",
+  });
+});
+
 test("verify-describe validates Executa tool identity", async () => {
   const dir = await makeTempDir();
   const toolManifestPath = await writeToolManifest(dir);

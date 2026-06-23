@@ -72,12 +72,13 @@ npm run build:full
 说明：
 
 - 这是当前平台构建。例如在 Apple Silicon macOS 上执行，产出 `darwin-arm64` 分发包。
+- GitHub release workflow 会构建 `darwin-x86_64`、`darwin-arm64`、`windows-x86_64`、`linux-x86_64` 和 `linux-aarch64`。
 - `bundle/` 只保留最终 archive 和 sha256，不再保留中间裸二进制。
 - archive 内部包含 `bin/ppt-engine`、`lib/`、`data/` 和顶层 binary distribution `manifest.json`。
 - `manifest.json` 名称有两层含义：本目录下的 Executa tool manifest 是 `describe` 的来源；archive 顶层 manifest 是 Anna Binary 分发入口配置。
 - 打包脚本的 `--test` 会解压最终 archive，校验 binary distribution manifest，并调用 `bin/ppt-engine` 的 `describe` 做冒烟。
+- release workflow 会先生成一次模板预览图 artifact，各平台二进制构建通过 `--reuse-template-previews` 复用这份静态资源；本地直接运行脚本时默认仍会重新生成预览图。
 - 二进制首次运行时会自动把内嵌的 `dist`、运行时依赖和模板资源释放到系统临时目录，再启动插件。
-- 如果后续要支持 Linux，建议在对应平台 runner 上单独扩展并验证。
 
 ## 主要工具能力
 

@@ -64,6 +64,16 @@ bundle/
   ppt-gener-v2.0.2-darwin-arm64.tar.gz.sha256
 ```
 
+GitHub release workflow 会构建：
+
+- `darwin-x86_64`
+- `darwin-arm64`
+- `windows-x86_64`
+- `linux-x86_64`
+- `linux-aarch64`
+
+Linux 包会随包携带 Cairo 相关运行库；`linux-aarch64` 是 Anna Binary 的 ARM64 Linux platform key。
+
 包内结构类似：
 
 ```text

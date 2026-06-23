@@ -10,11 +10,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 HELPER_PATH = ROOT / "scripts" / "binary_release.py"
+CAIRO_HELPER_PATH = ROOT / "prepare_cairo_runtime.py"
 PLUGIN_PATH = ROOT / "src" / "presenton_pptx_generator_plugin.py"
 spec = importlib.util.spec_from_file_location("binary_release", HELPER_PATH)
 assert spec is not None and spec.loader is not None
 binary_release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(binary_release)
+cairo_spec = importlib.util.spec_from_file_location("prepare_cairo_runtime", CAIRO_HELPER_PATH)
+assert cairo_spec is not None and cairo_spec.loader is not None
+prepare_cairo_runtime = importlib.util.module_from_spec(cairo_spec)
+cairo_spec.loader.exec_module(prepare_cairo_runtime)
 plugin_spec = importlib.util.spec_from_file_location("presenton_pptx_generator_plugin", PLUGIN_PATH)
 assert plugin_spec is not None and plugin_spec.loader is not None
 plugin = importlib.util.module_from_spec(plugin_spec)
@@ -86,9 +91,25 @@ class BinaryReleaseTest(unittest.TestCase):
                     tool_manifest=tool_manifest_path,
                     binary_name="ppt-gener",
                     extract_dir=extract_dir,
-                    platform_key="darwin-x86_64",
+                    platform_key="linux-aarch64",
                 ),
             )
+
+    def test_linux_cairo_runtime_excludes_core_system_libraries(self) -> None:
+        self.assertFalse(
+            prepare_cairo_runtime.should_bundle_linux_library(
+                Path("/lib/x86_64-linux-gnu/libc.so.6")
+            )
+        )
+        self.assertFalse(
+            prepare_cairo_runtime.should_bundle_linux_library(
+                Path("/lib64/ld-linux-x86-64.so.2")
+            )
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            library_path = Path(tmp) / "libcairo.so.2"
+            library_path.write_text("", encoding="utf-8")
+            self.assertTrue(prepare_cairo_runtime.should_bundle_linux_library(library_path))
 
     def test_read_tool_manifest_prefers_embedded_manifest(self) -> None:
         # When the codegen module is present, the plugin must use it and ignore

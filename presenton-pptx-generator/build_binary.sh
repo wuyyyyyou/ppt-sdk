@@ -57,6 +57,7 @@ detect_platform() {
 
   case "$os" in
     Darwin) echo "darwin" ;;
+    Linux) echo "linux" ;;
     MINGW*|MSYS*|CYGWIN*) echo "windows" ;;
     *) echo "other" ;;
   esac
@@ -83,6 +84,8 @@ detect_platform_key() {
   case "$platform:$arch" in
     darwin:x86_64) echo "darwin-x86_64" ;;
     darwin:arm64) echo "darwin-arm64" ;;
+    linux:x86_64) echo "linux-x86_64" ;;
+    linux:arm64) echo "linux-aarch64" ;;
     windows:x86_64) echo "windows-x86_64" ;;
     windows:arm64) echo "windows-arm64" ;;
     *)
@@ -339,6 +342,7 @@ run_archive_smoke_test() {
   (
     unset DYLD_LIBRARY_PATH
     unset DYLD_FALLBACK_LIBRARY_PATH
+    unset LD_LIBRARY_PATH
     unset CAIROCFFI_DLL_DIRECTORIES
     "$PYTHON_BIN" "$SMOKE_TEST_SCRIPT" "$TEST_BINARY_PATH"
   )

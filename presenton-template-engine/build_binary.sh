@@ -16,12 +16,14 @@ RELEASE_STAGE_DIR="$BUILD_DIR/release-stage"
 TEST_EXTRACT_DIR="$BUILD_DIR/test-extract"
 SEA_PREP_DIR="$BUILD_DIR/sea-prep"
 RUN_TEST=false
+REUSE_TEMPLATE_PREVIEWS=false
 
 for arg in "$@"; do
   case "$arg" in
     --test) RUN_TEST=true ;;
+    --reuse-template-previews) REUSE_TEMPLATE_PREVIEWS=true ;;
     --help|-h)
-      echo "Usage: $0 [--test]"
+      echo "Usage: $0 [--test] [--reuse-template-previews]"
       exit 0
       ;;
     *)
@@ -45,6 +47,7 @@ detect_platform() {
 
   case "$os" in
     Darwin) echo "darwin" ;;
+    Linux) echo "linux" ;;
     MINGW*|MSYS*|CYGWIN*) echo "windows" ;;
     *) echo "other" ;;
   esac
@@ -71,6 +74,8 @@ detect_platform_key() {
   case "$platform:$arch" in
     darwin:x86_64) echo "darwin-x86_64" ;;
     darwin:arm64) echo "darwin-arm64" ;;
+    linux:x86_64) echo "linux-x86_64" ;;
+    linux:arm64) echo "linux-aarch64" ;;
     windows:x86_64) echo "windows-x86_64" ;;
     windows:arm64) echo "windows-arm64" ;;
     *)
@@ -233,7 +238,15 @@ rm -rf "$BUNDLE_DIR" "$RAW_BINARY_DIR" "$RELEASE_STAGE_DIR" "$TEST_EXTRACT_DIR"
 mkdir -p "$BUNDLE_DIR" "$RAW_BINARY_DIR"
 
 echo "[1/7] Building dist artifacts and template previews..."
-npm run build:full
+if [[ "$REUSE_TEMPLATE_PREVIEWS" == "true" ]]; then
+  if [[ ! -f "$SCRIPT_DIR/dist/template-previews/index.json" ]]; then
+    echo "Template previews are missing. Run npm run build:template-previews or provide dist/template-previews before using --reuse-template-previews." >&2
+    exit 1
+  fi
+  npm run build
+else
+  npm run build:full
+fi
 
 node -e '
 const fs = require("node:fs");

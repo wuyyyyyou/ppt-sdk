@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path, PureWindowsPath
+import re
 import shlex
 import shutil
 import subprocess
@@ -50,8 +51,42 @@ def discover_runtime_dir(platform: str, runtime_dir: str | None) -> Path:
                 normalize_windows_path("C:/GTK3-Runtime Win64/bin"),
             ]
         )
+    elif platform == "linux":
+        multiarch = ""
+        if shutil.which("gcc"):
+            multiarch = subprocess.run(
+                ["gcc", "-print-multiarch"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                check=False,
+            ).stdout.strip()
+        if multiarch:
+            candidates.extend(
+                [
+                    Path("/usr/lib") / multiarch,
+                    Path("/lib") / multiarch,
+                ]
+            )
+        candidates.extend(
+            [
+                Path("/usr/lib64"),
+                Path("/usr/lib"),
+                Path("/lib64"),
+                Path("/lib"),
+                Path("/usr/lib/x86_64-linux-gnu"),
+                Path("/lib/x86_64-linux-gnu"),
+                Path("/usr/lib/aarch64-linux-gnu"),
+                Path("/lib/aarch64-linux-gnu"),
+            ]
+        )
 
-    expected = "libcairo.2.dylib" if platform == "darwin" else "libcairo-2.dll"
+    if platform == "darwin":
+        expected = "libcairo.2.dylib"
+    elif platform == "windows":
+        expected = "libcairo-2.dll"
+    else:
+        expected = "libcairo.so.2"
 
     for candidate in candidates:
         if (candidate / expected).is_file():
@@ -97,6 +132,82 @@ def stage_windows_runtime(runtime_dir: Path, staging_dir: Path) -> None:
 
     if copied == 0 or not (staging_dir / "libcairo-2.dll").is_file():
         raise SystemExit(f"Failed to stage Cairo runtime DLLs from {runtime_dir}")
+
+
+LINUX_LDD_PATH_RE = re.compile(r"=>\s+(/\S+)|^\s*(/\S+)")
+LINUX_CORE_LIBRARY_NAMES = {
+    "ld-linux-aarch64.so.1",
+    "ld-linux-x86-64.so.2",
+    "libBrokenLocale.so.1",
+    "libanl.so.1",
+    "libc.so.6",
+    "libdl.so.2",
+    "libm.so.6",
+    "libpthread.so.0",
+    "libresolv.so.2",
+    "librt.so.1",
+    "libthread_db.so.1",
+    "libutil.so.1",
+}
+
+
+def ldd_dependencies(path: Path) -> list[Path]:
+    proc = subprocess.run(
+        ["ldd", str(path)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=True,
+    )
+    result: list[Path] = []
+    for line in proc.stdout.splitlines():
+        if "linux-vdso" in line or "not found" in line:
+            continue
+        match = LINUX_LDD_PATH_RE.search(line)
+        if not match:
+            continue
+        dep = Path(match.group(1) or match.group(2))
+        if dep.is_file():
+            result.append(dep)
+    return result
+
+
+def should_bundle_linux_library(path: Path) -> bool:
+    name = path.name
+    if name in LINUX_CORE_LIBRARY_NAMES:
+        return False
+    return path.is_file()
+
+
+def stage_linux_runtime(runtime_dir: Path, staging_dir: Path) -> None:
+    shutil.rmtree(staging_dir, ignore_errors=True)
+    staging_dir.mkdir(parents=True, exist_ok=True)
+
+    queue: list[Path] = []
+    for name in ("libcairo.so.2", "libcairo-gobject.so.2"):
+        candidate = runtime_dir / name
+        if candidate.is_file():
+            queue.append(candidate)
+
+    if not queue:
+        raise SystemExit(f"Could not find Linux Cairo shared libraries in {runtime_dir}")
+
+    copied_by_name: dict[str, Path] = {}
+    while queue:
+        current = queue.pop(0)
+        if not should_bundle_linux_library(current) or current.name in copied_by_name:
+            continue
+
+        target = staging_dir / current.name
+        shutil.copy2(current, target)
+        copied_by_name[current.name] = target
+
+        for dep in ldd_dependencies(current):
+            if should_bundle_linux_library(dep) and dep.name not in copied_by_name:
+                queue.append(dep)
+
+    if "libcairo.so.2" not in copied_by_name:
+        raise SystemExit(f"Failed to stage libcairo.so.2 from {runtime_dir}")
 
 
 def otool_dependencies(path: Path) -> list[Path]:
@@ -173,7 +284,7 @@ def stage_macos_runtime(runtime_dir: Path, staging_dir: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--platform", required=True, choices=["darwin", "windows"])
+    parser.add_argument("--platform", required=True, choices=["darwin", "linux", "windows"])
     parser.add_argument("--staging-dir")
     parser.add_argument("--runtime-dir")
     parser.add_argument("--discover-only", action="store_true")
@@ -184,6 +295,8 @@ def main() -> None:
     if args.discover_only:
         if args.platform == "darwin":
             runtime_for_imports = str(runtime_dir)
+        elif args.platform == "linux":
+            runtime_for_imports = str(runtime_dir)
         else:
             runtime_for_imports = windows_string(runtime_dir)
     else:
@@ -193,6 +306,9 @@ def main() -> None:
         staging_dir = Path(args.staging_dir)
         if args.platform == "darwin":
             stage_macos_runtime(runtime_dir, staging_dir)
+            runtime_for_imports = str(runtime_dir)
+        elif args.platform == "linux":
+            stage_linux_runtime(runtime_dir, staging_dir)
             runtime_for_imports = str(runtime_dir)
         else:
             stage_windows_runtime(runtime_dir, staging_dir)
