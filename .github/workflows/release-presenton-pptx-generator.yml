@@ -95,7 +95,7 @@ jobs:
       - name: Verify tool manifest synchronization
         run: |
           set -euo pipefail
-          node scripts/sync-tool-manifests.mjs
+          node scripts/sync-presenton-pptx-generator-manifest.mjs
           git diff --exit-code
 
       - name: Build and validate binary release package

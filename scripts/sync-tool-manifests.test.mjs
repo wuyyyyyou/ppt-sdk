@@ -53,13 +53,11 @@ test("syncPyprojectText keeps script entry inside project scripts with Windows C
 
 test("syncPyprojectText is idempotent for the current pyproject with Windows CRLF line endings", async () => {
   const content = (await readFile("presenton-pptx-generator/pyproject.toml", "utf8")).replace(/\r?\n/g, "\r\n");
+  const manifest = JSON.parse(await readFile("presenton-pptx-generator/manifest.json", "utf8"));
 
   assert.equal(syncPyprojectText(content, {
     ...tool,
-    manifest: {
-      ...tool.manifest,
-      version: "2.0.2",
-    },
+    manifest,
   }), content);
 });
 
