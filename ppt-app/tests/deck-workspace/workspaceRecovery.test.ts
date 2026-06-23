@@ -43,6 +43,40 @@ describe("Workspace Recovery", () => {
     assert.equal(progress?.pages[0]?.status, "accepted");
   });
 
+  it("does not mark accepted pages complete when final deck render failed", () => {
+    const storedProgress = makeProgress(["accepted", "accepted"]);
+    storedProgress.final_deck_render = {
+      status: "failed",
+      message: "Final render failed",
+      error: "Final render failed",
+      output_dir: null,
+      deck_html_path: null,
+      pages_path: null,
+      rendered_at: null,
+      updated_at: "2026-06-02T03:47:38.344Z",
+    };
+    storedProgress.recovery = {
+      status: "failed",
+      run_kind: "final-deck-render",
+      step: "final-render",
+      target_page_ids: [],
+      page_refinement_request: null,
+      page_refinement_requests: {},
+      error: "Final render failed",
+      updated_at: "2026-06-02T03:47:38.344Z",
+    };
+
+    const progress = restoreDeckGenerationProgress({
+      staleDeck: false,
+      pageProgress: storedProgress,
+      locale: "zh",
+    });
+
+    assert.equal(progress?.step, "final-render");
+    assert.equal(progress?.recoveryRunKind, "final-deck-render");
+    assert.equal(progress?.totalPages, 2);
+  });
+
   it("does not restore generation progress for stale workspaces", () => {
     const progress = restoreDeckGenerationProgress({
       staleDeck: true,

@@ -306,7 +306,7 @@ function createHarness(options: {
   const authoringLogContexts: unknown[] = [];
   const visualReviewPrompts: string[] = [];
   const contentReviewPrompts: string[] = [];
-  const recordPageProgressInputs: Array<{ page_id: string; patch: Record<string, unknown> }> = [];
+  const recordPageProgressInputs: Array<{ page_id?: string; patch: Record<string, unknown> }> = [];
   const logs: unknown[] = [];
   const progressEvents: DeckGenerationProgress[] = [];
   let generatePagePlanCalls = 0;
@@ -561,10 +561,18 @@ function createHarness(options: {
         page_id: input.page_id,
         patch: clone(input.patch),
       });
+      const { recovery, final_deck_render: finalDeckRender, deck_status: deckStatus, ...pagePatch } = input.patch;
       progress = {
         ...progress,
+        status: typeof deckStatus === "string" ? deckStatus : progress.status,
+        recovery: recovery && typeof recovery === "object" && !Array.isArray(recovery)
+          ? { ...(progress.recovery ?? {}), ...clone(recovery) } as never
+          : progress.recovery,
+        final_deck_render: finalDeckRender && typeof finalDeckRender === "object" && !Array.isArray(finalDeckRender)
+          ? { ...(progress.final_deck_render ?? {}), ...clone(finalDeckRender) } as never
+          : progress.final_deck_render,
         pages: progress.pages.map((page) =>
-          page.page_id === input.page_id ? { ...page, ...input.patch } : page,
+          input.page_id && page.page_id === input.page_id ? { ...page, ...pagePatch } : page,
         ),
         updated_at: "2026-05-23T00:00:00.000Z",
       };
@@ -2207,6 +2215,46 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.progress.pages[1].visual_review_attempts, 0);
   });
 
+  it("does not reset unclaimed resume pages when infrastructure failure stops scheduling", async () => {
+    const pagePlan = makePagePlanWithCount(5);
+    const existingProgress = makeProgress(pagePlan);
+    for (const [index, page] of existingProgress.pages.entries()) {
+      existingProgress.pages[index] = {
+        ...page,
+        status: index === 0 ? "pending" : "render_failed",
+        render_attempts: index + 1,
+        last_error: `old failure ${index + 1}`,
+      };
+    }
+    const harness = createHarness({
+      pagePlan,
+      existingProgress,
+      authoringError: new AgentInfrastructureError("session limit", "http", true),
+    });
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: {
+        ...outline,
+        items: pagePlan.pages.map((page) => ({ title: page.title, outline: page.outline })),
+      },
+      locale: "zh",
+      startMode: "resume",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "failed");
+    assert.equal(harness.progress.pages[3].status, "render_failed");
+    assert.equal(harness.progress.pages[3].render_attempts, 4);
+    assert.equal(harness.progress.pages[3].last_error, "old failure 4");
+    assert.equal(harness.progress.pages[4].status, "render_failed");
+    assert.equal(harness.progress.pages[4].render_attempts, 5);
+    assert.equal(harness.progress.pages[4].last_error, "old failure 5");
+  });
+
   it("fails resume when artifacts are stale", async () => {
     const stalePlan = makePagePlan({
       source: {
@@ -2309,6 +2357,8 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.authoringPrompts.length, 0);
     assert.equal(harness.deckRenderCalls, 1);
     assert.equal(harness.progress.pages.every((page) => page.status === "accepted"), true);
+    assert.equal(harness.progress.recovery?.run_kind, "final-deck-render");
+    assert.equal(harness.progress.final_deck_render?.status, "failed");
   });
 
   it("skips page-level research when the Research Plan says no external evidence is needed", async () => {
@@ -2403,6 +2453,41 @@ describe("Deck Generation Flow Module", () => {
     assert.ok(contentReviewPrompt);
     assert.equal(contentReviewPrompt.includes("/research/evidence/drafts/"), false);
     assert.match(contentReviewPrompt, /Raw Research Material/);
+  });
+
+  it("does not promote cancelled research curation into evidence or ledger completion", async () => {
+    const pagePlan = makePagePlan();
+    const researchPlan = makeResearchPlan(pagePlan);
+    researchPlan.pages[0] = {
+      ...researchPlan.pages[0],
+      web_research_needed: true,
+      query_intents: ["market size"],
+      evidence_needs: ["market size"],
+    };
+    const harness = createHarness({
+      pagePlan,
+      researchPlan,
+      authoringError: new AgentRunCancelledError(),
+    });
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "cancelled");
+    assert.equal(harness.webSearchCalls, 1);
+    assert.equal(harness.webFetchCalls, 1);
+    assert.equal(harness.recordResearchEvidencePageCalls, 0);
+    assert.equal(harness.recordResearchStatusPageCalls, 0);
+    assert.equal(harness.researchEvidence.pages.length, 0);
+    assert.equal(harness.researchStatus.collection_ledger, undefined);
   });
 
   it("records a non-blocking research gap when search fails", async () => {

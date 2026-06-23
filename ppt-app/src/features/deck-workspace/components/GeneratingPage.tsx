@@ -118,7 +118,9 @@ export function GeneratingPage(props: GeneratingPageProps) {
         <div className="generation-recovery-actions">
           <button className="primary-btn" onClick={() => void onResume()} disabled={!viewState.canResume}>
             <Play size={14} />
-            {t.controls.resumeGeneration}
+            {viewState.resumeAction === "refinement"
+              ? t.controls.resumeRefinement
+              : t.controls.resumeGeneration}
           </button>
         </div>
       ) : viewState.showBackToOutline ? (

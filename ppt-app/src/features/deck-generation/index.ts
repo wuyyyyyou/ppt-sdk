@@ -1,4 +1,5 @@
 import {
+  AgentRunCancelledError,
   isAgentInfrastructureError,
   isAgentRunCancelledError,
   type AgentInfrastructureError,
@@ -126,6 +127,7 @@ export interface DeckGenerationProgress {
   currentPageIndex: number | null;
   totalPages: number;
   pages: DeckGenerationProgressPage[];
+  recoveryRunKind?: NonNullable<PageProgress["recovery"]>["run_kind"];
   stream?: DeckGenerationStream;
   activeStreams?: DeckGenerationStream[];
 }
@@ -194,6 +196,8 @@ export interface RunDeckRefinementInput extends RunDeckGenerationInput {
   instruction: string;
   scope: "deck" | "slide";
   pageIndex?: number;
+  resumePageIds?: string[];
+  skipIntentReview?: boolean;
 }
 
 export interface RunPageGenerationRetryInput extends RunDeckGenerationInput {
@@ -385,6 +389,37 @@ async function recordProgress(
     page_id: page.page_id,
     patch,
   });
+}
+
+async function recordDeckRecovery(
+  input: Pick<DeckGenerationContext, "backend" | "workspace">,
+  patch: {
+    status?: NonNullable<PageProgress["recovery"]>["status"];
+    run_kind?: NonNullable<PageProgress["recovery"]>["run_kind"];
+    step?: string | null;
+    target_page_ids?: string[];
+    page_refinement_request?: string | null;
+    page_refinement_requests?: Record<string, string>;
+    error?: string | null;
+    final_deck_render?: Partial<NonNullable<PageProgress["final_deck_render"]>>;
+    deck_status?: string;
+  },
+) {
+  const { final_deck_render: finalDeckRender, deck_status: deckStatus, ...recovery } = patch;
+  return input.backend.recordPageProgress({
+    workspace_dir: input.workspace.workspace_dir,
+    patch: {
+      ...(deckStatus ? { deck_status: deckStatus } : {}),
+      recovery,
+      ...(finalDeckRender ? { final_deck_render: finalDeckRender } : {}),
+    },
+  });
+}
+
+function throwIfCancelled(input: Pick<DeckGenerationContext, "isCancelled">): void {
+  if (input.isCancelled()) {
+    throw new AgentRunCancelledError();
+  }
 }
 
 function buildAuthoringPrompt(input: {
@@ -1057,7 +1092,7 @@ function pagePlanMatchesOutlineItems(pagePlan: PagePlan, outline: WorkspaceOutli
 function pagePlanMatchesOutlineAndTemplate(
   workspace: WorkspaceResult,
   pagePlan: PagePlan,
-  progress: PageProgress,
+  progress: PageProgress | null,
   outline: WorkspaceOutline,
 ) {
   if (
@@ -1085,7 +1120,7 @@ function pagePlanMatchesOutlineAndTemplate(
     return false;
   }
 
-  return progressMatchesPlan(pagePlan, progress);
+  return progress ? progressMatchesPlan(pagePlan, progress) : true;
 }
 
 function createEmptyResearchPlan(input: {
@@ -1319,11 +1354,13 @@ async function runResearchDraftAgent(input: {
       buildAgentRunOptions(flowInput, tracker.onStreamEvent, tracker.logContext),
     );
     await tracker.flush("completed", { draft_type: kind });
+    throwIfCancelled(flowInput);
     const rawDraft = await flowInput.backend.getResearchCurationDraft({
       workspace_dir: flowInput.workspace.workspace_dir,
       page_id: page.page_id,
       draft_type: kind,
     });
+    throwIfCancelled(flowInput);
     const validation = kind === "web"
       ? validateWebResearchCurationDraft(rawDraft, page.page_id)
       : validateVisualResearchCurationDraft(rawDraft, page.page_id);
@@ -1346,6 +1383,7 @@ async function runResearchDraftAgent(input: {
       draft_type: kind,
       draft: validation.draft as never,
     });
+    throwIfCancelled(flowInput);
     await appendResearchLogSafe(flowInput, {
       event: `ai.research.${kind}_curation.finished`,
       schema_version: 1,
@@ -1359,6 +1397,17 @@ async function runResearchDraftAgent(input: {
     return validation.draft;
   } catch (error) {
     await tracker.flush("error", { draft_type: kind, error: error instanceof Error ? error.message : String(error) });
+    if (isAgentRunCancelledError(error)) {
+      await appendResearchLogSafe(flowInput, {
+        event: `ai.research.${kind}_curation.cancelled`,
+        schema_version: 1,
+        page_id: page.page_id,
+        page_index: page.index,
+        draft_path: input.draftPath,
+        updated_at: new Date().toISOString(),
+      });
+      throw error;
+    }
     const message = `${kind === "web" ? "Web" : "Visual"} Research Curation failed: ${error instanceof Error ? error.message : String(error)}`;
     input.currentGaps.push(message);
     await appendResearchLogSafe(flowInput, {
@@ -1379,6 +1428,14 @@ async function generateAndRecordResearchPlan(
   pagePlan: PagePlan,
 ): Promise<ResearchPlan> {
   const text = generationText(input.locale);
+  await recordDeckRecovery(input, {
+    status: "running",
+    run_kind: "deck-generation",
+    step: "research-planning",
+    target_page_ids: pagePlan.pages.map((page) => page.page_id),
+    error: null,
+    deck_status: "running",
+  });
   emit(
     input,
     {
@@ -1393,6 +1450,7 @@ async function generateAndRecordResearchPlan(
   await input.backend.prepareResearchWorkspace({
     workspace_dir: input.workspace.workspace_dir,
   });
+  throwIfCancelled(input);
 
   const logContext: AiOperationLogContext | undefined = input.aiLogger
     ? {
@@ -1417,7 +1475,9 @@ async function generateAndRecordResearchPlan(
       }),
       pagePlan,
     });
+    throwIfCancelled(input);
   } catch (error) {
+    if (isAgentRunCancelledError(error)) throw error;
     researchPlan = createEmptyResearchPlan({
       outline: input.confirmedOutline,
       pagePlan,
@@ -1437,6 +1497,7 @@ async function generateAndRecordResearchPlan(
     workspace_dir: input.workspace.workspace_dir,
     research_plan: researchPlan,
   });
+  throwIfCancelled(input);
   await input.backend.recordResearchStatus({
     workspace_dir: input.workspace.workspace_dir,
     status: {
@@ -1451,6 +1512,7 @@ async function generateAndRecordResearchPlan(
       updated_at: new Date().toISOString(),
     },
   });
+  throwIfCancelled(input);
   return recorded;
 }
 
@@ -1459,9 +1521,11 @@ async function collectAndCurateResearchForPage(
   pagePlan: PagePlan,
   page: PagePlanItem,
 ): Promise<void> {
+  throwIfCancelled(input);
   const researchPlan = await input.backend.getResearchPlan({
     workspace_dir: input.workspace.workspace_dir,
   });
+  throwIfCancelled(input);
   const requirement = getResearchRequirement(researchPlan, page);
   if (!researchNeeded(requirement)) return;
   const pageRequirement = requirement as ResearchRequirement;
@@ -1470,11 +1534,13 @@ async function collectAndCurateResearchForPage(
       workspace_dir: input.workspace.workspace_dir,
     }),
   );
+  throwIfCancelled(input);
   const existingEvidence = currentEvidence.pages.find((item) => item.page_id === page.page_id);
   const isPageRefinement = Boolean(input.pageRefinementRequests?.[page.page_id]?.trim());
   const initialResearchStatus = await input.backend.getResearchStatus({
     workspace_dir: input.workspace.workspace_dir,
   });
+  throwIfCancelled(input);
   const deltaQueries = computeResearchQueryDelta({
     status: initialResearchStatus,
     pageId: page.page_id,
@@ -1503,6 +1569,7 @@ async function collectAndCurateResearchForPage(
   const paths = await input.backend.prepareResearchWorkspace({
     workspace_dir: input.workspace.workspace_dir,
   });
+  throwIfCancelled(input);
   let progress = await recordProgress(input, page, { status: "research_collecting" });
   input.setProgress(progress);
   emitRuntime(
@@ -1524,12 +1591,14 @@ async function collectAndCurateResearchForPage(
 
   if (pageRequirement.web_research_needed) {
     for (const query of deltaQueries.webQueries) {
+      throwIfCancelled(input);
       try {
         const search = await input.backend.webSearch({
           query,
           max_results: 6,
           safesearch: "moderate",
         });
+        throwIfCancelled(input);
         const urls = search.results.map((item) => item.url).filter(Boolean).slice(0, 5);
         if (urls.length === 0) {
           gaps.push(`No web search results for: ${query}`);
@@ -1542,6 +1611,7 @@ async function collectAndCurateResearchForPage(
           format: "text_markdown",
           max_chars: 12000,
         });
+        throwIfCancelled(input);
         if (fetched.index_path) {
           rawWebIndexPaths.push(fetched.index_path);
           webCollections.push({ query, raw_index_path: fetched.index_path });
@@ -1550,6 +1620,7 @@ async function collectAndCurateResearchForPage(
           webCollections.push({ query });
         }
       } catch (error) {
+        if (isAgentRunCancelledError(error)) throw error;
         gaps.push(`Web research failed for "${query}": ${error instanceof Error ? error.message : String(error)}`);
       }
     }
@@ -1557,12 +1628,14 @@ async function collectAndCurateResearchForPage(
 
   if (pageRequirement.image_research_needed) {
     for (const query of deltaQueries.imageQueries) {
+      throwIfCancelled(input);
       try {
         const search = await input.backend.imageSearch({
           query,
           max_results: 8,
           safesearch: "moderate",
         });
+        throwIfCancelled(input);
         const urls = search.results
           .filter((item) => !item.width || !item.height || (item.width >= 480 && item.height >= 270))
           .map((item) => item.image_url)
@@ -1577,6 +1650,7 @@ async function collectAndCurateResearchForPage(
           urls,
           output_dir: paths.raw_images_dir,
         });
+        throwIfCancelled(input);
         if (fetched.index_path) {
           rawImageIndexPaths.push(fetched.index_path);
           imageCollections.push({ query, raw_index_path: fetched.index_path });
@@ -1585,25 +1659,10 @@ async function collectAndCurateResearchForPage(
           imageCollections.push({ query });
         }
       } catch (error) {
+        if (isAgentRunCancelledError(error)) throw error;
         gaps.push(`Image research failed for "${query}": ${error instanceof Error ? error.message : String(error)}`);
       }
     }
-  }
-
-  if (webCollections.length > 0 || imageCollections.length > 0) {
-    const latestResearchStatus = await input.backend.getResearchStatus({
-      workspace_dir: input.workspace.workspace_dir,
-    });
-    await input.backend.recordResearchStatus({
-      workspace_dir: input.workspace.workspace_dir,
-      status: recordResearchCollectionLedger({
-        status: latestResearchStatus,
-        pageId: page.page_id,
-        webCollections,
-        imageCollections,
-        now: new Date().toISOString(),
-      }),
-    });
   }
 
   const evidenceMarkdownPath = `${paths.evidence_pages_dir}/${page.page_id}.md`;
@@ -1660,6 +1719,7 @@ async function collectAndCurateResearchForPage(
         draft_type: "web",
         draft: webDraft,
       });
+      throwIfCancelled(input);
     }
   }
 
@@ -1691,9 +1751,11 @@ async function collectAndCurateResearchForPage(
         draft_type: "visual",
         draft: visualDraft,
       });
+      throwIfCancelled(input);
     }
   }
 
+  throwIfCancelled(input);
   const merged = mergeResearchCurationDrafts({
     currentEvidence,
     page,
@@ -1709,10 +1771,12 @@ async function collectAndCurateResearchForPage(
     page_id: page.page_id,
     markdown: merged.markdown,
   });
+  throwIfCancelled(input);
   await input.backend.recordResearchEvidencePage({
     workspace_dir: input.workspace.workspace_dir,
     page_evidence: merged.pageEvidence,
   });
+  throwIfCancelled(input);
 
   await appendResearchLogSafe(input, {
     event: "ai.research.page.finished",
@@ -1734,19 +1798,70 @@ async function collectAndCurateResearchForPage(
       evidence_path: evidenceMarkdownPath,
     },
   });
+  throwIfCancelled(input);
+
+  if (webCollections.length > 0 || imageCollections.length > 0) {
+    const latestResearchStatus = await input.backend.getResearchStatus({
+      workspace_dir: input.workspace.workspace_dir,
+    });
+    throwIfCancelled(input);
+    await input.backend.recordResearchStatus({
+      workspace_dir: input.workspace.workspace_dir,
+      status: recordResearchCollectionLedger({
+        status: latestResearchStatus,
+        pageId: page.page_id,
+        webCollections,
+        imageCollections,
+        now: new Date().toISOString(),
+      }),
+    });
+    throwIfCancelled(input);
+  }
 }
 
 async function loadResumeArtifacts(input: RunDeckGenerationInput) {
   try {
-    const [pagePlan, progress] = await Promise.all([
-      input.backend.getPagePlan({ workspace_dir: input.workspace.workspace_dir }),
-      input.backend.getPageProgress({ workspace_dir: input.workspace.workspace_dir }),
-    ]);
-    if (!pagePlanMatchesOutlineAndTemplate(input.workspace, pagePlan, progress, input.confirmedOutline)) {
+    let pagePlan = await input.backend.getPagePlan({
+      workspace_dir: input.workspace.workspace_dir,
+    });
+    let progress = await input.backend.getPageProgress({
+      workspace_dir: input.workspace.workspace_dir,
+    });
+    const hasUsablePagePlan = pagePlan.pages.length === input.confirmedOutline.items.length && pagePlan.pages.length > 0;
+    if (!hasUsablePagePlan) {
+      if (pagePlan.pages.length > 0) return null;
+      return await createRestartArtifacts(input);
+    }
+    if (!pagePlanMatchesOutlineAndTemplate(input.workspace, pagePlan, null, input.confirmedOutline)) {
       return null;
     }
+
+    const researchPlan = await readResearchPlanSafe(input);
+    if (!researchPlan || researchPlan.pages.length !== pagePlan.pages.length) {
+      await generateAndRecordResearchPlan(input, pagePlan);
+    }
+
+    if (!progressMatchesPlan(pagePlan, progress)) {
+      await recordDeckRecovery(input, {
+        status: "running",
+        run_kind: "deck-generation",
+        step: "prepare",
+        target_page_ids: pagePlan.pages.map((page) => page.page_id),
+        error: null,
+        deck_status: "running",
+      });
+      await input.backend.preparePageFiles({
+        workspace_dir: input.workspace.workspace_dir,
+      });
+      progress = await input.backend.getPageProgress({
+        workspace_dir: input.workspace.workspace_dir,
+      });
+    }
+
+    pagePlan = alignPagePlanWithOutline(pagePlan, input.confirmedOutline);
     return { pagePlan, progress };
-  } catch {
+  } catch (error) {
+    if (isAgentRunCancelledError(error)) throw error;
     return null;
   }
 }
@@ -1813,6 +1928,25 @@ async function resolvePageRefinementVisualContext(input: {
 
 async function createRestartArtifacts(input: RunDeckGenerationInput) {
   const text = generationText(input.locale);
+  await recordDeckRecovery(input, {
+    status: "running",
+    run_kind: "deck-generation",
+    step: "page-plan",
+    target_page_ids: [],
+    page_refinement_request: null,
+    page_refinement_requests: {},
+    error: null,
+    final_deck_render: {
+      status: "idle",
+      message: null,
+      error: null,
+      output_dir: null,
+      deck_html_path: null,
+      pages_path: null,
+      rendered_at: null,
+    },
+    deck_status: "running",
+  });
   emit(
     input,
     {
@@ -1827,6 +1961,7 @@ async function createRestartArtifacts(input: RunDeckGenerationInput) {
   const planningContext = await input.backend.getTemplatePlanningContext({
     workspace_dir: input.workspace.workspace_dir,
   });
+  throwIfCancelled(input);
   const pagePlanLogContext: AiOperationLogContext | undefined = input.aiLogger
     ? {
         logger: input.aiLogger,
@@ -1844,6 +1979,7 @@ async function createRestartArtifacts(input: RunDeckGenerationInput) {
     locale: input.locale,
     logContext: pagePlanLogContext,
   });
+  throwIfCancelled(input);
   const alignedPagePlan = alignPagePlanWithOutline(pagePlan, input.confirmedOutline);
   if (input.aiLogger && pagePlanLogContext) {
     await input.aiLogger.appendSemanticLog(pagePlanLogContext, {
@@ -1877,9 +2013,19 @@ async function createRestartArtifacts(input: RunDeckGenerationInput) {
     workspace_dir: input.workspace.workspace_dir,
     page_plan: alignedPagePlan,
   });
+  throwIfCancelled(input);
 
   await generateAndRecordResearchPlan(input, alignedPagePlan);
+  throwIfCancelled(input);
 
+  await recordDeckRecovery(input, {
+    status: "running",
+    run_kind: "deck-generation",
+    step: "prepare",
+    target_page_ids: alignedPagePlan.pages.map((page) => page.page_id),
+    error: null,
+    deck_status: "running",
+  });
   emit(
     input,
     {
@@ -1894,10 +2040,12 @@ async function createRestartArtifacts(input: RunDeckGenerationInput) {
   await input.backend.preparePageFiles({
     workspace_dir: input.workspace.workspace_dir,
   });
+  throwIfCancelled(input);
 
   let progress = await input.backend.getPageProgress({
     workspace_dir: input.workspace.workspace_dir,
   });
+  throwIfCancelled(input);
 
   for (const page of alignedPagePlan.pages) {
     progress = await recordProgress(input, page, {
@@ -2035,13 +2183,20 @@ export function pageProgressToDeckGenerationProgress(
     null;
   const acceptedCount = pages.filter((item) => item.status === "accepted").length;
   const allAccepted = pages.length > 0 && acceptedCount === pages.length;
-  const step: DeckGenerationStep = allAccepted
+  const finalDeckRender = storedProgress.final_deck_render;
+  const finalDeckRenderCompleted =
+    !finalDeckRender || finalDeckRender.status === "completed";
+  const step: DeckGenerationStep = allAccepted && finalDeckRenderCompleted
       ? "complete"
-      : unfinishedPage
+      : allAccepted
+        ? "final-render"
+        : unfinishedPage
         ? "interrupted"
         : "page-authoring";
   const message = step === "complete"
       ? generationText(locale).complete
+      : step === "final-render"
+        ? finalDeckRender?.error || finalDeckRender?.message || generationText(locale).finalRender
       : step === "interrupted"
         ? failedPage?.last_error || generationText(locale).interrupted
         : generationText(locale).resumed;
@@ -2051,6 +2206,9 @@ export function pageProgressToDeckGenerationProgress(
     message,
     currentPageIndex: activePage ? activePage.index : null,
     totalPages: pages.length,
+    recoveryRunKind: storedProgress.recovery?.run_kind ?? (
+      step === "final-render" ? "final-deck-render" : undefined
+    ),
     pages: mapProgress({
       ...storedProgress,
       pages,
@@ -2159,7 +2317,35 @@ async function runPageGeneration(
     };
   }
 
-  await collectAndCurateResearchForPage(input, pagePlan, page);
+  try {
+    await collectAndCurateResearchForPage(input, pagePlan, page);
+  } catch (error) {
+    if (isAgentRunCancelledError(error)) {
+      return {
+        page,
+        reason: "cancelled",
+        progress: input.getProgress() ?? progress ?? {
+          version: 1,
+          status: "running",
+          pages: [],
+          updated_at: null,
+        },
+      };
+    }
+    throw error;
+  }
+  if (input.isCancelled()) {
+    return {
+      page,
+      reason: "cancelled",
+      progress: input.getProgress() ?? progress ?? {
+        version: 1,
+        status: "running",
+        pages: [],
+        updated_at: null,
+      },
+    };
+  }
 
   progress = await recordProgress(input, page, { status: "authoring" });
   input.setProgress(progress);
@@ -2254,6 +2440,13 @@ async function runPageGeneration(
         session_cache_miss_retries:
           authoringResult.session_cache_miss_retries ?? 0,
       });
+      if (input.isCancelled()) {
+        return {
+          page,
+          reason: "cancelled",
+          progress: input.getProgress() ?? progress,
+        };
+      }
       renderError = "";
       visualReview = null;
       contentReview = null;
@@ -2355,6 +2548,13 @@ async function runPageGeneration(
           parsed_review: true,
           review: contentReview,
         });
+        if (input.isCancelled()) {
+          return {
+            page,
+            reason: "cancelled",
+            progress: input.getProgress() ?? progress,
+          };
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (isAgentRunCancelledError(error)) {
@@ -2474,6 +2674,13 @@ async function runPageGeneration(
         workspace_dir: input.workspace.workspace_dir,
         page_index: page.index,
       });
+      if (input.isCancelled()) {
+        return {
+          page,
+          reason: "cancelled",
+          progress: input.getProgress() ?? progress,
+        };
+      }
       progress = await recordProgress(input, page, {
         status: "visual_review",
         last_html_path: preview.html_path,
@@ -2483,6 +2690,13 @@ async function runPageGeneration(
       input.setProgress(progress);
       renderFailureHistory = [];
     } catch (error) {
+      if (input.isCancelled()) {
+        return {
+          page,
+          reason: "cancelled",
+          progress: input.getProgress() ?? progress,
+        };
+      }
       renderAttempts += 1;
       renderError = error instanceof Error ? error.message : String(error);
       renderFailureHistory.push({
@@ -2551,6 +2765,13 @@ async function runPageGeneration(
         session_cache_miss_retries:
           visualReview.session_cache_miss_retries ?? 0,
       });
+      if (input.isCancelled()) {
+        return {
+          page,
+          reason: "cancelled",
+          progress: input.getProgress() ?? progress,
+        };
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (isAgentRunCancelledError(error)) {
@@ -2697,24 +2918,9 @@ async function runPagesConcurrently(
 ): Promise<PageGenerationResult[]> {
   const pagesToRun = pagePlan.pages.filter((page) => {
     const pageProgress = getProgressPage(runtime.getProgress(), page.page_id);
-    return shouldResumePageGenerationStatus(pageProgress?.status ?? "pending");
+    return Boolean(runtime.pageRefinementRequests?.[page.page_id]) ||
+      shouldResumePageGenerationStatus(pageProgress?.status ?? "pending");
   });
-  let progress = runtime.getProgress();
-  for (const page of pagesToRun) {
-    progress = await recordProgress(runtime, page, {
-      status: "pending",
-      render_attempts: 0,
-      visual_review_attempts: 0,
-      content_review_attempts: 0,
-      agent_failures: 0,
-      agent_infrastructure_failures: 0,
-      last_error: "",
-      content_review: null,
-      visual_review: null,
-      review: null,
-    });
-    runtime.setProgress(progress);
-  }
   const results: PageGenerationResult[] = [];
   let nextIndex = 0;
   let stopScheduling = false;
@@ -2724,6 +2930,24 @@ async function runPagesConcurrently(
       const page = pagesToRun[nextIndex];
       nextIndex += 1;
       if (!page) return;
+
+      const progress = await recordProgress(runtime, page, {
+        status: "pending",
+        render_attempts: 0,
+        visual_review_attempts: 0,
+        content_review_attempts: 0,
+        agent_failures: 0,
+        agent_infrastructure_failures: 0,
+        last_error: "",
+        content_review: null,
+        visual_review: null,
+        review: null,
+      });
+      runtime.setProgress(progress);
+      if (runtime.isCancelled()) {
+        results.push({ page, reason: "cancelled", progress });
+        return;
+      }
 
       const result = await runPageGeneration(runtime, pagePlan, page);
       results.push(result);
@@ -2769,13 +2993,61 @@ export async function runDeckGeneration(
   const startMode = input.startMode ?? "restart";
   let artifacts: { pagePlan: PagePlan; progress: PageProgress };
 
-  if (startMode === "resume") {
-    const resumeArtifacts = await loadResumeArtifacts(input);
-    if (!resumeArtifacts) {
+  try {
+    if (startMode === "resume") {
+      const resumeArtifacts = await loadResumeArtifacts(input);
+      if (!resumeArtifacts) {
+        const progress = createProgress(
+          {
+            step: "failed",
+            message: text.staleArtifacts,
+            currentPageIndex: null,
+            totalPages: input.confirmedOutline.items.length,
+          },
+          null,
+          undefined,
+          undefined,
+          attemptLimits,
+        );
+        input.onProgress(progress);
+        return failedCompletion({
+          progress,
+          error: {
+            type: "stale_artifacts",
+            message: progress.message,
+          },
+        });
+      }
+      const preflightFailure = await preflightAgentToolAccess({
+        agentClient: input.agentClient,
+        locale: input.locale,
+        onProgress: input.onProgress,
+        progress: resumeArtifacts.progress,
+        attemptLimits,
+        totalPages: resumeArtifacts.pagePlan.pages.length,
+        currentPageIndex: null,
+      });
+      if (preflightFailure) return preflightFailure;
+      artifacts = resumeArtifacts;
+    } else {
+      const preflightFailure = await preflightAgentToolAccess({
+        agentClient: input.agentClient,
+        locale: input.locale,
+        onProgress: input.onProgress,
+        progress: null,
+        attemptLimits,
+        totalPages: input.confirmedOutline.items.length,
+        currentPageIndex: null,
+      });
+      if (preflightFailure) return preflightFailure;
+      artifacts = await createRestartArtifacts(input);
+    }
+  } catch (error) {
+    if (isAgentRunCancelledError(error) || input.isCancelled()) {
       const progress = createProgress(
         {
-          step: "failed",
-          message: text.staleArtifacts,
+          step: "cancelled",
+          message: text.cancelled,
           currentPageIndex: null,
           totalPages: input.confirmedOutline.items.length,
         },
@@ -2785,37 +3057,19 @@ export async function runDeckGeneration(
         attemptLimits,
       );
       input.onProgress(progress);
-      return failedCompletion({
-        progress,
-        error: {
-          type: "stale_artifacts",
-          message: progress.message,
-        },
+      await recordDeckRecovery(input, {
+        status: "interrupted",
+        run_kind: "deck-generation",
+        step: "interrupted",
+        error: null,
+        deck_status: "interrupted",
       });
+      return {
+        status: "cancelled",
+        progress,
+      };
     }
-    const preflightFailure = await preflightAgentToolAccess({
-      agentClient: input.agentClient,
-      locale: input.locale,
-      onProgress: input.onProgress,
-      progress: resumeArtifacts.progress,
-      attemptLimits,
-      totalPages: resumeArtifacts.pagePlan.pages.length,
-      currentPageIndex: null,
-    });
-    if (preflightFailure) return preflightFailure;
-    artifacts = resumeArtifacts;
-  } else {
-    const preflightFailure = await preflightAgentToolAccess({
-      agentClient: input.agentClient,
-      locale: input.locale,
-      onProgress: input.onProgress,
-      progress: null,
-      attemptLimits,
-      totalPages: input.confirmedOutline.items.length,
-      currentPageIndex: null,
-    });
-    if (preflightFailure) return preflightFailure;
-    artifacts = await createRestartArtifacts(input);
+    throw error;
   }
 
   let { pagePlan, progress } = artifacts;
@@ -2844,13 +3098,20 @@ export async function runDeckGeneration(
       attemptLimits,
     );
     input.onProgress(failedProgress);
+    await recordDeckRecovery(input, {
+      status: "failed",
+      run_kind: "deck-generation",
+      step: "page-authoring",
+      error: infrastructureFailure.error.message,
+      deck_status: "failed",
+    });
     return failedCompletion({
       progress: failedProgress,
       error: infrastructureFailure.error,
     });
   }
 
-  if (input.isCancelled()) {
+  if (input.isCancelled() || results.some((result) => result.reason === "cancelled")) {
     const cancelledProgress = createProgress(
       {
         step: "cancelled",
@@ -2864,6 +3125,20 @@ export async function runDeckGeneration(
       attemptLimits,
     );
     input.onProgress(cancelledProgress);
+    await recordDeckRecovery(input, {
+      status: "interrupted",
+      run_kind: input.pageRefinementRequests ? "page-refinement" : "deck-generation",
+      step: "interrupted",
+      target_page_ids: input.pageRefinementRequests
+        ? Object.keys(input.pageRefinementRequests)
+        : pagePlan.pages.filter((page) => getProgressPage(progress, page.page_id)?.status !== "accepted").map((page) => page.page_id),
+      page_refinement_request: input.pageRefinementRequests
+        ? Object.values(input.pageRefinementRequests)[0] ?? null
+        : null,
+      page_refinement_requests: input.pageRefinementRequests ?? {},
+      error: null,
+      deck_status: "interrupted",
+    });
     return {
       status: "cancelled",
       progress: cancelledProgress,
@@ -2890,12 +3165,39 @@ export async function runDeckGeneration(
       attemptLimits,
     );
     input.onProgress(failedProgress);
+    await recordDeckRecovery(input, {
+      status: "failed",
+      run_kind: input.pageRefinementRequests ? "page-refinement" : "deck-generation",
+      step: "page-authoring",
+      target_page_ids: input.pageRefinementRequests
+        ? Object.keys(input.pageRefinementRequests)
+        : [failedPage.page_id],
+      page_refinement_request: input.pageRefinementRequests
+        ? Object.values(input.pageRefinementRequests)[0] ?? null
+        : null,
+      page_refinement_requests: input.pageRefinementRequests ?? {},
+      error: error.message,
+      deck_status: "failed",
+    });
     return failedCompletion({
       progress: failedProgress,
       error,
     });
   }
 
+  progress = await recordDeckRecovery(input, {
+    status: "running",
+    run_kind: "final-deck-render",
+    step: "final-render",
+    target_page_ids: [],
+    error: null,
+    final_deck_render: {
+      status: "running",
+      message: text.finalRender,
+      error: null,
+    },
+    deck_status: "running",
+  });
   emit(
     input,
     {
@@ -2911,8 +3213,51 @@ export async function runDeckGeneration(
     rendered = await input.backend.renderDeckHtml({
       workspace_dir: input.workspace.workspace_dir,
     });
+    if (input.isCancelled()) {
+      progress = await recordDeckRecovery(input, {
+        status: "interrupted",
+        run_kind: "final-deck-render",
+        step: "final-render",
+        error: null,
+        final_deck_render: {
+          status: "interrupted",
+          message: text.finalRender,
+          error: null,
+        },
+        deck_status: "interrupted",
+      });
+      const cancelledProgress = createProgress(
+        {
+          step: "cancelled",
+          message: text.cancelled,
+          currentPageIndex: null,
+          totalPages: pagePlan.pages.length,
+        },
+        progress,
+        null,
+        runtime.activeStreams.values(),
+        attemptLimits,
+      );
+      input.onProgress(cancelledProgress);
+      return {
+        status: "cancelled",
+        progress: cancelledProgress,
+      };
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    progress = await recordDeckRecovery(input, {
+      status: "failed",
+      run_kind: "final-deck-render",
+      step: "final-render",
+      error: message,
+      final_deck_render: {
+        status: "failed",
+        message,
+        error: message,
+      },
+      deck_status: "failed",
+    });
     const failedProgress = createProgress(
       {
         step: "final-render",
@@ -2936,6 +3281,22 @@ export async function runDeckGeneration(
   }
   progress = await input.backend.getPageProgress({
     workspace_dir: input.workspace.workspace_dir,
+  });
+  progress = await recordDeckRecovery(input, {
+    status: "completed",
+    run_kind: "final-deck-render",
+    step: "complete",
+    error: null,
+    final_deck_render: {
+      status: "completed",
+      message: text.deckReady,
+      error: null,
+      output_dir: rendered.output_dir,
+      deck_html_path: rendered.slides[0]?.html_path ?? null,
+      pages_path: `${input.workspace.workspace_dir}/pages.json`,
+      rendered_at: rendered.rendered_at,
+    },
+    deck_status: "completed",
   });
   emit(
     input,
@@ -3014,8 +3375,10 @@ export async function runDeckRefinement(
     });
   }
 
-  const targetPages =
-    input.scope === "deck"
+  const resumeTargetIds = new Set(input.resumePageIds ?? []);
+  const targetPages = resumeTargetIds.size > 0
+    ? pagePlan.pages.filter((page) => resumeTargetIds.has(page.page_id))
+    : input.scope === "deck"
       ? pagePlan.pages
       : pagePlan.pages.filter((page) => page.index === input.pageIndex);
   if (targetPages.length === 0) {
@@ -3048,7 +3411,16 @@ export async function runDeckRefinement(
   let targetPageIds = new Set(targetPages.map((page) => page.page_id));
   const pageRefinementVisualContexts: Record<string, PageRefinementVisualContext> = {};
 
-  if (input.scope === "slide") {
+  if (input.skipIntentReview) {
+    for (const page of targetPages) {
+      pageRefinementVisualContexts[page.page_id] = await resolvePageRefinementVisualContext({
+        backend: input.backend,
+        workspace: activeWorkspace,
+        page,
+        progress: activeProgress,
+      });
+    }
+  } else if (input.scope === "slide") {
     const targetPage = targetPages[0];
     const [planningContext, researchPlan, researchEvidence] = await Promise.all([
       input.backend.getTemplatePlanningContext({
@@ -3252,19 +3624,17 @@ export async function runDeckRefinement(
   const pageRefinementRequests: Record<string, string> = {};
   for (const page of activePagePlan.pages.filter((page) => targetPageIds.has(page.page_id))) {
     pageRefinementRequests[page.page_id] = instruction;
-    await recordProgress(input, page, {
-      status: "pending",
-      render_attempts: 0,
-      visual_review_attempts: 0,
-      content_review_attempts: 0,
-      agent_failures: 0,
-      agent_infrastructure_failures: 0,
-      last_error: instruction,
-      content_review: null,
-      visual_review: null,
-      review: null,
-    });
   }
+  await recordDeckRecovery(input, {
+    status: "running",
+    run_kind: "page-refinement",
+    step: "page-authoring",
+    target_page_ids: Object.keys(pageRefinementRequests),
+    page_refinement_request: instruction,
+    page_refinement_requests: pageRefinementRequests,
+    error: null,
+    deck_status: "running",
+  });
 
   return runDeckGeneration({
     backend: input.backend,
@@ -3350,6 +3720,16 @@ export async function runPageGenerationRetry(
   });
   if (preflightFailure) return preflightFailure;
 
+  await recordDeckRecovery(input, {
+    status: "running",
+    run_kind: "page-generation-retry",
+    step: "page-authoring",
+    target_page_ids: [page.page_id],
+    page_refinement_request: null,
+    page_refinement_requests: {},
+    error: null,
+    deck_status: "running",
+  });
   let progress = await recordProgress(input, page, {
     status: "pending",
     render_attempts: 0,
@@ -3392,7 +3772,7 @@ export async function runPageGenerationRetry(
     });
   }
 
-  if (input.isCancelled()) {
+  if (input.isCancelled() || result.reason === "cancelled") {
     const cancelledProgress = createProgress(
       {
         step: "cancelled",
@@ -3406,6 +3786,14 @@ export async function runPageGenerationRetry(
       attemptLimits,
     );
     input.onProgress(cancelledProgress);
+    await recordDeckRecovery(input, {
+      status: "interrupted",
+      run_kind: "page-generation-retry",
+      step: "interrupted",
+      target_page_ids: [page.page_id],
+      error: null,
+      deck_status: "interrupted",
+    });
     return {
       status: "cancelled",
       progress: cancelledProgress,
@@ -3438,6 +3826,19 @@ export async function runPageGenerationRetry(
     });
   }
 
+  progress = await recordDeckRecovery(input, {
+    status: "running",
+    run_kind: "final-deck-render",
+    step: "final-render",
+    target_page_ids: [],
+    error: null,
+    final_deck_render: {
+      status: "running",
+      message: text.finalRender,
+      error: null,
+    },
+    deck_status: "running",
+  });
   emit(
     input,
     {
@@ -3448,11 +3849,92 @@ export async function runPageGenerationRetry(
     },
     progress,
   );
-  const rendered = await input.backend.renderDeckHtml({
-    workspace_dir: input.workspace.workspace_dir,
-  });
-  progress = await input.backend.getPageProgress({
-    workspace_dir: input.workspace.workspace_dir,
+  let rendered: RenderDeckHtmlResult;
+  try {
+    rendered = await input.backend.renderDeckHtml({
+      workspace_dir: input.workspace.workspace_dir,
+    });
+    if (input.isCancelled()) {
+      progress = await recordDeckRecovery(input, {
+        status: "interrupted",
+        run_kind: "final-deck-render",
+        step: "final-render",
+        error: null,
+        final_deck_render: {
+          status: "interrupted",
+          message: text.finalRender,
+          error: null,
+        },
+        deck_status: "interrupted",
+      });
+      const cancelledProgress = createProgress(
+        {
+          step: "cancelled",
+          message: text.cancelled,
+          currentPageIndex: null,
+          totalPages: pagePlan.pages.length,
+        },
+        progress,
+        undefined,
+        undefined,
+        attemptLimits,
+      );
+      input.onProgress(cancelledProgress);
+      return {
+        status: "cancelled",
+        progress: cancelledProgress,
+      };
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    progress = await recordDeckRecovery(input, {
+      status: "failed",
+      run_kind: "final-deck-render",
+      step: "final-render",
+      error: message,
+      final_deck_render: {
+        status: "failed",
+        message,
+        error: message,
+      },
+      deck_status: "failed",
+    });
+    const failedProgress = createProgress(
+      {
+        step: "final-render",
+        message,
+        currentPageIndex: null,
+        totalPages: pagePlan.pages.length,
+      },
+      progress,
+      undefined,
+      undefined,
+      attemptLimits,
+    );
+    input.onProgress(failedProgress);
+    return failedCompletion({
+      progress: failedProgress,
+      error: {
+        type: "final_render_failed",
+        message,
+      },
+    });
+  }
+  progress = await recordDeckRecovery(input, {
+    status: "completed",
+    run_kind: "final-deck-render",
+    step: "complete",
+    error: null,
+    final_deck_render: {
+      status: "completed",
+      message: text.deckReady,
+      error: null,
+      output_dir: rendered.output_dir,
+      deck_html_path: rendered.slides[0]?.html_path ?? null,
+      pages_path: `${input.workspace.workspace_dir}/pages.json`,
+      rendered_at: rendered.rendered_at,
+    },
+    deck_status: "completed",
   });
   emit(
     input,

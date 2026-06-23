@@ -53,6 +53,7 @@ function makeViewState(patch: Partial<GenerationViewState>): GenerationViewState
     showResume: false,
     showBackToOutline: false,
     hasUnfinishedPages: false,
+    resumeAction: "generation",
     ...patch,
   };
 }
@@ -104,6 +105,23 @@ describe("GeneratingPage controls", () => {
     assert.doesNotMatch(html, /generation-major-node failed/);
     assert.doesNotMatch(html, /创建演示文稿/);
     assert.doesNotMatch(html, /重跑本页/);
+  });
+
+  it("shows continue refinement for page refinement resume", () => {
+    const html = renderPage(
+      makeViewState({
+        status: "interrupted",
+        isActive: false,
+        canStop: false,
+        canResume: true,
+        showResume: true,
+        resumeAction: "refinement",
+      }),
+      makeProgress("interrupted", "accepted"),
+    );
+
+    assert.match(html, /继续修改/);
+    assert.doesNotMatch(html, /继续生成/);
   });
 
   it("shows unresumable title and back-to-outline action without resume", () => {

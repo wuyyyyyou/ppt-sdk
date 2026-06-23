@@ -1036,8 +1036,11 @@ async function toolAppRecordPageProgress(args) {
   }
 
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  if (typeof args.page_id !== "string" || args.page_id.trim().length === 0) {
-    throw new Error('"page_id" must be a non-empty string');
+  const pageId = typeof args.page_id === "string" && args.page_id.trim().length > 0
+    ? args.page_id
+    : undefined;
+  if (args.page_id !== undefined && !pageId) {
+    throw new Error('"page_id" must be a non-empty string when provided');
   }
   const patch = args.patch;
   if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
@@ -1046,7 +1049,7 @@ async function toolAppRecordPageProgress(args) {
 
   return recordAppPageProgress({
     workspace_dir: workspaceDir,
-    page_id: args.page_id,
+    page_id: pageId,
     patch,
   });
 }

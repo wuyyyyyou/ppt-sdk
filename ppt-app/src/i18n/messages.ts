@@ -41,6 +41,7 @@ export interface Messages {
     delete: string;
     retryPage: string;
     resumeGeneration: string;
+    resumeRefinement: string;
     pptx: string;
     pdf: string;
     useTemplate: string;
@@ -334,6 +335,7 @@ export const messages: Record<Locale, Messages> = {
       delete: "Delete",
       retryPage: "Retry page",
       resumeGeneration: "Resume generation",
+      resumeRefinement: "Resume refinement",
       pptx: "PPTX",
       pdf: "PDF",
       useTemplate: "Use style",
@@ -642,6 +644,7 @@ export const messages: Record<Locale, Messages> = {
       delete: "删除",
       retryPage: "重跑本页",
       resumeGeneration: "继续生成",
+      resumeRefinement: "继续修改",
       pptx: "PPTX",
       pdf: "PDF",
       useTemplate: "使用风格",

@@ -590,16 +590,60 @@ export interface PageProgressItem {
   updated_at: string | null;
 }
 
+export type PageProgressRecoveryRunKind =
+  | "deck-generation"
+  | "page-generation-retry"
+  | "page-refinement"
+  | "final-deck-render";
+
+export type PageProgressRecoveryStatus =
+  | "idle"
+  | "running"
+  | "interrupted"
+  | "failed"
+  | "completed";
+
+export interface PageProgressRecoveryState {
+  status: PageProgressRecoveryStatus;
+  run_kind: PageProgressRecoveryRunKind | null;
+  step: string | null;
+  target_page_ids: string[];
+  page_refinement_request: string | null;
+  page_refinement_requests: Record<string, string>;
+  error: string | null;
+  updated_at: string | null;
+}
+
+export type FinalDeckRenderStatus =
+  | "idle"
+  | "running"
+  | "completed"
+  | "failed"
+  | "interrupted";
+
+export interface FinalDeckRenderState {
+  status: FinalDeckRenderStatus;
+  message: string | null;
+  error: string | null;
+  output_dir: string | null;
+  deck_html_path: string | null;
+  pages_path: string | null;
+  rendered_at: string | null;
+  updated_at: string | null;
+}
+
 export interface PageProgress {
   version: 1;
   status: string;
+  recovery?: PageProgressRecoveryState;
+  final_deck_render?: FinalDeckRenderState;
   pages: PageProgressItem[];
   updated_at: string | null;
 }
 
 export interface RecordPageProgressInput {
   workspace_dir: string;
-  page_id: string;
+  page_id?: string;
   patch: Record<string, unknown>;
 }
 

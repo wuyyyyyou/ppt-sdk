@@ -757,6 +757,87 @@ function normalizePageProgressItem(value: unknown): AppPageProgressItem | null {
   };
 }
 
+const PAGE_PROGRESS_RECOVERY_RUN_KINDS = new Set([
+  "deck-generation",
+  "page-generation-retry",
+  "page-refinement",
+  "final-deck-render",
+]);
+
+const PAGE_PROGRESS_RECOVERY_STATUSES = new Set([
+  "idle",
+  "running",
+  "interrupted",
+  "failed",
+  "completed",
+]);
+
+const FINAL_DECK_RENDER_STATUSES = new Set([
+  "idle",
+  "running",
+  "completed",
+  "failed",
+  "interrupted",
+]);
+
+function normalizeStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => normalizeString(item))
+    .filter((item) => item.length > 0);
+}
+
+function normalizeStringRecord(value: unknown): Record<string, string> {
+  const record = getPlainRecord(value);
+  return Object.fromEntries(
+    Object.entries(record)
+      .map(([key, rawValue]) => [key, normalizeString(rawValue)] as const)
+      .filter(([, rawValue]) => rawValue.length > 0),
+  );
+}
+
+function normalizeNullableString(value: unknown): string | null {
+  const normalized = normalizeString(value);
+  return normalized.length > 0 ? normalized : null;
+}
+
+function normalizePageProgressRecoveryState(value: unknown): AppPageProgress["recovery"] {
+  const record = getPlainRecord(value);
+  const runKind = normalizeString(record.run_kind);
+  const status = normalizeString(record.status);
+  return {
+    status: PAGE_PROGRESS_RECOVERY_STATUSES.has(status)
+      ? status as AppPageProgress["recovery"]["status"]
+      : "idle",
+    run_kind: PAGE_PROGRESS_RECOVERY_RUN_KINDS.has(runKind)
+      ? runKind as AppPageProgress["recovery"]["run_kind"]
+      : null,
+    step: normalizeNullableString(record.step),
+    target_page_ids: normalizeStringList(record.target_page_ids),
+    page_refinement_request: normalizeNullableString(record.page_refinement_request),
+    page_refinement_requests: normalizeStringRecord(record.page_refinement_requests),
+    error: normalizeNullableString(record.error),
+    updated_at: typeof record.updated_at === "string" ? record.updated_at : null,
+  };
+}
+
+function normalizeFinalDeckRenderState(value: unknown): AppPageProgress["final_deck_render"] {
+  const record = getPlainRecord(value);
+  const status = normalizeString(record.status);
+  return {
+    status: FINAL_DECK_RENDER_STATUSES.has(status)
+      ? status as AppPageProgress["final_deck_render"]["status"]
+      : "idle",
+    message: normalizeNullableString(record.message),
+    error: normalizeNullableString(record.error),
+    output_dir: normalizeNullableString(record.output_dir),
+    deck_html_path: normalizeNullableString(record.deck_html_path),
+    pages_path: normalizeNullableString(record.pages_path),
+    rendered_at: typeof record.rendered_at === "string" ? record.rendered_at : null,
+    updated_at: typeof record.updated_at === "string" ? record.updated_at : null,
+  };
+}
+
 function normalizePageProgressJson(value: unknown): AppPageProgress {
   const record = getPlainRecord(value);
   const pages = Array.isArray(record.pages)
@@ -769,6 +850,8 @@ function normalizePageProgressJson(value: unknown): AppPageProgress {
   return {
     version: 1,
     status: normalizeString(record.status) || "idle",
+    recovery: normalizePageProgressRecoveryState(record.recovery),
+    final_deck_render: normalizeFinalDeckRenderState(record.final_deck_render),
     pages,
     updated_at: typeof record.updated_at === "string" ? record.updated_at : null,
   };
@@ -802,6 +885,26 @@ function createDefaultPageProgressJson(): AppPageProgress {
   return {
     version: 1,
     status: "idle",
+    recovery: {
+      status: "idle",
+      run_kind: null,
+      step: null,
+      target_page_ids: [],
+      page_refinement_request: null,
+      page_refinement_requests: {},
+      error: null,
+      updated_at: null,
+    },
+    final_deck_render: {
+      status: "idle",
+      message: null,
+      error: null,
+      output_dir: null,
+      deck_html_path: null,
+      pages_path: null,
+      rendered_at: null,
+      updated_at: null,
+    },
     pages: [],
     updated_at: null,
   };
@@ -2624,6 +2727,26 @@ function buildInitialPageProgress(pagePlan: AppPagePlan): AppPageProgress {
   return {
     version: 1,
     status: "prepared",
+    recovery: {
+      status: "idle",
+      run_kind: null,
+      step: null,
+      target_page_ids: [],
+      page_refinement_request: null,
+      page_refinement_requests: {},
+      error: null,
+      updated_at: now,
+    },
+    final_deck_render: {
+      status: "idle",
+      message: null,
+      error: null,
+      output_dir: null,
+      deck_html_path: null,
+      pages_path: null,
+      rendered_at: null,
+      updated_at: now,
+    },
     pages: pagePlan.pages.map((page) => ({
       page_id: page.page_id,
       index: page.index,
@@ -2729,10 +2852,9 @@ export async function recordAppPageProgress(
     const workspace = await ensureWorkspaceFiles(input.workspace_dir);
     const current = normalizePageProgressJson(workspace.page_progress);
     const updatedAt = new Date().toISOString();
-    let found = false;
+    const pageId = normalizeString(input.page_id);
     const nextPages = current.pages.map((page) => {
-      if (page.page_id !== input.page_id) return page;
-      found = true;
+      if (!pageId || page.page_id !== pageId) return page;
       return normalizePageProgressItem({
         ...page,
         ...input.patch,
@@ -2742,13 +2864,32 @@ export async function recordAppPageProgress(
       }) as AppPageProgressItem;
     });
 
-    if (!found) {
-      throw new Error(`Unknown page_id "${input.page_id}" in page-progress.json`);
+    if (pageId && !current.pages.some((page) => page.page_id === pageId)) {
+      throw new Error(`Unknown page_id "${pageId}" in page-progress.json`);
     }
 
+    const patchRecord = getPlainRecord(input.patch);
+    const recoveryPatch = isRecord(patchRecord.recovery) ? patchRecord.recovery : {};
+    const finalDeckRenderPatch = isRecord(patchRecord.final_deck_render)
+      ? patchRecord.final_deck_render
+      : {};
+    const recovery = normalizePageProgressRecoveryState({
+      ...current.recovery,
+      ...recoveryPatch,
+      updated_at: Object.keys(recoveryPatch).length > 0 ? updatedAt : current.recovery.updated_at,
+    });
+    const finalDeckRender = normalizeFinalDeckRenderState({
+      ...current.final_deck_render,
+      ...finalDeckRenderPatch,
+      updated_at: Object.keys(finalDeckRenderPatch).length > 0
+        ? updatedAt
+        : current.final_deck_render.updated_at,
+    });
     const nextProgress: AppPageProgress = {
       version: 1,
       status: normalizeString(input.patch.deck_status) || current.status || "running",
+      recovery,
+      final_deck_render: finalDeckRender,
       pages: nextPages,
       updated_at: updatedAt,
     };

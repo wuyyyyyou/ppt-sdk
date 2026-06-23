@@ -111,6 +111,27 @@ test("recordAppPageProgress preserves concurrent updates in one workspace", asyn
   try {
     const workspaceDir = await createProgressWorkspace(homeDir);
 
+    await recordAppPageProgress({
+      workspace_dir: workspaceDir,
+      patch: {
+        deck_status: "running",
+        recovery: {
+          status: "running",
+          run_kind: "page-refinement",
+          step: "page-authoring",
+          target_page_ids: ["page-01"],
+          page_refinement_request: "make it clearer",
+          page_refinement_requests: {
+            "page-01": "make it clearer",
+          },
+        },
+        final_deck_render: {
+          status: "running",
+          message: "Rendering final deck",
+        },
+      },
+    });
+
     await Promise.all([
       recordAppPageProgress({
         workspace_dir: workspaceDir,
@@ -133,6 +154,18 @@ test("recordAppPageProgress preserves concurrent updates in one workspace", asyn
     ]);
 
     const persisted = await readJson<{
+      status: string;
+      recovery: {
+        status: string;
+        run_kind: string;
+        target_page_ids: string[];
+        page_refinement_request: string;
+        page_refinement_requests: Record<string, string>;
+      };
+      final_deck_render: {
+        status: string;
+        message: string;
+      };
       pages: Array<{
         page_id: string;
         status: string;
@@ -150,6 +183,14 @@ test("recordAppPageProgress preserves concurrent updates in one workspace", asyn
     assert.equal(second?.status, "render_failed");
     assert.equal(second?.render_attempts, 10);
     assert.equal(second?.last_error, "render broke");
+    assert.equal(persisted.status, "running");
+    assert.equal(persisted.recovery.status, "running");
+    assert.equal(persisted.recovery.run_kind, "page-refinement");
+    assert.deepEqual(persisted.recovery.target_page_ids, ["page-01"]);
+    assert.equal(persisted.recovery.page_refinement_request, "make it clearer");
+    assert.equal(persisted.recovery.page_refinement_requests["page-01"], "make it clearer");
+    assert.equal(persisted.final_deck_render.status, "running");
+    assert.equal(persisted.final_deck_render.message, "Rendering final deck");
   } finally {
     if (previousHome === undefined) {
       delete process.env.HOME;

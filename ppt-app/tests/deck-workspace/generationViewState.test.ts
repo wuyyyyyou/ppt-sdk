@@ -129,6 +129,21 @@ describe("Generation View State", () => {
     assert.equal(viewState.canResume, true);
   });
 
+  it("uses refinement resume action for interrupted page refinement", () => {
+    const progress = makeProgress("interrupted", ["accepted"]);
+    progress.recoveryRunKind = "page-refinement";
+
+    const viewState = buildGenerationViewState({
+      loading: "none",
+      progress,
+      activeRun: null,
+    });
+
+    assert.equal(viewState.status, "interrupted");
+    assert.equal(viewState.showResume, true);
+    assert.equal(viewState.resumeAction, "refinement");
+  });
+
   it("shows complete only when progress is complete and all pages are accepted", () => {
     const viewState = buildGenerationViewState({
       loading: "none",

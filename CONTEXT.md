@@ -41,13 +41,13 @@ The slide-by-slide mapping from Confirmed Outline entries to planned pages, with
 The process of collecting external material for a Page Generation Unit after the page intent is known. It produces candidate material for review, not presentation content by itself.
 
 **Research Collection Ledger**:
-A Workspace-owned record of which web and image query intents have already been collected for each Page Generation Unit. It is used to collect only newly requested material during Page Refinement while preserving existing Research Evidence.
+A Workspace-owned record of which web and image query intents have already been collected for each Page Generation Unit. It is used to collect only newly requested material during Page Refinement while preserving existing Research Evidence; interrupted research work must not make a query intent count as completed collection.
 
 **Research Requirement**:
 The decision that a Page Generation Unit needs external material before authoring because its intended content depends on real-world facts, current information, source-backed data, or non-template visual assets. During Page Refinement, additional Research Requirements should be introduced only when the Page Refinement Request or revised target-page intent cannot be satisfied from existing evidence without unsupported concrete details or missing visual assets.
 
 **Research Evidence Gap**:
-A case where a Page Generation Unit has a Research Requirement but Research Collection or Research Curation does not produce enough Research Evidence. It does not block Page Generation; unsupported concrete details must be omitted, generalized, or marked as TBD / 待补充.
+A case where a Page Generation Unit has a Research Requirement but completed Research Collection or Research Curation does not produce enough Research Evidence. It does not block Page Generation; unsupported concrete details must be omitted, generalized, or marked as TBD / 待补充. User cancellation or interruption during research is unfinished work, not a Research Evidence Gap.
 
 **Research Planning**:
 The step that decides which Page Generation Units have a Research Requirement and what external material they need. It is separate from Page Plan because it plans evidence needs rather than slide structure.
@@ -60,7 +60,7 @@ _Avoid_: Evidence, source of truth
 The step that turns Raw Research Material into Research Evidence by selecting relevant facts, sources, and visual assets for a Page Generation Unit.
 
 **Research Curation Draft**:
-An intermediate curation result for a Page Generation Unit that has been selected from Raw Research Material but has not yet been promoted into Research Evidence.
+An intermediate curation result for a Page Generation Unit that has been selected from Raw Research Material but has not yet been promoted into Research Evidence. Drafts from interrupted research work are not valid inputs for Research Evidence until the research stage is completed again.
 
 **Web Research Curation Draft**:
 A Research Curation Draft that contains candidate factual evidence, source judgments, derived insights, rejected material, and gaps from web material.
@@ -94,7 +94,7 @@ The process that turns a confirmed outline into presentation pages; it does not 
 A deck generation process that is currently running; the confirmed outline is not open to edits during this period.
 
 **Interrupted Deck Generation**:
-A Deck Generation that is neither running nor finished, with one or more Page Generation Units not yet accepted or with final Deck artifacts not yet ready, and no page actively authoring. It can be resumed to finish the unfinished work while keeping accepted pages.
+A Deck Generation that is neither running nor finished, with deck-level planning or preparation artifacts not yet ready, one or more Page Generation Units not yet accepted, or final Deck artifacts not yet ready, and no page actively authoring. It can be resumed to finish the unfinished work while keeping accepted pages.
 _Avoid_: Cancelled Deck — cancellation is the user action that leads here, not the resulting state.
 
 **Unresumable Deck Generation**:
@@ -103,6 +103,9 @@ _Avoid_: Failed Deck when the issue is an artifact or state blocker rather than 
 
 **Generation Step**:
 A visible part of deck generation, such as planning pages, preparing files, authoring a page, content review, rendering, visual review, or final rendering.
+
+**Final Deck Render**:
+The deck-level Generation Step that turns accepted Page Generation Units into final previewable Deck artifacts. It is not owned by any single Page Generation Unit, and Deck Generation is not complete until Final Deck Render has succeeded.
 
 **Page Generation Unit**:
 One planned page being authored, content-reviewed, rendered, and visual-reviewed as an independent part of Deck Generation. It owns only that page's content and page-level assets; shared deck structure and template-wide assets belong outside the unit.
@@ -141,7 +144,7 @@ _Avoid_: Session History, Live Page Stream
 A Page Generation Unit that reached a terminal state without becoming accepted after its automatic recovery attempts are exhausted or manual review is required. Deck Generation may still continue other Page Generation Units, but the Deck is not finished until failed pages are retried or otherwise resolved.
 
 **Interrupted Page Generation**:
-A Page Generation Unit that was Active but whose run is no longer owned by any process, because the user stopped Deck Generation or the app exited before the unit reached an accepted or failed verdict. It is unfinished in intent but terminal in fact: no run is advancing it, so it must be explicitly resumed or retried. It is defined by ownership, not by cause, so a user stop and an app exit produce the same state.
+A Page Generation Unit that was Active but whose run is no longer owned by any process, because the user stopped Deck Generation or the app exited before the unit reached an accepted or failed verdict, including interruption during Research Collection or Research Curation. It is unfinished in intent but terminal in fact: no run is advancing it, so it must be explicitly resumed or retried. It is defined by ownership, not by cause, so a user stop and an app exit produce the same state.
 _Avoid_: Stopped Page, Cancelled Page — cancellation is a deck-level user action, not a page state. Distinguish from Failed Page Generation, which exhausted recovery or needs review.
 
 **Agent Session Cache Miss**:
@@ -158,6 +161,9 @@ _Avoid_: Page Generation Retry, Page Visual Review, Visual Review Fix
 The user's active instruction for a Page Refinement during the current run. It may require target-page outline changes or additional evidence, and it is an evidence source only for facts, numbers, dates, names, and claims explicitly stated in the request.
 _Avoid_: Visual Review Issue, Rewrite Request
 
+**Page Refinement Resume**:
+The user action that continues an unfinished Page Refinement using the same persisted Page Refinement Request and the same target pages. It preserves non-target accepted pages and does not reinterpret the refinement as a new request.
+
 **Page Refinement Intent Review**:
 The pre-authoring judgment step in Page Refinement that decides whether the request requires a target-page outline revision, a target-page Page Plan revision, or additional Research Collection. It produces routing decisions for the refinement run rather than slide content.
 
@@ -168,11 +174,11 @@ A Page Refinement Request that cannot be handled within current-page refinement 
 The latest available rendered screenshot for a target page during Page Refinement. It guides visual and layout changes, but text, numbers, charts, and claims visible in the screenshot are not grounding evidence unless they are separately present in allowed evidence sources.
 
 **Deck Generation Resume**:
-The user action that continues unfinished Deck Generation by re-running any Page Generation Unit that is not accepted yet, including Interrupted Page Generations, pending pages, infrastructure failures, and Failed Page Generations. It keeps accepted pages and does not restart the whole Deck.
+The user action that continues unfinished Deck Generation by completing missing deck-level planning or preparation work, re-running any Page Generation Unit that is not accepted yet, including Interrupted Page Generations, pending pages, infrastructure failures, and Failed Page Generations, or by continuing Final Deck Render when all pages are accepted but final Deck artifacts are not ready. It keeps accepted pages and does not restart the whole Deck; an unfinished page keeps its previous current state until its resumed run actually starts.
 _Avoid_: Regenerate, Restart — those discard accepted pages and start the whole Deck over.
 
 **Deck Generation Cancellation**:
-The user action that stops an Active Deck Generation from starting more Page Generation Units. Work already inside a Page Generation Unit may finish its current step before cancellation is reflected; after cancellation settles, unfinished deck work is represented as an Interrupted Deck Generation.
+The user action that asks an Active Deck Generation to stop starting new Page Generation Units and to cooperatively stop active page, research, and final-render work. Work already inside an external operation may return after cancellation, but cancelled work must not be promoted into accepted page content, Research Evidence, or final Deck artifacts; after cancellation settles, unfinished deck work is represented as an Interrupted Deck Generation.
 
 **Task State Semantics**:
 The authoritative state-meaning module for the Task State Machine. It derives effective deck/page state, allowed operations, blockers, recommendations, and page progress synchronization from Workspace artifacts such as the Page Plan and Page Progress.

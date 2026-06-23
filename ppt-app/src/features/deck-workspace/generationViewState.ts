@@ -27,6 +27,7 @@ export interface GenerationViewState {
   showResume: boolean;
   showBackToOutline: boolean;
   hasUnfinishedPages: boolean;
+  resumeAction: "generation" | "refinement";
 }
 
 export interface BuildGenerationViewStateInput {
@@ -70,6 +71,7 @@ export function buildGenerationViewState(
       showResume: false,
       showBackToOutline: false,
       hasUnfinishedPages: unfinishedPages,
+      resumeAction: "generation",
     };
   }
 
@@ -85,6 +87,7 @@ export function buildGenerationViewState(
       showResume: false,
       showBackToOutline: false,
       hasUnfinishedPages: unfinishedPages,
+      resumeAction: "generation",
     };
   }
 
@@ -100,6 +103,7 @@ export function buildGenerationViewState(
       showResume: false,
       showBackToOutline: true,
       hasUnfinishedPages: unfinishedPages,
+      resumeAction: "generation",
     };
   }
 
@@ -115,6 +119,7 @@ export function buildGenerationViewState(
       showResume: false,
       showBackToOutline: false,
       hasUnfinishedPages: false,
+      resumeAction: "generation",
     };
   }
 
@@ -137,6 +142,9 @@ export function buildGenerationViewState(
       showResume: resumeAllowed,
       showBackToOutline: false,
       hasUnfinishedPages: unfinishedPages,
+      resumeAction: input.progress?.recoveryRunKind === "page-refinement"
+        ? "refinement"
+        : "generation",
     };
   }
 
@@ -151,5 +159,8 @@ export function buildGenerationViewState(
     showResume: resumeAllowed,
     showBackToOutline: false,
     hasUnfinishedPages: unfinishedPages,
+    resumeAction: input.progress?.recoveryRunKind === "page-refinement"
+      ? "refinement"
+      : "generation",
   };
 }

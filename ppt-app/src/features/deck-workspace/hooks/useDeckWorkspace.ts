@@ -432,6 +432,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return {
       version: 1,
       status: typeof progressRecord?.status === "string" ? progressRecord.status : "prepared",
+      recovery: progressRecord?.recovery,
+      final_deck_render: progressRecord?.final_deck_render,
       pages,
       updated_at:
         typeof progressRecord?.updated_at === "string" ? progressRecord.updated_at : null
@@ -2347,7 +2349,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         cancelSignal,
       });
       await applyDeckGenerationCompletion(completion, refreshedWorkspace, {
-        resumeAllowedOnRecoverableStop: false,
+        resumeAllowedOnRecoverableStop: true,
       });
       shouldReconcileActiveRun = false;
       if (completion.status === "completed") {
@@ -2400,7 +2402,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         cancelSignal,
       });
       await applyDeckGenerationCompletion(completion, refreshedWorkspace, {
-        resumeAllowedOnRecoverableStop: false,
+        resumeAllowedOnRecoverableStop: true,
       });
       shouldReconcileActiveRun = false;
       setCurrentSlide(currentSlide);
@@ -2559,24 +2561,47 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       if (!workspace) return;
       const refreshedWorkspace = await reconcileWorkspaceInterruptedPages(workspace);
       applyWorkspace(refreshedWorkspace);
-      beginActiveGenerationRun("deck-generation");
       activeRunWorkspaceDir = refreshedWorkspace.workspace_dir;
       shouldReconcileActiveRun = true;
       setStage("generating");
       setPage("main");
-      const completion = await runDeckGeneration({
-        backend,
-        aiClient,
-        agentClient,
-        aiLogger,
-        workspace: refreshedWorkspace,
-        confirmedOutline: refreshedWorkspace.outline as WorkspaceOutline,
-        locale,
-        startMode: "resume",
-        onProgress: recordGenerationProgress,
-        isCancelled: () => cancelCreateDeckRef.current,
-        cancelSignal,
-      });
+      const progress = normalizeWorkspacePageProgress(refreshedWorkspace.page_progress);
+      const recovery = progress?.recovery;
+      const isRefinementResume = recovery?.run_kind === "page-refinement";
+      beginActiveGenerationRun(isRefinementResume ? "page-refinement" : "deck-generation");
+      const completion = isRefinementResume
+        ? await runDeckRefinement({
+            backend,
+            aiClient,
+            agentClient,
+            aiLogger,
+            workspace: refreshedWorkspace,
+            confirmedOutline: refreshedWorkspace.outline as WorkspaceOutline,
+            locale,
+            instruction:
+              recovery.page_refinement_request ||
+              Object.values(recovery.page_refinement_requests ?? {})[0] ||
+              "",
+            scope: "deck",
+            resumePageIds: recovery.target_page_ids,
+            skipIntentReview: true,
+            onProgress: recordGenerationProgress,
+            isCancelled: () => cancelCreateDeckRef.current,
+            cancelSignal,
+          })
+        : await runDeckGeneration({
+            backend,
+            aiClient,
+            agentClient,
+            aiLogger,
+            workspace: refreshedWorkspace,
+            confirmedOutline: refreshedWorkspace.outline as WorkspaceOutline,
+            locale,
+            startMode: "resume",
+            onProgress: recordGenerationProgress,
+            isCancelled: () => cancelCreateDeckRef.current,
+            cancelSignal,
+          });
       await applyDeckGenerationCompletion(completion, refreshedWorkspace);
       shouldReconcileActiveRun = false;
     } catch (error) {

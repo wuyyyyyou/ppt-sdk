@@ -420,9 +420,53 @@ export interface AppPageProgressItem {
   updated_at: string | null;
 }
 
+export type AppPageProgressRecoveryRunKind =
+  | "deck-generation"
+  | "page-generation-retry"
+  | "page-refinement"
+  | "final-deck-render";
+
+export type AppPageProgressRecoveryStatus =
+  | "idle"
+  | "running"
+  | "interrupted"
+  | "failed"
+  | "completed";
+
+export interface AppPageProgressRecoveryState {
+  status: AppPageProgressRecoveryStatus;
+  run_kind: AppPageProgressRecoveryRunKind | null;
+  step: string | null;
+  target_page_ids: string[];
+  page_refinement_request: string | null;
+  page_refinement_requests: Record<string, string>;
+  error: string | null;
+  updated_at: string | null;
+}
+
+export type AppFinalDeckRenderStatus =
+  | "idle"
+  | "running"
+  | "completed"
+  | "failed"
+  | "interrupted";
+
+export interface AppFinalDeckRenderState {
+  status: AppFinalDeckRenderStatus;
+  message: string | null;
+  error: string | null;
+  output_dir: string | null;
+  deck_html_path: string | null;
+  pages_path: string | null;
+  rendered_at: string | null;
+  updated_at: string | null;
+}
+
 export interface AppPageProgress {
   version: 1;
   status: string;
+  recovery: AppPageProgressRecoveryState;
+  final_deck_render: AppFinalDeckRenderState;
   pages: AppPageProgressItem[];
   updated_at: string | null;
 }
@@ -433,7 +477,7 @@ export interface GetAppPageProgressInput {
 
 export interface RecordAppPageProgressInput {
   workspace_dir: string;
-  page_id: string;
+  page_id?: string;
   patch: Record<string, unknown>;
 }
 

@@ -526,7 +526,7 @@
     },
     {
       "name": "app_record_page_progress",
-      "description": "Patch one page entry in page-progress.json.",
+      "description": "Patch page-progress.json. When page_id is provided, patch one page entry; recovery and final_deck_render in patch update top-level recovery state.",
       "parameters": [
         {
           "name": "workspace_dir",
@@ -537,13 +537,13 @@
         {
           "name": "page_id",
           "type": "string",
-          "description": "Page id from page-plan.json.",
-          "required": true
+          "description": "Optional page id from page-plan.json. Omit for deck-level recovery state updates.",
+          "required": false
         },
         {
           "name": "patch",
           "type": "object",
-          "description": "Partial progress fields to merge into the page entry.",
+          "description": "Partial page fields, plus optional top-level recovery and final_deck_render patches.",
           "required": true
         }
       ]
