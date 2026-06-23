@@ -6,6 +6,7 @@ import {
   type AgentClient,
 } from "../../src/agent/agentClient.ts";
 import type { AiClient } from "../../src/ai/aiClient.ts";
+import type { PageRefinementIntentReviewResult } from "../../src/ai/types.ts";
 import type { PptBackend } from "../../src/api/pptBackend.ts";
 import type {
   PagePlan,
@@ -262,6 +263,8 @@ function createHarness(options: {
   pagePlan?: PagePlan;
   researchPlan?: ResearchPlan;
   existingResearchEvidence?: ResearchEvidenceIndex;
+  existingResearchStatus?: ResearchStatus;
+  intentReviews?: PageRefinementIntentReviewResult[];
   webSearchResults?: Array<{ title: string; url: string; snippet: string; source?: string }>;
   imageSearchResults?: Array<{ title: string; image_url: string; width?: number; height?: number }>;
   webSearchError?: Error;
@@ -291,8 +294,12 @@ function createHarness(options: {
   let progress = clone(options.existingProgress ?? makeProgress(pagePlan));
   let researchPlan = clone(options.researchPlan ?? makeResearchPlan(pagePlan));
   let researchEvidence = clone(options.existingResearchEvidence ?? makeEmptyResearchEvidence());
-  let researchStatus = makeResearchStatus();
+  let researchStatus = clone(options.existingResearchStatus ?? makeResearchStatus());
+  let currentOutline = clone(outline);
+  let currentWorkspace = clone(workspace);
+  currentWorkspace.outline = currentOutline;
   const researchDrafts = new Map<string, Record<string, unknown>>();
+  const intentReviewQueue = [...(options.intentReviews ?? [])];
   let renderFailures = options.renderFailures ?? 0;
   const authoringPrompts: string[] = [];
   const visualReviewPrompts: string[] = [];
@@ -301,6 +308,9 @@ function createHarness(options: {
   const logs: unknown[] = [];
   const progressEvents: DeckGenerationProgress[] = [];
   let generatePagePlanCalls = 0;
+  let updateWorkspaceOutlineCalls = 0;
+  let recordPagePlanCalls = 0;
+  let recordResearchPlanCalls = 0;
   let renderCalls = 0;
   let activeAuthoringRuns = 0;
   let maxActiveAuthoringRuns = 0;
@@ -308,8 +318,10 @@ function createHarness(options: {
   let checkToolAccessCalls = 0;
   let prepareResearchWorkspaceCalls = 0;
   let webSearchCalls = 0;
+  const webSearchQueries: string[] = [];
   let webFetchCalls = 0;
   let imageSearchCalls = 0;
+  const imageSearchQueries: string[] = [];
   let imageFetchCalls = 0;
   let recordResearchEvidenceCalls = 0;
   let recordResearchEvidencePageCalls = 0;
@@ -319,16 +331,36 @@ function createHarness(options: {
   const backend: PptBackend = {
     listWorkspaces: async () => ({ workspace_root: "", has_workspaces: false, latest_workspace: null, workspaces: [] }),
     getWorkspaceDefaults: async () => ({ workspace_root: workspace.workspace_root, setting: {} }),
-    createWorkspace: async () => workspace,
-    openWorkspace: async () => workspace,
+    createWorkspace: async () => currentWorkspace,
+    openWorkspace: async () => currentWorkspace,
     appendWorkspaceLog: async (input) => {
       logs.push(input);
       return { workspace_dir: input.workspace_dir, log_file: "log.jsonl", appended: true };
     },
-    getWorkspaceOutline: async () => outline,
-    updateWorkspaceOutline: async () => workspace,
-    updateWorkspaceSettings: async () => workspace,
-    updateWorkspaceTitle: async () => workspace,
+    getWorkspaceOutline: async () => clone(currentOutline),
+    updateWorkspaceOutline: async (input) => {
+      updateWorkspaceOutlineCalls += 1;
+      currentOutline = {
+        ...currentOutline,
+        title: input.outline.title ?? currentOutline.title,
+        output_language: input.outline.output_language ?? currentOutline.output_language,
+        status: input.outline.status ?? currentOutline.status,
+        items: input.outline.items ? clone(input.outline.items) : currentOutline.items,
+        source: input.outline.source
+          ? {
+              prompt: input.outline.source.prompt,
+              context: input.outline.source.context ?? [],
+              task_context: input.outline.source.task_context,
+              setting: input.outline.source.setting ?? {},
+            }
+          : currentOutline.source,
+        updated_at: "2026-05-23T00:00:00.000Z",
+      };
+      currentWorkspace = { ...currentWorkspace, outline: currentOutline };
+      return clone(currentWorkspace);
+    },
+    updateWorkspaceSettings: async () => currentWorkspace,
+    updateWorkspaceTitle: async () => currentWorkspace,
     createProject: async () => ({ projectDir: "", state: {} }),
     getProject: async () => ({ projectDir: "", state: {} }),
     recordRequirements: async () => ({ projectDir: "", state: {} }),
@@ -336,8 +368,22 @@ function createHarness(options: {
     selectTemplate: async () => ({ workspace, selection: {} as never }),
     getTemplatePlanningContext: async () => planningContext,
     recordPagePlan: async (input) => {
+      recordPagePlanCalls += 1;
       pagePlan = clone(input.page_plan);
-      progress = makeProgress(pagePlan);
+      progress = {
+        ...progress,
+        pages: pagePlan.pages.map((page) => {
+          const existing = progress.pages.find((item) => item.page_id === page.page_id);
+          return {
+            ...(existing ?? makeProgress({ ...pagePlan, pages: [page] }).pages[0]),
+            page_id: page.page_id,
+            index: page.index,
+            title: page.title,
+            slide_path: page.slide_path,
+            data_path: page.data_path,
+          };
+        }),
+      };
       researchPlan = clone(options.researchPlan ?? makeResearchPlan(pagePlan));
       return clone(pagePlan);
     },
@@ -376,6 +422,7 @@ function createHarness(options: {
       };
     },
     recordResearchPlan: async (input) => {
+      recordResearchPlanCalls += 1;
       researchPlan = clone(input.research_plan);
       return clone(researchPlan);
     },
@@ -450,8 +497,9 @@ function createHarness(options: {
       return clone(researchStatus);
     },
     getResearchStatus: async () => clone(researchStatus),
-    webSearch: async () => {
+    webSearch: async (input) => {
       webSearchCalls += 1;
+      webSearchQueries.push(input.query);
       if (options.webSearchError) throw options.webSearchError;
       const results = options.webSearchResults ?? [
         { title: "Source", url: "https://example.com/source", snippet: "source", source: "example.com" },
@@ -478,8 +526,9 @@ function createHarness(options: {
         count: results.length,
       };
     },
-    imageSearch: async () => {
+    imageSearch: async (input) => {
       imageSearchCalls += 1;
+      imageSearchQueries.push(input.query);
       const results = options.imageSearchResults ?? [
         { title: "Image", image_url: "https://example.com/image.jpg", width: 800, height: 450 },
       ];
@@ -567,6 +616,17 @@ function createHarness(options: {
       return clone(pagePlan);
     },
     generateResearchPlan: async () => clone(researchPlan),
+    reviewPageRefinementIntent: async () => intentReviewQueue.shift() ?? {
+      route: "proceed",
+      outline_change_required: false,
+      page_plan_replan_required: false,
+      additional_research_required: false,
+      additional_web_query_intents: [],
+      additional_image_query_intents: [],
+      evidence_needs: [],
+      visual_needs: [],
+      reason: "test proceed",
+    },
     generateDeck: async () => ({ title: "", outline: [], slides: [] }),
     reviseOutline: async () => ({ outline: { title: outline.title, output_language: "English", items: outline.items }, attempts: [] }),
     generateSlidesFromOutline: async () => [],
@@ -681,6 +741,15 @@ function createHarness(options: {
     get generatePagePlanCalls() {
       return generatePagePlanCalls;
     },
+    get updateWorkspaceOutlineCalls() {
+      return updateWorkspaceOutlineCalls;
+    },
+    get recordPagePlanCalls() {
+      return recordPagePlanCalls;
+    },
+    get recordResearchPlanCalls() {
+      return recordResearchPlanCalls;
+    },
     get renderCalls() {
       return renderCalls;
     },
@@ -696,11 +765,17 @@ function createHarness(options: {
     get webSearchCalls() {
       return webSearchCalls;
     },
+    get webSearchQueries() {
+      return [...webSearchQueries];
+    },
     get webFetchCalls() {
       return webFetchCalls;
     },
     get imageSearchCalls() {
       return imageSearchCalls;
+    },
+    get imageSearchQueries() {
+      return [...imageSearchQueries];
     },
     get imageFetchCalls() {
       return imageFetchCalls;
@@ -726,8 +801,14 @@ function createHarness(options: {
     get pagePlan() {
       return clone(pagePlan);
     },
+    get outline() {
+      return clone(currentOutline);
+    },
     get researchEvidence() {
       return clone(researchEvidence);
+    },
+    get researchPlan() {
+      return clone(researchPlan);
     },
     get researchStatus() {
       return clone(researchStatus);
@@ -1264,6 +1345,274 @@ describe("Deck Generation Flow Module", () => {
       ),
       false,
     );
+  });
+
+  it("stops unsupported current-page refinement before workspace mutations", async () => {
+    const pagePlan = makePagePlan();
+    const existingProgress = makeProgress(pagePlan, "accepted");
+    const harness = createHarness({
+      pagePlan,
+      existingProgress,
+      intentReviews: [{
+        route: "unsupported",
+        blocking_reason: "Current-page refinement cannot add a new appendix slide.",
+        outline_change_required: false,
+        page_plan_replan_required: false,
+        additional_research_required: false,
+        additional_web_query_intents: [],
+        additional_image_query_intents: [],
+        evidence_needs: [],
+        visual_needs: [],
+        reason: "Adds a page.",
+      }],
+    });
+
+    const completion = await runDeckRefinement({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      instruction: "Add a new appendix slide after this one.",
+      scope: "slide",
+      pageIndex: 0,
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "failed");
+    assert.match(completion.error.message, /cannot add a new appendix slide/);
+    assert.equal(harness.checkToolAccessCalls, 0);
+    assert.equal(harness.updateWorkspaceOutlineCalls, 0);
+    assert.equal(harness.recordPagePlanCalls, 0);
+    assert.equal(harness.recordResearchPlanCalls, 0);
+    assert.equal(harness.recordPageProgressInputs.length, 0);
+    assert.equal(harness.authoringPrompts.length, 0);
+    assert.equal(harness.progress.pages[0]?.status, "accepted");
+    assert.equal(harness.progress.pages[1]?.status, "accepted");
+  });
+
+  it("applies target-only outline and Page Plan revisions before current-page refinement", async () => {
+    const pagePlan = makePagePlan();
+    const existingProgress = makeProgress(pagePlan, "accepted");
+    existingProgress.pages[0]!.last_screenshot_path = "/tmp/workspaces/demo/output/page-1-before.png";
+    const harness = createHarness({
+      pagePlan,
+      existingProgress,
+      intentReviews: [{
+        route: "proceed",
+        outline_change_required: true,
+        revised_outline_item: {
+          title: "Customer Case Analysis",
+          outline: "Replace the overview with one grounded customer case and decision implications.",
+        },
+        page_plan_replan_required: true,
+        revised_page_plan_item: {
+          blueprint_id: "case-study",
+          blueprint_source: "./blueprints/CaseStudy.tsx",
+          reason: "A case-study structure better fits the revised page intent.",
+        },
+        additional_research_required: false,
+        additional_web_query_intents: [],
+        additional_image_query_intents: [],
+        evidence_needs: [],
+        visual_needs: [],
+        reason: "The request changes only the target page intent.",
+      }],
+    });
+
+    const completion = await runDeckRefinement({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      instruction: "Turn this page into a customer case analysis.",
+      scope: "slide",
+      pageIndex: 0,
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.updateWorkspaceOutlineCalls, 1);
+    assert.equal(harness.outline.title, outline.title);
+    assert.equal(harness.outline.output_language, outline.output_language);
+    assert.equal(harness.outline.items.length, outline.items.length);
+    assert.equal(harness.outline.items[0]?.title, "Customer Case Analysis");
+    assert.equal(harness.outline.items[1]?.title, outline.items[1]?.title);
+    const revisedPage = harness.pagePlan.pages[0]!;
+    assert.equal(revisedPage.page_id, "page-01");
+    assert.equal(revisedPage.index, 0);
+    assert.equal(revisedPage.slide_path, "./slides/page-01.tsx");
+    assert.equal(revisedPage.data_path, "./data/page-01.json");
+    assert.equal(revisedPage.manifest_slide_id, "page-01");
+    assert.equal(revisedPage.title, "Customer Case Analysis");
+    assert.equal(revisedPage.blueprint_id, "case-study");
+    assert.equal(revisedPage.blueprint_source, "./blueprints/CaseStudy.tsx");
+    assert.equal(harness.pagePlan.pages[1]?.title, pagePlan.pages[1]?.title);
+    const prompt = harness.authoringPrompts[0] ?? "";
+    assert.match(prompt, /Customer Case Analysis/);
+    assert.match(prompt, /CaseStudy\.tsx/);
+  });
+
+  it("collects only incremental research queries and merges new evidence", async () => {
+    const pagePlan = makePagePlan();
+    const existingProgress = makeProgress(pagePlan, "accepted");
+    existingProgress.pages[0]!.last_screenshot_path = "/tmp/workspaces/demo/output/page-1-before.png";
+    const researchPlan = makeResearchPlan(pagePlan, {
+      pages: makeResearchPlan(pagePlan).pages.map((page) =>
+        page.page_id === "page-01"
+          ? {
+              ...page,
+              web_research_needed: true,
+              query_intents: ["old query"],
+              evidence_needs: ["existing need"],
+            }
+          : page,
+      ),
+    });
+    const existingResearchEvidence: ResearchEvidenceIndex = {
+      ...makeEmptyResearchEvidence(),
+      status: "curated",
+      pages: [{
+        page_id: "page-01",
+        status: "curated",
+        facts: [{
+          id: "old-fact",
+          claim: "Existing fact",
+          source_type: "web_source",
+          source_title: "Old Source",
+          source_url: "https://example.com/old",
+        }],
+        visual_assets: [],
+        derived_insights: [],
+        gaps: [],
+        rejected_material: [],
+        markdown_path: "/tmp/workspaces/demo/research/evidence/pages/page-01.md",
+        updated_at: "2026-05-23T00:00:00.000Z",
+      }],
+    };
+    const existingResearchStatus: ResearchStatus = {
+      ...makeResearchStatus(),
+      status: "ready",
+      collection_ledger: {
+        version: 1,
+        pages: [{
+          page_id: "page-01",
+          web_queries: [{
+            key: "old query",
+            query: "old query",
+            collected_at: "2026-05-23T00:00:00.000Z",
+          }],
+          image_queries: [],
+        }],
+      },
+    };
+    const harness = createHarness({
+      pagePlan,
+      existingProgress,
+      researchPlan,
+      existingResearchEvidence,
+      existingResearchStatus,
+      intentReviews: [{
+        route: "proceed",
+        outline_change_required: false,
+        page_plan_replan_required: false,
+        additional_research_required: true,
+        additional_web_query_intents: ["old query", "new query"],
+        additional_image_query_intents: ["new image"],
+        evidence_needs: ["new evidence need"],
+        visual_needs: ["new visual need"],
+        reason: "The request needs a new source and image.",
+      }],
+    });
+
+    const completion = await runDeckRefinement({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      instruction: "Add a new sourced market fact and a real image.",
+      scope: "slide",
+      pageIndex: 0,
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.deepEqual(harness.webSearchQueries, ["new query"]);
+    assert.deepEqual(harness.imageSearchQueries, ["new image"]);
+    const requirement = harness.researchPlan.pages.find((page) => page.page_id === "page-01")!;
+    assert.deepEqual(requirement.query_intents, ["old query", "new query"]);
+    assert.deepEqual(requirement.image_query_intents, ["new image"]);
+    assert.ok(harness.researchStatus.collection_ledger?.pages[0]?.web_queries.some((item) => item.key === "new query"));
+    assert.ok(harness.researchStatus.collection_ledger?.pages[0]?.image_queries.some((item) => item.key === "new image"));
+    const evidence = harness.researchEvidence.pages.find((page) => page.page_id === "page-01")!;
+    assert.ok(evidence.facts.some((fact) => fact.claim === "Existing fact"));
+    assert.ok(evidence.facts.some((fact) => fact.claim === "Collected web fact"));
+    assert.equal(evidence.visual_assets.length, 1);
+  });
+
+  it("passes Page Refinement Visual Context into authoring and falls back gracefully", async () => {
+    const pagePlan = makePagePlan();
+    const existingProgress = makeProgress(pagePlan, "accepted");
+    existingProgress.pages[0]!.last_screenshot_path = "/tmp/workspaces/demo/output/current-page.png";
+    const harness = createHarness({ pagePlan, existingProgress });
+
+    const completion = await runDeckRefinement({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      instruction: "Improve the visual hierarchy of this page.",
+      scope: "slide",
+      pageIndex: 0,
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.renderCalls, 1);
+    const prompt = harness.authoringPrompts[0] ?? "";
+    assert.match(prompt, /Page Refinement Visual Context/);
+    assert.match(prompt, /\/tmp\/workspaces\/demo\/output\/current-page\.png/);
+    assert.match(prompt, /upload_local_file/);
+    assert.match(prompt, /analyze_image/);
+    assert.match(prompt, /not factual grounding evidence/);
+
+    const fallbackHarness = createHarness({
+      pagePlan,
+      existingProgress: makeProgress(pagePlan, "accepted"),
+      renderFailures: 1,
+    });
+    const fallbackCompletion = await runDeckRefinement({
+      backend: fallbackHarness.backend,
+      aiClient: fallbackHarness.aiClient,
+      agentClient: fallbackHarness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      instruction: "Improve the visual hierarchy of this page.",
+      scope: "slide",
+      pageIndex: 0,
+      onProgress: (progress) => fallbackHarness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(fallbackCompletion.status, "completed");
+    assert.match(fallbackHarness.authoringPrompts[0] ?? "", /No screenshot visual context is available/);
   });
 
   it("routes quick slide refinement instructions through Page Refinement semantics", async () => {
@@ -1970,7 +2319,7 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.imageFetchCalls, 1);
     assert.equal(harness.recordResearchEvidenceCalls, 0);
     assert.equal(harness.recordResearchEvidencePageCalls, 1);
-    assert.equal(harness.recordResearchStatusCalls, 1);
+    assert.equal(harness.recordResearchStatusCalls, 2);
     assert.equal(harness.recordResearchStatusPageCalls, 1);
     assert.ok(harness.progressEvents.some((progress) => progress.step === "research-collection"));
     assert.ok(harness.progressEvents.some((progress) => progress.step === "research-curation"));

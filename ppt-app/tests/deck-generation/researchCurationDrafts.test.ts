@@ -246,7 +246,7 @@ describe("Research Curation Drafts", () => {
     assert.equal(result.evidence.pages.length, 2);
     assert.equal(result.evidence.pages[0]?.page_id, "page-00");
     assert.equal(result.evidence.pages[1]?.page_id, page.page_id);
-    assert.deepEqual(result.evidence.pages[1]?.gaps, []);
+    assert.deepEqual(result.evidence.pages[1]?.gaps, ["old gap"]);
     assert.equal(result.evidence.pages[1]?.markdown_path, "/tmp/new.md");
   });
 });

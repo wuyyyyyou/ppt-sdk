@@ -1,8 +1,15 @@
 import type { OutlineDetail, Slide } from "../data/mockDeck";
 import type { AnnaLlmCompleteInput } from "../runtime/annaRuntime";
 import type { WorkspaceSettings } from "../api/types";
-import type { PagePlan, TemplatePlanningContext, WorkspaceOutline } from "../api/types";
-import type { ResearchPlan } from "../api/types";
+import type {
+  PagePlan,
+  PagePlanItem,
+  ResearchEvidenceIndex,
+  ResearchPlan,
+  ResearchRequirement,
+  TemplatePlanningContext,
+  WorkspaceOutline,
+} from "../api/types";
 import type { Locale } from "../i18n/messages";
 import type { AiOperationLogContext } from "./interactionLog";
 
@@ -114,6 +121,44 @@ export interface GenerateResearchPlanInput {
   logContext?: AiOperationLogContext;
 }
 
+export type PageRefinementIntentReviewRoute = "proceed" | "unsupported";
+
+export interface PageRefinementIntentReviewResult {
+  route: PageRefinementIntentReviewRoute;
+  blocking_reason?: string;
+  outline_change_required: boolean;
+  revised_outline_item?: {
+    title: string;
+    outline: string;
+  };
+  page_plan_replan_required: boolean;
+  revised_page_plan_item?: {
+    title?: string;
+    outline?: string;
+    blueprint_id?: string;
+    blueprint_source?: string;
+    reason?: string;
+  };
+  additional_research_required: boolean;
+  additional_web_query_intents: string[];
+  additional_image_query_intents: string[];
+  evidence_needs: string[];
+  visual_needs: string[];
+  reason: string;
+}
+
+export interface ReviewPageRefinementIntentInput {
+  instruction: string;
+  outline: WorkspaceOutline;
+  pagePlan: PagePlan;
+  targetPage: PagePlanItem;
+  planningContext: TemplatePlanningContext;
+  researchRequirement: ResearchRequirement | null;
+  researchEvidence: ResearchEvidenceIndex | null;
+  locale: Locale;
+  logContext?: AiOperationLogContext;
+}
+
 export interface AiClient {
   generateOutline(input: GenerateOutlineInput): Promise<OutlineGenerationResult>;
   detectOutputLanguage(input: GenerateOutlineInput & {
@@ -123,6 +168,7 @@ export interface AiClient {
   suggestContext(input: SuggestContextInput): Promise<ContextSuggestionResult>;
   generatePagePlan(input: GeneratePagePlanInput): Promise<PagePlan>;
   generateResearchPlan(input: GenerateResearchPlanInput): Promise<ResearchPlan>;
+  reviewPageRefinementIntent(input: ReviewPageRefinementIntentInput): Promise<PageRefinementIntentReviewResult>;
   generateDeck(input: GenerateDeckInput): Promise<GeneratedDeck>;
   reviseOutline(input: ReviseOutlineInput): Promise<OutlineGenerationResult>;
   generateSlidesFromOutline(

@@ -16,6 +16,10 @@ import {
   parseResearchPlanJson,
 } from "./researchPlanPrompt";
 import {
+  buildPageRefinementIntentReviewPrompt,
+  normalizePageRefinementIntentReview,
+} from "./pageRefinementIntentReview";
+import {
   OutlineValidationError,
   parseOutlineJson,
   validateGeneratedOutline,
@@ -495,6 +499,17 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         parseResearchPlanJson(rawText),
         input.pagePlan
       );
+    },
+
+    async reviewPageRefinementIntent(input) {
+      const result = await completeJson<unknown>(
+        runtime,
+        "page refinement intent review",
+        buildPageRefinementIntentReviewPrompt(input),
+        '{"route":"proceed","blocking_reason":"","outline_change_required":false,"page_plan_replan_required":false,"additional_research_required":false,"additional_web_query_intents":[],"additional_image_query_intents":[],"evidence_needs":[],"visual_needs":[],"reason":"..."}',
+        input.logContext,
+      );
+      return normalizePageRefinementIntentReview(result);
     },
 
     async generateDeck(input) {

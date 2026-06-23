@@ -323,22 +323,107 @@ function computeIndexStatus(pages: ResearchEvidencePage[]): ResearchEvidenceInde
   return "partial";
 }
 
+function normalizeTextKey(value: string | undefined): string {
+  return (value ?? "")
+    .normalize("NFKC")
+    .trim()
+    .toLocaleLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function dedupeFacts(
+  facts: ResearchEvidencePage["facts"],
+): ResearchEvidencePage["facts"] {
+  const seen = new Set<string>();
+  const result: ResearchEvidencePage["facts"] = [];
+  for (const fact of facts) {
+    const key =
+      normalizeTextKey(fact.source_url) ||
+      normalizeTextKey(fact.source_file) ||
+      normalizeTextKey(fact.claim) ||
+      fact.id;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(fact);
+  }
+  return result;
+}
+
+function dedupeVisualAssets(
+  assets: ResearchEvidencePage["visual_assets"],
+): ResearchEvidencePage["visual_assets"] {
+  const seen = new Set<string>();
+  const result: ResearchEvidencePage["visual_assets"] = [];
+  for (const asset of assets) {
+    const key =
+      normalizeTextKey(asset.sha256) ||
+      normalizeTextKey(asset.file_path) ||
+      normalizeTextKey(asset.image_url) ||
+      normalizeTextKey(asset.page_url) ||
+      asset.id;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(asset);
+  }
+  return result;
+}
+
+function dedupeInsights(
+  insights: ResearchEvidencePage["derived_insights"],
+): ResearchEvidencePage["derived_insights"] {
+  const seen = new Set<string>();
+  const result: ResearchEvidencePage["derived_insights"] = [];
+  for (const insight of insights) {
+    const key = normalizeTextKey(insight.insight) || insight.id;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(insight);
+  }
+  return result;
+}
+
+function dedupeRejectedMaterial(
+  rejected: ResearchEvidencePage["rejected_material"],
+): ResearchEvidencePage["rejected_material"] {
+  const seen = new Set<string>();
+  const result: ResearchEvidencePage["rejected_material"] = [];
+  for (const item of rejected) {
+    const key = `${normalizeTextKey(item.source)}:${normalizeTextKey(item.reason)}`;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(item);
+  }
+  return result;
+}
+
 export function mergeResearchCurationDrafts(
   input: MergeResearchCurationDraftsInput,
 ): MergeResearchCurationDraftsResult {
   const now = input.now ?? new Date().toISOString();
+  const existingPage = input.currentEvidence.pages.find((page) => page.page_id === input.page.page_id) ?? null;
   const gaps = dedupeStrings([
+    ...(existingPage?.gaps ?? []),
     ...(input.gaps ?? []),
     ...(input.webDraft?.gaps ?? []),
     ...(input.visualDraft?.gaps ?? []),
   ]);
-  const facts = input.webDraft?.facts ?? [];
-  const derivedInsights = input.webDraft?.derived_insights ?? [];
-  const visualAssets = input.visualDraft?.visual_assets ?? [];
-  const rejectedMaterial = [
+  const facts = dedupeFacts([
+    ...(existingPage?.facts ?? []),
+    ...(input.webDraft?.facts ?? []),
+  ]);
+  const derivedInsights = dedupeInsights([
+    ...(existingPage?.derived_insights ?? []),
+    ...(input.webDraft?.derived_insights ?? []),
+  ]);
+  const visualAssets = dedupeVisualAssets([
+    ...(existingPage?.visual_assets ?? []),
+    ...(input.visualDraft?.visual_assets ?? []),
+  ]);
+  const rejectedMaterial = dedupeRejectedMaterial([
+    ...(existingPage?.rejected_material ?? []),
     ...(input.webDraft?.rejected_material ?? []),
     ...(input.visualDraft?.rejected_material ?? []),
-  ];
+  ]);
   const hasUsableEvidence =
     facts.length > 0 || derivedInsights.length > 0 || visualAssets.length > 0;
 

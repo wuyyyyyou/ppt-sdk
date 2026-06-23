@@ -35,13 +35,16 @@ The selected visual style family used to shape the deck.
 The recommended data shape for a Template layout. It guides authoring and tooling, but it is not necessarily a render-time gate.
 
 **Page Plan**:
-The slide-by-slide mapping from outline entries to planned pages.
+The slide-by-slide mapping from Confirmed Outline entries to planned pages, with one Page Plan entry per outline item. During Page Refinement, only the target page entries should be revised when target page outlines change.
 
 **Research Collection**:
 The process of collecting external material for a Page Generation Unit after the page intent is known. It produces candidate material for review, not presentation content by itself.
 
+**Research Collection Ledger**:
+A Workspace-owned record of which web and image query intents have already been collected for each Page Generation Unit. It is used to collect only newly requested material during Page Refinement while preserving existing Research Evidence.
+
 **Research Requirement**:
-The decision that a Page Generation Unit needs external material before authoring because its intended content depends on real-world facts, current information, source-backed data, or non-template visual assets. Pages without a Research Requirement should not collect external material by default.
+The decision that a Page Generation Unit needs external material before authoring because its intended content depends on real-world facts, current information, source-backed data, or non-template visual assets. During Page Refinement, additional Research Requirements should be introduced only when the Page Refinement Request or revised target-page intent cannot be satisfied from existing evidence without unsupported concrete details or missing visual assets.
 
 **Research Evidence Gap**:
 A case where a Page Generation Unit has a Research Requirement but Research Collection or Research Curation does not produce enough Research Evidence. It does not block Page Generation; unsupported concrete details must be omitted, generalized, or marked as TBD / 待补充.
@@ -148,12 +151,21 @@ A transient Agent Session infrastructure failure where the platform cannot conti
 The action of rerunning one Page Generation Unit against the current Confirmed Outline, Page Plan, and Template with a fresh attempt budget. It is a lower-level recovery concept; the user-facing recovery action for unfinished deck work is Deck Generation Resume.
 
 **Page Refinement**:
-A user-requested revision of one accepted Page Generation Unit after Deck Generation, using the user's refinement request as the active instruction for that page while preserving the current Confirmed Outline, Page Plan, and Template.
+A user-requested revision of one or more accepted Page Generation Units after Deck Generation. It first interprets whether the request can stay within the current Confirmed Outline or must revise the target page outline; a required target-page outline revision becomes the active Confirmed Outline for downstream generation.
 _Avoid_: Page Generation Retry, Page Visual Review, Visual Review Fix
 
 **Page Refinement Request**:
-The user's active instruction for a Page Refinement during the current run. It is an evidence source only for facts, numbers, dates, names, and claims explicitly stated in the request, and does not authorize inferred adjacent facts or generated page content as grounded.
+The user's active instruction for a Page Refinement during the current run. It may require target-page outline changes or additional evidence, and it is an evidence source only for facts, numbers, dates, names, and claims explicitly stated in the request.
 _Avoid_: Visual Review Issue, Rewrite Request
+
+**Page Refinement Intent Review**:
+The pre-authoring judgment step in Page Refinement that decides whether the request requires a target-page outline revision, a target-page Page Plan revision, or additional Research Collection. It produces routing decisions for the refinement run rather than slide content.
+
+**Unsupported Page Refinement Request**:
+A Page Refinement Request that cannot be handled within current-page refinement boundaries, such as changing deck page count, page order, template selection, or other non-target pages. It should stop the refinement run before workspace artifacts are changed.
+
+**Page Refinement Visual Context**:
+The latest available rendered screenshot for a target page during Page Refinement. It guides visual and layout changes, but text, numbers, charts, and claims visible in the screenshot are not grounding evidence unless they are separately present in allowed evidence sources.
 
 **Deck Generation Resume**:
 The user action that continues unfinished Deck Generation by re-running any Page Generation Unit that is not accepted yet, including Interrupted Page Generations, pending pages, infrastructure failures, and Failed Page Generations. It keeps accepted pages and does not restart the whole Deck.

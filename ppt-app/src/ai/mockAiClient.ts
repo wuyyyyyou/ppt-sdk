@@ -237,6 +237,23 @@ export function createMockAiClient(): AiClient {
       return plan;
     },
 
+    async reviewPageRefinementIntent(input) {
+      await sleep(200);
+      const result = {
+        route: "proceed" as const,
+        outline_change_required: false,
+        page_plan_replan_required: false,
+        additional_research_required: false,
+        additional_web_query_intents: [],
+        additional_image_query_intents: [],
+        evidence_needs: [],
+        visual_needs: [],
+        reason: "Mock current-page refinement can proceed.",
+      };
+      await logMockInteraction(input.logContext, { method: "reviewPageRefinementIntent", input }, result);
+      return result;
+    },
+
     async generateDeck(input: GenerateDeckInput) {
       await sleep(input.outlineFirst ? 900 : 1100);
       const deck = {

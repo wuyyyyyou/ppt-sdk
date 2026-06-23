@@ -16,6 +16,7 @@ import {
 import { assertResearchPlanAligned } from "../../ai/researchPlanPrompt";
 import type { AiClient } from "../../ai/aiClient";
 import type { AiInteractionLogger, AiOperationLogContext } from "../../ai/interactionLog";
+import type { PageRefinementIntentReviewResult } from "../../ai/types";
 import type {
   PagePlan,
   PagePlanItem,
@@ -46,6 +47,13 @@ import {
   validateVisualResearchCurationDraft,
   validateWebResearchCurationDraft,
 } from "./researchCurationDrafts";
+import {
+  applyTargetOutlineRevision,
+  computeResearchQueryDelta,
+  mergeTargetResearchRequirement,
+  recordResearchCollectionLedger,
+  reviseTargetPagePlanEntry,
+} from "./pageRefinementWorkflow";
 
 const ATTEMPT_LIMITS = {
   render: 10,
@@ -179,6 +187,7 @@ export interface RunDeckGenerationInput {
   isCancelled: () => boolean;
   cancelSignal?: AbortSignal;
   pageRefinementRequests?: Record<string, string>;
+  pageRefinementVisualContexts?: Record<string, PageRefinementVisualContext>;
 }
 
 export interface RunDeckRefinementInput extends RunDeckGenerationInput {
@@ -205,6 +214,12 @@ interface DeckGenerationRuntime extends DeckGenerationContext {
   activeStreams: Map<string, DeckGenerationStream>;
   getProgress: () => PageProgress | null;
   setProgress: (progress: PageProgress) => void;
+}
+
+interface PageRefinementVisualContext {
+  screenshotPath?: string;
+  source: "progress" | "fresh-render" | "unavailable";
+  unavailableReason?: string;
 }
 
 function generationText(locale: Locale) {
@@ -383,6 +398,7 @@ function buildAuthoringPrompt(input: {
   renderFailureHistory?: RenderFailureHistoryItem[];
   visualReview?: AgentPageVisualReviewResult | null;
   contentReview?: AgentPageContentReviewResult | null;
+  pageRefinementVisualContext?: PageRefinementVisualContext;
 }) {
   const hasFailureFix = Boolean(input.renderError || input.visualReview || input.contentReview);
   const pageRefinementRequest = input.pageRefinementRequest?.trim() ?? "";
@@ -407,8 +423,10 @@ function buildAuthoringPrompt(input: {
     : input.contentReview
       ? [
           "This is a content-review-fix pass. Fix the language, alignment, or grounding issues reported by Page Content Review first.",
+          "Do not perform broad page-structure redesigns during render-fix, visual-review-fix, or content-review-fix.",
           "Prefer editing the current page data JSON. Do not modify outline.json, page-plan.json, other pages, or unrelated shared files.",
           "Do not replace unsupported claims with new unsupported claims. If source support is missing, remove, generalize, or mark the content as TBD / 待补充.",
+          "Never satisfy a rewrite request by inventing or approximating real-world numbers.",
         ].join("\n")
       : input.visualReview
         ? [
@@ -418,12 +436,14 @@ function buildAuthoringPrompt(input: {
         : pageRefinementRequest
           ? [
               "This is a page-refinement pass. Apply the user's current-page refinement request to this page.",
+              "You may adjust page structure, component composition, TSX, and data when needed to satisfy the current-page refinement request.",
               "Preserve the Confirmed Outline, Page Plan, and Template boundaries. Treat only facts, numbers, dates, names, and claims explicitly stated in the request as grounding for this refinement run.",
             ].join("\n")
           : "This is an initial authoring pass. Create the best version of this page from the current page plan, template components, and available grounded evidence.";
 
   return [
     "You are a local file-editing Agent authoring one TSX-first PPT slide.",
+    "You are a local file-editing Agent generating one PPT slide.",
     "Edit files directly on disk. Work only on the current page unless a shared component or theme change is truly necessary.",
     "",
     `Authoring mode: ${input.attemptKind}`,
@@ -438,6 +458,7 @@ function buildAuthoringPrompt(input: {
             ? [
                 "Consecutive render failure history:",
                 "The following JSON array records consecutive render or pre-render check failures for this page in the current run. Use it to avoid repeating the same failed fix.",
+                "Each item is one failed render or pre-render check attempt.",
                 JSON.stringify(renderFailureHistory, null, 2),
               ].join("\n")
             : "",
@@ -459,6 +480,24 @@ function buildAuthoringPrompt(input: {
           "This is a user-requested Page Refinement for the current page, not a Page Visual Review failure and not a Page Generation Retry.",
           "Adjust only the current page. Preserve existing grounded content unless the request explicitly changes it.",
           "Do not infer adjacent facts, complete missing time series, derive unstated metrics, or treat existing generated content as grounding.",
+        ].join("\n")
+      : "",
+    pageRefinementRequest
+      ? [
+          "Page Refinement Visual Context:",
+          input.pageRefinementVisualContext?.screenshotPath
+            ? [
+                `Screenshot path: ${input.pageRefinementVisualContext.screenshotPath}`,
+                `Screenshot source: ${input.pageRefinementVisualContext.source}`,
+                "Before editing, first call `upload_local_file` with the screenshot path, then call `analyze_image` on the uploaded image.",
+                "Use the image analysis for visual and layout decisions only: hierarchy, density, whitespace, overlap, readability, and visual emphasis.",
+                "The screenshot is not factual grounding evidence. Text, numbers, charts, logos, dates, claims, or source names visible in the screenshot are not grounded unless separately present in allowed grounding sources.",
+                "If upload or image analysis fails, continue without visual context and mention the degradation in the final JSON notes.",
+              ].join("\n")
+            : [
+                `No screenshot visual context is available: ${input.pageRefinementVisualContext?.unavailableReason ?? "not resolved"}.`,
+                "Continue the refinement without visual context. Do not treat any screenshot as factual evidence.",
+              ].join("\n"),
         ].join("\n")
       : "",
     "",
@@ -492,17 +531,34 @@ function buildAuthoringPrompt(input: {
       `7. Slide authoring guide: ${input.workspaceDir}/template/slides/README.md`,
       `8. REQUIRED when present, current-page Research Evidence: ${currentPageEvidencePath}`,
       `9. REQUIRED when present, deck-level Research Evidence index: ${evidenceIndexPath}`,
+      `Also read ${currentPageEvidencePath} if it exists.`,
+      `Also read ${evidenceIndexPath} if it exists.`,
       "10. Before using any component from template/components, read that component's source file.",
+    ].join("\n"),
+    "",
+    [
+      "Authoring composition strategy:",
+      "- The current slide TSX/data you receive is based on the selected blueprint. Treat it as a starting canvas, not a finished slide.",
+      "- Build the page primarily by composing existing template components.",
+      "- Do not hand-code bespoke page sections, cards, KPI blocks, charts, or decorative structures when existing template components can express the same intent.",
+      "- Add, remove, reorder, resize, or reconfigure components when needed to fit the page message and evidence.",
+      "- Avoid mechanically cloning the selected blueprint structure across pages.",
     ].join("\n"),
     "",
     [
       "Grounding rules:",
       "- Treat the current slide TSX and current data JSON as editable draft content, not as factual sources.",
+      "Authoring grounding source rules:",
+      "- Treat the current slide TSX and current data JSON as editable draft content, not as sources of truth.",
+      "- Current generated content must not be used as evidence for new factual claims, numbers, dates, chart data, KPIs, rankings, citations, or source-backed details.",
       "- Allowed grounding sources are only: the user's original prompt; context rows; task_context; uploaded or source material represented in workspace artifacts; Confirmed Outline source prompt/context/task_context; Confirmed Outline text; current Page Plan title/outline/reason when they restate or directly derive from the Confirmed Outline; current-page Research Evidence; Shared Research Evidence; and, in page-refinement mode, facts, numbers, dates, names, and claims explicitly stated in the current Page Refinement Request.",
       "- Not grounding sources: current generated data JSON or slide TSX; generated pages; rendered HTML; screenshots; visual review output; Agent summaries; Raw Research Material; and other pages' Research Evidence unless it is explicitly Shared Research Evidence.",
+      "- Do not use Raw Research Material as evidence unless it has been curated into Research Evidence.",
       "- Do not call search tools during Page Authoring.",
       "- If source support is missing, remove the detail, generalize it, or mark it as TBD / 待补充 / 待确认.",
       "- Do not invent facts, numbers, years, rankings, citations, URLs, organization names, market data, customer cases, or chart data for completeness, polish, or realism.",
+      "- Analytical conclusions must be clearly derived from provided facts.",
+      "- If the requested content requires external knowledge and no source material is available, omit it, generalize it, or mark it as TBD / 待补充 / 待确认.",
     ].join("\n"),
     "",
     [
@@ -544,6 +600,7 @@ function buildAuthoringPrompt(input: {
       "Component rules:",
       "- Prefer composing existing template components and blueprint-local patterns.",
       "- Do not hand-code new cards, KPIs, tables, matrices, charts, or decorative structures when an existing component can express the same intent.",
+      "- Read the component source file, not only components/README.md.",
       "- Before using or modifying any component from template/components, read the component source file, not only README.",
       "- Treat exported TypeScript props as the component API contract.",
       "- Do not invent prop names from component names or README descriptions.",
@@ -568,10 +625,14 @@ function buildAuthoringPrompt(input: {
     "",
     [
       "Numeric and chart rules:",
+      "Numeric and chart authoring rules:",
       "- Do not invent, estimate, approximate, or complete plausible-looking numbers. This includes revenue, cash flow, profit, margins, ROE, growth rates, percentages, target ranges, rankings, market share, store counts, user counts, customer counts, years, currency values, chart series values, and table data.",
+      "- Do not invent, estimate, approximate, or make up plausible-looking numbers.",
       "- If an evidence source does not provide a concrete number, do not create one for polish, realism, visual balance, or blueprint field needs.",
       "- If a chart, table, or KPI layout is useful but source data is missing, use explicit placeholders: KPI values should be TBD / 待补充 / 待确认; chart series values may be all zero; chart titles, notes, or nearby text must clearly say 数据待补充 / 示意 / 待确认.",
+      "- If source data is missing, set chart series values to all zeros and label the chart as 数据待补充 / 示意 / 待确认.",
       "- Without source data, do not use realistic-looking time or metric labels such as FY20-FY23, recent years, quarterly labels, or target lines. Prefer neutral labels such as Phase 1, Phase 2, Phase 3 or Item 1, Item 2.",
+      "- Without source data, do not use real-looking time labels such as FY20-FY23.",
       "- chart ticks, minValue, and maxValue may be visual scale controls, but they must not imply real measured ranges unless evidence explicitly supports them.",
       "- Do not describe placeholder numbers as design decisions in final summary notes. If placeholders are used, say that source data is pending.",
     ].join("\n"),
@@ -1410,7 +1471,22 @@ async function collectAndCurateResearchForPage(
     }),
   );
   const existingEvidence = currentEvidence.pages.find((item) => item.page_id === page.page_id);
-  if (existingEvidence?.status === "curated") {
+  const isPageRefinement = Boolean(input.pageRefinementRequests?.[page.page_id]?.trim());
+  const initialResearchStatus = await input.backend.getResearchStatus({
+    workspace_dir: input.workspace.workspace_dir,
+  });
+  const deltaQueries = computeResearchQueryDelta({
+    status: initialResearchStatus,
+    pageId: page.page_id,
+    requirement: pageRequirement,
+  });
+  if (
+    existingEvidence?.status === "curated" &&
+    (!isPageRefinement || (
+      deltaQueries.webQueries.length === 0 &&
+      deltaQueries.imageQueries.length === 0
+    ))
+  ) {
     await appendResearchLogSafe(input, {
       event: "ai.research.page.reused",
       schema_version: 1,
@@ -1442,10 +1518,12 @@ async function collectAndCurateResearchForPage(
 
   const rawWebIndexPaths: string[] = [];
   const rawImageIndexPaths: string[] = [];
+  const webCollections: Array<{ query: string; raw_index_path?: string }> = [];
+  const imageCollections: Array<{ query: string; raw_index_path?: string }> = [];
   const gaps: string[] = [];
 
   if (pageRequirement.web_research_needed) {
-    for (const query of pageRequirement.query_intents.slice(0, 3)) {
+    for (const query of deltaQueries.webQueries) {
       try {
         const search = await input.backend.webSearch({
           query,
@@ -1455,6 +1533,7 @@ async function collectAndCurateResearchForPage(
         const urls = search.results.map((item) => item.url).filter(Boolean).slice(0, 5);
         if (urls.length === 0) {
           gaps.push(`No web search results for: ${query}`);
+          webCollections.push({ query });
           continue;
         }
         const fetched = await input.backend.webFetch({
@@ -1465,8 +1544,10 @@ async function collectAndCurateResearchForPage(
         });
         if (fetched.index_path) {
           rawWebIndexPaths.push(fetched.index_path);
+          webCollections.push({ query, raw_index_path: fetched.index_path });
         } else {
           gaps.push(`Web fetch did not return an index path for: ${query}`);
+          webCollections.push({ query });
         }
       } catch (error) {
         gaps.push(`Web research failed for "${query}": ${error instanceof Error ? error.message : String(error)}`);
@@ -1475,7 +1556,7 @@ async function collectAndCurateResearchForPage(
   }
 
   if (pageRequirement.image_research_needed) {
-    for (const query of pageRequirement.image_query_intents.slice(0, 2)) {
+    for (const query of deltaQueries.imageQueries) {
       try {
         const search = await input.backend.imageSearch({
           query,
@@ -1489,6 +1570,7 @@ async function collectAndCurateResearchForPage(
           .slice(0, 4);
         if (urls.length === 0) {
           gaps.push(`No image search results for: ${query}`);
+          imageCollections.push({ query });
           continue;
         }
         const fetched = await input.backend.imageFetch({
@@ -1497,8 +1579,10 @@ async function collectAndCurateResearchForPage(
         });
         if (fetched.index_path) {
           rawImageIndexPaths.push(fetched.index_path);
+          imageCollections.push({ query, raw_index_path: fetched.index_path });
         } else {
           gaps.push(`Image fetch did not return an index path for: ${query}`);
+          imageCollections.push({ query });
         }
       } catch (error) {
         gaps.push(`Image research failed for "${query}": ${error instanceof Error ? error.message : String(error)}`);
@@ -1506,13 +1590,29 @@ async function collectAndCurateResearchForPage(
     }
   }
 
+  if (webCollections.length > 0 || imageCollections.length > 0) {
+    const latestResearchStatus = await input.backend.getResearchStatus({
+      workspace_dir: input.workspace.workspace_dir,
+    });
+    await input.backend.recordResearchStatus({
+      workspace_dir: input.workspace.workspace_dir,
+      status: recordResearchCollectionLedger({
+        status: latestResearchStatus,
+        pageId: page.page_id,
+        webCollections,
+        imageCollections,
+        now: new Date().toISOString(),
+      }),
+    });
+  }
+
   const evidenceMarkdownPath = `${paths.evidence_pages_dir}/${page.page_id}.md`;
   const webDraftPath = `${paths.evidence_drafts_dir}/${page.page_id}-web.json`;
   const visualDraftPath = `${paths.evidence_drafts_dir}/${page.page_id}-visual.json`;
-  if (pageRequirement.web_research_needed && rawWebIndexPaths.length === 0) {
+  if (deltaQueries.webQueries.length > 0 && rawWebIndexPaths.length === 0) {
     gaps.push("No raw web material was collected for this page.");
   }
-  if (pageRequirement.image_research_needed && rawImageIndexPaths.length === 0) {
+  if (deltaQueries.imageQueries.length > 0 && rawImageIndexPaths.length === 0) {
     gaps.push("No raw image material was collected for this page.");
   }
 
@@ -1532,7 +1632,7 @@ async function collectAndCurateResearchForPage(
   let webDraft: WebResearchCurationDraft | null = null;
   let visualDraft: VisualResearchCurationDraft | null = null;
 
-  if (pageRequirement.web_research_needed) {
+  if (pageRequirement.web_research_needed && deltaQueries.webQueries.length > 0) {
     if (rawWebIndexPaths.length > 0) {
       webDraft = await runResearchDraftAgent({
         flowInput: input,
@@ -1563,7 +1663,7 @@ async function collectAndCurateResearchForPage(
     }
   }
 
-  if (pageRequirement.image_research_needed) {
+  if (pageRequirement.image_research_needed && deltaQueries.imageQueries.length > 0) {
     if (rawImageIndexPaths.length > 0) {
       visualDraft = await runResearchDraftAgent({
         flowInput: input,
@@ -1595,7 +1695,7 @@ async function collectAndCurateResearchForPage(
   }
 
   const merged = mergeResearchCurationDrafts({
-    currentEvidence: normalizeResearchEvidenceIndex(null),
+    currentEvidence,
     page,
     requirement: pageRequirement,
     evidenceMarkdownPath,
@@ -1648,6 +1748,66 @@ async function loadResumeArtifacts(input: RunDeckGenerationInput) {
     return { pagePlan, progress };
   } catch {
     return null;
+  }
+}
+
+async function readResearchPlanSafe(input: Pick<DeckGenerationContext, "backend" | "workspace">): Promise<ResearchPlan | null> {
+  try {
+    return await input.backend.getResearchPlan({
+      workspace_dir: input.workspace.workspace_dir,
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function readResearchEvidenceSafe(input: Pick<DeckGenerationContext, "backend" | "workspace">): Promise<ResearchEvidenceIndex | null> {
+  try {
+    return normalizeResearchEvidenceIndex(
+      await input.backend.getResearchEvidence({
+        workspace_dir: input.workspace.workspace_dir,
+      }),
+    );
+  } catch {
+    return null;
+  }
+}
+
+async function resolvePageRefinementVisualContext(input: {
+  backend: PptBackend;
+  workspace: WorkspaceResult;
+  page: PagePlanItem;
+  progress: PageProgress;
+}): Promise<PageRefinementVisualContext> {
+  const progressPage = getProgressPage(input.progress, input.page.page_id);
+  const screenshotPath = progressPage?.last_screenshot_path?.trim();
+  if (screenshotPath) {
+    return {
+      screenshotPath,
+      source: "progress",
+    };
+  }
+
+  try {
+    const preview = await input.backend.renderWorkspacePagePreview({
+      workspace_dir: input.workspace.workspace_dir,
+      page_index: input.page.index,
+    });
+    if (preview.screenshot_path?.trim()) {
+      return {
+        screenshotPath: preview.screenshot_path.trim(),
+        source: "fresh-render",
+      };
+    }
+    return {
+      source: "unavailable",
+      unavailableReason: "fresh render did not return a screenshot path",
+    };
+  } catch (error) {
+    return {
+      source: "unavailable",
+      unavailableReason: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
@@ -2064,6 +2224,9 @@ async function runPageGeneration(
       renderFailureHistory,
       visualReview,
       contentReview,
+      pageRefinementVisualContext: pageRefinementRequest
+        ? input.pageRefinementVisualContexts?.[page.page_id]
+        : undefined,
     });
     const authoringKind = attemptKind === "initial" ? "authoring" : attemptKind;
     const authoringTracker = createAgentRunTracker({
@@ -2878,19 +3041,216 @@ export async function runDeckRefinement(
     });
   }
 
-  const preflightFailure = await preflightAgentToolAccess({
-    agentClient: input.agentClient,
-    locale: input.locale,
-    onProgress: input.onProgress,
-    progress,
-    attemptLimits,
-    totalPages: pagePlan.pages.length,
-    currentPageIndex: input.scope === "slide" ? input.pageIndex ?? null : null,
-  });
-  if (preflightFailure) return preflightFailure;
+  let activeOutline = input.confirmedOutline;
+  let activeWorkspace = input.workspace;
+  let activePagePlan = pagePlan;
+  let activeProgress = progress;
+  let targetPageIds = new Set(targetPages.map((page) => page.page_id));
+  const pageRefinementVisualContexts: Record<string, PageRefinementVisualContext> = {};
+
+  if (input.scope === "slide") {
+    const targetPage = targetPages[0];
+    const [planningContext, researchPlan, researchEvidence] = await Promise.all([
+      input.backend.getTemplatePlanningContext({
+        workspace_dir: input.workspace.workspace_dir,
+      }),
+      readResearchPlanSafe(input),
+      readResearchEvidenceSafe(input),
+    ]);
+    const researchRequirement = researchPlan ? getResearchRequirement(researchPlan, targetPage) : null;
+    let intentReview: PageRefinementIntentReviewResult;
+    try {
+      const logContext: AiOperationLogContext | undefined = input.aiLogger
+        ? {
+            logger: input.aiLogger,
+            workspace_dir: input.workspace.workspace_dir,
+            domain: "page_plan" as const,
+            operation: "page_refinement_intent_review",
+            operation_id: input.aiLogger.createOperationId("page_plan", "page_refinement_intent_review"),
+            provider: "anna",
+            runtime_mode: "anna",
+          }
+        : undefined;
+      intentReview = await input.aiClient.reviewPageRefinementIntent({
+        instruction,
+        outline: input.confirmedOutline,
+        pagePlan,
+        targetPage,
+        planningContext,
+        researchRequirement,
+        researchEvidence,
+        locale: input.locale,
+        logContext,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const failedProgress = createProgress(
+        {
+          step: "failed",
+          message,
+          currentPageIndex: input.pageIndex ?? null,
+          totalPages: pagePlan.pages.length,
+        },
+        progress,
+        undefined,
+        undefined,
+        attemptLimits,
+      );
+      input.onProgress(failedProgress);
+      return failedCompletion({
+        progress: failedProgress,
+        error: {
+          type: "page_failed",
+          message,
+        },
+      });
+    }
+
+    if (intentReview.route === "unsupported") {
+      const message = intentReview.blocking_reason || (
+        input.locale === "zh"
+          ? "当前页优化无法处理这个需求。"
+          : "This request cannot be handled as current-page refinement."
+      );
+      const failedProgress = createProgress(
+        {
+          step: "failed",
+          message,
+          currentPageIndex: input.pageIndex ?? null,
+          totalPages: pagePlan.pages.length,
+        },
+        progress,
+        undefined,
+        undefined,
+        attemptLimits,
+      );
+      input.onProgress(failedProgress);
+      return failedCompletion({
+        progress: failedProgress,
+        error: {
+          type: "page_failed",
+          message,
+          page_id: targetPage.page_id,
+          page_index: targetPage.index,
+        },
+      });
+    }
+
+    const preflightFailure = await preflightAgentToolAccess({
+      agentClient: input.agentClient,
+      locale: input.locale,
+      onProgress: input.onProgress,
+      progress,
+      attemptLimits,
+      totalPages: pagePlan.pages.length,
+      currentPageIndex: input.pageIndex ?? null,
+    });
+    if (preflightFailure) return preflightFailure;
+
+    const now = new Date().toISOString();
+    if (intentReview.outline_change_required && intentReview.revised_outline_item) {
+      activeOutline = applyTargetOutlineRevision({
+        outline: input.confirmedOutline,
+        pageIndex: targetPage.index,
+        revisedItem: intentReview.revised_outline_item,
+        now,
+      });
+      const updatedWorkspace = await input.backend.updateWorkspaceOutline({
+        workspace_dir: input.workspace.workspace_dir,
+        outline: {
+          title: activeOutline.title,
+          output_language: activeOutline.output_language,
+          status: "confirmed",
+          items: activeOutline.items,
+          source: {
+            prompt: activeOutline.source.prompt,
+            context: activeOutline.source.context,
+            task_context: activeOutline.source.task_context,
+            setting: activeOutline.source.setting,
+          },
+        },
+      });
+      activeWorkspace = {
+        ...updatedWorkspace,
+        outline: activeOutline,
+      };
+    }
+
+    if (intentReview.page_plan_replan_required || intentReview.outline_change_required) {
+      activePagePlan = reviseTargetPagePlanEntry({
+        pagePlan,
+        targetPage,
+        activeOutline,
+        review: intentReview,
+        now: new Date().toISOString(),
+      });
+      activePagePlan = await input.backend.recordPagePlan({
+        workspace_dir: input.workspace.workspace_dir,
+        page_plan: activePagePlan,
+      });
+      activeProgress = await input.backend.getPageProgress({
+        workspace_dir: input.workspace.workspace_dir,
+      });
+    }
+
+    const activeTargetPage = activePagePlan.pages.find((page) => page.page_id === targetPage.page_id) ?? targetPage;
+    targetPageIds = new Set([activeTargetPage.page_id]);
+
+    if (researchPlan && (
+      intentReview.additional_research_required ||
+      intentReview.additional_web_query_intents.length > 0 ||
+      intentReview.additional_image_query_intents.length > 0 ||
+      intentReview.evidence_needs.length > 0 ||
+      intentReview.visual_needs.length > 0
+    )) {
+      if (researchEvidence?.pages.find((page) => page.page_id === targetPage.page_id)?.status === "curated" && researchRequirement) {
+        const currentResearchStatus = await input.backend.getResearchStatus({
+          workspace_dir: input.workspace.workspace_dir,
+        });
+        await input.backend.recordResearchStatus({
+          workspace_dir: input.workspace.workspace_dir,
+          status: recordResearchCollectionLedger({
+            status: currentResearchStatus,
+            pageId: targetPage.page_id,
+            webCollections: researchRequirement.query_intents.map((query) => ({ query })),
+            imageCollections: researchRequirement.image_query_intents.map((query) => ({ query })),
+            now: new Date().toISOString(),
+          }),
+        });
+      }
+      await input.backend.recordResearchPlan({
+        workspace_dir: input.workspace.workspace_dir,
+        research_plan: mergeTargetResearchRequirement({
+          researchPlan,
+          targetPage: activeTargetPage,
+          review: intentReview,
+          pagePlanUpdatedAt: activePagePlan.updated_at,
+          now: new Date().toISOString(),
+        }),
+      });
+    }
+
+    pageRefinementVisualContexts[activeTargetPage.page_id] = await resolvePageRefinementVisualContext({
+      backend: input.backend,
+      workspace: activeWorkspace,
+      page: activeTargetPage,
+      progress: activeProgress,
+    });
+  } else {
+    const preflightFailure = await preflightAgentToolAccess({
+      agentClient: input.agentClient,
+      locale: input.locale,
+      onProgress: input.onProgress,
+      progress,
+      attemptLimits,
+      totalPages: pagePlan.pages.length,
+      currentPageIndex: null,
+    });
+    if (preflightFailure) return preflightFailure;
+  }
 
   const pageRefinementRequests: Record<string, string> = {};
-  for (const page of targetPages) {
+  for (const page of activePagePlan.pages.filter((page) => targetPageIds.has(page.page_id))) {
     pageRefinementRequests[page.page_id] = instruction;
     await recordProgress(input, page, {
       status: "pending",
@@ -2910,14 +3270,15 @@ export async function runDeckRefinement(
     backend: input.backend,
     aiClient: input.aiClient,
     agentClient: input.agentClient,
-    workspace: input.workspace,
-    confirmedOutline: input.confirmedOutline,
+    workspace: activeWorkspace,
+    confirmedOutline: activeOutline,
     locale: input.locale,
     startMode: "resume",
     onProgress: input.onProgress,
     isCancelled: input.isCancelled,
     cancelSignal: input.cancelSignal,
     pageRefinementRequests,
+    pageRefinementVisualContexts,
   });
 }
 

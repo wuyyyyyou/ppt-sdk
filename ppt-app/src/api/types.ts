@@ -502,6 +502,24 @@ export interface ResearchStatus {
     evidence_path?: string;
     updated_at?: string;
   }>;
+  collection_ledger?: {
+    version: 1;
+    pages: Array<{
+      page_id: string;
+      web_queries: Array<{
+        key: string;
+        query: string;
+        collected_at: string;
+        raw_index_path?: string;
+      }>;
+      image_queries: Array<{
+        key: string;
+        query: string;
+        collected_at: string;
+        raw_index_path?: string;
+      }>;
+    }>;
+  };
   updated_at: string;
 }
 
