@@ -6,6 +6,7 @@ import {
   type AgentClient,
 } from "../../src/agent/agentClient.ts";
 import type { AiClient } from "../../src/ai/aiClient.ts";
+import { createAiInteractionLogger } from "../../src/ai/interactionLog.ts";
 import type { PageRefinementIntentReviewResult } from "../../src/ai/types.ts";
 import type { PptBackend } from "../../src/api/pptBackend.ts";
 import type {
@@ -302,6 +303,7 @@ function createHarness(options: {
   const intentReviewQueue = [...(options.intentReviews ?? [])];
   let renderFailures = options.renderFailures ?? 0;
   const authoringPrompts: string[] = [];
+  const authoringLogContexts: unknown[] = [];
   const visualReviewPrompts: string[] = [];
   const contentReviewPrompts: string[] = [];
   const recordPageProgressInputs: Array<{ page_id: string; patch: Record<string, unknown> }> = [];
@@ -643,6 +645,7 @@ function createHarness(options: {
     },
     runAuthoringPrompt: async (prompt, runOptions) => {
       authoringPrompts.push(prompt);
+      authoringLogContexts.push(runOptions?.logContext ?? null);
       activeAuthoringRuns += 1;
       maxActiveAuthoringRuns = Math.max(maxActiveAuthoringRuns, activeAuthoringRuns);
       runOptions?.onStreamEvent?.({ type: "activity", message: "authoring started" });
@@ -733,6 +736,7 @@ function createHarness(options: {
     aiClient,
     agentClient,
     authoringPrompts,
+    authoringLogContexts,
     visualReviewPrompts,
     contentReviewPrompts,
     recordPageProgressInputs,
@@ -1274,6 +1278,46 @@ describe("Deck Generation Flow Module", () => {
     assert.doesNotMatch(authoringPrompt, /Visual review failed\. Fix request/);
     assert.equal(harness.progress.pages[0]?.status, "accepted");
     assert.equal(harness.progress.pages[1]?.status, "accepted");
+  });
+
+  it("passes AI interaction logging context into Page Refinement authoring", async () => {
+    const pagePlan = makePagePlan();
+    const existingProgress = makeProgress(pagePlan, "accepted");
+    const harness = createHarness({ pagePlan, existingProgress });
+    const aiLogger = createAiInteractionLogger(harness.backend);
+
+    const completion = await runDeckRefinement({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      aiLogger,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      instruction: "Improve this slide's visual hierarchy.",
+      scope: "slide",
+      pageIndex: 0,
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.authoringLogContexts.length, 1);
+    const logContext = harness.authoringLogContexts[0] as {
+      domain?: string;
+      operation?: string;
+      page_id?: string;
+      page_index?: number;
+      kind?: string;
+      logger?: unknown;
+    };
+    assert.equal(logContext.domain, "page_agent");
+    assert.equal(logContext.operation, "page-refinement");
+    assert.equal(logContext.kind, "page-refinement");
+    assert.equal(logContext.page_id, "page-01");
+    assert.equal(logContext.page_index, 0);
+    assert.equal(logContext.logger, aiLogger);
   });
 
   it("carries Page Refinement Request into content-review evidence sources", async () => {

@@ -3270,6 +3270,7 @@ export async function runDeckRefinement(
     backend: input.backend,
     aiClient: input.aiClient,
     agentClient: input.agentClient,
+    aiLogger: input.aiLogger,
     workspace: activeWorkspace,
     confirmedOutline: activeOutline,
     locale: input.locale,
