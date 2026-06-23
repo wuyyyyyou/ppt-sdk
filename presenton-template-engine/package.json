@@ -31,7 +31,8 @@
   },
   "scripts": {
     "sync:tool-manifests": "node ../scripts/sync-tool-manifests.mjs",
-    "prebuild": "npm run sync:tool-manifests",
+    "sync:engine-manifest": "node ../scripts/sync-presenton-template-engine-manifest.mjs",
+    "prebuild": "npm run sync:engine-manifest",
     "dev": "tsx src/cli.ts",
     "build": "node ./scripts/build-template-registry.mjs && node ./scripts/preserve-dist-template-previews.mjs save && tsup && node ./scripts/preserve-dist-template-previews.mjs restore && node ./scripts/build-forkable-templates.mjs",
     "build:full": "npm run build && npm run build:template-previews",

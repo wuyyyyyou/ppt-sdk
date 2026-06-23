@@ -112,7 +112,7 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
           set -euo pipefail
-          npm run sync:tool-manifests
+          npm run sync:engine-manifest
           git diff --exit-code
 
       - name: Build and validate binary release package
