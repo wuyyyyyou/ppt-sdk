@@ -372,26 +372,31 @@ export async function inspectRenderedSlides(
 ): Promise<RenderedSlideInspection[]> {
   const renderedContext = context.rendered ?? await prepareRenderedValidationContext(context);
   if (renderedContext.slideInspections) {
-    return renderedContext.slideInspectionsArePageScoped
+    return renderedContext.slideInspectionsArePageScoped || renderedContext.slidesArePageScoped
       ? renderedContext.slideInspections
       : selectCollectionPageForValidation(renderedContext.slideInspections, context);
   }
 
   if (renderedContext.inspectSlides) {
-    const inspections = selectCollectionPageForValidation(
-      await renderedContext.inspectSlides(),
-      context,
-    );
+    const allInspections = await renderedContext.inspectSlides();
+    const inspections = renderedContext.slidesArePageScoped
+      ? allInspections
+      : selectCollectionPageForValidation(allInspections, context);
     renderedContext.slideInspections = inspections;
-    renderedContext.slideInspectionsArePageScoped = Boolean(context.singlePage);
+    renderedContext.slideInspectionsArePageScoped =
+      Boolean(context.singlePage) || Boolean(renderedContext.slidesArePageScoped);
     return inspections;
   }
 
   const inspections: RenderedSlideInspection[] = [];
-  for (const slide of selectCollectionPageForValidation(renderedContext.slides, context)) {
+  const slides = renderedContext.slidesArePageScoped
+    ? renderedContext.slides
+    : selectCollectionPageForValidation(renderedContext.slides, context);
+  for (const slide of slides) {
     inspections.push(await inspectSlide(context, slide));
   }
   renderedContext.slideInspections = inspections;
-  renderedContext.slideInspectionsArePageScoped = Boolean(context.singlePage);
+  renderedContext.slideInspectionsArePageScoped =
+    Boolean(context.singlePage) || Boolean(renderedContext.slidesArePageScoped);
   return inspections;
 }

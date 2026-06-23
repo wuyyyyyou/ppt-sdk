@@ -15,7 +15,7 @@
       "version": "latest"
     },
     {
-      "tool_id": "tool-anna-search-local",
+      "tool_id": "tool-youming-anna-search-c9sjsr9s",
       "version": "latest"
     }
   ],
@@ -54,7 +54,7 @@
       "tools": [
         "required:tool-youming_5703-ppt-engine-fmkv9ru7",
         "required:tool-youming_5703-ppt-gener-ahzv8re6",
-        "required:tool-anna-search-local"
+        "required:tool-youming-anna-search-c9sjsr9s"
       ],
       "chat": [],
       "artifact": [],

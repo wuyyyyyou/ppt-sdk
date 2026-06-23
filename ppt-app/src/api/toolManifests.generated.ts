@@ -14,7 +14,7 @@ export const PPT_GENER_TOOL = {
 } as const;
 
 export const ANNA_SEARCH_TOOL = {
-  id: "tool-anna-search-local",
+  id: "tool-youming-anna-search-c9sjsr9s",
   version: "0.1.0",
   displayName: "Anna Search",
 } as const;

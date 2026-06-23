@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { prepareManifestRenderPlan } from "../../src/render/manifest-render-plan.ts";
@@ -19,6 +19,22 @@ export const layoutDescription = "Local fixture slide for render plan tests.";
 export default function LocalFixtureSlide({ data }) {
   const parsed = Schema.parse(data ?? {});
   return <div data-manifest-slide-id="local-fixture">{parsed.title}</div>;
+}
+`;
+
+const BROKEN_LOCAL_SLIDE = `import React from "react";
+import * as z from "zod";
+
+export const Schema = z.object({
+  title: z.string().default("Broken title"),
+});
+
+export const layoutId = "broken-local-fixture";
+export const layoutName = "Broken Local Fixture";
+
+export default function BrokenLocalFixtureSlide({ data }) {
+  const parsed = Schema.parse(data ?? {});
+  return <div data-manifest-slide-id="broken-local-fixture">{parsed.title}</div>;
 }
 `;
 
@@ -141,9 +157,10 @@ test("prepareManifestRenderPlan resolves local slides, data paths, and theme nor
   });
 });
 
-test("prepareManifestRenderPlan keeps full plan in single-page mode", async () => {
+test("prepareManifestRenderPlan isolates local slides in single-page mode", async () => {
   await withFixture(async ({ manifestPath, outputDir, deckDir }) => {
     await writeFile(path.join(deckDir, "slides", "LocalSlide.tsx"), LOCAL_SLIDE, "utf8");
+    await writeFile(path.join(deckDir, "slides", "BrokenLocalSlide.tsx"), BROKEN_LOCAL_SLIDE, "utf8");
     await writeFile(
       manifestPath,
       `${JSON.stringify({
@@ -151,7 +168,7 @@ test("prepareManifestRenderPlan keeps full plan in single-page mode", async () =
         slides: [
           {
             id: "page-1",
-            source: { type: "local", path: "./slides/LocalSlide.tsx" },
+            source: { type: "local", path: "./slides/BrokenLocalSlide.tsx" },
           },
           {
             id: "page-2",
@@ -170,8 +187,47 @@ test("prepareManifestRenderPlan keeps full plan in single-page mode", async () =
     });
 
     assert.equal(plan.singlePageIndex, 1);
-    assert.equal(plan.slides.length, 2);
-    assert.equal(plan.slides[1]?.slideId, "page-2");
+    assert.equal(plan.slideCount, 2);
+    assert.equal(plan.slides.length, 1);
+    assert.equal(plan.slides[0]?.slideId, "page-2");
+    assert.equal(plan.slides[0]?.sourceIndex, 1);
+    assert.equal(plan.slides[0]?.pageNumber, 2);
+    assert.equal(plan.deckRuntimeBundle, null);
+  });
+});
+
+test("prepareManifestRenderPlan still validates all local slides in full-deck mode", async () => {
+  await withFixture(async ({ manifestPath, outputDir, deckDir }) => {
+    await writeFile(path.join(deckDir, "slides", "LocalSlide.tsx"), LOCAL_SLIDE, "utf8");
+    await writeFile(path.join(deckDir, "slides", "BrokenLocalSlide.tsx"), BROKEN_LOCAL_SLIDE, "utf8");
+    await writeFile(
+      manifestPath,
+      `${JSON.stringify({
+        title: "Full Deck",
+        slides: [
+          {
+            id: "page-1",
+            source: { type: "local", path: "./slides/BrokenLocalSlide.tsx" },
+          },
+          {
+            id: "page-2",
+            source: { type: "local", path: "./slides/LocalSlide.tsx" },
+          },
+        ],
+      }, null, 2)}\n`,
+      "utf8",
+    );
+
+    await assert.rejects(
+      () => prepareManifestRenderPlan({
+        manifestPath,
+        outputDir,
+      }),
+      (error: Error) => {
+        assert.match(error.message, /Local template must export "layoutDescription"/);
+        return true;
+      },
+    );
   });
 });
 

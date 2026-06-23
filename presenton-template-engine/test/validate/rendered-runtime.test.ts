@@ -41,6 +41,22 @@ export default function RenderedRuntimeSlide({ data }) {
 }
 `;
 
+const BROKEN_SLIDE = `import React from "react";
+import * as z from "zod";
+
+export const Schema = z.object({
+  title: z.string().default("Broken title"),
+});
+
+export const layoutId = "broken-rendered-runtime";
+export const layoutName = "Broken Rendered Runtime";
+
+export default function BrokenRenderedRuntimeSlide({ data }) {
+  const parsed = Schema.parse(data ?? {});
+  return <div>{parsed.title}</div>;
+}
+`;
+
 type AttributeMap = Record<string, string>;
 
 class MockElementNode {
@@ -231,6 +247,52 @@ test("prepareRenderedValidationArtifacts builds deck html artifacts from manifes
 
     const deckHtml = await readFile(artifacts.deckHtmlPath as string, "utf8");
     assert.match(deckHtml, /presentation-slides-wrapper/);
+  });
+});
+
+test("prepareRenderedValidationArtifacts isolates local slides in single-page mode", async () => {
+  await withDeckFixture(async ({ manifestPath, outputDir }) => {
+    const deckDir = path.dirname(manifestPath);
+    await writeFile(path.join(deckDir, "slides", "BrokenSlide.tsx"), BROKEN_SLIDE, "utf8");
+    await writeFile(
+      manifestPath,
+      `${JSON.stringify({
+        title: "Rendered Runtime Fixture",
+        slides: [
+          {
+            id: "slide-1",
+            source: {
+              type: "local",
+              path: "./slides/BrokenSlide.tsx",
+            },
+          },
+          {
+            id: "slide-2",
+            source: {
+              type: "local",
+              path: "./slides/Slide.tsx",
+            },
+            data: {
+              title: "Fixture title",
+            },
+          },
+        ],
+      }, null, 2)}\n`,
+      "utf8",
+    );
+
+    const artifacts = await prepareRenderedValidationArtifacts({
+      manifestPath,
+      outputDir,
+      singlePage: true,
+      page: 2,
+    });
+
+    assert.equal(artifacts.deckBuildResult?.singlePage, true);
+    assert.equal(artifacts.deckBuildResult?.page, 2);
+    assert.equal(artifacts.deckBuildResult?.slideCount, 2);
+    assert.equal(artifacts.deckBuildResult?.slideFiles.length, 1);
+    assert.equal(artifacts.deckBuildResult?.slideFiles[0]?.slideId, "slide-2");
   });
 });
 

@@ -33,6 +33,8 @@ type ResolvedManifestSlide = {
 type PreparedManifestSlide = {
   context: BrowserRenderContext;
   html: string;
+  sourceIndex: number;
+  pageNumber: number;
   slideId: string;
   layoutId: string;
   runtimeLayoutId: string;
@@ -49,6 +51,7 @@ export interface ManifestRenderPlan {
   deckBaseName: string;
   title: string;
   singlePageIndex: number | null;
+  slideCount: number;
   slides: PreparedManifestSlide[];
   deckRuntimeBundle: string | null;
 }
@@ -424,9 +427,16 @@ export async function prepareManifestRenderPlan(
       : "presenton-manifest-deck"),
   );
   const singlePageIndex = parseSinglePageIndex(input, manifest.slides.length);
+  const slideEntries =
+    singlePageIndex === null
+      ? manifest.slides.map((slide, sourceIndex) => ({ slide, sourceIndex }))
+      : [{
+        slide: manifest.slides[singlePageIndex],
+        sourceIndex: singlePageIndex,
+      }];
 
   const slides = await Promise.all(
-    manifest.slides.map(async (slide, index) => {
+    slideEntries.map(async ({ slide, sourceIndex }) => {
       const resolvedSlide = await resolveManifestSlide(slide, manifestCwd);
       const slideData = await resolveSlideData(slide, manifestCwd);
       const theme = normalizeTheme(slide.theme ?? manifest.theme);
@@ -448,7 +458,8 @@ export async function prepareManifestRenderPlan(
       };
 
       const html = buildSlideDocumentHtml({ context });
-      const slideFileName = `${index + 1}-${deckBaseName}-${sanitizeFileNamePart(
+      const pageNumber = sourceIndex + 1;
+      const slideFileName = `${pageNumber}-${deckBaseName}-${sanitizeFileNamePart(
         resolvedSlide.layoutId,
       )}.png`;
       const slideOutputPath = path.join(outputDir, slideFileName);
@@ -456,6 +467,8 @@ export async function prepareManifestRenderPlan(
       return {
         context,
         html,
+        sourceIndex,
+        pageNumber,
         slideId: slide.id,
         layoutId: resolvedSlide.layoutId,
         runtimeLayoutId,
@@ -492,7 +505,7 @@ export async function prepareManifestRenderPlan(
       })
       : null;
   const localDeckRuntimeBundle =
-    localRuntimeEntries.length > 0
+    singlePageIndex === null && localRuntimeEntries.length > 0
       ? await buildLocalBrowserRuntimeBundle({
         mode: "deck",
         cwd: manifestCwd,
@@ -514,6 +527,7 @@ export async function prepareManifestRenderPlan(
     deckBaseName,
     title: manifest.title ?? "Presenton Manifest Deck",
     singlePageIndex,
+    slideCount: manifest.slides.length,
     slides: slidesWithRuntime,
     deckRuntimeBundle: localDeckRuntimeBundle,
   };

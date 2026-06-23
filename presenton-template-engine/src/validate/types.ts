@@ -185,6 +185,7 @@ export interface RenderedValidationContext {
   deckSelector: string;
   slideSelector: string;
   slides: RenderedSlideInfo[];
+  slidesArePageScoped?: boolean;
   slideInspections?: RenderedSlideInspection[];
   slideInspectionsArePageScoped?: boolean;
   inspectSlides?: () => Promise<RenderedSlideInspection[]>;

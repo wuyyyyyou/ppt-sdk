@@ -292,6 +292,8 @@ export async function prepareRenderedValidationArtifacts(
     manifestPath: context.manifestPath,
     outputDir,
     name: context.name ?? undefined,
+    singlePage: context.singlePage ?? undefined,
+    page: context.page ?? undefined,
   });
   const deckFileName = `${plan.deckBaseName}-deck.html`;
   const deckOutputPath = path.join(plan.outputDir, deckFileName);
@@ -306,8 +308,8 @@ export async function prepareRenderedValidationArtifacts(
     deckOutputPath,
     outputDir: plan.outputDir,
     deckGenerated: true,
-    singlePage: false,
-    page: null,
+    singlePage: plan.singlePageIndex !== null,
+    page: plan.singlePageIndex === null ? null : plan.singlePageIndex + 1,
     slideFiles: plan.slides.map((slide) => ({
       fileName: slide.fileName,
       outputPath: slide.outputPath,
@@ -316,7 +318,7 @@ export async function prepareRenderedValidationArtifacts(
       kind: "image" as const,
       mimeType: "image/png" as const,
     })),
-    slideCount: plan.slides.length,
+    slideCount: plan.slideCount,
     title: plan.title,
     manifestPath: plan.manifestPath,
   };
@@ -434,6 +436,7 @@ export async function prepareRenderedValidationContext(
       deckSelector,
       slideSelector,
       slides,
+      slidesArePageScoped: Boolean(artifacts.deckBuildResult?.singlePage),
       ownedPage,
       close: runtime.close,
     };
