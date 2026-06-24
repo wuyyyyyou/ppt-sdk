@@ -107,3 +107,45 @@ test("reports local component prop contract errors before rendering", async () =
     await rm(rootDir, { recursive: true, force: true });
   }
 });
+
+test("reports source context for Zod v4 record signature diagnostics", async () => {
+  const rootDir = await mkdtemp(path.join(tmpdir(), "presenton-local-template-typecheck-"));
+
+  try {
+    await writeFixtureFile(path.join(rootDir, "slides", "Slide.tsx"), [
+      'import React from "react";',
+      'import * as z from "zod";',
+      "",
+      "export const Schema = z.object({",
+      "  visuals: z.record(z.any()).default({}),",
+      "});",
+      "export const layoutId = 'typecheck-zod-record-fail';",
+      "export const layoutName = 'Typecheck Zod Record Fail';",
+      "export const layoutDescription = 'Invalid Zod v4 record signature.';",
+      "export default function Slide() {",
+      "  return <section />;",
+      "}",
+      "",
+    ]);
+
+    await assert.rejects(
+      () =>
+        assertLocalTemplateTypecheck({
+          entryPath: path.join(rootDir, "slides", "Slide.tsx"),
+          cwd: rootDir,
+          label: 'slide "page-03"',
+        }),
+      (error) => {
+        assert.ok(error instanceof Error);
+        assert.match(error.message, /Pre-render TypeScript check failed/);
+        assert.match(error.message, /TS2554/);
+        assert.match(error.message, /Expected 2-3 arguments, but got 1/);
+        assert.match(error.message, /visuals: z\.record\(z\.any\(\)\)\.default\(\{\}\),/);
+        assert.match(error.message, /\|[ \t]+\^+/);
+        return true;
+      },
+    );
+  } finally {
+    await rm(rootDir, { recursive: true, force: true });
+  }
+});

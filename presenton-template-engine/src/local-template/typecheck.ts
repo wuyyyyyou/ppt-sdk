@@ -12,6 +12,8 @@ const engineRequire = createRequire(CURRENT_MODULE_PATH);
 
 const MAX_REPORTED_DIAGNOSTICS = 8;
 const MAX_FORMATTED_MESSAGE_LENGTH = 6_000;
+const MAX_SOURCE_LINE_LENGTH = 240;
+const MAX_CARET_WIDTH = 80;
 const ENGINE_RESOLVER_FILE = path.join(CURRENT_MODULE_DIR, "__presenton_typecheck__.ts");
 
 export interface LocalTemplateTypecheckDiagnostic {
@@ -21,6 +23,8 @@ export interface LocalTemplateTypecheckDiagnostic {
   file_path?: string;
   line?: number;
   column?: number;
+  source_line?: string;
+  source_caret?: string;
 }
 
 export class LocalTemplateTypecheckError extends Error {
@@ -50,12 +54,88 @@ function getDiagnosticLocation(diagnostic: ts.Diagnostic): {
   };
 }
 
+function buildCaretLine(input: {
+  lineText: string;
+  columnIndex: number;
+  length: number | undefined;
+}): string {
+  const columnIndex = Math.max(0, Math.min(input.columnIndex, input.lineText.length));
+  const rawLength = typeof input.length === "number" && input.length > 0
+    ? input.length
+    : 1;
+  const boundedLineLength = Math.max(1, input.lineText.length - columnIndex);
+  const caretWidth = Math.max(1, Math.min(rawLength, boundedLineLength, MAX_CARET_WIDTH));
+  const prefix = input.lineText.slice(0, columnIndex).replace(/[^\t]/g, " ");
+  return `${prefix}${"^".repeat(caretWidth)}`;
+}
+
+function truncateSourceContext(input: {
+  lineText: string;
+  caretLine: string;
+  columnIndex: number;
+}): {
+  source_line: string;
+  source_caret: string;
+} {
+  if (input.lineText.length <= MAX_SOURCE_LINE_LENGTH) {
+    return {
+      source_line: input.lineText,
+      source_caret: input.caretLine,
+    };
+  }
+
+  const halfWindow = Math.floor((MAX_SOURCE_LINE_LENGTH - 5) / 2);
+  const start = Math.max(0, input.columnIndex - halfWindow);
+  const end = Math.min(input.lineText.length, start + MAX_SOURCE_LINE_LENGTH - 3);
+  const adjustedStart = Math.max(0, end - (MAX_SOURCE_LINE_LENGTH - 3));
+  const prefix = adjustedStart > 0 ? "..." : "";
+  const suffix = end < input.lineText.length ? "..." : "";
+  const sourceSlice = input.lineText.slice(adjustedStart, end);
+  const caretSlice = input.caretLine.slice(adjustedStart, end);
+
+  return {
+    source_line: `${prefix}${sourceSlice}${suffix}`,
+    source_caret: `${" ".repeat(prefix.length)}${caretSlice}`,
+  };
+}
+
+function getDiagnosticSourceContext(diagnostic: ts.Diagnostic): {
+  source_line?: string;
+  source_caret?: string;
+} {
+  if (!diagnostic.file || diagnostic.start === undefined) {
+    return {};
+  }
+
+  const location = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
+  const lineStarts = diagnostic.file.getLineStarts();
+  const lineStart = lineStarts[location.line];
+  if (lineStart === undefined) {
+    return {};
+  }
+
+  const nextLineStart = lineStarts[location.line + 1] ?? diagnostic.file.text.length;
+  const lineText = diagnostic.file.text.slice(lineStart, nextLineStart).replace(/\r?\n$/, "");
+  const caretLine = buildCaretLine({
+    lineText,
+    columnIndex: location.character,
+    length: diagnostic.length,
+  });
+
+  return truncateSourceContext({
+    lineText,
+    caretLine,
+    columnIndex: location.character,
+  });
+}
+
 function normalizeDiagnostic(diagnostic: ts.Diagnostic): LocalTemplateTypecheckDiagnostic {
   return {
     code: diagnostic.code,
     category: ts.DiagnosticCategory[diagnostic.category] ?? String(diagnostic.category),
     message: ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"),
     ...getDiagnosticLocation(diagnostic),
+    ...getDiagnosticSourceContext(diagnostic),
   };
 }
 
@@ -67,7 +147,18 @@ function formatDiagnostic(diagnostic: LocalTemplateTypecheckDiagnostic, cwd: str
     ? `${relativePath}:${diagnostic.line}:${diagnostic.column}`
     : relativePath;
 
-  return `${location} TS${diagnostic.code}: ${diagnostic.message}`;
+  const header = `${location} TS${diagnostic.code}: ${diagnostic.message}`;
+  if (!diagnostic.source_line || !diagnostic.source_caret || !diagnostic.line) {
+    return header;
+  }
+
+  const lineLabel = String(diagnostic.line);
+  const gutter = " ".repeat(lineLabel.length);
+  return [
+    header,
+    `${lineLabel} | ${diagnostic.source_line}`,
+    `${gutter} | ${diagnostic.source_caret}`,
+  ].join("\n");
 }
 
 function truncateMessage(value: string): string {

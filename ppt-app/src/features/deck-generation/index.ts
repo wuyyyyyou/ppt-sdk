@@ -422,6 +422,51 @@ function throwIfCancelled(input: Pick<DeckGenerationContext, "isCancelled">): vo
   }
 }
 
+function extractRenderFailureDiagnosticSummary(error: string): string {
+  const diagnosticLine = error
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => /:\d+:\d+\s+TS\d+:/.test(line));
+  if (diagnosticLine) return diagnosticLine;
+  return error.split(/\r?\n/).find((line) => line.trim().length > 0)?.trim() || error;
+}
+
+function extractRenderFailureDiagnosticKey(summary: string): string {
+  const match = summary.match(/^(.+?:\d+:\d+)\s+(TS\d+):/);
+  return match ? `${match[1]} ${match[2]}` : summary;
+}
+
+function summarizeRenderFailureHistory(history: RenderFailureHistoryItem[]) {
+  const grouped = new Map<string, {
+    attempts: number[];
+    phases: Set<RenderFailurePhase>;
+    diagnostic: string;
+  }>();
+
+  for (const item of history) {
+    const diagnostic = extractRenderFailureDiagnosticSummary(item.error);
+    const key = extractRenderFailureDiagnosticKey(diagnostic);
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.attempts.push(item.attempt);
+      existing.phases.add(item.phase);
+      continue;
+    }
+    grouped.set(key, {
+      attempts: [item.attempt],
+      phases: new Set([item.phase]),
+      diagnostic,
+    });
+  }
+
+  return Array.from(grouped.values()).map((item) => ({
+    attempts: item.attempts,
+    phases: Array.from(item.phases),
+    repeated_count: item.attempts.length,
+    diagnostic: item.diagnostic,
+  }));
+}
+
 function buildAuthoringPrompt(input: {
   workspaceDir: string;
   page: PagePlanItem;
@@ -453,6 +498,9 @@ function buildAuthoringPrompt(input: {
   const modeSpecificPriority = input.renderError
     ? [
         "This is a render-fix pass. Fix the render error first, and make only design or code changes that support that fix.",
+        "For TypeScript diagnostics, fix the exact expression at file:line:column first.",
+        "If a source excerpt with a caret is present, treat the caret target as the primary suspect.",
+        "Do not infer the failing API from the generic TypeScript message alone.",
         "Do not introduce unrelated redesigns, new content, or broad refactors during render-fix.",
       ].join("\n")
     : input.contentReview
@@ -489,12 +537,12 @@ function buildAuthoringPrompt(input: {
     hasFailureFix
       ? [
           "Failure-fix input:",
-          input.renderError && renderFailureHistory.length > 0
+          input.renderError && renderFailureHistory.length > 1
             ? [
-                "Consecutive render failure history:",
-                "The following JSON array records consecutive render or pre-render check failures for this page in the current run. Use it to avoid repeating the same failed fix.",
-                "Each item is one failed render or pre-render check attempt.",
-                JSON.stringify(renderFailureHistory, null, 2),
+                "Repeated render failure summary:",
+                "The following compressed JSON groups prior render or pre-render check failures for this page in the current run. Use it to avoid repeating the same failed fix.",
+                "Each item groups identical diagnostics by file:line:column and TS code when available.",
+                JSON.stringify(summarizeRenderFailureHistory(renderFailureHistory), null, 2),
               ].join("\n")
             : "",
           input.renderError ? `Render error to fix:\n${input.renderError}` : "",
