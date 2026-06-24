@@ -165,19 +165,28 @@ describe("Page Generation Stage Records", () => {
     assert.notEqual(enRecords[0].pageStatusLabel, "authoring");
   });
 
-  it("labels research curation streams as evidence curation stages", () => {
+  it("labels split research curation streams by evidence type", () => {
     const records = buildPageGenerationStageRecords({
       t: messages.zh,
       progress: makeProgress({
         step: "research-curation",
         activeStreams: [
           {
-            run_id: "research-1",
-            kind: "research-curation",
+            run_id: "research-web",
+            kind: "web-research-curation",
             page_id: "page-01",
             page_index: 0,
-            status: "正在筛选第 1 页事实和图片",
+            status: "正在筛选第 1 页事实证据",
             lines: ["curating"],
+            activities: ["read source"],
+          },
+          {
+            run_id: "research-visual",
+            kind: "visual-research-curation",
+            page_id: "page-01",
+            page_index: 0,
+            status: "正在筛选第 1 页图片素材",
+            lines: ["checking image"],
             activities: ["analyzed image"],
           },
         ],
@@ -185,9 +194,43 @@ describe("Page Generation Stage Records", () => {
       history: [],
     });
 
+    const researchStages = records[0].stages.filter((stage) =>
+      stage.stageKey === "webResearchCuration" || stage.stageKey === "visualResearchCuration"
+    );
+    assert.deepEqual(
+      researchStages.map((stage) => stage.stageKey),
+      ["webResearchCuration", "visualResearchCuration"],
+    );
+    assert.deepEqual(
+      researchStages.map((stage) => stage.label),
+      ["正在筛选第 1 页事实证据", "正在筛选第 1 页图片素材"],
+    );
+    assert.deepEqual(researchStages[1].activities, ["analyzed image"]);
+  });
+
+  it("keeps legacy research curation snapshots on the aggregate evidence label", () => {
+    const records = buildPageGenerationStageRecords({
+      t: messages.en,
+      progress: makeProgress({ activeStreams: [] }),
+      history: [
+        {
+          id: "research-curation:page-01:legacy-run",
+          phase: "research-curation",
+          kind: "research-curation",
+          label: "Page 1 · research-curation",
+          page_id: "page-01",
+          page_index: 0,
+          status: "completed",
+          message: "done",
+          lines: ["curated"],
+          activities: [],
+          updated_at: "2026-06-02T00:00:00.000Z",
+        },
+      ],
+    });
+
     const researchStage = records[0].stages.find((stage) => stage.stageKey === "researchCuration");
-    assert.equal(researchStage?.label, "正在筛选第 1 页事实和图片");
-    assert.deepEqual(researchStage?.activities, ["analyzed image"]);
+    assert.equal(researchStage?.label, "Curating evidence");
   });
 
   it("shows page-level research collection status instead of waiting", () => {
@@ -218,6 +261,36 @@ describe("Page Generation Stage Records", () => {
     assert.equal(records[0].pageStatusLabel, "正在搜索并抓取资料");
     assert.equal(records[0].stages[0].stageKey, "researchCollection");
     assert.equal(records[0].stages[0].state, "active");
+  });
+
+  it("uses aggregate evidence wording for page-level research curation status", () => {
+    const records = buildPageGenerationStageRecords({
+      t: messages.zh,
+      progress: makeProgress({
+        pages: [
+          {
+            page_id: "page-03",
+            index: 2,
+            title: "Research page",
+            status: "research_curating",
+            render_attempts: 0,
+            render_attempt_limit: 10,
+            visual_review_attempts: 0,
+            visual_review_attempt_limit: 5,
+            content_review_attempts: 0,
+            content_review_attempt_limit: 5,
+            agent_failures: 0,
+            agent_failure_limit: 5,
+            agent_infrastructure_failures: 0,
+          },
+        ],
+      }),
+      history: [],
+    });
+
+    assert.equal(records[0].pageStatusLabel, "正在筛选证据");
+    assert.equal(records[0].stages[0].label, "正在筛选证据");
+    assert.equal(records[0].stages[0].stageKey, "researchCuration");
   });
 
   it("orders repeated review and fix stages by their actual timeline", () => {

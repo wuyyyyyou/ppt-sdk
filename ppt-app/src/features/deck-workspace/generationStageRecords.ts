@@ -16,6 +16,8 @@ type StageLabelKey =
   | "researchPlanning"
   | "researchCollection"
   | "researchCuration"
+  | "webResearchCuration"
+  | "visualResearchCuration"
   | "prepare"
   | "authoring"
   | "contentReview"
@@ -226,6 +228,8 @@ function sortStageRecords(records: PageGenerationStageRecord[]) {
     "researchPlanning",
     "researchCollection",
     "researchCuration",
+    "webResearchCuration",
+    "visualResearchCuration",
     "authoring",
     "contentReview",
     "contentReviewFix",
@@ -274,6 +278,8 @@ function stageLabelKey(
   if (kind === "visual-review-fix") return "visualReviewFix";
   if (kind === "page-content-review") return "contentReview";
   if (kind === "page-visual-review") return "visualReview";
+  if (kind === "web-research-curation") return "webResearchCuration";
+  if (kind === "visual-research-curation") return "visualResearchCuration";
   if (kind === "research-curation") return "researchCuration";
 
   if (phase === "page-plan") return "pagePlan";

@@ -188,6 +188,8 @@ export interface Messages {
         | "researchPlanning"
         | "researchCollection"
         | "researchCuration"
+        | "webResearchCuration"
+        | "visualResearchCuration"
         | "prepare"
         | "authoring"
         | "contentReview"
@@ -492,6 +494,8 @@ export const messages: Record<Locale, Messages> = {
           researchPlanning: "Research planning",
           researchCollection: "Collecting sources",
           researchCuration: "Curating evidence",
+          webResearchCuration: "Curating facts",
+          visualResearchCuration: "Curating images",
           prepare: "File preparation",
           authoring: "Page expression",
           contentReview: "Page content review",
@@ -778,7 +782,7 @@ export const messages: Record<Locale, Messages> = {
         pageStatuses: {
           pending: "等待开始",
           researchCollecting: "正在搜索并抓取资料",
-          researchCurating: "正在筛选事实和图片",
+          researchCurating: "正在筛选证据",
           authoring: "正在思考这一页",
           contentReview: "正在检查页面内容",
           contentReviewFixing: "正在根据内容检查调整",
@@ -799,7 +803,9 @@ export const messages: Record<Locale, Messages> = {
           pagePlan: "页面规划",
           researchPlanning: "检索需求规划",
           researchCollection: "搜索并抓取资料",
-          researchCuration: "筛选事实和图片",
+          researchCuration: "筛选证据",
+          webResearchCuration: "筛选事实证据",
+          visualResearchCuration: "筛选图片素材",
           prepare: "文件准备",
           authoring: "页面表达",
           contentReview: "页面内容检查",

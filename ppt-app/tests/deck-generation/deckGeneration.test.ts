@@ -2431,6 +2431,22 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(evidencePage?.visual_assets.length, 1);
     assert.equal(harness.researchStatus.status, "ready");
     assert.equal(harness.researchStatus.pages.find((page) => page.page_id === "page-01")?.status, "curated");
+    assert.ok(harness.progressEvents.some((progress) =>
+      progress.step === "research-curation" &&
+      progress.message.includes("正在筛选第 1 页证据")
+    ));
+    assert.ok(harness.progressEvents.some((progress) =>
+      progress.activeStreams?.some((stream) =>
+        stream.kind === "web-research-curation" &&
+        stream.status.includes("事实证据")
+      )
+    ));
+    assert.ok(harness.progressEvents.some((progress) =>
+      progress.activeStreams?.some((stream) =>
+        stream.kind === "visual-research-curation" &&
+        stream.status.includes("图片素材")
+      )
+    ));
     assert.ok(harness.authoringPrompts.some((prompt) =>
       prompt.includes("You are a local file-editing Agent generating one PPT slide") &&
       prompt.includes("/research/evidence-index.json if it exists")

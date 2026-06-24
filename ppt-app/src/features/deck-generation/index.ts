@@ -234,7 +234,11 @@ function generationText(locale: Locale) {
     collectingSources: (page: PagePlanItem) =>
       zh ? `正在搜索并抓取第 ${page.index + 1} 页资料` : `Collecting sources for page ${page.index + 1}`,
     curatingEvidence: (page: PagePlanItem) =>
-      zh ? `正在筛选第 ${page.index + 1} 页事实和图片` : `Curating evidence for page ${page.index + 1}`,
+      zh ? `正在筛选第 ${page.index + 1} 页证据` : `Curating evidence for page ${page.index + 1}`,
+    curatingFacts: (page: PagePlanItem) =>
+      zh ? `正在筛选第 ${page.index + 1} 页事实证据` : `Curating facts for page ${page.index + 1}`,
+    curatingImages: (page: PagePlanItem) =>
+      zh ? `正在筛选第 ${page.index + 1} 页图片素材` : `Curating images for page ${page.index + 1}`,
     prepare: zh ? "正在准备页面文件" : "Preparing page files",
     complete: zh ? "生成完成" : "Generation complete",
     resumed: zh ? "已恢复上次生成进度" : "Resumed previous generation progress",
@@ -297,6 +301,12 @@ function generationText(locale: Locale) {
     streamLabel: (pageIndex: number, kind: string) =>
       zh ? `第 ${pageIndex + 1} 页 · ${kind}` : `Page ${pageIndex + 1} · ${kind}`,
   };
+}
+
+function isResearchAgentKind(kind: string) {
+  return kind === "research-curation"
+    || kind === "web-research-curation"
+    || kind === "visual-research-curation";
 }
 
 function mapProgress(
@@ -953,9 +963,10 @@ function createAgentRunTracker(input: {
   kind: string;
 }) {
   const startedAt = new Date().toISOString();
+  const isResearchOperation = isResearchAgentKind(input.kind);
   const operationId = input.flowInput.aiLogger
     ? input.flowInput.aiLogger.createOperationId(
-        input.kind === "research-curation" ? "research" : "page_agent",
+        isResearchOperation ? "research" : "page_agent",
         input.kind,
       )
     : `${input.page.page_id}-${input.kind}-${Date.now().toString(36)}`;
@@ -963,7 +974,7 @@ function createAgentRunTracker(input: {
     ? {
         logger: input.flowInput.aiLogger,
         workspace_dir: input.flowInput.workspace.workspace_dir,
-        domain: (input.kind === "research-curation" ? "research" : "page_agent") as AiOperationLogContext["domain"],
+        domain: (isResearchOperation ? "research" : "page_agent") as AiOperationLogContext["domain"],
         operation: input.kind,
         operation_id: operationId,
         page_id: input.page.page_id,
@@ -1052,7 +1063,7 @@ function createAgentRunTracker(input: {
     async flush(status: "completed" | "error", extra: Record<string, unknown>) {
       const endedAt = new Date().toISOString();
       const baseEntry = {
-        event: input.kind === "research-curation"
+        event: isResearchOperation
           ? "ai.research.curation.operation.finished"
           : "ai.page_agent.operation.finished",
         schema_version: 1,
@@ -1071,7 +1082,7 @@ function createAgentRunTracker(input: {
       try {
         await input.flowInput.backend.appendWorkspaceLog({
           workspace_dir: input.flowInput.workspace.workspace_dir,
-          channel: input.kind === "research-curation" ? "ai-research" : "ai-page-agent",
+          channel: isResearchOperation ? "ai-research" : "ai-page-agent",
           entry: baseEntry,
         });
         await flushStreamBatch(true);
@@ -1377,12 +1388,14 @@ async function runResearchDraftAgent(input: {
   currentGaps: string[];
 }): Promise<WebResearchCurationDraft | VisualResearchCurationDraft | null> {
   const { flowInput, page, pagePlan, kind, prompt } = input;
+  const text = generationText(flowInput.locale);
+  const agentKind = kind === "web" ? "web-research-curation" : "visual-research-curation";
   const tracker = createAgentRunTracker({
     flowInput,
     page,
-    kind: "research-curation",
+    kind: agentKind,
     step: "research-curation",
-    message: generationText(flowInput.locale).curatingEvidence(page),
+    message: kind === "web" ? text.curatingFacts(page) : text.curatingImages(page),
     prompt,
     totalPages: pagePlan.pages.length,
     progress: flowInput.getProgress,
