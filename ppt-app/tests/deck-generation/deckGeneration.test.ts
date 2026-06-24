@@ -629,7 +629,6 @@ function createHarness(options: {
     reviewPageRefinementIntent: async () => intentReviewQueue.shift() ?? {
       route: "proceed",
       outline_change_required: false,
-      page_plan_replan_required: false,
       additional_research_required: false,
       additional_web_query_intents: [],
       additional_image_query_intents: [],
@@ -1409,7 +1408,6 @@ describe("Deck Generation Flow Module", () => {
         route: "unsupported",
         blocking_reason: "Current-page refinement cannot add a new appendix slide.",
         outline_change_required: false,
-        page_plan_replan_required: false,
         additional_research_required: false,
         additional_web_query_intents: [],
         additional_image_query_intents: [],
@@ -1446,7 +1444,7 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.progress.pages[1]?.status, "accepted");
   });
 
-  it("applies target-only outline and Page Plan revisions before current-page refinement", async () => {
+  it("syncs target outline changes into the Page Plan before current-page refinement", async () => {
     const pagePlan = makePagePlan();
     const existingProgress = makeProgress(pagePlan, "accepted");
     existingProgress.pages[0]!.last_screenshot_path = "/tmp/workspaces/demo/output/page-1-before.png";
@@ -1456,15 +1454,9 @@ describe("Deck Generation Flow Module", () => {
       intentReviews: [{
         route: "proceed",
         outline_change_required: true,
-        revised_outline_item: {
+        target_outline_item: {
           title: "Customer Case Analysis",
           outline: "Replace the overview with one grounded customer case and decision implications.",
-        },
-        page_plan_replan_required: true,
-        revised_page_plan_item: {
-          blueprint_id: "case-study",
-          blueprint_source: "./blueprints/CaseStudy.tsx",
-          reason: "A case-study structure better fits the revised page intent.",
         },
         additional_research_required: false,
         additional_web_query_intents: [],
@@ -1498,18 +1490,22 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.outline.items[0]?.title, "Customer Case Analysis");
     assert.equal(harness.outline.items[1]?.title, outline.items[1]?.title);
     const revisedPage = harness.pagePlan.pages[0]!;
+    const persistedOutlineItem = harness.outline.items[0]!;
     assert.equal(revisedPage.page_id, "page-01");
     assert.equal(revisedPage.index, 0);
     assert.equal(revisedPage.slide_path, "./slides/page-01.tsx");
     assert.equal(revisedPage.data_path, "./data/page-01.json");
     assert.equal(revisedPage.manifest_slide_id, "page-01");
-    assert.equal(revisedPage.title, "Customer Case Analysis");
-    assert.equal(revisedPage.blueprint_id, "case-study");
-    assert.equal(revisedPage.blueprint_source, "./blueprints/CaseStudy.tsx");
+    assert.equal(revisedPage.title, persistedOutlineItem.title);
+    assert.equal(revisedPage.outline, persistedOutlineItem.outline);
+    assert.equal(harness.pagePlan.source.outline_updated_at, harness.outline.updated_at);
+    assert.equal(revisedPage.blueprint_id, pagePlan.pages[0]?.blueprint_id);
+    assert.equal(revisedPage.blueprint_source, pagePlan.pages[0]?.blueprint_source);
+    assert.equal(revisedPage.reason, pagePlan.pages[0]?.reason);
     assert.equal(harness.pagePlan.pages[1]?.title, pagePlan.pages[1]?.title);
     const prompt = harness.authoringPrompts[0] ?? "";
     assert.match(prompt, /Customer Case Analysis/);
-    assert.match(prompt, /CaseStudy\.tsx/);
+    assert.match(prompt, /Simple\.tsx/);
   });
 
   it("collects only incremental research queries and merges new evidence", async () => {
@@ -1574,7 +1570,6 @@ describe("Deck Generation Flow Module", () => {
       intentReviews: [{
         route: "proceed",
         outline_change_required: false,
-        page_plan_replan_required: false,
         additional_research_required: true,
         additional_web_query_intents: ["old query", "new query"],
         additional_image_query_intents: ["new image"],

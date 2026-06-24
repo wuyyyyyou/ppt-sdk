@@ -55,11 +55,9 @@ export function reviseTargetPagePlanEntry(input: {
   pagePlan: PagePlan;
   targetPage: PagePlanItem;
   activeOutline: WorkspaceOutline;
-  review: PageRefinementIntentReviewResult;
   now: string;
 }): PagePlan {
   const outlineItem = input.activeOutline.items[input.targetPage.index];
-  const revisedPlanItem = input.review.revised_page_plan_item;
   return {
     ...input.pagePlan,
     title: input.activeOutline.title || input.pagePlan.title,
@@ -71,22 +69,8 @@ export function reviseTargetPagePlanEntry(input: {
       if (page.page_id !== input.targetPage.page_id) return page;
       return {
         ...page,
-        title:
-          revisedPlanItem?.title ||
-          input.review.revised_outline_item?.title ||
-          outlineItem?.title ||
-          page.title,
-        outline:
-          revisedPlanItem?.outline ||
-          input.review.revised_outline_item?.outline ||
-          outlineItem?.outline ||
-          page.outline,
-        blueprint_id: revisedPlanItem?.blueprint_id || page.blueprint_id,
-        blueprint_source: revisedPlanItem?.blueprint_source || page.blueprint_source,
-        reason:
-          revisedPlanItem?.reason ||
-          input.review.reason ||
-          page.reason,
+        title: outlineItem?.title || page.title,
+        outline: outlineItem?.outline || page.outline,
       };
     }),
     updated_at: input.now,

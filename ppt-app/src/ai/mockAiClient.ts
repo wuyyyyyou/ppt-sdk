@@ -242,7 +242,6 @@ export function createMockAiClient(): AiClient {
       const result = {
         route: "proceed" as const,
         outline_change_required: false,
-        page_plan_replan_required: false,
         additional_research_required: false,
         additional_web_query_intents: [],
         additional_image_query_intents: [],

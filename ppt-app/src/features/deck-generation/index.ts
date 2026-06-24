@@ -3581,11 +3581,11 @@ export async function runDeckRefinement(
     if (preflightFailure) return preflightFailure;
 
     const now = new Date().toISOString();
-    if (intentReview.outline_change_required && intentReview.revised_outline_item) {
+    if (intentReview.outline_change_required && intentReview.target_outline_item) {
       activeOutline = applyTargetOutlineRevision({
         outline: input.confirmedOutline,
         pageIndex: targetPage.index,
-        revisedItem: intentReview.revised_outline_item,
+        revisedItem: intentReview.target_outline_item,
         now,
       });
       const updatedWorkspace = await input.backend.updateWorkspaceOutline({
@@ -3603,18 +3603,20 @@ export async function runDeckRefinement(
           },
         },
       });
+      if (updatedWorkspace.outline) {
+        activeOutline = updatedWorkspace.outline as WorkspaceOutline;
+      }
       activeWorkspace = {
         ...updatedWorkspace,
         outline: activeOutline,
       };
     }
 
-    if (intentReview.page_plan_replan_required || intentReview.outline_change_required) {
+    if (intentReview.outline_change_required) {
       activePagePlan = reviseTargetPagePlanEntry({
         pagePlan,
         targetPage,
         activeOutline,
-        review: intentReview,
         now: new Date().toISOString(),
       });
       activePagePlan = await input.backend.recordPagePlan({

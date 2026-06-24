@@ -127,17 +127,9 @@ export interface PageRefinementIntentReviewResult {
   route: PageRefinementIntentReviewRoute;
   blocking_reason?: string;
   outline_change_required: boolean;
-  revised_outline_item?: {
+  target_outline_item?: {
     title: string;
     outline: string;
-  };
-  page_plan_replan_required: boolean;
-  revised_page_plan_item?: {
-    title?: string;
-    outline?: string;
-    blueprint_id?: string;
-    blueprint_source?: string;
-    reason?: string;
   };
   additional_research_required: boolean;
   additional_web_query_intents: string[];

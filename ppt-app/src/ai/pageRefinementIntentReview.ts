@@ -36,18 +36,9 @@ export function normalizePageRefinementIntentReview(
     throw new Error('Page Refinement Intent Review must return route "proceed" or "unsupported".');
   }
 
-  const revisedOutlineRecord = asRecord(record.revised_outline_item);
-  const revisedOutlineTitle = cleanString(revisedOutlineRecord.title);
-  const revisedOutline = cleanString(revisedOutlineRecord.outline);
-  const revisedPlanRecord = asRecord(record.revised_page_plan_item);
-  const revisedPagePlanItem = {
-    title: cleanString(revisedPlanRecord.title) || undefined,
-    outline: cleanString(revisedPlanRecord.outline) || undefined,
-    blueprint_id: cleanString(revisedPlanRecord.blueprint_id) || undefined,
-    blueprint_source: cleanString(revisedPlanRecord.blueprint_source) || undefined,
-    reason: cleanString(revisedPlanRecord.reason) || undefined,
-  };
-  const hasRevisedPlanValue = Object.values(revisedPagePlanItem).some(Boolean);
+  const targetOutlineRecord = asRecord(record.target_outline_item);
+  const targetOutlineTitle = cleanString(targetOutlineRecord.title);
+  const targetOutline = cleanString(targetOutlineRecord.outline);
   const blockingReason = cleanString(record.blocking_reason);
   const reason = cleanString(record.reason);
 
@@ -56,7 +47,6 @@ export function normalizePageRefinementIntentReview(
       route,
       blocking_reason: blockingReason || reason || "This request cannot be handled as current-page refinement.",
       outline_change_required: false,
-      page_plan_replan_required: false,
       additional_research_required: false,
       additional_web_query_intents: [],
       additional_image_query_intents: [],
@@ -67,20 +57,17 @@ export function normalizePageRefinementIntentReview(
   }
 
   const outlineChangeRequired = record.outline_change_required === true;
-  if (outlineChangeRequired && (!revisedOutlineTitle || !revisedOutline)) {
-    throw new Error("Page Refinement Intent Review requires revised_outline_item.title and outline when outline_change_required is true.");
+  if (outlineChangeRequired && (!targetOutlineTitle || !targetOutline)) {
+    throw new Error("Page Refinement Intent Review requires target_outline_item.title and outline when outline_change_required is true.");
   }
 
   return {
     route,
     blocking_reason: blockingReason || undefined,
     outline_change_required: outlineChangeRequired,
-    revised_outline_item: outlineChangeRequired
-      ? { title: revisedOutlineTitle, outline: revisedOutline }
+    target_outline_item: outlineChangeRequired
+      ? { title: targetOutlineTitle, outline: targetOutline }
       : undefined,
-    page_plan_replan_required:
-      record.page_plan_replan_required === true || outlineChangeRequired || hasRevisedPlanValue,
-    revised_page_plan_item: hasRevisedPlanValue ? revisedPagePlanItem : undefined,
     additional_research_required:
       record.additional_research_required === true ||
       cleanStringArray(record.additional_web_query_intents).length > 0 ||
@@ -110,13 +97,14 @@ export function buildPageRefinementIntentReviewPrompt(
     '- First version route values are exactly "proceed" and "unsupported".',
     "",
     "Target-page mutation rules:",
-    "- If the request cannot be satisfied under the current target page outline, set outline_change_required=true and provide revised_outline_item with only the new target page title and outline.",
+    "- If the request cannot be satisfied under the current target page outline, set outline_change_required=true and provide target_outline_item with the complete new target page title and outline.",
     "- Never change page count, page order, deck title, output language, template group, or other outline items.",
-    "- Set page_plan_replan_required=true when the target page intent or blueprint should change.",
-    "- revised_page_plan_item may include title, outline, blueprint_id, blueprint_source, and reason only. Stable ids and file paths are not allowed in the output.",
+    "- Do not return page-plan revisions, blueprint changes, slide paths, data paths, manifest ids, or a second copy of the outline.",
+    "- The system will copy target_outline_item into both the Confirmed Outline and the target Page Plan entry when outline_change_required=true.",
     "",
     "Research rules:",
     "- Set additional_research_required=true only when the request or revised target-page intent requires external facts, current information, source-backed data, named cases, citations, or real visual assets that are not already available in current evidence.",
+    "- If target_outline_item introduces new concrete facts, numbers, dates, names, cases, citations, or real visual needs that are not present in the existing target Research Evidence or explicitly stated in the Page Refinement Request, set additional_research_required=true and add the needed query intents.",
     "- Do not request research merely to make the page richer.",
     "- Add only new query intents needed for this refinement.",
     "",
@@ -125,14 +113,9 @@ export function buildPageRefinementIntentReviewPrompt(
       route: "proceed",
       blocking_reason: "",
       outline_change_required: false,
-      revised_outline_item: { title: "", outline: "" },
-      page_plan_replan_required: false,
-      revised_page_plan_item: {
+      target_outline_item: {
         title: "",
         outline: "",
-        blueprint_id: "",
-        blueprint_source: "",
-        reason: "",
       },
       additional_research_required: false,
       additional_web_query_intents: [],
