@@ -43,8 +43,56 @@ export type FinanceIconName =
   | "users"
   | "wallet";
 
+export const DEFAULT_FINANCE_ICON_NAME: FinanceIconName = "grid";
+
+const FINANCE_ICON_NAMES = new Set<string>([
+  "bank",
+  "bolt",
+  "book-open",
+  "brain",
+  "calendar",
+  "chart-column",
+  "chart-line",
+  "chart-pie",
+  "chess",
+  "clock",
+  "briefcase",
+  "compass",
+  "coins",
+  "database",
+  "document",
+  "gavel",
+  "grid",
+  "flag",
+  "globe",
+  "health",
+  "image",
+  "leaf",
+  "lightbulb",
+  "laptop-code",
+  "list",
+  "microchip",
+  "network",
+  "architecture",
+  "regtech",
+  "robot",
+  "route",
+  "security",
+  "shield",
+  "shuffle",
+  "smartphone",
+  "user",
+  "user-plus",
+  "users",
+  "wallet",
+]);
+
+export function isFinanceIconName(name: string): name is FinanceIconName {
+  return FINANCE_ICON_NAMES.has(name);
+}
+
 type FinanceIconProps = {
-  name: FinanceIconName;
+  name: FinanceIconName | string;
   className?: string;
   stroke?: string;
 };
@@ -56,7 +104,11 @@ export const FinanceIcon = ({
   className = "h-5 w-5",
   stroke = defaultStroke,
 }: FinanceIconProps) => {
-  switch (name) {
+  const resolvedName = isFinanceIconName(name)
+    ? name
+    : DEFAULT_FINANCE_ICON_NAME;
+
+  switch (resolvedName) {
     case "bank":
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
@@ -362,7 +414,5 @@ export const FinanceIcon = ({
           <path d="M12 10.4a1.8 1.8 0 0 1 1.8 1.8v2.8h-3.6v-2.8a1.8 1.8 0 0 1 1.8-1.8Zm0 0V9.1a1.8 1.8 0 1 1 3.6 0v1.3" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
-    default:
-      return null;
   }
 };
