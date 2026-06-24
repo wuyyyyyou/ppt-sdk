@@ -7,6 +7,8 @@ import type {
   GeneratePptxInput,
   GeneratePptxResult,
   GetExportArtifactDownloadUrlInput,
+  GetWorkspacePageFileFingerprintsInput,
+  GetWorkspacePageFileFingerprintsResult,
   GetWorkspaceOutlineInput,
   ListWorkspacesResult,
   ListTemplatesResult,
@@ -83,6 +85,9 @@ export interface PptBackend {
   recordPagePlan(input: RecordPagePlanInput): Promise<PagePlan>;
   getPagePlan(input: { workspace_dir: string }): Promise<PagePlan>;
   preparePageFiles(input: PreparePageFilesInput): Promise<PreparePageFilesResult>;
+  getWorkspacePageFileFingerprints(
+    input: GetWorkspacePageFileFingerprintsInput
+  ): Promise<GetWorkspacePageFileFingerprintsResult>;
   prepareResearchWorkspace(input: { workspace_dir: string }): Promise<PrepareResearchWorkspaceResult>;
   recordResearchPlan(input: { workspace_dir: string; research_plan: ResearchPlan }): Promise<ResearchPlan>;
   getResearchPlan(input: { workspace_dir: string }): Promise<ResearchPlan>;

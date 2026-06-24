@@ -21,6 +21,7 @@ import {
   getAppTemplateGroup,
   getAppTemplatePlanningContext,
   getAppTemplatePreview,
+  getAppWorkspacePageFileFingerprints,
   getAppPagePlan,
   getAppPageProgress,
   getAppPptxExportStatus,
@@ -846,6 +847,28 @@ async function toolAppPreparePageFiles(args) {
   return prepareAppPageFiles({ workspace_dir: workspaceDir });
 }
 
+async function toolAppGetWorkspacePageFileFingerprints(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const slidePath = typeof args.slide_path === "string" ? args.slide_path : "";
+  const dataPath = typeof args.data_path === "string" ? args.data_path : "";
+  if (!slidePath) {
+    throw new Error('Missing required parameter: "slide_path"');
+  }
+  if (!dataPath) {
+    throw new Error('Missing required parameter: "data_path"');
+  }
+
+  return getAppWorkspacePageFileFingerprints({
+    workspace_dir: workspaceDir,
+    slide_path: slidePath,
+    data_path: dataPath,
+  });
+}
+
 async function toolAppGetPageProgress(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -1422,6 +1445,7 @@ const TOOL_DISPATCH = {
   app_record_page_plan: toolAppRecordPagePlan,
   app_get_page_plan: toolAppGetPagePlan,
   app_prepare_page_files: toolAppPreparePageFiles,
+  app_get_workspace_page_file_fingerprints: toolAppGetWorkspacePageFileFingerprints,
   app_get_page_progress: toolAppGetPageProgress,
   app_prepare_research_workspace: toolAppPrepareResearchWorkspace,
   app_record_research_plan: toolAppRecordResearchPlan,

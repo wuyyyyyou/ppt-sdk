@@ -297,6 +297,30 @@
       ]
     },
     {
+      "name": "app_get_workspace_page_file_fingerprints",
+      "description": "Return SHA-256 fingerprints for a target page slide TSX and data JSON under a workspace template directory.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "slide_path",
+          "type": "string",
+          "description": "Template-relative slide TSX path from page-plan.json, such as ./slides/page-01.tsx.",
+          "required": true
+        },
+        {
+          "name": "data_path",
+          "type": "string",
+          "description": "Template-relative data JSON path from page-plan.json, such as ./data/page-01.json.",
+          "required": true
+        }
+      ]
+    },
+    {
       "name": "app_get_page_progress",
       "description": "Read page-progress.json for a workspace.",
       "parameters": [

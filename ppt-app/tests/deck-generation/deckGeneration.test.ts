@@ -290,6 +290,8 @@ function createHarness(options: {
   authoringError?: Error;
   toolAccessError?: Error;
   authoringDelayMs?: number;
+  noChangeAuthoringRuns?: number;
+  authoringChangeMode?: "both" | "slide" | "data" | "none";
 } = {}) {
   let pagePlan = clone(options.pagePlan ?? makePagePlan());
   let progress = clone(options.existingProgress ?? makeProgress(pagePlan));
@@ -329,6 +331,9 @@ function createHarness(options: {
   let recordResearchEvidencePageCalls = 0;
   let recordResearchStatusCalls = 0;
   let recordResearchStatusPageCalls = 0;
+  let pageAuthoringRuns = 0;
+  let slideFingerprintVersion = 0;
+  let dataFingerprintVersion = 0;
 
   const backend: PptBackend = {
     listWorkspaces: async () => ({ workspace_root: "", has_workspaces: false, latest_workspace: null, workspaces: [] }),
@@ -404,6 +409,19 @@ function createHarness(options: {
         blueprint_id: page.blueprint_id,
         manifest_slide_id: page.manifest_slide_id,
       })),
+    }),
+    getWorkspacePageFileFingerprints: async (input) => ({
+      workspace_dir: input.workspace_dir,
+      slide: {
+        path: `${input.workspace_dir}/template/${input.slide_path.replace(/^\.\//, "")}`,
+        sha256: `slide:${input.slide_path}:${slideFingerprintVersion}`,
+        size_bytes: 100 + slideFingerprintVersion,
+      },
+      data: {
+        path: `${input.workspace_dir}/template/${input.data_path.replace(/^\.\//, "")}`,
+        sha256: `data:${input.data_path}:${dataFingerprintVersion}`,
+        size_bytes: 50 + dataFingerprintVersion,
+      },
     }),
     prepareResearchWorkspace: async () => {
       prepareResearchWorkspaceCalls += 1;
@@ -702,6 +720,20 @@ function createHarness(options: {
           visual_summary: "Useful image.",
           updated_at: "2026-05-23T00:00:00.000Z",
         });
+      }
+      const isPageAuthoringPrompt = prompt.includes("You are a local file-editing Agent authoring one TSX-first PPT slide.");
+      if (isPageAuthoringPrompt) {
+        pageAuthoringRuns += 1;
+        const shouldKeepUnchanged = pageAuthoringRuns <= (options.noChangeAuthoringRuns ?? 0);
+        if (!shouldKeepUnchanged) {
+          const mode = options.authoringChangeMode ?? "both";
+          if (mode === "both" || mode === "slide") {
+            slideFingerprintVersion += 1;
+          }
+          if (mode === "both" || mode === "data") {
+            dataFingerprintVersion += 1;
+          }
+        }
       }
       runOptions?.onStreamEvent?.({ type: "complete" });
       return {
@@ -1700,6 +1732,149 @@ describe("Deck Generation Flow Module", () => {
     assert.ok(harness.contentReviewPrompts.length > 0);
     assert.ok(harness.visualReviewPrompts.length > 0);
     assert.equal(harness.deckRenderCalls, 1);
+  });
+
+  it("retries page refinement when authoring completes without changing target files", async () => {
+    const pagePlan = makePagePlan();
+    const existingProgress = makeProgress(pagePlan, "accepted");
+    const harness = createHarness({
+      pagePlan,
+      existingProgress,
+      noChangeAuthoringRuns: 1,
+    });
+
+    const completion = await runDeckRefinement({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      instruction: "Make the first slide more specific.",
+      scope: "slide",
+      pageIndex: 0,
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.authoringPrompts.length, 2);
+    assert.match(
+      harness.authoringPrompts[1] ?? "",
+      /Previous authoring attempt did not modify the target page files/,
+    );
+    assert.match(harness.authoringPrompts[1] ?? "", /No-change retry count: 1/);
+    assert.equal(harness.progress.pages[0]?.agent_failures, 1);
+    assert.equal(harness.progress.pages[0]?.status, "accepted");
+    assert.ok(harness.recordPageProgressInputs.some((input) =>
+      input.page_id === "page-01" &&
+      input.patch.status === "authoring" &&
+      input.patch.agent_failures === 1
+    ));
+    assert.ok(harness.logs.some((entry) =>
+      JSON.stringify(entry).includes("target_file_fingerprints") &&
+      JSON.stringify(entry).includes("\"target_files_changed\":false")
+    ));
+  });
+
+  it("accepts page authoring when only the TSX target file changes", async () => {
+    const pagePlan = makePagePlan();
+    const existingProgress = makeProgress(pagePlan, "accepted");
+    const harness = createHarness({
+      pagePlan,
+      existingProgress,
+      authoringChangeMode: "slide",
+    });
+
+    const completion = await runDeckRefinement({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      instruction: "Tighten the slide layout.",
+      scope: "slide",
+      pageIndex: 0,
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.authoringPrompts.length, 1);
+    assert.equal(harness.progress.pages[0]?.agent_failures, 0);
+  });
+
+  it("accepts page authoring when only the data target file changes", async () => {
+    const pagePlan = makePagePlan();
+    const existingProgress = makeProgress(pagePlan, "accepted");
+    const harness = createHarness({
+      pagePlan,
+      existingProgress,
+      authoringChangeMode: "data",
+    });
+
+    const completion = await runDeckRefinement({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      instruction: "Tighten the slide content.",
+      scope: "slide",
+      pageIndex: 0,
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.authoringPrompts.length, 1);
+    assert.equal(harness.progress.pages[0]?.agent_failures, 0);
+  });
+
+  it("fails page refinement when no-change authoring exhausts the Agent budget", async () => {
+    const pagePlan = makePagePlan();
+    const existingProgress = makeProgress(pagePlan, "accepted");
+    const harness = createHarness({
+      pagePlan,
+      existingProgress,
+      noChangeAuthoringRuns: 5,
+    });
+
+    const completion = await runDeckRefinement({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      instruction: "Make the first slide more specific.",
+      scope: "slide",
+      pageIndex: 0,
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "failed");
+    assert.equal(completion.error.type, "page_failed");
+    assert.equal(completion.error.page_status, "agent_failed");
+    assert.equal(harness.authoringPrompts.length, 5);
+    assert.equal(harness.progress.pages[0]?.agent_failures, 5);
+    assert.equal(harness.progress.pages[0]?.status, "agent_failed");
+    assert.match(
+      harness.progress.pages[0]?.last_error ?? "",
+      /没有实际修改当前页 TSX 或 data 文件/,
+    );
+    assert.ok(harness.recordPageProgressInputs.some((input) =>
+      input.page_id === "page-01" &&
+      input.patch.status === "agent_failed" &&
+      input.patch.agent_failures === 5
+    ));
   });
 
   it("guards content-review-fix against unsupported real-data requests", async () => {

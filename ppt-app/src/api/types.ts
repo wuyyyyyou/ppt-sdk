@@ -349,6 +349,24 @@ export interface PreparePageFilesResult {
   }>;
 }
 
+export interface PageFileFingerprint {
+  path: string;
+  sha256: string;
+  size_bytes: number;
+}
+
+export interface GetWorkspacePageFileFingerprintsInput {
+  workspace_dir: string;
+  slide_path: string;
+  data_path: string;
+}
+
+export interface GetWorkspacePageFileFingerprintsResult {
+  workspace_dir: string;
+  slide: PageFileFingerprint;
+  data: PageFileFingerprint;
+}
+
 export interface ResearchPaths {
   root_dir: string;
   raw_dir: string;

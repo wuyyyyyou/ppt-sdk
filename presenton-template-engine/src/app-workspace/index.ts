@@ -56,6 +56,8 @@ import type {
   GetAppTemplatePlanningContextInput,
   GetAppTemplatePreviewInput,
   GetAppWorkspaceOutlineInput,
+  GetAppWorkspacePageFileFingerprintsInput,
+  GetAppWorkspacePageFileFingerprintsResult,
   ListAppTemplateGroupsResult,
   ListAppWorkspacesResult,
   OpenAppWorkspaceInput,
@@ -155,6 +157,10 @@ function formatDefaultWorkspaceTitle(date = new Date()): string {
 }
 
 function sha256Hex(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function sha256BufferHex(value: Buffer): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
@@ -2646,6 +2652,42 @@ function resolveTemplateRelativePath(templateDir: string, relativePath: string):
     throw new Error(`Template-relative path escapes template directory: ${relativePath}`);
   }
   return absolutePath;
+}
+
+async function fingerprintFile(filePath: string) {
+  const [bytes, fileStat] = await Promise.all([
+    readFile(filePath),
+    stat(filePath),
+  ]);
+  if (!fileStat.isFile()) {
+    throw new Error(`Target page file is not a file: ${filePath}`);
+  }
+  return {
+    path: filePath,
+    sha256: sha256BufferHex(bytes),
+    size_bytes: fileStat.size,
+  };
+}
+
+export async function getAppWorkspacePageFileFingerprints(
+  input: GetAppWorkspacePageFileFingerprintsInput,
+): Promise<GetAppWorkspacePageFileFingerprintsResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const manifestPath = readSelectedTemplateManifestPath(workspace);
+  const templateDir = path.dirname(manifestPath);
+  const slidePath = resolveTemplateRelativePath(templateDir, normalizeString(input.slide_path));
+  const dataPath = resolveTemplateRelativePath(templateDir, normalizeString(input.data_path));
+
+  const [slide, data] = await Promise.all([
+    fingerprintFile(slidePath),
+    fingerprintFile(dataPath),
+  ]);
+
+  return {
+    workspace_dir: workspace.workspace_dir,
+    slide,
+    data,
+  };
 }
 
 async function validatePagePlanAgainstTemplate(

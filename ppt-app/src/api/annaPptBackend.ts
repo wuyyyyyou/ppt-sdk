@@ -7,6 +7,7 @@ import type {
   ExportPdfResult,
   GeneratePptxInput,
   GeneratePptxResult,
+  GetWorkspacePageFileFingerprintsResult,
   ImageFetchResult,
   ImageSearchResult,
   PagePlan,
@@ -215,6 +216,12 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         PPT_ENGINE_TOOL_ID,
         "app_prepare_page_files",
         input
+      ),
+    getWorkspacePageFileFingerprints: (input) =>
+      invoke<GetWorkspacePageFileFingerprintsResult>(
+        PPT_ENGINE_TOOL_ID,
+        "app_get_workspace_page_file_fingerprints",
+        input,
       ),
     prepareResearchWorkspace: (input) =>
       invoke(PPT_ENGINE_TOOL_ID, "app_prepare_research_workspace", input),

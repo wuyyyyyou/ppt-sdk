@@ -27,6 +27,7 @@ import type {
   ResearchRequirement,
   VisualResearchCurationDraft,
   WebResearchCurationDraft,
+  GetWorkspacePageFileFingerprintsResult,
   RenderDeckHtmlResult,
   RenderWorkspacePagePreviewResult,
   WorkspaceOutline,
@@ -71,6 +72,12 @@ interface RenderFailureHistoryItem {
   phase: RenderFailurePhase;
   error: string;
   timestamp: string;
+}
+
+interface NoChangeAuthoringRetry {
+  retryCount: number;
+  previousSummary: string;
+  previousChangedFiles: string[];
 }
 
 export type DeckGenerationStep =
@@ -489,6 +496,7 @@ function buildAuthoringPrompt(input: {
   visualReview?: AgentPageVisualReviewResult | null;
   contentReview?: AgentPageContentReviewResult | null;
   pageRefinementVisualContext?: PageRefinementVisualContext;
+  noChangeRetry?: NoChangeAuthoringRetry | null;
 }) {
   const hasFailureFix = Boolean(input.renderError || input.visualReview || input.contentReview);
   const pageRefinementRequest = input.pageRefinementRequest?.trim() ?? "";
@@ -592,6 +600,23 @@ function buildAuthoringPrompt(input: {
                 "Continue the refinement without visual context. Do not treat any screenshot as factual evidence.",
               ].join("\n"),
         ].join("\n")
+      : "",
+    input.noChangeRetry
+      ? [
+          "Previous authoring attempt did not modify the target page files.",
+          `No-change retry count: ${input.noChangeRetry.retryCount}`,
+          "The previous run completed, but both the current slide TSX and current data JSON had identical file hashes before and after the run.",
+          "You must make a real edit to at least one of these target files when the authoring request requires a change:",
+          `- ${slidePath}`,
+          `- ${dataPath}`,
+          input.noChangeRetry.previousChangedFiles.length > 0
+            ? `Previous changed_files claim: ${JSON.stringify(input.noChangeRetry.previousChangedFiles)}`
+            : "Previous changed_files claim: []",
+          input.noChangeRetry.previousSummary
+            ? `Previous summary: ${input.noChangeRetry.previousSummary}`
+            : "",
+          "Do not only return a summary claiming changes.",
+        ].filter(Boolean).join("\n")
       : "",
     "",
     "Current page context:",
@@ -759,6 +784,35 @@ function resolveReviewExpectedOutputLanguage(
 
   const settingLanguage = normalizeOutputLanguage(outline.source?.setting?.output_language);
   return settingLanguage !== AUTO_OUTPUT_LANGUAGE ? settingLanguage : null;
+}
+
+function targetPageFilesChanged(
+  before: GetWorkspacePageFileFingerprintsResult,
+  after: GetWorkspacePageFileFingerprintsResult,
+) {
+  return before.slide.sha256 !== after.slide.sha256 ||
+    before.data.sha256 !== after.data.sha256;
+}
+
+function targetPageNoChangeMessage(locale: Locale, page: PagePlanItem) {
+  return locale === "zh"
+    ? `页面生成失败：Agent 多次完成响应但没有实际修改当前页 TSX 或 data 文件（${page.title || page.page_id}）。`
+    : `Page generation failed: the Agent completed multiple times without modifying the current page TSX or data file (${page.title || page.page_id}).`;
+}
+
+function targetPageFingerprintReadErrorMessage(locale: Locale, page: PagePlanItem, error: unknown) {
+  const detail = error instanceof Error ? error.message : String(error);
+  return locale === "zh"
+    ? `页面生成失败：无法读取当前页 TSX 或 data 文件用于 hash 校验（${page.title || page.page_id}）：${detail}`
+    : `Page generation failed: unable to read the current page TSX or data file for hash validation (${page.title || page.page_id}): ${detail}`;
+}
+
+async function getTargetPageFileFingerprints(input: RunDeckGenerationInput, page: PagePlanItem) {
+  return input.backend.getWorkspacePageFileFingerprints({
+    workspace_dir: input.workspace.workspace_dir,
+    slide_path: page.slide_path,
+    data_path: page.data_path,
+  });
 }
 
 function buildPageContentReviewPrompt(input: {
@@ -2449,6 +2503,8 @@ async function runPageGeneration(
       : null;
   const pageRefinementRequest =
     input.pageRefinementRequests?.[page.page_id]?.trim() || "";
+  let noChangeRetryCount = 0;
+  let noChangeRetry: NoChangeAuthoringRetry | null = null;
 
   while (!input.isCancelled()) {
     const attemptKind = renderError
@@ -2474,6 +2530,7 @@ async function runPageGeneration(
       pageRefinementVisualContext: pageRefinementRequest
         ? input.pageRefinementVisualContexts?.[page.page_id]
         : undefined,
+      noChangeRetry,
     });
     const authoringKind = attemptKind === "initial" ? "authoring" : attemptKind;
     const authoringTracker = createAgentRunTracker({
@@ -2488,15 +2545,44 @@ async function runPageGeneration(
     });
 
     try {
+      let beforeFingerprints: GetWorkspacePageFileFingerprintsResult;
+      try {
+        beforeFingerprints = await getTargetPageFileFingerprints(input, page);
+      } catch (fingerprintError) {
+        const message = targetPageFingerprintReadErrorMessage(input.locale, page, fingerprintError);
+        progress = await recordProgress(input, page, {
+          status: "agent_failed",
+          last_error: message,
+        });
+        input.setProgress(progress);
+        break;
+      }
+
       const authoringResult: AgentRunSummary = await input.agentClient.runAuthoringPrompt(
         authoringPrompt,
         buildAgentRunOptions(input, authoringTracker.onStreamEvent, authoringTracker.logContext),
       );
+      let afterFingerprints: GetWorkspacePageFileFingerprintsResult | null = null;
+      let targetFilesChanged = false;
+      let fingerprintErrorMessage = "";
+      try {
+        afterFingerprints = await getTargetPageFileFingerprints(input, page);
+        targetFilesChanged = targetPageFilesChanged(beforeFingerprints, afterFingerprints);
+      } catch (fingerprintError) {
+        fingerprintErrorMessage = targetPageFingerprintReadErrorMessage(input.locale, page, fingerprintError);
+      }
       await authoringTracker.flush("completed", {
         parsed_summary: authoringResult.parsed_json === true,
         summary: authoringResult.summary,
         changed_files: authoringResult.changed_files,
         needs_render: authoringResult.needs_render,
+        target_file_fingerprints: {
+          before: beforeFingerprints,
+          after: afterFingerprints,
+        },
+        target_files_changed: targetFilesChanged,
+        target_file_fingerprint_error: fingerprintErrorMessage || undefined,
+        no_change_retry_count: noChangeRetryCount,
         session_retries: authoringResult.session_retries ?? 0,
         session_cache_miss_retries:
           authoringResult.session_cache_miss_retries ?? 0,
@@ -2508,6 +2594,33 @@ async function runPageGeneration(
           progress: input.getProgress() ?? progress,
         };
       }
+      if (fingerprintErrorMessage) {
+        progress = await recordProgress(input, page, {
+          status: "agent_failed",
+          last_error: fingerprintErrorMessage,
+        });
+        input.setProgress(progress);
+        break;
+      }
+      if (!targetFilesChanged) {
+        noChangeRetryCount += 1;
+        agentFailures += 1;
+        const message = targetPageNoChangeMessage(input.locale, page);
+        progress = await recordProgress(input, page, {
+          status: agentFailures >= attemptLimits.agent ? "agent_failed" : "authoring",
+          agent_failures: agentFailures,
+          last_error: message,
+        });
+        input.setProgress(progress);
+        noChangeRetry = {
+          retryCount: noChangeRetryCount,
+          previousSummary: authoringResult.summary,
+          previousChangedFiles: authoringResult.changed_files,
+        };
+        if (agentFailures >= attemptLimits.agent) break;
+        continue;
+      }
+      noChangeRetry = null;
       renderError = "";
       visualReview = null;
       contentReview = null;

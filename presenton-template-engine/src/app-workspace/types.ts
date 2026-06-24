@@ -399,6 +399,24 @@ export interface PrepareAppPageFilesResult {
   }>;
 }
 
+export interface GetAppWorkspacePageFileFingerprintsInput {
+  workspace_dir: string;
+  slide_path: string;
+  data_path: string;
+}
+
+export interface AppWorkspacePageFileFingerprint {
+  path: string;
+  sha256: string;
+  size_bytes: number;
+}
+
+export interface GetAppWorkspacePageFileFingerprintsResult {
+  workspace_dir: string;
+  slide: AppWorkspacePageFileFingerprint;
+  data: AppWorkspacePageFileFingerprint;
+}
+
 export interface AppPageProgressItem {
   page_id: string;
   index: number;
