@@ -297,6 +297,24 @@
       ]
     },
     {
+      "name": "app_prepare_deck_refinement_page_files",
+      "description": "Incrementally prepare Deck Refinement page files from page-plan.json, writing only new page TSX/data while reconciling manifest, page-progress, and rendered page references.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "new_page_ids",
+          "type": "array",
+          "description": "Page ids that were newly added and should be initialized from their selected blueprint.",
+          "required": false
+        }
+      ]
+    },
+    {
       "name": "app_get_workspace_page_file_fingerprints",
       "description": "Return SHA-256 fingerprints for a target page slide TSX and data JSON under a workspace template directory.",
       "parameters": [

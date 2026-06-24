@@ -192,6 +192,7 @@ export interface Messages {
         | "visualResearchCuration"
         | "prepare"
         | "authoring"
+        | "deckRefinement"
         | "contentReview"
         | "contentReviewFix"
         | "rendering"
@@ -498,6 +499,7 @@ export const messages: Record<Locale, Messages> = {
           visualResearchCuration: "Curating images",
           prepare: "File preparation",
           authoring: "Page expression",
+          deckRefinement: "Deck refinement",
           contentReview: "Page content review",
           contentReviewFix: "Content review adjustment",
           rendering: "Page rendering",
@@ -808,6 +810,7 @@ export const messages: Record<Locale, Messages> = {
           visualResearchCuration: "筛选图片素材",
           prepare: "文件准备",
           authoring: "页面表达",
+          deckRefinement: "整套优化",
           contentReview: "页面内容检查",
           contentReviewFix: "内容检查后调整",
           rendering: "页面渲染",

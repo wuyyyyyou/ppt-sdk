@@ -399,6 +399,15 @@ export interface PrepareAppPageFilesResult {
   }>;
 }
 
+export interface PrepareAppDeckRefinementPageFilesInput {
+  workspace_dir: string;
+  new_page_ids?: string[];
+}
+
+export interface PrepareAppDeckRefinementPageFilesResult extends PrepareAppPageFilesResult {
+  new_page_ids: string[];
+}
+
 export interface GetAppWorkspacePageFileFingerprintsInput {
   workspace_dir: string;
   slide_path: string;
@@ -442,6 +451,7 @@ export type AppPageProgressRecoveryRunKind =
   | "deck-generation"
   | "page-generation-retry"
   | "page-refinement"
+  | "deck-refinement"
   | "final-deck-render";
 
 export type AppPageProgressRecoveryStatus =
@@ -458,6 +468,7 @@ export interface AppPageProgressRecoveryState {
   target_page_ids: string[];
   page_refinement_request: string | null;
   page_refinement_requests: Record<string, string>;
+  deck_refinement_review?: unknown | null;
   error: string | null;
   updated_at: string | null;
 }

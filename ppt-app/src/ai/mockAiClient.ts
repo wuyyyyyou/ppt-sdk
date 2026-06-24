@@ -15,6 +15,8 @@ import { buildGenerateResearchPlanLlmRequest } from "./researchPlanPrompt";
 import { validateGeneratedOutline } from "./outlineParser";
 import type {
   AiClient,
+  DeckRefinementIntentReviewResult,
+  DeckRefinementOutlineOperation,
   GenerateDeckInput,
   GenerateSlidesFromOutlineInput,
   RefineDeckInput,
@@ -194,6 +196,43 @@ export function createMockAiClient(): AiClient {
       return plan;
     },
 
+    async generateAddedPagePlan(input) {
+      await sleep(250);
+      const now = new Date().toISOString();
+      const blueprints = input.planningContext.blueprints;
+      const fallback = blueprints[0];
+      const content = blueprints.find((item) => item.layout_family === "two-column") ?? fallback;
+      const plan = {
+        version: 1 as const,
+        status: "planned" as const,
+        title: input.baseOutline.title,
+        source: {
+          outline_updated_at: input.baseOutline.updated_at,
+          template_group: input.planningContext.template_group,
+          template_manifest_path: input.planningContext.manifest_path,
+          generated_by: "mock",
+        },
+        pages: input.outlineItems.map((item, index) => {
+          const pageNumber = String(index + 1).padStart(2, "0");
+          return {
+            page_id: `added-${pageNumber}`,
+            index,
+            title: item.title,
+            outline: item.outline,
+            blueprint_id: content.id,
+            blueprint_source: content.blueprint_source,
+            slide_path: `./slides/added-${pageNumber}.tsx`,
+            data_path: `./data/added-${pageNumber}.json`,
+            manifest_slide_id: `added-${pageNumber}`,
+            reason: "Mock added-page page plan.",
+          };
+        }),
+        updated_at: now,
+      };
+      await logMockInteraction(input.logContext, { method: "generateAddedPagePlan", input }, plan);
+      return plan;
+    },
+
     async generateResearchPlan(input) {
       await sleep(250);
       const now = new Date().toISOString();
@@ -250,6 +289,94 @@ export function createMockAiClient(): AiClient {
         reason: "Mock current-page refinement can proceed.",
       };
       await logMockInteraction(input.logContext, { method: "reviewPageRefinementIntent", input }, result);
+      return result;
+    },
+
+    async reviewDeckRefinementIntent(input) {
+      await sleep(250);
+      const lower = input.instruction.toLowerCase();
+      const wantsNoOp = /no.?op|不用改|无需|没变化/.test(lower);
+      const wantsTemplate = /template|模板/.test(lower) && /换|change|switch|更换/.test(lower);
+      const wantsEnglish = /english|英文|英语/.test(lower);
+      const wantsChinese = /中文|chinese|汉语/.test(lower);
+      const wantsAdd = /add|增加|新增|加一页|加页/.test(lower);
+      const wantsDelete = /delete|remove|删除|删掉|去掉/.test(lower);
+      const wantsGlobal = /audience|style|theme|受众|风格|主题|表达|统一/.test(lower);
+      const wantsUpdate = /update|rewrite|优化|调整|改/.test(lower);
+
+      const result: DeckRefinementIntentReviewResult = wantsTemplate
+        ? {
+            route: "unsupported" as const,
+            blocking_reason: "Mock: selected Template changes are unsupported in Deck Refinement.",
+            context_updates: {},
+            output_language_change: { changed: false },
+            global_change: false,
+            operations: [],
+            reason: "Template migration is outside Deck Refinement.",
+          }
+        : wantsNoOp
+          ? {
+              route: "no_op" as const,
+              context_updates: {},
+              output_language_change: { changed: false },
+              global_change: false,
+              operations: [],
+              reason: "Mock no-op Deck Refinement.",
+            }
+          : {
+              route: "proceed" as const,
+              context_updates: wantsGlobal
+                ? { style_notes: input.instruction }
+                : {},
+              output_language_change: {
+                changed: wantsEnglish || wantsChinese,
+                output_language: wantsEnglish ? "English" : wantsChinese ? "中文" : "",
+                reason: wantsEnglish || wantsChinese ? "Mock explicit output language change." : "",
+              },
+              global_change: wantsGlobal,
+              global_change_reason: wantsGlobal ? "Mock global style/context change." : "",
+              operations: input.pagePlan.pages.flatMap((page, index): DeckRefinementOutlineOperation[] => {
+                if (wantsDelete && index === input.pagePlan.pages.length - 1) {
+                  return [{ op: "delete" as const, page_id: page.page_id, reason: "Mock delete last page." }];
+                }
+                const shouldUpdate = wantsUpdate && index === Math.min(1, input.pagePlan.pages.length - 1);
+                const base = shouldUpdate
+                  ? {
+                      op: "update" as const,
+                      page_id: page.page_id,
+                      title: page.title.includes("Updated") ? page.title : `${page.title} Updated`,
+                      outline: `${page.outline}\nMock deck-level refinement: ${input.instruction}`,
+                      reason: "Mock update page intent.",
+                      additional_research_required: /latest|最新|citation|引用|数据/.test(lower),
+                      additional_web_query_intents: /latest|最新|citation|引用|数据/.test(lower) ? [page.title] : [],
+                      additional_image_query_intents: [],
+                      evidence_needs: [],
+                      visual_needs: [],
+                    }
+                  : { op: "keep" as const, page_id: page.page_id, reason: "Mock keep page." };
+                if (wantsAdd && index === input.pagePlan.pages.length - 1) {
+                  return [
+                    base,
+                    {
+                      op: "add" as const,
+                      title: input.locale === "zh" ? "新增补充页" : "Additional Supporting Page",
+                      outline: input.locale === "zh"
+                        ? "补充整套优化请求中新增的关键信息。"
+                        : "Add the key supporting information requested by the deck refinement.",
+                      reason: "Mock add page.",
+                      additional_research_required: /latest|最新|citation|引用|数据/.test(lower),
+                      additional_web_query_intents: /latest|最新|citation|引用|数据/.test(lower) ? [input.instruction] : [],
+                      additional_image_query_intents: [],
+                      evidence_needs: [],
+                      visual_needs: [],
+                    },
+                  ];
+                }
+                return [base];
+              }),
+              reason: "Mock Deck Refinement proceed.",
+            };
+      await logMockInteraction(input.logContext, { method: "reviewDeckRefinementIntent", input }, result);
       return result;
     },
 

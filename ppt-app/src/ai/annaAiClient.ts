@@ -20,6 +20,10 @@ import {
   normalizePageRefinementIntentReview,
 } from "./pageRefinementIntentReview";
 import {
+  buildDeckRefinementIntentReviewPrompt,
+  normalizeDeckRefinementIntentReview,
+} from "./deckRefinementIntentReview";
+import {
   OutlineValidationError,
   parseOutlineJson,
   validateGeneratedOutline,
@@ -491,6 +495,54 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
       throw new Error("Anna LLM returned invalid page plan JSON.");
     },
 
+    async generateAddedPagePlan(input) {
+      const outline = {
+        ...input.baseOutline,
+        items: input.outlineItems,
+      };
+      let request = buildGeneratePagePlanLlmRequest({
+        outline,
+        planningContext: input.planningContext,
+        locale: input.locale,
+      });
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        const rawResult = await completeLlm(runtime, request, input.logContext);
+        const rawText = extractCompletionText(rawResult);
+
+        try {
+          return parsePagePlanJson(rawText);
+        } catch (error) {
+          if (attempt >= 2) {
+            throw error;
+          }
+
+          const message = error instanceof Error ? error.message : String(error);
+          request = {
+            ...request,
+            messages: [
+              ...request.messages,
+              {
+                role: "assistant",
+                content: {
+                  type: "text",
+                  text: rawText
+                }
+              },
+              {
+                role: "user",
+                content: {
+                  type: "text",
+                  text: buildPagePlanRepairPrompt([message])
+                }
+              }
+            ]
+          };
+        }
+      }
+
+      throw new Error("Anna LLM returned invalid added-page plan JSON.");
+    },
+
     async generateResearchPlan(input) {
       const request = buildGenerateResearchPlanLlmRequest(input);
       const rawResult = await completeLlm(runtime, request, input.logContext);
@@ -510,6 +562,17 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         input.logContext,
       );
       return normalizePageRefinementIntentReview(result);
+    },
+
+    async reviewDeckRefinementIntent(input) {
+      const result = await completeJson<unknown>(
+        runtime,
+        "deck refinement context review",
+        buildDeckRefinementIntentReviewPrompt(input),
+        '{"route":"proceed","blocking_reason":"","context_updates":{},"output_language_change":{"changed":false,"output_language":"","reason":""},"global_change":false,"global_change_reason":"","operations":[{"op":"keep","page_id":"page-01","reason":""}],"reason":"..."}',
+        input.logContext,
+      );
+      return normalizeDeckRefinementIntentReview(result);
     },
 
     async generateDeck(input) {

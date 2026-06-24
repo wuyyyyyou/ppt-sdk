@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, LayoutTemplate, LoaderCircle, MessageCircle, Wand2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Layers, LayoutTemplate, LoaderCircle, MessageCircle, Wand2 } from "lucide-react";
 import { useState } from "react";
 import type { Slide } from "../../../data/mockDeck";
 import { formatMessage, type Messages } from "../../../i18n/messages";
@@ -56,46 +56,11 @@ export function DeckPage(props: DeckPageProps) {
   return (
     <section className="page active deck-page">
       <div className="deck-top-actions">
-        <button className="secondary-btn" onClick={onRefineDeck}>
-          {t.controls.refineDeck}
-        </button>
-      </div>
-
-      {reviewRender.status === "ready" && selectedRenderedSlide?.screenshot_url ? (
-        <div className="deck-stage-html-frame">
-          <RenderedSlideImage slide={selectedRenderedSlide} loading="eager" />
-        </div>
-      ) : showPreviewLoading ? (
-        <div className="deck-stage-loading" role="status" aria-live="polite">
-          <LoaderCircle size={28} />
-          <span>{t.review.rendering}</span>
-        </div>
-      ) : (
-        <SlidePreview slide={slide} index={currentSlide} large />
-      )}
-
-      <div className="preview-controls">
-        <button
-          className="nav-arrow"
-          disabled={currentSlide === 0}
-          onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
-        >
-          <ChevronLeft size={16} />
-        </button>
-        <div className="slide-counter">
-          {formatMessage(t.deck.slideCounter, {
-            current: formatSlideNumber(currentSlide),
-            total: formatSlideCount(deck.length)
-          })}
-        </div>
-        <button
-          className="nav-arrow"
-          disabled={currentSlide === deck.length - 1}
-          onClick={() => setCurrentSlide(Math.min(deck.length - 1, currentSlide + 1))}
-        >
-          <ChevronRight size={16} />
-        </button>
         <div className="slide-ai-actions">
+          <button className="secondary-btn compact" onClick={onRefineDeck} disabled={localAiDisabled}>
+            <Layers size={14} />
+            {t.controls.refineDeck}
+          </button>
           <button className="secondary-btn compact" onClick={onRefineSlide} disabled={localAiDisabled}>
             <MessageCircle size={14} />
             {t.controls.refineSlide}
@@ -135,6 +100,42 @@ export function DeckPage(props: DeckPageProps) {
             ) : null}
           </div>
         </div>
+      </div>
+
+      {reviewRender.status === "ready" && selectedRenderedSlide?.screenshot_url ? (
+        <div className="deck-stage-html-frame">
+          <RenderedSlideImage slide={selectedRenderedSlide} loading="eager" />
+        </div>
+      ) : showPreviewLoading ? (
+        <div className="deck-stage-loading" role="status" aria-live="polite">
+          <LoaderCircle size={28} />
+          <span>{t.review.rendering}</span>
+        </div>
+      ) : (
+        <SlidePreview slide={slide} index={currentSlide} large />
+      )}
+
+      <div className="preview-controls">
+        <button
+          className="nav-arrow"
+          disabled={currentSlide === 0}
+          onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <div className="slide-counter">
+          {formatMessage(t.deck.slideCounter, {
+            current: formatSlideNumber(currentSlide),
+            total: formatSlideCount(deck.length)
+          })}
+        </div>
+        <button
+          className="nav-arrow"
+          disabled={currentSlide === deck.length - 1}
+          onClick={() => setCurrentSlide(Math.min(deck.length - 1, currentSlide + 1))}
+        >
+          <ChevronRight size={16} />
+        </button>
       </div>
 
       <ThumbnailStrip

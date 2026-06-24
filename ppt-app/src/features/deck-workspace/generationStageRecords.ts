@@ -20,6 +20,7 @@ type StageLabelKey =
   | "visualResearchCuration"
   | "prepare"
   | "authoring"
+  | "deckRefinement"
   | "contentReview"
   | "contentReviewFix"
   | "rendering"
@@ -231,6 +232,7 @@ function sortStageRecords(records: PageGenerationStageRecord[]) {
     "webResearchCuration",
     "visualResearchCuration",
     "authoring",
+    "deckRefinement",
     "contentReview",
     "contentReviewFix",
     "renderFix",
@@ -273,6 +275,7 @@ function stageLabelKey(
   pageStatus?: string,
 ): StageLabelKey {
   if (kind === "authoring") return "authoring";
+  if (kind === "deck-refinement") return "deckRefinement";
   if (kind === "render-fix") return "renderFix";
   if (kind === "content-review-fix") return "contentReviewFix";
   if (kind === "visual-review-fix") return "visualReviewFix";

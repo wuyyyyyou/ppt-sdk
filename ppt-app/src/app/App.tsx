@@ -139,8 +139,7 @@ export function App() {
               reviewRender={state.reviewRender}
               loading={state.loading}
               onRefineDeck={() => {
-                actions.setRefineScope("deck");
-                actions.navigate("refine");
+                void actions.openRefineDeck();
               }}
               onRefineSlide={() => {
                 void actions.openRefineSlide();
@@ -194,12 +193,10 @@ export function App() {
           {state.page === "refine" ? (
             <RefinePage
               t={t}
-              scope={state.refineScope}
-              setScope={actions.setRefineScope}
               slide={selectedSlide}
               slideIndex={state.currentSlide}
               slideNumber={formatSlideNumber(state.currentSlide)}
-              deckCount={state.deck.length}
+              refineScope={state.refineScope}
               reviewRender={state.reviewRender}
               loading={state.loading}
               onBack={actions.goBack}

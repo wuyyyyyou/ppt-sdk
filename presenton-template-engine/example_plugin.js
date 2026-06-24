@@ -36,6 +36,7 @@ import {
   listAppTemplateGroups,
   listDiscoveredTemplateGroupSummaries,
   openAppWorkspace,
+  prepareAppDeckRefinementPageFiles,
   prepareAppPageFiles,
   prepareAppExportModel,
   prepareAppResearchWorkspace,
@@ -847,6 +848,21 @@ async function toolAppPreparePageFiles(args) {
   return prepareAppPageFiles({ workspace_dir: workspaceDir });
 }
 
+async function toolAppPrepareDeckRefinementPageFiles(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const newPageIds = Array.isArray(args.new_page_ids)
+    ? args.new_page_ids.filter((item) => typeof item === "string")
+    : [];
+  return prepareAppDeckRefinementPageFiles({
+    workspace_dir: workspaceDir,
+    new_page_ids: newPageIds,
+  });
+}
+
 async function toolAppGetWorkspacePageFileFingerprints(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -1445,6 +1461,7 @@ const TOOL_DISPATCH = {
   app_record_page_plan: toolAppRecordPagePlan,
   app_get_page_plan: toolAppGetPagePlan,
   app_prepare_page_files: toolAppPreparePageFiles,
+  app_prepare_deck_refinement_page_files: toolAppPrepareDeckRefinementPageFiles,
   app_get_workspace_page_file_fingerprints: toolAppGetWorkspacePageFileFingerprints,
   app_get_page_progress: toolAppGetPageProgress,
   app_prepare_research_workspace: toolAppPrepareResearchWorkspace,

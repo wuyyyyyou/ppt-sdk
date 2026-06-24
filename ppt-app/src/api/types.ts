@@ -349,6 +349,15 @@ export interface PreparePageFilesResult {
   }>;
 }
 
+export interface PrepareDeckRefinementPageFilesInput {
+  workspace_dir: string;
+  new_page_ids?: string[];
+}
+
+export interface PrepareDeckRefinementPageFilesResult extends PreparePageFilesResult {
+  new_page_ids: string[];
+}
+
 export interface PageFileFingerprint {
   path: string;
   sha256: string;
@@ -612,6 +621,7 @@ export type PageProgressRecoveryRunKind =
   | "deck-generation"
   | "page-generation-retry"
   | "page-refinement"
+  | "deck-refinement"
   | "final-deck-render";
 
 export type PageProgressRecoveryStatus =
@@ -628,6 +638,7 @@ export interface PageProgressRecoveryState {
   target_page_ids: string[];
   page_refinement_request: string | null;
   page_refinement_requests: Record<string, string>;
+  deck_refinement_review?: unknown | null;
   error: string | null;
   updated_at: string | null;
 }

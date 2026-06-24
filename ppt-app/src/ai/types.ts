@@ -8,6 +8,7 @@ import type {
   ResearchPlan,
   ResearchRequirement,
   TemplatePlanningContext,
+  WorkspaceOutlineItem,
   WorkspaceOutline,
 } from "../api/types";
 import type { Locale } from "../i18n/messages";
@@ -151,6 +152,86 @@ export interface ReviewPageRefinementIntentInput {
   logContext?: AiOperationLogContext;
 }
 
+export type DeckRefinementIntentReviewRoute = "proceed" | "unsupported" | "no_op";
+
+export type DeckRefinementOutlineOperation =
+  | {
+      op: "keep";
+      page_id: string;
+      reason: string;
+    }
+  | {
+      op: "update";
+      page_id: string;
+      title: string;
+      outline: string;
+      reason: string;
+      additional_research_required?: boolean;
+      additional_web_query_intents?: string[];
+      additional_image_query_intents?: string[];
+      evidence_needs?: string[];
+      visual_needs?: string[];
+    }
+  | {
+      op: "add";
+      title: string;
+      outline: string;
+      reason: string;
+      additional_research_required?: boolean;
+      additional_web_query_intents?: string[];
+      additional_image_query_intents?: string[];
+      evidence_needs?: string[];
+      visual_needs?: string[];
+    }
+  | {
+      op: "delete";
+      page_id: string;
+      reason: string;
+    };
+
+export interface DeckRefinementContextUpdates {
+  audience?: string;
+  goal?: string;
+  style_notes?: string;
+  theme_id?: string;
+  visual_tone?: string;
+  typography?: string;
+  text_density?: string;
+}
+
+export interface DeckRefinementIntentReviewResult {
+  route: DeckRefinementIntentReviewRoute;
+  blocking_reason?: string;
+  context_updates: DeckRefinementContextUpdates;
+  output_language_change: {
+    changed: boolean;
+    output_language?: string;
+    reason?: string;
+  };
+  global_change: boolean;
+  global_change_reason?: string;
+  operations: DeckRefinementOutlineOperation[];
+  reason: string;
+}
+
+export interface ReviewDeckRefinementIntentInput {
+  instruction: string;
+  outline: WorkspaceOutline;
+  pagePlan: PagePlan;
+  planningContext: TemplatePlanningContext;
+  setting?: WorkspaceSettings;
+  locale: Locale;
+  logContext?: AiOperationLogContext;
+}
+
+export interface GenerateAddedPagePlanInput {
+  outlineItems: WorkspaceOutlineItem[];
+  baseOutline: WorkspaceOutline;
+  planningContext: TemplatePlanningContext;
+  locale: Locale;
+  logContext?: AiOperationLogContext;
+}
+
 export interface AiClient {
   generateOutline(input: GenerateOutlineInput): Promise<OutlineGenerationResult>;
   detectOutputLanguage(input: GenerateOutlineInput & {
@@ -159,8 +240,10 @@ export interface AiClient {
   }): Promise<{ output_language: string }>;
   suggestContext(input: SuggestContextInput): Promise<ContextSuggestionResult>;
   generatePagePlan(input: GeneratePagePlanInput): Promise<PagePlan>;
+  generateAddedPagePlan(input: GenerateAddedPagePlanInput): Promise<PagePlan>;
   generateResearchPlan(input: GenerateResearchPlanInput): Promise<ResearchPlan>;
   reviewPageRefinementIntent(input: ReviewPageRefinementIntentInput): Promise<PageRefinementIntentReviewResult>;
+  reviewDeckRefinementIntent(input: ReviewDeckRefinementIntentInput): Promise<DeckRefinementIntentReviewResult>;
   generateDeck(input: GenerateDeckInput): Promise<GeneratedDeck>;
   reviseOutline(input: ReviseOutlineInput): Promise<OutlineGenerationResult>;
   generateSlidesFromOutline(

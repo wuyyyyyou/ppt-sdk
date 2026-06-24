@@ -156,6 +156,7 @@ export interface DeckWorkspaceActions {
   saveWorkspaceSettings: (setting: WorkspaceSettings) => Promise<void>;
   saveWorkspaceTitle: (title: string) => Promise<void>;
   selectTemplate: (groupId: string) => Promise<void>;
+  openRefineDeck: () => Promise<void>;
   openRefineSlide: (index?: number) => Promise<void>;
   refineDeck: (instruction: string) => Promise<void>;
   refineSlide: (instruction: string) => Promise<void>;
@@ -990,6 +991,28 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (nextPage === "export" && currentWorkspace) {
       void refreshWorkspaceExportArtifact(currentWorkspace, exportRefreshVersionRef.current);
     }
+  }
+
+  async function openRefineDeck() {
+    if (!generated) {
+      showToast(t.toasts.createDeckFirst);
+      return;
+    }
+
+    setRefineScope("deck");
+    setPage("refine");
+    setHistory((items) =>
+      items.at(-1) === "refine" ? items : [...items, "refine"]
+    );
+
+    if (!currentWorkspace) return;
+    const renderKey = workspaceReviewRenderKey(currentWorkspace);
+    const hasCurrentRender =
+      reviewRender.status === "ready" &&
+      reviewRender.result !== null &&
+      reviewRender.renderKey === renderKey;
+    if (hasCurrentRender) return;
+    await renderDeckHtmlForWorkspace(currentWorkspace, "review");
   }
 
   async function openRefineSlide(index = currentSlide) {
@@ -2329,7 +2352,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     try {
       const refreshedWorkspace = await refreshCurrentWorkspaceSnapshot();
       if (!refreshedWorkspace) return;
-      beginActiveGenerationRun("page-refinement");
+      beginActiveGenerationRun("deck-refinement");
       activeRunWorkspaceDir = refreshedWorkspace.workspace_dir;
       shouldReconcileActiveRun = true;
       setStage("generating");
@@ -2567,8 +2590,15 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       setPage("main");
       const progress = normalizeWorkspacePageProgress(refreshedWorkspace.page_progress);
       const recovery = progress?.recovery;
-      const isRefinementResume = recovery?.run_kind === "page-refinement";
-      beginActiveGenerationRun(isRefinementResume ? "page-refinement" : "deck-generation");
+      const isPageRefinementResume = recovery?.run_kind === "page-refinement";
+      const isDeckRefinementResume = recovery?.run_kind === "deck-refinement";
+      const isRefinementResume = isPageRefinementResume || isDeckRefinementResume;
+      const resumePageIndex = progress?.pages.find((page) =>
+        recovery?.target_page_ids?.includes(page.page_id)
+      )?.index;
+      beginActiveGenerationRun(
+        isDeckRefinementResume ? "deck-refinement" : isPageRefinementResume ? "page-refinement" : "deck-generation"
+      );
       const completion = isRefinementResume
         ? await runDeckRefinement({
             backend,
@@ -2582,7 +2612,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
               recovery.page_refinement_request ||
               Object.values(recovery.page_refinement_requests ?? {})[0] ||
               "",
-            scope: "deck",
+            scope: isDeckRefinementResume ? "deck" : "slide",
+            pageIndex: isPageRefinementResume ? resumePageIndex : undefined,
             resumePageIds: recovery.target_page_ids,
             skipIntentReview: true,
             onProgress: recordGenerationProgress,
@@ -2832,6 +2863,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     saveWorkspaceSettings,
     saveWorkspaceTitle,
     selectTemplate,
+    openRefineDeck,
     openRefineSlide,
     refineDeck,
     refineSlide,

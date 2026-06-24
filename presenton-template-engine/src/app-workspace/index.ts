@@ -61,6 +61,8 @@ import type {
   ListAppTemplateGroupsResult,
   ListAppWorkspacesResult,
   OpenAppWorkspaceInput,
+  PrepareAppDeckRefinementPageFilesInput,
+  PrepareAppDeckRefinementPageFilesResult,
   PrepareAppPageFilesInput,
   PrepareAppPageFilesResult,
   PrepareAppExportModelInput,
@@ -767,6 +769,7 @@ const PAGE_PROGRESS_RECOVERY_RUN_KINDS = new Set([
   "deck-generation",
   "page-generation-retry",
   "page-refinement",
+  "deck-refinement",
   "final-deck-render",
 ]);
 
@@ -822,6 +825,7 @@ function normalizePageProgressRecoveryState(value: unknown): AppPageProgress["re
     target_page_ids: normalizeStringList(record.target_page_ids),
     page_refinement_request: normalizeNullableString(record.page_refinement_request),
     page_refinement_requests: normalizeStringRecord(record.page_refinement_requests),
+    deck_refinement_review: record.deck_refinement_review ?? null,
     error: normalizeNullableString(record.error),
     updated_at: typeof record.updated_at === "string" ? record.updated_at : null,
   };
@@ -898,6 +902,7 @@ function createDefaultPageProgressJson(): AppPageProgress {
       target_page_ids: [],
       page_refinement_request: null,
       page_refinement_requests: {},
+      deck_refinement_review: null,
       error: null,
       updated_at: null,
     },
@@ -2776,6 +2781,7 @@ function buildInitialPageProgress(pagePlan: AppPagePlan): AppPageProgress {
       target_page_ids: [],
       page_refinement_request: null,
       page_refinement_requests: {},
+      deck_refinement_review: null,
       error: null,
       updated_at: now,
     },
@@ -2868,6 +2874,151 @@ export async function prepareAppPageFiles(
     manifest_path: context.manifest_path,
     page_plan_path: workspace.files.page_plan,
     prepared_at: preparedAt,
+    pages: preparedPlan.pages.map((page) => ({
+      page_id: page.page_id,
+      index: page.index,
+      title: page.title,
+      slide_path: page.slide_path,
+      data_path: page.data_path,
+      blueprint_id: page.blueprint_id,
+      manifest_slide_id: page.manifest_slide_id,
+    })),
+  };
+}
+
+export async function prepareAppDeckRefinementPageFiles(
+  input: PrepareAppDeckRefinementPageFilesInput,
+): Promise<PrepareAppDeckRefinementPageFilesResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const pagePlan = normalizePagePlanJson(workspace.page_plan);
+  const context = await validatePagePlanAgainstTemplate(workspace, pagePlan);
+  const templateDir = context.template_dir;
+  const preparedAt = new Date().toISOString();
+  const newPageIds = new Set((input.new_page_ids ?? []).map(normalizeString).filter(Boolean));
+
+  if (pagePlan.pages.length === 0) {
+    throw new Error("page-plan.json has no pages to prepare");
+  }
+
+  for (const page of pagePlan.pages) {
+    if (!newPageIds.has(page.page_id)) continue;
+    const sourcePath = resolveTemplateRelativePath(templateDir, page.blueprint_source);
+    const slidePath = resolveTemplateRelativePath(templateDir, page.slide_path);
+    const dataPath = resolveTemplateRelativePath(templateDir, page.data_path);
+    await mkdir(path.dirname(slidePath), { recursive: true });
+    await mkdir(path.dirname(dataPath), { recursive: true });
+    await copyFile(sourcePath, slidePath);
+    await writeJsonFile(dataPath, buildInitialPageData(page));
+  }
+
+  const currentManifest = getPlainRecord(JSON.parse(await readFile(context.manifest_path, "utf8")) as unknown);
+  const nextManifest = {
+    ...currentManifest,
+    title: pagePlan.title || normalizeString(currentManifest.title) || "Generated Deck",
+    slides: pagePlan.pages.map((page) => ({
+      id: page.manifest_slide_id,
+      title: page.title,
+      speaker_note: page.outline,
+      source: {
+        type: "local",
+        path: page.slide_path,
+      },
+      data_path: page.data_path,
+    })),
+  };
+  const preparedPlan: AppPagePlan = {
+    ...pagePlan,
+    status: "prepared",
+    updated_at: preparedAt,
+  };
+
+  const currentProgress = normalizePageProgressJson(workspace.page_progress);
+  const currentProgressById = new Map(currentProgress.pages.map((page) => [page.page_id, page]));
+  const nextProgress: AppPageProgress = {
+    ...currentProgress,
+    status: currentProgress.status === "idle" ? "prepared" : currentProgress.status,
+    final_deck_render: {
+      ...currentProgress.final_deck_render,
+      status: "idle",
+      message: null,
+      error: null,
+      output_dir: null,
+      deck_html_path: null,
+      pages_path: null,
+      rendered_at: null,
+      updated_at: preparedAt,
+    },
+    pages: preparedPlan.pages.map((page) => {
+      const existing = currentProgressById.get(page.page_id);
+      if (existing && !newPageIds.has(page.page_id)) {
+        return {
+          ...existing,
+          index: page.index,
+          title: page.title,
+          slide_path: page.slide_path,
+          data_path: page.data_path,
+          updated_at: preparedAt,
+        };
+      }
+      return {
+        page_id: page.page_id,
+        index: page.index,
+        title: page.title,
+        status: "pending",
+        render_attempts: 0,
+        visual_review_attempts: 0,
+        content_review_attempts: 0,
+        agent_failures: 0,
+        agent_infrastructure_failures: 0,
+        slide_path: page.slide_path,
+        data_path: page.data_path,
+        last_html_path: "",
+        last_screenshot_path: "",
+        last_error: "",
+        content_review: null,
+        visual_review: null,
+        review: null,
+        updated_at: preparedAt,
+      };
+    }),
+    updated_at: preparedAt,
+  };
+
+  const activePageIds = new Set(preparedPlan.pages.map((page) => page.page_id));
+  const existingPagesRecord = getPlainRecord(workspace.pages);
+  const existingRenderedPages = Array.isArray(existingPagesRecord.pages)
+    ? existingPagesRecord.pages
+    : [];
+  const nextRenderedPages = existingRenderedPages
+    .filter((page) => activePageIds.has(normalizeString(getPlainRecord(page).page_id)))
+    .map((page) => {
+      const record = getPlainRecord(page);
+      const planPage = preparedPlan.pages.find((item) => item.page_id === normalizeString(record.page_id));
+      return {
+        ...record,
+        index: planPage?.index ?? record.index,
+        title: planPage?.title ?? record.title,
+      };
+    });
+
+  await writeJsonFile(context.manifest_path, nextManifest);
+  await writeJsonFile(workspace.files.page_plan, preparedPlan);
+  await writeJsonFile(workspace.files.page_progress, nextProgress);
+  await writeJsonFile(workspace.files.pages, {
+    ...existingPagesRecord,
+    status: nextRenderedPages.length === preparedPlan.pages.length ? existingPagesRecord.status : "stale",
+    title: preparedPlan.title,
+    pages: nextRenderedPages,
+    updated_at: preparedAt,
+  });
+  await touchWorkspaceTask(workspace, preparedAt);
+
+  return {
+    workspace_dir: workspace.workspace_dir,
+    manifest_path: context.manifest_path,
+    page_plan_path: workspace.files.page_plan,
+    prepared_at: preparedAt,
+    new_page_ids: Array.from(newPageIds),
     pages: preparedPlan.pages.map((page) => ({
       page_id: page.page_id,
       index: page.index,

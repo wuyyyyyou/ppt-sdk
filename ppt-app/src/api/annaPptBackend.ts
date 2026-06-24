@@ -217,6 +217,12 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         "app_prepare_page_files",
         input
       ),
+    prepareDeckRefinementPageFiles: (input) =>
+      invoke(
+        PPT_ENGINE_TOOL_ID,
+        "app_prepare_deck_refinement_page_files",
+        input
+      ),
     getWorkspacePageFileFingerprints: (input) =>
       invoke<GetWorkspacePageFileFingerprintsResult>(
         PPT_ENGINE_TOOL_ID,

@@ -2,7 +2,7 @@ import type { DeckGenerationProgress } from "../deck-generation";
 import { isActivePageGenerationStatus, isUnfinishedPageGenerationStatus } from "../deck-generation/pageStatusPolicy";
 import type { LoadingKind } from "./types";
 
-export type ActiveGenerationRunKind = "deck-generation" | "page-refinement";
+export type ActiveGenerationRunKind = "deck-generation" | "page-refinement" | "deck-refinement";
 
 export interface ActiveGenerationRun {
   kind: ActiveGenerationRunKind;
@@ -142,7 +142,8 @@ export function buildGenerationViewState(
       showResume: resumeAllowed,
       showBackToOutline: false,
       hasUnfinishedPages: unfinishedPages,
-      resumeAction: input.progress?.recoveryRunKind === "page-refinement"
+      resumeAction: input.progress?.recoveryRunKind === "page-refinement" ||
+        input.progress?.recoveryRunKind === "deck-refinement"
         ? "refinement"
         : "generation",
     };
@@ -159,7 +160,8 @@ export function buildGenerationViewState(
     showResume: resumeAllowed,
     showBackToOutline: false,
     hasUnfinishedPages: unfinishedPages,
-    resumeAction: input.progress?.recoveryRunKind === "page-refinement"
+    resumeAction: input.progress?.recoveryRunKind === "page-refinement" ||
+      input.progress?.recoveryRunKind === "deck-refinement"
       ? "refinement"
       : "generation",
   };

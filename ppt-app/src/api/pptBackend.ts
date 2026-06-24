@@ -17,6 +17,8 @@ import type {
   OpenWorkspaceInput,
   PrepareExportModelInput,
   PrepareExportModelResult,
+  PrepareDeckRefinementPageFilesInput,
+  PrepareDeckRefinementPageFilesResult,
   PreparePageFilesInput,
   PreparePageFilesResult,
   PrepareResearchWorkspaceResult,
@@ -85,6 +87,9 @@ export interface PptBackend {
   recordPagePlan(input: RecordPagePlanInput): Promise<PagePlan>;
   getPagePlan(input: { workspace_dir: string }): Promise<PagePlan>;
   preparePageFiles(input: PreparePageFilesInput): Promise<PreparePageFilesResult>;
+  prepareDeckRefinementPageFiles(
+    input: PrepareDeckRefinementPageFilesInput
+  ): Promise<PrepareDeckRefinementPageFilesResult>;
   getWorkspacePageFileFingerprints(
     input: GetWorkspacePageFileFingerprintsInput
   ): Promise<GetWorkspacePageFileFingerprintsResult>;

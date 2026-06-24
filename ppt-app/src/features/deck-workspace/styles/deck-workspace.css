@@ -2460,6 +2460,10 @@ details.generation-history-panel > summary::-webkit-details-marker {
   margin: -4px 0 8px;
 }
 
+.deck-top-actions .slide-ai-actions {
+  position: static;
+}
+
 .slide-preview-card {
   position: relative;
   display: flex;
