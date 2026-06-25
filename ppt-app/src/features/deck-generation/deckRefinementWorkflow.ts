@@ -221,10 +221,7 @@ export function reconcileDeckRefinement(input: {
   };
 
   const targetPageIds = new Set<string>();
-  const targetAll =
-    input.review.output_language_change.changed ||
-    input.review.global_change ||
-    Object.keys(input.review.context_updates).length > 0;
+  const targetAll = input.review.output_language_change.changed;
   if (targetAll) {
     for (const page of reindexedPages) targetPageIds.add(page.page_id);
   }
@@ -239,9 +236,6 @@ export function reconcileDeckRefinement(input: {
     const reasons = [
       input.review.output_language_change.changed
         ? `Output language changed to ${outputLanguage}.`
-        : "",
-      input.review.global_change
-        ? input.review.global_change_reason || "Global deck context/style/theme changed."
         : "",
       operationReasonByPageId.get(page.page_id) || "",
     ].filter(Boolean);
@@ -277,8 +271,7 @@ export function reconcileDeckRefinement(input: {
     renderRequired:
       targetPageIds.size > 0 ||
       deletedPageIds.length > 0 ||
-      input.review.output_language_change.changed ||
-      Object.keys(input.review.context_updates).length > 0,
+      input.review.output_language_change.changed,
   };
 }
 
@@ -345,14 +338,13 @@ export function mergeDeckRefinementResearchPlan(input: {
   };
 }
 
-export function applyDeckRefinementContextUpdates(input: {
+export function applyDeckRefinementSettingUpdates(input: {
   setting: WorkspaceSettings | Record<string, unknown>;
   review: DeckRefinementIntentReviewResult;
   now: string;
 }): WorkspaceSettings {
   const next = {
     ...input.setting,
-    ...input.review.context_updates,
   } as WorkspaceSettings;
   if (input.review.output_language_change.changed && input.review.output_language_change.output_language) {
     next.output_language = input.review.output_language_change.output_language;

@@ -58,7 +58,7 @@ import {
 } from "./pageRefinementWorkflow";
 import {
   alignDeckRefinementPagePlanToOutline,
-  applyDeckRefinementContextUpdates,
+  applyDeckRefinementSettingUpdates,
   mergeDeckRefinementResearchPlan,
   reconcileDeckRefinement,
 } from "./deckRefinementWorkflow";
@@ -3809,13 +3809,10 @@ async function runWholeDeckRefinement(args: {
   }
 
   let activeWorkspace = input.workspace;
-  if (
-    Object.keys(review.context_updates).length > 0 ||
-    review.output_language_change.changed
-  ) {
+  if (review.output_language_change.changed) {
     activeWorkspace = await input.backend.updateWorkspaceSettings({
       workspace_dir: input.workspace.workspace_dir,
-      setting: applyDeckRefinementContextUpdates({
+      setting: applyDeckRefinementSettingUpdates({
         setting: readWorkspaceSetting(input.workspace),
         review,
         now,

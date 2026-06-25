@@ -301,52 +301,43 @@ export function createMockAiClient(): AiClient {
       const wantsChinese = /中文|chinese|汉语/.test(lower);
       const wantsAdd = /add|增加|新增|加一页|加页/.test(lower);
       const wantsDelete = /delete|remove|删除|删掉|去掉/.test(lower);
-      const wantsGlobal = /audience|style|theme|受众|风格|主题|表达|统一/.test(lower);
+      const wantsGlobalRewrite = /audience|style|受众|风格|表达|统一/.test(lower);
       const wantsUpdate = /update|rewrite|优化|调整|改/.test(lower);
 
       const result: DeckRefinementIntentReviewResult = wantsTemplate
         ? {
             route: "unsupported" as const,
             blocking_reason: "Mock: selected Template changes are unsupported in Deck Refinement.",
-            context_updates: {},
             output_language_change: { changed: false },
-            global_change: false,
             operations: [],
             reason: "Template migration is outside Deck Refinement.",
           }
         : wantsNoOp
           ? {
               route: "no_op" as const,
-              context_updates: {},
               output_language_change: { changed: false },
-              global_change: false,
               operations: [],
               reason: "Mock no-op Deck Refinement.",
             }
           : {
               route: "proceed" as const,
-              context_updates: wantsGlobal
-                ? { style_notes: input.instruction }
-                : {},
               output_language_change: {
                 changed: wantsEnglish || wantsChinese,
                 output_language: wantsEnglish ? "English" : wantsChinese ? "中文" : "",
                 reason: wantsEnglish || wantsChinese ? "Mock explicit output language change." : "",
               },
-              global_change: wantsGlobal,
-              global_change_reason: wantsGlobal ? "Mock global style/context change." : "",
               operations: input.pagePlan.pages.flatMap((page, index): DeckRefinementOutlineOperation[] => {
                 if (wantsDelete && index === input.pagePlan.pages.length - 1) {
                   return [{ op: "delete" as const, page_id: page.page_id, reason: "Mock delete last page." }];
                 }
-                const shouldUpdate = wantsUpdate && index === Math.min(1, input.pagePlan.pages.length - 1);
+                const shouldUpdate = wantsGlobalRewrite || (wantsUpdate && index === Math.min(1, input.pagePlan.pages.length - 1));
                 const base = shouldUpdate
                   ? {
                       op: "update" as const,
                       page_id: page.page_id,
                       title: page.title.includes("Updated") ? page.title : `${page.title} Updated`,
                       outline: `${page.outline}\nMock deck-level refinement: ${input.instruction}`,
-                      reason: "Mock update page intent.",
+                      reason: wantsGlobalRewrite ? "Mock explicit whole-deck rewrite." : "Mock update page intent.",
                       additional_research_required: /latest|最新|citation|引用|数据/.test(lower),
                       additional_web_query_intents: /latest|最新|citation|引用|数据/.test(lower) ? [page.title] : [],
                       additional_image_query_intents: [],

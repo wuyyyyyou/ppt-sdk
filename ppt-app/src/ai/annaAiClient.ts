@@ -20,7 +20,7 @@ import {
   normalizePageRefinementIntentReview,
 } from "./pageRefinementIntentReview";
 import {
-  buildDeckRefinementIntentReviewPrompt,
+  buildDeckRefinementIntentReviewLlmRequest,
   normalizeDeckRefinementIntentReview,
 } from "./deckRefinementIntentReview";
 import {
@@ -162,15 +162,36 @@ async function completeJson<T>(
   expectedShape: string,
   logContext?: AiOperationLogContext
 ): Promise<T> {
-  let request: AnnaLlmCompleteInput = {
-    messages: [
-      {
-        role: "user",
-        content: {
-          type: "text",
-          text: prompt
+  return completeJsonRequest<T>(
+    runtime,
+    label,
+    {
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: prompt
+          }
         }
-      }
+      ]
+    },
+    expectedShape,
+    logContext,
+  );
+}
+
+async function completeJsonRequest<T>(
+  runtime: AnnaRuntime,
+  label: string,
+  initialRequest: AnnaLlmCompleteInput,
+  expectedShape: string,
+  logContext?: AiOperationLogContext
+): Promise<T> {
+  let request: AnnaLlmCompleteInput = {
+    ...initialRequest,
+    messages: [
+      ...initialRequest.messages
     ]
   };
 
@@ -565,11 +586,11 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
     },
 
     async reviewDeckRefinementIntent(input) {
-      const result = await completeJson<unknown>(
+      const result = await completeJsonRequest<unknown>(
         runtime,
-        "deck refinement context review",
-        buildDeckRefinementIntentReviewPrompt(input),
-        '{"route":"proceed","blocking_reason":"","context_updates":{},"output_language_change":{"changed":false,"output_language":"","reason":""},"global_change":false,"global_change_reason":"","operations":[{"op":"keep","page_id":"page-01","reason":""}],"reason":"..."}',
+        "deck refinement intent review",
+        buildDeckRefinementIntentReviewLlmRequest(input),
+        '{"route":"proceed","blocking_reason":"","output_language_change":{"changed":false,"output_language":"","reason":""},"operations":[{"op":"keep","page_id":"page-01","reason":""}],"reason":"..."}',
         input.logContext,
       );
       return normalizeDeckRefinementIntentReview(result);

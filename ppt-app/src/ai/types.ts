@@ -189,27 +189,14 @@ export type DeckRefinementOutlineOperation =
       reason: string;
     };
 
-export interface DeckRefinementContextUpdates {
-  audience?: string;
-  goal?: string;
-  style_notes?: string;
-  theme_id?: string;
-  visual_tone?: string;
-  typography?: string;
-  text_density?: string;
-}
-
 export interface DeckRefinementIntentReviewResult {
   route: DeckRefinementIntentReviewRoute;
   blocking_reason?: string;
-  context_updates: DeckRefinementContextUpdates;
   output_language_change: {
     changed: boolean;
     output_language?: string;
     reason?: string;
   };
-  global_change: boolean;
-  global_change_reason?: string;
   operations: DeckRefinementOutlineOperation[];
   reason: string;
 }

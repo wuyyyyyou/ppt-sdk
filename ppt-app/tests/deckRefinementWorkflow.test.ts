@@ -80,9 +80,7 @@ const basePagePlan: PagePlan = {
 function proceedReview(patch: Partial<DeckRefinementIntentReviewResult>): DeckRefinementIntentReviewResult {
   return {
     route: "proceed",
-    context_updates: {},
     output_language_change: { changed: false },
-    global_change: false,
     operations: basePagePlan.pages.map((page) => ({
       op: "keep" as const,
       page_id: page.page_id,
