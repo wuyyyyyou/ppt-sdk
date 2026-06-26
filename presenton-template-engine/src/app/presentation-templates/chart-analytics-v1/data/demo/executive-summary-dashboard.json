@@ -1,0 +1,129 @@
+{
+  "eyebrow": "Strategic Overview",
+  "title": "Executive Summary: China vs Japan",
+  "headerMetaLabel": "Comparison",
+  "headerMetaValue": "2026 Forecast",
+  "headerIcon": "chart-pie",
+  "metricCards": [
+    {
+      "accentColor": "#2563EB",
+      "icon": "scale",
+      "label": "Economic Scale Gap",
+      "value": "4.6x",
+      "qualifier": "China Larger",
+      "progressItems": [
+        {
+          "label": "China ($20.65T)",
+          "valueLabel": "82%",
+          "value": 82,
+          "color": "#2563EB"
+        },
+        {
+          "label": "Japan ($4.46T)",
+          "valueLabel": "18%",
+          "value": 18,
+          "color": "#94A3B8"
+        }
+      ]
+    },
+    {
+      "accentColor": "#14B8A6",
+      "icon": "wallet",
+      "label": "Per Capita Income",
+      "value": "2.5x",
+      "qualifier": "Japan Lead",
+      "valueTiles": [
+        {
+          "label": "Japan",
+          "value": "$34K",
+          "note": "High income",
+          "tint": "#F0FDFA",
+          "labelColor": "#0D9488"
+        },
+        {
+          "label": "China",
+          "value": "$14K",
+          "note": "Upper middle",
+          "tint": "#F8FAFC",
+          "labelColor": "#64748B"
+        }
+      ]
+    },
+    {
+      "accentColor": "#4F46E5",
+      "icon": "users",
+      "label": "Aging Crisis",
+      "value": "65+",
+      "qualifier": "Key Challenge",
+      "statusItems": [
+        {
+          "title": "Japan Status",
+          "description": "Super-aged society",
+          "badge": "Critical",
+          "badgeColor": "#4338CA",
+          "badgeBackground": "#E0E7FF"
+        },
+        {
+          "title": "China Trend",
+          "description": "Births < 8M (2025)",
+          "badge": "Declining",
+          "badgeColor": "#DC2626",
+          "badgeBackground": "#FEE2E2"
+        }
+      ]
+    }
+  ],
+  "chartTitle": "Technology & Innovation Landscape",
+  "chartSubtitle": "Comparison of adoption rates and strategic focus areas",
+  "chartLabels": ["AI Usage", "Mobile Payment", "5G Adoption", "R&D % GDP"],
+  "chartSeries": [
+    {
+      "label": "China",
+      "color": "#2563EB",
+      "values": [81, 92, 75, 2.4]
+    },
+    {
+      "label": "Japan",
+      "color": "#CBD5E1",
+      "values": [26.7, 45, 50, 3.3]
+    }
+  ],
+  "minValue": 0,
+  "maxValue": 100,
+  "ticks": [0, 25, 50, 75, 100],
+  "tickSuffix": "",
+  "chartInsights": [
+    {
+      "icon": "bolt",
+      "title": "China Speed",
+      "description": "Rapid deployment model drives broad AI adoption and faster commercial rollout.",
+      "color": "#2563EB",
+      "tint": "#EFF6FF"
+    },
+    {
+      "icon": "shield",
+      "title": "Japan Trust",
+      "description": "Reliability, safety standards, and social consensus shape the adoption pace.",
+      "color": "#475569",
+      "tint": "#F1F5F9"
+    }
+  ],
+  "outlookTitle": "Future Outlook",
+  "outlookIcon": "binoculars",
+  "outlookItems": [
+    {
+      "period": "2026-2028",
+      "text": "China growth normalization vs Japan structural reforms.",
+      "color": "#60A5FA"
+    },
+    {
+      "period": "2028-2030",
+      "text": "AI impact on productivity to offset labor shrinkage.",
+      "color": "#64748B"
+    }
+  ],
+  "progressLabel": "Trade Interdependence",
+  "progressValueLabel": "High",
+  "progressValue": 85,
+  "progressColor": "#22C55E"
+}

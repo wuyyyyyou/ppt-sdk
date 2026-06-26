@@ -28,6 +28,16 @@
         "path": "./slides/CoverAnalytics.tsx"
       },
       "data_path": "./data/demo/cover-analytics.json"
+    },
+    {
+      "id": "chart-analytics-v1-executive-summary-dashboard",
+      "title": "Executive Summary Dashboard",
+      "speaker_note": "Executive summary dashboard based on .tmp/Template/图表主题/2.html, rebuilt from reusable TSX components with editable KPI, chart, and outlook data.",
+      "source": {
+        "type": "local",
+        "path": "./slides/ExecutiveSummaryDashboard.tsx"
+      },
+      "data_path": "./data/demo/executive-summary-dashboard.json"
     }
   ]
 }

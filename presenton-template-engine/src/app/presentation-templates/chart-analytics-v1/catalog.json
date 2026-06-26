@@ -75,6 +75,23 @@
       "suitable_for": ["deck cover", "comparison report opening", "executive dashboard opening", "data story opening"],
       "avoid_for": ["body analysis", "dense charts", "agenda", "timeline", "thank-you page"],
       "composition_guidance": "Use for the opening page. Preserve the dark analytics posture, background image wash, large subject-versus-subject headline, concise report scope, publisher, and date."
+    },
+    {
+      "id": "executive-summary-dashboard",
+      "name": "Executive Summary Dashboard",
+      "blueprint_source": "./blueprints/ExecutiveSummaryDashboard.tsx",
+      "example_slide": "./slides/ExecutiveSummaryDashboard.tsx",
+      "layout_family": "dashboard",
+      "source_html": ".tmp/Template/图表主题/2.html",
+      "content_intents": ["executive-summary", "metric-dashboard", "entity-comparison", "technology-benchmark", "future-outlook"],
+      "suitable_for": [
+        "high-level dashboard after a cover",
+        "comparison summary across two entities",
+        "KPI overview with one primary chart",
+        "strategic market or country benchmark"
+      ],
+      "avoid_for": ["single-chart deep dive", "long narrative page", "agenda", "timeline-only page", "more than three headline KPI cards"],
+      "composition_guidance": "Use when the page needs three headline metrics, one grouped bar chart with short interpretation notes, and a compact dark outlook panel. Keep business claims in JSON data and edit TSX only for structure or component changes."
     }
   ],
   "planned_blueprint_families": [
@@ -87,7 +104,7 @@
     {
       "id": "metric-dashboard",
       "layout_family": "dashboard",
-      "source_signals": ["2.html", "3.html", "4.html", "top KPI cards plus chart panels"],
+      "source_signals": ["3.html", "4.html", "top KPI cards plus chart panels"],
       "intended_for": ["executive summary", "KPI overview", "multi-metric dashboard"]
     },
     {
@@ -110,9 +127,9 @@
     }
   ],
   "selection_guide": [
-    "Currently only cover-analytics is implemented and registered.",
+    "Choose executive-summary-dashboard for post-cover summary pages that need three KPI cards plus a primary grouped bar chart.",
     "Choose cover-analytics for the first page or an intentional title reset.",
-    "For body pages, future work should add metric-dashboard, comparison-matrix, timeline-analysis, and agenda-summary blueprints before registering them.",
+    "For other body pages, future work should add metric-dashboard, comparison-matrix, timeline-analysis, and agenda-summary blueprints before registering them.",
     "Keep source HTML as reference only; pages should be rebuilt from TSX components with editable text and data-driven content."
   ],
   "agent_workflow_notes": [

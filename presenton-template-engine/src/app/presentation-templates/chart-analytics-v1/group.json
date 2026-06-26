@@ -13,6 +13,7 @@
   "default": false,
   "registry_order": 95,
   "layouts": [
-    "slides/CoverAnalytics.tsx"
+    "slides/CoverAnalytics.tsx",
+    "slides/ExecutiveSummaryDashboard.tsx"
   ]
 }

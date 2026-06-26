@@ -14,3 +14,4 @@
 | 文件 | 来源蓝图 | 对应源页 |
 | --- | --- | --- |
 | `CoverAnalytics.tsx` | `../blueprints/CoverAnalytics.tsx` | `.tmp/Template/图表主题/1.html` |
+| `ExecutiveSummaryDashboard.tsx` | `../blueprints/ExecutiveSummaryDashboard.tsx` | `.tmp/Template/图表主题/2.html` |
