@@ -25,8 +25,8 @@
   "slides": [
     {
       "id": "red-blue-comparison-v1-cover",
-      "title": "Red Blue Comparison",
-      "speaker_note": "Starter cover blueprint for validating discovery and registry build of the TSX-first red-blue comparison template group.",
+      "title": "China vs Japan Comparison",
+      "speaker_note": "Demo cover derived from .tmp/Template/红蓝主题/1.html: centered comparison title, topic scope, red/blue legend, and reusable circular decoration system.",
       "source": {
         "type": "local",
         "path": "./slides/CoverComparison.tsx"

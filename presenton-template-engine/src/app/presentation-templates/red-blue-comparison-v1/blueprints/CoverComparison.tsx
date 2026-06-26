@@ -1,46 +1,54 @@
 import React from "react";
 import * as z from "zod";
 
-import ComparisonCanvas from "../components/ComparisonCanvas.tsx";
+import ComparisonHeroTitle from "../components/ComparisonHeroTitle.tsx";
 import { CoverComparisonDecorations } from "../components/ComparisonDecorations.tsx";
 import EntityLegend from "../components/EntityLegend.tsx";
+import ThemeCanvas from "../components/ThemeCanvas.tsx";
 import { redBlueComparisonTheme } from "../theme/tokens.ts";
 
-export const Schema = z.object({
-  titleLineOne: z.string().min(2).max(28).default("China"),
-  titleConnector: z.string().min(1).max(12).default("vs"),
-  titleLineTwo: z.string().min(2).max(28).default("Japan"),
-  subtitle: z.string().min(4).max(60).default("Comprehensive Comparison"),
-  topicLine: z
-    .string()
-    .min(4)
-    .max(96)
-    .default("Economy - Demographics - Technology - Trade - History - Culture"),
-  entities: z
-    .array(
-      z.object({
-        label: z.string().min(1).max(24),
-        color: z.string().optional(),
-      }),
-    )
-    .min(2)
-    .max(3)
-    .default([
-      { label: "China", color: "#FF4757" },
-      { label: "Japan", color: "#2E86DE" },
-    ]),
-  showGrid: z.boolean().default(true),
+const entitySchema = z.object({
+  label: z.string().min(1).max(24),
+  color: z.string().optional(),
 });
 
-export const sampleData = Schema.parse({});
+export const Schema = z.object({
+  titleLineOne: z.string().min(2).max(28).default("Entity A"),
+  titleConnector: z.string().min(1).max(12).default("vs"),
+  titleLineTwo: z.string().min(2).max(28).default("Entity B"),
+  subtitle: z.string().min(4).max(60).default("Comparative Analysis"),
+  topicItems: z
+    .array(z.string().min(2).max(24))
+    .min(2)
+    .max(8)
+    .default(["Market", "Scale", "Capability", "Outlook"]),
+  entities: z.array(entitySchema).min(2).max(3).default([
+    { label: "Entity A", color: "#FF4757" },
+    { label: "Entity B", color: "#2E86DE" },
+  ]),
+  showDecorations: z.boolean().default(true),
+});
+
+export const sampleData = Schema.parse({
+  titleLineOne: "China",
+  titleConnector: "vs",
+  titleLineTwo: "Japan",
+  subtitle: "Comprehensive Comparison",
+  topicItems: ["Economy", "Demographics", "Technology", "Trade", "History", "Culture"],
+  entities: [
+    { label: "China", color: "#FF4757" },
+    { label: "Japan", color: "#2E86DE" },
+  ],
+  showDecorations: true,
+});
 
 export const layoutId = "cover-comparison";
 export const layoutName = "Cover Comparison";
 export const layoutDescription =
-  "A TSX-first red and blue comparison cover with editable title, topic line, entity legend, and reusable decorative system.";
+  "A TSX-first red and blue comparison cover inspired by source page 1, with editable title, topic list, entity legend, and reusable decorative system.";
 export const layoutTags = ["cover", "comparison", "red-blue", "tsx-first"];
 export const layoutRole = "cover";
-export const contentElements = ["headline", "subtitle", "topic-line", "entity-legend", "decorative-circles"];
+export const contentElements = ["headline", "subtitle", "topic-list", "entity-legend", "decorative-circles"];
 export const useCases = ["cover", "comparison opening", "country benchmark", "executive briefing"];
 export const suitableFor =
   "Suitable for opening a red-blue comparison deck that contrasts countries, markets, products, or capabilities.";
@@ -54,27 +62,14 @@ const CoverComparison = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
   const parsed = Schema.parse(data ?? {});
 
   return (
-    <ComparisonCanvas>
-      {parsed.showGrid ? <CoverComparisonDecorations /> : null}
+    <ThemeCanvas>
+      {parsed.showDecorations ? <CoverComparisonDecorations /> : null}
 
       <div className="absolute left-[190px] top-[154px] z-10 flex w-[900px] flex-col items-center text-center">
-        <div
-          className="flex h-[104px] max-w-[900px] items-center justify-center whitespace-nowrap text-[88px] font-black leading-none"
-          style={{
-            color: redBlueComparisonTheme.colors.backgroundText,
-            fontFamily: redBlueComparisonTheme.fonts.heading,
-          }}
-        >
-          {parsed.titleLineOne}
-          <span className="px-[24px]" style={{ color: redBlueComparisonTheme.colors.primary }}>
-            {parsed.titleConnector}
-          </span>
-          {parsed.titleLineTwo}
-        </div>
-
-        <div
-          className="mt-[28px] h-[6px] w-[86px] rounded-full"
-          style={{ backgroundColor: redBlueComparisonTheme.colors.primary }}
+        <ComparisonHeroTitle
+          leftTitle={parsed.titleLineOne}
+          connector={parsed.titleConnector}
+          rightTitle={parsed.titleLineTwo}
         />
 
         <div
@@ -84,18 +79,30 @@ const CoverComparison = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
           {parsed.subtitle}
         </div>
 
-        <div
-          className="mt-[28px] h-[28px] max-w-[860px] whitespace-nowrap text-[18px] font-medium leading-none"
-          style={{ color: redBlueComparisonTheme.colors.subtleText }}
-        >
-          {parsed.topicLine}
+        <div className="mt-[28px] flex h-[28px] max-w-[900px] items-center justify-center gap-[12px]">
+          {parsed.topicItems.map((topic, index) => (
+            <React.Fragment key={`${topic}-${index}`}>
+              {index > 0 ? (
+                <div
+                  className="h-[4px] w-[4px] flex-none rounded-full"
+                  style={{ backgroundColor: redBlueComparisonTheme.colors.subtleText }}
+                />
+              ) : null}
+              <div
+                className="whitespace-nowrap text-[18px] font-medium leading-none"
+                style={{ color: redBlueComparisonTheme.colors.subtleText }}
+              >
+                {topic}
+              </div>
+            </React.Fragment>
+          ))}
         </div>
 
         <div className="mt-[50px]">
           <EntityLegend items={parsed.entities} />
         </div>
       </div>
-    </ComparisonCanvas>
+    </ThemeCanvas>
   );
 };
 

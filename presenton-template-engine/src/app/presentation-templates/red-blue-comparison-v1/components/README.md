@@ -18,8 +18,10 @@
 | `ThemeCanvas` | 画布基础 | 固定 1280x720 页面画布、字体、背景和可选点阵 | 所有页面可复用 |
 | `ComparisonCanvas` | 兼容别名 | 兼容早期 Cover，占位 re-export `ThemeCanvas` | 后续新页面优先用 `ThemeCanvas` |
 | `CoverComparisonDecorations` | 装饰 | 封面圆形、中心圆环、点阵背景 | 只承载氛围，不承载事实 |
+| `ThemeSoftCircle` | 装饰原语 | 使用 rgba / 浅色填充的导出安全软圆 | 背景装饰、视觉氛围，不承载内容 |
 | `ThemeContentFrame` | 页面框架 | 内容页标题区、meta、内容区、页脚 | 普通内容页首选框架 |
 | `ThemeTitleBlock` | 标题原语 | 标题、副标题、eyebrow、强调线 | 页面标题或内容区块标题 |
+| `ComparisonHeroTitle` | 标题原语 | `A vs B` 对比型大标题，三段文本独立渲染 | 封面、章节页、比较页主标题 |
 | `ThemePill` | 标签原语 | meta、状态、主体标签、短分类 | 短文本，不放长句 |
 | `StableInlineRow` | 基础原语 | 稳定单行横向对齐 | 图标文字、短指标、meta 行 |
 | `IconText` | 基础原语 | 图标 + 单行或短文本 | meta、卡片小标题、短说明 |
@@ -36,7 +38,7 @@
 | Slot 类型 | 推荐组件 | 不适合 |
 | --- | --- | --- |
 | `page-shell` | `ThemeCanvas`, `ThemeContentFrame` | 业务卡片、图表本体 |
-| `page-title` | `ThemeTitleBlock`, `ThemeContentFrame` | 大段正文、矩阵表格 |
+| `page-title` | `ThemeTitleBlock`, `ComparisonHeroTitle`, `ThemeContentFrame` | 大段正文、矩阵表格 |
 | `meta` / `pill` | `ThemePill`, `IconText`, `StableInlineRow` | 超过 24 字的长说明 |
 | `legend` | `EntityLegend`, `ThemePill` | 多维表格、长解释 |
 | `card-grid` | `ThemeCard`, `MetricCard` | 大段连续正文、复杂时间线 |
@@ -45,13 +47,14 @@
 | `timeline` | `TimelineNode` | 无顺序的分类信息 |
 | `comparison` | `ComparisonPanel`, `ThemeCard`, `EntityLegend` | 单一观点页、纯图表页 |
 | `image` | `ImageShowcasePanel` | 多图相册、大数据表 |
-| `decoration` | `CoverComparisonDecorations` | 任何关键事实、数字或结论 |
+| `decoration` | `CoverComparisonDecorations`, `ThemeSoftCircle` | 任何关键事实、数字或结论 |
 
 ## 文本容量
 
 | 组件 | 建议容量 | 溢出处理 |
 | --- | --- | --- |
 | `ThemeTitleBlock` | 标题 36 字以内；副标题 80 字以内 | 标题/副标题区域裁切，必要时调小页面标题或改布局 |
+| `ComparisonHeroTitle` | 左右标题各 28 字以内；连接词 12 字以内 | 三段文本独立渲染，超长标题应在 slide 中降字号 |
 | `ThemePill` | 24 字以内 | 单行 truncate |
 | `IconText` | 单行 48 字以内，非单行模式 2 行以内 | 固定高度单行；长文本请改为卡片正文 |
 | `EntityLegend` | 2-3 个主体，每项 24 字以内 | 单行图例，不承载说明 |
@@ -76,7 +79,9 @@
 - `IconText` 只表达图标和文本的稳定组合。
 - `ThemePill` 表达短状态、meta 或主体标签。
 - `ThemeTitleBlock` 负责标题组合，不承载正文结构。
+- `ComparisonHeroTitle` 负责导出稳定的 `A vs B` 标题，避免混合文本节点导致 PPT 丢字。
 - `EntityLegend` 只表达对比主体颜色映射。
+- `ThemeSoftCircle` 使用 rgba / 浅色填充，不使用元素级 `opacity`，避免 PPT 输出变成深色实心圆。
 
 ### 3. 内容组件
 

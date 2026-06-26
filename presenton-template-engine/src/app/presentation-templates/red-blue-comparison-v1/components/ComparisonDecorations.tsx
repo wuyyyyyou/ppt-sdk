@@ -1,29 +1,14 @@
 import React from "react";
 
 import { redBlueComparisonTheme } from "../theme/tokens.ts";
+import ThemeSoftCircle from "./ThemeSoftCircle.tsx";
 
-type Tone = "red" | "blue" | "purple";
-
-type CircleSpec = {
-  key: string;
-  tone: Tone;
-  className: string;
-  opacity: number;
-};
-
-const toneColor: Record<Tone, string> = {
-  red: redBlueComparisonTheme.colors.chinaRed,
-  blue: redBlueComparisonTheme.colors.japanBlue,
-  purple: redBlueComparisonTheme.colors.primary,
-};
-
-const coverCircles: CircleSpec[] = [
-  { key: "red-large", tone: "red", className: "left-[-112px] top-[-104px] h-[410px] w-[410px]", opacity: 0.08 },
-  { key: "red-small", tone: "red", className: "bottom-[92px] left-[80px] h-[190px] w-[190px]", opacity: 0.14 },
-  { key: "blue-large", tone: "blue", className: "bottom-[-150px] right-[-108px] h-[460px] w-[460px]", opacity: 0.08 },
-  { key: "blue-small", tone: "blue", className: "right-[120px] top-[78px] h-[180px] w-[180px]", opacity: 0.14 },
-  { key: "purple-mid", tone: "purple", className: "left-[560px] top-[112px] h-[120px] w-[120px]", opacity: 0.08 },
-];
+const coverCircles = [
+  { key: "red-large", tone: "red", left: 0, top: 0, size: 300, alpha: 0.08 },
+  { key: "red-small", tone: "red", left: 92, top: 438, size: 170, alpha: 0.14 },
+  { key: "blue-large", tone: "blue", left: 990, top: 450, size: 260, alpha: 0.08 },
+  { key: "blue-small", tone: "blue", left: 984, top: 86, size: 166, alpha: 0.14 },
+] as const;
 
 export const CoverComparisonDecorations = () => {
   return (
@@ -40,10 +25,13 @@ export const CoverComparisonDecorations = () => {
         style={{ borderColor: "rgba(80,56,166,0.12)" }}
       />
       {coverCircles.map((circle) => (
-        <div
+        <ThemeSoftCircle
           key={circle.key}
-          className={`absolute z-[1] rounded-full ${circle.className}`}
-          style={{ backgroundColor: toneColor[circle.tone], opacity: circle.opacity }}
+          tone={circle.tone}
+          left={circle.left}
+          top={circle.top}
+          size={circle.size}
+          alpha={circle.alpha}
         />
       ))}
     </>

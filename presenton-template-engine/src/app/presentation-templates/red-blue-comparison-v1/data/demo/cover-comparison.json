@@ -3,7 +3,7 @@
   "titleConnector": "vs",
   "titleLineTwo": "Japan",
   "subtitle": "Comprehensive Comparison",
-  "topicLine": "Economy - Demographics - Technology - Trade - History - Culture",
+  "topicItems": ["Economy", "Demographics", "Technology", "Trade", "History", "Culture"],
   "entities": [
     {
       "label": "China",
@@ -14,5 +14,5 @@
       "color": "#2E86DE"
     }
   ],
-  "showGrid": true
+  "showDecorations": true
 }

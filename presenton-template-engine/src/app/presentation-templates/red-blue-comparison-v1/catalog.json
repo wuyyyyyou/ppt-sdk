@@ -44,6 +44,7 @@
       "blueprint_source": "./blueprints/CoverComparison.tsx",
       "example_slide": "./slides/CoverComparison.tsx",
       "layout_family": "cover",
+      "visual_pattern": "centered comparison title + purple connector/separator + topic scope line + red/blue entity legend + soft circular decorations",
       "content_intents": ["opening", "comparison-frame", "entity-positioning"],
       "suitable_for": ["comparison deck cover", "country comparison opening", "market benchmark opening", "executive briefing opening"],
       "avoid_for": ["body analysis", "dense charts", "timeline", "large card grid"]
@@ -52,32 +53,26 @@
   "planned_blueprint_families": [
     {
       "layout_family": "agenda-card-grid",
-      "source_pages": ["2.html"],
       "intent": "Six-topic agenda grid with icons and numbered cards."
     },
     {
       "layout_family": "chart-with-metric-cards",
-      "source_pages": ["3.html", "4.html", "6.html", "7.html", "10.html"],
       "intent": "Primary chart paired with red/blue metric cards and numeric callouts."
     },
     {
       "layout_family": "comparison-card-grid",
-      "source_pages": ["5.html", "12.html", "14.html", "18.html", "19.html", "23.html", "25.html"],
       "intent": "Side-by-side or grid comparison using entity-colored cards."
     },
     {
       "layout_family": "timeline",
-      "source_pages": ["11.html", "15.html"],
       "intent": "Alternating milestone timeline with purple spine and date badges."
     },
     {
       "layout_family": "hero-number",
-      "source_pages": ["22.html"],
       "intent": "Large numeric callout with concise supporting explanation."
     },
     {
       "layout_family": "image-narrative",
-      "source_pages": ["21.html"],
       "intent": "Left narrative list with right-side image or illustration panel."
     }
   ],
