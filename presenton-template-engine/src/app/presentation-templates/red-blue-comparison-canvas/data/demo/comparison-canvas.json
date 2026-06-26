@@ -1,0 +1,12 @@
+{
+  "titlePrefix": "Comparison",
+  "titleHighlight": "Canvas",
+  "subtitle": "Start from entity lanes, then replace each slot with cards, evidence, charts, or matrices.",
+  "footerText": "Red Blue Comparison Canvas | Comparison",
+  "pageNumber": "03",
+  "entities": [
+    { "label": "Option A", "color": "#FF4757" },
+    { "label": "Option B", "color": "#2E86DE" },
+    { "label": "Shared Baseline", "color": "#5038A6" }
+  ]
+}

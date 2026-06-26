@@ -1,0 +1,81 @@
+export const redBlueComparisonTheme = {
+  size: {
+    slideWidth: 1280,
+    slideHeight: 720,
+    contentLeft: 80,
+    contentRight: 80,
+    contentWidth: 1120,
+    headerTop: 46,
+    headerHeight: 74,
+    contentTop: 156,
+    footerHeight: 46,
+  },
+  colors: {
+    background: "var(--background-color,#FFFFFF)",
+    backgroundText: "var(--background-text,#2D3436)",
+    mutedText: "var(--text-muted,#636E72)",
+    subtleText: "var(--text-subtle,#7F8C8D)",
+    primary: "var(--primary-color,#5038A6)",
+    primaryText: "var(--primary-text,#FFFFFF)",
+    purpleSoft: "var(--purple-soft,#DDD8F7)",
+    purpleTint: "var(--purple-tint,#F5F3FF)",
+    card: "var(--card-color,#FFFFFF)",
+    stroke: "var(--stroke,#E9E7F6)",
+    shadowSoft: "var(--shadow-soft,rgba(45,52,54,0.08))",
+    chinaRed: "var(--china-red,#FF4757)",
+    japanBlue: "var(--japan-blue,#2E86DE)",
+    koreaRed: "var(--korea-red,#EF3340)",
+    redTint: "var(--red-tint,#FFF1F3)",
+    blueTint: "var(--blue-tint,#EFF6FF)",
+    neutralTint: "var(--neutral-tint,#F8F9FA)",
+    softGrid: "var(--soft-grid,#DFE6E9)",
+    warning: "var(--warning-color,#F59E0B)",
+    success: "var(--success-color,#10B981)",
+  },
+  fonts: {
+    heading: 'var(--heading-font-family,Montserrat,"Noto Sans SC",sans-serif)',
+    body: 'var(--body-font-family,Inter,"Noto Sans SC",sans-serif)',
+  },
+  radius: {
+    xs: 4,
+    sm: 6,
+    md: 8,
+    lg: 10,
+    xl: 12,
+    pill: 999,
+  },
+  border: {
+    hairline: "1px solid var(--stroke,#E9E7F6)",
+    subtle: "1px solid rgba(45,52,54,0.06)",
+    accent: "1px solid rgba(80,56,166,0.16)",
+  },
+  shadow: {
+    card: "0 6px 16px rgba(45,52,54,0.06)",
+    panel: "0 10px 28px rgba(45,52,54,0.07)",
+    soft: "0 12px 30px var(--shadow-soft,rgba(45,52,54,0.08))",
+  },
+  tone: {
+    red: {
+      color: "var(--china-red,#FF4757)",
+      tint: "var(--red-tint,#FFF1F3)",
+      border: "rgba(255,71,87,0.22)",
+    },
+    blue: {
+      color: "var(--japan-blue,#2E86DE)",
+      tint: "var(--blue-tint,#EFF6FF)",
+      border: "rgba(46,134,222,0.22)",
+    },
+    purple: {
+      color: "var(--primary-color,#5038A6)",
+      tint: "var(--purple-tint,#F5F3FF)",
+      border: "rgba(80,56,166,0.18)",
+    },
+    neutral: {
+      color: "var(--text-muted,#636E72)",
+      tint: "var(--neutral-tint,#F8F9FA)",
+      border: "rgba(45,52,54,0.08)",
+    },
+  },
+} as const;
+
+export type RedBlueTone = keyof typeof redBlueComparisonTheme.tone;

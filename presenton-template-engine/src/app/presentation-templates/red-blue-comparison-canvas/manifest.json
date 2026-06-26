@@ -1,0 +1,77 @@
+{
+  "title": "Red Blue Comparison Canvas Starter Deck",
+  "theme": {
+    "company_name": "COMPARISON INSIGHTS",
+    "colors": {
+      "background": "#FFFFFF",
+      "background_text": "#2D3436",
+      "primary": "#5038A6",
+      "primary_text": "#FFFFFF",
+      "card": "#FFFFFF",
+      "stroke": "#E9E7F6",
+      "secondary": "#2E86DE",
+      "text_muted": "#636E72",
+      "text_subtle": "#7F8C8D",
+      "china_red": "#FF4757",
+      "japan_blue": "#2E86DE",
+      "korea_red": "#EF3340",
+      "purple_soft": "#DDD8F7",
+      "purple_tint": "#F5F3FF",
+      "red_tint": "#FFF1F3",
+      "blue_tint": "#EFF6FF",
+      "shadow_soft": "rgba(45,52,54,0.08)"
+    }
+  },
+  "slides": [
+    {
+      "id": "red-blue-comparison-canvas-cover",
+      "title": "Cover Canvas",
+      "speaker_note": "Starter cover canvas for component-first red-blue comparison deck authoring.",
+      "source": {
+        "type": "local",
+        "path": "./slides/CoverCanvas.tsx"
+      },
+      "data_path": "./data/demo/cover-canvas.json"
+    },
+    {
+      "id": "red-blue-comparison-canvas-content",
+      "title": "Content Canvas",
+      "speaker_note": "General content canvas. Replace the guide area with page-specific component composition.",
+      "source": {
+        "type": "local",
+        "path": "./slides/ContentCanvas.tsx"
+      },
+      "data_path": "./data/demo/content-canvas.json"
+    },
+    {
+      "id": "red-blue-comparison-canvas-comparison",
+      "title": "Comparison Canvas",
+      "speaker_note": "Open two- or three-entity comparison canvas for cards, metrics, evidence, charts, or tables.",
+      "source": {
+        "type": "local",
+        "path": "./slides/ComparisonCanvas.tsx"
+      },
+      "data_path": "./data/demo/comparison-canvas.json"
+    },
+    {
+      "id": "red-blue-comparison-canvas-chart-evidence",
+      "title": "Chart Evidence Canvas",
+      "speaker_note": "Primary chart or visual evidence canvas with an interpretation rail.",
+      "source": {
+        "type": "local",
+        "path": "./slides/ChartEvidenceCanvas.tsx"
+      },
+      "data_path": "./data/demo/chart-evidence-canvas.json"
+    },
+    {
+      "id": "red-blue-comparison-canvas-closing",
+      "title": "Closing Canvas",
+      "speaker_note": "Low-density closing/contact canvas.",
+      "source": {
+        "type": "local",
+        "path": "./slides/ClosingCanvas.tsx"
+      },
+      "data_path": "./data/demo/closing-canvas.json"
+    }
+  ]
+}

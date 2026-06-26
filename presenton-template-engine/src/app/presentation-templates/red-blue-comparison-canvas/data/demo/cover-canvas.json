@@ -1,0 +1,13 @@
+{
+  "brandName": "COMPARISON INSIGHTS",
+  "titleLineOne": "Option A",
+  "titleConnector": "vs",
+  "titleLineTwo": "Option B",
+  "subtitle": "Open comparison frame",
+  "scopeItems": ["Market", "Audience", "Capability", "Outlook"],
+  "entities": [
+    { "label": "Option A", "color": "#FF4757" },
+    { "label": "Option B", "color": "#2E86DE" }
+  ],
+  "footerMeta": "Canvas-first authoring base"
+}

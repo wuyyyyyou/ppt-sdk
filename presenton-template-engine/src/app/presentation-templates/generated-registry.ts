@@ -27,6 +27,11 @@ import red_blue_comparison_v1_TechnologyInnovationKpisComponent, * as red_blue_c
 import red_blue_comparison_v1_EvidenceImageTableComponent, * as red_blue_comparison_v1_EvidenceImageTableModule from "./red-blue-comparison-v1/slides/EvidenceImageTable.tsx";
 import red_blue_comparison_v1_HistoricalMilestonesTimelineComponent, * as red_blue_comparison_v1_HistoricalMilestonesTimelineModule from "./red-blue-comparison-v1/slides/HistoricalMilestonesTimeline.tsx";
 import red_blue_comparison_v1_ClosingContactComponent, * as red_blue_comparison_v1_ClosingContactModule from "./red-blue-comparison-v1/slides/ClosingContact.tsx";
+import red_blue_comparison_canvas_CoverCanvasComponent, * as red_blue_comparison_canvas_CoverCanvasModule from "./red-blue-comparison-canvas/slides/CoverCanvas.tsx";
+import red_blue_comparison_canvas_ContentCanvasComponent, * as red_blue_comparison_canvas_ContentCanvasModule from "./red-blue-comparison-canvas/slides/ContentCanvas.tsx";
+import red_blue_comparison_canvas_ComparisonCanvasComponent, * as red_blue_comparison_canvas_ComparisonCanvasModule from "./red-blue-comparison-canvas/slides/ComparisonCanvas.tsx";
+import red_blue_comparison_canvas_ChartEvidenceCanvasComponent, * as red_blue_comparison_canvas_ChartEvidenceCanvasModule from "./red-blue-comparison-canvas/slides/ChartEvidenceCanvas.tsx";
+import red_blue_comparison_canvas_ClosingCanvasComponent, * as red_blue_comparison_canvas_ClosingCanvasModule from "./red-blue-comparison-canvas/slides/ClosingCanvas.tsx";
 
 const red_finance_canvasGroupMeta = {
   "group_id": "red-finance-canvas",
@@ -221,6 +226,70 @@ const red_blue_comparison_v1Layouts: TemplateWithData[] = [
   createTemplateEntry(red_blue_comparison_v1_ClosingContactComponent, red_blue_comparison_v1_ClosingContactModule.Schema, red_blue_comparison_v1_ClosingContactModule.layoutId, red_blue_comparison_v1_ClosingContactModule.layoutName, red_blue_comparison_v1_ClosingContactModule.layoutDescription, "red-blue-comparison-v1", "ClosingContact", {"sampleData":{"title":"Thank You!","urlLabel":"www.example.com","contactItems":[{"icon":"email","label":"contact@example.com","tone":"purple"},{"icon":"phone","label":"+1-555-000-0000","tone":"purple"}],"footerNote":"Red Blue Comparison | Closing","accentTone":"purple","showDecorations":true},"layoutTags":["closing","thank-you","contact","red-blue","tsx-first"],"layoutRole":"closing","contentElements":["thank-you-title","url-pill","contact-items","soft-circle-decorations"],"useCases":["closing","thank you","contact information","final page"],"suitableFor":"Suitable for the final slide of a comparison deck when the audience needs a clean thank-you page and one to three contact or follow-up lines.","avoidFor":"Avoid using this layout for analytical conclusions, next-step action lists, dense recommendations, or content that needs charts or tables.","density":"low","visualWeight":"visual-heavy","editableTextPriority":"high"}),
 ];
 
+const red_blue_comparison_canvasGroupMeta = {
+  "group_id": "red-blue-comparison-canvas",
+  "group_name": "Red Blue Comparison Canvas",
+  "group_description": "Component-first red and blue comparison canvas templates for building custom benchmark, strategy, and evidence decks from reusable TSX components.",
+  "ordered": true,
+  "default": false,
+  "group_brief": "An open composition version of the red-blue comparison visual system. It preserves the white canvas, purple structure color, and red/blue entity accents from the red-blue comparison v1 visual language, but provides only broad canvas starting points so the AI Agent can compose each final slide from reusable components.",
+  "style_tags": [
+    "comparison",
+    "canvas",
+    "component-first",
+    "red-blue",
+    "tsx-first"
+  ],
+  "industry_tags": [
+    "business",
+    "market-analysis",
+    "strategy"
+  ],
+  "use_cases": [
+    "custom-comparison",
+    "market-analysis",
+    "executive-brief",
+    "benchmark-report",
+    "evidence-review"
+  ],
+  "audience_tags": [
+    "management",
+    "client",
+    "analyst"
+  ],
+  "tone_tags": [
+    "professional",
+    "analytical",
+    "balanced"
+  ],
+  "cover_layout_id": "red-blue-comparison-canvas:cover-canvas",
+  "agenda_layout_id": null,
+  "closing_layout_id": "red-blue-comparison-canvas:closing-canvas",
+  "default_theme_id": null
+};
+const red_blue_comparison_canvasSettings: TemplateGroupSettings = {
+  description: red_blue_comparison_canvasGroupMeta.group_description,
+  ordered: red_blue_comparison_canvasGroupMeta.ordered,
+  default: red_blue_comparison_canvasGroupMeta.default,
+  groupBrief: red_blue_comparison_canvasGroupMeta.group_brief ?? undefined,
+  styleTags: red_blue_comparison_canvasGroupMeta.style_tags ? [...red_blue_comparison_canvasGroupMeta.style_tags] : undefined,
+  industryTags: red_blue_comparison_canvasGroupMeta.industry_tags ? [...red_blue_comparison_canvasGroupMeta.industry_tags] : undefined,
+  useCases: red_blue_comparison_canvasGroupMeta.use_cases ? [...red_blue_comparison_canvasGroupMeta.use_cases] : undefined,
+  audienceTags: red_blue_comparison_canvasGroupMeta.audience_tags ? [...red_blue_comparison_canvasGroupMeta.audience_tags] : undefined,
+  toneTags: red_blue_comparison_canvasGroupMeta.tone_tags ? [...red_blue_comparison_canvasGroupMeta.tone_tags] : undefined,
+  coverLayoutId: red_blue_comparison_canvasGroupMeta.cover_layout_id ?? undefined,
+  agendaLayoutId: red_blue_comparison_canvasGroupMeta.agenda_layout_id ?? undefined,
+  closingLayoutId: red_blue_comparison_canvasGroupMeta.closing_layout_id ?? undefined,
+  defaultThemeId: red_blue_comparison_canvasGroupMeta.default_theme_id ?? undefined,
+};
+const red_blue_comparison_canvasLayouts: TemplateWithData[] = [
+  createTemplateEntry(red_blue_comparison_canvas_CoverCanvasComponent, red_blue_comparison_canvas_CoverCanvasModule.Schema, red_blue_comparison_canvas_CoverCanvasModule.layoutId, red_blue_comparison_canvas_CoverCanvasModule.layoutName, red_blue_comparison_canvas_CoverCanvasModule.layoutDescription, "red-blue-comparison-canvas", "CoverCanvas", {"sampleData":{"brandName":"COMPARISON INSIGHTS","titleLineOne":"Entity A","titleConnector":"vs","titleLineTwo":"Entity B","subtitle":"Open comparison frame","scopeItems":["Market","Audience","Capability","Outlook"],"entities":[{"label":"Entity A","color":"#FF4757"},{"label":"Entity B","color":"#2E86DE"}],"footerMeta":"Canvas-first authoring base","showSlotGuides":true,"showDecorations":true},"layoutTags":["cover","canvas","comparison","red-blue","component-first","tsx-first"],"layoutRole":"cover","contentElements":["brand","headline","subtitle","entity-legend","scope-tags","visual-slot"],"useCases":["cover","opening","comparison-frame","custom-composition"],"suitableFor":"Suitable as a starting cover for a custom red-blue comparison deck where the Agent should compose the final opening from reusable components.","avoidFor":"Avoid leaving it unchanged as a final page, and avoid using it for dense body analysis or chart-heavy pages.","density":"low","visualWeight":"visual-heavy","editableTextPriority":"high"}),
+  createTemplateEntry(red_blue_comparison_canvas_ContentCanvasComponent, red_blue_comparison_canvas_ContentCanvasModule.Schema, red_blue_comparison_canvas_ContentCanvasModule.layoutId, red_blue_comparison_canvas_ContentCanvasModule.layoutName, red_blue_comparison_canvas_ContentCanvasModule.layoutDescription, "red-blue-comparison-canvas", "ContentCanvas", {"sampleData":{"titlePrefix":"Content","titleHighlight":"Canvas","subtitle":"Use the open body area for page-specific component composition.","metaLabel":"COMPONENT-FIRST","footerText":"Red Blue Comparison Canvas | Content","pageNumber":"02","guideTitle":"Compose the final page structure here","guideText":"Replace this guide with reusable cards, metrics, images, charts, tables, or narrative blocks from components/.","showSlotGuides":true,"showDecorations":true},"layoutTags":["content","canvas","comparison","component-first","tsx-first"],"layoutRole":"content","contentElements":["page-title","subtitle","meta","content-slot","footer-meta"],"useCases":["overview","analysis","evidence","custom-composition"],"suitableFor":"Suitable as the default starting point for ordinary pages that need a custom component composition.","avoidFor":"Avoid using it unchanged as a final page, or for covers and closing pages.","density":"medium","visualWeight":"balanced","editableTextPriority":"high"}),
+  createTemplateEntry(red_blue_comparison_canvas_ComparisonCanvasComponent, red_blue_comparison_canvas_ComparisonCanvasModule.Schema, red_blue_comparison_canvas_ComparisonCanvasModule.layoutId, red_blue_comparison_canvas_ComparisonCanvasModule.layoutName, red_blue_comparison_canvas_ComparisonCanvasModule.layoutDescription, "red-blue-comparison-canvas", "ComparisonCanvas", {"sampleData":{"titlePrefix":"Comparison","titleHighlight":"Canvas","subtitle":"Start from two or three entity lanes, then replace each slot with cards, evidence, charts, or matrices.","footerText":"Red Blue Comparison Canvas | Comparison","pageNumber":"03","entities":[{"label":"Entity A","color":"#FF4757"},{"label":"Entity B","color":"#2E86DE"}],"guideTitle":"Entity lane","guideText":"Compose metrics, profiles, evidence, chart excerpts, or table cells.","showSlotGuides":true,"showDecorations":true},"layoutTags":["comparison","canvas","entity-lanes","component-first","tsx-first"],"layoutRole":"content","contentElements":["page-title","subtitle","entity-legend","comparison-slots","footer-meta"],"useCases":["two-entity comparison","three-entity comparison","matrix starting point","benchmark page"],"suitableFor":"Suitable for pages that compare two or three entities using cards, compact charts, evidence blocks, or a structured matrix.","avoidFor":"Avoid for single-entity narrative pages, long prose, or dense dashboards with unrelated modules.","density":"medium","visualWeight":"balanced","editableTextPriority":"high"}),
+  createTemplateEntry(red_blue_comparison_canvas_ChartEvidenceCanvasComponent, red_blue_comparison_canvas_ChartEvidenceCanvasModule.Schema, red_blue_comparison_canvas_ChartEvidenceCanvasModule.layoutId, red_blue_comparison_canvas_ChartEvidenceCanvasModule.layoutName, red_blue_comparison_canvas_ChartEvidenceCanvasModule.layoutDescription, "red-blue-comparison-canvas", "ChartEvidenceCanvas", {"sampleData":{"titlePrefix":"Chart","titleHighlight":"Evidence Canvas","subtitle":"Use the left area for a primary chart or visual evidence, and the right rail for interpretation.","footerText":"Red Blue Comparison Canvas | Evidence","pageNumber":"04","chartGuideTitle":"Primary chart or evidence slot","chartGuideText":"Use ChartContainer with a chart module, or ImageShowcasePanel for one visual asset.","railGuideTitle":"Interpretation rail","railGuideText":"Compose insight cards, KPI rows, source notes, or a compact comparison table.","showSlotGuides":true,"showDecorations":true},"layoutTags":["chart","evidence","canvas","comparison","component-first","tsx-first"],"layoutRole":"content","contentElements":["page-title","subtitle","primary-visual-slot","interpretation-slot","footer-meta"],"useCases":["chart analysis","visual evidence","image with interpretation","chart plus insight rail"],"suitableFor":"Suitable when a page needs one dominant chart, image, or table evidence anchor with concise interpretation beside it.","avoidFor":"Avoid for multi-chart dashboards, agenda pages, closing pages, or pages without a clear primary visual anchor.","density":"medium","visualWeight":"visual-heavy","editableTextPriority":"high"}),
+  createTemplateEntry(red_blue_comparison_canvas_ClosingCanvasComponent, red_blue_comparison_canvas_ClosingCanvasModule.Schema, red_blue_comparison_canvas_ClosingCanvasModule.layoutId, red_blue_comparison_canvas_ClosingCanvasModule.layoutName, red_blue_comparison_canvas_ClosingCanvasModule.layoutDescription, "red-blue-comparison-canvas", "ClosingCanvas", {"sampleData":{"eyebrow":"Closing Canvas","title":"Thank You","subtitle":"Use this low-density page for contact details, final framing, or next-step prompts.","primaryContact":"contact@example.com","secondaryContact":"www.example.com","showSlotGuides":true,"showDecorations":true},"layoutTags":["closing","canvas","contact","comparison","component-first","tsx-first"],"layoutRole":"closing","contentElements":["eyebrow","closing-title","subtitle","contact-slot","footer-slot"],"useCases":["closing","thank-you","contact","next-steps"],"suitableFor":"Suitable for final pages that need a polished low-density close while preserving the red-blue comparison language.","avoidFor":"Avoid for analytical conclusions with dense recommendations, charts, or tables.","density":"low","visualWeight":"visual-heavy","editableTextPriority":"high"}),
+];
+
 export const templates: TemplateLayoutsWithSettings[] = [
   {
     id: red_finance_canvasGroupMeta.group_id,
@@ -242,6 +311,13 @@ export const templates: TemplateLayoutsWithSettings[] = [
     description: red_blue_comparison_v1GroupMeta.group_description,
     settings: red_blue_comparison_v1Settings,
     layouts: red_blue_comparison_v1Layouts,
+  },
+  {
+    id: red_blue_comparison_canvasGroupMeta.group_id,
+    name: red_blue_comparison_canvasGroupMeta.group_name,
+    description: red_blue_comparison_canvasGroupMeta.group_description,
+    settings: red_blue_comparison_canvasSettings,
+    layouts: red_blue_comparison_canvasLayouts,
   },
 ];
 
