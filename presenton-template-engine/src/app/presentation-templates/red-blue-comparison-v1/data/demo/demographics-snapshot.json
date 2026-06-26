@@ -1,0 +1,40 @@
+{
+  "titlePrefix": "Demographics:",
+  "titleHighlight": "Snapshot",
+  "subtitle": "Key population indicators revealing scale differences (2025 Estimates)",
+  "footerText": "China vs Japan | Demographics",
+  "pageNumber": "05",
+  "cards": [
+    {
+      "entityName": "CHINA",
+      "tone": "red",
+      "entityIcon": "flag",
+      "heroLabel": "Total Population",
+      "heroValue": "1.41B",
+      "statusLabel": "Peak Passed",
+      "statusIcon": "trend-down",
+      "statusTone": "warning",
+      "kpis": [
+        { "label": "Median Age", "value": "39.0", "icon": "hourglass" },
+        { "label": "Urbanization", "value": "66.2%", "icon": "city" },
+        { "label": "Life Expectancy", "value": "78.2", "icon": "heart" }
+      ]
+    },
+    {
+      "entityName": "JAPAN",
+      "tone": "blue",
+      "entityIcon": "circle",
+      "heroLabel": "Total Population",
+      "heroValue": "122.6M",
+      "statusLabel": "Declining",
+      "statusIcon": "trend-down",
+      "statusTone": "warning",
+      "kpis": [
+        { "label": "Median Age", "value": "49.5", "icon": "hourglass" },
+        { "label": "Urbanization", "value": "92.0%", "icon": "building" },
+        { "label": "Life Expectancy", "value": "84.6", "icon": "heart" }
+      ]
+    }
+  ],
+  "showDecorations": true
+}

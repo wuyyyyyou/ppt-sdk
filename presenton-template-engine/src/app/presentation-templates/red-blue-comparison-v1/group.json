@@ -14,6 +14,9 @@
   "registry_order": 93,
   "layouts": [
     "slides/CoverComparison.tsx",
-    "slides/TopicOverview.tsx"
+    "slides/TopicOverview.tsx",
+    "slides/EconomySizeGrowth.tsx",
+    "slides/EconomicStructure.tsx",
+    "slides/DemographicsSnapshot.tsx"
   ]
 }

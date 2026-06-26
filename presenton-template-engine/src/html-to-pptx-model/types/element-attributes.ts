@@ -89,6 +89,7 @@ export interface ElementAttributes {
   connectorType?: string;
   textWrap?: boolean;
   pptxExport?: "screenshot";
+  noInheritBorderRadius?: boolean;
   should_screenshot?: boolean;
   element?: ElementHandleLike;
   filters?: {

@@ -1,0 +1,87 @@
+{
+  "titlePrefix": "Economy:",
+  "titleHighlight": "Size and Growth",
+  "subtitle": "Comparative outlook for 2026 based on IMF projections and current fiscal trajectories.",
+  "footerText": "China vs Japan | Economy",
+  "pageNumber": "03",
+  "chartTitle": "Nominal GDP Comparison (2026 Proj.)",
+  "chartSource": "*Source: IMF World Economic Outlook Projections (Estimates)",
+  "chartUnitLabel": "T",
+  "chartMaxValue": 24,
+  "chartTicks": [0, 10, 20],
+  "chartData": [
+    {
+      "label": "China",
+      "value": 20.65,
+      "displayValue": "$20.65T",
+      "tone": "red"
+    },
+    {
+      "label": "Japan",
+      "value": 4.46,
+      "displayValue": "$4.46T",
+      "tone": "blue"
+    }
+  ],
+  "metricCards": [
+    {
+      "title": "Global Economy Rank",
+      "mode": "rank",
+      "items": [
+        {
+          "label": "China",
+          "shortLabel": "CHINA",
+          "value": "#2",
+          "tone": "red"
+        },
+        {
+          "label": "Japan",
+          "shortLabel": "JAPAN",
+          "value": "#4",
+          "tone": "blue"
+        }
+      ]
+    },
+    {
+      "title": "Annual GDP Growth (%)",
+      "mode": "bar",
+      "items": [
+        {
+          "label": "China",
+          "shortLabel": "CHN",
+          "value": "4.5%",
+          "share": 85,
+          "tone": "red"
+        },
+        {
+          "label": "Japan",
+          "shortLabel": "JPN",
+          "value": "0.9%",
+          "share": 20,
+          "tone": "blue"
+        }
+      ]
+    },
+    {
+      "title": "GDP Per Capita (USD)",
+      "mode": "bar",
+      "items": [
+        {
+          "label": "China",
+          "shortLabel": "CHN",
+          "value": "$13.8k",
+          "share": 40,
+          "tone": "red"
+        },
+        {
+          "label": "Japan",
+          "shortLabel": "JPN",
+          "value": "$33.5k",
+          "share": 95,
+          "tone": "blue"
+        }
+      ]
+    }
+  ],
+  "showDecorations": true
+}

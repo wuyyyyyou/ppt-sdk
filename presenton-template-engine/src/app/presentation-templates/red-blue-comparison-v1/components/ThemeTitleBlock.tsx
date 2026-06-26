@@ -4,7 +4,9 @@ import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
 import ThemePill from "./ThemePill.tsx";
 
 type ThemeTitleBlockProps = {
-  title: ReactNode;
+  title?: ReactNode;
+  titlePrefix?: ReactNode;
+  titleHighlight?: ReactNode;
   subtitle?: ReactNode;
   eyebrow?: ReactNode;
   tone?: RedBlueTone;
@@ -17,6 +19,8 @@ type ThemeTitleBlockProps = {
 
 const ThemeTitleBlock = ({
   title,
+  titlePrefix,
+  titleHighlight,
   subtitle,
   eyebrow,
   tone = "purple",
@@ -28,6 +32,7 @@ const ThemeTitleBlock = ({
 }: ThemeTitleBlockProps) => {
   const toneValue = redBlueComparisonTheme.tone[tone];
   const isCentered = align === "center";
+  const hasSegmentedTitle = titlePrefix !== undefined || titleHighlight !== undefined;
 
   return (
     <div
@@ -49,7 +54,23 @@ const ThemeTitleBlock = ({
           color: redBlueComparisonTheme.colors.backgroundText,
         }}
       >
-        {title}
+        {hasSegmentedTitle ? (
+          <>
+            {titlePrefix !== undefined ? (
+              <span className="inline-block align-baseline" style={{ color: redBlueComparisonTheme.colors.backgroundText }}>
+                {titlePrefix}
+              </span>
+            ) : null}
+            {titlePrefix !== undefined && titleHighlight !== undefined ? " " : null}
+            {titleHighlight !== undefined ? (
+              <span className="inline-block align-baseline" style={{ color: toneValue.color }}>
+                {titleHighlight}
+              </span>
+            ) : null}
+          </>
+        ) : (
+          title
+        )}
       </div>
       <div
         className="mt-[12px] h-[5px] rounded-full"

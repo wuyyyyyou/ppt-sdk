@@ -1,6 +1,7 @@
 import React from "react";
 
 import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import CardAccentRail from "./CardAccentRail.tsx";
 
 export type AgendaTopicIconName =
   | "chart-line"
@@ -150,9 +151,9 @@ const AgendaTopicCard = ({
         boxShadow: redBlueComparisonTheme.shadow.card,
       }}
     >
-      <div className="absolute left-0 top-0 h-[5px] w-full" style={{ backgroundColor: toneValue.color }} />
+      <CardAccentRail position="top" color={toneValue.color} size={5} />
       <div
-        className="absolute right-[18px] top-[14px] select-none text-[48px] font-black leading-none"
+        className="absolute right-[18px] top-[14px] z-10 select-none text-[48px] font-black leading-none"
         style={{
           color: "rgba(45,52,54,0.035)",
           fontFamily: redBlueComparisonTheme.fonts.heading,
@@ -162,7 +163,7 @@ const AgendaTopicCard = ({
       </div>
 
       <div
-        className="mb-[16px] flex h-[44px] w-[44px] flex-none items-center justify-center rounded-[10px]"
+        className="relative z-10 mb-[16px] flex h-[44px] w-[44px] flex-none items-center justify-center rounded-[10px]"
         style={{ backgroundColor: toneValue.tint, color: toneValue.color }}
       >
         <AgendaTopicIcon name={iconName} className="h-[22px] w-[22px]" />

@@ -1,0 +1,62 @@
+{
+  "titlePrefix": "Economic Structure:",
+  "titleHighlight": "Sector Breakdown",
+  "subtitle": "Composition of Gross Domestic Product by key sectors (2025 Est.)",
+  "footerText": "China vs Japan | Economic Structure",
+  "pageNumber": "04",
+  "cards": [
+    {
+      "entityName": "CHINA",
+      "badge": "GDP: $20.6T",
+      "tone": "red",
+      "centerValue": "39%",
+      "centerLabel": "Industry",
+      "segments": [
+        {
+          "label": "Agri (7.3%)",
+          "value": 7.3,
+          "color": "#00B894"
+        },
+        {
+          "label": "Services (53.3%)",
+          "value": 53.3,
+          "color": "#5038A6"
+        },
+        {
+          "label": "Industry (39.4%)",
+          "value": 39.4,
+          "color": "#FF4757"
+        }
+      ],
+      "insightTitle": "Manufacturing Powerhouse",
+      "insightDescription": "Nearly 40% of GDP from manufacturing - the world's factory."
+    },
+    {
+      "entityName": "JAPAN",
+      "badge": "GDP: $4.4T",
+      "tone": "blue",
+      "centerValue": "70%",
+      "centerLabel": "Services",
+      "segments": [
+        {
+          "label": "Agri (1.1%)",
+          "value": 1.1,
+          "color": "#00B894"
+        },
+        {
+          "label": "Services (69.8%)",
+          "value": 69.8,
+          "color": "#2E86DE"
+        },
+        {
+          "label": "Industry (29.1%)",
+          "value": 29.1,
+          "color": "#636E72"
+        }
+      ],
+      "insightTitle": "Advanced Service Economy",
+      "insightDescription": "Service-driven economy with 70% GDP in services. Industry focuses on precision tech."
+    }
+  ],
+  "showDecorations": true
+}

@@ -1,6 +1,7 @@
 import React, { type ReactNode } from "react";
 
 import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import CardAccentRail, { type CardAccentRailPosition } from "./CardAccentRail.tsx";
 
 type ThemeCardProps = {
   title?: ReactNode;
@@ -12,7 +13,9 @@ type ThemeCardProps = {
   height?: number | string;
   minHeight?: number;
   padding?: number;
-  rail?: "none" | "top" | "left";
+  rail?: "none" | CardAccentRailPosition;
+  railColor?: string;
+  railSize?: number;
   className?: string;
 };
 
@@ -27,9 +30,12 @@ const ThemeCard = ({
   minHeight,
   padding = 20,
   rail = "top",
+  railColor,
+  railSize = 5,
   className,
 }: ThemeCardProps) => {
   const toneValue = redBlueComparisonTheme.tone[tone];
+  const resolvedRailColor = railColor ?? toneValue.color;
 
   return (
     <div
@@ -46,14 +52,11 @@ const ThemeCard = ({
         boxShadow: redBlueComparisonTheme.shadow.card,
       }}
     >
-      {rail === "top" ? (
-        <div className="absolute left-0 top-0 h-[5px] w-full" style={{ backgroundColor: toneValue.color }} />
-      ) : null}
-      {rail === "left" ? (
-        <div className="absolute bottom-0 left-0 top-0 w-[5px]" style={{ backgroundColor: toneValue.color }} />
+      {rail !== "none" ? (
+        <CardAccentRail position={rail} color={resolvedRailColor} size={railSize} />
       ) : null}
 
-      <div className="flex min-w-0 items-start gap-[14px]" style={{ paddingTop: rail === "top" ? 4 : 0 }}>
+      <div className="relative z-10 flex min-w-0 items-start gap-[14px]" style={{ paddingTop: rail === "top" ? 4 : 0 }}>
         {icon ? (
           <div
             className="flex h-[44px] w-[44px] flex-none items-center justify-center rounded-[10px]"
@@ -90,7 +93,7 @@ const ThemeCard = ({
         </div>
       </div>
 
-      {children ? <div className="mt-[14px] min-h-0 flex-1">{children}</div> : null}
+      {children ? <div className="relative z-10 mt-[14px] min-h-0 flex-1">{children}</div> : null}
     </div>
   );
 };

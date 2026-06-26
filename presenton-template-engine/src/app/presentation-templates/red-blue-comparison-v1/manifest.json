@@ -42,6 +42,36 @@
         "path": "./slides/TopicOverview.tsx"
       },
       "data_path": "./data/demo/topic-overview.json"
+    },
+    {
+      "id": "red-blue-comparison-v1-economy-size-growth",
+      "title": "Economy: Size and Growth",
+      "speaker_note": "Demo analysis page derived from .tmp/Template/红蓝主题/3.html: one primary GDP comparison chart with stacked red/blue metric cards for rank, growth, and per-capita indicators.",
+      "source": {
+        "type": "local",
+        "path": "./slides/EconomySizeGrowth.tsx"
+      },
+      "data_path": "./data/demo/economy-size-growth.json"
+    },
+    {
+      "id": "red-blue-comparison-v1-economic-structure",
+      "title": "Economic Structure: Sector Breakdown",
+      "speaker_note": "Demo sector breakdown page derived from .tmp/Template/红蓝主题/4.html: two entity cards with donut charts, legends, GDP badges, and concise economic-structure analysis.",
+      "source": {
+        "type": "local",
+        "path": "./slides/EconomicStructure.tsx"
+      },
+      "data_path": "./data/demo/economic-structure.json"
+    },
+    {
+      "id": "red-blue-comparison-v1-demographics-snapshot",
+      "title": "Demographics: Snapshot",
+      "speaker_note": "Demo demographic snapshot page derived from .tmp/Template/红蓝主题/5.html: two entity cards with hero population metrics, status indicators, and compact KPI rows.",
+      "source": {
+        "type": "local",
+        "path": "./slides/DemographicsSnapshot.tsx"
+      },
+      "data_path": "./data/demo/demographics-snapshot.json"
     }
   ]
 }

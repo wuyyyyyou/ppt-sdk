@@ -5,7 +5,9 @@ import ThemeCanvas from "./ThemeCanvas.tsx";
 import ThemeTitleBlock from "./ThemeTitleBlock.tsx";
 
 type ThemeContentFrameProps = {
-  title: ReactNode;
+  title?: ReactNode;
+  titlePrefix?: ReactNode;
+  titleHighlight?: ReactNode;
   children: ReactNode;
   subtitle?: ReactNode;
   eyebrow?: ReactNode;
@@ -23,6 +25,8 @@ type ThemeContentFrameProps = {
 
 const ThemeContentFrame = ({
   title,
+  titlePrefix,
+  titleHighlight,
   children,
   subtitle,
   eyebrow,
@@ -51,6 +55,8 @@ const ThemeContentFrame = ({
       >
         <ThemeTitleBlock
           title={title}
+          titlePrefix={titlePrefix}
+          titleHighlight={titleHighlight}
           subtitle={subtitle}
           eyebrow={eyebrow}
           tone={tone}

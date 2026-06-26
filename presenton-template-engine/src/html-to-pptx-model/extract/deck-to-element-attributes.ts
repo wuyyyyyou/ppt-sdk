@@ -511,7 +511,12 @@ async function getAllChildElementsAttributes({
     if (inheritedBackground && !attributes.background && attributes.shadow) {
       attributes.background = inheritedBackground;
     }
-    if (inheritedBorderRadius && !attributes.borderRadius) {
+    if (
+      inheritedBorderRadius &&
+      !attributes.borderRadius &&
+      attributes.pptxExport !== "screenshot" &&
+      !attributes.noInheritBorderRadius
+    ) {
       attributes.borderRadius = inheritedBorderRadius;
     }
     if (inheritedZIndex !== undefined && attributes.zIndex === 0) {
@@ -1893,6 +1898,8 @@ async function getElementAttributes(
           node.getAttribute("data-pptx-export") === "screenshot"
             ? ("screenshot" as const)
             : undefined,
+        noInheritBorderRadius:
+          node.getAttribute("data-pptx-no-inherit-border-radius") === "true",
         should_screenshot: false,
         element: undefined,
         filters: parseFilters(computedStyles) as any,
