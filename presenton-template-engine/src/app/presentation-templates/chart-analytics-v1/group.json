@@ -1,0 +1,18 @@
+{
+  "group_id": "chart-analytics-v1",
+  "group_name": "Dark Analytics Charts",
+  "group_description": "TSX-first analytics templates for chart-heavy comparison decks, executive dashboards, timelines, and evidence summaries.",
+  "group_brief": "Derived from .tmp/Template/图表主题. The source theme is a professional dark-and-slate analytics comparison deck with one dark cover, one agenda, eighteen content pages, and two thank-you pages. Most body pages combine charts, card grids, comparison lanes, and timeline structures for China/Japan/Korea style strategic analysis.",
+  "style_tags": ["analytics", "dashboard", "chart-heavy", "comparison", "tsx-first"],
+  "industry_tags": ["business", "market-analysis", "strategy", "regional-analysis"],
+  "use_cases": ["market-comparison", "executive-dashboard", "strategic-analysis", "data-story", "evidence-review"],
+  "audience_tags": ["management", "client", "analyst"],
+  "tone_tags": ["professional", "analytical", "executive"],
+  "cover_layout_id": "chart-analytics-v1:cover-analytics",
+  "ordered": true,
+  "default": false,
+  "registry_order": 95,
+  "layouts": [
+    "slides/CoverAnalytics.tsx"
+  ]
+}

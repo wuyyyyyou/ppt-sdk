@@ -32,6 +32,7 @@ import red_blue_comparison_canvas_ContentCanvasComponent, * as red_blue_comparis
 import red_blue_comparison_canvas_ComparisonCanvasComponent, * as red_blue_comparison_canvas_ComparisonCanvasModule from "./red-blue-comparison-canvas/slides/ComparisonCanvas.tsx";
 import red_blue_comparison_canvas_ChartEvidenceCanvasComponent, * as red_blue_comparison_canvas_ChartEvidenceCanvasModule from "./red-blue-comparison-canvas/slides/ChartEvidenceCanvas.tsx";
 import red_blue_comparison_canvas_ClosingCanvasComponent, * as red_blue_comparison_canvas_ClosingCanvasModule from "./red-blue-comparison-canvas/slides/ClosingCanvas.tsx";
+import chart_analytics_v1_CoverAnalyticsComponent, * as chart_analytics_v1_CoverAnalyticsModule from "./chart-analytics-v1/slides/CoverAnalytics.tsx";
 
 const red_finance_canvasGroupMeta = {
   "group_id": "red-finance-canvas",
@@ -290,6 +291,67 @@ const red_blue_comparison_canvasLayouts: TemplateWithData[] = [
   createTemplateEntry(red_blue_comparison_canvas_ClosingCanvasComponent, red_blue_comparison_canvas_ClosingCanvasModule.Schema, red_blue_comparison_canvas_ClosingCanvasModule.layoutId, red_blue_comparison_canvas_ClosingCanvasModule.layoutName, red_blue_comparison_canvas_ClosingCanvasModule.layoutDescription, "red-blue-comparison-canvas", "ClosingCanvas", {"sampleData":{"eyebrow":"Closing Canvas","title":"Thank You","subtitle":"Use this low-density page for contact details, final framing, or next-step prompts.","primaryContact":"contact@example.com","secondaryContact":"www.example.com","showSlotGuides":true,"showDecorations":true},"layoutTags":["closing","canvas","contact","comparison","component-first","tsx-first"],"layoutRole":"closing","contentElements":["eyebrow","closing-title","subtitle","contact-slot","footer-slot"],"useCases":["closing","thank-you","contact","next-steps"],"suitableFor":"Suitable for final pages that need a polished low-density close while preserving the red-blue comparison language.","avoidFor":"Avoid for analytical conclusions with dense recommendations, charts, or tables.","density":"low","visualWeight":"visual-heavy","editableTextPriority":"high"}),
 ];
 
+const chart_analytics_v1GroupMeta = {
+  "group_id": "chart-analytics-v1",
+  "group_name": "Dark Analytics Charts",
+  "group_description": "TSX-first analytics templates for chart-heavy comparison decks, executive dashboards, timelines, and evidence summaries.",
+  "ordered": true,
+  "default": false,
+  "group_brief": "Derived from .tmp/Template/图表主题. The source theme is a professional dark-and-slate analytics comparison deck with one dark cover, one agenda, eighteen content pages, and two thank-you pages. Most body pages combine charts, card grids, comparison lanes, and timeline structures for China/Japan/Korea style strategic analysis.",
+  "style_tags": [
+    "analytics",
+    "dashboard",
+    "chart-heavy",
+    "comparison",
+    "tsx-first"
+  ],
+  "industry_tags": [
+    "business",
+    "market-analysis",
+    "strategy",
+    "regional-analysis"
+  ],
+  "use_cases": [
+    "market-comparison",
+    "executive-dashboard",
+    "strategic-analysis",
+    "data-story",
+    "evidence-review"
+  ],
+  "audience_tags": [
+    "management",
+    "client",
+    "analyst"
+  ],
+  "tone_tags": [
+    "professional",
+    "analytical",
+    "executive"
+  ],
+  "cover_layout_id": "chart-analytics-v1:cover-analytics",
+  "agenda_layout_id": null,
+  "closing_layout_id": null,
+  "default_theme_id": null
+};
+const chart_analytics_v1Settings: TemplateGroupSettings = {
+  description: chart_analytics_v1GroupMeta.group_description,
+  ordered: chart_analytics_v1GroupMeta.ordered,
+  default: chart_analytics_v1GroupMeta.default,
+  groupBrief: chart_analytics_v1GroupMeta.group_brief ?? undefined,
+  styleTags: chart_analytics_v1GroupMeta.style_tags ? [...chart_analytics_v1GroupMeta.style_tags] : undefined,
+  industryTags: chart_analytics_v1GroupMeta.industry_tags ? [...chart_analytics_v1GroupMeta.industry_tags] : undefined,
+  useCases: chart_analytics_v1GroupMeta.use_cases ? [...chart_analytics_v1GroupMeta.use_cases] : undefined,
+  audienceTags: chart_analytics_v1GroupMeta.audience_tags ? [...chart_analytics_v1GroupMeta.audience_tags] : undefined,
+  toneTags: chart_analytics_v1GroupMeta.tone_tags ? [...chart_analytics_v1GroupMeta.tone_tags] : undefined,
+  coverLayoutId: chart_analytics_v1GroupMeta.cover_layout_id ?? undefined,
+  agendaLayoutId: chart_analytics_v1GroupMeta.agenda_layout_id ?? undefined,
+  closingLayoutId: chart_analytics_v1GroupMeta.closing_layout_id ?? undefined,
+  defaultThemeId: chart_analytics_v1GroupMeta.default_theme_id ?? undefined,
+};
+const chart_analytics_v1Layouts: TemplateWithData[] = [
+  createTemplateEntry(chart_analytics_v1_CoverAnalyticsComponent, chart_analytics_v1_CoverAnalyticsModule.Schema, chart_analytics_v1_CoverAnalyticsModule.layoutId, chart_analytics_v1_CoverAnalyticsModule.layoutName, chart_analytics_v1_CoverAnalyticsModule.layoutDescription, "chart-analytics-v1", "CoverAnalytics", {"sampleData":{"seriesLabel":"Global Intelligence Series","backgroundImageUrl":"https://page.talentsecsite.com/slides_images/6722217b327d461901b4f6677362a773.webp","backgroundImageAlt":"City skyline background","primarySubject":"CHINA","comparisonLabel":"vs","secondarySubject":"JAPAN","subtitle":"Strategic Comparison Report","scope":"Economic Shifts - Demographics - Technology - Culture","publisherLabel":"Analysis By","publisher":"Talentsec AI Analytics","dateLabel":"Published","reportDate":"March 03, 2026","showBackgroundImage":true,"showDecoration":true},"layoutTags":["cover","analytics","comparison","dark","background-image","tsx-first"],"layoutRole":"cover","contentElements":["background-image","headline","subtitle","scope","footer-meta","decoration"],"useCases":["cover","opening","comparison-report","executive-dashboard"],"suitableFor":"Suitable for opening a data-heavy comparison, market intelligence, country benchmark, or executive dashboard deck.","avoidFor":"Avoid using this layout for body analysis, dense charts, agendas, or closing pages.","density":"low","visualWeight":"visual-heavy","editableTextPriority":"high"}),
+];
+
 export const templates: TemplateLayoutsWithSettings[] = [
   {
     id: red_finance_canvasGroupMeta.group_id,
@@ -318,6 +380,13 @@ export const templates: TemplateLayoutsWithSettings[] = [
     description: red_blue_comparison_canvasGroupMeta.group_description,
     settings: red_blue_comparison_canvasSettings,
     layouts: red_blue_comparison_canvasLayouts,
+  },
+  {
+    id: chart_analytics_v1GroupMeta.group_id,
+    name: chart_analytics_v1GroupMeta.group_name,
+    description: chart_analytics_v1GroupMeta.group_description,
+    settings: chart_analytics_v1Settings,
+    layouts: chart_analytics_v1Layouts,
   },
 ];
 

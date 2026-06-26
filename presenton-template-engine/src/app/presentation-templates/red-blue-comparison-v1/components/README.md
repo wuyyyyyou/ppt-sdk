@@ -72,31 +72,6 @@
 | `timeline` | `AlternatingTimeline` | 超过六个事件、详细年表、量化趋势图 |
 | `decoration` | `CoverComparisonDecorations`, `BalancedComparisonDecorations`, `ThemeSoftCircle` | 任何关键事实、数字或结论 |
 
-## 文本容量
-
-| Module | 建议容量 | 溢出处理 |
-| --- | --- | --- |
-| `ThemeTitleBlock` | 标题 36 字以内；副标题 100 字以内 | 必要时调小页面标题或改布局 |
-| `ThemePanelShell` | 只承载一个清晰内容模块 | 过密内容应拆卡或拆页 |
-| `ComparisonHeroTitle` | 左右标题各 28 字以内；连接词 12 字以内 | 超长标题在 slide 中降字号 |
-| `ThemePill` | 24 字以内 | 单行 truncate |
-| `IconText` | 单行 48 字以内，非单行模式 2 行以内 | 长文本改为卡片正文 |
-| `AgendaTopicCard` | 标题 34 字以内；说明 115 字以内 | 减少卡片数量或拆短说明 |
-| `EntityComparisonMetricCard` | 2-3 个主体；标题 36 字以内；数值 18 字以内 | 超过 3 个主体应改矩阵页 |
-| `EntitySnapshotCard` | 主体 24 字以内；英雄数值 18 字以内；KPI 2-4 项 | 长解释放到独立文本页 |
-| `InsightMetricCard` | 标签 28 字以内；数值 18 字以内；说明 140 字以内 | 长结论应改为正文页 |
-| `TrendInsightCard` | 标题 28 字以内；数值 18 字以内；说明 160 字以内 | 右栏最多 4 张卡 |
-| `StrategicInsightCard` | 标题 34 字以内；说明约 180-220 字以内，默认 4-5 行 | 长正文应拆到叙事页或提高卡片高度 |
-| `ComparativeMetricRow` | 指标名 32 字以内；数值 16 字以内；副标签 24 字以内 | 超过两个主体应改矩阵页 |
-| `ChartContainer` | 标题 56 字以内；副标题 88 字以内 | 标题单行 truncate |
-| `ImageShowcasePanel` | 标题 48 字以内；说明约 3 行；来源 90 字以内 | 多图或长图注应拆页 |
-| `ComparisonTablePanel` | 3-4 列、2-5 行；单元格值 42 字以内 | 大表格应另做矩阵页 |
-| `VerticalComparisonBarChart` | 2-3 个柱；标签 24 字以内 | 超过 3 个主体应拆页 |
-| `StackedCompositionBarChart` | 2-4 行、2-5 个分段 | 小分段会隐藏内部数值标签 |
-| `DualAxisProjectionLineChart` | 1-3 条线；横轴 2-14 个点 | 复杂趋势应拆成多页 |
-| `ComparisonRadarChart` | 2 条序列；3-8 个维度 | 维度过多会造成标签拥挤 |
-| `SectorStructureCard` | 主体 24 字以内；badge 24 字以内；分析说明 110 字以内 | 更多主体应拆页 |
-| `AlternatingTimeline` | 3-6 个节点；日期 18 字以内；标题 42 字以内；说明 120 字以内 | 长叙事或更多节点应拆页 |
 
 ## AI 修改规则
 

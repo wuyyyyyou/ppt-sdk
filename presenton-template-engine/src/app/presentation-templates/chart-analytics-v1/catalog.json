@@ -1,0 +1,125 @@
+{
+  "group_id": "chart-analytics-v1",
+  "catalog_type": "tsx-first",
+  "version": 1,
+  "purpose": "Help the PPT AI Agent choose a copyable TSX blueprint first, derive it into slides/*.tsx, and then edit the final slide implementation directly.",
+  "source_theme": {
+    "folder": ".tmp/Template/图表主题",
+    "theme_id": "chart-theme",
+    "temp_no": "CHART-1",
+    "temp_brief": "Dark analytics comparison deck for China, Japan, and Korea with dashboards, timelines, and executive summaries.",
+    "page_distribution": {
+      "cover": 1,
+      "agenda": 1,
+      "content": 18,
+      "thank_you": 2
+    },
+    "dominant_elements": ["Chart", "CardGrid", "Comparison", "Timeline"],
+    "visual_language": [
+      "dark slate cover and closing pages",
+      "light slate body canvas",
+      "blue primary accent with teal and indigo secondary accents",
+      "card-based analytics dashboards",
+      "country or option comparison lanes",
+      "horizontal timeline milestones"
+    ]
+  },
+  "directory_roles": {
+    "blueprints": {
+      "path": "./blueprints",
+      "role": "Copyable TSX blueprint pages.",
+      "rules": [
+        "Start here by selecting the blueprint page closest to the content structure.",
+        "Copy or derive the selected blueprint into ./slides before adapting it for a concrete deck.",
+        "Do not paste source HTML into TSX; rebuild pages from reusable components and editable text."
+      ]
+    },
+    "slides": {
+      "path": "./slides",
+      "role": "Final registered slide entries.",
+      "rules": [
+        "group.json.layouts and manifest.json source.path must only reference this directory.",
+        "AI may edit TSX here directly to adjust layout, component composition, and content mapping."
+      ]
+    },
+    "components": {
+      "path": "./components",
+      "role": "Reusable visual components shared across pages.",
+      "rules": [
+        "Put cross-page canvas, card, chart shell, comparison, and timeline components here.",
+        "Do not hide page-specific content decisions inside generic components."
+      ]
+    },
+    "data": {
+      "path": "./data",
+      "role": "Demo or concrete deck content data.",
+      "rules": [
+        "JSON carries content only, not page-structure decisions.",
+        "If layout or component choice is wrong, edit slides/*.tsx."
+      ]
+    },
+    "theme": {
+      "path": "./theme",
+      "role": "Shared color, typography, and visual token definitions."
+    }
+  },
+  "blueprints": [
+    {
+      "id": "cover-analytics",
+      "name": "Cover Analytics",
+      "blueprint_source": "./blueprints/CoverAnalytics.tsx",
+      "example_slide": "./slides/CoverAnalytics.tsx",
+      "layout_family": "cover",
+      "source_html": ".tmp/Template/图表主题/1.html",
+      "content_intents": ["opening", "comparison-frame", "analytics-positioning", "executive-report-cover"],
+      "suitable_for": ["deck cover", "comparison report opening", "executive dashboard opening", "data story opening"],
+      "avoid_for": ["body analysis", "dense charts", "agenda", "timeline", "thank-you page"],
+      "composition_guidance": "Use for the opening page. Preserve the dark analytics posture, background image wash, large subject-versus-subject headline, concise report scope, publisher, and date."
+    }
+  ],
+  "planned_blueprint_families": [
+    {
+      "id": "agenda-summary",
+      "layout_family": "agenda",
+      "source_signals": ["17.html agenda slide", "section cards", "ordered report structure"],
+      "intended_for": ["agenda", "table of contents", "section overview"]
+    },
+    {
+      "id": "metric-dashboard",
+      "layout_family": "dashboard",
+      "source_signals": ["2.html", "3.html", "4.html", "top KPI cards plus chart panels"],
+      "intended_for": ["executive summary", "KPI overview", "multi-metric dashboard"]
+    },
+    {
+      "id": "comparison-matrix",
+      "layout_family": "comparison",
+      "source_signals": ["7.html", "8.html", "9.html", "12.html", "16.html", "19.html", "20.html"],
+      "intended_for": ["country comparison", "option benchmark", "multi-dimension comparison"]
+    },
+    {
+      "id": "timeline-analysis",
+      "layout_family": "timeline",
+      "source_signals": ["5.html", "10.html", "11.html", "21.html"],
+      "intended_for": ["historical timeline", "milestone analysis", "roadmap"]
+    },
+    {
+      "id": "closing-contact",
+      "layout_family": "closing",
+      "source_signals": ["15.html", "22.html"],
+      "intended_for": ["thank-you", "contact", "final close"]
+    }
+  ],
+  "selection_guide": [
+    "Currently only cover-analytics is implemented and registered.",
+    "Choose cover-analytics for the first page or an intentional title reset.",
+    "For body pages, future work should add metric-dashboard, comparison-matrix, timeline-analysis, and agenda-summary blueprints before registering them.",
+    "Keep source HTML as reference only; pages should be rebuilt from TSX components with editable text and data-driven content."
+  ],
+  "agent_workflow_notes": [
+    "Read catalog.json first and choose the blueprints/*.tsx file closest to the content structure.",
+    "Copy or derive the selected blueprint TSX into slides/*.tsx, then edit the final page directly.",
+    "manifest.json source.path should only point to slides/*.tsx.",
+    "data/*.json should carry content only; if structure, spacing, or components are unsuitable, edit slides/*.tsx.",
+    "Do not paste .tmp/Template HTML verbatim into TSX."
+  ]
+}

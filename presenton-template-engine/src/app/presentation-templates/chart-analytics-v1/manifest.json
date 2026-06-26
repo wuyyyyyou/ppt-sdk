@@ -1,0 +1,33 @@
+{
+  "title": "Dark Analytics Charts Demo Deck",
+  "theme": {
+    "company_name": "TALENTSEC AI ANALYTICS",
+    "colors": {
+      "background": "#0F172A",
+      "background_text": "#F8FAFC",
+      "primary": "#2563EB",
+      "primary_text": "#FFFFFF",
+      "card": "#FFFFFF",
+      "stroke": "#E2E8F0",
+      "secondary": "#14B8A6",
+      "text_muted": "#94A3B8",
+      "text_subtle": "#64748B",
+      "panel": "#1E293B",
+      "surface": "#F8FAFC",
+      "accent_indigo": "#4F46E5",
+      "accent_teal": "#14B8A6"
+    }
+  },
+  "slides": [
+    {
+      "id": "chart-analytics-v1-cover-analytics",
+      "title": "China vs Japan",
+      "speaker_note": "Dark analytics comparison cover based on .tmp/Template/图表主题/1.html, rebuilt as an editable TSX-first blueprint.",
+      "source": {
+        "type": "local",
+        "path": "./slides/CoverAnalytics.tsx"
+      },
+      "data_path": "./data/demo/cover-analytics.json"
+    }
+  ]
+}
