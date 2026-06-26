@@ -495,6 +495,30 @@
       ]
     },
     {
+      "name": "app_get_research_curation_draft_fingerprint",
+      "description": "Return the existence and SHA-256 fingerprint for a page-level Web or Visual Research Curation Draft artifact.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "page_id",
+          "type": "string",
+          "description": "Page Generation Unit id, for example page-01.",
+          "required": true
+        },
+        {
+          "name": "draft_type",
+          "type": "string",
+          "description": "Draft type: web or visual.",
+          "required": true
+        }
+      ]
+    },
+    {
       "name": "app_record_research_evidence_page_markdown",
       "description": "Write the current-page Research Evidence markdown summary for a workspace.",
       "parameters": [

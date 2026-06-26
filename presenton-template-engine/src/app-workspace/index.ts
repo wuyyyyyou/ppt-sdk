@@ -79,6 +79,7 @@ import type {
   PrepareAppResearchWorkspaceInput,
   PrepareAppResearchWorkspaceResult,
   GetAppResearchCurationDraftInput,
+  GetAppResearchCurationDraftFingerprintInput,
   RecordAppResearchEvidenceInput,
   RecordAppResearchEvidencePageInput,
   RecordAppResearchCurationDraftInput,
@@ -1950,6 +1951,41 @@ export async function getAppResearchCurationDraft(
     };
   }
   return normalizeResearchArtifact(existing, "empty");
+}
+
+export async function getAppResearchCurationDraftFingerprint(
+  input: GetAppResearchCurationDraftFingerprintInput,
+): Promise<Record<string, unknown>> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureResearchDirectories(workspace.workspace_dir);
+  const pageId = normalizeResearchDraftPageId(input.page_id);
+  const draftType = normalizeResearchDraftType(input.draft_type);
+  const draftPath = buildResearchDraftPath(paths, pageId, draftType);
+  assertResearchPathUnderWorkspace(workspace.workspace_dir, draftPath, "draft_path");
+
+  try {
+    const fingerprint = await fingerprintFile(draftPath);
+    return {
+      workspace_dir: workspace.workspace_dir,
+      page_id: pageId,
+      draft_type: draftType,
+      draft_path: draftPath,
+      exists: true,
+      sha256: fingerprint.sha256,
+      size_bytes: fingerprint.size_bytes,
+    };
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return {
+        workspace_dir: workspace.workspace_dir,
+        page_id: pageId,
+        draft_type: draftType,
+        draft_path: draftPath,
+        exists: false,
+      };
+    }
+    throw error;
+  }
 }
 
 export async function recordAppResearchEvidencePageMarkdown(

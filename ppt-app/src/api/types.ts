@@ -376,6 +376,16 @@ export interface GetWorkspacePageFileFingerprintsResult {
   data: PageFileFingerprint;
 }
 
+export interface ResearchCurationDraftFingerprint {
+  workspace_dir: string;
+  page_id: string;
+  draft_type: "web" | "visual";
+  draft_path: string;
+  exists: boolean;
+  sha256?: string;
+  size_bytes?: number;
+}
+
 export interface ResearchPaths {
   root_dir: string;
   raw_dir: string;
@@ -483,6 +493,8 @@ export interface ResearchCurationRejectedMaterial {
 export interface WebResearchCurationDraft {
   version: 1;
   page_id: string;
+  curation_run_id?: string;
+  draft_type?: "web";
   status: ResearchCurationDraftStatus;
   facts: ResearchEvidenceFact[];
   derived_insights: Array<{
@@ -499,6 +511,8 @@ export interface WebResearchCurationDraft {
 export interface VisualResearchCurationDraft {
   version: 1;
   page_id: string;
+  curation_run_id?: string;
+  draft_type?: "visual";
   status: ResearchCurationDraftStatus;
   visual_assets: VisualResearchEvidence[];
   gaps: string[];

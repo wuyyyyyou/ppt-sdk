@@ -26,6 +26,7 @@ import {
   getAppPageProgress,
   getAppPptxExportStatus,
   getAppResearchCurationDraft,
+  getAppResearchCurationDraftFingerprint,
   getAppResearchEvidence,
   getAppResearchPlan,
   getAppResearchStatus,
@@ -1010,6 +1011,27 @@ async function toolAppGetResearchCurationDraft(args) {
   });
 }
 
+async function toolAppGetResearchCurationDraftFingerprint(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const pageId = args.page_id;
+  const draftType = args.draft_type;
+  if (typeof pageId !== "string" || pageId.length === 0) {
+    throw new Error('"page_id" must be a non-empty string');
+  }
+  if (draftType !== "web" && draftType !== "visual") {
+    throw new Error('"draft_type" must be either "web" or "visual"');
+  }
+  return getAppResearchCurationDraftFingerprint({
+    workspace_dir: workspaceDir,
+    page_id: pageId,
+    draft_type: draftType,
+  });
+}
+
 async function toolAppRecordResearchEvidencePageMarkdown(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -1472,6 +1494,7 @@ const TOOL_DISPATCH = {
   app_get_research_evidence: toolAppGetResearchEvidence,
   app_record_research_curation_draft: toolAppRecordResearchCurationDraft,
   app_get_research_curation_draft: toolAppGetResearchCurationDraft,
+  app_get_research_curation_draft_fingerprint: toolAppGetResearchCurationDraftFingerprint,
   app_record_research_evidence_page_markdown: toolAppRecordResearchEvidencePageMarkdown,
   app_record_research_status: toolAppRecordResearchStatus,
   app_record_research_status_page: toolAppRecordResearchStatusPage,

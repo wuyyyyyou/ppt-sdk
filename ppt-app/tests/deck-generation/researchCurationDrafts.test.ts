@@ -139,6 +139,23 @@ describe("Research Curation Drafts", () => {
     assert.ok(invalid.gaps.some((gap) => gap.includes("page_id")));
   });
 
+  it("rejects stale drafts when a current curation run id is required", () => {
+    const valid = validateWebResearchCurationDraft(
+      makeWebDraft({ curation_run_id: "run-current", draft_type: "web" }),
+      page.page_id,
+      { curationRunId: "run-current" },
+    );
+    assert.equal(valid.draft?.curation_run_id, "run-current");
+
+    const stale = validateWebResearchCurationDraft(
+      makeWebDraft({ curation_run_id: "run-old", draft_type: "web" }),
+      page.page_id,
+      { curationRunId: "run-current" },
+    );
+    assert.equal(stale.draft, null);
+    assert.ok(stale.gaps.some((gap) => gap.includes("curation_run_id")));
+  });
+
   it("rejects visual drafts that try to contribute factual evidence", () => {
     const result = validateVisualResearchCurationDraft(
       { ...makeVisualDraft(), facts: [{ id: "bad", claim: "Bad" }] },

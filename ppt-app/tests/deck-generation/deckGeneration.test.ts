@@ -273,6 +273,7 @@ function createHarness(options: {
   imageFetchResults?: Array<Record<string, unknown>>;
   existingProgress?: PageProgress;
   renderFailures?: number;
+  renderErrorMessage?: string;
   deckRenderError?: Error;
   visualReviews?: Array<{ pass: boolean; score: number; revision_request?: string }>;
   contentReviews?: Array<{
@@ -292,6 +293,7 @@ function createHarness(options: {
   authoringDelayMs?: number;
   noChangeAuthoringRuns?: number;
   authoringChangeMode?: "both" | "slide" | "data" | "none";
+  researchDraftNoChangeRuns?: number;
 } = {}) {
   let pagePlan = clone(options.pagePlan ?? makePagePlan());
   let progress = clone(options.existingProgress ?? makeProgress(pagePlan));
@@ -304,6 +306,7 @@ function createHarness(options: {
   const researchDrafts = new Map<string, Record<string, unknown>>();
   const intentReviewQueue = [...(options.intentReviews ?? [])];
   let renderFailures = options.renderFailures ?? 0;
+  const renderErrorMessage = options.renderErrorMessage ?? "render broke";
   const authoringPrompts: string[] = [];
   const authoringLogContexts: unknown[] = [];
   const visualReviewPrompts: string[] = [];
@@ -332,8 +335,17 @@ function createHarness(options: {
   let recordResearchStatusCalls = 0;
   let recordResearchStatusPageCalls = 0;
   let pageAuthoringRuns = 0;
+  let researchDraftNoChangeRuns = options.researchDraftNoChangeRuns ?? 0;
   let slideFingerprintVersion = 0;
   let dataFingerprintVersion = 0;
+
+  function serializeResearchDraft(draft: Record<string, unknown>) {
+    const text = JSON.stringify(draft);
+    return {
+      sha256: `draft:${text}`,
+      size_bytes: Buffer.byteLength(text, "utf8"),
+    };
+  }
 
   const backend: PptBackend = {
     listWorkspaces: async () => ({ workspace_root: "", has_workspaces: false, latest_workspace: null, workspaces: [] }),
@@ -423,6 +435,29 @@ function createHarness(options: {
         size_bytes: 50 + dataFingerprintVersion,
       },
     }),
+    getResearchCurationDraftFingerprint: async (input) => {
+      const key = `${input.page_id}:${input.draft_type}`;
+      const draft = researchDrafts.get(key);
+      if (!draft) {
+        return {
+          workspace_dir: input.workspace_dir,
+          page_id: input.page_id,
+          draft_type: input.draft_type,
+          draft_path: `${workspace.workspace_dir}/research/evidence/drafts/${input.page_id}-${input.draft_type}.json`,
+          exists: false,
+        };
+      }
+      const fingerprint = serializeResearchDraft(draft);
+      return {
+        workspace_dir: input.workspace_dir,
+        page_id: input.page_id,
+        draft_type: input.draft_type,
+        draft_path: `${workspace.workspace_dir}/research/evidence/drafts/${input.page_id}-${input.draft_type}.json`,
+        exists: true,
+        sha256: fingerprint.sha256,
+        size_bytes: fingerprint.size_bytes,
+      };
+    },
     prepareResearchWorkspace: async () => {
       prepareResearchWorkspaceCalls += 1;
       return {
@@ -600,7 +635,7 @@ function createHarness(options: {
       renderCalls += 1;
       if (renderFailures > 0) {
         renderFailures -= 1;
-        throw new Error("render broke");
+        throw new Error(renderErrorMessage);
       }
       return createPreview(input.page_index);
     },
@@ -679,12 +714,20 @@ function createHarness(options: {
       }
       activeAuthoringRuns -= 1;
       if (options.authoringError) throw options.authoringError;
-      const pageMatch = prompt.match(/Current page id: (page-\d+)/);
+      const pageMatch = prompt.match(/(?:Current page id|Page id): (page-\d+)/);
       const promptPageId = pageMatch?.[1] ?? pagePlan.pages[0]?.page_id ?? "page-01";
-      if (prompt.includes("Web Research Curation Draft Agent")) {
+      const curationRunId = prompt.match(/Curation run id: ([^\n]+)/)?.[1] ?? "";
+      const isWebResearchCurationPrompt = prompt.includes("Web Research Curation Draft Agent");
+      const isVisualResearchCurationPrompt = prompt.includes("Visual Research Curation Draft Agent");
+      if (isWebResearchCurationPrompt) {
+        if (researchDraftNoChangeRuns > 0) {
+          researchDraftNoChangeRuns -= 1;
+        } else {
         researchDrafts.set(`${promptPageId}:web`, {
           version: 1,
           page_id: promptPageId,
+          curation_run_id: curationRunId,
+          draft_type: "web",
           status: "curated",
           facts: [
             {
@@ -701,11 +744,17 @@ function createHarness(options: {
           source_summary: "Useful web source.",
           updated_at: "2026-05-23T00:00:00.000Z",
         });
+        }
       }
-      if (prompt.includes("Visual Research Curation Draft Agent")) {
+      if (isVisualResearchCurationPrompt) {
+        if (researchDraftNoChangeRuns > 0) {
+          researchDraftNoChangeRuns -= 1;
+        } else {
         researchDrafts.set(`${promptPageId}:visual`, {
           version: 1,
           page_id: promptPageId,
+          curation_run_id: curationRunId,
+          draft_type: "visual",
           status: "curated",
           visual_assets: [
             {
@@ -720,6 +769,7 @@ function createHarness(options: {
           visual_summary: "Useful image.",
           updated_at: "2026-05-23T00:00:00.000Z",
         });
+        }
       }
       const isPageAuthoringPrompt = prompt.includes("You are a local file-editing Agent authoring one TSX-first PPT slide.");
       if (isPageAuthoringPrompt) {
@@ -970,14 +1020,14 @@ describe("Deck Generation Flow Module", () => {
 
     assert.equal(completion.status, "completed");
     const historyPrompts = harness.authoringPrompts.filter((prompt) =>
-      prompt.includes("Consecutive render failure history")
+      prompt.includes("Repeated render failure summary")
     );
     const promptWithHistory = historyPrompts.at(-1);
     assert.ok(promptWithHistory);
-    assert.match(promptWithHistory, /Each item is one failed render or pre-render check attempt/);
-    assert.match(promptWithHistory, /"attempt": 1/);
-    assert.match(promptWithHistory, /"attempt": 2/);
-    assert.match(promptWithHistory, /"phase": "render"/);
+    assert.match(promptWithHistory, /Each item groups identical diagnostics/);
+    assert.match(promptWithHistory, /"attempts": \[\s*1,\s*2\s*\]/);
+    assert.match(promptWithHistory, /"repeated_count": 2/);
+    assert.match(promptWithHistory, /"phases": \[\s*"render"\s*\]/);
     assert.match(promptWithHistory, /render broke/);
   });
 
@@ -1742,11 +1792,13 @@ describe("Deck Generation Flow Module", () => {
       existingProgress,
       noChangeAuthoringRuns: 1,
     });
+    const aiLogger = createAiInteractionLogger(harness.backend);
 
     const completion = await runDeckRefinement({
       backend: harness.backend,
       aiClient: harness.aiClient,
       agentClient: harness.agentClient,
+      aiLogger,
       workspace,
       confirmedOutline: outline,
       locale: "zh",
@@ -1760,22 +1812,89 @@ describe("Deck Generation Flow Module", () => {
 
     assert.equal(completion.status, "completed");
     assert.equal(harness.authoringPrompts.length, 2);
+    assert.equal(
+      (harness.authoringLogContexts[0] as { operation_id?: string })?.operation_id,
+      (harness.authoringLogContexts[1] as { operation_id?: string })?.operation_id,
+    );
     assert.match(
       harness.authoringPrompts[1] ?? "",
       /Previous authoring attempt did not modify the target page files/,
     );
     assert.match(harness.authoringPrompts[1] ?? "", /No-change retry count: 1/);
-    assert.equal(harness.progress.pages[0]?.agent_failures, 1);
+    assert.equal(harness.progress.pages[0]?.agent_failures, 0);
     assert.equal(harness.progress.pages[0]?.status, "accepted");
     assert.ok(harness.recordPageProgressInputs.some((input) =>
       input.page_id === "page-01" &&
       input.patch.status === "authoring" &&
-      input.patch.agent_failures === 1
+      input.patch.agent_failures === 0
     ));
     assert.ok(harness.logs.some((entry) =>
       JSON.stringify(entry).includes("target_file_fingerprints") &&
       JSON.stringify(entry).includes("\"target_files_changed\":false")
     ));
+  });
+
+  it("repairs pre-render TypeScript failures with fresh authoring prompts", async () => {
+    const pagePlan = makePagePlanWithCount(1);
+    const harness = createHarness({
+      pagePlan,
+      renderFailures: 1,
+      renderErrorMessage: "Pre-render TypeScript check failed: Cannot find name Broken",
+    });
+    const aiLogger = createAiInteractionLogger(harness.backend);
+
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      aiLogger,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.authoringPrompts.length, 2);
+    assert.equal(
+      (harness.authoringLogContexts[0] as { operation_id?: string })?.operation_id,
+      (harness.authoringLogContexts[1] as { operation_id?: string })?.operation_id,
+    );
+    assert.match(harness.authoringPrompts[1] ?? "", /Authoring mode: render-fix/);
+    assert.match(harness.authoringPrompts[1] ?? "", /Pre-render TypeScript check failed/);
+  });
+
+  it("continues with a fresh session after render repair exhausts the local budget", async () => {
+    const pagePlan = makePagePlanWithCount(1);
+    const harness = createHarness({
+      pagePlan,
+      renderFailures: 4,
+      renderErrorMessage: "Pre-render TypeScript check failed: Cannot find name Broken",
+    });
+    const aiLogger = createAiInteractionLogger(harness.backend);
+
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      aiLogger,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.authoringPrompts.length, 5);
+    assert.notEqual(
+      (harness.authoringLogContexts[3] as { operation_id?: string })?.operation_id,
+      (harness.authoringLogContexts[4] as { operation_id?: string })?.operation_id,
+    );
+    assert.equal(harness.progress.pages[0]?.render_attempts, 4);
   });
 
   it("accepts page authoring when only the TSX target file changes", async () => {
@@ -1836,19 +1955,21 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.progress.pages[0]?.agent_failures, 0);
   });
 
-  it("fails page refinement when no-change authoring exhausts the Agent budget", async () => {
+  it("continues page refinement with a fresh session after no-change repair exhausts the local budget", async () => {
     const pagePlan = makePagePlan();
     const existingProgress = makeProgress(pagePlan, "accepted");
     const harness = createHarness({
       pagePlan,
       existingProgress,
-      noChangeAuthoringRuns: 5,
+      noChangeAuthoringRuns: 4,
     });
+    const aiLogger = createAiInteractionLogger(harness.backend);
 
     const completion = await runDeckRefinement({
       backend: harness.backend,
       aiClient: harness.aiClient,
       agentClient: harness.agentClient,
+      aiLogger,
       workspace,
       confirmedOutline: outline,
       locale: "zh",
@@ -1860,20 +1981,26 @@ describe("Deck Generation Flow Module", () => {
       isCancelled: () => false,
     });
 
-    assert.equal(completion.status, "failed");
-    assert.equal(completion.error.type, "page_failed");
-    assert.equal(completion.error.page_status, "agent_failed");
+    assert.equal(completion.status, "completed");
     assert.equal(harness.authoringPrompts.length, 5);
-    assert.equal(harness.progress.pages[0]?.agent_failures, 5);
-    assert.equal(harness.progress.pages[0]?.status, "agent_failed");
-    assert.match(
-      harness.progress.pages[0]?.last_error ?? "",
-      /没有实际修改当前页 TSX 或 data 文件/,
+    assert.equal(
+      new Set(
+        harness.authoringLogContexts
+          .slice(0, 4)
+          .map((context) => (context as { operation_id?: string } | null)?.operation_id),
+      ).size,
+      1,
     );
+    assert.notEqual(
+      (harness.authoringLogContexts[3] as { operation_id?: string })?.operation_id,
+      (harness.authoringLogContexts[4] as { operation_id?: string })?.operation_id,
+    );
+    assert.equal(harness.progress.pages[0]?.agent_failures, 1);
+    assert.equal(harness.progress.pages[0]?.status, "accepted");
     assert.ok(harness.recordPageProgressInputs.some((input) =>
       input.page_id === "page-01" &&
-      input.patch.status === "agent_failed" &&
-      input.patch.agent_failures === 5
+      input.patch.status === "authoring" &&
+      input.patch.agent_failures === 1
     ));
   });
 
@@ -2589,11 +2716,13 @@ describe("Deck Generation Flow Module", () => {
     assert.ok(harness.progressEvents.some((progress) => progress.step === "research-curation"));
     assert.ok(harness.authoringPrompts.some((prompt) =>
       prompt.includes("Web Research Curation Draft Agent") &&
-      prompt.includes("Do not include visual_assets in this draft")
+      prompt.includes("Do not include visual_assets in this draft") &&
+      prompt.includes("Curation run id:")
     ));
     assert.ok(harness.authoringPrompts.some((prompt) =>
       prompt.includes("Visual Research Curation Draft Agent") &&
-      prompt.includes("Do not emit facts or derived_insights in this draft")
+      prompt.includes("Do not emit facts or derived_insights in this draft") &&
+      prompt.includes("Curation run id:")
     ));
     const evidencePage = harness.researchEvidence.pages.find((page) => page.page_id === "page-01");
     assert.equal(evidencePage?.status, "curated");
@@ -2639,6 +2768,130 @@ describe("Deck Generation Flow Module", () => {
     assert.ok(contentReviewPrompt);
     assert.equal(contentReviewPrompt.includes("/research/evidence/drafts/"), false);
     assert.match(contentReviewPrompt, /Raw Research Material/);
+  });
+
+  it("retries web research curation no-write failures with full fresh-session prompts and falls back to a gap", async () => {
+    const pagePlan = makePagePlan();
+    const researchPlan = makeResearchPlan(pagePlan);
+    researchPlan.pages[0] = {
+      ...researchPlan.pages[0],
+      web_research_needed: true,
+      image_research_needed: false,
+      query_intents: ["market evidence"],
+      image_query_intents: [],
+      evidence_needs: ["market evidence"],
+      visual_needs: [],
+    };
+    const harness = createHarness({
+      pagePlan,
+      researchPlan,
+      researchDraftNoChangeRuns: 4,
+    });
+    const aiLogger = createAiInteractionLogger(harness.backend);
+
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      aiLogger,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    const webPromptIndexes = harness.authoringPrompts
+      .map((prompt, index) => ({ prompt, index }))
+      .filter(({ prompt }) => prompt.includes("Web Research Curation Draft Agent"));
+    assert.equal(webPromptIndexes.length, 4);
+    assert.equal(webPromptIndexes.filter(({ prompt }) =>
+      prompt.includes("Previous deterministic gate failure")
+    ).length, 3);
+    assert.ok(webPromptIndexes.every(({ prompt }) =>
+      prompt.includes("Raw web index paths:") &&
+      prompt.includes("Web draft JSON path to write:")
+    ));
+    const webCurationRunIds = webPromptIndexes.map(({ prompt }) =>
+      prompt.match(/Curation run id: ([^\n]+)/)?.[1] ?? ""
+    );
+    assert.equal(new Set(webCurationRunIds).size, 1);
+    assert.ok(webCurationRunIds[0]);
+    const webOperationIds = webPromptIndexes.map(({ index }) =>
+      (harness.authoringLogContexts[index] as { operation_id?: string } | null)?.operation_id
+    );
+    assert.equal(new Set(webOperationIds).size, 1);
+    assert.ok(webOperationIds[0]);
+    assert.equal(harness.webSearchCalls, 1);
+    assert.equal(harness.webFetchCalls, 1);
+    const evidencePage = harness.researchEvidence.pages.find((page) => page.page_id === "page-01");
+    assert.equal(evidencePage?.status, "gap");
+    assert.ok(evidencePage?.gaps.some((gap) => gap.includes("Web Research Curation draft was not written")));
+    assert.equal(harness.researchStatus.pages.find((page) => page.page_id === "page-01")?.status, "gap");
+  });
+
+  it("retries visual research curation no-write failures with full fresh-session prompts and falls back to a gap", async () => {
+    const pagePlan = makePagePlan();
+    const researchPlan = makeResearchPlan(pagePlan);
+    researchPlan.pages[0] = {
+      ...researchPlan.pages[0],
+      web_research_needed: false,
+      image_research_needed: true,
+      query_intents: [],
+      image_query_intents: ["product evidence"],
+      evidence_needs: [],
+      visual_needs: ["product evidence"],
+    };
+    const harness = createHarness({
+      pagePlan,
+      researchPlan,
+      researchDraftNoChangeRuns: 4,
+    });
+    const aiLogger = createAiInteractionLogger(harness.backend);
+
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      aiLogger,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    const visualPromptIndexes = harness.authoringPrompts
+      .map((prompt, index) => ({ prompt, index }))
+      .filter(({ prompt }) => prompt.includes("Visual Research Curation Draft Agent"));
+    assert.equal(visualPromptIndexes.length, 4);
+    assert.equal(visualPromptIndexes.filter(({ prompt }) =>
+      prompt.includes("Previous deterministic gate failure")
+    ).length, 3);
+    assert.ok(visualPromptIndexes.every(({ prompt }) =>
+      prompt.includes("Raw image index paths:") &&
+      prompt.includes("Visual draft JSON path to write:")
+    ));
+    const visualCurationRunIds = visualPromptIndexes.map(({ prompt }) =>
+      prompt.match(/Curation run id: ([^\n]+)/)?.[1] ?? ""
+    );
+    assert.equal(new Set(visualCurationRunIds).size, 1);
+    assert.ok(visualCurationRunIds[0]);
+    const visualOperationIds = visualPromptIndexes.map(({ index }) =>
+      (harness.authoringLogContexts[index] as { operation_id?: string } | null)?.operation_id
+    );
+    assert.equal(new Set(visualOperationIds).size, 1);
+    assert.ok(visualOperationIds[0]);
+    assert.equal(harness.imageSearchCalls, 1);
+    assert.equal(harness.imageFetchCalls, 1);
+    const evidencePage = harness.researchEvidence.pages.find((page) => page.page_id === "page-01");
+    assert.equal(evidencePage?.status, "gap");
+    assert.ok(evidencePage?.gaps.some((gap) => gap.includes("Visual Research Curation draft was not written")));
+    assert.equal(harness.researchStatus.pages.find((page) => page.page_id === "page-01")?.status, "gap");
   });
 
   it("does not promote cancelled research curation into evidence or ledger completion", async () => {

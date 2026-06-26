@@ -210,6 +210,22 @@ export interface GetAppResearchCurationDraftInput {
   draft_type: "web" | "visual";
 }
 
+export interface GetAppResearchCurationDraftFingerprintInput {
+  workspace_dir: string;
+  page_id: string;
+  draft_type: "web" | "visual";
+}
+
+export interface AppResearchCurationDraftFingerprint {
+  workspace_dir: string;
+  page_id: string;
+  draft_type: "web" | "visual";
+  draft_path: string;
+  exists: boolean;
+  sha256?: string;
+  size_bytes?: number;
+}
+
 export interface RecordAppResearchEvidencePageMarkdownInput {
   workspace_dir: string;
   page_id: string;

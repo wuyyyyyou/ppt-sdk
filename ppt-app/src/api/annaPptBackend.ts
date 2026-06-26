@@ -19,6 +19,7 @@ import type {
   PrepareExportModelResult,
   ProjectResult,
   PptxExportJob,
+  ResearchCurationDraftFingerprint,
   ResearchEvidenceIndex,
   ResearchPlan,
   ResearchStatus,
@@ -263,6 +264,12 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invoke(
         PPT_ENGINE_TOOL_ID,
         "app_get_research_curation_draft",
+        input
+      ),
+    getResearchCurationDraftFingerprint: (input) =>
+      invoke<ResearchCurationDraftFingerprint>(
+        PPT_ENGINE_TOOL_ID,
+        "app_get_research_curation_draft_fingerprint",
         input
       ),
     recordResearchEvidencePageMarkdown: (input) =>

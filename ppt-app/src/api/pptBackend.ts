@@ -25,6 +25,7 @@ import type {
   ProjectResult,
   PptxExportJob,
   ResearchEvidenceIndex,
+  ResearchCurationDraftFingerprint,
   VisualResearchCurationDraft,
   ResearchPlan,
   ResearchStatus,
@@ -93,6 +94,11 @@ export interface PptBackend {
   getWorkspacePageFileFingerprints(
     input: GetWorkspacePageFileFingerprintsInput
   ): Promise<GetWorkspacePageFileFingerprintsResult>;
+  getResearchCurationDraftFingerprint(input: {
+    workspace_dir: string;
+    page_id: string;
+    draft_type: "web" | "visual";
+  }): Promise<ResearchCurationDraftFingerprint>;
   prepareResearchWorkspace(input: { workspace_dir: string }): Promise<PrepareResearchWorkspaceResult>;
   recordResearchPlan(input: { workspace_dir: string; research_plan: ResearchPlan }): Promise<ResearchPlan>;
   getResearchPlan(input: { workspace_dir: string }): Promise<ResearchPlan>;

@@ -31,6 +31,7 @@ test("workspace research tools prepare directories and persist metadata", async 
     getAppResearchEvidence,
     recordAppResearchCurationDraft,
     getAppResearchCurationDraft,
+    getAppResearchCurationDraftFingerprint,
     recordAppResearchEvidencePageMarkdown,
     recordAppResearchStatus,
     recordAppResearchStatusPage,
@@ -77,6 +78,14 @@ test("workspace research tools prepare directories and persist metadata", async 
     assert.equal(evidence.status, "partial");
     assert.deepEqual((await getAppResearchEvidence({ workspace_dir: workspace.workspace_dir })).pages, evidence.pages);
 
+    const missingDraftFingerprint = await getAppResearchCurationDraftFingerprint({
+      workspace_dir: workspace.workspace_dir,
+      page_id: "page-01",
+      draft_type: "web",
+    });
+    assert.equal(missingDraftFingerprint.exists, false);
+    assert.equal(path.basename(String(missingDraftFingerprint.draft_path)), "page-01-web.json");
+
     const draft = await recordAppResearchCurationDraft({
       workspace_dir: workspace.workspace_dir,
       page_id: "page-01",
@@ -94,6 +103,17 @@ test("workspace research tools prepare directories and persist metadata", async 
     assert.equal(draft.page_id, "page-01");
     assert.equal(draft.draft_type, "web");
     assert.equal(path.basename(String(draft.draft_path)), "page-01-web.json");
+    const draftFingerprint = await getAppResearchCurationDraftFingerprint({
+      workspace_dir: workspace.workspace_dir,
+      page_id: "page-01",
+      draft_type: "web",
+    });
+    assert.equal(draftFingerprint.exists, true);
+    assert.equal(draftFingerprint.page_id, "page-01");
+    assert.equal(draftFingerprint.draft_type, "web");
+    assert.equal(path.basename(String(draftFingerprint.draft_path)), "page-01-web.json");
+    assert.equal(typeof draftFingerprint.sha256, "string");
+    assert.ok(Number(draftFingerprint.size_bytes) > 0);
     assert.deepEqual(
       (await getAppResearchCurationDraft({
         workspace_dir: workspace.workspace_dir,

@@ -199,6 +199,28 @@ function fallbackRunSummary(
   };
 }
 
+function normalizeCollectedAuthoringRun(collected: {
+  text: string;
+  sessionRetries: number;
+  sessionCacheMissRetries: number;
+}): AgentRunSummary {
+  try {
+    return {
+      ...normalizeRunSummary(parseJsonObject(collected.text, "authoring summary")),
+      raw_text: collected.text,
+      parsed_json: true,
+      session_retries: collected.sessionRetries,
+      session_cache_miss_retries: collected.sessionCacheMissRetries,
+    };
+  } catch {
+    return fallbackRunSummary(
+      collected.text,
+      collected.sessionRetries,
+      collected.sessionCacheMissRetries,
+    );
+  }
+}
+
 function normalizePageVisualReview(value: unknown): AgentPageVisualReviewResult {
   const record = value && typeof value === "object" && !Array.isArray(value)
     ? (value as Partial<AgentPageVisualReviewResult>)
@@ -609,6 +631,162 @@ export async function createAgentClient(
     return expiresAtMs - Date.now() <= AGENT_SESSION_RENEW_MARGIN_MS;
   }
 
+  async function runPromptWithSession(
+    sessionMeta: Awaited<ReturnType<typeof createSession>>,
+    prompt: string,
+    runOptions: AgentRunOptions | undefined,
+    sessionState: {
+      sessionRetries: number;
+      streamIdleRetries: number;
+      sessionCacheMissRetryState: AgentSessionCacheMissRetryState;
+    },
+  ): Promise<CollectedAgentRun> {
+    const cacheMissRetriesAtRunStart = sessionState.sessionCacheMissRetryState.retries;
+    const interactionHandle = runOptions?.logContext?.logger
+      ? await runOptions.logContext.logger.startInteraction(runOptions.logContext, {
+          prompt,
+          extra: {
+            session_retries: sessionState.sessionRetries,
+            session_cache_miss_retries: sessionState.sessionCacheMissRetryState.retries,
+            stream_idle_retries: sessionState.streamIdleRetries,
+          },
+        })
+      : null;
+    try {
+      const collected = await withTimeout(
+        collectRunText(
+          sessionMeta.session,
+          prompt,
+          runOptions,
+          clientOptions,
+          toolAccessPolicy,
+        ),
+        AGENT_RUN_TIMEOUT_MS,
+      );
+      if (interactionHandle) {
+        await runOptions?.logContext?.logger?.finishInteraction(interactionHandle, {
+          status: "succeeded",
+          output: collected.text,
+          usage: readCompletionUsage(collected.events),
+          session_history: await readSessionHistory(sessionMeta.session),
+          extra: {
+            events: collected.events,
+            session_retries: sessionState.sessionRetries,
+            session_cache_miss_retries: sessionState.sessionCacheMissRetryState.retries,
+            stream_idle_retries: sessionState.streamIdleRetries,
+          },
+        });
+      }
+      if (sessionState.sessionCacheMissRetryState.retries > cacheMissRetriesAtRunStart) {
+        runOptions?.onStreamEvent?.({
+          type: "activity",
+          message: `Agent session recovered after ${sessionState.sessionCacheMissRetryState.retries - cacheMissRetriesAtRunStart} retries`,
+        });
+      }
+      return collected;
+    } catch (error) {
+      if (interactionHandle) {
+        await runOptions?.logContext?.logger?.finishInteraction(interactionHandle, {
+          status: isStreamCancelledError(error) ? "cancelled" : "failed",
+          error,
+          session_history: await readSessionHistory(sessionMeta.session),
+          extra: {
+            session_retries: sessionState.sessionRetries,
+            session_cache_miss_retries: sessionState.sessionCacheMissRetryState.retries,
+            stream_idle_retries: sessionState.streamIdleRetries,
+          },
+        });
+      }
+      if (isStreamCancelledError(error)) {
+        throw new AgentRunCancelledError();
+      }
+      if (isStreamIdleTimeoutError(error)) {
+        if (sessionState.streamIdleRetries < MAX_AGENT_STREAM_IDLE_RETRIES) {
+          sessionState.streamIdleRetries += 1;
+          runOptions?.onStreamEvent?.({
+            type: "activity",
+            message: formatIdleRetryMessage(),
+          });
+          return runPromptWithSession(sessionMeta, prompt, runOptions, sessionState);
+        }
+        throw toAgentInfrastructureError(error, "Agent stream idle timeout.", {
+          rawMessage: error.message,
+        });
+      }
+      if (error instanceof AgentRunStreamError && error.sessionCacheMiss) {
+        const decision = nextAgentSessionCacheMissRetry({
+          state: sessionState.sessionCacheMissRetryState,
+          config: clientOptions.cacheMissRetryConfig,
+          random: clientOptions.random,
+        });
+        if (decision.retry) {
+          if (shouldReportAgentSessionCacheMissRetry(decision.retryNumber)) {
+            runOptions?.onStreamEvent?.({
+              type: "activity",
+              message: formatCacheMissRetryMessage(
+                decision.retryNumber,
+                decision.delayMs,
+              ),
+            });
+          }
+          await wait(decision.delayMs);
+          await deleteSession(sessionMeta.session);
+          const renewedSession = await createSession();
+          sessionMeta.session = renewedSession.session;
+          sessionMeta.createdAtMs = renewedSession.createdAtMs;
+          sessionMeta.expiresInSeconds = renewedSession.expiresInSeconds;
+          return runPromptWithSession(sessionMeta, prompt, runOptions, sessionState);
+        }
+
+        runOptions?.onStreamEvent?.({
+          type: "activity",
+          message: `Agent session cache miss retries exhausted after ${sessionState.sessionCacheMissRetryState.retries} retries`,
+        });
+        throw toAgentInfrastructureError(error, "Agent session failed.", {
+          sessionCacheMiss: true,
+          sessionCacheMissRetries: sessionState.sessionCacheMissRetryState.retries,
+          rawMessage: error.message,
+        });
+      }
+      if (
+        error instanceof AgentRunStreamError &&
+        error.code === NO_TOOLS_AVAILABLE_CODE
+      ) {
+        throw toAgentInfrastructureError(error, "Agent session has no executable tools.", {
+          noToolsAvailable: true,
+          rawMessage: error.message,
+        });
+      }
+      if (
+        error instanceof AgentRunStreamError &&
+        error.expired &&
+        sessionState.sessionRetries < MAX_AGENT_SESSION_RETRIES
+      ) {
+        sessionState.sessionRetries += 1;
+        runOptions?.onStreamEvent?.({
+          type: "activity",
+          message: "Agent session expired; creating a new session",
+        });
+        await deleteSession(sessionMeta.session);
+        const renewedSession = await createSession();
+        sessionMeta.session = renewedSession.session;
+        sessionMeta.createdAtMs = renewedSession.createdAtMs;
+        sessionMeta.expiresInSeconds = renewedSession.expiresInSeconds;
+        return runPromptWithSession(sessionMeta, prompt, runOptions, sessionState);
+      }
+      if (
+        error instanceof AgentRunStreamError &&
+        (error.expired || error.code === "http" || isInfrastructureMessage(error.message))
+      ) {
+        throw toAgentInfrastructureError(error, "Agent session failed.");
+      }
+      if (error instanceof AgentInfrastructureError) {
+        throw error;
+      }
+      throw error;
+    }
+  }
+
   async function collectWithSessionRetry(
     prompt: string,
     runOptions: AgentRunOptions | undefined
@@ -620,23 +798,13 @@ export async function createAgentClient(
   > {
     let sessionRetries = 0;
     let streamIdleRetries = 0;
-    const cacheMissRetryState: AgentSessionCacheMissRetryState = {
+    const sessionCacheMissRetryState: AgentSessionCacheMissRetryState = {
       retries: 0,
       totalWaitMs: 0,
     };
 
     for (;;) {
       let sessionMeta: Awaited<ReturnType<typeof createSession>> | null = null;
-      const interactionHandle = runOptions?.logContext?.logger
-        ? await runOptions.logContext.logger.startInteraction(runOptions.logContext, {
-            prompt,
-            extra: {
-              session_retries: sessionRetries,
-              session_cache_miss_retries: cacheMissRetryState.retries,
-              stream_idle_retries: streamIdleRetries,
-            },
-          })
-        : null;
       try {
         sessionMeta = await createSession();
         if (shouldRenewBeforeRun(sessionMeta)) {
@@ -647,54 +815,25 @@ export async function createAgentClient(
           await deleteSession(sessionMeta.session);
           sessionMeta = await createSession();
         }
-        const collected = await withTimeout(
-          collectRunText(
-            sessionMeta.session,
-            prompt,
-            runOptions,
-            clientOptions,
-            toolAccessPolicy,
-          ),
-          AGENT_RUN_TIMEOUT_MS
+        const sessionState = {
+          sessionRetries,
+          streamIdleRetries,
+          sessionCacheMissRetryState,
+        };
+        const collected = await runPromptWithSession(
+          sessionMeta,
+          prompt,
+          runOptions,
+          sessionState,
         );
-        if (interactionHandle) {
-          await runOptions?.logContext?.logger?.finishInteraction(interactionHandle, {
-            status: "succeeded",
-            output: collected.text,
-            usage: readCompletionUsage(collected.events),
-            session_history: await readSessionHistory(sessionMeta.session),
-            extra: {
-              events: collected.events,
-              session_retries: sessionRetries,
-              session_cache_miss_retries: cacheMissRetryState.retries,
-              stream_idle_retries: streamIdleRetries,
-            },
-          });
-        }
-        if (cacheMissRetryState.retries > 0) {
-          runOptions?.onStreamEvent?.({
-            type: "activity",
-            message: `Agent session recovered after ${cacheMissRetryState.retries} retries`,
-          });
-        }
+        sessionRetries = sessionState.sessionRetries;
+        streamIdleRetries = sessionState.streamIdleRetries;
         return {
           ...collected,
           sessionRetries,
-          sessionCacheMissRetries: cacheMissRetryState.retries,
+          sessionCacheMissRetries: sessionCacheMissRetryState.retries,
         };
       } catch (error) {
-        if (interactionHandle) {
-          await runOptions?.logContext?.logger?.finishInteraction(interactionHandle, {
-            status: isStreamCancelledError(error) ? "cancelled" : "failed",
-            error,
-            session_history: await readSessionHistory(sessionMeta?.session ?? null),
-            extra: {
-              session_retries: sessionRetries,
-              session_cache_miss_retries: cacheMissRetryState.retries,
-              stream_idle_retries: streamIdleRetries,
-            },
-          });
-        }
         if (isStreamCancelledError(error)) {
           throw new AgentRunCancelledError();
         }
@@ -713,7 +852,7 @@ export async function createAgentClient(
         }
         if (error instanceof AgentRunStreamError && error.sessionCacheMiss) {
           const decision = nextAgentSessionCacheMissRetry({
-            state: cacheMissRetryState,
+            state: sessionCacheMissRetryState,
             config: clientOptions.cacheMissRetryConfig,
             random: clientOptions.random,
           });
@@ -733,11 +872,11 @@ export async function createAgentClient(
 
           runOptions?.onStreamEvent?.({
             type: "activity",
-            message: `Agent session cache miss retries exhausted after ${cacheMissRetryState.retries} retries`,
+            message: `Agent session cache miss retries exhausted after ${sessionCacheMissRetryState.retries} retries`,
           });
           throw toAgentInfrastructureError(error, "Agent session failed.", {
             sessionCacheMiss: true,
-            sessionCacheMissRetries: cacheMissRetryState.retries,
+            sessionCacheMissRetries: sessionCacheMissRetryState.retries,
             rawMessage: error.message,
           });
         }
@@ -786,21 +925,11 @@ export async function createAgentClient(
 
     async runAuthoringPrompt(prompt, options) {
       const collected = await collectWithSessionRetry(prompt, options);
-      try {
-        return {
-          ...normalizeRunSummary(parseJsonObject(collected.text, "authoring summary")),
-          raw_text: collected.text,
-          parsed_json: true,
-          session_retries: collected.sessionRetries,
-          session_cache_miss_retries: collected.sessionCacheMissRetries,
-        };
-      } catch {
-        return fallbackRunSummary(
-          collected.text,
-          collected.sessionRetries,
-          collected.sessionCacheMissRetries,
-        );
-      }
+      return normalizeCollectedAuthoringRun({
+        text: collected.text,
+        sessionRetries: collected.sessionRetries,
+        sessionCacheMissRetries: collected.sessionCacheMissRetries,
+      });
     },
 
     async runPageVisualReviewPrompt(prompt, options) {

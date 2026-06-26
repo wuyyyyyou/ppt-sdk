@@ -16,6 +16,11 @@ export interface DraftValidationResult<T> {
   gaps: string[];
 }
 
+export interface DraftValidationOptions {
+  curationRunId?: string;
+  draftType?: "web" | "visual";
+}
+
 export interface MergeResearchCurationDraftsInput {
   currentEvidence: ResearchEvidenceIndex;
   page: PagePlanItem;
@@ -127,7 +132,12 @@ function normalizeVisualAssets(value: unknown): VisualResearchEvidence[] {
     );
 }
 
-function validateDraftBase(value: unknown, pageId: string, label: string): {
+function validateDraftBase(
+  value: unknown,
+  pageId: string,
+  label: string,
+  options: DraftValidationOptions = {},
+): {
   record: RecordValue | null;
   gaps: string[];
 } {
@@ -146,6 +156,12 @@ function validateDraftBase(value: unknown, pageId: string, label: string): {
   if (!VALID_DRAFT_STATUSES.has(status)) {
     gaps.push(`${label} draft status is invalid.`);
   }
+  if (options.draftType && readString(value, "draft_type") !== options.draftType) {
+    gaps.push(`${label} draft_type does not match current curation path.`);
+  }
+  if (options.curationRunId && readString(value, "curation_run_id") !== options.curationRunId) {
+    gaps.push(`${label} draft curation_run_id does not match current curation run.`);
+  }
 
   return { record: value, gaps };
 }
@@ -153,13 +169,25 @@ function validateDraftBase(value: unknown, pageId: string, label: string): {
 export function validateWebResearchCurationDraft(
   value: unknown,
   pageId: string,
+  options: DraftValidationOptions = {},
 ): DraftValidationResult<WebResearchCurationDraft> {
-  const base = validateDraftBase(value, pageId, "Web Research Curation");
+  const base = validateDraftBase(
+    value,
+    pageId,
+    "Web Research Curation",
+    options.curationRunId || options.draftType
+      ? { ...options, draftType: options.draftType ?? "web" }
+      : options,
+  );
   if (!base.record) return { draft: null, gaps: base.gaps };
 
   const draft: WebResearchCurationDraft = {
     version: 1,
     page_id: pageId,
+    ...(readOptionalString(base.record, "curation_run_id")
+      ? { curation_run_id: readOptionalString(base.record, "curation_run_id") }
+      : {}),
+    draft_type: "web",
     status: readString(base.record, "status") as WebResearchCurationDraft["status"],
     facts: normalizeFacts(base.record.facts),
     derived_insights: normalizeDerivedInsights(base.record.derived_insights),
@@ -182,8 +210,16 @@ export function validateWebResearchCurationDraft(
 export function validateVisualResearchCurationDraft(
   value: unknown,
   pageId: string,
+  options: DraftValidationOptions = {},
 ): DraftValidationResult<VisualResearchCurationDraft> {
-  const base = validateDraftBase(value, pageId, "Visual Research Curation");
+  const base = validateDraftBase(
+    value,
+    pageId,
+    "Visual Research Curation",
+    options.curationRunId || options.draftType
+      ? { ...options, draftType: options.draftType ?? "visual" }
+      : options,
+  );
   if (!base.record) return { draft: null, gaps: base.gaps };
 
   const gaps = [...base.gaps];
@@ -194,6 +230,10 @@ export function validateVisualResearchCurationDraft(
   const draft: VisualResearchCurationDraft = {
     version: 1,
     page_id: pageId,
+    ...(readOptionalString(base.record, "curation_run_id")
+      ? { curation_run_id: readOptionalString(base.record, "curation_run_id") }
+      : {}),
+    draft_type: "visual",
     status: readString(base.record, "status") as VisualResearchCurationDraft["status"],
     visual_assets: normalizeVisualAssets(base.record.visual_assets),
     gaps: normalizeGaps(base.record.gaps),
@@ -214,11 +254,14 @@ export function validateVisualResearchCurationDraft(
 export function createWebResearchCurationGapDraft(input: {
   pageId: string;
   gaps: string[];
+  curationRunId?: string;
   now?: string;
 }): WebResearchCurationDraft {
   return {
     version: 1,
     page_id: input.pageId,
+    ...(input.curationRunId ? { curation_run_id: input.curationRunId } : {}),
+    draft_type: "web",
     status: "gap",
     facts: [],
     derived_insights: [],
@@ -231,11 +274,14 @@ export function createWebResearchCurationGapDraft(input: {
 export function createVisualResearchCurationGapDraft(input: {
   pageId: string;
   gaps: string[];
+  curationRunId?: string;
   now?: string;
 }): VisualResearchCurationDraft {
   return {
     version: 1,
     page_id: input.pageId,
+    ...(input.curationRunId ? { curation_run_id: input.curationRunId } : {}),
+    draft_type: "visual",
     status: "gap",
     visual_assets: [],
     gaps: input.gaps,
