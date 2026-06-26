@@ -38,6 +38,16 @@
         "path": "./slides/ExecutiveSummaryDashboard.tsx"
       },
       "data_path": "./data/demo/executive-summary-dashboard.json"
+    },
+    {
+      "id": "chart-analytics-v1-growth-trend-comparison",
+      "title": "Growth Trend Comparison",
+      "speaker_note": "Long-run growth trend comparison based on .tmp/Template/图表主题/4.html, rebuilt as a TSX-first page with reusable trend cards and a Recharts line chart.",
+      "source": {
+        "type": "local",
+        "path": "./slides/GrowthTrendComparison.tsx"
+      },
+      "data_path": "./data/demo/growth-trend-comparison.json"
     }
   ]
 }

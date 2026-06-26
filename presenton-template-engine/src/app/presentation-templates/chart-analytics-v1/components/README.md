@@ -30,6 +30,8 @@
 | `StatusBadge` | 状态原语 | 短状态标签 | 风险、趋势、优先级、阶段标签 |
 | `ChartPanelShell` | 图表容器 | 图表标题、副标题、legend 和稳定内容区；legend label 使用显式文本节点便于 PPT 抽取 | Recharts 图表页 |
 | `AnalyticsGroupedBarChart` | 图表组件 | Recharts 分组柱状图，自带 `data-pptx-export="screenshot"` 边界，避免 SVG 内部文字被二次抽取 | 对比指标、采用率、结构占比 |
+| `AnalyticsLineChart` | 图表组件 | Recharts 多系列折线图，支持负值区间、0% 基线和截图导出边界 | 趋势对比、历史波动、长周期指标 |
+| `TrendStatCard` | 指标组合 | 主体标签、状态徽章、两项关键指标和短解释 | 趋势对比、主体画像、左侧解释栏 |
 | `AnalyticsIcons` | 图标原语 | 当前主题使用的轻量线性图标集合 | 页眉、KPI、洞察、面板标题 |
 | `OutlookPanel` | 深色洞察面板 | 时间段列表 + 底部进度指标 | 未来展望、风险判断、行动窗口 |
 
@@ -45,7 +47,8 @@
 | `footer-meta` | `ReportMetaFooter` | 多列联系方式、长版权声明、正文内容 |
 | `body-header` | `ExecutiveHeader` | 封面 hero 标题、章节大标题 |
 | `metric-card` | `MetricHighlightCard` | 长正文说明、超过三组维度的矩阵 |
-| `chart-shell` | `ChartPanelShell` + `AnalyticsGroupedBarChart` | 单页临时手写 Chart.js、纯装饰图 |
+| `chart-shell` | `ChartPanelShell` + `AnalyticsGroupedBarChart` / `AnalyticsLineChart` | 单页临时手写 Chart.js、纯装饰图 |
+| `trend-stat-card` | `TrendStatCard` | 长正文、超过两项核心指标的详细表格 |
 | `dark-insight-panel` | `OutlookPanel` | 需要大段正文或复杂表格的内容 |
 | `decoration` | 封面蓝图内的安全坐标圆环 | 任何关键事实、数字或结论 |
 

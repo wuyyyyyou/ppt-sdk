@@ -14,6 +14,7 @@
   "registry_order": 95,
   "layouts": [
     "slides/CoverAnalytics.tsx",
-    "slides/ExecutiveSummaryDashboard.tsx"
+    "slides/ExecutiveSummaryDashboard.tsx",
+    "slides/GrowthTrendComparison.tsx"
   ]
 }

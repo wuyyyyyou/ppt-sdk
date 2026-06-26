@@ -92,6 +92,23 @@
       ],
       "avoid_for": ["single-chart deep dive", "long narrative page", "agenda", "timeline-only page", "more than three headline KPI cards"],
       "composition_guidance": "Use when the page needs three headline metrics, one grouped bar chart with short interpretation notes, and a compact dark outlook panel. Keep business claims in JSON data and edit TSX only for structure or component changes."
+    },
+    {
+      "id": "growth-trend-comparison",
+      "name": "Growth Trend Comparison",
+      "blueprint_source": "./blueprints/GrowthTrendComparison.tsx",
+      "example_slide": "./slides/GrowthTrendComparison.tsx",
+      "layout_family": "trend-analysis",
+      "source_html": ".tmp/Template/图表主题/4.html",
+      "content_intents": ["historical-trend", "entity-comparison", "volatility-analysis", "growth-normalization", "line-chart-deep-dive"],
+      "suitable_for": [
+        "long-run trend comparison",
+        "two-entity economic or market trajectory",
+        "volatility and stabilization narrative",
+        "one primary line chart with left-side interpretation"
+      ],
+      "avoid_for": ["categorical KPI dashboard", "agenda", "timeline-only page", "more than two compared entities", "pages dominated by prose"],
+      "composition_guidance": "Use when the page centers on one long-horizon multi-series line chart and needs concise entity cards to explain peaks, recent averages, volatility, and convergence. Keep factual claims and source notes in JSON data."
     }
   ],
   "planned_blueprint_families": [
@@ -104,7 +121,7 @@
     {
       "id": "metric-dashboard",
       "layout_family": "dashboard",
-      "source_signals": ["3.html", "4.html", "top KPI cards plus chart panels"],
+      "source_signals": ["3.html", "top KPI cards plus chart panels"],
       "intended_for": ["executive summary", "KPI overview", "multi-metric dashboard"]
     },
     {
@@ -128,6 +145,7 @@
   ],
   "selection_guide": [
     "Choose executive-summary-dashboard for post-cover summary pages that need three KPI cards plus a primary grouped bar chart.",
+    "Choose growth-trend-comparison for long-run multi-series line charts with left-side entity statistic cards and a short strategic interpretation.",
     "Choose cover-analytics for the first page or an intentional title reset.",
     "For other body pages, future work should add metric-dashboard, comparison-matrix, timeline-analysis, and agenda-summary blueprints before registering them.",
     "Keep source HTML as reference only; pages should be rebuilt from TSX components with editable text and data-driven content."

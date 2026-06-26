@@ -8,6 +8,7 @@
 | --- | --- |
 | `CoverAnalytics.tsx` | 对应 `.tmp/Template/图表主题/1.html` 的数据分析、市场情报、区域对比类 deck 开场封面。 |
 | `ExecutiveSummaryDashboard.tsx` | 对应 `.tmp/Template/图表主题/2.html` 的执行摘要仪表盘：三张 KPI 卡、一张分组柱状图、图表洞察和右侧未来展望。 |
+| `GrowthTrendComparison.tsx` | 对应 `.tmp/Template/图表主题/4.html` 的长周期趋势分析页：左侧主体统计卡和洞察，右侧多系列折线图。 |
 
 ## 已实现源页
 
@@ -15,6 +16,7 @@
 | --- | --- | --- | --- |
 | `.tmp/Template/图表主题/1.html` | `CoverAnalytics.tsx` | 战略对比报告封面 | 深色背景图洗底、系列标签、双主体超大标题、`vs` 分隔、报告范围、发布方和日期页脚。 |
 | `.tmp/Template/图表主题/2.html` | `ExecutiveSummaryDashboard.tsx` | 执行摘要和关键指标总览 | 深色内容页页眉、三列 KPI 卡片、技术采用率分组柱状图、短洞察列表、深色未来展望面板。 |
+| `.tmp/Template/图表主题/4.html` | `GrowthTrendComparison.tsx` | 历史增长趋势和波动收敛分析 | 深色内容页页眉、左侧两张主体统计卡、深色战略洞察、右侧长周期多系列折线图和资料页脚。 |
 
 ## 阅读顺序
 
