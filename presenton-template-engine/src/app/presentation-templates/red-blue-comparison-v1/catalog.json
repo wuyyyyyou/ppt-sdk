@@ -1,0 +1,91 @@
+{
+  "group_id": "red-blue-comparison-v1",
+  "catalog_type": "tsx-first",
+  "version": 1,
+  "source_theme": {
+    "folder": ".tmp/Template/红蓝主题",
+    "theme_json": ".tmp/Template/红蓝主题/red-blue.json",
+    "page_count": 26,
+    "layout_distribution": {
+      "CoverSlide": 2,
+      "AgendaSlide": 1,
+      "ContentSlide": 22,
+      "ThankyouSlide": 1
+    },
+    "dominant_elements": ["CardGrid", "Chart", "NumberCallout", "Timeline", "TextBlock"]
+  },
+  "purpose": "Help the PPT AI Agent choose copyable TSX blueprints for red/blue comparison decks, then derive final pages into slides/*.tsx and edit implementation directly.",
+  "directory_roles": {
+    "components": {
+      "path": "./components",
+      "role": "Reusable cross-slide visual components for the red-blue comparison system."
+    },
+    "blueprints": {
+      "path": "./blueprints",
+      "role": "Copyable TSX blueprint pages. Start here when selecting a page structure."
+    },
+    "slides": {
+      "path": "./slides",
+      "role": "Final registered slide entries. group.json.layouts and manifest.json source.path must only reference this directory."
+    },
+    "data": {
+      "path": "./data",
+      "role": "Demo or deck content data. JSON carries content only, not page structure decisions."
+    },
+    "theme": {
+      "path": "./theme",
+      "role": "Shared color, typography, and visual token definitions."
+    }
+  },
+  "blueprints": [
+    {
+      "id": "cover-comparison",
+      "name": "Cover Comparison",
+      "blueprint_source": "./blueprints/CoverComparison.tsx",
+      "example_slide": "./slides/CoverComparison.tsx",
+      "layout_family": "cover",
+      "content_intents": ["opening", "comparison-frame", "entity-positioning"],
+      "suitable_for": ["comparison deck cover", "country comparison opening", "market benchmark opening", "executive briefing opening"],
+      "avoid_for": ["body analysis", "dense charts", "timeline", "large card grid"]
+    }
+  ],
+  "planned_blueprint_families": [
+    {
+      "layout_family": "agenda-card-grid",
+      "source_pages": ["2.html"],
+      "intent": "Six-topic agenda grid with icons and numbered cards."
+    },
+    {
+      "layout_family": "chart-with-metric-cards",
+      "source_pages": ["3.html", "4.html", "6.html", "7.html", "10.html"],
+      "intent": "Primary chart paired with red/blue metric cards and numeric callouts."
+    },
+    {
+      "layout_family": "comparison-card-grid",
+      "source_pages": ["5.html", "12.html", "14.html", "18.html", "19.html", "23.html", "25.html"],
+      "intent": "Side-by-side or grid comparison using entity-colored cards."
+    },
+    {
+      "layout_family": "timeline",
+      "source_pages": ["11.html", "15.html"],
+      "intent": "Alternating milestone timeline with purple spine and date badges."
+    },
+    {
+      "layout_family": "hero-number",
+      "source_pages": ["22.html"],
+      "intent": "Large numeric callout with concise supporting explanation."
+    },
+    {
+      "layout_family": "image-narrative",
+      "source_pages": ["21.html"],
+      "intent": "Left narrative list with right-side image or illustration panel."
+    }
+  ],
+  "agent_workflow_notes": [
+    "Read catalog.json first and choose the blueprint closest to the page intent.",
+    "Copy or derive the selected blueprint into slides/*.tsx before adapting it.",
+    "group.json.layouts and manifest.json source.path must only reference slides/*.tsx.",
+    "Do not paste source HTML into TSX; extract reusable components and page blueprints.",
+    "Use data/*.json for content replacement only; change slides/*.tsx for structure, spacing, and component composition."
+  ]
+}

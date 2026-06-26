@@ -16,6 +16,7 @@ import red_finance_v3_TimelinePlanComponent, * as red_finance_v3_TimelinePlanMod
 import red_finance_v3_KpiSummaryComponent, * as red_finance_v3_KpiSummaryModule from "./red-finance-v3/slides/KpiSummary.tsx";
 import red_finance_v3_ImageNarrativeShowcaseComponent, * as red_finance_v3_ImageNarrativeShowcaseModule from "./red-finance-v3/slides/ImageNarrativeShowcase.tsx";
 import red_finance_v3_ClosingActionsComponent, * as red_finance_v3_ClosingActionsModule from "./red-finance-v3/slides/ClosingActions.tsx";
+import red_blue_comparison_v1_CoverComparisonComponent, * as red_blue_comparison_v1_CoverComparisonModule from "./red-blue-comparison-v1/slides/CoverComparison.tsx";
 
 const red_finance_canvasGroupMeta = {
   "group_id": "red-finance-canvas",
@@ -142,6 +143,64 @@ const red_finance_v3Layouts: TemplateWithData[] = [
   createTemplateEntry(red_finance_v3_ClosingActionsComponent, red_finance_v3_ClosingActionsModule.Schema, red_finance_v3_ClosingActionsModule.layoutId, red_finance_v3_ClosingActionsModule.layoutName, red_finance_v3_ClosingActionsModule.layoutDescription, "red-finance-v3", "ClosingActions", {"sampleData":{"title":"Closing Actions","metaLabel":"BLUEPRINT / CLOSING","footerText":"Business Professional | Closing Actions","pageNumber":"10","variant":"conclusion-plus-actions","density":"medium","heading":"Conclusion and actions","finalTitle":"Final judgment","finalText":"Close the deck with a concise conclusion and clear actions.","actions":[{"icon":"route","title":"Prioritize","description":"Define priorities and the focus for the next 30 days."},{"icon":"shield","title":"Validate","description":"Check risks, assumptions, and critical dependencies."},{"icon":"lightbulb","title":"Decide","description":"Clarify what needs confirmation or authorization."}],"summary":"A closing slide should make next steps explicit, not just repeat a slogan."},"layoutTags":["closing","actions","decision","tsx-first"],"layoutRole":"closing","contentElements":["final-message","action-list","decision-ask"],"useCases":["conclusion","recommendation","next-actions","decision"],"suitableFor":"Suitable for the final page of a deck when the agent needs to state conclusions and actions.","avoidFor":"Avoid using this layout for section transitions or analytical deep dives.","density":"medium","visualWeight":"balanced","editableTextPriority":"high"}),
 ];
 
+const red_blue_comparison_v1GroupMeta = {
+  "group_id": "red-blue-comparison-v1",
+  "group_name": "Red Blue Comparison",
+  "group_description": "TSX-first red and blue comparison templates for professional country, market, and capability analysis decks.",
+  "ordered": true,
+  "default": false,
+  "group_brief": "Suitable for professional comparison decks that contrast two or three entities with charts, card grids, numeric callouts, timelines, and concise interpretation. The source theme comes from .tmp/Template/红蓝主题: a white canvas, purple structure color, and red/blue entity accents. This group follows a TSX-first workflow: the AI Agent selects a blueprint, derives it into slides/*.tsx, and edits the final TSX directly.",
+  "style_tags": [
+    "comparison",
+    "professional",
+    "red-blue",
+    "tsx-first"
+  ],
+  "industry_tags": [
+    "business",
+    "market-analysis",
+    "strategy"
+  ],
+  "use_cases": [
+    "country-comparison",
+    "market-analysis",
+    "executive-brief",
+    "benchmark-report"
+  ],
+  "audience_tags": [
+    "management",
+    "client",
+    "analyst"
+  ],
+  "tone_tags": [
+    "professional",
+    "analytical",
+    "balanced"
+  ],
+  "cover_layout_id": "red-blue-comparison-v1:cover-comparison",
+  "agenda_layout_id": null,
+  "closing_layout_id": null,
+  "default_theme_id": null
+};
+const red_blue_comparison_v1Settings: TemplateGroupSettings = {
+  description: red_blue_comparison_v1GroupMeta.group_description,
+  ordered: red_blue_comparison_v1GroupMeta.ordered,
+  default: red_blue_comparison_v1GroupMeta.default,
+  groupBrief: red_blue_comparison_v1GroupMeta.group_brief ?? undefined,
+  styleTags: red_blue_comparison_v1GroupMeta.style_tags ? [...red_blue_comparison_v1GroupMeta.style_tags] : undefined,
+  industryTags: red_blue_comparison_v1GroupMeta.industry_tags ? [...red_blue_comparison_v1GroupMeta.industry_tags] : undefined,
+  useCases: red_blue_comparison_v1GroupMeta.use_cases ? [...red_blue_comparison_v1GroupMeta.use_cases] : undefined,
+  audienceTags: red_blue_comparison_v1GroupMeta.audience_tags ? [...red_blue_comparison_v1GroupMeta.audience_tags] : undefined,
+  toneTags: red_blue_comparison_v1GroupMeta.tone_tags ? [...red_blue_comparison_v1GroupMeta.tone_tags] : undefined,
+  coverLayoutId: red_blue_comparison_v1GroupMeta.cover_layout_id ?? undefined,
+  agendaLayoutId: red_blue_comparison_v1GroupMeta.agenda_layout_id ?? undefined,
+  closingLayoutId: red_blue_comparison_v1GroupMeta.closing_layout_id ?? undefined,
+  defaultThemeId: red_blue_comparison_v1GroupMeta.default_theme_id ?? undefined,
+};
+const red_blue_comparison_v1Layouts: TemplateWithData[] = [
+  createTemplateEntry(red_blue_comparison_v1_CoverComparisonComponent, red_blue_comparison_v1_CoverComparisonModule.Schema, red_blue_comparison_v1_CoverComparisonModule.layoutId, red_blue_comparison_v1_CoverComparisonModule.layoutName, red_blue_comparison_v1_CoverComparisonModule.layoutDescription, "red-blue-comparison-v1", "CoverComparison", {"sampleData":{"titleLineOne":"China","titleConnector":"vs","titleLineTwo":"Japan","subtitle":"Comprehensive Comparison","topicLine":"Economy - Demographics - Technology - Trade - History - Culture","entities":[{"label":"China","color":"#FF4757"},{"label":"Japan","color":"#2E86DE"}],"showGrid":true},"layoutTags":["cover","comparison","red-blue","tsx-first"],"layoutRole":"cover","contentElements":["headline","subtitle","topic-line","entity-legend","decorative-circles"],"useCases":["cover","comparison opening","country benchmark","executive briefing"],"suitableFor":"Suitable for opening a red-blue comparison deck that contrasts countries, markets, products, or capabilities.","avoidFor":"Avoid using this layout for dense body analysis, chart-heavy pages, timelines, or detailed comparison matrices.","density":"low","visualWeight":"visual-heavy","editableTextPriority":"high"}),
+];
+
 export const templates: TemplateLayoutsWithSettings[] = [
   {
     id: red_finance_canvasGroupMeta.group_id,
@@ -156,6 +215,13 @@ export const templates: TemplateLayoutsWithSettings[] = [
     description: red_finance_v3GroupMeta.group_description,
     settings: red_finance_v3Settings,
     layouts: red_finance_v3Layouts,
+  },
+  {
+    id: red_blue_comparison_v1GroupMeta.group_id,
+    name: red_blue_comparison_v1GroupMeta.group_name,
+    description: red_blue_comparison_v1GroupMeta.group_description,
+    settings: red_blue_comparison_v1Settings,
+    layouts: red_blue_comparison_v1Layouts,
   },
 ];
 

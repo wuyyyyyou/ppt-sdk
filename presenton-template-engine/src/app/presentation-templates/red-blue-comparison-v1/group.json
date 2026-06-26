@@ -1,0 +1,18 @@
+{
+  "group_id": "red-blue-comparison-v1",
+  "group_name": "Red Blue Comparison",
+  "group_description": "TSX-first red and blue comparison templates for professional country, market, and capability analysis decks.",
+  "group_brief": "Suitable for professional comparison decks that contrast two or three entities with charts, card grids, numeric callouts, timelines, and concise interpretation. The source theme comes from .tmp/Template/红蓝主题: a white canvas, purple structure color, and red/blue entity accents. This group follows a TSX-first workflow: the AI Agent selects a blueprint, derives it into slides/*.tsx, and edits the final TSX directly.",
+  "style_tags": ["comparison", "professional", "red-blue", "tsx-first"],
+  "industry_tags": ["business", "market-analysis", "strategy"],
+  "use_cases": ["country-comparison", "market-analysis", "executive-brief", "benchmark-report"],
+  "audience_tags": ["management", "client", "analyst"],
+  "tone_tags": ["professional", "analytical", "balanced"],
+  "cover_layout_id": "red-blue-comparison-v1:cover-comparison",
+  "ordered": true,
+  "default": false,
+  "registry_order": 93,
+  "layouts": [
+    "slides/CoverComparison.tsx"
+  ]
+}
