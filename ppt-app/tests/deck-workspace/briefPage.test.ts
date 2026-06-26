@@ -33,7 +33,7 @@ function renderBriefPage(options: { loading?: LoadingKind } = {}) {
       templates: [
         makeTemplate("red-finance-canvas", "Red Finance Canvas"),
         makeTemplate("red-finance-v3", "Business Professional"),
-        makeTemplate("red-blue", "Red Blue Professional"),
+        makeTemplate("legacy-hidden-template", "Legacy Hidden Template"),
       ],
       selectedTemplateGroupId: "red-finance-v3",
       loading: options.loading ?? "none",
@@ -66,7 +66,7 @@ function renderStyleSelection() {
       templates: [
         makeTemplate("red-finance-canvas", "Red Finance Canvas"),
         makeTemplate("red-finance-v3", "Business Professional"),
-        makeTemplate("red-blue", "Red Blue Professional"),
+        makeTemplate("legacy-hidden-template", "Legacy Hidden Template"),
       ],
       selectedTemplateGroupId: "red-finance-v3",
       loading: "none",
@@ -87,7 +87,7 @@ describe("BriefPage", () => {
 
     assert.match(html, /Red Finance Canvas/);
     assert.match(html, /Business Professional/);
-    assert.doesNotMatch(html, /Red Blue Professional/);
+    assert.doesNotMatch(html, /Legacy Hidden Template/);
   });
 
   it("shows the create button loading state while context is being suggested", () => {

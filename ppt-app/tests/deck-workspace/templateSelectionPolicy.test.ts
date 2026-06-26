@@ -24,14 +24,14 @@ describe("Template selection policy", () => {
   it("allows only the first-stage selectable template groups", () => {
     assert.equal(isSelectableTemplateGroup("red-finance-canvas"), true);
     assert.equal(isSelectableTemplateGroup("red-finance-v3"), true);
-    assert.equal(isSelectableTemplateGroup("red-blue"), false);
+    assert.equal(isSelectableTemplateGroup("legacy-hidden-template"), false);
   });
 
   it("filters hidden templates from the selectable list", () => {
     const templates = [
       makeTemplate("red-finance-canvas"),
       makeTemplate("red-finance-v3"),
-      makeTemplate("red-blue"),
+      makeTemplate("legacy-hidden-template"),
     ];
 
     assert.deepEqual(

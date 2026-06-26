@@ -16,14 +16,6 @@ import red_finance_v3_TimelinePlanComponent, * as red_finance_v3_TimelinePlanMod
 import red_finance_v3_KpiSummaryComponent, * as red_finance_v3_KpiSummaryModule from "./red-finance-v3/slides/KpiSummary.tsx";
 import red_finance_v3_ImageNarrativeShowcaseComponent, * as red_finance_v3_ImageNarrativeShowcaseModule from "./red-finance-v3/slides/ImageNarrativeShowcase.tsx";
 import red_finance_v3_ClosingActionsComponent, * as red_finance_v3_ClosingActionsModule from "./red-finance-v3/slides/ClosingActions.tsx";
-import red_blue_CoverStatementComponent, * as red_blue_CoverStatementModule from "./red-blue/slides/CoverStatement.tsx";
-import red_blue_AgendaOverviewComponent, * as red_blue_AgendaOverviewModule from "./red-blue/slides/AgendaOverview.tsx";
-import red_blue_ThreeTopicCardsComponent, * as red_blue_ThreeTopicCardsModule from "./red-blue/slides/ThreeTopicCards.tsx";
-import red_blue_ChartMetricBriefComponent, * as red_blue_ChartMetricBriefModule from "./red-blue/slides/ChartMetricBrief.tsx";
-import red_blue_CountryComparisonComponent, * as red_blue_CountryComparisonModule from "./red-blue/slides/CountryComparison.tsx";
-import red_blue_TimelineRoadmapComponent, * as red_blue_TimelineRoadmapModule from "./red-blue/slides/TimelineRoadmap.tsx";
-import red_blue_ClosingSummaryComponent, * as red_blue_ClosingSummaryModule from "./red-blue/slides/ClosingSummary.tsx";
-import red_blue_ComponentGalleryComponent, * as red_blue_ComponentGalleryModule from "./red-blue/slides/ComponentGallery.tsx";
 
 const red_finance_canvasGroupMeta = {
   "group_id": "red-finance-canvas",
@@ -150,71 +142,6 @@ const red_finance_v3Layouts: TemplateWithData[] = [
   createTemplateEntry(red_finance_v3_ClosingActionsComponent, red_finance_v3_ClosingActionsModule.Schema, red_finance_v3_ClosingActionsModule.layoutId, red_finance_v3_ClosingActionsModule.layoutName, red_finance_v3_ClosingActionsModule.layoutDescription, "red-finance-v3", "ClosingActions", {"sampleData":{"title":"Closing Actions","metaLabel":"BLUEPRINT / CLOSING","footerText":"Business Professional | Closing Actions","pageNumber":"10","variant":"conclusion-plus-actions","density":"medium","heading":"Conclusion and actions","finalTitle":"Final judgment","finalText":"Close the deck with a concise conclusion and clear actions.","actions":[{"icon":"route","title":"Prioritize","description":"Define priorities and the focus for the next 30 days."},{"icon":"shield","title":"Validate","description":"Check risks, assumptions, and critical dependencies."},{"icon":"lightbulb","title":"Decide","description":"Clarify what needs confirmation or authorization."}],"summary":"A closing slide should make next steps explicit, not just repeat a slogan."},"layoutTags":["closing","actions","decision","tsx-first"],"layoutRole":"closing","contentElements":["final-message","action-list","decision-ask"],"useCases":["conclusion","recommendation","next-actions","decision"],"suitableFor":"Suitable for the final page of a deck when the agent needs to state conclusions and actions.","avoidFor":"Avoid using this layout for section transitions or analytical deep dives.","density":"medium","visualWeight":"balanced","editableTextPriority":"high"}),
 ];
 
-const red_blueGroupMeta = {
-  "group_id": "red-blue",
-  "group_name": "Red Blue Professional",
-  "group_description": "TSX-first red and blue comparison template components for comparison, KPI, chart, timeline, and executive report decks.",
-  "ordered": true,
-  "default": false,
-  "group_brief": "TSX-first red-blue template based on the local HTML reference deck, with reusable components and blueprint layouts for covers, agendas, comparison cards, charts, timelines, and closing pages.",
-  "style_tags": [
-    "comparison",
-    "red-blue",
-    "professional",
-    "tsx-first"
-  ],
-  "industry_tags": [
-    "general-business",
-    "market-analysis",
-    "public-policy"
-  ],
-  "use_cases": [
-    "country-comparison",
-    "competitor-analysis",
-    "market-research",
-    "executive-brief"
-  ],
-  "audience_tags": [
-    "management",
-    "client",
-    "research"
-  ],
-  "tone_tags": [
-    "professional",
-    "analytical",
-    "balanced"
-  ],
-  "cover_layout_id": "red-blue:cover-statement",
-  "agenda_layout_id": null,
-  "closing_layout_id": "red-blue:closing-summary",
-  "default_theme_id": "red-blue"
-};
-const red_blueSettings: TemplateGroupSettings = {
-  description: red_blueGroupMeta.group_description,
-  ordered: red_blueGroupMeta.ordered,
-  default: red_blueGroupMeta.default,
-  groupBrief: red_blueGroupMeta.group_brief ?? undefined,
-  styleTags: red_blueGroupMeta.style_tags ? [...red_blueGroupMeta.style_tags] : undefined,
-  industryTags: red_blueGroupMeta.industry_tags ? [...red_blueGroupMeta.industry_tags] : undefined,
-  useCases: red_blueGroupMeta.use_cases ? [...red_blueGroupMeta.use_cases] : undefined,
-  audienceTags: red_blueGroupMeta.audience_tags ? [...red_blueGroupMeta.audience_tags] : undefined,
-  toneTags: red_blueGroupMeta.tone_tags ? [...red_blueGroupMeta.tone_tags] : undefined,
-  coverLayoutId: red_blueGroupMeta.cover_layout_id ?? undefined,
-  agendaLayoutId: red_blueGroupMeta.agenda_layout_id ?? undefined,
-  closingLayoutId: red_blueGroupMeta.closing_layout_id ?? undefined,
-  defaultThemeId: red_blueGroupMeta.default_theme_id ?? undefined,
-};
-const red_blueLayouts: TemplateWithData[] = [
-  createTemplateEntry(red_blue_CoverStatementComponent, red_blue_CoverStatementModule.Schema, red_blue_CoverStatementModule.layoutId, red_blue_CoverStatementModule.layoutName, red_blue_CoverStatementModule.layoutDescription, "red-blue", "CoverStatement", {"sampleData":{"eyebrow":"China | Japan | Korea","title":"East Asia Market Comparison","subtitle":"A concise red-blue analytical deck for market structure, performance signals, and strategic implications.","author":"Prepared for executive discussion","date":"2026","highlights":["Comparable evidence blocks","Country-level KPI framing","Decision-oriented narrative"]},"layoutTags":["cover","comparison","executive","red-blue"],"layoutRole":"cover","contentElements":["title","subtitle","text-block","card"],"useCases":["country-comparison","market-research","executive-brief"],"suitableFor":"Suitable for the first page of analytical comparison decks.","avoidFor":"Avoid when the slide needs dense evidence or charts.","density":"low","visualWeight":"visual-heavy","editableTextPriority":"high"}),
-  createTemplateEntry(red_blue_AgendaOverviewComponent, red_blue_AgendaOverviewModule.Schema, red_blue_AgendaOverviewModule.layoutId, red_blue_AgendaOverviewModule.layoutName, red_blue_AgendaOverviewModule.layoutDescription, "red-blue", "AgendaOverview", {"sampleData":{"title":"Agenda","subtitle":"A structured path from framing to evidence and implications.","footerText":"Red Blue Professional","pageNumber":"02","items":[{"number":"01","title":"Market Context","description":"Define comparison scope and baseline facts.","tone":"china"},{"number":"02","title":"Performance Signals","description":"Compare key indicators with visual evidence.","tone":"japan"},{"number":"03","title":"Strategic Implications","description":"Convert findings into decision themes.","tone":"purple"}]},"layoutTags":["agenda","cards","overview","red-blue"],"layoutRole":"agenda","contentElements":["heading","card-grid"],"useCases":["agenda","section-map","executive-brief"],"suitableFor":"Suitable for outlining the deck structure or a section roadmap.","avoidFor":"Avoid for detailed chart analysis.","density":"medium","visualWeight":"balanced","editableTextPriority":"high"}),
-  createTemplateEntry(red_blue_ThreeTopicCardsComponent, red_blue_ThreeTopicCardsModule.Schema, red_blue_ThreeTopicCardsModule.layoutId, red_blue_ThreeTopicCardsModule.layoutName, red_blue_ThreeTopicCardsModule.layoutDescription, "red-blue", "ThreeTopicCards", {"sampleData":{"title":"Three-Part Comparison","subtitle":"Summarize three comparable themes with a clear decision note.","footerText":"Red Blue Professional","pageNumber":"03","cards":[{"number":"01","title":"Scale","description":"Compare the absolute size or reach of each market.","tone":"china"},{"number":"02","title":"Quality","description":"Highlight maturity, efficiency, or capability differences.","tone":"japan"},{"number":"03","title":"Momentum","description":"Show the forward-looking trend or strategic direction.","tone":"purple"}],"insightTitle":"Decision note","insightText":"Use this layout when the slide should be easy to scan before the audience reads detailed evidence."},"layoutTags":["cards","comparison","insight","red-blue"],"layoutRole":"content","contentElements":["heading","card-grid","insight"],"useCases":["market-comparison","competitor-analysis","section-summary"],"suitableFor":"Suitable for three-part comparison or executive summary pages.","avoidFor":"Avoid when the core content is a large chart.","density":"medium","visualWeight":"balanced","editableTextPriority":"high"}),
-  createTemplateEntry(red_blue_ChartMetricBriefComponent, red_blue_ChartMetricBriefModule.Schema, red_blue_ChartMetricBriefModule.layoutId, red_blue_ChartMetricBriefModule.layoutName, red_blue_ChartMetricBriefModule.layoutDescription, "red-blue", "ChartMetricBrief", {"sampleData":{"title":"Performance Signal","subtitle":"Combine a simple evidence chart with KPI rows and a headline number.","footerText":"Red Blue Professional","pageNumber":"04","chartTitle":"Indexed Comparison","chartSubtitle":"Values are displayed as relative index scores for slide-level comparison.","series":[{"label":"China","value":84,"tone":"china"},{"label":"Japan","value":68,"tone":"japan"},{"label":"Korea","value":72,"tone":"korea"}],"metricTitle":"KPI Readout","metrics":[{"label":"China","value":"84%","share":84,"tone":"china"},{"label":"Japan","value":"68%","share":68,"tone":"japan"},{"label":"Korea","value":"72%","share":72,"tone":"korea"}],"calloutValue":"84%","calloutLabel":"Lead signal","calloutDescription":"Use the callout to focus attention on the most important measured result."},"layoutTags":["chart","metrics","number-callout","red-blue"],"layoutRole":"content","contentElements":["heading","chart","metrics","number-callout"],"useCases":["market-research","performance-analysis","comparison"],"suitableFor":"Suitable when one chart is the primary evidence and side cards explain the signal.","avoidFor":"Avoid for pure narrative or agenda pages.","density":"high","visualWeight":"visual-heavy","editableTextPriority":"medium"}),
-  createTemplateEntry(red_blue_CountryComparisonComponent, red_blue_CountryComparisonModule.Schema, red_blue_CountryComparisonModule.layoutId, red_blue_CountryComparisonModule.layoutName, red_blue_CountryComparisonModule.layoutDescription, "red-blue", "CountryComparison", {"sampleData":{"title":"Country Comparison","subtitle":"Compare country-level scale and capability through aligned KPI cards.","footerText":"Red Blue Professional","pageNumber":"05","countries":[{"name":"China","heroValue":"1.41B","heroLabel":"Population","tone":"china","kpis":[{"label":"GDP rank","value":"#2"},{"label":"Urban scale","value":"High"}]},{"name":"Japan","heroValue":"125M","heroLabel":"Population","tone":"japan","kpis":[{"label":"GDP rank","value":"#4"},{"label":"Innovation","value":"Strong"}]},{"name":"Korea","heroValue":"52M","heroLabel":"Population","tone":"korea","kpis":[{"label":"GDP rank","value":"#13"},{"label":"Digital adoption","value":"High"}]}],"insightTitle":"Comparison readout","insightText":"Keep fields aligned across countries so differences come from evidence rather than layout noise."},"layoutTags":["comparison","countries","cards","red-blue"],"layoutRole":"content","contentElements":["heading","card-grid","insight"],"useCases":["country-comparison","market-analysis","public-policy"],"suitableFor":"Suitable for comparing two or three entities with matched KPI fields.","avoidFor":"Avoid for single-topic narrative pages.","density":"medium","visualWeight":"balanced","editableTextPriority":"high"}),
-  createTemplateEntry(red_blue_TimelineRoadmapComponent, red_blue_TimelineRoadmapModule.Schema, red_blue_TimelineRoadmapModule.layoutId, red_blue_TimelineRoadmapModule.layoutName, red_blue_TimelineRoadmapModule.layoutDescription, "red-blue", "TimelineRoadmap", {"sampleData":{"title":"Timeline Roadmap","subtitle":"Show sequence, process, or implementation phases with a clear concluding note.","footerText":"Red Blue Professional","pageNumber":"06","items":[{"date":"01","title":"Frame","description":"Define the comparison lens."},{"date":"02","title":"Analyze","description":"Build evidence across KPI categories."},{"date":"03","title":"Decide","description":"Translate findings into action."}],"insightTitle":"Roadmap note","insightText":"This layout works best when each phase has a short verb-led title and one concise implication."},"layoutTags":["timeline","roadmap","process","red-blue"],"layoutRole":"content","contentElements":["heading","timeline","insight"],"useCases":["implementation-plan","market-history","process"],"suitableFor":"Suitable for three to five chronological or sequential points.","avoidFor":"Avoid for non-sequential comparisons.","density":"medium","visualWeight":"balanced","editableTextPriority":"high"}),
-  createTemplateEntry(red_blue_ClosingSummaryComponent, red_blue_ClosingSummaryModule.Schema, red_blue_ClosingSummaryModule.layoutId, red_blue_ClosingSummaryModule.layoutName, red_blue_ClosingSummaryModule.layoutDescription, "red-blue", "ClosingSummary", {"sampleData":{"title":"Thank You","subtitle":"Questions and discussion","statistic":"3","statisticLabel":"Key decisions","statisticDescription":"Close with the actions, owners, or decisions that should follow from the analysis.","contactTitle":"Next step","contactText":"Align on the evidence gaps and confirm the recommendation path."},"layoutTags":["closing","thank-you","summary","red-blue"],"layoutRole":"closing","contentElements":["title","number-callout","insight"],"useCases":["closing","executive-brief","next-steps"],"suitableFor":"Suitable for thank-you pages, decision summaries, or final next steps.","avoidFor":"Avoid for evidence-heavy middle pages.","density":"low","visualWeight":"visual-heavy","editableTextPriority":"high"}),
-  createTemplateEntry(red_blue_ComponentGalleryComponent, red_blue_ComponentGalleryModule.Schema, red_blue_ComponentGalleryModule.layoutId, red_blue_ComponentGalleryModule.layoutName, red_blue_ComponentGalleryModule.layoutDescription, "red-blue", "ComponentGallery", {"sampleData":{"title":"Red Blue Component Gallery","subtitle":"Reusable TSX building blocks extracted from the red-blue reference HTML deck.","footerText":"Red Blue Professional | Component Foundation","pageNumber":"01","topics":[{"number":"01","title":"Comparison","description":"Side-by-side country, market, or competitor framing.","tone":"china"},{"number":"02","title":"Evidence","description":"Metric cards, chart shells, and number callouts.","tone":"japan"},{"number":"03","title":"Narrative","description":"Timeline, insights, and executive recommendation blocks.","tone":"purple"}],"timeline":[{"date":"01","title":"Frame","description":"Define the comparison lens."},{"date":"02","title":"Analyze","description":"Combine KPIs with visual evidence."},{"date":"03","title":"Decide","description":"Close with implications and actions."}]},"layoutTags":["gallery","components","red-blue","tsx-first"],"layoutRole":"content","contentElements":["heading","legend","cards","metrics","chart-shell","timeline","insight"],"useCases":["component-preview","template-foundation","visual-audit"],"suitableFor":"Suitable for previewing red-blue reusable components before building concrete blueprints.","avoidFor":"Avoid using this layout as a production deck page.","density":"high","visualWeight":"visual-heavy","editableTextPriority":"high"}),
-];
-
 export const templates: TemplateLayoutsWithSettings[] = [
   {
     id: red_finance_canvasGroupMeta.group_id,
@@ -229,13 +156,6 @@ export const templates: TemplateLayoutsWithSettings[] = [
     description: red_finance_v3GroupMeta.group_description,
     settings: red_finance_v3Settings,
     layouts: red_finance_v3Layouts,
-  },
-  {
-    id: red_blueGroupMeta.group_id,
-    name: red_blueGroupMeta.group_name,
-    description: red_blueGroupMeta.group_description,
-    settings: red_blueSettings,
-    layouts: red_blueLayouts,
   },
 ];
 
