@@ -1,7 +1,7 @@
 {
   "group_id": "red-blue-comparison-v1",
   "catalog_type": "tsx-first",
-  "version": 1,
+  "version": 2,
   "source_theme": {
     "folder": ".tmp/Template/红蓝主题",
     "theme_json": ".tmp/Template/红蓝主题/red-blue.json",
@@ -48,13 +48,26 @@
       "content_intents": ["opening", "comparison-frame", "entity-positioning"],
       "suitable_for": ["comparison deck cover", "country comparison opening", "market benchmark opening", "executive briefing opening"],
       "avoid_for": ["body analysis", "dense charts", "timeline", "large card grid"]
+    },
+    {
+      "id": "topic-overview",
+      "name": "Topic Overview",
+      "blueprint_source": "./blueprints/TopicOverview.tsx",
+      "example_slide": "./slides/TopicOverview.tsx",
+      "layout_family": "agenda-card-grid",
+      "visual_pattern": "left-aligned title block + subtitle + 3x2 numbered icon cards + soft red/blue/purple background circles",
+      "content_intents": ["agenda", "overview", "topic-map", "comparison-dimensions"],
+      "suitable_for": [
+        "six-topic agenda",
+        "comparison pillars",
+        "chapter overview",
+        "analysis dimension map",
+        "executive briefing table of contents"
+      ],
+      "avoid_for": ["detailed chart analysis", "long narrative", "large comparison matrix", "timeline"]
     }
   ],
   "planned_blueprint_families": [
-    {
-      "layout_family": "agenda-card-grid",
-      "intent": "Six-topic agenda grid with icons and numbered cards."
-    },
     {
       "layout_family": "chart-with-metric-cards",
       "intent": "Primary chart paired with red/blue metric cards and numeric callouts."

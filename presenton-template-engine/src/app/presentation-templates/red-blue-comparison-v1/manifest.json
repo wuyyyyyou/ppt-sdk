@@ -32,6 +32,16 @@
         "path": "./slides/CoverComparison.tsx"
       },
       "data_path": "./data/demo/cover-comparison.json"
+    },
+    {
+      "id": "red-blue-comparison-v1-topic-overview",
+      "title": "Comparison Overview",
+      "speaker_note": "Demo overview derived from .tmp/Template/红蓝主题/2.html: professional title block, six numbered topic cards, reusable icon card language, and soft red/blue/purple decorations.",
+      "source": {
+        "type": "local",
+        "path": "./slides/TopicOverview.tsx"
+      },
+      "data_path": "./data/demo/topic-overview.json"
     }
   ]
 }

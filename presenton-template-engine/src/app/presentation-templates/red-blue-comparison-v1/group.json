@@ -13,6 +13,7 @@
   "default": false,
   "registry_order": 93,
   "layouts": [
-    "slides/CoverComparison.tsx"
+    "slides/CoverComparison.tsx",
+    "slides/TopicOverview.tsx"
   ]
 }

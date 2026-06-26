@@ -27,6 +27,7 @@
 | `IconText` | 基础原语 | 图标 + 单行或短文本 | meta、卡片小标题、短说明 |
 | `EntityLegend` | 基础原语 | 两到三个对比主体的颜色图例 | 封面、比较页、图表说明 |
 | `ThemeCard` | 内容组件 | 通用图标卡、议题卡、短说明卡 | 卡片网格和侧栏要点 |
+| `AgendaTopicCard` | 内容组件 | 编号水印、图标和短说明组合的议题卡 | 目录页、章节总览、主题/维度总览 |
 | `MetricCard` | 内容组件 | 数值、单位、说明和可选进度条 | KPI、数字强调、左右对比指标 |
 | `ChartContainer` | 内容组件 | 图表标题、meta 和图表承载区 | 图表外壳，不负责画图数据 |
 | `TimelineNode` | 内容组件 | 时间线节点、日期、标题、说明 | 横向或交错时间线 |
@@ -42,6 +43,7 @@
 | `meta` / `pill` | `ThemePill`, `IconText`, `StableInlineRow` | 超过 24 字的长说明 |
 | `legend` | `EntityLegend`, `ThemePill` | 多维表格、长解释 |
 | `card-grid` | `ThemeCard`, `MetricCard` | 大段连续正文、复杂时间线 |
+| `agenda-card-grid` | `AgendaTopicCard` | 图表、长段落、超过六个议题的目录 |
 | `metric` / `number-callout` | `MetricCard`, `StableInlineRow` | 多段结论或长脚注 |
 | `chart` | `ChartContainer` | 非数据装饰、长文本说明 |
 | `timeline` | `TimelineNode` | 无顺序的分类信息 |
@@ -59,6 +61,7 @@
 | `IconText` | 单行 48 字以内，非单行模式 2 行以内 | 固定高度单行；长文本请改为卡片正文 |
 | `EntityLegend` | 2-3 个主体，每项 24 字以内 | 单行图例，不承载说明 |
 | `ThemeCard` | 标题 28 字以内；说明 80 字以内 | 标题和说明限制高度 |
+| `AgendaTopicCard` | 标题 34 字以内；说明 115 字以内 | 固定卡片高度，长文本应拆短或减少卡片数量 |
 | `MetricCard` | 数值 10 字以内；说明 40 字以内 | 数值单行 truncate |
 | `ChartContainer` | 标题 36 字以内；副标题 60 字以内 | 标题单行 truncate |
 | `TimelineNode` | 日期 16 字以内；标题 28 字以内；说明 60 字以内 | 固定节点宽度和文本高度 |
@@ -86,6 +89,7 @@
 ### 3. 内容组件
 
 - `ThemeCard` 用于卡片网格、议题卡、简短说明卡。
+- `AgendaTopicCard` 用于目录或主题总览中的编号议题卡，保留淡化编号、图标和顶部强调条。
 - `MetricCard` 用于 KPI、数字强调和进度类指标。
 - `ChartContainer` 只负责图表外壳；图表本体由 slide 或专门图表组件传入。
 - `TimelineNode` 是时间线节点，不负责整页路线图布局。

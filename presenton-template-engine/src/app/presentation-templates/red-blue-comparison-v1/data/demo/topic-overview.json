@@ -1,0 +1,54 @@
+{
+  "title": "Comparison Overview",
+  "subtitle": "A deep dive into the key pillars defining the relationship and competition between Asia's two largest economies, exploring their strengths, challenges, and future trajectories.",
+  "eyebrow": "Overview",
+  "metaLabel": "6 Pillars",
+  "footerText": "China vs Japan | Comparison Overview",
+  "pageNumber": "02",
+  "accentTone": "purple",
+  "topics": [
+    {
+      "number": "01",
+      "title": "Economy",
+      "description": "Comparative analysis of GDP size, growth rates, economic structure, and global rankings.",
+      "icon": "chart-line",
+      "tone": "purple"
+    },
+    {
+      "number": "02",
+      "title": "Demographics",
+      "description": "Examination of population trends, aging societies, workforce challenges, and urbanization rates.",
+      "icon": "users",
+      "tone": "purple"
+    },
+    {
+      "number": "03",
+      "title": "Technology & Innovation",
+      "description": "Insights into R&D spending, AI development, robotics leadership, and patent output.",
+      "icon": "microchip",
+      "tone": "purple"
+    },
+    {
+      "number": "04",
+      "title": "Trade & Investment",
+      "description": "Breakdown of bilateral import/export flows, key industries, and economic interdependence.",
+      "icon": "exchange",
+      "tone": "purple"
+    },
+    {
+      "number": "05",
+      "title": "History",
+      "description": "Timeline of key historical milestones, conflicts, and diplomatic normalization events.",
+      "icon": "landmark",
+      "tone": "purple"
+    },
+    {
+      "number": "06",
+      "title": "Culture",
+      "description": "Exploration of societal values, business etiquette, art, and modern soft power influence.",
+      "icon": "culture",
+      "tone": "purple"
+    }
+  ],
+  "showDecorations": true
+}
