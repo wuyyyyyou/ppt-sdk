@@ -102,6 +102,16 @@
         "path": "./slides/TechnologyInnovationKpis.tsx"
       },
       "data_path": "./data/demo/technology-innovation-kpis.json"
+    },
+    {
+      "id": "red-blue-comparison-v1-historical-milestones-timeline",
+      "title": "History: Key Milestones",
+      "speaker_note": "Demo timeline page derived from .tmp/Template/红蓝主题/11.html: centered history title, horizontal structure line, alternating milestone text blocks, date pills, and purple diamond markers.",
+      "source": {
+        "type": "local",
+        "path": "./slides/HistoricalMilestonesTimeline.tsx"
+      },
+      "data_path": "./data/demo/historical-milestones-timeline.json"
     }
   ]
 }

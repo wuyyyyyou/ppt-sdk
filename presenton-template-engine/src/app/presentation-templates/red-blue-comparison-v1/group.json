@@ -20,6 +20,7 @@
     "slides/DemographicsSnapshot.tsx",
     "slides/AgingDependency.tsx",
     "slides/PopulationTrend.tsx",
-    "slides/TechnologyInnovationKpis.tsx"
+    "slides/TechnologyInnovationKpis.tsx",
+    "slides/HistoricalMilestonesTimeline.tsx"
   ]
 }

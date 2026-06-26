@@ -1,7 +1,16 @@
 from html.parser import HTMLParser
 from typing import List, Optional
+import re
 
 from .models import PptxFontModel, PptxTextRunModel
+
+
+def escape_plain_ampersands(text: str) -> str:
+    return re.sub(
+        r"&(?!(?:#\d+|#[xX][0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]+);)",
+        "&amp;",
+        text,
+    )
 
 
 class InlineHTMLToRunsParser(HTMLParser):
@@ -58,8 +67,8 @@ def parse_html_text_to_text_runs(
 ) -> List[PptxTextRunModel]:
     normalized_text = text.replace("\r\n", "\n").replace("\r", "\n")
     normalized_text = normalized_text.replace("\n", "<br>")
+    normalized_text = escape_plain_ampersands(normalized_text)
 
     parser = InlineHTMLToRunsParser(base_font if base_font else PptxFontModel())
     parser.feed(normalized_text)
     return parser.text_runs
-

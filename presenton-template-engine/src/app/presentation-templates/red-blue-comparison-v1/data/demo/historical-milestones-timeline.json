@@ -1,0 +1,40 @@
+{
+  "titlePrefix": "History:",
+  "titleHighlight": "Key Milestones",
+  "subtitle": "A concise timeline of pivotal moments shaping the modern China-Japan relationship.",
+  "footerText": "China vs Japan | Historical Timeline",
+  "pageNumber": "09",
+  "timelineItems": [
+    {
+      "date": "1894-95",
+      "title": "First Sino-Japanese War",
+      "description": "Conflict over Korea shifted regional dominance to Japan.",
+      "tone": "purple"
+    },
+    {
+      "date": "1937-45",
+      "title": "WWII Conflict",
+      "description": "Full-scale invasion marked by intense hostility.",
+      "tone": "purple"
+    },
+    {
+      "date": "1972",
+      "title": "Normalization",
+      "description": "Diplomatic relations were established via the Joint Communique.",
+      "tone": "purple"
+    },
+    {
+      "date": "2010-12",
+      "title": "Territorial Tensions",
+      "description": "Island disputes strained diplomatic and trade ties.",
+      "tone": "purple"
+    },
+    {
+      "date": "2020s",
+      "title": "Modern Dynamics",
+      "description": "Economic interdependence now coexists with strategic rivalry.",
+      "tone": "purple"
+    }
+  ],
+  "showDecorations": true
+}

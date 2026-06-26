@@ -44,6 +44,7 @@
 | `DualAxisProjectionLineChart` | 图表 | 双轴历史/预测折线图 | `PopulationTrend` |
 | `ComparisonRadarChart` | 图表 | 两个主体的多维能力雷达图 | 技术创新、竞争力、成熟度 |
 | `ProjectionLegend` | 图表辅助 | 实线实体图例 + 虚线预测说明 | `PopulationTrend` |
+| `AlternatingTimeline` | 时间线 | 横向中轴、菱形节点、上下交错日期和说明 | `HistoricalMilestonesTimeline` |
 
 ## Slot 适配
 
@@ -63,6 +64,7 @@
 | `stacked-composition` | `StackedCompositionBarChart` | 绝对量级、时间序列 |
 | `projection-trend` | `DualAxisProjectionLineChart`, `ProjectionLegend` | 非时间序列、多图 dashboard |
 | `radar-comparison` | `ComparisonRadarChart`, `ComparativeMetricRow`, `StrategicInsightCard` | 时间序列、大表格、超过两个主体 |
+| `timeline` | `AlternatingTimeline` | 超过六个事件、详细年表、量化趋势图 |
 | `decoration` | `CoverComparisonDecorations`, `BalancedComparisonDecorations`, `ThemeSoftCircle` | 任何关键事实、数字或结论 |
 
 ## 文本容量
@@ -86,6 +88,7 @@
 | `DualAxisProjectionLineChart` | 1-3 条线；横轴 2-14 个点 | 复杂趋势应拆成多页 |
 | `ComparisonRadarChart` | 2 条序列；3-8 个维度 | 维度过多会造成标签拥挤 |
 | `SectorStructureCard` | 主体 24 字以内；badge 24 字以内；分析说明 110 字以内 | 更多主体应拆页 |
+| `AlternatingTimeline` | 3-6 个节点；日期 18 字以内；标题 42 字以内；说明 120 字以内 | 长叙事或更多节点应拆页 |
 
 ## AI 修改规则
 

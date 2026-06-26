@@ -1,7 +1,7 @@
 {
   "group_id": "red-blue-comparison-v1",
   "catalog_type": "tsx-first",
-  "version": 8,
+  "version": 9,
   "source_theme": {
     "folder": ".tmp/Template/红蓝主题",
     "theme_json": ".tmp/Template/红蓝主题/red-blue.json",
@@ -35,14 +35,10 @@
       "population-trend",
       "technology-innovation-kpis"
     ],
-    "timeline": [],
+    "timeline": ["historical-milestones-timeline"],
     "closing": []
   },
   "not_available_yet": [
-    {
-      "page_type": "timeline",
-      "guidance": "No registered timeline blueprint exists in this group. Do not select a timeline layout from this catalog; derive from another implemented blueprint or add a new blueprint first."
-    },
     {
       "page_type": "closing",
       "guidance": "No registered closing blueprint exists in this group. Do not point manifest.json to a closing slide until a real slides/*.tsx entry exists."
@@ -212,6 +208,29 @@
         "single-metric comparison",
         "long narrative without quantitative dimensions"
       ]
+    },
+    {
+      "id": "historical-milestones-timeline",
+      "name": "Historical Milestones Timeline",
+      "blueprint_source": "./blueprints/HistoricalMilestonesTimeline.tsx",
+      "example_slide": "./slides/HistoricalMilestonesTimeline.tsx",
+      "layout_family": "alternating-horizontal-timeline",
+      "visual_pattern": "centered title + soft purple horizontal axis + alternating milestone text blocks + rounded date pills + purple diamond markers + soft circular decorations",
+      "content_intents": ["timeline", "history", "milestones", "sequence", "relationship-evolution"],
+      "suitable_for": [
+        "historical milestone summary",
+        "relationship evolution timeline",
+        "policy or market development sequence",
+        "strategic roadmap with three to six phases",
+        "executive chronology overview"
+      ],
+      "avoid_for": [
+        "dense chronology with many events",
+        "more than six milestones",
+        "quantitative time-series chart",
+        "large comparison matrix",
+        "long narrative history"
+      ]
     }
   ],
   "selection_guide": [
@@ -242,6 +261,10 @@
     {
       "when": "The page compares two entities across multiple capability dimensions and needs a radar chart plus KPI sidebar.",
       "choose": "technology-innovation-kpis"
+    },
+    {
+      "when": "The page needs a concise chronological arc with three to six key milestones.",
+      "choose": "historical-milestones-timeline"
     }
   ],
   "agent_workflow_notes": [
