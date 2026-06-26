@@ -109,6 +109,29 @@
       ],
       "avoid_for": ["categorical KPI dashboard", "agenda", "timeline-only page", "more than two compared entities", "pages dominated by prose"],
       "composition_guidance": "Use when the page centers on one long-horizon multi-series line chart and needs concise entity cards to explain peaks, recent averages, volatility, and convergence. Keep factual claims and source notes in JSON data."
+    },
+    {
+      "id": "population-structure-comparison",
+      "name": "Population Structure Comparison",
+      "blueprint_source": "./blueprints/PopulationStructureComparison.tsx",
+      "example_slide": "./slides/PopulationStructureComparison.tsx",
+      "layout_family": "composition-comparison",
+      "source_html": ".tmp/Template/图表主题/6.html",
+      "content_intents": ["composition-comparison", "population-structure", "segment-share", "two-entity-benchmark", "donut-chart-deep-dive"],
+      "suitable_for": [
+        "two-entity structure comparison",
+        "age distribution or population composition",
+        "market share or portfolio composition benchmark",
+        "paired donut charts with one center metric per entity"
+      ],
+      "avoid_for": [
+        "long-run time-series analysis",
+        "more than two compared entities",
+        "dense tables or matrices",
+        "pages requiring more than five composition segments",
+        "prose-led strategic narrative"
+      ],
+      "composition_guidance": "Use when the page compares two entities by percentage composition. Keep the shared segment legend editable outside the chart screenshot, keep factual values in JSON data, and use TSX edits only for structural layout changes."
     }
   ],
   "planned_blueprint_families": [
@@ -146,6 +169,7 @@
   "selection_guide": [
     "Choose executive-summary-dashboard for post-cover summary pages that need three KPI cards plus a primary grouped bar chart.",
     "Choose growth-trend-comparison for long-run multi-series line charts with left-side entity statistic cards and a short strategic interpretation.",
+    "Choose population-structure-comparison for two-entity composition pages such as age distribution, population structure, market share, portfolio mix, or segment allocation.",
     "Choose cover-analytics for the first page or an intentional title reset.",
     "For other body pages, future work should add metric-dashboard, comparison-matrix, timeline-analysis, and agenda-summary blueprints before registering them.",
     "Keep source HTML as reference only; pages should be rebuilt from TSX components with editable text and data-driven content."

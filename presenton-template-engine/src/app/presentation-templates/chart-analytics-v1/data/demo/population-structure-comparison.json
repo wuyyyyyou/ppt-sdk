@@ -1,0 +1,93 @@
+{
+  "eyebrow": "Demographics",
+  "title": "Population Structure: Age Distribution",
+  "headerMetaLabel": "Data Source",
+  "headerMetaValue": "UN World Population Prospects 2024",
+  "headerIcon": "users",
+  "legendItems": [
+    {
+      "label": "0-14 Years",
+      "color": "#CBD5E1"
+    },
+    {
+      "label": "15-64 Years",
+      "color": "#475569"
+    },
+    {
+      "label": "65+ Years",
+      "color": "#F43F5E"
+    }
+  ],
+  "entities": [
+    {
+      "name": "China",
+      "symbol": "CN",
+      "statusLabel": "Aging Society",
+      "accentColor": "#2563EB",
+      "symbolTint": "#EFF6FF",
+      "totalValue": "1.41B",
+      "totalLabel": "Population",
+      "centerMetricLabel": "Median Age",
+      "centerMetricValue": "39.5",
+      "segments": [
+        {
+          "label": "0-14 Years",
+          "value": 17,
+          "color": "#CBD5E1"
+        },
+        {
+          "label": "15-64 Years",
+          "value": 68,
+          "color": "#475569"
+        },
+        {
+          "label": "65+ Years",
+          "value": 15,
+          "color": "#F43F5E"
+        }
+      ],
+      "footerLabel": "Old-Age Dependency",
+      "footerValue": "22.5",
+      "footerSuffix": "%",
+      "footerTint": "#EFF6FF",
+      "footerTextColor": "#1E40AF",
+      "footerIcon": "users"
+    },
+    {
+      "name": "Japan",
+      "symbol": "JP",
+      "statusLabel": "Super-Aged Society",
+      "accentColor": "#F43F5E",
+      "symbolTint": "#FFF1F2",
+      "totalValue": "123M",
+      "totalLabel": "Population",
+      "centerMetricLabel": "Median Age",
+      "centerMetricValue": "49.5",
+      "segments": [
+        {
+          "label": "0-14 Years",
+          "value": 11,
+          "color": "#CBD5E1"
+        },
+        {
+          "label": "15-64 Years",
+          "value": 59,
+          "color": "#475569"
+        },
+        {
+          "label": "65+ Years",
+          "value": 30,
+          "color": "#F43F5E"
+        }
+      ],
+      "footerLabel": "Old-Age Dependency",
+      "footerValue": "54.2",
+      "footerSuffix": "%",
+      "footerTint": "#FFF1F2",
+      "footerTextColor": "#9F1239",
+      "footerIcon": "users"
+    }
+  ],
+  "footerSource": "Source: UN World Population Prospects 2024",
+  "pageNumber": "06"
+}

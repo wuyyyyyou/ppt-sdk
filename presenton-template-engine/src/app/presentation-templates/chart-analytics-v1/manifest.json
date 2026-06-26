@@ -48,6 +48,16 @@
         "path": "./slides/GrowthTrendComparison.tsx"
       },
       "data_path": "./data/demo/growth-trend-comparison.json"
+    },
+    {
+      "id": "chart-analytics-v1-population-structure-comparison",
+      "title": "Population Structure Comparison",
+      "speaker_note": "Population age-structure comparison based on .tmp/Template/图表主题/6.html, rebuilt as a TSX-first page with reusable structure cards and Recharts donut charts.",
+      "source": {
+        "type": "local",
+        "path": "./slides/PopulationStructureComparison.tsx"
+      },
+      "data_path": "./data/demo/population-structure-comparison.json"
     }
   ]
 }
