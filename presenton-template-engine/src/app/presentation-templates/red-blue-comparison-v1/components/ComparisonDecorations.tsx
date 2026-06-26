@@ -10,6 +10,12 @@ const coverCircles = [
   { key: "blue-small", tone: "blue", left: 984, top: 86, size: 166, alpha: 0.14 },
 ] as const;
 
+const balancedContentCircles = [
+  { key: "purple-top-right", tone: "purple", left: 980, top: -100, size: 350, alpha: 0.03 },
+  { key: "red-bottom-left", tone: "red", left: 20, top: 520, size: 150, alpha: 0.04 },
+  { key: "blue-middle", tone: "blue", left: 575, top: 150, size: 120, alpha: 0.04 },
+] as const;
+
 export const CoverComparisonDecorations = () => {
   return (
     <>
@@ -25,6 +31,23 @@ export const CoverComparisonDecorations = () => {
         style={{ borderColor: "rgba(80,56,166,0.12)" }}
       />
       {coverCircles.map((circle) => (
+        <ThemeSoftCircle
+          key={circle.key}
+          tone={circle.tone}
+          left={circle.left}
+          top={circle.top}
+          size={circle.size}
+          alpha={circle.alpha}
+        />
+      ))}
+    </>
+  );
+};
+
+export const BalancedComparisonDecorations = () => {
+  return (
+    <>
+      {balancedContentCircles.map((circle) => (
         <ThemeSoftCircle
           key={circle.key}
           tone={circle.tone}

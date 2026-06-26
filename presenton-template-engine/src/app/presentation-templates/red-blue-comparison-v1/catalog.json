@@ -1,7 +1,7 @@
 {
   "group_id": "red-blue-comparison-v1",
   "catalog_type": "tsx-first",
-  "version": 5,
+  "version": 7,
   "source_theme": {
     "folder": ".tmp/Template/红蓝主题",
     "theme_json": ".tmp/Template/红蓝主题/red-blue.json",
@@ -15,6 +15,37 @@
     "dominant_elements": ["CardGrid", "Chart", "NumberCallout", "Timeline", "TextBlock"]
   },
   "purpose": "Help the PPT AI Agent choose copyable TSX blueprints for red/blue comparison decks, then derive final pages into slides/*.tsx and edit implementation directly.",
+  "implemented_page_type_coverage": {
+    "cover": ["cover-comparison"],
+    "agenda": ["topic-overview"],
+    "content": [
+      "economy-size-growth",
+      "economic-structure",
+      "demographics-snapshot",
+      "aging-dependency",
+      "population-trend"
+    ],
+    "chart": ["economy-size-growth", "aging-dependency", "population-trend"],
+    "comparison": [
+      "economic-structure",
+      "demographics-snapshot",
+      "economy-size-growth",
+      "aging-dependency",
+      "population-trend"
+    ],
+    "timeline": [],
+    "closing": []
+  },
+  "not_available_yet": [
+    {
+      "page_type": "timeline",
+      "guidance": "No registered timeline blueprint exists in this group. Do not select a timeline layout from this catalog; derive from another implemented blueprint or add a new blueprint first."
+    },
+    {
+      "page_type": "closing",
+      "guidance": "No registered closing blueprint exists in this group. Do not point manifest.json to a closing slide until a real slides/*.tsx entry exists."
+    }
+  ],
   "directory_roles": {
     "components": {
       "path": "./components",
@@ -133,20 +164,55 @@
         "chart plus concise executive takeaway"
       ],
       "avoid_for": ["time-series trend", "absolute-volume chart", "dense table", "long policy narrative", "more than five composition segments"]
+    },
+    {
+      "id": "population-trend",
+      "name": "Population Trend",
+      "blueprint_source": "./blueprints/PopulationTrend.tsx",
+      "example_slide": "./slides/PopulationTrend.tsx",
+      "layout_family": "dual-axis-projection-trend",
+      "visual_pattern": "left primary dual-axis line chart with historical and projected segments + source note + right vertical insight cards with red/blue/purple accent rails",
+      "content_intents": ["time-series", "projection", "population-trend", "forecast-comparison", "turning-point-analysis"],
+      "suitable_for": [
+        "population trajectory comparison",
+        "historical plus forecast trend",
+        "two-entity time-series benchmark",
+        "trend chart with inflection callouts",
+        "chart plus executive implication cards"
+      ],
+      "avoid_for": [
+        "non-time-series comparison",
+        "composition breakdown",
+        "dense multi-chart dashboard",
+        "more than three line series",
+        "large comparison matrix"
+      ]
     }
   ],
-  "planned_blueprint_families": [
+  "selection_guide": [
     {
-      "layout_family": "timeline",
-      "intent": "Alternating milestone timeline with purple spine and date badges."
+      "when": "The page is an opening slide with two compared entities and a short scope list.",
+      "choose": "cover-comparison"
     },
     {
-      "layout_family": "hero-number",
-      "intent": "Large numeric callout with concise supporting explanation."
+      "when": "The page introduces four to six sections, pillars, or comparison dimensions.",
+      "choose": "topic-overview"
     },
     {
-      "layout_family": "image-narrative",
-      "intent": "Left narrative list with right-side image or illustration panel."
+      "when": "The page compares absolute scale or benchmark metrics with one primary bar chart.",
+      "choose": "economy-size-growth"
+    },
+    {
+      "when": "The page compares part-to-whole composition for exactly two entities.",
+      "choose": "economic-structure for donut composition, aging-dependency for horizontal stacked composition"
+    },
+    {
+      "when": "The page compares two entity profiles with one hero number and compact KPIs.",
+      "choose": "demographics-snapshot"
+    },
+    {
+      "when": "The page compares historical and projected trajectories over time.",
+      "choose": "population-trend"
     }
   ],
   "agent_workflow_notes": [

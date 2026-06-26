@@ -4,8 +4,8 @@ import * as z from "zod";
 import EntitySnapshotCard, {
   type EntitySnapshotIconName,
 } from "../components/EntitySnapshotCard.tsx";
+import { BalancedComparisonDecorations } from "../components/ComparisonDecorations.tsx";
 import ThemeContentFrame from "../components/ThemeContentFrame.tsx";
-import ThemeSoftCircle from "../components/ThemeSoftCircle.tsx";
 import { type RedBlueTone } from "../theme/tokens.ts";
 
 const ToneSchema = z.enum(["red", "blue", "purple", "neutral"]);
@@ -138,14 +138,6 @@ export const density = "medium";
 export const visualWeight = "balanced";
 export const editableTextPriority = "high";
 
-const DemographicsDecorations = () => (
-  <>
-    <ThemeSoftCircle tone="purple" left={980} top={-100} size={350} alpha={0.03} />
-    <ThemeSoftCircle tone="red" left={20} top={520} size={150} alpha={0.04} />
-    <ThemeSoftCircle tone="blue" left={575} top={150} size={120} alpha={0.04} />
-  </>
-);
-
 const DemographicsSnapshot = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
   const parsed = Schema.parse(data ?? {});
 
@@ -161,7 +153,7 @@ const DemographicsSnapshot = ({ data }: { data: Partial<z.infer<typeof Schema>> 
       contentTop={150}
       contentHeight={504}
     >
-      {parsed.showDecorations ? <DemographicsDecorations /> : null}
+      {parsed.showDecorations ? <BalancedComparisonDecorations /> : null}
       <div className="relative z-10 grid h-full min-h-0 grid-cols-2 gap-[40px]">
         {parsed.cards.map((card) => (
           <EntitySnapshotCard

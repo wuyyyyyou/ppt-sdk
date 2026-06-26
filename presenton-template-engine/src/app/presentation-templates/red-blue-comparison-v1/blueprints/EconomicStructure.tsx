@@ -1,9 +1,9 @@
 import React from "react";
 import * as z from "zod";
 
+import { BalancedComparisonDecorations } from "../components/ComparisonDecorations.tsx";
 import SectorStructureCard from "../components/SectorStructureCard.tsx";
 import ThemeContentFrame from "../components/ThemeContentFrame.tsx";
-import ThemeSoftCircle from "../components/ThemeSoftCircle.tsx";
 import { type RedBlueTone } from "../theme/tokens.ts";
 
 const ToneSchema = z.enum(["red", "blue", "purple", "neutral"]);
@@ -119,14 +119,6 @@ export const density = "medium";
 export const visualWeight = "visual-heavy";
 export const editableTextPriority = "high";
 
-const EconomicStructureDecorations = () => (
-  <>
-    <ThemeSoftCircle tone="purple" left={980} top={-100} size={350} alpha={0.03} />
-    <ThemeSoftCircle tone="red" left={20} top={520} size={150} alpha={0.04} />
-    <ThemeSoftCircle tone="blue" left={575} top={150} size={120} alpha={0.04} />
-  </>
-);
-
 const EconomicStructure = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
   const parsed = Schema.parse(data ?? {});
 
@@ -142,7 +134,7 @@ const EconomicStructure = ({ data }: { data: Partial<z.infer<typeof Schema>> }) 
       contentTop={150}
       contentHeight={504}
     >
-      {parsed.showDecorations ? <EconomicStructureDecorations /> : null}
+      {parsed.showDecorations ? <BalancedComparisonDecorations /> : null}
       <div className="relative z-10 grid h-full min-h-0 grid-cols-2 gap-[50px]">
         {parsed.cards.map((card) => (
           <SectorStructureCard

@@ -82,6 +82,16 @@
         "path": "./slides/AgingDependency.tsx"
       },
       "data_path": "./data/demo/aging-dependency.json"
+    },
+    {
+      "id": "red-blue-comparison-v1-population-trend",
+      "title": "Population Trends: 2000-2050",
+      "speaker_note": "Demo trend page derived from .tmp/Template/红蓝主题/7.html: one dual-axis projection line chart with custom legend, source note, and three right-side insight cards.",
+      "source": {
+        "type": "local",
+        "path": "./slides/PopulationTrend.tsx"
+      },
+      "data_path": "./data/demo/population-trend.json"
     }
   ]
 }
