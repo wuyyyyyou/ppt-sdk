@@ -21,7 +21,7 @@ export const Schema = z.object({
   titleHighlight: z.string().min(2).max(36).default("Key Milestones"),
   subtitle: z.string().min(8).max(130).optional(),
   footerText: z.string().min(4).max(90).default("Red Blue Comparison | Historical Timeline"),
-  pageNumber: z.string().min(1).max(4).default("09"),
+  pageNumber: z.string().min(1).max(4).default("10"),
   timelineItems: z.array(TimelineItemSchema).min(3).max(6).default([
     {
       date: "Phase 1",

@@ -9,6 +9,7 @@
   "audience_tags": ["management", "client", "analyst"],
   "tone_tags": ["professional", "analytical", "balanced"],
   "cover_layout_id": "red-blue-comparison-v1:cover-comparison",
+  "closing_layout_id": "red-blue-comparison-v1:closing-contact",
   "ordered": true,
   "default": false,
   "registry_order": 93,
@@ -21,6 +22,8 @@
     "slides/AgingDependency.tsx",
     "slides/PopulationTrend.tsx",
     "slides/TechnologyInnovationKpis.tsx",
-    "slides/HistoricalMilestonesTimeline.tsx"
+    "slides/EvidenceImageTable.tsx",
+    "slides/HistoricalMilestonesTimeline.tsx",
+    "slides/ClosingContact.tsx"
   ]
 }

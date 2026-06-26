@@ -104,6 +104,16 @@
       "data_path": "./data/demo/technology-innovation-kpis.json"
     },
     {
+      "id": "red-blue-comparison-v1-evidence-image-table",
+      "title": "Evidence View: Image & Table",
+      "speaker_note": "Demo image-and-table evidence page: one primary visual asset on the left and a compact editable comparison table on the right for observable evidence and short interpretation.",
+      "source": {
+        "type": "local",
+        "path": "./slides/EvidenceImageTable.tsx"
+      },
+      "data_path": "./data/demo/evidence-image-table.json"
+    },
+    {
       "id": "red-blue-comparison-v1-historical-milestones-timeline",
       "title": "History: Key Milestones",
       "speaker_note": "Demo timeline page derived from .tmp/Template/红蓝主题/11.html: centered history title, horizontal structure line, alternating milestone text blocks, date pills, and purple diamond markers.",
@@ -112,6 +122,16 @@
         "path": "./slides/HistoricalMilestonesTimeline.tsx"
       },
       "data_path": "./data/demo/historical-milestones-timeline.json"
+    },
+    {
+      "id": "red-blue-comparison-v1-closing-contact",
+      "title": "Thank You",
+      "speaker_note": "Demo closing page derived from .tmp/Template/红蓝主题/26.html: large thank-you title, editable URL pill, contact rows, and reusable soft-circle decoration language.",
+      "source": {
+        "type": "local",
+        "path": "./slides/ClosingContact.tsx"
+      },
+      "data_path": "./data/demo/closing-contact.json"
     }
   ]
 }

@@ -19,6 +19,7 @@
 | --- | --- | --- | --- |
 | `ThemeCanvas` | 页面框架 | 固定 1280x720 画布、字体、背景和可选点阵 | 封面或特殊页 |
 | `ThemeContentFrame` | 页面框架 | 内容页标题区、内容区和页脚 | 所有内容页 |
+| `ThemePanelShell` | 面板外壳 | 统一卡片/图表/表格/图片面板的背景、边框、圆角和阴影 | 图表壳、证据面板、closing 联系区 |
 | `ThemeTitleBlock` | 标题原语 | 标题、副标题、eyebrow、强调线和 prefix/highlight 分段标题 | 内容页标题 |
 | `ComparisonHeroTitle` | 标题原语 | 导出稳定的 `A vs B` 大标题 | 封面 |
 | `ThemePill` | 基础原语 | 短 meta、状态、分类标签 | header 或卡片角标 |
@@ -37,6 +38,8 @@
 | `StrategicInsightCard` | 卡片 | 带强调边的短洞察说明卡 | 雷达/KPI、能力对比、结论摘要 |
 | `ComparativeMetricRow` | 卡片 | 一行指标名 + 两个主体数值的紧凑对照 | KPI sidebar、能力基准对比 |
 | `ChartContainer` | 图表外壳 | 图表标题、meta 和导出控制 | 所有图表页 |
+| `ImageShowcasePanel` | 证据面板 | 主图片、标题、说明、来源和占位状态 | `EvidenceImageTable` |
+| `ComparisonTablePanel` | 表格面板 | 3-4 列紧凑比较表、强调单元格和底部证据注释 | `EvidenceImageTable` |
 | `VerticalComparisonBarChart` | 图表 | 两到三个实体垂直柱图 | 规模、量级、基准指标 |
 | `SectorDonutChart` | 图表 | 截图安全的环形占比图 | 结构占比 |
 | `SectorStructureCard` | 图表卡片 | 主体色条卡 + 环形图 + 图例 + 分析框 | `EconomicStructure` |
@@ -51,6 +54,7 @@
 | Slot 类型 | 推荐 Module | 不适合 |
 | --- | --- | --- |
 | `page-shell` | `ThemeCanvas`, `ThemeContentFrame` | 业务卡片、图表本体 |
+| `panel-shell` | `ThemePanelShell` | 页面整体布局、复杂业务逻辑 |
 | `page-title` | `ThemeTitleBlock`, `ComparisonHeroTitle`, `ThemeContentFrame` | 大段正文 |
 | `meta` / `pill` | `ThemePill`, `IconText`, `StableInlineRow` | 超过 24 字的长说明 |
 | `legend` | `EntityLegend`, `ProjectionLegend` | 长解释、复杂表格 |
@@ -64,6 +68,7 @@
 | `stacked-composition` | `StackedCompositionBarChart` | 绝对量级、时间序列 |
 | `projection-trend` | `DualAxisProjectionLineChart`, `ProjectionLegend` | 非时间序列、多图 dashboard |
 | `radar-comparison` | `ComparisonRadarChart`, `ComparativeMetricRow`, `StrategicInsightCard` | 时间序列、大表格、超过两个主体 |
+| `image-evidence` | `ImageShowcasePanel`, `ComparisonTablePanel` | 多图 gallery、chart-first 页面 |
 | `timeline` | `AlternatingTimeline` | 超过六个事件、详细年表、量化趋势图 |
 | `decoration` | `CoverComparisonDecorations`, `BalancedComparisonDecorations`, `ThemeSoftCircle` | 任何关键事实、数字或结论 |
 
@@ -72,6 +77,7 @@
 | Module | 建议容量 | 溢出处理 |
 | --- | --- | --- |
 | `ThemeTitleBlock` | 标题 36 字以内；副标题 100 字以内 | 必要时调小页面标题或改布局 |
+| `ThemePanelShell` | 只承载一个清晰内容模块 | 过密内容应拆卡或拆页 |
 | `ComparisonHeroTitle` | 左右标题各 28 字以内；连接词 12 字以内 | 超长标题在 slide 中降字号 |
 | `ThemePill` | 24 字以内 | 单行 truncate |
 | `IconText` | 单行 48 字以内，非单行模式 2 行以内 | 长文本改为卡片正文 |
@@ -83,6 +89,8 @@
 | `StrategicInsightCard` | 标题 34 字以内；说明约 180-220 字以内，默认 4-5 行 | 长正文应拆到叙事页或提高卡片高度 |
 | `ComparativeMetricRow` | 指标名 32 字以内；数值 16 字以内；副标签 24 字以内 | 超过两个主体应改矩阵页 |
 | `ChartContainer` | 标题 56 字以内；副标题 88 字以内 | 标题单行 truncate |
+| `ImageShowcasePanel` | 标题 48 字以内；说明约 3 行；来源 90 字以内 | 多图或长图注应拆页 |
+| `ComparisonTablePanel` | 3-4 列、2-5 行；单元格值 42 字以内 | 大表格应另做矩阵页 |
 | `VerticalComparisonBarChart` | 2-3 个柱；标签 24 字以内 | 超过 3 个主体应拆页 |
 | `StackedCompositionBarChart` | 2-4 行、2-5 个分段 | 小分段会隐藏内部数值标签 |
 | `DualAxisProjectionLineChart` | 1-3 条线；横轴 2-14 个点 | 复杂趋势应拆成多页 |

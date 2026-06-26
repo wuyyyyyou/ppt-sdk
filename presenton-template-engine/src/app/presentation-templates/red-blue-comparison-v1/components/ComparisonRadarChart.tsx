@@ -108,7 +108,7 @@ const ComparisonRadarChart = ({
         <PolarRadiusAxis
           axisLine={false}
           domain={[minValue, maxValue]}
-          ticks={ticks}
+          tickCount={ticks.length}
           tick={false}
           tickLine={false}
         />

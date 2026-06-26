@@ -1,7 +1,7 @@
 {
   "group_id": "red-blue-comparison-v1",
   "catalog_type": "tsx-first",
-  "version": 9,
+  "version": 11,
   "source_theme": {
     "folder": ".tmp/Template/红蓝主题",
     "theme_json": ".tmp/Template/红蓝主题/red-blue.json",
@@ -24,26 +24,24 @@
       "demographics-snapshot",
       "aging-dependency",
       "population-trend",
-      "technology-innovation-kpis"
+      "technology-innovation-kpis",
+      "evidence-image-table"
     ],
     "chart": ["economy-size-growth", "aging-dependency", "population-trend", "technology-innovation-kpis"],
+    "image": ["evidence-image-table"],
+    "table": ["evidence-image-table"],
     "comparison": [
       "economic-structure",
       "demographics-snapshot",
       "economy-size-growth",
       "aging-dependency",
       "population-trend",
-      "technology-innovation-kpis"
+      "technology-innovation-kpis",
+      "evidence-image-table"
     ],
     "timeline": ["historical-milestones-timeline"],
-    "closing": []
+    "closing": ["closing-contact"]
   },
-  "not_available_yet": [
-    {
-      "page_type": "closing",
-      "guidance": "No registered closing blueprint exists in this group. Do not point manifest.json to a closing slide until a real slides/*.tsx entry exists."
-    }
-  ],
   "directory_roles": {
     "components": {
       "path": "./components",
@@ -210,6 +208,29 @@
       ]
     },
     {
+      "id": "evidence-image-table",
+      "name": "Evidence Image Table",
+      "blueprint_source": "./blueprints/EvidenceImageTable.tsx",
+      "example_slide": "./slides/EvidenceImageTable.tsx",
+      "layout_family": "image-table-evidence",
+      "visual_pattern": "left primary image showcase with caption and source + right compact comparison table with red/blue/purple emphasis cells + concise evidence note",
+      "content_intents": ["visual-evidence", "image-analysis", "structured-comparison", "case-observation"],
+      "suitable_for": [
+        "one image with structured interpretation",
+        "visual evidence comparison",
+        "product or asset screenshot analysis",
+        "field observation summary",
+        "case visual plus compact table"
+      ],
+      "avoid_for": [
+        "multiple unrelated images",
+        "large dense tables",
+        "chart-first quantitative analysis",
+        "long narrative explanation",
+        "more than one primary visual asset"
+      ]
+    },
+    {
       "id": "historical-milestones-timeline",
       "name": "Historical Milestones Timeline",
       "blueprint_source": "./blueprints/HistoricalMilestonesTimeline.tsx",
@@ -230,6 +251,29 @@
         "quantitative time-series chart",
         "large comparison matrix",
         "long narrative history"
+      ]
+    },
+    {
+      "id": "closing-contact",
+      "name": "Closing Contact",
+      "blueprint_source": "./blueprints/ClosingContact.tsx",
+      "example_slide": "./slides/ClosingContact.tsx",
+      "layout_family": "closing-contact",
+      "visual_pattern": "large centered thank-you title + purple URL pill + contact panel + soft purple circular decorations",
+      "content_intents": ["closing", "thank-you", "contact", "final-page"],
+      "suitable_for": [
+        "clean thank-you final slide",
+        "contact information",
+        "follow-up URL and email",
+        "low-density final page",
+        "presentation close"
+      ],
+      "avoid_for": [
+        "analytical conclusion",
+        "next-step action plan",
+        "dense recommendations",
+        "chart or table content",
+        "section transition"
       ]
     }
   ],
@@ -263,8 +307,16 @@
       "choose": "technology-innovation-kpis"
     },
     {
+      "when": "The page needs one primary image, map, photo, screenshot, or visual asset plus a compact editable comparison table.",
+      "choose": "evidence-image-table"
+    },
+    {
       "when": "The page needs a concise chronological arc with three to six key milestones.",
       "choose": "historical-milestones-timeline"
+    },
+    {
+      "when": "The page is the final thank-you/contact slide and should stay low density.",
+      "choose": "closing-contact"
     }
   ],
   "agent_workflow_notes": [

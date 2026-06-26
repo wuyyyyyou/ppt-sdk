@@ -1,0 +1,60 @@
+{
+  "titlePrefix": "Evidence View:",
+  "titleHighlight": "Image & Table",
+  "subtitle": "One visual asset anchors the page while a structured table compares observable differences.",
+  "footerText": "China vs Japan | Visual Evidence",
+  "pageNumber": "09",
+  "image": {
+    "url": "",
+    "title": "Industrial cluster and benchmark signals",
+    "caption": "Demo visual placeholder for a market, product, infrastructure, or field-evidence image that needs structured interpretation.",
+    "source": "SOURCE: ADD VISUAL EVIDENCE",
+    "alt": "Abstract red blue comparison evidence visual",
+    "fit": "cover",
+    "tone": "purple"
+  },
+  "tableTitle": "Evidence comparison",
+  "tableSubtitle": "Condense what the visual suggests into editable comparison rows.",
+  "tableColumns": [
+    { "label": "Dimension", "width": "1.08fr", "tone": "purple" },
+    { "label": "China", "width": "0.86fr", "align": "center", "tone": "red" },
+    { "label": "Japan", "width": "0.86fr", "align": "center", "tone": "blue" },
+    { "label": "Signal", "width": "1.2fr", "tone": "purple" }
+  ],
+  "tableRows": [
+    {
+      "cells": [
+        { "value": "Visible scale", "note": "Asset footprint" },
+        { "value": "Large", "tone": "red", "emphasis": true, "align": "center" },
+        { "value": "Focused", "tone": "blue", "emphasis": true, "align": "center" },
+        { "value": "Scale vs precision", "note": "Frame the contrast" }
+      ]
+    },
+    {
+      "cells": [
+        { "value": "Operating pattern", "note": "Observed setup" },
+        { "value": "Distributed", "tone": "red", "align": "center" },
+        { "value": "Specialized", "tone": "blue", "align": "center" },
+        { "value": "Different strengths" }
+      ]
+    },
+    {
+      "cells": [
+        { "value": "Upgrade focus", "note": "Likely emphasis" },
+        { "value": "Automation", "tone": "red", "align": "center" },
+        { "value": "Quality systems", "tone": "blue", "align": "center" },
+        { "value": "Investment lens" }
+      ]
+    },
+    {
+      "cells": [
+        { "value": "Evidence status", "note": "Needs validation" },
+        { "value": "Image-backed", "tone": "purple", "align": "center" },
+        { "value": "Image-backed", "tone": "purple", "align": "center" },
+        { "value": "Pair with data", "note": "Avoid overclaiming" }
+      ]
+    }
+  ],
+  "tableFooterNote": "Use observable language for the table, then support any concrete claims with separate research evidence.",
+  "showDecorations": true
+}

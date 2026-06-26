@@ -1,6 +1,7 @@
 import React, { type ReactNode } from "react";
 
 import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import ThemePanelShell from "./ThemePanelShell.tsx";
 import ThemePill from "./ThemePill.tsx";
 
 type ChartContainerProps = {
@@ -27,16 +28,10 @@ const ChartContainer = ({
   const toneValue = redBlueComparisonTheme.tone[tone];
 
   return (
-    <div
-      className={["flex h-full min-h-0 flex-col rounded-[12px] border", className]
-        .filter(Boolean)
-        .join(" ")}
-      style={{
-        padding,
-        borderColor: redBlueComparisonTheme.colors.stroke,
-        backgroundColor: redBlueComparisonTheme.colors.card,
-        boxShadow: redBlueComparisonTheme.shadow.card,
-      }}
+    <ThemePanelShell
+      className={["flex h-full min-h-0 flex-col", className].filter(Boolean).join(" ")}
+      padding={padding}
+      radius={redBlueComparisonTheme.radius.xl}
     >
       <div className="mb-[16px] flex flex-none items-start justify-between gap-[16px]">
         <div className="min-w-0 flex-1">
@@ -67,7 +62,7 @@ const ChartContainer = ({
       >
         {children}
       </div>
-    </div>
+    </ThemePanelShell>
   );
 };
 
