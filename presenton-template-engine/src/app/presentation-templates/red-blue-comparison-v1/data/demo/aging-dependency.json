@@ -1,0 +1,75 @@
+{
+  "titlePrefix": "Aging &",
+  "titleHighlight": "Demographics",
+  "subtitle": "Age Structure Breakdown: China vs Japan (2025 Est.)",
+  "footerText": "China vs Japan | Demographics",
+  "pageNumber": "06",
+  "chartTitle": "Population by Age Group (%)",
+  "chartSubtitle": "Share of total population by broad age cohort",
+  "chartNote": "Values shown as share of total population.",
+  "chartUnitLabel": "%",
+  "segments": [
+    {
+      "key": "young",
+      "label": "0-14",
+      "color": "#00CEC9",
+      "textColor": "#FFFFFF"
+    },
+    {
+      "key": "working",
+      "label": "15-64",
+      "color": "#DFE6E9",
+      "textColor": "#2D3436"
+    },
+    {
+      "key": "elderly",
+      "label": "65+",
+      "color": "#5038A6",
+      "textColor": "#FFFFFF"
+    }
+  ],
+  "rows": [
+    {
+      "label": "China",
+      "values": {
+        "young": 16.5,
+        "working": 69.1,
+        "elderly": 14.4
+      }
+    },
+    {
+      "label": "Japan",
+      "values": {
+        "young": 11.5,
+        "working": 58.7,
+        "elderly": 29.8
+      }
+    }
+  ],
+  "insightCards": [
+    {
+      "label": "Japan (65+)",
+      "value": "29.8%",
+      "description": "World's highest elderly proportion. A super-aged society facing persistent labor shortages.",
+      "tone": "blue",
+      "icon": "flag",
+      "emphasis": "metric"
+    },
+    {
+      "label": "China (65+)",
+      "value": "14.4%",
+      "description": "Rapidly aging. The workforce is shrinking before the nation reaches high-income status.",
+      "tone": "red",
+      "icon": "flag",
+      "emphasis": "metric"
+    },
+    {
+      "label": "Key Conclusion",
+      "description": "Japan manages a mature aging crisis, while China faces a steeper transition that challenges its traditional manufacturing advantage.",
+      "tone": "purple",
+      "icon": "lightbulb",
+      "emphasis": "conclusion"
+    }
+  ],
+  "showDecorations": true
+}

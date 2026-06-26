@@ -34,6 +34,8 @@
 | `AgendaTopicCard` | 内容组件 | 编号水印、图标和短说明组合的议题卡 | 目录页、章节总览、主题/维度总览 |
 | `MetricCard` | 内容组件 | 数值、单位、说明和可选进度条 | KPI、数字强调、左右对比指标 |
 | `VerticalComparisonBarChart` | 内容组件 | 基于 Recharts 的两到三个实体垂直柱图 | 主图表、规模对比、量级比较 |
+| `StackedCompositionBarChart` | 内容组件 | 基于 Recharts 的 100% 横向堆叠构成图 | 年龄结构、收入结构、成本构成、份额拆分 |
+| `InsightMetricCard` | 内容组件 | 左侧强调线数值摘要卡或浅色结论卡 | 图表侧栏要点、风险提示、执行摘要 |
 | `EntityComparisonMetricCard` | 内容组件 | 实体排名卡或横向条形指标卡 | 右侧指标组、红/蓝主体指标对比 |
 | `SectorDonutChart` | 内容组件 | 基于 Recharts 且截图安全的环形占比图 | 结构占比、份额构成、组合拆分 |
 | `SectorStructureCard` | 内容组件 | 主体色条卡 + 环形图 + 图例 + 分析框 | 双主体结构对比、行业/收入/市场份额拆分 |
@@ -54,6 +56,8 @@
 | `agenda-card-grid` | `AgendaTopicCard` | 图表、长段落、超过六个议题的目录 |
 | `metric` / `number-callout` | `MetricCard`, `StableInlineRow` | 多段结论或长脚注 |
 | `chart` | `ChartContainer`, `VerticalComparisonBarChart` | 非数据装饰、长文本说明 |
+| `composition` / `stacked-bar` | `StackedCompositionBarChart`, `ChartContainer` | 时间序列、大段解释、非百分比量级对比 |
+| `insight-sidebar` | `InsightMetricCard`, `MetricCard` | 大段连续正文、复杂矩阵 |
 | `comparison-metric` | `EntityComparisonMetricCard` | 超过三个主体、复杂表格 |
 | `composition` / `donut` | `SectorDonutChart`, `SectorStructureCard` | 时间序列、大段解释、超过两个主卡的复杂对比 |
 | `timeline` | `TimelineNode` | 无顺序的分类信息 |
@@ -74,6 +78,8 @@
 | `AgendaTopicCard` | 标题 34 字以内；说明 115 字以内 | 固定卡片高度，长文本应拆短或减少卡片数量 |
 | `MetricCard` | 数值 10 字以内；说明 40 字以内 | 数值单行 truncate |
 | `VerticalComparisonBarChart` | 2-3 个柱；标签 24 字以内；数值标签 18 字以内；需传稳定 width/height | 超过 3 个主体应改图表布局或拆页 |
+| `StackedCompositionBarChart` | 2-4 行、2-5 个分段；分段标签 24 字以内；总量应约等于 100 | 小分段会隐藏内部数值标签，复杂构成应拆页 |
+| `InsightMetricCard` | 标签 28 字以内；数值 18 字以内；说明 140 字以内 | 说明限制高度，长结论应改为正文页 |
 | `EntityComparisonMetricCard` | 2-3 个主体；标题 36 字以内；数值 18 字以内 | 超过 3 个主体或长解释应改矩阵页 |
 | `SectorDonutChart` | 2-5 个分段；中心值 12 字以内；中心标签 18 字以内；扇区边界保持直角 | 图表区域截图导出，不承载正文 |
 | `SectorStructureCard` | 主体 24 字以内；badge 24 字以内；分析说明 110 字以内 | 两卡并排为主，更多主体应拆页 |
@@ -108,6 +114,8 @@
 - `AgendaTopicCard` 用于目录或主题总览中的编号议题卡，保留淡化编号、图标和顶部强调条。
 - `MetricCard` 用于 KPI、数字强调和进度类指标。
 - `VerticalComparisonBarChart` 用 Recharts 渲染基础垂直对比柱图；外层应通过 `ChartContainer exportMode="screenshot"` 进入 PPT，保留图表视觉一致性。
+- `StackedCompositionBarChart` 用 Recharts 渲染 100% 横向堆叠构成图；适合百分比分布，不适合绝对量级或时间序列。
+- `InsightMetricCard` 用于图表侧栏摘要，保留数值和说明为可编辑文本；结论卡使用浅色底，不承载复杂段落。
 - `EntityComparisonMetricCard` 用于实体排名和横向条形指标对比。
 - `SectorDonutChart` 用 Recharts 渲染结构占比图，默认截图导出以保留环形分段和中心标签；扇区边界不用圆帽，避免小分段视觉变形。
 - `SectorStructureCard` 用于可复用的主体结构卡，顶部色条、badge、图例和分析框保持可编辑文本。

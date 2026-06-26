@@ -10,5 +10,7 @@
 | `TopicOverview.tsx` | agenda-card-grid | 用 3x2 编号图标卡展示四到六个议题、章节或比较维度。 |
 | `EconomySizeGrowth.tsx` | chart-with-metric-cards | 用左侧主柱图和右侧指标卡比较两到三个主体的规模、增速或基准指标。 |
 | `EconomicStructure.tsx` | comparison-card-grid | 用两张主体卡、环形占比图、图例和分析框比较结构构成。 |
+| `DemographicsSnapshot.tsx` | entity-snapshot-cards | 用两张主体卡展示人口规模、状态和人口相关 KPI。 |
+| `AgingDependency.tsx` | stacked-composition-with-insights | 用左侧 100% 堆叠构成图和右侧摘要卡比较年龄结构、依赖风险或其他百分比构成。 |
 
 后续规划的蓝图家族记录在 `../catalog.json`。不要把 `.tmp/Template` 里的源 HTML 原样粘进 TSX；应抽象出可复用组件和页面结构。

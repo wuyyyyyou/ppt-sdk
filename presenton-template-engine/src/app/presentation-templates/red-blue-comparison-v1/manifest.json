@@ -72,6 +72,16 @@
         "path": "./slides/DemographicsSnapshot.tsx"
       },
       "data_path": "./data/demo/demographics-snapshot.json"
+    },
+    {
+      "id": "red-blue-comparison-v1-aging-dependency",
+      "title": "Aging & Demographics",
+      "speaker_note": "Demo demographic composition page derived from .tmp/Template/红蓝主题/6.html: a 100% stacked age-structure chart with right-side elderly-share callouts and a concise conclusion.",
+      "source": {
+        "type": "local",
+        "path": "./slides/AgingDependency.tsx"
+      },
+      "data_path": "./data/demo/aging-dependency.json"
     }
   ]
 }

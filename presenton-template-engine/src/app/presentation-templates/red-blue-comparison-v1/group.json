@@ -17,6 +17,7 @@
     "slides/TopicOverview.tsx",
     "slides/EconomySizeGrowth.tsx",
     "slides/EconomicStructure.tsx",
-    "slides/DemographicsSnapshot.tsx"
+    "slides/DemographicsSnapshot.tsx",
+    "slides/AgingDependency.tsx"
   ]
 }

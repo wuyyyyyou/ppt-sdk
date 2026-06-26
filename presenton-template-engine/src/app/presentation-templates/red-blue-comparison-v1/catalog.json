@@ -1,7 +1,7 @@
 {
   "group_id": "red-blue-comparison-v1",
   "catalog_type": "tsx-first",
-  "version": 4,
+  "version": 5,
   "source_theme": {
     "folder": ".tmp/Template/红蓝主题",
     "theme_json": ".tmp/Template/红蓝主题/red-blue.json",
@@ -116,6 +116,23 @@
         "primary metric plus supporting KPIs"
       ],
       "avoid_for": ["time-series trend", "dense tables", "long narrative", "more than two primary entity cards"]
+    },
+    {
+      "id": "aging-dependency",
+      "name": "Aging Dependency",
+      "blueprint_source": "./blueprints/AgingDependency.tsx",
+      "example_slide": "./slides/AgingDependency.tsx",
+      "layout_family": "stacked-composition-with-insights",
+      "visual_pattern": "left primary 100% stacked horizontal composition chart + right elderly-share metric callouts + purple conclusion card + soft circular decorations",
+      "content_intents": ["demographic-composition", "age-structure", "dependency-risk", "part-to-whole-comparison"],
+      "suitable_for": [
+        "age structure comparison",
+        "dependency ratio narrative",
+        "percentage composition benchmark",
+        "two to four entity part-to-whole comparison",
+        "chart plus concise executive takeaway"
+      ],
+      "avoid_for": ["time-series trend", "absolute-volume chart", "dense table", "long policy narrative", "more than five composition segments"]
     }
   ],
   "planned_blueprint_families": [
