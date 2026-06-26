@@ -13,5 +13,6 @@
 | `DemographicsSnapshot.tsx` | entity-snapshot-cards | 用两张主体卡展示人口规模、状态和人口相关 KPI。 |
 | `AgingDependency.tsx` | stacked-composition-with-insights | 用左侧 100% 堆叠构成图和右侧摘要卡比较年龄结构、依赖风险或其他百分比构成。 |
 | `PopulationTrend.tsx` | dual-axis-projection-trend | 用左侧双轴折线图和右侧洞察卡比较历史趋势、预测段和关键拐点。 |
+| `TechnologyInnovationKpis.tsx` | radar-kpi-sidebar | 用左侧雷达图和右侧 KPI 行比较两个主体的技术、创新、能力成熟度。 |
 
 当前组还没有注册 timeline 或 closing 蓝图；不要在 `group.json.layouts` 或 `manifest.json` 中引用不存在的页面。不要把 `.tmp/Template` 里的源 HTML 原样粘进 TSX；应抽象出可复用组件和页面结构。

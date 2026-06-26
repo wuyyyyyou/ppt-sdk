@@ -19,6 +19,7 @@
     "slides/EconomicStructure.tsx",
     "slides/DemographicsSnapshot.tsx",
     "slides/AgingDependency.tsx",
-    "slides/PopulationTrend.tsx"
+    "slides/PopulationTrend.tsx",
+    "slides/TechnologyInnovationKpis.tsx"
   ]
 }

@@ -1,0 +1,134 @@
+{
+  "titlePrefix": "Technology &",
+  "titleHighlight": "Innovation",
+  "subtitle": "Comparative assessment of R&D capabilities, output, and ecosystem maturity.",
+  "footerText": "China vs Japan | Technology & Innovation",
+  "pageNumber": "08",
+  "chartTitle": "Innovation Ecosystem Profile",
+  "chartSubtitle": "Normalized score comparison across innovation capability dimensions.",
+  "sourceNote": "*Scores normalized (0-100 scale) based on global indices (WIPO, Bloomberg, OECD).",
+  "entities": [
+    {
+      "label": "China",
+      "tone": "red"
+    },
+    {
+      "label": "Japan",
+      "tone": "blue"
+    }
+  ],
+  "radarLabels": [
+    "R&D % GDP",
+    "Patent Volume",
+    "High-Tech Exports",
+    "Startup/VC",
+    "Research Density",
+    "AI Adoption"
+  ],
+  "radarSeries": [
+    {
+      "label": "China",
+      "tone": "red",
+      "fillColor": "rgba(255,71,87,0.18)",
+      "values": [75, 95, 98, 85, 40, 90]
+    },
+    {
+      "label": "Japan",
+      "tone": "blue",
+      "fillColor": "rgba(46,134,222,0.18)",
+      "values": [90, 80, 50, 40, 95, 70]
+    }
+  ],
+  "minValue": 0,
+  "maxValue": 100,
+  "ticks": [20, 40, 60, 80, 100],
+  "insight": {
+    "title": "Strategic Divergence",
+    "text": "China excels in scale, rapid commercialization, and digital ecosystem growth (\"Speed & Scale\"). Japan maintains superiority in fundamental research, precision engineering, and robotics (\"Quality & Precision\").",
+    "icon": "microscope",
+    "tone": "purple"
+  },
+  "metrics": [
+    {
+      "label": "R&D Spending",
+      "icon": "flask",
+      "values": [
+        {
+          "value": "2.6%",
+          "sublabel": "of GDP",
+          "tone": "red"
+        },
+        {
+          "value": "3.3%",
+          "sublabel": "of GDP",
+          "tone": "blue"
+        }
+      ]
+    },
+    {
+      "label": "Patents (Triadic)",
+      "icon": "certificate",
+      "values": [
+        {
+          "value": "High",
+          "sublabel": "Volume",
+          "tone": "red"
+        },
+        {
+          "value": "High",
+          "sublabel": "Quality/Global",
+          "tone": "blue"
+        }
+      ]
+    },
+    {
+      "label": "High-Tech Exp.",
+      "icon": "microchip",
+      "values": [
+        {
+          "value": "$942B",
+          "sublabel": "Dominant",
+          "tone": "red"
+        },
+        {
+          "value": "$120B",
+          "sublabel": "Specialized",
+          "tone": "blue"
+        }
+      ]
+    },
+    {
+      "label": "Researcher Density",
+      "icon": "graduation-cap",
+      "values": [
+        {
+          "value": "1.6k",
+          "sublabel": "per million",
+          "tone": "red"
+        },
+        {
+          "value": "5.3k",
+          "sublabel": "per million",
+          "tone": "blue"
+        }
+      ]
+    },
+    {
+      "label": "Unicorn Startups",
+      "icon": "rocket",
+      "values": [
+        {
+          "value": "300+",
+          "sublabel": "Vibrant Scene",
+          "tone": "red"
+        },
+        {
+          "value": "~12",
+          "sublabel": "Emerging",
+          "tone": "blue"
+        }
+      ]
+    }
+  ],
+  "showDecorations": true
+}

@@ -1,7 +1,7 @@
 {
   "group_id": "red-blue-comparison-v1",
   "catalog_type": "tsx-first",
-  "version": 7,
+  "version": 8,
   "source_theme": {
     "folder": ".tmp/Template/红蓝主题",
     "theme_json": ".tmp/Template/红蓝主题/red-blue.json",
@@ -23,15 +23,17 @@
       "economic-structure",
       "demographics-snapshot",
       "aging-dependency",
-      "population-trend"
+      "population-trend",
+      "technology-innovation-kpis"
     ],
-    "chart": ["economy-size-growth", "aging-dependency", "population-trend"],
+    "chart": ["economy-size-growth", "aging-dependency", "population-trend", "technology-innovation-kpis"],
     "comparison": [
       "economic-structure",
       "demographics-snapshot",
       "economy-size-growth",
       "aging-dependency",
-      "population-trend"
+      "population-trend",
+      "technology-innovation-kpis"
     ],
     "timeline": [],
     "closing": []
@@ -187,6 +189,29 @@
         "more than three line series",
         "large comparison matrix"
       ]
+    },
+    {
+      "id": "technology-innovation-kpis",
+      "name": "Technology Innovation KPIs",
+      "blueprint_source": "./blueprints/TechnologyInnovationKpis.tsx",
+      "example_slide": "./slides/TechnologyInnovationKpis.tsx",
+      "layout_family": "radar-kpi-sidebar",
+      "visual_pattern": "left primary radar ecosystem profile with entity legend + source note + right strategic insight card and compact two-entity KPI rows",
+      "content_intents": ["innovation-benchmark", "capability-comparison", "technology-ecosystem", "kpi-evidence"],
+      "suitable_for": [
+        "technology and innovation capability benchmark",
+        "multi-dimension two-entity score comparison",
+        "innovation ecosystem profile",
+        "radar chart with supporting KPI evidence",
+        "executive capability assessment"
+      ],
+      "avoid_for": [
+        "time-series trend",
+        "more than two compared entities",
+        "large matrix",
+        "single-metric comparison",
+        "long narrative without quantitative dimensions"
+      ]
     }
   ],
   "selection_guide": [
@@ -213,6 +238,10 @@
     {
       "when": "The page compares historical and projected trajectories over time.",
       "choose": "population-trend"
+    },
+    {
+      "when": "The page compares two entities across multiple capability dimensions and needs a radar chart plus KPI sidebar.",
+      "choose": "technology-innovation-kpis"
     }
   ],
   "agent_workflow_notes": [

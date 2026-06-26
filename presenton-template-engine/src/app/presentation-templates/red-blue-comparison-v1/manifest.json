@@ -92,6 +92,16 @@
         "path": "./slides/PopulationTrend.tsx"
       },
       "data_path": "./data/demo/population-trend.json"
+    },
+    {
+      "id": "red-blue-comparison-v1-technology-innovation-kpis",
+      "title": "Technology & Innovation",
+      "speaker_note": "Demo KPI benchmark page derived from .tmp/Template/红蓝主题/8.html: one radar ecosystem profile with custom entity legend, strategic divergence callout, and compact two-entity KPI rows.",
+      "source": {
+        "type": "local",
+        "path": "./slides/TechnologyInnovationKpis.tsx"
+      },
+      "data_path": "./data/demo/technology-innovation-kpis.json"
     }
   ]
 }

@@ -34,12 +34,15 @@
 | `EntitySnapshotCard` | 卡片 | 主体英雄数值、状态和 KPI 列表 | `DemographicsSnapshot` |
 | `InsightMetricCard` | 卡片 | 数值摘要卡或浅色结论卡 | `AgingDependency` |
 | `TrendInsightCard` | 卡片 | 趋势页右侧拐点/降幅/展望洞察卡 | `PopulationTrend` |
+| `StrategicInsightCard` | 卡片 | 带强调边的短洞察说明卡 | 雷达/KPI、能力对比、结论摘要 |
+| `ComparativeMetricRow` | 卡片 | 一行指标名 + 两个主体数值的紧凑对照 | KPI sidebar、能力基准对比 |
 | `ChartContainer` | 图表外壳 | 图表标题、meta 和导出控制 | 所有图表页 |
 | `VerticalComparisonBarChart` | 图表 | 两到三个实体垂直柱图 | 规模、量级、基准指标 |
 | `SectorDonutChart` | 图表 | 截图安全的环形占比图 | 结构占比 |
 | `SectorStructureCard` | 图表卡片 | 主体色条卡 + 环形图 + 图例 + 分析框 | `EconomicStructure` |
 | `StackedCompositionBarChart` | 图表 | 100% 横向堆叠构成图 | 年龄结构、份额构成 |
 | `DualAxisProjectionLineChart` | 图表 | 双轴历史/预测折线图 | `PopulationTrend` |
+| `ComparisonRadarChart` | 图表 | 两个主体的多维能力雷达图 | 技术创新、竞争力、成熟度 |
 | `ProjectionLegend` | 图表辅助 | 实线实体图例 + 虚线预测说明 | `PopulationTrend` |
 
 ## Slot 适配
@@ -59,6 +62,7 @@
 | `donut-composition` | `SectorDonutChart`, `SectorStructureCard` | 时间序列、超过两个主卡 |
 | `stacked-composition` | `StackedCompositionBarChart` | 绝对量级、时间序列 |
 | `projection-trend` | `DualAxisProjectionLineChart`, `ProjectionLegend` | 非时间序列、多图 dashboard |
+| `radar-comparison` | `ComparisonRadarChart`, `ComparativeMetricRow`, `StrategicInsightCard` | 时间序列、大表格、超过两个主体 |
 | `decoration` | `CoverComparisonDecorations`, `BalancedComparisonDecorations`, `ThemeSoftCircle` | 任何关键事实、数字或结论 |
 
 ## 文本容量
@@ -74,10 +78,13 @@
 | `EntitySnapshotCard` | 主体 24 字以内；英雄数值 18 字以内；KPI 2-4 项 | 长解释放到独立文本页 |
 | `InsightMetricCard` | 标签 28 字以内；数值 18 字以内；说明 140 字以内 | 长结论应改为正文页 |
 | `TrendInsightCard` | 标题 28 字以内；数值 18 字以内；说明 160 字以内 | 右栏最多 4 张卡 |
+| `StrategicInsightCard` | 标题 34 字以内；说明约 180-220 字以内，默认 4-5 行 | 长正文应拆到叙事页或提高卡片高度 |
+| `ComparativeMetricRow` | 指标名 32 字以内；数值 16 字以内；副标签 24 字以内 | 超过两个主体应改矩阵页 |
 | `ChartContainer` | 标题 56 字以内；副标题 88 字以内 | 标题单行 truncate |
 | `VerticalComparisonBarChart` | 2-3 个柱；标签 24 字以内 | 超过 3 个主体应拆页 |
 | `StackedCompositionBarChart` | 2-4 行、2-5 个分段 | 小分段会隐藏内部数值标签 |
 | `DualAxisProjectionLineChart` | 1-3 条线；横轴 2-14 个点 | 复杂趋势应拆成多页 |
+| `ComparisonRadarChart` | 2 条序列；3-8 个维度 | 维度过多会造成标签拥挤 |
 | `SectorStructureCard` | 主体 24 字以内；badge 24 字以内；分析说明 110 字以内 | 更多主体应拆页 |
 
 ## AI 修改规则
