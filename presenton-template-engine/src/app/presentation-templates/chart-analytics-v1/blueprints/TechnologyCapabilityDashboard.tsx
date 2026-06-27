@@ -3,6 +3,7 @@ import * as z from "zod";
 
 import AdvantageBarList from "../components/AdvantageBarList.tsx";
 import AnalyticsCanvas from "../components/AnalyticsCanvas.tsx";
+import AnalyticsSourceFooter from "../components/AnalyticsSourceFooter.tsx";
 import CircularComparisonMetricCard from "../components/CircularComparisonMetricCard.tsx";
 import ExecutiveHeader from "../components/ExecutiveHeader.tsx";
 import StrategicInsightPanel from "../components/StrategicInsightPanel.tsx";
@@ -217,12 +218,7 @@ const TechnologyCapabilityDashboard = ({ data }: { data: Partial<z.infer<typeof 
           </div>
         </div>
 
-        <div className="flex h-[18px] flex-none items-center justify-between border-t pt-[8px] text-[10px]" style={{ borderColor: "#E2E8F0", color: chartAnalyticsTheme.colors.mutedText }}>
-          <div className="truncate">{parsed.sourceNote}</div>
-          <div className="flex-none pl-[20px] font-bold" style={{ color: chartAnalyticsTheme.colors.subtleText }}>
-            {parsed.slideLabel}
-          </div>
-        </div>
+        <AnalyticsSourceFooter source={parsed.sourceNote} slideLabel={parsed.slideLabel} height={18} padded={false} backgroundColor="transparent" />
       </div>
     </AnalyticsCanvas>
   );

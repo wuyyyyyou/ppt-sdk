@@ -2,9 +2,10 @@ import React from "react";
 import * as z from "zod";
 
 import AnalyticsCanvas from "../components/AnalyticsCanvas.tsx";
-import { AnalyticsIcon } from "../components/AnalyticsIcons.tsx";
 import AnalyticsLineChart, { type AnalyticsLineSeries } from "../components/AnalyticsLineChart.tsx";
+import AnalyticsSourceFooter from "../components/AnalyticsSourceFooter.tsx";
 import ChartPanelShell from "../components/ChartPanelShell.tsx";
+import DarkInsightCard from "../components/DarkInsightCard.tsx";
 import ExecutiveHeader from "../components/ExecutiveHeader.tsx";
 import TrendStatCard from "../components/TrendStatCard.tsx";
 import { chartAnalyticsTheme } from "../theme/tokens.ts";
@@ -143,20 +144,13 @@ const GrowthTrendComparison = ({ data }: { data: Partial<z.infer<typeof Schema>>
             <TrendStatCard key={card.subject} {...card} />
           ))}
 
-          <div className="relative flex min-h-0 flex-1 flex-col justify-center overflow-hidden rounded-[8px] px-[20px] py-[18px] text-white" style={{ backgroundColor: chartAnalyticsTheme.colors.panel, boxShadow: "0 10px 18px rgba(15,23,42,0.18)" }}>
-            <div className="absolute right-[18px] top-[16px] opacity-[0.08]">
-              <AnalyticsIcon name={parsed.insightIcon} className="h-[70px] w-[70px]" stroke="#FFFFFF" />
-            </div>
-            <div className="relative z-[1] text-[13px] font-bold uppercase leading-[1.2]" style={{ color: "#60A5FA" }}>
-              {parsed.insightLabel}
-            </div>
-            <div className="relative z-[1] mt-[10px] text-[17px] font-bold leading-[1.2] text-white">
-              {parsed.insightTitle}
-            </div>
-            <div className="relative z-[1] mt-[8px] text-[13px] leading-[1.45]" style={{ color: "#CBD5E1" }}>
-              {parsed.insightText}
-            </div>
-          </div>
+          <DarkInsightCard
+            label={parsed.insightLabel}
+            title={parsed.insightTitle}
+            text={parsed.insightText}
+            icon={parsed.insightIcon}
+            className="flex-1"
+          />
         </div>
 
         <div className="min-h-0">
@@ -187,13 +181,11 @@ const GrowthTrendComparison = ({ data }: { data: Partial<z.infer<typeof Schema>>
         </div>
       </div>
 
-      <div className="flex h-[38px] items-center justify-between border-t bg-white px-[48px] text-[10px]" style={{ borderColor: chartAnalyticsTheme.colors.stroke, color: chartAnalyticsTheme.colors.mutedText }}>
-        <div>{parsed.footerSource}</div>
-        <div className="flex items-center gap-[18px]">
-          <span>{parsed.confidentialityLabel}</span>
-          <span>SLIDE {parsed.pageNumber}</span>
-        </div>
-      </div>
+      <AnalyticsSourceFooter
+        source={parsed.footerSource}
+        confidentialityLabel={parsed.confidentialityLabel}
+        pageNumber={parsed.pageNumber}
+      />
     </AnalyticsCanvas>
   );
 };

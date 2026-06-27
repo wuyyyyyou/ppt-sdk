@@ -24,6 +24,7 @@
 | `ComparisonHeroTitle` | 标题组合 | 上下双主体大标题 + `ComparisonDivider` | 对比报告封面 |
 | `ReportMetaFooter` | 页脚原语 | 左侧发布方/署名和右侧日期/版本 | 封面、报告收束页、章节重置页 |
 | `ExecutiveHeader` | 内容页页眉 | 深色报告页眉、eyebrow、标题、右侧元信息和图标 | 执行摘要、仪表盘、图表内容页 |
+| `AnalyticsSourceFooter` | 内容页脚 | 来源、保密标签、页码或 slide label 的稳定单行页脚 | 图表页、构成对比页、仪表盘页 |
 | `AnalyticsCardShell` | 卡片容器 | 白色或深色分析卡片、边框、阴影、顶部强调色 | KPI 卡、图表卡、洞察卡 |
 | `MetricHighlightCard` | 指标组合 | 大数字 KPI + 进度条、双值块或状态徽章 | 摘要仪表盘、KPI overview |
 | `ProgressMeter` | 度量原语 | 固定高度进度条 | KPI、成熟度、占比、状态面板 |
@@ -33,6 +34,7 @@
 | `AnalyticsLineChart` | 图表组件 | Recharts 多系列折线图，支持负值区间、0% 基线和截图导出边界 | 趋势对比、历史波动、长周期指标 |
 | `AnalyticsDonutChart` | 图表组件 | Recharts 环形构成图，中心指标固定在图内，自带截图导出边界 | 结构占比、年龄分布、市场份额、组合构成 |
 | `TrendStatCard` | 指标组合 | 主体标签、状态徽章、两项关键指标和短解释 | 趋势对比、主体画像、左侧解释栏 |
+| `DarkInsightCard` | 深色洞察卡 | 标签、标题、短解释和背景图标水印 | 趋势解释、收束洞察、低密度解读卡 |
 | `StructureLegendBar` | 图例组合 | 居中胶囊图例，保留可编辑 label 文本 | 构成对比、份额对比、环图页 |
 | `StructureComparisonCard` | 指标+图表组合 | 实体身份、总量、环形结构图、中心指标和底部强调指标 | 双实体结构占比对比页 |
 | `AnalyticsIcons` | 图标原语 | 当前主题使用的轻量线性图标集合 | 页眉、KPI、洞察、面板标题 |
@@ -52,11 +54,12 @@
 | `comparison-divider` | `ComparisonDivider` | 无对比语义的普通分割线 |
 | `footer-meta` | `ReportMetaFooter` | 多列联系方式、长版权声明、正文内容 |
 | `body-header` | `ExecutiveHeader` | 封面 hero 标题、章节大标题 |
+| `source-footer` | `AnalyticsSourceFooter` | 多段免责声明、正文解释、复杂联系方式 |
 | `metric-card` | `MetricHighlightCard` | 长正文说明、超过三组维度的矩阵 |
 | `chart-shell` | `ChartPanelShell` + `AnalyticsGroupedBarChart` / `AnalyticsLineChart` | 单页临时手写 Chart.js、纯装饰图 |
 | `composition-donut` | `StructureLegendBar` + `StructureComparisonCard` / `AnalyticsDonutChart` | 超过两个对象的拥挤环图、需要长解释段落的结构页 |
 | `trend-stat-card` | `TrendStatCard` | 长正文、超过两项核心指标的详细表格 |
-| `dark-insight-panel` | `OutlookPanel` | 需要大段正文或复杂表格的内容 |
+| `dark-insight-panel` | `OutlookPanel` / `DarkInsightCard` | 需要大段正文或复杂表格的内容 |
 | `paired-ring-metrics` | `CircularComparisonMetricCard` | 单实体 KPI、需要精确坐标轴的趋势图 |
 | `advantage-bars` | `AdvantageBarList` | 时间序列、超过两个主体的堆叠比较 |
 | `strategic-insight-summary` | `StrategicInsightPanel` | 长篇文本、复杂多列表格 |
@@ -69,3 +72,4 @@
 - 改跨页共享的稳定视觉单元：改或新增 `components/*.tsx`，并同步更新本 README。
 - 实现图表页时，优先新增可复用图表容器和 Recharts 图表 Module，不要在 blueprint 中临时手写 Chart.js 或源 HTML 图表结构。
 - Recharts 图表组件必须在组件内部设置截图导出边界，避免 PPTX model 同时包含图表截图和轴标签文本框；图表标题、legend、解释文本应放在截图边界外，保持可编辑。
+- 复用阈值：内容页脚、图表壳、跨页卡片、洞察面板、对比卡和时间线面板放在 `components/`；只服务一个源页的装饰、特殊 grid 和字段编排留在对应 blueprint。

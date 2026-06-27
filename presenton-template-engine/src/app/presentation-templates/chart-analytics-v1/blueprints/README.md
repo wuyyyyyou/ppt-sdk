@@ -11,6 +11,7 @@
 | `GrowthTrendComparison.tsx` | 对应 `.tmp/Template/图表主题/4.html` 的长周期趋势分析页：左侧主体统计卡和洞察，右侧多系列折线图。 |
 | `PopulationStructureComparison.tsx` | 对应 `.tmp/Template/图表主题/6.html` 的双实体构成结构对比页：共享图例、左右实体卡、环形构成图、中心指标和底部比率强调。 |
 | `TechnologyCapabilityDashboard.tsx` | 对应 `.tmp/Template/图表主题/8.html` 的技术能力仪表盘：四张双主体环形指标卡、领域优势条和战略分歧洞察。 |
+| `ClosingAnalytics.tsx` | 对应 `.tmp/Template/图表主题/15.html` / `22.html` 的暗色收束页：感谢标题、下一步/决策 callout、联系人和日期。 |
 
 ## 已实现源页
 
@@ -21,6 +22,7 @@
 | `.tmp/Template/图表主题/4.html` | `GrowthTrendComparison.tsx` | 历史增长趋势和波动收敛分析 | 深色内容页页眉、左侧两张主体统计卡、深色战略洞察、右侧长周期多系列折线图和资料页脚。 |
 | `.tmp/Template/图表主题/6.html` | `PopulationStructureComparison.tsx` | 人口或市场结构构成对比 | 深色内容页页眉、居中共享图例、左右等宽实体卡、环形构成图、中心关键指标、底部比率指标和来源页脚。 |
 | `.tmp/Template/图表主题/8.html` | `TechnologyCapabilityDashboard.tsx` | 技术能力和领域优势对比 | 深色内容页页眉、四列双主体环形指标卡、左侧 sector dominance 条形列表、右侧深色战略分歧洞察和关键统计。 |
+| `.tmp/Template/图表主题/15.html` / `22.html` | `ClosingAnalytics.tsx` | 感谢和收束 | 暗色背景、短标题、下一步 callout、联系人和报告日期页脚。 |
 
 ## 阅读顺序
 
@@ -35,3 +37,4 @@
 - `slides/*.tsx` 是最终页面入口，`group.json.layouts` 只引用这里。
 - `data/*.json` 只承载内容数据；结构、列宽、组件选择和越界修复应改 TSX。
 - 不要把 `.tmp/Template/图表主题` 的 HTML 原样塞进 TSX。
+- 上移到 `components/` 的标准：跨两页以上复用、或者属于稳定页面原语（页眉、页脚、图表壳、卡片壳、洞察面板、对比卡、timeline/outlook 面板）。单页专属装饰和特殊栅格留在 blueprint。

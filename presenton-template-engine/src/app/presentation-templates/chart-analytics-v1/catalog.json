@@ -161,6 +161,18 @@
         "composition-only donut chart pages"
       ],
       "composition_guidance": "Use when the page needs a high-density comparison dashboard: four paired circular metric cards across the top, sector advantage bars on the lower left, and a compact strategic divergence panel on the lower right. Keep business values in JSON data; edit TSX for structure only."
+    },
+    {
+      "id": "closing-analytics",
+      "name": "Closing Analytics",
+      "blueprint_source": "./blueprints/ClosingAnalytics.tsx",
+      "example_slide": "./slides/ClosingAnalytics.tsx",
+      "layout_family": "closing",
+      "source_html": ".tmp/Template/图表主题/15.html, .tmp/Template/图表主题/22.html",
+      "content_intents": ["closing", "thank-you", "decision-request", "next-steps", "contact-meta"],
+      "suitable_for": ["final thank-you page", "decision request", "next-step close", "executive report wrap-up"],
+      "avoid_for": ["body analysis", "chart-heavy evidence", "agenda", "timeline", "dense comparison"],
+      "composition_guidance": "Use as the final page. Preserve the dark analytics background, concise closing headline, two short next-step callouts, and contact/date metadata. Do not use it for analytical body slides."
     }
   ],
   "planned_blueprint_families": [
@@ -187,20 +199,16 @@
       "layout_family": "timeline",
       "source_signals": ["5.html", "10.html", "11.html", "21.html"],
       "intended_for": ["historical timeline", "milestone analysis", "roadmap"]
-    },
-    {
-      "id": "closing-contact",
-      "layout_family": "closing",
-      "source_signals": ["15.html", "22.html"],
-      "intended_for": ["thank-you", "contact", "final close"]
     }
   ],
   "selection_guide": [
     "Choose executive-summary-dashboard for post-cover summary pages that need three KPI cards plus a primary grouped bar chart.",
+    "Choose technology-capability-dashboard for two-entity capability pages that need four circular comparison metrics, sector advantage bars, and a strategic divergence panel.",
     "Choose growth-trend-comparison for long-run multi-series line charts with left-side entity statistic cards and a short strategic interpretation.",
     "Choose population-structure-comparison for two-entity composition pages such as age distribution, population structure, market share, portfolio mix, or segment allocation.",
-    "Choose technology-capability-dashboard for two-entity capability pages that need four circular comparison metrics, sector advantage bars, and a strategic divergence panel.",
     "Choose cover-analytics for the first page or an intentional title reset.",
+    "Choose closing-analytics for the final page, thank-you page, decision ask, or next-step wrap-up.",
+    "Use executive-summary-dashboard's Future Outlook panel when a compact timeline is enough; add a dedicated timeline-analysis blueprint before registering timeline-only pages.",
     "For other body pages, future work should add metric-dashboard, comparison-matrix, timeline-analysis, and agenda-summary blueprints before registering them.",
     "Keep source HTML as reference only; pages should be rebuilt from TSX components with editable text and data-driven content."
   ],

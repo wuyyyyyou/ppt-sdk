@@ -2,6 +2,7 @@ import React from "react";
 import * as z from "zod";
 
 import AnalyticsCanvas from "../components/AnalyticsCanvas.tsx";
+import AnalyticsSourceFooter from "../components/AnalyticsSourceFooter.tsx";
 import ExecutiveHeader from "../components/ExecutiveHeader.tsx";
 import StructureComparisonCard, { type StructureComparisonCardData } from "../components/StructureComparisonCard.tsx";
 import StructureLegendBar from "../components/StructureLegendBar.tsx";
@@ -156,10 +157,7 @@ const PopulationStructureComparison = ({ data }: { data: Partial<z.infer<typeof 
           ))}
         </div>
 
-        <div className="flex h-[34px] flex-none items-end justify-between text-[10px] font-medium" style={{ color: chartAnalyticsTheme.colors.mutedText }}>
-          <div>{parsed.footerSource}</div>
-          <div>SLIDE {parsed.pageNumber}</div>
-        </div>
+        <AnalyticsSourceFooter source={parsed.footerSource} pageNumber={parsed.pageNumber} height={34} padded={false} backgroundColor="transparent" />
       </div>
     </AnalyticsCanvas>
   );

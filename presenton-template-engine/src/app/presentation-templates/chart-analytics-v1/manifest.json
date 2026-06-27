@@ -68,6 +68,16 @@
         "path": "./slides/TechnologyCapabilityDashboard.tsx"
       },
       "data_path": "./data/demo/technology-capability-dashboard.json"
+    },
+    {
+      "id": "chart-analytics-v1-closing-analytics",
+      "title": "Closing Analytics",
+      "speaker_note": "Dark analytics closing page derived from the source theme's thank-you pages, rebuilt with reusable backdrop, expanded label, next-step callouts, and report metadata.",
+      "source": {
+        "type": "local",
+        "path": "./slides/ClosingAnalytics.tsx"
+      },
+      "data_path": "./data/demo/closing-analytics.json"
     }
   ]
 }
