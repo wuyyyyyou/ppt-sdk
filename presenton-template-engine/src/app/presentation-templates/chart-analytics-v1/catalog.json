@@ -186,6 +186,30 @@
       "composition_guidance": "Use when the page needs a structured qualitative matrix: one dark analytics header, two entity lanes, a left dimension column, three to six row-level contrast points, and a short implication bar. Keep concrete entity names and business claims in JSON data."
     },
     {
+      "id": "historical-milestone-timeline",
+      "name": "Historical Milestone Timeline",
+      "blueprint_source": "./blueprints/HistoricalMilestoneTimeline.tsx",
+      "example_slide": "./slides/HistoricalMilestoneTimeline.tsx",
+      "layout_family": "timeline-analysis",
+      "source_html": ".tmp/Template/图表主题/10.html",
+      "content_intents": ["historical-context", "milestone-analysis", "relationship-history", "policy-evolution", "roadmap"],
+      "suitable_for": [
+        "four to six chronological milestones",
+        "historical relationship summaries",
+        "policy or regulation evolution",
+        "product or project roadmap checkpoints",
+        "strategic turning-point narratives"
+      ],
+      "avoid_for": [
+        "dense event chronologies with more than six entries",
+        "quantitative trend analysis requiring a chart axis",
+        "pages dominated by long prose",
+        "non-chronological comparison matrices",
+        "timelines needing multiple lanes or dependencies"
+      ],
+      "composition_guidance": "Use when the page needs a clean horizontal timeline: dark analytics header, one primary axis, four to six period nodes, concise cards, and a source footer. Keep dates, events, claims, and sources in JSON data; edit TSX only for structural changes."
+    },
+    {
       "id": "closing-analytics",
       "name": "Closing Analytics",
       "blueprint_source": "./blueprints/ClosingAnalytics.tsx",
@@ -220,20 +244,21 @@
     {
       "id": "timeline-analysis",
       "layout_family": "timeline",
-      "source_signals": ["5.html", "10.html", "11.html", "21.html"],
-      "intended_for": ["historical timeline", "milestone analysis", "roadmap"]
+      "source_signals": ["5.html", "11.html", "21.html"],
+      "intended_for": ["multi-lane timeline", "detailed milestone analysis", "roadmap variants"]
     }
   ],
   "selection_guide": [
     "Choose executive-summary-dashboard for post-cover summary pages that need three KPI cards plus a primary grouped bar chart.",
     "Choose technology-capability-dashboard for two-entity capability pages that need four circular comparison metrics, sector advantage bars, and a strategic divergence panel.",
     "Choose business-practice-matrix for two-entity qualitative comparisons across several dimensions, especially business culture, operating model, partner practices, or market-entry engagement style.",
+    "Choose historical-milestone-timeline for four to six chronological milestones, historical context, policy evolution, relationship history, or project roadmap checkpoints.",
     "Choose growth-trend-comparison for long-run multi-series line charts with left-side entity statistic cards and a short strategic interpretation.",
     "Choose population-structure-comparison for two-entity composition pages such as age distribution, population structure, market share, portfolio mix, or segment allocation.",
     "Choose cover-analytics for the first page or an intentional title reset.",
     "Choose closing-analytics for the final page, thank-you page, decision ask, or next-step wrap-up.",
-    "Use executive-summary-dashboard's Future Outlook panel when a compact timeline is enough; add a dedicated timeline-analysis blueprint before registering timeline-only pages.",
-    "For other body pages, future work should add metric-dashboard, comparison-matrix, timeline-analysis, and agenda-summary blueprints before registering them.",
+    "Use executive-summary-dashboard's Future Outlook panel when a compact timeline is only a side note; use historical-milestone-timeline when the timeline is the page's main structure.",
+    "For other body pages, future work should add metric-dashboard, additional comparison-matrix variants, multi-lane timeline variants, and agenda-summary blueprints before registering them.",
     "Keep source HTML as reference only; pages should be rebuilt from TSX components with editable text and data-driven content."
   ],
   "agent_workflow_notes": [

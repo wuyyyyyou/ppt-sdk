@@ -22,12 +22,13 @@ const AnalyticsCardShell = ({
     style={{
       backgroundColor: dark ? chartAnalyticsTheme.colors.panel : chartAnalyticsTheme.colors.card,
       borderColor: dark ? "transparent" : chartAnalyticsTheme.colors.stroke,
-      borderTopWidth: accentColor ? 4 : 1,
-      borderTopColor: accentColor ?? (dark ? "transparent" : chartAnalyticsTheme.colors.stroke),
       boxShadow: dark ? "0 10px 18px rgba(15,23,42,0.18)" : "0 4px 8px rgba(15,23,42,0.05)",
       padding,
     }}
   >
+    {accentColor ? (
+      <div className="absolute left-0 top-0 h-[4px] w-full flex-none" style={{ backgroundColor: accentColor }} />
+    ) : null}
     {children}
   </div>
 );

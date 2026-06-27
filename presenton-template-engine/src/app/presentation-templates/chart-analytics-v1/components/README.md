@@ -43,6 +43,7 @@
 | `AdvantageBarList` | 双向优势条列表 | 左右主体分别从条形两端伸展，展示多个领域的相对优势 | sector dominance、能力矩阵、份额比较 |
 | `StrategicInsightPanel` | 战略洞察组合 | 深色洞察卡 + 底部关键统计卡 | 战略分歧、模式对比、行动启示 |
 | `ComparisonMatrixBoard` | 双实体矩阵 | 左侧维度列 + 两个实体列 + 行级对比观点 | 商业文化、运营模式、伙伴实践、定性 benchmark |
+| `HorizontalMilestoneTimeline` | 横向时间轴 | 贯穿轴、节点、竖向连接线和可编辑里程碑卡片 | 历史脉络、政策演进、项目路线图、关键转折点 |
 
 ## Slot 适配
 
@@ -65,6 +66,7 @@
 | `advantage-bars` | `AdvantageBarList` | 时间序列、超过两个主体的堆叠比较 |
 | `strategic-insight-summary` | `StrategicInsightPanel` | 长篇文本、复杂多列表格 |
 | `comparison-matrix` | `ComparisonMatrixBoard` | 超过两个主体、需要精确数值坐标轴的图表、长段落表格 |
+| `horizontal-timeline` | `HorizontalMilestoneTimeline` | 超过六个节点的详细年表、需要精确数值坐标轴的趋势图 |
 | `decoration` | 封面蓝图内的安全坐标圆环 | 任何关键事实、数字或结论 |
 
 ## AI 修改规则

@@ -30,14 +30,13 @@ const TrendStatCard = ({
   narrative,
 }: TrendStatCardProps) => (
   <div
-    className="relative flex min-h-0 flex-col rounded-[8px] border bg-white px-[18px] py-[16px]"
+    className="relative flex min-h-0 flex-col overflow-hidden rounded-[8px] border bg-white px-[18px] py-[16px]"
     style={{
       borderColor: chartAnalyticsTheme.colors.stroke,
-      borderLeftColor: accentColor,
-      borderLeftWidth: 4,
       boxShadow: "0 4px 8px rgba(15,23,42,0.05)",
     }}
   >
+    <div className="absolute bottom-0 left-0 top-0 w-[4px] flex-none" style={{ backgroundColor: accentColor }} />
     <div className="mb-[12px] flex items-center justify-between gap-[12px]">
       <div className="flex min-w-0 items-center gap-[8px]">
         {symbol ? <div className="flex-none text-[23px] leading-none">{symbol}</div> : null}

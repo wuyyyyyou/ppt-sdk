@@ -17,6 +17,7 @@
 | `ExecutiveSummaryDashboard.tsx` | `../blueprints/ExecutiveSummaryDashboard.tsx` | `.tmp/Template/图表主题/2.html` |
 | `TechnologyCapabilityDashboard.tsx` | `../blueprints/TechnologyCapabilityDashboard.tsx` | `.tmp/Template/图表主题/8.html` |
 | `BusinessPracticeMatrix.tsx` | `../blueprints/BusinessPracticeMatrix.tsx` | `.tmp/Template/图表主题/9.html` |
+| `HistoricalMilestoneTimeline.tsx` | `../blueprints/HistoricalMilestoneTimeline.tsx` | `.tmp/Template/图表主题/10.html` |
 | `GrowthTrendComparison.tsx` | `../blueprints/GrowthTrendComparison.tsx` | `.tmp/Template/图表主题/4.html` |
 | `PopulationStructureComparison.tsx` | `../blueprints/PopulationStructureComparison.tsx` | `.tmp/Template/图表主题/6.html` |
 | `ClosingAnalytics.tsx` | `../blueprints/ClosingAnalytics.tsx` | `.tmp/Template/图表主题/15.html` / `22.html` |

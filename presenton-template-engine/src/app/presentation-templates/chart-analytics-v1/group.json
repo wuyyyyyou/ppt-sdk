@@ -17,6 +17,7 @@
     "slides/ExecutiveSummaryDashboard.tsx",
     "slides/TechnologyCapabilityDashboard.tsx",
     "slides/BusinessPracticeMatrix.tsx",
+    "slides/HistoricalMilestoneTimeline.tsx",
     "slides/GrowthTrendComparison.tsx",
     "slides/PopulationStructureComparison.tsx",
     "slides/ClosingAnalytics.tsx"
