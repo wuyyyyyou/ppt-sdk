@@ -132,6 +132,35 @@
         "prose-led strategic narrative"
       ],
       "composition_guidance": "Use when the page compares two entities by percentage composition. Keep the shared segment legend editable outside the chart screenshot, keep factual values in JSON data, and use TSX edits only for structural layout changes."
+    },
+    {
+      "id": "technology-capability-dashboard",
+      "name": "Technology Capability Dashboard",
+      "blueprint_source": "./blueprints/TechnologyCapabilityDashboard.tsx",
+      "example_slide": "./slides/TechnologyCapabilityDashboard.tsx",
+      "layout_family": "comparison-dashboard",
+      "source_html": ".tmp/Template/图表主题/8.html",
+      "content_intents": [
+        "technology-benchmark",
+        "capability-dashboard",
+        "sector-dominance-analysis",
+        "paired-metric-comparison",
+        "strategic-divergence"
+      ],
+      "suitable_for": [
+        "two-entity technology capability comparison",
+        "innovation or infrastructure benchmark",
+        "dashboard pages with four paired metrics",
+        "sector advantage analysis with one strategic insight panel"
+      ],
+      "avoid_for": [
+        "single-chart deep dive",
+        "long-run time-series analysis",
+        "more than two compared entities",
+        "pages requiring long prose or table-heavy evidence",
+        "composition-only donut chart pages"
+      ],
+      "composition_guidance": "Use when the page needs a high-density comparison dashboard: four paired circular metric cards across the top, sector advantage bars on the lower left, and a compact strategic divergence panel on the lower right. Keep business values in JSON data; edit TSX for structure only."
     }
   ],
   "planned_blueprint_families": [
@@ -150,7 +179,7 @@
     {
       "id": "comparison-matrix",
       "layout_family": "comparison",
-      "source_signals": ["7.html", "8.html", "9.html", "12.html", "16.html", "19.html", "20.html"],
+      "source_signals": ["7.html", "9.html", "12.html", "16.html", "19.html", "20.html"],
       "intended_for": ["country comparison", "option benchmark", "multi-dimension comparison"]
     },
     {
@@ -170,6 +199,7 @@
     "Choose executive-summary-dashboard for post-cover summary pages that need three KPI cards plus a primary grouped bar chart.",
     "Choose growth-trend-comparison for long-run multi-series line charts with left-side entity statistic cards and a short strategic interpretation.",
     "Choose population-structure-comparison for two-entity composition pages such as age distribution, population structure, market share, portfolio mix, or segment allocation.",
+    "Choose technology-capability-dashboard for two-entity capability pages that need four circular comparison metrics, sector advantage bars, and a strategic divergence panel.",
     "Choose cover-analytics for the first page or an intentional title reset.",
     "For other body pages, future work should add metric-dashboard, comparison-matrix, timeline-analysis, and agenda-summary blueprints before registering them.",
     "Keep source HTML as reference only; pages should be rebuilt from TSX components with editable text and data-driven content."

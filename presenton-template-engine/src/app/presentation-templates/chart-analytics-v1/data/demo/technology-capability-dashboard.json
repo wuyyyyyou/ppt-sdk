@@ -1,0 +1,154 @@
+{
+  "eyebrow": "Innovation Dashboard",
+  "title": "Tech Capabilities: China vs Japan",
+  "headerMetaLabel": "Strategic Focus",
+  "headerMetaValue": "AI, R&D, Infrastructure",
+  "headerIcon": "gauge",
+  "ringMetrics": [
+    {
+      "category": "Enterprise AI",
+      "title": "Adoption Rate",
+      "accentColor": "#2563EB",
+      "icon": "robot",
+      "entities": [
+        {
+          "label": "CN",
+          "valueLabel": "81%",
+          "progress": 81,
+          "color": "#2563EB",
+          "emphasized": true
+        },
+        {
+          "label": "JP",
+          "valueLabel": "27%",
+          "progress": 27,
+          "color": "#14B8A6"
+        }
+      ],
+      "footerLabel": "Gap",
+      "footerValue": "+54 pts"
+    },
+    {
+      "category": "R&D Spend",
+      "title": "% of GDP",
+      "accentColor": "#14B8A6",
+      "icon": "flask",
+      "entities": [
+        {
+          "label": "JP",
+          "valueLabel": "3.3%",
+          "progress": 67,
+          "color": "#14B8A6",
+          "emphasized": true
+        },
+        {
+          "label": "CN",
+          "valueLabel": "2.4%",
+          "progress": 49,
+          "color": "#2563EB"
+        }
+      ],
+      "footerLabel": "Lead",
+      "footerValue": "Japan"
+    },
+    {
+      "category": "Infrastructure",
+      "title": "5G Base Stations",
+      "accentColor": "#2563EB",
+      "icon": "broadcast",
+      "entities": [
+        {
+          "label": "CN",
+          "valueLabel": "3.4M",
+          "progress": 90,
+          "color": "#2563EB",
+          "emphasized": true
+        },
+        {
+          "label": "JP",
+          "valueLabel": "0.2M",
+          "progress": 15,
+          "color": "#14B8A6"
+        }
+      ],
+      "footerLabel": "Scale",
+      "footerValue": "17x"
+    },
+    {
+      "category": "Innovation Output",
+      "title": "PCT Patents",
+      "accentColor": "#94A3B8",
+      "icon": "file-signature",
+      "entities": [
+        {
+          "label": "CN",
+          "valueLabel": "69k",
+          "progress": 74,
+          "color": "#2563EB",
+          "emphasized": true
+        },
+        {
+          "label": "JP",
+          "valueLabel": "48k",
+          "progress": 56,
+          "color": "#14B8A6"
+        }
+      ],
+      "footerLabel": "Volume",
+      "footerValue": "CN Lead"
+    }
+  ],
+  "advantageTitle": "Sector Dominance Analysis",
+  "advantageLeftLabel": "China Advantage",
+  "advantageLeftColor": "#2563EB",
+  "advantageRightLabel": "Japan Advantage",
+  "advantageRightColor": "#14B8A6",
+  "advantageItems": [
+    {
+      "label": "EV Batteries (Global Share)",
+      "valueLabel": "China ~60% vs Japan ~10%",
+      "leftValue": 60,
+      "rightValue": 10
+    },
+    {
+      "label": "Industrial Robotics (Production)",
+      "valueLabel": "Japan ~45% vs China ~20%",
+      "leftValue": 20,
+      "rightValue": 45
+    },
+    {
+      "label": "Semi Materials (Global Share)",
+      "valueLabel": "Japan ~55% dominant",
+      "leftValue": 15,
+      "rightValue": 55
+    },
+    {
+      "label": "E-Commerce Penetration",
+      "valueLabel": "China ~52% vs Japan ~13%",
+      "leftValue": 52,
+      "rightValue": 13
+    }
+  ],
+  "insightEyebrow": "Strategic Divergence",
+  "insightHeadline": "\"Speed vs. Precision\"",
+  "insightIcon": "grid",
+  "insightItems": [
+    {
+      "label": "China",
+      "text": "Deploy-first model scales consumer apps quickly through AI and payments feedback loops.",
+      "color": "#60A5FA"
+    },
+    {
+      "label": "Japan",
+      "text": "Quality-first engineering leads in upstream materials and precision components.",
+      "color": "#2DD4BF"
+    }
+  ],
+  "statLabel": "Unicorn Startups",
+  "statValue": "300+ vs 10+",
+  "statBadge": "CN Lead",
+  "statBadgeColor": "#2563EB",
+  "statBadgeBackground": "#EFF6FF",
+  "sourceNote": "Sources: WIPO 2024, OECD MSTI, CAICT, METI White Paper",
+  "slideLabel": "SLIDE 08"
+}

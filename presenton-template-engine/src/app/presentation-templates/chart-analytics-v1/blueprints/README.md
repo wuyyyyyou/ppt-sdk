@@ -10,6 +10,7 @@
 | `ExecutiveSummaryDashboard.tsx` | 对应 `.tmp/Template/图表主题/2.html` 的执行摘要仪表盘：三张 KPI 卡、一张分组柱状图、图表洞察和右侧未来展望。 |
 | `GrowthTrendComparison.tsx` | 对应 `.tmp/Template/图表主题/4.html` 的长周期趋势分析页：左侧主体统计卡和洞察，右侧多系列折线图。 |
 | `PopulationStructureComparison.tsx` | 对应 `.tmp/Template/图表主题/6.html` 的双实体构成结构对比页：共享图例、左右实体卡、环形构成图、中心指标和底部比率强调。 |
+| `TechnologyCapabilityDashboard.tsx` | 对应 `.tmp/Template/图表主题/8.html` 的技术能力仪表盘：四张双主体环形指标卡、领域优势条和战略分歧洞察。 |
 
 ## 已实现源页
 
@@ -19,6 +20,7 @@
 | `.tmp/Template/图表主题/2.html` | `ExecutiveSummaryDashboard.tsx` | 执行摘要和关键指标总览 | 深色内容页页眉、三列 KPI 卡片、技术采用率分组柱状图、短洞察列表、深色未来展望面板。 |
 | `.tmp/Template/图表主题/4.html` | `GrowthTrendComparison.tsx` | 历史增长趋势和波动收敛分析 | 深色内容页页眉、左侧两张主体统计卡、深色战略洞察、右侧长周期多系列折线图和资料页脚。 |
 | `.tmp/Template/图表主题/6.html` | `PopulationStructureComparison.tsx` | 人口或市场结构构成对比 | 深色内容页页眉、居中共享图例、左右等宽实体卡、环形构成图、中心关键指标、底部比率指标和来源页脚。 |
+| `.tmp/Template/图表主题/8.html` | `TechnologyCapabilityDashboard.tsx` | 技术能力和领域优势对比 | 深色内容页页眉、四列双主体环形指标卡、左侧 sector dominance 条形列表、右侧深色战略分歧洞察和关键统计。 |
 
 ## 阅读顺序
 

@@ -16,6 +16,7 @@
     "slides/CoverAnalytics.tsx",
     "slides/ExecutiveSummaryDashboard.tsx",
     "slides/GrowthTrendComparison.tsx",
-    "slides/PopulationStructureComparison.tsx"
+    "slides/PopulationStructureComparison.tsx",
+    "slides/TechnologyCapabilityDashboard.tsx"
   ]
 }

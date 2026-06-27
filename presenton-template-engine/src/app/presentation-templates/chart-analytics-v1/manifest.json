@@ -58,6 +58,16 @@
         "path": "./slides/PopulationStructureComparison.tsx"
       },
       "data_path": "./data/demo/population-structure-comparison.json"
+    },
+    {
+      "id": "chart-analytics-v1-technology-capability-dashboard",
+      "title": "Technology Capability Dashboard",
+      "speaker_note": "Technology capability dashboard based on .tmp/Template/图表主题/8.html, rebuilt as a TSX-first page with reusable paired ring metrics, sector advantage bars, and a strategic insight panel.",
+      "source": {
+        "type": "local",
+        "path": "./slides/TechnologyCapabilityDashboard.tsx"
+      },
+      "data_path": "./data/demo/technology-capability-dashboard.json"
     }
   ]
 }

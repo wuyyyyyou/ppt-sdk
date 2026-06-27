@@ -37,6 +37,9 @@
 | `StructureComparisonCard` | 指标+图表组合 | 实体身份、总量、环形结构图、中心指标和底部强调指标 | 双实体结构占比对比页 |
 | `AnalyticsIcons` | 图标原语 | 当前主题使用的轻量线性图标集合 | 页眉、KPI、洞察、面板标题 |
 | `OutlookPanel` | 深色洞察面板 | 时间段列表 + 底部进度指标 | 未来展望、风险判断、行动窗口 |
+| `CircularComparisonMetricCard` | 双主体环形指标卡 | 一个指标下的两组环形进度、主次强调和底部简短结论 | 技术能力、采用率、成熟度、覆盖率等双主体指标比较 |
+| `AdvantageBarList` | 双向优势条列表 | 左右主体分别从条形两端伸展，展示多个领域的相对优势 | sector dominance、能力矩阵、份额比较 |
+| `StrategicInsightPanel` | 战略洞察组合 | 深色洞察卡 + 底部关键统计卡 | 战略分歧、模式对比、行动启示 |
 
 ## Slot 适配
 
@@ -54,6 +57,9 @@
 | `composition-donut` | `StructureLegendBar` + `StructureComparisonCard` / `AnalyticsDonutChart` | 超过两个对象的拥挤环图、需要长解释段落的结构页 |
 | `trend-stat-card` | `TrendStatCard` | 长正文、超过两项核心指标的详细表格 |
 | `dark-insight-panel` | `OutlookPanel` | 需要大段正文或复杂表格的内容 |
+| `paired-ring-metrics` | `CircularComparisonMetricCard` | 单实体 KPI、需要精确坐标轴的趋势图 |
+| `advantage-bars` | `AdvantageBarList` | 时间序列、超过两个主体的堆叠比较 |
+| `strategic-insight-summary` | `StrategicInsightPanel` | 长篇文本、复杂多列表格 |
 | `decoration` | 封面蓝图内的安全坐标圆环 | 任何关键事实、数字或结论 |
 
 ## AI 修改规则
