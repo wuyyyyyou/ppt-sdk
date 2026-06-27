@@ -20,4 +20,5 @@
 | `HistoricalMilestoneTimeline.tsx` | `../blueprints/HistoricalMilestoneTimeline.tsx` | `.tmp/Template/图表主题/10.html` |
 | `GrowthTrendComparison.tsx` | `../blueprints/GrowthTrendComparison.tsx` | `.tmp/Template/图表主题/4.html` |
 | `PopulationStructureComparison.tsx` | `../blueprints/PopulationStructureComparison.tsx` | `.tmp/Template/图表主题/6.html` |
+| `StrategicSummaryTakeaways.tsx` | `../blueprints/StrategicSummaryTakeaways.tsx` | `.tmp/Template/图表主题/14.html` |
 | `ClosingAnalytics.tsx` | `../blueprints/ClosingAnalytics.tsx` | `.tmp/Template/图表主题/15.html` / `22.html` |

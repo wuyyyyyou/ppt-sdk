@@ -44,6 +44,8 @@
 | `StrategicInsightPanel` | 战略洞察组合 | 深色洞察卡 + 底部关键统计卡 | 战略分歧、模式对比、行动启示 |
 | `ComparisonMatrixBoard` | 双实体矩阵 | 左侧维度列 + 两个实体列 + 行级对比观点 | 商业文化、运营模式、伙伴实践、定性 benchmark |
 | `HorizontalMilestoneTimeline` | 横向时间轴 | 贯穿轴、节点、竖向连接线和可编辑里程碑卡片 | 历史脉络、政策演进、项目路线图、关键转折点 |
+| `SummaryInsightCard` | 纵向总结卡 | 图标、编号、标题、短解释和 2-3 条对比/结论条目 | 结论页、key takeaways、执行摘要收束 |
+| `SummaryOutcomeCard` | 横向总结卡 | 图标、短结论、标签组或 kicker，可切换浅色/深色强调 | 结论页、建议页、未来展望、战略含义 |
 
 ## Slot 适配
 
@@ -67,6 +69,8 @@
 | `strategic-insight-summary` | `StrategicInsightPanel` | 长篇文本、复杂多列表格 |
 | `comparison-matrix` | `ComparisonMatrixBoard` | 超过两个主体、需要精确数值坐标轴的图表、长段落表格 |
 | `horizontal-timeline` | `HorizontalMilestoneTimeline` | 超过六个节点的详细年表、需要精确数值坐标轴的趋势图 |
+| `takeaway-card` | `SummaryInsightCard` | 长正文、超过三条结论、复杂图表 |
+| `summary-outcome` | `SummaryOutcomeCard` | 需要矩阵、时间轴或数值坐标轴的详细分析 |
 | `decoration` | 封面蓝图内的安全坐标圆环 | 任何关键事实、数字或结论 |
 
 ## AI 修改规则

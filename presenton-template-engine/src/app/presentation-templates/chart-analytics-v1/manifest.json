@@ -90,6 +90,16 @@
       "data_path": "./data/demo/historical-milestone-timeline.json"
     },
     {
+      "id": "chart-analytics-v1-strategic-summary-takeaways",
+      "title": "Strategic Summary Takeaways",
+      "speaker_note": "Strategic summary takeaways page based on .tmp/Template/图表主题/14.html, rebuilt as a TSX-first conclusion page with reusable takeaway and outcome cards.",
+      "source": {
+        "type": "local",
+        "path": "./slides/StrategicSummaryTakeaways.tsx"
+      },
+      "data_path": "./data/demo/strategic-summary-takeaways.json"
+    },
+    {
       "id": "chart-analytics-v1-closing-analytics",
       "title": "Closing Analytics",
       "speaker_note": "Dark analytics closing page derived from the source theme's thank-you pages, rebuilt with reusable backdrop, expanded label, next-step callouts, and report metadata.",

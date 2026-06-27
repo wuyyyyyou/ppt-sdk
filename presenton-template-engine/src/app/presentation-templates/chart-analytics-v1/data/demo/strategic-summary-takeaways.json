@@ -1,0 +1,92 @@
+{
+  "eyebrow": "Conclusion",
+  "title": "Strategic Summary: Key Takeaways",
+  "headerMetaLabel": "Horizon",
+  "headerMetaValue": "2026 - 2030",
+  "headerIcon": "shield",
+  "topCards": [
+    {
+      "indexLabel": "01",
+      "title": "Scale vs. Standard",
+      "description": "A clear dichotomy defines the economic relationship:",
+      "icon": "chart-pie",
+      "accentColor": "#2563EB",
+      "iconTint": "#EFF6FF",
+      "iconColor": "#2563EB",
+      "rows": [
+        {
+          "label": "China",
+          "text": "Dominates aggregate scale (~$20T GDP)",
+          "labelColor": "#2563EB"
+        },
+        {
+          "label": "Japan",
+          "text": "Leads in per-capita wealth (~2.5x)",
+          "labelColor": "#14B8A6"
+        }
+      ]
+    },
+    {
+      "indexLabel": "02",
+      "title": "The Aging Race",
+      "description": "Both nations face labor shortages, but the timing differs:",
+      "icon": "users",
+      "accentColor": "#F43F5E",
+      "iconTint": "#FFF1F2",
+      "iconColor": "#E11D48",
+      "rows": [
+        {
+          "label": "Japan",
+          "text": "Stabilizing a super-aged society",
+          "labelColor": "#14B8A6"
+        },
+        {
+          "label": "China",
+          "text": "Facing rapid, steep demographic decline",
+          "labelColor": "#2563EB"
+        }
+      ]
+    },
+    {
+      "indexLabel": "03",
+      "title": "Speed vs. Stability",
+      "description": "Distinct approaches to technology deployment:",
+      "icon": "robot",
+      "accentColor": "#4F46E5",
+      "iconTint": "#EEF2FF",
+      "iconColor": "#4F46E5",
+      "rows": [
+        {
+          "label": "China",
+          "text": "Rapid piloting and scaling in AI and payments",
+          "labelColor": "#2563EB"
+        },
+        {
+          "label": "Japan",
+          "text": "Precision, robotics, and safety assurance",
+          "labelColor": "#14B8A6"
+        }
+      ]
+    }
+  ],
+  "interdependenceCard": {
+    "title": "Resilient Interdependence",
+    "text": "Despite geopolitical friction (\"hot economics, cold politics\"), supply chains remain deeply integrated.",
+    "icon": "broadcast",
+    "accentColor": "#14B8A6",
+    "iconTint": "#F0FDFA",
+    "tags": ["Electronics", "Automotive", "Machinery"]
+  },
+  "outlookCard": {
+    "title": "2030 Outlook: The Productivity Era",
+    "text": "Success for both nations hinges on the same variable: offsetting labor shrinkage with AI-driven productivity.",
+    "icon": "bolt",
+    "accentColor": "#34D399",
+    "iconTint": "#334155",
+    "tags": [],
+    "kicker": "Key Differentiator: Policy Execution"
+  },
+  "sourceNote": "Summary derived from analysis of IMF, World Bank, and UN Data",
+  "confidentialityLabel": "CONFIDENTIAL",
+  "slideLabel": "SLIDE 13"
+}
