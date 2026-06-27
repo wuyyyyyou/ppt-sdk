@@ -1,0 +1,101 @@
+{
+  "eyebrow": "Business Culture",
+  "title": "Cultural Differences: China vs Japan",
+  "headerMetaLabel": "Focus Area",
+  "headerMetaValue": "Values & Behavior",
+  "headerIcon": "scale",
+  "dimensionLabel": "Dimension",
+  "entities": [
+    {
+      "name": "China",
+      "tagline": "Speed & Pragmatism",
+      "accentColor": "#2563EB",
+      "tintColor": "#EFF6FF",
+      "icon": "chart-line"
+    },
+    {
+      "name": "Japan",
+      "tagline": "Quality & Consensus",
+      "accentColor": "#14B8A6",
+      "tintColor": "#F0FDFA",
+      "icon": "scale"
+    }
+  ],
+  "rows": [
+    {
+      "dimension": "Decision Making",
+      "icon": "scale",
+      "left": {
+        "icon": "bolt",
+        "title": "Top-Down & Fast",
+        "description": "Decisions made quickly by leaders. High flexibility to pivot and make course corrections."
+      },
+      "right": {
+        "icon": "users",
+        "title": "Consensus Alignment",
+        "description": "Bottom-up consensus takes longer, but execution is rapid and unified once decided."
+      }
+    },
+    {
+      "dimension": "Risk & Innovation",
+      "icon": "gauge",
+      "left": {
+        "icon": "chart-line",
+        "title": "Trial & Error",
+        "description": "Deploy 80% solutions quickly, learn from the market, and iterate through feedback."
+      },
+      "right": {
+        "icon": "shield",
+        "title": "Risk Averse",
+        "description": "Extensive testing and verification before launch protect brand reputation and trust."
+      }
+    },
+    {
+      "dimension": "Relationships",
+      "icon": "users",
+      "left": {
+        "icon": "grid",
+        "title": "Guanxi Personal Trust",
+        "description": "Trust is built between individuals; personal connections help drive deals and bypass friction."
+      },
+      "right": {
+        "icon": "broadcast",
+        "title": "Organizational Trust",
+        "description": "Trust builds between organizations over time, and loyalty to existing partners is paramount."
+      }
+    },
+    {
+      "dimension": "Contracts",
+      "icon": "file-signature",
+      "left": {
+        "icon": "bolt",
+        "title": "Flexible & Adaptive",
+        "description": "Contracts are a snapshot; terms can be renegotiated if circumstances change."
+      },
+      "right": {
+        "icon": "file-signature",
+        "title": "Strict & Binding",
+        "description": "Contracts are absolute, with meticulous adherence to specifications expected."
+      }
+    },
+    {
+      "dimension": "Communication",
+      "icon": "broadcast",
+      "left": {
+        "icon": "chart-line",
+        "title": "Pragmatic & Direct",
+        "description": "High-context norms exist, but efficiency can override formality when results are at stake."
+      },
+      "right": {
+        "icon": "users",
+        "title": "Indirect Context",
+        "description": "Reading the room, avoiding open conflict, and preserving face are critical signals."
+      }
+    }
+  ],
+  "implicationLabel": "Implication",
+  "implicationText": "Innovation requires distinct styles: agile pilots for China, rigorous validation for Japan.",
+  "implicationIcon": "bolt",
+  "implicationAccentColor": "#8B5CF6",
+  "slideLabel": "SLIDE 09"
+}

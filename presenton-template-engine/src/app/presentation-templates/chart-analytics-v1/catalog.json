@@ -163,6 +163,29 @@
       "composition_guidance": "Use when the page needs a high-density comparison dashboard: four paired circular metric cards across the top, sector advantage bars on the lower left, and a compact strategic divergence panel on the lower right. Keep business values in JSON data; edit TSX for structure only."
     },
     {
+      "id": "business-practice-matrix",
+      "name": "Business Practice Matrix",
+      "blueprint_source": "./blueprints/BusinessPracticeMatrix.tsx",
+      "example_slide": "./slides/BusinessPracticeMatrix.tsx",
+      "layout_family": "comparison-matrix",
+      "source_html": ".tmp/Template/图表主题/9.html",
+      "content_intents": ["business-culture-comparison", "operating-model-benchmark", "practice-comparison", "qualitative-contrast", "two-entity-benchmark"],
+      "suitable_for": [
+        "two-entity qualitative comparison",
+        "business culture or operating practice matrix",
+        "partner, market, or country engagement playbook",
+        "three to six comparison dimensions with concise row-level contrast points"
+      ],
+      "avoid_for": [
+        "numeric time-series analysis",
+        "single-entity narrative pages",
+        "more than two compared entities",
+        "large tables requiring long paragraph cells",
+        "chart-heavy evidence pages"
+      ],
+      "composition_guidance": "Use when the page needs a structured qualitative matrix: one dark analytics header, two entity lanes, a left dimension column, three to six row-level contrast points, and a short implication bar. Keep concrete entity names and business claims in JSON data."
+    },
+    {
       "id": "closing-analytics",
       "name": "Closing Analytics",
       "blueprint_source": "./blueprints/ClosingAnalytics.tsx",
@@ -191,7 +214,7 @@
     {
       "id": "comparison-matrix",
       "layout_family": "comparison",
-      "source_signals": ["7.html", "9.html", "12.html", "16.html", "19.html", "20.html"],
+      "source_signals": ["7.html", "12.html", "16.html", "19.html", "20.html"],
       "intended_for": ["country comparison", "option benchmark", "multi-dimension comparison"]
     },
     {
@@ -204,6 +227,7 @@
   "selection_guide": [
     "Choose executive-summary-dashboard for post-cover summary pages that need three KPI cards plus a primary grouped bar chart.",
     "Choose technology-capability-dashboard for two-entity capability pages that need four circular comparison metrics, sector advantage bars, and a strategic divergence panel.",
+    "Choose business-practice-matrix for two-entity qualitative comparisons across several dimensions, especially business culture, operating model, partner practices, or market-entry engagement style.",
     "Choose growth-trend-comparison for long-run multi-series line charts with left-side entity statistic cards and a short strategic interpretation.",
     "Choose population-structure-comparison for two-entity composition pages such as age distribution, population structure, market share, portfolio mix, or segment allocation.",
     "Choose cover-analytics for the first page or an intentional title reset.",

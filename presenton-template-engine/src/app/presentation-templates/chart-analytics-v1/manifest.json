@@ -70,6 +70,16 @@
       "data_path": "./data/demo/technology-capability-dashboard.json"
     },
     {
+      "id": "chart-analytics-v1-business-practice-matrix",
+      "title": "Business Practice Matrix",
+      "speaker_note": "Business practice comparison matrix based on .tmp/Template/图表主题/9.html, rebuilt as a TSX-first page with a reusable two-entity comparison matrix and editable implication bar.",
+      "source": {
+        "type": "local",
+        "path": "./slides/BusinessPracticeMatrix.tsx"
+      },
+      "data_path": "./data/demo/business-practice-matrix.json"
+    },
+    {
       "id": "chart-analytics-v1-closing-analytics",
       "title": "Closing Analytics",
       "speaker_note": "Dark analytics closing page derived from the source theme's thank-you pages, rebuilt with reusable backdrop, expanded label, next-step callouts, and report metadata.",
