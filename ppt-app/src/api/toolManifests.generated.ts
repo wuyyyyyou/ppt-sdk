@@ -3,13 +3,13 @@
 
 export const PPT_ENGINE_TOOL = {
   id: "tool-youming_5703-ppt-engine-fmkv9ru7",
-  version: "3.2.0",
+  version: "3.2.1",
   displayName: "ppt-engine",
 } as const;
 
 export const PPT_GENER_TOOL = {
   id: "tool-youming_5703-ppt-gener-ahzv8re6",
-  version: "3.1.0",
+  version: "3.1.1",
   displayName: "ppt-gener",
 } as const;
 
