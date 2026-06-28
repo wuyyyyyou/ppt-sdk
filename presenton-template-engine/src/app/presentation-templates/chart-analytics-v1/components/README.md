@@ -33,6 +33,7 @@
 | `AnalyticsGroupedBarChart` | 图表组件 | Recharts 分组柱状图，自带 `data-pptx-export="screenshot"` 边界，避免 SVG 内部文字被二次抽取 | 对比指标、采用率、结构占比 |
 | `AnalyticsLineChart` | 图表组件 | Recharts 多系列折线图，支持负值区间、0% 基线和截图导出边界 | 趋势对比、历史波动、长周期指标 |
 | `AnalyticsDonutChart` | 图表组件 | Recharts 环形构成图，中心指标固定在图内，自带截图导出边界 | 结构占比、年龄分布、市场份额、组合构成 |
+| `AnalyticsImageShowcasePanel` | 图片展示组件 | 主图片、标题、说明、来源、加载失败占位和 cover/contain 适配 | 图片证据页、截图页、地图/照片/产品图展示页 |
 | `TrendStatCard` | 指标组合 | 主体标签、状态徽章、两项关键指标和短解释 | 趋势对比、主体画像、左侧解释栏 |
 | `DarkInsightCard` | 深色洞察卡 | 标签、标题、短解释和背景图标水印 | 趋势解释、收束洞察、低密度解读卡 |
 | `StructureLegendBar` | 图例组合 | 居中胶囊图例，保留可编辑 label 文本 | 构成对比、份额对比、环图页 |
@@ -46,6 +47,17 @@
 | `HorizontalMilestoneTimeline` | 横向时间轴 | 贯穿轴、节点、竖向连接线和可编辑里程碑卡片 | 历史脉络、政策演进、项目路线图、关键转折点 |
 | `SummaryInsightCard` | 纵向总结卡 | 图标、编号、标题、短解释和 2-3 条对比/结论条目 | 结论页、key takeaways、执行摘要收束 |
 | `SummaryOutcomeCard` | 横向总结卡 | 图标、短结论、标签组或 kicker，可切换浅色/深色强调 | 结论页、建议页、未来展望、战略含义 |
+
+## 回收决策
+
+| 重复模式 | 处理 | 说明 |
+| --- | --- | --- |
+| 页面画布、暗色背景、内容页页眉、来源页脚、报告元信息页脚 | 上移到 `components/` | 跨封面、内容页、总结页和收束页复用，是稳定页面原语。 |
+| 白色/深色卡片壳、图表壳、KPI 卡、洞察面板 | 上移到 `components/` | 多个内容页都依赖相同边框、阴影、圆角、标题区和内容区规则。 |
+| 分组柱图、折线图、环图、双主体环形指标、优势条、结构对比卡 | 上移到 `components/` | 图表和对比模块需要稳定截图边界、文本抽取边界和固定尺寸约束。 |
+| 主图片、截图、地图、照片或视觉研究素材面板 | 上移到 `components/` | 图片加载、失败占位、标题/说明/来源和 fit 适配会被图片证据页、案例页和产品图页重复使用，不属于单页特化结构。 |
+| 双实体矩阵、横向里程碑时间轴、总结洞察卡、总结结果卡 | 上移到 `components/` | 新增蓝图和后续相似页面可直接复用这些布局系统。 |
+| 封面圆环装饰、结束页两个 callout | 留在对应 blueprint | 当前只服务单一页面，不应制造泛化组件。 |
 
 ## Slot 适配
 
@@ -62,6 +74,7 @@
 | `metric-card` | `MetricHighlightCard` | 长正文说明、超过三组维度的矩阵 |
 | `chart-shell` | `ChartPanelShell` + `AnalyticsGroupedBarChart` / `AnalyticsLineChart` | 单页临时手写 Chart.js、纯装饰图 |
 | `composition-donut` | `StructureLegendBar` + `StructureComparisonCard` / `AnalyticsDonutChart` | 超过两个对象的拥挤环图、需要长解释段落的结构页 |
+| `image-showcase` | `AnalyticsImageShowcasePanel` | 多图相册、图片仅作装饰、需要复杂表格解释的页面 |
 | `trend-stat-card` | `TrendStatCard` | 长正文、超过两项核心指标的详细表格 |
 | `dark-insight-panel` | `OutlookPanel` / `DarkInsightCard` | 需要大段正文或复杂表格的内容 |
 | `paired-ring-metrics` | `CircularComparisonMetricCard` | 单实体 KPI、需要精确坐标轴的趋势图 |

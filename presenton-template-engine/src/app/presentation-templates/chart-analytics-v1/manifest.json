@@ -90,6 +90,16 @@
       "data_path": "./data/demo/historical-milestone-timeline.json"
     },
     {
+      "id": "chart-analytics-v1-image-evidence-showcase",
+      "title": "Image Evidence Showcase",
+      "speaker_note": "Image-dominant visual evidence page rebuilt as a TSX-first blueprint with a reusable image showcase panel, concise observation cards, and editable source metadata.",
+      "source": {
+        "type": "local",
+        "path": "./slides/ImageEvidenceShowcase.tsx"
+      },
+      "data_path": "./data/demo/image-evidence-showcase.json"
+    },
+    {
       "id": "chart-analytics-v1-strategic-summary-takeaways",
       "title": "Strategic Summary Takeaways",
       "speaker_note": "Strategic summary takeaways page based on .tmp/Template/图表主题/14.html, rebuilt as a TSX-first conclusion page with reusable takeaway and outcome cards.",

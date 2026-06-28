@@ -9,17 +9,19 @@
   "audience_tags": ["management", "client", "analyst"],
   "tone_tags": ["professional", "analytical", "executive"],
   "cover_layout_id": "chart-analytics-v1:cover-analytics",
+  "closing_layout_id": "chart-analytics-v1:closing-analytics",
   "ordered": true,
   "default": false,
   "registry_order": 95,
   "layouts": [
     "slides/CoverAnalytics.tsx",
     "slides/ExecutiveSummaryDashboard.tsx",
+    "slides/GrowthTrendComparison.tsx",
+    "slides/PopulationStructureComparison.tsx",
     "slides/TechnologyCapabilityDashboard.tsx",
     "slides/BusinessPracticeMatrix.tsx",
     "slides/HistoricalMilestoneTimeline.tsx",
-    "slides/GrowthTrendComparison.tsx",
-    "slides/PopulationStructureComparison.tsx",
+    "slides/ImageEvidenceShowcase.tsx",
     "slides/StrategicSummaryTakeaways.tsx",
     "slides/ClosingAnalytics.tsx"
   ]
