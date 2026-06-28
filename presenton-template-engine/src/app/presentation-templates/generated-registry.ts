@@ -42,6 +42,11 @@ import chart_analytics_v1_HistoricalMilestoneTimelineComponent, * as chart_analy
 import chart_analytics_v1_ImageEvidenceShowcaseComponent, * as chart_analytics_v1_ImageEvidenceShowcaseModule from "./chart-analytics-v1/slides/ImageEvidenceShowcase.tsx";
 import chart_analytics_v1_StrategicSummaryTakeawaysComponent, * as chart_analytics_v1_StrategicSummaryTakeawaysModule from "./chart-analytics-v1/slides/StrategicSummaryTakeaways.tsx";
 import chart_analytics_v1_ClosingAnalyticsComponent, * as chart_analytics_v1_ClosingAnalyticsModule from "./chart-analytics-v1/slides/ClosingAnalytics.tsx";
+import chart_analytics_canvas_CoverCanvasComponent, * as chart_analytics_canvas_CoverCanvasModule from "./chart-analytics-canvas/slides/CoverCanvas.tsx";
+import chart_analytics_canvas_ContentCanvasComponent, * as chart_analytics_canvas_ContentCanvasModule from "./chart-analytics-canvas/slides/ContentCanvas.tsx";
+import chart_analytics_canvas_ComparisonCanvasComponent, * as chart_analytics_canvas_ComparisonCanvasModule from "./chart-analytics-canvas/slides/ComparisonCanvas.tsx";
+import chart_analytics_canvas_ChartEvidenceCanvasComponent, * as chart_analytics_canvas_ChartEvidenceCanvasModule from "./chart-analytics-canvas/slides/ChartEvidenceCanvas.tsx";
+import chart_analytics_canvas_ClosingCanvasComponent, * as chart_analytics_canvas_ClosingCanvasModule from "./chart-analytics-canvas/slides/ClosingCanvas.tsx";
 
 const red_finance_canvasGroupMeta = {
   "group_id": "red-finance-canvas",
@@ -370,6 +375,71 @@ const chart_analytics_v1Layouts: TemplateWithData[] = [
   createTemplateEntry(chart_analytics_v1_ClosingAnalyticsComponent, chart_analytics_v1_ClosingAnalyticsModule.Schema, chart_analytics_v1_ClosingAnalyticsModule.layoutId, chart_analytics_v1_ClosingAnalyticsModule.layoutName, chart_analytics_v1_ClosingAnalyticsModule.layoutDescription, "chart-analytics-v1", "ClosingAnalytics", {"sampleData":{"seriesLabel":"Global Intelligence Series","backgroundImageUrl":"https://page.talentsecsite.com/slides_images/6722217b327d461901b4f6677362a773.webp","backgroundImageAlt":"City skyline background","headline":"Thank You","subtitle":"Questions, decisions, and next steps","closingMessage":"Use this closing page to restate the key decision, request feedback, or point the audience to the next action.","primaryLabel":"Next Step","primaryValue":"Align on priority actions","secondaryLabel":"Follow-up","secondaryValue":"Share supporting evidence pack","contactLabel":"Contact","contactValue":"Talentsec AI Analytics","dateLabel":"Report Date","reportDate":"March 03, 2026","showBackgroundImage":true},"layoutTags":["closing","thank-you","next-steps","analytics","dark","tsx-first"],"layoutRole":"closing","contentElements":["headline","closing-message","next-step-callouts","contact-meta","date-meta"],"useCases":["closing","thank-you","decision-request","next-steps"],"suitableFor":"Suitable for the final page of an analytics deck when the presenter needs a polished close and clear next steps.","avoidFor":"Avoid using this layout for body analysis, chart-heavy pages, agendas, or dense evidence summaries.","density":"low","visualWeight":"visual-heavy","editableTextPriority":"high"}),
 ];
 
+const chart_analytics_canvasGroupMeta = {
+  "group_id": "chart-analytics-canvas",
+  "group_name": "Dark Analytics Canvas",
+  "group_description": "Component-first dark analytics canvas templates for building custom chart-heavy and evidence-led decks from reusable TSX components.",
+  "ordered": true,
+  "default": false,
+  "group_brief": "Open composition version of the original Dark Analytics Charts template. It keeps the dark analytics visual language and component library, but provides only broad cover, content, comparison, chart/evidence, and closing canvases so the AI Agent can compose final pages from components based on actual page intent.",
+  "style_tags": [
+    "analytics",
+    "dashboard",
+    "canvas",
+    "component-first",
+    "tsx-first"
+  ],
+  "industry_tags": [
+    "business",
+    "market-analysis",
+    "strategy",
+    "research"
+  ],
+  "use_cases": [
+    "custom-composition",
+    "executive-dashboard",
+    "evidence-review",
+    "data-story",
+    "market-comparison"
+  ],
+  "audience_tags": [
+    "management",
+    "client",
+    "analyst"
+  ],
+  "tone_tags": [
+    "professional",
+    "analytical",
+    "executive"
+  ],
+  "cover_layout_id": "chart-analytics-canvas:cover-canvas",
+  "agenda_layout_id": null,
+  "closing_layout_id": "chart-analytics-canvas:closing-canvas",
+  "default_theme_id": null
+};
+const chart_analytics_canvasSettings: TemplateGroupSettings = {
+  description: chart_analytics_canvasGroupMeta.group_description,
+  ordered: chart_analytics_canvasGroupMeta.ordered,
+  default: chart_analytics_canvasGroupMeta.default,
+  groupBrief: chart_analytics_canvasGroupMeta.group_brief ?? undefined,
+  styleTags: chart_analytics_canvasGroupMeta.style_tags ? [...chart_analytics_canvasGroupMeta.style_tags] : undefined,
+  industryTags: chart_analytics_canvasGroupMeta.industry_tags ? [...chart_analytics_canvasGroupMeta.industry_tags] : undefined,
+  useCases: chart_analytics_canvasGroupMeta.use_cases ? [...chart_analytics_canvasGroupMeta.use_cases] : undefined,
+  audienceTags: chart_analytics_canvasGroupMeta.audience_tags ? [...chart_analytics_canvasGroupMeta.audience_tags] : undefined,
+  toneTags: chart_analytics_canvasGroupMeta.tone_tags ? [...chart_analytics_canvasGroupMeta.tone_tags] : undefined,
+  coverLayoutId: chart_analytics_canvasGroupMeta.cover_layout_id ?? undefined,
+  agendaLayoutId: chart_analytics_canvasGroupMeta.agenda_layout_id ?? undefined,
+  closingLayoutId: chart_analytics_canvasGroupMeta.closing_layout_id ?? undefined,
+  defaultThemeId: chart_analytics_canvasGroupMeta.default_theme_id ?? undefined,
+};
+const chart_analytics_canvasLayouts: TemplateWithData[] = [
+  createTemplateEntry(chart_analytics_canvas_CoverCanvasComponent, chart_analytics_canvas_CoverCanvasModule.Schema, chart_analytics_canvas_CoverCanvasModule.layoutId, chart_analytics_canvas_CoverCanvasModule.layoutName, chart_analytics_canvas_CoverCanvasModule.layoutDescription, "chart-analytics-canvas", "CoverCanvas", {"sampleData":{"seriesLabel":"Analytics Canvas Series","headline":"Build the Analysis Opening","subtitle":"Start with the dark analytics visual language, then compose the final cover from reusable components.","scope":"Evidence scope - audience frame - decision context","publisherLabel":"Prepared By","publisher":"Analytics Authoring Workspace","dateLabel":"Report Date","reportDate":"2026","backgroundImageAlt":"Analytics background","showBackgroundImage":false,"showSlotGuides":true},"layoutTags":["cover","canvas","analytics","dark","component-first","tsx-first"],"layoutRole":"cover","contentElements":["series-label","headline","subtitle","scope","visual-slot","footer-meta"],"useCases":["cover","opening","analytics-report","custom-composition"],"suitableFor":"Suitable as a branded opening canvas before composing a specific analytics cover.","avoidFor":"Avoid using it unchanged as a final page or for dense analytical body pages.","density":"low","visualWeight":"visual-heavy","editableTextPriority":"high"}),
+  createTemplateEntry(chart_analytics_canvas_ContentCanvasComponent, chart_analytics_canvas_ContentCanvasModule.Schema, chart_analytics_canvas_ContentCanvasModule.layoutId, chart_analytics_canvas_ContentCanvasModule.layoutName, chart_analytics_canvas_ContentCanvasModule.layoutDescription, "chart-analytics-canvas", "ContentCanvas", {"sampleData":{"eyebrow":"Component-first Workspace","title":"Content Canvas","headerMetaLabel":"Mode","headerMetaValue":"Open Composition","headerIcon":"grid","guideTitle":"Compose the page-specific structure here","guideText":"Replace this guide with reusable cards, metrics, charts, images, matrices, timelines, or concise narrative blocks.","footerSource":"Canvas note: data provides content; TSX owns composition.","confidentialityLabel":"CANVAS","pageNumber":"02","showSlotGuides":true},"layoutTags":["content","canvas","analytics","component-first","tsx-first"],"layoutRole":"content","contentElements":["header","content-slot","source-footer"],"useCases":["overview","analysis","evidence","custom-composition"],"suitableFor":"Suitable as the default starting frame for ordinary analytics pages.","avoidFor":"Avoid for covers, final closings, or pages whose primary intent is a dedicated comparison or chart canvas.","density":"medium","visualWeight":"balanced","editableTextPriority":"high"}),
+  createTemplateEntry(chart_analytics_canvas_ComparisonCanvasComponent, chart_analytics_canvas_ComparisonCanvasModule.Schema, chart_analytics_canvas_ComparisonCanvasModule.layoutId, chart_analytics_canvas_ComparisonCanvasModule.layoutName, chart_analytics_canvas_ComparisonCanvasModule.layoutDescription, "chart-analytics-canvas", "ComparisonCanvas", {"sampleData":{"eyebrow":"Comparison Canvas","title":"Two or Three Entity Comparison","headerMetaLabel":"Structure","headerMetaValue":"Open Lanes","headerIcon":"scale","entities":[{"name":"Entity A","accentColor":"var(--primary-color,#2563EB)","prompt":"Replace with evidence cards, metrics, chart fragments, or short findings."},{"name":"Entity B","accentColor":"var(--accent-teal,#14B8A6)","prompt":"Mirror or contrast the same slots so the comparison remains scannable."}],"centerGuideTitle":"Shared criteria / matrix / key contrast","centerGuideText":"Use this band for comparison dimensions, shared assumptions, a compact table, or a synthesis callout.","footerSource":"Sources: add grounded evidence and assumptions per compared entity.","confidentialityLabel":"CANVAS","pageNumber":"03","showSlotGuides":true},"layoutTags":["comparison","canvas","analytics","component-first","tsx-first"],"layoutRole":"content","contentElements":["header","entity-lanes","shared-criteria-slot","source-footer"],"useCases":["two-entity-comparison","three-entity-comparison","benchmark","matrix"],"suitableFor":"Suitable when the page intent is explicit side-by-side comparison.","avoidFor":"Avoid for single-narrative pages, covers, closings, or pages dominated by one chart.","density":"high","visualWeight":"balanced","editableTextPriority":"high"}),
+  createTemplateEntry(chart_analytics_canvas_ChartEvidenceCanvasComponent, chart_analytics_canvas_ChartEvidenceCanvasModule.Schema, chart_analytics_canvas_ChartEvidenceCanvasModule.layoutId, chart_analytics_canvas_ChartEvidenceCanvasModule.layoutName, chart_analytics_canvas_ChartEvidenceCanvasModule.layoutDescription, "chart-analytics-canvas", "ChartEvidenceCanvas", {"sampleData":{"eyebrow":"Chart and Evidence Canvas","title":"Primary Evidence With Interpretation","headerMetaLabel":"Anchor","headerMetaValue":"Chart / Image / Timeline","headerIcon":"chart-line","chartTitle":"Primary evidence area","chartSubtitle":"Place one dominant chart, image, table, or timeline component here","legendLabel":"Evidence","insightTitle":"Interpretation Rail","insights":[{"label":"Claim","text":"State the grounded takeaway supported by the primary visual."},{"label":"Caveat","text":"Add methodology, coverage, or confidence notes without overloading the chart."},{"label":"Action","text":"Connect the evidence to the page-level decision or recommendation."}],"footerSource":"Sources: attach data source, image credit, or research evidence reference.","confidentialityLabel":"CANVAS","pageNumber":"04","showSlotGuides":true},"layoutTags":["chart","evidence","timeline","canvas","analytics","component-first","tsx-first"],"layoutRole":"content","contentElements":["header","primary-evidence-slot","interpretation-rail","source-footer"],"useCases":["chart-analysis","visual-evidence","timeline","source-backed-claim"],"suitableFor":"Suitable when one visual or evidence module should dominate the page.","avoidFor":"Avoid for pages with many unrelated charts, covers, closing pages, or text-only summaries.","density":"high","visualWeight":"visual-heavy","editableTextPriority":"high"}),
+  createTemplateEntry(chart_analytics_canvas_ClosingCanvasComponent, chart_analytics_canvas_ClosingCanvasModule.Schema, chart_analytics_canvas_ClosingCanvasModule.layoutId, chart_analytics_canvas_ClosingCanvasModule.layoutName, chart_analytics_canvas_ClosingCanvasModule.layoutDescription, "chart-analytics-canvas", "ClosingCanvas", {"sampleData":{"seriesLabel":"Analytics Canvas Series","headline":"Thank You","subtitle":"Decisions, questions, and next steps","closingMessage":"Use this low-density closing canvas for contact details, a decision request, or follow-up actions.","primaryLabel":"Next Step","primaryValue":"Confirm decision path","secondaryLabel":"Follow-up","secondaryValue":"Share source appendix","contactLabel":"Contact","contactValue":"Analytics Authoring Workspace","dateLabel":"Report Date","reportDate":"2026"},"layoutTags":["closing","thank-you","canvas","analytics","component-first","tsx-first"],"layoutRole":"closing","contentElements":["headline","closing-message","next-step-callouts","footer-meta"],"useCases":["closing","thank-you","contact","next-steps"],"suitableFor":"Suitable for final thank-you, contact, or next-step slides.","avoidFor":"Avoid for analytical conclusions that still need charts, matrices, or dense recommendations.","density":"low","visualWeight":"visual-heavy","editableTextPriority":"high"}),
+];
+
 export const templates: TemplateLayoutsWithSettings[] = [
   {
     id: red_finance_canvasGroupMeta.group_id,
@@ -405,6 +475,13 @@ export const templates: TemplateLayoutsWithSettings[] = [
     description: chart_analytics_v1GroupMeta.group_description,
     settings: chart_analytics_v1Settings,
     layouts: chart_analytics_v1Layouts,
+  },
+  {
+    id: chart_analytics_canvasGroupMeta.group_id,
+    name: chart_analytics_canvasGroupMeta.group_name,
+    description: chart_analytics_canvasGroupMeta.group_description,
+    settings: chart_analytics_canvasSettings,
+    layouts: chart_analytics_canvasLayouts,
   },
 ];
 

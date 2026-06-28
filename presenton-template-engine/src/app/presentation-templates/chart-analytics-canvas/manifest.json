@@ -1,0 +1,73 @@
+{
+  "title": "Dark Analytics Canvas Starter Deck",
+  "theme": {
+    "company_name": "ANALYTICS AUTHORING WORKSPACE",
+    "colors": {
+      "background": "#0F172A",
+      "background_text": "#F8FAFC",
+      "primary": "#2563EB",
+      "primary_text": "#FFFFFF",
+      "card": "#FFFFFF",
+      "stroke": "#E2E8F0",
+      "secondary": "#14B8A6",
+      "text_muted": "#94A3B8",
+      "text_subtle": "#64748B",
+      "panel": "#1E293B",
+      "surface": "#F8FAFC",
+      "accent_indigo": "#4F46E5",
+      "accent_teal": "#14B8A6"
+    }
+  },
+  "slides": [
+    {
+      "id": "chart-analytics-canvas-cover",
+      "title": "Cover Canvas",
+      "speaker_note": "Open cover canvas for component-first dark analytics deck authoring.",
+      "source": {
+        "type": "local",
+        "path": "./slides/CoverCanvas.tsx"
+      },
+      "data_path": "./data/demo/cover-canvas.json"
+    },
+    {
+      "id": "chart-analytics-canvas-content",
+      "title": "Content Canvas",
+      "speaker_note": "General content canvas. Replace the guide area with page-specific component composition.",
+      "source": {
+        "type": "local",
+        "path": "./slides/ContentCanvas.tsx"
+      },
+      "data_path": "./data/demo/content-canvas.json"
+    },
+    {
+      "id": "chart-analytics-canvas-comparison",
+      "title": "Comparison Canvas",
+      "speaker_note": "Open comparison canvas for two or three entities, options, markets, products, or capabilities.",
+      "source": {
+        "type": "local",
+        "path": "./slides/ComparisonCanvas.tsx"
+      },
+      "data_path": "./data/demo/comparison-canvas.json"
+    },
+    {
+      "id": "chart-analytics-canvas-chart-evidence",
+      "title": "Chart Evidence Canvas",
+      "speaker_note": "Open canvas for one dominant chart, image, table, timeline, or source-backed evidence anchor plus interpretation.",
+      "source": {
+        "type": "local",
+        "path": "./slides/ChartEvidenceCanvas.tsx"
+      },
+      "data_path": "./data/demo/chart-evidence-canvas.json"
+    },
+    {
+      "id": "chart-analytics-canvas-closing",
+      "title": "Closing Canvas",
+      "speaker_note": "Low-density closing canvas for final contact, decision request, or next-step page.",
+      "source": {
+        "type": "local",
+        "path": "./slides/ClosingCanvas.tsx"
+      },
+      "data_path": "./data/demo/closing-canvas.json"
+    }
+  ]
+}

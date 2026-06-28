@@ -1,0 +1,24 @@
+{
+  "eyebrow": "Evidence Anchor",
+  "title": "Chart Evidence Canvas",
+  "headerMetaValue": "Primary Visual",
+  "chartTitle": "Primary evidence area",
+  "chartSubtitle": "Use a chart, table, image, screenshot, map, or timeline as the page anchor",
+  "legendLabel": "Evidence module",
+  "insightTitle": "Interpretation Rail",
+  "insights": [
+    {
+      "label": "Main claim",
+      "text": "Summarize the grounded takeaway supported by the visual anchor."
+    },
+    {
+      "label": "Evidence note",
+      "text": "Identify source coverage, method limits, or confidence level."
+    },
+    {
+      "label": "Implication",
+      "text": "Connect the evidence to the audience decision or next action."
+    }
+  ],
+  "pageNumber": "04"
+}

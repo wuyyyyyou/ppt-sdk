@@ -1,0 +1,24 @@
+export const chartAnalyticsTheme = {
+  colors: {
+    background: "var(--background-color,#0F172A)",
+    backgroundText: "var(--background-text,#F8FAFC)",
+    primary: "var(--primary-color,#2563EB)",
+    primaryText: "var(--primary-text,#FFFFFF)",
+    card: "var(--card-color,#FFFFFF)",
+    stroke: "var(--stroke,#E2E8F0)",
+    secondary: "var(--secondary-color,var(--graph-1,#14B8A6))",
+    mutedText: "var(--text-muted,#94A3B8)",
+    subtleText: "var(--text-subtle,#64748B)",
+    panel: "var(--panel-color,#1E293B)",
+    surface: "var(--surface-color,#F8FAFC)",
+    accentIndigo: "var(--accent-indigo,#4F46E5)",
+    accentTeal: "var(--accent-teal,#14B8A6)",
+    darkOverlay: "rgba(15,23,42,0.84)",
+    faintLine: "rgba(255,255,255,0.12)",
+    faintPanel: "rgba(255,255,255,0.05)",
+  },
+  fonts: {
+    body: 'var(--body-font-family,Roboto,Inter,"Noto Sans SC",sans-serif)',
+    display: 'var(--display-font-family,Montserrat,Inter,"Noto Sans SC",sans-serif)',
+  },
+} as const;

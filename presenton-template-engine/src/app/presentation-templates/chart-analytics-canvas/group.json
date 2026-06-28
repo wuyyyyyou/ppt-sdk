@@ -1,0 +1,23 @@
+{
+  "group_id": "chart-analytics-canvas",
+  "group_name": "Dark Analytics Canvas",
+  "group_description": "Component-first dark analytics canvas templates for building custom chart-heavy and evidence-led decks from reusable TSX components.",
+  "group_brief": "Open composition version of the original Dark Analytics Charts template. It keeps the dark analytics visual language and component library, but provides only broad cover, content, comparison, chart/evidence, and closing canvases so the AI Agent can compose final pages from components based on actual page intent.",
+  "style_tags": ["analytics", "dashboard", "canvas", "component-first", "tsx-first"],
+  "industry_tags": ["business", "market-analysis", "strategy", "research"],
+  "use_cases": ["custom-composition", "executive-dashboard", "evidence-review", "data-story", "market-comparison"],
+  "audience_tags": ["management", "client", "analyst"],
+  "tone_tags": ["professional", "analytical", "executive"],
+  "cover_layout_id": "chart-analytics-canvas:cover-canvas",
+  "closing_layout_id": "chart-analytics-canvas:closing-canvas",
+  "ordered": true,
+  "default": false,
+  "registry_order": 96,
+  "layouts": [
+    "slides/CoverCanvas.tsx",
+    "slides/ContentCanvas.tsx",
+    "slides/ComparisonCanvas.tsx",
+    "slides/ChartEvidenceCanvas.tsx",
+    "slides/ClosingCanvas.tsx"
+  ]
+}

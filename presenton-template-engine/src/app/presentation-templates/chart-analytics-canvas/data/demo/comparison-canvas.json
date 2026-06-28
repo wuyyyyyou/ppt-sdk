@@ -1,0 +1,24 @@
+{
+  "eyebrow": "Benchmark Frame",
+  "title": "Comparison Canvas",
+  "headerMetaValue": "Entity Lanes",
+  "entities": [
+    {
+      "name": "Option A",
+      "accentColor": "#2563EB",
+      "prompt": "Place evidence cards, metric highlights, or visual proof for this option."
+    },
+    {
+      "name": "Option B",
+      "accentColor": "#14B8A6",
+      "prompt": "Mirror comparable evidence so the audience can scan tradeoffs."
+    },
+    {
+      "name": "Option C",
+      "accentColor": "#4F46E5",
+      "prompt": "Use only when a third option is essential to the decision."
+    }
+  ],
+  "centerGuideTitle": "Shared criteria and synthesis",
+  "pageNumber": "03"
+}

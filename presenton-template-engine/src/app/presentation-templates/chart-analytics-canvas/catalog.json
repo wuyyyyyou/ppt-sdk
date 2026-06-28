@@ -1,0 +1,131 @@
+{
+  "group_id": "chart-analytics-canvas",
+  "catalog_type": "tsx-first-canvas",
+  "version": 1,
+  "purpose": "Help the PPT AI Agent choose a broad dark analytics canvas first, then compose the final page in slides/*.tsx from reusable components based on page intent and grounded content.",
+  "source_theme": {
+    "derived_from": "the original Dark Analytics Charts template",
+    "visual_language": [
+      "dark slate cover and closing pages",
+      "light slate body canvas",
+      "blue primary accent with teal and indigo secondary accents",
+      "card-based analytics dashboards",
+      "chart, comparison, timeline, image evidence, and summary component systems"
+    ],
+    "relationship_to_v1": "This canvas group keeps the v1 theme and component library, but does not copy v1's concrete concrete regional-comparison business page blueprints."
+  },
+  "directory_roles": {
+    "blueprints": {
+      "path": "./blueprints",
+      "role": "Copyable canvas TSX blueprint pages.",
+      "rules": [
+        "Do not treat canvas files as finished slide structures.",
+        "Copy or derive the selected canvas into ./slides before adapting it for a concrete deck.",
+        "Use each canvas only as a branded frame before composing real content."
+      ]
+    },
+    "slides": {
+      "path": "./slides",
+      "role": "Registered slide entries and final page implementations.",
+      "rules": [
+        "group.json.layouts and manifest.json source.path must only reference this directory.",
+        "Final deck pages should replace canvas slot guides with page-specific component compositions."
+      ]
+    },
+    "components": {
+      "path": "./components",
+      "role": "Reusable dark analytics component library copied from the original Dark Analytics Charts template.",
+      "rules": [
+        "Read components/README.md before choosing components.",
+        "Choose component families from page semantics, not visual convenience.",
+        "Prefer composing existing components before adding new ones."
+      ]
+    },
+    "data": {
+      "path": "./data",
+      "role": "Content data for demo or concrete decks.",
+      "rules": [
+        "JSON carries content only, not page-structure decisions.",
+        "If layout or component choice is wrong, edit slides/*.tsx."
+      ]
+    },
+    "theme": {
+      "path": "./theme",
+      "role": "Shared color, typography, and visual token definitions migrated from the original Dark Analytics Charts template."
+    }
+  },
+  "blueprints": [
+    {
+      "id": "cover-canvas",
+      "name": "Cover Canvas",
+      "blueprint_source": "./blueprints/CoverCanvas.tsx",
+      "example_slide": "./slides/CoverCanvas.tsx",
+      "layout_family": "cover-canvas",
+      "content_intents": ["opening", "analytics-positioning", "report-frame", "custom-cover"],
+      "suitable_for": ["deck cover", "analytics report opening", "executive dashboard opening", "evidence-led briefing opening"],
+      "avoid_for": ["body analysis", "dense charts", "timeline", "large card grid", "unchanged final slide"],
+      "composition_guidance": "Keep the dark analytics frame, series label, headline, scope, and footer metadata. Replace the visual slot with a relevant image, compact metric cluster, evidence cue, or scoped report motif."
+    },
+    {
+      "id": "content-canvas",
+      "name": "Content Canvas",
+      "blueprint_source": "./blueprints/ContentCanvas.tsx",
+      "example_slide": "./slides/ContentCanvas.tsx",
+      "layout_family": "content-canvas",
+      "content_intents": ["overview", "analysis", "narrative", "evidence", "custom-composition"],
+      "suitable_for": ["ordinary content page", "overview page", "component-composed analysis page", "custom evidence page", "mixed narrative and metric page"],
+      "avoid_for": ["cover", "closing", "explicit two-entity comparison", "single dominant chart page", "unchanged final slide"],
+      "composition_guidance": "Use as the default body frame when the page plan does not demand a dedicated comparison lane or primary chart. Fill the body with cards, headings, metrics, images, matrices, timelines, or short narrative blocks."
+    },
+    {
+      "id": "comparison-canvas",
+      "name": "Comparison Canvas",
+      "blueprint_source": "./blueprints/ComparisonCanvas.tsx",
+      "example_slide": "./slides/ComparisonCanvas.tsx",
+      "layout_family": "entity-comparison-canvas",
+      "content_intents": ["two-entity-comparison", "three-entity-comparison", "benchmark", "matrix", "capability-comparison"],
+      "suitable_for": ["two or three entity comparison", "side-by-side profiles", "market or option benchmark", "compact comparison matrix", "evidence lanes"],
+      "avoid_for": ["single narrative page", "cover", "closing", "one dominant chart page", "long prose"],
+      "composition_guidance": "Treat each lane as a scaffold, not a fixed card. Replace lane guides with TrendStatCard, MetricHighlightCard, CircularComparisonMetricCard, AdvantageBarList, ComparisonMatrixBoard, image evidence, or custom lane-level compositions."
+    },
+    {
+      "id": "chart-evidence-canvas",
+      "name": "Chart Evidence Canvas",
+      "blueprint_source": "./blueprints/ChartEvidenceCanvas.tsx",
+      "example_slide": "./slides/ChartEvidenceCanvas.tsx",
+      "layout_family": "primary-visual-with-interpretation",
+      "content_intents": ["chart-analysis", "visual-evidence", "timeline", "source-backed-claim", "interpretation-rail"],
+      "suitable_for": ["one dominant chart", "single image evidence page", "timeline or milestone evidence", "chart plus insight cards", "table or source note alongside a visual"],
+      "avoid_for": ["agenda", "cover", "closing", "pages with no primary visual anchor", "multiple unrelated charts"],
+      "composition_guidance": "Use ChartPanelShell plus a chart module for quantitative evidence, AnalyticsImageShowcasePanel for a visual asset, ComparisonMatrixBoard for compact evidence tables, or HorizontalMilestoneTimeline for chronology. Use the right rail for concise interpretation, caveats, KPI notes, or source context."
+    },
+    {
+      "id": "closing-canvas",
+      "name": "Closing Canvas",
+      "blueprint_source": "./blueprints/ClosingCanvas.tsx",
+      "example_slide": "./slides/ClosingCanvas.tsx",
+      "layout_family": "closing-canvas",
+      "content_intents": ["closing", "thank-you", "contact", "next-step"],
+      "suitable_for": ["final slide", "contact information", "follow-up request", "low-density close", "decision ask"],
+      "avoid_for": ["analytical conclusion", "dense recommendations", "charts", "tables", "section transition"],
+      "composition_guidance": "Keep density low. Adapt the two callouts into final CTA, next-step cards, or concise follow-up information while preserving editable text."
+    }
+  ],
+  "selection_guide": [
+    "Choose cover-canvas only for the opening page or an intentional title reset.",
+    "Choose content-canvas for ordinary pages where the Agent needs freedom to compose cards, text, image, table, timeline, or mixed modules.",
+    "Choose comparison-canvas when the page intent is explicitly to compare two or three entities, options, markets, products, capabilities, or scenarios.",
+    "Choose chart-evidence-canvas when one chart, table, image, screenshot, map, timeline, or other evidence asset should dominate the page and interpretation should sit beside it.",
+    "For timeline pages, choose chart-evidence-canvas when chronology is the main evidence anchor; choose content-canvas only when the timeline is one module among several.",
+    "For evidence pages, choose chart-evidence-canvas when one source-backed visual or table anchors the claim; choose content-canvas for multi-evidence summaries.",
+    "Choose closing-canvas only for the final thank-you, contact, decision request, or next-step page."
+  ],
+  "agent_workflow_notes": [
+    "This template group intentionally provides canvas-level starting points, not finished industry pages.",
+    "Start by choosing the broad canvas family from page intent; do not start by copying a the original Dark Analytics Charts template business blueprint.",
+    "Before editing slides/*.tsx, read components/README.md and identify the component families that fit the page plan.",
+    "Derive final pages in slides/*.tsx, then replace slot guides with concrete component composition.",
+    "Use data/demo or deck JSON for content values only; layout, slot ownership, and component choice belong in TSX.",
+    "Do not paste source HTML or a concrete business page into a canvas. Rebuild the page from chart analytics components so it remains editable and PPT-friendly."
+  ]
+}
