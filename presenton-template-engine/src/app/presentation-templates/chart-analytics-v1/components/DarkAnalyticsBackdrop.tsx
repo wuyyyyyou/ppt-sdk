@@ -16,7 +16,7 @@ const DarkAnalyticsBackdrop = ({
   showAccentLine = true,
 }: DarkAnalyticsBackdropProps) => {
   return (
-    <div className="absolute inset-0 z-0 overflow-hidden">
+    <div data-pptx-export="screenshot" className="absolute inset-0 z-0 overflow-hidden">
       {showImage && imageUrl ? (
         <img
           alt={imageAlt}
