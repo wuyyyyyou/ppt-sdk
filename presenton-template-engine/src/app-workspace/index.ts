@@ -2477,6 +2477,7 @@ export async function prepareAppExportModel(
   });
   const model = await convertDeckHtmlToPptxModel({
     html: result.deckHtml,
+    htmlFilePath: result.deckOutputPath,
     name: result.title,
   });
   const modelPath = path.join(outputDir, "ppt-model.json");

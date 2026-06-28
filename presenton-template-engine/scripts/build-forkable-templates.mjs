@@ -16,6 +16,8 @@ const registryManifestPath = path.join(
 );
 const outputRoot = path.join(projectDir, "dist", "forkable-templates");
 const workspaceAssetTemplateGroups = new Set([
+  "chart-analytics-canvas",
+  "red-blue-comparison-canvas",
   "red-finance-canvas",
   "red-finance-v3",
 ]);

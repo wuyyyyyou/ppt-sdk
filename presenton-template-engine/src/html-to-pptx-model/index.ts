@@ -1,3 +1,8 @@
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { pathToFileURL } from "node:url";
+
 import type { BrowserLike, PageLike } from "./types/browser.js";
 import {
   createPresentationPptxModel,
@@ -35,6 +40,7 @@ export interface ConvertDeckPageToPptxModelInput
 
 export interface ConvertDeckHtmlToPptxModelInput {
   html: string;
+  htmlFilePath?: string;
   name?: string;
   page?: PageLike;
   viewport?: {
@@ -86,6 +92,7 @@ export async function convertDeckHtmlToPptxModel(
   const runtime = ownedPage
     ? await createManagedPage(input.launchOptions)
     : { page: input.page as PageLike, close: async () => {} };
+  let temporaryHtmlPath: string | null = null;
 
   try {
     if (runtime.page.setViewport) {
@@ -107,15 +114,33 @@ export async function convertDeckHtmlToPptxModel(
     const deckSelector = input.deckSelector ?? DEFAULT_DECK_SELECTOR;
     const contentTimeoutMs = input.contentTimeoutMs ?? 300000;
 
-    debugLog("setContent.start", {
-      deckSelector,
-      contentTimeoutMs,
-    });
-    await runtime.page.setContent(input.html, {
-      waitUntil: input.contentWaitUntil ?? "domcontentloaded",
-      timeout: contentTimeoutMs,
-    });
-    debugLog("setContent.done");
+    if (ownedPage && runtime.page.goto) {
+      const htmlFilePath = input.htmlFilePath ?? await writeTemporaryDeckHtml(input.html);
+      if (!input.htmlFilePath) {
+        temporaryHtmlPath = htmlFilePath;
+      }
+
+      debugLog("gotoHtmlFile.start", {
+        deckSelector,
+        contentTimeoutMs,
+        htmlFilePath,
+      });
+      await runtime.page.goto(pathToFileURL(htmlFilePath).href, {
+        waitUntil: input.contentWaitUntil ?? "domcontentloaded",
+        timeout: contentTimeoutMs,
+      });
+      debugLog("gotoHtmlFile.done");
+    } else {
+      debugLog("setContent.start", {
+        deckSelector,
+        contentTimeoutMs,
+      });
+      await runtime.page.setContent(input.html, {
+        waitUntil: input.contentWaitUntil ?? "domcontentloaded",
+        timeout: contentTimeoutMs,
+      });
+      debugLog("setContent.done");
+    }
 
     debugLog("waitForDeckRenderReady.start");
     await waitForDeckRenderReady(
@@ -144,10 +169,23 @@ export async function convertDeckHtmlToPptxModel(
       screenshotsDir: input.screenshotsDir,
     });
   } finally {
+    if (temporaryHtmlPath) {
+      await rm(temporaryHtmlPath, { force: true }).catch((error: Error) => {
+        debugLog("temporaryHtml.cleanup.error", error.stack ?? error.message);
+      });
+    }
     if (ownedPage) {
       await runtime.close();
     }
   }
+}
+
+async function writeTemporaryDeckHtml(html: string): Promise<string> {
+  const dir = join(tmpdir(), "presenton-template-engine", "html-to-pptx-model");
+  await mkdir(dir, { recursive: true });
+  const htmlPath = join(dir, `deck-${Date.now()}-${Math.random().toString(36).slice(2)}.html`);
+  await writeFile(htmlPath, html, "utf8");
+  return htmlPath;
 }
 
 async function normalizeDeckForExtraction(

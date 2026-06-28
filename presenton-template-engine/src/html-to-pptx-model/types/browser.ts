@@ -18,6 +18,10 @@ export interface PageLike {
     html: string,
     options?: { waitUntil?: string | string[]; timeout?: number },
   ) => Promise<void>;
+  goto?: (
+    url: string,
+    options?: { waitUntil?: string | string[]; timeout?: number },
+  ) => Promise<unknown>;
   $: (selector: string) => Promise<ElementHandleLike | null>;
   close?: () => Promise<void>;
 }
