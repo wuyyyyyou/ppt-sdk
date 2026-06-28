@@ -21,9 +21,13 @@ function makeTemplate(groupId: string): TemplateSummary {
 }
 
 describe("Template selection policy", () => {
-  it("allows only the first-stage selectable template groups", () => {
+  it("allows all built-in presentation template groups", () => {
     assert.equal(isSelectableTemplateGroup("red-finance-canvas"), true);
     assert.equal(isSelectableTemplateGroup("red-finance-v3"), true);
+    assert.equal(isSelectableTemplateGroup("red-blue-comparison-v1"), true);
+    assert.equal(isSelectableTemplateGroup("red-blue-comparison-canvas"), true);
+    assert.equal(isSelectableTemplateGroup("chart-analytics-v1"), true);
+    assert.equal(isSelectableTemplateGroup("chart-analytics-canvas"), true);
     assert.equal(isSelectableTemplateGroup("legacy-hidden-template"), false);
   });
 
@@ -31,12 +35,23 @@ describe("Template selection policy", () => {
     const templates = [
       makeTemplate("red-finance-canvas"),
       makeTemplate("red-finance-v3"),
+      makeTemplate("red-blue-comparison-v1"),
+      makeTemplate("red-blue-comparison-canvas"),
+      makeTemplate("chart-analytics-v1"),
+      makeTemplate("chart-analytics-canvas"),
       makeTemplate("legacy-hidden-template"),
     ];
 
     assert.deepEqual(
       filterSelectableTemplates(templates).map((template) => template.group_id),
-      ["red-finance-canvas", "red-finance-v3"],
+      [
+        "red-finance-canvas",
+        "red-finance-v3",
+        "red-blue-comparison-v1",
+        "red-blue-comparison-canvas",
+        "chart-analytics-v1",
+        "chart-analytics-canvas",
+      ],
     );
   });
 });

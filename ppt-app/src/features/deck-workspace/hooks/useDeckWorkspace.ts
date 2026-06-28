@@ -94,7 +94,7 @@ import {
 } from "../generationViewState";
 import { isSelectableTemplateGroup } from "../templateSelectionPolicy";
 
-const DEFAULT_TEMPLATE_GROUP_ID = "red-finance-v3";
+const DEFAULT_TEMPLATE_GROUP_ID = "red-finance-canvas";
 const AGENT_TOOL_ACCESS_POLICY = resolveAgentToolAccessPolicy(
   import.meta.env.VITE_AGENT_TOOL_ACCESS_POLICY,
   { warn: (message) => console.warn(message) },

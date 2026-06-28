@@ -33,9 +33,13 @@ function renderBriefPage(options: { loading?: LoadingKind } = {}) {
       templates: [
         makeTemplate("red-finance-canvas", "Red Finance Canvas"),
         makeTemplate("red-finance-v3", "Business Professional"),
+        makeTemplate("red-blue-comparison-v1", "Red Blue Comparison"),
+        makeTemplate("red-blue-comparison-canvas", "Red Blue Comparison Canvas"),
+        makeTemplate("chart-analytics-v1", "Dark Analytics Charts"),
+        makeTemplate("chart-analytics-canvas", "Dark Analytics Canvas"),
         makeTemplate("legacy-hidden-template", "Legacy Hidden Template"),
       ],
-      selectedTemplateGroupId: "red-finance-v3",
+      selectedTemplateGroupId: "red-finance-canvas",
       loading: options.loading ?? "none",
       selectTemplate: async () => undefined,
       reviewOutlineFirst: false,
@@ -66,9 +70,13 @@ function renderStyleSelection() {
       templates: [
         makeTemplate("red-finance-canvas", "Red Finance Canvas"),
         makeTemplate("red-finance-v3", "Business Professional"),
+        makeTemplate("red-blue-comparison-v1", "Red Blue Comparison"),
+        makeTemplate("red-blue-comparison-canvas", "Red Blue Comparison Canvas"),
+        makeTemplate("chart-analytics-v1", "Dark Analytics Charts"),
+        makeTemplate("chart-analytics-canvas", "Dark Analytics Canvas"),
         makeTemplate("legacy-hidden-template", "Legacy Hidden Template"),
       ],
-      selectedTemplateGroupId: "red-finance-v3",
+      selectedTemplateGroupId: "red-finance-canvas",
       loading: "none",
       selectTemplate: async () => undefined,
     }),
@@ -87,6 +95,10 @@ describe("BriefPage", () => {
 
     assert.match(html, /Red Finance Canvas/);
     assert.match(html, /Business Professional/);
+    assert.match(html, /Red Blue Comparison/);
+    assert.match(html, /Red Blue Comparison Canvas/);
+    assert.match(html, /Dark Analytics Charts/);
+    assert.match(html, /Dark Analytics Canvas/);
     assert.doesNotMatch(html, /Legacy Hidden Template/);
   });
 

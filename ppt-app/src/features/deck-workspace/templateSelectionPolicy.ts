@@ -3,6 +3,10 @@ import type { TemplateSummary } from "../../api/types";
 export const SELECTABLE_TEMPLATE_GROUP_IDS = [
   "red-finance-canvas",
   "red-finance-v3",
+  "red-blue-comparison-v1",
+  "red-blue-comparison-canvas",
+  "chart-analytics-v1",
+  "chart-analytics-canvas",
 ] as const;
 
 const SELECTABLE_TEMPLATE_GROUP_ID_SET = new Set<string>(
