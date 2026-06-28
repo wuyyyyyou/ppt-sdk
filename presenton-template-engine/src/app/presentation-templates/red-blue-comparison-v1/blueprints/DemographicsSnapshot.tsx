@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import EntitySnapshotCard, {
   type EntitySnapshotIconName,
@@ -139,7 +140,7 @@ export const visualWeight = "balanced";
 export const editableTextPriority = "high";
 
 const DemographicsSnapshot = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = Schema.parse(data ?? {});
+  const parsed = readTemplateData(Schema, data);
 
   return (
     <ThemeContentFrame

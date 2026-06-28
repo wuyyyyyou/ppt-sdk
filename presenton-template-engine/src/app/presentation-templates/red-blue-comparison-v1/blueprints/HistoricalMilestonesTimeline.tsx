@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import AlternatingTimeline from "../components/AlternatingTimeline.tsx";
 import ThemeCanvas from "../components/ThemeCanvas.tsx";
@@ -82,7 +83,7 @@ const TimelineDecorations = () => (
 );
 
 const HistoricalMilestonesTimeline = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = Schema.parse(data ?? {});
+  const parsed = readTemplateData(Schema, data);
 
   return (
     <ThemeCanvas>

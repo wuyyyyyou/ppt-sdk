@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import AnalyticsCanvas from "../components/AnalyticsCanvas.tsx";
 import AnalyticsLineChart, { type AnalyticsLineSeries } from "../components/AnalyticsLineChart.tsx";
@@ -123,10 +124,9 @@ export const density = "high";
 export const visualWeight = "visual-heavy";
 export const editableTextPriority = "high";
 
-const readData = (data: Partial<z.infer<typeof Schema>>): z.infer<typeof Schema> => Schema.parse(data ?? {});
 
 const GrowthTrendComparison = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = readData(data);
+  const parsed = readTemplateData(Schema, data);
 
   return (
     <AnalyticsCanvas variant="light">

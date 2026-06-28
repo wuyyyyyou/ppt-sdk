@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import IconText from "../components/IconText.tsx";
 import ThemeCanvas from "../components/ThemeCanvas.tsx";
@@ -113,7 +114,7 @@ const ContactIcon = ({ icon, tone }: { icon: z.infer<typeof ContactIconSchema>; 
 };
 
 const ClosingContact = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = Schema.parse(data ?? {});
+  const parsed = readTemplateData(Schema, data);
   const accentTone = parsed.accentTone as RedBlueTone;
   const accent = redBlueComparisonTheme.tone[accentTone];
 

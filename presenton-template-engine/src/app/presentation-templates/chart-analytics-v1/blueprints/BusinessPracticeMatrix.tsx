@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import AnalyticsCanvas from "../components/AnalyticsCanvas.tsx";
 import ComparisonMatrixBoard from "../components/ComparisonMatrixBoard.tsx";
@@ -168,10 +169,9 @@ export const density = "high";
 export const visualWeight = "balanced";
 export const editableTextPriority = "high";
 
-const readData = (data: Partial<z.infer<typeof Schema>>): z.infer<typeof Schema> => Schema.parse(data ?? {});
 
 const BusinessPracticeMatrix = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = readData(data);
+  const parsed = readTemplateData(Schema, data);
   const entities = parsed.entities as [z.infer<typeof EntitySchema>, z.infer<typeof EntitySchema>];
 
   return (

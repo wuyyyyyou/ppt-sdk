@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import { BalancedComparisonDecorations } from "../components/ComparisonDecorations.tsx";
 import ChartContainer from "../components/ChartContainer.tsx";
@@ -162,7 +163,7 @@ export const visualWeight = "balanced";
 export const editableTextPriority = "high";
 
 const TechnologyInnovationKpis = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = Schema.parse(data ?? {});
+  const parsed = readTemplateData(Schema, data);
   const legend = parsed.entities.map((entity, index) => {
     const series = parsed.radarSeries[index];
     return {

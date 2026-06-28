@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import AnalyticsCanvas from "../components/AnalyticsCanvas.tsx";
 import AnalyticsCardShell from "../components/AnalyticsCardShell.tsx";
@@ -111,10 +112,9 @@ export const density = "medium";
 export const visualWeight = "visual-heavy";
 export const editableTextPriority = "medium";
 
-const readData = (data: Partial<z.infer<typeof Schema>>): z.infer<typeof Schema> => Schema.parse(data ?? {});
 
 const ImageEvidenceShowcase = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = readData(data);
+  const parsed = readTemplateData(Schema, data);
 
   return (
     <AnalyticsCanvas variant="light">

@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import AnalyticsCanvas from "../components/AnalyticsCanvas.tsx";
 import ComparisonHeroTitle from "../components/ComparisonHeroTitle.tsx";
@@ -42,7 +43,6 @@ export const density = "low";
 export const visualWeight = "visual-heavy";
 export const editableTextPriority = "high";
 
-const readData = (data: Partial<z.infer<typeof Schema>>): z.infer<typeof Schema> => Schema.parse(data ?? {});
 
 const CoverRings = () => (
   <div className="absolute inset-0 z-[1] pointer-events-none">
@@ -53,7 +53,7 @@ const CoverRings = () => (
 );
 
 const CoverAnalytics = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = readData(data);
+  const parsed = readTemplateData(Schema, data);
 
   return (
     <AnalyticsCanvas>

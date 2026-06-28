@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import AnalyticsCanvas from "../components/AnalyticsCanvas.tsx";
 import AnalyticsGroupedBarChart, { type AnalyticsBarSeries } from "../components/AnalyticsGroupedBarChart.tsx";
@@ -200,10 +201,9 @@ export const density = "high";
 export const visualWeight = "balanced";
 export const editableTextPriority = "high";
 
-const readData = (data: Partial<z.infer<typeof Schema>>): z.infer<typeof Schema> => Schema.parse(data ?? {});
 
 const ExecutiveSummaryDashboard = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = readData(data);
+  const parsed = readTemplateData(Schema, data);
 
   return (
     <AnalyticsCanvas variant="light">

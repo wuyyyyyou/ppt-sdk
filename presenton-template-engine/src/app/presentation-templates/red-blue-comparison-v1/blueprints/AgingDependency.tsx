@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import ChartContainer from "../components/ChartContainer.tsx";
 import InsightMetricCard from "../components/InsightMetricCard.tsx";
@@ -152,7 +153,7 @@ const AgingDecorations = () => (
 );
 
 const AgingDependency = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = Schema.parse(data ?? {});
+  const parsed = readTemplateData(Schema, data);
 
   return (
     <ThemeContentFrame

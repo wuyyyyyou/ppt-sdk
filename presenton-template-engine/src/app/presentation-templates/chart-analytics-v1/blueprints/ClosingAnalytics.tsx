@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import AnalyticsCanvas from "../components/AnalyticsCanvas.tsx";
 import DarkAnalyticsBackdrop from "../components/DarkAnalyticsBackdrop.tsx";
@@ -46,7 +47,6 @@ export const density = "low";
 export const visualWeight = "visual-heavy";
 export const editableTextPriority = "high";
 
-const readData = (data: Partial<z.infer<typeof Schema>>): z.infer<typeof Schema> => Schema.parse(data ?? {});
 
 const ClosingCallout = ({ label, value }: { label: string; value: string }) => (
   <div className="min-w-0 rounded-[8px] border border-white/10 bg-white/[0.06] px-[24px] py-[18px] text-left">
@@ -58,7 +58,7 @@ const ClosingCallout = ({ label, value }: { label: string; value: string }) => (
 );
 
 const ClosingAnalytics = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = readData(data);
+  const parsed = readTemplateData(Schema, data);
 
   return (
     <AnalyticsCanvas>

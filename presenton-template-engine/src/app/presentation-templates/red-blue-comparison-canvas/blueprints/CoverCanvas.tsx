@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import ComparisonHeroTitle from "../components/ComparisonHeroTitle.tsx";
 import { CoverComparisonDecorations } from "../components/ComparisonDecorations.tsx";
@@ -52,7 +53,7 @@ export const visualWeight = "visual-heavy";
 export const editableTextPriority = "high";
 
 const CoverCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = Schema.parse(data ?? {});
+  const parsed = readTemplateData(Schema, data);
 
   return (
     <ThemeCanvas>

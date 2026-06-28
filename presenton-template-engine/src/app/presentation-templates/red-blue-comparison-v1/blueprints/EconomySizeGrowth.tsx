@@ -1,5 +1,6 @@
 import React from "react";
 import * as z from "zod";
+import { readTemplateData } from "../utils/templateData.ts";
 
 import ChartContainer from "../components/ChartContainer.tsx";
 import EntityComparisonMetricCard from "../components/EntityComparisonMetricCard.tsx";
@@ -148,7 +149,7 @@ const EconomyDecorations = () => (
 );
 
 const EconomySizeGrowth = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
-  const parsed = Schema.parse(data ?? {});
+  const parsed = readTemplateData(Schema, data);
 
   return (
     <ThemeContentFrame
