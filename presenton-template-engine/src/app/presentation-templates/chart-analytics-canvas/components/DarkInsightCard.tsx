@@ -29,8 +29,10 @@ const DarkInsightCard = ({
       <div className="text-[13px] font-bold uppercase leading-[1.2]" style={{ color: accentColor }}>
         {label}
       </div>
-      <div className="mt-[10px] text-[17px] font-bold leading-[1.2] text-white">{title}</div>
-      <div className="mt-[8px] text-[13px] leading-[1.45]" style={{ color: "#CBD5E1" }}>
+      <div className="mt-[10px] text-[17px] font-bold leading-[1.2]" style={{ color: chartAnalyticsTheme.colors.darkText }}>
+        {title}
+      </div>
+      <div className="mt-[8px] text-[13px] leading-[1.45]" style={{ color: chartAnalyticsTheme.colors.darkMutedText }}>
         {text}
       </div>
     </div>

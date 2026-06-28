@@ -88,14 +88,18 @@ const ChartEvidenceCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }
         </ChartPanelShell>
 
         <AnalyticsCardShell dark padding={24}>
-          <div className="text-[22px] font-black leading-[1.12] text-white">{parsed.insightTitle}</div>
+          <div className="text-[22px] font-black leading-[1.12]" style={{ color: chartAnalyticsTheme.colors.darkText }}>
+            {parsed.insightTitle}
+          </div>
           <div className="mt-[18px] flex flex-1 flex-col gap-[14px]">
             {parsed.insights.map((insight) => (
               <div key={insight.label} className="rounded-[8px] border border-white/10 bg-white/[0.06] p-[16px]">
                 <div className="text-[11px] font-bold uppercase leading-none" style={{ color: "#60A5FA" }}>
                   {insight.label}
                 </div>
-                <div className="mt-[8px] text-[14px] font-medium leading-[1.42] text-slate-200">{insight.text}</div>
+                <div className="mt-[8px] text-[14px] font-medium leading-[1.42]" style={{ color: chartAnalyticsTheme.colors.darkMutedText }}>
+                  {insight.text}
+                </div>
               </div>
             ))}
           </div>

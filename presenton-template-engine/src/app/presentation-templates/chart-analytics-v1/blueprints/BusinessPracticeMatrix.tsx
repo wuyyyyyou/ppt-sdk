@@ -192,7 +192,7 @@ const BusinessPracticeMatrix = ({ data }: { data: Partial<z.infer<typeof Schema>
         <div
           className="mt-[16px] flex h-[54px] flex-none items-center justify-between rounded-[8px] px-[18px]"
           style={{
-            backgroundColor: chartAnalyticsTheme.colors.panel,
+            backgroundColor: chartAnalyticsTheme.colors.darkPanel,
             boxShadow: "0 10px 18px rgba(15,23,42,0.16)",
           }}
         >
@@ -204,12 +204,12 @@ const BusinessPracticeMatrix = ({ data }: { data: Partial<z.infer<typeof Schema>
               <div className="flex-none text-[14px] font-bold uppercase leading-[1.25]" style={{ color: "#C4B5FD" }}>
                 {parsed.implicationLabel}:
               </div>
-              <div className="min-w-0 flex-1 text-[14px] font-medium leading-[1.25]" style={{ color: "#E2E8F0" }}>
+              <div className="min-w-0 flex-1 text-[14px] font-medium leading-[1.25]" style={{ color: chartAnalyticsTheme.colors.darkMutedText }}>
                 {parsed.implicationText}
               </div>
             </div>
           </div>
-          <div className="ml-[24px] flex-none text-[11px] font-bold" style={{ color: chartAnalyticsTheme.colors.mutedText }}>
+          <div className="ml-[24px] flex-none text-[11px] font-bold" style={{ color: chartAnalyticsTheme.colors.darkMutedText }}>
             {parsed.slideLabel}
           </div>
         </div>

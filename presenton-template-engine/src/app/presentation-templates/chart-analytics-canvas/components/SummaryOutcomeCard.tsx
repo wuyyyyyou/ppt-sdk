@@ -40,10 +40,10 @@ const SummaryOutcomeCard = ({
       </div>
 
       <div className="min-w-0 flex-1">
-        <h3 className="m-0 text-[18px] font-bold leading-[1.15]" style={{ color: dark ? "#FFFFFF" : "#1E293B" }}>
+        <h3 className="m-0 text-[18px] font-bold leading-[1.15]" style={{ color: dark ? chartAnalyticsTheme.colors.darkText : "#1E293B" }}>
           {title}
         </h3>
-        <p className="m-0 mt-[9px] text-[13px] leading-[1.38]" style={{ color: dark ? "#CBD5E1" : chartAnalyticsTheme.colors.subtleText }}>
+        <p className="m-0 mt-[9px] text-[13px] leading-[1.38]" style={{ color: dark ? chartAnalyticsTheme.colors.darkMutedText : chartAnalyticsTheme.colors.subtleText }}>
           {text}
         </p>
 

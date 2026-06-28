@@ -33,7 +33,9 @@ const OutlookPanel = ({
   <AnalyticsCardShell dark padding={24}>
     <div className="mb-[18px] flex items-center gap-[9px] border-b pb-[14px]" style={{ borderColor: "#334155" }}>
       <AnalyticsIcon name={icon} className="h-[18px] w-[18px]" stroke="#60A5FA" />
-      <h3 className="m-0 text-[13px] font-bold uppercase text-white">{title}</h3>
+      <h3 className="m-0 text-[13px] font-bold uppercase" style={{ color: chartAnalyticsTheme.colors.darkText }}>
+        {title}
+      </h3>
     </div>
 
     <div className="grid gap-[18px]">
@@ -42,14 +44,16 @@ const OutlookPanel = ({
           <div className="text-[12px] font-bold" style={{ color: item.color }}>
             {item.period}
           </div>
-          <div className="mt-[5px] text-[14px] font-medium leading-[1.25] text-white">{item.text}</div>
+          <div className="mt-[5px] text-[14px] font-medium leading-[1.25]" style={{ color: chartAnalyticsTheme.colors.darkText }}>
+            {item.text}
+          </div>
         </div>
       ))}
     </div>
 
     <div className="mt-auto border-t pt-[16px]" style={{ borderColor: "#334155" }}>
       <div className="flex justify-between gap-[12px] text-[12px]">
-        <span className="truncate" style={{ color: chartAnalyticsTheme.colors.mutedText }}>
+        <span className="truncate" style={{ color: chartAnalyticsTheme.colors.darkMutedText }}>
           {progressLabel}
         </span>
         <span className="flex-none font-bold" style={{ color: progressColor }}>

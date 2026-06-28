@@ -105,12 +105,14 @@ const ComparisonCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
             className="flex h-[116px] flex-none items-center justify-between rounded-[8px] border px-[28px]"
             style={{
               borderColor: chartAnalyticsTheme.colors.stroke,
-              backgroundColor: chartAnalyticsTheme.colors.panel,
-              color: chartAnalyticsTheme.colors.backgroundText,
+              backgroundColor: chartAnalyticsTheme.colors.darkPanel,
+              color: chartAnalyticsTheme.colors.darkText,
             }}
           >
             <div className="text-[20px] font-black leading-[1.2]">{parsed.centerGuideTitle}</div>
-            <div className="w-[620px] text-[15px] font-medium leading-[1.45] text-slate-300">{parsed.centerGuideText}</div>
+            <div className="w-[620px] text-[15px] font-medium leading-[1.45]" style={{ color: chartAnalyticsTheme.colors.darkMutedText }}>
+              {parsed.centerGuideText}
+            </div>
           </div>
         ) : null}
       </div>

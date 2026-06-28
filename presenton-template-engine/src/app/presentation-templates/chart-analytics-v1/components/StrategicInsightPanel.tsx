@@ -43,15 +43,19 @@ const StrategicInsightPanel = ({
         <div className="text-[12px] font-bold uppercase leading-[1.2]" style={{ color: "#60A5FA" }}>
           {eyebrow}
         </div>
-        <div className="mt-[10px] text-[20px] font-light leading-[1.15] text-white">{headline}</div>
+        <div className="mt-[10px] text-[20px] font-light leading-[1.15]" style={{ color: chartAnalyticsTheme.colors.darkText }}>
+          {headline}
+        </div>
 
         <div className="mt-[16px] grid flex-1 content-start gap-[12px]">
           {items.map((item) => (
             <div key={item.label} className="flex items-start gap-[9px]">
               <div className="mt-[5px] h-[7px] w-[7px] flex-none rounded-full" style={{ backgroundColor: item.color }} />
               <div className="flex min-w-0 flex-1 items-start gap-[5px]">
-                <div className="w-[48px] flex-none text-[12px] font-bold leading-[1.2] text-white">{item.label}:</div>
-                <div className="min-w-0 flex-1 text-[11px] leading-[1.2]" style={{ color: "#CBD5E1" }}>
+                <div className="w-[48px] flex-none text-[12px] font-bold leading-[1.2]" style={{ color: chartAnalyticsTheme.colors.darkText }}>
+                  {item.label}:
+                </div>
+                <div className="min-w-0 flex-1 text-[11px] leading-[1.2]" style={{ color: chartAnalyticsTheme.colors.darkMutedText }}>
                   {item.text}
                 </div>
               </div>
