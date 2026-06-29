@@ -6,18 +6,18 @@
   "required_executas": [
     {
       "tool_id": "bundled:ppt-engine",
-      "min_version": "3.2.1",
+      "min_version": "4.0.3",
       "version": "latest"
     },
     {
       "tool_id": "bundled:ppt-gener",
-      "min_version": "3.1.1",
+      "min_version": "3.1.2",
       "version": "latest"
     },
     {
       "tool_id": "bundled:anna-search",
       "version": "latest",
-      "min_version": "0.1.0"
+      "min_version": "0.1.1"
     }
   ],
   "optional_executas": [],
