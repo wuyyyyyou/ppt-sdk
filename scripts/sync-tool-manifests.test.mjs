@@ -157,6 +157,16 @@ test("applyPptAppListingSync maps bundled handles to sibling project paths", () 
   });
 });
 
+test("applyPptAppListingSync writes POSIX paths from Windows relative paths", () => {
+  const listing = applyPptAppListingSync({ name: "Anna Deck" }, tools, (_from, to) => `..\\${to.split("/")[0]}`);
+
+  assert.deepEqual(listing.bundled_executas, {
+    "ppt-engine": { path: "../presenton-template-engine" },
+    "ppt-gener": { path: "../presenton-pptx-generator" },
+    "anna-search": { path: "../anna-search-executa" },
+  });
+});
+
 test("buildGeneratedFrontendConstants emits bundled handles without real tool ids", () => {
   const generated = buildGeneratedFrontendConstants(tools);
 

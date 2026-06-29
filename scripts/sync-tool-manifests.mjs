@@ -56,6 +56,10 @@ async function writeJson(relativePath, value) {
   await writeText(relativePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+function toPosixPath(relativePath) {
+  return relativePath.replaceAll(path.sep, "/").replaceAll("\\", "/");
+}
+
 function assertNonEmptyString(value, label) {
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`${label} must be a non-empty string`);
@@ -116,11 +120,11 @@ async function syncPptAppListing(tools) {
   await writeJson("ppt-app/app.json", appListing);
 }
 
-export function applyPptAppListingSync(appListing, tools) {
+export function applyPptAppListingSync(appListing, tools, relativePath = path.relative) {
   appListing.bundled_executas = Object.fromEntries(
     tools.map((tool) => [
       tool.bundledHandle,
-      { path: path.relative("ppt-app", path.dirname(tool.manifestPath)) },
+      { path: toPosixPath(relativePath("ppt-app", path.dirname(tool.manifestPath))) },
     ]),
   );
   return appListing;
