@@ -8,8 +8,8 @@ from pathlib import Path
 
 
 SHIM_DIR = Path(__file__).resolve().parent
-ANNA_DIR = SHIM_DIR.parents[3]
-SEARCH_DIR = ANNA_DIR / "anna-search-executa"
+REPO_ROOT = SHIM_DIR.parents[2]
+SEARCH_DIR = REPO_ROOT / "anna-search-executa"
 PLUGIN_PATH = SEARCH_DIR / "example_plugin.py"
 
 os.chdir(SEARCH_DIR)

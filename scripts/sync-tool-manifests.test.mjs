@@ -182,3 +182,16 @@ test("buildGeneratedFrontendConstants emits bundled handles without real tool id
   assert.doesNotMatch(generated, /tool-real-engine/);
   assert.doesNotMatch(generated, /tool-real-search/);
 });
+
+test("anna-search local executa starts through the repository shim", async () => {
+  const executa = JSON.parse(await readFile("ppt-app/executas/anna-search-local/executa.json", "utf8"));
+
+  assert.deepEqual(executa.command, [
+    "uv",
+    "run",
+    "--project",
+    "../../../anna-search-executa",
+    "python",
+    "anna_search_local.py",
+  ]);
+});
