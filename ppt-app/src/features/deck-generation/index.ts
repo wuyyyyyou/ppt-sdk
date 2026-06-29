@@ -51,6 +51,12 @@ import {
   validateWebResearchCurationDraft,
 } from "./researchCurationDrafts";
 import {
+  formatResearchCurationExhaustedGap,
+  formatResearchCurationRetryActivity,
+  formatResearchCurationRunError,
+  RESEARCH_CURATION_ATTEMPT_LIMIT,
+} from "./researchCurationRetry";
+import {
   applyTargetOutlineRevision,
   computeResearchQueryDelta,
   mergeTargetResearchRequirement,
@@ -1391,7 +1397,7 @@ function buildWebResearchCurationPrompt(input: {
     "",
     input.previousGateFailure
       ? [
-          "Previous deterministic gate failure:",
+          "Previous Research Curation attempt failure:",
           input.previousGateFailure,
           "Rerun Web Research Curation from the same Raw web index paths and write a valid current draft.",
         ].join("\n")
@@ -1444,7 +1450,7 @@ function buildVisualResearchCurationPrompt(input: {
     "",
     input.previousGateFailure
       ? [
-          "Previous deterministic gate failure:",
+          "Previous Research Curation attempt failure:",
           input.previousGateFailure,
           "Rerun Visual Research Curation from the same Raw image index paths and write a valid current draft.",
         ].join("\n")
@@ -1504,6 +1510,29 @@ function summarizeResearchDraftGateFailure(input: {
     reasons.push(`${label} Research Curation draft did not pass deterministic validation.`);
   }
   return dedupeNonEmptyStrings(reasons).join("\n");
+}
+
+async function getResearchCurationDraftFingerprintSafe(input: {
+  flowInput: DeckGenerationRuntime;
+  page: PagePlanItem;
+  kind: "web" | "visual";
+  draftPath: string;
+}): Promise<ResearchCurationDraftFingerprint> {
+  try {
+    return await input.flowInput.backend.getResearchCurationDraftFingerprint({
+      workspace_dir: input.flowInput.workspace.workspace_dir,
+      page_id: input.page.page_id,
+      draft_type: input.kind,
+    });
+  } catch {
+    return {
+      workspace_dir: input.flowInput.workspace.workspace_dir,
+      page_id: input.page.page_id,
+      draft_type: input.kind,
+      draft_path: input.draftPath,
+      exists: false,
+    };
+  }
 }
 
 async function appendResearchLogSafe(
@@ -1580,36 +1609,38 @@ async function runResearchDraftAgent(input: {
     attempt: number;
     prompt_kind: "initial" | "retry";
     before_fingerprint: ResearchCurationDraftFingerprint;
-    after_fingerprint: ResearchCurationDraftFingerprint;
-    validation_gaps: string[];
+    after_fingerprint?: ResearchCurationDraftFingerprint;
+    validation_gaps?: string[];
     gate_passed: boolean;
+    error?: string;
     retry_prompt_reason?: string;
   }> = [];
   let attempt = 0;
+  let previousGateFailure: string | undefined;
+  let lastFailure = "";
 
   try {
-    let currentPrompt = initialPrompt;
-    let beforeFingerprint: ResearchCurationDraftFingerprint;
-    try {
-      beforeFingerprint = await flowInput.backend.getResearchCurationDraftFingerprint({
-        workspace_dir: flowInput.workspace.workspace_dir,
-        page_id: page.page_id,
-        draft_type: kind,
-      });
-    } catch {
-      beforeFingerprint = {
-        workspace_dir: flowInput.workspace.workspace_dir,
-        page_id: page.page_id,
-        draft_type: kind,
-        draft_path: input.draftPath,
-        exists: false,
-      };
-    }
-
     while (!flowInput.isCancelled()) {
       attempt += 1;
-      const logPrompt = attempt === 1 ? initialPrompt : currentPrompt;
+      const logPrompt = attempt === 1 ? initialPrompt : input.buildPrompt(previousGateFailure);
       const attemptKind = attempt === 1 ? "initial" : "retry";
+      if (attempt > 1) {
+        tracker.onStreamEvent({
+          type: "activity",
+          message: formatResearchCurationRetryActivity({
+            kind,
+            nextAttempt: attempt,
+            attemptLimit: RESEARCH_CURATION_ATTEMPT_LIMIT,
+          }),
+        });
+      }
+      const beforeFingerprint = await getResearchCurationDraftFingerprintSafe({
+        flowInput,
+        page,
+        kind,
+        draftPath: input.draftPath,
+      });
+      throwIfCancelled(flowInput);
       await appendResearchLogSafe(flowInput, {
         event: `ai.research.${kind}_curation.attempt`,
         schema_version: 1,
@@ -1621,28 +1652,91 @@ async function runResearchDraftAgent(input: {
         attempt_kind: attemptKind,
         updated_at: new Date().toISOString(),
       });
-      await flowInput.agentClient.runAuthoringPrompt(
-        logPrompt,
-        buildAgentRunOptions(flowInput, tracker.onStreamEvent, tracker.logContext),
-      );
-      throwIfCancelled(flowInput);
-
-      let afterFingerprint: ResearchCurationDraftFingerprint;
       try {
-        afterFingerprint = await flowInput.backend.getResearchCurationDraftFingerprint({
-          workspace_dir: flowInput.workspace.workspace_dir,
-          page_id: page.page_id,
-          draft_type: kind,
+        await flowInput.agentClient.runAuthoringPrompt(
+          logPrompt,
+          buildAgentRunOptions(flowInput, tracker.onStreamEvent, tracker.logContext),
+        );
+        throwIfCancelled(flowInput);
+      } catch (error) {
+        if (isAgentRunCancelledError(error)) throw error;
+        const failureSummary = formatResearchCurationRunError({ kind, error });
+        lastFailure = failureSummary;
+        previousGateFailure = failureSummary;
+        attemptLog.push({
+          attempt,
+          prompt_kind: attemptKind,
+          before_fingerprint: beforeFingerprint,
+          gate_passed: false,
+          error: failureSummary,
+          retry_prompt_reason: failureSummary,
         });
-      } catch {
-        afterFingerprint = {
+        await appendResearchLogSafe(flowInput, {
+          event: `ai.research.${kind}_curation.failed_attempt`,
+          schema_version: 1,
+          page_id: page.page_id,
+          page_index: page.index,
+          draft_path: input.draftPath,
+          curation_run_id: curationRunId,
+          attempt,
+          error: failureSummary,
+          will_retry: attempt < RESEARCH_CURATION_ATTEMPT_LIMIT,
+          updated_at: new Date().toISOString(),
+        });
+        if (attempt < RESEARCH_CURATION_ATTEMPT_LIMIT) {
+          throwIfCancelled(flowInput);
+          continue;
+        }
+        const finalGap = formatResearchCurationExhaustedGap({
+          kind,
+          attemptLimit: RESEARCH_CURATION_ATTEMPT_LIMIT,
+          lastFailure: failureSummary,
+        });
+        const gapDraft = kind === "web"
+          ? createWebResearchCurationGapDraft({
+              pageId: page.page_id,
+              gaps: [finalGap],
+              curationRunId,
+            })
+          : createVisualResearchCurationGapDraft({
+              pageId: page.page_id,
+              gaps: [finalGap],
+              curationRunId,
+            });
+        await flowInput.backend.recordResearchCurationDraft({
           workspace_dir: flowInput.workspace.workspace_dir,
           page_id: page.page_id,
           draft_type: kind,
+          draft: gapDraft as never,
+        });
+        await tracker.flush("completed", {
+          draft_type: kind,
+          curation_run_id: curationRunId,
+          attempts: attemptLog,
+          final_gate: "gap",
+          final_gap_count: gapDraft.gaps.length,
+          attempt_limit: RESEARCH_CURATION_ATTEMPT_LIMIT,
+        });
+        await appendResearchLogSafe(flowInput, {
+          event: `ai.research.${kind}_curation.gap`,
+          schema_version: 1,
+          page_id: page.page_id,
+          page_index: page.index,
           draft_path: input.draftPath,
-          exists: false,
-        };
+          curation_run_id: curationRunId,
+          gaps: gapDraft.gaps,
+          attempts_exhausted: true,
+          updated_at: new Date().toISOString(),
+        });
+        return gapDraft;
       }
+
+      const afterFingerprint = await getResearchCurationDraftFingerprintSafe({
+        flowInput,
+        page,
+        kind,
+        draftPath: input.draftPath,
+      });
 
       const rawDraft = await flowInput.backend.getResearchCurationDraft({
         workspace_dir: flowInput.workspace.workspace_dir,
@@ -1691,6 +1785,7 @@ async function runResearchDraftAgent(input: {
           curation_run_id: curationRunId,
           attempts: attemptLog,
           final_gate: "passed",
+          attempt_limit: RESEARCH_CURATION_ATTEMPT_LIMIT,
         });
         await appendResearchLogSafe(flowInput, {
           event: `ai.research.${kind}_curation.finished`,
@@ -1706,7 +1801,8 @@ async function runResearchDraftAgent(input: {
         return validation.draft;
       }
 
-      input.currentGaps.push(failureSummary);
+      lastFailure = failureSummary;
+      previousGateFailure = failureSummary;
       await appendResearchLogSafe(flowInput, {
         event: `ai.research.${kind}_curation.invalid`,
         schema_version: 1,
@@ -1720,16 +1816,21 @@ async function runResearchDraftAgent(input: {
         updated_at: new Date().toISOString(),
       });
 
-      if (attempt >= LOCAL_GATE_REPAIR_LIMIT + 1) {
+      if (attempt >= RESEARCH_CURATION_ATTEMPT_LIMIT) {
+        const finalGap = formatResearchCurationExhaustedGap({
+          kind,
+          attemptLimit: RESEARCH_CURATION_ATTEMPT_LIMIT,
+          lastFailure: lastFailure || failureSummary,
+        });
         const gapDraft = kind === "web"
           ? createWebResearchCurationGapDraft({
               pageId: page.page_id,
-              gaps: dedupeNonEmptyStrings([...input.currentGaps, failureSummary]),
+              gaps: [finalGap],
               curationRunId,
             })
           : createVisualResearchCurationGapDraft({
               pageId: page.page_id,
-              gaps: dedupeNonEmptyStrings([...input.currentGaps, failureSummary]),
+              gaps: [finalGap],
               curationRunId,
             });
         await flowInput.backend.recordResearchCurationDraft({
@@ -1744,6 +1845,7 @@ async function runResearchDraftAgent(input: {
           attempts: attemptLog,
           final_gate: "gap",
           final_gap_count: gapDraft.gaps.length,
+          attempt_limit: RESEARCH_CURATION_ATTEMPT_LIMIT,
         });
         await appendResearchLogSafe(flowInput, {
           event: `ai.research.${kind}_curation.gap`,
@@ -1753,13 +1855,12 @@ async function runResearchDraftAgent(input: {
           draft_path: input.draftPath,
           curation_run_id: curationRunId,
           gaps: gapDraft.gaps,
+          attempts_exhausted: true,
           updated_at: new Date().toISOString(),
         });
         return gapDraft;
       }
 
-      currentPrompt = input.buildPrompt(failureSummary);
-      beforeFingerprint = afterFingerprint;
       throwIfCancelled(flowInput);
     }
 
@@ -1779,7 +1880,7 @@ async function runResearchDraftAgent(input: {
       throw error;
     }
     await tracker.flush("error", { draft_type: kind, error: error instanceof Error ? error.message : String(error), curation_run_id: curationRunId, attempts: attemptLog });
-    const message = `${kind === "web" ? "Web" : "Visual"} Research Curation failed: ${error instanceof Error ? error.message : String(error)}`;
+    const message = formatResearchCurationRunError({ kind, error });
     input.currentGaps.push(message);
     await appendResearchLogSafe(flowInput, {
       event: `ai.research.${kind}_curation.failed`,

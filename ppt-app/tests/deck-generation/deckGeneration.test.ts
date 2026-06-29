@@ -294,6 +294,7 @@ function createHarness(options: {
   noChangeAuthoringRuns?: number;
   authoringChangeMode?: "both" | "slide" | "data" | "none";
   researchDraftNoChangeRuns?: number;
+  researchCurationErrorRuns?: number;
 } = {}) {
   let pagePlan = clone(options.pagePlan ?? makePagePlan());
   let progress = clone(options.existingProgress ?? makeProgress(pagePlan));
@@ -336,6 +337,7 @@ function createHarness(options: {
   let recordResearchStatusPageCalls = 0;
   let pageAuthoringRuns = 0;
   let researchDraftNoChangeRuns = options.researchDraftNoChangeRuns ?? 0;
+  let researchCurationErrorRuns = options.researchCurationErrorRuns ?? 0;
   let slideFingerprintVersion = 0;
   let dataFingerprintVersion = 0;
 
@@ -719,6 +721,10 @@ function createHarness(options: {
       const curationRunId = prompt.match(/Curation run id: ([^\n]+)/)?.[1] ?? "";
       const isWebResearchCurationPrompt = prompt.includes("Web Research Curation Draft Agent");
       const isVisualResearchCurationPrompt = prompt.includes("Visual Research Curation Draft Agent");
+      if ((isWebResearchCurationPrompt || isVisualResearchCurationPrompt) && researchCurationErrorRuns > 0) {
+        researchCurationErrorRuns -= 1;
+        throw new Error("QueuePool limit of size 3 overflow 5 reached");
+      }
       if (isWebResearchCurationPrompt) {
         if (researchDraftNoChangeRuns > 0) {
           researchDraftNoChangeRuns -= 1;
@@ -2785,7 +2791,7 @@ describe("Deck Generation Flow Module", () => {
     const harness = createHarness({
       pagePlan,
       researchPlan,
-      researchDraftNoChangeRuns: 4,
+      researchDraftNoChangeRuns: 5,
     });
     const aiLogger = createAiInteractionLogger(harness.backend);
 
@@ -2806,10 +2812,10 @@ describe("Deck Generation Flow Module", () => {
     const webPromptIndexes = harness.authoringPrompts
       .map((prompt, index) => ({ prompt, index }))
       .filter(({ prompt }) => prompt.includes("Web Research Curation Draft Agent"));
-    assert.equal(webPromptIndexes.length, 4);
+    assert.equal(webPromptIndexes.length, 5);
     assert.equal(webPromptIndexes.filter(({ prompt }) =>
-      prompt.includes("Previous deterministic gate failure")
-    ).length, 3);
+      prompt.includes("Previous Research Curation attempt failure")
+    ).length, 4);
     assert.ok(webPromptIndexes.every(({ prompt }) =>
       prompt.includes("Raw web index paths:") &&
       prompt.includes("Web draft JSON path to write:")
@@ -2828,7 +2834,9 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.webFetchCalls, 1);
     const evidencePage = harness.researchEvidence.pages.find((page) => page.page_id === "page-01");
     assert.equal(evidencePage?.status, "gap");
-    assert.ok(evidencePage?.gaps.some((gap) => gap.includes("Web Research Curation draft was not written")));
+    assert.deepEqual(evidencePage?.gaps, [
+      "Web Research Curation failed after 5 attempts. Last error: Web Research Curation draft was not written.\nWeb Research Curation draft status is invalid.\nWeb Research Curation draft curation_run_id does not match current curation run.",
+    ]);
     assert.equal(harness.researchStatus.pages.find((page) => page.page_id === "page-01")?.status, "gap");
   });
 
@@ -2847,7 +2855,7 @@ describe("Deck Generation Flow Module", () => {
     const harness = createHarness({
       pagePlan,
       researchPlan,
-      researchDraftNoChangeRuns: 4,
+      researchDraftNoChangeRuns: 5,
     });
     const aiLogger = createAiInteractionLogger(harness.backend);
 
@@ -2868,10 +2876,10 @@ describe("Deck Generation Flow Module", () => {
     const visualPromptIndexes = harness.authoringPrompts
       .map((prompt, index) => ({ prompt, index }))
       .filter(({ prompt }) => prompt.includes("Visual Research Curation Draft Agent"));
-    assert.equal(visualPromptIndexes.length, 4);
+    assert.equal(visualPromptIndexes.length, 5);
     assert.equal(visualPromptIndexes.filter(({ prompt }) =>
-      prompt.includes("Previous deterministic gate failure")
-    ).length, 3);
+      prompt.includes("Previous Research Curation attempt failure")
+    ).length, 4);
     assert.ok(visualPromptIndexes.every(({ prompt }) =>
       prompt.includes("Raw image index paths:") &&
       prompt.includes("Visual draft JSON path to write:")
@@ -2890,8 +2898,62 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.imageFetchCalls, 1);
     const evidencePage = harness.researchEvidence.pages.find((page) => page.page_id === "page-01");
     assert.equal(evidencePage?.status, "gap");
-    assert.ok(evidencePage?.gaps.some((gap) => gap.includes("Visual Research Curation draft was not written")));
+    assert.deepEqual(evidencePage?.gaps, [
+      "Visual Research Curation failed after 5 attempts. Last error: Visual Research Curation draft was not written.\nVisual Research Curation draft status is invalid.\nVisual Research Curation draft curation_run_id does not match current curation run.",
+    ]);
     assert.equal(harness.researchStatus.pages.find((page) => page.page_id === "page-01")?.status, "gap");
+  });
+
+  it("retries transient web research curation errors without polluting final evidence gaps", async () => {
+    const pagePlan = makePagePlan();
+    const researchPlan = makeResearchPlan(pagePlan);
+    researchPlan.pages[0] = {
+      ...researchPlan.pages[0],
+      web_research_needed: true,
+      image_research_needed: false,
+      query_intents: ["market evidence"],
+      image_query_intents: [],
+      evidence_needs: ["market evidence"],
+      visual_needs: [],
+    };
+    const harness = createHarness({
+      pagePlan,
+      researchPlan,
+      researchCurationErrorRuns: 4,
+    });
+    const aiLogger = createAiInteractionLogger(harness.backend);
+
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      aiLogger,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    const webPrompts = harness.authoringPrompts.filter((prompt) =>
+      prompt.includes("Web Research Curation Draft Agent")
+    );
+    assert.equal(webPrompts.length, 5);
+    assert.equal(webPrompts.filter((prompt) =>
+      prompt.includes("Web Research Curation failed: QueuePool limit of size 3 overflow 5 reached")
+    ).length, 4);
+    assert.ok(harness.progressEvents.some((progress) =>
+      progress.activeStreams?.some((stream) =>
+        stream.kind === "web-research-curation" &&
+        stream.activities.some((activity) => activity.includes("Web Research Curation retry 5/5"))
+      )
+    ));
+    const evidencePage = harness.researchEvidence.pages.find((page) => page.page_id === "page-01");
+    assert.equal(evidencePage?.status, "curated");
+    assert.equal(evidencePage?.facts.length, 1);
+    assert.deepEqual(evidencePage?.gaps, []);
   });
 
   it("does not promote cancelled research curation into evidence or ledger completion", async () => {
