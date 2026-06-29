@@ -57,16 +57,16 @@ The important invariant is split by layer:
 
 - `manifest.json` `required_executas[].tool_id` and `ui.host_api.tools` use `bundled:<handle>`.
 - `manifest.json` `required_executas[].min_version` follows each Executa manifest version.
-- `app.json` `bundled_executas` maps each handle to its sibling Executa directory.
+- `app.json` `bundled_executas` maps each handle to its local Executa shim directory.
 - `executas/*/executa.json` keeps the real local `tool_id`.
 - the real plugin `describe` manifest `name` matches the real local `tool_id`.
 
 Current real ids:
 
 ```text
-ppt-engine:  tool-youming_5703-ppt-engine-fmkv9ru7
-ppt-gener:   tool-youming_5703-ppt-gener-ahzv8re6
-anna-search: tool-youming-anna-search-c9sjsr9s
+ppt-engine:  tool-lightvoss_5433-ppt-engine-6443rj2a
+ppt-gener:   tool-lightvoss_5433-ppt-gener-dc7ftcep
+anna-search: tool-lightvoss-anna-search-xkx84a3z
 ```
 
 The engine shim starts `presenton-template-engine/example_plugin.js` from the

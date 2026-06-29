@@ -92,6 +92,7 @@ const tools = [
   {
     bundledHandle: "ppt-engine",
     manifestPath: "presenton-template-engine/manifest.json",
+    bundledExecutaDir: "ppt-app/executas/ppt-engine-local",
     generatedConstName: "PPT_ENGINE_TOOL",
     manifest: {
       name: "tool-real-engine",
@@ -102,6 +103,7 @@ const tools = [
   {
     bundledHandle: "ppt-gener",
     manifestPath: "presenton-pptx-generator/manifest.json",
+    bundledExecutaDir: "ppt-app/executas/ppt-gener-local",
     generatedConstName: "PPT_GENER_TOOL",
     manifest: {
       name: "tool-real-gener",
@@ -112,6 +114,7 @@ const tools = [
   {
     bundledHandle: "anna-search",
     manifestPath: "anna-search-executa/manifest.json",
+    bundledExecutaDir: "ppt-app/executas/anna-search-local",
     generatedConstName: "ANNA_SEARCH_TOOL",
     manifest: {
       name: "tool-real-search",
@@ -147,23 +150,27 @@ test("applyPptAppManifestSync writes bundled handles and synchronizes min versio
   ]);
 });
 
-test("applyPptAppListingSync maps bundled handles to sibling project paths", () => {
+test("applyPptAppListingSync maps bundled handles to local executa shim directories", () => {
   const listing = applyPptAppListingSync({ name: "Anna Deck" }, tools);
 
   assert.deepEqual(listing.bundled_executas, {
-    "ppt-engine": { path: "../presenton-template-engine" },
-    "ppt-gener": { path: "../presenton-pptx-generator" },
-    "anna-search": { path: "../anna-search-executa" },
+    "ppt-engine": { path: "executas/ppt-engine-local" },
+    "ppt-gener": { path: "executas/ppt-gener-local" },
+    "anna-search": { path: "executas/anna-search-local" },
   });
 });
 
 test("applyPptAppListingSync writes POSIX paths from Windows relative paths", () => {
-  const listing = applyPptAppListingSync({ name: "Anna Deck" }, tools, (_from, to) => `..\\${to.split("/")[0]}`);
+  const listing = applyPptAppListingSync(
+    { name: "Anna Deck" },
+    tools,
+    (_from, to) => to.replace(/^ppt-app\//, "").replaceAll("/", "\\"),
+  );
 
   assert.deepEqual(listing.bundled_executas, {
-    "ppt-engine": { path: "../presenton-template-engine" },
-    "ppt-gener": { path: "../presenton-pptx-generator" },
-    "anna-search": { path: "../anna-search-executa" },
+    "ppt-engine": { path: "executas/ppt-engine-local" },
+    "ppt-gener": { path: "executas/ppt-gener-local" },
+    "anna-search": { path: "executas/anna-search-local" },
   });
 });
 

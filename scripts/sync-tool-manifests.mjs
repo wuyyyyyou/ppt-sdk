@@ -12,6 +12,7 @@ const TOOLS = [
     packagePath: "presenton-template-engine/package.json",
     packageLockPath: "presenton-template-engine/package-lock.json",
     localExecutaPath: "ppt-app/executas/ppt-engine-local/executa.json",
+    bundledExecutaDir: "ppt-app/executas/ppt-engine-local",
     generatedConstName: "PPT_ENGINE_TOOL",
     packageBinTarget: "./example_plugin.js",
     packageLockBinTarget: "example_plugin.js",
@@ -23,6 +24,7 @@ const TOOLS = [
     pyprojectPath: "presenton-pptx-generator/pyproject.toml",
     uvLockPath: "presenton-pptx-generator/uv.lock",
     localExecutaPath: "ppt-app/executas/ppt-gener-local/executa.json",
+    bundledExecutaDir: "ppt-app/executas/ppt-gener-local",
     generatedConstName: "PPT_GENER_TOOL",
     pythonScriptTarget: "presenton_pptx_generator_plugin:main",
     pythonPackageName: "presenton-pptx-generator-executa",
@@ -32,6 +34,7 @@ const TOOLS = [
     bundledHandle: "anna-search",
     manifestPath: "anna-search-executa/manifest.json",
     localExecutaPath: "ppt-app/executas/anna-search-local/executa.json",
+    bundledExecutaDir: "ppt-app/executas/anna-search-local",
     generatedConstName: "ANNA_SEARCH_TOOL",
   },
 ];
@@ -124,7 +127,7 @@ export function applyPptAppListingSync(appListing, tools, relativePath = path.re
   appListing.bundled_executas = Object.fromEntries(
     tools.map((tool) => [
       tool.bundledHandle,
-      { path: toPosixPath(relativePath("ppt-app", path.dirname(tool.manifestPath))) },
+      { path: toPosixPath(relativePath("ppt-app", tool.bundledExecutaDir)) },
     ]),
   );
   return appListing;

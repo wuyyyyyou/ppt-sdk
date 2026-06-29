@@ -10,13 +10,13 @@
   "pricing_model": "free",
   "bundled_executas": {
     "ppt-engine": {
-      "path": "../presenton-template-engine"
+      "path": "executas/ppt-engine-local"
     },
     "ppt-gener": {
-      "path": "../presenton-pptx-generator"
+      "path": "executas/ppt-gener-local"
     },
     "anna-search": {
-      "path": "../anna-search-executa"
+      "path": "executas/anna-search-local"
     }
   }
 }

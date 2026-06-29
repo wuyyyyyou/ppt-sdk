@@ -82,9 +82,9 @@ manifest.json -> deck.html -> ppt-model.json -> .pptx
 当前真实 ID：
 
 ```text
-ppt-engine:  tool-youming_5703-ppt-engine-fmkv9ru7
-ppt-gener:   tool-youming_5703-ppt-gener-ahzv8re6
-anna-search: tool-youming-anna-search-c9sjsr9s
+ppt-engine:  tool-lightvoss_5433-ppt-engine-6443rj2a
+ppt-gener:   tool-lightvoss_5433-ppt-gener-dc7ftcep
+anna-search: tool-lightvoss-anna-search-xkx84a3z
 ```
 
 ## 开发与运行
