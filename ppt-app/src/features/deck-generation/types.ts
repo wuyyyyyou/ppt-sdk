@@ -1,0 +1,200 @@
+import type {
+  AgentClient,
+  AgentPageContentReviewResult,
+  AgentPageVisualReviewResult,
+} from "../../agent/agentClient";
+import type { AiClient } from "../../ai/aiClient";
+import type { AiInteractionLogger } from "../../ai/interactionLog";
+import type {
+  PagePlanItem,
+  PageProgress,
+  RenderDeckHtmlResult,
+  WorkspaceOutline,
+  WorkspaceResult,
+} from "../../api/types";
+import type { PptBackend } from "../../api/pptBackend";
+import type { Locale } from "../../i18n/messages";
+
+export const ATTEMPT_LIMITS = {
+  render: 10,
+  visualReview: 5,
+  contentReview: 5,
+  agent: 5,
+};
+
+export const PAGE_GENERATION_CONCURRENCY = 3;
+export const LOCAL_GATE_REPAIR_LIMIT = 3;
+
+export type RenderFailurePhase = "pre-render-typecheck" | "render";
+
+export interface RenderFailureHistoryItem {
+  attempt: number;
+  phase: RenderFailurePhase;
+  error: string;
+  timestamp: string;
+}
+
+export interface NoChangeAuthoringRetry {
+  retryCount: number;
+  previousSummary: string;
+  previousChangedFiles: string[];
+}
+
+export type DeckGenerationStep =
+  | "page-plan"
+  | "research-planning"
+  | "research-collection"
+  | "research-curation"
+  | "prepare"
+  | "page-authoring"
+  | "page-content-review"
+  | "page-render"
+  | "page-visual-review"
+  | "final-render"
+  | "complete"
+  | "interrupted"
+  | "cancelled"
+  | "failed";
+
+export type DeckGenerationStartMode = "restart" | "resume";
+
+export interface DeckGenerationProgressPage {
+  page_id: string;
+  index: number;
+  title: string;
+  status: string;
+  render_attempts: number;
+  render_attempt_limit: number;
+  visual_review_attempts: number;
+  visual_review_attempt_limit: number;
+  content_review_attempts: number;
+  content_review_attempt_limit: number;
+  agent_failures: number;
+  agent_failure_limit: number;
+  agent_infrastructure_failures: number;
+  last_error?: string;
+  last_screenshot_path?: string;
+}
+
+export interface DeckGenerationStream {
+  run_id?: string;
+  kind?: string;
+  page_id: string;
+  page_index: number;
+  status: string;
+  lines: string[];
+  activities: string[];
+  started_at?: string;
+  updated_at?: string;
+}
+
+export interface DeckGenerationProgress {
+  step: DeckGenerationStep;
+  message: string;
+  currentPageIndex: number | null;
+  totalPages: number;
+  pages: DeckGenerationProgressPage[];
+  recoveryRunKind?: NonNullable<PageProgress["recovery"]>["run_kind"];
+  stream?: DeckGenerationStream;
+  activeStreams?: DeckGenerationStream[];
+}
+
+export interface DeckGenerationStreamSnapshot {
+  id: string;
+  phase: string;
+  kind?: string;
+  label: string;
+  page_id?: string;
+  page_index?: number;
+  status: string;
+  message: string;
+  lines: string[];
+  activities: string[];
+  updated_at: string;
+}
+
+export interface DeckGenerationResult {
+  outline: WorkspaceOutline;
+  pagePlan: import("../../api/types").PagePlan;
+  progress: PageProgress;
+  rendered: RenderDeckHtmlResult;
+}
+
+export interface DeckGenerationError {
+  type:
+    | "page_failed"
+    | "agent_infrastructure"
+    | "final_render_failed"
+    | "stale_artifacts"
+    | "cancelled"
+    | "invalid_confirmed_outline";
+  message: string;
+  page_id?: string;
+  page_index?: number;
+  page_status?: string;
+}
+
+export type DeckGenerationCompletion =
+  | { status: "completed"; result: DeckGenerationResult }
+  | { status: "cancelled"; progress: DeckGenerationProgress | null }
+  | {
+      status: "failed";
+      error: DeckGenerationError;
+      progress: DeckGenerationProgress | null;
+    };
+
+export interface PageRefinementVisualContext {
+  screenshotPath?: string;
+  source: "progress" | "fresh-render" | "unavailable";
+  unavailableReason?: string;
+}
+
+export interface RunDeckGenerationInput {
+  backend: PptBackend;
+  aiClient: AiClient;
+  agentClient: AgentClient;
+  aiLogger?: AiInteractionLogger | null;
+  workspace: WorkspaceResult;
+  confirmedOutline: WorkspaceOutline;
+  locale: Locale;
+  startMode?: DeckGenerationStartMode;
+  onProgress: (progress: DeckGenerationProgress) => void;
+  isCancelled: () => boolean;
+  cancelSignal?: AbortSignal;
+  pageRefinementRequests?: Record<string, string>;
+  pageRefinementVisualContexts?: Record<string, PageRefinementVisualContext>;
+  refinementRunKind?: "page-refinement" | "deck-refinement";
+}
+
+export interface RunDeckRefinementInput extends RunDeckGenerationInput {
+  instruction: string;
+  scope: "deck" | "slide";
+  pageIndex?: number;
+  resumePageIds?: string[];
+  skipIntentReview?: boolean;
+}
+
+export interface RunPageGenerationRetryInput extends RunDeckGenerationInput {
+  pageId: string;
+}
+
+export type DeckGenerationContext = Omit<RunDeckGenerationInput, "startMode">;
+export type PageTerminalReason = "accepted" | "page_failed" | "agent_infrastructure" | "cancelled";
+
+export interface PageGenerationResult {
+  page: PagePlanItem;
+  reason: PageTerminalReason;
+  progress: PageProgress;
+  error?: DeckGenerationError;
+}
+
+export interface DeckGenerationRuntime extends DeckGenerationContext {
+  activeStreams: Map<string, DeckGenerationStream>;
+  getProgress: () => PageProgress | null;
+  setProgress: (progress: PageProgress) => void;
+}
+
+export interface StoredPageReviews {
+  visualReview: AgentPageVisualReviewResult | null;
+  contentReview: AgentPageContentReviewResult | null;
+}

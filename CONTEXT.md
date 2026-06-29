@@ -90,6 +90,10 @@ A deck that was generated from an earlier outline, template, or setting and shou
 **Deck Generation**:
 The process that turns a confirmed outline into presentation pages; it does not include outline creation from a brief.
 
+**Deck Generation Public Facade**:
+The stable app-facing entry boundary for Deck Generation, Deck Refinement, and Page Generation Retry. It exposes the workflow capabilities without owning their internal workflow decisions.
+_Avoid_: Workflow implementation, orchestration module
+
 **Active Deck Generation**:
 A deck generation process that is currently running; the confirmed outline is not open to edits during this period.
 
@@ -204,6 +208,10 @@ The latest available rendered screenshot for a target page during Page Refinemen
 **Deck Generation Resume**:
 The user action that continues unfinished Deck Generation by completing missing deck-level planning or preparation work, re-running any Page Generation Unit that is not accepted yet, including Interrupted Page Generations, pending pages, infrastructure failures, and Failed Page Generations, or by continuing Final Deck Render when all pages are accepted but final Deck artifacts are not ready. It keeps accepted pages and does not restart the whole Deck; an unfinished page keeps its previous current state until its resumed run actually starts.
 _Avoid_: Regenerate, Restart — those discard accepted pages and start the whole Deck over.
+
+**Deck Generation Restart**:
+The user action that discards current Deck Generation artifacts and starts Deck Generation again from the current Confirmed Outline and Template. It is different from Deck Generation Resume because it does not preserve accepted Page Generation Units as completed work.
+_Avoid_: Resume, Continue Generation
 
 **Deck Generation Cancellation**:
 The user action that asks an Active Deck Generation to stop starting new Page Generation Units and to cooperatively stop active page, research, and final-render work. Work already inside an external operation may return after cancellation, but cancelled work must not be promoted into accepted page content, Research Evidence, or final Deck artifacts; after cancellation settles, unfinished deck work is represented as an Interrupted Deck Generation.

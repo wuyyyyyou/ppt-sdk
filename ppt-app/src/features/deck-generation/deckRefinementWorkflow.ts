@@ -11,7 +11,7 @@ import type {
   WorkspaceOutline,
   WorkspaceSettings,
 } from "../../api/types";
-import { mergeTargetResearchRequirement } from "./pageRefinementWorkflow";
+import { mergeTargetResearchRequirement } from "./pageRefinementArtifacts";
 
 function cleanSegment(value: string): string {
   const ascii = value
