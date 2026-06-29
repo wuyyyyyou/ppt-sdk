@@ -1,0 +1,265 @@
+{
+  "name": "tool-youming-anna-search-c9sjsr9s",
+  "version": "0.1.0",
+  "display_name": "Anna Search",
+  "description": "Search the web through pluggable search providers. The initial provider is ddgs.",
+  "tools": [
+    {
+      "name": "web_search",
+      "description": "Search the web and return normalized search results.",
+      "parameters": [
+        {
+          "name": "query",
+          "type": "string",
+          "description": "Search keywords or question.",
+          "required": true
+        },
+        {
+          "name": "max_results",
+          "type": "integer",
+          "description": "Maximum number of results to return. Must be between 1 and 20.",
+          "required": false,
+          "default": 5
+        },
+        {
+          "name": "region",
+          "type": "string",
+          "description": "Search region, such as us-en.",
+          "required": false,
+          "default": "us-en"
+        },
+        {
+          "name": "safesearch",
+          "type": "string",
+          "description": "Safe search level.",
+          "required": false,
+          "default": "moderate",
+          "enum": ["off", "moderate", "strict"]
+        },
+        {
+          "name": "timelimit",
+          "type": "string",
+          "description": "Optional time limit: d, w, m, or y.",
+          "required": false,
+          "enum": ["d", "w", "m", "y"]
+        }
+      ],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" },
+          "max_results": { "type": "integer", "minimum": 1, "maximum": 20, "default": 5 },
+          "region": { "type": "string", "default": "us-en" },
+          "safesearch": {
+            "type": "string",
+            "enum": ["off", "moderate", "strict"],
+            "default": "moderate"
+          },
+          "timelimit": {
+            "type": "string",
+            "enum": ["d", "w", "m", "y"]
+          }
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "web_fetch",
+      "description": "Fetch extracted page content for a list of URLs and write content files to an output directory.",
+      "parameters": [
+        {
+          "name": "urls",
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "URLs to fetch. Must contain between 1 and 10 HTTP or HTTPS URLs.",
+          "required": true
+        },
+        {
+          "name": "output_dir",
+          "type": "string",
+          "description": "Optional base output directory. A per-call subdirectory is created inside it. Defaults to the system tmp directory.",
+          "required": false
+        },
+        {
+          "name": "format",
+          "type": "string",
+          "description": "Extracted content format.",
+          "required": false,
+          "default": "text_rich",
+          "enum": ["text_markdown", "text_plain", "text_rich"]
+        },
+        {
+          "name": "max_chars",
+          "type": "integer",
+          "description": "Maximum characters to write per URL content file. Must be between 1000 and 50000.",
+          "required": false,
+          "default": 12000
+        }
+      ],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "urls": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "output_dir": { "type": "string" },
+          "format": {
+            "type": "string",
+            "enum": ["text_markdown", "text_plain", "text_rich"],
+            "default": "text_rich"
+          },
+          "max_chars": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 50000,
+            "default": 12000
+          }
+        },
+        "required": ["urls"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "image_search",
+      "description": "Search images and return normalized image metadata.",
+      "parameters": [
+        {
+          "name": "query",
+          "type": "string",
+          "description": "Image search keywords or question.",
+          "required": true
+        },
+        {
+          "name": "max_results",
+          "type": "integer",
+          "description": "Maximum number of image results to return. Must be between 1 and 20.",
+          "required": false,
+          "default": 5
+        },
+        {
+          "name": "region",
+          "type": "string",
+          "description": "Search region, such as us-en.",
+          "required": false,
+          "default": "us-en"
+        },
+        {
+          "name": "safesearch",
+          "type": "string",
+          "description": "Safe search level.",
+          "required": false,
+          "default": "moderate",
+          "enum": ["off", "moderate", "strict"]
+        },
+        {
+          "name": "timelimit",
+          "type": "string",
+          "description": "Optional time limit: d, w, m, or y.",
+          "required": false,
+          "enum": ["d", "w", "m", "y"]
+        },
+        {
+          "name": "size",
+          "type": "string",
+          "description": "Optional provider-specific image size filter.",
+          "required": false
+        },
+        {
+          "name": "color",
+          "type": "string",
+          "description": "Optional provider-specific image color filter.",
+          "required": false
+        },
+        {
+          "name": "type_image",
+          "type": "string",
+          "description": "Optional provider-specific image type filter.",
+          "required": false
+        },
+        {
+          "name": "layout",
+          "type": "string",
+          "description": "Optional provider-specific image layout filter.",
+          "required": false
+        }
+      ],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" },
+          "max_results": { "type": "integer", "minimum": 1, "maximum": 20, "default": 5 },
+          "region": { "type": "string", "default": "us-en" },
+          "safesearch": {
+            "type": "string",
+            "enum": ["off", "moderate", "strict"],
+            "default": "moderate"
+          },
+          "timelimit": {
+            "type": "string",
+            "enum": ["d", "w", "m", "y"]
+          },
+          "size": { "type": "string" },
+          "color": { "type": "string" },
+          "type_image": { "type": "string" },
+          "layout": { "type": "string" }
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "image_fetch",
+      "description": "Download image URLs to files and return file paths plus lightweight metadata.",
+      "parameters": [
+        {
+          "name": "urls",
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Image URLs to download. Must contain between 1 and 10 HTTP or HTTPS URLs.",
+          "required": true
+        },
+        {
+          "name": "output_dir",
+          "type": "string",
+          "description": "Optional base output directory. A per-call subdirectory is created inside it. Defaults to the system tmp directory.",
+          "required": false
+        },
+        {
+          "name": "max_bytes",
+          "type": "integer",
+          "description": "Maximum bytes to download per image. Must be between 1048576 and 52428800.",
+          "required": false,
+          "default": 10485760
+        }
+      ],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "urls": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "output_dir": { "type": "string" },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1048576,
+            "maximum": 52428800,
+            "default": 10485760
+          }
+        },
+        "required": ["urls"],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "runtime": {
+    "type": "uv",
+    "min_version": "0.4.0"
+  }
+}

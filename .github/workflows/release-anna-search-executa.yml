@@ -1,4 +1,4 @@
-name: Release presenton-pptx-generator
+name: Release anna-search-executa
 
 on:
   workflow_dispatch:
@@ -10,7 +10,6 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.meta.outputs.version }}
       release_tag: ${{ steps.meta.outputs.release_tag }}
       release_name: ${{ steps.meta.outputs.release_name }}
     steps:
@@ -23,13 +22,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          name="$(python3 -c "import json; print(json.load(open('presenton-pptx-generator/manifest.json', encoding='utf-8'))['name'])")"
-          version="$(python3 -c "import json; print(json.load(open('presenton-pptx-generator/manifest.json', encoding='utf-8'))['version'])")"
+          name="$(python3 -c "import json; print(json.load(open('anna-search-executa/manifest.json', encoding='utf-8'))['name'])")"
+          version="$(python3 -c "import json; print(json.load(open('anna-search-executa/manifest.json', encoding='utf-8'))['version'])")"
           release_tag="${name}-v${version}"
           release_name="${name} v${version}"
 
           {
-            echo "version=$version"
             echo "release_tag=$release_tag"
             echo "release_name=$release_name"
           } >> "$GITHUB_OUTPUT"
@@ -43,24 +41,19 @@ jobs:
         include:
           - runner: ubuntu-22.04
             asset_suffix: linux-x86_64
-            cairo_runtime_dir: /usr/lib/x86_64-linux-gnu
           - runner: ubuntu-22.04-arm
             asset_suffix: linux-aarch64
-            cairo_runtime_dir: /usr/lib/aarch64-linux-gnu
           - runner: macos-15-intel
             asset_suffix: darwin-x86_64
-            cairo_runtime_dir: /usr/local/opt/cairo/lib
           - runner: macos-15
             asset_suffix: darwin-arm64
-            cairo_runtime_dir: /opt/homebrew/opt/cairo/lib
           - runner: windows-2025
             asset_suffix: windows-x86_64
-            cairo_runtime_dir: C:/msys64/mingw64/bin
     defaults:
       run:
         shell: bash
     env:
-      PROJECT_DIR: presenton-pptx-generator
+      PROJECT_DIR: anna-search-executa
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -73,46 +66,24 @@ jobs:
       - name: Install uv
         run: python -m pip install --upgrade pip uv
 
-      - name: Install Cairo runtime on Linux
-        if: ${{ startsWith(matrix.runner, 'ubuntu-') }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libcairo2 libcairo-gobject2 libffi8
-
-      - name: Install Cairo runtime on macOS
-        if: ${{ startsWith(matrix.runner, 'macos-') }}
-        run: brew install cairo libffi
-
-      - name: Install Cairo runtime on Windows
-        if: ${{ matrix.runner == 'windows-2025' }}
-        uses: msys2/setup-msys2@v2
-        with:
-          location: 'C:\msys64'
-          msystem: MINGW64
-          update: true
-          install: >-
-            mingw-w64-x86_64-cairo
-
       - name: Verify tool manifest synchronization
         run: |
           set -euo pipefail
-          node scripts/sync-presenton-pptx-generator-manifest.mjs
+          node scripts/sync-tool-manifests.mjs
           git diff --exit-code
 
       - name: Build and validate binary release package
         working-directory: ${{ env.PROJECT_DIR }}
-        env:
-          CAIRO_RUNTIME_DIR: ${{ matrix.cairo_runtime_dir }}
         run: ./build_binary.sh --test
 
       - name: Upload packaged assets
         uses: actions/upload-artifact@v4
         with:
-          name: release-assets-${{ matrix.asset_suffix }}
+          name: anna-search-release-assets-${{ matrix.asset_suffix }}
           path: |
-            presenton-pptx-generator/bundle/*.tar.gz
-            presenton-pptx-generator/bundle/*.zip
-            presenton-pptx-generator/bundle/*.sha256
+            anna-search-executa/bundle/*.tar.gz
+            anna-search-executa/bundle/*.zip
+            anna-search-executa/bundle/*.sha256
           if-no-files-found: error
 
   release:
@@ -124,7 +95,7 @@ jobs:
       - name: Download packaged assets
         uses: actions/download-artifact@v4
         with:
-          pattern: release-assets-*
+          pattern: anna-search-release-assets-*
           merge-multiple: true
           path: release-assets
 

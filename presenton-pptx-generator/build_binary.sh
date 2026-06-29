@@ -368,7 +368,7 @@ ARCHIVE_EXT="tar.gz"
 if [[ "$PLATFORM" == "windows" ]]; then
   ARCHIVE_EXT="zip"
 fi
-ARCHIVE_NAME="${BINARY_NAME}-v${PLUGIN_VERSION}-${PLATFORM_KEY}.${ARCHIVE_EXT}"
+ARCHIVE_NAME="${PLUGIN_NAME}-v${PLUGIN_VERSION}-${PLATFORM_KEY}.${ARCHIVE_EXT}"
 ARCHIVE_PATH="$BUNDLE_DIR/$ARCHIVE_NAME"
 
 echo "[1/8] Preparing virtual environment..."

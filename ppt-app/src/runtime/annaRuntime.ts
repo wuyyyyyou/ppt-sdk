@@ -64,6 +64,7 @@ declare global {
     AnnaAppRuntime?: {
       connect(): Promise<AnnaRuntime>;
     };
+    __ANNA_TOOL_IDS__?: Record<string, string>;
   }
 }
 

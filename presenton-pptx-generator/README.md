@@ -60,8 +60,8 @@ cd presenton-pptx-generator
 
 ```text
 bundle/
-  ppt-gener-v2.0.2-darwin-arm64.tar.gz
-  ppt-gener-v2.0.2-darwin-arm64.tar.gz.sha256
+  tool-youming_5703-ppt-gener-ahzv8re6-v3.1.1-darwin-arm64.tar.gz
+  tool-youming_5703-ppt-gener-ahzv8re6-v3.1.1-darwin-arm64.tar.gz.sha256
 ```
 
 GitHub release workflow 会构建：

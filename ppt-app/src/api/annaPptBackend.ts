@@ -30,18 +30,9 @@ import type {
   WorkspaceDefaultsResult,
   WorkspaceResult,
 } from "./types";
-import { ANNA_SEARCH_TOOL, PPT_ENGINE_TOOL, PPT_GENER_TOOL } from "./toolManifests.generated";
 import { createSearchAdapter } from "./searchAdapter";
+import { resolvePptBundledToolIds } from "./bundledToolIds";
 
-const PPT_ENGINE_TOOL_ID =
-  import.meta.env.VITE_PPT_ENGINE_TOOL_ID ??
-  PPT_ENGINE_TOOL.id;
-const PPT_GENER_TOOL_ID =
-  import.meta.env.VITE_PPT_GENER_TOOL_ID ??
-  PPT_GENER_TOOL.id;
-const ANNA_SEARCH_TOOL_ID =
-  import.meta.env.VITE_ANNA_SEARCH_TOOL_ID ??
-  ANNA_SEARCH_TOOL.id;
 const PPTX_EXPORT_TIMEOUT_MS = 600_000;
 
 function unwrapToolResult<T>(result: unknown): T {
@@ -110,6 +101,7 @@ function normalizeExportPdfResult(value: unknown): ExportPdfResult {
 }
 
 export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
+  const toolIds = resolvePptBundledToolIds();
   async function invoke<T>(
     toolId: string,
     method: string,
@@ -127,73 +119,73 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
   }
   const searchAdapter = createSearchAdapter({
     runtime,
-    toolId: ANNA_SEARCH_TOOL_ID,
+    toolId: toolIds.annaSearch,
   });
 
   return {
     listWorkspaces: () =>
-      invoke<ListWorkspacesResult>(PPT_ENGINE_TOOL_ID, "app_list_workspaces", {}),
+      invoke<ListWorkspacesResult>(toolIds.pptEngine, "app_list_workspaces", {}),
     getWorkspaceDefaults: () =>
-      invoke<WorkspaceDefaultsResult>(PPT_ENGINE_TOOL_ID, "app_get_workspace_defaults", {}),
+      invoke<WorkspaceDefaultsResult>(toolIds.pptEngine, "app_get_workspace_defaults", {}),
     createWorkspace: (input) =>
-      invoke<WorkspaceResult>(PPT_ENGINE_TOOL_ID, "app_create_workspace", input),
+      invoke<WorkspaceResult>(toolIds.pptEngine, "app_create_workspace", input),
     openWorkspace: (input) =>
-      invoke<WorkspaceResult>(PPT_ENGINE_TOOL_ID, "app_open_workspace", input),
+      invoke<WorkspaceResult>(toolIds.pptEngine, "app_open_workspace", input),
     appendWorkspaceLog: (input) =>
       invoke<AppendWorkspaceLogResult>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_append_workspace_log",
         input
       ),
     getWorkspaceOutline: (input) =>
       invoke<WorkspaceOutline>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_get_workspace_outline",
         input
       ),
     updateWorkspaceOutline: (input) =>
       invoke<WorkspaceResult>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_update_workspace_outline",
         input
       ),
     updateWorkspaceSettings: (input) =>
       invoke<WorkspaceResult>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_update_workspace_settings",
         input
       ),
     updateWorkspacePages: (input) =>
       invoke<WorkspaceResult>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_update_workspace_pages",
         input
       ),
     duplicateWorkspacePage: (input) =>
       invoke<WorkspaceResult>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_duplicate_workspace_page",
         input
       ),
     updateWorkspaceTitle: (input) =>
       invoke<WorkspaceResult>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_update_workspace_title",
         input
       ),
     createProject: (input) =>
-      invoke<ProjectResult>(PPT_ENGINE_TOOL_ID, "app_create_project", input),
+      invoke<ProjectResult>(toolIds.pptEngine, "app_create_project", input),
     getProject: (input) =>
-      invoke<ProjectResult>(PPT_ENGINE_TOOL_ID, "app_get_project", input),
+      invoke<ProjectResult>(toolIds.pptEngine, "app_get_project", input),
     recordRequirements: (input) =>
       invoke<ProjectResult>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_record_requirements",
         input
       ),
     listTemplates: () =>
       invoke<{ groups?: TemplateSummary[]; count?: number }>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_list_template_groups",
         {}
       ).then((result) => ({
@@ -201,161 +193,161 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         count: result.count ?? result.groups?.length ?? 0,
       })),
     selectTemplate: (input) =>
-      invoke(PPT_ENGINE_TOOL_ID, "app_select_workspace_template", input),
+      invoke(toolIds.pptEngine, "app_select_workspace_template", input),
     getTemplatePlanningContext: (input) =>
       invoke<TemplatePlanningContext>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_get_template_planning_context",
         input
       ),
     recordPagePlan: (input) =>
-      invoke<PagePlan>(PPT_ENGINE_TOOL_ID, "app_record_page_plan", input),
+      invoke<PagePlan>(toolIds.pptEngine, "app_record_page_plan", input),
     getPagePlan: (input) =>
-      invoke<PagePlan>(PPT_ENGINE_TOOL_ID, "app_get_page_plan", input),
+      invoke<PagePlan>(toolIds.pptEngine, "app_get_page_plan", input),
     preparePageFiles: (input) =>
       invoke<PreparePageFilesResult>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_prepare_page_files",
         input
       ),
     prepareDeckRefinementPageFiles: (input) =>
       invoke(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_prepare_deck_refinement_page_files",
         input
       ),
     getWorkspacePageFileFingerprints: (input) =>
       invoke<GetWorkspacePageFileFingerprintsResult>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_get_workspace_page_file_fingerprints",
         input,
       ),
     prepareResearchWorkspace: (input) =>
-      invoke(PPT_ENGINE_TOOL_ID, "app_prepare_research_workspace", input),
+      invoke(toolIds.pptEngine, "app_prepare_research_workspace", input),
     recordResearchPlan: (input) =>
-      invoke<ResearchPlan>(PPT_ENGINE_TOOL_ID, "app_record_research_plan", input),
+      invoke<ResearchPlan>(toolIds.pptEngine, "app_record_research_plan", input),
     getResearchPlan: (input) =>
-      invoke<ResearchPlan>(PPT_ENGINE_TOOL_ID, "app_get_research_plan", input),
+      invoke<ResearchPlan>(toolIds.pptEngine, "app_get_research_plan", input),
     recordResearchEvidence: (input) =>
       invoke<ResearchEvidenceIndex>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_record_research_evidence",
         input
       ),
     recordResearchEvidencePage: (input) =>
       invoke<ResearchEvidenceIndex>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_record_research_evidence_page",
         input
       ),
     getResearchEvidence: (input) =>
       invoke<ResearchEvidenceIndex>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_get_research_evidence",
         input
       ),
     recordResearchCurationDraft: (input) =>
       invoke(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_record_research_curation_draft",
         input
       ),
     getResearchCurationDraft: (input) =>
       invoke(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_get_research_curation_draft",
         input
       ),
     getResearchCurationDraftFingerprint: (input) =>
       invoke<ResearchCurationDraftFingerprint>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_get_research_curation_draft_fingerprint",
         input
       ),
     recordResearchEvidencePageMarkdown: (input) =>
       invoke(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_record_research_evidence_page_markdown",
         input
       ),
     recordResearchStatus: (input) =>
-      invoke<ResearchStatus>(PPT_ENGINE_TOOL_ID, "app_record_research_status", input),
+      invoke<ResearchStatus>(toolIds.pptEngine, "app_record_research_status", input),
     recordResearchStatusPage: (input) =>
-      invoke<ResearchStatus>(PPT_ENGINE_TOOL_ID, "app_record_research_status_page", input),
+      invoke<ResearchStatus>(toolIds.pptEngine, "app_record_research_status_page", input),
     getResearchStatus: (input) =>
-      invoke<ResearchStatus>(PPT_ENGINE_TOOL_ID, "app_get_research_status", input),
+      invoke<ResearchStatus>(toolIds.pptEngine, "app_get_research_status", input),
     webSearch: searchAdapter.webSearch,
     webFetch: searchAdapter.webFetch,
     imageSearch: searchAdapter.imageSearch,
     imageFetch: searchAdapter.imageFetch,
     getPageProgress: (input) =>
-      invoke<PageProgress>(PPT_ENGINE_TOOL_ID, "app_get_page_progress", input),
+      invoke<PageProgress>(toolIds.pptEngine, "app_get_page_progress", input),
     recordPageProgress: (input) =>
       invoke<PageProgress>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_record_page_progress",
         input
       ),
     renderWorkspacePagePreview: (input) =>
       invoke<RenderWorkspacePagePreviewResult>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_render_workspace_page_preview",
         input
       ),
     recordOutline: (input) =>
-      invoke<ProjectResult>(PPT_ENGINE_TOOL_ID, "app_record_outline", input),
+      invoke<ProjectResult>(toolIds.pptEngine, "app_record_outline", input),
     renderDeckHtml: (input) =>
       invoke<RenderDeckHtmlResult>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_render_deck_html",
         input
       ),
     recordDeckReview: (input) =>
       invoke<ProjectResult>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_record_deck_review",
         input
       ),
     prepareExportModel: (input) =>
       invoke<PrepareExportModelResult>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_prepare_export_model",
         input,
         { timeoutMs: PPTX_EXPORT_TIMEOUT_MS }
       ).then(normalizePrepareExportModelResult),
     startPptxExportModel: (input) =>
       invoke<PptxExportJob>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_start_pptx_export_model",
         input
       ),
     getPptxExportStatus: (input) =>
       invoke<PptxExportJob>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_get_pptx_export_status",
         input
       ),
     generatePptx: (input: GeneratePptxInput) =>
-      invoke<GeneratePptxResult>(PPT_GENER_TOOL_ID, "generatePptx", {
+      invoke<GeneratePptxResult>(toolIds.pptGener, "generatePptx", {
         model_path: input.modelPath,
         output_path: input.outputPath,
       }, { timeoutMs: PPTX_EXPORT_TIMEOUT_MS }).then((result) =>
         normalizeGeneratePptxResult(result, input.outputPath)
       ),
     startGeneratePptx: (input) =>
-      invoke<PptxExportJob>(PPT_GENER_TOOL_ID, "startGeneratePptx", {
+      invoke<PptxExportJob>(toolIds.pptGener, "startGeneratePptx", {
         workspace_dir: input.workspace_dir,
         model_path: input.modelPath,
         output_path: input.outputPath,
         job_id: input.job_id,
       }),
     exportPdf: (input: ExportPdfInput) =>
-      invoke<ExportPdfResult>(PPT_ENGINE_TOOL_ID, "app_export_pdf", input).then(
+      invoke<ExportPdfResult>(toolIds.pptEngine, "app_export_pdf", input).then(
         normalizeExportPdfResult
       ),
     recordPptxExport: (input) =>
       invoke<WorkspaceResult>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_record_pptx_export",
         {
           workspace_dir: input.workspace_dir,
@@ -365,7 +357,7 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       ),
     recordPdfExport: (input: RecordPdfExportInput) =>
       invoke<WorkspaceResult>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_record_pdf_export",
         {
           workspace_dir: input.workspace_dir,
@@ -374,7 +366,7 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       ),
     getExportArtifactDownloadUrl: (input) =>
       invoke<ExportArtifactDownloadUrlResult>(
-        PPT_ENGINE_TOOL_ID,
+        toolIds.pptEngine,
         "app_get_export_artifact_download_url",
         {
           workspace_dir: input.workspace_dir,

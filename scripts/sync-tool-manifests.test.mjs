@@ -2,7 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-import { syncPyprojectText, syncUvLockText } from "./sync-tool-manifests.mjs";
+import {
+  applyPptAppListingSync,
+  applyPptAppManifestSync,
+  buildGeneratedFrontendConstants,
+  syncPyprojectText,
+  syncUvLockText,
+} from "./sync-tool-manifests.mjs";
 
 const tool = {
   manifest: {
@@ -80,4 +86,82 @@ test("syncUvLockText updates uv.lock package entry with Windows CRLF line ending
       "",
     ].join("\r\n"),
   );
+});
+
+const tools = [
+  {
+    bundledHandle: "ppt-engine",
+    manifestPath: "presenton-template-engine/manifest.json",
+    generatedConstName: "PPT_ENGINE_TOOL",
+    manifest: {
+      name: "tool-real-engine",
+      version: "3.2.1",
+      display_name: "ppt-engine",
+    },
+  },
+  {
+    bundledHandle: "ppt-gener",
+    manifestPath: "presenton-pptx-generator/manifest.json",
+    generatedConstName: "PPT_GENER_TOOL",
+    manifest: {
+      name: "tool-real-gener",
+      version: "3.1.1",
+      display_name: "ppt-gener",
+    },
+  },
+  {
+    bundledHandle: "anna-search",
+    manifestPath: "anna-search-executa/manifest.json",
+    generatedConstName: "ANNA_SEARCH_TOOL",
+    manifest: {
+      name: "tool-real-search",
+      version: "0.1.0",
+      display_name: "Anna Search",
+    },
+  },
+];
+
+test("applyPptAppManifestSync writes bundled handles and synchronizes min versions", () => {
+  const manifest = applyPptAppManifestSync({
+    required_executas: [
+      { tool_id: "tool-old-engine", version: "latest" },
+      { tool_id: "tool-old-gener", version: "latest" },
+      { tool_id: "tool-old-search", version: "latest" },
+    ],
+    ui: {
+      host_api: {
+        tools: [],
+      },
+    },
+  }, tools);
+
+  assert.deepEqual(manifest.required_executas, [
+    { tool_id: "bundled:ppt-engine", version: "latest", min_version: "3.2.1" },
+    { tool_id: "bundled:ppt-gener", version: "latest", min_version: "3.1.1" },
+    { tool_id: "bundled:anna-search", version: "latest", min_version: "0.1.0" },
+  ]);
+  assert.deepEqual(manifest.ui.host_api.tools, [
+    "required:bundled:ppt-engine",
+    "required:bundled:ppt-gener",
+    "required:bundled:anna-search",
+  ]);
+});
+
+test("applyPptAppListingSync maps bundled handles to sibling project paths", () => {
+  const listing = applyPptAppListingSync({ name: "Anna Deck" }, tools);
+
+  assert.deepEqual(listing.bundled_executas, {
+    "ppt-engine": { path: "../presenton-template-engine" },
+    "ppt-gener": { path: "../presenton-pptx-generator" },
+    "anna-search": { path: "../anna-search-executa" },
+  });
+});
+
+test("buildGeneratedFrontendConstants emits bundled handles without real tool ids", () => {
+  const generated = buildGeneratedFrontendConstants(tools);
+
+  assert.match(generated, /handle: "ppt-engine"/);
+  assert.match(generated, /handle: "anna-search"/);
+  assert.doesNotMatch(generated, /tool-real-engine/);
+  assert.doesNotMatch(generated, /tool-real-search/);
 });

@@ -7,5 +7,16 @@
   "homepage_url": "https://example.com/ppt-app",
   "support_url": "https://example.com/ppt-app/support",
   "privacy_url": "https://example.com/ppt-app/privacy",
-  "pricing_model": "free"
+  "pricing_model": "free",
+  "bundled_executas": {
+    "ppt-engine": {
+      "path": "../presenton-template-engine"
+    },
+    "ppt-gener": {
+      "path": "../presenton-pptx-generator"
+    },
+    "anna-search": {
+      "path": "../anna-search-executa"
+    }
+  }
 }

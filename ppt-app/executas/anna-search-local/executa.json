@@ -5,9 +5,9 @@
     "uv",
     "run",
     "--project",
-    "../../../../anna-search-executa",
+    "../../../anna-search-executa",
     "python",
-    "anna_search_local.py"
+    "example_plugin.py"
   ],
   "enabled": true,
   "_comment": "Local anna-app dev shim. It starts ../../../anna-search-executa/example_plugin.py with the real Anna Search tool_id."

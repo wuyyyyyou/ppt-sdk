@@ -26,6 +26,8 @@ For this mode the app root contains local Executa shims under `executas/`:
 
 ```text
 executas/
+├── anna-search-local/
+│   └── executa.json
 ├── ppt-engine-local/
 │   ├── executa.json
 │   └── ppt_engine_local.js
@@ -38,23 +40,38 @@ executas/
 values with the local Anna bridge, and lazy-starts the command when the bundle
 calls `anna.tools.invoke(...)`.
 
-The important invariant is that each id is identical in all local Anna paths:
-
-- `manifest.json` `required_executas[].tool_id`
-- `manifest.json` `ui.host_api.tools`
-- `src/api/annaPptBackend.ts` defaults, or `.env` `VITE_PPT_*_TOOL_ID`
-- `executas/*/executa.json`
-- the real plugin `describe` manifest name
-
-Current local ids:
+The app manifest references tools with stable bundled handles:
 
 ```text
-ppt-engine: tool-lightvoss_5433-ppt-engine-6443rj2a
-ppt-gener:  tool-lightvoss_5433-ppt-gener-dc7ftcep
+bundled:ppt-engine
+bundled:ppt-gener
+bundled:anna-search
+```
+
+`anna-app dev` and app publishing generate `anna-tool-ids.js`, which assigns
+`window.__ANNA_TOOL_IDS__`. The frontend must read real tool ids from that
+sidecar and fail when it is missing; it does not use `.env` or hard-coded tool
+id fallbacks.
+
+The important invariant is split by layer:
+
+- `manifest.json` `required_executas[].tool_id` and `ui.host_api.tools` use `bundled:<handle>`.
+- `manifest.json` `required_executas[].min_version` follows each Executa manifest version.
+- `app.json` `bundled_executas` maps each handle to its sibling Executa directory.
+- `executas/*/executa.json` keeps the real local `tool_id`.
+- the real plugin `describe` manifest `name` matches the real local `tool_id`.
+
+Current real ids:
+
+```text
+ppt-engine:  tool-youming_5703-ppt-engine-fmkv9ru7
+ppt-gener:   tool-youming_5703-ppt-gener-ahzv8re6
+anna-search: tool-youming-anna-search-c9sjsr9s
 ```
 
 The engine shim starts `presenton-template-engine/example_plugin.js` from the
 engine directory. The generator shim starts `presenton-pptx-generator/example_plugin.py`
+through `uv run`. The search shim starts `anna-search-executa/example_plugin.py`
 through `uv run`.
 
 Before using the harness, rebuild the static bundle:

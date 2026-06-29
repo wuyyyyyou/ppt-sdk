@@ -65,20 +65,26 @@ manifest.json -> deck.html -> ppt-model.json -> .pptx
 
 ## Tool ID 不变量
 
-`ppt-app` 本地 Anna harness 依赖 tool id 完全一致。以下位置必须同步：
+`ppt-app` App manifest 使用 `bundled:<handle>` 引用 Executa，前端只从
+`window.__ANNA_TOOL_IDS__` 读取运行时生成的真实 tool id；缺失 sidecar 或 handle
+应直接失败，不要回退到 `.env` 或硬编码真实 id。
 
-- [`ppt-app/manifest.json`](ppt-app/manifest.json) 的 `required_executas[].tool_id`
-- [`ppt-app/manifest.json`](ppt-app/manifest.json) 的 `ui.host_api.tools`
-- [`ppt-app/src/api/annaPptBackend.ts`](ppt-app/src/api/annaPptBackend.ts) 里的默认 tool id
-- `.env` 里的 `VITE_PPT_ENGINE_TOOL_ID` 和 `VITE_PPT_GENER_TOOL_ID`
-- [`ppt-app/executas/*/executa.json`](ppt-app/executas/)
+以下位置必须通过 [`scripts/sync-tool-manifests.mjs`](scripts/sync-tool-manifests.mjs)
+保持同步：
+
+- [`ppt-app/manifest.json`](ppt-app/manifest.json) 的 `required_executas[].tool_id`：固定为 `bundled:ppt-engine`、`bundled:ppt-gener`、`bundled:anna-search`
+- [`ppt-app/manifest.json`](ppt-app/manifest.json) 的 `required_executas[].min_version`：来自各 Executa manifest 的 `version`
+- [`ppt-app/manifest.json`](ppt-app/manifest.json) 的 `ui.host_api.tools`：固定为 `required:bundled:<handle>`
+- [`ppt-app/app.json`](ppt-app/app.json) 的 `bundled_executas`
+- [`ppt-app/executas/*/executa.json`](ppt-app/executas/) 的真实 `tool_id`
 - 真实插件 `describe` 返回的 manifest `name`
 
-当前本地 ID：
+当前真实 ID：
 
 ```text
-ppt-engine: tool-lightvoss_5433-ppt-engine-6443rj2a
-ppt-gener:  tool-lightvoss_5433-ppt-gener-dc7ftcep
+ppt-engine:  tool-youming_5703-ppt-engine-fmkv9ru7
+ppt-gener:   tool-youming_5703-ppt-gener-ahzv8re6
+anna-search: tool-youming-anna-search-c9sjsr9s
 ```
 
 ## 开发与运行

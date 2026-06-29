@@ -1,0 +1,28 @@
+[project]
+name = "anna-search-executa"
+version = "0.1.0"
+description = "Anna Executa web search tool backed by pluggable providers."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "ddgs>=9.0.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0"
+]
+build = [
+  "pyinstaller>=6.0.0"
+]
+
+[project.scripts]
+anna-search-executa = "anna_search_executa.plugin:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

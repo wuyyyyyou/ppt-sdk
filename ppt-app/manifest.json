@@ -5,18 +5,19 @@
   ],
   "required_executas": [
     {
-      "tool_id": "tool-youming_5703-ppt-engine-fmkv9ru7",
-      "min_version": "3.1.0",
+      "tool_id": "bundled:ppt-engine",
+      "min_version": "3.2.1",
       "version": "latest"
     },
     {
-      "tool_id": "tool-youming_5703-ppt-gener-ahzv8re6",
-      "min_version": "2.0.0",
+      "tool_id": "bundled:ppt-gener",
+      "min_version": "3.1.1",
       "version": "latest"
     },
     {
-      "tool_id": "tool-youming-anna-search-c9sjsr9s",
-      "version": "latest"
+      "tool_id": "bundled:anna-search",
+      "version": "latest",
+      "min_version": "0.1.0"
     }
   ],
   "optional_executas": [],
@@ -52,9 +53,9 @@
     ],
     "host_api": {
       "tools": [
-        "required:tool-youming_5703-ppt-engine-fmkv9ru7",
-        "required:tool-youming_5703-ppt-gener-ahzv8re6",
-        "required:tool-youming-anna-search-c9sjsr9s"
+        "required:bundled:ppt-engine",
+        "required:bundled:ppt-gener",
+        "required:bundled:anna-search"
       ],
       "chat": [],
       "artifact": [],

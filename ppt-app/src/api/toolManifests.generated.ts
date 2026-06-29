@@ -2,19 +2,19 @@
 // Do not edit it by hand.
 
 export const PPT_ENGINE_TOOL = {
-  id: "tool-youming_5703-ppt-engine-fmkv9ru7",
+  handle: "ppt-engine",
   version: "3.2.1",
   displayName: "ppt-engine",
 } as const;
 
 export const PPT_GENER_TOOL = {
-  id: "tool-youming_5703-ppt-gener-ahzv8re6",
+  handle: "ppt-gener",
   version: "3.1.1",
   displayName: "ppt-gener",
 } as const;
 
 export const ANNA_SEARCH_TOOL = {
-  id: "tool-youming-anna-search-c9sjsr9s",
+  handle: "anna-search",
   version: "0.1.0",
   displayName: "Anna Search",
 } as const;
