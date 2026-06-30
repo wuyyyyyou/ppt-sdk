@@ -40,7 +40,7 @@ const ComparisonPoint = ({ cell, color }: { cell: ComparisonMatrixCell; color: s
       <AnalyticsIcon name={cell.icon ?? "bolt"} className="h-[15px] w-[15px]" stroke={color} />
     </div>
     <div className="min-w-0 flex-1">
-      <div className="text-[14px] font-bold leading-[1.2]" style={{ color: chartAnalyticsTheme.colors.background }}>
+      <div className="text-[14px] font-bold leading-[1.2]" style={{ color: chartAnalyticsTheme.colors.backgroundText }}>
         {cell.title}
       </div>
       <div className="mt-[4px] text-[12px] leading-[1.32]" style={{ color: chartAnalyticsTheme.colors.subtleText }}>
@@ -59,7 +59,7 @@ const EntityHeader = ({ entity }: { entity: ComparisonMatrixEntity }) => (
   >
     <div className="flex items-center gap-[8px]">
       <AnalyticsIcon name={entity.icon ?? "chart-column"} className="h-[16px] w-[16px]" stroke={entity.accentColor} />
-      <div className="text-[16px] font-bold leading-[1.1]" style={{ color: chartAnalyticsTheme.colors.background }}>
+      <div className="text-[16px] font-bold leading-[1.1]" style={{ color: chartAnalyticsTheme.colors.backgroundText }}>
         {entity.name}
       </div>
     </div>
@@ -83,7 +83,7 @@ const DimensionCell = ({ row }: { row: ComparisonMatrixRow }) => (
     <div className="flex h-[34px] w-[34px] items-center justify-center rounded-full" style={{ backgroundColor: "#F1F5F9" }}>
       <AnalyticsIcon name={row.icon ?? "grid"} className="h-[17px] w-[17px]" stroke={chartAnalyticsTheme.colors.subtleText} />
     </div>
-    <div className="mt-[7px] text-[12px] font-bold leading-[1.18]" style={{ color: chartAnalyticsTheme.colors.background }}>
+    <div className="mt-[7px] text-[12px] font-bold leading-[1.18]" style={{ color: chartAnalyticsTheme.colors.backgroundText }}>
       {row.dimension}
     </div>
   </div>
