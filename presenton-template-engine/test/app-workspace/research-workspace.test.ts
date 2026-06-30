@@ -219,6 +219,152 @@ test("workspace research tools prepare directories and persist metadata", async 
     assert.match(path.basename(finalizedAsset?.file_path ?? ""), /^page-01-image-1-[a-f0-9]{16}\.png$/);
     assert.deepEqual(await readFile(finalizedAsset?.file_path ?? ""), rawImageBytes);
 
+    const indexedRawImageDir = path.join(prepared.raw_images_dir, "image-fetch-001");
+    await mkdir(indexedRawImageDir, { recursive: true });
+    const indexedRawImagePath = path.join(indexedRawImageDir, "001-example-com.png");
+    const indexedRawImageBytes = Buffer.from("indexed-image-bytes");
+    await writeFile(indexedRawImagePath, indexedRawImageBytes);
+    const indexedRawImageSha256 = createHash("sha256").update(indexedRawImageBytes).digest("hex");
+    const rawImageIndexPath = path.join(indexedRawImageDir, "index.json");
+    await writeFile(rawImageIndexPath, JSON.stringify({
+      output_dir: indexedRawImageDir,
+      index_path: rawImageIndexPath,
+      results: [
+        {
+          url: "https://example.com/indexed.png",
+          success: true,
+          file_path: indexedRawImagePath,
+          relative_path: "001-example-com.png",
+          content_type: "image/png",
+          bytes: indexedRawImageBytes.length,
+          sha256: indexedRawImageSha256,
+        },
+      ],
+      count: 1,
+    }));
+    const agentFileToolRawPath = path.relative(
+      path.dirname(path.dirname(workspace.workspace_dir)),
+      indexedRawImagePath,
+    );
+    const recoveredVisualAssets = await finalizeAppResearchVisualAssets({
+      workspace_dir: workspace.workspace_dir,
+      page_id: "page-01",
+      raw_image_index_paths: [rawImageIndexPath],
+      visual_assets: [
+        {
+          id: "image-agent-path",
+          file_path: agentFileToolRawPath,
+          original_raw_path: agentFileToolRawPath,
+          image_url: "https://example.com/indexed.png",
+          sha256: indexedRawImageSha256,
+          reason: "Useful indexed image",
+          visual_summary: "A usable indexed image.",
+        },
+      ],
+    });
+    assert.equal(recoveredVisualAssets.visual_assets.length, 1);
+    assert.equal(recoveredVisualAssets.gaps.length, 0);
+    assert.ok(
+      recoveredVisualAssets.rejected_material.some((item) =>
+        item.reason.includes("recovered from raw image index metadata"),
+      ),
+    );
+    const recoveredAsset = recoveredVisualAssets.visual_assets[0];
+    assert.equal(recoveredAsset?.original_raw_path, indexedRawImagePath);
+    assert.equal(recoveredAsset?.sha256, indexedRawImageSha256);
+    assert.equal(recoveredAsset?.image_url, "https://example.com/indexed.png");
+    assert.ok(recoveredAsset?.file_path.startsWith(prepared.evidence_images_dir));
+    assert.deepEqual(await readFile(recoveredAsset?.file_path ?? ""), indexedRawImageBytes);
+
+    const hashMismatchRawImagePath = path.join(indexedRawImageDir, "002-hash-mismatch.png");
+    await writeFile(hashMismatchRawImagePath, Buffer.from("hash-mismatch-bytes"));
+    const hashMismatchRawIndexPath = path.join(indexedRawImageDir, "hash-mismatch-index.json");
+    await writeFile(hashMismatchRawIndexPath, JSON.stringify({
+      output_dir: indexedRawImageDir,
+      index_path: hashMismatchRawIndexPath,
+      results: [
+        {
+          url: "https://example.com/hash-mismatch.png",
+          success: true,
+          file_path: hashMismatchRawImagePath,
+          relative_path: "002-hash-mismatch.png",
+          sha256: "wrong-index-sha",
+        },
+      ],
+      count: 1,
+    }));
+    const hashMismatchVisualAssets = await finalizeAppResearchVisualAssets({
+      workspace_dir: workspace.workspace_dir,
+      page_id: "page-01",
+      raw_image_index_paths: [hashMismatchRawIndexPath],
+      visual_assets: [
+        {
+          id: "image-hash-mismatch",
+          file_path: hashMismatchRawImagePath,
+          image_url: "https://example.com/hash-mismatch.png",
+          reason: "Hash mismatch image",
+          visual_summary: "Should be rejected.",
+        },
+      ],
+    });
+    assert.equal(hashMismatchVisualAssets.visual_assets.length, 0);
+    assert.ok(hashMismatchVisualAssets.gaps.some((gap) => gap.includes("raw image index sha256 did not match")));
+    assert.ok(
+      hashMismatchVisualAssets.rejected_material.some((item) =>
+        item.source === "image-hash-mismatch" &&
+        item.reason.includes("raw image index sha256 did not match"),
+      ),
+    );
+
+    const ambiguousRawImageDir = path.join(prepared.raw_images_dir, "ambiguous-fetch");
+    const ambiguousRawImagePathA = path.join(ambiguousRawImageDir, "a", "same-name.png");
+    const ambiguousRawImagePathB = path.join(ambiguousRawImageDir, "b", "same-name.png");
+    await mkdir(path.dirname(ambiguousRawImagePathA), { recursive: true });
+    await mkdir(path.dirname(ambiguousRawImagePathB), { recursive: true });
+    await writeFile(ambiguousRawImagePathA, Buffer.from("ambiguous-a"));
+    await writeFile(ambiguousRawImagePathB, Buffer.from("ambiguous-b"));
+    const ambiguousRawImageIndexPath = path.join(ambiguousRawImageDir, "index.json");
+    await writeFile(ambiguousRawImageIndexPath, JSON.stringify({
+      output_dir: ambiguousRawImageDir,
+      index_path: ambiguousRawImageIndexPath,
+      results: [
+        {
+          url: "https://example.com/a.png",
+          success: true,
+          file_path: ambiguousRawImagePathA,
+          relative_path: "a/same-name.png",
+        },
+        {
+          url: "https://example.com/b.png",
+          success: true,
+          file_path: ambiguousRawImagePathB,
+          relative_path: "b/same-name.png",
+        },
+      ],
+      count: 2,
+    }));
+    const ambiguousVisualAssets = await finalizeAppResearchVisualAssets({
+      workspace_dir: workspace.workspace_dir,
+      page_id: "page-01",
+      raw_image_index_paths: [ambiguousRawImageIndexPath],
+      visual_assets: [
+        {
+          id: "image-ambiguous",
+          file_path: "same-name.png",
+          reason: "Ambiguous image",
+          visual_summary: "Should be rejected.",
+        },
+      ],
+    });
+    assert.equal(ambiguousVisualAssets.visual_assets.length, 0);
+    assert.ok(ambiguousVisualAssets.gaps.some((gap) => gap.includes("ambiguous raw image match")));
+    assert.ok(
+      ambiguousVisualAssets.rejected_material.some((item) =>
+        item.source === "image-ambiguous" &&
+        item.reason.includes("ambiguous raw image match"),
+      ),
+    );
+
     const outsidePath = path.join(homeDir, "outside.png");
     await writeFile(outsidePath, Buffer.from("outside"));
     const rejectedVisualAssets = await finalizeAppResearchVisualAssets({

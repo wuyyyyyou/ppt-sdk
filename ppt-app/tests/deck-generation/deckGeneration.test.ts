@@ -2803,6 +2803,48 @@ describe("Deck Generation Flow Module", () => {
     assert.match(contentReviewPrompt, /Raw Research Material/);
   });
 
+  it("tells visual research curation to copy raw index file paths into draft assets", async () => {
+    const pagePlan = makePagePlan();
+    const researchPlan = makeResearchPlan(pagePlan);
+    researchPlan.pages[0] = {
+      ...researchPlan.pages[0],
+      web_research_needed: false,
+      image_research_needed: true,
+      query_intents: [],
+      image_query_intents: ["Anna Executa product screenshot"],
+    };
+    const harness = createHarness({ pagePlan, researchPlan });
+    const reviewDisabledWorkspace: WorkspaceResult = {
+      ...workspace,
+      setting: {
+        content_review_enabled: false,
+        visual_review_enabled: false,
+      },
+    };
+
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace: reviewDisabledWorkspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    const visualCurationPrompt = harness.authoringPrompts.find((prompt) =>
+      prompt.includes("Visual Research Curation Draft Agent")
+    );
+    assert.ok(visualCurationPrompt);
+    assert.match(visualCurationPrompt, /Agent file-tool paths are only for fs_\* tool calls and upload_local_file/);
+    assert.match(visualCurationPrompt, /copy the exact file_path value from the selected raw image index result/);
+    assert.match(visualCurationPrompt, /Do not write Agent file-tool paths into visual_assets file_path or original_raw_path/);
+    assert.match(visualCurationPrompt, /do not write PPT-task-relative paths such as ppt\/<workspace>\/research\/raw\/images/);
+  });
+
   it("retries web research curation no-write failures with full fresh-session prompts and falls back to a gap", async () => {
     const pagePlan = makePagePlan();
     const researchPlan = makeResearchPlan(pagePlan);

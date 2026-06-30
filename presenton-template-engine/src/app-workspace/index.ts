@@ -303,6 +303,11 @@ function normalizeVisualAssetSourcePath(workspaceDir: string, value: unknown): s
   return path.normalize(path.join(workspaceDir, trimmed));
 }
 
+interface RawImageMetadataEntry {
+  file_path: string;
+  metadata: Record<string, unknown>;
+}
+
 function readOptionalVisualAssetString(record: Record<string, unknown>, key: string): string | undefined {
   const value = record[key];
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
@@ -325,18 +330,104 @@ async function buildRawImageMetadataByPath(
     const record = getPlainRecord(index);
     const results = Array.isArray(record.results) ? record.results.map(getPlainRecord) : [];
     for (const item of results) {
-      const candidatePaths = [
-        item.file_path,
-        item.path,
-        item.local_path,
-        item.output_path,
-      ].map((value) => normalizeVisualAssetSourcePath(workspaceDir, value)).filter(Boolean);
+      const candidatePaths = getRawImageMetadataCandidatePaths(workspaceDir, item);
       for (const candidatePath of candidatePaths) {
         metadata.set(candidatePath, item);
       }
     }
   }
   return metadata;
+}
+
+async function buildRawImageMetadataEntries(
+  workspaceDir: string,
+  rawImageIndexPaths: string[] | undefined,
+): Promise<RawImageMetadataEntry[]> {
+  const entries: RawImageMetadataEntry[] = [];
+  const seen = new Set<string>();
+  for (const indexPathValue of rawImageIndexPaths ?? []) {
+    const indexPath = normalizeVisualAssetSourcePath(workspaceDir, indexPathValue);
+    if (!indexPath || !isPathInsideDir(workspaceDir, indexPath)) continue;
+    let index: unknown;
+    try {
+      index = await readJsonFileIfExists(indexPath);
+    } catch {
+      continue;
+    }
+    const record = getPlainRecord(index);
+    const results = Array.isArray(record.results) ? record.results.map(getPlainRecord) : [];
+    for (const item of results) {
+      const filePath = normalizeVisualAssetSourcePath(workspaceDir, item.file_path);
+      if (!filePath || seen.has(filePath)) continue;
+      seen.add(filePath);
+      entries.push({ file_path: filePath, metadata: item });
+    }
+  }
+  return entries;
+}
+
+function getRawImageMetadataCandidatePaths(
+  workspaceDir: string,
+  item: Record<string, unknown>,
+): string[] {
+  return [
+    item.file_path,
+    item.path,
+    item.local_path,
+    item.output_path,
+  ].map((value) => normalizeVisualAssetSourcePath(workspaceDir, value)).filter(Boolean);
+}
+
+function normalizePathForSuffixMatch(value: string): string {
+  return path.normalize(value.trim().replace(/\\/g, "/")).replace(/\\/g, "/").replace(/^\.\/+/, "");
+}
+
+function findUniqueRawImageMetadataEntryBySuffix(
+  entries: RawImageMetadataEntry[],
+  rawPath: string,
+): RawImageMetadataEntry | "ambiguous" | null {
+  const normalizedRawPath = normalizePathForSuffixMatch(rawPath);
+  if (!normalizedRawPath) return null;
+  const matches = entries.filter((entry) => {
+    const normalizedFilePath = normalizePathForSuffixMatch(entry.file_path);
+    return normalizedFilePath === normalizedRawPath ||
+      normalizedFilePath.endsWith(`/${normalizedRawPath}`) ||
+      normalizedRawPath.endsWith(`/${normalizedFilePath}`);
+  });
+  if (matches.length === 1) return matches[0] ?? null;
+  return matches.length > 1 ? "ambiguous" : null;
+}
+
+function findRawImageMetadataEntryForAsset(input: {
+  entries: RawImageMetadataEntry[];
+  asset: Record<string, unknown>;
+  draftPaths: string[];
+}): RawImageMetadataEntry | "ambiguous" | null {
+  const draftSha256 = normalizeString(input.asset.sha256).trim().toLowerCase();
+  if (draftSha256) {
+    const matches = input.entries.filter((entry) =>
+      normalizeString(entry.metadata.sha256).trim().toLowerCase() === draftSha256
+    );
+    if (matches.length === 1) return matches[0] ?? null;
+    if (matches.length > 1) return "ambiguous";
+  }
+
+  const imageUrl = readOptionalVisualAssetString(input.asset, "image_url");
+  if (imageUrl) {
+    const matches = input.entries.filter((entry) =>
+      readOptionalVisualAssetString(entry.metadata, "image_url") === imageUrl ||
+      readOptionalVisualAssetString(entry.metadata, "url") === imageUrl
+    );
+    if (matches.length === 1) return matches[0] ?? null;
+    if (matches.length > 1) return "ambiguous";
+  }
+
+  for (const draftPath of input.draftPaths) {
+    const match = findUniqueRawImageMetadataEntryBySuffix(input.entries, draftPath);
+    if (match) return match;
+  }
+
+  return null;
 }
 
 function buildPptxExportPaths(workspaceDir: string) {
@@ -1994,13 +2085,18 @@ export async function finalizeAppResearchVisualAssets(
     workspace.workspace_dir,
     input.raw_image_index_paths,
   );
+  const rawMetadataEntries = await buildRawImageMetadataEntries(
+    workspace.workspace_dir,
+    input.raw_image_index_paths,
+  );
 
   for (const rawAsset of input.visual_assets) {
     const asset = getPlainRecord(rawAsset);
     const assetId = normalizeString(asset.id);
-    const originalRawPath = normalizeVisualAssetSourcePath(workspace.workspace_dir, asset.original_raw_path);
-    const draftFilePath = normalizeVisualAssetSourcePath(workspace.workspace_dir, asset.file_path);
-    const sourcePath = originalRawPath || draftFilePath;
+    let originalRawPath = normalizeVisualAssetSourcePath(workspace.workspace_dir, asset.original_raw_path);
+    let draftFilePath = normalizeVisualAssetSourcePath(workspace.workspace_dir, asset.file_path);
+    let sourcePath = originalRawPath || draftFilePath;
+    let rawMetadata = sourcePath ? rawMetadataByPath.get(sourcePath) : undefined;
 
     if (!assetId) {
       gaps.push("Visual asset was rejected because id is missing.");
@@ -2027,8 +2123,39 @@ export async function finalizeAppResearchVisualAssets(
       });
     }
 
-    const isRawImage = isPathInsideDir(paths.raw_images_dir, sourcePath);
-    const isEvidenceImage = isPathInsideDir(paths.evidence_images_dir, sourcePath);
+    let isRawImage = isPathInsideDir(paths.raw_images_dir, sourcePath);
+    let isEvidenceImage = isPathInsideDir(paths.evidence_images_dir, sourcePath);
+    if (!isRawImage && !isEvidenceImage) {
+      const recoveredEntry = findRawImageMetadataEntryForAsset({
+        entries: rawMetadataEntries,
+        asset,
+        draftPaths: [
+          normalizeString(asset.original_raw_path),
+          normalizeString(asset.file_path),
+          sourcePath,
+        ],
+      });
+      if (recoveredEntry === "ambiguous") {
+        gaps.push(`Visual asset ${assetId} was rejected because its source path had an ambiguous raw image match.`);
+        rejectedMaterial.push({
+          source: assetId,
+          reason: `Visual asset source path had an ambiguous raw image match: ${sourcePath}`,
+        });
+        continue;
+      }
+      if (recoveredEntry) {
+        sourcePath = recoveredEntry.file_path;
+        originalRawPath = recoveredEntry.file_path;
+        draftFilePath = recoveredEntry.file_path;
+        rawMetadata = recoveredEntry.metadata;
+        rejectedMaterial.push({
+          source: assetId,
+          reason: "Visual asset source path was recovered from raw image index metadata because the draft path was not directly usable.",
+        });
+        isRawImage = isPathInsideDir(paths.raw_images_dir, sourcePath);
+        isEvidenceImage = isPathInsideDir(paths.evidence_images_dir, sourcePath);
+      }
+    }
     if (!isRawImage && !isEvidenceImage) {
       gaps.push(`Visual asset ${assetId} was rejected because its source path is outside research image directories.`);
       rejectedMaterial.push({
@@ -2068,7 +2195,15 @@ export async function finalizeAppResearchVisualAssets(
         reason: `Visual asset draft sha256 did not match local file bytes; using computed sha256 ${sha256}.`,
       });
     }
-    const rawMetadata = rawMetadataByPath.get(sourcePath);
+    const metadataSha256 = rawMetadata ? normalizeString(rawMetadata.sha256) : "";
+    if (metadataSha256 && metadataSha256.toLowerCase() !== sha256) {
+      gaps.push(`Visual asset ${assetId} was rejected because raw image index sha256 did not match local file bytes.`);
+      rejectedMaterial.push({
+        source: assetId,
+        reason: `Visual asset raw image index sha256 did not match local file bytes: expected ${metadataSha256}, computed ${sha256}.`,
+      });
+      continue;
+    }
     const metadataImageUrl = rawMetadata ? readOptionalVisualAssetString(rawMetadata, "image_url") ?? readOptionalVisualAssetString(rawMetadata, "url") : undefined;
     const metadataPageUrl = rawMetadata ? readOptionalVisualAssetString(rawMetadata, "page_url") : undefined;
     const assetImageUrl = readOptionalVisualAssetString(asset, "image_url");
