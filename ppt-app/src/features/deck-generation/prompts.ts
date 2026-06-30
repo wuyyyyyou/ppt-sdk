@@ -77,6 +77,7 @@ export function buildAuthoringPrompt(input: {
   renderError?: string;
   renderFailureHistory?: RenderFailureHistoryItem[];
   visualReview?: AgentPageVisualReviewResult | null;
+  visualReviewScreenshotPath?: string;
   contentReview?: AgentPageContentReviewResult | null;
   pageRefinementVisualContext?: PageRefinementVisualContext;
   noChangeRetry?: NoChangeAuthoringRetry | null;
@@ -115,6 +116,14 @@ export function buildAuthoringPrompt(input: {
       : input.visualReview
         ? [
             "This is a visual-review-fix pass. Fix the visual issue reported by Page Visual Review first.",
+            input.visualReviewScreenshotPath
+              ? [
+                  `Before editing, first call \`upload_local_file\` with this screenshot path: ${input.visualReviewScreenshotPath}`,
+                  "Then call `analyze_image` on the uploaded image.",
+                  "Use that image analysis together with the Page Visual Review JSON to decide the smallest layout fix.",
+                  "If upload or image analysis fails, continue from the Page Visual Review JSON and local page files, and mention the degradation in the final JSON notes.",
+                ].join("\n")
+              : "No screenshot path is available for this visual-review-fix pass. Continue from the Page Visual Review JSON and local page files.",
             "Make only necessary visual and layout changes, and do not add new factual claims.",
           ].join("\n")
         : pageRefinementRequest
@@ -148,7 +157,15 @@ export function buildAuthoringPrompt(input: {
               ].join("\n")
             : "",
           input.renderError ? `Render error to fix:\n${input.renderError}` : "",
-          input.visualReview ? `Visual review failed. Fix request:\n${JSON.stringify(input.visualReview)}` : "",
+          input.visualReview
+            ? [
+                "Visual review failed. Fix request:",
+                JSON.stringify(input.visualReview),
+                input.visualReviewScreenshotPath
+                  ? `Screenshot path for visual fix: ${input.visualReviewScreenshotPath}`
+                  : "",
+              ].filter(Boolean).join("\n")
+            : "",
           input.contentReview
             ? [
                 "Page Content Review failed. Rewrite request:",
@@ -497,11 +514,13 @@ export function buildPageVisualReviewPrompt(input: {
 }) {
   return [
     "You are a Page Visual Review agent for one generated PPT slide.",
-    "Review only the generated PPT slide screenshot for visual quality.",
+    "Review only whether the generated PPT slide screenshot is visually usable as a PPT page.",
     "Do not judge output language, outline alignment, factual grounding, unsupported claims, or content correctness.",
     "Do not fail a slide merely because some content is explicitly marked TBD / 待补充; judge only whether the placeholder is visually clear, readable, and does not break the layout.",
     "First use `upload_local_file` on the screenshot path, then inspect that uploaded image with `analyze_image` before making a visual judgment.",
     "If image analysis is unavailable or inconclusive, use the rendered HTML path as fallback context and still return a JSON review.",
+    "Fail only for usability defects: element overlap or obstruction; text, chart, or image overflow/cutoff; unreadable key content; very small text; clearly insufficient contrast; large unintended blank areas; broken layout; missing, failed, distorted, or badly misplaced images/charts/components; or content that does not fit within the 1280x720 slide canvas.",
+    "Do not fail for subjective polish issues such as style not being premium enough, ordinary color choices, or layout that could be nicer but is still usable. Put those in low-severity suggestions with pass=true.",
     "Return only one JSON object matching this shape:",
     '{"pass":true,"score":8,"issues":[],"revision_request":"","confidence":"medium"}',
     "Do not include markdown, code fences, explanations, or any extra text.",
@@ -510,7 +529,7 @@ export function buildPageVisualReviewPrompt(input: {
     `Page title for identification only: ${input.page.title}`,
     `Rendered HTML path: ${input.preview.html_path}`,
     "",
-    "Pass only if the slide looks like a complete PPT page, has no obvious overlap/cutoff/blank errors, uses readable text, renders all intended visual regions, and fits the selected template style.",
+    "Pass if the slide is complete and usable, with readable key content, no obvious overlap/cutoff/blank rendering errors, intended visual regions rendered, and page content fitting the slide canvas.",
     "Use score 0-10. pass=true requires score >= 7.",
   ].join("\n");
 }

@@ -189,6 +189,11 @@ export async function runPageGeneration(
       renderError,
       renderFailureHistory,
       visualReview,
+      visualReviewScreenshotPath: visualReview
+        ? getProgressPage(input.getProgress(), page.page_id)?.last_screenshot_path ||
+          existingPageProgress?.last_screenshot_path ||
+          ""
+        : "",
       contentReview,
       pageRefinementVisualContext: pageRefinementRequest
         ? input.pageRefinementVisualContexts?.[page.page_id]
@@ -728,18 +733,38 @@ export async function runPageGeneration(
     }
 
     visualReviewAttempts += 1;
+    const visualReviewExhausted = visualReviewAttempts >= attemptLimits.visualReview;
+    if (visualReviewExhausted) {
+      const visualReviewPassThroughReason = input.locale === "zh"
+        ? "页面视觉检查未通过，但已达到视觉检查失败次数上限；为避免阻塞整套生成，已按策略放行。"
+        : "Page Visual Review did not pass, but the visual review failure limit was reached; accepting the page to avoid blocking deck generation.";
+      const passThroughMessage = [
+        visualReviewPassThroughReason,
+        visualReview.revision_request,
+      ].filter(Boolean).join("\n");
+      progress = await recordProgress(input, page, {
+        status: "accepted",
+        visual_review_attempts: visualReviewAttempts,
+        visual_review: visualReview,
+        review: visualReview,
+        last_error: passThroughMessage,
+      });
+      input.setProgress(progress);
+      return {
+        page,
+        reason: "accepted",
+        progress,
+      };
+    }
+
     progress = await recordProgress(input, page, {
-      status:
-        visualReviewAttempts >= attemptLimits.visualReview
-          ? "needs_user_review"
-          : "visual_review_fixing",
+      status: "visual_review_fixing",
       visual_review_attempts: visualReviewAttempts,
       visual_review: visualReview,
       review: visualReview,
       last_error: visualReview.revision_request,
     });
     input.setProgress(progress);
-    if (visualReviewAttempts >= attemptLimits.visualReview) break;
   }
 
   progress = input.getProgress() ?? await input.backend.getPageProgress({

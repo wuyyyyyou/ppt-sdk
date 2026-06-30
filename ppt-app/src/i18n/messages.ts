@@ -235,8 +235,6 @@ export interface Messages {
     textDensity: string;
     visualTone: string;
     typography: string;
-    contentReviewEnabled: string;
-    contentReviewFailureLimit: string;
     visualReviewEnabled: string;
     visualReviewFailureLimit: string;
     enabled: string;
@@ -368,13 +366,13 @@ export const messages: Record<Locale, Messages> = {
       placeholder:
         "Create a 7-slide investor deck about AI agent workflows. Keep it visual, concise, and premium.",
       reviewOutlineFirst: "Review outline first",
-      strictReviewMode: "Strict review mode",
+      strictReviewMode: "Visual check",
       strictReviewModeHelp:
-        "Strict review mode runs extra content and visual checks after each page is generated. It may substantially increase generation time and token usage.",
-      strictReviewConfirmTitle: "Enable strict review mode?",
+        "Visual check calls the model again after each page is generated to inspect screenshot usability, layout fit, overlap, cutoff, and readability. It may increase generation time and token usage.",
+      strictReviewConfirmTitle: "Enable visual check?",
       strictReviewConfirmBody:
-        "When enabled, Anna will call the model again after each page is generated to check page content and visual quality. This may substantially increase PPT generation time and token usage, and the review quality depends on the default model's capabilities. Are you sure you want to enable it?",
-      strictReviewConfirmAction: "Enable strict review",
+        "When enabled, Anna will call the model again after each page is generated to check visual quality from the page screenshot. This may increase PPT generation time and token usage, and the review quality depends on the default model's capabilities. Are you sure you want to enable it?",
+      strictReviewConfirmAction: "Enable visual check",
       optionalContext: "Optional context",
       chips: {
         audience: "Audience",
@@ -541,8 +539,6 @@ export const messages: Record<Locale, Messages> = {
       textDensity: "Text density",
       visualTone: "Visual tone",
       typography: "Typography",
-      contentReviewEnabled: "Content fact check",
-      contentReviewFailureLimit: "Content check failure limit",
       visualReviewEnabled: "Visual check",
       visualReviewFailureLimit: "Visual check failure limit",
       enabled: "On",
@@ -680,13 +676,13 @@ export const messages: Record<Locale, Messages> = {
       placeholder:
         "创建一份 7 页的 AI Agent 工作流投资人演示，要求视觉化、简洁、有高级感。",
       reviewOutlineFirst: "先审阅大纲",
-      strictReviewMode: "严格审查模式",
+      strictReviewMode: "视觉检查",
       strictReviewModeHelp:
-        "开启后会在每页生成后额外进行内容和视觉检查，可能显著增加生成时间和 token 消耗。",
-      strictReviewConfirmTitle: "开启严格审查模式？",
+        "开启后会在每页生成后额外调用模型检查截图可用性、布局适配、元素覆盖、裁切和可读性，可能增加生成时间和 token 消耗。",
+      strictReviewConfirmTitle: "开启视觉检查？",
       strictReviewConfirmBody:
-        "开启后，Anna 会在每页生成后再次调用大模型检查页面内容和视觉效果。这可能显著延长 PPT 生成时间，并消耗更多 token；检查质量也会受默认模型能力影响。确定要开启吗？",
-      strictReviewConfirmAction: "开启严格审查",
+        "开启后，Anna 会在每页生成后再次调用大模型，根据页面截图检查视觉质量。这可能延长 PPT 生成时间，并消耗更多 token；检查质量也会受默认模型能力影响。确定要开启吗？",
+      strictReviewConfirmAction: "开启视觉检查",
       optionalContext: "可选上下文",
       chips: {
         audience: "受众",
@@ -852,8 +848,6 @@ export const messages: Record<Locale, Messages> = {
       textDensity: "文字密度",
       visualTone: "视觉语气",
       typography: "字体风格",
-      contentReviewEnabled: "内容事实检查",
-      contentReviewFailureLimit: "内容检查失败次数上限",
       visualReviewEnabled: "视觉检查",
       visualReviewFailureLimit: "视觉检查失败次数上限",
       enabled: "开启",

@@ -2290,7 +2290,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const currentReviewSettings = readPageReviewSettings(setting);
       const nextReviewSettings: PageReviewSettings = {
         ...currentReviewSettings,
-        contentReviewEnabled: enabled,
         visualReviewEnabled: enabled,
       };
       const updatedWorkspace = await backend.updateWorkspaceSettings({

@@ -5,7 +5,7 @@ export const REVIEW_FAILURE_LIMIT_MAX = 10;
 export const DEFAULT_CONTENT_REVIEW_ENABLED = false;
 export const DEFAULT_CONTENT_REVIEW_FAILURE_LIMIT = 5;
 export const DEFAULT_VISUAL_REVIEW_ENABLED = false;
-export const DEFAULT_VISUAL_REVIEW_FAILURE_LIMIT = 5;
+export const DEFAULT_VISUAL_REVIEW_FAILURE_LIMIT = 3;
 
 export interface PageReviewSettings {
   contentReviewEnabled: boolean;
@@ -38,8 +38,7 @@ export function readPageReviewSettings(
   setting: WorkspaceSettings | Record<string, unknown> | null | undefined,
 ): PageReviewSettings {
   return {
-    contentReviewEnabled:
-      setting?.content_review_enabled === true,
+    contentReviewEnabled: false,
     contentReviewFailureLimit: normalizeReviewFailureLimit(
       setting?.content_review_failure_limit,
       DEFAULT_CONTENT_REVIEW_FAILURE_LIMIT,
@@ -71,5 +70,5 @@ export function pageReviewSettingsToWorkspaceSettings(
 }
 
 export function isStrictReviewModeEnabled(reviewSettings: PageReviewSettings) {
-  return reviewSettings.contentReviewEnabled && reviewSettings.visualReviewEnabled;
+  return reviewSettings.visualReviewEnabled;
 }

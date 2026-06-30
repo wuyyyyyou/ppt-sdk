@@ -12,6 +12,7 @@ import {
   DEFAULT_OUTPUT_LANGUAGE_OPTIONS,
 } from "../../../ai/outputLanguage";
 import {
+  DEFAULT_VISUAL_REVIEW_FAILURE_LIMIT,
   pageReviewSettingsToWorkspaceSettings,
   readPageReviewSettings,
   REVIEW_FAILURE_LIMIT_MAX,
@@ -300,19 +301,6 @@ export function LibraryPage({
           onChange={(value) => setDraft((next) => ({ ...next, typography: value }))}
         />
         <PreferenceSwitch
-          label={t.preferences.contentReviewEnabled}
-          value={draft.content_review_enabled === true}
-          editing={editing}
-          t={t}
-          onChange={(value) => setDraft((next) => ({ ...next, content_review_enabled: value }))}
-        />
-        <PreferenceNumber
-          label={t.preferences.contentReviewFailureLimit}
-          value={Number(draft.content_review_failure_limit ?? 5)}
-          editing={editing}
-          onChange={(value) => setDraft((next) => ({ ...next, content_review_failure_limit: value }))}
-        />
-        <PreferenceSwitch
           label={t.preferences.visualReviewEnabled}
           value={draft.visual_review_enabled === true}
           editing={editing}
@@ -321,7 +309,7 @@ export function LibraryPage({
         />
         <PreferenceNumber
           label={t.preferences.visualReviewFailureLimit}
-          value={Number(draft.visual_review_failure_limit ?? 5)}
+          value={Number(draft.visual_review_failure_limit ?? DEFAULT_VISUAL_REVIEW_FAILURE_LIMIT)}
           editing={editing}
           onChange={(value) => setDraft((next) => ({ ...next, visual_review_failure_limit: value }))}
         />
