@@ -8,9 +8,9 @@ import { shouldResumePageGenerationStatus } from "./pageStatusPolicy";
 import { buildAuthoringPrompt, buildPageContentReviewPrompt, buildPageVisualReviewPrompt, contentReviewPassed, targetPageFilesChanged, targetPageFingerprintReadErrorMessage, targetPageNoChangeMessage, visualReviewPassed } from "./prompts";
 import { collectAndCurateResearchForPage } from "./researchWorkflow";
 import { buildAgentRunOptions, createAgentRunTracker, getProgressPage, getStoredContentReview, getStoredVisualReview, recordProgress } from "./runtimeSupport";
-import { getAttemptLimits, getReviewSettings } from "./settings";
+import { getAttemptLimits, getPageGenerationConcurrency, getReviewSettings } from "./settings";
 import { createFailedPageError } from "./pageFailure";
-import { ATTEMPT_LIMITS, LOCAL_GATE_REPAIR_LIMIT, PAGE_GENERATION_CONCURRENCY, type DeckGenerationError, type DeckGenerationRuntime, type DeckGenerationStep, type DeckGenerationStream, type NoChangeAuthoringRetry, type PageGenerationResult, type RenderFailureHistoryItem, type RenderFailurePhase, type RunDeckGenerationInput } from "./types";
+import { ATTEMPT_LIMITS, LOCAL_GATE_REPAIR_LIMIT, type DeckGenerationError, type DeckGenerationRuntime, type DeckGenerationStep, type DeckGenerationStream, type NoChangeAuthoringRetry, type PageGenerationResult, type RenderFailureHistoryItem, type RenderFailurePhase, type RunDeckGenerationInput } from "./types";
 
 function emitRuntime(
   input: DeckGenerationRuntime,
@@ -862,7 +862,7 @@ export async function runPagesConcurrently(
     }
   }
 
-  const workerCount = Math.min(PAGE_GENERATION_CONCURRENCY, pagesToRun.length);
+  const workerCount = Math.min(getPageGenerationConcurrency(runtime), pagesToRun.length);
   await Promise.all(Array.from({ length: workerCount }, () => worker()));
   return results.sort((left, right) => left.page.index - right.page.index);
 }

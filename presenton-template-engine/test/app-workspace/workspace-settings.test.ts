@@ -47,6 +47,7 @@ test("workspace settings can be saved as defaults for newly created workspaces",
     assert.equal(firstSetting.content_review_failure_limit, 5);
     assert.equal(firstSetting.visual_review_enabled, false);
     assert.equal(firstSetting.visual_review_failure_limit, 5);
+    assert.equal(firstSetting.page_generation_concurrency, 3);
     assert.equal("language" in firstSetting, false);
 
     await writeJson(path.join(homeDir, "anna-workspace", "ppt", "setting.json"), {
@@ -86,6 +87,7 @@ test("workspace settings can be saved as defaults for newly created workspaces",
         content_review_failure_limit: 99,
         visual_review_enabled: false,
         visual_review_failure_limit: -1,
+        page_generation_concurrency: 99,
       },
     });
 
@@ -101,6 +103,7 @@ test("workspace settings can be saved as defaults for newly created workspaces",
     assert.equal(updatedGlobalSetting.content_review_failure_limit, 10);
     assert.equal(updatedGlobalSetting.visual_review_enabled, false);
     assert.equal(updatedGlobalSetting.visual_review_failure_limit, 0);
+    assert.equal(updatedGlobalSetting.page_generation_concurrency, 6);
 
     const inherited = await createAppWorkspace({ title: "Inherited" });
     const inheritedSetting = await readJson<Record<string, unknown>>(path.join(inherited.workspace_dir, "setting.json"));
@@ -111,6 +114,7 @@ test("workspace settings can be saved as defaults for newly created workspaces",
     assert.equal(inheritedSetting.content_review_failure_limit, 10);
     assert.equal(inheritedSetting.visual_review_enabled, false);
     assert.equal(inheritedSetting.visual_review_failure_limit, 0);
+    assert.equal(inheritedSetting.page_generation_concurrency, 6);
 
     const secondWorkspaceDir = createWorkspaceDir(homeDir);
     const second = await updateAppWorkspaceSettings({

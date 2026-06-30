@@ -235,6 +235,7 @@ export interface Messages {
     textDensity: string;
     visualTone: string;
     typography: string;
+    pageGenerationConcurrency: string;
     visualReviewEnabled: string;
     visualReviewFailureLimit: string;
     enabled: string;
@@ -539,6 +540,7 @@ export const messages: Record<Locale, Messages> = {
       textDensity: "Text density",
       visualTone: "Visual tone",
       typography: "Typography",
+      pageGenerationConcurrency: "Page generation concurrency",
       visualReviewEnabled: "Visual check",
       visualReviewFailureLimit: "Visual check failure limit",
       enabled: "On",
@@ -848,6 +850,7 @@ export const messages: Record<Locale, Messages> = {
       textDensity: "文字密度",
       visualTone: "视觉语气",
       typography: "字体风格",
+      pageGenerationConcurrency: "页面生成并发数",
       visualReviewEnabled: "视觉检查",
       visualReviewFailureLimit: "视觉检查失败次数上限",
       enabled: "开启",

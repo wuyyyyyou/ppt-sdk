@@ -54,6 +54,7 @@ export interface WorkspaceSettings {
   visual_tone?: string;
   typography?: string;
   theme_id?: string;
+  page_generation_concurrency?: number;
   content_review_enabled?: boolean;
   content_review_failure_limit?: number;
   visual_review_enabled?: boolean;

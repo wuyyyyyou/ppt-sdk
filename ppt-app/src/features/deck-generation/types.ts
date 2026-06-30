@@ -22,7 +22,6 @@ export const ATTEMPT_LIMITS = {
   agent: 5,
 };
 
-export const PAGE_GENERATION_CONCURRENCY = 3;
 export const LOCAL_GATE_REPAIR_LIMIT = 3;
 
 export type RenderFailurePhase = "pre-render-typecheck" | "render";

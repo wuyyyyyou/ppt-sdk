@@ -12,6 +12,11 @@ import {
   DEFAULT_OUTPUT_LANGUAGE_OPTIONS,
 } from "../../../ai/outputLanguage";
 import {
+  PAGE_GENERATION_CONCURRENCY_MAX,
+  PAGE_GENERATION_CONCURRENCY_MIN,
+  readPageGenerationConcurrency,
+} from "../generationConcurrency";
+import {
   DEFAULT_VISUAL_REVIEW_FAILURE_LIMIT,
   pageReviewSettingsToWorkspaceSettings,
   readPageReviewSettings,
@@ -69,6 +74,7 @@ function toEditableSettings(workspace: WorkspaceResult | null) {
     text_density: normalizeSettingValue(setting.text_density, EMPTY_SETTINGS.text_density),
     output_language: normalizeSettingValue(setting.output_language, EMPTY_SETTINGS.output_language),
     aspect_ratio: normalizeSettingValue(setting.aspect_ratio, EMPTY_SETTINGS.aspect_ratio),
+    page_generation_concurrency: readPageGenerationConcurrency(setting),
     typography:
       setting.typography === "Clean Sans"
         ? EMPTY_SETTINGS.typography
@@ -308,9 +314,19 @@ export function LibraryPage({
           onChange={(value) => setDraft((next) => ({ ...next, visual_review_enabled: value }))}
         />
         <PreferenceNumber
+          label={t.preferences.pageGenerationConcurrency}
+          value={Number(draft.page_generation_concurrency)}
+          editing={editing}
+          min={PAGE_GENERATION_CONCURRENCY_MIN}
+          max={PAGE_GENERATION_CONCURRENCY_MAX}
+          onChange={(value) => setDraft((next) => ({ ...next, page_generation_concurrency: value }))}
+        />
+        <PreferenceNumber
           label={t.preferences.visualReviewFailureLimit}
           value={Number(draft.visual_review_failure_limit ?? DEFAULT_VISUAL_REVIEW_FAILURE_LIMIT)}
           editing={editing}
+          min={REVIEW_FAILURE_LIMIT_MIN}
+          max={REVIEW_FAILURE_LIMIT_MAX}
           onChange={(value) => setDraft((next) => ({ ...next, visual_review_failure_limit: value }))}
         />
       </div>
@@ -347,9 +363,9 @@ function WorkspaceRow(props: {
   );
 }
 
-function clampReviewFailureLimit(value: number) {
-  if (!Number.isFinite(value)) return 5;
-  return Math.max(REVIEW_FAILURE_LIMIT_MIN, Math.min(REVIEW_FAILURE_LIMIT_MAX, Math.floor(value)));
+function clampPreferenceNumber(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, Math.floor(value)));
 }
 
 function PreferenceSwitch(props: {
@@ -379,9 +395,11 @@ function PreferenceNumber(props: {
   label: string;
   value: number;
   editing: boolean;
+  min: number;
+  max: number;
   onChange: (value: number) => void;
 }) {
-  const value = clampReviewFailureLimit(props.value);
+  const value = clampPreferenceNumber(props.value, props.min, props.max);
 
   return (
     <label className="pref-row">
@@ -389,11 +407,11 @@ function PreferenceNumber(props: {
       {props.editing ? (
         <input
           type="number"
-          min={REVIEW_FAILURE_LIMIT_MIN}
-          max={REVIEW_FAILURE_LIMIT_MAX}
+          min={props.min}
+          max={props.max}
           step={1}
           value={value}
-          onChange={(event) => props.onChange(clampReviewFailureLimit(Number(event.target.value)))}
+          onChange={(event) => props.onChange(clampPreferenceNumber(Number(event.target.value), props.min, props.max))}
         />
       ) : (
         <strong>{value}</strong>

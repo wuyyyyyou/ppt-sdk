@@ -430,6 +430,7 @@ function createDefaultSettingJson() {
     visual_tone: "",
     typography: "",
     theme_id: "finance-red-classic",
+    page_generation_concurrency: 3,
     content_review_enabled: false,
     content_review_failure_limit: 5,
     visual_review_enabled: false,
@@ -444,6 +445,15 @@ function normalizeReviewFailureLimit(value: unknown): number {
   }
 
   return Math.max(0, Math.min(10, Math.floor(numericValue)));
+}
+
+function normalizePageGenerationConcurrency(value: unknown): number {
+  const numericValue = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return 3;
+  }
+
+  return Math.max(1, Math.min(6, Math.floor(numericValue)));
 }
 
 function normalizeSettingJson(setting: unknown): Record<string, unknown> {
@@ -476,6 +486,9 @@ function normalizeSettingJson(setting: unknown): Record<string, unknown> {
 
   nextSetting.content_review_enabled = nextSetting.content_review_enabled === true;
   nextSetting.visual_review_enabled = nextSetting.visual_review_enabled === true;
+  nextSetting.page_generation_concurrency = normalizePageGenerationConcurrency(
+    nextSetting.page_generation_concurrency,
+  );
   nextSetting.content_review_failure_limit = normalizeReviewFailureLimit(
     nextSetting.content_review_failure_limit,
   );

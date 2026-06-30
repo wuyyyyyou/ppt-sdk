@@ -1,4 +1,5 @@
 import type { WorkspaceResult } from "../../api/types";
+import { readPageGenerationConcurrency } from "../deck-workspace/generationConcurrency";
 import { readPageReviewSettings } from "../deck-workspace/reviewSettings";
 import { ATTEMPT_LIMITS } from "./types";
 
@@ -19,4 +20,8 @@ export function getAttemptLimits(input: { workspace: WorkspaceResult }) {
 
 export function getReviewSettings(input: { workspace: WorkspaceResult }) {
   return readPageReviewSettings(readWorkspaceSetting(input.workspace));
+}
+
+export function getPageGenerationConcurrency(input: { workspace: WorkspaceResult }) {
+  return readPageGenerationConcurrency(readWorkspaceSetting(input.workspace));
 }
