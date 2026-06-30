@@ -180,6 +180,7 @@ export async function runPageGeneration(
             ? "page-refinement"
             : "initial";
     const authoringPrompt = buildAuthoringPrompt({
+      workspaceRoot: input.workspace.workspace_root,
       workspaceDir: input.workspace.workspace_dir,
       page,
       pagePlan,
@@ -393,6 +394,7 @@ export async function runPageGeneration(
         progress,
       );
       const contentReviewPrompt = buildPageContentReviewPrompt({
+        workspaceRoot: input.workspace.workspace_root,
         workspaceDir: input.workspace.workspace_dir,
         page,
         pagePlan,
@@ -624,6 +626,8 @@ export async function runPageGeneration(
       progress,
     );
     const visualReviewPrompt = buildPageVisualReviewPrompt({
+      workspaceRoot: input.workspace.workspace_root,
+      workspaceDir: input.workspace.workspace_dir,
       page,
       screenshotPath: preview.screenshot_path,
       preview,

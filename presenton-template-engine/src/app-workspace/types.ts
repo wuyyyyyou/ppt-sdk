@@ -197,6 +197,37 @@ export interface GetAppResearchEvidenceInput {
   workspace_dir: string;
 }
 
+export interface AppVisualResearchEvidence {
+  id: string;
+  file_path: string;
+  original_raw_path?: string;
+  image_url?: string;
+  page_url?: string;
+  sha256?: string;
+  reason: string;
+  visual_summary: string;
+}
+
+export interface AppResearchRejectedMaterial {
+  source?: string;
+  reason: string;
+}
+
+export interface FinalizeAppResearchVisualAssetsInput {
+  workspace_dir: string;
+  page_id: string;
+  visual_assets: AppVisualResearchEvidence[];
+  raw_image_index_paths?: string[];
+}
+
+export interface FinalizeAppResearchVisualAssetsResult {
+  workspace_dir: string;
+  page_id: string;
+  visual_assets: AppVisualResearchEvidence[];
+  gaps: string[];
+  rejected_material: AppResearchRejectedMaterial[];
+}
+
 export interface RecordAppResearchCurationDraftInput {
   workspace_dir: string;
   page_id: string;

@@ -456,13 +456,23 @@ export interface ResearchEvidenceFact {
 
 export interface VisualResearchEvidence {
   id: string;
+  /** Final Research Evidence must use a canonical absolute path under research/evidence/images. */
   file_path: string;
+  /** Original selected Raw Research Material path, usually under research/raw/images. */
   original_raw_path?: string;
   image_url?: string;
   page_url?: string;
   sha256?: string;
   reason: string;
   visual_summary: string;
+}
+
+export interface FinalizeResearchVisualAssetsResult {
+  workspace_dir: string;
+  page_id: string;
+  visual_assets: VisualResearchEvidence[];
+  gaps: string[];
+  rejected_material: ResearchCurationRejectedMaterial[];
 }
 
 export interface ResearchEvidencePage {

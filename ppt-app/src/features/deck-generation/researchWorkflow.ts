@@ -10,6 +10,13 @@ import { computeResearchQueryDelta, recordResearchCollectionLedger } from "./pag
 import { buildAgentRunOptions, createAgentRunTracker, recordDeckRecovery, recordProgress, throwIfCancelled } from "./runtimeSupport";
 import { getAttemptLimits } from "./settings";
 import { ATTEMPT_LIMITS, type DeckGenerationContext, type DeckGenerationProgress, type DeckGenerationRuntime, type DeckGenerationStream, type RunDeckGenerationInput } from "./types";
+import {
+  createAgentFileToolPathContext,
+  describeAgentFileToolPathContext,
+  formatAgentFileToolPathBlock,
+  type AgentFileToolPathContext,
+  toAgentFileToolPath,
+} from "./agentFileToolPaths";
 
 function emit(
   input: Pick<DeckGenerationContext, "onProgress"> & Partial<Pick<DeckGenerationContext, "workspace">>,
@@ -112,6 +119,7 @@ export function normalizeResearchEvidenceIndex(value: ResearchEvidenceIndex | nu
 }
 
 function buildWebResearchCurationPrompt(input: {
+  workspaceRoot?: string;
   workspaceDir: string;
   page: PagePlanItem;
   requirement: ResearchRequirement;
@@ -120,11 +128,23 @@ function buildWebResearchCurationPrompt(input: {
   curationRunId: string;
   previousGateFailure?: string;
 }) {
+  const agentPathContext = createAgentFileToolPathContext({
+    workspaceRoot: input.workspaceRoot,
+    workspaceDir: input.workspaceDir,
+  });
+  const rawWebIndexPathBlocks = input.rawWebIndexPaths.map((path, index) =>
+    formatAgentFileToolPathBlock({
+      label: `Raw web index path ${index + 1}`,
+      path: toAgentFileToolPath(agentPathContext, path),
+    })
+  );
   return [
     "You are a Web Research Curation Draft Agent for one PPT Page Generation Unit.",
     "Read Raw web material, select only useful facts, source judgments, derived insights, rejected material, and gaps, then write a Web Research Curation Draft JSON file.",
     "Do not edit slide TSX, page data JSON, manifest, outline, or page-plan files.",
     "Do not edit the final evidence-index.json or current-page evidence markdown. Final Research Evidence is merged by app code after this draft.",
+    "",
+    describeAgentFileToolPathContext(agentPathContext),
     "",
     `Workspace directory: ${input.workspaceDir}`,
     `Current page id: ${input.page.page_id}`,
@@ -132,8 +152,12 @@ function buildWebResearchCurationPrompt(input: {
     `Current page outline: ${input.page.outline}`,
     `Research requirement: ${JSON.stringify(input.requirement)}`,
     `Curation run id: ${input.curationRunId}`,
-    `Raw web index paths: ${JSON.stringify(input.rawWebIndexPaths)}`,
-    `Web draft JSON path to write: ${input.draftPath}`,
+    "Raw web index paths to read:",
+    rawWebIndexPathBlocks.length > 0 ? rawWebIndexPathBlocks.join("\n") : "- None",
+    formatAgentFileToolPathBlock({
+      label: "Web draft JSON path to write",
+      path: toAgentFileToolPath(agentPathContext, input.draftPath),
+    }),
     "",
     "Source quality rules:",
     "- Prefer official websites, company reports, government/regulatory sources, industry associations, recognized research institutions, authoritative media, and documentation.",
@@ -152,6 +176,7 @@ function buildWebResearchCurationPrompt(input: {
           "Previous Research Curation attempt failure:",
           input.previousGateFailure,
           "Rerun Web Research Curation from the same Raw web index paths and write a valid current draft.",
+          "When writing the draft with fs_write_file, use the Web draft JSON Agent file-tool path above.",
         ].join("\n")
       : "",
     "",
@@ -165,6 +190,7 @@ function buildWebResearchCurationPrompt(input: {
 }
 
 function buildVisualResearchCurationPrompt(input: {
+  workspaceRoot?: string;
   workspaceDir: string;
   page: PagePlanItem;
   requirement: ResearchRequirement;
@@ -173,11 +199,23 @@ function buildVisualResearchCurationPrompt(input: {
   curationRunId: string;
   previousGateFailure?: string;
 }) {
+  const agentPathContext = createAgentFileToolPathContext({
+    workspaceRoot: input.workspaceRoot,
+    workspaceDir: input.workspaceDir,
+  });
+  const rawImageIndexPathBlocks = input.rawImageIndexPaths.map((path, index) =>
+    formatAgentFileToolPathBlock({
+      label: `Raw image index path ${index + 1}`,
+      path: toAgentFileToolPath(agentPathContext, path),
+    })
+  );
   return [
     "You are a Visual Research Curation Draft Agent for one PPT Page Generation Unit.",
     "Read Raw image material, select only useful visual assets, visual judgments, rejected material, and gaps, then write a Visual Research Curation Draft JSON file.",
     "Do not edit slide TSX, page data JSON, manifest, outline, or page-plan files.",
     "Do not edit the final evidence-index.json or current-page evidence markdown. Final Research Evidence is merged by app code after this draft.",
+    "",
+    describeAgentFileToolPathContext(agentPathContext),
     "",
     `Workspace directory: ${input.workspaceDir}`,
     `Current page id: ${input.page.page_id}`,
@@ -185,12 +223,18 @@ function buildVisualResearchCurationPrompt(input: {
     `Current page outline: ${input.page.outline}`,
     `Research requirement: ${JSON.stringify(input.requirement)}`,
     `Curation run id: ${input.curationRunId}`,
-    `Raw image index paths: ${JSON.stringify(input.rawImageIndexPaths)}`,
-    `Visual draft JSON path to write: ${input.draftPath}`,
+    "Raw image index paths to read:",
+    rawImageIndexPathBlocks.length > 0 ? rawImageIndexPathBlocks.join("\n") : "- None",
+    formatAgentFileToolPathBlock({
+      label: "Visual draft JSON path to write",
+      path: toAgentFileToolPath(agentPathContext, input.draftPath),
+    }),
     "",
     "Image rules:",
     "- For downloaded image candidates, first use upload_local_file on the local image path, then analyze_image before selecting it.",
     "- Select an image only if it fits the current page intent and is visually usable.",
+    "- In visual_assets, write the selected raw local image path in original_raw_path. Because file_path is required by the draft schema, write the same raw local image path there too.",
+    "- Do not copy images into research/evidence/images and do not invent a final evidence image path. App code will finalize selected raw images into Visual Research Evidence after this draft passes validation.",
     "- Text, chart data, rankings, or claims visible inside a selected image are not grounded facts.",
     "- Do not emit facts or derived_insights in this draft.",
     "",
@@ -205,6 +249,7 @@ function buildVisualResearchCurationPrompt(input: {
           "Previous Research Curation attempt failure:",
           input.previousGateFailure,
           "Rerun Visual Research Curation from the same Raw image index paths and write a valid current draft.",
+          "When writing the draft with fs_write_file, use the Visual draft JSON Agent file-tool path above.",
         ].join("\n")
       : "",
     "",
@@ -244,6 +289,8 @@ function researchDraftFingerprintChanged(
 function summarizeResearchDraftGateFailure(input: {
   kind: "web" | "visual";
   curationRunId: string;
+  draftPath: string;
+  draftAgentFileToolPath?: string | null;
   beforeFingerprint: ResearchCurationDraftFingerprint;
   afterFingerprint: ResearchCurationDraftFingerprint;
   validationGaps: string[];
@@ -261,7 +308,23 @@ function summarizeResearchDraftGateFailure(input: {
   if (reasons.length === 0) {
     reasons.push(`${label} Research Curation draft did not pass deterministic validation.`);
   }
-  return dedupeNonEmptyStrings(reasons).join("\n");
+  const actualRunIdGap = input.validationGaps.find((gap) => gap.includes("curation_run_id"));
+  return [
+    dedupeNonEmptyStrings(reasons).join("\n"),
+    "",
+    "Canonical Research Curation draft gate details:",
+    `Expected canonical draft path: ${input.draftPath}`,
+    `Expected curation_run_id: ${input.curationRunId}`,
+    `Actual curation_run_id: ${actualRunIdGap ? "mismatched or missing in canonical draft" : input.afterFingerprint.exists ? "not inspected by gate failure summary" : "unavailable because canonical draft was not written"}`,
+    `Before fingerprint: ${input.beforeFingerprint.exists ? `${input.beforeFingerprint.sha256 ?? "unknown"} (${input.beforeFingerprint.size_bytes ?? "unknown"} bytes)` : "missing"}`,
+    `After fingerprint: ${input.afterFingerprint.exists ? `${input.afterFingerprint.sha256 ?? "unknown"} (${input.afterFingerprint.size_bytes ?? "unknown"} bytes)` : "missing"}`,
+    "",
+    "You may have written to the wrong path.",
+    input.draftAgentFileToolPath
+      ? `Use this Agent file-tool draft path with fs_write_file: ${input.draftAgentFileToolPath}`
+      : "Use the canonical absolute draft path exactly as provided; if rejected, list \".\" and locate the matching task directory before writing.",
+    `Do not write task-relative path: research/evidence/drafts/<page-id>-${input.kind}.json`,
+  ].join("\n");
 }
 
 async function getResearchCurationDraftFingerprintSafe(input: {
@@ -340,12 +403,14 @@ async function runResearchDraftAgent(input: {
   curationRunId: string;
   buildPrompt: (previousGateFailure?: string) => string;
   draftPath: string;
+  agentPathContext: AgentFileToolPathContext;
   currentGaps: string[];
 }): Promise<WebResearchCurationDraft | VisualResearchCurationDraft | null> {
   const { flowInput, page, pagePlan, kind } = input;
   const text = generationText(flowInput.locale);
   const agentKind = kind === "web" ? "web-research-curation" : "visual-research-curation";
   const curationRunId = input.curationRunId;
+  const draftAgentFileToolPath = toAgentFileToolPath(input.agentPathContext, input.draftPath).agentFileToolPath;
   const initialPrompt = input.buildPrompt();
   const tracker = createAgentRunTracker({
     flowInput,
@@ -400,6 +465,9 @@ async function runResearchDraftAgent(input: {
         page_id: page.page_id,
         page_index: page.index,
         draft_path: input.draftPath,
+        draft_agent_file_tool_path: draftAgentFileToolPath,
+        agent_file_tool_root: input.agentPathContext.agentFileToolRoot,
+        agent_file_tool_root_inference_failed: input.agentPathContext.inferenceFailedReason,
         curation_run_id: curationRunId,
         attempt,
         attempt_kind: attemptKind,
@@ -430,6 +498,9 @@ async function runResearchDraftAgent(input: {
           page_id: page.page_id,
           page_index: page.index,
           draft_path: input.draftPath,
+          draft_agent_file_tool_path: draftAgentFileToolPath,
+          agent_file_tool_root: input.agentPathContext.agentFileToolRoot,
+          agent_file_tool_root_inference_failed: input.agentPathContext.inferenceFailedReason,
           curation_run_id: curationRunId,
           attempt,
           error: failureSummary,
@@ -511,6 +582,8 @@ async function runResearchDraftAgent(input: {
       const failureSummary = summarizeResearchDraftGateFailure({
         kind,
         curationRunId,
+        draftPath: input.draftPath,
+        draftAgentFileToolPath,
         beforeFingerprint,
         afterFingerprint,
         validationGaps: validation.gaps,
@@ -546,6 +619,9 @@ async function runResearchDraftAgent(input: {
           page_id: page.page_id,
           page_index: page.index,
           draft_path: input.draftPath,
+          draft_agent_file_tool_path: draftAgentFileToolPath,
+          agent_file_tool_root: input.agentPathContext.agentFileToolRoot,
+          agent_file_tool_root_inference_failed: input.agentPathContext.inferenceFailedReason,
           curation_run_id: curationRunId,
           status: validation.draft.status,
           gaps: validation.draft.gaps,
@@ -562,6 +638,9 @@ async function runResearchDraftAgent(input: {
         page_id: page.page_id,
         page_index: page.index,
         draft_path: input.draftPath,
+        draft_agent_file_tool_path: draftAgentFileToolPath,
+        agent_file_tool_root: input.agentPathContext.agentFileToolRoot,
+        agent_file_tool_root_inference_failed: input.agentPathContext.inferenceFailedReason,
         curation_run_id: curationRunId,
         attempt,
         gaps: validation.gaps,
@@ -606,6 +685,9 @@ async function runResearchDraftAgent(input: {
           page_id: page.page_id,
           page_index: page.index,
           draft_path: input.draftPath,
+          draft_agent_file_tool_path: draftAgentFileToolPath,
+          agent_file_tool_root: input.agentPathContext.agentFileToolRoot,
+          agent_file_tool_root_inference_failed: input.agentPathContext.inferenceFailedReason,
           curation_run_id: curationRunId,
           gaps: gapDraft.gaps,
           attempts_exhausted: true,
@@ -627,6 +709,9 @@ async function runResearchDraftAgent(input: {
         page_id: page.page_id,
         page_index: page.index,
         draft_path: input.draftPath,
+        draft_agent_file_tool_path: draftAgentFileToolPath,
+        agent_file_tool_root: input.agentPathContext.agentFileToolRoot,
+        agent_file_tool_root_inference_failed: input.agentPathContext.inferenceFailedReason,
         curation_run_id: curationRunId,
         updated_at: new Date().toISOString(),
       });
@@ -641,6 +726,9 @@ async function runResearchDraftAgent(input: {
       page_id: page.page_id,
       page_index: page.index,
       draft_path: input.draftPath,
+      draft_agent_file_tool_path: draftAgentFileToolPath,
+      agent_file_tool_root: input.agentPathContext.agentFileToolRoot,
+      agent_file_tool_root_inference_failed: input.agentPathContext.inferenceFailedReason,
       curation_run_id: curationRunId,
       error: message,
       updated_at: new Date().toISOString(),
@@ -894,6 +982,10 @@ export async function collectAndCurateResearchForPage(
   const evidenceMarkdownPath = `${paths.evidence_pages_dir}/${page.page_id}.md`;
   const webDraftPath = `${paths.evidence_drafts_dir}/${page.page_id}-web.json`;
   const visualDraftPath = `${paths.evidence_drafts_dir}/${page.page_id}-visual.json`;
+  const agentPathContext = createAgentFileToolPathContext({
+    workspaceRoot: input.workspace.workspace_root,
+    workspaceDir: input.workspace.workspace_dir,
+  });
   if (deltaQueries.webQueries.length > 0 && rawWebIndexPaths.length === 0) {
     gaps.push("No raw web material was collected for this page.");
   }
@@ -928,6 +1020,7 @@ export async function collectAndCurateResearchForPage(
         curationRunId,
         buildPrompt: (previousGateFailure) =>
           buildWebResearchCurationPrompt({
+            workspaceRoot: input.workspace.workspace_root,
             workspaceDir: input.workspace.workspace_dir,
             page,
             requirement: pageRequirement,
@@ -935,8 +1028,9 @@ export async function collectAndCurateResearchForPage(
             draftPath: webDraftPath,
             curationRunId,
             previousGateFailure,
-          }),
+        }),
         draftPath: webDraftPath,
+        agentPathContext,
         currentGaps: gaps,
       }) as WebResearchCurationDraft | null;
     } else {
@@ -965,6 +1059,7 @@ export async function collectAndCurateResearchForPage(
         curationRunId,
         buildPrompt: (previousGateFailure) =>
           buildVisualResearchCurationPrompt({
+            workspaceRoot: input.workspace.workspace_root,
             workspaceDir: input.workspace.workspace_dir,
             page,
             requirement: pageRequirement,
@@ -972,8 +1067,9 @@ export async function collectAndCurateResearchForPage(
             draftPath: visualDraftPath,
             curationRunId,
             previousGateFailure,
-          }),
+        }),
         draftPath: visualDraftPath,
+        agentPathContext,
         currentGaps: gaps,
       }) as VisualResearchCurationDraft | null;
     } else {
@@ -992,6 +1088,71 @@ export async function collectAndCurateResearchForPage(
   }
 
   throwIfCancelled(input);
+  if (visualDraft && visualDraft.visual_assets.length > 0) {
+    const visualAssetInputCount = visualDraft.visual_assets.length;
+    try {
+      const finalized = await input.backend.finalizeResearchVisualAssets({
+        workspace_dir: input.workspace.workspace_dir,
+        page_id: page.page_id,
+        visual_assets: visualDraft.visual_assets,
+        raw_image_index_paths: rawImageIndexPaths,
+      });
+      visualDraft = {
+        ...visualDraft,
+        visual_assets: finalized.visual_assets,
+        gaps: [
+          ...visualDraft.gaps,
+          ...finalized.gaps,
+        ],
+        rejected_material: [
+          ...visualDraft.rejected_material,
+          ...finalized.rejected_material,
+        ],
+      };
+      await appendResearchLogSafe(input, {
+        event: "ai.research.visual_assets.finalized",
+        schema_version: 1,
+        page_id: page.page_id,
+        page_index: page.index,
+        input_count: visualAssetInputCount,
+        finalized_count: finalized.visual_assets.length,
+        rejected_count: Math.max(0, visualAssetInputCount - finalized.visual_assets.length),
+        gaps: finalized.gaps,
+        rejected_material: finalized.rejected_material,
+        assets: finalized.visual_assets.map((asset) => ({
+          id: asset.id,
+          original_raw_path: asset.original_raw_path,
+          file_path: asset.file_path,
+          image_url: asset.image_url,
+          page_url: asset.page_url,
+          sha256: asset.sha256,
+        })),
+        updated_at: new Date().toISOString(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const gap = `Visual research assets could not be finalized: ${message}`;
+      visualDraft = {
+        ...visualDraft,
+        visual_assets: [],
+        gaps: [...visualDraft.gaps, gap],
+        rejected_material: [
+          ...visualDraft.rejected_material,
+          { reason: gap },
+        ],
+      };
+      await appendResearchLogSafe(input, {
+        event: "ai.research.visual_assets.finalization_failed",
+        schema_version: 1,
+        page_id: page.page_id,
+        page_index: page.index,
+        error: message,
+        updated_at: new Date().toISOString(),
+      });
+    }
+    throwIfCancelled(input);
+  }
+
   const merged = mergeResearchCurationDrafts({
     currentEvidence,
     page,

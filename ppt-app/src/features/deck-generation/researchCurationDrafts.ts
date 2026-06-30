@@ -377,21 +377,65 @@ function normalizeTextKey(value: string | undefined): string {
     .replace(/\s+/g, " ");
 }
 
-function dedupeFacts(
-  facts: ResearchEvidencePage["facts"],
-): ResearchEvidencePage["facts"] {
-  const seen = new Set<string>();
-  const result: ResearchEvidencePage["facts"] = [];
-  for (const fact of facts) {
-    const key =
-      normalizeTextKey(fact.source_url) ||
-      normalizeTextKey(fact.source_file) ||
-      normalizeTextKey(fact.claim) ||
-      fact.id;
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    result.push(fact);
+function factSourceKey(fact: ResearchEvidenceFact): string {
+  return (
+    normalizeTextKey(fact.source_url) ||
+    normalizeTextKey(fact.source_file) ||
+    normalizeTextKey(fact.source_title) ||
+    normalizeTextKey(fact.source_type)
+  );
+}
+
+function factDedupeKey(fact: ResearchEvidenceFact): string {
+  const claim = normalizeTextKey(fact.claim);
+  if (!claim) return fact.id;
+  const source = factSourceKey(fact);
+  return source ? `${claim}:${source}` : claim;
+}
+
+function nextFactId(usedIds: Set<string>): string {
+  let max = 0;
+  for (const id of usedIds) {
+    const match = /^fact-(\d+)$/.exec(id);
+    if (match) max = Math.max(max, Number(match[1]));
   }
+
+  let next = max + 1;
+  while (usedIds.has(`fact-${next}`)) {
+    next += 1;
+  }
+  return `fact-${next}`;
+}
+
+interface DedupeFactsInput {
+  facts: ResearchEvidencePage["facts"];
+  idMap: Map<string, string>;
+}
+
+function dedupeFacts(
+  inputs: DedupeFactsInput[],
+): ResearchEvidencePage["facts"] {
+  const seenByKey = new Map<string, string>();
+  const usedIds = new Set<string>();
+  const result: ResearchEvidencePage["facts"] = [];
+
+  for (const input of inputs) {
+    for (const fact of input.facts) {
+      const key = factDedupeKey(fact);
+      const existingId = key ? seenByKey.get(key) : undefined;
+      if (existingId) {
+        if (!input.idMap.has(fact.id)) input.idMap.set(fact.id, existingId);
+        continue;
+      }
+
+      const id = usedIds.has(fact.id) ? nextFactId(usedIds) : fact.id;
+      usedIds.add(id);
+      if (key) seenByKey.set(key, id);
+      if (!input.idMap.has(fact.id)) input.idMap.set(fact.id, id);
+      result.push(id === fact.id ? fact : { ...fact, id });
+    }
+  }
+
   return result;
 }
 
@@ -428,6 +472,41 @@ function dedupeInsights(
   return result;
 }
 
+function cleanInsights(input: {
+  insights: ResearchEvidencePage["derived_insights"];
+  factIdMap: Map<string, string>;
+  validFactIds: Set<string>;
+}): {
+  insights: ResearchEvidencePage["derived_insights"];
+  rejectedMaterial: ResearchEvidencePage["rejected_material"];
+} {
+  const insights: ResearchEvidencePage["derived_insights"] = [];
+  const rejectedMaterial: ResearchEvidencePage["rejected_material"] = [];
+
+  for (const insight of input.insights) {
+    const supportingFactIds: string[] = [];
+    const seenFactIds = new Set<string>();
+    for (const factId of insight.supporting_fact_ids) {
+      const mappedFactId = input.factIdMap.get(factId) ?? factId;
+      if (!input.validFactIds.has(mappedFactId) || seenFactIds.has(mappedFactId)) continue;
+      seenFactIds.add(mappedFactId);
+      supportingFactIds.push(mappedFactId);
+    }
+
+    if (supportingFactIds.length === 0) {
+      rejectedMaterial.push({
+        source: insight.id,
+        reason: `Derived insight was dropped because it has no valid supporting facts: ${insight.insight}`,
+      });
+      continue;
+    }
+
+    insights.push({ ...insight, supporting_fact_ids: supportingFactIds });
+  }
+
+  return { insights, rejectedMaterial };
+}
+
 function dedupeRejectedMaterial(
   rejected: ResearchEvidencePage["rejected_material"],
 ): ResearchEvidencePage["rejected_material"] {
@@ -453,22 +532,38 @@ export function mergeResearchCurationDrafts(
     ...(input.webDraft?.gaps ?? []),
     ...(input.visualDraft?.gaps ?? []),
   ]);
+  const existingFactIdMap = new Map<string, string>();
+  const webDraftFactIdMap = new Map<string, string>();
   const facts = dedupeFacts([
-    ...(existingPage?.facts ?? []),
-    ...(input.webDraft?.facts ?? []),
+    { facts: existingPage?.facts ?? [], idMap: existingFactIdMap },
+    { facts: input.webDraft?.facts ?? [], idMap: webDraftFactIdMap },
   ]);
+  const validFactIds = new Set(facts.map((fact) => fact.id));
+  const existingInsights = cleanInsights({
+    insights: existingPage?.derived_insights ?? [],
+    factIdMap: existingFactIdMap,
+    validFactIds,
+  });
+  const webDraftInsights = cleanInsights({
+    insights: input.webDraft?.derived_insights ?? [],
+    factIdMap: webDraftFactIdMap,
+    validFactIds,
+  });
   const derivedInsights = dedupeInsights([
-    ...(existingPage?.derived_insights ?? []),
-    ...(input.webDraft?.derived_insights ?? []),
+    ...existingInsights.insights,
+    ...webDraftInsights.insights,
   ]);
-  const visualAssets = dedupeVisualAssets([
-    ...(existingPage?.visual_assets ?? []),
-    ...(input.visualDraft?.visual_assets ?? []),
-  ]);
+  const visualAssets = dedupeVisualAssets(
+    input.visualDraft
+      ? input.visualDraft.visual_assets
+      : (existingPage?.visual_assets ?? []),
+  );
   const rejectedMaterial = dedupeRejectedMaterial([
     ...(existingPage?.rejected_material ?? []),
     ...(input.webDraft?.rejected_material ?? []),
     ...(input.visualDraft?.rejected_material ?? []),
+    ...existingInsights.rejectedMaterial,
+    ...webDraftInsights.rejectedMaterial,
   ]);
   const hasUsableEvidence =
     facts.length > 0 || derivedInsights.length > 0 || visualAssets.length > 0;

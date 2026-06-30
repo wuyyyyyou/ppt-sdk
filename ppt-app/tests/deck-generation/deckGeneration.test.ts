@@ -510,6 +510,18 @@ function createHarness(options: {
       return clone(researchEvidence);
     },
     getResearchEvidence: async () => clone(researchEvidence),
+    finalizeResearchVisualAssets: async (input) => ({
+      workspace_dir: input.workspace_dir,
+      page_id: input.page_id,
+      visual_assets: input.visual_assets.map((asset) => ({
+        ...asset,
+        file_path: `${workspace.workspace_dir}/research/evidence/images/${input.page_id}-${asset.id}.jpg`,
+        original_raw_path: asset.original_raw_path ?? asset.file_path,
+        sha256: asset.sha256 ?? `sha:${asset.id}`,
+      })),
+      gaps: [],
+      rejected_material: [],
+    }),
     recordResearchCurationDraft: async (input) => {
       researchDrafts.set(`${input.page_id}:${input.draft_type}`, clone(input.draft));
       return clone(input.draft);
@@ -2734,6 +2746,19 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(evidencePage?.status, "curated");
     assert.equal(evidencePage?.facts.length, 1);
     assert.equal(evidencePage?.visual_assets.length, 1);
+    assert.equal(
+      evidencePage?.visual_assets[0]?.file_path,
+      `${workspace.workspace_dir}/research/evidence/images/page-01-image-1.jpg`,
+    );
+    assert.equal(
+      evidencePage?.visual_assets[0]?.original_raw_path,
+      `${workspace.workspace_dir}/research/raw/images/image.jpg`,
+    );
+    assert.ok(harness.logs.some((log) => {
+      const entry = (log as { entry?: Record<string, unknown> }).entry;
+      return entry?.event === "ai.research.visual_assets.finalized" &&
+        entry.finalized_count === 1;
+    }));
     assert.equal(harness.researchStatus.status, "ready");
     assert.equal(harness.researchStatus.pages.find((page) => page.page_id === "page-01")?.status, "curated");
     assert.ok(harness.progressEvents.some((progress) =>
@@ -2754,11 +2779,13 @@ describe("Deck Generation Flow Module", () => {
     ));
     assert.ok(harness.authoringPrompts.some((prompt) =>
       prompt.includes("You are a local file-editing Agent generating one PPT slide") &&
-      prompt.includes("/research/evidence-index.json if it exists")
+      prompt.includes("Deck-level Research Evidence index") &&
+      prompt.includes("Agent file-tool path: workspaces/demo/research/evidence-index.json")
     ));
     assert.ok(harness.authoringPrompts.some((prompt) =>
       prompt.includes("You are a local file-editing Agent generating one PPT slide") &&
-      prompt.includes("/research/evidence/pages/page-01.md if it exists")
+      prompt.includes("Current-page Research Evidence") &&
+      prompt.includes("Agent file-tool path: workspaces/demo/research/evidence/pages/page-01.md")
     ));
     const pageAuthoringPrompt = harness.authoringPrompts.find((prompt) =>
       prompt.includes("You are a local file-editing Agent generating one PPT slide") &&
@@ -2817,8 +2844,10 @@ describe("Deck Generation Flow Module", () => {
       prompt.includes("Previous Research Curation attempt failure")
     ).length, 4);
     assert.ok(webPromptIndexes.every(({ prompt }) =>
-      prompt.includes("Raw web index paths:") &&
-      prompt.includes("Web draft JSON path to write:")
+      prompt.includes("Raw web index paths to read:") &&
+      prompt.includes("Web draft JSON path to write:") &&
+      prompt.includes("Agent file-tool path:") &&
+      prompt.includes("workspaces/demo/research/evidence/drafts/page-01-web.json")
     ));
     const webCurationRunIds = webPromptIndexes.map(({ prompt }) =>
       prompt.match(/Curation run id: ([^\n]+)/)?.[1] ?? ""
@@ -2834,9 +2863,11 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.webFetchCalls, 1);
     const evidencePage = harness.researchEvidence.pages.find((page) => page.page_id === "page-01");
     assert.equal(evidencePage?.status, "gap");
-    assert.deepEqual(evidencePage?.gaps, [
-      "Web Research Curation failed after 5 attempts. Last error: Web Research Curation draft was not written.\nWeb Research Curation draft status is invalid.\nWeb Research Curation draft curation_run_id does not match current curation run.",
-    ]);
+    assert.equal(evidencePage?.gaps.length, 1);
+    assert.match(evidencePage?.gaps[0] ?? "", /Web Research Curation failed after 5 attempts/);
+    assert.match(evidencePage?.gaps[0] ?? "", /Expected canonical draft path: \/tmp\/workspaces\/demo\/research\/evidence\/drafts\/page-01-web\.json/);
+    assert.match(evidencePage?.gaps[0] ?? "", /Use this Agent file-tool draft path with fs_write_file: workspaces\/demo\/research\/evidence\/drafts\/page-01-web\.json/);
+    assert.match(evidencePage?.gaps[0] ?? "", /Do not write task-relative path: research\/evidence\/drafts\/<page-id>-web\.json/);
     assert.equal(harness.researchStatus.pages.find((page) => page.page_id === "page-01")?.status, "gap");
   });
 
@@ -2881,8 +2912,10 @@ describe("Deck Generation Flow Module", () => {
       prompt.includes("Previous Research Curation attempt failure")
     ).length, 4);
     assert.ok(visualPromptIndexes.every(({ prompt }) =>
-      prompt.includes("Raw image index paths:") &&
-      prompt.includes("Visual draft JSON path to write:")
+      prompt.includes("Raw image index paths to read:") &&
+      prompt.includes("Visual draft JSON path to write:") &&
+      prompt.includes("Agent file-tool path:") &&
+      prompt.includes("workspaces/demo/research/evidence/drafts/page-01-visual.json")
     ));
     const visualCurationRunIds = visualPromptIndexes.map(({ prompt }) =>
       prompt.match(/Curation run id: ([^\n]+)/)?.[1] ?? ""
@@ -2898,9 +2931,11 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.imageFetchCalls, 1);
     const evidencePage = harness.researchEvidence.pages.find((page) => page.page_id === "page-01");
     assert.equal(evidencePage?.status, "gap");
-    assert.deepEqual(evidencePage?.gaps, [
-      "Visual Research Curation failed after 5 attempts. Last error: Visual Research Curation draft was not written.\nVisual Research Curation draft status is invalid.\nVisual Research Curation draft curation_run_id does not match current curation run.",
-    ]);
+    assert.equal(evidencePage?.gaps.length, 1);
+    assert.match(evidencePage?.gaps[0] ?? "", /Visual Research Curation failed after 5 attempts/);
+    assert.match(evidencePage?.gaps[0] ?? "", /Expected canonical draft path: \/tmp\/workspaces\/demo\/research\/evidence\/drafts\/page-01-visual\.json/);
+    assert.match(evidencePage?.gaps[0] ?? "", /Use this Agent file-tool draft path with fs_write_file: workspaces\/demo\/research\/evidence\/drafts\/page-01-visual\.json/);
+    assert.match(evidencePage?.gaps[0] ?? "", /Do not write task-relative path: research\/evidence\/drafts\/<page-id>-visual\.json/);
     assert.equal(harness.researchStatus.pages.find((page) => page.page_id === "page-01")?.status, "gap");
   });
 

@@ -189,6 +189,161 @@ describe("Research Curation Drafts", () => {
     assert.match(result.markdown, /A clear product image/);
   });
 
+  it("keeps different facts from the same source URL", () => {
+    const result = mergeResearchCurationDrafts({
+      currentEvidence: makeEvidenceIndex(),
+      page,
+      requirement,
+      evidenceMarkdownPath: "/tmp/research/evidence/pages/page-01.md",
+      webDraft: makeWebDraft({
+        facts: [
+          {
+            id: "fact-1",
+            claim: "The market grew by 12% in 2025.",
+            source_type: "web_source",
+            source_title: "Report",
+            source_url: "https://example.com/report",
+          },
+          {
+            id: "fact-2",
+            claim: "Enterprise demand accounted for most of the growth.",
+            source_type: "web_source",
+            source_title: "Report",
+            source_url: "https://example.com/report",
+          },
+        ],
+        derived_insights: [
+          {
+            id: "insight-1",
+            insight: "Growth was concentrated in enterprise demand.",
+            supporting_fact_ids: ["fact-2"],
+          },
+        ],
+      }),
+      now,
+    });
+
+    assert.deepEqual(
+      result.pageEvidence.facts.map((fact) => fact.id),
+      ["fact-1", "fact-2"],
+    );
+    assert.deepEqual(result.pageEvidence.derived_insights[0]?.supporting_fact_ids, ["fact-2"]);
+  });
+
+  it("dedupes facts, resolves fact id conflicts, and drops unsupported insights", () => {
+    const currentEvidence = makeEvidenceIndex();
+    currentEvidence.pages.push({
+      page_id: page.page_id,
+      status: "curated",
+      facts: [
+        {
+          id: "fact-1",
+          claim: "The market grew.",
+          source_type: "web_source",
+          source_title: "Report",
+          source_url: "https://example.com/report",
+        },
+      ],
+      visual_assets: [],
+      derived_insights: [
+        {
+          id: "existing-insight",
+          insight: "Existing growth insight remains supported.",
+          supporting_fact_ids: ["fact-1"],
+        },
+        {
+          id: "stale-existing-insight",
+          insight: "Old unsupported insight should be cleaned.",
+          supporting_fact_ids: ["missing-existing-fact"],
+        },
+      ],
+      gaps: [],
+      rejected_material: [],
+      markdown_path: "/tmp/old.md",
+      updated_at: now,
+    });
+
+    const result = mergeResearchCurationDrafts({
+      currentEvidence,
+      page,
+      requirement,
+      evidenceMarkdownPath: "/tmp/new.md",
+      webDraft: makeWebDraft({
+        facts: [
+          {
+            id: "fact-9",
+            claim: "The market grew.",
+            source_type: "web_source",
+            source_title: "Report",
+            source_url: "https://example.com/report",
+          },
+          {
+            id: "fact-1",
+            claim: "Revenue expanded in international markets.",
+            source_type: "web_source",
+            source_title: "Report",
+            source_url: "https://example.com/revenue",
+          },
+        ],
+        derived_insights: [
+          {
+            id: "remapped-insight",
+            insight: "Repeated growth evidence still supports the story.",
+            supporting_fact_ids: ["fact-9", "missing-fact", "fact-9"],
+          },
+          {
+            id: "renamed-fact-insight",
+            insight: "International revenue is a separate signal.",
+            supporting_fact_ids: ["fact-1"],
+          },
+          {
+            id: "unsupported-insight",
+            insight: "This insight has no surviving support.",
+            supporting_fact_ids: ["missing-fact"],
+          },
+        ],
+        rejected_material: [],
+      }),
+      now,
+    });
+
+    assert.deepEqual(
+      result.pageEvidence.facts.map((fact) => [fact.id, fact.claim]),
+      [
+        ["fact-1", "The market grew."],
+        ["fact-2", "Revenue expanded in international markets."],
+      ],
+    );
+    assert.deepEqual(
+      result.pageEvidence.derived_insights.map((insight) => [insight.id, insight.supporting_fact_ids]),
+      [
+        ["existing-insight", ["fact-1"]],
+        ["remapped-insight", ["fact-1"]],
+        ["renamed-fact-insight", ["fact-2"]],
+      ],
+    );
+    assert.ok(
+      result.pageEvidence.rejected_material.some(
+        (item) =>
+          item.source === "unsupported-insight" &&
+          item.reason.includes("no valid supporting facts") &&
+          item.reason.includes("This insight has no surviving support."),
+      ),
+    );
+    assert.ok(
+      result.pageEvidence.rejected_material.some(
+        (item) =>
+          item.source === "stale-existing-insight" &&
+          item.reason.includes("no valid supporting facts") &&
+          item.reason.includes("Old unsupported insight should be cleaned."),
+      ),
+    );
+    const factIds = new Set(result.pageEvidence.facts.map((fact) => fact.id));
+    for (const insight of result.pageEvidence.derived_insights) {
+      assert.ok(insight.supporting_fact_ids.every((factId) => factIds.has(factId)));
+    }
+  });
+
   it("keeps curated status when only one requested path produces usable evidence", () => {
     const result = mergeResearchCurationDrafts({
       currentEvidence: makeEvidenceIndex(),

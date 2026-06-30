@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 
@@ -28,6 +29,7 @@ test("workspace research tools prepare directories and persist metadata", async 
     getAppResearchPlan,
     recordAppResearchEvidence,
     recordAppResearchEvidencePage,
+    finalizeAppResearchVisualAssets,
     getAppResearchEvidence,
     recordAppResearchCurationDraft,
     getAppResearchCurationDraft,
@@ -179,6 +181,65 @@ test("workspace research tools prepare directories and persist metadata", async 
     assert.equal(
       replacementEvidence.pages.find((page) => page.page_id === "page-01")?.facts?.[0]?.id,
       "fact-1b",
+    );
+
+    const rawImagePath = path.join(prepared.raw_images_dir, "candidate.png");
+    const rawImageBytes = Buffer.from("fake-image-bytes");
+    await writeFile(rawImagePath, rawImageBytes);
+    const rawImageSha256 = createHash("sha256").update(rawImageBytes).digest("hex");
+    const finalizedVisualAssets = await finalizeAppResearchVisualAssets({
+      workspace_dir: workspace.workspace_dir,
+      page_id: "page-01",
+      visual_assets: [
+        {
+          id: "image-1",
+          file_path: rawImagePath,
+          original_raw_path: rawImagePath,
+          image_url: "https://example.com/image.png",
+          page_url: "https://example.com/page",
+          sha256: "stale-draft-sha",
+          reason: "Useful image",
+          visual_summary: "A usable image.",
+        },
+      ],
+    });
+    assert.equal(finalizedVisualAssets.visual_assets.length, 1);
+    assert.equal(finalizedVisualAssets.gaps.length, 0);
+    assert.ok(
+      finalizedVisualAssets.rejected_material.some((item) =>
+        item.reason.includes("draft sha256 did not match"),
+      ),
+    );
+    const finalizedAsset = finalizedVisualAssets.visual_assets[0];
+    assert.equal(finalizedAsset?.original_raw_path, rawImagePath);
+    assert.equal(finalizedAsset?.sha256, rawImageSha256);
+    assert.equal(finalizedAsset?.image_url, "https://example.com/image.png");
+    assert.equal(finalizedAsset?.page_url, "https://example.com/page");
+    assert.ok(finalizedAsset?.file_path.startsWith(prepared.evidence_images_dir));
+    assert.match(path.basename(finalizedAsset?.file_path ?? ""), /^page-01-image-1-[a-f0-9]{16}\.png$/);
+    assert.deepEqual(await readFile(finalizedAsset?.file_path ?? ""), rawImageBytes);
+
+    const outsidePath = path.join(homeDir, "outside.png");
+    await writeFile(outsidePath, Buffer.from("outside"));
+    const rejectedVisualAssets = await finalizeAppResearchVisualAssets({
+      workspace_dir: workspace.workspace_dir,
+      page_id: "page-01",
+      visual_assets: [
+        {
+          id: "outside-image",
+          file_path: outsidePath,
+          reason: "Should not be accepted",
+          visual_summary: "Outside workspace.",
+        },
+      ],
+    });
+    assert.equal(rejectedVisualAssets.visual_assets.length, 0);
+    assert.ok(rejectedVisualAssets.gaps.some((gap) => gap.includes("outside research image directories")));
+    assert.ok(
+      rejectedVisualAssets.rejected_material.some((item) =>
+        item.source === "outside-image" &&
+        item.reason.includes("outside research image directories"),
+      ),
     );
 
     const statusAfterPageUpserts = await recordAppResearchStatusPage({

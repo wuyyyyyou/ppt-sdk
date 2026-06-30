@@ -246,6 +246,12 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         "app_get_research_evidence",
         input
       ),
+    finalizeResearchVisualAssets: (input) =>
+      invoke(
+        toolIds.pptEngine,
+        "app_finalize_research_visual_assets",
+        input
+      ),
     recordResearchCurationDraft: (input) =>
       invoke(
         toolIds.pptEngine,

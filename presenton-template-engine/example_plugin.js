@@ -30,6 +30,7 @@ import {
   getAppResearchEvidence,
   getAppResearchPlan,
   getAppResearchStatus,
+  finalizeAppResearchVisualAssets,
   getAllDiscoveredTemplateGroups,
   getAppWorkspaceOutline,
   getDiscoveredTemplateGroup,
@@ -964,6 +965,31 @@ async function toolAppGetResearchEvidence(args) {
   return getAppResearchEvidence({ workspace_dir: workspaceDir });
 }
 
+async function toolAppFinalizeResearchVisualAssets(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const pageId = args.page_id;
+  if (typeof pageId !== "string" || pageId.length === 0) {
+    throw new Error('"page_id" must be a non-empty string');
+  }
+  const visualAssets = args.visual_assets;
+  if (!Array.isArray(visualAssets)) {
+    throw new Error('"visual_assets" must be an array');
+  }
+  const rawImageIndexPaths = Array.isArray(args.raw_image_index_paths)
+    ? args.raw_image_index_paths.filter((item) => typeof item === "string")
+    : undefined;
+  return finalizeAppResearchVisualAssets({
+    workspace_dir: workspaceDir,
+    page_id: pageId,
+    visual_assets: visualAssets,
+    raw_image_index_paths: rawImageIndexPaths,
+  });
+}
+
 async function toolAppRecordResearchCurationDraft(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -1492,6 +1518,7 @@ const TOOL_DISPATCH = {
   app_record_research_evidence: toolAppRecordResearchEvidence,
   app_record_research_evidence_page: toolAppRecordResearchEvidencePage,
   app_get_research_evidence: toolAppGetResearchEvidence,
+  app_finalize_research_visual_assets: toolAppFinalizeResearchVisualAssets,
   app_record_research_curation_draft: toolAppRecordResearchCurationDraft,
   app_get_research_curation_draft: toolAppGetResearchCurationDraft,
   app_get_research_curation_draft_fingerprint: toolAppGetResearchCurationDraftFingerprint,

@@ -21,6 +21,12 @@ import type {
   RenderFailureHistoryItem,
   RenderFailurePhase,
 } from "./types";
+import {
+  createAgentFileToolPathContext,
+  describeAgentFileToolPathContext,
+  formatAgentFileToolPathBlock,
+  toAgentFileToolPath,
+} from "./agentFileToolPaths";
 
 export function extractRenderFailureDiagnosticSummary(error: string): string {
   const diagnosticLine = error
@@ -68,6 +74,7 @@ export function summarizeRenderFailureHistory(history: RenderFailureHistoryItem[
 }
 
 export function buildAuthoringPrompt(input: {
+  workspaceRoot?: string;
   workspaceDir: string;
   page: PagePlanItem;
   pagePlan: PagePlan;
@@ -92,6 +99,27 @@ export function buildAuthoringPrompt(input: {
   const blueprintSourcePath = `${input.workspaceDir}/template/${input.page.blueprint_source.replace(/^\.\//, "")}`;
   const currentPageEvidencePath = `${input.workspaceDir}/research/evidence/pages/${input.page.page_id}.md`;
   const evidenceIndexPath = `${input.workspaceDir}/research/evidence-index.json`;
+  const outlinePath = `${input.workspaceDir}/outline.json`;
+  const pagePlanPath = `${input.workspaceDir}/page-plan.json`;
+  const componentGuidePath = `${input.workspaceDir}/template/components/README.md`;
+  const slideGuidePath = `${input.workspaceDir}/template/slides/README.md`;
+  const agentPathContext = createAgentFileToolPathContext({
+    workspaceRoot: input.workspaceRoot,
+    workspaceDir: input.workspaceDir,
+  });
+  const formatToolPath = (label: string, absolutePath: string) =>
+    formatAgentFileToolPathBlock({
+      label,
+      path: toAgentFileToolPath(agentPathContext, absolutePath),
+    });
+  const visualReviewScreenshotPath = input.visualReviewScreenshotPath?.trim() ?? "";
+  const visualReviewScreenshotToolPath = visualReviewScreenshotPath
+    ? toAgentFileToolPath(agentPathContext, visualReviewScreenshotPath)
+    : null;
+  const pageRefinementScreenshotPath = input.pageRefinementVisualContext?.screenshotPath?.trim() ?? "";
+  const pageRefinementScreenshotToolPath = pageRefinementScreenshotPath
+    ? toAgentFileToolPath(agentPathContext, pageRefinementScreenshotPath)
+    : null;
   const neighborPageTitles = input.pagePlan.pages
     .filter((page) => page.page_id !== input.page.page_id && Math.abs(page.index - input.page.index) <= 1)
     .sort((left, right) => left.index - right.index)
@@ -116,9 +144,13 @@ export function buildAuthoringPrompt(input: {
       : input.visualReview
         ? [
             "This is a visual-review-fix pass. Fix the visual issue reported by Page Visual Review first.",
-            input.visualReviewScreenshotPath
+            visualReviewScreenshotToolPath
               ? [
-                  `Before editing, first call \`upload_local_file\` with this screenshot path: ${input.visualReviewScreenshotPath}`,
+                  "Before editing, first call `upload_local_file` with the Agent file-tool screenshot path below:",
+                  formatAgentFileToolPathBlock({
+                    label: "Visual-review screenshot",
+                    path: visualReviewScreenshotToolPath,
+                  }),
                   "Then call `analyze_image` on the uploaded image.",
                   "Use that image analysis together with the Page Visual Review JSON to decide the smallest layout fix.",
                   "If upload or image analysis fails, continue from the Page Visual Review JSON and local page files, and mention the degradation in the final JSON notes.",
@@ -161,8 +193,14 @@ export function buildAuthoringPrompt(input: {
             ? [
                 "Visual review failed. Fix request:",
                 JSON.stringify(input.visualReview),
-                input.visualReviewScreenshotPath
-                  ? `Screenshot path for visual fix: ${input.visualReviewScreenshotPath}`
+                visualReviewScreenshotToolPath
+                  ? [
+                      "Screenshot path for visual fix:",
+                      formatAgentFileToolPathBlock({
+                        label: "Visual-review screenshot",
+                        path: visualReviewScreenshotToolPath,
+                      }),
+                    ].join("\n")
                   : "",
               ].filter(Boolean).join("\n")
             : "",
@@ -189,9 +227,12 @@ export function buildAuthoringPrompt(input: {
           "Page Refinement Visual Context:",
           input.pageRefinementVisualContext?.screenshotPath
             ? [
-                `Screenshot path: ${input.pageRefinementVisualContext.screenshotPath}`,
+                formatAgentFileToolPathBlock({
+                  label: "Page refinement screenshot",
+                  path: pageRefinementScreenshotToolPath ?? toAgentFileToolPath(agentPathContext, input.pageRefinementVisualContext.screenshotPath),
+                }),
                 `Screenshot source: ${input.pageRefinementVisualContext.source}`,
-                "Before editing, first call `upload_local_file` with the screenshot path, then call `analyze_image` on the uploaded image.",
+                "Before editing, first call `upload_local_file` with the Agent file-tool screenshot path above, then call `analyze_image` on the uploaded image.",
                 "Use the image analysis for visual and layout decisions only: hierarchy, density, whitespace, overlap, readability, and visual emphasis.",
                 "The screenshot is not factual grounding evidence. Text, numbers, charts, logos, dates, claims, or source names visible in the screenshot are not grounded unless separately present in allowed grounding sources.",
                 "If upload or image analysis fails, continue without visual context and mention the degradation in the final JSON notes.",
@@ -208,8 +249,8 @@ export function buildAuthoringPrompt(input: {
           `No-change retry count: ${input.noChangeRetry.retryCount}`,
           "The previous run completed, but both the current slide TSX and current data JSON had identical file hashes before and after the run.",
           "You must make a real edit to at least one of these target files when the authoring request requires a change:",
-          `- ${slidePath}`,
-          `- ${dataPath}`,
+          formatToolPath("Current slide TSX target", slidePath),
+          formatToolPath("Current data JSON target", dataPath),
           input.noChangeRetry.previousChangedFiles.length > 0
             ? `Previous changed_files claim: ${JSON.stringify(input.noChangeRetry.previousChangedFiles)}`
             : "Previous changed_files claim: []",
@@ -219,6 +260,8 @@ export function buildAuthoringPrompt(input: {
           "Do not only return a summary claiming changes.",
         ].filter(Boolean).join("\n")
       : "",
+    "",
+    describeAgentFileToolPathContext(agentPathContext),
     "",
     "Current page context:",
     `- Workspace directory: ${input.workspaceDir}`,
@@ -230,7 +273,9 @@ export function buildAuthoringPrompt(input: {
     `- Current page outline: ${input.page.outline}`,
     `- Current page Page Plan reason: ${input.page.reason}`,
     `- Current slide TSX path: ${slidePath}`,
+    `- Current slide TSX Agent file-tool path: ${toAgentFileToolPath(agentPathContext, slidePath).agentFileToolPath ?? "unavailable; use canonical absolute path"}`,
     `- Current data JSON path: ${dataPath}`,
+    `- Current data JSON Agent file-tool path: ${toAgentFileToolPath(agentPathContext, dataPath).agentFileToolPath ?? "unavailable; use canonical absolute path"}`,
     `- Selected blueprint id: ${input.page.blueprint_id}`,
     `- Selected blueprint source: ${blueprintSourcePath}`,
     "",
@@ -241,17 +286,17 @@ export function buildAuthoringPrompt(input: {
     "",
     [
       "Before editing, read these files in order:",
-      `1. Current slide TSX: ${slidePath}`,
-      `2. Current data JSON: ${dataPath}`,
-      `3. Current blueprint source: ${blueprintSourcePath}`,
-      `4. Workspace outline: ${input.workspaceDir}/outline.json`,
-      `5. Workspace page plan: ${input.workspaceDir}/page-plan.json`,
-      `6. Template component guide: ${input.workspaceDir}/template/components/README.md`,
-      `7. Slide authoring guide: ${input.workspaceDir}/template/slides/README.md`,
-      `8. REQUIRED when present, current-page Research Evidence: ${currentPageEvidencePath}`,
-      `9. REQUIRED when present, deck-level Research Evidence index: ${evidenceIndexPath}`,
-      `Also read ${currentPageEvidencePath} if it exists.`,
-      `Also read ${evidenceIndexPath} if it exists.`,
+      `1. ${formatToolPath("Current slide TSX", slidePath)}`,
+      `2. ${formatToolPath("Current data JSON", dataPath)}`,
+      `3. ${formatToolPath("Current blueprint source", blueprintSourcePath)}`,
+      `4. ${formatToolPath("Workspace outline", outlinePath)}`,
+      `5. ${formatToolPath("Workspace page plan", pagePlanPath)}`,
+      `6. ${formatToolPath("Template component guide", componentGuidePath)}`,
+      `7. ${formatToolPath("Slide authoring guide", slideGuidePath)}`,
+      `8. REQUIRED when present, ${formatToolPath("Current-page Research Evidence", currentPageEvidencePath)}`,
+      `9. REQUIRED when present, ${formatToolPath("Deck-level Research Evidence index", evidenceIndexPath)}`,
+      `Also read the current-page Research Evidence file if it exists, using its Agent file-tool path above.`,
+      `Also read the deck-level Research Evidence index if it exists, using its Agent file-tool path above.`,
       "10. Before using any component from template/components, read that component's source file.",
     ].join("\n"),
     "",
@@ -409,6 +454,7 @@ export function targetPageFingerprintReadErrorMessage(locale: Locale, page: Page
 }
 
 export function buildPageContentReviewPrompt(input: {
+  workspaceRoot?: string;
   workspaceDir: string;
   page: PagePlanItem;
   pagePlan: PagePlan;
@@ -417,6 +463,23 @@ export function buildPageContentReviewPrompt(input: {
 }) {
   const expectedOutputLanguage = resolveReviewExpectedOutputLanguage(input.outline);
   const pageRefinementRequest = input.pageRefinementRequest?.trim() ?? "";
+  const currentDataPath = `${input.workspaceDir}/template/${input.page.data_path.replace(/^\.\//, "")}`;
+  const currentSlidePath = `${input.workspaceDir}/template/${input.page.slide_path.replace(/^\.\//, "")}`;
+  const outlinePath = `${input.workspaceDir}/outline.json`;
+  const pagePlanPath = `${input.workspaceDir}/page-plan.json`;
+  const evidenceIndexPath = `${input.workspaceDir}/research/evidence-index.json`;
+  const currentPageEvidencePath = `${input.workspaceDir}/research/evidence/pages/${input.page.page_id}.md`;
+  const settingPath = `${input.workspaceDir}/setting.json`;
+  const taskPath = `${input.workspaceDir}/task.json`;
+  const agentPathContext = createAgentFileToolPathContext({
+    workspaceRoot: input.workspaceRoot,
+    workspaceDir: input.workspaceDir,
+  });
+  const formatToolPath = (label: string, absolutePath: string) =>
+    formatAgentFileToolPathBlock({
+      label,
+      path: toAgentFileToolPath(agentPathContext, absolutePath),
+    });
   const languageInstruction = expectedOutputLanguage
     ? [
         `Expected output language: ${expectedOutputLanguage}`,
@@ -427,15 +490,18 @@ export function buildPageContentReviewPrompt(input: {
   return [
     "You are a Page Content Review agent for one generated PPT slide.",
     "Review only the current page's user-facing textual content: visible slide text plus speaker notes when they are part of the generated page data. Do not judge visual layout quality.",
+    "",
+    describeAgentFileToolPathContext(agentPathContext),
+    "",
     "Read these files before judging, in this order:",
-    `1. Current data JSON: ${input.workspaceDir}/template/${input.page.data_path.replace(/^\.\//, "")}`,
-    `2. Current slide TSX for visibility/schema interpretation: ${input.workspaceDir}/template/${input.page.slide_path.replace(/^\.\//, "")}`,
-    `3. Workspace outline: ${input.workspaceDir}/outline.json`,
-    `4. Workspace page plan: ${input.workspaceDir}/page-plan.json`,
-    `5. Workspace research evidence index if present: ${input.workspaceDir}/research/evidence-index.json`,
-    `6. Current page research evidence markdown if present: ${input.workspaceDir}/research/evidence/pages/${input.page.page_id}.md`,
-    `7. Workspace setting: ${input.workspaceDir}/setting.json`,
-    `8. Workspace task metadata: ${input.workspaceDir}/task.json`,
+    `1. ${formatToolPath("Current data JSON", currentDataPath)}`,
+    `2. ${formatToolPath("Current slide TSX for visibility/schema interpretation", currentSlidePath)}`,
+    `3. ${formatToolPath("Workspace outline", outlinePath)}`,
+    `4. ${formatToolPath("Workspace page plan", pagePlanPath)}`,
+    `5. ${formatToolPath("Workspace research evidence index if present", evidenceIndexPath)}`,
+    `6. ${formatToolPath("Current page research evidence markdown if present", currentPageEvidencePath)}`,
+    `7. ${formatToolPath("Workspace setting", settingPath)}`,
+    `8. ${formatToolPath("Workspace task metadata", taskPath)}`,
     "",
     "Data field scope:",
     "- Judge user-visible string values in the current data JSON.",
@@ -508,10 +574,16 @@ export function buildPageContentReviewPrompt(input: {
 }
 
 export function buildPageVisualReviewPrompt(input: {
+  workspaceRoot?: string;
+  workspaceDir: string;
   page: PagePlanItem;
   screenshotPath: string;
   preview: RenderWorkspacePagePreviewResult;
 }) {
+  const agentPathContext = createAgentFileToolPathContext({
+    workspaceRoot: input.workspaceRoot,
+    workspaceDir: input.workspaceDir,
+  });
   return [
     "You are a Page Visual Review agent for one generated PPT slide.",
     "Review only whether the generated PPT slide screenshot is visually usable as a PPT page.",
@@ -525,9 +597,17 @@ export function buildPageVisualReviewPrompt(input: {
     '{"pass":true,"score":8,"issues":[],"revision_request":"","confidence":"medium"}',
     "Do not include markdown, code fences, explanations, or any extra text.",
     "",
-    `Screenshot path: ${input.screenshotPath}`,
+    describeAgentFileToolPathContext(agentPathContext),
+    "",
+    formatAgentFileToolPathBlock({
+      label: "Screenshot path",
+      path: toAgentFileToolPath(agentPathContext, input.screenshotPath),
+    }),
     `Page title for identification only: ${input.page.title}`,
-    `Rendered HTML path: ${input.preview.html_path}`,
+    formatAgentFileToolPathBlock({
+      label: "Rendered HTML path",
+      path: toAgentFileToolPath(agentPathContext, input.preview.html_path),
+    }),
     "",
     "Pass if the slide is complete and usable, with readable key content, no obvious overlap/cutoff/blank rendering errors, intended visual regions rendered, and page content fitting the slide canvas.",
     "Use score 0-10. pass=true requires score >= 7.",

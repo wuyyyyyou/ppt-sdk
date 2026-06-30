@@ -1,7 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { appendFile, copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import {
   getDiscoveredTemplateGroup,
@@ -76,6 +76,8 @@ import type {
   GetAppResearchEvidenceInput,
   GetAppResearchPlanInput,
   GetAppResearchStatusInput,
+  FinalizeAppResearchVisualAssetsInput,
+  FinalizeAppResearchVisualAssetsResult,
   PrepareAppResearchWorkspaceInput,
   PrepareAppResearchWorkspaceResult,
   GetAppResearchCurationDraftInput,
@@ -165,6 +167,14 @@ function sha256Hex(value: string): string {
 
 function sha256BufferHex(value: Buffer): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function sanitizeFileNamePart(value: string, fallback: string): string {
+  const sanitized = value
+    .normalize("NFKC")
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return sanitized.length > 0 ? sanitized : fallback;
 }
 
 function sanitizePayloadKey(key: string): string {
@@ -261,6 +271,72 @@ function assertResearchPathUnderWorkspace(workspaceDir: string, targetPath: stri
   const researchRoot = buildResearchPaths(workspaceDir).root_dir;
   const normalizedTarget = path.normalize(targetPath);
   assertPathUnderWorkspace(researchRoot, normalizedTarget, parameterName);
+}
+
+function isPathInsideDir(parentDir: string, targetPath: string): boolean {
+  const relativePath = path.relative(parentDir, targetPath);
+  return relativePath.length === 0 || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
+}
+
+function fileUrlToPathOrNull(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return url.protocol === "file:" ? fileURLToPath(url) : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeVisualAssetSourcePath(workspaceDir: string, value: unknown): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return "";
+  }
+
+  const trimmed = value.trim();
+  const fileUrlPath = trimmed.startsWith("file://") ? fileUrlToPathOrNull(trimmed) : null;
+  if (fileUrlPath) {
+    return path.normalize(fileUrlPath);
+  }
+  if (path.isAbsolute(trimmed)) {
+    return path.normalize(trimmed);
+  }
+  return path.normalize(path.join(workspaceDir, trimmed));
+}
+
+function readOptionalVisualAssetString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+async function buildRawImageMetadataByPath(
+  workspaceDir: string,
+  rawImageIndexPaths: string[] | undefined,
+): Promise<Map<string, Record<string, unknown>>> {
+  const metadata = new Map<string, Record<string, unknown>>();
+  for (const indexPathValue of rawImageIndexPaths ?? []) {
+    const indexPath = normalizeVisualAssetSourcePath(workspaceDir, indexPathValue);
+    if (!indexPath || !isPathInsideDir(workspaceDir, indexPath)) continue;
+    let index: unknown;
+    try {
+      index = await readJsonFileIfExists(indexPath);
+    } catch {
+      continue;
+    }
+    const record = getPlainRecord(index);
+    const results = Array.isArray(record.results) ? record.results.map(getPlainRecord) : [];
+    for (const item of results) {
+      const candidatePaths = [
+        item.file_path,
+        item.path,
+        item.local_path,
+        item.output_path,
+      ].map((value) => normalizeVisualAssetSourcePath(workspaceDir, value)).filter(Boolean);
+      for (const candidatePath of candidatePaths) {
+        metadata.set(candidatePath, item);
+      }
+    }
+  }
+  return metadata;
 }
 
 function buildPptxExportPaths(workspaceDir: string) {
@@ -1896,6 +1972,162 @@ export async function getAppResearchEvidence(input: GetAppResearchEvidenceInput)
     return defaultEvidence;
   }
   return normalizeResearchArtifact(existing, "empty");
+}
+
+export async function finalizeAppResearchVisualAssets(
+  input: FinalizeAppResearchVisualAssetsInput,
+): Promise<FinalizeAppResearchVisualAssetsResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureResearchDirectories(workspace.workspace_dir);
+  const pageId = normalizeString(input.page_id);
+  if (pageId.length === 0) {
+    throw new Error('"page_id" must be a non-empty string');
+  }
+  if (!Array.isArray(input.visual_assets)) {
+    throw new Error('"visual_assets" must be an array');
+  }
+
+  const visualAssets: FinalizeAppResearchVisualAssetsResult["visual_assets"] = [];
+  const gaps: string[] = [];
+  const rejectedMaterial: FinalizeAppResearchVisualAssetsResult["rejected_material"] = [];
+  const rawMetadataByPath = await buildRawImageMetadataByPath(
+    workspace.workspace_dir,
+    input.raw_image_index_paths,
+  );
+
+  for (const rawAsset of input.visual_assets) {
+    const asset = getPlainRecord(rawAsset);
+    const assetId = normalizeString(asset.id);
+    const originalRawPath = normalizeVisualAssetSourcePath(workspace.workspace_dir, asset.original_raw_path);
+    const draftFilePath = normalizeVisualAssetSourcePath(workspace.workspace_dir, asset.file_path);
+    const sourcePath = originalRawPath || draftFilePath;
+
+    if (!assetId) {
+      gaps.push("Visual asset was rejected because id is missing.");
+      rejectedMaterial.push({ reason: "Visual asset was rejected because id is missing." });
+      continue;
+    }
+    if (!sourcePath) {
+      gaps.push(`Visual asset ${assetId} was rejected because no local source path was provided.`);
+      rejectedMaterial.push({
+        source: assetId,
+        reason: "Visual asset was rejected because no local source path was provided.",
+      });
+      continue;
+    }
+
+    if (
+      originalRawPath &&
+      draftFilePath &&
+      path.normalize(originalRawPath) !== path.normalize(draftFilePath)
+    ) {
+      rejectedMaterial.push({
+        source: assetId,
+        reason: "Visual asset file_path differed from original_raw_path; original_raw_path was used.",
+      });
+    }
+
+    const isRawImage = isPathInsideDir(paths.raw_images_dir, sourcePath);
+    const isEvidenceImage = isPathInsideDir(paths.evidence_images_dir, sourcePath);
+    if (!isRawImage && !isEvidenceImage) {
+      gaps.push(`Visual asset ${assetId} was rejected because its source path is outside research image directories.`);
+      rejectedMaterial.push({
+        source: assetId,
+        reason: `Visual asset source path is outside research image directories: ${sourcePath}`,
+      });
+      continue;
+    }
+
+    let sourceBytes: Buffer;
+    try {
+      const sourceStat = await stat(sourcePath);
+      if (!sourceStat.isFile()) {
+        gaps.push(`Visual asset ${assetId} was rejected because its source path is not a file.`);
+        rejectedMaterial.push({
+          source: assetId,
+          reason: `Visual asset source path is not a file: ${sourcePath}`,
+        });
+        continue;
+      }
+      sourceBytes = await readFile(sourcePath);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      gaps.push(`Visual asset ${assetId} was rejected because its source file could not be read.`);
+      rejectedMaterial.push({
+        source: assetId,
+        reason: `Visual asset source file could not be read: ${message}`,
+      });
+      continue;
+    }
+
+    const sha256 = sha256BufferHex(sourceBytes);
+    const draftSha256 = normalizeString(asset.sha256);
+    if (draftSha256 && draftSha256.toLowerCase() !== sha256) {
+      rejectedMaterial.push({
+        source: assetId,
+        reason: `Visual asset draft sha256 did not match local file bytes; using computed sha256 ${sha256}.`,
+      });
+    }
+    const rawMetadata = rawMetadataByPath.get(sourcePath);
+    const metadataImageUrl = rawMetadata ? readOptionalVisualAssetString(rawMetadata, "image_url") ?? readOptionalVisualAssetString(rawMetadata, "url") : undefined;
+    const metadataPageUrl = rawMetadata ? readOptionalVisualAssetString(rawMetadata, "page_url") : undefined;
+    const assetImageUrl = readOptionalVisualAssetString(asset, "image_url");
+    const assetPageUrl = readOptionalVisualAssetString(asset, "page_url");
+    if (assetImageUrl && metadataImageUrl && assetImageUrl !== metadataImageUrl) {
+      rejectedMaterial.push({
+        source: assetId,
+        reason: "Visual asset image_url differed from raw image index metadata; draft image_url was preserved.",
+      });
+    }
+    if (assetPageUrl && metadataPageUrl && assetPageUrl !== metadataPageUrl) {
+      rejectedMaterial.push({
+        source: assetId,
+        reason: "Visual asset page_url differed from raw image index metadata; draft page_url was preserved.",
+      });
+    }
+
+    const ext = path.extname(sourcePath) || ".bin";
+    const outputFileName = [
+      sanitizeFileNamePart(pageId, "page"),
+      sanitizeFileNamePart(assetId, "asset"),
+      sha256.slice(0, 16),
+    ].join("-") + ext;
+    const outputPath = path.join(paths.evidence_images_dir, outputFileName);
+
+    if (!isEvidenceImage || sourcePath !== outputPath) {
+      try {
+        await mkdir(paths.evidence_images_dir, { recursive: true });
+        await copyFile(sourcePath, outputPath);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        gaps.push(`Visual asset ${assetId} was rejected because it could not be copied into evidence images.`);
+        rejectedMaterial.push({
+          source: assetId,
+          reason: `Visual asset could not be copied into evidence images: ${message}`,
+        });
+        continue;
+      }
+    }
+
+    visualAssets.push({
+      id: assetId,
+      file_path: outputPath,
+      original_raw_path: originalRawPath || (isRawImage ? sourcePath : undefined),
+      ...(assetImageUrl || metadataImageUrl ? { image_url: assetImageUrl ?? metadataImageUrl } : {}),
+      ...(assetPageUrl || metadataPageUrl ? { page_url: assetPageUrl ?? metadataPageUrl } : {}),
+      sha256,
+      reason: normalizeString(asset.reason),
+      visual_summary: normalizeString(asset.visual_summary),
+    });
+  }
+
+  return {
+    workspace_dir: workspace.workspace_dir,
+    page_id: pageId,
+    visual_assets: visualAssets,
+    gaps,
+    rejected_material: rejectedMaterial,
+  };
 }
 
 function normalizeResearchDraftType(value: string): "web" | "visual" {

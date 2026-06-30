@@ -33,6 +33,7 @@ import type {
   ExportPdfInput,
   ExportPdfResult,
   ExportArtifactDownloadUrlResult,
+  FinalizeResearchVisualAssetsResult,
   RecordDeckReviewInput,
   RecordPagePlanInput,
   RecordPageProgressInput,
@@ -110,6 +111,12 @@ export interface PptBackend {
     };
   }): Promise<ResearchEvidenceIndex>;
   getResearchEvidence(input: { workspace_dir: string }): Promise<ResearchEvidenceIndex>;
+  finalizeResearchVisualAssets(input: {
+    workspace_dir: string;
+    page_id: string;
+    visual_assets: VisualResearchCurationDraft["visual_assets"];
+    raw_image_index_paths?: string[];
+  }): Promise<FinalizeResearchVisualAssetsResult>;
   recordResearchCurationDraft(input: {
     workspace_dir: string;
     page_id: string;

@@ -441,6 +441,36 @@
       ]
     },
     {
+      "name": "app_finalize_research_visual_assets",
+      "description": "Copy selected raw research image assets into research/evidence/images and return canonical Visual Research Evidence records with gaps and rejected material.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "page_id",
+          "type": "string",
+          "description": "Page id that owns the selected visual assets.",
+          "required": true
+        },
+        {
+          "name": "visual_assets",
+          "type": "array",
+          "description": "Visual Research Curation Draft assets selected from local raw image material.",
+          "required": true
+        },
+        {
+          "name": "raw_image_index_paths",
+          "type": "array",
+          "description": "Optional raw image index paths for audit metadata lookup.",
+          "required": false
+        }
+      ]
+    },
+    {
       "name": "app_record_research_curation_draft",
       "description": "Write a page-level Web or Visual Research Curation Draft artifact for a workspace.",
       "parameters": [
