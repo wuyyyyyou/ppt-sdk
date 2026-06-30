@@ -345,6 +345,7 @@ button {
 .header-left,
 .header-controls,
 .page-header-left,
+.page-header-actions,
 .feedback-actions,
 .action-bar,
 .preview-controls,
@@ -1958,6 +1959,12 @@ button {
 
 .page-header-left {
   gap: 9px;
+  min-width: 0;
+}
+
+.page-header-actions {
+  flex: 0 0 auto;
+  gap: 8px;
 }
 
 .back-btn {

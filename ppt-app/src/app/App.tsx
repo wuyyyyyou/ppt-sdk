@@ -146,6 +146,9 @@ export function App() {
               }}
               onRewriteSlide={actions.rewriteCurrentSlide}
               onChangeSlideLayout={actions.changeCurrentSlideLayout}
+              onRefreshPreview={() => {
+                void actions.renderDeckHtml();
+              }}
               onPreview={() => actions.navigate("review")}
               onExport={() => actions.navigate("export")}
             />

@@ -63,7 +63,21 @@ export function ReviewPage(props: ReviewPageProps) {
 
   return (
     <section className="page active review-page">
-      <PageHeader title={t.review.title} onBack={onBack} t={t} />
+      <PageHeader
+        title={t.review.title}
+        onBack={onBack}
+        t={t}
+        actions={
+          <button
+            className="icon-action-btn"
+            onClick={() => void renderDeckHtml()}
+            disabled={reviewRender.status === "loading"}
+            title={t.review.renderAgain}
+          >
+            <RefreshCw size={14} />
+          </button>
+        }
+      />
       <div className="mode-toggle">
         {(["grid", "organize", "present"] as PreviewMode[]).map((mode) => (
           <button
@@ -106,14 +120,6 @@ export function ReviewPage(props: ReviewPageProps) {
                 <ExternalLink size={14} />
               </a>
             ) : null}
-            <button
-              className="icon-action-btn"
-              onClick={() => void renderDeckHtml()}
-              disabled={reviewRender.status === "loading"}
-              title={t.review.renderAgain}
-            >
-              <RefreshCw size={14} />
-            </button>
           </div>
         </header>
 

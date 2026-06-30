@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Layers, LayoutTemplate, LoaderCircle, MessageCircle, Wand2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Layers, LayoutTemplate, LoaderCircle, MessageCircle, RefreshCw, Wand2 } from "lucide-react";
 import { useState } from "react";
 import type { Slide } from "../../../data/mockDeck";
 import { formatMessage, type Messages } from "../../../i18n/messages";
@@ -19,6 +19,7 @@ interface DeckPageProps {
   onRefineSlide: () => void;
   onRewriteSlide: () => void;
   onChangeSlideLayout: (mode: SlideLayoutMode) => void;
+  onRefreshPreview: () => void;
   onPreview: () => void;
   onExport: () => void;
 }
@@ -37,6 +38,7 @@ export function DeckPage(props: DeckPageProps) {
     onRefineSlide,
     onRewriteSlide,
     onChangeSlideLayout,
+    onRefreshPreview,
     onPreview,
     onExport
   } = props;
@@ -45,6 +47,7 @@ export function DeckPage(props: DeckPageProps) {
   const renderedSlides = reviewRender.result?.slides ?? [];
   const selectedRenderedSlide = renderedSlides[currentSlide] ?? renderedSlides[0];
   const localAiDisabled = loading === "refineSlide" || loading === "refineDeck" || loading === "deck";
+  const refreshDisabled = reviewRender.status === "loading" || loading === "review";
   const showPreviewLoading = reviewRender.status === "loading";
   const layoutOptions: Array<{ mode: SlideLayoutMode; label: string }> = [
     { mode: "simpler", label: t.controls.layoutSimpler },
@@ -99,6 +102,15 @@ export function DeckPage(props: DeckPageProps) {
               </div>
             ) : null}
           </div>
+          <button
+            className="secondary-btn compact"
+            onClick={onRefreshPreview}
+            disabled={refreshDisabled}
+            title={t.review.renderAgain}
+          >
+            <RefreshCw size={14} />
+            {t.review.renderAgain}
+          </button>
         </div>
       </div>
 
