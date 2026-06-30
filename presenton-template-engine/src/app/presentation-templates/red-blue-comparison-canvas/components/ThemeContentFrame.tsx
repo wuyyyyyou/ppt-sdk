@@ -101,7 +101,7 @@ const ThemeContentFrame = ({
             borderTop: redBlueComparisonTheme.border.hairline,
           }}
         >
-          <div className="min-w-0 truncate">{footerText}</div>
+          <div className="min-w-0 break-words">{footerText}</div>
           <div className="flex-none font-black" style={{ color: redBlueComparisonTheme.tone[tone].color }}>
             {pageNumber}
           </div>

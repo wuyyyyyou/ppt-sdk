@@ -28,7 +28,7 @@ const ProjectionLegend = ({ items, projectionLabel }: ProjectionLegendProps) => 
             className="h-[3px] w-[18px] flex-none rounded-full"
             style={{ backgroundColor: redBlueComparisonTheme.tone[item.tone].color }}
           />
-          <span className="max-w-[130px] truncate">{item.label}</span>
+          <span className="max-w-[130px] break-words">{item.label}</span>
         </div>
       ))}
       {projectionLabel ? (
@@ -37,7 +37,7 @@ const ProjectionLegend = ({ items, projectionLabel }: ProjectionLegendProps) => 
             className="h-0 w-[22px] flex-none"
             style={{ borderTop: `2px dashed ${redBlueComparisonTheme.colors.subtleText}` }}
           />
-          <span className="max-w-[150px] truncate">{projectionLabel}</span>
+          <span className="max-w-[150px] break-words">{projectionLabel}</span>
         </div>
       ) : null}
     </div>

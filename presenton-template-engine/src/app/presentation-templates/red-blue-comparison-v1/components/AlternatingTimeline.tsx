@@ -93,7 +93,7 @@ type TimelineDateProps = {
 const TimelineDate = ({ date, color, tint }: TimelineDateProps) => (
   <div className="flex h-[86px] flex-none items-center justify-center">
     <div
-      className="max-w-[174px] truncate rounded-full px-[18px] py-[8px] text-center text-[28px] font-black leading-none"
+      className="max-w-[174px] break-words rounded-full px-[18px] py-[8px] text-center text-[28px] font-black leading-none"
       style={{ color, backgroundColor: tint }}
     >
       {date}

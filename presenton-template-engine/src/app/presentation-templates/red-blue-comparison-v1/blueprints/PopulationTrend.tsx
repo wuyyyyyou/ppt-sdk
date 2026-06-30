@@ -240,7 +240,7 @@ const PopulationTrend = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
                 height={336}
               />
             </div>
-            <div className="mt-[8px] flex-none truncate text-right text-[11px] font-medium" style={{ color: redBlueComparisonTheme.colors.subtleText }}>
+            <div className="mt-[8px] flex-none break-words text-right text-[11px] font-medium" style={{ color: redBlueComparisonTheme.colors.subtleText }}>
               {parsed.chartNote}
             </div>
           </div>

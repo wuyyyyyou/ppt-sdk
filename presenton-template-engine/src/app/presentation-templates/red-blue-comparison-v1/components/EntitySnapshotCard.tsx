@@ -166,7 +166,7 @@ const EntitySnapshotCard = ({
           <EntitySnapshotIcon name={entityIcon} size={24} />
         </div>
         <div
-          className="min-w-0 truncate text-[28px] font-black uppercase leading-none"
+          className="min-w-0 break-words text-[28px] font-black uppercase leading-none"
           style={{ color: toneValue.color, fontFamily: redBlueComparisonTheme.fonts.heading }}
         >
           {entityName}
@@ -179,13 +179,13 @@ const EntitySnapshotCard = ({
       >
         <div className="min-w-0 flex-1">
           <div
-            className="mb-[7px] truncate text-[14px] font-black uppercase leading-none"
+            className="mb-[7px] break-words text-[14px] font-black uppercase leading-none"
             style={{ color: redBlueComparisonTheme.colors.mutedText }}
           >
             {hero.label}
           </div>
           <div
-            className="truncate text-[48px] font-black leading-none"
+            className="break-words text-[48px] font-black leading-none"
             style={{ color: toneValue.color, fontFamily: redBlueComparisonTheme.fonts.heading }}
           >
             {hero.value}
@@ -194,7 +194,7 @@ const EntitySnapshotCard = ({
         {hero.statusLabel ? (
           <div className="flex w-[112px] flex-none flex-col items-end justify-center text-right">
             <div
-              className="mb-[8px] max-w-full truncate text-[12px] font-black uppercase leading-none"
+              className="mb-[8px] max-w-full break-words text-[12px] font-black uppercase leading-none"
               style={{ color: statusColor }}
             >
               {hero.statusLabel}
@@ -221,14 +221,14 @@ const EntitySnapshotCard = ({
                 <EntitySnapshotIcon name={item.icon} size={18} />
               </div>
               <div
-                className="min-w-0 truncate text-[14px] font-bold leading-none"
+                className="min-w-0 break-words text-[14px] font-bold leading-none"
                 style={{ color: redBlueComparisonTheme.colors.mutedText }}
               >
                 {item.label}
               </div>
             </div>
             <div
-              className="max-w-[120px] flex-none truncate text-right text-[24px] font-black leading-none"
+              className="max-w-[120px] flex-none break-words text-right text-[24px] font-black leading-none"
               style={{ color: redBlueComparisonTheme.colors.backgroundText, fontFamily: redBlueComparisonTheme.fonts.heading }}
             >
               {item.value}

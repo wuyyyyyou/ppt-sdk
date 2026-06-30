@@ -89,13 +89,13 @@ const TrendInsightCard = ({
         <TrendInsightIcon name={icon} />
       </div>
       <div
-        className="relative z-10 mb-[6px] max-w-[178px] truncate text-[13px] font-black uppercase"
+        className="relative z-10 mb-[6px] max-w-[178px] break-words text-[13px] font-black uppercase"
         style={{ color: toneValue.color, fontFamily: redBlueComparisonTheme.fonts.heading }}
       >
         {title}
       </div>
       <div
-        className="relative z-10 mb-[7px] truncate text-[28px] font-black leading-none"
+        className="relative z-10 mb-[7px] break-words text-[28px] font-black leading-none"
         style={{ color: toneValue.color, fontFamily: redBlueComparisonTheme.fonts.heading }}
       >
         {value}

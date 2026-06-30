@@ -84,11 +84,11 @@ const StrategicInsightCard = ({
     >
       <CardAccentRail position="left" color={toneValue.color} size={5} />
       <div
-        className="mb-[8px] flex h-[20px] flex-none items-center gap-[8px] truncate text-[14px] font-black uppercase"
+        className="mb-[8px] flex h-[20px] flex-none items-center gap-[8px] break-words text-[14px] font-black uppercase"
         style={{ color: toneValue.color, fontFamily: redBlueComparisonTheme.fonts.heading }}
       >
         <StrategicInsightIcon name={icon} />
-        <span className="truncate">{title}</span>
+        <span className="break-words">{title}</span>
       </div>
       <div
         data-validation-role="multi-line-body-text"

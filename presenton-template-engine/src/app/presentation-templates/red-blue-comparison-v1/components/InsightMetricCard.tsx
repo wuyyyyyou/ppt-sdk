@@ -86,7 +86,7 @@ const InsightMetricCard = ({
     >
       {isConclusion ? null : <CardAccentRail position="left" color={toneValue.color} size={5} />}
       <div className="relative z-10 mb-[8px] flex h-[22px] flex-none items-center justify-between gap-[12px]">
-        <div className="min-w-0 truncate text-[12px] font-black uppercase" style={{ color: redBlueComparisonTheme.colors.mutedText }}>
+        <div className="min-w-0 break-words text-[12px] font-black uppercase" style={{ color: redBlueComparisonTheme.colors.mutedText }}>
           {label}
         </div>
         <div className="flex h-[24px] w-[24px] flex-none items-center justify-center" style={{ color: toneValue.color }}>
@@ -96,7 +96,7 @@ const InsightMetricCard = ({
 
       {value ? (
         <div
-          className="relative z-10 mb-[8px] truncate text-[34px] font-black leading-none"
+          className="relative z-10 mb-[8px] break-words text-[34px] font-black leading-none"
           style={{ color: redBlueComparisonTheme.colors.backgroundText, fontFamily: redBlueComparisonTheme.fonts.heading }}
         >
           {value}

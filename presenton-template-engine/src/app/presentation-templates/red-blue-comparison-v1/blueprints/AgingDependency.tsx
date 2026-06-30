@@ -185,7 +185,7 @@ const AgingDependency = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
                 height={360}
               />
             </div>
-            <div className="mt-[10px] flex-none truncate text-right text-[11px] font-medium" style={{ color: redBlueComparisonTheme.colors.subtleText }}>
+            <div className="mt-[10px] flex-none break-words text-right text-[11px] font-medium" style={{ color: redBlueComparisonTheme.colors.subtleText }}>
               {parsed.chartNote}
             </div>
           </div>

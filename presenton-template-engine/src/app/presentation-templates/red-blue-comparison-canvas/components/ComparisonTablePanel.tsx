@@ -136,7 +136,7 @@ const ComparisonTablePanel = ({
         <div className="mt-[3px] h-[34px] w-[5px] flex-none rounded-full" style={{ backgroundColor: toneValue.color }} />
         <div className="min-w-0 flex-1">
           <div
-            className="truncate text-[18px] font-black"
+            className="break-words text-[18px] font-black"
             style={{
               color: redBlueComparisonTheme.colors.backgroundText,
               fontFamily: redBlueComparisonTheme.fonts.heading,
@@ -147,7 +147,7 @@ const ComparisonTablePanel = ({
           </div>
           {subtitle ? (
             <div
-              className="mt-[5px] truncate text-[12px] font-medium"
+              className="mt-[5px] break-words text-[12px] font-medium"
               style={{ color: redBlueComparisonTheme.colors.mutedText }}
             >
               {subtitle}
@@ -187,7 +187,7 @@ const ComparisonTablePanel = ({
                       color: columnTone.color,
                     }}
                   >
-                    <span className="min-w-0 truncate">{column.label}</span>
+                    <span className="min-w-0 break-words">{column.label}</span>
                   </div>
                 );
               })}
@@ -255,7 +255,7 @@ const ComparisonTablePanel = ({
       {footerNote ? (
         <div
           data-validation-role="multi-line-body-text"
-          className="mt-[12px] flex h-[26px] flex-none items-center overflow-hidden truncate whitespace-nowrap rounded-[6px] px-[12px] text-[10.5px] font-bold leading-none"
+          className="mt-[12px] flex min-h-[26px] flex-none items-center break-words rounded-[6px] px-[12px] py-[5px] text-[10.5px] font-bold leading-[1.2]"
           style={{
             color: toneValue.color,
             backgroundColor: toneValue.tint,

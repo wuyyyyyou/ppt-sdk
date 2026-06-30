@@ -181,7 +181,7 @@ const ClosingContact = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
 
         {parsed.footerNote ? (
           <div
-            className="mt-[28px] max-w-[720px] truncate text-[14px] font-black uppercase"
+            className="mt-[28px] max-w-[720px] break-words text-[14px] font-black uppercase"
             style={{ color: redBlueComparisonTheme.colors.subtleText }}
           >
             {parsed.footerNote}

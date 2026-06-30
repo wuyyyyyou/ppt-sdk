@@ -37,12 +37,12 @@ const ChartContainer = ({
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-[10px]">
             <div className="h-[18px] w-[4px] flex-none rounded-full" style={{ backgroundColor: toneValue.color }} />
-            <div className="min-w-0 truncate text-[17px] font-black" style={{ color: redBlueComparisonTheme.colors.backgroundText }}>
+            <div className="min-w-0 break-words text-[17px] font-black" style={{ color: redBlueComparisonTheme.colors.backgroundText }}>
               {title}
             </div>
           </div>
           {subtitle ? (
-            <div className="mt-[6px] truncate pl-[14px] text-[12px] font-medium" style={{ color: redBlueComparisonTheme.colors.mutedText }}>
+            <div className="mt-[6px] break-words pl-[14px] text-[12px] font-medium" style={{ color: redBlueComparisonTheme.colors.mutedText }}>
               {subtitle}
             </div>
           ) : null}

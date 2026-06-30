@@ -24,14 +24,14 @@ const ThemePill = ({
   return (
     <div
       className={[
-        "inline-flex items-center justify-center whitespace-nowrap rounded-full border px-[12px] text-[12px] font-black uppercase leading-none",
+        "inline-flex items-center justify-center rounded-full border px-[12px] py-[4px] text-center text-[12px] font-black uppercase leading-[1.15]",
         className,
       ]
         .filter(Boolean)
         .join(" ")}
       style={{
         width,
-        height,
+        minHeight: height,
         gap: icon ? 8 : 0,
         color: toneValue.color,
         backgroundColor: toneValue.tint,
@@ -39,7 +39,7 @@ const ThemePill = ({
       }}
     >
       {icon ? <span className="flex flex-none items-center justify-center">{icon}</span> : null}
-      <span className="min-w-0 truncate">{children}</span>
+      <span className="min-w-0 break-words">{children}</span>
     </div>
   );
 };

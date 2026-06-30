@@ -81,7 +81,7 @@
 | `ThemeTitleBlock` | 标题 36 字以内；副标题 100 字以内 | 必须保持文本 |
 | `ThemePanelShell` | 只承载一个清晰内容模块 | 不单独截图；内部复杂图形可截图 |
 | `ComparisonHeroTitle` | 左右标题各 28 字以内；连接词 12 字以内 | 超长标题应在 slide 中降字号 |
-| `ThemePill` | 24 字以内 | 单行 truncate |
+| `ThemePill` | 24 字以内 | 可换行，不使用省略号 |
 | `IconText` | 单行 48 字以内，非单行模式 2 行以内 | 多行正文不要放这里 |
 | `AgendaTopicCard` | 标题 34 字以内；说明 115 字以内 | 过密时减少卡片或拆页 |
 | `EntityComparisonMetricCard` | 2-3 个主体；标题 36 字以内；数值 18 字以内 | 超过 3 个主体改矩阵页 |

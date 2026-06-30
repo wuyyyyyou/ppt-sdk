@@ -154,7 +154,7 @@ const ImageShowcasePanel = ({
 
       {image.source ? (
         <div
-          className="flex-none truncate pt-[6px] text-[10px] font-black uppercase"
+          className="flex-none break-words pt-[6px] text-[10px] font-black uppercase"
           style={{
             color: redBlueComparisonTheme.colors.subtleText,
             lineHeight: "14px",

@@ -120,7 +120,7 @@ const HistoricalMilestonesTimeline = ({ data }: { data: Partial<z.infer<typeof S
           borderTop: redBlueComparisonTheme.border.hairline,
         }}
       >
-        <div className="min-w-0 truncate">{parsed.footerText}</div>
+        <div className="min-w-0 break-words">{parsed.footerText}</div>
         <div className="flex-none font-black" style={{ color: redBlueComparisonTheme.colors.primary }}>
           {parsed.pageNumber}
         </div>

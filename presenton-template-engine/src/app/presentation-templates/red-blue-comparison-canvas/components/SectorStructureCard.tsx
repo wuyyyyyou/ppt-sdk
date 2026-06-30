@@ -43,7 +43,7 @@ const SectorStructureCard = ({
 
       <div className="relative z-10 mb-[14px] flex h-[34px] flex-none items-center justify-between gap-[16px]">
         <div
-          className="min-w-0 truncate text-[24px] font-black uppercase leading-none"
+          className="min-w-0 break-words text-[24px] font-black uppercase leading-none"
           style={{ color: toneValue.color, fontFamily: redBlueComparisonTheme.fonts.heading }}
         >
           {entityName}
@@ -70,7 +70,7 @@ const SectorStructureCard = ({
         {segments.map((segment) => (
           <div key={segment.label} className="flex min-w-0 items-center gap-[6px] text-[11px] font-bold" style={{ color: redBlueComparisonTheme.colors.mutedText }}>
             <div className="h-[10px] w-[10px] flex-none rounded-[3px]" style={{ backgroundColor: segment.color }} />
-            <div className="truncate">{segment.label}</div>
+            <div className="break-words">{segment.label}</div>
           </div>
         ))}
       </div>

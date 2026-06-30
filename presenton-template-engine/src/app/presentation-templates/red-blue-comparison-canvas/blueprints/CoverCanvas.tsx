@@ -85,7 +85,7 @@ const CoverCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
           {parsed.subtitle}
         </div>
 
-        <div className="mt-[28px] flex h-[30px] max-w-[720px] items-center gap-[12px]">
+        <div className="mt-[28px] flex min-h-[30px] max-w-[720px] flex-wrap items-center justify-center gap-x-[12px] gap-y-[8px]">
           {parsed.scopeItems.map((scope, index) => (
             <React.Fragment key={`${scope}-${index}`}>
               {index > 0 ? (
@@ -95,7 +95,7 @@ const CoverCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
                 />
               ) : null}
               <div
-                className="whitespace-nowrap text-[17px] font-bold leading-none"
+                className="break-words text-[17px] font-bold leading-[1.15]"
                 style={{ color: redBlueComparisonTheme.colors.subtleText }}
               >
                 {scope}

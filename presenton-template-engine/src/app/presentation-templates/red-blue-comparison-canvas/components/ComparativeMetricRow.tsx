@@ -127,7 +127,7 @@ const ComparativeMetricRow = ({
           return (
             <div key={`${entry.value}-${index}`} className="min-w-0 text-right">
               <div
-                className="truncate text-[16px] font-black leading-[1.1]"
+                className="break-words text-[16px] font-black leading-[1.1]"
                 style={{
                   color: toneValue.color,
                   fontFamily: redBlueComparisonTheme.fonts.heading,
@@ -136,7 +136,7 @@ const ComparativeMetricRow = ({
                 {entry.value}
               </div>
               <div
-                className="mt-[3px] truncate text-[10px] font-semibold leading-none"
+                className="mt-[3px] break-words text-[10px] font-semibold leading-none"
                 style={{ color: redBlueComparisonTheme.colors.subtleText }}
               >
                 {entry.sublabel}

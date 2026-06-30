@@ -42,7 +42,7 @@ const EntityComparisonMetricCard = ({
     >
       <CardAccentRail position="left" color={toneValue.color} size={5} />
       <div className="relative z-10 mb-[13px] flex h-[18px] flex-none items-center justify-between gap-[12px]">
-        <div className="min-w-0 truncate text-[12px] font-black uppercase tracking-[0.5px]" style={{ color: redBlueComparisonTheme.colors.mutedText }}>
+        <div className="min-w-0 break-words text-[12px] font-black uppercase tracking-[0.5px]" style={{ color: redBlueComparisonTheme.colors.mutedText }}>
           {title}
         </div>
       </div>
@@ -76,7 +76,7 @@ const EntityComparisonMetricCard = ({
               <div key={`${item.label}-${item.value}`} className="grid h-[26px] grid-cols-[58px_1fr_74px] items-center gap-[12px]">
                 <div className="flex min-w-0 items-center gap-[6px]">
                   <div className="h-[9px] w-[9px] flex-none rounded-full" style={{ backgroundColor: itemTone.color }} />
-                  <div className="truncate text-[13px] font-black uppercase" style={{ color: itemTone.color }}>
+                  <div className="break-words text-[13px] font-black uppercase" style={{ color: itemTone.color }}>
                     {item.shortLabel ?? item.label}
                   </div>
                 </div>

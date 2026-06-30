@@ -74,13 +74,13 @@ const CoverComparison = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
         />
 
         <div
-          className="mt-[36px] h-[30px] whitespace-nowrap text-[24px] font-semibold uppercase leading-none tracking-[1px]"
+          className="mt-[36px] min-h-[30px] break-words text-[24px] font-semibold uppercase leading-[1.15] tracking-[1px]"
           style={{ color: redBlueComparisonTheme.colors.mutedText }}
         >
           {parsed.subtitle}
         </div>
 
-        <div className="mt-[28px] flex h-[28px] max-w-[900px] items-center justify-center gap-[12px]">
+        <div className="mt-[28px] flex min-h-[28px] max-w-[900px] flex-wrap items-center justify-center gap-x-[12px] gap-y-[8px]">
           {parsed.topicItems.map((topic, index) => (
             <React.Fragment key={`${topic}-${index}`}>
               {index > 0 ? (
@@ -90,7 +90,7 @@ const CoverComparison = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
                 />
               ) : null}
               <div
-                className="whitespace-nowrap text-[18px] font-medium leading-none"
+                className="break-words text-[18px] font-medium leading-[1.15]"
                 style={{ color: redBlueComparisonTheme.colors.subtleText }}
               >
                 {topic}
