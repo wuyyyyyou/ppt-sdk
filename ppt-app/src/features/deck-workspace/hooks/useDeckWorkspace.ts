@@ -984,8 +984,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         reviewRender.status === "ready" &&
         reviewRender.result !== null &&
         reviewRender.renderKey === renderKey;
-      if (!hasCurrentRender) {
-        void renderDeckHtml();
+      if (!hasCurrentRender && currentWorkspace) {
+        void loadDeckHtmlForWorkspace(currentWorkspace, "review");
       }
     }
     if (nextPage === "export" && currentWorkspace) {
@@ -1012,7 +1012,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       reviewRender.result !== null &&
       reviewRender.renderKey === renderKey;
     if (hasCurrentRender) return;
-    await renderDeckHtmlForWorkspace(currentWorkspace, "review");
+    await loadDeckHtmlForWorkspace(currentWorkspace, "review");
   }
 
   async function openRefineSlide(index = currentSlide) {
@@ -1038,7 +1038,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       Boolean(reviewRender.result.slides[index]?.screenshot_url);
     if (hasCurrentSlidePreview) return;
 
-    const rendered = await renderDeckHtmlForWorkspace(currentWorkspace, "review");
+    const rendered = await loadDeckHtmlForWorkspace(currentWorkspace, "review");
     if (rendered) {
       setCurrentSlide(index);
     }
@@ -2181,7 +2181,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       if (shouldOpenDeck) {
         setPage("main");
         setHistory((items) => (items.at(-1) === "main" ? items : [...items, "main"]));
-        const rendered = await renderDeckHtmlForWorkspace(workspace, "review");
+        const rendered = await loadDeckHtmlForWorkspace(workspace, "review");
         if (rendered) {
           showToast(formatMessage(t.toasts.workspaceOpened, { id: workspace.task_id ?? workspace.workspace_id }));
         }
@@ -2543,6 +2543,39 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
+  async function loadDeckHtmlForWorkspace(
+    workspace: WorkspaceResult,
+    loadingKind: LoadingKind
+  ): Promise<Awaited<ReturnType<PptBackend["renderDeckHtml"]>> | null> {
+    if (!backend) return null;
+
+    setLoading(loadingKind);
+    setReviewRender((current) => ({
+      ...current,
+      status: "loading",
+      result: null,
+      error: ""
+    }));
+
+    try {
+      const result = await backend.getRenderedDeckHtml({
+        workspace_dir: workspace.workspace_dir
+      });
+      const renderKey = workspaceReviewRenderKey(workspace);
+      applyRenderedDeck(result);
+      setReviewRender({
+        status: "ready",
+        result,
+        error: "",
+        renderKey
+      });
+      setLoading("none");
+      return result;
+    } catch {
+      return renderDeckHtmlForWorkspace(workspace, loadingKind);
+    }
+  }
+
   async function renderDeckHtml() {
     if (!backend) return;
 
@@ -2706,7 +2739,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setExportArtifact(null);
     try {
       if (needsFreshRender) {
-        const rendered = await renderDeckHtmlForWorkspace(workspace, "export");
+        const rendered = await loadDeckHtmlForWorkspace(workspace, "export");
         if (!rendered) return;
         setLoading("export");
         setExportProgress(createExportStartProgress(t, type));

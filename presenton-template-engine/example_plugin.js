@@ -25,6 +25,7 @@ import {
   getAppPagePlan,
   getAppPageProgress,
   getAppPptxExportStatus,
+  getRenderedAppWorkspaceDeckHtml,
   getAppResearchCurationDraft,
   getAppResearchCurationDraftFingerprint,
   getAppResearchEvidence,
@@ -1188,6 +1189,30 @@ async function toolAppRenderDeckHtml(args) {
   };
 }
 
+async function toolAppGetRenderedDeckHtml(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const result = await getRenderedAppWorkspaceDeckHtml({
+    workspace_dir: workspaceDir,
+  });
+  const slides = await Promise.all(
+    result.slides.map(async (slide) => ({
+      ...slide,
+      preview_url: await registerPreviewHtml(slide.html_path),
+      screenshot_url: await registerPreviewImage(slide.screenshot_path),
+    })),
+  );
+
+  return {
+    ...result,
+    slides,
+    preview_url: slides[0]?.preview_url ?? null,
+  };
+}
+
 async function toolAppPrepareExportModel(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -1528,6 +1553,7 @@ const TOOL_DISPATCH = {
   app_get_research_status: toolAppGetResearchStatus,
   app_record_page_progress: toolAppRecordPageProgress,
   app_render_workspace_page_preview: toolAppRenderWorkspacePagePreview,
+  app_get_rendered_deck_html: toolAppGetRenderedDeckHtml,
   app_render_deck_html: toolAppRenderDeckHtml,
   app_start_pptx_export_model: toolAppStartPptxExportModel,
   app_get_pptx_export_status: toolAppGetPptxExportStatus,

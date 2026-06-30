@@ -2703,6 +2703,88 @@ export async function renderAppWorkspaceDeckHtml(
   };
 }
 
+async function assertExistingFile(filePath: string, label: string): Promise<string> {
+  if (!filePath) {
+    throw new Error(`${label} is missing`);
+  }
+
+  const normalizedPath = path.normalize(filePath);
+  let fileStat;
+  try {
+    fileStat = await stat(normalizedPath);
+  } catch {
+    throw new Error(`${label} is unavailable: ${normalizedPath}`);
+  }
+  if (!fileStat.isFile()) {
+    throw new Error(`${label} is not a file: ${normalizedPath}`);
+  }
+
+  return normalizedPath;
+}
+
+export async function getRenderedAppWorkspaceDeckHtml(
+  input: RenderAppWorkspaceDeckHtmlInput,
+): Promise<RenderAppWorkspaceDeckHtmlResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const manifestPath = readSelectedTemplateManifestPath(workspace);
+  const manifestRecord = getPlainRecord(JSON.parse(await readFile(manifestPath, "utf8")) as unknown);
+  const manifestSlides = Array.isArray(manifestRecord.slides)
+    ? manifestRecord.slides.map((slide) => getPlainRecord(slide))
+    : [];
+  const pagesRecord = getPlainRecord(await readJsonFileIfExists(workspace.files.pages));
+  const rawPages = Array.isArray(pagesRecord.pages)
+    ? pagesRecord.pages.map((page) => getPlainRecord(page))
+    : [];
+
+  if (pagesRecord.status !== "rendered" || rawPages.length === 0) {
+    throw new Error("Rendered deck pages are unavailable");
+  }
+  if (manifestSlides.length !== rawPages.length) {
+    throw new Error("Rendered deck page count does not match the selected template manifest");
+  }
+
+  const recordedManifestPath = normalizeString(pagesRecord.manifest_path);
+  if (recordedManifestPath && path.normalize(recordedManifestPath) !== path.normalize(manifestPath)) {
+    throw new Error("Rendered deck manifest path does not match the selected template manifest");
+  }
+
+  const slides = await Promise.all(
+    rawPages.map(async (page, index) => {
+      const manifestSlide = manifestSlides[index] ?? {};
+      const pageId = normalizeString(page.page_id);
+      const manifestPageId = readPageIdFromManifestSlide(manifestSlide);
+      if (!pageId || pageId !== manifestPageId) {
+        throw new Error(`Rendered deck page ${index + 1} does not match the selected template manifest`);
+      }
+
+      const htmlPath = await assertExistingFile(normalizeString(page.html_path), `Rendered deck HTML for ${pageId}`);
+      const screenshotPath = await assertExistingFile(
+        normalizeString(page.screenshot_path),
+        `Rendered deck screenshot for ${pageId}`,
+      );
+
+      return {
+        slide_id: pageId,
+        layout_id: normalizeString(page.layout_id),
+        title: normalizeString(page.title) || normalizeString(manifestSlide.title) || pageId,
+        html_path: htmlPath,
+        screenshot_path: screenshotPath,
+        speaker_note: normalizeString(page.speaker_note),
+      };
+    }),
+  );
+
+  return {
+    workspace_dir: workspace.workspace_dir,
+    manifest_path: recordedManifestPath || manifestPath,
+    output_dir: normalizeString(pagesRecord.output_dir),
+    slides,
+    slide_count: slides.length,
+    title: normalizeString(pagesRecord.title) || normalizeString(manifestRecord.title),
+    rendered_at: normalizeString(pagesRecord.rendered_at) || normalizeString(pagesRecord.updated_at),
+  };
+}
+
 async function launchPdfBrowser(): Promise<any> {
   const puppeteerModule = await import("puppeteer");
   const puppeteer = puppeteerModule.default ?? puppeteerModule;

@@ -300,6 +300,12 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         "app_render_workspace_page_preview",
         input
       ),
+    getRenderedDeckHtml: (input) =>
+      invoke<RenderDeckHtmlResult>(
+        toolIds.pptEngine,
+        "app_get_rendered_deck_html",
+        input
+      ),
     recordOutline: (input) =>
       invoke<ProjectResult>(toolIds.pptEngine, "app_record_outline", input),
     renderDeckHtml: (input) =>

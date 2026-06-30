@@ -182,6 +182,7 @@ export interface PptBackend {
     input: RenderWorkspacePagePreviewInput
   ): Promise<RenderWorkspacePagePreviewResult>;
   recordOutline(input: RecordOutlineInput): Promise<ProjectResult>;
+  getRenderedDeckHtml(input: RenderDeckHtmlInput): Promise<RenderDeckHtmlResult>;
   renderDeckHtml(input: RenderDeckHtmlInput): Promise<RenderDeckHtmlResult>;
   recordDeckReview(input: RecordDeckReviewInput): Promise<ProjectResult>;
   prepareExportModel(

@@ -663,6 +663,18 @@
       ]
     },
     {
+      "name": "app_get_rendered_deck_html",
+      "description": "Read existing rendered workspace deck HTML and screenshots, register local preview URLs, and fail if any rendered artifact is missing.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
       "name": "app_render_deck_html",
       "description": "Render the selected workspace template manifest to reviewable deck HTML and return a local preview URL.",
       "parameters": [
