@@ -26,6 +26,7 @@ import type {
   RenderDeckHtmlResult,
   RenderWorkspacePagePreviewResult,
   RecordPdfExportInput,
+  SelectTemplateResult,
   TemplatePlanningContext,
   WorkspaceDefaultsResult,
   WorkspaceResult,
@@ -34,6 +35,11 @@ import { createSearchAdapter } from "./searchAdapter";
 import { resolvePptBundledToolIds } from "./bundledToolIds";
 
 const PPTX_EXPORT_TIMEOUT_MS = 600_000;
+
+interface HttpJsonReference {
+  workspace_url?: string;
+  result_url?: string;
+}
 
 function unwrapToolResult<T>(result: unknown): T {
   if (
@@ -51,6 +57,34 @@ function unwrapToolResult<T>(result: unknown): T {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function readHttpJsonReferenceUrl(value: unknown): string {
+  if (!isRecord(value)) {
+    return "";
+  }
+
+  const workspaceUrl = value.workspace_url;
+  if (typeof workspaceUrl === "string" && workspaceUrl.length > 0) {
+    return workspaceUrl;
+  }
+
+  const resultUrl = value.result_url;
+  return typeof resultUrl === "string" && resultUrl.length > 0 ? resultUrl : "";
+}
+
+async function resolveHttpJsonReference<T>(value: T | HttpJsonReference): Promise<T> {
+  const url = readHttpJsonReferenceUrl(value);
+  if (!url) {
+    return value as T;
+  }
+
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch tool JSON reference: HTTP ${response.status}`);
+  }
+
+  return (await response.json()) as T;
 }
 
 function readString(record: Record<string, unknown>, ...keys: string[]): string {
@@ -117,6 +151,21 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       await runtime.tools.invoke(input, options)
     );
   }
+  async function invokeHttpJson<T>(
+    toolId: string,
+    method: string,
+    args: object,
+    options?: { timeoutMs?: number }
+  ): Promise<T> {
+    return resolveHttpJsonReference<T>(
+      await invoke<T | HttpJsonReference>(toolId, method, args, options)
+    );
+  }
+  const invokeWorkspaceResult = (
+    method: string,
+    args: object,
+    options?: { timeoutMs?: number }
+  ) => invokeHttpJson<WorkspaceResult>(toolIds.pptEngine, method, args, options);
   const searchAdapter = createSearchAdapter({
     runtime,
     toolId: toolIds.annaSearch,
@@ -128,9 +177,9 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
     getWorkspaceDefaults: () =>
       invoke<WorkspaceDefaultsResult>(toolIds.pptEngine, "app_get_workspace_defaults", {}),
     createWorkspace: (input) =>
-      invoke<WorkspaceResult>(toolIds.pptEngine, "app_create_workspace", input),
+      invokeWorkspaceResult("app_create_workspace", input),
     openWorkspace: (input) =>
-      invoke<WorkspaceResult>(toolIds.pptEngine, "app_open_workspace", input),
+      invokeWorkspaceResult("app_open_workspace", input),
     appendWorkspaceLog: (input) =>
       invoke<AppendWorkspaceLogResult>(
         toolIds.pptEngine,
@@ -144,35 +193,15 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         input
       ),
     updateWorkspaceOutline: (input) =>
-      invoke<WorkspaceResult>(
-        toolIds.pptEngine,
-        "app_update_workspace_outline",
-        input
-      ),
+      invokeWorkspaceResult("app_update_workspace_outline", input),
     updateWorkspaceSettings: (input) =>
-      invoke<WorkspaceResult>(
-        toolIds.pptEngine,
-        "app_update_workspace_settings",
-        input
-      ),
+      invokeWorkspaceResult("app_update_workspace_settings", input),
     updateWorkspacePages: (input) =>
-      invoke<WorkspaceResult>(
-        toolIds.pptEngine,
-        "app_update_workspace_pages",
-        input
-      ),
+      invokeWorkspaceResult("app_update_workspace_pages", input),
     duplicateWorkspacePage: (input) =>
-      invoke<WorkspaceResult>(
-        toolIds.pptEngine,
-        "app_duplicate_workspace_page",
-        input
-      ),
+      invokeWorkspaceResult("app_duplicate_workspace_page", input),
     updateWorkspaceTitle: (input) =>
-      invoke<WorkspaceResult>(
-        toolIds.pptEngine,
-        "app_update_workspace_title",
-        input
-      ),
+      invokeWorkspaceResult("app_update_workspace_title", input),
     createProject: (input) =>
       invoke<ProjectResult>(toolIds.pptEngine, "app_create_project", input),
     getProject: (input) =>
@@ -193,7 +222,11 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         count: result.count ?? result.groups?.length ?? 0,
       })),
     selectTemplate: (input) =>
-      invoke(toolIds.pptEngine, "app_select_workspace_template", input),
+      invokeHttpJson<SelectTemplateResult>(
+        toolIds.pptEngine,
+        "app_select_workspace_template",
+        input
+      ),
     getTemplatePlanningContext: (input) =>
       invoke<TemplatePlanningContext>(
         toolIds.pptEngine,
@@ -358,24 +391,16 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         normalizeExportPdfResult
       ),
     recordPptxExport: (input) =>
-      invoke<WorkspaceResult>(
-        toolIds.pptEngine,
-        "app_record_pptx_export",
-        {
-          workspace_dir: input.workspace_dir,
-          pptx_path: input.pptxPath,
-          generator_result: input.generatorResult,
-        }
-      ),
+      invokeWorkspaceResult("app_record_pptx_export", {
+        workspace_dir: input.workspace_dir,
+        pptx_path: input.pptxPath,
+        generator_result: input.generatorResult,
+      }),
     recordPdfExport: (input: RecordPdfExportInput) =>
-      invoke<WorkspaceResult>(
-        toolIds.pptEngine,
-        "app_record_pdf_export",
-        {
-          workspace_dir: input.workspace_dir,
-          pdf_path: input.pdfPath,
-        }
-      ),
+      invokeWorkspaceResult("app_record_pdf_export", {
+        workspace_dir: input.workspace_dir,
+        pdf_path: input.pdfPath,
+      }),
     getExportArtifactDownloadUrl: (input) =>
       invoke<ExportArtifactDownloadUrlResult>(
         toolIds.pptEngine,

@@ -226,6 +226,7 @@ function readOptionalStringArg(args, parameterName) {
 const previewFiles = new Map();
 const previewImageFiles = new Map();
 const artifactFiles = new Map();
+const jsonPayloads = new Map();
 let previewServerPromise = null;
 
 function encodeRfc5987Value(value) {
@@ -357,6 +358,30 @@ async function handlePreviewRequest(request, response) {
     return;
   }
 
+  if (parts.length === 3 && parts[0] === "json") {
+    const payloadId = parts[1];
+    const payload = jsonPayloads.get(payloadId);
+    if (!payload) {
+      response.writeHead(404, {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+      });
+      response.end("JSON payload expired or not found");
+      return;
+    }
+
+    response.writeHead(200, {
+      "content-type": "application/json; charset=utf-8",
+      "content-length": payload.byteLength,
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+      "access-control-allow-origin": "*",
+    });
+    response.end(payload.body);
+    return;
+  }
+
   {
     response.writeHead(404, {
       "content-type": "text/plain; charset=utf-8",
@@ -438,6 +463,29 @@ async function registerArtifactDownload({ path: artifactPath, filename, artifact
   });
 
   return `http://127.0.0.1:${port}/artifact/${artifactId}/${safeUrlName}`;
+}
+
+async function registerJsonPayload(value, filename) {
+  const body = `${JSON.stringify(value)}\n`;
+  const { port } = await ensurePreviewServer();
+  const payloadId = randomUUID();
+  const safeUrlName = encodeURIComponent(sanitizeHeaderFileName(filename || "payload.json"));
+  jsonPayloads.set(payloadId, {
+    body,
+    byteLength: Buffer.byteLength(body, "utf8"),
+  });
+
+  return `http://127.0.0.1:${port}/json/${payloadId}/${safeUrlName}`;
+}
+
+async function registerJsonReference(value, filename, urlFieldName) {
+  return {
+    [urlFieldName]: await registerJsonPayload(value, filename),
+  };
+}
+
+async function registerWorkspaceJsonReference(value) {
+  return registerJsonReference(value, "workspace.json", "workspace_url");
 }
 
 function parseRequestLine(line) {
@@ -615,7 +663,7 @@ async function toolAppCreateWorkspace(args) {
       ? args.title.trim()
       : undefined;
 
-  return createAppWorkspace({ title });
+  return registerWorkspaceJsonReference(await createAppWorkspace({ title }));
 }
 
 async function toolAppOpenWorkspace(args) {
@@ -624,7 +672,7 @@ async function toolAppOpenWorkspace(args) {
   }
 
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  return openAppWorkspace({ workspace_dir: workspaceDir });
+  return registerWorkspaceJsonReference(await openAppWorkspace({ workspace_dir: workspaceDir }));
 }
 
 async function toolAppGetWorkspaceOutline(args) {
@@ -690,10 +738,10 @@ async function toolAppUpdateWorkspaceOutline(args) {
     throw new Error('"outline" must be an object');
   }
 
-  return updateAppWorkspaceOutline({
+  return registerWorkspaceJsonReference(await updateAppWorkspaceOutline({
     workspace_dir: workspaceDir,
     outline,
-  });
+  }));
 }
 
 async function toolAppUpdateWorkspaceSettings(args) {
@@ -707,11 +755,11 @@ async function toolAppUpdateWorkspaceSettings(args) {
     throw new Error('"setting" must be an object');
   }
 
-  return updateAppWorkspaceSettings({
+  return registerWorkspaceJsonReference(await updateAppWorkspaceSettings({
     workspace_dir: workspaceDir,
     setting,
     persist_as_default: args.persist_as_default === true,
-  });
+  }));
 }
 
 async function toolAppUpdateWorkspacePages(args) {
@@ -725,10 +773,10 @@ async function toolAppUpdateWorkspacePages(args) {
     throw new Error('"pages" must be an array');
   }
 
-  return updateAppWorkspacePages({
+  return registerWorkspaceJsonReference(await updateAppWorkspacePages({
     workspace_dir: workspaceDir,
     pages,
-  });
+  }));
 }
 
 async function toolAppDuplicateWorkspacePage(args) {
@@ -741,11 +789,11 @@ async function toolAppDuplicateWorkspacePage(args) {
     throw new Error('"page_id" must be a non-empty string');
   }
 
-  return duplicateAppWorkspacePage({
+  return registerWorkspaceJsonReference(await duplicateAppWorkspacePage({
     workspace_dir: workspaceDir,
     page_id: args.page_id,
     title: typeof args.title === "string" ? args.title : undefined,
-  });
+  }));
 }
 
 async function toolAppUpdateWorkspaceTitle(args) {
@@ -758,10 +806,10 @@ async function toolAppUpdateWorkspaceTitle(args) {
     throw new Error('"title" must be a non-empty string');
   }
 
-  return updateAppWorkspaceTitle({
+  return registerWorkspaceJsonReference(await updateAppWorkspaceTitle({
     workspace_dir: workspaceDir,
     title: args.title,
-  });
+  }));
 }
 
 async function toolAppListTemplateGroups() {
@@ -812,10 +860,10 @@ async function toolAppSelectWorkspaceTemplate(args) {
     throw new Error('"template_group" must be a non-empty string');
   }
 
-  return selectAppWorkspaceTemplate({
+  return registerJsonReference(await selectAppWorkspaceTemplate({
     workspace_dir: workspaceDir,
     template_group: args.template_group,
-  });
+  }), "select-template.json", "result_url");
 }
 
 async function toolAppGetTemplatePlanningContext(args) {
@@ -1304,11 +1352,11 @@ async function toolAppRecordPptxExport(args) {
 
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
   const pptxPath = readRequiredAbsolutePathArg(args, "pptx_path");
-  return recordAppPptxExport({
+  return registerWorkspaceJsonReference(await recordAppPptxExport({
     workspace_dir: workspaceDir,
     pptx_path: pptxPath,
     generator_result: args.generator_result,
-  });
+  }));
 }
 
 async function toolAppRecordPdfExport(args) {
@@ -1318,10 +1366,10 @@ async function toolAppRecordPdfExport(args) {
 
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
   const pdfPath = readRequiredAbsolutePathArg(args, "pdf_path");
-  return recordAppPdfExport({
+  return registerWorkspaceJsonReference(await recordAppPdfExport({
     workspace_dir: workspaceDir,
     pdf_path: pdfPath,
-  });
+  }));
 }
 
 async function toolGetAllDiscoveredTemplateGroups(args) {
