@@ -435,6 +435,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       status: typeof progressRecord?.status === "string" ? progressRecord.status : "prepared",
       recovery: progressRecord?.recovery,
       final_deck_render: progressRecord?.final_deck_render,
+      research_discovery: progressRecord?.research_discovery,
       pages,
       updated_at:
         typeof progressRecord?.updated_at === "string" ? progressRecord.updated_at : null

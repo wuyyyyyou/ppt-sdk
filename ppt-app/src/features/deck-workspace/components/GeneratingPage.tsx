@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Messages } from "../../../i18n/messages";
 import type { DeckGenerationProgress, DeckGenerationStep } from "../../deck-generation";
 import { buildPageGenerationStageRecords, type PageGenerationStageRecord, type PageGenerationStageRecordGroup } from "../generationStageRecords";
-import { buildResearchDiscoveryStageRecords, type ResearchDiscoveryStageRecord, type ResearchDiscoveryStageGroup } from "../researchDiscoveryStageRecords";
+import { buildResearchDiscoveryStageRecords, isDiscoveryPageId, type ResearchDiscoveryStageRecord, type ResearchDiscoveryStageGroup } from "../researchDiscoveryStageRecords";
 import { getGenerationProgressDisplayMessage } from "../generationProgressDisplay";
 import type { GenerationStreamSnapshot } from "../types";
 import type { GenerationViewState } from "../generationViewState";
@@ -55,6 +55,9 @@ function stepState(
   progress: DeckGenerationProgress | null,
   viewStatus: GenerationViewState["status"],
 ) {
+  if (viewStatus === "complete" || progress?.step === "complete") {
+    return "done";
+  }
   if (viewStatus === "interrupted") {
     return index === activeIndex ? "interrupted" : index < activeIndex ? "done" : "pending";
   }
@@ -143,8 +146,10 @@ function GenerationProgressPanel(props: {
   canStop: boolean;
 }) {
   const { t, progress, history, onCancel, showStop, canStop } = props;
-  const completed = progress.pages.filter((page) => page.status === "accepted").length;
-  const total = progress.totalPages || progress.pages.length || 0;
+  const realPages = progress.pages.filter((page) => !isDiscoveryPageId(page.page_id));
+  const completed = realPages.filter((page) => page.status === "accepted").length;
+  const total = realPages.length || progress.totalPages || 0;
+  const showPageAcceptedSummary = isPageGenerationStep(progress.step) && total > 0;
   const progressMessage = getGenerationProgressDisplayMessage(t, progress);
   const stageGroups = useMemo(
     () => buildPageGenerationStageRecords({ t, progress, history }),
@@ -167,7 +172,7 @@ function GenerationProgressPanel(props: {
           {running ? (
             <span className="generation-stay-hint">{t.generating.stayOnPageHint}</span>
           ) : null}
-          {total > 0 ? (
+          {showPageAcceptedSummary ? (
             <span className="generation-pages-passed">
               {t.generating.pagesPassed
                 .replace("{completed}", String(completed))
@@ -217,9 +222,6 @@ function ResearchDiscoveryStageGroupView(props: {
       <div className="generation-page-item-header">
         <div>
           <strong>{group.title}</strong>
-          {group.summaryLines.length > 0 ? (
-            <p className="research-discovery-summary">{group.summaryLines.join(" · ")}</p>
-          ) : null}
         </div>
         <span className={`generation-status-badge ${badgeState}`}>{group.statusLabel}</span>
       </div>
@@ -256,13 +258,11 @@ function ResearchDiscoveryStageRecordView(props: {
     Boolean(record.rationale) ||
     record.queryLines.length > 0 ||
     record.sourceLines.length > 0 ||
-    record.visualAssets.length > 0 ||
     displayActivities.length > 0 ||
     displayLines.some((line) => line.trim()) ||
     record.gaps.length > 0 ||
     record.rejectedReasons.length > 0 ||
-    record.summaryLines.length > 0 ||
-    Boolean(record.note);
+    record.summaryLines.length > 0;
 
   return (
     <article className={`generation-stage-record research-discovery-record ${record.state}`}>
@@ -295,23 +295,6 @@ function ResearchDiscoveryStageRecordView(props: {
           ) : null}
           <ResearchDiscoveryLineList title={t.generating.researchDiscovery.queries} lines={record.queryLines} />
           <ResearchDiscoveryLineList title={t.generating.researchDiscovery.sources} lines={record.sourceLines} />
-          {record.visualAssets.length > 0 ? (
-            <div className="research-discovery-visual-grid" aria-label={t.generating.researchDiscovery.visualAssets}>
-              {record.visualAssets.map((asset) => (
-                <div key={asset.id} className="research-discovery-visual-asset">
-                  {asset.thumbnailUrl || asset.imageUrl ? (
-                    <img src={asset.thumbnailUrl ?? asset.imageUrl} alt={asset.visualSummary || asset.reason || asset.id} />
-                  ) : (
-                    <span className="research-discovery-image-ref">{asset.filePath || asset.id}</span>
-                  )}
-                  <div>
-                    <strong>{asset.visualSummary || asset.reason || asset.id}</strong>
-                    {asset.pageUrl ? <span>{asset.pageUrl}</span> : null}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : null}
           {displayActivities.length > 0 ? (
             <div className="generation-activity-list" aria-label={t.generating.stageRecords.activities}>
               {displayActivities.map((activity, index) => (
@@ -327,7 +310,6 @@ function ResearchDiscoveryStageRecordView(props: {
           <ResearchDiscoveryLineList title={t.generating.researchDiscovery.gaps} lines={record.gaps} warning />
           <ResearchDiscoveryLineList title={t.generating.researchDiscovery.rejected} lines={record.rejectedReasons} />
           <ResearchDiscoveryLineList title={t.generating.researchDiscovery.summary} lines={record.summaryLines} />
-          {record.note ? <p className="research-discovery-note">{record.note}</p> : null}
           {!hasBody ? (
             <p className="generation-empty-stream">{t.generating.researchDiscovery.empty}</p>
           ) : null}
@@ -356,6 +338,18 @@ function ResearchDiscoveryLineList(props: {
 
 function isProgressRunning(progress: DeckGenerationProgress) {
   return !["complete", "interrupted", "failed", "cancelled"].includes(progress.step);
+}
+
+function isPageGenerationStep(step: DeckGenerationStep) {
+  return ![
+    "page-plan",
+    "research-planning",
+    "prepare",
+    "research-discovery",
+    "research-collection",
+    "research-curation",
+    "evidence-page-planning",
+  ].includes(step);
 }
 
 function PageStageRecordGroupView(props: {
@@ -477,10 +471,9 @@ function sanitizeGenerationDebugText(text: string) {
     .trim();
 }
 
-function statusBadgeState(state: PageGenerationStageRecord["state"] | "warning") {
+function statusBadgeState(state: PageGenerationStageRecord["state"]) {
   if (state === "completed") return "completed";
   if (state === "active") return "active";
-  if (state === "warning") return "warning";
   if (state === "failed") return "failed";
   return "pending";
 }
@@ -558,7 +551,7 @@ function useResearchDiscoveryDisclosure(group: ResearchDiscoveryStageGroup | nul
       const next = { ...current };
       records.forEach((record) => {
         if (userTouchedRef.current.has(record.id)) return;
-        if (record.state === "active" || record.state === "failed" || record.state === "warning") {
+        if (record.state === "active" || record.state === "failed") {
           next[record.id] = true;
         } else if (record.state === "pending" && next[record.id] === undefined) {
           next[record.id] = false;
@@ -572,7 +565,7 @@ function useResearchDiscoveryDisclosure(group: ResearchDiscoveryStageGroup | nul
 
   return {
     isOpen(record: ResearchDiscoveryStageRecord) {
-      return openStages[record.id] ?? (record.state === "active" || record.state === "failed" || record.state === "warning");
+      return openStages[record.id] ?? (record.state === "active" || record.state === "failed");
     },
     toggle(recordId: string) {
       userTouchedRef.current.add(recordId);

@@ -667,7 +667,7 @@ function createHarness(options: {
         page_id: input.page_id,
         patch: clone(input.patch),
       });
-      const { recovery, final_deck_render: finalDeckRender, deck_status: deckStatus, ...pagePatch } = input.patch;
+      const { recovery, final_deck_render: finalDeckRender, research_discovery: researchDiscovery, deck_status: deckStatus, ...pagePatch } = input.patch;
       progress = {
         ...progress,
         status: typeof deckStatus === "string" ? deckStatus : progress.status,
@@ -677,6 +677,9 @@ function createHarness(options: {
         final_deck_render: finalDeckRender && typeof finalDeckRender === "object" && !Array.isArray(finalDeckRender)
           ? { ...(progress.final_deck_render ?? {}), ...clone(finalDeckRender) } as never
           : progress.final_deck_render,
+        research_discovery: researchDiscovery && typeof researchDiscovery === "object" && !Array.isArray(researchDiscovery)
+          ? clone(researchDiscovery) as never
+          : progress.research_discovery,
         pages: progress.pages.map((page) =>
           input.page_id && page.page_id === input.page_id ? { ...page, ...pagePatch } : page,
         ),
@@ -2883,6 +2886,11 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.webSearchCalls, 0);
     assert.equal(harness.imageSearchCalls, 0);
     assert.equal(harness.authoringPrompts.length, 2);
+    const records = harness.progress.research_discovery?.records ?? [];
+    for (const phase of ["web-collection", "web-curation", "visual-collection", "visual-curation"] as const) {
+      assert.equal(records.find((record) => record.phase === phase)?.state, "completed");
+    }
+    assert.equal(harness.progress.research_discovery?.status, "completed");
   });
 
   it("collects web and image research before page authoring when a page needs evidence", async () => {

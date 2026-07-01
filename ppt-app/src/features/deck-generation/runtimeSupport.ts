@@ -4,7 +4,7 @@ import type { PagePlanItem, PageProgress } from "../../api/types";
 import type { DeckRefinementIntentReviewResult } from "../../ai/types";
 import { buildDeckGenerationSummary, emitRuntime } from "./progressProjection";
 import { updateResearchDiscoveryCurationStream } from "./researchDiscoveryProgress";
-import { ATTEMPT_LIMITS, type DeckGenerationContext, type DeckGenerationRuntime, type DeckGenerationStep, type DeckGenerationStream } from "./types";
+import { ATTEMPT_LIMITS, type DeckGenerationContext, type DeckGenerationRuntime, type DeckGenerationStep, type DeckGenerationStream, type ResearchDiscoveryProgress } from "./types";
 
 function isResearchAgentKind(kind: string) {
   return kind === "research-curation"
@@ -43,16 +43,18 @@ export async function recordDeckRecovery(
     deck_refinement_review?: DeckRefinementIntentReviewResult | null;
     error?: string | null;
     final_deck_render?: Partial<NonNullable<PageProgress["final_deck_render"]>>;
+    research_discovery?: ResearchDiscoveryProgress;
     deck_status?: string;
   },
 ) {
-  const { final_deck_render: finalDeckRender, deck_status: deckStatus, ...recovery } = patch;
+  const { final_deck_render: finalDeckRender, research_discovery: researchDiscovery, deck_status: deckStatus, ...recovery } = patch;
   return input.backend.recordPageProgress({
     workspace_dir: input.workspace.workspace_dir,
     patch: {
       ...(deckStatus ? { deck_status: deckStatus } : {}),
       recovery,
       ...(finalDeckRender ? { final_deck_render: finalDeckRender } : {}),
+      ...(researchDiscovery ? { research_discovery: researchDiscovery } : {}),
     },
   });
 }

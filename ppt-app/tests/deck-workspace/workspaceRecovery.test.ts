@@ -32,15 +32,37 @@ function makeProgress(statuses = ["accepted"]): PageProgress {
 
 describe("Workspace Recovery", () => {
   it("restores completed generation progress for already rendered workspaces", () => {
+    const storedProgress = makeProgress();
+    storedProgress.research_discovery = {
+      status: "completed",
+      summary: {
+        facts: 1,
+        derivedInsights: 0,
+        visualAssets: 0,
+        gaps: 0,
+        rejectedMaterial: 0,
+      },
+      records: [
+        { phase: "web-decision", state: "completed", rationale: "No additional web facts needed." },
+        { phase: "web-collection", state: "completed", activities: ["无需网页搜索，已跳过搜索与抓取。"] },
+        { phase: "web-curation", state: "completed", activities: ["无需筛选网页事实证据。"] },
+        { phase: "visual-decision", state: "completed" },
+        { phase: "visual-collection", state: "completed" },
+        { phase: "visual-curation", state: "completed" },
+        { phase: "evidence-page-planning", state: "completed" },
+      ],
+    };
     const progress = restoreDeckGenerationProgress({
       staleDeck: false,
-      pageProgress: makeProgress(),
+      pageProgress: storedProgress,
       locale: "zh",
     });
 
     assert.equal(progress?.step, "complete");
     assert.equal(progress?.totalPages, 1);
     assert.equal(progress?.pages[0]?.status, "accepted");
+    assert.equal(progress?.researchDiscovery?.records.length, 7);
+    assert.equal(progress?.researchDiscovery?.records.find((record) => record.phase === "web-collection")?.activities?.[0], "无需网页搜索，已跳过搜索与抓取。");
   });
 
   it("does not mark accepted pages complete when final deck render failed", () => {

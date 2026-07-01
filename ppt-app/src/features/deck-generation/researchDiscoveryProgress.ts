@@ -365,8 +365,8 @@ function progressStatus(records: ResearchDiscoveryProgressPhaseRecord[]): Resear
   const hasWarning = records.some((record) => record.state === "warning");
   const hasStarted = records.some((record) => record.state === "completed" || record.state === "warning");
   const allTerminal = records.every((record) => record.state === "completed" || record.state === "warning");
-  if (hasWarning) return "warning";
-  if (hasStarted) return allTerminal ? "completed" : "active";
+  if (allTerminal) return hasWarning ? "warning" : "completed";
+  if (hasStarted) return "active";
   return "pending";
 }
 

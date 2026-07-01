@@ -762,11 +762,85 @@ export interface FinalDeckRenderState {
   updated_at: string | null;
 }
 
+export type ResearchDiscoveryProgressPhase =
+  | "web-decision"
+  | "web-collection"
+  | "web-curation"
+  | "visual-decision"
+  | "visual-collection"
+  | "visual-curation"
+  | "evidence-page-planning";
+
+export type ResearchDiscoveryProgressState =
+  | "pending"
+  | "active"
+  | "completed"
+  | "warning"
+  | "failed";
+
+export interface ResearchDiscoveryProgressSource {
+  title?: string;
+  url?: string;
+}
+
+export interface ResearchDiscoveryProgressQuery {
+  kind: "web" | "visual";
+  query: string;
+  status: "collected" | "gap" | "error" | "skipped_duplicate";
+  resultCount?: number;
+  fetchCount?: number;
+  downloadCount?: number;
+  message?: string;
+  sources?: ResearchDiscoveryProgressSource[];
+}
+
+export interface ResearchDiscoveryProgressVisualAsset {
+  id: string;
+  filePath?: string;
+  imageUrl?: string;
+  thumbnailUrl?: string;
+  pageUrl?: string;
+  reason?: string;
+  visualSummary?: string;
+}
+
+export interface ResearchDiscoveryProgressSummary {
+  facts: number;
+  derivedInsights: number;
+  visualAssets: number;
+  gaps: number;
+  rejectedMaterial: number;
+}
+
+export interface ResearchDiscoveryProgressPhaseRecord {
+  phase: ResearchDiscoveryProgressPhase;
+  state: ResearchDiscoveryProgressState;
+  iteration?: number;
+  rationale?: string;
+  queries?: ResearchDiscoveryProgressQuery[];
+  sources?: ResearchDiscoveryProgressSource[];
+  visualAssets?: ResearchDiscoveryProgressVisualAsset[];
+  activities?: string[];
+  lines?: string[];
+  gaps?: string[];
+  rejectedReasons?: string[];
+  counts?: Partial<ResearchDiscoveryProgressSummary>;
+  updatedAt?: string;
+}
+
+export interface ResearchDiscoveryProgress {
+  status: ResearchDiscoveryProgressState;
+  records: ResearchDiscoveryProgressPhaseRecord[];
+  summary: ResearchDiscoveryProgressSummary;
+  updatedAt?: string;
+}
+
 export interface PageProgress {
   version: 1;
   status: string;
   recovery?: PageProgressRecoveryState;
   final_deck_render?: FinalDeckRenderState;
+  research_discovery?: ResearchDiscoveryProgress;
   pages: PageProgressItem[];
   updated_at: string | null;
 }

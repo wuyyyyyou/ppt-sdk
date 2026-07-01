@@ -558,6 +558,7 @@ export interface AppPageProgress {
   status: string;
   recovery: AppPageProgressRecoveryState;
   final_deck_render: AppFinalDeckRenderState;
+  research_discovery?: unknown;
   pages: AppPageProgressItem[];
   updated_at: string | null;
 }

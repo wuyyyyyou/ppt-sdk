@@ -53,7 +53,7 @@ A Workspace-owned record of which web and image query intents have already been 
 The decision that more external material is needed because the deck or a refinement target depends on real-world facts, current information, source-backed data, or non-template visual assets that are not already available in Research Evidence.
 
 **Research Evidence Gap**:
-A case where Research Discovery, Research Curation, or Evidence-Aware Page Planning cannot produce enough Research Evidence for a requested deck or page intent. It does not block Page Generation; unsupported concrete details must be omitted, generalized, or marked as TBD / 待补充. Reaching a Research Discovery iteration limit may produce a Research Evidence Gap. User cancellation or interruption during research is unfinished work, not a Research Evidence Gap.
+A case where Research Discovery, Research Curation, or Evidence-Aware Page Planning cannot produce enough Research Evidence for a requested deck or page intent. It does not block Page Generation and does not make completed research work partially failed; unsupported concrete details must be omitted, generalized, or marked as TBD / 待补充. Reaching a Research Discovery iteration limit may produce a Research Evidence Gap. User cancellation or interruption during research is unfinished work, not a Research Evidence Gap.
 
 **Evidence-Aware Page Planning**:
 The deck-level step after Research Discovery that updates the Page Plan with each Page Generation Unit's main content direction, supporting Research Evidence references, and Visual Research Evidence references. It does not modify the Confirmed Outline, does not copy full evidence content into the Page Plan, and does not make Raw Research Material a grounding source.

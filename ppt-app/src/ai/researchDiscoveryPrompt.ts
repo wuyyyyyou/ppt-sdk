@@ -55,7 +55,37 @@ export function buildResearchDiscoveryDecisionLlmRequest(input: {
     : input.pagePlan.pages;
   const phaseRule = input.phase === "web"
     ? "Decide whether source-backed web research is still needed for facts, current information, data, citations, named cases, or other real-world claims."
-    : "Decide whether image research is still needed for real visual assets. Use curated web facts and insights to form image queries when helpful, but do not treat images as factual evidence.";
+    : "Decide only whether image research is still needed for real visual assets. Use curated web facts and insights only as context for image queries; do not decide whether factual evidence is sufficient.";
+  const stopRule = input.phase === "web"
+    ? "If existing curated web evidence is sufficient for factual grounding, return action stop."
+    : "If existing curated visual assets are sufficient for page imagery needs, return action stop.";
+  const searchRule = input.phase === "web"
+    ? "If more source-backed web material is needed, return action search with concise queries."
+    : "If more image material is needed, return action search with concise image queries.";
+  const phaseSpecificRules = input.phase === "web"
+    ? [
+        "- Decide only web evidence needs in this phase.",
+        "- Use evidence_needs for missing factual/source-backed material.",
+        "- visual_needs may mention later image needs, but do not use them to keep web research running.",
+      ]
+    : [
+        "- Decide only image asset needs in this phase.",
+        "- Completion means no more image asset collection is needed; it does not mean web/factual research is complete.",
+        "- The rationale, visual_needs, and gaps must discuss visual assets only.",
+        "- evidence_needs must be []. Do not report missing facts, data, citations, or source-backed claims here.",
+      ];
+  const jsonShape = JSON.stringify({
+    action: "stop",
+    phase: input.phase,
+    queries: [],
+    rationale: "...",
+    evidence_needs: [],
+    visual_needs: [],
+    gaps: [],
+  });
+  const poolLabel = input.phase === "web"
+    ? "Existing curated Discovery Evidence Pool summary"
+    : "Existing curated Discovery Evidence Pool summary (facts are context only; make the decision from visual_assets and visual gaps)";
 
   return {
     messages: [
@@ -69,8 +99,8 @@ export function buildResearchDiscoveryDecisionLlmRequest(input: {
             "Do not search. Decide only whether the app should search next and which concise query intents to run.",
             "Do not request research merely to enrich a page.",
             phaseRule,
-            "If existing curated evidence is sufficient, return action stop.",
-            "If more material is needed, return action search with concise queries.",
+            stopRule,
+            searchRule,
             "Never ask visual discovery to create factual evidence.",
             "The JSON must be parseable by JSON.parse.",
           ].join("\n"),
@@ -88,10 +118,10 @@ export function buildResearchDiscoveryDecisionLlmRequest(input: {
             `Target page ids: ${JSON.stringify(input.targetPageIds ?? [])}`,
             `Outline: ${JSON.stringify(input.outline)}`,
             `Scoped Page Plan pages: ${JSON.stringify(scopedPages)}`,
-            `Existing curated Discovery Evidence Pool summary: ${JSON.stringify(compactDiscoveryPool(input.discoveryPool))}`,
+            `${poolLabel}: ${JSON.stringify(compactDiscoveryPool(input.discoveryPool))}`,
             `Research status / ledger summary: ${JSON.stringify(input.researchStatus ?? null)}`,
             "Return exactly this JSON shape:",
-            '{"action":"stop","phase":"web","queries":[],"rationale":"...","evidence_needs":[],"visual_needs":[],"gaps":[]}',
+            jsonShape,
             "Rules:",
             "- action must be stop or search.",
             `- phase must be ${input.phase}.`,
@@ -99,6 +129,7 @@ export function buildResearchDiscoveryDecisionLlmRequest(input: {
             "- Do not repeat completed queries listed in the pool summary.",
             "- Put geography, date, entity names, and specificity in query text when needed.",
             "- If the iteration limit is near and important evidence is still missing, return stop with gaps instead of low-value broad queries.",
+            ...phaseSpecificRules,
           ].join("\n"),
         },
       },
@@ -119,7 +150,9 @@ export function parseResearchDiscoveryDecisionJson(text: string, phase: "web" | 
       ? (Array.isArray(parsed.queries) ? parsed.queries.filter((query): query is string => typeof query === "string" && query.trim().length > 0).slice(0, 4) : [])
       : [],
     rationale: typeof parsed.rationale === "string" ? parsed.rationale : "",
-    evidence_needs: Array.isArray(parsed.evidence_needs) ? parsed.evidence_needs.filter((item): item is string => typeof item === "string") : [],
+    evidence_needs: phase === "web" && Array.isArray(parsed.evidence_needs)
+      ? parsed.evidence_needs.filter((item): item is string => typeof item === "string")
+      : [],
     visual_needs: Array.isArray(parsed.visual_needs) ? parsed.visual_needs.filter((item): item is string => typeof item === "string") : [],
     gaps: Array.isArray(parsed.gaps) ? parsed.gaps.filter((item): item is string => typeof item === "string") : [],
   };

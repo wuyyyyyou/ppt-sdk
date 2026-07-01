@@ -232,13 +232,35 @@ describe("Research Discovery Progress projection", () => {
     assert.equal(summary.counts?.visualAssets, 1);
   });
 
-  it("keeps gap states as warning instead of failure", () => {
+  it("keeps gap states as diagnostic warning without making incomplete discovery terminal", () => {
     const progress = updateResearchDiscoveryPhase(createEmptyResearchDiscoveryProgress(), {
       phase: "web-curation",
       state: "warning",
       gaps: ["Could not verify latest pricing."],
       counts: { facts: 2, gaps: 1, rejectedMaterial: 3 },
     });
+
+    assert.equal(progress.status, "active");
+    assert.equal(progress.records.find((record) => record.phase === "web-curation")?.state, "warning");
+  });
+
+  it("keeps completed discovery with gaps as diagnostic warning after all phases finish", () => {
+    const progress = [
+      "web-decision",
+      "web-collection",
+      "web-curation",
+      "visual-decision",
+      "visual-collection",
+      "visual-curation",
+      "evidence-page-planning",
+    ].reduce(
+      (current, phase) => updateResearchDiscoveryPhase(current, {
+        phase: phase as Parameters<typeof updateResearchDiscoveryPhase>[1]["phase"],
+        state: phase === "web-curation" ? "warning" : "completed",
+        gaps: phase === "web-curation" ? ["Could not verify latest pricing."] : undefined,
+      }),
+      createEmptyResearchDiscoveryProgress(),
+    );
 
     assert.equal(progress.status, "warning");
     assert.equal(progress.records.find((record) => record.phase === "web-curation")?.state, "warning");
@@ -369,9 +391,15 @@ describe("Research Discovery Progress projection", () => {
     assert.equal(progressEvents.some((event) => JSON.stringify(event).includes("researchDiscovery")), true);
   });
 
-  it("does not restore Research Discovery details from durable page progress recovery", () => {
+  it("restores Research Discovery details from durable page progress", () => {
+    const researchDiscovery = updateResearchDiscoveryPhase(createEmptyResearchDiscoveryProgress(), {
+      phase: "web-curation",
+      state: "completed",
+      counts: { facts: 2 },
+    });
     const projected = pageProgressToDeckGenerationProgress({
       status: "interrupted",
+      research_discovery: researchDiscovery,
       pages: [
         {
           page_id: "page-01",
@@ -405,7 +433,7 @@ describe("Research Discovery Progress projection", () => {
       },
     });
 
-    assert.equal(projected.researchDiscovery, undefined);
+    assert.equal(projected.researchDiscovery?.records.find((record) => record.phase === "web-curation")?.counts?.facts, 2);
   });
 
   it("keeps current-run Research Discovery progress on terminal and final render progress events", () => {

@@ -1046,6 +1046,44 @@ function normalizeFinalDeckRenderState(value: unknown): AppPageProgress["final_d
   };
 }
 
+const RESEARCH_DISCOVERY_PHASES = new Set([
+  "web-decision",
+  "web-collection",
+  "web-curation",
+  "visual-decision",
+  "visual-collection",
+  "visual-curation",
+  "evidence-page-planning",
+]);
+
+const RESEARCH_DISCOVERY_STATES = new Set([
+  "pending",
+  "active",
+  "completed",
+  "warning",
+  "failed",
+]);
+
+function normalizeResearchDiscoveryProgress(value: unknown): AppPageProgress["research_discovery"] {
+  const record = getPlainRecord(value);
+  const status = normalizeString(record.status);
+  if (!RESEARCH_DISCOVERY_STATES.has(status) || !Array.isArray(record.records)) {
+    return undefined;
+  }
+  return {
+    ...record,
+    status,
+    summary: getPlainRecord(record.summary),
+    records: record.records
+      .map((item) => getPlainRecord(item))
+      .filter((item) =>
+        RESEARCH_DISCOVERY_PHASES.has(normalizeString(item.phase)) &&
+        RESEARCH_DISCOVERY_STATES.has(normalizeString(item.state))
+      ),
+    updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : undefined,
+  };
+}
+
 function normalizePageProgressJson(value: unknown): AppPageProgress {
   const record = getPlainRecord(value);
   const pages = Array.isArray(record.pages)
@@ -1060,6 +1098,7 @@ function normalizePageProgressJson(value: unknown): AppPageProgress {
     status: normalizeString(record.status) || "idle",
     recovery: normalizePageProgressRecoveryState(record.recovery),
     final_deck_render: normalizeFinalDeckRenderState(record.final_deck_render),
+    research_discovery: normalizeResearchDiscoveryProgress(record.research_discovery),
     pages,
     updated_at: typeof record.updated_at === "string" ? record.updated_at : null,
   };
@@ -1114,6 +1153,7 @@ function createDefaultPageProgressJson(): AppPageProgress {
       rendered_at: null,
       updated_at: null,
     },
+    research_discovery: undefined,
     pages: [],
     updated_at: null,
   };
@@ -3604,6 +3644,9 @@ export async function recordAppPageProgress(
     const finalDeckRenderPatch = isRecord(patchRecord.final_deck_render)
       ? patchRecord.final_deck_render
       : {};
+    const researchDiscoveryPatch = isRecord(patchRecord.research_discovery)
+      ? normalizeResearchDiscoveryProgress(patchRecord.research_discovery)
+      : undefined;
     const recovery = normalizePageProgressRecoveryState({
       ...current.recovery,
       ...recoveryPatch,
@@ -3621,6 +3664,7 @@ export async function recordAppPageProgress(
       status: normalizeString(input.patch.deck_status) || current.status || "running",
       recovery,
       final_deck_render: finalDeckRender,
+      research_discovery: researchDiscoveryPatch ?? current.research_discovery,
       pages: nextPages,
       updated_at: updatedAt,
     };

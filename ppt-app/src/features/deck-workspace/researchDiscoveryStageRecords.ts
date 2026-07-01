@@ -14,31 +14,21 @@ export interface ResearchDiscoveryStageRecord {
   phase: ResearchDiscoveryProgressPhase;
   label: string;
   statusLabel: string;
-  state: PageStageRecordState | "warning";
+  state: PageStageRecordState;
   rationale?: string;
   queryLines: string[];
   sourceLines: string[];
-  visualAssets: Array<{
-    id: string;
-    imageUrl?: string;
-    thumbnailUrl?: string;
-    filePath?: string;
-    pageUrl?: string;
-    reason?: string;
-    visualSummary?: string;
-  }>;
   activities: string[];
   lines: string[];
   gaps: string[];
   rejectedReasons: string[];
   summaryLines: string[];
-  note?: string;
 }
 
 export interface ResearchDiscoveryStageGroup {
   title: string;
   statusLabel: string;
-  state: PageStageRecordState | "warning";
+  state: PageStageRecordState;
   summaryLines: string[];
   records: ResearchDiscoveryStageRecord[];
 }
@@ -56,12 +46,12 @@ export function buildResearchDiscoveryStageRecords(input: {
   const records = progress.researchDiscovery.records.map((record) =>
     buildRecord(t, mergeActiveStream(record, streamByKind))
   );
-  const state = normalizeState(progress.researchDiscovery.status);
+  const state = groupDisplayState(progress.researchDiscovery.records, progress.researchDiscovery.status);
   return {
     title: t.generating.researchDiscovery.title,
     statusLabel: stateLabel(t, state),
     state,
-    summaryLines: summaryLines(t, progress.researchDiscovery.summary),
+    summaryLines: [],
     records,
   };
 }
@@ -95,6 +85,21 @@ function mergeActiveStream(
   };
 }
 
+function groupDisplayState(
+  records: ResearchDiscoveryProgressPhaseRecord[],
+  status: ResearchDiscoveryProgressState,
+): ResearchDiscoveryStageGroup["state"] {
+  if (records.some((record) => record.state === "failed")) return "failed";
+  if (records.some((record) => record.state === "active")) return "active";
+  const hasStarted = records.some((record) => record.state === "completed" || record.state === "warning");
+  const allTerminal = records.length > 0 && records.every((record) =>
+    record.state === "completed" || record.state === "warning"
+  );
+  if (!allTerminal && hasStarted) return "active";
+  if (allTerminal) return "completed";
+  return normalizeState(status);
+}
+
 function buildRecord(
   t: Messages,
   record: ResearchDiscoveryProgressPhaseRecord,
@@ -109,15 +114,11 @@ function buildRecord(
     rationale: record.rationale,
     queryLines: queryLines(t, record),
     sourceLines: sourceLines(t, record),
-    visualAssets: record.visualAssets ?? [],
     activities: record.activities ?? [],
     lines: record.lines ?? [],
     gaps: record.gaps ?? [],
     rejectedReasons: record.rejectedReasons ?? [],
     summaryLines: countLines(t, record.counts),
-    note: record.phase === "visual-curation"
-      ? t.generating.researchDiscovery.visualEvidenceNote
-      : undefined,
   };
 }
 
@@ -161,10 +162,6 @@ function sourceLines(t: Messages, record: ResearchDiscoveryProgressPhaseRecord) 
   return lines;
 }
 
-function summaryLines(t: Messages, summary: ResearchDiscoveryProgressSummary) {
-  return countLines(t, summary);
-}
-
 function countLines(
   t: Messages,
   counts: Partial<ResearchDiscoveryProgressSummary> | undefined,
@@ -181,7 +178,7 @@ function countLines(
 }
 
 function normalizeState(state: ResearchDiscoveryProgressState): ResearchDiscoveryStageRecord["state"] {
-  if (state === "warning") return "warning";
+  if (state === "warning") return "completed";
   if (state === "failed") return "failed";
   if (state === "active") return "active";
   if (state === "completed") return "completed";
@@ -192,7 +189,6 @@ function stateLabel(
   t: Messages,
   state: ResearchDiscoveryStageRecord["state"],
 ) {
-  if (state === "warning") return t.generating.researchDiscovery.warning;
   switch (state) {
     case "active":
       return t.generating.stageRecords.running;

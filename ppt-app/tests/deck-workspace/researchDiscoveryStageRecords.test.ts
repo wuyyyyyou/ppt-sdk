@@ -51,12 +51,12 @@ describe("Research Discovery Stage Records", () => {
     const collection = group?.records.find((record) => record.phase === "web-collection");
 
     assert.equal(group?.title, "Facts collection");
-    assert.equal(group?.summaryLines.includes("Facts: 1"), true);
+    assert.deepEqual(group?.summaryLines, []);
     assert.equal(collection?.queryLines[0], "Collected: EV market 2026 (6 results · 4 fetched)");
     assert.deepEqual(collection?.sourceLines, ["IEA · https://example.com/iea"]);
   });
 
-  it("presents gaps as warning state rather than failed state", () => {
+  it("presents completed gaps as completed state for the user-facing UI", () => {
     const progress: DeckGenerationProgress = {
       step: "research-curation",
       message: "Curating",
@@ -86,8 +86,47 @@ describe("Research Discovery Stage Records", () => {
 
     const group = buildResearchDiscoveryStageRecords({ t: messages.en, progress });
 
-    assert.equal(group?.state, "warning");
-    assert.equal(group?.statusLabel, "Partial");
-    assert.equal(group?.records.find((record) => record.phase === "web-curation")?.state, "warning");
+    assert.equal(group?.state, "completed");
+    assert.equal(group?.statusLabel, "Completed");
+    assert.equal(group?.records.find((record) => record.phase === "web-curation")?.state, "completed");
+    assert.deepEqual(
+      group?.records.find((record) => record.phase === "web-curation")?.gaps,
+      ["No source verified the latest price."],
+    );
+  });
+
+  it("keeps the user-facing group active when warning phases have later pending work", () => {
+    const progress: DeckGenerationProgress = {
+      step: "research-curation",
+      message: "Curating",
+      currentPageIndex: null,
+      totalPages: 1,
+      pages: [],
+      researchDiscovery: {
+        status: "warning",
+        summary: {
+          facts: 2,
+          derivedInsights: 0,
+          visualAssets: 0,
+          gaps: 1,
+          rejectedMaterial: 0,
+        },
+        records: [
+          { phase: "web-decision", state: "completed" },
+          { phase: "web-collection", state: "completed" },
+          { phase: "web-curation", state: "warning", gaps: ["No source verified the latest price."] },
+          { phase: "visual-decision", state: "pending" },
+          { phase: "visual-collection", state: "pending" },
+          { phase: "visual-curation", state: "pending" },
+          { phase: "evidence-page-planning", state: "pending" },
+        ],
+      },
+    };
+
+    const group = buildResearchDiscoveryStageRecords({ t: messages.en, progress });
+
+    assert.equal(group?.state, "active");
+    assert.equal(group?.statusLabel, "Running");
+    assert.equal(group?.records.find((record) => record.phase === "web-curation")?.state, "completed");
   });
 });

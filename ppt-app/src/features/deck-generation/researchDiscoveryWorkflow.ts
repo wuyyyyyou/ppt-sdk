@@ -676,7 +676,7 @@ function emitResearchProgress(input: {
   );
 }
 
-function updateDiscoveryProgress(input: {
+async function updateDiscoveryProgress(input: {
   runtime: DeckGenerationRuntime;
   pagePlan: PagePlan;
   message: string;
@@ -685,6 +685,16 @@ function updateDiscoveryProgress(input: {
   stream?: import("./types").DeckGenerationStream | null;
 }) {
   setRuntimeResearchDiscoveryProgress(input.runtime, input.update());
+  const progress = await recordDeckRecovery(input.runtime, {
+    status: "running",
+    run_kind: input.runtime.refinementRunKind ?? (input.runtime.pageRefinementRequests ? "page-refinement" : "deck-generation"),
+    step: input.step,
+    target_page_ids: input.pagePlan.pages.map((page) => page.page_id),
+    error: null,
+    deck_status: "running",
+    research_discovery: input.runtime.researchDiscoveryProgress,
+  });
+  input.runtime.setProgress(progress);
   emitResearchProgress({
     runtime: input.runtime,
     pagePlan: input.pagePlan,
@@ -710,7 +720,7 @@ async function runDiscoveryPhase(input: {
     const decisionPhase = input.phase === "web" ? "web-decision" : "visual-decision";
     const collectionPhase = input.phase === "web" ? "web-collection" : "visual-collection";
     const curationPhase = input.phase === "web" ? "web-curation" : "visual-curation";
-    updateDiscoveryProgress({
+    await updateDiscoveryProgress({
       runtime: input.runtime,
       pagePlan: input.pagePlan,
       step: "research-discovery",
@@ -761,7 +771,7 @@ async function runDiscoveryPhase(input: {
       target_page_ids: input.targetPageIds ?? input.pagePlan.pages.map((page) => page.page_id),
       updated_at: new Date().toISOString(),
     });
-    updateDiscoveryProgress({
+    await updateDiscoveryProgress({
       runtime: input.runtime,
       pagePlan: input.pagePlan,
       step: "research-discovery",
@@ -783,10 +793,42 @@ async function runDiscoveryPhase(input: {
         };
         pool.status = poolStatus(pool);
       }
+      await updateDiscoveryProgress({
+        runtime: input.runtime,
+        pagePlan: input.pagePlan,
+        step: "research-collection",
+        message: input.phase === "web" ? text.collectingWebSources : text.collectingVisualSources,
+        update: () => updateResearchDiscoveryPhase(input.runtime.researchDiscoveryProgress, {
+          phase: collectionPhase,
+          state: "completed",
+          iteration,
+          activities: [
+            input.phase === "web"
+              ? "无需网页搜索，已跳过搜索与抓取。"
+              : "无需图片搜索，已跳过图片素材收集。",
+          ],
+        }),
+      });
+      await updateDiscoveryProgress({
+        runtime: input.runtime,
+        pagePlan: input.pagePlan,
+        step: "research-curation",
+        message: input.phase === "web" ? text.curatingDiscoveryFacts : text.curatingDiscoveryImages,
+        update: () => updateResearchDiscoveryPhase(input.runtime.researchDiscoveryProgress, {
+          phase: curationPhase,
+          state: "completed",
+          iteration,
+          activities: [
+            input.phase === "web"
+              ? "无需筛选网页事实证据。"
+              : "无需筛选图片素材。",
+          ],
+        }),
+      });
       break;
     }
 
-    updateDiscoveryProgress({
+    await updateDiscoveryProgress({
       runtime: input.runtime,
       pagePlan: input.pagePlan,
       step: "research-collection",
@@ -804,7 +846,7 @@ async function runDiscoveryPhase(input: {
       queries: decision.queries,
       pool,
     });
-    updateDiscoveryProgress({
+    await updateDiscoveryProgress({
       runtime: input.runtime,
       pagePlan: input.pagePlan,
       step: "research-collection",
@@ -844,7 +886,7 @@ async function runDiscoveryPhase(input: {
     const draftType = input.phase === "web" ? "web" : "visual";
     const draftPath = `${input.paths.evidence_drafts_dir}/${draftId}-${draftType}.json`;
 
-    updateDiscoveryProgress({
+    await updateDiscoveryProgress({
       runtime: input.runtime,
       pagePlan: input.pagePlan,
       step: "research-curation",
@@ -958,7 +1000,7 @@ async function runDiscoveryPhase(input: {
     const curationSummary = input.phase === "web"
       ? summarizeWebDraft(webDraft)
       : summarizeVisualDraft(visualDraft);
-    updateDiscoveryProgress({
+    await updateDiscoveryProgress({
       runtime: input.runtime,
       pagePlan: input.pagePlan,
       step: "research-curation",
@@ -1176,7 +1218,7 @@ export async function runResearchDiscoveryForPagePlan(input: {
     paths,
   });
 
-  updateDiscoveryProgress({
+  await updateDiscoveryProgress({
     runtime,
     pagePlan: input.pagePlan,
     step: "evidence-page-planning",
@@ -1221,7 +1263,7 @@ export async function runResearchDiscoveryForPagePlan(input: {
       updated_at: new Date().toISOString(),
     };
   }
-  updateDiscoveryProgress({
+  await updateDiscoveryProgress({
     runtime,
     pagePlan: input.pagePlan,
     step: "evidence-page-planning",

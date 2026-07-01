@@ -157,6 +157,7 @@ export function pageProgressToDeckGenerationProgress(
       ...storedProgress,
       pages,
     }),
+    researchDiscovery: cloneResearchDiscoveryProgress(storedProgress.research_discovery),
   };
 }
 
