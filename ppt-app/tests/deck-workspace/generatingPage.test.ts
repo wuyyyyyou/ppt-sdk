@@ -151,17 +151,144 @@ describe("GeneratingPage controls", () => {
     );
 
     assert.match(html, /<button class="generation-major-node active">[\s\S]*?<span>页面规划<\/span><\/button>/);
+    assert.match(html, /<button class="generation-major-node pending">[\s\S]*?<span>事实收集<\/span><\/button>/);
     assert.match(html, /<button class="generation-major-node pending">[\s\S]*?<span>逐页生成<\/span><\/button>/);
   });
 
-  it("shows page-level research collection in the page generation major step", () => {
+  it("shows Research Discovery as its own major step after file preparation", () => {
     const html = renderPage(
       makeViewState({ status: "running" }),
-      makeProgress("research-collection", "research_collecting"),
+      {
+        ...makeProgress("research-discovery", "pending"),
+        researchDiscovery: {
+          status: "active",
+          summary: {
+            facts: 0,
+            derivedInsights: 0,
+            visualAssets: 0,
+            gaps: 0,
+            rejectedMaterial: 0,
+          },
+          records: [
+            {
+              phase: "web-decision",
+              state: "active",
+              rationale: "Need current facts before authoring.",
+            },
+            { phase: "web-collection", state: "pending" },
+            { phase: "web-curation", state: "pending" },
+            { phase: "visual-decision", state: "pending" },
+            { phase: "visual-collection", state: "pending" },
+            { phase: "visual-curation", state: "pending" },
+            { phase: "evidence-page-planning", state: "pending" },
+          ],
+        },
+      },
     );
 
     assert.match(html, /<button class="generation-major-node done">[\s\S]*?<span>页面规划<\/span><\/button>/);
     assert.match(html, /<button class="generation-major-node done">[\s\S]*?<span>准备文件<\/span><\/button>/);
-    assert.match(html, /<button class="generation-major-node active">[\s\S]*?<span>逐页生成<\/span><\/button>/);
+    assert.match(html, /<button class="generation-major-node active">[\s\S]*?<span>事实收集<\/span><\/button>/);
+    assert.match(html, /事实收集/);
+    assert.match(html, /判断网页资料需求/);
+    assert.match(html, /Need current facts before authoring/);
+  });
+
+  it("orders major timeline as planning, preparation, discovery, page generation, final preview", () => {
+    const html = renderPage(
+      makeViewState({ status: "running" }),
+      makeProgress("research-discovery", "pending"),
+    );
+    const labels = [...html.matchAll(/<span>(页面规划|准备文件|事实收集|逐页生成|最终预览)<\/span>/g)]
+      .map((match) => match[1]);
+
+    assert.deepEqual(labels, ["页面规划", "准备文件", "事实收集", "逐页生成", "最终预览"]);
+  });
+
+  it("uses a warning badge for partial Research Discovery instead of failed styling", () => {
+    const html = renderPage(
+      makeViewState({ status: "running" }),
+      {
+        ...makeProgress("research-curation", "pending"),
+        researchDiscovery: {
+          status: "warning",
+          summary: {
+            facts: 1,
+            derivedInsights: 0,
+            visualAssets: 0,
+            gaps: 1,
+            rejectedMaterial: 0,
+          },
+          records: [
+            { phase: "web-decision", state: "completed" },
+            { phase: "web-collection", state: "completed" },
+            { phase: "web-curation", state: "warning", gaps: ["No current price source."] },
+            { phase: "visual-decision", state: "pending" },
+            { phase: "visual-collection", state: "pending" },
+            { phase: "visual-curation", state: "pending" },
+            { phase: "evidence-page-planning", state: "pending" },
+          ],
+        },
+      },
+    );
+
+    assert.match(html, /generation-status-badge warning/);
+    assert.doesNotMatch(html, /generation-status-badge failed">部分完成/);
+  });
+
+  it("renders Research Discovery above page records without a fake slide", () => {
+    const html = renderPage(
+      makeViewState({ status: "running" }),
+      {
+        ...makeProgress("research-curation", "pending"),
+        activeStreams: [
+          {
+            run_id: "research-web",
+            kind: "web-research-curation",
+            page_id: "discovery-web-1",
+            page_index: 0,
+            status: "正在筛选资料证据",
+            lines: ["筛选事实证据流"],
+            activities: ["读取抓取索引"],
+          },
+        ],
+        researchDiscovery: {
+          status: "active",
+          summary: {
+            facts: 1,
+            derivedInsights: 0,
+            visualAssets: 0,
+            gaps: 0,
+            rejectedMaterial: 0,
+          },
+          records: [
+            { phase: "web-decision", state: "completed", rationale: "Need source-backed facts." },
+            {
+              phase: "web-collection",
+              state: "completed",
+              queries: [
+                {
+                  kind: "web",
+                  query: "EV market 2026",
+                  status: "collected",
+                  resultCount: 6,
+                  fetchCount: 4,
+                  sources: [{ title: "IEA", url: "https://example.com/iea" }],
+                },
+              ],
+            },
+            { phase: "web-curation", state: "active" },
+            { phase: "visual-decision", state: "pending" },
+            { phase: "visual-collection", state: "pending" },
+            { phase: "visual-curation", state: "pending" },
+            { phase: "evidence-page-planning", state: "pending" },
+          ],
+        },
+      },
+    );
+
+    assert.match(html, /事实收集[\s\S]*?Page 1/);
+    assert.match(html, /筛选事实证据流/);
+    assert.doesNotMatch(html, /1\. Deck-level web Research Discovery batch 1/);
   });
 });

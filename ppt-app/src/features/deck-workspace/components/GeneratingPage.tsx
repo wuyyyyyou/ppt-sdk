@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Messages } from "../../../i18n/messages";
 import type { DeckGenerationProgress, DeckGenerationStep } from "../../deck-generation";
 import { buildPageGenerationStageRecords, type PageGenerationStageRecord, type PageGenerationStageRecordGroup } from "../generationStageRecords";
+import { buildResearchDiscoveryStageRecords, type ResearchDiscoveryStageRecord, type ResearchDiscoveryStageGroup } from "../researchDiscoveryStageRecords";
 import { getGenerationProgressDisplayMessage } from "../generationProgressDisplay";
 import type { GenerationStreamSnapshot } from "../types";
 import type { GenerationViewState } from "../generationViewState";
@@ -24,14 +25,13 @@ const majorSteps: Array<{
   labelKey: keyof Messages["generating"]["steps"];
   steps: DeckGenerationStep[];
 }> = [
-  { id: "page-plan", labelKey: "pagePlan", steps: ["page-plan", "research-planning", "research-discovery", "evidence-page-planning"] },
+  { id: "page-plan", labelKey: "pagePlan", steps: ["page-plan", "research-planning"] },
   { id: "prepare", labelKey: "prepare", steps: ["prepare"] },
+  { id: "research-discovery", labelKey: "researchDiscovery", steps: ["research-discovery", "research-collection", "research-curation", "evidence-page-planning"] },
   {
     id: "pages",
     labelKey: "pages",
     steps: [
-      "research-collection",
-      "research-curation",
       "page-authoring",
       "page-content-review",
       "page-render",
@@ -150,7 +150,12 @@ function GenerationProgressPanel(props: {
     () => buildPageGenerationStageRecords({ t, progress, history }),
     [t, progress, history],
   );
+  const researchDiscoveryGroup = useMemo(
+    () => buildResearchDiscoveryStageRecords({ t, progress }),
+    [t, progress],
+  );
   const disclosure = useStageDisclosure(stageGroups);
+  const researchDisclosure = useResearchDiscoveryDisclosure(researchDiscoveryGroup);
   const running = isProgressRunning(progress);
 
   return (
@@ -176,6 +181,13 @@ function GenerationProgressPanel(props: {
           </button>
         ) : null}
       </div>
+      {researchDiscoveryGroup ? (
+        <ResearchDiscoveryStageGroupView
+          group={researchDiscoveryGroup}
+          t={t}
+          disclosure={researchDisclosure}
+        />
+      ) : null}
       {stageGroups.length > 0 ? (
         <div className="generation-page-list generation-stage-record-list">
           {stageGroups.map((group) => (
@@ -189,6 +201,156 @@ function GenerationProgressPanel(props: {
         </div>
       ) : null}
     </section>
+  );
+}
+
+function ResearchDiscoveryStageGroupView(props: {
+  group: ResearchDiscoveryStageGroup;
+  t: Messages;
+  disclosure: ReturnType<typeof useResearchDiscoveryDisclosure>;
+}) {
+  const { group, t, disclosure } = props;
+  const badgeState = statusBadgeState(group.state);
+
+  return (
+    <article className={`generation-page-item generation-stage-page research-discovery-stage-group ${group.state}`}>
+      <div className="generation-page-item-header">
+        <div>
+          <strong>{group.title}</strong>
+          {group.summaryLines.length > 0 ? (
+            <p className="research-discovery-summary">{group.summaryLines.join(" · ")}</p>
+          ) : null}
+        </div>
+        <span className={`generation-status-badge ${badgeState}`}>{group.statusLabel}</span>
+      </div>
+      <div className="generation-page-stage-list">
+        {group.records.map((record) => (
+          <ResearchDiscoveryStageRecordView
+            key={record.id}
+            record={record}
+            t={t}
+            open={disclosure.isOpen(record)}
+            onToggle={() => disclosure.toggle(record.id)}
+          />
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function ResearchDiscoveryStageRecordView(props: {
+  record: ResearchDiscoveryStageRecord;
+  t: Messages;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const { record, t, open, onToggle } = props;
+  const badgeState = statusBadgeState(record.state);
+  const displayActivities = record.activities
+    .map((activity) => sanitizeGenerationDebugText(activity))
+    .filter((activity) => activity.length > 0);
+  const displayLines = record.lines
+    .map((line) => sanitizeGenerationDebugText(line))
+    .filter((line) => line.length > 0);
+  const hasBody =
+    Boolean(record.rationale) ||
+    record.queryLines.length > 0 ||
+    record.sourceLines.length > 0 ||
+    record.visualAssets.length > 0 ||
+    displayActivities.length > 0 ||
+    displayLines.some((line) => line.trim()) ||
+    record.gaps.length > 0 ||
+    record.rejectedReasons.length > 0 ||
+    record.summaryLines.length > 0 ||
+    Boolean(record.note);
+
+  return (
+    <article className={`generation-stage-record research-discovery-record ${record.state}`}>
+      <button
+        className="generation-stage-summary"
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-label={open ? t.generating.stageRecords.collapse : t.generating.stageRecords.expand}
+      >
+        <span className="generation-stage-title">
+          {record.state === "active" ? <Sparkles className="generation-stage-active-icon" size={14} /> : null}
+          <strong>
+            <ThinkingStatusText
+              text={record.label}
+              active={record.state === "active"}
+              showOrb={false}
+            />
+          </strong>
+        </span>
+        <span className="generation-stage-meta">
+          <span className={`generation-status-badge ${badgeState}`}>{record.statusLabel}</span>
+          <ChevronDown className="generation-stage-chevron" size={15} />
+        </span>
+      </button>
+      {open ? (
+        <div className="generation-stage-body research-discovery-body">
+          {record.rationale ? (
+            <p className="research-discovery-rationale">{record.rationale}</p>
+          ) : null}
+          <ResearchDiscoveryLineList title={t.generating.researchDiscovery.queries} lines={record.queryLines} />
+          <ResearchDiscoveryLineList title={t.generating.researchDiscovery.sources} lines={record.sourceLines} />
+          {record.visualAssets.length > 0 ? (
+            <div className="research-discovery-visual-grid" aria-label={t.generating.researchDiscovery.visualAssets}>
+              {record.visualAssets.map((asset) => (
+                <div key={asset.id} className="research-discovery-visual-asset">
+                  {asset.thumbnailUrl || asset.imageUrl ? (
+                    <img src={asset.thumbnailUrl ?? asset.imageUrl} alt={asset.visualSummary || asset.reason || asset.id} />
+                  ) : (
+                    <span className="research-discovery-image-ref">{asset.filePath || asset.id}</span>
+                  )}
+                  <div>
+                    <strong>{asset.visualSummary || asset.reason || asset.id}</strong>
+                    {asset.pageUrl ? <span>{asset.pageUrl}</span> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {displayActivities.length > 0 ? (
+            <div className="generation-activity-list" aria-label={t.generating.stageRecords.activities}>
+              {displayActivities.map((activity, index) => (
+                <span key={`${record.id}-activity-${index}`}>{activity}</span>
+              ))}
+            </div>
+          ) : null}
+          {displayLines.some((line) => line.trim()) ? (
+            <pre className="generation-stream-text" aria-label={t.generating.stageRecords.stream}>
+              {displayLines.join("\n").trim()}
+            </pre>
+          ) : null}
+          <ResearchDiscoveryLineList title={t.generating.researchDiscovery.gaps} lines={record.gaps} warning />
+          <ResearchDiscoveryLineList title={t.generating.researchDiscovery.rejected} lines={record.rejectedReasons} />
+          <ResearchDiscoveryLineList title={t.generating.researchDiscovery.summary} lines={record.summaryLines} />
+          {record.note ? <p className="research-discovery-note">{record.note}</p> : null}
+          {!hasBody ? (
+            <p className="generation-empty-stream">{t.generating.researchDiscovery.empty}</p>
+          ) : null}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function ResearchDiscoveryLineList(props: {
+  title: string;
+  lines: string[];
+  warning?: boolean;
+}) {
+  const { title, lines, warning } = props;
+  if (lines.length === 0) return null;
+  return (
+    <div className={`research-discovery-line-list ${warning ? "warning" : ""}`}>
+      <strong>{title}</strong>
+      {lines.map((line, index) => (
+        <span key={`${title}-${index}`}>{line}</span>
+      ))}
+    </div>
   );
 }
 
@@ -315,9 +477,10 @@ function sanitizeGenerationDebugText(text: string) {
     .trim();
 }
 
-function statusBadgeState(state: PageGenerationStageRecord["state"]) {
+function statusBadgeState(state: PageGenerationStageRecord["state"] | "warning") {
   if (state === "completed") return "completed";
   if (state === "active") return "active";
+  if (state === "warning") return "warning";
   if (state === "failed") return "failed";
   return "pending";
 }
@@ -381,6 +544,39 @@ function useStageDisclosure(groups: PageGenerationStageRecordGroup[]) {
     toggle(stageId: string) {
       userTouchedRef.current.add(stageId);
       setOpenStages((current) => ({ ...current, [stageId]: !(current[stageId] ?? false) }));
+    },
+  };
+}
+
+function useResearchDiscoveryDisclosure(group: ResearchDiscoveryStageGroup | null) {
+  const [openStages, setOpenStages] = useState<Record<string, boolean>>({});
+  const userTouchedRef = useRef<Set<string>>(new Set());
+  const records = useMemo(() => group?.records ?? [], [group]);
+
+  useEffect(() => {
+    setOpenStages((current) => {
+      const next = { ...current };
+      records.forEach((record) => {
+        if (userTouchedRef.current.has(record.id)) return;
+        if (record.state === "active" || record.state === "failed" || record.state === "warning") {
+          next[record.id] = true;
+        } else if (record.state === "pending" && next[record.id] === undefined) {
+          next[record.id] = false;
+        } else if (record.state === "completed" && next[record.id] === undefined) {
+          next[record.id] = false;
+        }
+      });
+      return next;
+    });
+  }, [records]);
+
+  return {
+    isOpen(record: ResearchDiscoveryStageRecord) {
+      return openStages[record.id] ?? (record.state === "active" || record.state === "failed" || record.state === "warning");
+    },
+    toggle(recordId: string) {
+      userTouchedRef.current.add(recordId);
+      setOpenStages((current) => ({ ...current, [recordId]: !(current[recordId] ?? false) }));
     },
   };
 }

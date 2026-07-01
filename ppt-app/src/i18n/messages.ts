@@ -143,9 +143,38 @@ export interface Messages {
     steps: {
       outline: string;
       pagePlan: string;
+      researchDiscovery: string;
       prepare: string;
       pages: string;
       finalRender: string;
+    };
+    researchDiscovery: {
+      title: string;
+      empty: string;
+      warning: string;
+      queries: string;
+      sources: string;
+      visualAssets: string;
+      gaps: string;
+      rejected: string;
+      summary: string;
+      untitledSource: string;
+      resultCount: string;
+      fetchCount: string;
+      downloadCount: string;
+      visualEvidenceNote: string;
+      queryStatuses: Record<"collected" | "gap" | "error" | "skipped_duplicate", string>;
+      counts: Record<"facts" | "derivedInsights" | "visualAssets" | "gaps" | "rejectedMaterial", string>;
+      phases: Record<
+        | "web-decision"
+        | "web-collection"
+        | "web-curation"
+        | "visual-decision"
+        | "visual-collection"
+        | "visual-curation"
+        | "evidence-page-planning",
+        string
+      >;
     };
     currentSessionStream: string;
     sessionHistory: string;
@@ -452,9 +481,48 @@ export const messages: Record<Locale, Messages> = {
       steps: {
         outline: "Outline",
         pagePlan: "Page plan",
+        researchDiscovery: "Facts collection",
         prepare: "Prepare files",
         pages: "Pages",
         finalRender: "Final preview"
+      },
+      researchDiscovery: {
+        title: "Facts collection",
+        empty: "No details for this step yet.",
+        warning: "Partial",
+        queries: "Queries",
+        sources: "Sources",
+        visualAssets: "Selected visual assets",
+        gaps: "Evidence gaps",
+        rejected: "Rejected material",
+        summary: "Summary",
+        untitledSource: "Untitled source",
+        resultCount: "{count} results",
+        fetchCount: "{count} fetched",
+        downloadCount: "{count} downloaded",
+        visualEvidenceNote: "Selected images are visual evidence only; text or charts inside an image are not factual grounding by themselves.",
+        queryStatuses: {
+          collected: "Collected",
+          gap: "Gap",
+          error: "Error",
+          skipped_duplicate: "Skipped duplicate"
+        },
+        counts: {
+          facts: "Facts",
+          derivedInsights: "Insights",
+          visualAssets: "Images",
+          gaps: "Gaps",
+          rejectedMaterial: "Rejected"
+        },
+        phases: {
+          "web-decision": "Judge web evidence needs",
+          "web-collection": "Search and fetch web sources",
+          "web-curation": "Curate factual evidence",
+          "visual-decision": "Judge image asset needs",
+          "visual-collection": "Search and download image assets",
+          "visual-curation": "Curate image assets",
+          "evidence-page-planning": "Evidence-aware page planning"
+        }
       },
       currentSessionStream: "Current session stream",
       sessionHistory: "Session history",
@@ -764,9 +832,48 @@ export const messages: Record<Locale, Messages> = {
       steps: {
         outline: "大纲",
         pagePlan: "页面规划",
+        researchDiscovery: "事实收集",
         prepare: "准备文件",
         pages: "逐页生成",
         finalRender: "最终预览"
+      },
+      researchDiscovery: {
+        title: "事实收集",
+        empty: "这个步骤暂无详细输出。",
+        warning: "部分完成",
+        queries: "查询",
+        sources: "来源",
+        visualAssets: "入选图片素材",
+        gaps: "证据缺口",
+        rejected: "被拒绝材料",
+        summary: "汇总",
+        untitledSource: "未命名来源",
+        resultCount: "{count} 条结果",
+        fetchCount: "抓取 {count} 条",
+        downloadCount: "下载 {count} 张",
+        visualEvidenceNote: "入选图片只作为视觉素材；图片里的文字、图表或结论本身不构成事实依据。",
+        queryStatuses: {
+          collected: "已收集",
+          gap: "有缺口",
+          error: "出错",
+          skipped_duplicate: "跳过重复"
+        },
+        counts: {
+          facts: "事实",
+          derivedInsights: "洞察",
+          visualAssets: "图片",
+          gaps: "缺口",
+          rejectedMaterial: "拒绝"
+        },
+        phases: {
+          "web-decision": "判断网页资料需求",
+          "web-collection": "搜索并抓取网页资料",
+          "web-curation": "筛选事实证据",
+          "visual-decision": "判断图片素材需求",
+          "visual-collection": "搜索并下载图片素材",
+          "visual-curation": "筛选图片素材",
+          "evidence-page-planning": "证据感知页面规划"
+        }
       },
       currentSessionStream: "当前会话流",
       sessionHistory: "会话历史",

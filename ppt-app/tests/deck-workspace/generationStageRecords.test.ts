@@ -370,4 +370,113 @@ describe("Page Generation Stage Records", () => {
     );
     assert.equal(records[0].stages.at(-1)?.state, "active");
   });
+
+  it("does not expose internal Research Discovery batch pages as slide records", () => {
+    const records = buildPageGenerationStageRecords({
+      t: messages.zh,
+      progress: makeProgress({
+        pages: [
+          {
+            page_id: "discovery-web-1",
+            index: 0,
+            title: "Deck-level web Research Discovery batch 1",
+            status: "authoring",
+            render_attempts: 0,
+            render_attempt_limit: 10,
+            visual_review_attempts: 0,
+            visual_review_attempt_limit: 5,
+            content_review_attempts: 0,
+            content_review_attempt_limit: 5,
+            agent_failures: 0,
+            agent_failure_limit: 5,
+            agent_infrastructure_failures: 0,
+          },
+          {
+            page_id: "page-01",
+            index: 0,
+            title: "Real page",
+            status: "pending",
+            render_attempts: 0,
+            render_attempt_limit: 10,
+            visual_review_attempts: 0,
+            visual_review_attempt_limit: 5,
+            content_review_attempts: 0,
+            content_review_attempt_limit: 5,
+            agent_failures: 0,
+            agent_failure_limit: 5,
+            agent_infrastructure_failures: 0,
+          },
+        ],
+        activeStreams: [
+          {
+            run_id: "research-web",
+            kind: "web-research-curation",
+            page_id: "discovery-web-1",
+            page_index: 0,
+            status: "正在筛选资料证据",
+            lines: ["research stream"],
+            activities: [],
+          },
+        ],
+      }),
+      history: [],
+    });
+
+    assert.deepEqual(records.map((record) => record.pageId), ["page-01"]);
+    assert.equal(records.some((record) => record.title.includes("Research Discovery")), false);
+  });
+
+  it("keeps real page-level web and visual research curation streams in page records", () => {
+    const records = buildPageGenerationStageRecords({
+      t: messages.en,
+      progress: makeProgress({
+        step: "research-curation",
+        pages: [
+          {
+            page_id: "page-01",
+            index: 0,
+            title: "Real page",
+            status: "research_curating",
+            render_attempts: 0,
+            render_attempt_limit: 10,
+            visual_review_attempts: 0,
+            visual_review_attempt_limit: 5,
+            content_review_attempts: 0,
+            content_review_attempt_limit: 5,
+            agent_failures: 0,
+            agent_failure_limit: 5,
+            agent_infrastructure_failures: 0,
+          },
+        ],
+        activeStreams: [
+          {
+            run_id: "page-web",
+            kind: "web-research-curation",
+            page_id: "page-01",
+            page_index: 0,
+            status: "Curating page facts",
+            lines: ["page fact stream"],
+            activities: [],
+          },
+          {
+            run_id: "page-visual",
+            kind: "visual-research-curation",
+            page_id: "page-01",
+            page_index: 0,
+            status: "Curating page visuals",
+            lines: ["page visual stream"],
+            activities: [],
+          },
+        ],
+      }),
+      history: [],
+    });
+
+    assert.deepEqual(
+      records[0].stages
+        .filter((stage) => stage.stageKey === "webResearchCuration" || stage.stageKey === "visualResearchCuration")
+        .map((stage) => stage.lines[0]),
+      ["page fact stream", "page visual stream"],
+    );
+  });
 });

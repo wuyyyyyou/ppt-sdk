@@ -89,6 +89,79 @@ export interface DeckGenerationStream {
   updated_at?: string;
 }
 
+export type ResearchDiscoveryProgressPhase =
+  | "web-decision"
+  | "web-collection"
+  | "web-curation"
+  | "visual-decision"
+  | "visual-collection"
+  | "visual-curation"
+  | "evidence-page-planning";
+
+export type ResearchDiscoveryProgressState =
+  | "pending"
+  | "active"
+  | "completed"
+  | "warning"
+  | "failed";
+
+export interface ResearchDiscoveryProgressSource {
+  title?: string;
+  url?: string;
+}
+
+export interface ResearchDiscoveryProgressQuery {
+  kind: "web" | "visual";
+  query: string;
+  status: "collected" | "gap" | "error" | "skipped_duplicate";
+  resultCount?: number;
+  fetchCount?: number;
+  downloadCount?: number;
+  message?: string;
+  sources?: ResearchDiscoveryProgressSource[];
+}
+
+export interface ResearchDiscoveryProgressVisualAsset {
+  id: string;
+  filePath?: string;
+  imageUrl?: string;
+  thumbnailUrl?: string;
+  pageUrl?: string;
+  reason?: string;
+  visualSummary?: string;
+}
+
+export interface ResearchDiscoveryProgressPhaseRecord {
+  phase: ResearchDiscoveryProgressPhase;
+  state: ResearchDiscoveryProgressState;
+  iteration?: number;
+  rationale?: string;
+  queries?: ResearchDiscoveryProgressQuery[];
+  sources?: ResearchDiscoveryProgressSource[];
+  visualAssets?: ResearchDiscoveryProgressVisualAsset[];
+  activities?: string[];
+  lines?: string[];
+  gaps?: string[];
+  rejectedReasons?: string[];
+  counts?: Partial<ResearchDiscoveryProgressSummary>;
+  updatedAt?: string;
+}
+
+export interface ResearchDiscoveryProgressSummary {
+  facts: number;
+  derivedInsights: number;
+  visualAssets: number;
+  gaps: number;
+  rejectedMaterial: number;
+}
+
+export interface ResearchDiscoveryProgress {
+  status: ResearchDiscoveryProgressState;
+  records: ResearchDiscoveryProgressPhaseRecord[];
+  summary: ResearchDiscoveryProgressSummary;
+  updatedAt?: string;
+}
+
 export interface DeckGenerationProgress {
   step: DeckGenerationStep;
   message: string;
@@ -98,6 +171,7 @@ export interface DeckGenerationProgress {
   recoveryRunKind?: NonNullable<PageProgress["recovery"]>["run_kind"];
   stream?: DeckGenerationStream;
   activeStreams?: DeckGenerationStream[];
+  researchDiscovery?: ResearchDiscoveryProgress;
 }
 
 export interface DeckGenerationStreamSnapshot {
@@ -191,6 +265,7 @@ export interface PageGenerationResult {
 
 export interface DeckGenerationRuntime extends DeckGenerationContext {
   activeStreams: Map<string, DeckGenerationStream>;
+  researchDiscoveryProgress?: ResearchDiscoveryProgress;
   getProgress: () => PageProgress | null;
   setProgress: (progress: PageProgress) => void;
 }

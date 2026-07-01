@@ -11,6 +11,8 @@ import type {
   ResearchEvidenceIndex,
   ResearchEvidencePage,
   ResearchRequirement,
+  WebFetchResult,
+  ImageFetchResult,
   VisualResearchCurationDraft,
   VisualResearchEvidence,
   WebResearchCurationDraft,
@@ -29,10 +31,25 @@ import {
   createVisualResearchCurationGapDraft,
   createWebResearchCurationGapDraft,
 } from "./researchCurationDrafts";
+import {
+  applyResearchDiscoveryPoolSummary,
+  createEmptyResearchDiscoveryProgress,
+  setRuntimeResearchDiscoveryProgress,
+  summarizeDecision,
+  summarizeImageFetchCount,
+  summarizeImageFetchResult,
+  summarizeQueries,
+  summarizeResearchDiscoveryPool,
+  summarizeVisualDraft,
+  summarizeWebDraft,
+  summarizeWebFetchCount,
+  summarizeWebFetchResult,
+  updateResearchDiscoveryPhase,
+} from "./researchDiscoveryProgress";
 import { normalizeResearchQueryKey } from "./pageRefinementArtifacts";
 import { recordDeckRecovery, throwIfCancelled } from "./runtimeSupport";
 import { getAttemptLimits } from "./settings";
-import type { DeckGenerationRuntime } from "./types";
+import type { DeckGenerationRuntime, ResearchDiscoveryProgressQuery } from "./types";
 import { createAgentFileToolPathContext } from "./agentFileToolPaths";
 
 const RESEARCH_DISCOVERY_ITERATION_LIMIT = 5;
@@ -456,10 +473,12 @@ async function collectQueries(input: {
 }): Promise<{
   rawIndexPaths: string[];
   summaries: ResearchDiscoveryQuerySummary[];
+  progressQueries: ResearchDiscoveryProgressQuery[];
   gaps: string[];
 }> {
   const rawIndexPaths: string[] = [];
   const summaries: ResearchDiscoveryQuerySummary[] = [];
+  const progressQueries: ResearchDiscoveryProgressQuery[] = [];
   const gaps: string[] = [];
   const completed = completedQueryKeys(input.pool, input.phase);
   for (const query of input.queries) {
@@ -467,6 +486,7 @@ async function collectQueries(input: {
     const key = normalizeResearchQueryKey(query);
     if (completed.has(key)) {
       summaries.push({ kind: input.phase, query, status: "skipped_duplicate" });
+      progressQueries.push({ kind: input.phase, query, status: "skipped_duplicate" });
       continue;
     }
     try {
@@ -481,6 +501,14 @@ async function collectQueries(input: {
           const message = `No web search results for: ${query}`;
           gaps.push(message);
           summaries.push({ kind: "web", query, status: "gap", result_count: 0, message });
+          progressQueries.push({
+            kind: "web",
+            query,
+            status: "gap",
+            resultCount: 0,
+            fetchCount: 0,
+            message,
+          });
           continue;
         }
         const fetched = await input.runtime.backend.webFetch({
@@ -489,13 +517,44 @@ async function collectQueries(input: {
           format: "text_markdown",
           max_chars: 12000,
         });
-        if (fetched.index_path) {
+        const fetchCount = summarizeWebFetchCount(fetched as WebFetchResult, 0);
+        if (fetched.index_path && fetchCount > 0) {
           rawIndexPaths.push(fetched.index_path);
-          summaries.push({ kind: "web", query, status: "collected", raw_index_path: fetched.index_path, result_count: urls.length });
+          summaries.push({
+            kind: "web",
+            query,
+            status: "collected",
+            raw_index_path: fetched.index_path,
+            result_count: search.count,
+            fetch_count: fetchCount,
+          });
+          progressQueries.push(summarizeWebFetchResult({
+            query,
+            resultCount: search.count,
+            fetched,
+          }));
         } else {
-          const message = `Web fetch did not return an index path for: ${query}`;
+          const message = fetched.index_path
+            ? `No web sources were fetched successfully for: ${query}`
+            : `Web fetch did not return an index path for: ${query}`;
           gaps.push(message);
-          summaries.push({ kind: "web", query, status: "gap", result_count: urls.length, message });
+          summaries.push({
+            kind: "web",
+            query,
+            status: "gap",
+            result_count: search.count,
+            fetch_count: fetchCount,
+            message,
+          });
+          progressQueries.push({
+            ...summarizeWebFetchResult({
+              query,
+              resultCount: search.count,
+              fetched,
+            }),
+            status: "gap",
+            message,
+          });
         }
       } else {
         const search = await input.runtime.backend.imageSearch({
@@ -512,19 +571,58 @@ async function collectQueries(input: {
           const message = `No image search results for: ${query}`;
           gaps.push(message);
           summaries.push({ kind: "visual", query, status: "gap", result_count: 0, message });
+          progressQueries.push({
+            kind: "visual",
+            query,
+            status: "gap",
+            resultCount: 0,
+            downloadCount: 0,
+            message,
+          });
           continue;
         }
         const fetched = await input.runtime.backend.imageFetch({
           urls,
           output_dir: input.paths.raw_images_dir,
         });
-        if (fetched.index_path) {
+        const downloadCount = summarizeImageFetchCount(fetched as ImageFetchResult, 0);
+        if (fetched.index_path && downloadCount > 0) {
           rawIndexPaths.push(fetched.index_path);
-          summaries.push({ kind: "visual", query, status: "collected", raw_index_path: fetched.index_path, result_count: urls.length });
+          summaries.push({
+            kind: "visual",
+            query,
+            status: "collected",
+            raw_index_path: fetched.index_path,
+            result_count: search.count,
+            fetch_count: downloadCount,
+          });
+          progressQueries.push(summarizeImageFetchResult({
+            query,
+            resultCount: search.count,
+            fetched,
+          }));
         } else {
-          const message = `Image fetch did not return an index path for: ${query}`;
+          const message = fetched.index_path
+            ? `No images were downloaded successfully for: ${query}`
+            : `Image fetch did not return an index path for: ${query}`;
           gaps.push(message);
-          summaries.push({ kind: "visual", query, status: "gap", result_count: urls.length, message });
+          summaries.push({
+            kind: "visual",
+            query,
+            status: "gap",
+            result_count: search.count,
+            fetch_count: downloadCount,
+            message,
+          });
+          progressQueries.push({
+            ...summarizeImageFetchResult({
+              query,
+              resultCount: search.count,
+              fetched,
+            }),
+            status: "gap",
+            message,
+          });
         }
       }
     } catch (error) {
@@ -532,9 +630,10 @@ async function collectQueries(input: {
       const message = `${input.phase === "web" ? "Web" : "Image"} research failed for "${query}": ${error instanceof Error ? error.message : String(error)}`;
       gaps.push(message);
       summaries.push({ kind: input.phase, query, status: "error", message });
+      progressQueries.push({ kind: input.phase, query, status: "error", message });
     }
   }
-  return { rawIndexPaths, summaries, gaps };
+  return { rawIndexPaths, summaries, progressQueries, gaps };
 }
 
 function buildDiscoveryLogContext(input: {
@@ -561,6 +660,7 @@ function emitResearchProgress(input: {
   pagePlan: PagePlan;
   message: string;
   step: "research-discovery" | "research-collection" | "research-curation" | "evidence-page-planning";
+  stream?: import("./types").DeckGenerationStream | null;
 }) {
   emitRuntimeProgress(
     input.runtime,
@@ -571,9 +671,27 @@ function emitResearchProgress(input: {
       totalPages: input.pagePlan.pages.length,
     },
     input.runtime.getProgress(),
-    undefined,
+    input.stream,
     getAttemptLimits(input.runtime),
   );
+}
+
+function updateDiscoveryProgress(input: {
+  runtime: DeckGenerationRuntime;
+  pagePlan: PagePlan;
+  message: string;
+  step: "research-discovery" | "research-collection" | "research-curation" | "evidence-page-planning";
+  update: () => NonNullable<DeckGenerationRuntime["researchDiscoveryProgress"]>;
+  stream?: import("./types").DeckGenerationStream | null;
+}) {
+  setRuntimeResearchDiscoveryProgress(input.runtime, input.update());
+  emitResearchProgress({
+    runtime: input.runtime,
+    pagePlan: input.pagePlan,
+    message: input.message,
+    step: input.step,
+    stream: input.stream,
+  });
 }
 
 async function runDiscoveryPhase(input: {
@@ -589,11 +707,19 @@ async function runDiscoveryPhase(input: {
   let stopped = false;
   for (let iteration = 1; iteration <= RESEARCH_DISCOVERY_ITERATION_LIMIT; iteration += 1) {
     throwIfCancelled(input.runtime);
-    emitResearchProgress({
+    const decisionPhase = input.phase === "web" ? "web-decision" : "visual-decision";
+    const collectionPhase = input.phase === "web" ? "web-collection" : "visual-collection";
+    const curationPhase = input.phase === "web" ? "web-curation" : "visual-curation";
+    updateDiscoveryProgress({
       runtime: input.runtime,
       pagePlan: input.pagePlan,
       step: "research-discovery",
       message: input.phase === "web" ? text.webResearchDiscovery : text.visualResearchDiscovery,
+      update: () => updateResearchDiscoveryPhase(input.runtime.researchDiscoveryProgress, {
+        phase: decisionPhase,
+        state: "active",
+        iteration,
+      }),
     });
     let decision: ResearchDiscoveryDecision;
     try {
@@ -635,6 +761,18 @@ async function runDiscoveryPhase(input: {
       target_page_ids: input.targetPageIds ?? input.pagePlan.pages.map((page) => page.page_id),
       updated_at: new Date().toISOString(),
     });
+    updateDiscoveryProgress({
+      runtime: input.runtime,
+      pagePlan: input.pagePlan,
+      step: "research-discovery",
+      message: input.phase === "web" ? text.webResearchDiscovery : text.visualResearchDiscovery,
+      update: () => updateResearchDiscoveryPhase(input.runtime.researchDiscoveryProgress, {
+        phase: decisionPhase,
+        state: decision.gaps.length > 0 ? "warning" : "completed",
+        iteration,
+        ...summarizeDecision(decision),
+      }),
+    });
     if (decision.action === "stop" || decision.queries.length === 0) {
       stopped = true;
       if (decision.gaps.length > 0) {
@@ -648,11 +786,16 @@ async function runDiscoveryPhase(input: {
       break;
     }
 
-    emitResearchProgress({
+    updateDiscoveryProgress({
       runtime: input.runtime,
       pagePlan: input.pagePlan,
       step: "research-collection",
       message: input.phase === "web" ? text.collectingWebSources : text.collectingVisualSources,
+      update: () => updateResearchDiscoveryPhase(input.runtime.researchDiscoveryProgress, {
+        phase: collectionPhase,
+        state: "active",
+        iteration,
+      }),
     });
     const collection = await collectQueries({
       runtime: input.runtime,
@@ -660,6 +803,24 @@ async function runDiscoveryPhase(input: {
       phase: input.phase,
       queries: decision.queries,
       pool,
+    });
+    updateDiscoveryProgress({
+      runtime: input.runtime,
+      pagePlan: input.pagePlan,
+      step: "research-collection",
+      message: input.phase === "web" ? text.collectingWebSources : text.collectingVisualSources,
+      update: () => updateResearchDiscoveryPhase(input.runtime.researchDiscoveryProgress, {
+        phase: collectionPhase,
+        state: collection.gaps.length > 0 ? "warning" : "completed",
+        iteration,
+        queries: collection.progressQueries.length > 0
+          ? collection.progressQueries
+          : summarizeQueries(collection.summaries),
+        gaps: collection.gaps,
+        counts: {
+          gaps: collection.gaps.length,
+        },
+      }),
     });
     const batchPage = makeDiscoveryBatchPage({
       pagePlan: input.pagePlan,
@@ -683,11 +844,16 @@ async function runDiscoveryPhase(input: {
     const draftType = input.phase === "web" ? "web" : "visual";
     const draftPath = `${input.paths.evidence_drafts_dir}/${draftId}-${draftType}.json`;
 
-    emitResearchProgress({
+    updateDiscoveryProgress({
       runtime: input.runtime,
       pagePlan: input.pagePlan,
       step: "research-curation",
       message: input.phase === "web" ? text.curatingDiscoveryFacts : text.curatingDiscoveryImages,
+      update: () => updateResearchDiscoveryPhase(input.runtime.researchDiscoveryProgress, {
+        phase: curationPhase,
+        state: "active",
+        iteration,
+      }),
     });
     let webDraft: WebResearchCurationDraft | null = null;
     let visualDraft: VisualResearchCurationDraft | null = null;
@@ -789,6 +955,22 @@ async function runDiscoveryPhase(input: {
       }
     }
 
+    const curationSummary = input.phase === "web"
+      ? summarizeWebDraft(webDraft)
+      : summarizeVisualDraft(visualDraft);
+    updateDiscoveryProgress({
+      runtime: input.runtime,
+      pagePlan: input.pagePlan,
+      step: "research-curation",
+      message: input.phase === "web" ? text.curatingDiscoveryFacts : text.curatingDiscoveryImages,
+      update: () => updateResearchDiscoveryPhase(input.runtime.researchDiscoveryProgress, {
+        phase: curationPhase,
+        state: (curationSummary.gaps?.length ?? 0) > 0 ? "warning" : "completed",
+        iteration,
+        ...curationSummary,
+      }),
+    });
+
     const now = new Date().toISOString();
     pool = mergeDraftIntoPool({
       pool,
@@ -816,6 +998,10 @@ async function runDiscoveryPhase(input: {
         updated_at: now,
       },
     });
+    setRuntimeResearchDiscoveryProgress(
+      input.runtime,
+      applyResearchDiscoveryPoolSummary(input.runtime.researchDiscoveryProgress, pool, now),
+    );
   }
   if (!stopped) {
     pool = {
@@ -827,6 +1013,10 @@ async function runDiscoveryPhase(input: {
       ]),
       updated_at: new Date().toISOString(),
     };
+    setRuntimeResearchDiscoveryProgress(
+      input.runtime,
+      applyResearchDiscoveryPoolSummary(input.runtime.researchDiscoveryProgress, pool),
+    );
   }
   return pool;
 }
@@ -955,6 +1145,13 @@ export async function runResearchDiscoveryForPagePlan(input: {
     error: null,
     deck_status: "running",
   });
+  setRuntimeResearchDiscoveryProgress(runtime, createEmptyResearchDiscoveryProgress());
+  emitResearchProgress({
+    runtime,
+    pagePlan: input.pagePlan,
+    step: "research-discovery",
+    message: text.webResearchDiscovery,
+  });
 
   const existingEvidence = normalizeResearchEvidenceIndex(
     await runtime.backend.getResearchEvidence({
@@ -979,11 +1176,15 @@ export async function runResearchDiscoveryForPagePlan(input: {
     paths,
   });
 
-  emitResearchProgress({
+  updateDiscoveryProgress({
     runtime,
     pagePlan: input.pagePlan,
     step: "evidence-page-planning",
     message: text.evidencePagePlanning,
+    update: () => updateResearchDiscoveryPhase(runtime.researchDiscoveryProgress, {
+      phase: "evidence-page-planning",
+      state: "active",
+    }),
   });
   let plannedPagePlan: PagePlan;
   try {
@@ -1020,6 +1221,18 @@ export async function runResearchDiscoveryForPagePlan(input: {
       updated_at: new Date().toISOString(),
     };
   }
+  updateDiscoveryProgress({
+    runtime,
+    pagePlan: input.pagePlan,
+    step: "evidence-page-planning",
+    message: text.evidencePagePlanning,
+    update: () => updateResearchDiscoveryPhase(runtime.researchDiscoveryProgress, {
+      phase: "evidence-page-planning",
+      state: pool.gaps.length > 0 ? "warning" : "completed",
+      gaps: pool.gaps.slice(0, 8),
+      counts: summarizeResearchDiscoveryPool(pool),
+    }),
+  });
   plannedPagePlan = await runtime.backend.recordPagePlan({
     workspace_dir: runtime.workspace.workspace_dir,
     page_plan: plannedPagePlan,

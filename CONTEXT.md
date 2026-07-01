@@ -39,6 +39,7 @@ The slide-by-slide mapping from Confirmed Outline entries to planned pages, with
 
 **Research Discovery**:
 The deck-level iterative process that decides what external material is still needed, collects candidate web and image material, curates it into Research Evidence, and stops when enough useful evidence has been collected or the iteration limit is reached. It happens before Page Generation Units are authored. Web material is discovered before visual material so image needs can be informed by curated facts and insights; visual material does not become factual evidence by itself. Interrupted Research Discovery work is not complete discovery work and must not be promoted into the Research Discovery Evidence Pool.
+User-facing Chinese label: 事实收集
 _Avoid_: Research Planning
 
 **Research Discovery Evidence Pool**:

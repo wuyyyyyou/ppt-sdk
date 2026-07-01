@@ -3,12 +3,20 @@ import type { AiOperationLogContext } from "../../ai/interactionLog";
 import type { PagePlanItem, PageProgress } from "../../api/types";
 import type { DeckRefinementIntentReviewResult } from "../../ai/types";
 import { buildDeckGenerationSummary, emitRuntime } from "./progressProjection";
+import { updateResearchDiscoveryCurationStream } from "./researchDiscoveryProgress";
 import { ATTEMPT_LIMITS, type DeckGenerationContext, type DeckGenerationRuntime, type DeckGenerationStep, type DeckGenerationStream } from "./types";
 
 function isResearchAgentKind(kind: string) {
   return kind === "research-curation"
     || kind === "web-research-curation"
     || kind === "visual-research-curation";
+}
+
+function isDeckLevelResearchDiscoveryStream(stream: DeckGenerationStream) {
+  return stream.page_id.startsWith("discovery-") && (
+    stream.kind === "web-research-curation" ||
+    stream.kind === "visual-research-curation"
+  );
 }
 
 export async function recordProgress(
@@ -247,6 +255,14 @@ export function createAgentRunTracker(input: {
       } finally {
         stream.status = status;
         stream.updated_at = endedAt;
+        if (isDeckLevelResearchDiscoveryStream(stream)) {
+          input.flowInput.researchDiscoveryProgress = updateResearchDiscoveryCurationStream(
+            input.flowInput.researchDiscoveryProgress,
+            stream.kind === "web-research-curation" ? "web" : "visual",
+            stream,
+            endedAt,
+          );
+        }
         emitStream();
         input.flowInput.activeStreams.delete(operationId);
         emitRuntime(

@@ -9,6 +9,7 @@ import {
   isActivePageGenerationStatus,
   isGenuinelyFailedPageGenerationStatus,
 } from "../deck-generation/pageStatusPolicy";
+import { isDiscoveryPageId, isDiscoveryStream } from "./researchDiscoveryStageRecords";
 import type { GenerationStreamSnapshot } from "./types";
 
 type StageLabelKey =
@@ -90,7 +91,8 @@ export function buildPageGenerationStageRecords(input: {
   const { t, progress, history } = input;
   if (!progress) return [];
 
-  const activeStreams = progress.activeStreams ?? (progress.stream ? [progress.stream] : []);
+  const activeStreams = (progress.activeStreams ?? (progress.stream ? [progress.stream] : []))
+    .filter((stream) => !isDiscoveryStream(stream));
   const activeIds = new Set(activeStreams.map((stream) => buildActiveStageId(progress.step, stream)));
   const activeByPageId = groupBy(
     activeStreams.map((stream) => buildActiveStageRecord(t, progress.step, stream)),
@@ -98,12 +100,13 @@ export function buildPageGenerationStageRecords(input: {
   );
   const snapshotsByPageId = groupBy(
     history
-      .filter((snapshot) => snapshot.page_id && !activeIds.has(snapshot.id))
+      .filter((snapshot) => snapshot.page_id && !isDiscoveryPageId(snapshot.page_id) && !activeIds.has(snapshot.id))
       .map((snapshot) => buildSnapshotStageRecord(t, snapshot)),
     (record) => record.pageId,
   );
 
   return [...progress.pages]
+    .filter((page) => !isDiscoveryPageId(page.page_id))
     .sort((left, right) => left.index - right.index)
     .map((page) => {
       const activeRecords = activeByPageId.get(page.page_id)?.map(({ pageId: _pageId, ...record }) => record) ?? [];

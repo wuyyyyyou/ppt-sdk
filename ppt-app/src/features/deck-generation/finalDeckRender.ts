@@ -10,6 +10,7 @@ import type {
   DeckGenerationProgress,
   DeckGenerationResult,
   DeckGenerationStream,
+  ResearchDiscoveryProgress,
 } from "./types";
 
 function failedCompletion(input: {
@@ -29,6 +30,7 @@ function emit(
   progress: PageProgress | null,
   stream?: DeckGenerationStream | null,
   activeStreams?: Iterable<DeckGenerationStream>,
+  researchDiscovery?: ResearchDiscoveryProgress,
 ) {
   emitProgress(
     input,
@@ -37,6 +39,7 @@ function emit(
     stream,
     activeStreams,
     getAttemptLimits({ workspace: input.workspace }),
+    researchDiscovery,
   );
 }
 
@@ -45,8 +48,9 @@ export async function runFinalDeckRender(input: {
   pagePlan: PagePlan;
   progress: PageProgress;
   activeStreams?: Iterable<DeckGenerationStream>;
+  researchDiscoveryProgress?: ResearchDiscoveryProgress;
 }): Promise<DeckGenerationCompletion> {
-  const { flowInput, pagePlan, activeStreams } = input;
+  const { flowInput, pagePlan, activeStreams, researchDiscoveryProgress } = input;
   const text = generationText(flowInput.locale);
   const attemptLimits = getAttemptLimits(flowInput);
   let progress = await recordDeckRecovery(flowInput, {
@@ -73,6 +77,7 @@ export async function runFinalDeckRender(input: {
     progress,
     null,
     activeStreams,
+    researchDiscoveryProgress,
   );
 
   let rendered: DeckGenerationResult["rendered"];
@@ -104,6 +109,7 @@ export async function runFinalDeckRender(input: {
         null,
         activeStreams,
         attemptLimits,
+        researchDiscoveryProgress,
       );
       flowInput.onProgress(cancelledProgress);
       return {
@@ -136,6 +142,7 @@ export async function runFinalDeckRender(input: {
       null,
       activeStreams,
       attemptLimits,
+      researchDiscoveryProgress,
     );
     flowInput.onProgress(failedProgress);
     return failedCompletion({
@@ -177,6 +184,7 @@ export async function runFinalDeckRender(input: {
     progress,
     null,
     activeStreams,
+    researchDiscoveryProgress,
   );
 
   return {

@@ -527,6 +527,7 @@ export interface ResearchDiscoveryQuerySummary {
   query: string;
   raw_index_path?: string;
   result_count?: number;
+  fetch_count?: number;
   status: "collected" | "gap" | "error" | "skipped_duplicate";
   message?: string;
 }

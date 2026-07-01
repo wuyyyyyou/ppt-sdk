@@ -14,8 +14,33 @@ import {
   type DeckGenerationStep,
   type DeckGenerationStream,
   type DeckGenerationStreamSnapshot,
+  type ResearchDiscoveryProgress,
 } from "./types";
 import { generationText } from "./messages";
+
+function cloneResearchDiscoveryProgress(
+  progress?: ResearchDiscoveryProgress,
+): ResearchDiscoveryProgress | undefined {
+  if (!progress) return undefined;
+  return {
+    ...progress,
+    summary: { ...progress.summary },
+    records: progress.records.map((record) => ({
+      ...record,
+      queries: record.queries?.map((query) => ({
+        ...query,
+        sources: query.sources?.map((source) => ({ ...source })),
+      })),
+      sources: record.sources?.map((source) => ({ ...source })),
+      visualAssets: record.visualAssets?.map((asset) => ({ ...asset })),
+      activities: record.activities ? [...record.activities] : undefined,
+      lines: record.lines ? [...record.lines] : undefined,
+      gaps: record.gaps ? [...record.gaps] : undefined,
+      rejectedReasons: record.rejectedReasons ? [...record.rejectedReasons] : undefined,
+      counts: record.counts ? { ...record.counts } : undefined,
+    })),
+  };
+}
 
 export function mapProgress(
   progress: PageProgress | null,
@@ -46,6 +71,7 @@ export function createProgress(
   stream?: DeckGenerationStream | null,
   activeStreams?: Iterable<DeckGenerationStream>,
   attemptLimits: typeof ATTEMPT_LIMITS = ATTEMPT_LIMITS,
+  researchDiscovery?: ResearchDiscoveryProgress,
 ): DeckGenerationProgress {
   const activeStreamList = activeStreams
     ? Array.from(activeStreams).sort((left, right) => left.page_index - right.page_index)
@@ -59,6 +85,7 @@ export function createProgress(
       lines: [...item.lines],
       activities: [...item.activities],
     })) : undefined,
+    researchDiscovery: cloneResearchDiscoveryProgress(researchDiscovery),
   };
 }
 
@@ -69,6 +96,7 @@ export function emit(
   stream?: DeckGenerationStream | null,
   activeStreams?: Iterable<DeckGenerationStream>,
   attemptLimits: typeof ATTEMPT_LIMITS = ATTEMPT_LIMITS,
+  researchDiscovery?: ResearchDiscoveryProgress,
 ) {
   input.onProgress(createProgress(
     value,
@@ -76,6 +104,7 @@ export function emit(
     stream,
     activeStreams,
     attemptLimits,
+    researchDiscovery,
   ));
 }
 
@@ -182,5 +211,5 @@ export function emitRuntime(
   stream?: DeckGenerationStream | null,
   attemptLimits: typeof ATTEMPT_LIMITS = ATTEMPT_LIMITS,
 ) {
-  emit(input, value, progress, stream, input.activeStreams.values(), attemptLimits);
+  emit(input, value, progress, stream, input.activeStreams.values(), attemptLimits, input.researchDiscoveryProgress);
 }

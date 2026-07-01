@@ -176,6 +176,7 @@ export async function runDeckGeneration(
       null,
       runtime.activeStreams.values(),
       attemptLimits,
+      runtime.researchDiscoveryProgress,
     );
     input.onProgress(failedProgress);
     await recordDeckRecovery(input, {
@@ -203,6 +204,7 @@ export async function runDeckGeneration(
       null,
       runtime.activeStreams.values(),
       attemptLimits,
+      runtime.researchDiscoveryProgress,
     );
     input.onProgress(cancelledProgress);
     await recordDeckRecovery(input, {
@@ -240,6 +242,7 @@ export async function runDeckGeneration(
       null,
       runtime.activeStreams.values(),
       attemptLimits,
+      runtime.researchDiscoveryProgress,
     );
     input.onProgress(failedProgress);
     await recordDeckRecovery(input, {
@@ -267,5 +270,6 @@ export async function runDeckGeneration(
     pagePlan,
     progress,
     activeStreams: runtime.activeStreams.values(),
+    researchDiscoveryProgress: runtime.researchDiscoveryProgress,
   });
 }
