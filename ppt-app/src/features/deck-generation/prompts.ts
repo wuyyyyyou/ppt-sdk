@@ -98,7 +98,6 @@ export function buildAuthoringPrompt(input: {
   const dataPath = `${input.workspaceDir}/${relativeDataPath}`;
   const blueprintSourcePath = `${input.workspaceDir}/template/${input.page.blueprint_source.replace(/^\.\//, "")}`;
   const currentPageEvidencePath = `${input.workspaceDir}/research/evidence/pages/${input.page.page_id}.md`;
-  const evidenceIndexPath = `${input.workspaceDir}/research/evidence-index.json`;
   const outlinePath = `${input.workspaceDir}/outline.json`;
   const pagePlanPath = `${input.workspaceDir}/page-plan.json`;
   const componentGuidePath = `${input.workspaceDir}/template/components/README.md`;
@@ -272,6 +271,7 @@ export function buildAuthoringPrompt(input: {
     `- Current page title: ${input.page.title}`,
     `- Current page outline: ${input.page.outline}`,
     `- Current page Page Plan reason: ${input.page.reason}`,
+    `- Current page content_plan: ${JSON.stringify(input.page.content_plan ?? null)}`,
     `- Current slide TSX path: ${slidePath}`,
     `- Current slide TSX Agent file-tool path: ${toAgentFileToolPath(agentPathContext, slidePath).agentFileToolPath ?? "unavailable; use canonical absolute path"}`,
     `- Current data JSON path: ${dataPath}`,
@@ -294,10 +294,8 @@ export function buildAuthoringPrompt(input: {
       `6. ${formatToolPath("Template component guide", componentGuidePath)}`,
       `7. ${formatToolPath("Slide authoring guide", slideGuidePath)}`,
       `8. REQUIRED when present, ${formatToolPath("Current-page Research Evidence", currentPageEvidencePath)}`,
-      `9. REQUIRED when present, ${formatToolPath("Deck-level Research Evidence index", evidenceIndexPath)}`,
       `Also read the current-page Research Evidence file if it exists, using its Agent file-tool path above.`,
-      `Also read the deck-level Research Evidence index if it exists, using its Agent file-tool path above.`,
-      "10. Before using any component from template/components, read that component's source file.",
+      "9. Before using any component from template/components, read that component's source file.",
     ].join("\n"),
     "",
     [
@@ -315,7 +313,8 @@ export function buildAuthoringPrompt(input: {
       "Authoring grounding source rules:",
       "- Treat the current slide TSX and current data JSON as editable draft content, not as sources of truth.",
       "- Current generated content must not be used as evidence for new factual claims, numbers, dates, chart data, KPIs, rankings, citations, or source-backed details.",
-      "- Allowed grounding sources are only: the user's original prompt; context rows; task_context; uploaded or source material represented in workspace artifacts; Confirmed Outline source prompt/context/task_context; Confirmed Outline text; current Page Plan title/outline/reason when they restate or directly derive from the Confirmed Outline; current-page Research Evidence; Shared Research Evidence; and, in page-refinement mode, facts, numbers, dates, names, and claims explicitly stated in the current Page Refinement Request.",
+      "- Allowed grounding sources are only: the user's original prompt; context rows; task_context; uploaded or source material represented in workspace artifacts; Confirmed Outline source prompt/context/task_context; Confirmed Outline text; current Page Plan title/outline/reason/content_plan when they restate or directly derive from the Confirmed Outline or assigned Research Evidence; current-page Research Evidence; explicitly marked Shared Research Evidence inside the current-page evidence markdown; and, in page-refinement mode, facts, numbers, dates, names, and claims explicitly stated in the current Page Refinement Request.",
+      "- The Research Discovery Evidence Pool and research/evidence-index.json are diagnostic/planning artifacts, not Page Authoring grounding sources. Do not read or use them unless a current-page Research Evidence file explicitly points to a shared evidence excerpt.",
       "- Not grounding sources: current generated data JSON or slide TSX; generated pages; rendered HTML; screenshots; visual review output; Agent summaries; Raw Research Material; and other pages' Research Evidence unless it is explicitly Shared Research Evidence.",
       "- Do not use Raw Research Material as evidence unless it has been curated into Research Evidence.",
       "- Do not call search tools during Page Authoring.",
@@ -467,7 +466,6 @@ export function buildPageContentReviewPrompt(input: {
   const currentSlidePath = `${input.workspaceDir}/template/${input.page.slide_path.replace(/^\.\//, "")}`;
   const outlinePath = `${input.workspaceDir}/outline.json`;
   const pagePlanPath = `${input.workspaceDir}/page-plan.json`;
-  const evidenceIndexPath = `${input.workspaceDir}/research/evidence-index.json`;
   const currentPageEvidencePath = `${input.workspaceDir}/research/evidence/pages/${input.page.page_id}.md`;
   const settingPath = `${input.workspaceDir}/setting.json`;
   const taskPath = `${input.workspaceDir}/task.json`;
@@ -498,10 +496,9 @@ export function buildPageContentReviewPrompt(input: {
     `2. ${formatToolPath("Current slide TSX for visibility/schema interpretation", currentSlidePath)}`,
     `3. ${formatToolPath("Workspace outline", outlinePath)}`,
     `4. ${formatToolPath("Workspace page plan", pagePlanPath)}`,
-    `5. ${formatToolPath("Workspace research evidence index if present", evidenceIndexPath)}`,
-    `6. ${formatToolPath("Current page research evidence markdown if present", currentPageEvidencePath)}`,
-    `7. ${formatToolPath("Workspace setting", settingPath)}`,
-    `8. ${formatToolPath("Workspace task metadata", taskPath)}`,
+    `5. ${formatToolPath("Current page research evidence markdown if present", currentPageEvidencePath)}`,
+    `6. ${formatToolPath("Workspace setting", settingPath)}`,
+    `7. ${formatToolPath("Workspace task metadata", taskPath)}`,
     "",
     "Data field scope:",
     "- Judge user-visible string values in the current data JSON.",
@@ -523,9 +520,9 @@ export function buildPageContentReviewPrompt(input: {
     "Separate review targets from evidence sources:",
     "- Review targets: current data JSON and current slide TSX visible content. These are the claims being checked.",
     pageRefinementRequest
-      ? "- Evidence sources: user prompt, context rows, task_context, uploaded/source material represented in workspace artifacts, Confirmed Outline source prompt/context/task_context, Confirmed Outline text, current-page Research Evidence, Shared Research Evidence, current Page Refinement Request facts explicitly stated below, and the current Page Plan title/outline/reason only when they restate or derive from the Confirmed Outline."
-      : "- Evidence sources: user prompt, context rows, task_context, uploaded/source material represented in workspace artifacts, Confirmed Outline source prompt/context/task_context, Confirmed Outline text, current-page Research Evidence, Shared Research Evidence, and the current Page Plan title/outline/reason only when they restate or derive from the Confirmed Outline.",
-    "- Not evidence sources: current page data JSON, current page slide TSX, Raw Research Material, stale Research Evidence, other pages' Research Evidence, rendered HTML, screenshots, generated pages, generated slide data, Agent summaries, visual review output, or any content created during the current page authoring run.",
+      ? "- Evidence sources: user prompt, context rows, task_context, uploaded/source material represented in workspace artifacts, Confirmed Outline source prompt/context/task_context, Confirmed Outline text, current-page Research Evidence, explicitly marked Shared Research Evidence inside the current-page evidence markdown, current Page Refinement Request facts explicitly stated below, and the current Page Plan title/outline/reason/content_plan only when they restate or derive from the Confirmed Outline or assigned Research Evidence."
+      : "- Evidence sources: user prompt, context rows, task_context, uploaded/source material represented in workspace artifacts, Confirmed Outline source prompt/context/task_context, Confirmed Outline text, current-page Research Evidence, explicitly marked Shared Research Evidence inside the current-page evidence markdown, and the current Page Plan title/outline/reason/content_plan only when they restate or derive from the Confirmed Outline or assigned Research Evidence.",
+    "- Not evidence sources: current page data JSON, current page slide TSX, Raw Research Material, Research Discovery Evidence Pool, research/evidence-index.json, stale Research Evidence, other pages' Research Evidence, rendered HTML, screenshots, generated pages, generated slide data, Agent summaries, visual review output, or any content created during the current page authoring run.",
     "A claim is grounded only when it can be traced to an evidence source above. The fact that a value appears in current data JSON or current slide TSX never makes it grounded by itself.",
     pageRefinementRequest
       ? [

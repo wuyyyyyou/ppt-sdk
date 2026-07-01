@@ -6,7 +6,6 @@ import { generationText } from "./messages";
 import { buildDeckGenerationSummary, emitRuntime as emitRuntimeProgress } from "./progressProjection";
 import { shouldResumePageGenerationStatus } from "./pageStatusPolicy";
 import { buildAuthoringPrompt, buildPageContentReviewPrompt, buildPageVisualReviewPrompt, contentReviewPassed, targetPageFilesChanged, targetPageFingerprintReadErrorMessage, targetPageNoChangeMessage, visualReviewPassed } from "./prompts";
-import { collectAndCurateResearchForPage } from "./researchWorkflow";
 import { buildAgentRunOptions, createAgentRunTracker, getProgressPage, getStoredContentReview, getStoredVisualReview, recordProgress } from "./runtimeSupport";
 import { getAttemptLimits, getPageGenerationConcurrency, getReviewSettings } from "./settings";
 import { createFailedPageError } from "./pageFailure";
@@ -88,23 +87,6 @@ export async function runPageGeneration(
     };
   }
 
-  try {
-    await collectAndCurateResearchForPage(input, pagePlan, page);
-  } catch (error) {
-    if (isAgentRunCancelledError(error)) {
-      return {
-        page,
-        reason: "cancelled",
-        progress: input.getProgress() ?? progress ?? {
-          version: 1,
-          status: "running",
-          pages: [],
-          updated_at: null,
-        },
-      };
-    }
-    throw error;
-  }
   if (input.isCancelled()) {
     return {
       page,

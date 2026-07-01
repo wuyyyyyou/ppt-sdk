@@ -6,6 +6,13 @@ export function generationText(locale: Locale) {
   return {
     pagePlan: zh ? "正在规划页面和模板蓝图" : "Planning pages and template blueprints",
     researchPlanning: zh ? "正在规划检索需求" : "Planning research needs",
+    webResearchDiscovery: zh ? "正在判断并补充网页资料" : "Discovering needed web evidence",
+    visualResearchDiscovery: zh ? "正在判断并补充图片素材" : "Discovering needed visual assets",
+    collectingWebSources: zh ? "正在搜索并抓取网页资料" : "Searching and fetching web sources",
+    collectingVisualSources: zh ? "正在搜索并下载图片素材" : "Searching and downloading visual assets",
+    curatingDiscoveryFacts: zh ? "正在筛选资料证据" : "Curating discovered factual evidence",
+    curatingDiscoveryImages: zh ? "正在筛选图片素材" : "Curating discovered visual assets",
+    evidencePagePlanning: zh ? "正在根据证据补充页面内容规划" : "Planning page content from curated evidence",
     collectingSources: (page: PagePlanItem) =>
       zh ? `正在搜索并抓取第 ${page.index + 1} 页资料` : `Collecting sources for page ${page.index + 1}`,
     curatingEvidence: (page: PagePlanItem) =>
@@ -77,4 +84,3 @@ export function generationText(locale: Locale) {
       zh ? `第 ${pageIndex + 1} 页 · ${kind}` : `Page ${pageIndex + 1} · ${kind}`,
   };
 }
-

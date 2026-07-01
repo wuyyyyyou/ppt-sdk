@@ -823,6 +823,20 @@ function normalizeStringArray(value: unknown): string[] {
     : [];
 }
 
+function normalizePageContentPlan(value: unknown) {
+  const record = getPlainRecord(value);
+  if (Object.keys(record).length === 0) return undefined;
+  return {
+    main_message: normalizeString(record.main_message),
+    content_points: normalizeStringArray(record.content_points),
+    evidence_fact_ids: normalizeStringArray(record.evidence_fact_ids),
+    derived_insight_ids: normalizeStringArray(record.derived_insight_ids),
+    visual_asset_ids: normalizeStringArray(record.visual_asset_ids),
+    gaps: normalizeStringArray(record.gaps),
+    authoring_notes: normalizeStringArray(record.authoring_notes),
+  };
+}
+
 function normalizeRelativeManifestPath(value: unknown, fieldName: string): string {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new Error(`"${fieldName}" must be a non-empty relative path`);
@@ -876,6 +890,9 @@ function normalizePagePlanItem(value: unknown, index: number): AppPagePlanItem {
     data_path: dataPath,
     manifest_slide_id: manifestSlideId,
     reason: normalizeString(record.reason),
+    ...(normalizePageContentPlan(record.content_plan)
+      ? { content_plan: normalizePageContentPlan(record.content_plan) }
+      : {}),
   };
 }
 

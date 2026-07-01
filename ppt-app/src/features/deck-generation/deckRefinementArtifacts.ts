@@ -1,7 +1,6 @@
 export {
   alignDeckRefinementPagePlanToOutline,
   applyDeckRefinementSettingUpdates,
-  mergeDeckRefinementResearchPlan,
   reconcileDeckRefinement,
   type DeckRefinementReconciliationResult,
 } from "./deckRefinementWorkflow";
@@ -13,11 +12,9 @@ import type {
   WorkspaceOutline,
   WorkspaceResult,
 } from "../../api/types";
-import { createEmptyResearchPlan } from "./researchWorkflow";
 import {
   alignDeckRefinementPagePlanToOutline,
   applyDeckRefinementSettingUpdates,
-  mergeDeckRefinementResearchPlan,
   type DeckRefinementReconciliationResult,
 } from "./deckRefinementWorkflow";
 import { emit as emitProgress } from "./progressProjection";
@@ -26,10 +23,7 @@ import {
   recordDeckRecovery,
   throwIfCancelled,
 } from "./runtimeSupport";
-import {
-  readResearchEvidenceSafe,
-  readResearchPlanSafe,
-} from "./researchArtifacts";
+import { readResearchEvidenceSafe } from "./researchArtifacts";
 import {
   ATTEMPT_LIMITS,
   type DeckGenerationContext,
@@ -108,41 +102,6 @@ export async function persistDeckRefinementArtifacts(input: {
   });
   throwIfCancelled(flowInput);
 
-  const existingResearchPlan = await readResearchPlanSafe(flowInput) ?? createEmptyResearchPlan({
-    outline: persistedOutline,
-    pagePlan: activePagePlan,
-    generatedBy: "deck-refinement-fallback",
-  });
-  const needsResearchPlanning = Object.keys(reconciliation.researchReviews).length > 0;
-  const generatedResearchPlan = needsResearchPlanning
-    ? await flowInput.aiClient.generateResearchPlan({
-        outline: persistedOutline,
-        pagePlan: activePagePlan,
-        locale: flowInput.locale,
-        logContext: flowInput.aiLogger
-          ? {
-              logger: flowInput.aiLogger,
-              workspace_dir: flowInput.workspace.workspace_dir,
-              domain: "page_plan" as const,
-              operation: "deck_refinement_research_plan",
-              operation_id: flowInput.aiLogger.createOperationId("page_plan", "deck_refinement_research_plan"),
-              provider: "anna",
-              runtime_mode: "anna",
-            }
-          : undefined,
-      })
-    : null;
-  const mergedResearchPlan = mergeDeckRefinementResearchPlan({
-    existingPlan: existingResearchPlan,
-    generatedPlan: generatedResearchPlan,
-    pagePlan: activePagePlan,
-    researchReviews: reconciliation.researchReviews,
-    now: new Date().toISOString(),
-  });
-  await flowInput.backend.recordResearchPlan({
-    workspace_dir: flowInput.workspace.workspace_dir,
-    research_plan: mergedResearchPlan,
-  });
   const activePageIds = new Set(activePagePlan.pages.map((page) => page.page_id));
   const existingEvidence = await readResearchEvidenceSafe(flowInput);
   if (existingEvidence) {

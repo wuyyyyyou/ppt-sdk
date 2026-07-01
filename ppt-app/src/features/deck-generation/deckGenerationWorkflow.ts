@@ -24,6 +24,7 @@ import {
   getProgressPage,
   recordDeckRecovery,
 } from "./runtimeSupport";
+import { runResearchDiscoveryForPagePlan } from "./researchDiscoveryWorkflow";
 
 function getActiveGenerationRunKind(input: RunDeckGenerationInput): NonNullable<PageProgress["recovery"]>["run_kind"] {
   return input.refinementRunKind ?? (input.pageRefinementRequests ? "page-refinement" : "deck-generation");
@@ -145,6 +146,21 @@ export async function runDeckGeneration(
       progress = nextProgress;
     },
   };
+
+  const targetPageIds = input.pageRefinementRequests
+    ? Object.keys(input.pageRefinementRequests).filter((pageId) => input.pageRefinementRequests?.[pageId]?.trim())
+    : pagePlan.pages
+        .filter((page) => getProgressPage(progress, page.page_id)?.status !== "accepted")
+        .map((page) => page.page_id);
+  if (targetPageIds.length > 0) {
+    pagePlan = await runResearchDiscoveryForPagePlan({
+      runtime,
+      pagePlan,
+      targetPageIds: targetPageIds.length === pagePlan.pages.length && !input.pageRefinementRequests
+        ? undefined
+        : targetPageIds,
+    });
+  }
 
   const results = await runPagesConcurrently(runtime, pagePlan);
   const infrastructureFailure = results.find((result) => result.reason === "agent_infrastructure");

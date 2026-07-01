@@ -14,7 +14,6 @@ import {
   type RunDeckRefinementInput,
 } from "./types";
 import { getAttemptLimits } from "./settings";
-import { getResearchRequirement } from "./researchWorkflow";
 import {
   persistPageRefinementArtifacts,
   recordPageRefinementRecovery,
@@ -28,7 +27,6 @@ import {
 } from "./runtimeSupport";
 import {
   readResearchEvidenceSafe,
-  readResearchPlanSafe,
 } from "./researchArtifacts";
 import { runDeckGeneration } from "./deckGenerationWorkflow";
 
@@ -97,14 +95,12 @@ export async function runPageRefinement(args: {
     }
   } else if (input.scope === "slide") {
     const targetPage = targetPages[0];
-    const [planningContext, researchPlan, researchEvidence] = await Promise.all([
+    const [planningContext, researchEvidence] = await Promise.all([
       input.backend.getTemplatePlanningContext({
         workspace_dir: input.workspace.workspace_dir,
       }),
-      readResearchPlanSafe(input),
       readResearchEvidenceSafe(input),
     ]);
-    const researchRequirement = researchPlan ? getResearchRequirement(researchPlan, targetPage) : null;
     let intentReview: PageRefinementIntentReviewResult;
     try {
       const logContext: AiOperationLogContext | undefined = input.aiLogger
@@ -124,7 +120,7 @@ export async function runPageRefinement(args: {
         pagePlan,
         targetPage,
         planningContext,
-        researchRequirement,
+        researchRequirement: null,
         researchEvidence,
         locale: input.locale,
         logContext,
@@ -200,9 +196,6 @@ export async function runPageRefinement(args: {
       progress,
       targetPage,
       review: intentReview,
-      researchPlan,
-      researchEvidence,
-      researchRequirement,
       now: new Date().toISOString(),
     });
     activeOutline = persisted.activeOutline;

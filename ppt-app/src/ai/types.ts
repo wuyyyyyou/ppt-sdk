@@ -4,8 +4,9 @@ import type { WorkspaceSettings } from "../api/types";
 import type {
   PagePlan,
   PagePlanItem,
+  ResearchDiscoveryDecision,
+  ResearchDiscoveryEvidencePool,
   ResearchEvidenceIndex,
-  ResearchPlan,
   ResearchRequirement,
   TemplatePlanningContext,
   WorkspaceOutlineItem,
@@ -115,13 +116,6 @@ export interface GeneratePagePlanInput {
   logContext?: AiOperationLogContext;
 }
 
-export interface GenerateResearchPlanInput {
-  outline: WorkspaceOutline;
-  pagePlan: PagePlan;
-  locale: Locale;
-  logContext?: AiOperationLogContext;
-}
-
 export type PageRefinementIntentReviewRoute = "proceed" | "unsupported";
 
 export interface PageRefinementIntentReviewResult {
@@ -219,6 +213,28 @@ export interface GenerateAddedPagePlanInput {
   logContext?: AiOperationLogContext;
 }
 
+export interface GenerateResearchDiscoveryDecisionInput {
+  outline: WorkspaceOutline;
+  pagePlan: PagePlan;
+  phase: "web" | "visual";
+  iteration: number;
+  iterationLimit: number;
+  targetPageIds?: string[];
+  discoveryPool: ResearchDiscoveryEvidencePool;
+  researchStatus?: unknown;
+  locale: Locale;
+  logContext?: AiOperationLogContext;
+}
+
+export interface GenerateEvidenceAwarePagePlanInput {
+  outline: WorkspaceOutline;
+  pagePlan: PagePlan;
+  discoveryPool: ResearchDiscoveryEvidencePool;
+  targetPageIds?: string[];
+  locale: Locale;
+  logContext?: AiOperationLogContext;
+}
+
 export interface AiClient {
   generateOutline(input: GenerateOutlineInput): Promise<OutlineGenerationResult>;
   detectOutputLanguage(input: GenerateOutlineInput & {
@@ -228,7 +244,8 @@ export interface AiClient {
   suggestContext(input: SuggestContextInput): Promise<ContextSuggestionResult>;
   generatePagePlan(input: GeneratePagePlanInput): Promise<PagePlan>;
   generateAddedPagePlan(input: GenerateAddedPagePlanInput): Promise<PagePlan>;
-  generateResearchPlan(input: GenerateResearchPlanInput): Promise<ResearchPlan>;
+  generateResearchDiscoveryDecision(input: GenerateResearchDiscoveryDecisionInput): Promise<ResearchDiscoveryDecision>;
+  generateEvidenceAwarePagePlan(input: GenerateEvidenceAwarePagePlanInput): Promise<PagePlan>;
   reviewPageRefinementIntent(input: ReviewPageRefinementIntentInput): Promise<PageRefinementIntentReviewResult>;
   reviewDeckRefinementIntent(input: ReviewDeckRefinementIntentInput): Promise<DeckRefinementIntentReviewResult>;
   generateDeck(input: GenerateDeckInput): Promise<GeneratedDeck>;

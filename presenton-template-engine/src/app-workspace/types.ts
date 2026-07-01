@@ -44,6 +44,16 @@ export interface AppWorkspaceOutline {
   updated_at: string | null;
 }
 
+export interface AppPageContentPlan {
+  main_message: string;
+  content_points: string[];
+  evidence_fact_ids: string[];
+  derived_insight_ids: string[];
+  visual_asset_ids: string[];
+  gaps: string[];
+  authoring_notes: string[];
+}
+
 export interface AppWorkspaceResult {
   workspace_root: string;
   task_root: string;
@@ -401,6 +411,7 @@ export interface AppPagePlanItem {
   data_path: string;
   manifest_slide_id: string;
   reason: string;
+  content_plan?: AppPageContentPlan;
 }
 
 export interface AppPagePlan {

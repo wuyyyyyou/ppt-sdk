@@ -12,9 +12,11 @@ import {
   parsePagePlanJson,
 } from "./pagePlanPrompt";
 import {
-  buildGenerateResearchPlanLlmRequest,
-  parseResearchPlanJson,
-} from "./researchPlanPrompt";
+  buildEvidenceAwarePagePlanLlmRequest,
+  buildResearchDiscoveryDecisionLlmRequest,
+  parseEvidenceAwarePagePlanJson,
+  parseResearchDiscoveryDecisionJson,
+} from "./researchDiscoveryPrompt";
 import {
   buildPageRefinementIntentReviewPrompt,
   normalizePageRefinementIntentReview,
@@ -45,7 +47,6 @@ import type {
   GeneratedDeck,
   OutlineGenerationResult,
 } from "./types";
-import type { PagePlan, ResearchPlan } from "../api/types";
 
 interface AnnaCompletionContent {
   type?: string;
@@ -281,49 +282,6 @@ function normalizeContextSuggestions(value: unknown): ContextSuggestionResult {
       THEME_PRESET_IDS.includes(themeId),
     ),
     slides: normalizeSlideCountValue(record.slides),
-  };
-}
-
-function alignResearchPlanWithPagePlan(researchPlan: ResearchPlan, pagePlan: PagePlan): ResearchPlan {
-  const byPageId = new Map(researchPlan.pages.map((page) => [page.page_id, page]));
-  return {
-    ...researchPlan,
-    title: pagePlan.title,
-    source: {
-      ...researchPlan.source,
-      page_plan_updated_at: pagePlan.updated_at,
-      template_group: pagePlan.source.template_group,
-    },
-    pages: pagePlan.pages.map((page) => {
-      const planned = byPageId.get(page.page_id);
-      return {
-        page_id: page.page_id,
-        index: page.index,
-        title: page.title,
-        web_research_needed: planned?.web_research_needed === true,
-        image_research_needed: planned?.image_research_needed === true,
-        query_intents: Array.isArray(planned?.query_intents)
-          ? planned.query_intents.filter((item): item is string => typeof item === "string").slice(0, 3)
-          : [],
-        image_query_intents: Array.isArray(planned?.image_query_intents)
-          ? planned.image_query_intents.filter((item): item is string => typeof item === "string").slice(0, 2)
-          : [],
-        evidence_needs: Array.isArray(planned?.evidence_needs)
-          ? planned.evidence_needs.filter((item): item is string => typeof item === "string").slice(0, 6)
-          : [],
-        visual_needs: Array.isArray(planned?.visual_needs)
-          ? planned.visual_needs.filter((item): item is string => typeof item === "string").slice(0, 4)
-          : [],
-        gap_strategy:
-          typeof planned?.gap_strategy === "string" && planned.gap_strategy.trim()
-            ? planned.gap_strategy
-            : "Generalize unsupported concrete details or mark data slots as TBD / 待补充.",
-        reason:
-          typeof planned?.reason === "string" && planned.reason.trim()
-            ? planned.reason
-            : "Research need normalized from Page Plan alignment.",
-      };
-    }),
   };
 }
 
@@ -564,14 +522,18 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
       throw new Error("Anna LLM returned invalid added-page plan JSON.");
     },
 
-    async generateResearchPlan(input) {
-      const request = buildGenerateResearchPlanLlmRequest(input);
+    async generateResearchDiscoveryDecision(input) {
+      const request = buildResearchDiscoveryDecisionLlmRequest(input);
       const rawResult = await completeLlm(runtime, request, input.logContext);
       const rawText = extractCompletionText(rawResult);
-      return alignResearchPlanWithPagePlan(
-        parseResearchPlanJson(rawText),
-        input.pagePlan
-      );
+      return parseResearchDiscoveryDecisionJson(rawText, input.phase);
+    },
+
+    async generateEvidenceAwarePagePlan(input) {
+      const request = buildEvidenceAwarePagePlanLlmRequest(input);
+      const rawResult = await completeLlm(runtime, request, input.logContext);
+      const rawText = extractCompletionText(rawResult);
+      return parseEvidenceAwarePagePlanJson(rawText, input.pagePlan, input.targetPageIds);
     },
 
     async reviewPageRefinementIntent(input) {

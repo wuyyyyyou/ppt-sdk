@@ -6,12 +6,9 @@ import type {
 import type {
   PagePlan,
   PagePlanItem,
-  ResearchPlan,
-  ResearchRequirement,
   WorkspaceOutline,
   WorkspaceSettings,
 } from "../../api/types";
-import { mergeTargetResearchRequirement } from "./pageRefinementArtifacts";
 
 function cleanSegment(value: string): string {
   const ascii = value
@@ -272,69 +269,6 @@ export function reconcileDeckRefinement(input: {
       targetPageIds.size > 0 ||
       deletedPageIds.length > 0 ||
       input.review.output_language_change.changed,
-  };
-}
-
-export function mergeDeckRefinementResearchPlan(input: {
-  existingPlan: ResearchPlan;
-  generatedPlan: ResearchPlan | null;
-  pagePlan: PagePlan;
-  researchReviews: Record<string, PageRefinementIntentReviewResult>;
-  now: string;
-}): ResearchPlan {
-  const generatedByPageId = new Map(
-    (input.generatedPlan?.pages ?? []).map((requirement) => [requirement.page_id, requirement]),
-  );
-  const existingByPageId = new Map(input.existingPlan.pages.map((requirement) => [requirement.page_id, requirement]));
-
-  const pages = input.pagePlan.pages.map((page): ResearchRequirement => {
-    const existing = existingByPageId.get(page.page_id);
-    const generated = generatedByPageId.get(page.page_id);
-    const base = existing ?? generated ?? {
-      page_id: page.page_id,
-      index: page.index,
-      title: page.title,
-      web_research_needed: false,
-      image_research_needed: false,
-      query_intents: [],
-      image_query_intents: [],
-      evidence_needs: [],
-      visual_needs: [],
-      gap_strategy: "Generalize unsupported concrete details or mark data slots as TBD / 待补充.",
-      reason: "No external research needed.",
-    };
-    const aligned = {
-      ...base,
-      page_id: page.page_id,
-      index: page.index,
-      title: page.title,
-    };
-    const review = input.researchReviews[page.page_id];
-    if (!review) return aligned;
-    return mergeTargetResearchRequirement({
-      researchPlan: {
-        ...input.existingPlan,
-        pages: [aligned],
-      },
-      targetPage: page,
-      review,
-      pagePlanUpdatedAt: input.pagePlan.updated_at,
-      now: input.now,
-    }).pages[0] ?? aligned;
-  });
-
-  return {
-    ...input.existingPlan,
-    status: "planned",
-    title: input.pagePlan.title,
-    source: {
-      ...input.existingPlan.source,
-      outline_updated_at: input.pagePlan.source.outline_updated_at,
-      page_plan_updated_at: input.pagePlan.updated_at,
-      template_group: input.pagePlan.source.template_group,
-    },
-    pages,
-    updated_at: input.now,
   };
 }
 

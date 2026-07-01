@@ -18,8 +18,6 @@ import {
   throwIfCancelled,
 } from "./runtimeSupport";
 import { getAttemptLimits } from "./settings";
-import { generateAndRecordResearchPlan } from "./researchWorkflow";
-import { readResearchPlanSafe } from "./researchArtifacts";
 
 function readWorkspaceTemplate(workspace: WorkspaceResult) {
   return workspace.template && typeof workspace.template === "object" && !Array.isArray(workspace.template)
@@ -113,11 +111,6 @@ export async function loadResumeArtifacts(input: RunDeckGenerationInput) {
     }
     if (!pagePlanMatchesOutlineAndTemplate(input.workspace, pagePlan, null, input.confirmedOutline)) {
       return null;
-    }
-
-    const researchPlan = await readResearchPlanSafe(input);
-    if (!researchPlan || researchPlan.pages.length !== pagePlan.pages.length) {
-      await generateAndRecordResearchPlan(input, pagePlan);
     }
 
     if (!progressMatchesPlan(pagePlan, progress)) {
@@ -235,9 +228,6 @@ export async function createRestartArtifacts(input: RunDeckGenerationInput) {
     workspace_dir: input.workspace.workspace_dir,
     page_plan: alignedPagePlan,
   });
-  throwIfCancelled(input);
-
-  await generateAndRecordResearchPlan(input, alignedPagePlan);
   throwIfCancelled(input);
 
   await recordDeckRecovery(input, {

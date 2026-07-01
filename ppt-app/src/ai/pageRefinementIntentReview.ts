@@ -132,7 +132,6 @@ export function buildPageRefinementIntentReviewPrompt(
     `Full Page Plan JSON: ${JSON.stringify(input.pagePlan)}`,
     `Target Page Plan entry JSON: ${JSON.stringify(input.targetPage)}`,
     `Available template blueprints JSON: ${JSON.stringify(input.planningContext.blueprints)}`,
-    `Target Research Requirement JSON: ${JSON.stringify(input.researchRequirement)}`,
     `Existing target Research Evidence summary JSON: ${JSON.stringify(pageEvidence)}`,
   ].join("\n");
 }

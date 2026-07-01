@@ -1,15 +1,11 @@
 import { AgentRunCancelledError, isAgentRunCancelledError } from "../../agent/agentClient";
-import type { AiOperationLogContext } from "../../ai/interactionLog";
-import { assertResearchPlanAligned } from "../../ai/researchPlanPrompt";
-import type { PagePlan, PagePlanItem, ResearchCurationDraftFingerprint, ResearchEvidenceIndex, ResearchPlan, ResearchRequirement, VisualResearchCurationDraft, WebResearchCurationDraft, WorkspaceOutline } from "../../api/types";
+import type { PagePlan, PagePlanItem, ResearchCurationDraftFingerprint, ResearchEvidenceIndex, ResearchRequirement, VisualResearchCurationDraft, WebResearchCurationDraft } from "../../api/types";
 import { generationText } from "./messages";
-import { buildDeckGenerationSummary, emit as emitProgress, emitRuntime as emitRuntimeProgress } from "./progressProjection";
-import { createVisualResearchCurationGapDraft, createWebResearchCurationGapDraft, mergeResearchCurationDrafts, validateVisualResearchCurationDraft, validateWebResearchCurationDraft } from "./researchCurationDrafts";
+import { createVisualResearchCurationGapDraft, createWebResearchCurationGapDraft, validateVisualResearchCurationDraft, validateWebResearchCurationDraft } from "./researchCurationDrafts";
 import { formatResearchCurationExhaustedGap, formatResearchCurationRetryActivity, formatResearchCurationRunError, RESEARCH_CURATION_ATTEMPT_LIMIT } from "./researchCurationRetry";
-import { computeResearchQueryDelta, recordResearchCollectionLedger } from "./pageRefinementWorkflow";
-import { buildAgentRunOptions, createAgentRunTracker, recordDeckRecovery, recordProgress, throwIfCancelled } from "./runtimeSupport";
+import { buildAgentRunOptions, createAgentRunTracker, throwIfCancelled } from "./runtimeSupport";
 import { getAttemptLimits } from "./settings";
-import { ATTEMPT_LIMITS, type DeckGenerationContext, type DeckGenerationProgress, type DeckGenerationRuntime, type DeckGenerationStream, type RunDeckGenerationInput } from "./types";
+import { type DeckGenerationRuntime } from "./types";
 import {
   createAgentFileToolPathContext,
   describeAgentFileToolPathContext,
@@ -17,83 +13,6 @@ import {
   type AgentFileToolPathContext,
   toAgentFileToolPath,
 } from "./agentFileToolPaths";
-
-function emit(
-  input: Pick<DeckGenerationContext, "onProgress"> & Partial<Pick<DeckGenerationContext, "workspace">>,
-  value: Omit<DeckGenerationProgress, "pages">,
-  progress: import("../../api/types").PageProgress | null,
-  stream?: DeckGenerationStream | null,
-  activeStreams?: Iterable<DeckGenerationStream>,
-) {
-  emitProgress(
-    input,
-    value,
-    progress,
-    stream,
-    activeStreams,
-    input.workspace ? getAttemptLimits({ workspace: input.workspace }) : ATTEMPT_LIMITS,
-  );
-}
-
-function emitRuntime(
-  input: DeckGenerationRuntime,
-  value: Omit<DeckGenerationProgress, "pages">,
-  progress: import("../../api/types").PageProgress | null,
-  stream?: DeckGenerationStream | null,
-) {
-  emitRuntimeProgress(
-    input,
-    value,
-    progress,
-    stream,
-    getAttemptLimits({ workspace: input.workspace }),
-  );
-}
-
-export function createEmptyResearchPlan(input: {
-  outline: WorkspaceOutline;
-  pagePlan: PagePlan;
-  generatedBy: string;
-}): ResearchPlan {
-  return {
-    version: 1,
-    status: "planned",
-    title: input.pagePlan.title,
-    source: {
-      outline_updated_at: input.outline.updated_at,
-      page_plan_updated_at: input.pagePlan.updated_at,
-      template_group: input.pagePlan.source.template_group,
-      generated_by: input.generatedBy,
-    },
-    pages: input.pagePlan.pages.map((page) => ({
-      page_id: page.page_id,
-      index: page.index,
-      title: page.title,
-      web_research_needed: false,
-      image_research_needed: false,
-      query_intents: [],
-      image_query_intents: [],
-      evidence_needs: [],
-      visual_needs: [],
-      gap_strategy: "Generalize unsupported concrete details or mark data slots as TBD / 待补充.",
-      reason: "Research Planning unavailable or no external research needed.",
-    })),
-    shared: {
-      web_research_needed: false,
-      image_research_needed: false,
-      query_intents: [],
-    },
-    updated_at: new Date().toISOString(),
-  };
-}
-
-export function getResearchRequirement(researchPlan: ResearchPlan | null, page: PagePlanItem): ResearchRequirement | null {
-  return researchPlan?.pages.find((item) => item.page_id === page.page_id) ?? null;
-}
-
-function researchNeeded(requirement: ResearchRequirement | null): boolean {
-  return Boolean(requirement?.web_research_needed || requirement?.image_research_needed);
-}
 
 export function normalizeResearchEvidenceIndex(value: ResearchEvidenceIndex | null | undefined): ResearchEvidenceIndex {
   const record = value && typeof value === "object" && !Array.isArray(value)
@@ -114,11 +33,12 @@ export function normalizeResearchEvidenceIndex(value: ResearchEvidenceIndex | nu
       visual_assets: Array.isArray(shared?.visual_assets) ? shared.visual_assets : [],
       gaps: Array.isArray(shared?.gaps) ? shared.gaps : [],
     },
+    ...(record?.discovery_pool ? { discovery_pool: record.discovery_pool as ResearchEvidenceIndex["discovery_pool"] } : {}),
     updated_at: typeof record?.updated_at === "string" ? record.updated_at : new Date().toISOString(),
   };
 }
 
-function buildWebResearchCurationPrompt(input: {
+export function buildWebResearchCurationPrompt(input: {
   workspaceRoot?: string;
   workspaceDir: string;
   page: PagePlanItem;
@@ -189,7 +109,7 @@ function buildWebResearchCurationPrompt(input: {
   ].join("\n");
 }
 
-function buildVisualResearchCurationPrompt(input: {
+export function buildVisualResearchCurationPrompt(input: {
   workspaceRoot?: string;
   workspaceDir: string;
   page: PagePlanItem;
@@ -265,7 +185,7 @@ function buildVisualResearchCurationPrompt(input: {
   ].join("\n");
 }
 
-function createResearchCurationRunId(page: PagePlanItem, kind: "web" | "visual"): string {
+export function createResearchCurationRunId(page: PagePlanItem, kind: "web" | "visual"): string {
   return `research-${kind}-${page.page_id}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
@@ -354,8 +274,8 @@ async function getResearchCurationDraftFingerprintSafe(input: {
   }
 }
 
-async function appendResearchLogSafe(
-  input: Pick<DeckGenerationContext, "backend" | "workspace">,
+export async function appendResearchLogSafe(
+  input: Pick<DeckGenerationRuntime, "backend" | "workspace">,
   entry: Record<string, unknown>,
 ) {
   try {
@@ -399,7 +319,7 @@ async function recordResearchGapForPage(input: {
   });
 }
 
-async function runResearchDraftAgent(input: {
+export async function runResearchDraftAgent(input: {
   flowInput: DeckGenerationRuntime;
   pagePlan: PagePlan;
   page: PagePlanItem;
@@ -738,484 +658,5 @@ async function runResearchDraftAgent(input: {
       updated_at: new Date().toISOString(),
     });
     return null;
-  }
-}
-
-export async function generateAndRecordResearchPlan(
-  input: RunDeckGenerationInput,
-  pagePlan: PagePlan,
-): Promise<ResearchPlan> {
-  const text = generationText(input.locale);
-  await recordDeckRecovery(input, {
-    status: "running",
-    run_kind: "deck-generation",
-    step: "research-planning",
-    target_page_ids: pagePlan.pages.map((page) => page.page_id),
-    error: null,
-    deck_status: "running",
-  });
-  emit(
-    input,
-    {
-      step: "research-planning",
-      message: text.researchPlanning,
-      currentPageIndex: null,
-      totalPages: pagePlan.pages.length,
-    },
-    null,
-  );
-
-  await input.backend.prepareResearchWorkspace({
-    workspace_dir: input.workspace.workspace_dir,
-  });
-  throwIfCancelled(input);
-
-  const logContext: AiOperationLogContext | undefined = input.aiLogger
-    ? {
-        logger: input.aiLogger,
-        workspace_dir: input.workspace.workspace_dir,
-        domain: "page_plan" as const,
-        operation: "generate_research_plan",
-        operation_id: input.aiLogger.createOperationId("page_plan", "generate_research_plan"),
-        provider: "anna",
-        runtime_mode: "anna",
-      }
-    : undefined;
-
-  let researchPlan: ResearchPlan;
-  try {
-    researchPlan = assertResearchPlanAligned({
-      researchPlan: await input.aiClient.generateResearchPlan({
-        outline: input.confirmedOutline,
-        pagePlan,
-        locale: input.locale,
-        logContext,
-      }),
-      pagePlan,
-    });
-    throwIfCancelled(input);
-  } catch (error) {
-    if (isAgentRunCancelledError(error)) throw error;
-    researchPlan = createEmptyResearchPlan({
-      outline: input.confirmedOutline,
-      pagePlan,
-      generatedBy: "fallback",
-    });
-    await appendResearchLogSafe(input, {
-      event: "ai.research.planning.failed",
-      schema_version: 1,
-      status: "gap",
-      error: error instanceof Error ? error.message : String(error),
-      fallback: "empty_research_plan",
-      updated_at: new Date().toISOString(),
-    });
-  }
-
-  const recorded = await input.backend.recordResearchPlan({
-    workspace_dir: input.workspace.workspace_dir,
-    research_plan: researchPlan,
-  });
-  throwIfCancelled(input);
-  await input.backend.recordResearchStatus({
-    workspace_dir: input.workspace.workspace_dir,
-    status: {
-      version: 1,
-      status: "ready",
-      pages: recorded.pages.map((page) => ({
-        page_id: page.page_id,
-        status: researchNeeded(page) ? "planned" : "skipped",
-        message: page.reason,
-        updated_at: new Date().toISOString(),
-      })),
-      updated_at: new Date().toISOString(),
-    },
-  });
-  throwIfCancelled(input);
-  return recorded;
-}
-
-export async function collectAndCurateResearchForPage(
-  input: DeckGenerationRuntime,
-  pagePlan: PagePlan,
-  page: PagePlanItem,
-): Promise<void> {
-  throwIfCancelled(input);
-  const researchPlan = await input.backend.getResearchPlan({
-    workspace_dir: input.workspace.workspace_dir,
-  });
-  throwIfCancelled(input);
-  const requirement = getResearchRequirement(researchPlan, page);
-  if (!researchNeeded(requirement)) return;
-  const pageRequirement = requirement as ResearchRequirement;
-  const currentEvidence = normalizeResearchEvidenceIndex(
-    await input.backend.getResearchEvidence({
-      workspace_dir: input.workspace.workspace_dir,
-    }),
-  );
-  throwIfCancelled(input);
-  const existingEvidence = currentEvidence.pages.find((item) => item.page_id === page.page_id);
-  const isPageRefinement = Boolean(input.pageRefinementRequests?.[page.page_id]?.trim());
-  const initialResearchStatus = await input.backend.getResearchStatus({
-    workspace_dir: input.workspace.workspace_dir,
-  });
-  throwIfCancelled(input);
-  const deltaQueries = computeResearchQueryDelta({
-    status: initialResearchStatus,
-    pageId: page.page_id,
-    requirement: pageRequirement,
-  });
-  if (
-    existingEvidence?.status === "curated" &&
-    (!isPageRefinement || (
-      deltaQueries.webQueries.length === 0 &&
-      deltaQueries.imageQueries.length === 0
-    ))
-  ) {
-    await appendResearchLogSafe(input, {
-      event: "ai.research.page.reused",
-      schema_version: 1,
-      page_id: page.page_id,
-      page_index: page.index,
-      evidence_path: existingEvidence.markdown_path,
-      status: "curated",
-      updated_at: new Date().toISOString(),
-    });
-    return;
-  }
-
-  const text = generationText(input.locale);
-  const paths = await input.backend.prepareResearchWorkspace({
-    workspace_dir: input.workspace.workspace_dir,
-  });
-  throwIfCancelled(input);
-  let progress = await recordProgress(input, page, { status: "research_collecting" });
-  input.setProgress(progress);
-  emitRuntime(
-    input,
-    {
-      step: "research-collection",
-      message: text.collectingSources(page),
-      currentPageIndex: page.index,
-      totalPages: pagePlan.pages.length,
-    },
-    progress,
-  );
-
-  const rawWebIndexPaths: string[] = [];
-  const rawImageIndexPaths: string[] = [];
-  const webCollections: Array<{ query: string; raw_index_path?: string }> = [];
-  const imageCollections: Array<{ query: string; raw_index_path?: string }> = [];
-  const gaps: string[] = [];
-
-  if (pageRequirement.web_research_needed) {
-    for (const query of deltaQueries.webQueries) {
-      throwIfCancelled(input);
-      try {
-        const search = await input.backend.webSearch({
-          query,
-          max_results: 6,
-          safesearch: "moderate",
-        });
-        throwIfCancelled(input);
-        const urls = search.results.map((item) => item.url).filter(Boolean).slice(0, 5);
-        if (urls.length === 0) {
-          gaps.push(`No web search results for: ${query}`);
-          webCollections.push({ query });
-          continue;
-        }
-        const fetched = await input.backend.webFetch({
-          urls,
-          output_dir: paths.raw_web_dir,
-          format: "text_markdown",
-          max_chars: 12000,
-        });
-        throwIfCancelled(input);
-        if (fetched.index_path) {
-          rawWebIndexPaths.push(fetched.index_path);
-          webCollections.push({ query, raw_index_path: fetched.index_path });
-        } else {
-          gaps.push(`Web fetch did not return an index path for: ${query}`);
-          webCollections.push({ query });
-        }
-      } catch (error) {
-        if (isAgentRunCancelledError(error)) throw error;
-        gaps.push(`Web research failed for "${query}": ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }
-  }
-
-  if (pageRequirement.image_research_needed) {
-    for (const query of deltaQueries.imageQueries) {
-      throwIfCancelled(input);
-      try {
-        const search = await input.backend.imageSearch({
-          query,
-          max_results: 8,
-          safesearch: "moderate",
-        });
-        throwIfCancelled(input);
-        const urls = search.results
-          .filter((item) => !item.width || !item.height || (item.width >= 480 && item.height >= 270))
-          .map((item) => item.image_url)
-          .filter(Boolean)
-          .slice(0, 4);
-        if (urls.length === 0) {
-          gaps.push(`No image search results for: ${query}`);
-          imageCollections.push({ query });
-          continue;
-        }
-        const fetched = await input.backend.imageFetch({
-          urls,
-          output_dir: paths.raw_images_dir,
-        });
-        throwIfCancelled(input);
-        if (fetched.index_path) {
-          rawImageIndexPaths.push(fetched.index_path);
-          imageCollections.push({ query, raw_index_path: fetched.index_path });
-        } else {
-          gaps.push(`Image fetch did not return an index path for: ${query}`);
-          imageCollections.push({ query });
-        }
-      } catch (error) {
-        if (isAgentRunCancelledError(error)) throw error;
-        gaps.push(`Image research failed for "${query}": ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }
-  }
-
-  const evidenceMarkdownPath = `${paths.evidence_pages_dir}/${page.page_id}.md`;
-  const webDraftPath = `${paths.evidence_drafts_dir}/${page.page_id}-web.json`;
-  const visualDraftPath = `${paths.evidence_drafts_dir}/${page.page_id}-visual.json`;
-  const agentPathContext = createAgentFileToolPathContext({
-    workspaceRoot: input.workspace.workspace_root,
-    workspaceDir: input.workspace.workspace_dir,
-  });
-  if (deltaQueries.webQueries.length > 0 && rawWebIndexPaths.length === 0) {
-    gaps.push("No raw web material was collected for this page.");
-  }
-  if (deltaQueries.imageQueries.length > 0 && rawImageIndexPaths.length === 0) {
-    gaps.push("No raw image material was collected for this page.");
-  }
-
-  progress = await recordProgress(input, page, { status: "research_curating" });
-  input.setProgress(progress);
-  emitRuntime(
-    input,
-    {
-      step: "research-curation",
-      message: text.curatingEvidence(page),
-      currentPageIndex: page.index,
-      totalPages: pagePlan.pages.length,
-    },
-    progress,
-  );
-
-  let webDraft: WebResearchCurationDraft | null = null;
-  let visualDraft: VisualResearchCurationDraft | null = null;
-
-  if (pageRequirement.web_research_needed && deltaQueries.webQueries.length > 0) {
-    if (rawWebIndexPaths.length > 0) {
-      const curationRunId = createResearchCurationRunId(page, "web");
-      webDraft = await runResearchDraftAgent({
-        flowInput: input,
-        pagePlan,
-        page,
-        kind: "web",
-        curationRunId,
-        buildPrompt: (previousGateFailure) =>
-          buildWebResearchCurationPrompt({
-            workspaceRoot: input.workspace.workspace_root,
-            workspaceDir: input.workspace.workspace_dir,
-            page,
-            requirement: pageRequirement,
-            rawWebIndexPaths,
-            draftPath: webDraftPath,
-            curationRunId,
-            previousGateFailure,
-        }),
-        draftPath: webDraftPath,
-        agentPathContext,
-        currentGaps: gaps,
-      }) as WebResearchCurationDraft | null;
-    } else {
-      webDraft = createWebResearchCurationGapDraft({
-        pageId: page.page_id,
-        gaps: ["No raw web material was collected for this page."],
-      });
-      await input.backend.recordResearchCurationDraft({
-        workspace_dir: input.workspace.workspace_dir,
-        page_id: page.page_id,
-        draft_type: "web",
-        draft: webDraft,
-      });
-      throwIfCancelled(input);
-    }
-  }
-
-  if (pageRequirement.image_research_needed && deltaQueries.imageQueries.length > 0) {
-    if (rawImageIndexPaths.length > 0) {
-      const curationRunId = createResearchCurationRunId(page, "visual");
-      visualDraft = await runResearchDraftAgent({
-        flowInput: input,
-        pagePlan,
-        page,
-        kind: "visual",
-        curationRunId,
-        buildPrompt: (previousGateFailure) =>
-          buildVisualResearchCurationPrompt({
-            workspaceRoot: input.workspace.workspace_root,
-            workspaceDir: input.workspace.workspace_dir,
-            page,
-            requirement: pageRequirement,
-            rawImageIndexPaths,
-            draftPath: visualDraftPath,
-            curationRunId,
-            previousGateFailure,
-        }),
-        draftPath: visualDraftPath,
-        agentPathContext,
-        currentGaps: gaps,
-      }) as VisualResearchCurationDraft | null;
-    } else {
-      visualDraft = createVisualResearchCurationGapDraft({
-        pageId: page.page_id,
-        gaps: ["No raw image material was collected for this page."],
-      });
-      await input.backend.recordResearchCurationDraft({
-        workspace_dir: input.workspace.workspace_dir,
-        page_id: page.page_id,
-        draft_type: "visual",
-        draft: visualDraft,
-      });
-      throwIfCancelled(input);
-    }
-  }
-
-  throwIfCancelled(input);
-  if (visualDraft && visualDraft.visual_assets.length > 0) {
-    const visualAssetInputCount = visualDraft.visual_assets.length;
-    try {
-      const finalized = await input.backend.finalizeResearchVisualAssets({
-        workspace_dir: input.workspace.workspace_dir,
-        page_id: page.page_id,
-        visual_assets: visualDraft.visual_assets,
-        raw_image_index_paths: rawImageIndexPaths,
-      });
-      visualDraft = {
-        ...visualDraft,
-        visual_assets: finalized.visual_assets,
-        gaps: [
-          ...visualDraft.gaps,
-          ...finalized.gaps,
-        ],
-        rejected_material: [
-          ...visualDraft.rejected_material,
-          ...finalized.rejected_material,
-        ],
-      };
-      await appendResearchLogSafe(input, {
-        event: "ai.research.visual_assets.finalized",
-        schema_version: 1,
-        page_id: page.page_id,
-        page_index: page.index,
-        input_count: visualAssetInputCount,
-        finalized_count: finalized.visual_assets.length,
-        rejected_count: Math.max(0, visualAssetInputCount - finalized.visual_assets.length),
-        gaps: finalized.gaps,
-        rejected_material: finalized.rejected_material,
-        assets: finalized.visual_assets.map((asset) => ({
-          id: asset.id,
-          original_raw_path: asset.original_raw_path,
-          file_path: asset.file_path,
-          image_url: asset.image_url,
-          page_url: asset.page_url,
-          sha256: asset.sha256,
-        })),
-        updated_at: new Date().toISOString(),
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const gap = `Visual research assets could not be finalized: ${message}`;
-      visualDraft = {
-        ...visualDraft,
-        visual_assets: [],
-        gaps: [...visualDraft.gaps, gap],
-        rejected_material: [
-          ...visualDraft.rejected_material,
-          { reason: gap },
-        ],
-      };
-      await appendResearchLogSafe(input, {
-        event: "ai.research.visual_assets.finalization_failed",
-        schema_version: 1,
-        page_id: page.page_id,
-        page_index: page.index,
-        error: message,
-        updated_at: new Date().toISOString(),
-      });
-    }
-    throwIfCancelled(input);
-  }
-
-  const merged = mergeResearchCurationDrafts({
-    currentEvidence,
-    page,
-    requirement: pageRequirement,
-    evidenceMarkdownPath,
-    webDraft,
-    visualDraft,
-    gaps,
-  });
-
-  await input.backend.recordResearchEvidencePageMarkdown({
-    workspace_dir: input.workspace.workspace_dir,
-    page_id: page.page_id,
-    markdown: merged.markdown,
-  });
-  throwIfCancelled(input);
-  await input.backend.recordResearchEvidencePage({
-    workspace_dir: input.workspace.workspace_dir,
-    page_evidence: merged.pageEvidence,
-  });
-  throwIfCancelled(input);
-
-  await appendResearchLogSafe(input, {
-    event: "ai.research.page.finished",
-    schema_version: 1,
-    page_id: page.page_id,
-    page_index: page.index,
-    raw_web_index_paths: rawWebIndexPaths,
-    raw_image_index_paths: rawImageIndexPaths,
-    gaps: merged.pageEvidence.gaps,
-    status: merged.pageEvidence.status,
-    updated_at: new Date().toISOString(),
-  });
-  await input.backend.recordResearchStatusPage({
-    workspace_dir: input.workspace.workspace_dir,
-    page_status: {
-      page_id: page.page_id,
-      status: merged.pageEvidence.status,
-      message: merged.pageEvidence.gaps.join("\n"),
-      evidence_path: evidenceMarkdownPath,
-    },
-  });
-  throwIfCancelled(input);
-
-  if (webCollections.length > 0 || imageCollections.length > 0) {
-    const latestResearchStatus = await input.backend.getResearchStatus({
-      workspace_dir: input.workspace.workspace_dir,
-    });
-    throwIfCancelled(input);
-    await input.backend.recordResearchStatus({
-      workspace_dir: input.workspace.workspace_dir,
-      status: recordResearchCollectionLedger({
-        status: latestResearchStatus,
-        pageId: page.page_id,
-        webCollections,
-        imageCollections,
-        now: new Date().toISOString(),
-      }),
-    });
-    throwIfCancelled(input);
   }
 }

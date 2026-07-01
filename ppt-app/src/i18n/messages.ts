@@ -186,8 +186,10 @@ export interface Messages {
       stages: Record<
         | "pagePlan"
         | "researchPlanning"
+        | "researchDiscovery"
         | "researchCollection"
         | "researchCuration"
+        | "evidencePagePlanning"
         | "webResearchCuration"
         | "visualResearchCuration"
         | "prepare"
@@ -492,8 +494,10 @@ export const messages: Record<Locale, Messages> = {
         stages: {
           pagePlan: "Page planning",
           researchPlanning: "Research planning",
+          researchDiscovery: "Research discovery",
           researchCollection: "Collecting sources",
           researchCuration: "Curating evidence",
+          evidencePagePlanning: "Evidence-aware page planning",
           webResearchCuration: "Curating facts",
           visualResearchCuration: "Curating images",
           prepare: "File preparation",
@@ -802,8 +806,10 @@ export const messages: Record<Locale, Messages> = {
         stages: {
           pagePlan: "页面规划",
           researchPlanning: "检索需求规划",
+          researchDiscovery: "资料发现",
           researchCollection: "搜索并抓取资料",
           researchCuration: "筛选证据",
+          evidencePagePlanning: "证据感知页面规划",
           webResearchCuration: "筛选事实证据",
           visualResearchCuration: "筛选图片素材",
           prepare: "文件准备",

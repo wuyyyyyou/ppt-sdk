@@ -42,8 +42,10 @@ export interface NoChangeAuthoringRetry {
 export type DeckGenerationStep =
   | "page-plan"
   | "research-planning"
+  | "research-discovery"
   | "research-collection"
   | "research-curation"
+  | "evidence-page-planning"
   | "prepare"
   | "page-authoring"
   | "page-content-review"

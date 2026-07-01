@@ -24,7 +24,7 @@ const majorSteps: Array<{
   labelKey: keyof Messages["generating"]["steps"];
   steps: DeckGenerationStep[];
 }> = [
-  { id: "page-plan", labelKey: "pagePlan", steps: ["page-plan", "research-planning"] },
+  { id: "page-plan", labelKey: "pagePlan", steps: ["page-plan", "research-planning", "research-discovery", "evidence-page-planning"] },
   { id: "prepare", labelKey: "prepare", steps: ["prepare"] },
   {
     id: "pages",

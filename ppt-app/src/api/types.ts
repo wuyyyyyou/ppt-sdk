@@ -309,6 +309,17 @@ export interface PagePlanItem {
   data_path: string;
   manifest_slide_id: string;
   reason: string;
+  content_plan?: PageContentPlan;
+}
+
+export interface PageContentPlan {
+  main_message: string;
+  content_points: string[];
+  evidence_fact_ids: string[];
+  derived_insight_ids: string[];
+  visual_asset_ids: string[];
+  gaps: string[];
+  authoring_notes: string[];
 }
 
 export interface PagePlan {
@@ -467,6 +478,68 @@ export interface VisualResearchEvidence {
   visual_summary: string;
 }
 
+export interface ResearchDiscoveryEvidencePool {
+  version: 1;
+  status: "empty" | "partial" | "curated" | "gap";
+  facts: ResearchEvidenceFact[];
+  derived_insights: Array<{
+    id: string;
+    insight: string;
+    supporting_fact_ids: string[];
+  }>;
+  visual_assets: VisualResearchEvidence[];
+  gaps: string[];
+  rejected_material: ResearchCurationRejectedMaterial[];
+  source_summaries: Array<{
+    id: string;
+    kind: "web" | "visual";
+    summary: string;
+    source_count?: number;
+    updated_at: string;
+  }>;
+  iterations: ResearchDiscoveryIterationRecord[];
+  updated_at: string;
+}
+
+export interface ResearchDiscoveryIterationRecord {
+  id: string;
+  phase: "web" | "visual";
+  iteration: number;
+  status: "completed" | "gap" | "error";
+  decision: ResearchDiscoveryDecision;
+  query_summaries: ResearchDiscoveryQuerySummary[];
+  draft_page_id?: string;
+  curation_run_id?: string;
+  gaps: string[];
+  merged_counts: {
+    facts: number;
+    derived_insights: number;
+    visual_assets: number;
+    gaps: number;
+    rejected_material: number;
+  };
+  completed_at: string;
+}
+
+export interface ResearchDiscoveryQuerySummary {
+  kind: "web" | "visual";
+  query: string;
+  raw_index_path?: string;
+  result_count?: number;
+  status: "collected" | "gap" | "error" | "skipped_duplicate";
+  message?: string;
+}
+
+export interface ResearchDiscoveryDecision {
+  action: "stop" | "search";
+  phase: "web" | "visual";
+  queries: string[];
+  rationale: string;
+  evidence_needs: string[];
+  visual_needs: string[];
+  gaps: string[];
+}
+
 export interface FinalizeResearchVisualAssetsResult {
   workspace_dir: string;
   page_id: string;
@@ -541,6 +614,7 @@ export interface ResearchEvidenceIndex {
     visual_assets: VisualResearchEvidence[];
     gaps: string[];
   };
+  discovery_pool?: ResearchDiscoveryEvidencePool;
   updated_at: string;
 }
 

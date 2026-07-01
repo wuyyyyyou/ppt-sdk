@@ -35,22 +35,27 @@ The selected visual style family used to shape the deck.
 The recommended data shape for a Template layout. It guides authoring and tooling, but it is not necessarily a render-time gate.
 
 **Page Plan**:
-The slide-by-slide mapping from Confirmed Outline entries to planned pages, with one Page Plan entry per outline item. During Page Refinement, only the target page entries should be revised when target page outlines change.
+The slide-by-slide mapping from Confirmed Outline entries to planned pages, with one Page Plan entry per outline item. It owns page identity, template blueprint selection, and, after Evidence-Aware Page Planning, page-level content direction and assigned Research Evidence references. Page-level content direction should reference Research Evidence by identity rather than copying full evidence content. During Page Refinement, only the target page entries should be revised when target page outlines change.
 
-**Research Collection**:
-The process of collecting external material for a Page Generation Unit after the page intent is known. It produces candidate material for review, not presentation content by itself.
+**Research Discovery**:
+The deck-level iterative process that decides what external material is still needed, collects candidate web and image material, curates it into Research Evidence, and stops when enough useful evidence has been collected or the iteration limit is reached. It happens before Page Generation Units are authored. Web material is discovered before visual material so image needs can be informed by curated facts and insights; visual material does not become factual evidence by itself. Interrupted Research Discovery work is not complete discovery work and must not be promoted into the Research Discovery Evidence Pool.
+_Avoid_: Research Planning
+
+**Research Discovery Evidence Pool**:
+The deck-level curated evidence pool produced during Research Discovery before evidence is assigned to Page Generation Units. It supports further Research Discovery decisions and Evidence-Aware Page Planning, but it is not by itself an allowed grounding source for Page Authoring.
+_Avoid_: Shared Research Evidence, Page Research Evidence
 
 **Research Collection Ledger**:
-A Workspace-owned record of which web and image query intents have already been collected for each Page Generation Unit. It is used to collect only newly requested material during Page Refinement while preserving existing Research Evidence; interrupted research work must not make a query intent count as completed collection.
+A Workspace-owned record of which web and image query intents have already been collected during Research Discovery or later refinement research. It is used to avoid repeating completed query intents while preserving existing Research Evidence; interrupted research work must not make a query intent count as completed collection.
 
 **Research Requirement**:
-The decision that a Page Generation Unit needs external material before authoring because its intended content depends on real-world facts, current information, source-backed data, or non-template visual assets. During Page Refinement, additional Research Requirements should be introduced only when the Page Refinement Request or revised target-page intent cannot be satisfied from existing evidence without unsupported concrete details or missing visual assets.
+The decision that more external material is needed because the deck or a refinement target depends on real-world facts, current information, source-backed data, or non-template visual assets that are not already available in Research Evidence.
 
 **Research Evidence Gap**:
-A case where a Page Generation Unit has a Research Requirement but completed Research Collection or Research Curation does not produce enough Research Evidence. It does not block Page Generation; unsupported concrete details must be omitted, generalized, or marked as TBD / 待补充. User cancellation or interruption during research is unfinished work, not a Research Evidence Gap.
+A case where Research Discovery, Research Curation, or Evidence-Aware Page Planning cannot produce enough Research Evidence for a requested deck or page intent. It does not block Page Generation; unsupported concrete details must be omitted, generalized, or marked as TBD / 待补充. Reaching a Research Discovery iteration limit may produce a Research Evidence Gap. User cancellation or interruption during research is unfinished work, not a Research Evidence Gap.
 
-**Research Planning**:
-The step that decides which Page Generation Units have a Research Requirement and what external material they need. It is separate from Page Plan because it plans evidence needs rather than slide structure.
+**Evidence-Aware Page Planning**:
+The deck-level step after Research Discovery that updates the Page Plan with each Page Generation Unit's main content direction, supporting Research Evidence references, and Visual Research Evidence references. It does not modify the Confirmed Outline, does not copy full evidence content into the Page Plan, and does not make Raw Research Material a grounding source.
 
 **Raw Research Material**:
 External material collected by search, fetch, or image lookup before cleanup or selection. It is not grounding evidence until promoted into Research Evidence.
@@ -60,7 +65,7 @@ _Avoid_: Evidence, source of truth
 The step that turns Raw Research Material into Research Evidence by selecting relevant facts, sources, and visual assets for a Page Generation Unit.
 
 **Research Curation Draft**:
-An intermediate curation result for a Page Generation Unit that has been selected from Raw Research Material but has not yet been promoted into Research Evidence. Drafts from interrupted research work are not valid inputs for Research Evidence until the research stage is completed again.
+An intermediate curation result selected from Raw Research Material before it is promoted into a Research Discovery Evidence Pool or page-assigned Research Evidence. Drafts from interrupted research work are not valid inputs for Research Evidence until the research stage is completed again.
 
 **Web Research Curation Draft**:
 A Research Curation Draft that contains candidate factual evidence, source judgments, derived insights, rejected material, and gaps from web material.
@@ -72,7 +77,7 @@ A Research Curation Draft that contains candidate visual assets, visual judgment
 A Workspace-owned diagnostic record of Research Planning, Research Collection, and Research Curation activity. It is separate from Page Generation Stage Records and is used for troubleshooting evidence decisions.
 
 **Research Evidence**:
-Curated facts, sources, and visual assets selected from Raw Research Material for use in Page Generation. It is an allowed grounding source for generated page content.
+Curated facts, sources, and visual assets selected from Raw Research Material for use in Page Generation. Page-assigned Research Evidence is materialized deterministically from the Research Discovery Evidence Pool and Page Plan evidence references. It is an allowed grounding source for generated page content.
 _Avoid_: Raw search results, raw crawl output
 
 **Visual Research Evidence**:
@@ -159,12 +164,12 @@ A transient Agent Session infrastructure failure where the platform cannot conti
 The action of rerunning one Page Generation Unit against the current Confirmed Outline, Page Plan, and Template with a fresh attempt budget. It is a lower-level recovery concept; the user-facing recovery action for unfinished deck work is Deck Generation Resume.
 
 **Deck Refinement**:
-A user-requested revision of an accepted Deck as a whole after Deck Generation. It may update deck-level context, output language, Confirmed Outline, Page Plan, Research Requirements, and selected Page Generation Units while preserving unaffected accepted pages when safe.
+A user-requested revision of an accepted Deck as a whole after Deck Generation. It may update deck-level context, output language, Confirmed Outline, Page Plan content direction, page-assigned Research Evidence, and selected Page Generation Units while preserving unaffected accepted pages when safe.
 When the Confirmed Outline changes without changing output language, only Page Generation Units whose outline intent changed are affected unless the request explicitly asks for a global style, language, or narrative rewrite.
 For retained Page Generation Units, Deck Refinement preserves existing Page Plan blueprint identity and copies only the updated outline title and outline into the Page Plan; requested layout changes are handled by page authoring against the existing TSX.
 New Page Generation Units introduced during Deck Refinement may be initialized from a selected Template blueprint because they do not yet have existing TSX content to preserve.
 Deleted Page Generation Units are removed from current outline, planning, progress, and render artifacts, but their old workspace files may remain as unreferenced artifacts.
-Research Requirements are updated incrementally during Deck Refinement: unaffected pages preserve existing requirements and evidence, while added pages or pages with changed intent may receive new requirements.
+Deck Refinement may run a Research Discovery Loop when the refinement needs additional or updated evidence. The loop uses deck context and a target scope, then updates the affected Page Plan entries' evidence-aware content direction and corresponding page-assigned Research Evidence; unaffected pages preserve their Page Plan content direction and assigned Research Evidence when safe.
 Target Page Generation Units in Deck Refinement receive both the deck-level request and a page-level refinement reason so page authoring can preserve useful existing work while applying the whole-deck change.
 Deck Refinement outline reconciliation is operation-based so retained Page Generation Units keep their `page_id` identity across keep, update, add, and delete decisions.
 Deck Refinement should add or delete Page Generation Units only when the user explicitly asks for a page-count or page-structure change; vague structure-improvement requests should preserve page count.
@@ -187,6 +192,7 @@ Deck Refinement Context Review does not rewrite the original Brief; the Deck Ref
 
 **Page Refinement**:
 A user-requested revision of one or more accepted Page Generation Units after Deck Generation. It first interprets whether the request can stay within the current Confirmed Outline or must revise the target page outline; a required target-page outline revision becomes the active Confirmed Outline for downstream generation.
+When additional or updated evidence is needed, Page Refinement runs a Research Discovery Loop with the target page scope, then updates the target Page Plan content direction and target page-assigned Research Evidence.
 _Avoid_: Page Generation Retry, Page Visual Review, Visual Review Fix
 
 **Page Refinement Request**:
