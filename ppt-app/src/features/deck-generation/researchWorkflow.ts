@@ -256,18 +256,21 @@ async function getResearchCurationDraftFingerprintSafe(input: {
   page: PagePlanItem;
   kind: "web" | "visual";
   draftPath: string;
+  draftId?: string;
 }): Promise<ResearchCurationDraftFingerprint> {
   try {
     return await input.flowInput.backend.getResearchCurationDraftFingerprint({
       workspace_dir: input.flowInput.workspace.workspace_dir,
       page_id: input.page.page_id,
       draft_type: input.kind,
+      draft_id: input.draftId,
     });
   } catch {
     return {
       workspace_dir: input.flowInput.workspace.workspace_dir,
       page_id: input.page.page_id,
       draft_type: input.kind,
+      draft_id: input.draftId,
       draft_path: input.draftPath,
       exists: false,
     };
@@ -327,6 +330,7 @@ export async function runResearchDraftAgent(input: {
   curationRunId: string;
   buildPrompt: (previousGateFailure?: string) => string;
   draftPath: string;
+  draftId?: string;
   agentPathContext: AgentFileToolPathContext;
   currentGaps: string[];
 }): Promise<WebResearchCurationDraft | VisualResearchCurationDraft | null> {
@@ -381,6 +385,7 @@ export async function runResearchDraftAgent(input: {
         page,
         kind,
         draftPath: input.draftPath,
+        draftId: input.draftId,
       });
       throwIfCancelled(flowInput);
       await appendResearchLogSafe(flowInput, {
@@ -455,6 +460,7 @@ export async function runResearchDraftAgent(input: {
           workspace_dir: flowInput.workspace.workspace_dir,
           page_id: page.page_id,
           draft_type: kind,
+          draft_id: input.draftId,
           draft: gapDraft as never,
         });
         await tracker.flush("completed", {
@@ -484,12 +490,14 @@ export async function runResearchDraftAgent(input: {
         page,
         kind,
         draftPath: input.draftPath,
+        draftId: input.draftId,
       });
 
       const rawDraft = await flowInput.backend.getResearchCurationDraft({
         workspace_dir: flowInput.workspace.workspace_dir,
         page_id: page.page_id,
         draft_type: kind,
+        draft_id: input.draftId,
       });
       throwIfCancelled(flowInput);
       const validation = kind === "web"
@@ -527,6 +535,7 @@ export async function runResearchDraftAgent(input: {
           workspace_dir: flowInput.workspace.workspace_dir,
           page_id: page.page_id,
           draft_type: kind,
+          draft_id: input.draftId,
           draft: validation.draft as never,
         });
         throwIfCancelled(flowInput);
@@ -593,6 +602,7 @@ export async function runResearchDraftAgent(input: {
           workspace_dir: flowInput.workspace.workspace_dir,
           page_id: page.page_id,
           draft_type: kind,
+          draft_id: input.draftId,
           draft: gapDraft as never,
         });
         await tracker.flush("completed", {

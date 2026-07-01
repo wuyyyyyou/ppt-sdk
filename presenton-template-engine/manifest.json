@@ -493,6 +493,12 @@
           "required": true
         },
         {
+          "name": "draft_id",
+          "type": "string",
+          "description": "Optional unique draft artifact id. When omitted, the legacy page-level draft path is used.",
+          "required": false
+        },
+        {
           "name": "draft",
           "type": "object",
           "description": "Research Curation Draft artifact.",
@@ -521,6 +527,12 @@
           "type": "string",
           "description": "Draft type: web or visual.",
           "required": true
+        },
+        {
+          "name": "draft_id",
+          "type": "string",
+          "description": "Optional unique draft artifact id. When omitted, the legacy page-level draft path is used.",
+          "required": false
         }
       ]
     },
@@ -545,6 +557,12 @@
           "type": "string",
           "description": "Draft type: web or visual.",
           "required": true
+        },
+        {
+          "name": "draft_id",
+          "type": "string",
+          "description": "Optional unique draft artifact id. When omitted, the legacy page-level draft path is used.",
+          "required": false
         }
       ]
     },

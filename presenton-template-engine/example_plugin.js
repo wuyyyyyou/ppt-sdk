@@ -212,6 +212,17 @@ function readOptionalAbsolutePathArg(args, parameterName) {
   return path.normalize(value);
 }
 
+function readOptionalStringArg(args, parameterName) {
+  const value = args?.[parameterName];
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`"${parameterName}" must be a non-empty string when provided`);
+  }
+  return value;
+}
+
 const previewFiles = new Map();
 const previewImageFiles = new Map();
 const artifactFiles = new Map();
@@ -999,6 +1010,7 @@ async function toolAppRecordResearchCurationDraft(args) {
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
   const pageId = args.page_id;
   const draftType = args.draft_type;
+  const draftId = readOptionalStringArg(args, "draft_id");
   const draft = args.draft;
   if (typeof pageId !== "string" || pageId.length === 0) {
     throw new Error('"page_id" must be a non-empty string');
@@ -1013,6 +1025,7 @@ async function toolAppRecordResearchCurationDraft(args) {
     workspace_dir: workspaceDir,
     page_id: pageId,
     draft_type: draftType,
+    draft_id: draftId,
     draft,
   });
 }
@@ -1025,6 +1038,7 @@ async function toolAppGetResearchCurationDraft(args) {
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
   const pageId = args.page_id;
   const draftType = args.draft_type;
+  const draftId = readOptionalStringArg(args, "draft_id");
   if (typeof pageId !== "string" || pageId.length === 0) {
     throw new Error('"page_id" must be a non-empty string');
   }
@@ -1035,6 +1049,7 @@ async function toolAppGetResearchCurationDraft(args) {
     workspace_dir: workspaceDir,
     page_id: pageId,
     draft_type: draftType,
+    draft_id: draftId,
   });
 }
 
@@ -1046,6 +1061,7 @@ async function toolAppGetResearchCurationDraftFingerprint(args) {
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
   const pageId = args.page_id;
   const draftType = args.draft_type;
+  const draftId = readOptionalStringArg(args, "draft_id");
   if (typeof pageId !== "string" || pageId.length === 0) {
     throw new Error('"page_id" must be a non-empty string');
   }
@@ -1056,6 +1072,7 @@ async function toolAppGetResearchCurationDraftFingerprint(args) {
     workspace_dir: workspaceDir,
     page_id: pageId,
     draft_type: draftType,
+    draft_id: draftId,
   });
 }
 

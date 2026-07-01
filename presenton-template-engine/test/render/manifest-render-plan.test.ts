@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { buildSinglePagePreviewBaseFileName } from "../../src/render/build-deck-from-manifest.tsx";
 import { prepareManifestRenderPlan } from "../../src/render/manifest-render-plan.ts";
 
 const LOCAL_SLIDE = `import React from "react";
@@ -37,6 +38,18 @@ export default function BrokenLocalFixtureSlide({ data }) {
   return <div data-manifest-slide-id="broken-local-fixture">{parsed.title}</div>;
 }
 `;
+
+test("buildSinglePagePreviewBaseFileName includes stable slide id", () => {
+  assert.equal(
+    buildSinglePagePreviewBaseFileName({
+      pageNumber: 5,
+      deckBaseName: "ppt-20260701-page-preview",
+      slideId: "page-06-2026",
+      layoutId: "content-canvas",
+    }),
+    "05-ppt-20260701-page-preview-page-06-2026-content-canvas",
+  );
+});
 
 async function withFixture(
   fn: (input: { manifestPath: string; outputDir: string; deckDir: string }) => Promise<void>,

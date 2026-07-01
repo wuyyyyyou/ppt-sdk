@@ -7,7 +7,10 @@ import {
 } from "../../src/agent/agentClient.ts";
 import type { AiClient } from "../../src/ai/aiClient.ts";
 import { createAiInteractionLogger } from "../../src/ai/interactionLog.ts";
-import type { PageRefinementIntentReviewResult } from "../../src/ai/types.ts";
+import type {
+  DeckRefinementIntentReviewResult,
+  PageRefinementIntentReviewResult,
+} from "../../src/ai/types.ts";
 import type { PptBackend } from "../../src/api/pptBackend.ts";
 import type {
   PagePlan,
@@ -244,16 +247,19 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function createPreview(pageIndex: number): RenderWorkspacePagePreviewResult {
+function createPreview(pageIndex: number, page?: PagePlanItem): RenderWorkspacePagePreviewResult {
+  const pageNumber = pageIndex + 1;
+  const slideId = page?.manifest_slide_id ?? page?.page_id ?? `page-${String(pageNumber).padStart(2, "0")}`;
+  const baseName = `${String(pageNumber).padStart(2, "0")}-${workspace.workspace_id}-page-preview-${slideId}-simple`;
   return {
     workspace_dir: workspace.workspace_dir,
     manifest_path: "/tmp/workspaces/demo/template/manifest.json",
-    html_path: `/tmp/workspaces/demo/output/page-${pageIndex + 1}.html`,
-    preview_url: `file:///tmp/workspaces/demo/output/page-${pageIndex + 1}.html`,
-    screenshot_path: `/tmp/workspaces/demo/output/page-${pageIndex + 1}.png`,
+    html_path: `/tmp/workspaces/demo/output/page-preview-html/${baseName}.html`,
+    preview_url: `file:///tmp/workspaces/demo/output/page-preview-html/${baseName}.html`,
+    screenshot_path: `/tmp/workspaces/demo/output/screenshots/${baseName}.png`,
     page_index: pageIndex,
-    page_number: pageIndex + 1,
-    slide_id: `page-${String(pageIndex + 1).padStart(2, "0")}`,
+    page_number: pageNumber,
+    slide_id: slideId,
     layout_id: "simple",
     title: outline.items[pageIndex]?.title ?? "Slide",
     rendered_at: "2026-05-23T00:00:00.000Z",
@@ -275,6 +281,7 @@ function createHarness(options: {
   renderFailures?: number;
   renderErrorMessage?: string;
   deckRenderError?: Error;
+  deckIntentReviews?: DeckRefinementIntentReviewResult[];
   visualReviews?: Array<{ pass: boolean; score: number; revision_request?: string }>;
   contentReviews?: Array<{
     pass: boolean;
@@ -306,6 +313,7 @@ function createHarness(options: {
   currentWorkspace.outline = currentOutline;
   const researchDrafts = new Map<string, Record<string, unknown>>();
   const intentReviewQueue = [...(options.intentReviews ?? [])];
+  const deckIntentReviewQueue = [...(options.deckIntentReviews ?? [])];
   let renderFailures = options.renderFailures ?? 0;
   const renderErrorMessage = options.renderErrorMessage ?? "render broke";
   const authoringPrompts: string[] = [];
@@ -347,6 +355,19 @@ function createHarness(options: {
       sha256: `draft:${text}`,
       size_bytes: Buffer.byteLength(text, "utf8"),
     };
+  }
+
+  function researchDraftKey(input: { page_id: string; draft_type: "web" | "visual"; draft_id?: string }) {
+    return `${input.draft_id ?? input.page_id}:${input.draft_type}`;
+  }
+
+  function researchDraftPath(input: { page_id: string; draft_type: "web" | "visual"; draft_id?: string }) {
+    return `${workspace.workspace_dir}/research/evidence/drafts/${input.draft_id ?? input.page_id}-${input.draft_type}.json`;
+  }
+
+  function draftIdFromPrompt(prompt: string, draftType: "web" | "visual") {
+    const pathMatch = prompt.match(new RegExp(`/research/evidence/drafts/([^\\n]+)-${draftType}\\.json`));
+    return pathMatch?.[1] ?? undefined;
   }
 
   const backend: PptBackend = {
@@ -424,6 +445,22 @@ function createHarness(options: {
         manifest_slide_id: page.manifest_slide_id,
       })),
     }),
+    prepareDeckRefinementPageFiles: async (input) => ({
+      workspace_dir: workspace.workspace_dir,
+      manifest_path: "/tmp/workspaces/demo/template/manifest.json",
+      page_plan_path: "/tmp/workspaces/demo/page-plan.json",
+      prepared_at: "2026-05-23T00:00:00.000Z",
+      new_page_ids: input.new_page_ids ?? [],
+      pages: pagePlan.pages.map((page) => ({
+        page_id: page.page_id,
+        index: page.index,
+        title: page.title,
+        slide_path: page.slide_path,
+        data_path: page.data_path,
+        blueprint_id: page.blueprint_id,
+        manifest_slide_id: page.manifest_slide_id,
+      })),
+    }),
     getWorkspacePageFileFingerprints: async (input) => ({
       workspace_dir: input.workspace_dir,
       slide: {
@@ -438,14 +475,15 @@ function createHarness(options: {
       },
     }),
     getResearchCurationDraftFingerprint: async (input) => {
-      const key = `${input.page_id}:${input.draft_type}`;
+      const key = researchDraftKey(input);
       const draft = researchDrafts.get(key);
       if (!draft) {
         return {
           workspace_dir: input.workspace_dir,
           page_id: input.page_id,
           draft_type: input.draft_type,
-          draft_path: `${workspace.workspace_dir}/research/evidence/drafts/${input.page_id}-${input.draft_type}.json`,
+          draft_id: input.draft_id,
+          draft_path: researchDraftPath(input),
           exists: false,
         };
       }
@@ -454,7 +492,8 @@ function createHarness(options: {
         workspace_dir: input.workspace_dir,
         page_id: input.page_id,
         draft_type: input.draft_type,
-        draft_path: `${workspace.workspace_dir}/research/evidence/drafts/${input.page_id}-${input.draft_type}.json`,
+        draft_id: input.draft_id,
+        draft_path: researchDraftPath(input),
         exists: true,
         sha256: fingerprint.sha256,
         size_bytes: fingerprint.size_bytes,
@@ -523,11 +562,11 @@ function createHarness(options: {
       rejected_material: [],
     }),
     recordResearchCurationDraft: async (input) => {
-      researchDrafts.set(`${input.page_id}:${input.draft_type}`, clone(input.draft));
+      researchDrafts.set(researchDraftKey(input), clone(input.draft));
       return clone(input.draft);
     },
     getResearchCurationDraft: async (input) => ({
-      ...(researchDrafts.get(`${input.page_id}:${input.draft_type}`) ?? {
+      ...(researchDrafts.get(researchDraftKey(input)) ?? {
         version: 1,
         status: "empty",
         page_id: input.page_id,
@@ -651,7 +690,7 @@ function createHarness(options: {
         renderFailures -= 1;
         throw new Error(renderErrorMessage);
       }
-      return createPreview(input.page_index);
+      return createPreview(input.page_index, pagePlan.pages[input.page_index]);
     },
     recordOutline: async () => ({ projectDir: "", state: {} }),
     renderDeckHtml: async () => {
@@ -692,6 +731,23 @@ function createHarness(options: {
       generatePagePlanCalls += 1;
       return clone(pagePlan);
     },
+    generateAddedPagePlan: async (input) => makePagePlan({
+      pages: input.outlineItems.map((item, index) => {
+        const pageNumber = String(index + 1).padStart(2, "0");
+        return {
+          page_id: `added-${pageNumber}`,
+          index,
+          title: item.title,
+          outline: item.outline,
+          blueprint_id: "simple",
+          blueprint_source: "./blueprints/Simple.tsx",
+          slide_path: `./slides/added-${pageNumber}.tsx`,
+          data_path: `./data/added-${pageNumber}.json`,
+          manifest_slide_id: `added-${pageNumber}`,
+          reason: "test added page",
+        };
+      }),
+    }),
     generateResearchPlan: async () => clone(researchPlan),
     reviewPageRefinementIntent: async () => intentReviewQueue.shift() ?? {
       route: "proceed",
@@ -702,6 +758,68 @@ function createHarness(options: {
       evidence_needs: [],
       visual_needs: [],
       reason: "test proceed",
+    },
+    reviewDeckRefinementIntent: async () => deckIntentReviewQueue.shift() ?? {
+      route: "no_op",
+      output_language_change: { changed: false },
+      operations: [],
+      reason: "test no-op",
+    },
+    generateResearchDiscoveryDecision: async (input) => {
+      const targetIds = new Set(input.targetPageIds ?? input.pagePlan.pages.map((page) => page.page_id));
+      const completed = new Set(
+        input.discoveryPool.iterations
+          .filter((iteration) => iteration.phase === input.phase)
+          .flatMap((iteration) => iteration.query_summaries.map((summary) => summary.query)),
+      );
+      for (const page of researchStatus.collection_ledger?.pages ?? []) {
+        for (const item of input.phase === "web" ? page.web_queries : page.image_queries) {
+          completed.add(item.query);
+        }
+      }
+      const plannedQueries = researchPlan.pages
+        .filter((page) => targetIds.has(page.page_id))
+        .flatMap((page) => input.phase === "web" ? page.query_intents : page.image_query_intents)
+        .filter((query) => !completed.has(query));
+      const fallbackQueries = plannedQueries.length > 0
+        ? []
+        : input.pagePlan.pages
+            .filter((page) => targetIds.has(page.page_id))
+            .filter((page) => /research|evidence|unexpected|match|visual/i.test(`${page.title} ${page.outline}`))
+            .map((page) => input.phase === "web" ? `${page.title} evidence` : `${page.title} visual`)
+            .filter((query) => !completed.has(query));
+      const queries = plannedQueries.concat(fallbackQueries)
+        .filter((query) => !completed.has(query));
+      return {
+        action: queries.length > 0 ? "search" : "stop",
+        phase: input.phase,
+        queries,
+        rationale: queries.length > 0 ? "test search" : "test stop",
+        evidence_needs: input.phase === "web" ? ["test evidence"] : [],
+        visual_needs: input.phase === "visual" ? ["test visual"] : [],
+        gaps: [],
+      };
+    },
+    generateEvidenceAwarePagePlan: async (input) => {
+      const targetIds = new Set(input.targetPageIds ?? input.pagePlan.pages.map((page) => page.page_id));
+      return {
+        ...input.pagePlan,
+        pages: input.pagePlan.pages.map((page) => targetIds.has(page.page_id)
+          ? {
+              ...page,
+              content_plan: {
+                main_message: page.outline,
+                content_points: [page.outline],
+                evidence_fact_ids: input.discoveryPool.facts.map((fact) => fact.id),
+                derived_insight_ids: input.discoveryPool.derived_insights.map((insight) => insight.id),
+                visual_asset_ids: input.discoveryPool.visual_assets.map((asset) => asset.id),
+                gaps: input.discoveryPool.gaps,
+                authoring_notes: ["Use assigned evidence."],
+              },
+            }
+          : page),
+        updated_at: "2026-05-23T00:00:00.000Z",
+      };
     },
     generateDeck: async () => ({ title: "", outline: [], slides: [] }),
     reviseOutline: async () => ({ outline: { title: outline.title, output_language: "English", items: outline.items }, attempts: [] }),
@@ -741,7 +859,11 @@ function createHarness(options: {
         if (researchDraftNoChangeRuns > 0) {
           researchDraftNoChangeRuns -= 1;
         } else {
-        researchDrafts.set(`${promptPageId}:web`, {
+        researchDrafts.set(researchDraftKey({
+          page_id: promptPageId,
+          draft_type: "web",
+          draft_id: draftIdFromPrompt(prompt, "web"),
+        }), {
           version: 1,
           page_id: promptPageId,
           curation_run_id: curationRunId,
@@ -768,7 +890,11 @@ function createHarness(options: {
         if (researchDraftNoChangeRuns > 0) {
           researchDraftNoChangeRuns -= 1;
         } else {
-        researchDrafts.set(`${promptPageId}:visual`, {
+        researchDrafts.set(researchDraftKey({
+          page_id: promptPageId,
+          draft_type: "visual",
+          draft_id: draftIdFromPrompt(prompt, "visual"),
+        }), {
           version: 1,
           page_id: promptPageId,
           curation_run_id: curationRunId,
@@ -924,6 +1050,9 @@ function createHarness(options: {
     get researchStatus() {
       return clone(researchStatus);
     },
+    get researchDraftKeys() {
+      return Array.from(researchDrafts.keys()).sort();
+    },
   };
 }
 
@@ -948,6 +1077,14 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.progressEvents[0]?.step, "page-plan");
     assert.equal(harness.progressEvents.at(-1)?.step, "complete");
     assert.ok(!harness.progressEvents.some((progress) => progress.step === "failed"));
+    assert.match(
+      harness.progress.pages[0]?.last_html_path ?? "",
+      /\/page-preview-html\/01-demo-page-preview-page-01-simple\.html$/,
+    );
+    assert.match(
+      harness.progress.pages[0]?.last_screenshot_path ?? "",
+      /\/screenshots\/01-demo-page-preview-page-01-simple\.png$/,
+    );
   });
 
   it("keeps confirmed outline text when the LLM rewrites page plan text", async () => {
@@ -1496,6 +1633,57 @@ describe("Deck Generation Flow Module", () => {
       ),
       false,
     );
+  });
+
+  it("keeps deck-level and deck-refinement discovery drafts in separate artifacts", async () => {
+    const pagePlan = makePagePlan();
+    const existingProgress = makeProgress(pagePlan, "accepted");
+    const harness = createHarness({
+      pagePlan,
+      existingProgress,
+      deckIntentReviews: [{
+        route: "proceed",
+        output_language_change: { changed: false },
+        operations: [
+          { op: "keep", page_id: "page-01", reason: "Keep intro." },
+          { op: "keep", page_id: "page-02", reason: "Keep close." },
+          {
+            op: "add",
+            title: "Unexpected Match",
+            outline: "Add one page about the most unexpected match.",
+            reason: "Add a researched page.",
+            additional_research_required: true,
+            additional_web_query_intents: ["unexpected 2026 match evidence"],
+            additional_image_query_intents: ["unexpected match visual"],
+            evidence_needs: ["credible match evidence"],
+            visual_needs: ["match visual"],
+          },
+        ],
+        reason: "Add one researched page.",
+      }],
+    });
+
+    const completion = await runDeckRefinement({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "resume",
+      instruction: "Add a researched page about the most unexpected match.",
+      scope: "deck",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.pagePlan.pages.length, 3);
+    assert.equal(harness.pagePlan.pages[2]?.page_id, "page-03");
+    assert.ok(harness.researchDraftKeys.some((key) => /^discovery-page-03-web-1-[a-z0-9]+-[a-z0-9]+:web$/.test(key)));
+    assert.ok(harness.researchDraftKeys.some((key) => /^discovery-page-03-visual-1-[a-z0-9]+-[a-z0-9]+:visual$/.test(key)));
+    assert.equal(harness.researchDraftKeys.some((key) => key === "discovery-web-1:web"), false);
+    assert.equal(harness.researchDraftKeys.some((key) => key === "discovery-visual-1:visual"), false);
   });
 
   it("stops unsupported current-page refinement before workspace mutations", async () => {
@@ -2889,7 +3077,8 @@ describe("Deck Generation Flow Module", () => {
       prompt.includes("Raw web index paths to read:") &&
       prompt.includes("Web draft JSON path to write:") &&
       prompt.includes("Agent file-tool path:") &&
-      prompt.includes("workspaces/demo/research/evidence/drafts/page-01-web.json")
+      /workspaces\/demo\/research\/evidence\/drafts\/discovery-deck-web-1-[a-z0-9]+-[a-z0-9]+-web\.json/.test(prompt) &&
+      !prompt.includes("workspaces/demo/research/evidence/drafts/discovery-web-1-web.json")
     ));
     const webCurationRunIds = webPromptIndexes.map(({ prompt }) =>
       prompt.match(/Curation run id: ([^\n]+)/)?.[1] ?? ""
@@ -2907,8 +3096,8 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(evidencePage?.status, "gap");
     assert.equal(evidencePage?.gaps.length, 1);
     assert.match(evidencePage?.gaps[0] ?? "", /Web Research Curation failed after 5 attempts/);
-    assert.match(evidencePage?.gaps[0] ?? "", /Expected canonical draft path: \/tmp\/workspaces\/demo\/research\/evidence\/drafts\/page-01-web\.json/);
-    assert.match(evidencePage?.gaps[0] ?? "", /Use this Agent file-tool draft path with fs_write_file: workspaces\/demo\/research\/evidence\/drafts\/page-01-web\.json/);
+    assert.match(evidencePage?.gaps[0] ?? "", /Expected canonical draft path: \/tmp\/workspaces\/demo\/research\/evidence\/drafts\/discovery-deck-web-1-[a-z0-9]+-[a-z0-9]+-web\.json/);
+    assert.match(evidencePage?.gaps[0] ?? "", /Use this Agent file-tool draft path with fs_write_file: workspaces\/demo\/research\/evidence\/drafts\/discovery-deck-web-1-[a-z0-9]+-[a-z0-9]+-web\.json/);
     assert.match(evidencePage?.gaps[0] ?? "", /Do not write task-relative path: research\/evidence\/drafts\/<page-id>-web\.json/);
     assert.equal(harness.researchStatus.pages.find((page) => page.page_id === "page-01")?.status, "gap");
   });
@@ -2957,7 +3146,8 @@ describe("Deck Generation Flow Module", () => {
       prompt.includes("Raw image index paths to read:") &&
       prompt.includes("Visual draft JSON path to write:") &&
       prompt.includes("Agent file-tool path:") &&
-      prompt.includes("workspaces/demo/research/evidence/drafts/page-01-visual.json")
+      /workspaces\/demo\/research\/evidence\/drafts\/discovery-deck-visual-1-[a-z0-9]+-[a-z0-9]+-visual\.json/.test(prompt) &&
+      !prompt.includes("workspaces/demo/research/evidence/drafts/discovery-visual-1-visual.json")
     ));
     const visualCurationRunIds = visualPromptIndexes.map(({ prompt }) =>
       prompt.match(/Curation run id: ([^\n]+)/)?.[1] ?? ""
@@ -2975,8 +3165,8 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(evidencePage?.status, "gap");
     assert.equal(evidencePage?.gaps.length, 1);
     assert.match(evidencePage?.gaps[0] ?? "", /Visual Research Curation failed after 5 attempts/);
-    assert.match(evidencePage?.gaps[0] ?? "", /Expected canonical draft path: \/tmp\/workspaces\/demo\/research\/evidence\/drafts\/page-01-visual\.json/);
-    assert.match(evidencePage?.gaps[0] ?? "", /Use this Agent file-tool draft path with fs_write_file: workspaces\/demo\/research\/evidence\/drafts\/page-01-visual\.json/);
+    assert.match(evidencePage?.gaps[0] ?? "", /Expected canonical draft path: \/tmp\/workspaces\/demo\/research\/evidence\/drafts\/discovery-deck-visual-1-[a-z0-9]+-[a-z0-9]+-visual\.json/);
+    assert.match(evidencePage?.gaps[0] ?? "", /Use this Agent file-tool draft path with fs_write_file: workspaces\/demo\/research\/evidence\/drafts\/discovery-deck-visual-1-[a-z0-9]+-[a-z0-9]+-visual\.json/);
     assert.match(evidencePage?.gaps[0] ?? "", /Do not write task-relative path: research\/evidence\/drafts\/<page-id>-visual\.json/);
     assert.equal(harness.researchStatus.pages.find((page) => page.page_id === "page-01")?.status, "gap");
   });

@@ -242,6 +242,7 @@ export interface RecordAppResearchCurationDraftInput {
   workspace_dir: string;
   page_id: string;
   draft_type: "web" | "visual";
+  draft_id?: string;
   draft: unknown;
 }
 
@@ -249,18 +250,21 @@ export interface GetAppResearchCurationDraftInput {
   workspace_dir: string;
   page_id: string;
   draft_type: "web" | "visual";
+  draft_id?: string;
 }
 
 export interface GetAppResearchCurationDraftFingerprintInput {
   workspace_dir: string;
   page_id: string;
   draft_type: "web" | "visual";
+  draft_id?: string;
 }
 
 export interface AppResearchCurationDraftFingerprint {
   workspace_dir: string;
   page_id: string;
   draft_type: "web" | "visual";
+  draft_id?: string;
   draft_path: string;
   exists: boolean;
   sha256?: string;

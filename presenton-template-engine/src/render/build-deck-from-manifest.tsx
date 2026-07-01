@@ -84,6 +84,19 @@ function sanitizeFileNamePart(value: string): string {
   return normalized || "deck";
 }
 
+export function buildSinglePagePreviewBaseFileName(input: {
+  pageNumber: number;
+  deckBaseName: string;
+  slideId: string;
+  layoutId: string;
+}): string {
+  return `${String(input.pageNumber).padStart(2, "0")}-${input.deckBaseName}-${sanitizeFileNamePart(
+    input.slideId,
+  )}-${sanitizeFileNamePart(
+    input.layoutId,
+  )}`;
+}
+
 function resolveAbsolutePath(targetPath: string, fieldName: string): string {
   if (!targetPath || typeof targetPath !== "string") {
     throw new Error(`Field "${fieldName}" must be a non-empty string`);
@@ -439,9 +452,12 @@ export async function buildDeckPageScreenshotFromManifest(
     throw new Error("Single-page render plan did not produce a slide");
   }
   const pageNumber = slide.pageNumber;
-  const baseFileName = `${String(pageNumber).padStart(2, "0")}-${prepared.deckBaseName}-${sanitizeFileNamePart(
-    slide.layoutId,
-  )}`;
+  const baseFileName = buildSinglePagePreviewBaseFileName({
+    pageNumber,
+    deckBaseName: prepared.deckBaseName,
+    slideId: slide.slideId,
+    layoutId: slide.layoutId,
+  });
 
   await mkdir(outputDir, { recursive: true });
   await mkdir(htmlOutputDir, { recursive: true });

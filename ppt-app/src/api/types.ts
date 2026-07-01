@@ -392,6 +392,7 @@ export interface ResearchCurationDraftFingerprint {
   workspace_dir: string;
   page_id: string;
   draft_type: "web" | "visual";
+  draft_id?: string;
   draft_path: string;
   exists: boolean;
   sha256?: string;

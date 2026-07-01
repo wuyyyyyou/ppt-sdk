@@ -37,6 +37,80 @@ import { createAgentFileToolPathContext } from "./agentFileToolPaths";
 
 const RESEARCH_DISCOVERY_ITERATION_LIMIT = 5;
 
+function sanitizeDiscoveryDraftIdPart(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "scope";
+}
+
+function stableDiscoveryScopeHash(values: string[]): string {
+  let hash = 2166136261;
+  for (const value of values) {
+    for (let index = 0; index < value.length; index += 1) {
+      hash ^= value.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    hash ^= 31;
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36).padStart(7, "0").slice(0, 8);
+}
+
+function sortedSanitizedDraftIdParts(values?: string[]): string[] {
+  return (values ?? [])
+    .map(sanitizeDiscoveryDraftIdPart)
+    .filter(Boolean)
+    .sort();
+}
+
+function sameDraftIdPartSet(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function buildDiscoveryDraftScope(input: {
+  targetPageIds?: string[];
+  allPageIds?: string[];
+}): string {
+  const targetPageIds = sortedSanitizedDraftIdParts(input.targetPageIds);
+  if (targetPageIds.length === 0) {
+    return "deck";
+  }
+  const allPageIds = sortedSanitizedDraftIdParts(input.allPageIds);
+  if (allPageIds.length > 0 && sameDraftIdPartSet(targetPageIds, allPageIds)) {
+    return "deck";
+  }
+  if (targetPageIds.length === 1) {
+    return targetPageIds[0] ?? "scope";
+  }
+  return `pages-${targetPageIds.length}-${stableDiscoveryScopeHash(targetPageIds)}`;
+}
+
+function buildDiscoveryRunToken(curationRunId: string): string {
+  const sanitized = sanitizeDiscoveryDraftIdPart(curationRunId);
+  const parts = sanitized.split("-").filter(Boolean);
+  if (parts.length >= 2) {
+    return parts.slice(-2).join("-");
+  }
+  return sanitized;
+}
+
+export function buildDiscoveryDraftId(input: {
+  phase: "web" | "visual";
+  iteration: number;
+  curationRunId: string;
+  targetPageIds?: string[];
+  allPageIds?: string[];
+}): string {
+  return [
+    "discovery",
+    buildDiscoveryDraftScope({
+      targetPageIds: input.targetPageIds,
+      allPageIds: input.allPageIds,
+    }),
+    input.phase,
+    String(input.iteration),
+    buildDiscoveryRunToken(input.curationRunId),
+  ].join("-");
+}
+
 function dedupeStrings(values: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -599,7 +673,15 @@ async function runDiscoveryPhase(input: {
       decision,
     });
     const curationRunId = createResearchCurationRunId(batchPage, input.phase === "web" ? "web" : "visual");
-    const draftPath = `${input.paths.evidence_drafts_dir}/${batchPage.page_id}-${input.phase === "web" ? "web" : "visual"}.json`;
+    const draftId = buildDiscoveryDraftId({
+      phase: input.phase,
+      iteration,
+      curationRunId,
+      targetPageIds: input.targetPageIds,
+      allPageIds: input.pagePlan.pages.map((page) => page.page_id),
+    });
+    const draftType = input.phase === "web" ? "web" : "visual";
+    const draftPath = `${input.paths.evidence_drafts_dir}/${draftId}-${draftType}.json`;
 
     emitResearchProgress({
       runtime: input.runtime,
@@ -641,6 +723,7 @@ async function runDiscoveryPhase(input: {
               previousGateFailure,
             }),
         draftPath,
+        draftId,
         agentPathContext: createAgentFileToolPathContext({
           workspaceRoot: input.runtime.workspace.workspace_root,
           workspaceDir: input.runtime.workspace.workspace_dir,
@@ -662,6 +745,7 @@ async function runDiscoveryPhase(input: {
         workspace_dir: input.runtime.workspace.workspace_dir,
         page_id: batchPage.page_id,
         draft_type: "web",
+        draft_id: draftId,
         draft: webDraft,
       });
     } else {
@@ -674,6 +758,7 @@ async function runDiscoveryPhase(input: {
         workspace_dir: input.runtime.workspace.workspace_dir,
         page_id: batchPage.page_id,
         draft_type: "visual",
+        draft_id: draftId,
         draft: visualDraft,
       });
     }

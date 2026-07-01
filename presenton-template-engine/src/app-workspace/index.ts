@@ -2300,8 +2300,25 @@ function normalizeResearchDraftPageId(value: string): string {
   return pageId;
 }
 
-function buildResearchDraftPath(paths: AppResearchPaths, pageId: string, draftType: "web" | "visual"): string {
-  return path.join(paths.evidence_drafts_dir, `${pageId}-${draftType}.json`);
+function normalizeResearchDraftId(value: unknown): string | null {
+  const draftId = normalizeString(value);
+  if (!draftId) {
+    return null;
+  }
+  if (!/^[a-zA-Z0-9_-]+$/.test(draftId)) {
+    throw new Error('"draft_id" may only contain letters, numbers, underscores, and hyphens');
+  }
+  return draftId;
+}
+
+function buildResearchDraftPath(
+  paths: AppResearchPaths,
+  pageId: string,
+  draftType: "web" | "visual",
+  draftId?: string | null,
+): string {
+  const fileStem = draftId ?? pageId;
+  return path.join(paths.evidence_drafts_dir, `${fileStem}-${draftType}.json`);
 }
 
 export async function recordAppResearchCurationDraft(
@@ -2311,7 +2328,8 @@ export async function recordAppResearchCurationDraft(
   const paths = await ensureResearchDirectories(workspace.workspace_dir);
   const pageId = normalizeResearchDraftPageId(input.page_id);
   const draftType = normalizeResearchDraftType(input.draft_type);
-  const draftPath = buildResearchDraftPath(paths, pageId, draftType);
+  const draftId = normalizeResearchDraftId(input.draft_id);
+  const draftPath = buildResearchDraftPath(paths, pageId, draftType, draftId);
   assertResearchPathUnderWorkspace(workspace.workspace_dir, draftPath, "draft_path");
   const updatedAt = new Date().toISOString();
   const draft = normalizeResearchArtifact(input.draft, "curated");
@@ -2334,7 +2352,8 @@ export async function getAppResearchCurationDraft(
   const paths = await ensureResearchDirectories(workspace.workspace_dir);
   const pageId = normalizeResearchDraftPageId(input.page_id);
   const draftType = normalizeResearchDraftType(input.draft_type);
-  const draftPath = buildResearchDraftPath(paths, pageId, draftType);
+  const draftId = normalizeResearchDraftId(input.draft_id);
+  const draftPath = buildResearchDraftPath(paths, pageId, draftType, draftId);
   assertResearchPathUnderWorkspace(workspace.workspace_dir, draftPath, "draft_path");
   const existing = await readJsonFileIfExists(draftPath);
   if (existing === null) {
@@ -2357,7 +2376,8 @@ export async function getAppResearchCurationDraftFingerprint(
   const paths = await ensureResearchDirectories(workspace.workspace_dir);
   const pageId = normalizeResearchDraftPageId(input.page_id);
   const draftType = normalizeResearchDraftType(input.draft_type);
-  const draftPath = buildResearchDraftPath(paths, pageId, draftType);
+  const draftId = normalizeResearchDraftId(input.draft_id);
+  const draftPath = buildResearchDraftPath(paths, pageId, draftType, draftId);
   assertResearchPathUnderWorkspace(workspace.workspace_dir, draftPath, "draft_path");
 
   try {
@@ -2366,6 +2386,7 @@ export async function getAppResearchCurationDraftFingerprint(
       workspace_dir: workspace.workspace_dir,
       page_id: pageId,
       draft_type: draftType,
+      ...(draftId ? { draft_id: draftId } : {}),
       draft_path: draftPath,
       exists: true,
       sha256: fingerprint.sha256,
@@ -2377,6 +2398,7 @@ export async function getAppResearchCurationDraftFingerprint(
         workspace_dir: workspace.workspace_dir,
         page_id: pageId,
         draft_type: draftType,
+        ...(draftId ? { draft_id: draftId } : {}),
         draft_path: draftPath,
         exists: false,
       };

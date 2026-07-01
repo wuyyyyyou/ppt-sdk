@@ -124,6 +124,48 @@ test("workspace research tools prepare directories and persist metadata", async 
       })).facts,
       draft.facts,
     );
+    const scopedDraft = await recordAppResearchCurationDraft({
+      workspace_dir: workspace.workspace_dir,
+      page_id: "page-01",
+      draft_type: "web",
+      draft_id: "discovery-page-06-web-1-run",
+      draft: {
+        version: 1,
+        status: "curated",
+        facts: [{ id: "fact-scoped", claim: "Scoped claim", source_type: "web_source" }],
+        derived_insights: [],
+        gaps: [],
+        rejected_material: [],
+      },
+    });
+    assert.equal(path.basename(String(scopedDraft.draft_path)), "discovery-page-06-web-1-run-web.json");
+    assert.notEqual(scopedDraft.draft_path, draft.draft_path);
+    assert.deepEqual(
+      (await getAppResearchCurationDraft({
+        workspace_dir: workspace.workspace_dir,
+        page_id: "page-01",
+        draft_type: "web",
+      })).facts,
+      draft.facts,
+    );
+    assert.deepEqual(
+      (await getAppResearchCurationDraft({
+        workspace_dir: workspace.workspace_dir,
+        page_id: "page-01",
+        draft_type: "web",
+        draft_id: "discovery-page-06-web-1-run",
+      })).facts,
+      scopedDraft.facts,
+    );
+    const scopedDraftFingerprint = await getAppResearchCurationDraftFingerprint({
+      workspace_dir: workspace.workspace_dir,
+      page_id: "page-01",
+      draft_type: "web",
+      draft_id: "discovery-page-06-web-1-run",
+    });
+    assert.equal(scopedDraftFingerprint.exists, true);
+    assert.equal(scopedDraftFingerprint.draft_id, "discovery-page-06-web-1-run");
+    assert.equal(path.basename(String(scopedDraftFingerprint.draft_path)), "discovery-page-06-web-1-run-web.json");
 
     const markdown = await recordAppResearchEvidencePageMarkdown({
       workspace_dir: workspace.workspace_dir,

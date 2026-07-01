@@ -99,6 +99,7 @@ export interface PptBackend {
     workspace_dir: string;
     page_id: string;
     draft_type: "web" | "visual";
+    draft_id?: string;
   }): Promise<ResearchCurationDraftFingerprint>;
   prepareResearchWorkspace(input: { workspace_dir: string }): Promise<PrepareResearchWorkspaceResult>;
   recordResearchPlan(input: { workspace_dir: string; research_plan: ResearchPlan }): Promise<ResearchPlan>;
@@ -121,17 +122,20 @@ export interface PptBackend {
     workspace_dir: string;
     page_id: string;
     draft_type: "web";
+    draft_id?: string;
     draft: WebResearchCurationDraft;
   } | {
     workspace_dir: string;
     page_id: string;
     draft_type: "visual";
+    draft_id?: string;
     draft: VisualResearchCurationDraft;
   }): Promise<WebResearchCurationDraft | VisualResearchCurationDraft>;
   getResearchCurationDraft(input: {
     workspace_dir: string;
     page_id: string;
     draft_type: "web" | "visual";
+    draft_id?: string;
   }): Promise<WebResearchCurationDraft | VisualResearchCurationDraft | Record<string, unknown>>;
   recordResearchEvidencePageMarkdown(input: {
     workspace_dir: string;
