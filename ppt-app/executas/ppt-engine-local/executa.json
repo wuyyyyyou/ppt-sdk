@@ -1,5 +1,7 @@
 {
-  "tool_id": "tool-lightvoss_5433-ppt-engine-6443rj2a",
+  "tool_id": "tool-lightvoss-ppt-engine-kqhra9hy",
+  "name": "ppt-gener",
+  "slug": "ppt-gener",
   "type": "node",
   "command": [
     "node",

@@ -1,5 +1,7 @@
 {
-  "tool_id": "tool-lightvoss-anna-search-xkx84a3z",
+  "tool_id": "tool-lightvoss-anna-search-7ym3jyqv",
+  "name": "Anna Search",
+  "slug": "anna-search",
   "type": "python",
   "command": [
     "uv",

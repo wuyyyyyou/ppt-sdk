@@ -1,5 +1,7 @@
 {
-  "tool_id": "tool-lightvoss_5433-ppt-gener-dc7ftcep",
+  "tool_id": "tool-lightvoss-ppt-gener-2r765c57",
+  "name": "ppt-engine",
+  "slug": "ppt-engine",
   "type": "python",
   "command": [
     "uv",
