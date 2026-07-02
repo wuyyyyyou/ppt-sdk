@@ -51,6 +51,11 @@ import { recordDeckRecovery, throwIfCancelled } from "./runtimeSupport";
 import { getAttemptLimits } from "./settings";
 import type { DeckGenerationRuntime, ResearchDiscoveryProgressQuery } from "./types";
 import { createAgentFileToolPathContext } from "./agentFileToolPaths";
+import {
+  compactUploadedSourceAnalysisForPrompt,
+  uploadedSourceAnalysisMatchesActiveSet,
+  type UploadedSourceAnalysis,
+} from "./uploadedSourceAnalysis";
 
 const RESEARCH_DISCOVERY_ITERATION_LIMIT = 5;
 const WEB_RESEARCH_FETCH_MAX_CHARS = 20000;
@@ -712,6 +717,7 @@ async function runDiscoveryPhase(input: {
   targetPageIds?: string[];
   pool: ResearchDiscoveryEvidencePool;
   paths: { raw_web_dir: string; raw_images_dir: string; evidence_drafts_dir: string };
+  uploadedSourceAnalysisContext?: unknown;
 }): Promise<ResearchDiscoveryEvidencePool> {
   const text = generationText(input.runtime.locale);
   let pool = input.pool;
@@ -742,6 +748,7 @@ async function runDiscoveryPhase(input: {
         iterationLimit: RESEARCH_DISCOVERY_ITERATION_LIMIT,
         targetPageIds: input.targetPageIds,
         discoveryPool: pool,
+        uploadedSourceAnalysisContext: input.uploadedSourceAnalysisContext,
         researchStatus: await input.runtime.backend.getResearchStatus({
           workspace_dir: input.runtime.workspace.workspace_dir,
         }).catch(() => null),
@@ -1110,16 +1117,20 @@ function buildPageEvidenceMarkdown(pageEvidence: ResearchEvidencePage, page: Pag
   return `${lines.join("\n")}\n`;
 }
 
-function materializePageEvidence(input: {
+async function materializePageEvidence(input: {
+  runtime: DeckGenerationRuntime;
   page: PagePlanItem;
   pool: ResearchDiscoveryEvidencePool;
+  uploadedSourceAnalysis: UploadedSourceAnalysis | null;
   evidenceMarkdownPath: string;
   now: string;
-}): { pageEvidence: ResearchEvidencePage; markdown: string } {
+}): Promise<{ pageEvidence: ResearchEvidencePage; markdown: string }> {
   const contentPlan = input.page.content_plan;
   const factById = new Map(input.pool.facts.map((fact) => [fact.id, fact]));
   const insightById = new Map(input.pool.derived_insights.map((insight) => [insight.id, insight]));
   const visualById = new Map(input.pool.visual_assets.map((asset) => [asset.id, asset]));
+  const uploadedFactById = new Map((input.uploadedSourceAnalysis?.facts ?? []).map((fact) => [fact.id, fact]));
+  const uploadedVisualById = new Map((input.uploadedSourceAnalysis?.visual_assets ?? []).map((asset) => [asset.id, asset]));
   const gaps: string[] = [...(contentPlan?.gaps ?? [])];
   const facts = (contentPlan?.evidence_fact_ids ?? []).flatMap((id) => {
     const fact = factById.get(id);
@@ -1129,6 +1140,23 @@ function materializePageEvidence(input: {
     }
     return [fact];
   });
+  const uploadedFacts = (contentPlan?.uploaded_source_fact_ids ?? []).flatMap((id): ResearchEvidenceFact[] => {
+    const fact = uploadedFactById.get(id);
+    if (!fact) {
+      gaps.push(`Missing assigned Uploaded Source fact id: ${id}`);
+      return [];
+    }
+    return [{
+      id: `uploaded:${fact.id}`,
+      claim: fact.claim,
+      source_type: "user_provided",
+      source_file: fact.source_label || fact.source_path,
+      ...(fact.excerpt ? { excerpt: fact.excerpt } : {}),
+      ...(fact.confidence ? { confidence: fact.confidence } : {}),
+      source_note: `Uploaded Source Material: ${fact.uploaded_source_id}`,
+    }];
+  });
+  facts.push(...uploadedFacts);
   const factIds = new Set(facts.map((fact) => fact.id));
   const derivedInsights = (contentPlan?.derived_insight_ids ?? []).flatMap((id) => {
     const insight = insightById.get(id);
@@ -1151,6 +1179,37 @@ function materializePageEvidence(input: {
     }
     return [asset];
   });
+  const uploadedVisualDraftAssets = (contentPlan?.uploaded_source_visual_asset_ids ?? []).flatMap((id): VisualResearchEvidence[] => {
+    const asset = uploadedVisualById.get(id);
+    if (!asset) {
+      gaps.push(`Missing assigned Uploaded Source visual asset id: ${id}`);
+      return [];
+    }
+    if (asset.use_constraint === "do_not_use" || asset.use_constraint === "rejected" || asset.use_constraint === "reference_only") {
+      gaps.push(`Assigned Uploaded Source visual asset ${id} is not usable for page evidence: ${asset.use_constraint}`);
+      return [];
+    }
+    return [{
+      id: `uploaded:${asset.id}`,
+      file_path: asset.source_path,
+      original_raw_path: asset.source_path,
+      reason: asset.reason,
+      visual_summary: asset.visual_summary,
+    }];
+  });
+  let uploadedVisualAssets: VisualResearchEvidence[] = [];
+  let uploadedRejectedMaterial: ResearchEvidencePage["rejected_material"] = [];
+  if (uploadedVisualDraftAssets.length > 0) {
+    const finalized = await input.runtime.backend.finalizeResearchVisualAssets({
+      workspace_dir: input.runtime.workspace.workspace_dir,
+      page_id: input.page.page_id,
+      visual_assets: uploadedVisualDraftAssets,
+    });
+    uploadedVisualAssets = finalized.visual_assets;
+    gaps.push(...finalized.gaps);
+    uploadedRejectedMaterial = finalized.rejected_material;
+  }
+  visualAssets.push(...uploadedVisualAssets);
   const hasEvidence = facts.length > 0 || derivedInsights.length > 0 || visualAssets.length > 0;
   const pageEvidence: ResearchEvidencePage = {
     page_id: input.page.page_id,
@@ -1159,7 +1218,7 @@ function materializePageEvidence(input: {
     visual_assets: visualAssets,
     derived_insights: derivedInsights,
     gaps: dedupeStrings(gaps),
-    rejected_material: [],
+    rejected_material: uploadedRejectedMaterial,
     markdown_path: input.evidenceMarkdownPath,
     updated_at: input.now,
   };
@@ -1167,6 +1226,38 @@ function materializePageEvidence(input: {
     pageEvidence,
     markdown: buildPageEvidenceMarkdown(pageEvidence, input.page),
   };
+}
+
+async function resolveFreshUploadedSourceAnalysisForResearchDiscovery(
+  runtime: DeckGenerationRuntime,
+): Promise<UploadedSourceAnalysis | null> {
+  const uploadedSourceList = await runtime.backend.listUploadedSources({
+    workspace_dir: runtime.workspace.workspace_dir,
+    include_removed: false,
+  });
+  if (uploadedSourceList.active.length === 0) {
+    return null;
+  }
+
+  const analysis = await runtime.backend.getUploadedSourceAnalysis({
+    workspace_dir: runtime.workspace.workspace_dir,
+  }) as unknown as UploadedSourceAnalysis;
+  if (
+    !analysis ||
+    (analysis.status !== "ready" && analysis.status !== "gap" && analysis.status !== "blocked")
+  ) {
+    throw new Error("Uploaded Source Analysis is missing or invalid while active Uploaded Source Material exists.");
+  }
+  if (analysis.status === "blocked" || !analysis.continuation_decision?.can_continue) {
+    throw new Error(`Uploaded Source Analysis blocks Research Discovery: ${analysis.continuation_decision?.reason ?? "No continuation decision."}`);
+  }
+  if (!uploadedSourceAnalysisMatchesActiveSet({
+    analysis,
+    uploadedSourceIndex: uploadedSourceList.index,
+  })) {
+    throw new Error("Uploaded Source Analysis is stale for the current active Uploaded Source Material set.");
+  }
+  return analysis;
 }
 
 export async function runResearchDiscoveryForPagePlan(input: {
@@ -1201,6 +1292,8 @@ export async function runResearchDiscoveryForPagePlan(input: {
       workspace_dir: runtime.workspace.workspace_dir,
     }),
   );
+  const uploadedSourceAnalysis = await resolveFreshUploadedSourceAnalysisForResearchDiscovery(runtime);
+  const uploadedSourceAnalysisContext = compactUploadedSourceAnalysisForPrompt(uploadedSourceAnalysis);
   let pool = normalizeResearchDiscoveryEvidencePool(existingEvidence.discovery_pool);
   pool = await runDiscoveryPhase({
     runtime,
@@ -1209,6 +1302,7 @@ export async function runResearchDiscoveryForPagePlan(input: {
     targetPageIds: input.targetPageIds,
     pool,
     paths,
+    uploadedSourceAnalysisContext,
   });
   pool = await runDiscoveryPhase({
     runtime,
@@ -1217,6 +1311,7 @@ export async function runResearchDiscoveryForPagePlan(input: {
     targetPageIds: input.targetPageIds,
     pool,
     paths,
+    uploadedSourceAnalysisContext,
   });
 
   await updateDiscoveryProgress({
@@ -1235,6 +1330,7 @@ export async function runResearchDiscoveryForPagePlan(input: {
       outline: runtime.confirmedOutline,
       pagePlan: input.pagePlan,
       discoveryPool: pool,
+      uploadedSourceAnalysisContext,
       targetPageIds: input.targetPageIds,
       locale: runtime.locale,
       logContext: buildDiscoveryLogContext({
@@ -1285,9 +1381,11 @@ export async function runResearchDiscoveryForPagePlan(input: {
   const targetIds = new Set(input.targetPageIds ?? plannedPagePlan.pages.map((page) => page.page_id));
   for (const page of plannedPagePlan.pages.filter((page) => targetIds.has(page.page_id))) {
     const evidenceMarkdownPath = `${paths.evidence_pages_dir}/${page.page_id}.md`;
-    const materialized = materializePageEvidence({
+    const materialized = await materializePageEvidence({
+      runtime,
       page,
       pool,
+      uploadedSourceAnalysis,
       evidenceMarkdownPath,
       now: new Date().toISOString(),
     });
@@ -1308,6 +1406,17 @@ export async function runResearchDiscoveryForPagePlan(input: {
         message: materialized.pageEvidence.gaps.join("\n"),
         evidence_path: evidenceMarkdownPath,
       },
+    });
+    await appendResearchLogSafe(runtime, {
+      event: "uploaded_source.evidence.materialized",
+      schema_version: 1,
+      page_id: page.page_id,
+      uploaded_source_fact_ids: page.content_plan?.uploaded_source_fact_ids ?? [],
+      uploaded_source_visual_asset_ids: page.content_plan?.uploaded_source_visual_asset_ids ?? [],
+      materialized_facts: materialized.pageEvidence.facts.filter((fact) => fact.id.startsWith("uploaded:")).length,
+      materialized_visual_assets: materialized.pageEvidence.visual_assets.filter((asset) => asset.id.startsWith("uploaded:")).length,
+      gaps: materialized.pageEvidence.gaps.filter((gap) => gap.includes("Uploaded Source")),
+      updated_at: new Date().toISOString(),
     });
   }
   const currentEvidence = normalizeResearchEvidenceIndex(

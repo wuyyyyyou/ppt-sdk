@@ -30,6 +30,13 @@ import type {
   TemplatePlanningContext,
   WorkspaceDefaultsResult,
   WorkspaceResult,
+  BeginUploadedSourceUploadResult,
+  CommitUploadedSourceUploadResult,
+  UploadUploadedSourceResult,
+  ListUploadedSourcesResult,
+  RemoveUploadedSourceResult,
+  PrepareUploadedSourceAnalysisWorkspaceResult,
+  UploadedSourceAnalysisDraftFingerprint,
 } from "./types";
 import { createSearchAdapter } from "./searchAdapter";
 import { resolvePptBundledToolIds } from "./bundledToolIds";
@@ -180,6 +187,77 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invokeWorkspaceResult("app_create_workspace", input),
     openWorkspace: (input) =>
       invokeWorkspaceResult("app_open_workspace", input),
+    beginUploadedSourceUpload: (input) =>
+      invoke<BeginUploadedSourceUploadResult>(
+        toolIds.pptEngine,
+        "app_begin_uploaded_source_upload",
+        input
+      ),
+    commitUploadedSourceUpload: (input) =>
+      invoke<CommitUploadedSourceUploadResult>(
+        toolIds.pptEngine,
+        "app_commit_uploaded_source_upload",
+        input
+      ),
+    uploadUploadedSource: (input) =>
+      invoke<UploadUploadedSourceResult>(
+        toolIds.pptEngine,
+        "app_upload_uploaded_source",
+        {
+          workspace_dir: input.workspace_dir,
+          filename: input.filename,
+          mime_type: input.mime_type,
+          content_base64: input.content_base64,
+        }
+      ),
+    listUploadedSources: (input) =>
+      invoke<ListUploadedSourcesResult>(
+        toolIds.pptEngine,
+        "app_list_uploaded_sources",
+        input
+      ),
+    removeUploadedSource: (input) =>
+      invoke<RemoveUploadedSourceResult>(
+        toolIds.pptEngine,
+        "app_remove_uploaded_source",
+        input
+      ),
+    prepareUploadedSourceAnalysisWorkspace: (input) =>
+      invoke<PrepareUploadedSourceAnalysisWorkspaceResult>(
+        toolIds.pptEngine,
+        "app_prepare_uploaded_source_analysis_workspace",
+        input
+      ),
+    recordUploadedSourceAnalysisDraft: (input) =>
+      invoke<Record<string, unknown>>(
+        toolIds.pptEngine,
+        "app_record_uploaded_source_analysis_draft",
+        input
+      ),
+    getUploadedSourceAnalysisDraft: (input) =>
+      invoke<Record<string, unknown>>(
+        toolIds.pptEngine,
+        "app_get_uploaded_source_analysis_draft",
+        input
+      ),
+    getUploadedSourceAnalysisDraftFingerprint: (input) =>
+      invoke<UploadedSourceAnalysisDraftFingerprint>(
+        toolIds.pptEngine,
+        "app_get_uploaded_source_analysis_draft_fingerprint",
+        input
+      ),
+    recordUploadedSourceAnalysis: (input) =>
+      invoke<Record<string, unknown>>(
+        toolIds.pptEngine,
+        "app_record_uploaded_source_analysis",
+        input
+      ),
+    getUploadedSourceAnalysis: (input) =>
+      invoke<Record<string, unknown>>(
+        toolIds.pptEngine,
+        "app_get_uploaded_source_analysis",
+        input
+      ),
     appendWorkspaceLog: (input) =>
       invoke<AppendWorkspaceLogResult>(
         toolIds.pptEngine,

@@ -62,7 +62,7 @@ describe("outline prompt slide count handling", () => {
     });
     const userPrompt = request.messages[1]?.content.text ?? "";
 
-    assert.match(userPrompt, /必须完全按照用户简报里的页数意图来/);
+    assert.match(userPrompt, /follow the page-count intent in the user brief exactly/);
     assert.doesNotMatch(userPrompt, /items 中必须严格返回 5 页/);
   });
 
@@ -76,7 +76,7 @@ describe("outline prompt slide count handling", () => {
     const userPrompt = request.messages[1]?.content.text ?? "";
 
     assert.match(userPrompt, /contextRows\.slides = 25/);
-    assert.match(userPrompt, /只有当用户简报没有表达页数相关要求时，才参考 contextRows\.slides/);
+    assert.match(userPrompt, /only consult contextRows\.slides when the user brief does not express any page-count requirement/);
     assert.doesNotMatch(userPrompt, /items 中必须严格返回 25 页/);
   });
 
@@ -92,7 +92,7 @@ describe("outline prompt slide count handling", () => {
     const userPrompt = request.messages[1]?.content.text ?? "";
 
     assert.doesNotMatch(userPrompt, /items 中必须严格返回 5 页/);
-    assert.match(userPrompt, /必须完全按照最高优先级修改反馈里的页数意图来/);
+    assert.match(userPrompt, /follow the page-count intent in the highest-priority feedback exactly/);
   });
 
   it("does not reject outlines that differ from a provided expected slide count", () => {
@@ -134,6 +134,27 @@ describe("outline prompt slide count handling", () => {
     assert.match(userPrompt, /output_language/);
     assert.match(userPrompt, /auto/);
     assert.doesNotMatch(userPrompt, /Locale: en[\s\S]*content language must be English/);
+  });
+
+  it("passes compact uploaded source analysis context into outline generation", () => {
+    const request = buildGenerateOutlineLlmRequest({
+      prompt: "根据上传材料做一份经营复盘",
+      contextRows: [],
+      locale: "zh",
+      setting: { output_language: "Chinese" },
+      uploadedSourceAnalysisContext: {
+        status: "ready",
+        facts: [{ id: "fact-1", claim: "ARR grew 12%." }],
+        visual_assets: [],
+        gaps: [],
+      },
+    });
+    const userPrompt = request.messages[1]?.content.text ?? "";
+
+    assert.match(userPrompt, /Uploaded Source Analysis context/);
+    assert.match(userPrompt, /ARR grew 12%/);
+    assert.match(userPrompt, /high-priority user-provided source material/);
+    assert.match(userPrompt, /Do not mention raw uploaded file paths/);
   });
 });
 

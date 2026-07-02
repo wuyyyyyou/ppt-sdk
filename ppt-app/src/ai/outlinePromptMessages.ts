@@ -6,6 +6,7 @@ interface GenerateOutlinePromptMessageInput {
   settingSummaryJson: string;
   prompt: string;
   contextRowsJson: string;
+  uploadedSourceAnalysisContextJson: string;
 }
 
 interface ReviseOutlinePromptMessageInput {
@@ -13,6 +14,7 @@ interface ReviseOutlinePromptMessageInput {
   locale: string;
   settingSummaryJson: string;
   contextRowsJson: string;
+  uploadedSourceAnalysisContextJson: string;
   title?: string;
   feedback: string;
   outlineJson: string;
@@ -71,6 +73,12 @@ export function buildGenerateOutlineUserPrompt(
     `Relevant workspace setting: ${input.settingSummaryJson}`,
     `User brief: ${input.prompt}`,
     `Additional context rows: ${input.contextRowsJson}`,
+    `Uploaded Source Analysis context: ${input.uploadedSourceAnalysisContextJson}`,
+    "Uploaded Source Analysis rules:",
+    "- If this context is not null, treat it as high-priority user-provided source material for outline strategy.",
+    "- Use uploaded-source facts and source summaries before external assumptions.",
+    "- Respect gaps and continuation decisions; do not invent facts to fill gaps.",
+    "- Do not mention raw uploaded file paths in the outline.",
     "Output requirements:",
     ...OUTLINE_OUTPUT_REQUIREMENTS,
   ].join("\n");
@@ -89,9 +97,14 @@ export function buildReviseOutlineUserPrompt(
     `Locale: ${input.locale}`,
     `Lower-priority workspace setting: ${input.settingSummaryJson}`,
     `Optional context rows: ${input.contextRowsJson}`,
+    `Uploaded Source Analysis context: ${input.uploadedSourceAnalysisContextJson}`,
     `Current presentation title: ${input.title || ""}`,
     `Highest-priority feedback: ${input.feedback}`,
     `Current outline items: ${input.outlineJson}`,
+    "Uploaded Source Analysis rules:",
+    "- If this context is not null, keep revised outline grounded in the current uploaded-source facts and source summaries.",
+    "- Respect gaps and continuation decisions; do not invent facts to fill gaps.",
+    "- Do not mention raw uploaded file paths in the outline.",
     "Output requirements:",
     "- Return one valid JSON object only.",
     "- title must be the presentation title.",

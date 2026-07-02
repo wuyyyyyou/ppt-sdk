@@ -18,6 +18,9 @@ import type {
   PageProgress,
   PptxExportJob,
   TemplateSummary,
+  UploadedSourceAnalysisDependency,
+  UploadedSourceIndex,
+  UploadedSourceMaterial,
   WorkspaceResult,
   WorkspaceOutline,
   WorkspaceOutlineItem,
@@ -57,6 +60,14 @@ import {
   type DeckGenerationError,
   type DeckGenerationProgress,
 } from "../../deck-generation";
+import { ensureFreshUploadedSourceAnalysis } from "../../deck-generation/uploadedSourceAnalysisWorkflow";
+import {
+  compactUploadedSourceAnalysisForPrompt,
+  createUploadedSourceAnalysisDependency,
+  uploadedSourceAnalysisMatchesActiveSet,
+  uploadedSourceDependencyMatchesAnalysis,
+  type UploadedSourceAnalysis,
+} from "../../deck-generation/uploadedSourceAnalysis";
 import { reconcileInterruptedPageProgress } from "../../deck-generation/interruptedReconciliation";
 import {
   createArtifactExportProgress,
@@ -84,7 +95,8 @@ import type {
   PageId,
   PanelMode,
   PreviewMode,
-  RefineScope
+  RefineScope,
+  UploadedSourceAnalysisViewState
 } from "../types";
 import { getThemePreset, THEME_PRESET_IDS } from "../themePresets";
 import {
@@ -112,6 +124,43 @@ function formatWorkspaceDate(date = new Date()) {
     padDatePart(date.getMonth() + 1),
     padDatePart(date.getDate())
   ].join("-");
+}
+
+function uploadedSourceDependencyMatchesActiveSources(input: {
+  dependency?: UploadedSourceAnalysisDependency;
+  uploadedSources: UploadedSourceMaterial[];
+}) {
+  const { dependency, uploadedSources } = input;
+  if (!dependency) return false;
+  if (dependency.active_uploaded_sources.length !== uploadedSources.length) return false;
+  const dependencyById = new Map(
+    dependency.active_uploaded_sources.map((source) => [source.uploaded_source_id, source])
+  );
+  return uploadedSources.every((source) => {
+    const dependencySource = dependencyById.get(source.uploaded_source_id);
+    return dependencySource !== undefined &&
+      dependencySource.sha256 === source.sha256 &&
+      dependencySource.size_bytes === source.size_bytes;
+  });
+}
+
+function readWorkspaceUploadedSourceDependency(
+  workspace: WorkspaceResult | null,
+): UploadedSourceAnalysisDependency | undefined {
+  const outline = workspace?.outline && typeof workspace.outline === "object" && !Array.isArray(workspace.outline)
+    ? workspace.outline as Partial<WorkspaceOutline>
+    : null;
+  return outline?.source?.uploaded_source_analysis;
+}
+
+function createEmptyUploadedSourceAnalysisViewState(): UploadedSourceAnalysisViewState {
+  return {
+    status: "hidden",
+    sourceCount: 0,
+    factCount: null,
+    visualAssetCount: null,
+    gapCount: null,
+  };
 }
 
 export interface DeckWorkspaceActions {
@@ -153,6 +202,8 @@ export interface DeckWorkspaceActions {
   showWorkspacePicker: () => Promise<void>;
   useLatestWorkspace: () => Promise<void>;
   createWorkspace: () => Promise<void>;
+  uploadUploadedSource: (file: File) => Promise<void>;
+  removeUploadedSource: (uploadedSourceId: string) => Promise<void>;
   saveWorkspaceSettings: (setting: WorkspaceSettings) => Promise<void>;
   saveWorkspaceTitle: (title: string) => Promise<void>;
   selectTemplate: (groupId: string) => Promise<void>;
@@ -226,6 +277,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const outlineAutosaveTimerRef = useRef<number | null>(null);
   const [workspaceScan, setWorkspaceScan] = useState<ListWorkspacesResult | null>(null);
   const [currentWorkspace, setCurrentWorkspace] = useState<WorkspaceResult | null>(null);
+  const [uploadedSources, setUploadedSources] = useState<UploadedSourceMaterial[]>([]);
+  const [currentUploadedSourceAnalysis, setCurrentUploadedSourceAnalysis] =
+    useState<UploadedSourceAnalysis | null>(null);
+  const [uploadedSourceAnalysisError, setUploadedSourceAnalysisError] = useState("");
   const [workspaceLoading, setWorkspaceLoading] = useState(true);
   const [workspaceError, setWorkspaceError] = useState("");
   const [workspaceSettingsSaving, setWorkspaceSettingsSaving] = useState(false);
@@ -467,6 +522,134 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   function sleep(ms: number) {
     return new Promise((resolve) => window.setTimeout(resolve, ms));
+  }
+
+  function readFileAsBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error ?? new Error("Failed to read file."));
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result !== "string") {
+          reject(new Error("Failed to read file as base64."));
+          return;
+        }
+        const commaIndex = result.indexOf(",");
+        resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  const RPC_UPLOAD_FALLBACK_MAX_BYTES = 768 * 1024;
+
+  function isUploadSessionUnsupported(error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return /app_begin_uploaded_source_upload|app_commit_uploaded_source_upload|unknown|not found|unsupported|no such tool/i.test(message);
+  }
+
+  async function uploadUploadedSourceViaRpcFallback(workspace: WorkspaceResult, file: File) {
+    if (file.size > RPC_UPLOAD_FALLBACK_MAX_BYTES) {
+      throw new Error(
+        locale === "zh"
+          ? "当前运行时不支持大文件 HTTP 上传，请升级 ppt-engine 后重试。"
+          : "This runtime does not support large HTTP uploads. Upgrade ppt-engine and try again."
+      );
+    }
+    const contentBase64 = await readFileAsBase64(file);
+    return backend!.uploadUploadedSource({
+      workspace_dir: workspace.workspace_dir,
+      filename: file.name,
+      mime_type: file.type,
+      content_base64: contentBase64,
+    });
+  }
+
+  async function uploadUploadedSourceFile(workspace: WorkspaceResult, file: File) {
+    if (!backend?.beginUploadedSourceUpload || !backend.commitUploadedSourceUpload) {
+      return uploadUploadedSourceViaRpcFallback(workspace, file);
+    }
+    try {
+      const session = await backend.beginUploadedSourceUpload({
+        workspace_dir: workspace.workspace_dir,
+        filename: file.name,
+        mime_type: file.type,
+        size_bytes: file.size,
+      });
+      const response = await fetch(session.upload_url, {
+        method: "PUT",
+        body: file,
+      });
+      if (!response.ok) {
+        const message = await response.text().catch(() => "");
+        throw new Error(message || `Uploaded source HTTP upload failed: HTTP ${response.status}`);
+      }
+      return backend.commitUploadedSourceUpload({
+        workspace_dir: workspace.workspace_dir,
+        upload_id: session.upload_id,
+      });
+    } catch (error) {
+      if (!isUploadSessionUnsupported(error)) {
+        throw error;
+      }
+      return uploadUploadedSourceViaRpcFallback(workspace, file);
+    }
+  }
+
+  async function refreshUploadedSources(workspace: WorkspaceResult | null = currentWorkspace) {
+    if (!backend || !workspace) {
+      setUploadedSources([]);
+      setCurrentUploadedSourceAnalysis(null);
+      setUploadedSourceAnalysisError("");
+      return;
+    }
+    try {
+      const result = await backend.listUploadedSources({
+        workspace_dir: workspace.workspace_dir,
+        include_removed: false,
+      });
+      setUploadedSources(result.active);
+      await refreshUploadedSourceAnalysisSnapshot(workspace, result.index);
+    } catch (error) {
+      console.warn(
+        "Failed to refresh uploaded sources",
+        error instanceof Error ? error.message : error
+      );
+      setUploadedSources([]);
+      setCurrentUploadedSourceAnalysis(null);
+    }
+  }
+
+  async function refreshUploadedSourceAnalysisSnapshot(
+    workspace: WorkspaceResult,
+    uploadedSourceIndex: UploadedSourceIndex,
+  ) {
+    if (uploadedSourceIndex.materials.filter((item) => item.status === "active").length === 0) {
+      setCurrentUploadedSourceAnalysis(null);
+      setUploadedSourceAnalysisError("");
+      return;
+    }
+    try {
+      const analysis = await backend!.getUploadedSourceAnalysis({
+        workspace_dir: workspace.workspace_dir,
+      });
+      const status = typeof analysis.status === "string" ? analysis.status : "";
+      if (
+        (status === "ready" || status === "gap" || status === "blocked") &&
+        uploadedSourceAnalysisMatchesActiveSet({ analysis, uploadedSourceIndex })
+      ) {
+        setCurrentUploadedSourceAnalysis(analysis as unknown as UploadedSourceAnalysis);
+        setUploadedSourceAnalysisError("");
+        return;
+      }
+      setCurrentUploadedSourceAnalysis(null);
+    } catch (error) {
+      console.warn(
+        "Failed to refresh uploaded source analysis",
+        error instanceof Error ? error.message : error
+      );
+      setCurrentUploadedSourceAnalysis(null);
+    }
   }
 
   function getPptxExportErrorMessage(job: PptxExportJob) {
@@ -719,6 +902,48 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     };
   }
 
+  async function ensureUploadedSourceAnalysisForOutline(
+    workspace: WorkspaceResult
+  ): Promise<UploadedSourceAnalysis | null> {
+    if (!backend) return null;
+    const uploadedSourceList = await backend.listUploadedSources({
+      workspace_dir: workspace.workspace_dir,
+      include_removed: false,
+    });
+    setUploadedSources(uploadedSourceList.active);
+    if (uploadedSourceList.active.length === 0) {
+      setCurrentUploadedSourceAnalysis(null);
+      setUploadedSourceAnalysisError("");
+      return null;
+    }
+    if (!agentClient) {
+      const message = t.errors.uploadedSourceAnalysisUnavailable;
+      setUploadedSourceAnalysisError(message);
+      throw new Error(message);
+    }
+    setLoading("uploadedSourceAnalysis");
+    setUploadedSourceAnalysisError("");
+    try {
+      const analysis = await ensureFreshUploadedSourceAnalysis({
+        backend,
+        agentClient,
+        workspace,
+      });
+      if (!analysis) return null;
+      setCurrentUploadedSourceAnalysis(analysis);
+      if (analysis.status === "blocked" || !analysis.continuation_decision.can_continue) {
+        const message = `${t.errors.uploadedSourceAnalysisBlocked}: ${analysis.continuation_decision.reason}`;
+        setUploadedSourceAnalysisError(message);
+        throw new Error(message);
+      }
+      return analysis;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setUploadedSourceAnalysisError(message);
+      throw error;
+    }
+  }
+
   function applyRenderedDeck(result: Awaited<ReturnType<PptBackend["renderDeckHtml"]>>) {
     setGenerated(true);
     setDeckTitle(result.title);
@@ -743,6 +968,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     options: { syncEmptyContextRows?: boolean } = {}
   ) {
     setCurrentWorkspace(workspace);
+    void refreshUploadedSources(workspace);
     setPageReviewSettings(workspacePageReviewSettings(workspace));
     if (!exportInFlightRef.current) {
       setExportArtifactWithProgress(readWorkspaceExportArtifactPath(workspace));
@@ -943,6 +1169,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   const currentStatus = useMemo(() => {
     if (loading === "template") return t.template.loading;
+    if (loading === "uploadedSourceAnalysis") return t.status.analyzingUploadedSource;
     if (loading === "outline") return t.status.creatingOutline;
     if (generationViewState.status === "running") {
       return t.status.creatingDeck;
@@ -963,6 +1190,86 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (generated) return deckReadyStatus(t, deck.length);
     return "";
   }, [createDeckProgress?.message, deck.length, generated, generationViewState.status, loading, stage, t]);
+
+  const uploadedSourceAnalysisState = useMemo<UploadedSourceAnalysisViewState>(() => {
+    if (uploadedSources.length === 0) {
+      return createEmptyUploadedSourceAnalysisViewState();
+    }
+    if (loading === "uploadedSourceAnalysis") {
+      return {
+        status: "analyzing",
+        sourceCount: uploadedSources.length,
+        factCount: null,
+        visualAssetCount: null,
+        gapCount: null,
+      };
+    }
+    if (uploadedSourceAnalysisError) {
+      return {
+        status: "error",
+        sourceCount: uploadedSources.length,
+        factCount: null,
+        visualAssetCount: null,
+        gapCount: null,
+        reason: uploadedSourceAnalysisError,
+      };
+    }
+
+    if (currentUploadedSourceAnalysis) {
+      const currentDependency = createUploadedSourceAnalysisDependency(currentUploadedSourceAnalysis);
+      if (uploadedSourceDependencyMatchesActiveSources({
+        dependency: currentDependency,
+        uploadedSources,
+      })) {
+        const blocked =
+          currentUploadedSourceAnalysis.status === "blocked" ||
+          !currentUploadedSourceAnalysis.continuation_decision.can_continue;
+        return {
+          status: blocked ? "blocked" : currentUploadedSourceAnalysis.status,
+          sourceCount: uploadedSources.length,
+          factCount: currentUploadedSourceAnalysis.facts.length,
+          visualAssetCount: currentUploadedSourceAnalysis.visual_assets.length,
+          gapCount: currentUploadedSourceAnalysis.gaps.length,
+          reason: blocked ? currentUploadedSourceAnalysis.continuation_decision.reason : undefined,
+        };
+      }
+      return {
+        status: "stale",
+        sourceCount: uploadedSources.length,
+        factCount: null,
+        visualAssetCount: null,
+        gapCount: null,
+      };
+    }
+
+    const outlineDependency = readWorkspaceUploadedSourceDependency(currentWorkspace);
+    if (outlineDependency) {
+      return {
+        status: uploadedSourceDependencyMatchesActiveSources({
+          dependency: outlineDependency,
+          uploadedSources,
+        }) ? outlineDependency.status : "stale",
+        sourceCount: uploadedSources.length,
+        factCount: null,
+        visualAssetCount: null,
+        gapCount: null,
+      };
+    }
+
+    return {
+      status: "pending",
+      sourceCount: uploadedSources.length,
+      factCount: null,
+      visualAssetCount: null,
+      gapCount: null,
+    };
+  }, [
+    currentUploadedSourceAnalysis,
+    currentWorkspace,
+    loading,
+    uploadedSourceAnalysisError,
+    uploadedSources,
+  ]);
 
   function showToast(message: string) {
     setToast(message);
@@ -1280,7 +1587,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function generateDeck() {
-    if (!backend || !aiClient || !agentClient) return;
+    if (!backend || !aiClient) return;
+    if (!agentClient) {
+      if (uploadedSources.length > 0) {
+        showToast(t.errors.uploadedSourceAnalysisUnavailable);
+      }
+      return;
+    }
 
     let activeRunWorkspaceDir: string | undefined;
     let shouldReconcileActiveRun = false;
@@ -1303,6 +1616,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         templateWorkspace,
         generationContextRows
       );
+      const uploadedSourceAnalysis = await ensureUploadedSourceAnalysisForOutline(themedWorkspace);
+      const uploadedSourceAnalysisContext = compactUploadedSourceAnalysisForPrompt(uploadedSourceAnalysis);
 
       const setting = workspaceSettingsToState(themedWorkspace);
 
@@ -1315,6 +1630,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           contextRows: llmContextRows,
           locale,
           setting,
+          uploadedSourceAnalysisContext,
           logContext: outlineLogContext,
         });
         await appendOutlineAiAttemptLogs(themedWorkspace, result.attempts, outlineLogContext);
@@ -1341,7 +1657,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           languageSetting,
           "draft",
           true,
-          syncedContextRows
+          syncedContextRows,
+          uploadedSourceAnalysis
         );
         if (updatedWorkspace) {
           applyWorkspace(updatedWorkspace);
@@ -1358,6 +1675,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         contextRows: llmContextRows,
         locale,
         setting,
+        uploadedSourceAnalysisContext,
         logContext: outlineLogContext,
       });
       await appendOutlineAiAttemptLogs(themedWorkspace, outlineResult.attempts, outlineLogContext);
@@ -1381,7 +1699,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         languageSetting,
         "confirmed",
         true,
-        syncedContextRows
+        syncedContextRows,
+        uploadedSourceAnalysis
       );
       if (!confirmedWorkspace) return;
       if (cancelCreateDeckRef.current) {
@@ -1448,7 +1767,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function createDeckFromOutline() {
-    if (!backend || !aiClient || !agentClient) return;
+    if (!backend || !aiClient) return;
+    if (!agentClient) {
+      if (uploadedSources.length > 0) {
+        showToast(t.errors.uploadedSourceAnalysisUnavailable);
+      }
+      return;
+    }
 
     let activeRunWorkspaceDir: string | undefined;
     let shouldReconcileActiveRun = false;
@@ -1467,6 +1792,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     resetGenerationProgress();
     try {
       const setting = workspaceSettingsToState(templateWorkspace);
+      const uploadedSourceAnalysis = await ensureUploadedSourceAnalysisForOutline(templateWorkspace);
+      setLoading("outline");
       const resolved = await resolveOutputLanguageForOutline({
         workspace: templateWorkspace,
         setting,
@@ -1479,7 +1806,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         resolved.outputLanguage,
         resolved.workspace,
         resolved.setting,
-        "confirmed"
+        "confirmed",
+        true,
+        null,
+        uploadedSourceAnalysis
       );
       if (!confirmedWorkspace) return;
       beginActiveGenerationRun("deck-generation");
@@ -1530,6 +1860,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const nextContextRows = deriveContextRowsFromOutlineFeedback(contextRows, outlineFeedback);
       setContextRows(nextContextRows);
       const llmContextRows = buildLlmContextRows(nextContextRows);
+      const uploadedSourceAnalysis = backend
+        ? await ensureUploadedSourceAnalysisForOutline(workspace)
+        : null;
+      setLoading("outline");
+      const uploadedSourceAnalysisContext = compactUploadedSourceAnalysisForPrompt(uploadedSourceAnalysis);
       const outlineLogContext = buildAiLogContext(workspace, "outline", "revise_outline");
       const result = await aiClient.reviseOutline({
         title: baseTitle,
@@ -1538,6 +1873,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         locale,
         setting,
         contextRows: llmContextRows,
+        uploadedSourceAnalysisContext,
         logContext: outlineLogContext,
       });
       await appendOutlineAiAttemptLogs(workspace, result.attempts, outlineLogContext);
@@ -1557,7 +1893,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         setting,
         "draft",
         false,
-        syncedContextRows
+        syncedContextRows,
+        uploadedSourceAnalysis
       );
       if (backend) {
         setWorkspaceScan(await backend.listWorkspaces());
@@ -1597,47 +1934,56 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   async function saveOutlineEdit() {
     if (!outlineEditMode) return;
-    const workspace = await ensureCurrentWorkspace();
-    if (!workspace) return;
-    const setting = workspaceSettingsToState(workspace);
-    const outputLanguage = normalizeOutputLanguage(outlineDraftOutputLanguage);
-    const languageWorkspace = await persistWorkspaceOutputLanguage(
-      workspace,
-      outputLanguage,
-      setting
-    );
-    const languageSetting = withOutputLanguage(setting, outputLanguage);
-    const downstreamExists = hasDownstreamArtifacts(workspace);
-    const syncedContextRows = syncContextRowsToOutlineCount(contextRows, outlineDraft);
-    setContextRows(syncedContextRows);
-    const updatedWorkspace = await saveOutlineArtifact(
-      outlineDraft,
-      outlineDraftTitle,
-      outputLanguage,
-      languageWorkspace,
-      languageSetting,
-      "draft",
-      true,
-      syncedContextRows
-    );
-    if (updatedWorkspace) {
-      setDeckTitle(outlineDraftTitle);
-      setOutline(outlineDraft);
-      setOutlineOutputLanguage(outputLanguage);
-      setOutlineEditMode(false);
-      if (downstreamExists) {
-        setGenerated(false);
-        setReviewRender({
-          status: "idle",
-          result: null,
-          error: "",
-          renderKey: workspaceReviewRenderKey(updatedWorkspace)
-        });
-        resetGenerationProgress();
-        setStage("outline");
-        setPage("main");
+    try {
+      const workspace = await ensureCurrentWorkspace();
+      if (!workspace) return;
+      const setting = workspaceSettingsToState(workspace);
+      const outputLanguage = normalizeOutputLanguage(outlineDraftOutputLanguage);
+      const languageWorkspace = await persistWorkspaceOutputLanguage(
+        workspace,
+        outputLanguage,
+        setting
+      );
+      const languageSetting = withOutputLanguage(setting, outputLanguage);
+      const uploadedSourceAnalysis = await ensureUploadedSourceAnalysisForOutline(languageWorkspace);
+      setLoading("outline");
+      const downstreamExists = hasDownstreamArtifacts(workspace);
+      const syncedContextRows = syncContextRowsToOutlineCount(contextRows, outlineDraft);
+      setContextRows(syncedContextRows);
+      const updatedWorkspace = await saveOutlineArtifact(
+        outlineDraft,
+        outlineDraftTitle,
+        outputLanguage,
+        languageWorkspace,
+        languageSetting,
+        "draft",
+        true,
+        syncedContextRows,
+        uploadedSourceAnalysis
+      );
+      if (updatedWorkspace) {
+        setDeckTitle(outlineDraftTitle);
+        setOutline(outlineDraft);
+        setOutlineOutputLanguage(outputLanguage);
+        setOutlineEditMode(false);
+        if (downstreamExists) {
+          setGenerated(false);
+          setReviewRender({
+            status: "idle",
+            result: null,
+            error: "",
+            renderKey: workspaceReviewRenderKey(updatedWorkspace)
+          });
+          resetGenerationProgress();
+          setStage("outline");
+          setPage("main");
+        }
+        showToast(t.toasts.outlineUpdated);
       }
-      showToast(t.toasts.outlineUpdated);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t.toasts.createOutlineFirst);
+    } finally {
+      setLoading("none");
     }
   }
 
@@ -1926,6 +2272,83 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return workspace;
   }
 
+  async function uploadUploadedSource(file: File) {
+    if (!backend) return;
+    setLoading("upload");
+    try {
+      const workspace = await ensureCurrentWorkspace();
+      if (!workspace) return;
+      const result = await uploadUploadedSourceFile(workspace, file);
+      await backend.appendWorkspaceLog({
+        workspace_dir: workspace.workspace_dir,
+        channel: "ai-research",
+        entry: {
+          event: "uploaded_source.uploaded",
+          schema_version: 1,
+          uploaded_source_id: result.material.uploaded_source_id,
+          filename: result.material.original_filename,
+          extension: result.material.extension,
+          size_bytes: result.material.size_bytes,
+          sha256: result.material.sha256,
+          duplicate_of: result.material.duplicate_of ?? null,
+          warnings: result.warnings,
+          updated_at: new Date().toISOString(),
+        },
+      }).catch((error) => {
+        console.warn("Failed to append uploaded source upload log", error);
+      });
+      setUploadedSources(result.index.materials.filter((item) => item.status === "active"));
+      setCurrentUploadedSourceAnalysis(null);
+      setUploadedSourceAnalysisError("");
+      setWorkspaceScan(await backend.listWorkspaces());
+      showToast(
+        result.warnings.length > 0
+          ? result.warnings[0]
+          : t.toasts.attachmentAdded
+      );
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t.toasts.attachmentAdded);
+    } finally {
+      setLoading("none");
+    }
+  }
+
+  async function removeUploadedSource(uploadedSourceId: string) {
+    if (!backend) return;
+    const workspace = await ensureCurrentWorkspace();
+    if (!workspace) return;
+    setLoading("upload");
+    try {
+      const result = await backend.removeUploadedSource({
+        workspace_dir: workspace.workspace_dir,
+        uploaded_source_id: uploadedSourceId,
+      });
+      await backend.appendWorkspaceLog({
+        workspace_dir: workspace.workspace_dir,
+        channel: "ai-research",
+        entry: {
+          event: "uploaded_source.removed",
+          schema_version: 1,
+          uploaded_source_id: uploadedSourceId,
+          filename: result.material.original_filename,
+          active_count: result.index.materials.filter((item) => item.status === "active").length,
+          updated_at: new Date().toISOString(),
+        },
+      }).catch((error) => {
+        console.warn("Failed to append uploaded source remove log", error);
+      });
+      setUploadedSources(result.index.materials.filter((item) => item.status === "active"));
+      setCurrentUploadedSourceAnalysis(null);
+      setUploadedSourceAnalysisError("");
+      setWorkspaceScan(await backend.listWorkspaces());
+      showToast(t.toasts.attachmentRemoved);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t.toasts.attachmentRemoved);
+    } finally {
+      setLoading("none");
+    }
+  }
+
   async function refreshCurrentWorkspaceSnapshot() {
     if (!backend) return null;
     const workspace = await ensureCurrentWorkspace();
@@ -2079,7 +2502,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     settingOverride: WorkspaceSettings | null = null,
     status: "draft" | "confirmed" = "draft",
     applyWorkspaceState = true,
-    contextRowsOverride: Array<ContextRow | LlmContextRow> | null = null
+    contextRowsOverride: Array<ContextRow | LlmContextRow> | null = null,
+    uploadedSourceAnalysis: UploadedSourceAnalysis | null = null
   ) {
     if (!backend) return null;
     const workspace = workspaceOverride ?? (await ensureCurrentWorkspace());
@@ -2095,7 +2519,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           setting: withOutputLanguage(
             settingOverride ?? workspaceSettingsToState(workspace),
             outputLanguage
-          )
+          ),
+          ...(uploadedSourceAnalysis
+            ? { uploaded_source_analysis: createUploadedSourceAnalysisDependency(uploadedSourceAnalysis) }
+            : {})
         }
       }
     });
@@ -2847,6 +3274,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     currentStatus,
     workspaceScan,
     currentWorkspace,
+    uploadedSources,
+    uploadedSourceAnalysisState,
     workspaceLoading,
     workspaceError,
     workspaceSettingsSaving,
@@ -2893,6 +3322,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     showWorkspacePicker,
     useLatestWorkspace,
     createWorkspace,
+    uploadUploadedSource,
+    removeUploadedSource,
     saveWorkspaceSettings,
     saveWorkspaceTitle,
     selectTemplate,

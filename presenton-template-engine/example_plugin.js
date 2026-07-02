@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import readline from "node:readline";
 import { readFileSync } from "node:fs";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -26,6 +26,11 @@ import {
   getAppPageProgress,
   getAppPptxExportStatus,
   getRenderedAppWorkspaceDeckHtml,
+  listAppUploadedSources,
+  commitAppUploadedSourceUpload,
+  getAppUploadedSourceAnalysis,
+  getAppUploadedSourceAnalysisDraft,
+  getAppUploadedSourceAnalysisDraftFingerprint,
   getAppResearchCurationDraft,
   getAppResearchCurationDraftFingerprint,
   getAppResearchEvidence,
@@ -42,6 +47,7 @@ import {
   prepareAppDeckRefinementPageFiles,
   prepareAppPageFiles,
   prepareAppExportModel,
+  prepareAppUploadedSourceAnalysisWorkspace,
   prepareAppResearchWorkspace,
   recordAppPagePlan,
   recordAppPageProgress,
@@ -54,6 +60,9 @@ import {
   recordAppResearchPlan,
   recordAppResearchStatus,
   recordAppResearchStatusPage,
+  removeAppUploadedSource,
+  recordAppUploadedSourceAnalysis,
+  recordAppUploadedSourceAnalysisDraft,
   renderAppWorkspaceDeckHtml,
   renderAppWorkspacePagePreview,
   runDeckValidation,
@@ -64,6 +73,7 @@ import {
   updateAppWorkspacePages,
   updateAppWorkspaceSettings,
   updateAppWorkspaceTitle,
+  uploadAppUploadedSource,
 } from "./dist/index.js";
 
 const TASK_STATE_MACHINE_TOOL_NAMES = [
@@ -227,7 +237,16 @@ const previewFiles = new Map();
 const previewImageFiles = new Map();
 const artifactFiles = new Map();
 const jsonPayloads = new Map();
+const uploadedSourceUploadSessions = new Map();
 let previewServerPromise = null;
+
+const UPLOADED_SOURCE_UPLOAD_TTL_MS = 15 * 60 * 1000;
+const UPLOADED_SOURCE_SINGLE_FILE_MAX_BYTES = 25 * 1024 * 1024;
+const UPLOADED_SOURCE_STAGING_DIR = path.join(
+  os.tmpdir(),
+  "presenton-template-engine-executa",
+  "uploaded-source-staging",
+);
 
 function encodeRfc5987Value(value) {
   return encodeURIComponent(value)
@@ -257,9 +276,117 @@ function getArtifactContentType(artifactType) {
   return "application/octet-stream";
 }
 
+function writePlainResponse(response, statusCode, message, extraHeaders = {}) {
+  response.writeHead(statusCode, {
+    "content-type": "text/plain; charset=utf-8",
+    "cache-control": "no-store",
+    "x-content-type-options": "nosniff",
+    ...extraHeaders,
+  });
+  response.end(message);
+}
+
+function getUploadCorsHeaders() {
+  return {
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "PUT, OPTIONS",
+    "access-control-allow-headers": "content-type, content-length",
+  };
+}
+
+function cleanupExpiredUploadedSourceUploadSessions() {
+  const now = Date.now();
+  for (const [uploadId, session] of uploadedSourceUploadSessions) {
+    if (Date.parse(session.expiresAt) > now) continue;
+    uploadedSourceUploadSessions.delete(uploadId);
+    void unlink(session.stagingPath).catch(() => undefined);
+  }
+}
+
+async function writeUploadedSourceStagingFile(request, session) {
+  await mkdir(path.dirname(session.stagingPath), { recursive: true });
+  const handle = await open(session.stagingPath, "w");
+  let received = 0;
+  try {
+    for await (const chunk of request) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      received += buffer.byteLength;
+      if (received > session.expectedSizeBytes || received > UPLOADED_SOURCE_SINGLE_FILE_MAX_BYTES) {
+        throw new Error(`Uploaded source body exceeds expected size of ${session.expectedSizeBytes} bytes.`);
+      }
+      await handle.write(buffer);
+    }
+  } finally {
+    await handle.close();
+  }
+
+  if (received !== session.expectedSizeBytes) {
+    await unlink(session.stagingPath).catch(() => undefined);
+    throw new Error(`Uploaded source body size mismatch: expected ${session.expectedSizeBytes} bytes, got ${received} bytes.`);
+  }
+  return received;
+}
+
 async function handlePreviewRequest(request, response) {
   const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
   const parts = requestUrl.pathname.split("/").filter(Boolean);
+
+  if (request.method === "OPTIONS" && parts.length === 3 && parts[0] === "upload") {
+    response.writeHead(204, {
+      "cache-control": "no-store",
+      ...getUploadCorsHeaders(),
+    });
+    response.end();
+    return;
+  }
+
+  if (parts.length === 3 && parts[0] === "upload") {
+    cleanupExpiredUploadedSourceUploadSessions();
+    const uploadId = parts[1];
+    const token = parts[2];
+    const session = uploadedSourceUploadSessions.get(uploadId);
+    if (!session || session.token !== token) {
+      writePlainResponse(response, 404, "Upload session expired or not found", getUploadCorsHeaders());
+      return;
+    }
+    if (request.method !== "PUT") {
+      writePlainResponse(response, 405, "Upload endpoint only accepts PUT", getUploadCorsHeaders());
+      return;
+    }
+    if (Date.parse(session.expiresAt) <= Date.now()) {
+      uploadedSourceUploadSessions.delete(uploadId);
+      await unlink(session.stagingPath).catch(() => undefined);
+      writePlainResponse(response, 410, "Upload session expired", getUploadCorsHeaders());
+      return;
+    }
+    if (session.committed) {
+      writePlainResponse(response, 409, "Upload session already committed", getUploadCorsHeaders());
+      return;
+    }
+    if (session.uploaded) {
+      writePlainResponse(response, 409, "Upload session already received a binary body", getUploadCorsHeaders());
+      return;
+    }
+    try {
+      const received = await writeUploadedSourceStagingFile(request, session);
+      session.receivedBytes = received;
+      session.uploaded = true;
+      response.writeHead(200, {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+        ...getUploadCorsHeaders(),
+      });
+      response.end(JSON.stringify({ ok: true, upload_id: uploadId, size_bytes: received }));
+    } catch (error) {
+      session.uploaded = false;
+      session.receivedBytes = 0;
+      await unlink(session.stagingPath).catch(() => undefined);
+      const message = error instanceof Error ? error.message : "Failed to receive uploaded source body";
+      writePlainResponse(response, 413, message, getUploadCorsHeaders());
+    }
+    return;
+  }
 
   if (parts.length === 3 && parts[0] === "preview" && parts[2] === "deck.html") {
     const previewId = parts[1];
@@ -673,6 +800,229 @@ async function toolAppOpenWorkspace(args) {
 
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
   return registerWorkspaceJsonReference(await openAppWorkspace({ workspace_dir: workspaceDir }));
+}
+
+async function toolAppBeginUploadedSourceUpload(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  cleanupExpiredUploadedSourceUploadSessions();
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  if (typeof args.filename !== "string" || args.filename.trim().length === 0) {
+    throw new Error('"filename" must be a non-empty string');
+  }
+  const sizeBytes = Number(args.size_bytes);
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+    throw new Error('"size_bytes" must be a positive number');
+  }
+  if (sizeBytes > UPLOADED_SOURCE_SINGLE_FILE_MAX_BYTES) {
+    throw new Error(`Uploaded source file exceeds the single-file limit of ${UPLOADED_SOURCE_SINGLE_FILE_MAX_BYTES} bytes.`);
+  }
+
+  const { port } = await ensurePreviewServer();
+  const uploadId = randomUUID();
+  const token = randomUUID();
+  const expiresAt = new Date(Date.now() + UPLOADED_SOURCE_UPLOAD_TTL_MS).toISOString();
+  const stagingPath = path.join(UPLOADED_SOURCE_STAGING_DIR, `${uploadId}.upload`);
+  uploadedSourceUploadSessions.set(uploadId, {
+    uploadId,
+    token,
+    workspaceDir,
+    filename: args.filename,
+    mimeType: typeof args.mime_type === "string" ? args.mime_type : "",
+    expectedSizeBytes: Math.floor(sizeBytes),
+    stagingPath,
+    expiresAt,
+    uploaded: false,
+    committed: false,
+    receivedBytes: 0,
+  });
+
+  return {
+    workspace_dir: workspaceDir,
+    upload_id: uploadId,
+    upload_url: `http://127.0.0.1:${port}/upload/${encodeURIComponent(uploadId)}/${encodeURIComponent(token)}`,
+    expires_at: expiresAt,
+    size_bytes: Math.floor(sizeBytes),
+  };
+}
+
+async function toolAppCommitUploadedSourceUpload(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  cleanupExpiredUploadedSourceUploadSessions();
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  if (typeof args.upload_id !== "string" || args.upload_id.trim().length === 0) {
+    throw new Error('"upload_id" must be a non-empty string');
+  }
+  const uploadId = args.upload_id;
+  const session = uploadedSourceUploadSessions.get(uploadId);
+  if (!session) {
+    throw new Error(`Uploaded source upload session not found or expired: ${uploadId}`);
+  }
+  if (session.workspaceDir !== workspaceDir) {
+    throw new Error("Uploaded source upload session workspace mismatch.");
+  }
+  if (Date.parse(session.expiresAt) <= Date.now()) {
+    uploadedSourceUploadSessions.delete(uploadId);
+    await unlink(session.stagingPath).catch(() => undefined);
+    throw new Error(`Uploaded source upload session expired: ${uploadId}`);
+  }
+  if (!session.uploaded || session.receivedBytes !== session.expectedSizeBytes) {
+    throw new Error(`Uploaded source upload session has not received the expected binary body: ${uploadId}`);
+  }
+
+  try {
+    session.committed = true;
+    return await commitAppUploadedSourceUpload({
+      workspace_dir: workspaceDir,
+      upload_id: uploadId,
+      filename: session.filename,
+      mime_type: session.mimeType,
+      staging_file_path: session.stagingPath,
+      expected_size_bytes: session.expectedSizeBytes,
+    });
+  } finally {
+    uploadedSourceUploadSessions.delete(uploadId);
+    await unlink(session.stagingPath).catch(() => undefined);
+  }
+}
+
+async function toolAppUploadUploadedSource(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  if (typeof args.filename !== "string" || args.filename.trim().length === 0) {
+    throw new Error('"filename" must be a non-empty string');
+  }
+  if (typeof args.content_base64 !== "string" || args.content_base64.trim().length === 0) {
+    throw new Error('"content_base64" must be a non-empty base64 string');
+  }
+
+  return uploadAppUploadedSource({
+    workspace_dir: workspaceDir,
+    filename: args.filename,
+    mime_type: typeof args.mime_type === "string" ? args.mime_type : undefined,
+    content_base64: args.content_base64,
+  });
+}
+
+async function toolAppListUploadedSources(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return listAppUploadedSources({
+    workspace_dir: workspaceDir,
+    include_removed: args.include_removed === true,
+  });
+}
+
+async function toolAppRemoveUploadedSource(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  if (typeof args.uploaded_source_id !== "string" || args.uploaded_source_id.trim().length === 0) {
+    throw new Error('"uploaded_source_id" must be a non-empty string');
+  }
+
+  return removeAppUploadedSource({
+    workspace_dir: workspaceDir,
+    uploaded_source_id: args.uploaded_source_id,
+  });
+}
+
+function readUploadedSourceAnalysisDraftTypeArg(args) {
+  const draftType = args.draft_type;
+  if (draftType !== "factual" && draftType !== "visual") {
+    throw new Error('"draft_type" must be either "factual" or "visual"');
+  }
+  return draftType;
+}
+
+async function toolAppPrepareUploadedSourceAnalysisWorkspace(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return prepareAppUploadedSourceAnalysisWorkspace({ workspace_dir: workspaceDir });
+}
+
+async function toolAppRecordUploadedSourceAnalysisDraft(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const draftType = readUploadedSourceAnalysisDraftTypeArg(args);
+  if (!args.draft || typeof args.draft !== "object" || Array.isArray(args.draft)) {
+    throw new Error('"draft" must be an object');
+  }
+  return recordAppUploadedSourceAnalysisDraft({
+    workspace_dir: workspaceDir,
+    draft_type: draftType,
+    draft_id: typeof args.draft_id === "string" ? args.draft_id : undefined,
+    draft: args.draft,
+  });
+}
+
+async function toolAppGetUploadedSourceAnalysisDraft(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return getAppUploadedSourceAnalysisDraft({
+    workspace_dir: workspaceDir,
+    draft_type: readUploadedSourceAnalysisDraftTypeArg(args),
+    draft_id: typeof args.draft_id === "string" ? args.draft_id : undefined,
+  });
+}
+
+async function toolAppGetUploadedSourceAnalysisDraftFingerprint(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return getAppUploadedSourceAnalysisDraftFingerprint({
+    workspace_dir: workspaceDir,
+    draft_type: readUploadedSourceAnalysisDraftTypeArg(args),
+    draft_id: typeof args.draft_id === "string" ? args.draft_id : undefined,
+  });
+}
+
+async function toolAppRecordUploadedSourceAnalysis(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  if (!args.analysis || typeof args.analysis !== "object" || Array.isArray(args.analysis)) {
+    throw new Error('"analysis" must be an object');
+  }
+  return recordAppUploadedSourceAnalysis({
+    workspace_dir: workspaceDir,
+    analysis: args.analysis,
+  });
+}
+
+async function toolAppGetUploadedSourceAnalysis(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return getAppUploadedSourceAnalysis({ workspace_dir: workspaceDir });
 }
 
 async function toolAppGetWorkspaceOutline(args) {
@@ -1584,6 +1934,17 @@ const TOOL_DISPATCH = {
   app_get_workspace_defaults: toolAppGetWorkspaceDefaults,
   app_create_workspace: toolAppCreateWorkspace,
   app_open_workspace: toolAppOpenWorkspace,
+  app_begin_uploaded_source_upload: toolAppBeginUploadedSourceUpload,
+  app_commit_uploaded_source_upload: toolAppCommitUploadedSourceUpload,
+  app_upload_uploaded_source: toolAppUploadUploadedSource,
+  app_list_uploaded_sources: toolAppListUploadedSources,
+  app_remove_uploaded_source: toolAppRemoveUploadedSource,
+  app_prepare_uploaded_source_analysis_workspace: toolAppPrepareUploadedSourceAnalysisWorkspace,
+  app_record_uploaded_source_analysis_draft: toolAppRecordUploadedSourceAnalysisDraft,
+  app_get_uploaded_source_analysis_draft: toolAppGetUploadedSourceAnalysisDraft,
+  app_get_uploaded_source_analysis_draft_fingerprint: toolAppGetUploadedSourceAnalysisDraftFingerprint,
+  app_record_uploaded_source_analysis: toolAppRecordUploadedSourceAnalysis,
+  app_get_uploaded_source_analysis: toolAppGetUploadedSourceAnalysis,
   app_append_workspace_log: toolAppAppendWorkspaceLog,
   app_get_workspace_outline: toolAppGetWorkspaceOutline,
   app_update_workspace_outline: toolAppUpdateWorkspaceOutline,

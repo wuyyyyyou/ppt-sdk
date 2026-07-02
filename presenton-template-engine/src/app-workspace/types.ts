@@ -30,8 +30,19 @@ export interface AppWorkspaceOutlineItem {
 export interface AppWorkspaceOutlineSource {
   prompt: string;
   context: unknown[];
+  task_context?: unknown[];
   setting: Record<string, unknown>;
   kind?: string;
+  uploaded_source_analysis?: {
+    status: "ready" | "blocked" | "gap";
+    updated_at: string;
+    active_uploaded_sources: Array<{
+      uploaded_source_id: string;
+      sha256: string;
+      size_bytes: number;
+      file_path?: string;
+    }>;
+  };
 }
 
 export interface AppWorkspaceOutline {
@@ -50,6 +61,8 @@ export interface AppPageContentPlan {
   evidence_fact_ids: string[];
   derived_insight_ids: string[];
   visual_asset_ids: string[];
+  uploaded_source_fact_ids?: string[];
+  uploaded_source_visual_asset_ids?: string[];
   gaps: string[];
   authoring_notes: string[];
 }
@@ -72,6 +85,153 @@ export interface AppWorkspaceResult {
   page_progress: unknown;
   pages: unknown;
   template: unknown;
+}
+
+export type AppUploadedSourceStatus = "active" | "removed";
+
+export interface AppUploadedSourceMaterial {
+  uploaded_source_id: string;
+  status: AppUploadedSourceStatus;
+  original_filename: string;
+  display_name: string;
+  mime_type: string;
+  extension: string;
+  size_bytes: number;
+  sha256: string;
+  file_path: string;
+  duplicate_of: string[];
+  created_at: string;
+  updated_at: string;
+  removed_at?: string | null;
+}
+
+export interface AppUploadedSourceIndex {
+  version: 1;
+  workspace_dir: string;
+  active_total_size_bytes: number;
+  materials: AppUploadedSourceMaterial[];
+  updated_at: string;
+}
+
+export interface UploadAppUploadedSourceInput {
+  workspace_dir: string;
+  filename: string;
+  mime_type?: string;
+  content_base64: string;
+}
+
+export interface UploadAppUploadedSourceResult {
+  workspace_dir: string;
+  material: AppUploadedSourceMaterial;
+  index: AppUploadedSourceIndex;
+  warnings: string[];
+}
+
+export interface BeginAppUploadedSourceUploadInput {
+  workspace_dir: string;
+  filename: string;
+  mime_type?: string;
+  size_bytes: number;
+}
+
+export interface BeginAppUploadedSourceUploadResult {
+  workspace_dir: string;
+  upload_id: string;
+  upload_url: string;
+  expires_at: string;
+  size_bytes: number;
+}
+
+export interface CommitAppUploadedSourceUploadInput {
+  workspace_dir: string;
+  upload_id: string;
+}
+
+export interface CommitAppUploadedSourceUploadResult extends UploadAppUploadedSourceResult {
+  upload_id: string;
+}
+
+export interface ListAppUploadedSourcesInput {
+  workspace_dir: string;
+  include_removed?: boolean;
+}
+
+export interface ListAppUploadedSourcesResult {
+  workspace_dir: string;
+  index: AppUploadedSourceIndex;
+  active: AppUploadedSourceMaterial[];
+  removed: AppUploadedSourceMaterial[];
+  limits: {
+    single_file_max_bytes: number;
+    active_total_max_bytes: number;
+  };
+}
+
+export interface RemoveAppUploadedSourceInput {
+  workspace_dir: string;
+  uploaded_source_id: string;
+}
+
+export interface RemoveAppUploadedSourceResult {
+  workspace_dir: string;
+  material: AppUploadedSourceMaterial;
+  index: AppUploadedSourceIndex;
+}
+
+export interface AppUploadedSourceAnalysisPaths {
+  root_dir: string;
+  drafts_dir: string;
+  factual_draft_path: string;
+  visual_draft_path: string;
+  analysis_path: string;
+}
+
+export interface PrepareAppUploadedSourceAnalysisWorkspaceInput {
+  workspace_dir: string;
+}
+
+export interface PrepareAppUploadedSourceAnalysisWorkspaceResult extends AppUploadedSourceAnalysisPaths {
+  workspace_dir: string;
+  uploaded_source_index: AppUploadedSourceIndex;
+  prepared_at: string;
+}
+
+export interface RecordAppUploadedSourceAnalysisDraftInput {
+  workspace_dir: string;
+  draft_type: "factual" | "visual";
+  draft_id?: string;
+  draft: unknown;
+}
+
+export interface GetAppUploadedSourceAnalysisDraftInput {
+  workspace_dir: string;
+  draft_type: "factual" | "visual";
+  draft_id?: string;
+}
+
+export interface GetAppUploadedSourceAnalysisDraftFingerprintInput {
+  workspace_dir: string;
+  draft_type: "factual" | "visual";
+  draft_id?: string;
+}
+
+export interface AppUploadedSourceAnalysisDraftFingerprint {
+  workspace_dir: string;
+  draft_type: "factual" | "visual";
+  draft_id?: string;
+  draft_path: string;
+  exists: boolean;
+  sha256?: string;
+  size_bytes?: number;
+}
+
+export interface RecordAppUploadedSourceAnalysisInput {
+  workspace_dir: string;
+  analysis: unknown;
+}
+
+export interface GetAppUploadedSourceAnalysisInput {
+  workspace_dir: string;
 }
 
 export interface ListAppWorkspacesResult {

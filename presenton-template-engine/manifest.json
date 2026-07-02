@@ -40,6 +40,240 @@
       ]
     },
     {
+      "name": "app_upload_uploaded_source",
+      "description": "Save one user-selected source file into a PPT Workspace as Workspace-owned Uploaded Source Material.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "filename",
+          "type": "string",
+          "description": "Original display filename selected by the user.",
+          "required": true
+        },
+        {
+          "name": "mime_type",
+          "type": "string",
+          "description": "Optional browser-provided MIME type.",
+          "required": false
+        },
+        {
+          "name": "content_base64",
+          "type": "string",
+          "description": "Base64-encoded file bytes.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_begin_uploaded_source_upload",
+      "description": "Create a short-lived local HTTP upload session for one Workspace-owned Uploaded Source Material file.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "filename",
+          "type": "string",
+          "description": "Original display filename selected by the user.",
+          "required": true
+        },
+        {
+          "name": "mime_type",
+          "type": "string",
+          "description": "Optional browser-provided MIME type.",
+          "required": false
+        },
+        {
+          "name": "size_bytes",
+          "type": "number",
+          "description": "Expected binary upload body size in bytes.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_commit_uploaded_source_upload",
+      "description": "Commit a completed local HTTP Uploaded Source Material upload session into the Workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "upload_id",
+          "type": "string",
+          "description": "Upload session id returned by app_begin_uploaded_source_upload.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_list_uploaded_sources",
+      "description": "List Workspace-owned Uploaded Source Material entries for a PPT Workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "include_removed",
+          "type": "boolean",
+          "description": "When true, include removed Uploaded Source Material entries.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "app_remove_uploaded_source",
+      "description": "Remove one Uploaded Source Material entry from the active set without physically deleting the stored file.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "uploaded_source_id",
+          "type": "string",
+          "description": "Stable uploaded-source id to remove from the active set.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_prepare_uploaded_source_analysis_workspace",
+      "description": "Prepare Uploaded Source Analysis directories and return draft/final analysis paths for a workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_record_uploaded_source_analysis_draft",
+      "description": "Record one Uploaded Source Analysis draft artifact.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "draft_type",
+          "type": "string",
+          "description": "Draft type: factual or visual.",
+          "required": true
+        },
+        {
+          "name": "draft_id",
+          "type": "string",
+          "description": "Optional draft run id.",
+          "required": false
+        },
+        {
+          "name": "draft",
+          "type": "object",
+          "description": "Draft JSON object.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_uploaded_source_analysis_draft",
+      "description": "Read one Uploaded Source Analysis draft artifact.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "draft_type",
+          "type": "string",
+          "description": "Draft type: factual or visual.",
+          "required": true
+        },
+        {
+          "name": "draft_id",
+          "type": "string",
+          "description": "Optional draft run id.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "app_get_uploaded_source_analysis_draft_fingerprint",
+      "description": "Read existence and file fingerprint metadata for one Uploaded Source Analysis draft artifact.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "draft_type",
+          "type": "string",
+          "description": "Draft type: factual or visual.",
+          "required": true
+        },
+        {
+          "name": "draft_id",
+          "type": "string",
+          "description": "Optional draft run id.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "app_record_uploaded_source_analysis",
+      "description": "Record final Uploaded Source Analysis produced by deterministic app code.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "analysis",
+          "type": "object",
+          "description": "Final Uploaded Source Analysis JSON object.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_uploaded_source_analysis",
+      "description": "Read final Uploaded Source Analysis for a workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
       "name": "app_update_workspace_settings",
       "description": "Update the PPT workspace-level setting.json and return the refreshed task workspace.",
       "parameters": [

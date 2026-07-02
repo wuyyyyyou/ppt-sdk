@@ -38,7 +38,7 @@ The recommended data shape for a Template layout. It guides authoring and toolin
 The slide-by-slide mapping from Confirmed Outline entries to planned pages, with one Page Plan entry per outline item. It owns page identity, template blueprint selection, and, after Evidence-Aware Page Planning, page-level content direction and assigned Research Evidence references. Page-level content direction should reference Research Evidence by identity rather than copying full evidence content. During Page Refinement, only the target page entries should be revised when target page outlines change.
 
 **Research Discovery**:
-The deck-level iterative process that decides what external material is still needed, collects candidate web and image material, curates it into Research Evidence, and stops when enough useful evidence has been collected or the iteration limit is reached. It happens before Page Generation Units are authored. Web material is discovered before visual material so image needs can be informed by curated facts and insights; visual material does not become factual evidence by itself. Interrupted Research Discovery work is not complete discovery work and must not be promoted into the Research Discovery Evidence Pool.
+The deck-level iterative process that decides what external material is still needed, collects candidate web and image material, curates it into Research Evidence, and stops when enough useful evidence has been collected or the iteration limit is reached. It happens before Page Generation Units are authored. When Uploaded Source Analysis exists, Research Discovery treats it as prior source context and should search only for unresolved gaps, required current external facts, public benchmarks, or additional visual assets. Web material is discovered before visual material so image needs can be informed by curated facts and insights; visual material does not become factual evidence by itself. Interrupted Research Discovery work is not complete discovery work and must not be promoted into the Research Discovery Evidence Pool.
 User-facing Chinese label: 事实收集
 _Avoid_: Research Planning
 
@@ -56,11 +56,28 @@ The decision that more external material is needed because the deck or a refinem
 A case where Research Discovery, Research Curation, or Evidence-Aware Page Planning cannot produce enough Research Evidence for a requested deck or page intent. It does not block Page Generation and does not make completed research work partially failed; unsupported concrete details must be omitted, generalized, or marked as TBD / 待补充. Reaching a Research Discovery iteration limit may produce a Research Evidence Gap. User cancellation or interruption during research is unfinished work, not a Research Evidence Gap.
 
 **Evidence-Aware Page Planning**:
-The deck-level step after Research Discovery that updates the Page Plan with each Page Generation Unit's main content direction, supporting Research Evidence references, and Visual Research Evidence references. It does not modify the Confirmed Outline, does not copy full evidence content into the Page Plan, and does not make Raw Research Material a grounding source.
+The deck-level step after Research Discovery that updates the Page Plan with each Page Generation Unit's main content direction, supporting Research Evidence references, and Visual Research Evidence references. When Uploaded Source Analysis exists, Evidence-Aware Page Planning should prioritize assigning relevant facts and visual assets from Uploaded Source Analysis and should try to use the uploaded-source factual content as fully as the deck intent, requested page count or structure, and page readability allow. It does not modify the Confirmed Outline, does not copy full evidence content into the Page Plan, and does not make Raw Research Material or full Uploaded Source Analysis a Page Authoring grounding source.
 
 **Raw Research Material**:
 External material collected by search, fetch, or image lookup before cleanup or selection. It is not grounding evidence until promoted into Research Evidence.
 _Avoid_: Evidence, source of truth
+
+**Uploaded Source Material**:
+User-provided files uploaded into a Workspace as source material for the requested deck, such as documents, spreadsheets, images, or HTML. Uploaded Source Material is Workspace-owned from upload time; it is not a browser-temporary input that can silently move between Workspaces. Its identity is stable and not derived from the original filename, so files with the same display name can still be distinct uploaded materials. Uploaded Source Material is not Raw Research Material and is not Research Evidence by itself. It must be analyzed or curated before its facts or visual assets can be used as grounding evidence in deck generation.
+User-facing Chinese label: 上传资料
+User-facing English label: Source material
+
+**Uploaded Source Analysis**:
+A deck-level analysis result produced from Uploaded Source Material before Outline Creation or Deck Generation uses the uploaded material. It captures selected factual content, visual asset understanding, source-use constraints, gaps, and rejected or unusable material. Uploaded Source Analysis may inform Outline Creation and later evidence assignment, but it is not the same artifact as the Research Discovery Evidence Pool. It combines the continuation decisions from the factual and visual analysis drafts into the overall decision about whether Outline Creation may continue. When the Uploaded Source Material set or file content changes, existing Uploaded Source Analysis becomes stale, and any Outline Draft or Confirmed Outline that depended on it must be regenerated or reconfirmed before downstream generation uses the changed material.
+
+**Uploaded Source Analysis Continuation Decision**:
+A structured decision inside a valid Uploaded Source Analysis result that states whether downstream Outline Creation may continue when some Uploaded Source Material could not be fully parsed or understood. The decision is valid only after the analysis draft itself has been written and passed deterministic validation. Agent session failure, missing or invalid analysis drafts, or missing continuation decisions are analysis failures, not continuable uploaded-source gaps.
+
+**Uploaded Source Factual Analysis Draft**:
+An intermediate analysis result that selects factual claims, tables, metrics, source excerpts, gaps, and rejected material from Uploaded Source Material. It owns the continuation decision for factual uploaded-source analysis. It must not select visual assets for page use.
+
+**Uploaded Source Visual Analysis Draft**:
+An intermediate analysis result that interprets images, screenshots, charts, diagrams, and other visual material found in Uploaded Source Material, including suitability for PPT use and user-provided use constraints. It owns the continuation decision for visual uploaded-source analysis. Uploaded images and embedded visuals are not page-usable Visual Research Evidence until selected through Uploaded Source Visual Analysis and later assigned to a page. It must not promote visual text or chart content as factual evidence unless that content is separately captured by factual analysis.
 
 **Research Curation**:
 The step that turns Raw Research Material into Research Evidence by selecting relevant facts, sources, and visual assets for a Page Generation Unit.

@@ -15,6 +15,7 @@ interface GenerateOutlinePromptInput {
   contextRows: LlmContextRow[];
   locale: Locale;
   setting?: WorkspaceSettings;
+  uploadedSourceAnalysisContext?: unknown;
 }
 
 interface ReviseOutlinePromptInput {
@@ -24,6 +25,7 @@ interface ReviseOutlinePromptInput {
   locale: Locale;
   setting?: WorkspaceSettings;
   contextRows?: LlmContextRow[];
+  uploadedSourceAnalysisContext?: unknown;
 }
 
 function readSettingString(setting: WorkspaceSettings | undefined, key: string): string {
@@ -80,6 +82,7 @@ function buildGenerateUserPrompt(input: GenerateOutlinePromptInput): string {
     settingSummaryJson: JSON.stringify(buildSettingSummary(input.setting, input.contextRows)),
     prompt: input.prompt,
     contextRowsJson: JSON.stringify(input.contextRows),
+    uploadedSourceAnalysisContextJson: JSON.stringify(input.uploadedSourceAnalysisContext ?? null),
   });
 }
 
@@ -89,6 +92,7 @@ function buildReviseUserPrompt(input: ReviseOutlinePromptInput): string {
     locale: input.locale,
     settingSummaryJson: JSON.stringify(buildSettingSummary(input.setting, input.contextRows)),
     contextRowsJson: JSON.stringify(input.contextRows ?? []),
+    uploadedSourceAnalysisContextJson: JSON.stringify(input.uploadedSourceAnalysisContext ?? null),
     title: input.title,
     feedback: input.feedback,
     outlineJson: JSON.stringify(input.outline),

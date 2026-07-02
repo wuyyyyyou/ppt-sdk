@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  buildEvidenceAwarePagePlanLlmRequest,
   buildResearchDiscoveryDecisionLlmRequest,
   parseResearchDiscoveryDecisionJson,
 } from "../../src/ai/researchDiscoveryPrompt.ts";
@@ -90,6 +91,12 @@ function requestText(phase: "web" | "visual") {
     iteration: 3,
     iterationLimit: 3,
     discoveryPool,
+    uploadedSourceAnalysisContext: {
+      status: "ready",
+      facts: [{ id: "uploaded-fact-1", claim: "Uploaded source already covers format." }],
+      visual_assets: [{ id: "uploaded-visual-1", use_constraint: "usable_visual_asset" }],
+      gaps: ["Need current ticketing policy."],
+    },
     researchStatus: { status: "gap" },
     locale: "zh",
   }).messages.map((message) => message.content.text).join("\n");
@@ -119,5 +126,34 @@ describe("Research Discovery decision prompt", () => {
 
     assert.equal(decision.phase, "visual");
     assert.deepEqual(decision.evidence_needs, []);
+  });
+
+  it("treats uploaded source analysis as prior context without merging it into the discovery pool", () => {
+    const text = requestText("web");
+
+    assert.match(text, /Uploaded Source Analysis prior context/);
+    assert.match(text, /Uploaded source already covers format/);
+    assert.match(text, /outrank external web facts/);
+    assert.match(text, /conflicts between uploaded-source facts and web facts/);
+    assert.doesNotMatch(text, /discovery_pool[\s\S]*uploaded-fact-1/);
+  });
+
+  it("allows evidence-aware page planning to assign uploaded-source ids separately", () => {
+    const text = buildEvidenceAwarePagePlanLlmRequest({
+      outline,
+      pagePlan,
+      discoveryPool,
+      uploadedSourceAnalysisContext: {
+        status: "ready",
+        facts: [{ id: "uploaded-fact-1", claim: "ARR grew 12%." }],
+        visual_assets: [{ id: "uploaded-visual-1", use_constraint: "must_use" }],
+      },
+      locale: "zh",
+    }).messages.map((message) => message.content.text).join("\n");
+
+    assert.match(text, /uploaded_source_fact_ids/);
+    assert.match(text, /uploaded_source_visual_asset_ids/);
+    assert.match(text, /Do not add pages or overload a page solely/);
+    assert.match(text, /ARR grew 12%/);
   });
 });

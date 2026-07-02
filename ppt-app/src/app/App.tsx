@@ -86,13 +86,16 @@ export function App() {
               pageReviewSettings={state.pageReviewSettings}
               setStrictReviewMode={actions.setStrictReviewMode}
               contextRows={state.contextRows}
+              uploadedSources={state.uploadedSources}
+              uploadedSourceAnalysisState={state.uploadedSourceAnalysisState}
               addContextRow={actions.addContextRow}
               updateContextRow={actions.updateContextRow}
               removeContextRow={actions.removeContextRow}
+              uploadUploadedSource={actions.uploadUploadedSource}
+              removeUploadedSource={actions.removeUploadedSource}
               addStyleRow={actions.addStyleRow}
               suggestContextFromPrompt={actions.suggestContextFromPrompt}
               generateDeck={actions.generateDeck}
-              showToast={actions.showToast}
             />
           ) : null}
 
@@ -114,6 +117,7 @@ export function App() {
               applyFeedback={actions.applyOutlineFeedback}
               createDeck={actions.createDeckFromOutline}
               loading={state.loading}
+              uploadedSourceAnalysisState={state.uploadedSourceAnalysisState}
             />
           ) : null}
 

@@ -44,6 +44,118 @@ export interface WorkspaceResult {
   template: unknown;
 }
 
+export type UploadedSourceStatus = "active" | "removed";
+
+export interface UploadedSourceMaterial {
+  uploaded_source_id: string;
+  status: UploadedSourceStatus;
+  original_filename: string;
+  display_name: string;
+  mime_type: string;
+  extension: string;
+  size_bytes: number;
+  sha256: string;
+  file_path: string;
+  duplicate_of: string[];
+  created_at: string;
+  updated_at: string;
+  removed_at?: string | null;
+}
+
+export interface UploadedSourceIndex {
+  version: 1;
+  workspace_dir: string;
+  active_total_size_bytes: number;
+  materials: UploadedSourceMaterial[];
+  updated_at: string;
+}
+
+export interface UploadUploadedSourceInput {
+  workspace_dir: string;
+  filename: string;
+  mime_type?: string;
+  content_base64: string;
+}
+
+export interface UploadUploadedSourceResult {
+  workspace_dir: string;
+  material: UploadedSourceMaterial;
+  index: UploadedSourceIndex;
+  warnings: string[];
+}
+
+export interface BeginUploadedSourceUploadInput {
+  workspace_dir: string;
+  filename: string;
+  mime_type?: string;
+  size_bytes: number;
+}
+
+export interface BeginUploadedSourceUploadResult {
+  workspace_dir: string;
+  upload_id: string;
+  upload_url: string;
+  expires_at: string;
+  size_bytes: number;
+}
+
+export interface CommitUploadedSourceUploadInput {
+  workspace_dir: string;
+  upload_id: string;
+}
+
+export interface CommitUploadedSourceUploadResult extends UploadUploadedSourceResult {
+  upload_id: string;
+}
+
+export interface ListUploadedSourcesResult {
+  workspace_dir: string;
+  index: UploadedSourceIndex;
+  active: UploadedSourceMaterial[];
+  removed: UploadedSourceMaterial[];
+  limits: {
+    single_file_max_bytes: number;
+    active_total_max_bytes: number;
+  };
+}
+
+export interface RemoveUploadedSourceInput {
+  workspace_dir: string;
+  uploaded_source_id: string;
+}
+
+export interface RemoveUploadedSourceResult {
+  workspace_dir: string;
+  material: UploadedSourceMaterial;
+  index: UploadedSourceIndex;
+}
+
+export interface UploadedSourceAnalysisPaths {
+  root_dir: string;
+  drafts_dir: string;
+  factual_draft_path: string;
+  visual_draft_path: string;
+  analysis_path: string;
+}
+
+export interface PrepareUploadedSourceAnalysisWorkspaceResult extends UploadedSourceAnalysisPaths {
+  workspace_dir: string;
+  uploaded_source_index: UploadedSourceIndex;
+  prepared_at: string;
+}
+
+export type UploadedSourceAnalysisDraftType = "factual" | "visual";
+
+export interface UploadedSourceAnalysisDraftFingerprint {
+  workspace_dir: string;
+  draft_type: UploadedSourceAnalysisDraftType;
+  draft_id?: string;
+  draft_path: string;
+  exists: boolean;
+  sha256?: string;
+  size_bytes?: number;
+}
+
 export interface WorkspaceSettings {
   audience?: string;
   goal?: string;
@@ -80,8 +192,20 @@ export interface WorkspaceOutline {
     task_context?: unknown[];
     setting: Record<string, unknown>;
     kind?: string;
+    uploaded_source_analysis?: UploadedSourceAnalysisDependency;
   };
   updated_at: string | null;
+}
+
+export interface UploadedSourceAnalysisDependency {
+  status: "ready" | "blocked" | "gap";
+  updated_at: string;
+  active_uploaded_sources: Array<{
+    uploaded_source_id: string;
+    sha256: string;
+    size_bytes: number;
+    file_path?: string;
+  }>;
 }
 
 export interface WorkspacePageItem {
@@ -318,6 +442,8 @@ export interface PageContentPlan {
   evidence_fact_ids: string[];
   derived_insight_ids: string[];
   visual_asset_ids: string[];
+  uploaded_source_fact_ids?: string[];
+  uploaded_source_visual_asset_ids?: string[];
   gaps: string[];
   authoring_notes: string[];
 }

@@ -28,6 +28,10 @@ import { convertDeckHtmlToPptxModel } from "../html-to-pptx-model/index.js";
 import type {
   AppendAppWorkspaceLogInput,
   AppendAppWorkspaceLogResult,
+  AppUploadedSourceIndex,
+  AppUploadedSourceMaterial,
+  AppUploadedSourceAnalysisDraftFingerprint,
+  AppUploadedSourceAnalysisPaths,
   AppTemplateGroupSummary,
   AppTemplatePreviewRef,
   AppTemplatePreviewResult,
@@ -35,6 +39,7 @@ import type {
   AppWorkspaceSummary,
   AppWorkspaceOutline,
   AppWorkspaceOutlineItem,
+  AppWorkspaceOutlineSource,
   AppPagePlan,
   AppPagePlanItem,
   AppPageProgress,
@@ -48,6 +53,11 @@ import type {
   AppTemplatePlanningContext,
   CreateAppWorkspaceInput,
   DuplicateAppWorkspacePageInput,
+  ListAppUploadedSourcesInput,
+  ListAppUploadedSourcesResult,
+  GetAppUploadedSourceAnalysisDraftFingerprintInput,
+  GetAppUploadedSourceAnalysisDraftInput,
+  GetAppUploadedSourceAnalysisInput,
   GetAppPagePlanInput,
   GetAppPageProgressInput,
   GetAppExportArtifactInput,
@@ -61,6 +71,11 @@ import type {
   ListAppTemplateGroupsResult,
   ListAppWorkspacesResult,
   OpenAppWorkspaceInput,
+  RemoveAppUploadedSourceInput,
+  RemoveAppUploadedSourceResult,
+  CommitAppUploadedSourceUploadResult,
+  RecordAppUploadedSourceAnalysisDraftInput,
+  RecordAppUploadedSourceAnalysisInput,
   PrepareAppDeckRefinementPageFilesInput,
   PrepareAppDeckRefinementPageFilesResult,
   PrepareAppPageFilesInput,
@@ -80,6 +95,8 @@ import type {
   FinalizeAppResearchVisualAssetsResult,
   PrepareAppResearchWorkspaceInput,
   PrepareAppResearchWorkspaceResult,
+  PrepareAppUploadedSourceAnalysisWorkspaceInput,
+  PrepareAppUploadedSourceAnalysisWorkspaceResult,
   GetAppResearchCurationDraftInput,
   GetAppResearchCurationDraftFingerprintInput,
   RecordAppResearchEvidenceInput,
@@ -101,6 +118,8 @@ import type {
   UpdateAppWorkspaceOutlineInput,
   UpdateAppWorkspaceSettingsInput,
   UpdateAppWorkspaceTitleInput,
+  UploadAppUploadedSourceInput,
+  UploadAppUploadedSourceResult,
 } from "./types.js";
 
 const WORKSPACE_ROOT = path.join(os.homedir(), "anna-workspace", "ppt");
@@ -137,6 +156,53 @@ const PPTX_EXPORT_STATUSES: AppPptxExportJob["status"][] = [
   "completed",
   "failed",
 ];
+const UPLOADED_SOURCE_SINGLE_FILE_MAX_BYTES = 25 * 1024 * 1024;
+const UPLOADED_SOURCE_ACTIVE_TOTAL_MAX_BYTES = 100 * 1024 * 1024;
+const UPLOADED_SOURCE_ALLOWED_EXTENSIONS = new Set([
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".webp",
+  ".gif",
+  ".xlsx",
+  ".xls",
+  ".csv",
+  ".docx",
+  ".txt",
+  ".md",
+  ".html",
+  ".htm",
+]);
+const UPLOADED_SOURCE_REJECTED_EXTENSIONS = new Set([
+  ".exe",
+  ".dll",
+  ".dmg",
+  ".pkg",
+  ".app",
+  ".sh",
+  ".bat",
+  ".cmd",
+  ".ps1",
+  ".js",
+  ".mjs",
+  ".cjs",
+  ".ts",
+  ".tsx",
+  ".zip",
+  ".tar",
+  ".gz",
+  ".tgz",
+  ".rar",
+  ".7z",
+  ".mp3",
+  ".wav",
+  ".m4a",
+  ".mp4",
+  ".mov",
+  ".avi",
+  ".mkv",
+  ".pdf",
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -235,6 +301,148 @@ function buildWorkspaceFilePaths(workspaceDir: string) {
     research_evidence: path.join(workspaceDir, "research", "evidence-index.json"),
     research_status: path.join(workspaceDir, "research", "research-status.json"),
   };
+}
+
+function buildUploadedSourcePaths(workspaceDir: string) {
+  const rootDir = path.join(workspaceDir, "uploaded-sources");
+  return {
+    root_dir: rootDir,
+    files_dir: path.join(rootDir, "files"),
+    index_path: path.join(rootDir, "index.json"),
+  };
+}
+
+function buildUploadedSourceAnalysisPaths(workspaceDir: string): AppUploadedSourceAnalysisPaths {
+  const rootDir = path.join(workspaceDir, "uploaded-sources", "analysis");
+  const draftsDir = path.join(rootDir, "drafts");
+  return {
+    root_dir: rootDir,
+    drafts_dir: draftsDir,
+    factual_draft_path: path.join(draftsDir, "uploaded-source-factual.json"),
+    visual_draft_path: path.join(draftsDir, "uploaded-source-visual.json"),
+    analysis_path: path.join(rootDir, "uploaded-source-analysis.json"),
+  };
+}
+
+function createDefaultUploadedSourceIndex(workspaceDir: string): AppUploadedSourceIndex {
+  return {
+    version: 1,
+    workspace_dir: workspaceDir,
+    active_total_size_bytes: 0,
+    materials: [],
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function normalizeUploadedSourceStatus(value: unknown): AppUploadedSourceMaterial["status"] {
+  return value === "removed" ? "removed" : "active";
+}
+
+function normalizeUploadedSourceMaterial(value: unknown): AppUploadedSourceMaterial | null {
+  const record = getPlainRecord(value);
+  const uploadedSourceId = normalizeString(record.uploaded_source_id);
+  const filePath = normalizeString(record.file_path);
+  if (!uploadedSourceId || !filePath) return null;
+  return {
+    uploaded_source_id: uploadedSourceId,
+    status: normalizeUploadedSourceStatus(record.status),
+    original_filename: normalizeString(record.original_filename),
+    display_name: normalizeString(record.display_name) || normalizeString(record.original_filename) || uploadedSourceId,
+    mime_type: normalizeString(record.mime_type),
+    extension: normalizeString(record.extension),
+    size_bytes: typeof record.size_bytes === "number" && Number.isFinite(record.size_bytes)
+      ? Math.max(0, Math.floor(record.size_bytes))
+      : 0,
+    sha256: normalizeString(record.sha256),
+    file_path: filePath,
+    duplicate_of: normalizeStringArray(record.duplicate_of),
+    created_at: normalizeString(record.created_at) || new Date().toISOString(),
+    updated_at: normalizeString(record.updated_at) || new Date().toISOString(),
+    removed_at: typeof record.removed_at === "string" ? record.removed_at : null,
+  };
+}
+
+function normalizeUploadedSourceIndex(value: unknown, workspaceDir: string): AppUploadedSourceIndex {
+  const record = getPlainRecord(value);
+  const materials = Array.isArray(record.materials)
+    ? record.materials
+        .map(normalizeUploadedSourceMaterial)
+        .filter((item): item is AppUploadedSourceMaterial => item !== null)
+    : [];
+  const activeTotalSize = materials
+    .filter((item) => item.status === "active")
+    .reduce((sum, item) => sum + item.size_bytes, 0);
+  return {
+    version: 1,
+    workspace_dir: workspaceDir,
+    active_total_size_bytes: activeTotalSize,
+    materials,
+    updated_at: normalizeString(record.updated_at) || new Date().toISOString(),
+  };
+}
+
+async function readUploadedSourceIndex(workspaceDir: string): Promise<AppUploadedSourceIndex> {
+  const paths = buildUploadedSourcePaths(workspaceDir);
+  const existing = await readJsonFileIfExists(paths.index_path);
+  return normalizeUploadedSourceIndex(existing, workspaceDir);
+}
+
+async function writeUploadedSourceIndex(workspaceDir: string, index: AppUploadedSourceIndex): Promise<AppUploadedSourceIndex> {
+  const normalized = normalizeUploadedSourceIndex(index, workspaceDir);
+  await writeJsonFile(buildUploadedSourcePaths(workspaceDir).index_path, normalized);
+  return normalized;
+}
+
+function sanitizeUploadedSourceDisplayName(value: string): string {
+  return sanitizeFileNameBase(value || "uploaded-source");
+}
+
+function readUploadedSourceExtension(filename: string): string {
+  return path.extname(filename).trim().toLowerCase();
+}
+
+function assertAllowedUploadedSourceFile(filename: string, sizeBytes: number): string {
+  const extension = readUploadedSourceExtension(filename);
+  if (!extension) {
+    throw new Error("Uploaded source file must have an allowed extension.");
+  }
+  if (UPLOADED_SOURCE_REJECTED_EXTENSIONS.has(extension) || !UPLOADED_SOURCE_ALLOWED_EXTENSIONS.has(extension)) {
+    throw new Error(`Unsupported uploaded source file type: ${extension}`);
+  }
+  if (sizeBytes <= 0) {
+    throw new Error("Uploaded source file must not be empty.");
+  }
+  if (sizeBytes > UPLOADED_SOURCE_SINGLE_FILE_MAX_BYTES) {
+    throw new Error(`Uploaded source file exceeds the single-file limit of ${UPLOADED_SOURCE_SINGLE_FILE_MAX_BYTES} bytes.`);
+  }
+  return extension;
+}
+
+function createUploadedSourceId(now: Date, sha256: string, existingIds: Set<string>): string {
+  const datePart = [
+    now.getFullYear(),
+    padDatePart(now.getMonth() + 1),
+    padDatePart(now.getDate()),
+    padDatePart(now.getHours()),
+    padDatePart(now.getMinutes()),
+    padDatePart(now.getSeconds()),
+  ].join("");
+  const base = `uploaded-source-${datePart}-${sha256.slice(0, 8)}`;
+  if (!existingIds.has(base)) return base;
+  for (let index = 2; index < 10_000; index += 1) {
+    const candidate = `${base}-${index}`;
+    if (!existingIds.has(candidate)) return candidate;
+  }
+  throw new Error("Could not create a unique uploaded-source id.");
+}
+
+function decodeUploadedSourceBase64(value: string): Buffer {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new Error('"content_base64" must be a non-empty base64 string');
+  }
+  const base64 = trimmed.includes(",") ? trimmed.slice(trimmed.indexOf(",") + 1) : trimmed;
+  return Buffer.from(base64, "base64");
 }
 
 function buildResearchPaths(workspaceDir: string): AppResearchPaths {
@@ -469,6 +677,7 @@ async function writeJsonFile(filePath: string, data: unknown): Promise<void> {
 }
 
 const pageProgressWriteQueues = new Map<string, Promise<unknown>>();
+const uploadedSourceWriteQueues = new Map<string, Promise<unknown>>();
 
 async function withPageProgressWriteQueue<T>(
   workspaceDir: string,
@@ -485,6 +694,25 @@ async function withPageProgressWriteQueue<T>(
   } finally {
     if (pageProgressWriteQueues.get(queueKey) === tail) {
       pageProgressWriteQueues.delete(queueKey);
+    }
+  }
+}
+
+async function withUploadedSourceWriteQueue<T>(
+  workspaceDir: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const queueKey = path.normalize(workspaceDir);
+  const previous = uploadedSourceWriteQueues.get(queueKey) ?? Promise.resolve();
+  const run = previous.catch(() => undefined).then(operation);
+  const tail = run.catch(() => undefined);
+  uploadedSourceWriteQueues.set(queueKey, tail);
+
+  try {
+    return await run;
+  } finally {
+    if (uploadedSourceWriteQueues.get(queueKey) === tail) {
+      uploadedSourceWriteQueues.delete(queueKey);
     }
   }
 }
@@ -777,6 +1005,44 @@ function normalizeOutlineItem(value: unknown): AppWorkspaceOutlineItem | null {
   };
 }
 
+function normalizeUploadedSourceAnalysisDependency(value: unknown): AppWorkspaceOutlineSource["uploaded_source_analysis"] | undefined {
+  const record =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : null;
+  if (!record) return undefined;
+  const status = record.status === "ready" || record.status === "blocked" || record.status === "gap"
+    ? record.status
+    : "";
+  const updatedAt = normalizeString(record.updated_at);
+  const activeUploadedSources = Array.isArray(record.active_uploaded_sources)
+    ? record.active_uploaded_sources
+        .map((item) => {
+          const source =
+            item && typeof item === "object" && !Array.isArray(item)
+              ? (item as Record<string, unknown>)
+              : {};
+          const uploadedSourceId = normalizeString(source.uploaded_source_id);
+          const sha256 = normalizeString(source.sha256);
+          const sizeBytes = typeof source.size_bytes === "number" ? source.size_bytes : NaN;
+          if (!uploadedSourceId || !sha256 || !Number.isFinite(sizeBytes)) return null;
+          return {
+            uploaded_source_id: uploadedSourceId,
+            sha256,
+            size_bytes: sizeBytes,
+            ...(normalizeString(source.file_path) ? { file_path: normalizeString(source.file_path) } : {}),
+          };
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null)
+    : [];
+  if (!status || !updatedAt || activeUploadedSources.length === 0) return undefined;
+  return {
+    status,
+    updated_at: updatedAt,
+    active_uploaded_sources: activeUploadedSources,
+  };
+}
+
 function normalizeOutlineJson(outline: unknown): AppWorkspaceOutline {
   const existing =
     outline && typeof outline === "object" && !Array.isArray(outline)
@@ -791,6 +1057,7 @@ function normalizeOutlineJson(outline: unknown): AppWorkspaceOutline {
         .map(normalizeOutlineItem)
         .filter((item): item is AppWorkspaceOutlineItem => item !== null)
     : [];
+  const uploadedSourceAnalysisDependency = normalizeUploadedSourceAnalysisDependency(source.uploaded_source_analysis);
 
   return {
     version: 2,
@@ -801,11 +1068,13 @@ function normalizeOutlineJson(outline: unknown): AppWorkspaceOutline {
     source: {
       prompt: normalizeString(source.prompt),
       context: Array.isArray(source.context) ? source.context : [],
+      ...(Array.isArray(source.task_context) ? { task_context: source.task_context } : {}),
       setting:
         source.setting && typeof source.setting === "object" && !Array.isArray(source.setting)
           ? (source.setting as Record<string, unknown>)
           : {},
       kind: normalizeString(source.kind) || undefined,
+      ...(uploadedSourceAnalysisDependency ? { uploaded_source_analysis: uploadedSourceAnalysisDependency } : {}),
     },
     updated_at: typeof existing.updated_at === "string" ? existing.updated_at : null,
   };
@@ -832,6 +1101,8 @@ function normalizePageContentPlan(value: unknown) {
     evidence_fact_ids: normalizeStringArray(record.evidence_fact_ids),
     derived_insight_ids: normalizeStringArray(record.derived_insight_ids),
     visual_asset_ids: normalizeStringArray(record.visual_asset_ids),
+    uploaded_source_fact_ids: normalizeStringArray(record.uploaded_source_fact_ids),
+    uploaded_source_visual_asset_ids: normalizeStringArray(record.uploaded_source_visual_asset_ids),
     gaps: normalizeStringArray(record.gaps),
     authoring_notes: normalizeStringArray(record.authoring_notes),
   };
@@ -1500,6 +1771,344 @@ export async function updateAppWorkspaceTitle(
   return ensureWorkspaceFiles(input.workspace_dir);
 }
 
+export async function uploadAppUploadedSource(
+  input: UploadAppUploadedSourceInput,
+): Promise<UploadAppUploadedSourceResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const bytes = decodeUploadedSourceBase64(input.content_base64);
+  return withUploadedSourceWriteQueue(workspace.workspace_dir, () => persistUploadedSourceBytes({
+    workspace,
+    filename: input.filename,
+    mime_type: input.mime_type,
+    bytes,
+  }));
+}
+
+async function persistUploadedSourceBytes(input: {
+  workspace: AppWorkspaceResult;
+  filename: string;
+  mime_type?: string;
+  bytes: Buffer;
+}): Promise<UploadAppUploadedSourceResult> {
+  const originalFilename = sanitizeUploadedSourceDisplayName(input.filename);
+  const bytes = input.bytes;
+  const sizeBytes = bytes.byteLength;
+  const extension = assertAllowedUploadedSourceFile(originalFilename, sizeBytes);
+  const sha256 = sha256BufferHex(bytes);
+  const now = new Date();
+  const updatedAt = now.toISOString();
+  const index = await readUploadedSourceIndex(input.workspace.workspace_dir);
+  const activeMaterials = index.materials.filter((item) => item.status === "active");
+  const activeTotalWithNew = activeMaterials.reduce((sum, item) => sum + item.size_bytes, 0) + sizeBytes;
+  if (activeTotalWithNew > UPLOADED_SOURCE_ACTIVE_TOTAL_MAX_BYTES) {
+    throw new Error(`Active uploaded source files exceed the total limit of ${UPLOADED_SOURCE_ACTIVE_TOTAL_MAX_BYTES} bytes.`);
+  }
+
+  const existingIds = new Set(index.materials.map((item) => item.uploaded_source_id));
+  const uploadedSourceId = createUploadedSourceId(now, sha256, existingIds);
+  const storageDir = path.join(buildUploadedSourcePaths(input.workspace.workspace_dir).files_dir, uploadedSourceId);
+  const storedFileName = `${sanitizeFileNamePart(path.basename(originalFilename, extension), "source")}${extension}`;
+  const filePath = path.join(storageDir, storedFileName);
+  assertPathUnderWorkspace(input.workspace.workspace_dir, filePath, "uploaded_source.file_path");
+  await mkdir(storageDir, { recursive: true });
+  await writeFile(filePath, bytes);
+
+  const duplicateOf = activeMaterials
+    .filter((item) => item.sha256 === sha256)
+    .map((item) => item.uploaded_source_id);
+  const material: AppUploadedSourceMaterial = {
+    uploaded_source_id: uploadedSourceId,
+    status: "active",
+    original_filename: originalFilename,
+    display_name: originalFilename,
+    mime_type: normalizeString(input.mime_type),
+    extension,
+    size_bytes: sizeBytes,
+    sha256,
+    file_path: filePath,
+    duplicate_of: duplicateOf,
+    created_at: updatedAt,
+    updated_at: updatedAt,
+    removed_at: null,
+  };
+  const nextIndex = await writeUploadedSourceIndex(input.workspace.workspace_dir, {
+    version: 1,
+    workspace_dir: input.workspace.workspace_dir,
+    active_total_size_bytes: activeTotalWithNew,
+    materials: [...index.materials, material],
+    updated_at: updatedAt,
+  });
+  await touchWorkspaceTask(input.workspace, updatedAt);
+  return {
+    workspace_dir: input.workspace.workspace_dir,
+    material,
+    index: nextIndex,
+    warnings: duplicateOf.length > 0
+      ? [`Duplicate uploaded source content matches: ${duplicateOf.join(", ")}`]
+      : [],
+  };
+}
+
+export async function commitAppUploadedSourceUpload(input: {
+  workspace_dir: string;
+  upload_id: string;
+  filename: string;
+  mime_type?: string;
+  staging_file_path: string;
+  expected_size_bytes: number;
+}): Promise<CommitAppUploadedSourceUploadResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const stagingPath = path.normalize(input.staging_file_path);
+  const stagingStat = await stat(stagingPath);
+  if (!stagingStat.isFile()) {
+    throw new Error(`Uploaded source staging path is not a file: ${stagingPath}`);
+  }
+  if (stagingStat.size !== input.expected_size_bytes) {
+    throw new Error(`Uploaded source staging size mismatch: expected ${input.expected_size_bytes} bytes, got ${stagingStat.size} bytes.`);
+  }
+  const bytes = await readFile(stagingPath);
+  const result = await withUploadedSourceWriteQueue(workspace.workspace_dir, () => persistUploadedSourceBytes({
+    workspace,
+    filename: input.filename,
+    mime_type: input.mime_type,
+    bytes,
+  }));
+  return {
+    ...result,
+    upload_id: input.upload_id,
+  };
+}
+
+export async function listAppUploadedSources(
+  input: ListAppUploadedSourcesInput,
+): Promise<ListAppUploadedSourcesResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const index = await readUploadedSourceIndex(workspace.workspace_dir);
+  const active = index.materials.filter((item) => item.status === "active");
+  const removed = index.materials.filter((item) => item.status === "removed");
+  return {
+    workspace_dir: workspace.workspace_dir,
+    index: {
+      ...index,
+      materials: input.include_removed === true ? index.materials : active,
+    },
+    active,
+    removed: input.include_removed === true ? removed : [],
+    limits: {
+      single_file_max_bytes: UPLOADED_SOURCE_SINGLE_FILE_MAX_BYTES,
+      active_total_max_bytes: UPLOADED_SOURCE_ACTIVE_TOTAL_MAX_BYTES,
+    },
+  };
+}
+
+export async function removeAppUploadedSource(
+  input: RemoveAppUploadedSourceInput,
+): Promise<RemoveAppUploadedSourceResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  return withUploadedSourceWriteQueue(workspace.workspace_dir, async () => {
+    const index = await readUploadedSourceIndex(workspace.workspace_dir);
+    const updatedAt = new Date().toISOString();
+    let removedMaterial: AppUploadedSourceMaterial | null = null;
+    const materials = index.materials.map((item) => {
+      if (item.uploaded_source_id !== input.uploaded_source_id) return item;
+      removedMaterial = {
+        ...item,
+        status: "removed",
+        updated_at: updatedAt,
+        removed_at: updatedAt,
+      };
+      return removedMaterial;
+    });
+    if (!removedMaterial) {
+      throw new Error(`Uploaded Source Material not found: ${input.uploaded_source_id}`);
+    }
+    const activeTotalSize = materials
+      .filter((item) => item.status === "active")
+      .reduce((sum, item) => sum + item.size_bytes, 0);
+    const nextIndex = await writeUploadedSourceIndex(workspace.workspace_dir, {
+      version: 1,
+      workspace_dir: workspace.workspace_dir,
+      active_total_size_bytes: activeTotalSize,
+      materials,
+      updated_at: updatedAt,
+    });
+    await touchWorkspaceTask(workspace, updatedAt);
+    return {
+      workspace_dir: workspace.workspace_dir,
+      material: removedMaterial,
+      index: nextIndex,
+    };
+  });
+}
+
+function normalizeUploadedSourceAnalysisDraftType(value: string): "factual" | "visual" {
+  if (value === "factual" || value === "visual") return value;
+  throw new Error('"draft_type" must be either "factual" or "visual"');
+}
+
+function normalizeUploadedSourceAnalysisDraftId(value: unknown): string | null {
+  const draftId = normalizeString(value);
+  if (!draftId) return null;
+  if (!/^[a-zA-Z0-9_-]+$/.test(draftId)) {
+    throw new Error('"draft_id" may only contain letters, numbers, underscores, and hyphens');
+  }
+  return draftId;
+}
+
+function buildUploadedSourceAnalysisDraftPath(
+  paths: AppUploadedSourceAnalysisPaths,
+  draftType: "factual" | "visual",
+  draftId?: string | null,
+): string {
+  if (!draftId) {
+    return draftType === "factual" ? paths.factual_draft_path : paths.visual_draft_path;
+  }
+  return path.join(paths.drafts_dir, `${draftId}-${draftType}.json`);
+}
+
+function normalizeUploadedSourceAnalysisArtifact(value: unknown, fallbackStatus: string): Record<string, unknown> {
+  const record = getPlainRecord(value);
+  return {
+    version: typeof record.version === "number" ? record.version : 1,
+    status: normalizeString(record.status) || fallbackStatus,
+    ...record,
+    updated_at: typeof record.updated_at === "string" ? record.updated_at : new Date().toISOString(),
+  };
+}
+
+async function ensureUploadedSourceAnalysisDirectories(workspaceDir: string): Promise<AppUploadedSourceAnalysisPaths> {
+  const paths = buildUploadedSourceAnalysisPaths(workspaceDir);
+  await mkdir(paths.drafts_dir, { recursive: true });
+  return paths;
+}
+
+export async function prepareAppUploadedSourceAnalysisWorkspace(
+  input: PrepareAppUploadedSourceAnalysisWorkspaceInput,
+): Promise<PrepareAppUploadedSourceAnalysisWorkspaceResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureUploadedSourceAnalysisDirectories(workspace.workspace_dir);
+  const preparedAt = new Date().toISOString();
+  await touchWorkspaceTask(workspace, preparedAt);
+  return {
+    workspace_dir: workspace.workspace_dir,
+    uploaded_source_index: await readUploadedSourceIndex(workspace.workspace_dir),
+    ...paths,
+    prepared_at: preparedAt,
+  };
+}
+
+export async function recordAppUploadedSourceAnalysisDraft(
+  input: RecordAppUploadedSourceAnalysisDraftInput,
+): Promise<Record<string, unknown>> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureUploadedSourceAnalysisDirectories(workspace.workspace_dir);
+  const draftType = normalizeUploadedSourceAnalysisDraftType(input.draft_type);
+  const draftId = normalizeUploadedSourceAnalysisDraftId(input.draft_id);
+  const draftPath = buildUploadedSourceAnalysisDraftPath(paths, draftType, draftId);
+  assertPathUnderWorkspace(workspace.workspace_dir, draftPath, "draft_path");
+  const updatedAt = new Date().toISOString();
+  const next = {
+    ...normalizeUploadedSourceAnalysisArtifact(input.draft, "draft"),
+    draft_type: draftType,
+    ...(draftId ? { draft_id: draftId } : {}),
+    draft_path: draftPath,
+    updated_at: updatedAt,
+  };
+  await writeJsonFile(draftPath, next);
+  await touchWorkspaceTask(workspace, updatedAt);
+  return next;
+}
+
+export async function getAppUploadedSourceAnalysisDraft(
+  input: GetAppUploadedSourceAnalysisDraftInput,
+): Promise<Record<string, unknown>> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureUploadedSourceAnalysisDirectories(workspace.workspace_dir);
+  const draftType = normalizeUploadedSourceAnalysisDraftType(input.draft_type);
+  const draftId = normalizeUploadedSourceAnalysisDraftId(input.draft_id);
+  const draftPath = buildUploadedSourceAnalysisDraftPath(paths, draftType, draftId);
+  assertPathUnderWorkspace(workspace.workspace_dir, draftPath, "draft_path");
+  const existing = await readJsonFileIfExists(draftPath);
+  if (existing === null) {
+    return {
+      version: 1,
+      status: "empty",
+      draft_type: draftType,
+      ...(draftId ? { draft_id: draftId } : {}),
+      draft_path: draftPath,
+      updated_at: new Date().toISOString(),
+    };
+  }
+  return normalizeUploadedSourceAnalysisArtifact(existing, "empty");
+}
+
+export async function getAppUploadedSourceAnalysisDraftFingerprint(
+  input: GetAppUploadedSourceAnalysisDraftFingerprintInput,
+): Promise<AppUploadedSourceAnalysisDraftFingerprint> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureUploadedSourceAnalysisDirectories(workspace.workspace_dir);
+  const draftType = normalizeUploadedSourceAnalysisDraftType(input.draft_type);
+  const draftId = normalizeUploadedSourceAnalysisDraftId(input.draft_id);
+  const draftPath = buildUploadedSourceAnalysisDraftPath(paths, draftType, draftId);
+  assertPathUnderWorkspace(workspace.workspace_dir, draftPath, "draft_path");
+  try {
+    const fingerprint = await fingerprintFile(draftPath);
+    return {
+      workspace_dir: workspace.workspace_dir,
+      draft_type: draftType,
+      ...(draftId ? { draft_id: draftId } : {}),
+      draft_path: draftPath,
+      exists: true,
+      sha256: fingerprint.sha256,
+      size_bytes: fingerprint.size_bytes,
+    };
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return {
+        workspace_dir: workspace.workspace_dir,
+        draft_type: draftType,
+        ...(draftId ? { draft_id: draftId } : {}),
+        draft_path: draftPath,
+        exists: false,
+      };
+    }
+    throw error;
+  }
+}
+
+export async function recordAppUploadedSourceAnalysis(
+  input: RecordAppUploadedSourceAnalysisInput,
+): Promise<Record<string, unknown>> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureUploadedSourceAnalysisDirectories(workspace.workspace_dir);
+  const updatedAt = new Date().toISOString();
+  const next = {
+    ...normalizeUploadedSourceAnalysisArtifact(input.analysis, "ready"),
+    analysis_path: paths.analysis_path,
+    updated_at: updatedAt,
+  };
+  await writeJsonFile(paths.analysis_path, next);
+  await touchWorkspaceTask(workspace, updatedAt);
+  return next;
+}
+
+export async function getAppUploadedSourceAnalysis(
+  input: GetAppUploadedSourceAnalysisInput,
+): Promise<Record<string, unknown>> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureUploadedSourceAnalysisDirectories(workspace.workspace_dir);
+  const existing = await readJsonFileIfExists(paths.analysis_path);
+  if (existing === null) {
+    return {
+      version: 1,
+      status: "empty",
+      analysis_path: paths.analysis_path,
+      updated_at: new Date().toISOString(),
+    };
+  }
+  return normalizeUploadedSourceAnalysisArtifact(existing, "empty");
+}
+
 function readPageIdFromManifestSlide(value: unknown): string {
   return normalizeString(getPlainRecord(value).id);
 }
@@ -2138,6 +2747,7 @@ export async function finalizeAppResearchVisualAssets(
   const visualAssets: FinalizeAppResearchVisualAssetsResult["visual_assets"] = [];
   const gaps: string[] = [];
   const rejectedMaterial: FinalizeAppResearchVisualAssetsResult["rejected_material"] = [];
+  const uploadedSourcePaths = buildUploadedSourcePaths(workspace.workspace_dir);
   const rawMetadataByPath = await buildRawImageMetadataByPath(
     workspace.workspace_dir,
     input.raw_image_index_paths,
@@ -2182,7 +2792,8 @@ export async function finalizeAppResearchVisualAssets(
 
     let isRawImage = isPathInsideDir(paths.raw_images_dir, sourcePath);
     let isEvidenceImage = isPathInsideDir(paths.evidence_images_dir, sourcePath);
-    if (!isRawImage && !isEvidenceImage) {
+    let isUploadedSourceImage = isPathInsideDir(uploadedSourcePaths.files_dir, sourcePath);
+    if (!isRawImage && !isEvidenceImage && !isUploadedSourceImage) {
       const recoveredEntry = findRawImageMetadataEntryForAsset({
         entries: rawMetadataEntries,
         asset,
@@ -2211,13 +2822,14 @@ export async function finalizeAppResearchVisualAssets(
         });
         isRawImage = isPathInsideDir(paths.raw_images_dir, sourcePath);
         isEvidenceImage = isPathInsideDir(paths.evidence_images_dir, sourcePath);
+        isUploadedSourceImage = isPathInsideDir(uploadedSourcePaths.files_dir, sourcePath);
       }
     }
-    if (!isRawImage && !isEvidenceImage) {
-      gaps.push(`Visual asset ${assetId} was rejected because its source path is outside research image directories.`);
+    if (!isRawImage && !isEvidenceImage && !isUploadedSourceImage) {
+      gaps.push(`Visual asset ${assetId} was rejected because its source path is outside research image directories or uploaded-source directories.`);
       rejectedMaterial.push({
         source: assetId,
-        reason: `Visual asset source path is outside research image directories: ${sourcePath}`,
+        reason: `Visual asset source path is outside research image directories or uploaded-source directories: ${sourcePath}`,
       });
       continue;
     }
@@ -2304,7 +2916,7 @@ export async function finalizeAppResearchVisualAssets(
     visualAssets.push({
       id: assetId,
       file_path: outputPath,
-      original_raw_path: originalRawPath || (isRawImage ? sourcePath : undefined),
+      original_raw_path: originalRawPath || (isRawImage || isUploadedSourceImage ? sourcePath : undefined),
       ...(assetImageUrl || metadataImageUrl ? { image_url: assetImageUrl ?? metadataImageUrl } : {}),
       ...(assetPageUrl || metadataPageUrl ? { page_url: assetPageUrl ?? metadataPageUrl } : {}),
       sha256,

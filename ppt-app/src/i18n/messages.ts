@@ -58,6 +58,7 @@ export interface Messages {
     draftReady: string;
     outlineReady: string;
     creatingOutline: string;
+    analyzingUploadedSource: string;
     creatingDeck: string;
     refiningDeck: string;
     refiningSlide: string;
@@ -104,6 +105,18 @@ export interface Messages {
       goal: string;
       styleNotes: string;
       contentSource: string;
+    };
+    uploadedSourceStatus: {
+      pending: string;
+      stale: string;
+      analyzing: string;
+      ready: string;
+      readyWithCounts: string;
+      gap: string;
+      gapWithCount: string;
+      blocked: string;
+      error: string;
+      duplicate: string;
     };
   };
   template: {
@@ -312,6 +325,7 @@ export interface Messages {
   toasts: {
     localFolder: string;
     attachmentAdded: string;
+    attachmentRemoved: string;
     outlineUpdated: string;
     outlineSkipped: string;
     promptRequired: string;
@@ -323,6 +337,10 @@ export interface Messages {
     workspaceCreated: string;
     pptxExported: string;
     pdfExported: string;
+  };
+  errors: {
+    uploadedSourceAnalysisUnavailable: string;
+    uploadedSourceAnalysisBlocked: string;
   };
 }
 
@@ -385,6 +403,7 @@ export const messages: Record<Locale, Messages> = {
       draftReady: "Draft ready",
       outlineReady: "Outline ready",
       creatingOutline: "Creating outline...",
+      analyzingUploadedSource: "Analyzing source material...",
       creatingDeck: "Creating deck...",
       refiningDeck: "Refining deck",
       refiningSlide: "Refining slide",
@@ -412,7 +431,7 @@ export const messages: Record<Locale, Messages> = {
         style: "Style",
         theme: "Theme",
         content: "Content",
-        attachment: "Attachment",
+        attachment: "Source material",
         template: "Template"
       },
       contextLabels: {
@@ -421,7 +440,7 @@ export const messages: Record<Locale, Messages> = {
         styleNotes: "Style notes",
         theme: "Theme color",
         contentSource: "Content source",
-        attachment: "Attachment",
+        attachment: "Source material",
         slides: "Slides",
         textPerSlide: "Text per slide",
         outputLanguage: "Output language",
@@ -441,6 +460,18 @@ export const messages: Record<Locale, Messages> = {
         goal: "What should the deck achieve? e.g. explain the product, drive demo requests",
         styleNotes: "Describe the desired style, tone, or visual direction",
         contentSource: "Describe source material or say whether Anna should draft from scratch"
+      },
+      uploadedSourceStatus: {
+        pending: "Will analyze before outline creation",
+        stale: "Source material changed; analysis will refresh before continuing",
+        analyzing: "Analyzing source material",
+        ready: "Source material analyzed",
+        readyWithCounts: "Analyzed: {facts} facts, {visualAssets} visual assets",
+        gap: "Analyzed with gaps",
+        gapWithCount: "Analyzed with {gaps} gaps",
+        blocked: "Source material cannot be used to continue",
+        error: "Source material analysis failed",
+        duplicate: "duplicate"
       }
     },
     template: {
@@ -665,7 +696,8 @@ export const messages: Record<Locale, Messages> = {
     },
     toasts: {
       localFolder: "Opening local folder...",
-      attachmentAdded: "Attachment added",
+      attachmentAdded: "Source material added",
+      attachmentRemoved: "Source material removed",
       outlineUpdated: "Outline revised",
       outlineSkipped: "Outline was skipped for this deck",
       promptRequired: "Enter a prompt first",
@@ -677,6 +709,10 @@ export const messages: Record<Locale, Messages> = {
       workspaceCreated: "Created task {id}",
       pptxExported: "PPTX exported",
       pdfExported: "PDF exported"
+    },
+    errors: {
+      uploadedSourceAnalysisUnavailable: "Source material analysis is unavailable because the agent session is not ready.",
+      uploadedSourceAnalysisBlocked: "Source material analysis blocked outline creation"
     }
   },
   zh: {
@@ -737,6 +773,7 @@ export const messages: Record<Locale, Messages> = {
       draftReady: "草稿已就绪",
       outlineReady: "大纲已就绪",
       creatingOutline: "正在创建大纲...",
+      analyzingUploadedSource: "正在分析上传资料...",
       creatingDeck: "正在创建演示文稿...",
       refiningDeck: "正在优化整套",
       refiningSlide: "正在优化当前页",
@@ -764,7 +801,7 @@ export const messages: Record<Locale, Messages> = {
         style: "风格",
         theme: "主题色",
         content: "内容",
-        attachment: "附件",
+        attachment: "上传资料",
         template: "模板选择"
       },
       contextLabels: {
@@ -773,7 +810,7 @@ export const messages: Record<Locale, Messages> = {
         styleNotes: "风格说明",
         theme: "主题色",
         contentSource: "内容来源",
-        attachment: "附件",
+        attachment: "上传资料",
         slides: "页数",
         textPerSlide: "单页文字量",
         outputLanguage: "输出语言",
@@ -793,6 +830,18 @@ export const messages: Record<Locale, Messages> = {
         goal: "这份演示要达成什么目标？例如说明产品、推动预约演示",
         styleNotes: "描述希望的风格、语气或视觉方向",
         contentSource: "描述参考材料，或说明是否由 Anna 从零起草"
+      },
+      uploadedSourceStatus: {
+        pending: "将在创建大纲前分析",
+        stale: "上传资料已变更，继续前会重新分析",
+        analyzing: "正在分析上传资料",
+        ready: "上传资料已分析",
+        readyWithCounts: "已分析：{facts} 条事实，{visualAssets} 个视觉素材",
+        gap: "已分析，但存在缺口",
+        gapWithCount: "已分析，但有 {gaps} 个缺口",
+        blocked: "上传资料无法用于继续生成",
+        error: "上传资料分析失败",
+        duplicate: "重复"
       }
     },
     template: {
@@ -1014,7 +1063,8 @@ export const messages: Record<Locale, Messages> = {
     },
     toasts: {
       localFolder: "正在打开本地文件夹...",
-      attachmentAdded: "已添加附件",
+      attachmentAdded: "已添加上传资料",
+      attachmentRemoved: "已移除上传资料",
       outlineUpdated: "大纲已调整",
       outlineSkipped: "这份演示跳过了大纲审阅",
       promptRequired: "请先输入 prompt",
@@ -1026,6 +1076,10 @@ export const messages: Record<Locale, Messages> = {
       workspaceCreated: "已创建任务 {id}",
       pptxExported: "PPTX 已导出",
       pdfExported: "PDF 已导出"
+    },
+    errors: {
+      uploadedSourceAnalysisUnavailable: "Agent 会话尚未就绪，无法分析上传资料。",
+      uploadedSourceAnalysisBlocked: "上传资料分析阻止了大纲创建"
     }
   }
 };

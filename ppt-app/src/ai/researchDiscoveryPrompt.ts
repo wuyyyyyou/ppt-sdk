@@ -46,6 +46,7 @@ export function buildResearchDiscoveryDecisionLlmRequest(input: {
   iterationLimit: number;
   targetPageIds?: string[];
   discoveryPool: ResearchDiscoveryEvidencePool;
+  uploadedSourceAnalysisContext?: unknown;
   researchStatus?: unknown;
   locale: Locale;
 }): AnnaLlmCompleteInput {
@@ -119,6 +120,7 @@ export function buildResearchDiscoveryDecisionLlmRequest(input: {
             `Outline: ${JSON.stringify(input.outline)}`,
             `Scoped Page Plan pages: ${JSON.stringify(scopedPages)}`,
             `${poolLabel}: ${JSON.stringify(compactDiscoveryPool(input.discoveryPool))}`,
+            `Uploaded Source Analysis prior context: ${JSON.stringify(input.uploadedSourceAnalysisContext ?? null)}`,
             `Research status / ledger summary: ${JSON.stringify(input.researchStatus ?? null)}`,
             "Return exactly this JSON shape:",
             jsonShape,
@@ -127,6 +129,10 @@ export function buildResearchDiscoveryDecisionLlmRequest(input: {
             `- phase must be ${input.phase}.`,
             "- queries must contain 0-4 concise natural-language query intents.",
             "- Do not repeat completed queries listed in the pool summary.",
+            "- Uploaded-source facts are user-provided prior context and outrank external web facts unless the task explicitly asks for public/current/benchmark validation.",
+            "- If uploaded-source facts or visual candidates already satisfy the scoped pages, return action stop.",
+            "- Search only for unresolved uploaded-source gaps, current external facts, public benchmarks, extra visual assets, or conflict investigation.",
+            "- Record conflicts between uploaded-source facts and web facts as gaps or evidence_needs; do not silently overwrite uploaded-source facts.",
             "- Put geography, date, entity names, and specificity in query text when needed.",
             "- If the iteration limit is near and important evidence is still missing, return stop with gaps instead of low-value broad queries.",
             ...phaseSpecificRules,
@@ -171,6 +177,8 @@ function normalizeContentPlan(value: unknown): PageContentPlan {
     evidence_fact_ids: strings(record.evidence_fact_ids),
     derived_insight_ids: strings(record.derived_insight_ids),
     visual_asset_ids: strings(record.visual_asset_ids),
+    uploaded_source_fact_ids: strings(record.uploaded_source_fact_ids),
+    uploaded_source_visual_asset_ids: strings(record.uploaded_source_visual_asset_ids),
     gaps: strings(record.gaps),
     authoring_notes: strings(record.authoring_notes),
   };
@@ -180,6 +188,7 @@ export function buildEvidenceAwarePagePlanLlmRequest(input: {
   outline: WorkspaceOutline;
   pagePlan: PagePlan;
   discoveryPool: ResearchDiscoveryEvidencePool;
+  uploadedSourceAnalysisContext?: unknown;
   targetPageIds?: string[];
   locale: Locale;
 }): AnnaLlmCompleteInput {
@@ -200,7 +209,9 @@ export function buildEvidenceAwarePagePlanLlmRequest(input: {
             "Do not modify Confirmed Outline.",
             "Do not change page identity, page order, titles, outlines, blueprint ids, file paths, or manifest ids.",
             "content_plan must reference evidence and visual assets by ID. Do not copy full evidence records.",
+            "Uploaded-source facts and visual candidates must use uploaded_source_fact_ids and uploaded_source_visual_asset_ids, not discovery pool IDs.",
             "If evidence is missing, record gaps and authoring notes instead of inventing facts.",
+            "Do not add pages or overload a page solely to cover every uploaded-source fact.",
           ].join("\n"),
         },
       },
@@ -215,9 +226,12 @@ export function buildEvidenceAwarePagePlanLlmRequest(input: {
             `Current Page Plan: ${JSON.stringify(input.pagePlan)}`,
             `Target pages: ${JSON.stringify(scopedPages)}`,
             `Research Discovery Evidence Pool summary: ${JSON.stringify(compactDiscoveryPool(input.discoveryPool))}`,
+            `Uploaded Source Analysis planning context: ${JSON.stringify(input.uploadedSourceAnalysisContext ?? null)}`,
             "Return the full Page Plan JSON with the same pages and identity fields, adding or updating content_plan on target pages only.",
             "content_plan shape:",
-            '{"main_message":"...","content_points":["..."],"evidence_fact_ids":["fact-1"],"derived_insight_ids":["insight-1"],"visual_asset_ids":["image-1"],"gaps":["..."],"authoring_notes":["..."]}',
+            '{"main_message":"...","content_points":["..."],"evidence_fact_ids":["fact-1"],"derived_insight_ids":["insight-1"],"visual_asset_ids":["image-1"],"uploaded_source_fact_ids":["uploaded-fact-1"],"uploaded_source_visual_asset_ids":["uploaded-visual-1"],"gaps":["..."],"authoring_notes":["..."]}',
+            "Prioritize relevant uploaded-source facts and usable/must_use visual candidates when they fit the page purpose and readability.",
+            "Leave unused uploaded-source facts unassigned and note important omissions in gaps or authoring_notes.",
           ].join("\n"),
         },
       },

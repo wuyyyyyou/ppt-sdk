@@ -28,7 +28,9 @@ export interface DeckBriefInput {
   logContext?: AiOperationLogContext;
 }
 
-export interface GenerateOutlineInput extends DeckBriefInput {}
+export interface GenerateOutlineInput extends DeckBriefInput {
+  uploadedSourceAnalysisContext?: unknown;
+}
 
 export interface GenerateDeckInput extends DeckBriefInput {
   outlineFirst: boolean;
@@ -55,6 +57,7 @@ export interface ReviseOutlineInput {
   locale: Locale;
   setting?: WorkspaceSettings;
   contextRows?: LlmContextRow[];
+  uploadedSourceAnalysisContext?: unknown;
   logContext?: AiOperationLogContext;
 }
 
@@ -221,6 +224,7 @@ export interface GenerateResearchDiscoveryDecisionInput {
   iterationLimit: number;
   targetPageIds?: string[];
   discoveryPool: ResearchDiscoveryEvidencePool;
+  uploadedSourceAnalysisContext?: unknown;
   researchStatus?: unknown;
   locale: Locale;
   logContext?: AiOperationLogContext;
@@ -230,6 +234,7 @@ export interface GenerateEvidenceAwarePagePlanInput {
   outline: WorkspaceOutline;
   pagePlan: PagePlan;
   discoveryPool: ResearchDiscoveryEvidencePool;
+  uploadedSourceAnalysisContext?: unknown;
   targetPageIds?: string[];
   locale: Locale;
   logContext?: AiOperationLogContext;

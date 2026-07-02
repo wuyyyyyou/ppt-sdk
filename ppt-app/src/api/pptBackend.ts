@@ -58,6 +58,18 @@ import type {
   UpdateWorkspaceOutlineInput,
   UpdateWorkspacePagesInput,
   UpdateWorkspaceTitleInput,
+  BeginUploadedSourceUploadInput,
+  BeginUploadedSourceUploadResult,
+  CommitUploadedSourceUploadInput,
+  CommitUploadedSourceUploadResult,
+  UploadUploadedSourceInput,
+  UploadUploadedSourceResult,
+  ListUploadedSourcesResult,
+  RemoveUploadedSourceInput,
+  RemoveUploadedSourceResult,
+  PrepareUploadedSourceAnalysisWorkspaceResult,
+  UploadedSourceAnalysisDraftFingerprint,
+  UploadedSourceAnalysisDraftType,
   WorkspaceOutline,
   WorkspaceDefaultsResult,
   WorkspaceResult
@@ -71,6 +83,33 @@ export interface PptBackend {
   getWorkspaceDefaults(): Promise<WorkspaceDefaultsResult>;
   createWorkspace(input: CreateWorkspaceInput): Promise<WorkspaceResult>;
   openWorkspace(input: OpenWorkspaceInput): Promise<WorkspaceResult>;
+  beginUploadedSourceUpload?(input: BeginUploadedSourceUploadInput): Promise<BeginUploadedSourceUploadResult>;
+  commitUploadedSourceUpload?(input: CommitUploadedSourceUploadInput): Promise<CommitUploadedSourceUploadResult>;
+  uploadUploadedSource(input: UploadUploadedSourceInput): Promise<UploadUploadedSourceResult>;
+  listUploadedSources(input: { workspace_dir: string; include_removed?: boolean }): Promise<ListUploadedSourcesResult>;
+  removeUploadedSource(input: RemoveUploadedSourceInput): Promise<RemoveUploadedSourceResult>;
+  prepareUploadedSourceAnalysisWorkspace(input: { workspace_dir: string }): Promise<PrepareUploadedSourceAnalysisWorkspaceResult>;
+  recordUploadedSourceAnalysisDraft(input: {
+    workspace_dir: string;
+    draft_type: UploadedSourceAnalysisDraftType;
+    draft_id?: string;
+    draft: Record<string, unknown>;
+  }): Promise<Record<string, unknown>>;
+  getUploadedSourceAnalysisDraft(input: {
+    workspace_dir: string;
+    draft_type: UploadedSourceAnalysisDraftType;
+    draft_id?: string;
+  }): Promise<Record<string, unknown>>;
+  getUploadedSourceAnalysisDraftFingerprint(input: {
+    workspace_dir: string;
+    draft_type: UploadedSourceAnalysisDraftType;
+    draft_id?: string;
+  }): Promise<UploadedSourceAnalysisDraftFingerprint>;
+  recordUploadedSourceAnalysis(input: {
+    workspace_dir: string;
+    analysis: Record<string, unknown>;
+  }): Promise<Record<string, unknown>>;
+  getUploadedSourceAnalysis(input: { workspace_dir: string }): Promise<Record<string, unknown>>;
   appendWorkspaceLog(input: AppendWorkspaceLogInput): Promise<AppendWorkspaceLogResult>;
   getWorkspaceOutline(input: GetWorkspaceOutlineInput): Promise<WorkspaceOutline>;
   updateWorkspaceOutline(input: UpdateWorkspaceOutlineInput): Promise<WorkspaceResult>;

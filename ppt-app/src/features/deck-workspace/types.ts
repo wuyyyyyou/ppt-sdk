@@ -4,6 +4,7 @@ import type {
   PageProgress,
   RenderDeckHtmlResult,
   TemplateSummary,
+  UploadedSourceMaterial,
   WorkspaceResult,
   WorkspaceSettings
 } from "../../api/types";
@@ -23,9 +24,11 @@ export type LoadingKind =
   | "none"
   | "template"
   | "context"
+  | "uploadedSourceAnalysis"
   | "deck"
   | "outline"
   | "deckFromOutline"
+  | "upload"
   | "review"
   | "refineDeck"
   | "refineSlide"
@@ -96,6 +99,8 @@ export interface DeckWorkspaceState {
   currentStatus: string;
   workspaceScan: ListWorkspacesResult | null;
   currentWorkspace: WorkspaceResult | null;
+  uploadedSources: UploadedSourceMaterial[];
+  uploadedSourceAnalysisState: UploadedSourceAnalysisViewState;
   workspaceLoading: boolean;
   workspaceError: string;
   workspaceSettingsSaving: boolean;
@@ -106,3 +111,22 @@ export interface DeckWorkspaceState {
 export type { WorkspaceSettings };
 
 export type GenerationStreamSnapshot = DeckGenerationStreamSnapshot;
+
+export type UploadedSourceAnalysisViewStatus =
+  | "hidden"
+  | "pending"
+  | "stale"
+  | "analyzing"
+  | "ready"
+  | "gap"
+  | "blocked"
+  | "error";
+
+export interface UploadedSourceAnalysisViewState {
+  status: UploadedSourceAnalysisViewStatus;
+  sourceCount: number;
+  factCount: number | null;
+  visualAssetCount: number | null;
+  gapCount: number | null;
+  reason?: string;
+}

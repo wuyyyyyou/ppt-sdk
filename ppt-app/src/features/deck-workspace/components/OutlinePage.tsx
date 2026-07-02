@@ -1,7 +1,7 @@
-import { CheckCircle2, ChevronDown, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, LoaderCircle, Sparkles } from "lucide-react";
 import type { OutlineDetail } from "../../../data/mockDeck";
 import type { Messages } from "../../../i18n/messages";
-import type { LoadingKind } from "../types";
+import type { LoadingKind, UploadedSourceAnalysisViewState } from "../types";
 import { formatSlideNumber } from "../utils";
 import { DEFAULT_OUTPUT_LANGUAGE_OPTIONS } from "../../../ai/outputLanguage";
 
@@ -22,6 +22,7 @@ interface OutlinePageProps {
   applyFeedback: () => Promise<void>;
   createDeck: () => Promise<void>;
   loading: LoadingKind;
+  uploadedSourceAnalysisState: UploadedSourceAnalysisViewState;
 }
 
 export function OutlinePage(props: OutlinePageProps) {
@@ -42,6 +43,7 @@ export function OutlinePage(props: OutlinePageProps) {
     applyFeedback,
     createDeck,
     loading,
+    uploadedSourceAnalysisState,
   } = props;
   const activeOutline = outlineEditMode ? outlineDraft : outline;
   const languageOptions = DEFAULT_OUTPUT_LANGUAGE_OPTIONS.includes(
@@ -49,7 +51,8 @@ export function OutlinePage(props: OutlinePageProps) {
   )
     ? [...DEFAULT_OUTPUT_LANGUAGE_OPTIONS]
     : [...DEFAULT_OUTPUT_LANGUAGE_OPTIONS, outputLanguageDraft];
-  const generating = loading === "deck" || loading === "deckFromOutline";
+  const analyzingUploadedSources = loading === "uploadedSourceAnalysis";
+  const generating = loading === "deck" || loading === "deckFromOutline" || analyzingUploadedSources;
 
   return (
     <section className="page active outline-page">
@@ -61,6 +64,12 @@ export function OutlinePage(props: OutlinePageProps) {
       </div>
 
       <div className="outline-review-controls">
+        {uploadedSourceAnalysisState.status === "stale" ? (
+          <div className="uploaded-source-outline-warning">
+            <AlertTriangle size={14} />
+            <span>{t.brief.uploadedSourceStatus.stale}</span>
+          </div>
+        ) : null}
         <div className="feedback-box">
           <textarea
             className="prompt-input compact"
@@ -71,7 +80,7 @@ export function OutlinePage(props: OutlinePageProps) {
           />
           <div className="feedback-actions">
             <button className="primary-btn" onClick={applyFeedback} disabled={loading === "outline" || generating}>
-              {loading === "outline" ? <span className="spinner small" /> : <Sparkles size={14} />}
+              {loading === "outline" || analyzingUploadedSources ? <span className="spinner small" /> : <Sparkles size={14} />}
               {t.controls.reviseOutline}
             </button>
           </div>
@@ -161,9 +170,9 @@ export function OutlinePage(props: OutlinePageProps) {
             <button
               className="primary-btn confirm-outline-btn"
               onClick={createDeck}
-              disabled={loading === "deck" || loading === "outline"}
+              disabled={loading === "deck" || loading === "outline" || analyzingUploadedSources}
             >
-              {loading === "deck" ? <span className="spinner small" /> : <CheckCircle2 size={14} />}
+              {analyzingUploadedSources ? <LoaderCircle className="generation-running-icon" size={14} /> : loading === "deck" ? <span className="spinner small" /> : <CheckCircle2 size={14} />}
               {t.controls.confirmOutline}
             </button>
           )}

@@ -25,6 +25,8 @@ import {
   recordDeckRecovery,
 } from "./runtimeSupport";
 import { runResearchDiscoveryForPagePlan } from "./researchDiscoveryWorkflow";
+import { ensureFreshUploadedSourceAnalysis } from "./uploadedSourceAnalysisWorkflow";
+import { uploadedSourceDependencyMatchesAnalysis } from "./uploadedSourceAnalysis";
 
 function getActiveGenerationRunKind(input: RunDeckGenerationInput): NonNullable<PageProgress["recovery"]>["run_kind"] {
   return input.refinementRunKind ?? (input.pageRefinementRequests ? "page-refinement" : "deck-generation");
@@ -56,6 +58,79 @@ export async function runDeckGeneration(
         message: progress.message,
       },
     });
+  }
+
+  const uploadedSourceDependency = input.confirmedOutline.source?.uploaded_source_analysis;
+  let uploadedSourceList;
+  try {
+    uploadedSourceList = await input.backend.listUploadedSources({
+      workspace_dir: input.workspace.workspace_dir,
+    });
+  } catch (error) {
+    const message = `Uploaded Source Material is unavailable: ${error instanceof Error ? error.message : String(error)}`;
+    const progress = createProgress(
+      {
+        step: "failed",
+        message,
+        currentPageIndex: null,
+        totalPages: input.confirmedOutline.items.length,
+      },
+      null,
+      undefined,
+      undefined,
+      attemptLimits,
+    );
+    input.onProgress(progress);
+    return failedCompletion({
+      progress,
+      error: {
+        type: "stale_artifacts",
+        message,
+      },
+    });
+  }
+  const hasActiveUploadedSources = (uploadedSourceList?.active.length ?? 0) > 0;
+  if (hasActiveUploadedSources || uploadedSourceDependency) {
+    const uploadedSourceAnalysis = hasActiveUploadedSources
+      ? await ensureFreshUploadedSourceAnalysis({
+          backend: input.backend,
+          agentClient: input.agentClient,
+          workspace: input.workspace,
+        })
+      : null;
+    if (
+      uploadedSourceAnalysis?.status === "blocked" ||
+      (uploadedSourceAnalysis && !uploadedSourceAnalysis.continuation_decision.can_continue) ||
+      (!uploadedSourceAnalysis && uploadedSourceDependency) ||
+      (uploadedSourceAnalysis && !uploadedSourceDependencyMatchesAnalysis({
+        dependency: uploadedSourceDependency,
+        analysis: uploadedSourceAnalysis,
+      }))
+    ) {
+      const message = uploadedSourceAnalysis?.status === "blocked"
+        ? `Uploaded Source Analysis blocks deck generation: ${uploadedSourceAnalysis.continuation_decision.reason}`
+        : "Uploaded Source Analysis changed after this outline was confirmed. Regenerate or reconfirm the outline before generating the deck.";
+      const progress = createProgress(
+        {
+          step: "failed",
+          message,
+          currentPageIndex: null,
+          totalPages: input.confirmedOutline.items.length,
+        },
+        null,
+        undefined,
+        undefined,
+        attemptLimits,
+      );
+      input.onProgress(progress);
+      return failedCompletion({
+        progress,
+        error: {
+          type: "stale_artifacts",
+          message,
+        },
+      });
+    }
   }
 
   const startMode = input.startMode ?? "restart";

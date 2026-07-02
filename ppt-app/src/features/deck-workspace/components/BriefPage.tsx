@@ -1,8 +1,8 @@
-import { AlertTriangle, Check, CheckCircle2, ChevronDown, File, HelpCircle, ImageIcon, Palette, Search, Sparkles, Upload, X } from "lucide-react";
-import { useState, type CSSProperties } from "react";
-import type { TemplateSummary } from "../../../api/types";
-import type { Messages } from "../../../i18n/messages";
-import type { ContextRow, LoadingKind } from "../types";
+import { AlertTriangle, Check, CheckCircle2, ChevronDown, File, HelpCircle, ImageIcon, LoaderCircle, Palette, Search, Sparkles, Upload, X } from "lucide-react";
+import { useRef, useState, type ChangeEvent, type CSSProperties } from "react";
+import type { TemplateSummary, UploadedSourceMaterial } from "../../../api/types";
+import { formatMessage, type Messages } from "../../../i18n/messages";
+import type { ContextRow, LoadingKind, UploadedSourceAnalysisViewState } from "../types";
 import { TemplatePreviewModal } from "./TemplatePreviewModal";
 import { getThemePreset, THEME_PRESET_IDS } from "../themePresets";
 import { isStrictReviewModeEnabled, type PageReviewSettings } from "../reviewSettings";
@@ -23,13 +23,16 @@ interface BriefPageProps {
   pageReviewSettings: PageReviewSettings;
   setStrictReviewMode: (enabled: boolean) => Promise<void>;
   contextRows: ContextRow[];
+  uploadedSources: UploadedSourceMaterial[];
+  uploadedSourceAnalysisState: UploadedSourceAnalysisViewState;
   addContextRow: (row: ContextRow) => void;
   updateContextRow: (id: string, value: string) => void;
   removeContextRow: (id: string) => void;
+  uploadUploadedSource: (file: File) => Promise<void>;
+  removeUploadedSource: (uploadedSourceId: string) => Promise<void>;
   addStyleRow: () => void;
   suggestContextFromPrompt: () => Promise<void>;
   generateDeck: () => Promise<void>;
-  showToast: (message: string) => void;
 }
 
 export function BriefPage(props: BriefPageProps) {
@@ -46,18 +49,25 @@ export function BriefPage(props: BriefPageProps) {
     pageReviewSettings,
     setStrictReviewMode,
     contextRows,
+    uploadedSources,
+    uploadedSourceAnalysisState,
     addContextRow,
     updateContextRow,
     removeContextRow,
+    uploadUploadedSource,
+    removeUploadedSource,
     addStyleRow,
     suggestContextFromPrompt,
     generateDeck,
-    showToast,
   } = props;
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [strictReviewConfirmOpen, setStrictReviewConfirmOpen] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const isCreating =
-    loading === "deck" || loading === "outline" || loading === "review";
+    loading === "deck" ||
+    loading === "outline" ||
+    loading === "review" ||
+    loading === "uploadedSourceAnalysis";
   const isSuggestingContext = loading === "context";
   const isCreateButtonLoading = isCreating || isSuggestingContext;
   const strictReviewMode = isStrictReviewModeEnabled(pageReviewSettings);
@@ -74,6 +84,22 @@ export function BriefPage(props: BriefPageProps) {
   function confirmStrictReviewMode() {
     setStrictReviewConfirmOpen(false);
     void setStrictReviewMode(true);
+  }
+
+  function openUploadPicker() {
+    uploadInputRef.current?.click();
+  }
+
+  async function uploadSelectedFiles(files: File[]) {
+    for (const file of files) {
+      await uploadUploadedSource(file);
+    }
+  }
+
+  function handleUploadSelection(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    void uploadSelectedFiles(files);
   }
 
   return (
@@ -251,6 +277,10 @@ export function BriefPage(props: BriefPageProps) {
             >
               {t.brief.chips.content}
             </button>
+            <button className="chip-btn" onClick={openUploadPicker} disabled={loading === "upload" || loading === "uploadedSourceAnalysis"}>
+              <Upload size={13} />
+              {t.brief.chips.attachment}
+            </button>
             <button
               className="chip-btn"
               onClick={() =>
@@ -273,6 +303,14 @@ export function BriefPage(props: BriefPageProps) {
               {t.brief.chips.template}
             </button>
           </div>
+          <input
+            ref={uploadInputRef}
+            type="file"
+            multiple
+            className="uploaded-source-input"
+            onChange={handleUploadSelection}
+            aria-label={t.controls.chooseFile}
+          />
         </div>
       </div>
 
@@ -294,12 +332,96 @@ export function BriefPage(props: BriefPageProps) {
             t={t}
             update={updateContextRow}
             remove={removeContextRow}
-            onUpload={() => showToast(t.toasts.attachmentAdded)}
+            onUpload={openUploadPicker}
           />
         ))}
+        {uploadedSources.length > 0 ? (
+          <div className="uploaded-source-block">
+            <div className="uploaded-source-list">
+              {uploadedSources.map((source) => (
+                <span className="file-pill visible uploaded-source-pill" key={source.uploaded_source_id}>
+                  <File size={12} />
+                  {source.display_name || source.original_filename}
+                  {source.duplicate_of.length > 0 ? (
+                    <span className="uploaded-source-warning">{t.brief.uploadedSourceStatus.duplicate}</span>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="context-remove-btn"
+                    disabled={loading === "uploadedSourceAnalysis"}
+                    onClick={() => void removeUploadedSource(source.uploaded_source_id)}
+                    aria-label={`Remove ${source.display_name || source.original_filename}`}
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <UploadedSourceAnalysisStatusView
+              t={t}
+              state={uploadedSourceAnalysisState}
+            />
+          </div>
+        ) : null}
       </div>
     </section>
   );
+}
+
+function UploadedSourceAnalysisStatusView(props: {
+  t: Messages;
+  state: UploadedSourceAnalysisViewState;
+}) {
+  const { t, state } = props;
+  if (state.status === "hidden") return null;
+  const text = uploadedSourceAnalysisStatusText(t, state);
+  const icon = state.status === "analyzing"
+    ? <LoaderCircle className="uploaded-source-status-spin" size={13} />
+    : state.status === "ready" || state.status === "gap"
+      ? <CheckCircle2 size={13} />
+      : state.status === "pending"
+        ? <File size={13} />
+        : <AlertTriangle size={13} />;
+  return (
+    <div className={`uploaded-source-analysis-status ${state.status}`}>
+      {icon}
+      <span>{text}</span>
+    </div>
+  );
+}
+
+function uploadedSourceAnalysisStatusText(
+  t: Messages,
+  state: UploadedSourceAnalysisViewState,
+) {
+  const labels = t.brief.uploadedSourceStatus;
+  switch (state.status) {
+    case "pending":
+      return labels.pending;
+    case "stale":
+      return labels.stale;
+    case "analyzing":
+      return labels.analyzing;
+    case "ready":
+      if (state.factCount !== null && state.visualAssetCount !== null) {
+        return formatMessage(labels.readyWithCounts, {
+          facts: state.factCount,
+          visualAssets: state.visualAssetCount,
+        });
+      }
+      return labels.ready;
+    case "gap":
+      if (state.gapCount !== null) {
+        return formatMessage(labels.gapWithCount, { gaps: state.gapCount });
+      }
+      return labels.gap;
+    case "blocked":
+      return labels.blocked;
+    case "error":
+      return state.reason || labels.error;
+    case "hidden":
+      return "";
+  }
 }
 
 export function StyleSelection(props: {
@@ -519,10 +641,6 @@ function ContextRowView(props: {
             <Upload size={12} />
             {t.controls.chooseFile}
           </button>
-          <span className="file-pill visible">
-            <File size={12} />
-            anna-logo.png
-          </span>
           <input
             className="context-input"
             value={row.value}
