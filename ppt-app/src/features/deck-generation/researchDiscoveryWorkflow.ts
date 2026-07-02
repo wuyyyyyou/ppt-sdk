@@ -53,6 +53,7 @@ import type { DeckGenerationRuntime, ResearchDiscoveryProgressQuery } from "./ty
 import { createAgentFileToolPathContext } from "./agentFileToolPaths";
 
 const RESEARCH_DISCOVERY_ITERATION_LIMIT = 5;
+const WEB_RESEARCH_FETCH_MAX_CHARS = 20000;
 
 function sanitizeDiscoveryDraftIdPart(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "scope";
@@ -515,7 +516,7 @@ async function collectQueries(input: {
           urls,
           output_dir: input.paths.raw_web_dir,
           format: "text_markdown",
-          max_chars: 12000,
+          max_chars: WEB_RESEARCH_FETCH_MAX_CHARS,
         });
         const fetchCount = summarizeWebFetchCount(fetched as WebFetchResult, 0);
         if (fetched.index_path && fetchCount > 0) {
