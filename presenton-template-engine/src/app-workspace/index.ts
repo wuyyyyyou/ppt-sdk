@@ -508,6 +508,13 @@ function normalizeVisualAssetSourcePath(workspaceDir: string, value: unknown): s
   if (path.isAbsolute(trimmed)) {
     return path.normalize(trimmed);
   }
+
+  const agentFileToolRoot = path.dirname(path.dirname(workspaceDir));
+  const agentFileToolPath = path.normalize(path.join(agentFileToolRoot, trimmed));
+  if (isPathInsideDir(workspaceDir, agentFileToolPath)) {
+    return agentFileToolPath;
+  }
+
   return path.normalize(path.join(workspaceDir, trimmed));
 }
 

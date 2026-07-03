@@ -261,6 +261,45 @@ test("workspace research tools prepare directories and persist metadata", async 
     assert.match(path.basename(finalizedAsset?.file_path ?? ""), /^page-01-image-1-[a-f0-9]{16}\.png$/);
     assert.deepEqual(await readFile(finalizedAsset?.file_path ?? ""), rawImageBytes);
 
+    const uploadedSourceImagePath = path.join(
+      workspace.workspace_dir,
+      "uploaded-sources",
+      "files",
+      "uploaded-source-1",
+      "source.jpg",
+    );
+    await mkdir(path.dirname(uploadedSourceImagePath), { recursive: true });
+    const uploadedSourceImageBytes = Buffer.from("uploaded-source-image-bytes");
+    await writeFile(uploadedSourceImagePath, uploadedSourceImageBytes);
+    const agentFileToolUploadedSourcePath = path.relative(
+      path.dirname(path.dirname(workspace.workspace_dir)),
+      uploadedSourceImagePath,
+    );
+    const uploadedSourceVisualAssets = await finalizeAppResearchVisualAssets({
+      workspace_dir: workspace.workspace_dir,
+      page_id: "page-01",
+      visual_assets: [
+        {
+          id: "uploaded:visual-1",
+          file_path: agentFileToolUploadedSourcePath,
+          original_raw_path: agentFileToolUploadedSourcePath,
+          reason: "Useful uploaded image",
+          visual_summary: "A usable uploaded-source image.",
+        },
+      ],
+    });
+    assert.equal(uploadedSourceVisualAssets.visual_assets.length, 1);
+    assert.equal(uploadedSourceVisualAssets.gaps.length, 0);
+    assert.equal(uploadedSourceVisualAssets.rejected_material.length, 0);
+    const uploadedSourceAsset = uploadedSourceVisualAssets.visual_assets[0];
+    assert.equal(uploadedSourceAsset?.original_raw_path, uploadedSourceImagePath);
+    assert.ok(uploadedSourceAsset?.file_path.startsWith(prepared.evidence_images_dir));
+    assert.match(
+      path.basename(uploadedSourceAsset?.file_path ?? ""),
+      /^page-01-uploaded-visual-1-[a-f0-9]{16}\.jpg$/,
+    );
+    assert.deepEqual(await readFile(uploadedSourceAsset?.file_path ?? ""), uploadedSourceImageBytes);
+
     const indexedRawImageDir = path.join(prepared.raw_images_dir, "image-fetch-001");
     await mkdir(indexedRawImageDir, { recursive: true });
     const indexedRawImagePath = path.join(indexedRawImageDir, "001-example-com.png");
@@ -284,19 +323,16 @@ test("workspace research tools prepare directories and persist metadata", async 
       ],
       count: 1,
     }));
-    const agentFileToolRawPath = path.relative(
-      path.dirname(path.dirname(workspace.workspace_dir)),
-      indexedRawImagePath,
-    );
+    const unusableRawImagePath = path.basename(indexedRawImagePath);
     const recoveredVisualAssets = await finalizeAppResearchVisualAssets({
       workspace_dir: workspace.workspace_dir,
       page_id: "page-01",
       raw_image_index_paths: [rawImageIndexPath],
       visual_assets: [
         {
-          id: "image-agent-path",
-          file_path: agentFileToolRawPath,
-          original_raw_path: agentFileToolRawPath,
+          id: "image-recovered-path",
+          file_path: unusableRawImagePath,
+          original_raw_path: unusableRawImagePath,
           image_url: "https://example.com/indexed.png",
           sha256: indexedRawImageSha256,
           reason: "Useful indexed image",

@@ -213,6 +213,7 @@ export function App() {
           {state.page === "refine" ? (
             <RefinePage
               t={t}
+              deck={state.deck}
               slide={selectedSlide}
               slideIndex={state.currentSlide}
               slideNumber={formatSlideNumber(state.currentSlide)}

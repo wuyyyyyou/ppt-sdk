@@ -1,12 +1,9 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Layers, LayoutTemplate, LoaderCircle, MessageCircle, RefreshCw, Wand2 } from "lucide-react";
+import { ChevronDown, Layers, LayoutTemplate, MessageCircle, RefreshCw, Wand2 } from "lucide-react";
 import { useState } from "react";
 import type { Slide } from "../../../data/mockDeck";
-import { formatMessage, type Messages } from "../../../i18n/messages";
+import type { Messages } from "../../../i18n/messages";
 import type { DeckReviewRenderState } from "../types";
-import { formatSlideCount, formatSlideNumber } from "../utils";
-import { RenderedSlideImage } from "./RenderedSlideImage";
-import { SlidePreview } from "./SlidePreview";
-import { ThumbnailStrip } from "./ThumbnailStrip";
+import { SlidePreviewNavigator } from "./SlidePreviewNavigator";
 
 interface DeckPageProps {
   t: Messages;
@@ -43,12 +40,8 @@ export function DeckPage(props: DeckPageProps) {
     onExport
   } = props;
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
-  const slide = deck[currentSlide] ?? deck[0];
-  const renderedSlides = reviewRender.result?.slides ?? [];
-  const selectedRenderedSlide = renderedSlides[currentSlide] ?? renderedSlides[0];
   const localAiDisabled = loading === "refineSlide" || loading === "refineDeck" || loading === "deck";
   const refreshDisabled = reviewRender.status === "loading" || loading === "review";
-  const showPreviewLoading = reviewRender.status === "loading";
   const layoutOptions: Array<{ mode: SlideLayoutMode; label: string }> = [
     { mode: "simpler", label: t.controls.layoutSimpler },
     { mode: "visual", label: t.controls.layoutVisual },
@@ -114,48 +107,12 @@ export function DeckPage(props: DeckPageProps) {
         </div>
       </div>
 
-      {reviewRender.status === "ready" && selectedRenderedSlide?.screenshot_url ? (
-        <div className="deck-stage-html-frame">
-          <RenderedSlideImage slide={selectedRenderedSlide} loading="eager" />
-        </div>
-      ) : showPreviewLoading ? (
-        <div className="deck-stage-loading" role="status" aria-live="polite">
-          <LoaderCircle size={28} />
-          <span>{t.review.rendering}</span>
-        </div>
-      ) : (
-        <SlidePreview slide={slide} index={currentSlide} large />
-      )}
-
-      <div className="preview-controls">
-        <button
-          className="nav-arrow"
-          disabled={currentSlide === 0}
-          onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
-        >
-          <ChevronLeft size={16} />
-        </button>
-        <div className="slide-counter">
-          {formatMessage(t.deck.slideCounter, {
-            current: formatSlideNumber(currentSlide),
-            total: formatSlideCount(deck.length)
-          })}
-        </div>
-        <button
-          className="nav-arrow"
-          disabled={currentSlide === deck.length - 1}
-          onClick={() => setCurrentSlide(Math.min(deck.length - 1, currentSlide + 1))}
-        >
-          <ChevronRight size={16} />
-        </button>
-      </div>
-
-      <ThumbnailStrip
+      <SlidePreviewNavigator
+        t={t}
         deck={deck}
         currentSlide={currentSlide}
         setCurrentSlide={setCurrentSlide}
-        renderedSlides={renderedSlides}
-        loadingPreviews={reviewRender.status === "loading"}
+        reviewRender={reviewRender}
       />
 
       <div className="action-bar">

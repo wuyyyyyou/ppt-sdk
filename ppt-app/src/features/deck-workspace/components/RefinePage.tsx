@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Slide } from "../../../data/mockDeck";
 import { formatMessage, type Messages } from "../../../i18n/messages";
 import type { DeckReviewRenderState, LoadingKind, RefineScope } from "../types";
@@ -6,9 +6,11 @@ import { PageHeader } from "./PageHeader";
 import { RenderedSlideImage } from "./RenderedSlideImage";
 import { RefineSteps } from "./RefineSteps";
 import { SlidePreview } from "./SlidePreview";
+import { SlidePreviewNavigator } from "./SlidePreviewNavigator";
 
 interface RefinePageProps {
   t: Messages;
+  deck: Slide[];
   slide: Slide;
   slideIndex: number;
   slideNumber: string;
@@ -23,6 +25,7 @@ interface RefinePageProps {
 export function RefinePage(props: RefinePageProps) {
   const {
     t,
+    deck,
     slide,
     slideIndex,
     slideNumber,
@@ -35,17 +38,32 @@ export function RefinePage(props: RefinePageProps) {
   } = props;
   const [deckInstruction, setDeckInstruction] = useState("");
   const [slideInstruction, setSlideInstruction] = useState("");
+  const [deckPreviewSlide, setDeckPreviewSlide] = useState(slideIndex);
   const renderedSlides = reviewRender.result?.slides ?? [];
   const renderedSlide = renderedSlides[slideIndex] ?? null;
   const showRenderedSlide =
     reviewRender.status === "ready" && Boolean(renderedSlide?.screenshot_url);
+
+  useEffect(() => {
+    if (refineScope === "deck") {
+      setDeckPreviewSlide(slideIndex);
+    }
+  }, [refineScope, slideIndex]);
 
   return (
     <section className="page active refine-page">
       <PageHeader title={t.refine.title} onBack={onBack} t={t} />
 
       <div className="refine-content">
-        {showRenderedSlide && renderedSlide ? (
+        {refineScope === "deck" ? (
+          <SlidePreviewNavigator
+            t={t}
+            deck={deck}
+            currentSlide={deckPreviewSlide}
+            setCurrentSlide={setDeckPreviewSlide}
+            reviewRender={reviewRender}
+          />
+        ) : showRenderedSlide && renderedSlide ? (
           <div className="deck-stage-html-frame refine-slide-html-frame">
             <RenderedSlideImage slide={renderedSlide} loading="eager" />
           </div>
