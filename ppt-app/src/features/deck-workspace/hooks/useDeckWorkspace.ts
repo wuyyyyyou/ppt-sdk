@@ -980,6 +980,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const analysis = await ensureFreshUploadedSourceAnalysis({
         backend,
         agentClient,
+        aiLogger,
         workspace,
         forceRefresh,
         onProgress: recordUploadedSourceAnalysisProgress,

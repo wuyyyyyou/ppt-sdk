@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type { UploadedSourceIndex } from "../../src/api/types.ts";
+import type { AppendWorkspaceLogInput, UploadedSourceIndex } from "../../src/api/types.ts";
 import type { PptBackend } from "../../src/api/pptBackend.ts";
 import type { AgentClient, AgentRunOptions } from "../../src/agent/agentClient.ts";
+import { createAiInteractionLogger } from "../../src/ai/interactionLog.ts";
 import {
   compactUploadedSourceAnalysisForPrompt,
   createSkippedUploadedSourceVisualAnalysisDraft,
@@ -181,11 +182,21 @@ describe("Uploaded Source Analysis contracts", () => {
 describe("Uploaded Source Analysis workflow gates", () => {
   function createWorkflowHarness(options: {
     firstAttempt: "no-write" | "invalid-schema";
+    uploadedSourceIndex?: UploadedSourceIndex;
   }) {
     let factualAttempt = 0;
+    let visualAttempt = 0;
     let factualFingerprint = "before";
+    let visualFingerprint = "visual-before";
     let finalAnalysis: Record<string, unknown> | null = null;
+    const sourceIndex = options.uploadedSourceIndex ?? uploadedSourceIndex;
+    const logs: Array<{
+      channel: AppendWorkspaceLogInput["channel"];
+      entry: Record<string, unknown>;
+      payload_keys?: string[];
+    }> = [];
     const prompts: string[] = [];
+    const logContexts: Array<AgentRunOptions["logContext"]> = [];
     const workspace = {
       workspace_root: "/tmp",
       task_root: "/tmp",
@@ -213,10 +224,17 @@ describe("Uploaded Source Analysis workflow gates", () => {
         factual_draft_path: "/tmp/workspace/uploaded-sources/analysis/drafts/uploaded-source-factual.json",
         visual_draft_path: "/tmp/workspace/uploaded-sources/analysis/drafts/uploaded-source-visual.json",
         analysis_path: "/tmp/workspace/uploaded-sources/analysis/uploaded-source-analysis.json",
-        uploaded_source_index: uploadedSourceIndex,
+        uploaded_source_index: sourceIndex,
         prepared_at: "2026-07-01T00:00:00.000Z",
       }),
-      appendWorkspaceLog: async () => ({ workspace_dir: workspace.workspace_dir, log_path: "", entry: {} }),
+      appendWorkspaceLog: async (input: AppendWorkspaceLogInput) => {
+        logs.push({
+          channel: input.channel,
+          entry: input.entry,
+          payload_keys: input.payload_keys,
+        });
+        return { workspace_dir: workspace.workspace_dir, log_path: "", entry: input.entry };
+      },
       getUploadedSourceAnalysis: async () => ({ version: 1, status: "empty" }),
       getUploadedSourceAnalysisDraftFingerprint: async ({ draft_type }: { draft_type: "factual" | "visual" }) => {
         if (draft_type === "visual") {
@@ -225,7 +243,7 @@ describe("Uploaded Source Analysis workflow gates", () => {
             draft_type,
             draft_path: "/tmp/visual.json",
             exists: true,
-            sha256: "visual",
+            sha256: visualFingerprint,
             size_bytes: 10,
           };
         }
@@ -238,7 +256,26 @@ describe("Uploaded Source Analysis workflow gates", () => {
           size_bytes: 10,
         };
       },
-      getUploadedSourceAnalysisDraft: async () => {
+      getUploadedSourceAnalysisDraft: async ({ draft_type }: { draft_type: "factual" | "visual" }) => {
+        if (draft_type === "visual") {
+          return {
+            version: 1,
+            draft_type: "visual",
+            status: "ready",
+            continuation_decision: { can_continue: true, reason: "ok", blocking: false },
+            visual_assets: [{
+              id: "visual-1",
+              uploaded_source_id: "uploaded-source-image",
+              source_path: "/tmp/workspace/uploaded-sources/files/uploaded-source-image/chart.png",
+              use_constraint: "usable_visual_asset",
+              reason: "Useful chart.",
+              visual_summary: "Chart image.",
+            }],
+            gaps: [],
+            rejected_material: [],
+            updated_at: "2026-07-01T00:00:00.000Z",
+          };
+        }
         if (options.firstAttempt === "invalid-schema" && factualAttempt === 1) {
           return { version: 1, draft_type: "factual", status: "ready", facts: [] };
         }
@@ -267,6 +304,20 @@ describe("Uploaded Source Analysis workflow gates", () => {
     const agentClient = {
       runAuthoringPrompt: async (prompt: string, runOptions?: AgentRunOptions) => {
         prompts.push(prompt);
+        logContexts.push(runOptions?.logContext);
+        const isVisual = prompt.includes("Uploaded Source Visual Analysis Draft Agent");
+        if (isVisual) {
+          visualAttempt += 1;
+          visualFingerprint = `visual-after-${visualAttempt}`;
+          runOptions?.onStreamEvent?.({ type: "content", text: `visual draft attempt ${visualAttempt}` });
+          return {
+            status: "ready_for_render",
+            changed_files: ["/tmp/visual.json"],
+            summary: "wrote visual draft",
+            needs_render: false,
+            notes: [],
+          };
+        }
         factualAttempt += 1;
         if (options.firstAttempt === "no-write" && factualAttempt === 1) return {
           status: "ready_for_render",
@@ -286,7 +337,19 @@ describe("Uploaded Source Analysis workflow gates", () => {
         };
       },
     } as unknown as AgentClient;
-    return { workspace, backend, agentClient, prompts, getFinalAnalysis: () => finalAnalysis };
+    return {
+      workspace,
+      backend,
+      agentClient,
+      prompts,
+      logs,
+      logContexts,
+      getFinalAnalysis: () => finalAnalysis,
+    };
+  }
+
+  function logEvents(logs: Array<{ entry: Record<string, unknown> }>) {
+    return logs.map((log) => log.entry.event);
   }
 
   it("retries a no-write draft gate failure and then merges a valid analysis", async () => {
@@ -297,6 +360,10 @@ describe("Uploaded Source Analysis workflow gates", () => {
     assert.equal(harness.prompts.length, 2);
     assert.match(harness.prompts[1], /Previous gate failure/);
     assert.equal(harness.getFinalAnalysis()?.status, "ready");
+    assert.ok(logEvents(harness.logs).includes("uploaded_source.analysis.factual.invalid"));
+    assert.ok(logEvents(harness.logs).includes("uploaded_source.analysis.factual.finished"));
+    const finished = harness.logs.find((log) => log.entry.event === "uploaded_source.analysis.factual.finished");
+    assert.equal(Array.isArray(finished?.entry.attempts), true);
   });
 
   it("retries an invalid draft schema and then accepts the repaired draft", async () => {
@@ -306,6 +373,10 @@ describe("Uploaded Source Analysis workflow gates", () => {
     assert.equal(analysis?.facts[0]?.claim, "Revenue grew 12%.");
     assert.equal(harness.prompts.length, 2);
     assert.match(harness.prompts[1], /continuation_decision/);
+    const invalid = harness.logs.find((log) => log.entry.event === "uploaded_source.analysis.factual.invalid");
+    assert.equal(invalid?.entry.gate_passed, false);
+    assert.equal(invalid?.entry.will_retry, true);
+    assert.ok(Array.isArray(invalid?.entry.validation_gaps));
   });
 
   it("emits factual Agent stream events during analysis", async () => {
@@ -326,6 +397,127 @@ describe("Uploaded Source Analysis workflow gates", () => {
       { phase: "factual", text: "draft attempt 1" },
       { phase: "factual", text: "draft attempt 2" },
     ]);
+    const streamBatch = harness.logs.find((log) => log.entry.event === "uploaded_source.analysis.stream.batch");
+    assert.equal(streamBatch?.channel, "ai-research");
+    assert.deepEqual(streamBatch?.payload_keys, ["events"]);
+    assert.equal(Array.isArray(streamBatch?.entry.events), true);
+  });
+
+  it("logs fresh reuse without synthetic Agent operations", async () => {
+    const harness = createWorkflowHarness({ firstAttempt: "invalid-schema" });
+    const freshAnalysis = mergeUploadedSourceAnalysis({
+      uploadedSourceIndex,
+      factualDraft: validateUploadedSourceFactualAnalysisDraft({
+        version: 1,
+        draft_type: "factual",
+        status: "ready",
+        continuation_decision: { can_continue: true, reason: "ok", blocking: false },
+        facts: [{
+          id: "fact-1",
+          claim: "Revenue grew 12%.",
+          uploaded_source_id: "uploaded-source-1",
+          source_path: "/tmp/workspace/uploaded-sources/files/uploaded-source-1/metrics.md",
+        }],
+        gaps: [],
+        rejected_material: [],
+        updated_at: "2026-07-01T00:00:00.000Z",
+      }).draft!,
+      visualDraft: createSkippedUploadedSourceVisualAnalysisDraft("No images."),
+    });
+    (harness.backend as PptBackend & { getUploadedSourceAnalysis: PptBackend["getUploadedSourceAnalysis"] })
+      .getUploadedSourceAnalysis = async () => freshAnalysis as unknown as Record<string, unknown>;
+
+    const reused = await ensureFreshUploadedSourceAnalysis(harness);
+
+    assert.equal(reused?.status, "ready");
+    assert.deepEqual(logEvents(harness.logs), [
+      "uploaded_source.analysis.started",
+      "uploaded_source.analysis.reused",
+    ]);
+    assert.equal(harness.prompts.length, 0);
+  });
+
+  it("logs no-active-source skip without running an Agent", async () => {
+    const emptyIndex: UploadedSourceIndex = {
+      ...uploadedSourceIndex,
+      materials: [],
+      active_total_size_bytes: 0,
+    };
+    const harness = createWorkflowHarness({
+      firstAttempt: "invalid-schema",
+      uploadedSourceIndex: emptyIndex,
+    });
+
+    const analysis = await ensureFreshUploadedSourceAnalysis(harness);
+
+    assert.equal(analysis, null);
+    assert.deepEqual(logEvents(harness.logs), ["uploaded_source.analysis.skipped"]);
+    assert.equal(harness.prompts.length, 0);
+  });
+
+  it("passes research log context to factual and visual Agents and logs merged operation ids", async () => {
+    const imageIndex: UploadedSourceIndex = {
+      ...uploadedSourceIndex,
+      materials: [
+        uploadedSourceIndex.materials[0],
+        {
+          uploaded_source_id: "uploaded-source-image",
+          original_filename: "chart.png",
+          display_name: "chart.png",
+          extension: ".png",
+          mime_type: "image/png",
+          size_bytes: 34,
+          sha256: "sha-image",
+          file_path: "/tmp/workspace/uploaded-sources/files/uploaded-source-image/chart.png",
+          status: "active",
+          created_at: "2026-07-01T00:00:00.000Z",
+          updated_at: "2026-07-01T00:00:00.000Z",
+        },
+      ],
+      active_total_size_bytes: 46,
+    };
+    const harness = createWorkflowHarness({
+      firstAttempt: "invalid-schema",
+      uploadedSourceIndex: imageIndex,
+    });
+    const aiLogger = createAiInteractionLogger(harness.backend);
+
+    const analysis = await ensureFreshUploadedSourceAnalysis({
+      ...harness,
+      aiLogger,
+    });
+
+    assert.equal(analysis?.visual_assets[0]?.id, "visual-1");
+    const factualContext = harness.logContexts.find((context) =>
+      context?.operation === "uploaded_source_analysis_factual"
+    );
+    const visualContext = harness.logContexts.find((context) =>
+      context?.operation === "uploaded_source_analysis_visual"
+    );
+    assert.equal(factualContext?.domain, "research");
+    assert.equal(factualContext?.kind, "uploaded-source-factual-analysis");
+    assert.equal(visualContext?.domain, "research");
+    assert.equal(visualContext?.kind, "uploaded-source-visual-analysis");
+    const merged = harness.logs.find((log) => log.entry.event === "uploaded_source.analysis.merged");
+    assert.ok(merged?.entry.analysis_run_id);
+    assert.equal(typeof merged?.entry.factual_operation_id, "string");
+    assert.equal(typeof merged?.entry.visual_operation_id, "string");
+  });
+
+  it("logs deterministic visual skip without creating a visual Agent operation", async () => {
+    const harness = createWorkflowHarness({ firstAttempt: "invalid-schema" });
+
+    await ensureFreshUploadedSourceAnalysis({
+      ...harness,
+      aiLogger: createAiInteractionLogger(harness.backend),
+    });
+
+    const visualSkipped = harness.logs.find((log) => log.entry.event === "uploaded_source.analysis.visual.skipped");
+    assert.equal(visualSkipped?.entry.reason, "no_uploaded_image_source_material");
+    assert.equal(
+      harness.logContexts.some((context) => context?.operation === "uploaded_source_analysis_visual"),
+      false,
+    );
   });
 
   it("force-refreshes instead of reusing a fresh blocked analysis", async () => {

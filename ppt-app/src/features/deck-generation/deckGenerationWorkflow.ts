@@ -95,6 +95,7 @@ export async function runDeckGeneration(
       ? await ensureFreshUploadedSourceAnalysis({
           backend: input.backend,
           agentClient: input.agentClient,
+          aiLogger: input.aiLogger,
           workspace: input.workspace,
         })
       : null;

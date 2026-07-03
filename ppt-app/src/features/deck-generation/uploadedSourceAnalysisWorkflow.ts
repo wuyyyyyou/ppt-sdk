@@ -5,6 +5,7 @@ import type {
   UploadedSourceMaterial,
   WorkspaceResult,
 } from "../../api/types";
+import type { AiInteractionLogger } from "../../ai/interactionLog";
 import { LOCAL_GATE_REPAIR_LIMIT } from "./types";
 import {
   createAgentFileToolPathContext,
@@ -23,6 +24,15 @@ import {
   type UploadedSourceFactualAnalysisDraft,
   type UploadedSourceVisualAnalysisDraft,
 } from "./uploadedSourceAnalysis";
+import {
+  appendUploadedSourceAnalysisLog,
+  createUploadedSourceAnalysisAgentRunLogger,
+  createUploadedSourceAnalysisRunId,
+  readUploadedSourceAnalysisError,
+  summarizeActiveUploadedSources,
+  summarizeUploadedSourceAnalysisCounts,
+  type UploadedSourceAnalysisGateAttemptLog,
+} from "./uploadedSourceAnalysisLogging";
 
 export type UploadedSourceAnalysisWorkflowPhase = "prepare" | "factual" | "visual" | "merge";
 
@@ -173,23 +183,42 @@ async function runDraftAgent<TDraft>(input: {
   backend: PptBackend;
   agentClient: AgentClient;
   workspace: WorkspaceResult;
-  sources: UploadedSourceMaterial[];
+  analysisRunId: string;
   draftType: "factual" | "visual";
   draftPath: string;
+  draftAgentFileToolPath?: string | null;
   buildPrompt: (previousGateFailure?: string) => string;
   validateDraft: (value: unknown) => UploadedSourceDraftValidationResult<TDraft>;
-  onStreamEvent?: (event: AgentStreamEvent) => void;
-}): Promise<TDraft> {
+  runLogger: ReturnType<typeof createUploadedSourceAnalysisAgentRunLogger>;
+}): Promise<{ draft: TDraft; attempts: UploadedSourceAnalysisGateAttemptLog[] }> {
   let previousGateFailure: string | undefined;
+  const attempts: UploadedSourceAnalysisGateAttemptLog[] = [];
   for (let attempt = 1; attempt <= LOCAL_GATE_REPAIR_LIMIT; attempt += 1) {
+    const attemptKind = attempt === 1 ? "initial" : "retry";
     const before = await input.backend.getUploadedSourceAnalysisDraftFingerprint({
       workspace_dir: input.workspace.workspace_dir,
       draft_type: input.draftType,
     });
+    await input.runLogger.appendSemantic({
+      event: `uploaded_source.analysis.${input.draftType}.attempt`,
+      attempt,
+      attempt_kind: attemptKind,
+      draft_path: input.draftPath,
+      draft_agent_file_tool_path: input.draftAgentFileToolPath,
+      before_fingerprint: before,
+      validation_gaps: [],
+      gate_passed: false,
+      retry_prompt_reason: previousGateFailure,
+      will_retry: false,
+      attempt_limit: LOCAL_GATE_REPAIR_LIMIT,
+    });
     try {
       await input.agentClient.runAuthoringPrompt(
         input.buildPrompt(previousGateFailure),
-        { onStreamEvent: input.onStreamEvent },
+        {
+          onStreamEvent: input.runLogger.onStreamEvent,
+          logContext: input.runLogger.logContext,
+        },
       );
     } catch (error) {
       if (isAgentRunCancelledError(error)) throw error;
@@ -198,7 +227,33 @@ async function runDraftAgent<TDraft>(input: {
         before,
         error,
       });
+      const willRetry = attempt < LOCAL_GATE_REPAIR_LIMIT;
+      const attemptLog: UploadedSourceAnalysisGateAttemptLog = {
+        analysis_run_id: input.analysisRunId,
+        operation_id: input.runLogger.operationId,
+        draft_type: input.draftType,
+        attempt,
+        attempt_kind: attemptKind,
+        draft_path: input.draftPath,
+        draft_agent_file_tool_path: input.draftAgentFileToolPath,
+        before_fingerprint: before,
+        validation_gaps: [],
+        gate_passed: false,
+        retry_prompt_reason: previousGateFailure,
+        will_retry: willRetry,
+        attempt_limit: LOCAL_GATE_REPAIR_LIMIT,
+        error: readUploadedSourceAnalysisError(error),
+      };
+      attempts.push(attemptLog);
+      await input.runLogger.appendSemantic({
+        event: `uploaded_source.analysis.${input.draftType}.failed_attempt`,
+        ...attemptLog,
+      });
       if (attempt >= LOCAL_GATE_REPAIR_LIMIT) {
+        await input.runLogger.finish("failed", {
+          attempts,
+          error: readUploadedSourceAnalysisError(error),
+        });
         throw new Error(previousGateFailure);
       }
       continue;
@@ -212,16 +267,44 @@ async function runDraftAgent<TDraft>(input: {
       draft_type: input.draftType,
     });
     const validation = input.validateDraft(rawDraft);
-    if (after.exists && fingerprintChanged(before, after) && validation.draft) {
-      return validation.draft;
-    }
+    const gatePassed = after.exists && fingerprintChanged(before, after) && Boolean(validation.draft);
     previousGateFailure = summarizeDraftGateFailure({
       draftType: input.draftType,
       before,
       after,
       validationGaps: validation.gaps,
     });
+    const attemptLog: UploadedSourceAnalysisGateAttemptLog = {
+      analysis_run_id: input.analysisRunId,
+      operation_id: input.runLogger.operationId,
+      draft_type: input.draftType,
+      attempt,
+      attempt_kind: attemptKind,
+      draft_path: input.draftPath,
+      draft_agent_file_tool_path: input.draftAgentFileToolPath,
+      before_fingerprint: before,
+      after_fingerprint: after,
+      fingerprint_changed: fingerprintChanged(before, after),
+      validation_gaps: validation.gaps,
+      gate_passed: gatePassed,
+      retry_prompt_reason: gatePassed ? undefined : previousGateFailure,
+      will_retry: !gatePassed && attempt < LOCAL_GATE_REPAIR_LIMIT,
+      attempt_limit: LOCAL_GATE_REPAIR_LIMIT,
+    };
+    attempts.push(attemptLog);
+    if (gatePassed && validation.draft) {
+      await input.runLogger.finish("completed", { ...attemptLog, attempts });
+      return { draft: validation.draft, attempts };
+    }
+    await input.runLogger.appendSemantic({
+      event: `uploaded_source.analysis.${input.draftType}.invalid`,
+      ...attemptLog,
+    });
     if (attempt >= LOCAL_GATE_REPAIR_LIMIT) {
+      await input.runLogger.finish("failed", {
+        attempts,
+        error: { message: previousGateFailure },
+      });
       throw new Error(previousGateFailure);
     }
   }
@@ -234,41 +317,49 @@ function hasVisualCandidate(sources: UploadedSourceMaterial[]) {
   );
 }
 
-async function appendUploadedSourceAnalysisLog(input: {
-  backend: PptBackend;
-  workspace: WorkspaceResult;
-  entry: Record<string, unknown>;
-}) {
-  await input.backend.appendWorkspaceLog({
-    workspace_dir: input.workspace.workspace_dir,
-    channel: "ai-research",
-    entry: {
-      schema_version: 1,
-      updated_at: new Date().toISOString(),
-      ...input.entry,
-    },
-  }).catch((error) => {
-    console.warn("Failed to append uploaded source analysis log", error);
-  });
-}
-
 export async function ensureFreshUploadedSourceAnalysis(input: {
   backend: PptBackend;
   agentClient: AgentClient;
+  aiLogger?: AiInteractionLogger | null;
   workspace: WorkspaceResult;
   forceRefresh?: boolean;
   onProgress?: (event: UploadedSourceAnalysisWorkflowEvent) => void;
 }): Promise<UploadedSourceAnalysis | null> {
+  const analysisRunId = createUploadedSourceAnalysisRunId();
+  let activeSources: UploadedSourceMaterial[] = [];
+  let activeTotalSizeBytes = 0;
+  let prepared: Awaited<ReturnType<PptBackend["prepareUploadedSourceAnalysisWorkspace"]>> | null = null;
+  let failedPhase: UploadedSourceAnalysisWorkflowPhase = "prepare";
+  let factualOperationId: string | undefined;
+  let visualOperationId: string | undefined;
+  let factualAttempts: UploadedSourceAnalysisGateAttemptLog[] = [];
+  let visualAttempts: UploadedSourceAnalysisGateAttemptLog[] = [];
   input.onProgress?.({
     type: "phase",
     phase: "prepare",
     state: "active",
   });
-  const prepared = await input.backend.prepareUploadedSourceAnalysisWorkspace({
-    workspace_dir: input.workspace.workspace_dir,
-  });
-  const activeSources = prepared.uploaded_source_index.materials.filter((source) => source.status === "active");
+  try {
+    prepared = await input.backend.prepareUploadedSourceAnalysisWorkspace({
+      workspace_dir: input.workspace.workspace_dir,
+    });
+    activeSources = prepared.uploaded_source_index.materials.filter((source) => source.status === "active");
+    activeTotalSizeBytes = prepared.uploaded_source_index.active_total_size_bytes;
   if (activeSources.length === 0) {
+    await appendUploadedSourceAnalysisLog({
+      backend: input.backend,
+      workspace: input.workspace,
+      entry: {
+        event: "uploaded_source.analysis.skipped",
+        analysis_run_id: analysisRunId,
+        reason: "no_active_uploaded_sources",
+        active_count: 0,
+        active_total_size_bytes: 0,
+        active_uploaded_sources: [],
+        mode: "auto-skip",
+        updated_at: prepared.uploaded_source_index.updated_at,
+      },
+    });
     input.onProgress?.({
       type: "phase",
       phase: "prepare",
@@ -289,8 +380,11 @@ export async function ensureFreshUploadedSourceAnalysis(input: {
     workspace: input.workspace,
     entry: {
       event: "uploaded_source.analysis.started",
+      analysis_run_id: analysisRunId,
+      mode: input.forceRefresh ? "force-refresh" : "reuse-check",
       active_count: activeSources.length,
-      active_total_size_bytes: prepared.uploaded_source_index.active_total_size_bytes,
+      active_total_size_bytes: activeTotalSizeBytes,
+      active_uploaded_sources: summarizeActiveUploadedSources(activeSources),
     },
   });
 
@@ -306,13 +400,26 @@ export async function ensureFreshUploadedSourceAnalysis(input: {
       uploadedSourceIndex: prepared.uploaded_source_index,
     })
   ) {
+    const existingAnalysis = existing as Partial<UploadedSourceAnalysis>;
     await appendUploadedSourceAnalysisLog({
       backend: input.backend,
       workspace: input.workspace,
       entry: {
         event: "uploaded_source.analysis.reused",
-        status: existing.status,
+        analysis_run_id: analysisRunId,
+        ...summarizeUploadedSourceAnalysisCounts({
+          status: existingAnalysis.status,
+          can_continue: existingAnalysis.continuation_decision?.can_continue,
+          updated_at: existingAnalysis.updated_at,
+          facts: existingAnalysis.facts,
+          visual_assets: existingAnalysis.visual_assets,
+          gaps: existingAnalysis.gaps,
+          rejected_material: existingAnalysis.rejected_material,
+        }),
+        reused_analysis_updated_at: existingAnalysis.updated_at,
         active_count: activeSources.length,
+        active_total_size_bytes: activeTotalSizeBytes,
+        active_uploaded_sources: summarizeActiveUploadedSources(activeSources),
       },
     });
     const reused = existing as unknown as UploadedSourceAnalysis;
@@ -346,22 +453,48 @@ export async function ensureFreshUploadedSourceAnalysis(input: {
     state: "active",
     sourceCount: activeSources.length,
   });
-  const factualDraft = await runDraftAgent<UploadedSourceFactualAnalysisDraft>({
+  failedPhase = "factual";
+  const agentPathContext = createAgentFileToolPathContext({
+    workspaceRoot: input.workspace.workspace_root,
+    workspaceDir: input.workspace.workspace_dir,
+  });
+  const factualDraftPath = prepared.factual_draft_path;
+  const visualDraftPath = prepared.visual_draft_path;
+  const factualDraftAgentPath = toAgentFileToolPath(
+    agentPathContext,
+    factualDraftPath,
+  ).agentFileToolPath;
+  const factualLogger = createUploadedSourceAnalysisAgentRunLogger({
+    backend: input.backend,
+    workspace: input.workspace,
+    aiLogger: input.aiLogger,
+    analysisRunId,
+    draftType: "factual",
+    operation: "uploaded_source_analysis_factual",
+    kind: "uploaded-source-factual-analysis",
+    draftPath: factualDraftPath,
+    onStreamEvent: (event) => input.onProgress?.({ type: "stream", phase: "factual", event }),
+  });
+  factualOperationId = factualLogger.operationId;
+  const factualResult = await runDraftAgent<UploadedSourceFactualAnalysisDraft>({
     backend: input.backend,
     agentClient: input.agentClient,
     workspace: input.workspace,
-    sources: activeSources,
+    analysisRunId,
     draftType: "factual",
-    draftPath: prepared.factual_draft_path,
+    draftPath: factualDraftPath,
+    draftAgentFileToolPath: factualDraftAgentPath,
     buildPrompt: (previousGateFailure) => buildFactualPrompt({
       workspace: input.workspace,
       sources: activeSources,
-      draftPath: prepared.factual_draft_path,
+      draftPath: factualDraftPath,
       previousGateFailure,
     }),
     validateDraft: validateUploadedSourceFactualAnalysisDraft,
-    onStreamEvent: (event) => input.onProgress?.({ type: "stream", phase: "factual", event }),
+    runLogger: factualLogger,
   });
+  const factualDraft = factualResult.draft;
+  factualAttempts = factualResult.attempts;
   input.onProgress?.({
     type: "phase",
     phase: "factual",
@@ -371,11 +504,29 @@ export async function ensureFreshUploadedSourceAnalysis(input: {
 
   let visualDraft: UploadedSourceVisualAnalysisDraft;
   if (!hasVisualCandidate(activeSources)) {
+    failedPhase = "visual";
     visualDraft = createSkippedUploadedSourceVisualAnalysisDraft("No uploaded image source material requires visual analysis.");
     await input.backend.recordUploadedSourceAnalysisDraft({
       workspace_dir: input.workspace.workspace_dir,
       draft_type: "visual",
       draft: visualDraft as unknown as Record<string, unknown>,
+    });
+    await appendUploadedSourceAnalysisLog({
+      backend: input.backend,
+      workspace: input.workspace,
+      entry: {
+        event: "uploaded_source.analysis.visual.skipped",
+        analysis_run_id: analysisRunId,
+        draft_type: "visual",
+        reason: "no_uploaded_image_source_material",
+        active_count: activeSources.length,
+        active_total_size_bytes: activeTotalSizeBytes,
+        active_uploaded_sources: summarizeActiveUploadedSources(activeSources),
+        draft_path: visualDraftPath,
+        status: "skipped",
+        can_continue: true,
+        updated_at: visualDraft.updated_at,
+      },
     });
     input.onProgress?.({
       type: "phase",
@@ -391,22 +542,42 @@ export async function ensureFreshUploadedSourceAnalysis(input: {
       state: "active",
       sourceCount: activeSources.length,
     });
-    visualDraft = await runDraftAgent<UploadedSourceVisualAnalysisDraft>({
+    failedPhase = "visual";
+    const visualLogger = createUploadedSourceAnalysisAgentRunLogger({
+      backend: input.backend,
+      workspace: input.workspace,
+      aiLogger: input.aiLogger,
+      analysisRunId,
+      draftType: "visual",
+      operation: "uploaded_source_analysis_visual",
+      kind: "uploaded-source-visual-analysis",
+      draftPath: visualDraftPath,
+      onStreamEvent: (event) => input.onProgress?.({ type: "stream", phase: "visual", event }),
+    });
+    visualOperationId = visualLogger.operationId;
+    const visualDraftAgentPath = toAgentFileToolPath(
+      agentPathContext,
+      visualDraftPath,
+    ).agentFileToolPath;
+    const visualResult = await runDraftAgent<UploadedSourceVisualAnalysisDraft>({
       backend: input.backend,
       agentClient: input.agentClient,
       workspace: input.workspace,
-      sources: activeSources,
+      analysisRunId,
       draftType: "visual",
-      draftPath: prepared.visual_draft_path,
+      draftPath: visualDraftPath,
+      draftAgentFileToolPath: visualDraftAgentPath,
       buildPrompt: (previousGateFailure) => buildVisualPrompt({
         workspace: input.workspace,
         sources: activeSources,
-        draftPath: prepared.visual_draft_path,
+        draftPath: visualDraftPath,
         previousGateFailure,
       }),
       validateDraft: validateUploadedSourceVisualAnalysisDraft,
-      onStreamEvent: (event) => input.onProgress?.({ type: "stream", phase: "visual", event }),
+      runLogger: visualLogger,
     });
+    visualDraft = visualResult.draft;
+    visualAttempts = visualResult.attempts;
     input.onProgress?.({
       type: "phase",
       phase: "visual",
@@ -421,6 +592,7 @@ export async function ensureFreshUploadedSourceAnalysis(input: {
     state: "active",
     sourceCount: activeSources.length,
   });
+  failedPhase = "merge";
   const analysis = mergeUploadedSourceAnalysis({
     uploadedSourceIndex: prepared.uploaded_source_index,
     factualDraft,
@@ -435,14 +607,47 @@ export async function ensureFreshUploadedSourceAnalysis(input: {
     workspace: input.workspace,
     entry: {
       event: "uploaded_source.analysis.merged",
+      analysis_run_id: analysisRunId,
+      analysis_path: prepared.analysis_path,
       status: analysis.status,
       can_continue: analysis.continuation_decision.can_continue,
+      reason: analysis.continuation_decision.reason,
       facts: analysis.facts.length,
       visual_assets: analysis.visual_assets.length,
       gaps: analysis.gaps.length,
       rejected_material: analysis.rejected_material.length,
+      factual_operation_id: factualOperationId,
+      visual_operation_id: visualOperationId,
+      factual_status: factualDraft.status,
+      visual_status: visualDraft.status,
+      active_count: activeSources.length,
+      active_total_size_bytes: activeTotalSizeBytes,
+      active_uploaded_sources: summarizeActiveUploadedSources(activeSources),
     },
   });
+  if (analysis.status === "blocked" || !analysis.continuation_decision.can_continue) {
+    await appendUploadedSourceAnalysisLog({
+      backend: input.backend,
+      workspace: input.workspace,
+      entry: {
+        event: "uploaded_source.analysis.blocked",
+        analysis_run_id: analysisRunId,
+        analysis_status: analysis.status,
+        can_continue: false,
+        reason: analysis.continuation_decision.reason,
+        analysis_path: prepared.analysis_path,
+        facts: analysis.facts.length,
+        visual_assets: analysis.visual_assets.length,
+        gaps: analysis.gaps.length,
+        rejected_material: analysis.rejected_material.length,
+        factual_operation_id: factualOperationId,
+        visual_operation_id: visualOperationId,
+        active_count: activeSources.length,
+        active_total_size_bytes: activeTotalSizeBytes,
+        active_uploaded_sources: summarizeActiveUploadedSources(activeSources),
+      },
+    });
+  }
   input.onProgress?.({
     type: "phase",
     phase: "merge",
@@ -454,4 +659,33 @@ export async function ensureFreshUploadedSourceAnalysis(input: {
     message: analysis.continuation_decision.reason,
   });
   return analysis;
+  } catch (error) {
+    if (isAgentRunCancelledError(error)) throw error;
+    input.onProgress?.({
+      type: "phase",
+      phase: failedPhase,
+      state: "failed",
+      sourceCount: activeSources.length,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    await appendUploadedSourceAnalysisLog({
+      backend: input.backend,
+      workspace: input.workspace,
+      entry: {
+        event: "uploaded_source.analysis.failed",
+        analysis_run_id: analysisRunId,
+        failed_phase: failedPhase,
+        error: readUploadedSourceAnalysisError(error),
+        factual_operation_id: factualOperationId,
+        visual_operation_id: visualOperationId,
+        attempts: [...factualAttempts, ...visualAttempts],
+        active_count: activeSources.length,
+        active_total_size_bytes: activeTotalSizeBytes,
+        active_uploaded_sources: summarizeActiveUploadedSources(activeSources),
+        analysis_path: prepared?.analysis_path,
+      },
+      payloadKeys: ["attempts"],
+    });
+    throw error;
+  }
 }
