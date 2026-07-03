@@ -46,14 +46,10 @@ const EMPTY_SETTINGS: Required<
     WorkspaceSettings,
     | "text_density"
     | "output_language"
-    | "aspect_ratio"
-    | "typography"
   >
 > = {
   text_density: "balanced",
-  output_language: AUTO_OUTPUT_LANGUAGE,
-  aspect_ratio: "16:9",
-  typography: ""
+  output_language: AUTO_OUTPUT_LANGUAGE
 };
 
 function readSettings(workspace: WorkspaceResult | null): WorkspaceSettings {
@@ -73,12 +69,7 @@ function toEditableSettings(workspace: WorkspaceResult | null) {
   return {
     text_density: normalizeSettingValue(setting.text_density, EMPTY_SETTINGS.text_density),
     output_language: normalizeSettingValue(setting.output_language, EMPTY_SETTINGS.output_language),
-    aspect_ratio: normalizeSettingValue(setting.aspect_ratio, EMPTY_SETTINGS.aspect_ratio),
     page_generation_concurrency: readPageGenerationConcurrency(setting),
-    typography:
-      setting.typography === "Clean Sans"
-        ? EMPTY_SETTINGS.typography
-        : normalizeSettingValue(setting.typography, EMPTY_SETTINGS.typography),
     ...pageReviewSettingsToWorkspaceSettings(readPageReviewSettings(setting))
   };
 }
@@ -293,19 +284,6 @@ export function LibraryPage({
           editing={editing}
           onChange={(value) => setDraft((next) => ({ ...next, output_language: value }))}
         />
-        <PreferenceSelect
-          label={t.preferences.aspectRatio}
-          value={draft.aspect_ratio}
-          options={["16:9", "4:3"]}
-          editing={editing}
-          onChange={(value) => setDraft((next) => ({ ...next, aspect_ratio: value }))}
-        />
-        <PreferenceField
-          label={t.preferences.typography}
-          value={draft.typography}
-          editing={editing}
-          onChange={(value) => setDraft((next) => ({ ...next, typography: value }))}
-        />
         <PreferenceSwitch
           label={t.preferences.visualReviewEnabled}
           value={draft.visual_review_enabled === true}
@@ -415,24 +393,6 @@ function PreferenceNumber(props: {
         />
       ) : (
         <strong>{value}</strong>
-      )}
-    </label>
-  );
-}
-
-function PreferenceField(props: {
-  label: string;
-  value: string;
-  editing: boolean;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="pref-row">
-      <span>{props.label}</span>
-      {props.editing ? (
-        <input value={props.value} onChange={(event) => props.onChange(event.target.value)} />
-      ) : (
-        <strong>{props.value || "-"}</strong>
       )}
     </label>
   );

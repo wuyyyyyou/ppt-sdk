@@ -205,7 +205,7 @@ export function buildDeckRefinementIntentReviewLlmRequest(
             "Return exactly one JSON object. Do not edit files. Do not include markdown, comments, or code fences.",
             "",
             "Route rules:",
-            '- Use route "unsupported" for selected Template/template group changes, theme_id changes, aspect_ratio changes, unsafe template migrations, or requests that cannot be handled by editing existing/new pages.',
+            '- Use route "unsupported" for selected Template/template group changes, theme_id changes, unsafe template migrations, or requests that cannot be handled by editing existing/new pages.',
             '- Use route "no_op" when the request does not require output language, outline, research, page, manifest, progress, or render changes.',
             '- Use route "proceed" when any deck-level artifact or Page Generation Unit should change.',
             "",

@@ -86,6 +86,12 @@ import {
   readPageReviewSettings,
   type PageReviewSettings,
 } from "../reviewSettings";
+import {
+  DEFAULT_RESEARCH_SEARCH_CONTROL_SETTINGS,
+  readResearchSearchControlSettings,
+  researchSearchControlSettingsToWorkspaceSettings,
+  type ResearchSearchControlSettings,
+} from "../researchSearchControl";
 import type {
   ContextRow,
   DeckReviewRenderState,
@@ -179,6 +185,7 @@ export interface DeckWorkspaceActions {
   setPrompt: (value: string) => void;
   setReviewOutlineFirst: (value: boolean) => void;
   setStrictReviewMode: (enabled: boolean) => Promise<void>;
+  setResearchSearchControlSettings: (settings: ResearchSearchControlSettings) => Promise<void>;
   setDeckTitle: (value: string) => void;
   setCurrentSlide: (index: number) => void;
   setOutlineFeedback: (value: string) => void;
@@ -245,6 +252,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [pageReviewSettings, setPageReviewSettings] = useState<PageReviewSettings>(
     DEFAULT_PAGE_REVIEW_SETTINGS
   );
+  const [researchSearchControlSettings, setResearchSearchControlSettingsState] =
+    useState<ResearchSearchControlSettings>(DEFAULT_RESEARCH_SEARCH_CONTROL_SETTINGS);
   const [contextRows, setContextRows] = useState<ContextRow[]>([]);
   const [deckTitle, setDeckTitle] = useState(t.deck.title);
   const [deck, setDeck] = useState<Slide[]>(initialDeck);
@@ -741,6 +750,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return readPageReviewSettings(workspaceSettingsToState(workspace));
   }
 
+  function workspaceResearchSearchControlSettings(workspace: WorkspaceResult | null) {
+    return readResearchSearchControlSettings(workspaceSettingsToState(workspace));
+  }
+
   function normalizePersistedContextRow(value: unknown): ContextRow | null {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       return null;
@@ -1041,6 +1054,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setCurrentWorkspace(workspace);
     void refreshUploadedSources(workspace);
     setPageReviewSettings(workspacePageReviewSettings(workspace));
+    setResearchSearchControlSettingsState(workspaceResearchSearchControlSettings(workspace));
     if (!exportInFlightRef.current) {
       setExportArtifactWithProgress(readWorkspaceExportArtifactPath(workspace));
       void refreshWorkspaceExportArtifact(workspace, exportRefreshVersionRef.current);
@@ -1141,6 +1155,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         const defaults = await nextBackend.getWorkspaceDefaults();
         if (cancelled) return;
         setPageReviewSettings(readPageReviewSettings(defaults.setting));
+        setResearchSearchControlSettingsState(readResearchSearchControlSettings(defaults.setting));
         const templates = await nextBackend.listTemplates();
         if (cancelled) return;
         setTemplateGroups(templates.templates);
@@ -2780,13 +2795,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const workspace = await backend.updateWorkspaceSettings({
         workspace_dir: currentWorkspace.workspace_dir,
         persist_as_default: true,
-        setting: {
-          ...setting,
-          audience: "",
-          goal: "",
-          style_notes: "",
-          slide_count: undefined
-        }
+        setting
       });
       applyWorkspace(workspace);
       setWorkspaceScan(await backend.listWorkspaces());
@@ -2817,10 +2826,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const updatedWorkspace = await backend.updateWorkspaceSettings({
         workspace_dir: workspace.workspace_dir,
         persist_as_default: true,
-        setting: {
-          ...setting,
-          ...pageReviewSettingsToWorkspaceSettings(nextReviewSettings),
-        },
+        setting: pageReviewSettingsToWorkspaceSettings(nextReviewSettings),
       });
       applyWorkspace(updatedWorkspace);
       setWorkspaceScan(await backend.listWorkspaces());
@@ -2828,6 +2834,35 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     } catch (error) {
       setWorkspaceError(
         error instanceof Error ? error.message : "Failed to save settings."
+      );
+    } finally {
+      setWorkspaceSettingsSaving(false);
+    }
+  }
+
+  async function setResearchSearchControlSettings(settings: ResearchSearchControlSettings) {
+    if (!backend) return;
+
+    setWorkspaceSettingsSaving(true);
+    setWorkspaceError("");
+    setResearchSearchControlSettingsState(settings);
+    try {
+      const workspace = await ensureCurrentWorkspace();
+      if (!workspace) return;
+      const updatedWorkspace = await backend.updateWorkspaceSettings({
+        workspace_dir: workspace.workspace_dir,
+        persist_as_default: true,
+        setting: researchSearchControlSettingsToWorkspaceSettings(settings),
+      });
+      applyWorkspace(updatedWorkspace);
+      setWorkspaceScan(await backend.listWorkspaces());
+      showToast(t.status.settingsSaved);
+    } catch (error) {
+      setWorkspaceError(
+        error instanceof Error ? error.message : "Failed to save settings."
+      );
+      setResearchSearchControlSettingsState(
+        workspaceResearchSearchControlSettings(currentWorkspace)
       );
     } finally {
       setWorkspaceSettingsSaving(false);
@@ -3369,6 +3404,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     prompt,
     reviewOutlineFirst,
     pageReviewSettings,
+    researchSearchControlSettings,
     contextRows,
     deckTitle,
     deck,
@@ -3409,6 +3445,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setPrompt,
     setReviewOutlineFirst,
     setStrictReviewMode,
+    setResearchSearchControlSettings,
     setDeckTitle,
     setCurrentSlide,
     setOutlineFeedback,

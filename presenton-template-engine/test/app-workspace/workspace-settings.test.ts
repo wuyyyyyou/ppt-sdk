@@ -47,7 +47,11 @@ test("workspace settings can be saved as defaults for newly created workspaces",
     assert.equal(firstSetting.content_review_failure_limit, 5);
     assert.equal(firstSetting.visual_review_enabled, false);
     assert.equal(firstSetting.visual_review_failure_limit, 5);
+    assert.equal(firstSetting.disable_web_research, false);
+    assert.equal(firstSetting.disable_image_research, false);
     assert.equal(firstSetting.page_generation_concurrency, 3);
+    assert.equal("aspect_ratio" in firstSetting, false);
+    assert.equal("typography" in firstSetting, false);
     assert.equal("language" in firstSetting, false);
 
     await writeJson(path.join(homeDir, "anna-workspace", "ppt", "setting.json"), {
@@ -87,6 +91,8 @@ test("workspace settings can be saved as defaults for newly created workspaces",
         content_review_failure_limit: 99,
         visual_review_enabled: false,
         visual_review_failure_limit: -1,
+        disable_web_research: true,
+        disable_image_research: "true",
         page_generation_concurrency: 99,
       },
     });
@@ -103,7 +109,11 @@ test("workspace settings can be saved as defaults for newly created workspaces",
     assert.equal(updatedGlobalSetting.content_review_failure_limit, 10);
     assert.equal(updatedGlobalSetting.visual_review_enabled, false);
     assert.equal(updatedGlobalSetting.visual_review_failure_limit, 0);
+    assert.equal(updatedGlobalSetting.disable_web_research, true);
+    assert.equal(updatedGlobalSetting.disable_image_research, false);
     assert.equal(updatedGlobalSetting.page_generation_concurrency, 6);
+    assert.equal("aspect_ratio" in updatedGlobalSetting, false);
+    assert.equal("typography" in updatedGlobalSetting, false);
 
     const inherited = await createAppWorkspace({ title: "Inherited" });
     const inheritedSetting = await readJson<Record<string, unknown>>(path.join(inherited.workspace_dir, "setting.json"));
@@ -114,7 +124,37 @@ test("workspace settings can be saved as defaults for newly created workspaces",
     assert.equal(inheritedSetting.content_review_failure_limit, 10);
     assert.equal(inheritedSetting.visual_review_enabled, false);
     assert.equal(inheritedSetting.visual_review_failure_limit, 0);
+    assert.equal(inheritedSetting.disable_web_research, true);
+    assert.equal(inheritedSetting.disable_image_research, false);
     assert.equal(inheritedSetting.page_generation_concurrency, 6);
+    assert.equal("aspect_ratio" in inheritedSetting, false);
+    assert.equal("typography" in inheritedSetting, false);
+
+    await updateAppWorkspaceSettings({
+      workspace_dir: first.workspace_dir,
+      setting: {
+        output_language: "Workspace only",
+      },
+    });
+    await updateAppWorkspaceSettings({
+      workspace_dir: first.workspace_dir,
+      persist_as_default: true,
+      setting: {
+        disable_image_research: true,
+      },
+    });
+    const patchedFirstSetting = await readJson<Record<string, unknown>>(firstSettingPath);
+    const patchedGlobalSetting = await readJson<Record<string, unknown>>(
+      path.join(homeDir, "anna-workspace", "ppt", "setting.json"),
+    );
+
+    assert.equal(patchedFirstSetting.output_language, "Workspace only");
+    assert.equal(patchedFirstSetting.disable_web_research, true);
+    assert.equal(patchedFirstSetting.disable_image_research, true);
+    assert.equal(patchedGlobalSetting.output_language, "中文");
+    assert.equal(patchedGlobalSetting.text_density, "light");
+    assert.equal(patchedGlobalSetting.disable_web_research, true);
+    assert.equal(patchedGlobalSetting.disable_image_research, true);
 
     const secondWorkspaceDir = createWorkspaceDir(homeDir);
     const second = await updateAppWorkspaceSettings({

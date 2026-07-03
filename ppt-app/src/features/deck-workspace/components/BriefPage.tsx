@@ -6,7 +6,9 @@ import type { ContextRow, LoadingKind } from "../types";
 import { TemplatePreviewModal } from "./TemplatePreviewModal";
 import { getThemePreset, THEME_PRESET_IDS } from "../themePresets";
 import { isStrictReviewModeEnabled, type PageReviewSettings } from "../reviewSettings";
+import type { ResearchSearchControlSettings } from "../researchSearchControl";
 import { filterSelectableTemplates } from "../templateSelectionPolicy";
+import { ResearchSearchControlSwitches } from "./ResearchSearchControlSwitches";
 
 const SLIDE_COUNT_OPTIONS = ["auto", ...Array.from({ length: 20 }, (_, index) => String(index + 1))];
 
@@ -22,6 +24,9 @@ interface BriefPageProps {
   setReviewOutlineFirst: (value: boolean) => void;
   pageReviewSettings: PageReviewSettings;
   setStrictReviewMode: (enabled: boolean) => Promise<void>;
+  researchSearchControlSettings: ResearchSearchControlSettings;
+  workspaceSettingsSaving: boolean;
+  setResearchSearchControlSettings: (settings: ResearchSearchControlSettings) => Promise<void>;
   contextRows: ContextRow[];
   uploadedSources: UploadedSourceMaterial[];
   addContextRow: (row: ContextRow) => void;
@@ -47,6 +52,9 @@ export function BriefPage(props: BriefPageProps) {
     setReviewOutlineFirst,
     pageReviewSettings,
     setStrictReviewMode,
+    researchSearchControlSettings,
+    workspaceSettingsSaving,
+    setResearchSearchControlSettings,
     contextRows,
     uploadedSources,
     addContextRow,
@@ -128,7 +136,7 @@ export function BriefPage(props: BriefPageProps) {
           <button
             className="inline-create-btn"
             onClick={generateDeck}
-            disabled={isCreating || isSuggestingContext}
+            disabled={isCreating || isSuggestingContext || workspaceSettingsSaving}
           >
             {isCreateButtonLoading ? (
               <span className="spinner small" />
@@ -140,37 +148,50 @@ export function BriefPage(props: BriefPageProps) {
         </div>
       </div>
 
-      <button
-        type="button"
-        className={`checkbox-row ${reviewOutlineFirst ? "active" : ""}`}
-        onClick={() => setReviewOutlineFirst(!reviewOutlineFirst)}
-        aria-checked={reviewOutlineFirst}
-        role="switch"
-      >
-        <span className="checkbox-custom">
-          {reviewOutlineFirst ? <Check size={11} strokeWidth={3} /> : null}
-        </span>
-        <span>{t.brief.reviewOutlineFirst}</span>
-      </button>
+      <div className="brief-toggle-columns">
+        <div className="brief-toggle-column">
+          <button
+            type="button"
+            className={`checkbox-row ${reviewOutlineFirst ? "active" : ""}`}
+            onClick={() => setReviewOutlineFirst(!reviewOutlineFirst)}
+            aria-checked={reviewOutlineFirst}
+            role="switch"
+          >
+            <span className="checkbox-custom">
+              {reviewOutlineFirst ? <Check size={11} strokeWidth={3} /> : null}
+            </span>
+            <span>{t.brief.reviewOutlineFirst}</span>
+          </button>
 
-      <div className="checkbox-row-with-help">
-        <button
-          type="button"
-          className={`checkbox-row ${strictReviewMode ? "active" : ""}`}
-          onClick={toggleStrictReviewMode}
-          aria-checked={strictReviewMode}
-          role="switch"
-          disabled={isCreating || isSuggestingContext}
-        >
-          <span className="checkbox-custom">
-            {strictReviewMode ? <Check size={11} strokeWidth={3} /> : null}
-          </span>
-          <span>{t.brief.strictReviewMode}</span>
-        </button>
-        <span className="help-tooltip" tabIndex={0} aria-label={t.brief.strictReviewModeHelp}>
-          <HelpCircle size={15} />
-          <span className="help-tooltip-content">{t.brief.strictReviewModeHelp}</span>
-        </span>
+          <div className="checkbox-row-with-help">
+            <button
+              type="button"
+              className={`checkbox-row ${strictReviewMode ? "active" : ""}`}
+              onClick={toggleStrictReviewMode}
+              aria-checked={strictReviewMode}
+              role="switch"
+              disabled={isCreating || isSuggestingContext}
+            >
+              <span className="checkbox-custom">
+                {strictReviewMode ? <Check size={11} strokeWidth={3} /> : null}
+              </span>
+              <span>{t.brief.strictReviewMode}</span>
+            </button>
+            <span className="help-tooltip" tabIndex={0} aria-label={t.brief.strictReviewModeHelp}>
+              <HelpCircle size={15} />
+              <span className="help-tooltip-content">{t.brief.strictReviewModeHelp}</span>
+            </span>
+          </div>
+        </div>
+
+        <ResearchSearchControlSwitches
+          t={t}
+          settings={researchSearchControlSettings}
+          disabled={isCreating || isSuggestingContext || workspaceSettingsSaving}
+          onChange={(settings) => {
+            void setResearchSearchControlSettings(settings);
+          }}
+        />
       </div>
 
       {strictReviewConfirmOpen ? (

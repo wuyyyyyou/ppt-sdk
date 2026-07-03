@@ -14,6 +14,7 @@ import type {
 } from "../deck-generation";
 import type { ActiveGenerationRun, GenerationViewState } from "./generationViewState";
 import type { PageReviewSettings } from "./reviewSettings";
+import type { ResearchSearchControlSettings } from "./researchSearchControl";
 
 export type MainStage = "brief" | "uploaded-source-analysis" | "outline" | "generating" | "deck";
 export type PageId = "main" | "library" | "review" | "refine" | "export";
@@ -74,6 +75,7 @@ export interface DeckWorkspaceState {
   prompt: string;
   reviewOutlineFirst: boolean;
   pageReviewSettings: PageReviewSettings;
+  researchSearchControlSettings: ResearchSearchControlSettings;
   contextRows: ContextRow[];
   deckTitle: string;
   deck: Slide[];

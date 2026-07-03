@@ -24,7 +24,7 @@ function makeTemplate(groupId: string, groupName: string): TemplateSummary {
   };
 }
 
-function renderBriefPage(options: { loading?: LoadingKind } = {}) {
+function renderBriefPage(options: { loading?: LoadingKind; workspaceSettingsSaving?: boolean } = {}) {
   return renderToStaticMarkup(
     createElement(BriefPage, {
       t: messages.zh,
@@ -51,15 +51,30 @@ function renderBriefPage(options: { loading?: LoadingKind } = {}) {
         visualReviewFailureLimit: 5,
       },
       setStrictReviewMode: async () => undefined,
+      researchSearchControlSettings: {
+        disableWebResearch: false,
+        disableImageResearch: false,
+      },
+      workspaceSettingsSaving: options.workspaceSettingsSaving ?? false,
+      setResearchSearchControlSettings: async () => undefined,
       contextRows: [],
+      uploadedSources: [],
       addContextRow: (_row: ContextRow) => undefined,
       updateContextRow: () => undefined,
       removeContextRow: () => undefined,
+      uploadUploadedSource: async () => undefined,
+      removeUploadedSource: async () => undefined,
       addStyleRow: () => undefined,
       suggestContextFromPrompt: async () => undefined,
       generateDeck: async () => undefined,
-      showToast: () => undefined,
     }),
+  );
+}
+
+function assertDisabledButtonWithLabel(html: string, label: string) {
+  assert.match(
+    html,
+    new RegExp(`<button(?=[^>]*disabled="")[^>]*>[\\s\\S]*?${label}[\\s\\S]*?</button>`),
   );
 }
 
@@ -107,5 +122,27 @@ describe("BriefPage", () => {
 
     assert.match(html, /inline-create-btn/);
     assert.match(html, /spinner small/);
+  });
+
+  it("disables research search controls while context is being suggested", () => {
+    const html = renderBriefPage({ loading: "context" });
+
+    assertDisabledButtonWithLabel(html, "禁止网络资料搜索");
+    assertDisabledButtonWithLabel(html, "禁止图片搜索");
+  });
+
+  it("shows persistent research search controls on the first stage", () => {
+    const html = renderBriefPage();
+
+    assert.match(html, /禁止网络资料搜索/);
+    assert.match(html, /禁止图片搜索/);
+  });
+
+  it("disables create and research search controls while workspace settings are saving", () => {
+    const html = renderBriefPage({ workspaceSettingsSaving: true });
+
+    assert.match(html, /<button class="inline-create-btn" disabled="">/);
+    assertDisabledButtonWithLabel(html, "禁止网络资料搜索");
+    assertDisabledButtonWithLabel(html, "禁止图片搜索");
   });
 });

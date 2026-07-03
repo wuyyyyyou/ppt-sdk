@@ -161,16 +161,16 @@ export interface WorkspaceSettings {
   goal?: string;
   style_notes?: string;
   output_language?: string;
-  aspect_ratio?: string;
   text_density?: string;
   visual_tone?: string;
-  typography?: string;
   theme_id?: string;
   page_generation_concurrency?: number;
   content_review_enabled?: boolean;
   content_review_failure_limit?: number;
   visual_review_enabled?: boolean;
   visual_review_failure_limit?: number;
+  disable_web_research?: boolean;
+  disable_image_research?: boolean;
   updated_at?: string;
   [key: string]: unknown;
 }

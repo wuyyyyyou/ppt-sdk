@@ -45,6 +45,8 @@ export interface Messages {
     pptx: string;
     pdf: string;
     useTemplate: string;
+    disableWebResearch: string;
+    disableImageResearch: string;
     stop: string;
   };
   stages: {
@@ -89,7 +91,6 @@ export interface Messages {
       | "slides"
       | "textPerSlide"
       | "outputLanguage"
-      | "aspectRatio"
       | "look",
       string
     >;
@@ -303,11 +304,9 @@ export interface Messages {
     lastEditedDate: string;
   };
   preferences: {
-    aspectRatio: string;
     defaultLanguage: string;
     textDensity: string;
     visualTone: string;
-    typography: string;
     pageGenerationConcurrency: string;
     visualReviewEnabled: string;
     visualReviewFailureLimit: string;
@@ -419,6 +418,8 @@ export const messages: Record<Locale, Messages> = {
       pptx: "PPTX",
       pdf: "PDF",
       useTemplate: "Use style",
+      disableWebResearch: "Disable web research",
+      disableImageResearch: "Disable image search",
       stop: "Stop"
     },
     stages: {
@@ -474,7 +475,6 @@ export const messages: Record<Locale, Messages> = {
         slides: "Slides",
         textPerSlide: "Text per slide",
         outputLanguage: "Output language",
-        aspectRatio: "Aspect ratio",
         look: "Look"
       },
       contextDefaults: {
@@ -706,11 +706,9 @@ export const messages: Record<Locale, Messages> = {
       lastEditedDate: "Last edited {date}"
     },
     preferences: {
-      aspectRatio: "Aspect ratio",
       defaultLanguage: "Default language",
       textDensity: "Text density",
       visualTone: "Visual tone",
-      typography: "Typography",
       pageGenerationConcurrency: "Page generation concurrency",
       visualReviewEnabled: "Visual check",
       visualReviewFailureLimit: "Visual check failure limit",
@@ -828,6 +826,8 @@ export const messages: Record<Locale, Messages> = {
       pptx: "PPTX",
       pdf: "PDF",
       useTemplate: "使用风格",
+      disableWebResearch: "禁止网络资料搜索",
+      disableImageResearch: "禁止图片搜索",
       stop: "停止"
     },
     stages: {
@@ -883,7 +883,6 @@ export const messages: Record<Locale, Messages> = {
         slides: "页数",
         textPerSlide: "单页文字量",
         outputLanguage: "输出语言",
-        aspectRatio: "画幅比例",
         look: "视觉方向"
       },
       contextDefaults: {
@@ -1114,11 +1113,9 @@ export const messages: Record<Locale, Messages> = {
       lastEditedDate: "{date} 编辑"
     },
     preferences: {
-      aspectRatio: "画幅比例",
       defaultLanguage: "默认语言",
       textDensity: "文字密度",
       visualTone: "视觉语气",
-      typography: "字体风格",
       pageGenerationConcurrency: "页面生成并发数",
       visualReviewEnabled: "视觉检查",
       visualReviewFailureLimit: "视觉检查失败次数上限",

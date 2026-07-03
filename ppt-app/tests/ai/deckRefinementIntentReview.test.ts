@@ -72,7 +72,6 @@ const planningContext: TemplatePlanningContext = {
 
 const setting: WorkspaceSettings = {
   output_language: "zh",
-  aspect_ratio: "16:9",
   theme_id: "digital-indigo",
   text_density: "balanced",
 };

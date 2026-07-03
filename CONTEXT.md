@@ -49,6 +49,10 @@ _Avoid_: Shared Research Evidence, Page Research Evidence
 **Research Collection Ledger**:
 A Workspace-owned record of which web and image query intents have already been collected during Research Discovery or later refinement research. It is used to avoid repeating completed query intents while preserving existing Research Evidence; interrupted research work must not make a query intent count as completed collection.
 
+**Research Search Control**:
+A Workspace-level or run-level user preference that disables new web or visual external search and fetch during Research Discovery. It does not disable reuse of existing Research Evidence, Evidence-Aware Page Planning, Uploaded Source Material, or Uploaded Source Analysis.
+_Avoid_: Disable evidence, disable uploaded sources
+
 **Research Requirement**:
 The decision that more external material is needed because the deck or a refinement target depends on real-world facts, current information, source-backed data, or non-template visual assets that are not already available in Research Evidence.
 

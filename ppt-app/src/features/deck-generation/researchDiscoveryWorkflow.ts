@@ -48,7 +48,7 @@ import {
 } from "./researchDiscoveryProgress";
 import { normalizeResearchQueryKey } from "./pageRefinementArtifacts";
 import { recordDeckRecovery, throwIfCancelled } from "./runtimeSupport";
-import { getAttemptLimits } from "./settings";
+import { getAttemptLimits, getResearchSearchControlSettings } from "./settings";
 import type { DeckGenerationRuntime, ResearchDiscoveryProgressQuery } from "./types";
 import { createAgentFileToolPathContext } from "./agentFileToolPaths";
 import {
@@ -714,6 +714,7 @@ async function runDiscoveryPhase(input: {
   runtime: DeckGenerationRuntime;
   pagePlan: PagePlan;
   phase: "web" | "visual";
+  disabled?: boolean;
   targetPageIds?: string[];
   pool: ResearchDiscoveryEvidencePool;
   paths: { raw_web_dir: string; raw_images_dir: string; evidence_drafts_dir: string };
@@ -722,6 +723,59 @@ async function runDiscoveryPhase(input: {
   const text = generationText(input.runtime.locale);
   let pool = input.pool;
   let stopped = false;
+  if (input.disabled) {
+    const iteration = 1;
+    const decisionPhase = input.phase === "web" ? "web-decision" : "visual-decision";
+    const collectionPhase = input.phase === "web" ? "web-collection" : "visual-collection";
+    const curationPhase = input.phase === "web" ? "web-curation" : "visual-curation";
+    await updateDiscoveryProgress({
+      runtime: input.runtime,
+      pagePlan: input.pagePlan,
+      step: "research-discovery",
+      message: input.phase === "web" ? text.webResearchDiscovery : text.visualResearchDiscovery,
+      update: () => updateResearchDiscoveryPhase(input.runtime.researchDiscoveryProgress, {
+        phase: decisionPhase,
+        state: "completed",
+        iteration,
+        rationale: input.phase === "web"
+          ? "Web Research Discovery is disabled by workspace setting."
+          : "Visual Research Discovery is disabled by workspace setting.",
+      }),
+    });
+    await updateDiscoveryProgress({
+      runtime: input.runtime,
+      pagePlan: input.pagePlan,
+      step: "research-collection",
+      message: input.phase === "web" ? text.collectingWebSources : text.collectingVisualSources,
+      update: () => updateResearchDiscoveryPhase(input.runtime.researchDiscoveryProgress, {
+        phase: collectionPhase,
+        state: "completed",
+        iteration,
+        activities: [
+          input.phase === "web"
+            ? "无需网页搜索，已跳过搜索与抓取。"
+            : "无需图片搜索，已跳过图片素材收集。",
+        ],
+      }),
+    });
+    await updateDiscoveryProgress({
+      runtime: input.runtime,
+      pagePlan: input.pagePlan,
+      step: "research-curation",
+      message: input.phase === "web" ? text.curatingDiscoveryFacts : text.curatingDiscoveryImages,
+      update: () => updateResearchDiscoveryPhase(input.runtime.researchDiscoveryProgress, {
+        phase: curationPhase,
+        state: "completed",
+        iteration,
+        activities: [
+          input.phase === "web"
+            ? "无需筛选网页事实证据。"
+            : "无需筛选图片素材。",
+        ],
+      }),
+    });
+    return pool;
+  }
   for (let iteration = 1; iteration <= RESEARCH_DISCOVERY_ITERATION_LIMIT; iteration += 1) {
     throwIfCancelled(input.runtime);
     const decisionPhase = input.phase === "web" ? "web-decision" : "visual-decision";
@@ -1294,11 +1348,13 @@ export async function runResearchDiscoveryForPagePlan(input: {
   );
   const uploadedSourceAnalysis = await resolveFreshUploadedSourceAnalysisForResearchDiscovery(runtime);
   const uploadedSourceAnalysisContext = compactUploadedSourceAnalysisForPrompt(uploadedSourceAnalysis);
+  const researchSearchControlSettings = getResearchSearchControlSettings(runtime);
   let pool = normalizeResearchDiscoveryEvidencePool(existingEvidence.discovery_pool);
   pool = await runDiscoveryPhase({
     runtime,
     pagePlan: input.pagePlan,
     phase: "web",
+    disabled: researchSearchControlSettings.disableWebResearch,
     targetPageIds: input.targetPageIds,
     pool,
     paths,
@@ -1308,6 +1364,7 @@ export async function runResearchDiscoveryForPagePlan(input: {
     runtime,
     pagePlan: input.pagePlan,
     phase: "visual",
+    disabled: researchSearchControlSettings.disableImageResearch,
     targetPageIds: input.targetPageIds,
     pool,
     paths,

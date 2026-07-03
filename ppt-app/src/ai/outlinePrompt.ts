@@ -66,8 +66,6 @@ function buildSettingSummary(
     slide_count: readContextRowString(contextRows, "slides") || "auto",
     text_density: readSettingString(setting, "text_density"),
     visual_tone: readSettingString(setting, "visual_tone"),
-    typography: readSettingString(setting, "typography"),
-    aspect_ratio: readSettingString(setting, "aspect_ratio"),
   };
 }
 

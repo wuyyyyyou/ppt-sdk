@@ -827,16 +827,16 @@ function createDefaultSettingJson() {
     goal: "",
     style_notes: "",
     output_language: "auto",
-    aspect_ratio: "16:9",
     text_density: "balanced",
     visual_tone: "",
-    typography: "",
     theme_id: "finance-red-classic",
     page_generation_concurrency: 3,
     content_review_enabled: false,
     content_review_failure_limit: 5,
     visual_review_enabled: false,
     visual_review_failure_limit: 5,
+    disable_web_research: false,
+    disable_image_research: false,
   };
 }
 
@@ -882,12 +882,10 @@ function normalizeSettingJson(setting: unknown): Record<string, unknown> {
     nextSetting.visual_tone = "";
   }
 
-  if (nextSetting.typography === "Clean Sans") {
-    nextSetting.typography = "";
-  }
-
   nextSetting.content_review_enabled = nextSetting.content_review_enabled === true;
   nextSetting.visual_review_enabled = nextSetting.visual_review_enabled === true;
+  nextSetting.disable_web_research = nextSetting.disable_web_research === true;
+  nextSetting.disable_image_research = nextSetting.disable_image_research === true;
   nextSetting.page_generation_concurrency = normalizePageGenerationConcurrency(
     nextSetting.page_generation_concurrency,
   );

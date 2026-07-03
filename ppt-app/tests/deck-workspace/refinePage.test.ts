@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { messages } from "../../src/i18n/messages.ts";
-import type { DeckReviewRenderState } from "../../src/features/deck-workspace/types.ts";
+import type { DeckReviewRenderState, LoadingKind, RefineScope } from "../../src/features/deck-workspace/types.ts";
 import { RefinePage } from "../../src/features/deck-workspace/components/RefinePage.tsx";
 
 const slide = {
@@ -45,22 +45,41 @@ const idleReviewRender: DeckReviewRenderState = {
   result: null,
 };
 
-function renderRefinePage(reviewRender: DeckReviewRenderState) {
+function renderRefinePage(
+  reviewRender: DeckReviewRenderState,
+  options: {
+    refineScope?: RefineScope;
+    loading?: LoadingKind;
+    workspaceSettingsSaving?: boolean;
+  } = {},
+) {
   return renderToStaticMarkup(
     createElement(RefinePage, {
       t: messages.zh,
-      scope: "slide",
-      setScope: () => undefined,
+      deck: [slide],
+      refineScope: options.refineScope ?? "slide",
       slide,
       slideIndex: 0,
       slideNumber: "01",
-      deckCount: 1,
       reviewRender,
-      loading: "none",
+      loading: options.loading ?? "none",
+      researchSearchControlSettings: {
+        disableWebResearch: false,
+        disableImageResearch: false,
+      },
+      workspaceSettingsSaving: options.workspaceSettingsSaving ?? false,
       onBack: () => undefined,
+      setResearchSearchControlSettings: async () => undefined,
       onRefineDeck: () => undefined,
       onRefineSlide: () => undefined,
     }),
+  );
+}
+
+function assertDisabledButtonWithLabel(html: string, label: string) {
+  assert.match(
+    html,
+    new RegExp(`<button(?=[^>]*disabled="")[^>]*>[\\s\\S]*?${label}[\\s\\S]*?</button>`),
   );
 }
 
@@ -79,5 +98,32 @@ describe("RefinePage", () => {
     assert.doesNotMatch(html, /<iframe/);
     assert.match(html, /slide-preview-card/);
     assert.match(html, /The Future with AI/);
+  });
+
+  it("shows persistent research search controls on refinement entry pages", () => {
+    const html = renderRefinePage(idleReviewRender);
+
+    assert.match(html, /禁止网络资料搜索/);
+    assert.match(html, /禁止图片搜索/);
+  });
+
+  it("disables research search controls while deck refinement settings are saving", () => {
+    const html = renderRefinePage(idleReviewRender, {
+      refineScope: "deck",
+      workspaceSettingsSaving: true,
+    });
+
+    assertDisabledButtonWithLabel(html, "禁止网络资料搜索");
+    assertDisabledButtonWithLabel(html, "禁止图片搜索");
+  });
+
+  it("disables research search controls while slide refinement settings are saving", () => {
+    const html = renderRefinePage(idleReviewRender, {
+      refineScope: "slide",
+      workspaceSettingsSaving: true,
+    });
+
+    assertDisabledButtonWithLabel(html, "禁止网络资料搜索");
+    assertDisabledButtonWithLabel(html, "禁止图片搜索");
   });
 });

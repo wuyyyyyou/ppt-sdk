@@ -87,6 +87,25 @@ export interface AppWorkspaceResult {
   template: unknown;
 }
 
+export interface AppWorkspaceSettings {
+  audience?: string;
+  goal?: string;
+  style_notes?: string;
+  output_language?: string;
+  text_density?: string;
+  visual_tone?: string;
+  theme_id?: string;
+  page_generation_concurrency?: number;
+  content_review_enabled?: boolean;
+  content_review_failure_limit?: number;
+  visual_review_enabled?: boolean;
+  visual_review_failure_limit?: number;
+  disable_web_research?: boolean;
+  disable_image_research?: boolean;
+  updated_at?: string;
+  [key: string]: unknown;
+}
+
 export type AppUploadedSourceStatus = "active" | "removed";
 
 export interface AppUploadedSourceMaterial {
@@ -255,7 +274,7 @@ export interface OpenAppWorkspaceInput {
 
 export interface UpdateAppWorkspaceSettingsInput {
   workspace_dir: string;
-  setting: Record<string, unknown>;
+  setting: AppWorkspaceSettings;
   persist_as_default?: boolean;
 }
 

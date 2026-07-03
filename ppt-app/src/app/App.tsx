@@ -89,6 +89,9 @@ export function App() {
               setReviewOutlineFirst={actions.setReviewOutlineFirst}
               pageReviewSettings={state.pageReviewSettings}
               setStrictReviewMode={actions.setStrictReviewMode}
+              researchSearchControlSettings={state.researchSearchControlSettings}
+              workspaceSettingsSaving={state.workspaceSettingsSaving}
+              setResearchSearchControlSettings={actions.setResearchSearchControlSettings}
               contextRows={state.contextRows}
               uploadedSources={state.uploadedSources}
               addContextRow={actions.addContextRow}
@@ -220,7 +223,10 @@ export function App() {
               refineScope={state.refineScope}
               reviewRender={state.reviewRender}
               loading={state.loading}
+              researchSearchControlSettings={state.researchSearchControlSettings}
+              workspaceSettingsSaving={state.workspaceSettingsSaving}
               onBack={actions.goBack}
+              setResearchSearchControlSettings={actions.setResearchSearchControlSettings}
               onRefineDeck={actions.refineDeck}
               onRefineSlide={actions.refineSlide}
             />

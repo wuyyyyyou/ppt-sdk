@@ -343,6 +343,8 @@ function createHarness(options: {
   let recordResearchEvidencePageCalls = 0;
   let recordResearchStatusCalls = 0;
   let recordResearchStatusPageCalls = 0;
+  let webResearchDiscoveryDecisionCalls = 0;
+  let visualResearchDiscoveryDecisionCalls = 0;
   let pageAuthoringRuns = 0;
   let researchDraftNoChangeRuns = options.researchDraftNoChangeRuns ?? 0;
   let researchCurationErrorRuns = options.researchCurationErrorRuns ?? 0;
@@ -375,6 +377,32 @@ function createHarness(options: {
     getWorkspaceDefaults: async () => ({ workspace_root: workspace.workspace_root, setting: {} }),
     createWorkspace: async () => currentWorkspace,
     openWorkspace: async () => currentWorkspace,
+    listUploadedSources: async () => ({
+      workspace_dir: workspace.workspace_dir,
+      index: {
+        version: 1,
+        workspace_dir: workspace.workspace_dir,
+        active_total_size_bytes: 0,
+        materials: [],
+        updated_at: "2026-05-23T00:00:00.000Z",
+      },
+      active: [],
+      removed: [],
+      limits: {
+        single_file_max_bytes: 25 * 1024 * 1024,
+        active_total_max_bytes: 100 * 1024 * 1024,
+      },
+    }),
+    getUploadedSourceAnalysis: async () => ({
+      version: 1,
+      status: "ready",
+      facts: [],
+      visual_assets: [],
+      gaps: [],
+      rejected_material: [],
+      active_uploaded_sources: [],
+      updated_at: "2026-05-23T00:00:00.000Z",
+    }),
     appendWorkspaceLog: async (input) => {
       logs.push(input);
       return { workspace_dir: input.workspace_dir, log_file: "log.jsonl", appended: true };
@@ -769,6 +797,11 @@ function createHarness(options: {
       reason: "test no-op",
     },
     generateResearchDiscoveryDecision: async (input) => {
+      if (input.phase === "web") {
+        webResearchDiscoveryDecisionCalls += 1;
+      } else {
+        visualResearchDiscoveryDecisionCalls += 1;
+      }
       const targetIds = new Set(input.targetPageIds ?? input.pagePlan.pages.map((page) => page.page_id));
       const completed = new Set(
         input.discoveryPool.iterations
@@ -1031,6 +1064,12 @@ function createHarness(options: {
     },
     get recordResearchStatusPageCalls() {
       return recordResearchStatusPageCalls;
+    },
+    get webResearchDiscoveryDecisionCalls() {
+      return webResearchDiscoveryDecisionCalls;
+    },
+    get visualResearchDiscoveryDecisionCalls() {
+      return visualResearchDiscoveryDecisionCalls;
     },
     get maxActiveAuthoringRuns() {
       return maxActiveAuthoringRuns;
@@ -2997,6 +3036,93 @@ describe("Deck Generation Flow Module", () => {
     assert.ok(contentReviewPrompt);
     assert.equal(contentReviewPrompt.includes("/research/evidence/drafts/"), false);
     assert.match(contentReviewPrompt, /Raw Research Material/);
+  });
+
+  it("short-circuits web and image Research Discovery phases when disabled by workspace setting", async () => {
+    const pagePlan = makePagePlan();
+    const researchPlan = makeResearchPlan(pagePlan);
+    researchPlan.pages[0] = {
+      ...researchPlan.pages[0],
+      web_research_needed: true,
+      image_research_needed: true,
+      query_intents: ["Anna Executa market evidence"],
+      image_query_intents: ["Anna Executa product screenshot"],
+    };
+    const harness = createHarness({ pagePlan, researchPlan });
+    const searchDisabledWorkspace: WorkspaceResult = {
+      ...workspace,
+      setting: {
+        ...STRICT_REVIEW_SETTING,
+        disable_web_research: true,
+        disable_image_research: true,
+      },
+    };
+
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace: searchDisabledWorkspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.webResearchDiscoveryDecisionCalls, 0);
+    assert.equal(harness.visualResearchDiscoveryDecisionCalls, 0);
+    assert.equal(harness.webSearchCalls, 0);
+    assert.equal(harness.webFetchCalls, 0);
+    assert.equal(harness.imageSearchCalls, 0);
+    assert.equal(harness.imageFetchCalls, 0);
+    assert.equal(harness.authoringPrompts.some((prompt) => prompt.includes("Research Curation Draft Agent")), false);
+    const records = harness.progress.research_discovery?.records ?? [];
+    assert.equal(records.find((record) => record.phase === "web-collection")?.activities?.[0], "无需网页搜索，已跳过搜索与抓取。");
+    assert.equal(records.find((record) => record.phase === "visual-collection")?.activities?.[0], "无需图片搜索，已跳过图片素材收集。");
+    assert.equal(records.find((record) => record.phase === "evidence-page-planning")?.state, "completed");
+  });
+
+  it("short-circuits only the disabled Research Discovery phase", async () => {
+    const pagePlan = makePagePlan();
+    const researchPlan = makeResearchPlan(pagePlan);
+    researchPlan.pages[0] = {
+      ...researchPlan.pages[0],
+      web_research_needed: true,
+      image_research_needed: true,
+      query_intents: ["Anna Executa market evidence"],
+      image_query_intents: ["Anna Executa product screenshot"],
+    };
+    const harness = createHarness({ pagePlan, researchPlan });
+    const webDisabledWorkspace: WorkspaceResult = {
+      ...workspace,
+      setting: {
+        ...STRICT_REVIEW_SETTING,
+        disable_web_research: true,
+        disable_image_research: false,
+      },
+    };
+
+    const completion = await runDeckGeneration({
+      backend: harness.backend,
+      aiClient: harness.aiClient,
+      agentClient: harness.agentClient,
+      workspace: webDisabledWorkspace,
+      confirmedOutline: outline,
+      locale: "zh",
+      startMode: "restart",
+      onProgress: (progress) => harness.progressEvents.push(progress),
+      isCancelled: () => false,
+    });
+
+    assert.equal(completion.status, "completed");
+    assert.equal(harness.webResearchDiscoveryDecisionCalls, 0);
+    assert.ok(harness.visualResearchDiscoveryDecisionCalls > 0);
+    assert.equal(harness.webSearchCalls, 0);
+    assert.equal(harness.webFetchCalls, 0);
+    assert.equal(harness.imageSearchCalls, 1);
+    assert.equal(harness.imageFetchCalls, 1);
   });
 
   it("tells visual research curation to copy raw index file paths into draft assets", async () => {
