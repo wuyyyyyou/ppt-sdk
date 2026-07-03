@@ -532,7 +532,7 @@ export function uploadedSourceDependencyMatchesAnalysis(input: {
 }): boolean {
   const { dependency, analysis } = input;
   if (!dependency || !analysis) return false;
-  if (dependency.status !== analysis.status || dependency.updated_at !== analysis.updated_at) return false;
+  if (dependency.status !== analysis.status) return false;
   if (dependency.active_uploaded_sources.length !== analysis.source.active_uploaded_sources.length) return false;
   const dependencyById = new Map(dependency.active_uploaded_sources.map((source) => [source.uploaded_source_id, source]));
   return analysis.source.active_uploaded_sources.every((source) => {

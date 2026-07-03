@@ -160,6 +160,20 @@ describe("Uploaded Source Analysis contracts", () => {
 
     const dependency = createUploadedSourceAnalysisDependency(analysis);
     assert.equal(uploadedSourceDependencyMatchesAnalysis({ dependency, analysis }), true);
+    assert.equal(uploadedSourceDependencyMatchesAnalysis({
+      dependency: { ...dependency, updated_at: "2026-07-01T00:01:00.005Z" },
+      analysis,
+    }), true);
+    assert.equal(uploadedSourceDependencyMatchesAnalysis({
+      dependency: {
+        ...dependency,
+        active_uploaded_sources: dependency.active_uploaded_sources.map((source) => ({
+          ...source,
+          sha256: "changed",
+        })),
+      },
+      analysis,
+    }), false);
     assert.equal(compactUploadedSourceAnalysisForPrompt(analysis)?.facts[0]?.id, "fact-1");
   });
 });
