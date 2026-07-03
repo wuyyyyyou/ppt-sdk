@@ -92,6 +92,7 @@ import {
   researchSearchControlSettingsToWorkspaceSettings,
   type ResearchSearchControlSettings,
 } from "../researchSearchControl";
+import { createWorkspaceReviewRenderKey } from "../workspaceReviewRenderKey";
 import type {
   ContextRow,
   DeckReviewRenderState,
@@ -856,44 +857,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     };
   }
 
-  function workspaceReviewRenderKey(workspace: WorkspaceResult) {
-    const templateRecord =
-      workspace.template && typeof workspace.template === "object" && !Array.isArray(workspace.template)
-        ? (workspace.template as { manifest_path?: unknown; selected_at?: unknown })
-        : null;
-    const settingRecord =
-      workspace.setting && typeof workspace.setting === "object" && !Array.isArray(workspace.setting)
-        ? (workspace.setting as { updated_at?: unknown })
-        : null;
-    const outlineRecord =
-      workspace.outline && typeof workspace.outline === "object" && !Array.isArray(workspace.outline)
-        ? (workspace.outline as { updated_at?: unknown })
-        : null;
-    const pagePlanRecord =
-      workspace.page_plan && typeof workspace.page_plan === "object" && !Array.isArray(workspace.page_plan)
-        ? (workspace.page_plan as { updated_at?: unknown })
-        : null;
-    const pageProgressRecord =
-      workspace.page_progress && typeof workspace.page_progress === "object" && !Array.isArray(workspace.page_progress)
-        ? (workspace.page_progress as { updated_at?: unknown })
-        : null;
-    const pagesRecord =
-      workspace.pages && typeof workspace.pages === "object" && !Array.isArray(workspace.pages)
-        ? (workspace.pages as { updated_at?: unknown })
-        : null;
-    const manifestPath =
-      typeof templateRecord?.manifest_path === "string" ? templateRecord.manifest_path : "";
-    const selectedAt = typeof templateRecord?.selected_at === "string" ? templateRecord.selected_at : "";
-    const updatedParts = [
-      typeof settingRecord?.updated_at === "string" ? settingRecord.updated_at : "",
-      typeof outlineRecord?.updated_at === "string" ? outlineRecord.updated_at : "",
-      typeof pagePlanRecord?.updated_at === "string" ? pagePlanRecord.updated_at : "",
-      typeof pageProgressRecord?.updated_at === "string" ? pageProgressRecord.updated_at : "",
-      typeof pagesRecord?.updated_at === "string" ? pagesRecord.updated_at : "",
-      selectedAt,
-    ];
-    return `${workspace.task_dir ?? workspace.workspace_dir}:${manifestPath}:${updatedParts.join(":")}`;
-  }
+  const workspaceReviewRenderKey = createWorkspaceReviewRenderKey;
 
   function setExportArtifactWithProgress(artifact: ExportArtifact | null) {
     setExportArtifact(artifact);
