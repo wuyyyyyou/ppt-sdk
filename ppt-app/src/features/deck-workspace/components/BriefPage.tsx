@@ -1,8 +1,8 @@
-import { AlertTriangle, Check, CheckCircle2, ChevronDown, File, HelpCircle, ImageIcon, LoaderCircle, Palette, Search, Sparkles, Upload, X } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, ChevronDown, File, HelpCircle, ImageIcon, Palette, Search, Sparkles, Upload, X } from "lucide-react";
 import { useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import type { TemplateSummary, UploadedSourceMaterial } from "../../../api/types";
-import { formatMessage, type Messages } from "../../../i18n/messages";
-import type { ContextRow, LoadingKind, UploadedSourceAnalysisViewState } from "../types";
+import type { Messages } from "../../../i18n/messages";
+import type { ContextRow, LoadingKind } from "../types";
 import { TemplatePreviewModal } from "./TemplatePreviewModal";
 import { getThemePreset, THEME_PRESET_IDS } from "../themePresets";
 import { isStrictReviewModeEnabled, type PageReviewSettings } from "../reviewSettings";
@@ -24,7 +24,6 @@ interface BriefPageProps {
   setStrictReviewMode: (enabled: boolean) => Promise<void>;
   contextRows: ContextRow[];
   uploadedSources: UploadedSourceMaterial[];
-  uploadedSourceAnalysisState: UploadedSourceAnalysisViewState;
   addContextRow: (row: ContextRow) => void;
   updateContextRow: (id: string, value: string) => void;
   removeContextRow: (id: string) => void;
@@ -50,7 +49,6 @@ export function BriefPage(props: BriefPageProps) {
     setStrictReviewMode,
     contextRows,
     uploadedSources,
-    uploadedSourceAnalysisState,
     addContextRow,
     updateContextRow,
     removeContextRow,
@@ -357,71 +355,11 @@ export function BriefPage(props: BriefPageProps) {
                 </span>
               ))}
             </div>
-            <UploadedSourceAnalysisStatusView
-              t={t}
-              state={uploadedSourceAnalysisState}
-            />
           </div>
         ) : null}
       </div>
     </section>
   );
-}
-
-function UploadedSourceAnalysisStatusView(props: {
-  t: Messages;
-  state: UploadedSourceAnalysisViewState;
-}) {
-  const { t, state } = props;
-  if (state.status === "hidden") return null;
-  const text = uploadedSourceAnalysisStatusText(t, state);
-  const icon = state.status === "analyzing"
-    ? <LoaderCircle className="uploaded-source-status-spin" size={13} />
-    : state.status === "ready" || state.status === "gap"
-      ? <CheckCircle2 size={13} />
-      : state.status === "pending"
-        ? <File size={13} />
-        : <AlertTriangle size={13} />;
-  return (
-    <div className={`uploaded-source-analysis-status ${state.status}`}>
-      {icon}
-      <span>{text}</span>
-    </div>
-  );
-}
-
-function uploadedSourceAnalysisStatusText(
-  t: Messages,
-  state: UploadedSourceAnalysisViewState,
-) {
-  const labels = t.brief.uploadedSourceStatus;
-  switch (state.status) {
-    case "pending":
-      return labels.pending;
-    case "stale":
-      return labels.stale;
-    case "analyzing":
-      return labels.analyzing;
-    case "ready":
-      if (state.factCount !== null && state.visualAssetCount !== null) {
-        return formatMessage(labels.readyWithCounts, {
-          facts: state.factCount,
-          visualAssets: state.visualAssetCount,
-        });
-      }
-      return labels.ready;
-    case "gap":
-      if (state.gapCount !== null) {
-        return formatMessage(labels.gapWithCount, { gaps: state.gapCount });
-      }
-      return labels.gap;
-    case "blocked":
-      return labels.blocked;
-    case "error":
-      return state.reason || labels.error;
-    case "hidden":
-      return "";
-  }
 }
 
 export function StyleSelection(props: {

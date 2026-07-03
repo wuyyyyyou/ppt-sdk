@@ -91,7 +91,6 @@ export function App() {
               setStrictReviewMode={actions.setStrictReviewMode}
               contextRows={state.contextRows}
               uploadedSources={state.uploadedSources}
-              uploadedSourceAnalysisState={state.uploadedSourceAnalysisState}
               addContextRow={actions.addContextRow}
               updateContextRow={actions.updateContextRow}
               removeContextRow={actions.removeContextRow}
