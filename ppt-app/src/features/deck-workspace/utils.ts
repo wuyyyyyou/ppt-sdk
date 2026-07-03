@@ -20,7 +20,12 @@ export function deckReadyStatus(t: Messages, count: number) {
 }
 
 export function stageOrder(stage: MainStage) {
-  return { brief: 1, outline: 2, generating: 3, deck: 4 }[stage];
+  return { brief: 1, "uploaded-source-analysis": 2, outline: 3, generating: 4, deck: 5 }[stage];
+}
+
+export function stageLabel(t: Messages, stage: MainStage) {
+  if (stage === "uploaded-source-analysis") return t.stages.uploadedSourceAnalysis;
+  return t.stages[stage];
 }
 
 export function syncSlideCountContextRow(

@@ -1,6 +1,6 @@
 import type { Messages } from "../../../i18n/messages";
 import type { MainStage } from "../types";
-import { stageOrder } from "../utils";
+import { stageLabel, stageOrder } from "../utils";
 
 interface ProgressLineProps {
   stage: MainStage;
@@ -9,7 +9,7 @@ interface ProgressLineProps {
 }
 
 export function ProgressLine({ stage, t, onNavigate }: ProgressLineProps) {
-  const stages = ["brief", "outline", "generating", "deck"] as MainStage[];
+  const stages = ["brief", "uploaded-source-analysis", "outline", "generating", "deck"] as MainStage[];
   const currentIndex = Math.max(0, stages.indexOf(stage));
   const progress = `${(currentIndex / (stages.length - 1)) * 100}%`;
 
@@ -23,7 +23,7 @@ export function ProgressLine({ stage, t, onNavigate }: ProgressLineProps) {
           className={`progress-node ${
             item === stage ? "active" : stageOrder(item) < stageOrder(stage) ? "completed" : ""
           }`}
-          title={t.stages[item]}
+          title={stageLabel(t, item)}
           onClick={() => onNavigate(item)}
         />
       ))}

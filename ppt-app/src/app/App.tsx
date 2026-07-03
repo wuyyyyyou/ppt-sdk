@@ -9,6 +9,7 @@ import { PanelHeader } from "../features/deck-workspace/components/PanelHeader";
 import { ProgressLine } from "../features/deck-workspace/components/ProgressLine";
 import { RefinePage } from "../features/deck-workspace/components/RefinePage";
 import { ReviewPage } from "../features/deck-workspace/components/ReviewPage";
+import { UploadedSourceAnalysisPage } from "../features/deck-workspace/components/UploadedSourceAnalysisPage";
 import { WorkspaceDialog } from "../features/deck-workspace/components/WorkspaceDialog";
 import { useDeckWorkspace } from "../features/deck-workspace/hooks/useDeckWorkspace";
 import { useI18n } from "../i18n/useI18n";
@@ -61,8 +62,11 @@ export function App() {
           status={state.currentStatus}
           onLibrary={() => actions.navigate("library")}
           navigationDisabled={
-            state.stage === "generating" &&
-            state.generationViewState.isActive
+            (state.stage === "generating" && state.generationViewState.isActive) ||
+            (
+              state.stage === "uploaded-source-analysis" &&
+              state.uploadedSourceAnalysisProgress.status === "running"
+            )
           }
           onHome={() => void actions.showWorkspacePicker()}
         />
@@ -118,6 +122,16 @@ export function App() {
               createDeck={actions.createDeckFromOutline}
               loading={state.loading}
               uploadedSourceAnalysisState={state.uploadedSourceAnalysisState}
+            />
+          ) : null}
+
+          {state.page === "main" && state.stage === "uploaded-source-analysis" ? (
+            <UploadedSourceAnalysisPage
+              t={t}
+              progress={state.uploadedSourceAnalysisProgress}
+              viewState={state.uploadedSourceAnalysisState}
+              onReturnToBrief={actions.returnToBriefFromUploadedSourceAnalysis}
+              onRetry={actions.retryUploadedSourceAnalysis}
             />
           ) : null}
 

@@ -50,6 +50,7 @@ export interface Messages {
   stages: {
     template: string;
     brief: string;
+    uploadedSourceAnalysis: string;
     outline: string;
     generating: string;
     deck: string;
@@ -143,6 +144,34 @@ export interface Messages {
     readOnlyHint: string;
     feedbackPlaceholder: string;
     fallbackSummary: string;
+  };
+  uploadedSourceAnalysis: {
+    title: string;
+    running: string;
+    completed: string;
+    skipped: string;
+    failed: string;
+    blocked: string;
+    noSources: string;
+    stale: string;
+    sourceCount: string;
+    resultSummary: string;
+    retry: string;
+    returnToBrief: string;
+    records: Record<"prepare" | "factual" | "visual" | "merge", string>;
+    messages: Record<
+      | "idle"
+      | "prepare"
+      | "factual"
+      | "visual"
+      | "merge"
+      | "completed"
+      | "skipped"
+      | "failed"
+      | "blocked",
+      string
+    >;
+    summaryLabels: Record<"facts" | "visualAssets" | "gaps" | "rejected" | "reason", string>;
   };
   generating: {
     progressTitle: string;
@@ -395,6 +424,7 @@ export const messages: Record<Locale, Messages> = {
     stages: {
       template: "Template",
       brief: "Brief",
+      uploadedSourceAnalysis: "Source analysis",
       outline: "Outline",
       generating: "Generating",
       deck: "Deck"
@@ -499,6 +529,44 @@ export const messages: Record<Locale, Messages> = {
       feedbackPlaceholder:
         "Enter a rewrite request, such as adding a security slide, making it more executive-facing, or reducing to 5 slides...",
       fallbackSummary: "Add supporting points and details for this slide."
+    },
+    uploadedSourceAnalysis: {
+      title: "Source material analysis",
+      running: "Analyzing source material",
+      completed: "Source material analysis complete",
+      skipped: "No source material to analyze",
+      failed: "Source material analysis failed",
+      blocked: "Source material analysis blocked continuation",
+      noSources: "No source material, no analysis needed.",
+      stale: "Source material changed; continuing will rerun analysis.",
+      sourceCount: "{count} source files",
+      resultSummary: "Analysis result",
+      retry: "Retry analysis",
+      returnToBrief: "Return to brief",
+      records: {
+        prepare: "Prepare source material",
+        factual: "Factual analysis",
+        visual: "Visual analysis",
+        merge: "Compile analysis result"
+      },
+      messages: {
+        idle: "Waiting to analyze source material.",
+        prepare: "Preparing uploaded source material...",
+        factual: "Running factual source analysis...",
+        visual: "Running visual source analysis...",
+        merge: "Compiling analysis result...",
+        completed: "Analysis is ready; continuing the previous action.",
+        skipped: "No source material, no analysis needed.",
+        failed: "Analysis failed. Retry or return to the brief.",
+        blocked: "Analysis blocked continuation. Retry or return to the brief."
+      },
+      summaryLabels: {
+        facts: "Facts",
+        visualAssets: "Visual assets",
+        gaps: "Gaps",
+        rejected: "Rejected",
+        reason: "Reason"
+      }
     },
     generating: {
       progressTitle: "Generation progress",
@@ -765,6 +833,7 @@ export const messages: Record<Locale, Messages> = {
     stages: {
       template: "模板",
       brief: "需求",
+      uploadedSourceAnalysis: "上传资料分析",
       outline: "大纲",
       generating: "生成中",
       deck: "成稿"
@@ -868,6 +937,44 @@ export const messages: Record<Locale, Messages> = {
       readOnlyHint: "默认只读，点击修改后才能编辑大纲。",
       feedbackPlaceholder: "输入重构需求，例如增加安全页、改成更面向高管，或缩减到 5 页...",
       fallbackSummary: "为这一页补充要点和细节。"
+    },
+    uploadedSourceAnalysis: {
+      title: "上传资料分析",
+      running: "正在分析上传资料",
+      completed: "上传资料分析完成",
+      skipped: "无上传资料可分析",
+      failed: "上传资料分析失败",
+      blocked: "上传资料分析阻止继续",
+      noSources: "无上传资料，不需要分析。",
+      stale: "上传资料已变更，继续创建时会重新分析。",
+      sourceCount: "{count} 个上传资料",
+      resultSummary: "分析结果",
+      retry: "重试分析",
+      returnToBrief: "返回需求",
+      records: {
+        prepare: "准备上传资料",
+        factual: "事实分析",
+        visual: "视觉分析",
+        merge: "整理分析结果"
+      },
+      messages: {
+        idle: "等待分析上传资料。",
+        prepare: "正在准备上传资料...",
+        factual: "正在运行事实分析...",
+        visual: "正在运行视觉分析...",
+        merge: "正在整理分析结果...",
+        completed: "分析已完成，将继续之前的操作。",
+        skipped: "无上传资料，不需要分析。",
+        failed: "分析失败。可重试分析或返回需求。",
+        blocked: "分析阻止继续。可重试分析或返回需求。"
+      },
+      summaryLabels: {
+        facts: "事实",
+        visualAssets: "视觉素材",
+        gaps: "缺口",
+        rejected: "拒绝",
+        reason: "原因"
+      }
     },
     generating: {
       progressTitle: "生成进度",

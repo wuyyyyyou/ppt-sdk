@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import type { UploadedSourceIndex } from "../../src/api/types.ts";
 import type { PptBackend } from "../../src/api/pptBackend.ts";
-import type { AgentClient } from "../../src/agent/agentClient.ts";
+import type { AgentClient, AgentRunOptions } from "../../src/agent/agentClient.ts";
 import {
   compactUploadedSourceAnalysisForPrompt,
   createSkippedUploadedSourceVisualAnalysisDraft,
@@ -265,7 +265,7 @@ describe("Uploaded Source Analysis workflow gates", () => {
       },
     } as unknown as PptBackend;
     const agentClient = {
-      runAuthoringPrompt: async (prompt: string) => {
+      runAuthoringPrompt: async (prompt: string, runOptions?: AgentRunOptions) => {
         prompts.push(prompt);
         factualAttempt += 1;
         if (options.firstAttempt === "no-write" && factualAttempt === 1) return {
@@ -276,6 +276,7 @@ describe("Uploaded Source Analysis workflow gates", () => {
           notes: [],
         };
         factualFingerprint = `after-${factualAttempt}`;
+        runOptions?.onStreamEvent?.({ type: "content", text: `draft attempt ${factualAttempt}` });
         return {
           status: "ready_for_render",
           changed_files: ["/tmp/factual.json"],
@@ -305,6 +306,69 @@ describe("Uploaded Source Analysis workflow gates", () => {
     assert.equal(analysis?.facts[0]?.claim, "Revenue grew 12%.");
     assert.equal(harness.prompts.length, 2);
     assert.match(harness.prompts[1], /continuation_decision/);
+  });
+
+  it("emits factual Agent stream events during analysis", async () => {
+    const harness = createWorkflowHarness({ firstAttempt: "invalid-schema" });
+    const events: Array<{ phase: string; text: string }> = [];
+    await ensureFreshUploadedSourceAnalysis({
+      backend: harness.backend,
+      agentClient: harness.agentClient,
+      workspace: harness.workspace,
+      onProgress: (event) => {
+        if (event.type === "stream" && event.event.type === "content") {
+          events.push({ phase: event.phase, text: event.event.text });
+        }
+      },
+    });
+
+    assert.deepEqual(events, [
+      { phase: "factual", text: "draft attempt 1" },
+      { phase: "factual", text: "draft attempt 2" },
+    ]);
+  });
+
+  it("force-refreshes instead of reusing a fresh blocked analysis", async () => {
+    const harness = createWorkflowHarness({ firstAttempt: "invalid-schema" });
+    const blockedAnalysis = {
+      version: 1,
+      status: "blocked",
+      source: {
+        active_uploaded_sources: uploadedSourceIndex.materials.map((source) => ({
+          uploaded_source_id: source.uploaded_source_id,
+          sha256: source.sha256,
+          size_bytes: source.size_bytes,
+          file_path: source.file_path,
+        })),
+        active_total_size_bytes: uploadedSourceIndex.active_total_size_bytes,
+      },
+      continuation_decision: { can_continue: false, reason: "old blocked result", blocking: true },
+      facts: [],
+      visual_assets: [],
+      gaps: [],
+      rejected_material: [],
+      source_summaries: [],
+      updated_at: "2026-07-01T00:00:00.000Z",
+    };
+    (harness.backend as PptBackend & { getUploadedSourceAnalysis: PptBackend["getUploadedSourceAnalysis"] })
+      .getUploadedSourceAnalysis = async () => blockedAnalysis;
+
+    const reused = await ensureFreshUploadedSourceAnalysis({
+      backend: harness.backend,
+      agentClient: harness.agentClient,
+      workspace: harness.workspace,
+    });
+    assert.equal(reused?.status, "blocked");
+    assert.equal(harness.prompts.length, 0);
+
+    const refreshed = await ensureFreshUploadedSourceAnalysis({
+      backend: harness.backend,
+      agentClient: harness.agentClient,
+      workspace: harness.workspace,
+      forceRefresh: true,
+    });
+    assert.equal(refreshed?.status, "ready");
+    assert.equal(harness.prompts.length, 2);
   });
 });
 

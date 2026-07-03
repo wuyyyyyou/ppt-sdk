@@ -1,4 +1,4 @@
-import { isAgentRunCancelledError, type AgentClient } from "../../agent/agentClient";
+import { isAgentRunCancelledError, type AgentClient, type AgentStreamEvent } from "../../agent/agentClient";
 import type { PptBackend } from "../../api/pptBackend";
 import type {
   UploadedSourceAnalysisDraftFingerprint,
@@ -23,6 +23,24 @@ import {
   type UploadedSourceFactualAnalysisDraft,
   type UploadedSourceVisualAnalysisDraft,
 } from "./uploadedSourceAnalysis";
+
+export type UploadedSourceAnalysisWorkflowPhase = "prepare" | "factual" | "visual" | "merge";
+
+export type UploadedSourceAnalysisWorkflowEvent =
+  | {
+      type: "phase";
+      phase: UploadedSourceAnalysisWorkflowPhase;
+      state: "active" | "completed" | "skipped" | "failed";
+      message?: string;
+      sourceCount?: number;
+      analysis?: UploadedSourceAnalysis;
+      error?: string;
+    }
+  | {
+      type: "stream";
+      phase: "factual" | "visual";
+      event: AgentStreamEvent;
+    };
 
 function fingerprintChanged(
   before: UploadedSourceAnalysisDraftFingerprint,
@@ -160,6 +178,7 @@ async function runDraftAgent<TDraft>(input: {
   draftPath: string;
   buildPrompt: (previousGateFailure?: string) => string;
   validateDraft: (value: unknown) => UploadedSourceDraftValidationResult<TDraft>;
+  onStreamEvent?: (event: AgentStreamEvent) => void;
 }): Promise<TDraft> {
   let previousGateFailure: string | undefined;
   for (let attempt = 1; attempt <= LOCAL_GATE_REPAIR_LIMIT; attempt += 1) {
@@ -168,7 +187,10 @@ async function runDraftAgent<TDraft>(input: {
       draft_type: input.draftType,
     });
     try {
-      await input.agentClient.runAuthoringPrompt(input.buildPrompt(previousGateFailure));
+      await input.agentClient.runAuthoringPrompt(
+        input.buildPrompt(previousGateFailure),
+        { onStreamEvent: input.onStreamEvent },
+      );
     } catch (error) {
       if (isAgentRunCancelledError(error)) throw error;
       previousGateFailure = summarizeDraftGateFailure({
@@ -234,12 +256,34 @@ export async function ensureFreshUploadedSourceAnalysis(input: {
   backend: PptBackend;
   agentClient: AgentClient;
   workspace: WorkspaceResult;
+  forceRefresh?: boolean;
+  onProgress?: (event: UploadedSourceAnalysisWorkflowEvent) => void;
 }): Promise<UploadedSourceAnalysis | null> {
+  input.onProgress?.({
+    type: "phase",
+    phase: "prepare",
+    state: "active",
+  });
   const prepared = await input.backend.prepareUploadedSourceAnalysisWorkspace({
     workspace_dir: input.workspace.workspace_dir,
   });
   const activeSources = prepared.uploaded_source_index.materials.filter((source) => source.status === "active");
-  if (activeSources.length === 0) return null;
+  if (activeSources.length === 0) {
+    input.onProgress?.({
+      type: "phase",
+      phase: "prepare",
+      state: "skipped",
+      sourceCount: 0,
+      message: "No active uploaded source material.",
+    });
+    return null;
+  }
+  input.onProgress?.({
+    type: "phase",
+    phase: "prepare",
+    state: "completed",
+    sourceCount: activeSources.length,
+  });
   await appendUploadedSourceAnalysisLog({
     backend: input.backend,
     workspace: input.workspace,
@@ -254,6 +298,7 @@ export async function ensureFreshUploadedSourceAnalysis(input: {
     workspace_dir: input.workspace.workspace_dir,
   });
   if (
+    !input.forceRefresh &&
     existing &&
     (existing.status === "ready" || existing.status === "gap" || existing.status === "blocked") &&
     uploadedSourceAnalysisMatchesActiveSet({
@@ -270,9 +315,37 @@ export async function ensureFreshUploadedSourceAnalysis(input: {
         active_count: activeSources.length,
       },
     });
-    return existing as unknown as UploadedSourceAnalysis;
+    const reused = existing as unknown as UploadedSourceAnalysis;
+    input.onProgress?.({
+      type: "phase",
+      phase: "factual",
+      state: "completed",
+      sourceCount: activeSources.length,
+      message: "Reused fresh Uploaded Source Analysis.",
+    });
+    input.onProgress?.({
+      type: "phase",
+      phase: "visual",
+      state: "completed",
+      sourceCount: activeSources.length,
+      message: "Reused fresh Uploaded Source Analysis.",
+    });
+    input.onProgress?.({
+      type: "phase",
+      phase: "merge",
+      state: "completed",
+      sourceCount: activeSources.length,
+      analysis: reused,
+    });
+    return reused;
   }
 
+  input.onProgress?.({
+    type: "phase",
+    phase: "factual",
+    state: "active",
+    sourceCount: activeSources.length,
+  });
   const factualDraft = await runDraftAgent<UploadedSourceFactualAnalysisDraft>({
     backend: input.backend,
     agentClient: input.agentClient,
@@ -287,6 +360,13 @@ export async function ensureFreshUploadedSourceAnalysis(input: {
       previousGateFailure,
     }),
     validateDraft: validateUploadedSourceFactualAnalysisDraft,
+    onStreamEvent: (event) => input.onProgress?.({ type: "stream", phase: "factual", event }),
+  });
+  input.onProgress?.({
+    type: "phase",
+    phase: "factual",
+    state: "completed",
+    sourceCount: activeSources.length,
   });
 
   let visualDraft: UploadedSourceVisualAnalysisDraft;
@@ -297,7 +377,20 @@ export async function ensureFreshUploadedSourceAnalysis(input: {
       draft_type: "visual",
       draft: visualDraft as unknown as Record<string, unknown>,
     });
+    input.onProgress?.({
+      type: "phase",
+      phase: "visual",
+      state: "skipped",
+      sourceCount: activeSources.length,
+      message: "No uploaded image source material requires visual analysis.",
+    });
   } else {
+    input.onProgress?.({
+      type: "phase",
+      phase: "visual",
+      state: "active",
+      sourceCount: activeSources.length,
+    });
     visualDraft = await runDraftAgent<UploadedSourceVisualAnalysisDraft>({
       backend: input.backend,
       agentClient: input.agentClient,
@@ -312,9 +405,22 @@ export async function ensureFreshUploadedSourceAnalysis(input: {
         previousGateFailure,
       }),
       validateDraft: validateUploadedSourceVisualAnalysisDraft,
+      onStreamEvent: (event) => input.onProgress?.({ type: "stream", phase: "visual", event }),
+    });
+    input.onProgress?.({
+      type: "phase",
+      phase: "visual",
+      state: "completed",
+      sourceCount: activeSources.length,
     });
   }
 
+  input.onProgress?.({
+    type: "phase",
+    phase: "merge",
+    state: "active",
+    sourceCount: activeSources.length,
+  });
   const analysis = mergeUploadedSourceAnalysis({
     uploadedSourceIndex: prepared.uploaded_source_index,
     factualDraft,
@@ -336,6 +442,16 @@ export async function ensureFreshUploadedSourceAnalysis(input: {
       gaps: analysis.gaps.length,
       rejected_material: analysis.rejected_material.length,
     },
+  });
+  input.onProgress?.({
+    type: "phase",
+    phase: "merge",
+    state: analysis.status === "blocked" || !analysis.continuation_decision.can_continue
+      ? "failed"
+      : "completed",
+    sourceCount: activeSources.length,
+    analysis,
+    message: analysis.continuation_decision.reason,
   });
   return analysis;
 }

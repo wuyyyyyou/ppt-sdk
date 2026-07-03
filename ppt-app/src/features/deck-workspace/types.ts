@@ -15,7 +15,7 @@ import type {
 import type { ActiveGenerationRun, GenerationViewState } from "./generationViewState";
 import type { PageReviewSettings } from "./reviewSettings";
 
-export type MainStage = "brief" | "outline" | "generating" | "deck";
+export type MainStage = "brief" | "uploaded-source-analysis" | "outline" | "generating" | "deck";
 export type PageId = "main" | "library" | "review" | "refine" | "export";
 export type PanelMode = "visible" | "minimized" | "closed";
 export type RefineScope = "deck" | "slide";
@@ -88,6 +88,7 @@ export interface DeckWorkspaceState {
   previewMode: PreviewMode;
   reviewRender: DeckReviewRenderState;
   createDeckProgress: DeckGenerationProgress | null;
+  uploadedSourceAnalysisProgress: UploadedSourceAnalysisProgress;
   generationHistory: GenerationStreamSnapshot[];
   pageProgress: PageProgress | null;
   refineScope: RefineScope;
@@ -129,4 +130,50 @@ export interface UploadedSourceAnalysisViewState {
   visualAssetCount: number | null;
   gapCount: number | null;
   reason?: string;
+}
+
+export type UploadedSourceAnalysisRunStatus =
+  | "idle"
+  | "skipped"
+  | "running"
+  | "completed"
+  | "blocked"
+  | "failed";
+
+export type UploadedSourceAnalysisRecordId = "prepare" | "factual" | "visual" | "merge";
+
+export type UploadedSourceAnalysisRecordState =
+  | "pending"
+  | "active"
+  | "completed"
+  | "skipped"
+  | "failed";
+
+export interface UploadedSourceAnalysisRecord {
+  id: UploadedSourceAnalysisRecordId;
+  label: string;
+  state: UploadedSourceAnalysisRecordState;
+  activities: string[];
+  lines: string[];
+  summaryLines: string[];
+  error?: string;
+  started_at?: string;
+  updated_at?: string;
+}
+
+export interface UploadedSourceAnalysisResultSummary {
+  status: "ready" | "gap" | "blocked";
+  factCount: number;
+  visualAssetCount: number;
+  gapCount: number;
+  rejectedCount: number;
+  reason: string;
+}
+
+export interface UploadedSourceAnalysisProgress {
+  status: UploadedSourceAnalysisRunStatus;
+  sourceCount: number;
+  message: string;
+  records: UploadedSourceAnalysisRecord[];
+  resultSummary?: UploadedSourceAnalysisResultSummary;
 }
