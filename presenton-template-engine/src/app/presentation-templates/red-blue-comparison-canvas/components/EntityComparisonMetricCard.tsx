@@ -1,6 +1,6 @@
 import React from "react";
 
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 import CardAccentRail from "./CardAccentRail.tsx";
 
 export type EntityComparisonMetricItem = {
@@ -8,14 +8,14 @@ export type EntityComparisonMetricItem = {
   shortLabel?: string;
   value: string;
   share?: number;
-  tone: RedBlueTone;
+  tone: ComparisonTone;
 };
 
 type EntityComparisonMetricCardProps = {
   title: string;
   items: EntityComparisonMetricItem[];
   mode: "rank" | "bar";
-  tone?: RedBlueTone;
+  tone?: ComparisonTone;
   height?: number;
 };
 
@@ -25,24 +25,25 @@ const EntityComparisonMetricCard = ({
   title,
   items,
   mode,
-  tone = "purple",
+  tone = "comparison",
   height = 148,
 }: EntityComparisonMetricCardProps) => {
   const toneValue = redBlueComparisonTheme.tone[tone];
 
   return (
     <div
-      className="relative flex min-w-0 flex-col overflow-hidden border bg-white p-[18px]"
+      className="relative flex min-w-0 flex-col overflow-hidden border p-[18px]"
       style={{
         height,
         borderRadius: redBlueComparisonTheme.radius.xl,
-        borderColor: redBlueComparisonTheme.colors.stroke,
+        borderColor: redBlueComparisonTheme.colors.neutralBorder,
+        backgroundColor: redBlueComparisonTheme.colors.card,
         boxShadow: redBlueComparisonTheme.shadow.card,
       }}
     >
       <CardAccentRail position="left" color={toneValue.color} size={5} />
       <div className="relative z-10 mb-[13px] flex h-[18px] flex-none items-center justify-between gap-[12px]">
-        <div className="min-w-0 break-words text-[12px] font-black uppercase tracking-[0.5px]" style={{ color: redBlueComparisonTheme.colors.mutedText }}>
+        <div className="min-w-0 break-words text-[12px] font-black uppercase tracking-[0.5px]" style={{ color: redBlueComparisonTheme.colors.textMuted }}>
           {title}
         </div>
       </div>
@@ -58,7 +59,7 @@ const EntityComparisonMetricCard = ({
                 style={{ backgroundColor: itemTone.tint, color: itemTone.color }}
               >
                 <div className="absolute right-[9px] top-[8px] text-[36px] font-black opacity-10">◎</div>
-                <div className="text-[11px] font-black uppercase leading-none" style={{ color: redBlueComparisonTheme.colors.mutedText }}>
+                <div className="text-[11px] font-black uppercase leading-none" style={{ color: redBlueComparisonTheme.colors.textMuted }}>
                   {item.shortLabel ?? item.label}
                 </div>
                 <div className="mt-[8px] text-[40px] font-black leading-none" style={{ fontFamily: redBlueComparisonTheme.fonts.heading }}>

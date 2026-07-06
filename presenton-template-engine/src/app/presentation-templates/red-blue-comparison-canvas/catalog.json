@@ -2,11 +2,11 @@
   "group_id": "red-blue-comparison-canvas",
   "catalog_type": "tsx-first-canvas",
   "version": 1,
-  "purpose": "Help the PPT AI Agent choose a broad red-blue comparison canvas first, then compose the final page in slides/*.tsx from reusable components based on the page plan and grounded content.",
+  "purpose": "Help the PPT AI Agent choose a broad Red Blue Comparison canvas first, then compose the final page in slides/*.tsx from reusable components based on the page plan and grounded content.",
   "source_theme": {
     "derived_from": "red-blue comparison v1",
-    "visual_language": ["white canvas", "purple structure color", "red and blue entity accents", "soft circular decorations", "editable chart/card/table components"],
-    "relationship_to_v1": "This canvas group keeps the v1 component library and theme, but does not copy v1's concrete country/economy/demographic page blueprints."
+    "visual_language": ["theme-token canvas", "comparison structure color", "sideA and sideB entity accents", "neutral supporting accents", "soft circular decorations", "editable chart/card/table components"],
+    "relationship_to_v1": "This canvas group keeps the v1 component library and semantic theme token contract, but does not copy v1's concrete country/economy/demographic page blueprints."
   },
   "directory_roles": {
     "blueprints": {
@@ -28,7 +28,7 @@
     },
     "components": {
       "path": "./components",
-      "role": "Reusable red-blue comparison component library copied from the red-blue comparison v1 component set.",
+      "role": "Reusable Red Blue Comparison component library copied from the v1 component set.",
       "rules": [
         "Read components/README.md before choosing components.",
         "Choose component families from page semantics, not visual convenience.",
@@ -45,7 +45,7 @@
     },
     "theme": {
       "path": "./theme",
-      "role": "Shared color, typography, and visual token definitions."
+      "role": "Shared semantic theme token definitions and component-facing CSS variable accessors."
     }
   },
   "blueprints": [
@@ -119,6 +119,6 @@
     "Before editing slides/*.tsx, read components/README.md and identify the component families that fit the page plan.",
     "Derive final pages in slides/*.tsx, then replace slot guides with concrete component composition.",
     "Use data/demo or deck JSON for content values only; layout, slot ownership, and component choice belong in TSX.",
-    "Do not paste source HTML or a concrete business page into a canvas. Rebuild the page from red-blue components so it remains editable and PPT-friendly."
+    "Do not paste source HTML or a concrete business page into a canvas. Rebuild the page from reusable comparison components so it remains editable and PPT-friendly."
   ]
 }

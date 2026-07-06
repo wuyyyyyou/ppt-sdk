@@ -31,7 +31,7 @@ export const sampleData = Schema.parse({});
 export const layoutId = "chart-evidence-canvas";
 export const layoutName = "Chart Evidence Canvas";
 export const layoutDescription =
-  "A red-blue comparison canvas for one primary chart or evidence visual plus a right-side interpretation area.";
+  "A comparison canvas for one primary chart or evidence visual plus a right-side interpretation area.";
 export const layoutTags = ["chart", "evidence", "canvas", "comparison", "component-first", "tsx-first"];
 export const layoutRole = "content";
 export const contentElements = ["page-title", "subtitle", "primary-visual-slot", "interpretation-slot", "footer-meta"];
@@ -52,10 +52,10 @@ const ChartEvidenceCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }
       titlePrefix={parsed.titlePrefix}
       titleHighlight={parsed.titleHighlight}
       subtitle={parsed.subtitle}
-      meta={<ThemePill tone="purple" width={180}>Evidence Slot</ThemePill>}
+      meta={<ThemePill tone="comparison" width={180}>Evidence Slot</ThemePill>}
       footerText={parsed.footerText}
       pageNumber={parsed.pageNumber}
-      tone="purple"
+      tone="comparison"
       showHeaderDivider={false}
       contentTop={150}
       contentHeight={512}
@@ -64,16 +64,16 @@ const ChartEvidenceCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }
       <div className="relative z-10 grid h-full min-h-0 grid-cols-[1.35fr_0.78fr] gap-[28px]">
         <ThemePanelShell
           className="flex min-h-0 items-center justify-center text-center"
-          borderColor={redBlueComparisonTheme.tone.blue.border}
-          backgroundColor="rgba(239,246,255,0.68)"
+          borderColor={redBlueComparisonTheme.colors.sideBBorder}
+          backgroundColor={redBlueComparisonTheme.colors.sideBTint}
           shadow={redBlueComparisonTheme.shadow.panel}
         >
           {parsed.showSlotGuides ? (
             <div className="w-[500px]">
-              <div className="text-[28px] font-black leading-none" style={{ color: redBlueComparisonTheme.colors.japanBlue }}>
+              <div className="text-[28px] font-black leading-none" style={{ color: redBlueComparisonTheme.colors.sideB }}>
                 {parsed.chartGuideTitle}
               </div>
-              <div className="mt-[18px] text-[17px] font-medium leading-[1.5]" style={{ color: redBlueComparisonTheme.colors.mutedText }}>
+              <div className="mt-[18px] text-[17px] font-medium leading-[1.5]" style={{ color: redBlueComparisonTheme.colors.textMuted }}>
                 {parsed.chartGuideText}
               </div>
             </div>
@@ -81,16 +81,16 @@ const ChartEvidenceCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }
         </ThemePanelShell>
         <ThemePanelShell
           className="flex min-h-0 items-center justify-center text-center"
-          borderColor={redBlueComparisonTheme.tone.red.border}
-          backgroundColor="rgba(255,241,243,0.72)"
+          borderColor={redBlueComparisonTheme.colors.sideABorder}
+          backgroundColor={redBlueComparisonTheme.colors.sideATint}
           shadow={redBlueComparisonTheme.shadow.card}
         >
           {parsed.showSlotGuides ? (
             <div className="px-[10px]">
-              <div className="text-[24px] font-black leading-none" style={{ color: redBlueComparisonTheme.colors.chinaRed }}>
+              <div className="text-[24px] font-black leading-none" style={{ color: redBlueComparisonTheme.colors.sideA }}>
                 {parsed.railGuideTitle}
               </div>
-              <div className="mt-[18px] text-[16px] font-medium leading-[1.55]" style={{ color: redBlueComparisonTheme.colors.mutedText }}>
+              <div className="mt-[18px] text-[16px] font-medium leading-[1.55]" style={{ color: redBlueComparisonTheme.colors.textMuted }}>
                 {parsed.railGuideText}
               </div>
             </div>

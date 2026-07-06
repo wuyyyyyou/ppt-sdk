@@ -1,6 +1,6 @@
 import React from "react";
 
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 import CardAccentRail from "./CardAccentRail.tsx";
 import SectorDonutChart, { type SectorDonutSegment } from "./SectorDonutChart.tsx";
 
@@ -12,7 +12,7 @@ export type SectorStructureInsight = {
 type SectorStructureCardProps = {
   entityName: string;
   badge: string;
-  tone: RedBlueTone;
+  tone: ComparisonTone;
   segments: SectorDonutSegment[];
   centerValue: string;
   centerLabel: string;
@@ -32,10 +32,11 @@ const SectorStructureCard = ({
 
   return (
     <div
-      className="relative flex h-full min-h-0 flex-col overflow-hidden border bg-white px-[30px] pb-[24px] pt-[25px]"
+      className="relative flex h-full min-h-0 flex-col overflow-hidden border px-[30px] pb-[24px] pt-[25px]"
       style={{
         borderRadius: 20,
-        borderColor: "rgba(45,52,54,0.04)",
+        backgroundColor: redBlueComparisonTheme.colors.card,
+        borderColor: redBlueComparisonTheme.colors.neutralBorder,
         boxShadow: redBlueComparisonTheme.shadow.panel,
       }}
     >
@@ -50,7 +51,7 @@ const SectorStructureCard = ({
         </div>
         <div
           className="flex h-[28px] flex-none items-center rounded-full px-[12px] text-[12px] font-bold"
-          style={{ backgroundColor: redBlueComparisonTheme.colors.neutralTint, color: redBlueComparisonTheme.colors.mutedText }}
+          style={{ backgroundColor: redBlueComparisonTheme.colors.neutralTint, color: redBlueComparisonTheme.colors.textMuted }}
         >
           {badge}
         </div>
@@ -68,7 +69,7 @@ const SectorStructureCard = ({
 
       <div className="relative z-10 mt-[13px] flex h-[24px] flex-none items-center justify-center gap-[12px]">
         {segments.map((segment) => (
-          <div key={segment.label} className="flex min-w-0 items-center gap-[6px] text-[11px] font-bold" style={{ color: redBlueComparisonTheme.colors.mutedText }}>
+          <div key={segment.label} className="flex min-w-0 items-center gap-[6px] text-[11px] font-bold" style={{ color: redBlueComparisonTheme.colors.textMuted }}>
             <div className="h-[10px] w-[10px] flex-none rounded-[3px]" style={{ backgroundColor: segment.color }} />
             <div className="break-words">{segment.label}</div>
           </div>
@@ -87,7 +88,7 @@ const SectorStructureCard = ({
         <div className="text-[14px] font-black leading-[1.25]" style={{ color: toneValue.color }}>
           {insight.title}
         </div>
-        <div className="mt-[5px] overflow-hidden text-[13px] font-medium leading-[1.4]" style={{ maxHeight: 38, color: redBlueComparisonTheme.colors.backgroundText }}>
+        <div className="mt-[5px] overflow-hidden text-[13px] font-medium leading-[1.4]" style={{ maxHeight: 38, color: redBlueComparisonTheme.colors.textPrimary }}>
           {insight.description}
         </div>
       </div>

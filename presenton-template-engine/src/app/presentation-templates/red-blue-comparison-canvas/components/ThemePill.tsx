@@ -1,10 +1,10 @@
 import React, { type ReactNode } from "react";
 
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 
 type ThemePillProps = {
   children: ReactNode;
-  tone?: RedBlueTone;
+  tone?: ComparisonTone;
   icon?: ReactNode;
   width?: number;
   height?: number;
@@ -13,7 +13,7 @@ type ThemePillProps = {
 
 const ThemePill = ({
   children,
-  tone = "purple",
+  tone = "comparison",
   icon,
   width,
   height = 28,

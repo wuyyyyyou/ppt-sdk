@@ -8,7 +8,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 
 export type ProjectionAxisConfig = {
   id: "left" | "right";
@@ -17,14 +17,14 @@ export type ProjectionAxisConfig = {
   max: number;
   ticks: number[];
   tickSuffix?: string;
-  tone: RedBlueTone;
+  tone: ComparisonTone;
   width?: number;
 };
 
 export type ProjectionLineSeries = {
   label: string;
   axis: "left" | "right";
-  tone: RedBlueTone;
+  tone: ComparisonTone;
   values: number[];
 };
 
@@ -92,7 +92,7 @@ const DualAxisProjectionLineChart = ({
     >
       <CartesianGrid
         vertical={false}
-        stroke={redBlueComparisonTheme.colors.softGrid}
+        stroke={redBlueComparisonTheme.colors.grid}
         strokeDasharray="4 6"
         strokeOpacity={0.72}
       />
@@ -100,7 +100,7 @@ const DualAxisProjectionLineChart = ({
         dataKey="label"
         axisLine={{ stroke: redBlueComparisonTheme.colors.stroke, strokeWidth: 1 }}
         tickLine={false}
-        tick={{ fill: redBlueComparisonTheme.colors.mutedText, fontSize: 11, fontWeight: 700 }}
+        tick={{ fill: redBlueComparisonTheme.colors.textMuted, fontSize: 11, fontWeight: 700 }}
         interval={0}
         height={30}
         padding={{ left: 14, right: 14 }}

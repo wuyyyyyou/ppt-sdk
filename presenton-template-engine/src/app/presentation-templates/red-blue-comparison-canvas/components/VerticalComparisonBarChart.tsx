@@ -9,13 +9,13 @@ import {
   YAxis,
 } from "recharts";
 
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 
 export type VerticalComparisonBarDatum = {
   label: string;
   value: number;
   displayValue: string;
-  tone: RedBlueTone;
+  tone: ComparisonTone;
 };
 
 type VerticalComparisonBarChartProps = {
@@ -76,7 +76,7 @@ const VerticalComparisonBarChart = ({
         textAnchor="middle"
         fontSize={15}
         fontWeight={900}
-        fill={item?.color ?? redBlueComparisonTheme.colors.backgroundText}
+        fill={item?.color ?? redBlueComparisonTheme.colors.textPrimary}
         fontFamily={redBlueComparisonTheme.fonts.body}
       >
         {item?.displayValue ?? props.value}
@@ -88,7 +88,7 @@ const VerticalComparisonBarChart = ({
     <div className="flex h-full min-h-0 w-full flex-col">
       <div className="flex h-[26px] flex-none items-center justify-end gap-[18px] pr-[12px]">
         {chartData.map((item) => (
-          <div key={item.label} className="flex items-center gap-[7px] text-[12px] font-bold" style={{ color: redBlueComparisonTheme.colors.mutedText }}>
+          <div key={item.label} className="flex items-center gap-[7px] text-[12px] font-bold" style={{ color: redBlueComparisonTheme.colors.textMuted }}>
             <div className="h-[9px] w-[9px] rounded-full" style={{ backgroundColor: item.color }} />
             <span>{item.label}</span>
           </div>
@@ -106,7 +106,7 @@ const VerticalComparisonBarChart = ({
         >
           <CartesianGrid
             vertical={false}
-            stroke="rgba(45,52,54,0.08)"
+            stroke={redBlueComparisonTheme.colors.grid}
             strokeWidth={1}
           />
           <XAxis
@@ -114,7 +114,7 @@ const VerticalComparisonBarChart = ({
             axisLine={{ stroke: redBlueComparisonTheme.colors.stroke, strokeWidth: 1 }}
             tickLine={false}
             tick={{
-              fill: redBlueComparisonTheme.colors.backgroundText,
+              fill: redBlueComparisonTheme.colors.textPrimary,
               fontSize: 14,
               fontWeight: 800,
             }}
@@ -128,7 +128,7 @@ const VerticalComparisonBarChart = ({
             tickLine={false}
             tickFormatter={(value) => formatTick(Number(value), unitLabel)}
             tick={{
-              fill: redBlueComparisonTheme.colors.subtleText,
+              fill: redBlueComparisonTheme.colors.textSubtle,
               fontSize: 12,
               fontWeight: 700,
             }}

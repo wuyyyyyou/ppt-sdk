@@ -14,7 +14,7 @@
     },
     "dominant_elements": ["CardGrid", "Chart", "NumberCallout", "Timeline", "TextBlock"]
   },
-  "purpose": "Help the PPT AI Agent choose copyable TSX blueprints for red/blue comparison decks, then derive final pages into slides/*.tsx and edit implementation directly.",
+  "purpose": "Help the PPT AI Agent choose copyable TSX blueprints for Red Blue Comparison decks, then derive final pages into slides/*.tsx and edit implementation directly.",
   "implemented_page_type_coverage": {
     "cover": ["cover-comparison"],
     "agenda": ["topic-overview"],
@@ -71,7 +71,7 @@
       "blueprint_source": "./blueprints/CoverComparison.tsx",
       "example_slide": "./slides/CoverComparison.tsx",
       "layout_family": "cover",
-      "visual_pattern": "centered comparison title + purple connector/separator + topic scope line + red/blue entity legend + soft circular decorations",
+      "visual_pattern": "centered comparison title + comparison connector/separator + topic scope line + sideA/sideB entity legend + soft circular decorations",
       "content_intents": ["opening", "comparison-frame", "entity-positioning"],
       "suitable_for": ["comparison deck cover", "country comparison opening", "market benchmark opening", "executive briefing opening"],
       "avoid_for": ["body analysis", "dense charts", "timeline", "large card grid"]
@@ -82,7 +82,7 @@
       "blueprint_source": "./blueprints/TopicOverview.tsx",
       "example_slide": "./slides/TopicOverview.tsx",
       "layout_family": "agenda-card-grid",
-      "visual_pattern": "left-aligned title block + subtitle + 3x2 numbered icon cards + soft red/blue/purple background circles",
+      "visual_pattern": "left-aligned title block + subtitle + 3x2 numbered icon cards + soft sideA/sideB/comparison background circles",
       "content_intents": ["agenda", "overview", "topic-map", "comparison-dimensions"],
       "suitable_for": [
         "six-topic agenda",
@@ -99,7 +99,7 @@
       "blueprint_source": "./blueprints/EconomySizeGrowth.tsx",
       "example_slide": "./slides/EconomySizeGrowth.tsx",
       "layout_family": "chart-with-metric-cards",
-      "visual_pattern": "left primary vertical comparison bar chart + right stacked rank and bar metric cards + soft red/blue/purple circular decorations",
+      "visual_pattern": "left primary vertical comparison bar chart + right stacked rank and bar metric cards + soft sideA/sideB/comparison circular decorations",
       "content_intents": ["quantitative-comparison", "market-scale", "growth-analysis", "benchmark-metrics"],
       "suitable_for": [
         "economic size comparison",
@@ -133,7 +133,7 @@
       "blueprint_source": "./blueprints/DemographicsSnapshot.tsx",
       "example_slide": "./slides/DemographicsSnapshot.tsx",
       "layout_family": "entity-snapshot-cards",
-      "visual_pattern": "two side-by-side entity cards + top red/blue accent rail + large hero metric + status indicator + compact KPI rows",
+      "visual_pattern": "two side-by-side entity cards + top sideA/sideB accent rail + large hero metric + status indicator + compact KPI rows",
       "content_intents": ["demographics", "population-snapshot", "entity-profile", "kpi-comparison"],
       "suitable_for": [
         "population comparison",
@@ -150,7 +150,7 @@
       "blueprint_source": "./blueprints/AgingDependency.tsx",
       "example_slide": "./slides/AgingDependency.tsx",
       "layout_family": "stacked-composition-with-insights",
-      "visual_pattern": "left primary 100% stacked horizontal composition chart + right elderly-share metric callouts + purple conclusion card + soft circular decorations",
+      "visual_pattern": "left primary 100% stacked horizontal composition chart + right elderly-share metric callouts + comparison conclusion card + soft circular decorations",
       "content_intents": ["demographic-composition", "age-structure", "dependency-risk", "part-to-whole-comparison"],
       "suitable_for": [
         "age structure comparison",
@@ -167,7 +167,7 @@
       "blueprint_source": "./blueprints/PopulationTrend.tsx",
       "example_slide": "./slides/PopulationTrend.tsx",
       "layout_family": "dual-axis-projection-trend",
-      "visual_pattern": "left primary dual-axis line chart with historical and projected segments + source note + right vertical insight cards with red/blue/purple accent rails",
+      "visual_pattern": "left primary dual-axis line chart with historical and projected segments + source note + right vertical insight cards with semantic accent rails",
       "content_intents": ["time-series", "projection", "population-trend", "forecast-comparison", "turning-point-analysis"],
       "suitable_for": [
         "population trajectory comparison",
@@ -213,7 +213,7 @@
       "blueprint_source": "./blueprints/EvidenceImageTable.tsx",
       "example_slide": "./slides/EvidenceImageTable.tsx",
       "layout_family": "image-table-evidence",
-      "visual_pattern": "left primary image showcase with caption and source + right compact comparison table with red/blue/purple emphasis cells + concise evidence note",
+      "visual_pattern": "left primary image showcase with caption and source + right compact comparison table with semantic emphasis cells + concise evidence note",
       "content_intents": ["visual-evidence", "image-analysis", "structured-comparison", "case-observation"],
       "suitable_for": [
         "one image with structured interpretation",
@@ -236,7 +236,7 @@
       "blueprint_source": "./blueprints/HistoricalMilestonesTimeline.tsx",
       "example_slide": "./slides/HistoricalMilestonesTimeline.tsx",
       "layout_family": "alternating-horizontal-timeline",
-      "visual_pattern": "centered title + soft purple horizontal axis + alternating milestone text blocks + rounded date pills + purple diamond markers + soft circular decorations",
+      "visual_pattern": "centered title + soft comparison horizontal axis + alternating milestone text blocks + rounded date pills + comparison diamond markers + soft circular decorations",
       "content_intents": ["timeline", "history", "milestones", "sequence", "relationship-evolution"],
       "suitable_for": [
         "historical milestone summary",
@@ -259,7 +259,7 @@
       "blueprint_source": "./blueprints/ClosingContact.tsx",
       "example_slide": "./slides/ClosingContact.tsx",
       "layout_family": "closing-contact",
-      "visual_pattern": "large centered thank-you title + purple URL pill + contact panel + soft purple circular decorations",
+      "visual_pattern": "large centered thank-you title + comparison URL pill + contact panel + soft comparison circular decorations",
       "content_intents": ["closing", "thank-you", "contact", "final-page"],
       "suitable_for": [
         "clean thank-you final slide",

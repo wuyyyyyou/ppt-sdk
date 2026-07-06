@@ -6,8 +6,8 @@
   "subtitle": "Open comparison frame",
   "scopeItems": ["Market", "Audience", "Capability", "Outlook"],
   "entities": [
-    { "label": "Option A", "color": "#FF4757" },
-    { "label": "Option B", "color": "#2E86DE" }
+    { "label": "Option A" },
+    { "label": "Option B" }
   ],
   "footerMeta": "Canvas-first authoring base"
 }

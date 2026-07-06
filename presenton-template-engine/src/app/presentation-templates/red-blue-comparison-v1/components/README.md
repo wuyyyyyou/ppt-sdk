@@ -27,9 +27,9 @@
 | `IconText` | 基础原语 | 图标 + 单行或短文本 | 卡片小标题、短说明 |
 | `CardAccentRail` | 基础原语 | 导出安全的卡片上下左右装饰条 | 卡片强调边 |
 | `EntityLegend` | 基础原语 | 两到三个对比主体的颜色图例 | 封面、图表说明 |
-| `ThemeSoftCircle` | 装饰原语 | rgba / 浅色填充软圆 | 背景装饰 |
+| `ThemeSoftCircle` | 装饰原语 | token 化浅色填充软圆 | 背景装饰 |
 | `CoverComparisonDecorations` | 装饰组合 | 封面圆形、中心圆环、点阵背景 | `CoverComparison` |
-| `BalancedComparisonDecorations` | 装饰组合 | 内容页通用红/蓝/紫软圆组合 | 双卡对比内容页 |
+| `BalancedComparisonDecorations` | 装饰组合 | 内容页通用 sideA / sideB / comparison 软圆组合 | 双卡对比内容页 |
 | `AgendaTopicCard` | 卡片 | 编号水印、图标和短说明的议题卡 | `TopicOverview` |
 | `EntityComparisonMetricCard` | 卡片 | 实体排名或横向条形指标对比 | `EconomySizeGrowth` |
 | `EntitySnapshotCard` | 卡片 | 主体英雄数值、状态和 KPI 列表 | `DemographicsSnapshot` |
@@ -76,7 +76,7 @@
 ## AI 修改规则
 
 - 改某一页的布局、列宽、栅格、字段映射：优先改 `slides/*.tsx`。
-- 改跨页共享的颜色、字体、阴影、圆角：改 `theme/tokens.ts`。
+- 改跨页共享的默认颜色、阴影或预设：改 `theme/token.default.json`、`theme/token.schema.json` 或命名预设；组件侧统一通过 `theme/tokens.ts` 消费 CSS vars。
 - 改跨页共享的视觉单元：改或新增 `components/*.tsx`。
 - 做主图表时，先找已有 Recharts 图表 Module；没有合适 Module 时，新增一个 Recharts Module，再让页面蓝图组合它。
 - `ChartContainer` 只包裹图表，不能替代图表本体。

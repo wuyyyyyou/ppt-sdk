@@ -1,12 +1,12 @@
 import React from "react";
 
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 
 export type AlternatingTimelineItem = {
   date: string;
   title: string;
   description: string;
-  tone?: RedBlueTone;
+  tone?: ComparisonTone;
 };
 
 type AlternatingTimelineProps = {
@@ -26,13 +26,13 @@ const AlternatingTimeline = ({
     <div className={["relative h-full w-full", className].filter(Boolean).join(" ")}>
       <div
         className="absolute left-0 right-0 top-1/2 h-[4px] -translate-y-1/2 rounded-full"
-        style={{ backgroundColor: redBlueComparisonTheme.colors.purpleSoft }}
+        style={{ backgroundColor: redBlueComparisonTheme.colors.comparisonSoft }}
       />
 
       <div className="relative z-10 flex h-full w-full items-center justify-between gap-[18px]">
         {visibleItems.map((item, index) => {
           const isTop = index % 2 === 0;
-          const tone = item.tone ?? "purple";
+          const tone = item.tone ?? "comparison";
           const color = redBlueComparisonTheme.tone[tone].color;
           const tint = redBlueComparisonTheme.tone[tone].tint;
 
@@ -58,9 +58,10 @@ const AlternatingTimeline = ({
                   data-validation-ignore="true"
                 >
                   <div
-                    className="h-[26px] w-[26px] rotate-45 border-[4px] border-white"
+                    className="h-[26px] w-[26px] rotate-45 border-[4px]"
                     style={{
                       backgroundColor: color,
+                      borderColor: redBlueComparisonTheme.colors.card,
                       boxShadow: `0 0 0 3px ${color}`,
                     }}
                   />
@@ -116,13 +117,13 @@ const TimelineTextBlock = ({ title, description, align }: TimelineTextBlockProps
   >
     <div
       className="w-full text-[22px] font-black leading-[1.12]"
-      style={{ color: redBlueComparisonTheme.colors.backgroundText }}
+      style={{ color: redBlueComparisonTheme.colors.textPrimary }}
     >
       {title}
     </div>
     <div
       className="mt-[10px] w-full text-[15px] font-medium leading-[1.35]"
-      style={{ color: redBlueComparisonTheme.colors.mutedText }}
+      style={{ color: redBlueComparisonTheme.colors.textMuted }}
     >
       {description}
     </div>

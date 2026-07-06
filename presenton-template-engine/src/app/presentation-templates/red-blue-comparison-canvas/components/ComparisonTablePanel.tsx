@@ -1,6 +1,6 @@
 import React from "react";
 
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 import ThemePanelShell from "./ThemePanelShell.tsx";
 
 type ComparisonTableAlign = "left" | "center" | "right";
@@ -9,13 +9,13 @@ export type ComparisonTableColumn = {
   label: string;
   width?: string;
   align?: ComparisonTableAlign;
-  tone?: RedBlueTone;
+  tone?: ComparisonTone;
 };
 
 export type ComparisonTableCell = {
   value: string;
   note?: string;
-  tone?: RedBlueTone;
+  tone?: ComparisonTone;
   emphasis?: boolean;
   align?: ComparisonTableAlign;
 };
@@ -30,7 +30,7 @@ type ComparisonTablePanelProps = {
   columns: ComparisonTableColumn[];
   rows: ComparisonTableRow[];
   footerNote?: string;
-  tone?: RedBlueTone;
+  tone?: ComparisonTone;
   className?: string;
 };
 
@@ -119,12 +119,12 @@ const ComparisonTablePanel = ({
   columns,
   rows,
   footerNote,
-  tone = "purple",
+  tone = "comparison",
   className,
 }: ComparisonTablePanelProps) => {
   const toneValue = redBlueComparisonTheme.tone[tone];
   const gridTemplateColumns = columns.map((column) => column.width ?? "minmax(0, 1fr)").join(" ");
-  const gridLineColor = "#DDD8F7";
+  const gridLineColor = redBlueComparisonTheme.colors.tableGrid;
 
   return (
     <ThemePanelShell
@@ -138,7 +138,7 @@ const ComparisonTablePanel = ({
           <div
             className="break-words text-[18px] font-black"
             style={{
-              color: redBlueComparisonTheme.colors.backgroundText,
+              color: redBlueComparisonTheme.colors.textPrimary,
               fontFamily: redBlueComparisonTheme.fonts.heading,
               lineHeight: 1.2,
             }}
@@ -148,7 +148,7 @@ const ComparisonTablePanel = ({
           {subtitle ? (
             <div
               className="mt-[5px] break-words text-[12px] font-medium"
-              style={{ color: redBlueComparisonTheme.colors.mutedText }}
+              style={{ color: redBlueComparisonTheme.colors.textMuted }}
             >
               {subtitle}
             </div>
@@ -170,7 +170,7 @@ const ComparisonTablePanel = ({
               className="grid min-h-0"
               style={{
                 gridTemplateColumns,
-                backgroundColor: redBlueComparisonTheme.colors.purpleTint,
+                backgroundColor: redBlueComparisonTheme.colors.comparisonTint,
               }}
             >
               {columns.map((column, index) => {
@@ -216,7 +216,7 @@ const ComparisonTablePanel = ({
                       ].join(" ")}
                       style={{
                         backgroundColor: cell.emphasis && cellTone ? cellTone.tint : "transparent",
-                        color: cellTone?.color ?? redBlueComparisonTheme.colors.backgroundText,
+                        color: cellTone?.color ?? redBlueComparisonTheme.colors.textPrimary,
                       }}
                     >
                       <div
@@ -230,7 +230,7 @@ const ComparisonTablePanel = ({
                           data-validation-role="multi-line-body-text"
                           className="mt-[4px] min-w-0 overflow-hidden text-[10.5px] font-medium leading-[1.28]"
                           style={{
-                            color: redBlueComparisonTheme.colors.mutedText,
+                            color: redBlueComparisonTheme.colors.textMuted,
                             maxHeight: 28,
                           }}
                         >

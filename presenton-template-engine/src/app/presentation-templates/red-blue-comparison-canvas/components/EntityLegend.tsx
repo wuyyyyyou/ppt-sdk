@@ -14,9 +14,9 @@ type EntityLegendProps = {
 };
 
 const defaultColors = [
-  redBlueComparisonTheme.colors.chinaRed,
-  redBlueComparisonTheme.colors.japanBlue,
-  redBlueComparisonTheme.colors.koreaRed,
+  redBlueComparisonTheme.colors.sideA,
+  redBlueComparisonTheme.colors.sideB,
+  redBlueComparisonTheme.colors.comparison,
 ];
 
 const EntityLegend = ({ items }: EntityLegendProps) => {
@@ -26,9 +26,9 @@ const EntityLegend = ({ items }: EntityLegendProps) => {
       style={{
         height: 50,
         gap: 34,
-        backgroundColor: "rgba(255,255,255,0.92)",
-        border: "1px solid rgba(45,52,54,0.06)",
-        boxShadow: `0 12px 30px ${redBlueComparisonTheme.colors.shadowSoft}`,
+        backgroundColor: redBlueComparisonTheme.alpha.surface(0.92),
+        border: redBlueComparisonTheme.border.subtle,
+        boxShadow: redBlueComparisonTheme.shadow.soft,
       }}
     >
       {items.map((item, index) => (
@@ -50,7 +50,7 @@ const EntityLegend = ({ items }: EntityLegendProps) => {
             gap={12}
             fontSize={16}
             fontWeight={900}
-            textColor={redBlueComparisonTheme.colors.backgroundText}
+            textColor={redBlueComparisonTheme.colors.textPrimary}
           />
         </StableInlineRow>
       ))}

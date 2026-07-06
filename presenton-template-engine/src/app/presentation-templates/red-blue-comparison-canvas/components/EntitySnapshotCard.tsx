@@ -1,6 +1,6 @@
 import React from "react";
 
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 import CardAccentRail from "./CardAccentRail.tsx";
 
 export type EntitySnapshotIconName =
@@ -26,12 +26,12 @@ export type EntitySnapshotHero = {
   value: string;
   statusLabel?: string;
   statusIcon?: EntitySnapshotIconName;
-  statusTone?: RedBlueTone | "warning" | "success";
+  statusTone?: ComparisonTone | "warning" | "success";
 };
 
 type EntitySnapshotCardProps = {
   entityName: string;
-  tone: RedBlueTone;
+  tone: ComparisonTone;
   entityIcon?: EntitySnapshotIconName;
   hero: EntitySnapshotHero;
   kpis: EntitySnapshotKpi[];
@@ -107,12 +107,12 @@ const iconPath = {
   ),
 } satisfies Record<EntitySnapshotIconName, React.ReactNode>;
 
-const toneColor = (tone: RedBlueTone | "warning" | "success") => {
+const toneColor = (tone: ComparisonTone | "warning" | "success") => {
   if (tone === "warning") {
-    return redBlueComparisonTheme.colors.warning;
+    return redBlueComparisonTheme.colors.statusWarning;
   }
   if (tone === "success") {
-    return redBlueComparisonTheme.colors.success;
+    return redBlueComparisonTheme.colors.statusSuccess;
   }
   return redBlueComparisonTheme.tone[tone].color;
 };
@@ -152,11 +152,12 @@ const EntitySnapshotCard = ({
 
   return (
     <div
-      className="relative flex h-full min-h-0 flex-col overflow-hidden border bg-white px-[30px] pb-[28px] pt-[30px]"
+      className="relative flex h-full min-h-0 flex-col overflow-hidden border px-[30px] pb-[28px] pt-[30px]"
       style={{
         borderRadius: 20,
-        borderColor: "rgba(45,52,54,0.04)",
-        boxShadow: "0 10px 30px rgba(45,52,54,0.04)",
+        backgroundColor: redBlueComparisonTheme.colors.card,
+        borderColor: redBlueComparisonTheme.colors.neutralBorder,
+        boxShadow: redBlueComparisonTheme.shadow.panel,
       }}
     >
       <CardAccentRail position="top" color={toneValue.color} size={8} />
@@ -180,7 +181,7 @@ const EntitySnapshotCard = ({
         <div className="min-w-0 flex-1">
           <div
             className="mb-[7px] break-words text-[14px] font-black uppercase leading-none"
-            style={{ color: redBlueComparisonTheme.colors.mutedText }}
+            style={{ color: redBlueComparisonTheme.colors.textMuted }}
           >
             {hero.label}
           </div>
@@ -210,8 +211,11 @@ const EntitySnapshotCard = ({
         {kpis.slice(0, 4).map((item) => (
           <div
             key={`${item.label}-${item.value}`}
-            className="flex h-[67px] flex-none items-center justify-between gap-[16px] rounded-[12px] border bg-white px-[16px]"
-            style={{ borderColor: "rgba(45,52,54,0.06)" }}
+            className="flex h-[67px] flex-none items-center justify-between gap-[16px] rounded-[12px] border px-[16px]"
+            style={{
+              backgroundColor: redBlueComparisonTheme.colors.card,
+              borderColor: redBlueComparisonTheme.colors.neutralBorder,
+            }}
           >
             <div className="flex min-w-0 items-center gap-[12px]">
               <div
@@ -222,14 +226,14 @@ const EntitySnapshotCard = ({
               </div>
               <div
                 className="min-w-0 break-words text-[14px] font-bold leading-none"
-                style={{ color: redBlueComparisonTheme.colors.mutedText }}
+                style={{ color: redBlueComparisonTheme.colors.textMuted }}
               >
                 {item.label}
               </div>
             </div>
             <div
               className="max-w-[120px] flex-none break-words text-right text-[24px] font-black leading-none"
-              style={{ color: redBlueComparisonTheme.colors.backgroundText, fontFamily: redBlueComparisonTheme.fonts.heading }}
+              style={{ color: redBlueComparisonTheme.colors.textPrimary, fontFamily: redBlueComparisonTheme.fonts.heading }}
             >
               {item.value}
             </div>

@@ -6,7 +6,7 @@ import { redBlueComparisonTheme } from "../theme/tokens.ts";
 export type SectorDonutSegment = {
   label: string;
   value: number;
-  color: string;
+  color?: string;
 };
 
 type SectorDonutChartProps = {
@@ -29,7 +29,7 @@ const SectorDonutChart = ({
   const chartData = segments.map((segment) => ({
     name: segment.label,
     value: Math.max(0, segment.value),
-    color: segment.color,
+    color: segment.color ?? redBlueComparisonTheme.colors.chart1,
   }));
 
   return (
@@ -64,13 +64,13 @@ const SectorDonutChart = ({
         <div
           className="text-[30px] font-black leading-none"
           style={{
-            color: redBlueComparisonTheme.colors.backgroundText,
+            color: redBlueComparisonTheme.colors.textPrimary,
             fontFamily: redBlueComparisonTheme.fonts.heading,
           }}
         >
           {centerValue}
         </div>
-        <div className="mt-[5px] text-[11px] font-black uppercase tracking-[0.4px]" style={{ color: redBlueComparisonTheme.colors.subtleText }}>
+        <div className="mt-[5px] text-[11px] font-black uppercase tracking-[0.4px]" style={{ color: redBlueComparisonTheme.colors.textSubtle }}>
           {centerLabel}
         </div>
       </div>

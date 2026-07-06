@@ -46,13 +46,13 @@ export const sampleData = Schema.parse({
 export const layoutId = "cover-comparison";
 export const layoutName = "Cover Comparison";
 export const layoutDescription =
-  "A TSX-first red and blue comparison cover inspired by source page 1, with editable title, topic list, entity legend, and reusable decorative system.";
+  "A TSX-first comparison cover inspired by source page 1, with editable title, topic list, entity legend, and reusable decorative system.";
 export const layoutTags = ["cover", "comparison", "red-blue", "tsx-first"];
 export const layoutRole = "cover";
 export const contentElements = ["headline", "subtitle", "topic-list", "entity-legend", "decorative-circles"];
 export const useCases = ["cover", "comparison opening", "country benchmark", "executive briefing"];
 export const suitableFor =
-  "Suitable for opening a red-blue comparison deck that contrasts countries, markets, products, or capabilities.";
+  "Suitable for opening a comparison deck that contrasts countries, markets, products, or capabilities.";
 export const avoidFor =
   "Avoid using this layout for dense body analysis, chart-heavy pages, timelines, or detailed comparison matrices.";
 export const density = "low";

@@ -26,8 +26,8 @@ export const Schema = z.object({
     .max(6)
     .default(["Market", "Audience", "Capability", "Outlook"]),
   entities: z.array(entitySchema).min(2).max(3).default([
-    { label: "Entity A", color: "#FF4757" },
-    { label: "Entity B", color: "#2E86DE" },
+    { label: "Entity A" },
+    { label: "Entity B" },
   ]),
   footerMeta: z.string().min(2).max(48).default("Canvas-first authoring base"),
   showSlotGuides: z.boolean().default(true),
@@ -39,13 +39,13 @@ export const sampleData = Schema.parse({});
 export const layoutId = "cover-canvas";
 export const layoutName = "Cover Canvas";
 export const layoutDescription =
-  "An open red-blue comparison cover canvas with hero title, entity legend, scope tags, and a visual slot for custom composition.";
+  "An open comparison cover canvas with hero title, entity legend, scope tags, and a visual slot for custom composition.";
 export const layoutTags = ["cover", "canvas", "comparison", "red-blue", "component-first", "tsx-first"];
 export const layoutRole = "cover";
 export const contentElements = ["brand", "headline", "subtitle", "entity-legend", "scope-tags", "visual-slot"];
 export const useCases = ["cover", "opening", "comparison-frame", "custom-composition"];
 export const suitableFor =
-  "Suitable as a starting cover for a custom red-blue comparison deck where the Agent should compose the final opening from reusable components.";
+  "Suitable as a starting cover for a custom comparison deck where the Agent should compose the final opening from reusable components.";
 export const avoidFor =
   "Avoid leaving it unchanged as a final page, and avoid using it for dense body analysis or chart-heavy pages.";
 export const density = "low";
@@ -60,10 +60,10 @@ const CoverCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
       {parsed.showDecorations ? <CoverComparisonDecorations /> : null}
 
       <div className="absolute left-[80px] right-[80px] top-[44px] z-20 flex items-center justify-between">
-        <div className="text-[18px] font-black uppercase leading-none" style={{ color: redBlueComparisonTheme.colors.primary }}>
+        <div className="text-[18px] font-black uppercase leading-none" style={{ color: redBlueComparisonTheme.colors.comparison }}>
           {parsed.brandName}
         </div>
-        <ThemePill tone="purple" width={230}>
+        <ThemePill tone="comparison" width={230}>
           Cover Canvas
         </ThemePill>
       </div>
@@ -80,7 +80,7 @@ const CoverCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
 
         <div
           className="mt-[28px] w-[620px] text-[25px] font-semibold uppercase leading-[1.18]"
-          style={{ color: redBlueComparisonTheme.colors.mutedText }}
+          style={{ color: redBlueComparisonTheme.colors.textMuted }}
         >
           {parsed.subtitle}
         </div>
@@ -91,12 +91,12 @@ const CoverCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
               {index > 0 ? (
                 <div
                   className="h-[4px] w-[4px] flex-none rounded-full"
-                  style={{ backgroundColor: redBlueComparisonTheme.colors.subtleText }}
+                  style={{ backgroundColor: redBlueComparisonTheme.colors.textSubtle }}
                 />
               ) : null}
               <div
                 className="break-words text-[17px] font-bold leading-[1.15]"
-                style={{ color: redBlueComparisonTheme.colors.subtleText }}
+                style={{ color: redBlueComparisonTheme.colors.textSubtle }}
               >
                 {scope}
               </div>
@@ -113,11 +113,11 @@ const CoverCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
         <div
           className="absolute right-[94px] top-[174px] z-10 flex h-[330px] w-[300px] items-center justify-center rounded-[8px] text-center"
           style={{
-            border: `1px dashed ${redBlueComparisonTheme.tone.purple.border}`,
-            backgroundColor: "rgba(245,243,255,0.72)",
+            border: `1px dashed ${redBlueComparisonTheme.colors.comparisonBorder}`,
+            backgroundColor: redBlueComparisonTheme.colors.comparisonTint,
           }}
         >
-          <div className="px-[30px] text-[17px] font-black uppercase leading-[1.35]" style={{ color: redBlueComparisonTheme.colors.primary }}>
+          <div className="px-[30px] text-[17px] font-black uppercase leading-[1.35]" style={{ color: redBlueComparisonTheme.colors.comparison }}>
             Compose optional image, chart, or evidence motif here
           </div>
         </div>
@@ -125,7 +125,7 @@ const CoverCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
 
       <div
         className="absolute bottom-[52px] left-[132px] z-10 text-[14px] font-black uppercase leading-none"
-        style={{ color: redBlueComparisonTheme.colors.subtleText }}
+        style={{ color: redBlueComparisonTheme.colors.textSubtle }}
       >
         {parsed.footerMeta}
       </div>

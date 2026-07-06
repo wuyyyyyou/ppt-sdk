@@ -1,9 +1,9 @@
 import React from "react";
 
-import { type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 
 type ThemeSoftCircleProps = {
-  tone?: RedBlueTone;
+  tone?: ComparisonTone;
   left: number;
   top: number;
   size: number;
@@ -12,15 +12,15 @@ type ThemeSoftCircleProps = {
   fillColor?: string;
 };
 
-const rgbaByTone: Record<RedBlueTone, string> = {
-  red: "255,71,87",
-  blue: "46,134,222",
-  purple: "80,56,166",
-  neutral: "45,52,54",
+const alphaByTone: Record<ComparisonTone, (opacity: number) => string> = {
+  sideA: redBlueComparisonTheme.alpha.sideA,
+  sideB: redBlueComparisonTheme.alpha.sideB,
+  comparison: redBlueComparisonTheme.alpha.comparison,
+  neutral: redBlueComparisonTheme.alpha.neutral,
 };
 
 const ThemeSoftCircle = ({
-  tone = "purple",
+  tone = "comparison",
   left,
   top,
   size,
@@ -39,7 +39,7 @@ const ThemeSoftCircle = ({
         top,
         width: size,
         height: size,
-        backgroundColor: fillColor ?? `rgba(${rgbaByTone[tone]},${boundedAlpha})`,
+        backgroundColor: fillColor ?? alphaByTone[tone](boundedAlpha),
       }}
     />
   );

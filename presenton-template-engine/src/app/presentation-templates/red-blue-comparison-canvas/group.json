@@ -1,8 +1,8 @@
 {
   "group_id": "red-blue-comparison-canvas",
   "group_name": "Red Blue Comparison Canvas",
-  "group_description": "Component-first red and blue comparison canvas templates for building custom benchmark, strategy, and evidence decks from reusable TSX components.",
-  "group_brief": "An open composition version of the red-blue comparison visual system. It preserves the white canvas, purple structure color, and red/blue entity accents from the red-blue comparison v1 visual language, but provides only broad canvas starting points so the AI Agent can compose each final slide from reusable components.",
+  "group_description": "Component-first Red Blue Comparison canvas templates for building custom benchmark, strategy, and evidence decks from reusable TSX components.",
+  "group_brief": "An open composition version of the Red Blue Comparison visual system. It preserves the v1 component language while expressing themeable roles through sideA, sideB, comparison, and neutral tokens, so the AI Agent can compose each final slide from reusable components without assuming fixed palette colors.",
   "style_tags": ["comparison", "canvas", "component-first", "red-blue", "tsx-first"],
   "industry_tags": ["business", "market-analysis", "strategy"],
   "use_cases": ["custom-comparison", "market-analysis", "executive-brief", "benchmark-report", "evidence-review"],

@@ -61,7 +61,7 @@ export const Schema = z.object({
 export const layoutId = "historical-milestones-timeline";
 export const layoutName = "Historical Milestones Timeline";
 export const layoutDescription =
-  "A TSX-first horizontal alternating timeline page with a centered title, soft purple structure line, and diamond milestone markers.";
+  "A TSX-first horizontal alternating timeline page with a centered title, soft comparison structure line, and diamond milestone markers.";
 export const layoutTags = ["timeline", "history", "milestones", "sequence", "comparison", "red-blue", "tsx-first"];
 export const layoutRole = "content";
 export const contentElements = ["centered-page-title", "optional-subtitle", "horizontal-timeline", "date-pills", "milestone-markers", "footer"];

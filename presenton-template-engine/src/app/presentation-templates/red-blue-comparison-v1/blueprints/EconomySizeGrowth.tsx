@@ -127,7 +127,7 @@ export const sampleData = Schema.parse({
 export const layoutId = "economy-size-growth";
 export const layoutName = "Economy Size Growth";
 export const layoutDescription =
-  "A TSX-first comparison analysis page with a primary vertical bar chart and stacked red/blue metric cards.";
+  "A TSX-first comparison analysis page with a primary vertical bar chart and stacked sideA/sideB metric cards.";
 export const layoutTags = ["economy", "chart", "metrics", "comparison", "red-blue", "tsx-first"];
 export const layoutRole = "content";
 export const contentElements = ["page-title", "subtitle", "bar-chart", "rank-card", "comparison-metric-cards", "source-note"];

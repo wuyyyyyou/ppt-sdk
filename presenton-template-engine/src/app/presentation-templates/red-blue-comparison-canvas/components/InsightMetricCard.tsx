@@ -1,6 +1,6 @@
 import React from "react";
 
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 import CardAccentRail from "./CardAccentRail.tsx";
 
 type InsightIconName = "flag" | "lightbulb" | "users" | "trend";
@@ -9,7 +9,7 @@ export type InsightMetricCardProps = {
   label: string;
   value?: string;
   description: string;
-  tone?: RedBlueTone;
+  tone?: ComparisonTone;
   icon?: InsightIconName;
   height?: number;
   emphasis?: "metric" | "conclusion";
@@ -65,7 +65,7 @@ const InsightMetricCard = ({
   label,
   value,
   description,
-  tone = "purple",
+  tone = "comparison",
   icon = "flag",
   height = 138,
   emphasis = "metric",
@@ -79,14 +79,14 @@ const InsightMetricCard = ({
       style={{
         height,
         borderRadius: redBlueComparisonTheme.radius.xl,
-        borderColor: isConclusion ? toneValue.border : "rgba(45,52,54,0.05)",
+        borderColor: isConclusion ? toneValue.border : redBlueComparisonTheme.colors.neutralBorder,
         backgroundColor: isConclusion ? toneValue.tint : redBlueComparisonTheme.colors.neutralTint,
         boxShadow: isConclusion ? "none" : redBlueComparisonTheme.shadow.card,
       }}
     >
       {isConclusion ? null : <CardAccentRail position="left" color={toneValue.color} size={5} />}
       <div className="relative z-10 mb-[8px] flex h-[22px] flex-none items-center justify-between gap-[12px]">
-        <div className="min-w-0 break-words text-[12px] font-black uppercase" style={{ color: redBlueComparisonTheme.colors.mutedText }}>
+        <div className="min-w-0 break-words text-[12px] font-black uppercase" style={{ color: redBlueComparisonTheme.colors.textMuted }}>
           {label}
         </div>
         <div className="flex h-[24px] w-[24px] flex-none items-center justify-center" style={{ color: toneValue.color }}>
@@ -97,7 +97,7 @@ const InsightMetricCard = ({
       {value ? (
         <div
           className="relative z-10 mb-[8px] break-words text-[34px] font-black leading-none"
-          style={{ color: redBlueComparisonTheme.colors.backgroundText, fontFamily: redBlueComparisonTheme.fonts.heading }}
+          style={{ color: redBlueComparisonTheme.colors.textPrimary, fontFamily: redBlueComparisonTheme.fonts.heading }}
         >
           {value}
         </div>
@@ -106,7 +106,7 @@ const InsightMetricCard = ({
       <div
         className="relative z-10 overflow-hidden text-[13px] font-medium leading-[1.45]"
         style={{
-          color: redBlueComparisonTheme.colors.backgroundText,
+          color: redBlueComparisonTheme.colors.textPrimary,
           maxHeight: isConclusion ? 68 : 58,
         }}
       >

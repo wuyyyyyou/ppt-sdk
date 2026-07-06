@@ -1,6 +1,6 @@
 import React, { type ReactNode } from "react";
 
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 import ThemeCanvas from "./ThemeCanvas.tsx";
 import ThemeTitleBlock from "./ThemeTitleBlock.tsx";
 
@@ -14,7 +14,7 @@ type ThemeContentFrameProps = {
   meta?: ReactNode;
   footerText?: ReactNode;
   pageNumber?: ReactNode;
-  tone?: RedBlueTone;
+  tone?: ComparisonTone;
   showGrid?: boolean;
   showHeaderDivider?: boolean;
   showFooter?: boolean;
@@ -33,7 +33,7 @@ const ThemeContentFrame = ({
   meta,
   footerText,
   pageNumber,
-  tone = "purple",
+  tone = "comparison",
   showGrid = false,
   showHeaderDivider = true,
   showFooter = true,
@@ -96,8 +96,8 @@ const ThemeContentFrame = ({
           className="absolute bottom-0 left-0 z-20 flex w-full items-center justify-between px-[60px] text-[12px]"
           style={{
             height: redBlueComparisonTheme.size.footerHeight,
-            color: redBlueComparisonTheme.colors.subtleText,
-            backgroundColor: redBlueComparisonTheme.colors.background,
+            color: redBlueComparisonTheme.colors.textSubtle,
+            backgroundColor: redBlueComparisonTheme.colors.canvas,
             borderTop: redBlueComparisonTheme.border.hairline,
           }}
         >

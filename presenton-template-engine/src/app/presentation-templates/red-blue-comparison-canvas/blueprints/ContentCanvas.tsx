@@ -34,7 +34,7 @@ export const sampleData = Schema.parse({});
 export const layoutId = "content-canvas";
 export const layoutName = "Content Canvas";
 export const layoutDescription =
-  "A general red-blue comparison content frame with title, meta, footer, and a large open composition slot.";
+  "A general comparison content frame with title, meta, footer, and a large open composition slot.";
 export const layoutTags = ["content", "canvas", "comparison", "component-first", "tsx-first"];
 export const layoutRole = "content";
 export const contentElements = ["page-title", "subtitle", "meta", "content-slot", "footer-meta"];
@@ -55,25 +55,25 @@ const ContentCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
       titlePrefix={parsed.titlePrefix}
       titleHighlight={parsed.titleHighlight}
       subtitle={parsed.subtitle}
-      meta={<ThemePill tone="purple" width={190}>{parsed.metaLabel}</ThemePill>}
+      meta={<ThemePill tone="comparison" width={190}>{parsed.metaLabel}</ThemePill>}
       footerText={parsed.footerText}
       pageNumber={parsed.pageNumber}
-      tone="purple"
+      tone="comparison"
       contentClassName="flex items-center justify-center"
     >
       {parsed.showDecorations ? <BalancedComparisonDecorations /> : null}
       {parsed.showSlotGuides ? (
         <ThemePanelShell
           className="relative z-10 flex h-full w-full items-center justify-center"
-          borderColor={redBlueComparisonTheme.tone.purple.border}
-          backgroundColor="rgba(245,243,255,0.72)"
+          borderColor={redBlueComparisonTheme.colors.comparisonBorder}
+          backgroundColor={redBlueComparisonTheme.colors.comparisonTint}
           shadow="none"
         >
           <div className="w-[620px] text-center">
-            <div className="text-[28px] font-black leading-none" style={{ color: redBlueComparisonTheme.colors.primary }}>
+            <div className="text-[28px] font-black leading-none" style={{ color: redBlueComparisonTheme.colors.comparison }}>
               {parsed.guideTitle}
             </div>
-            <div className="mt-[18px] text-[18px] font-medium leading-[1.5]" style={{ color: redBlueComparisonTheme.colors.mutedText }}>
+            <div className="mt-[18px] text-[18px] font-medium leading-[1.5]" style={{ color: redBlueComparisonTheme.colors.textMuted }}>
               {parsed.guideText}
             </div>
           </div>

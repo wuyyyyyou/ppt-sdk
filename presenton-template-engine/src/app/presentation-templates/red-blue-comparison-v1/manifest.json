@@ -4,7 +4,7 @@
     {
       "id": "red-blue-comparison-v1-cover",
       "title": "China vs Japan Comparison",
-      "speaker_note": "Demo cover derived from .tmp/Template/红蓝主题/1.html: centered comparison title, topic scope, red/blue legend, and reusable circular decoration system.",
+      "speaker_note": "Demo cover derived from .tmp/Template/红蓝主题/1.html: centered comparison title, topic scope, sideA/sideB legend, and reusable circular decoration system.",
       "source": {
         "type": "local",
         "path": "./slides/CoverComparison.tsx"
@@ -14,7 +14,7 @@
     {
       "id": "red-blue-comparison-v1-topic-overview",
       "title": "Comparison Overview",
-      "speaker_note": "Demo overview derived from .tmp/Template/红蓝主题/2.html: professional title block, six numbered topic cards, reusable icon card language, and soft red/blue/purple decorations.",
+      "speaker_note": "Demo overview derived from .tmp/Template/红蓝主题/2.html: professional title block, six numbered topic cards, reusable icon card language, and soft semantic token decorations.",
       "source": {
         "type": "local",
         "path": "./slides/TopicOverview.tsx"
@@ -24,7 +24,7 @@
     {
       "id": "red-blue-comparison-v1-economy-size-growth",
       "title": "Economy: Size and Growth",
-      "speaker_note": "Demo analysis page derived from .tmp/Template/红蓝主题/3.html: one primary GDP comparison chart with stacked red/blue metric cards for rank, growth, and per-capita indicators.",
+      "speaker_note": "Demo analysis page derived from .tmp/Template/红蓝主题/3.html: one primary GDP comparison chart with stacked sideA/sideB metric cards for rank, growth, and per-capita indicators.",
       "source": {
         "type": "local",
         "path": "./slides/EconomySizeGrowth.tsx"
@@ -94,7 +94,7 @@
     {
       "id": "red-blue-comparison-v1-historical-milestones-timeline",
       "title": "History: Key Milestones",
-      "speaker_note": "Demo timeline page derived from .tmp/Template/红蓝主题/11.html: centered history title, horizontal structure line, alternating milestone text blocks, date pills, and purple diamond markers.",
+      "speaker_note": "Demo timeline page derived from .tmp/Template/红蓝主题/11.html: centered history title, horizontal structure line, alternating milestone text blocks, date pills, and comparison diamond markers.",
       "source": {
         "type": "local",
         "path": "./slides/HistoricalMilestonesTimeline.tsx"

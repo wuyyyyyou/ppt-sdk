@@ -27,7 +27,7 @@ const IconText = ({
   minTextWidth,
   fontSize = 15,
   fontWeight = 600,
-  textColor = redBlueComparisonTheme.colors.backgroundText,
+  textColor = redBlueComparisonTheme.colors.textPrimary,
   noWrap = true,
 }: IconTextProps) => {
   return (

@@ -25,8 +25,8 @@ export const Schema = z.object({
   footerText: z.string().min(4).max(80).default("Red Blue Comparison Canvas | Comparison"),
   pageNumber: z.string().min(1).max(4).default("03"),
   entities: z.array(entitySchema).min(2).max(3).default([
-    { label: "Entity A", color: "#FF4757" },
-    { label: "Entity B", color: "#2E86DE" },
+    { label: "Entity A" },
+    { label: "Entity B" },
   ]),
   guideTitle: z.string().min(2).max(48).default("Entity lane"),
   guideText: z.string().min(8).max(120).default("Compose metrics, profiles, evidence, chart excerpts, or table cells."),
@@ -39,7 +39,7 @@ export const sampleData = Schema.parse({});
 export const layoutId = "comparison-canvas";
 export const layoutName = "Comparison Canvas";
 export const layoutDescription =
-  "A two- or three-entity red-blue comparison canvas with balanced lanes and an entity legend.";
+  "A two- or three-entity comparison canvas with balanced side lanes and an entity legend.";
 export const layoutTags = ["comparison", "canvas", "entity-lanes", "component-first", "tsx-first"];
 export const layoutRole = "content";
 export const contentElements = ["page-title", "subtitle", "entity-legend", "comparison-slots", "footer-meta"];
@@ -53,10 +53,12 @@ export const visualWeight = "balanced";
 export const editableTextPriority = "high";
 
 const defaultColors = [
-  redBlueComparisonTheme.colors.chinaRed,
-  redBlueComparisonTheme.colors.japanBlue,
-  redBlueComparisonTheme.colors.koreaRed,
+  redBlueComparisonTheme.colors.sideA,
+  redBlueComparisonTheme.colors.sideB,
+  redBlueComparisonTheme.colors.comparison,
 ];
+
+const laneTones = ["sideA", "sideB", "comparison"] as const;
 
 const ComparisonCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
   const parsed = readTemplateData(Schema, data);
@@ -69,7 +71,7 @@ const ComparisonCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
       meta={<EntityLegend items={parsed.entities} />}
       footerText={parsed.footerText}
       pageNumber={parsed.pageNumber}
-      tone="purple"
+      tone="comparison"
       showHeaderDivider={false}
       contentTop={164}
       contentHeight={498}
@@ -81,6 +83,7 @@ const ComparisonCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
       >
         {parsed.entities.map((entity, index) => {
           const color = entity.color ?? defaultColors[index % defaultColors.length];
+          const tone = laneTones[index % laneTones.length];
           return (
             <ThemePanelShell key={`${entity.label}-${index}`} className="flex min-h-0 flex-col" padding={0}>
               <div className="h-[8px] w-full" style={{ backgroundColor: color }} />
@@ -88,7 +91,7 @@ const ComparisonCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
                 <div className="text-[25px] font-black leading-none" style={{ color }}>
                   {entity.label}
                 </div>
-                <ThemePill tone={index === 0 ? "red" : index === 1 ? "blue" : "purple"} width={104}>
+                <ThemePill tone={tone} width={104}>
                   Lane {index + 1}
                 </ThemePill>
               </div>
@@ -98,7 +101,7 @@ const ComparisonCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
                     <div className="text-[22px] font-black leading-none" style={{ color }}>
                       {parsed.guideTitle}
                     </div>
-                    <div className="mt-[16px] text-[16px] font-medium leading-[1.5]" style={{ color: redBlueComparisonTheme.colors.mutedText }}>
+                    <div className="mt-[16px] text-[16px] font-medium leading-[1.5]" style={{ color: redBlueComparisonTheme.colors.textMuted }}>
                       {parsed.guideText}
                     </div>
                   </div>

@@ -45,7 +45,7 @@ export const sampleData = Schema.parse({
 export const layoutId = "closing-contact";
 export const layoutName = "Closing Contact";
 export const layoutDescription =
-  "A TSX-first closing page with a large thank-you message, editable URL pill, contact rows, and soft purple circle decorations.";
+  "A TSX-first closing page with a large thank-you message, editable URL pill, contact rows, and soft comparison circle decorations.";
 export const layoutTags = ["closing", "thank-you", "contact", "red-blue", "tsx-first"];
 export const layoutRole = "closing";
 export const contentElements = ["thank-you-title", "url-pill", "contact-items", "soft-circle-decorations"];

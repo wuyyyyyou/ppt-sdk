@@ -27,13 +27,13 @@ export const sampleData = Schema.parse({});
 export const layoutId = "closing-canvas";
 export const layoutName = "Closing Canvas";
 export const layoutDescription =
-  "A low-density red-blue comparison closing canvas for final contact, thanks, or follow-up pages.";
+  "A low-density comparison closing canvas for final contact, thanks, or follow-up pages.";
 export const layoutTags = ["closing", "canvas", "contact", "comparison", "component-first", "tsx-first"];
 export const layoutRole = "closing";
 export const contentElements = ["eyebrow", "closing-title", "subtitle", "contact-slot", "footer-slot"];
 export const useCases = ["closing", "thank-you", "contact", "next-steps"];
 export const suitableFor =
-  "Suitable for final pages that need a polished low-density close while preserving the red-blue comparison language.";
+  "Suitable for final pages that need a polished low-density close while preserving the comparison component language.";
 export const avoidFor =
   "Avoid for analytical conclusions with dense recommendations, charts, or tables.";
 export const density = "low";
@@ -49,23 +49,23 @@ const ClosingCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
 
       <div className="absolute left-[190px] top-[142px] z-10 w-[900px] text-center">
         <div className="mb-[28px] flex justify-center">
-          <ThemePill tone="purple" width={210}>
+          <ThemePill tone="comparison" width={210}>
             {parsed.eyebrow}
           </ThemePill>
         </div>
-        <div className="text-[78px] font-black leading-none" style={{ color: redBlueComparisonTheme.colors.primary }}>
+        <div className="text-[78px] font-black leading-none" style={{ color: redBlueComparisonTheme.colors.comparison }}>
           {parsed.title}
         </div>
-        <div className="mx-auto mt-[26px] w-[720px] text-[24px] font-medium leading-[1.42]" style={{ color: redBlueComparisonTheme.colors.mutedText }}>
+        <div className="mx-auto mt-[26px] w-[720px] text-[24px] font-medium leading-[1.42]" style={{ color: redBlueComparisonTheme.colors.textMuted }}>
           {parsed.subtitle}
         </div>
 
         <div className="mt-[54px] flex justify-center">
           <ThemePanelShell className="flex w-[650px] items-center justify-center gap-[20px]" padding={18}>
-            <ThemePill tone="red" width={270}>
+            <ThemePill tone="sideA" width={270}>
               {parsed.primaryContact}
             </ThemePill>
-            <ThemePill tone="blue" width={270}>
+            <ThemePill tone="sideB" width={270}>
               {parsed.secondaryContact}
             </ThemePill>
           </ThemePanelShell>
@@ -75,9 +75,9 @@ const ClosingCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
           <div
             className="mx-auto mt-[30px] w-[520px] rounded-[8px] py-[14px] text-[14px] font-black uppercase leading-none"
             style={{
-              color: redBlueComparisonTheme.colors.primary,
-              backgroundColor: "rgba(245,243,255,0.78)",
-              border: `1px dashed ${redBlueComparisonTheme.tone.purple.border}`,
+              color: redBlueComparisonTheme.colors.comparison,
+              backgroundColor: redBlueComparisonTheme.colors.comparisonTint,
+              border: `1px dashed ${redBlueComparisonTheme.colors.comparisonBorder}`,
             }}
           >
             Replace contact module or add concise next-step component

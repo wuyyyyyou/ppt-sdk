@@ -1,6 +1,6 @@
 import React from "react";
 
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 import CardAccentRail from "./CardAccentRail.tsx";
 
 type StrategicInsightIconName = "lightbulb" | "microscope" | "target";
@@ -9,7 +9,7 @@ type StrategicInsightCardProps = {
   title: string;
   text: string;
   icon?: StrategicInsightIconName;
-  tone?: RedBlueTone;
+  tone?: ComparisonTone;
   height?: number;
 };
 
@@ -60,7 +60,7 @@ const StrategicInsightCard = ({
   title,
   text,
   icon = "lightbulb",
-  tone = "purple",
+  tone = "comparison",
   height = 152,
 }: StrategicInsightCardProps) => {
   const toneValue = redBlueComparisonTheme.tone[tone];
@@ -94,7 +94,7 @@ const StrategicInsightCard = ({
         data-validation-role="multi-line-body-text"
         className="overflow-hidden text-[13px] font-medium leading-[1.46]"
         style={{
-          color: redBlueComparisonTheme.colors.backgroundText,
+          color: redBlueComparisonTheme.colors.textPrimary,
           maxHeight: textMaxHeight,
         }}
       >

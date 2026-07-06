@@ -1,13 +1,13 @@
 # Red Blue Comparison Canvas 蓝图说明
 
-`red-blue-comparison-canvas` 是 component-first / canvas-first 的红蓝对比模板组。它保留红蓝对比 v1 的视觉语言和组件能力，但故意不搬运 v1 的具体业务页面蓝图。
+`red-blue-comparison-canvas` 是 component-first / canvas-first 的 Red Blue Comparison 模板组。它保留 v1 的组件能力和对比版式语言，但主题契约使用 `sideA` / `sideB` / `comparison` / `neutral` 语义 token，不把颜色名作为可变主题接口。
 
 ## Agent 阅读顺序
 
 1. 先读 `../catalog.json`，判断当前页面应选哪类 canvas。
 2. 必须读 `../components/README.md`，确认组件 slot、文本容量和导出注意事项。
 3. 再读对应的 `./*.tsx`，复制或派生到 `../slides/*.tsx`，把 slot guide 替换为真实组件组合。
-4. 如果页面需要行业页参考，可以参考红蓝对比 v1，但不要直接复制它的成品页面结构。
+4. 如果页面需要行业页参考，可以参考 Red Blue Comparison v1，但不要直接复制它的成品页面结构。
 
 ## 核心约定
 

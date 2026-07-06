@@ -44,17 +44,37 @@
 - canvas / slide 中的图标+文字行应使用 `IconText` 或 `StableInlineRow` 的 `data-pptx-inline-*` 语义结构，不要手写 `svg + 直接文本节点`，否则 HTML 预览可能正常但 PPTX model 丢文字。
 - 已通过 `presenton-template-engine` 的 `npm run check` 和 `npm run build`。
 
+`red-blue-comparison-v1` 已完成 token 迁移：
+
+- 增加 `theme/token.schema.json`、`theme/token.default.json`、中文 `theme/README.md`，并保留 `theme/token.dark-orange.json` 作为黑金命名预设。
+- 不提交 `theme/token.json`；该文件继续作为本地测试/工作区主题文件。
+- 移除 `manifest.theme`，真实颜色来源改为 theme token。
+- `theme/tokens.ts` 已改为读取 `--theme-color-*` / `--theme-shadow-*`，并提供 alpha helper 复用 `*-rgb` CSS vars。
+- 该模板的核心主题语义是双方对比，不应把可变契约命名为 red / blue。使用 `sideA`、`sideB`、`comparison`、`neutral` 表达两个被比较对象、对比框架和中性语义。
+- components、blueprints、demo data 已从 `red` / `blue` / `purple` tone 迁移到 `sideA` / `sideB` / `comparison` / `neutral`。
+- demo data 默认不再写 `color`、`fillColor`、`textColor`；图表、产业结构、年龄结构等默认颜色由 token fallback 控制。
+- 暗色主题回归时修复过 `bg-white` card 和 `border-white` 时间线节点描边这类硬编码白色。后续迁移同族模板时要重点扫描 `bg-white`、`border-white`、`#FFFFFF`、`rgba(...)`、旧 CSS var 和旧 tone 字符串。
+- 已通过 `presenton-template-engine` 的 `npm run check` 和 `npm run build`。
+
 ## Canvas 模板关系
 
-这个模板和 `red-finance-v3` 的关系：
+`red-finance-canvas` 和 `red-finance-v3` 的关系：
 
 - `red-finance-canvas` 是开放性 canvas 蓝图模板。
 - 它的组件基本来自 `red-finance-v3` / 同一套红色金融组件体系。
 - 主要差异在蓝图形态：`red-finance-v3` 是较完整的页面蓝图；`red-finance-canvas` 提供 cover/content/section 级 canvas，让 AI Agent 自行组合组件。
 
+`red-blue-comparison-canvas` 和 `red-blue-comparison-v1` 的关系：
+
+- `red-blue-comparison-canvas` 是开放性 canvas 蓝图模板。
+- 它的 components 基本来自 `red-blue-comparison-v1` / 同一套双方对比组件体系。
+- 主要差异在蓝图形态：`red-blue-comparison-v1` 是较完整的页面蓝图；`red-blue-comparison-canvas` 提供 `CoverCanvas`、`ContentCanvas`、`ComparisonCanvas`、`ChartEvidenceCanvas`、`ClosingCanvas`，让 AI Agent 在画布槽位上组合组件生成页面。
+- 迁移 `red-blue-comparison-canvas` 时，应优先对齐 `red-blue-comparison-v1` 的 token 契约和组件实现，而不是重新设计一套红/蓝命名或照搬 red-finance 的 accent 契约。
+
 ## 注意事项
 
 - 先读 `red-finance-v3` 的最终实现，再迁移 canvas；不要凭记忆手改。
+- 迁移 `red-blue-comparison-canvas` 时，先读 `red-blue-comparison-v1` 的最终实现，再对照 canvas 独有 blueprints；不要只复制 red-finance-canvas 的 token 文件。
 - 不要迁移 `reference-slides/` 这类参考材料，除非后续明确要求。
 - data 默认不要再写颜色；只有明确业务覆盖才允许 data color。
 - 允许 `tokens.ts` 做机械派生，例如 alpha helper；语义颜色应进入 token json。
