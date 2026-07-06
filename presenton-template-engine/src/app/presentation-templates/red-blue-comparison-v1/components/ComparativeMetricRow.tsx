@@ -1,6 +1,6 @@
 import React from "react";
 
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 
 export type ComparativeMetricIconName =
   | "certificate"
@@ -12,7 +12,7 @@ export type ComparativeMetricIconName =
 export type ComparativeMetricValue = {
   value: string;
   sublabel: string;
-  tone?: RedBlueTone;
+  tone?: ComparisonTone;
 };
 
 type ComparativeMetricRowProps = {
@@ -83,21 +83,22 @@ const ComparativeMetricRow = ({
 }: ComparativeMetricRowProps) => {
   return (
     <div
-      className="grid min-w-0 items-center border bg-white px-[16px]"
+      className="grid min-w-0 items-center border px-[16px]"
       style={{
         height,
         gridTemplateColumns: "1.05fr 1.35fr",
         borderRadius: redBlueComparisonTheme.radius.xl,
-        borderColor: "rgba(45,52,54,0.05)",
-        boxShadow: "0 3px 8px rgba(45,52,54,0.03)",
+        backgroundColor: redBlueComparisonTheme.colors.card,
+        borderColor: redBlueComparisonTheme.colors.neutralBorder,
+        boxShadow: redBlueComparisonTheme.shadow.card,
       }}
     >
       <div className="flex min-w-0 items-center gap-[10px]">
         <div
           className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-[7px]"
           style={{
-            backgroundColor: redBlueComparisonTheme.colors.purpleTint,
-            color: redBlueComparisonTheme.colors.primary,
+            backgroundColor: redBlueComparisonTheme.colors.comparisonTint,
+            color: redBlueComparisonTheme.colors.comparison,
           }}
         >
           <MetricIcon name={icon} />
@@ -105,7 +106,7 @@ const ComparativeMetricRow = ({
         <div
           className="min-w-0 overflow-hidden text-[13px] font-bold leading-[1.15]"
           style={{
-            color: redBlueComparisonTheme.colors.mutedText,
+            color: redBlueComparisonTheme.colors.textMuted,
             maxHeight: 32,
           }}
         >
@@ -121,7 +122,7 @@ const ComparativeMetricRow = ({
         }}
       >
         {values.map((entry, index) => {
-          const tone = entry.tone ?? (index === 0 ? "red" : "blue");
+          const tone = entry.tone ?? (index === 0 ? "sideA" : "sideB");
           const toneValue = redBlueComparisonTheme.tone[tone];
 
           return (
@@ -137,7 +138,7 @@ const ComparativeMetricRow = ({
               </div>
               <div
                 className="mt-[3px] break-words text-[10px] font-semibold leading-none"
-                style={{ color: redBlueComparisonTheme.colors.subtleText }}
+                style={{ color: redBlueComparisonTheme.colors.textSubtle }}
               >
                 {entry.sublabel}
               </div>

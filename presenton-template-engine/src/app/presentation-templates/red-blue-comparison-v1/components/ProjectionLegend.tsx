@@ -1,10 +1,10 @@
 import React from "react";
 
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 
 export type ProjectionLegendItem = {
   label: string;
-  tone: RedBlueTone;
+  tone: ComparisonTone;
 };
 
 type ProjectionLegendProps = {
@@ -18,8 +18,8 @@ const ProjectionLegend = ({ items, projectionLabel }: ProjectionLegendProps) => 
       className="flex flex-none items-center gap-[14px] rounded-[8px] border px-[12px] py-[7px] text-[11px] font-bold"
       style={{
         borderColor: redBlueComparisonTheme.colors.stroke,
-        backgroundColor: "rgba(255,255,255,0.92)",
-        color: redBlueComparisonTheme.colors.mutedText,
+        backgroundColor: redBlueComparisonTheme.alpha.surface(0.92),
+        color: redBlueComparisonTheme.colors.textMuted,
       }}
     >
       {items.map((item) => (
@@ -32,10 +32,10 @@ const ProjectionLegend = ({ items, projectionLabel }: ProjectionLegendProps) => 
         </div>
       ))}
       {projectionLabel ? (
-        <div className="flex min-w-0 items-center gap-[6px]" style={{ color: redBlueComparisonTheme.colors.subtleText }}>
+        <div className="flex min-w-0 items-center gap-[6px]" style={{ color: redBlueComparisonTheme.colors.textSubtle }}>
           <span
             className="h-0 w-[22px] flex-none"
-            style={{ borderTop: `2px dashed ${redBlueComparisonTheme.colors.subtleText}` }}
+            style={{ borderTop: `2px dashed ${redBlueComparisonTheme.colors.textSubtle}` }}
           />
           <span className="max-w-[150px] break-words">{projectionLabel}</span>
         </div>

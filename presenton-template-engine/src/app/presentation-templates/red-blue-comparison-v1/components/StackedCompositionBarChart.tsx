@@ -15,7 +15,7 @@ import { redBlueComparisonTheme } from "../theme/tokens.ts";
 export type StackedCompositionSegment = {
   key: string;
   label: string;
-  color: string;
+  color?: string;
   textColor?: string;
 };
 
@@ -70,7 +70,7 @@ const StackedCompositionBarChart = ({
       return (
         <text
           dominantBaseline="central"
-          fill={segment.textColor ?? "#FFFFFF"}
+          fill={segment.textColor ?? redBlueComparisonTheme.colors.textInverse}
           fontFamily={redBlueComparisonTheme.fonts.body}
           fontSize={13}
           fontWeight={900}
@@ -94,14 +94,14 @@ const StackedCompositionBarChart = ({
         >
           <CartesianGrid
             horizontal={false}
-            stroke="rgba(45,52,54,0.07)"
+            stroke={redBlueComparisonTheme.colors.grid}
             strokeDasharray="3 3"
           />
           <XAxis
             axisLine={false}
             domain={[0, 100]}
             tick={{
-              fill: redBlueComparisonTheme.colors.subtleText,
+              fill: redBlueComparisonTheme.colors.textSubtle,
               fontSize: 11,
               fontWeight: 800,
             }}
@@ -114,7 +114,7 @@ const StackedCompositionBarChart = ({
             axisLine={false}
             dataKey="label"
             tick={{
-              fill: redBlueComparisonTheme.colors.backgroundText,
+              fill: redBlueComparisonTheme.colors.textPrimary,
               fontSize: 16,
               fontWeight: 900,
             }}
@@ -128,7 +128,7 @@ const StackedCompositionBarChart = ({
             iconType="square"
             verticalAlign="top"
             wrapperStyle={{
-              color: redBlueComparisonTheme.colors.mutedText,
+              color: redBlueComparisonTheme.colors.textMuted,
               fontFamily: redBlueComparisonTheme.fonts.body,
               fontSize: 12,
               fontWeight: 800,
@@ -139,7 +139,7 @@ const StackedCompositionBarChart = ({
             <Bar
               key={segment.key}
               dataKey={(row: StackedCompositionRow) => row.values[segment.key] ?? 0}
-              fill={segment.color}
+              fill={segment.color ?? redBlueComparisonTheme.colors.chart1}
               isAnimationActive={false}
               name={segment.label}
               radius={0}

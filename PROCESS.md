@@ -40,6 +40,8 @@
 - `theme/tokens.ts` 已改为读取 `--theme-color-*` / `--theme-shadow-*`。
 - components 已对齐 `red-finance-v3` 的 token 消费方式，图表默认由 `chart1..chart6` token 控制。
 - canvas 独有的 `blueprints/ContentCanvas.tsx`、`blueprints/CoverCanvas.tsx`、`blueprints/SectionFocusCanvas.tsx` 已迁移 slot guide 和占位视觉用色。
+- starter `manifest.json` 的每页需要保留 `data_path` 指向 `data/demo/*.json`，否则 VSCode pipeline 会向 slide 传 `{}`，导致 starter deck 看起来像空页。
+- canvas / slide 中的图标+文字行应使用 `IconText` 或 `StableInlineRow` 的 `data-pptx-inline-*` 语义结构，不要手写 `svg + 直接文本节点`，否则 HTML 预览可能正常但 PPTX model 丢文字。
 - 已通过 `presenton-template-engine` 的 `npm run check` 和 `npm run build`。
 
 ## Canvas 模板关系
@@ -58,3 +60,4 @@
 - 允许 `tokens.ts` 做机械派生，例如 alpha helper；语义颜色应进入 token json。
 - 页面级一次性改色可以改具体 TSX，但模板级主题能力必须走 token。
 - 暂时不要接 LLM 生成 `token.json`，那是下一阶段工作；当前 `token.json` 只作为本地可变测试文件。
+- 迁移下一个模板时，不要机械复制 `red-finance-v3` 的 token schema。应先分析目标模板的视觉语义、组件结构、图表/对比关系和主题切换需求，再设计适配该模板的 `token.default.json` 与 `token.schema.json`；命名可以复用已稳定的通用字段，但模板特有语义应进入自己的 token 契约。

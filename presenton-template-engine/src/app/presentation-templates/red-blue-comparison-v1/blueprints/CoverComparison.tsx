@@ -24,8 +24,8 @@ export const Schema = z.object({
     .max(8)
     .default(["Market", "Scale", "Capability", "Outlook"]),
   entities: z.array(entitySchema).min(2).max(3).default([
-    { label: "Entity A", color: "#FF4757" },
-    { label: "Entity B", color: "#2E86DE" },
+    { label: "Entity A" },
+    { label: "Entity B" },
   ]),
   showDecorations: z.boolean().default(true),
 });
@@ -37,8 +37,8 @@ export const sampleData = Schema.parse({
   subtitle: "Comprehensive Comparison",
   topicItems: ["Economy", "Demographics", "Technology", "Trade", "History", "Culture"],
   entities: [
-    { label: "China", color: "#FF4757" },
-    { label: "Japan", color: "#2E86DE" },
+    { label: "China" },
+    { label: "Japan" },
   ],
   showDecorations: true,
 });
@@ -75,7 +75,7 @@ const CoverComparison = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
 
         <div
           className="mt-[36px] min-h-[30px] break-words text-[24px] font-semibold uppercase leading-[1.15] tracking-[1px]"
-          style={{ color: redBlueComparisonTheme.colors.mutedText }}
+          style={{ color: redBlueComparisonTheme.colors.textMuted }}
         >
           {parsed.subtitle}
         </div>
@@ -86,12 +86,12 @@ const CoverComparison = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
               {index > 0 ? (
                 <div
                   className="h-[4px] w-[4px] flex-none rounded-full"
-                  style={{ backgroundColor: redBlueComparisonTheme.colors.subtleText }}
+                  style={{ backgroundColor: redBlueComparisonTheme.colors.textSubtle }}
                 />
               ) : null}
               <div
                 className="break-words text-[18px] font-medium leading-[1.15]"
-                style={{ color: redBlueComparisonTheme.colors.subtleText }}
+                style={{ color: redBlueComparisonTheme.colors.textSubtle }}
               >
                 {topic}
               </div>

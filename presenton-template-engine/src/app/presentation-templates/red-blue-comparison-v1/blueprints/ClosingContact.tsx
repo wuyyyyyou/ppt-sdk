@@ -7,26 +7,26 @@ import ThemeCanvas from "../components/ThemeCanvas.tsx";
 import ThemePanelShell from "../components/ThemePanelShell.tsx";
 import ThemeSoftCircle from "../components/ThemeSoftCircle.tsx";
 import ThemePill from "../components/ThemePill.tsx";
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 
-const ToneSchema = z.enum(["red", "blue", "purple", "neutral"]);
+const ToneSchema = z.enum(["sideA", "sideB", "comparison", "neutral"]);
 const ContactIconSchema = z.enum(["email", "phone", "link", "person"]);
 
 const ContactItemSchema = z.object({
   icon: ContactIconSchema.default("email"),
   label: z.string().min(2).max(72),
-  tone: ToneSchema.default("purple"),
+  tone: ToneSchema.default("comparison"),
 });
 
 export const Schema = z.object({
   title: z.string().min(2).max(28).default("Thank You!"),
   urlLabel: z.string().min(2).max(48).default("www.example.com"),
   contactItems: z.array(ContactItemSchema).min(1).max(3).default([
-    { icon: "email", label: "contact@example.com", tone: "purple" },
-    { icon: "phone", label: "+1-555-000-0000", tone: "purple" },
+    { icon: "email", label: "contact@example.com", tone: "comparison" },
+    { icon: "phone", label: "+1-555-000-0000", tone: "comparison" },
   ]),
   footerNote: z.string().min(2).max(80).optional(),
-  accentTone: ToneSchema.default("purple"),
+  accentTone: ToneSchema.default("comparison"),
   showDecorations: z.boolean().default(true),
 });
 
@@ -34,11 +34,11 @@ export const sampleData = Schema.parse({
   title: "Thank You!",
   urlLabel: "www.example.com",
   contactItems: [
-    { icon: "email", label: "contact@example.com", tone: "purple" },
-    { icon: "phone", label: "+1-555-000-0000", tone: "purple" },
+    { icon: "email", label: "contact@example.com", tone: "comparison" },
+    { icon: "phone", label: "+1-555-000-0000", tone: "comparison" },
   ],
   footerNote: "Red Blue Comparison | Closing",
-  accentTone: "purple",
+  accentTone: "comparison",
   showDecorations: true,
 });
 
@@ -59,15 +59,15 @@ export const visualWeight = "visual-heavy";
 export const editableTextPriority = "high";
 
 const closingCircles = [
-  { key: "large-top-left", tone: "purple", left: -80, top: -120, size: 350, alpha: 0.08 },
-  { key: "bottom-right", tone: "purple", left: 850, top: 610, size: 250, alpha: 0.18 },
-  { key: "right-middle", tone: "purple", left: 1130, top: 180, size: 200, alpha: 0.06 },
-  { key: "left-bottom", tone: "purple", left: 120, top: 450, size: 150, alpha: 0.12 },
-  { key: "right-top", tone: "purple", left: 800, top: 80, size: 180, alpha: 0.05 },
-  { key: "left-mid", tone: "purple", left: 300, top: 380, size: 120, alpha: 0.14 },
+  { key: "large-top-left", tone: "comparison", left: -80, top: -120, size: 350, alpha: 0.08 },
+  { key: "bottom-right", tone: "comparison", left: 850, top: 610, size: 250, alpha: 0.18 },
+  { key: "right-middle", tone: "comparison", left: 1130, top: 180, size: 200, alpha: 0.06 },
+  { key: "left-bottom", tone: "comparison", left: 120, top: 450, size: 150, alpha: 0.12 },
+  { key: "right-top", tone: "comparison", left: 800, top: 80, size: 180, alpha: 0.05 },
+  { key: "left-mid", tone: "comparison", left: 300, top: 380, size: 120, alpha: 0.14 },
 ] as const;
 
-const ContactIcon = ({ icon, tone }: { icon: z.infer<typeof ContactIconSchema>; tone: RedBlueTone }) => {
+const ContactIcon = ({ icon, tone }: { icon: z.infer<typeof ContactIconSchema>; tone: ComparisonTone }) => {
   const toneValue = redBlueComparisonTheme.tone[tone];
 
   const iconPath = {
@@ -115,7 +115,7 @@ const ContactIcon = ({ icon, tone }: { icon: z.infer<typeof ContactIconSchema>; 
 
 const ClosingContact = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
   const parsed = readTemplateData(Schema, data);
-  const accentTone = parsed.accentTone as RedBlueTone;
+  const accentTone = parsed.accentTone as ComparisonTone;
   const accent = redBlueComparisonTheme.tone[accentTone];
 
   return (
@@ -157,11 +157,11 @@ const ClosingContact = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
           padding={22}
           radius={redBlueComparisonTheme.radius.xl}
           borderColor={accent.border}
-          backgroundColor="rgba(255,255,255,0.88)"
+          backgroundColor={redBlueComparisonTheme.alpha.surface(0.88)}
           shadow={redBlueComparisonTheme.shadow.panel}
         >
           {parsed.contactItems.map((item, index) => {
-            const tone = item.tone as RedBlueTone;
+            const tone = item.tone as ComparisonTone;
 
             return (
               <IconText
@@ -173,7 +173,7 @@ const ClosingContact = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
                 gap={12}
                 fontSize={21}
                 fontWeight={700}
-                textColor={redBlueComparisonTheme.colors.backgroundText}
+                textColor={redBlueComparisonTheme.colors.textPrimary}
               />
             );
           })}
@@ -182,7 +182,7 @@ const ClosingContact = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
         {parsed.footerNote ? (
           <div
             className="mt-[28px] max-w-[720px] break-words text-[14px] font-black uppercase"
-            style={{ color: redBlueComparisonTheme.colors.subtleText }}
+            style={{ color: redBlueComparisonTheme.colors.textSubtle }}
           >
             {parsed.footerNote}
           </div>

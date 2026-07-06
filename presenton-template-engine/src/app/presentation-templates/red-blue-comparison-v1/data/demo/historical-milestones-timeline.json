@@ -9,31 +9,31 @@
       "date": "1894-95",
       "title": "First Sino-Japanese War",
       "description": "Conflict over Korea shifted regional dominance to Japan.",
-      "tone": "purple"
+      "tone": "comparison"
     },
     {
       "date": "1937-45",
       "title": "WWII Conflict",
       "description": "Full-scale invasion marked by intense hostility.",
-      "tone": "purple"
+      "tone": "comparison"
     },
     {
       "date": "1972",
       "title": "Normalization",
       "description": "Diplomatic relations were established via the Joint Communique.",
-      "tone": "purple"
+      "tone": "comparison"
     },
     {
       "date": "2010-12",
       "title": "Territorial Tensions",
       "description": "Island disputes strained diplomatic and trade ties.",
-      "tone": "purple"
+      "tone": "comparison"
     },
     {
       "date": "2020s",
       "title": "Modern Dynamics",
       "description": "Economic interdependence now coexists with strategic rivalry.",
-      "tone": "purple"
+      "tone": "comparison"
     }
   ],
   "showDecorations": true

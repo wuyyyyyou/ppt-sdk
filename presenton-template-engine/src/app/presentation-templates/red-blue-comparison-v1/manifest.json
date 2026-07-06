@@ -1,27 +1,5 @@
 {
   "title": "Red Blue Comparison Starter Deck",
-  "theme": {
-    "company_name": "COMPARISON INSIGHTS",
-    "colors": {
-      "background": "#FFFFFF",
-      "background_text": "#2D3436",
-      "primary": "#5038A6",
-      "primary_text": "#FFFFFF",
-      "card": "#FFFFFF",
-      "stroke": "#E9E7F6",
-      "secondary": "#2E86DE",
-      "text_muted": "#636E72",
-      "text_subtle": "#7F8C8D",
-      "china_red": "#FF4757",
-      "japan_blue": "#2E86DE",
-      "korea_red": "#EF3340",
-      "purple_soft": "#DDD8F7",
-      "purple_tint": "#F5F3FF",
-      "red_tint": "#FFF1F3",
-      "blue_tint": "#EFF6FF",
-      "shadow_soft": "rgba(45,52,54,0.08)"
-    }
-  },
   "slides": [
     {
       "id": "red-blue-comparison-v1-cover",

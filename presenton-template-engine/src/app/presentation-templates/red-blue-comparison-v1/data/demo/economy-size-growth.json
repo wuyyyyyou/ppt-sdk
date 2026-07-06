@@ -14,13 +14,13 @@
       "label": "China",
       "value": 20.65,
       "displayValue": "$20.65T",
-      "tone": "red"
+      "tone": "sideA"
     },
     {
       "label": "Japan",
       "value": 4.46,
       "displayValue": "$4.46T",
-      "tone": "blue"
+      "tone": "sideB"
     }
   ],
   "metricCards": [
@@ -32,13 +32,13 @@
           "label": "China",
           "shortLabel": "CHINA",
           "value": "#2",
-          "tone": "red"
+          "tone": "sideA"
         },
         {
           "label": "Japan",
           "shortLabel": "JAPAN",
           "value": "#4",
-          "tone": "blue"
+          "tone": "sideB"
         }
       ]
     },
@@ -51,14 +51,14 @@
           "shortLabel": "CHN",
           "value": "4.5%",
           "share": 85,
-          "tone": "red"
+          "tone": "sideA"
         },
         {
           "label": "Japan",
           "shortLabel": "JPN",
           "value": "0.9%",
           "share": 20,
-          "tone": "blue"
+          "tone": "sideB"
         }
       ]
     },
@@ -71,14 +71,14 @@
           "shortLabel": "CHN",
           "value": "$13.8k",
           "share": 40,
-          "tone": "red"
+          "tone": "sideA"
         },
         {
           "label": "Japan",
           "shortLabel": "JPN",
           "value": "$33.5k",
           "share": 95,
-          "tone": "blue"
+          "tone": "sideB"
         }
       ]
     }

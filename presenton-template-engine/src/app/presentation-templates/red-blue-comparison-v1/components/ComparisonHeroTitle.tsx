@@ -22,8 +22,8 @@ const ComparisonHeroTitle = ({
   width = 900,
   height = 104,
   fontSize = 88,
-  connectorColor = redBlueComparisonTheme.colors.primary,
-  separatorColor = redBlueComparisonTheme.colors.primary,
+  connectorColor = redBlueComparisonTheme.colors.comparison,
+  separatorColor = redBlueComparisonTheme.colors.comparison,
   separatorWidth = 86,
   separatorHeight = 6,
 }: ComparisonHeroTitleProps) => {
@@ -35,7 +35,7 @@ const ComparisonHeroTitle = ({
           width,
           height,
           fontSize,
-          color: redBlueComparisonTheme.colors.backgroundText,
+          color: redBlueComparisonTheme.colors.textPrimary,
           fontFamily: redBlueComparisonTheme.fonts.heading,
         }}
       >

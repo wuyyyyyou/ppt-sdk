@@ -7,17 +7,43 @@ import InsightMetricCard from "../components/InsightMetricCard.tsx";
 import StackedCompositionBarChart from "../components/StackedCompositionBarChart.tsx";
 import ThemeContentFrame from "../components/ThemeContentFrame.tsx";
 import ThemeSoftCircle from "../components/ThemeSoftCircle.tsx";
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 
-const ToneSchema = z.enum(["red", "blue", "purple", "neutral"]);
+const ToneSchema = z.enum(["sideA", "sideB", "comparison", "neutral"]);
 const InsightIconSchema = z.enum(["flag", "lightbulb", "users", "trend"]);
 
 const SegmentSchema = z.object({
   key: z.string().min(1).max(24),
   label: z.string().min(1).max(24),
-  color: z.string().min(4).max(32),
+  color: z.string().min(4).max(32).optional(),
   textColor: z.string().min(4).max(32).optional(),
 });
+
+const ageSegmentDefaults = (key: string) => {
+  const normalized = key.toLowerCase();
+  if (normalized.includes("young") || normalized.includes("child") || normalized.includes("0-14")) {
+    return {
+      color: redBlueComparisonTheme.colors.chartAgeYoung,
+      textColor: redBlueComparisonTheme.colors.textInverse,
+    };
+  }
+  if (normalized.includes("working") || normalized.includes("15-64") || normalized.includes("adult")) {
+    return {
+      color: redBlueComparisonTheme.colors.chartAgeWorking,
+      textColor: redBlueComparisonTheme.colors.textPrimary,
+    };
+  }
+  if (normalized.includes("elder") || normalized.includes("65")) {
+    return {
+      color: redBlueComparisonTheme.colors.chartAgeElderly,
+      textColor: redBlueComparisonTheme.colors.textInverse,
+    };
+  }
+  return {
+    color: redBlueComparisonTheme.colors.chart1,
+    textColor: redBlueComparisonTheme.colors.textInverse,
+  };
+};
 
 const CompositionRowSchema = z.object({
   label: z.string().min(1).max(24),
@@ -44,9 +70,9 @@ export const Schema = z.object({
   chartNote: z.string().min(4).max(90).default("Values shown as share of total population."),
   chartUnitLabel: z.string().min(1).max(4).default("%"),
   segments: z.array(SegmentSchema).min(2).max(5).default([
-    { key: "young", label: "0-14", color: "#00CEC9", textColor: "#FFFFFF" },
-    { key: "working", label: "15-64", color: "#DFE6E9", textColor: "#2D3436" },
-    { key: "elderly", label: "65+", color: "#5038A6", textColor: "#FFFFFF" },
+    { key: "young", label: "0-14" },
+    { key: "working", label: "15-64" },
+    { key: "elderly", label: "65+" },
   ]),
   rows: z.array(CompositionRowSchema).min(2).max(4).default([
     { label: "Entity A", values: { young: 16, working: 68, elderly: 16 } },
@@ -57,7 +83,7 @@ export const Schema = z.object({
       label: "Entity B (65+)",
       value: "30%",
       description: "A mature aging profile with a high elderly share and sustained labor pressure.",
-      tone: "blue",
+      tone: "sideB",
       icon: "flag",
       emphasis: "metric",
     },
@@ -65,14 +91,14 @@ export const Schema = z.object({
       label: "Entity A (65+)",
       value: "16%",
       description: "A faster demographic transition that is reshaping labor supply and public services.",
-      tone: "red",
+      tone: "sideA",
       icon: "flag",
       emphasis: "metric",
     },
     {
       label: "Key Conclusion",
       description: "The comparison should focus on aging speed, labor dependency, and the different policy timelines implied by each profile.",
-      tone: "purple",
+      tone: "comparison",
       icon: "lightbulb",
       emphasis: "conclusion",
     },
@@ -91,9 +117,9 @@ export const sampleData = Schema.parse({
   chartNote: "Values shown as share of total population.",
   chartUnitLabel: "%",
   segments: [
-    { key: "young", label: "0-14", color: "#00CEC9", textColor: "#FFFFFF" },
-    { key: "working", label: "15-64", color: "#DFE6E9", textColor: "#2D3436" },
-    { key: "elderly", label: "65+", color: "#5038A6", textColor: "#FFFFFF" },
+    { key: "young", label: "0-14" },
+    { key: "working", label: "15-64" },
+    { key: "elderly", label: "65+" },
   ],
   rows: [
     { label: "China", values: { young: 16.5, working: 69.1, elderly: 14.4 } },
@@ -104,7 +130,7 @@ export const sampleData = Schema.parse({
       label: "Japan (65+)",
       value: "29.8%",
       description: "World's highest elderly proportion. A super-aged society facing persistent labor shortages.",
-      tone: "blue",
+      tone: "sideB",
       icon: "flag",
       emphasis: "metric",
     },
@@ -112,7 +138,7 @@ export const sampleData = Schema.parse({
       label: "China (65+)",
       value: "14.4%",
       description: "Rapidly aging. The workforce is shrinking before the nation reaches high-income status.",
-      tone: "red",
+      tone: "sideA",
       icon: "flag",
       emphasis: "metric",
     },
@@ -120,7 +146,7 @@ export const sampleData = Schema.parse({
       label: "Key Conclusion",
       description:
         "Japan manages a mature aging crisis, while China faces a steeper transition that challenges its traditional manufacturing advantage.",
-      tone: "purple",
+      tone: "comparison",
       icon: "lightbulb",
       emphasis: "conclusion",
     },
@@ -146,9 +172,9 @@ export const editableTextPriority = "high";
 
 const AgingDecorations = () => (
   <>
-    <ThemeSoftCircle tone="purple" left={-88} top={-104} size={350} alpha={0.03} />
-    <ThemeSoftCircle tone="blue" left={1082} top={492} size={210} alpha={0.04} />
-    <ThemeSoftCircle tone="red" left={880} top={86} size={118} alpha={0.035} />
+    <ThemeSoftCircle tone="comparison" left={-88} top={-104} size={350} alpha={0.03} />
+    <ThemeSoftCircle tone="sideB" left={1082} top={492} size={210} alpha={0.04} />
+    <ThemeSoftCircle tone="sideA" left={880} top={86} size={118} alpha={0.035} />
   </>
 );
 
@@ -160,7 +186,7 @@ const AgingDependency = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
       titlePrefix={parsed.titlePrefix}
       titleHighlight={parsed.titleHighlight}
       subtitle={parsed.subtitle}
-      tone="purple"
+      tone="comparison"
       footerText={parsed.footerText}
       pageNumber={parsed.pageNumber}
       showHeaderDivider={false}
@@ -172,7 +198,7 @@ const AgingDependency = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
         <ChartContainer
           title={parsed.chartTitle}
           subtitle={parsed.chartSubtitle}
-          tone="purple"
+          tone="comparison"
           padding={22}
           exportMode="editable"
         >
@@ -180,12 +206,19 @@ const AgingDependency = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
             <div className="min-h-0 flex-1">
               <StackedCompositionBarChart
                 rows={parsed.rows}
-                segments={parsed.segments}
+                segments={parsed.segments.map((segment) => {
+                  const defaults = ageSegmentDefaults(`${segment.key} ${segment.label}`);
+                  return {
+                    ...segment,
+                    color: segment.color ?? defaults.color,
+                    textColor: segment.textColor ?? defaults.textColor,
+                  };
+                })}
                 unitLabel={parsed.chartUnitLabel}
                 height={360}
               />
             </div>
-            <div className="mt-[10px] flex-none break-words text-right text-[11px] font-medium" style={{ color: redBlueComparisonTheme.colors.subtleText }}>
+            <div className="mt-[10px] flex-none break-words text-right text-[11px] font-medium" style={{ color: redBlueComparisonTheme.colors.textSubtle }}>
               {parsed.chartNote}
             </div>
           </div>
@@ -201,7 +234,7 @@ const AgingDependency = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
                 label={card.label}
                 value={card.value}
                 description={card.description}
-                tone={card.tone as RedBlueTone}
+                tone={card.tone as ComparisonTone}
                 icon={card.icon}
                 emphasis={card.emphasis}
                 height={card.emphasis === "conclusion" ? 144 : 136}

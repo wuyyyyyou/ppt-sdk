@@ -10,19 +10,19 @@ import StrategicInsightCard from "../components/StrategicInsightCard.tsx";
 import ThemeContentFrame from "../components/ThemeContentFrame.tsx";
 import { redBlueComparisonTheme } from "../theme/tokens.ts";
 
-const ToneSchema = z.enum(["red", "blue", "purple", "neutral"]);
+const ToneSchema = z.enum(["sideA", "sideB", "comparison", "neutral"]);
 const MetricIconSchema = z.enum(["certificate", "flask", "graduation-cap", "microchip", "rocket"]);
 const InsightIconSchema = z.enum(["lightbulb", "microscope", "target"]);
 
 const EntitySchema = z.object({
   label: z.string().min(2).max(24),
-  tone: ToneSchema.default("red"),
+  tone: ToneSchema.default("sideA"),
   color: z.string().min(4).max(48).optional(),
 });
 
 const RadarSeriesSchema = z.object({
   label: z.string().min(2).max(24),
-  tone: ToneSchema.default("red"),
+  tone: ToneSchema.default("sideA"),
   color: z.string().min(4).max(48).optional(),
   fillColor: z.string().min(4).max(64).optional(),
   values: z.array(z.number().min(0).max(100)).min(3).max(8),
@@ -32,13 +32,13 @@ const InsightSchema = z.object({
   title: z.string().min(2).max(34),
   text: z.string().min(12).max(220),
   icon: InsightIconSchema.default("microscope"),
-  tone: ToneSchema.default("purple"),
+  tone: ToneSchema.default("comparison"),
 });
 
 const MetricValueSchema = z.object({
   value: z.string().min(1).max(16),
   sublabel: z.string().min(1).max(24),
-  tone: ToneSchema.default("red"),
+  tone: ToneSchema.default("sideA"),
 });
 
 const MetricRowSchema = z.object({
@@ -69,8 +69,8 @@ export const Schema = z.object({
     .min(2)
     .max(2)
     .default([
-      { label: "China", tone: "red" },
-      { label: "Japan", tone: "blue" },
+      { label: "China", tone: "sideA" },
+      { label: "Japan", tone: "sideB" },
     ]),
   radarLabels: z
     .array(z.string().min(2).max(24))
@@ -80,14 +80,12 @@ export const Schema = z.object({
   radarSeries: z.array(RadarSeriesSchema).min(2).max(2).default([
     {
       label: "China",
-      tone: "red",
-      fillColor: "rgba(255,71,87,0.18)",
+      tone: "sideA",
       values: [75, 95, 98, 85, 40, 90],
     },
     {
       label: "Japan",
-      tone: "blue",
-      fillColor: "rgba(46,134,222,0.18)",
+      tone: "sideB",
       values: [90, 80, 50, 40, 95, 70],
     },
   ]),
@@ -99,47 +97,47 @@ export const Schema = z.object({
     text:
       "China excels in scale, rapid commercialization, and digital ecosystem growth. Japan maintains strength in fundamental research, precision engineering, and robotics.",
     icon: "microscope",
-    tone: "purple",
+    tone: "comparison",
   }),
   metrics: z.array(MetricRowSchema).min(3).max(5).default([
     {
       label: "R&D Spending",
       icon: "flask",
       values: [
-        { value: "2.6%", sublabel: "of GDP", tone: "red" },
-        { value: "3.3%", sublabel: "of GDP", tone: "blue" },
+        { value: "2.6%", sublabel: "of GDP", tone: "sideA" },
+        { value: "3.3%", sublabel: "of GDP", tone: "sideB" },
       ],
     },
     {
       label: "Patents (Triadic)",
       icon: "certificate",
       values: [
-        { value: "High", sublabel: "Volume", tone: "red" },
-        { value: "High", sublabel: "Quality/Global", tone: "blue" },
+        { value: "High", sublabel: "Volume", tone: "sideA" },
+        { value: "High", sublabel: "Quality/Global", tone: "sideB" },
       ],
     },
     {
       label: "High-Tech Exp.",
       icon: "microchip",
       values: [
-        { value: "$942B", sublabel: "Dominant", tone: "red" },
-        { value: "$120B", sublabel: "Specialized", tone: "blue" },
+        { value: "$942B", sublabel: "Dominant", tone: "sideA" },
+        { value: "$120B", sublabel: "Specialized", tone: "sideB" },
       ],
     },
     {
       label: "Researcher Density",
       icon: "graduation-cap",
       values: [
-        { value: "1.6k", sublabel: "per million", tone: "red" },
-        { value: "5.3k", sublabel: "per million", tone: "blue" },
+        { value: "1.6k", sublabel: "per million", tone: "sideA" },
+        { value: "5.3k", sublabel: "per million", tone: "sideB" },
       ],
     },
     {
       label: "Unicorn Startups",
       icon: "rocket",
       values: [
-        { value: "300+", sublabel: "Vibrant Scene", tone: "red" },
-        { value: "~12", sublabel: "Emerging", tone: "blue" },
+        { value: "300+", sublabel: "Vibrant Scene", tone: "sideA" },
+        { value: "~12", sublabel: "Emerging", tone: "sideB" },
       ],
     },
   ]),
@@ -178,7 +176,7 @@ const TechnologyInnovationKpis = ({ data }: { data: Partial<z.infer<typeof Schem
       titlePrefix={parsed.titlePrefix}
       titleHighlight={parsed.titleHighlight}
       subtitle={parsed.subtitle}
-      tone="purple"
+      tone="comparison"
       footerText={parsed.footerText}
       pageNumber={parsed.pageNumber}
       showHeaderDivider={false}
@@ -190,15 +188,13 @@ const TechnologyInnovationKpis = ({ data }: { data: Partial<z.infer<typeof Schem
         <ChartContainer
           title={parsed.chartTitle}
           subtitle={parsed.chartSubtitle}
-          tone="purple"
+          tone="comparison"
           padding={20}
           exportMode="screenshot"
           meta={
             <div className="flex items-center gap-[12px]">
               {legend.map((item) => {
-                const color = item.color ?? (item.tone === "red"
-                  ? "var(--china-red,#FF4757)"
-                  : "var(--japan-blue,#2E86DE)");
+                const color = item.color ?? redBlueComparisonTheme.tone[item.tone].color;
                 return (
                   <div key={item.label} className="flex items-center gap-[6px] text-[11px] font-black uppercase">
                     <span className="h-[10px] w-[10px] rounded-[3px]" style={{ backgroundColor: color }} />
@@ -223,7 +219,7 @@ const TechnologyInnovationKpis = ({ data }: { data: Partial<z.infer<typeof Schem
             </div>
             <div
               className="h-[26px] flex-none overflow-hidden text-center text-[11px] font-medium leading-[26px]"
-              style={{ color: redBlueComparisonTheme.colors.subtleText }}
+              style={{ color: redBlueComparisonTheme.colors.textSubtle }}
             >
               {parsed.sourceNote}
             </div>

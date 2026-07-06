@@ -5,15 +5,37 @@ import { readTemplateData } from "../utils/templateData.ts";
 import { BalancedComparisonDecorations } from "../components/ComparisonDecorations.tsx";
 import SectorStructureCard from "../components/SectorStructureCard.tsx";
 import ThemeContentFrame from "../components/ThemeContentFrame.tsx";
-import { type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 
-const ToneSchema = z.enum(["red", "blue", "purple", "neutral"]);
+const ToneSchema = z.enum(["sideA", "sideB", "comparison", "neutral"]);
 
 const SectorSchema = z.object({
   label: z.string().min(2).max(28),
   value: z.number().min(0).max(100),
-  color: z.string().min(4).max(24),
+  color: z.string().min(4).max(24).optional(),
 });
+
+const sectorColor = (label: string, index: number) => {
+  const normalized = label.toLowerCase();
+  if (normalized.includes("agri")) {
+    return redBlueComparisonTheme.colors.chartSectorAgriculture;
+  }
+  if (normalized.includes("industry") || normalized.includes("manufact")) {
+    return redBlueComparisonTheme.colors.chartSectorIndustry;
+  }
+  if (normalized.includes("service")) {
+    return redBlueComparisonTheme.colors.chartSectorServices;
+  }
+  const fallback = [
+    redBlueComparisonTheme.colors.chart1,
+    redBlueComparisonTheme.colors.chart2,
+    redBlueComparisonTheme.colors.chart3,
+    redBlueComparisonTheme.colors.chart4,
+    redBlueComparisonTheme.colors.chart5,
+    redBlueComparisonTheme.colors.chart6,
+  ];
+  return fallback[index % fallback.length];
+};
 
 const StructureCardSchema = z.object({
   entityName: z.string().min(2).max(24),
@@ -36,13 +58,13 @@ export const Schema = z.object({
     {
       entityName: "Entity A",
       badge: "GDP: TBD",
-      tone: "red",
+      tone: "sideA",
       centerValue: "40%",
       centerLabel: "Industry",
       segments: [
-        { label: "Agri (7%)", value: 7, color: "#00B894" },
-        { label: "Industry (40%)", value: 40, color: "#FF4757" },
-        { label: "Services (53%)", value: 53, color: "#5038A6" },
+        { label: "Agri (7%)", value: 7 },
+        { label: "Industry (40%)", value: 40 },
+        { label: "Services (53%)", value: 53 },
       ],
       insightTitle: "Industrial base",
       insightDescription: "Use this card to describe the dominant sector and what it implies for the comparison.",
@@ -50,13 +72,13 @@ export const Schema = z.object({
     {
       entityName: "Entity B",
       badge: "GDP: TBD",
-      tone: "blue",
+      tone: "sideB",
       centerValue: "70%",
       centerLabel: "Services",
       segments: [
-        { label: "Agri (1%)", value: 1, color: "#00B894" },
-        { label: "Industry (29%)", value: 29, color: "#636E72" },
-        { label: "Services (70%)", value: 70, color: "#2E86DE" },
+        { label: "Agri (1%)", value: 1 },
+        { label: "Industry (29%)", value: 29 },
+        { label: "Services (70%)", value: 70 },
       ],
       insightTitle: "Service economy",
       insightDescription: "Use this card to explain the sector mix and the strategic difference versus the other entity.",
@@ -75,13 +97,13 @@ export const sampleData = Schema.parse({
     {
       entityName: "CHINA",
       badge: "GDP: $20.6T",
-      tone: "red",
+      tone: "sideA",
       centerValue: "39%",
       centerLabel: "Industry",
       segments: [
-        { label: "Agri (7.3%)", value: 7.3, color: "#00B894" },
-        { label: "Services (53.3%)", value: 53.3, color: "#5038A6" },
-        { label: "Industry (39.4%)", value: 39.4, color: "#FF4757" },
+        { label: "Agri (7.3%)", value: 7.3 },
+        { label: "Services (53.3%)", value: 53.3 },
+        { label: "Industry (39.4%)", value: 39.4 },
       ],
       insightTitle: "Manufacturing Powerhouse",
       insightDescription: "Nearly 40% of GDP from manufacturing - the world's factory.",
@@ -89,13 +111,13 @@ export const sampleData = Schema.parse({
     {
       entityName: "JAPAN",
       badge: "GDP: $4.4T",
-      tone: "blue",
+      tone: "sideB",
       centerValue: "70%",
       centerLabel: "Services",
       segments: [
-        { label: "Agri (1.1%)", value: 1.1, color: "#00B894" },
-        { label: "Services (69.8%)", value: 69.8, color: "#2E86DE" },
-        { label: "Industry (29.1%)", value: 29.1, color: "#636E72" },
+        { label: "Agri (1.1%)", value: 1.1 },
+        { label: "Services (69.8%)", value: 69.8 },
+        { label: "Industry (29.1%)", value: 29.1 },
       ],
       insightTitle: "Advanced Service Economy",
       insightDescription: "Service-driven economy with 70% GDP in services. Industry focuses on precision tech.",
@@ -128,7 +150,7 @@ const EconomicStructure = ({ data }: { data: Partial<z.infer<typeof Schema>> }) 
       titlePrefix={parsed.titlePrefix}
       titleHighlight={parsed.titleHighlight}
       subtitle={parsed.subtitle}
-      tone="purple"
+      tone="comparison"
       footerText={parsed.footerText}
       pageNumber={parsed.pageNumber}
       showHeaderDivider={false}
@@ -142,10 +164,13 @@ const EconomicStructure = ({ data }: { data: Partial<z.infer<typeof Schema>> }) 
             key={card.entityName}
             entityName={card.entityName}
             badge={card.badge}
-            tone={card.tone as RedBlueTone}
+            tone={card.tone as ComparisonTone}
             centerValue={card.centerValue}
             centerLabel={card.centerLabel}
-            segments={card.segments}
+            segments={card.segments.map((segment, index) => ({
+              ...segment,
+              color: segment.color ?? sectorColor(segment.label, index),
+            }))}
             insight={{
               title: card.insightTitle,
               description: card.insightDescription,

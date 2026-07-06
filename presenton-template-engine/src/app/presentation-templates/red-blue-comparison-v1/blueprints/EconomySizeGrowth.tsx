@@ -7,9 +7,9 @@ import EntityComparisonMetricCard from "../components/EntityComparisonMetricCard
 import ThemeContentFrame from "../components/ThemeContentFrame.tsx";
 import ThemeSoftCircle from "../components/ThemeSoftCircle.tsx";
 import VerticalComparisonBarChart from "../components/VerticalComparisonBarChart.tsx";
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 
-const ToneSchema = z.enum(["red", "blue", "purple", "neutral"]);
+const ToneSchema = z.enum(["sideA", "sideB", "comparison", "neutral"]);
 
 const ChartDatumSchema = z.object({
   label: z.string().min(1).max(24),
@@ -48,32 +48,32 @@ export const Schema = z.object({
   chartMaxValue: z.number().min(1).default(24),
   chartTicks: z.array(z.number().min(0)).min(2).max(5).default([0, 10, 20]),
   chartData: z.array(ChartDatumSchema).min(2).max(3).default([
-    { label: "Entity A", value: 20.6, displayValue: "$20.6T", tone: "red" },
-    { label: "Entity B", value: 4.5, displayValue: "$4.5T", tone: "blue" },
+    { label: "Entity A", value: 20.6, displayValue: "$20.6T", tone: "sideA" },
+    { label: "Entity B", value: 4.5, displayValue: "$4.5T", tone: "sideB" },
   ]),
   metricCards: z.array(MetricCardSchema).min(2).max(4).default([
     {
       title: "Global Economy Rank",
       mode: "rank",
       items: [
-        { label: "Entity A", shortLabel: "A", value: "#2", tone: "red" },
-        { label: "Entity B", shortLabel: "B", value: "#4", tone: "blue" },
+        { label: "Entity A", shortLabel: "A", value: "#2", tone: "sideA" },
+        { label: "Entity B", shortLabel: "B", value: "#4", tone: "sideB" },
       ],
     },
     {
       title: "Annual GDP Growth (%)",
       mode: "bar",
       items: [
-        { label: "Entity A", shortLabel: "A", value: "4.5%", share: 85, tone: "red" },
-        { label: "Entity B", shortLabel: "B", value: "0.9%", share: 20, tone: "blue" },
+        { label: "Entity A", shortLabel: "A", value: "4.5%", share: 85, tone: "sideA" },
+        { label: "Entity B", shortLabel: "B", value: "0.9%", share: 20, tone: "sideB" },
       ],
     },
     {
       title: "GDP Per Capita",
       mode: "bar",
       items: [
-        { label: "Entity A", shortLabel: "A", value: "$13.8k", share: 40, tone: "red" },
-        { label: "Entity B", shortLabel: "B", value: "$33.5k", share: 95, tone: "blue" },
+        { label: "Entity A", shortLabel: "A", value: "$13.8k", share: 40, tone: "sideA" },
+        { label: "Entity B", shortLabel: "B", value: "$33.5k", share: 95, tone: "sideB" },
       ],
     },
   ]),
@@ -92,32 +92,32 @@ export const sampleData = Schema.parse({
   chartMaxValue: 24,
   chartTicks: [0, 10, 20],
   chartData: [
-    { label: "China", value: 20.65, displayValue: "$20.65T", tone: "red" },
-    { label: "Japan", value: 4.46, displayValue: "$4.46T", tone: "blue" },
+    { label: "China", value: 20.65, displayValue: "$20.65T", tone: "sideA" },
+    { label: "Japan", value: 4.46, displayValue: "$4.46T", tone: "sideB" },
   ],
   metricCards: [
     {
       title: "Global Economy Rank",
       mode: "rank",
       items: [
-        { label: "China", shortLabel: "CHINA", value: "#2", tone: "red" },
-        { label: "Japan", shortLabel: "JAPAN", value: "#4", tone: "blue" },
+        { label: "China", shortLabel: "CHINA", value: "#2", tone: "sideA" },
+        { label: "Japan", shortLabel: "JAPAN", value: "#4", tone: "sideB" },
       ],
     },
     {
       title: "Annual GDP Growth (%)",
       mode: "bar",
       items: [
-        { label: "China", shortLabel: "CHN", value: "4.5%", share: 85, tone: "red" },
-        { label: "Japan", shortLabel: "JPN", value: "0.9%", share: 20, tone: "blue" },
+        { label: "China", shortLabel: "CHN", value: "4.5%", share: 85, tone: "sideA" },
+        { label: "Japan", shortLabel: "JPN", value: "0.9%", share: 20, tone: "sideB" },
       ],
     },
     {
       title: "GDP Per Capita (USD)",
       mode: "bar",
       items: [
-        { label: "China", shortLabel: "CHN", value: "$13.8k", share: 40, tone: "red" },
-        { label: "Japan", shortLabel: "JPN", value: "$33.5k", share: 95, tone: "blue" },
+        { label: "China", shortLabel: "CHN", value: "$13.8k", share: 40, tone: "sideA" },
+        { label: "Japan", shortLabel: "JPN", value: "$33.5k", share: 95, tone: "sideB" },
       ],
     },
   ],
@@ -142,9 +142,9 @@ export const editableTextPriority = "high";
 
 const EconomyDecorations = () => (
   <>
-    <ThemeSoftCircle tone="red" left={1030} top={-88} size={300} alpha={0.05} />
-    <ThemeSoftCircle tone="blue" left={-92} top={468} size={220} alpha={0.05} />
-    <ThemeSoftCircle tone="purple" left={610} top={78} size={110} alpha={0.05} />
+    <ThemeSoftCircle tone="sideA" left={1030} top={-88} size={300} alpha={0.05} />
+    <ThemeSoftCircle tone="sideB" left={-92} top={468} size={220} alpha={0.05} />
+    <ThemeSoftCircle tone="comparison" left={610} top={78} size={110} alpha={0.05} />
   </>
 );
 
@@ -156,7 +156,7 @@ const EconomySizeGrowth = ({ data }: { data: Partial<z.infer<typeof Schema>> }) 
       titlePrefix={parsed.titlePrefix}
       titleHighlight={parsed.titleHighlight}
       subtitle={parsed.subtitle}
-      tone="purple"
+      tone="comparison"
       footerText={parsed.footerText}
       pageNumber={parsed.pageNumber}
       showHeaderDivider={false}
@@ -165,7 +165,7 @@ const EconomySizeGrowth = ({ data }: { data: Partial<z.infer<typeof Schema>> }) 
     >
       {parsed.showDecorations ? <EconomyDecorations /> : null}
       <div className="relative z-10 grid h-full min-h-0 grid-cols-[1.36fr_0.92fr] gap-[34px]">
-        <ChartContainer title={parsed.chartTitle} tone="purple" padding={24} exportMode="screenshot">
+        <ChartContainer title={parsed.chartTitle} tone="comparison" padding={24} exportMode="screenshot">
           <div className="flex h-full min-h-0 flex-col">
             <div className="min-h-0 flex-1">
               <VerticalComparisonBarChart
@@ -173,7 +173,7 @@ const EconomySizeGrowth = ({ data }: { data: Partial<z.infer<typeof Schema>> }) 
                   label: item.label,
                   value: item.value,
                   displayValue: item.displayValue,
-                  tone: item.tone as RedBlueTone,
+                  tone: item.tone as ComparisonTone,
                 }))}
                 maxValue={parsed.chartMaxValue}
                 yTicks={parsed.chartTicks}
@@ -182,7 +182,7 @@ const EconomySizeGrowth = ({ data }: { data: Partial<z.infer<typeof Schema>> }) 
                 height={348}
               />
             </div>
-            <div className="mt-[12px] flex-none text-right text-[11px] font-medium" style={{ color: redBlueComparisonTheme.colors.subtleText }}>
+            <div className="mt-[12px] flex-none text-right text-[11px] font-medium" style={{ color: redBlueComparisonTheme.colors.textSubtle }}>
               {parsed.chartSource}
             </div>
           </div>
@@ -199,10 +199,10 @@ const EconomySizeGrowth = ({ data }: { data: Partial<z.infer<typeof Schema>> }) 
                 shortLabel: item.shortLabel,
                 value: item.value,
                 share: item.share,
-                tone: item.tone as RedBlueTone,
+                tone: item.tone as ComparisonTone,
               }))}
               height={index === 0 ? 160 : 144}
-              tone="purple"
+              tone="comparison"
             />
           ))}
         </div>

@@ -6,15 +6,15 @@ import AlternatingTimeline from "../components/AlternatingTimeline.tsx";
 import ThemeCanvas from "../components/ThemeCanvas.tsx";
 import ThemeSoftCircle from "../components/ThemeSoftCircle.tsx";
 import ThemeTitleBlock from "../components/ThemeTitleBlock.tsx";
-import { type RedBlueTone, redBlueComparisonTheme } from "../theme/tokens.ts";
+import { type ComparisonTone, redBlueComparisonTheme } from "../theme/tokens.ts";
 
-const ToneSchema = z.enum(["red", "blue", "purple", "neutral"]);
+const ToneSchema = z.enum(["sideA", "sideB", "comparison", "neutral"]);
 
 const TimelineItemSchema = z.object({
   date: z.string().min(1).max(18),
   title: z.string().min(2).max(42),
   description: z.string().min(8).max(120),
-  tone: ToneSchema.default("purple"),
+  tone: ToneSchema.default("comparison"),
 });
 
 export const Schema = z.object({
@@ -28,31 +28,31 @@ export const Schema = z.object({
       date: "Phase 1",
       title: "Early Context",
       description: "Use this slot for the opening milestone that frames the historical arc.",
-      tone: "purple",
+      tone: "comparison",
     },
     {
       date: "Phase 2",
       title: "Turning Point",
       description: "Highlight the shift that changed relations, markets, or strategic direction.",
-      tone: "purple",
+      tone: "comparison",
     },
     {
       date: "Phase 3",
       title: "Normalization",
       description: "Capture the period where institutions, agreements, or operating norms emerged.",
-      tone: "purple",
+      tone: "comparison",
     },
     {
       date: "Phase 4",
       title: "Renewed Tension",
       description: "Summarize a later conflict, constraint, or external pressure point.",
-      tone: "purple",
+      tone: "comparison",
     },
     {
       date: "Phase 5",
       title: "Current Dynamics",
       description: "Close with the present-day balance of cooperation, competition, or uncertainty.",
-      tone: "purple",
+      tone: "comparison",
     },
   ]),
   showDecorations: z.boolean().default(true),
@@ -76,9 +76,9 @@ export const editableTextPriority = "high";
 
 const TimelineDecorations = () => (
   <>
-    <ThemeSoftCircle tone="purple" left={-88} top={-128} size={350} alpha={0.035} />
-    <ThemeSoftCircle tone="purple" left={1040} top={510} size={280} alpha={0.12} />
-    <ThemeSoftCircle tone="purple" left={488} top={134} size={150} alpha={0.024} />
+    <ThemeSoftCircle tone="comparison" left={-88} top={-128} size={350} alpha={0.035} />
+    <ThemeSoftCircle tone="comparison" left={1040} top={510} size={280} alpha={0.12} />
+    <ThemeSoftCircle tone="comparison" left={488} top={134} size={150} alpha={0.024} />
   </>
 );
 
@@ -94,7 +94,7 @@ const HistoricalMilestonesTimeline = ({ data }: { data: Partial<z.infer<typeof S
           titlePrefix={parsed.titlePrefix}
           titleHighlight={parsed.titleHighlight}
           subtitle={parsed.subtitle}
-          tone="purple"
+          tone="comparison"
           align="center"
           titleFontSize={60}
           titleMaxWidth={1060}
@@ -106,7 +106,7 @@ const HistoricalMilestonesTimeline = ({ data }: { data: Partial<z.infer<typeof S
         <AlternatingTimeline
           items={parsed.timelineItems.map((item) => ({
             ...item,
-            tone: item.tone as RedBlueTone,
+            tone: item.tone as ComparisonTone,
           }))}
         />
       </div>
@@ -115,13 +115,13 @@ const HistoricalMilestonesTimeline = ({ data }: { data: Partial<z.infer<typeof S
         className="absolute bottom-0 left-0 z-20 flex w-full items-center justify-between px-[60px] text-[12px]"
         style={{
           height: redBlueComparisonTheme.size.footerHeight,
-          color: redBlueComparisonTheme.colors.subtleText,
-          backgroundColor: redBlueComparisonTheme.colors.background,
+          color: redBlueComparisonTheme.colors.textSubtle,
+          backgroundColor: redBlueComparisonTheme.colors.canvas,
           borderTop: redBlueComparisonTheme.border.hairline,
         }}
       >
         <div className="min-w-0 break-words">{parsed.footerText}</div>
-        <div className="flex-none font-black" style={{ color: redBlueComparisonTheme.colors.primary }}>
+        <div className="flex-none font-black" style={{ color: redBlueComparisonTheme.colors.comparison }}>
           {parsed.pageNumber}
         </div>
       </div>

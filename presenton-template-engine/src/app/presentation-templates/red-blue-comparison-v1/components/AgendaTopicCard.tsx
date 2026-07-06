@@ -1,6 +1,6 @@
 import React from "react";
 
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 import CardAccentRail from "./CardAccentRail.tsx";
 
 export type AgendaTopicIconName =
@@ -129,7 +129,7 @@ type AgendaTopicCardProps = {
   title: string;
   description: string;
   iconName: AgendaTopicIconName;
-  tone?: RedBlueTone;
+  tone?: ComparisonTone;
 };
 
 const AgendaTopicCard = ({
@@ -137,7 +137,7 @@ const AgendaTopicCard = ({
   title,
   description,
   iconName,
-  tone = "purple",
+  tone = "comparison",
 }: AgendaTopicCardProps) => {
   const toneValue = redBlueComparisonTheme.tone[tone];
 
@@ -146,7 +146,7 @@ const AgendaTopicCard = ({
       className="relative flex h-full min-h-0 flex-col overflow-hidden border px-[24px] pb-[18px] pt-[24px]"
       style={{
         borderRadius: redBlueComparisonTheme.radius.xl,
-        borderColor: "rgba(45,52,54,0.06)",
+        borderColor: redBlueComparisonTheme.colors.neutralBorder,
         backgroundColor: redBlueComparisonTheme.colors.card,
         boxShadow: redBlueComparisonTheme.shadow.card,
       }}
@@ -155,7 +155,7 @@ const AgendaTopicCard = ({
       <div
         className="absolute right-[18px] top-[14px] z-10 select-none text-[48px] font-black leading-none"
         style={{
-          color: "rgba(45,52,54,0.035)",
+          color: redBlueComparisonTheme.alpha.textPrimary(0.035),
           fontFamily: redBlueComparisonTheme.fonts.heading,
         }}
       >
@@ -173,7 +173,7 @@ const AgendaTopicCard = ({
         className="relative z-10 min-w-0 overflow-hidden text-[20px] font-black leading-[1.18]"
         style={{
           maxHeight: 48,
-          color: redBlueComparisonTheme.colors.backgroundText,
+          color: redBlueComparisonTheme.colors.textPrimary,
           fontFamily: redBlueComparisonTheme.fonts.heading,
         }}
       >
@@ -181,7 +181,7 @@ const AgendaTopicCard = ({
       </div>
       <div
         className="relative z-10 mt-[8px] min-w-0 overflow-hidden text-[14px] font-medium leading-[1.5]"
-        style={{ maxHeight: 64, color: redBlueComparisonTheme.colors.mutedText }}
+        style={{ maxHeight: 64, color: redBlueComparisonTheme.colors.textMuted }}
       >
         {description}
       </div>

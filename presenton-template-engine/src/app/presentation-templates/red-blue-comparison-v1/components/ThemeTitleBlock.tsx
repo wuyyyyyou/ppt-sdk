@@ -1,6 +1,6 @@
 import React, { type ReactNode } from "react";
 
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 import ThemePill from "./ThemePill.tsx";
 
 type ThemeTitleBlockProps = {
@@ -9,7 +9,7 @@ type ThemeTitleBlockProps = {
   titleHighlight?: ReactNode;
   subtitle?: ReactNode;
   eyebrow?: ReactNode;
-  tone?: RedBlueTone;
+  tone?: ComparisonTone;
   align?: "left" | "center";
   titleMaxWidth?: number;
   subtitleMaxWidth?: number;
@@ -23,7 +23,7 @@ const ThemeTitleBlock = ({
   titleHighlight,
   subtitle,
   eyebrow,
-  tone = "purple",
+  tone = "comparison",
   align = "left",
   titleMaxWidth = 860,
   subtitleMaxWidth = 900,
@@ -51,13 +51,13 @@ const ThemeTitleBlock = ({
           maxWidth: titleMaxWidth,
           fontFamily: redBlueComparisonTheme.fonts.heading,
           fontSize: titleFontSize,
-          color: redBlueComparisonTheme.colors.backgroundText,
+          color: redBlueComparisonTheme.colors.textPrimary,
         }}
       >
         {hasSegmentedTitle ? (
           <>
             {titlePrefix !== undefined ? (
-              <span className="inline-block align-baseline" style={{ color: redBlueComparisonTheme.colors.backgroundText }}>
+              <span className="inline-block align-baseline" style={{ color: redBlueComparisonTheme.colors.textPrimary }}>
                 {titlePrefix}
               </span>
             ) : null}
@@ -85,7 +85,7 @@ const ThemeTitleBlock = ({
           style={{
             maxWidth: subtitleMaxWidth,
             maxHeight: 47,
-            color: redBlueComparisonTheme.colors.mutedText,
+            color: redBlueComparisonTheme.colors.textMuted,
           }}
         >
           {subtitle}

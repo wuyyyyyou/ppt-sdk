@@ -11,21 +11,15 @@
   "segments": [
     {
       "key": "young",
-      "label": "0-14",
-      "color": "#00CEC9",
-      "textColor": "#FFFFFF"
+      "label": "0-14"
     },
     {
       "key": "working",
-      "label": "15-64",
-      "color": "#DFE6E9",
-      "textColor": "#2D3436"
+      "label": "15-64"
     },
     {
       "key": "elderly",
-      "label": "65+",
-      "color": "#5038A6",
-      "textColor": "#FFFFFF"
+      "label": "65+"
     }
   ],
   "rows": [
@@ -51,7 +45,7 @@
       "label": "Japan (65+)",
       "value": "29.8%",
       "description": "World's highest elderly proportion. A super-aged society facing persistent labor shortages.",
-      "tone": "blue",
+      "tone": "sideB",
       "icon": "flag",
       "emphasis": "metric"
     },
@@ -59,14 +53,14 @@
       "label": "China (65+)",
       "value": "14.4%",
       "description": "Rapidly aging. The workforce is shrinking before the nation reaches high-income status.",
-      "tone": "red",
+      "tone": "sideA",
       "icon": "flag",
       "emphasis": "metric"
     },
     {
       "label": "Key Conclusion",
       "description": "Japan manages a mature aging crisis, while China faces a steeper transition that challenges its traditional manufacturing advantage.",
-      "tone": "purple",
+      "tone": "comparison",
       "icon": "lightbulb",
       "emphasis": "conclusion"
     }

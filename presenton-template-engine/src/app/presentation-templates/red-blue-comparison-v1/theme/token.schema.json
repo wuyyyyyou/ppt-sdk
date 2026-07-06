@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "two-side comparison theme tokens",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "mode", "colors", "shadows"],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "mode": {
+      "enum": ["light", "dark"]
+    },
+    "colors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canvas",
+        "surface",
+        "card",
+        "textPrimary",
+        "textMuted",
+        "textSubtle",
+        "textInverse",
+        "stroke",
+        "strokeSoft",
+        "grid",
+        "tableGrid",
+        "comparison",
+        "comparisonSoft",
+        "comparisonTint",
+        "comparisonBorder",
+        "sideA",
+        "sideATint",
+        "sideABorder",
+        "sideB",
+        "sideBTint",
+        "sideBBorder",
+        "neutral",
+        "neutralTint",
+        "neutralBorder",
+        "statusWarning",
+        "statusSuccess",
+        "chart1",
+        "chart2",
+        "chart3",
+        "chart4",
+        "chart5",
+        "chart6",
+        "chartSectorAgriculture",
+        "chartSectorIndustry",
+        "chartSectorServices",
+        "chartAgeYoung",
+        "chartAgeWorking",
+        "chartAgeElderly"
+      ],
+      "properties": {
+        "canvas": { "$ref": "#/$defs/hexColor" },
+        "surface": { "$ref": "#/$defs/hexColor" },
+        "card": { "$ref": "#/$defs/hexColor" },
+        "textPrimary": { "$ref": "#/$defs/hexColor" },
+        "textMuted": { "$ref": "#/$defs/hexColor" },
+        "textSubtle": { "$ref": "#/$defs/hexColor" },
+        "textInverse": { "$ref": "#/$defs/hexColor" },
+        "stroke": { "$ref": "#/$defs/hexColor" },
+        "strokeSoft": { "$ref": "#/$defs/hexColor" },
+        "grid": { "$ref": "#/$defs/hexColor" },
+        "tableGrid": { "$ref": "#/$defs/hexColor" },
+        "comparison": { "$ref": "#/$defs/hexColor" },
+        "comparisonSoft": { "$ref": "#/$defs/hexColor" },
+        "comparisonTint": { "$ref": "#/$defs/hexColor" },
+        "comparisonBorder": { "$ref": "#/$defs/hexColor" },
+        "sideA": { "$ref": "#/$defs/hexColor" },
+        "sideATint": { "$ref": "#/$defs/hexColor" },
+        "sideABorder": { "$ref": "#/$defs/hexColor" },
+        "sideB": { "$ref": "#/$defs/hexColor" },
+        "sideBTint": { "$ref": "#/$defs/hexColor" },
+        "sideBBorder": { "$ref": "#/$defs/hexColor" },
+        "neutral": { "$ref": "#/$defs/hexColor" },
+        "neutralTint": { "$ref": "#/$defs/hexColor" },
+        "neutralBorder": { "$ref": "#/$defs/hexColor" },
+        "statusWarning": { "$ref": "#/$defs/hexColor" },
+        "statusSuccess": { "$ref": "#/$defs/hexColor" },
+        "chart1": { "$ref": "#/$defs/hexColor" },
+        "chart2": { "$ref": "#/$defs/hexColor" },
+        "chart3": { "$ref": "#/$defs/hexColor" },
+        "chart4": { "$ref": "#/$defs/hexColor" },
+        "chart5": { "$ref": "#/$defs/hexColor" },
+        "chart6": { "$ref": "#/$defs/hexColor" },
+        "chartSectorAgriculture": { "$ref": "#/$defs/hexColor" },
+        "chartSectorIndustry": { "$ref": "#/$defs/hexColor" },
+        "chartSectorServices": { "$ref": "#/$defs/hexColor" },
+        "chartAgeYoung": { "$ref": "#/$defs/hexColor" },
+        "chartAgeWorking": { "$ref": "#/$defs/hexColor" },
+        "chartAgeElderly": { "$ref": "#/$defs/hexColor" }
+      }
+    },
+    "shadows": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["card", "panel", "soft"],
+      "properties": {
+        "card": { "type": "string", "minLength": 1 },
+        "panel": { "type": "string", "minLength": 1 },
+        "soft": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "$defs": {
+    "hexColor": {
+      "type": "string",
+      "pattern": "^#[0-9A-Fa-f]{6}$"
+    }
+  }
+}

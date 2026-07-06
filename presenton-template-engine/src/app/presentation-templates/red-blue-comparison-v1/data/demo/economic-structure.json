@@ -8,24 +8,21 @@
     {
       "entityName": "CHINA",
       "badge": "GDP: $20.6T",
-      "tone": "red",
+      "tone": "sideA",
       "centerValue": "39%",
       "centerLabel": "Industry",
       "segments": [
         {
           "label": "Agri (7.3%)",
-          "value": 7.3,
-          "color": "#00B894"
+          "value": 7.3
         },
         {
           "label": "Services (53.3%)",
-          "value": 53.3,
-          "color": "#5038A6"
+          "value": 53.3
         },
         {
           "label": "Industry (39.4%)",
-          "value": 39.4,
-          "color": "#FF4757"
+          "value": 39.4
         }
       ],
       "insightTitle": "Manufacturing Powerhouse",
@@ -34,24 +31,21 @@
     {
       "entityName": "JAPAN",
       "badge": "GDP: $4.4T",
-      "tone": "blue",
+      "tone": "sideB",
       "centerValue": "70%",
       "centerLabel": "Services",
       "segments": [
         {
           "label": "Agri (1.1%)",
-          "value": 1.1,
-          "color": "#00B894"
+          "value": 1.1
         },
         {
           "label": "Services (69.8%)",
-          "value": 69.8,
-          "color": "#2E86DE"
+          "value": 69.8
         },
         {
           "label": "Industry (29.1%)",
-          "value": 29.1,
-          "color": "#636E72"
+          "value": 29.1
         }
       ],
       "insightTitle": "Advanced Service Economy",

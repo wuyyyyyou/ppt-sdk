@@ -11,46 +11,46 @@
     "source": "SOURCE: ADD VISUAL EVIDENCE",
     "alt": "Abstract red blue comparison evidence visual",
     "fit": "cover",
-    "tone": "purple"
+    "tone": "comparison"
   },
   "tableTitle": "Evidence comparison",
   "tableSubtitle": "Condense what the visual suggests into editable comparison rows.",
   "tableColumns": [
-    { "label": "Dimension", "width": "1.08fr", "tone": "purple" },
-    { "label": "China", "width": "0.86fr", "align": "center", "tone": "red" },
-    { "label": "Japan", "width": "0.86fr", "align": "center", "tone": "blue" },
-    { "label": "Signal", "width": "1.2fr", "tone": "purple" }
+    { "label": "Dimension", "width": "1.08fr", "tone": "comparison" },
+    { "label": "China", "width": "0.86fr", "align": "center", "tone": "sideA" },
+    { "label": "Japan", "width": "0.86fr", "align": "center", "tone": "sideB" },
+    { "label": "Signal", "width": "1.2fr", "tone": "comparison" }
   ],
   "tableRows": [
     {
       "cells": [
         { "value": "Visible scale", "note": "Asset footprint" },
-        { "value": "Large", "tone": "red", "emphasis": true, "align": "center" },
-        { "value": "Focused", "tone": "blue", "emphasis": true, "align": "center" },
+        { "value": "Large", "tone": "sideA", "emphasis": true, "align": "center" },
+        { "value": "Focused", "tone": "sideB", "emphasis": true, "align": "center" },
         { "value": "Scale vs precision", "note": "Frame the contrast" }
       ]
     },
     {
       "cells": [
         { "value": "Operating pattern", "note": "Observed setup" },
-        { "value": "Distributed", "tone": "red", "align": "center" },
-        { "value": "Specialized", "tone": "blue", "align": "center" },
+        { "value": "Distributed", "tone": "sideA", "align": "center" },
+        { "value": "Specialized", "tone": "sideB", "align": "center" },
         { "value": "Different strengths" }
       ]
     },
     {
       "cells": [
         { "value": "Upgrade focus", "note": "Likely emphasis" },
-        { "value": "Automation", "tone": "red", "align": "center" },
-        { "value": "Quality systems", "tone": "blue", "align": "center" },
+        { "value": "Automation", "tone": "sideA", "align": "center" },
+        { "value": "Quality systems", "tone": "sideB", "align": "center" },
         { "value": "Investment lens" }
       ]
     },
     {
       "cells": [
         { "value": "Evidence status", "note": "Needs validation" },
-        { "value": "Image-backed", "tone": "purple", "align": "center" },
-        { "value": "Image-backed", "tone": "purple", "align": "center" },
+        { "value": "Image-backed", "tone": "comparison", "align": "center" },
+        { "value": "Image-backed", "tone": "comparison", "align": "center" },
         { "value": "Pair with data", "note": "Avoid overclaiming" }
       ]
     }

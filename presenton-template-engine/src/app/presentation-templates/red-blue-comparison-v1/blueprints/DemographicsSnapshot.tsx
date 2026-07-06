@@ -7,9 +7,9 @@ import EntitySnapshotCard, {
 } from "../components/EntitySnapshotCard.tsx";
 import { BalancedComparisonDecorations } from "../components/ComparisonDecorations.tsx";
 import ThemeContentFrame from "../components/ThemeContentFrame.tsx";
-import { type RedBlueTone } from "../theme/tokens.ts";
+import { type ComparisonTone } from "../theme/tokens.ts";
 
-const ToneSchema = z.enum(["red", "blue", "purple", "neutral"]);
+const ToneSchema = z.enum(["sideA", "sideB", "comparison", "neutral"]);
 const SnapshotIconSchema = z.enum([
   "flag",
   "circle",
@@ -37,7 +37,7 @@ const SnapshotCardSchema = z.object({
   heroValue: z.string().min(1).max(18),
   statusLabel: z.string().min(2).max(20).optional(),
   statusIcon: SnapshotIconSchema.default("trend-down"),
-  statusTone: z.enum(["red", "blue", "purple", "neutral", "warning", "success"]).default("warning"),
+  statusTone: z.enum(["sideA", "sideB", "comparison", "neutral", "warning", "success"]).default("warning"),
   kpis: z.array(KpiSchema).min(2).max(4),
 });
 
@@ -50,7 +50,7 @@ export const Schema = z.object({
   cards: z.array(SnapshotCardSchema).min(2).max(2).default([
     {
       entityName: "Entity A",
-      tone: "red",
+      tone: "sideA",
       entityIcon: "flag",
       heroLabel: "Primary Scale",
       heroValue: "1.4B",
@@ -65,7 +65,7 @@ export const Schema = z.object({
     },
     {
       entityName: "Entity B",
-      tone: "blue",
+      tone: "sideB",
       entityIcon: "circle",
       heroLabel: "Primary Scale",
       heroValue: "122M",
@@ -91,7 +91,7 @@ export const sampleData = Schema.parse({
   cards: [
     {
       entityName: "CHINA",
-      tone: "red",
+      tone: "sideA",
       entityIcon: "flag",
       heroLabel: "Total Population",
       heroValue: "1.41B",
@@ -106,7 +106,7 @@ export const sampleData = Schema.parse({
     },
     {
       entityName: "JAPAN",
-      tone: "blue",
+      tone: "sideB",
       entityIcon: "circle",
       heroLabel: "Total Population",
       heroValue: "122.6M",
@@ -147,7 +147,7 @@ const DemographicsSnapshot = ({ data }: { data: Partial<z.infer<typeof Schema>> 
       titlePrefix={parsed.titlePrefix}
       titleHighlight={parsed.titleHighlight}
       subtitle={parsed.subtitle}
-      tone="purple"
+      tone="comparison"
       footerText={parsed.footerText}
       pageNumber={parsed.pageNumber}
       showHeaderDivider={false}
@@ -160,14 +160,14 @@ const DemographicsSnapshot = ({ data }: { data: Partial<z.infer<typeof Schema>> 
           <EntitySnapshotCard
             key={card.entityName}
             entityName={card.entityName}
-            tone={card.tone as RedBlueTone}
+            tone={card.tone as ComparisonTone}
             entityIcon={card.entityIcon as EntitySnapshotIconName}
             hero={{
               label: card.heroLabel,
               value: card.heroValue,
               statusLabel: card.statusLabel,
               statusIcon: card.statusIcon as EntitySnapshotIconName,
-              statusTone: card.statusTone as RedBlueTone | "warning" | "success",
+              statusTone: card.statusTone as ComparisonTone | "warning" | "success",
             }}
             kpis={card.kpis.map((item) => ({
               label: item.label,

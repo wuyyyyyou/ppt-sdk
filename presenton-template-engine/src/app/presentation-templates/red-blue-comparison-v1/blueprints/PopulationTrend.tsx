@@ -11,9 +11,9 @@ import ProjectionLegend from "../components/ProjectionLegend.tsx";
 import ThemeContentFrame from "../components/ThemeContentFrame.tsx";
 import ThemeSoftCircle from "../components/ThemeSoftCircle.tsx";
 import TrendInsightCard, { type TrendInsightIconName } from "../components/TrendInsightCard.tsx";
-import { type RedBlueTone, redBlueComparisonTheme } from "../theme/tokens.ts";
+import { type ComparisonTone, redBlueComparisonTheme } from "../theme/tokens.ts";
 
-const ToneSchema = z.enum(["red", "blue", "purple", "neutral"]);
+const ToneSchema = z.enum(["sideA", "sideB", "comparison", "neutral"]);
 const AxisSideSchema = z.enum(["left", "right"]);
 const InsightIconSchema = z.enum(["trend", "decline", "outlook", "users"]);
 
@@ -59,7 +59,7 @@ export const Schema = z.object({
     min: 0,
     max: 100,
     ticks: [0, 25, 50, 75, 100],
-    tone: "red",
+    tone: "sideA",
   }),
   rightAxis: AxisSchema.default({
     id: "right",
@@ -67,11 +67,11 @@ export const Schema = z.object({
     min: 0,
     max: 100,
     ticks: [0, 25, 50, 75, 100],
-    tone: "blue",
+    tone: "sideB",
   }),
   series: z.array(SeriesSchema).min(1).max(3).default([
-    { label: "Entity A", axis: "left", tone: "red", values: [62, 70, 78, 76, 72, 68] },
-    { label: "Entity B", axis: "right", tone: "blue", values: [78, 80, 76, 70, 64, 58] },
+    { label: "Entity A", axis: "left", tone: "sideA", values: [62, 70, 78, 76, 72, 68] },
+    { label: "Entity B", axis: "right", tone: "sideB", values: [78, 80, 76, 70, 64, 58] },
   ]),
   projectionStartIndex: z.number().int().min(0).max(13).default(3),
   projectionLabel: z.string().min(2).max(34).default("Projection"),
@@ -80,21 +80,21 @@ export const Schema = z.object({
       title: "Entity A inflection",
       value: "Peak",
       description: "Use this card to call out the year or point where the trend changes direction.",
-      tone: "red",
+      tone: "sideA",
       icon: "trend",
     },
     {
       title: "Entity B decline",
       value: "-18%",
       description: "Use this card to summarize the magnitude of the projected change.",
-      tone: "blue",
+      tone: "sideB",
       icon: "decline",
     },
     {
       title: "Outlook",
       value: "High impact",
       description: "Use this card for labor, demand, fiscal, or strategic implications.",
-      tone: "purple",
+      tone: "comparison",
       icon: "outlook",
     },
   ]),
@@ -118,7 +118,7 @@ export const sampleData = Schema.parse({
     max: 1.5,
     ticks: [1.2, 1.3, 1.4, 1.5],
     tickSuffix: "B",
-    tone: "red",
+    tone: "sideA",
     width: 62,
   },
   rightAxis: {
@@ -128,20 +128,20 @@ export const sampleData = Schema.parse({
     max: 140,
     ticks: [80, 100, 120, 140],
     tickSuffix: "M",
-    tone: "blue",
+    tone: "sideB",
     width: 62,
   },
   series: [
     {
       label: "China (Left Scale)",
       axis: "left",
-      tone: "red",
+      tone: "sideA",
       values: [1.26, 1.3, 1.34, 1.37, 1.41, 1.41, 1.4, 1.38, 1.35, 1.32, 1.29],
     },
     {
       label: "Japan (Right Scale)",
       axis: "right",
-      tone: "blue",
+      tone: "sideB",
       values: [126.9, 127.7, 128, 127, 126.2, 123.5, 119.1, 114.5, 109.8, 105.2, 100],
     },
   ],
@@ -152,21 +152,21 @@ export const sampleData = Schema.parse({
       title: "China's Inflection",
       value: "2022",
       description: "The year China's population officially began to shrink, marking the end of decades of growth.",
-      tone: "red",
+      tone: "sideA",
       icon: "trend",
     },
     {
       title: "Japan's Decline",
       value: "-18%",
       description: "Projected population loss from the 2010 peak to 2050, accelerating over the next two decades.",
-      tone: "blue",
+      tone: "sideB",
       icon: "decline",
     },
     {
       title: "2050 Outlook",
       value: "High Impact",
       description: "Both nations face shrinking labor forces, requiring automation policies and economic restructuring.",
-      tone: "purple",
+      tone: "comparison",
       icon: "outlook",
     },
   ],
@@ -191,9 +191,9 @@ export const editableTextPriority = "high";
 
 const PopulationTrendDecorations = () => (
   <>
-    <ThemeSoftCircle tone="purple" left={980} top={-186} size={380} alpha={0.03} />
-    <ThemeSoftCircle tone="blue" left={-54} top={542} size={206} alpha={0.04} />
-    <ThemeSoftCircle tone="red" left={254} top={104} size={142} alpha={0.035} />
+    <ThemeSoftCircle tone="comparison" left={980} top={-186} size={380} alpha={0.03} />
+    <ThemeSoftCircle tone="sideB" left={-54} top={542} size={206} alpha={0.04} />
+    <ThemeSoftCircle tone="sideA" left={254} top={104} size={142} alpha={0.035} />
   </>
 );
 
@@ -201,7 +201,7 @@ const PopulationTrend = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
   const parsed = readTemplateData(Schema, data);
   const legendItems = parsed.series.map((entry) => ({
     label: entry.label,
-    tone: entry.tone as RedBlueTone,
+    tone: entry.tone as ComparisonTone,
   }));
 
   return (
@@ -209,7 +209,7 @@ const PopulationTrend = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
       titlePrefix={parsed.titlePrefix}
       titleHighlight={parsed.titleHighlight}
       subtitle={parsed.subtitle}
-      tone="purple"
+      tone="comparison"
       footerText={parsed.footerText}
       pageNumber={parsed.pageNumber}
       showHeaderDivider={false}
@@ -221,7 +221,7 @@ const PopulationTrend = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
         <ChartContainer
           title={parsed.chartTitle}
           subtitle={parsed.chartSubtitle}
-          tone="purple"
+          tone="comparison"
           padding={20}
           exportMode="screenshot"
         >
@@ -240,7 +240,7 @@ const PopulationTrend = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
                 height={336}
               />
             </div>
-            <div className="mt-[8px] flex-none break-words text-right text-[11px] font-medium" style={{ color: redBlueComparisonTheme.colors.subtleText }}>
+            <div className="mt-[8px] flex-none break-words text-right text-[11px] font-medium" style={{ color: redBlueComparisonTheme.colors.textSubtle }}>
               {parsed.chartNote}
             </div>
           </div>
@@ -253,7 +253,7 @@ const PopulationTrend = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
               title={card.title}
               value={card.value}
               description={card.description}
-              tone={card.tone as RedBlueTone}
+              tone={card.tone as ComparisonTone}
               icon={card.icon as TrendInsightIconName}
               height={index === parsed.insightCards.length - 1 ? 168 : 150}
             />

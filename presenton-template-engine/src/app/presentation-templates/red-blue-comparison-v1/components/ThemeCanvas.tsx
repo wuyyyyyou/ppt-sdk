@@ -13,7 +13,7 @@ const ThemeCanvas = ({
   children,
   className,
   showGrid = false,
-  backgroundColor = redBlueComparisonTheme.colors.background,
+  backgroundColor = redBlueComparisonTheme.colors.canvas,
 }: ThemeCanvasProps) => {
   return (
     <>
@@ -27,7 +27,7 @@ const ThemeCanvas = ({
           width: redBlueComparisonTheme.size.slideWidth,
           height: redBlueComparisonTheme.size.slideHeight,
           backgroundColor,
-          color: redBlueComparisonTheme.colors.backgroundText,
+          color: redBlueComparisonTheme.colors.textPrimary,
           fontFamily: redBlueComparisonTheme.fonts.body,
         }}
       >
@@ -35,7 +35,7 @@ const ThemeCanvas = ({
           <div
             className="absolute inset-0 z-0 opacity-30"
             style={{
-              backgroundImage: `radial-gradient(${redBlueComparisonTheme.colors.softGrid} 1px, transparent 1px)`,
+              backgroundImage: `radial-gradient(${redBlueComparisonTheme.colors.grid} 1px, transparent 1px)`,
               backgroundSize: "40px 40px",
             }}
           />

@@ -7,7 +7,7 @@
   "cards": [
     {
       "entityName": "CHINA",
-      "tone": "red",
+      "tone": "sideA",
       "entityIcon": "flag",
       "heroLabel": "Total Population",
       "heroValue": "1.41B",
@@ -22,7 +22,7 @@
     },
     {
       "entityName": "JAPAN",
-      "tone": "blue",
+      "tone": "sideB",
       "entityIcon": "circle",
       "heroLabel": "Total Population",
       "heroValue": "122.6M",

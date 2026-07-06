@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 import ThemePanelShell from "./ThemePanelShell.tsx";
 
 export type ImageShowcaseFit = "cover" | "contain";
@@ -12,7 +12,7 @@ export type ImageShowcaseImage = {
   source?: string;
   alt?: string;
   fit?: ImageShowcaseFit;
-  tone?: RedBlueTone;
+  tone?: ComparisonTone;
 };
 
 type ImageShowcasePanelProps = {
@@ -42,7 +42,7 @@ const ImageIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const ImagePlaceholder = ({ message, tone }: { message: string; tone: RedBlueTone }) => {
+const ImagePlaceholder = ({ message, tone }: { message: string; tone: ComparisonTone }) => {
   const toneValue = redBlueComparisonTheme.tone[tone];
 
   return (
@@ -84,7 +84,7 @@ const ImageShowcasePanel = ({
   const imageUrl = image.url?.trim();
   const hasImage = Boolean(imageUrl) && failedUrl !== imageUrl;
   const fit = image.fit ?? "cover";
-  const tone = image.tone ?? "purple";
+  const tone = image.tone ?? "comparison";
 
   useEffect(() => {
     setFailedUrl(null);
@@ -100,7 +100,7 @@ const ImageShowcasePanel = ({
         <div
           className="flex-none font-black"
           style={{
-            color: redBlueComparisonTheme.colors.backgroundText,
+            color: redBlueComparisonTheme.colors.textPrimary,
             fontFamily: redBlueComparisonTheme.fonts.heading,
             fontSize: 18,
             lineHeight: 1.22,
@@ -140,7 +140,7 @@ const ImageShowcasePanel = ({
           data-validation-role="multi-line-body-text"
           className="flex-none"
           style={{
-            color: redBlueComparisonTheme.colors.mutedText,
+            color: redBlueComparisonTheme.colors.textMuted,
             fontSize: 12,
             lineHeight: 1.4,
             maxHeight: textMaxHeight(12, 1.4, captionMaxLines),
@@ -156,7 +156,7 @@ const ImageShowcasePanel = ({
         <div
           className="flex-none break-words pt-[6px] text-[10px] font-black uppercase"
           style={{
-            color: redBlueComparisonTheme.colors.subtleText,
+            color: redBlueComparisonTheme.colors.textSubtle,
             lineHeight: "14px",
             overflow: "hidden",
           }}

@@ -10,11 +10,11 @@
   "entities": [
     {
       "label": "China",
-      "tone": "red"
+      "tone": "sideA"
     },
     {
       "label": "Japan",
-      "tone": "blue"
+      "tone": "sideB"
     }
   ],
   "radarLabels": [
@@ -28,25 +28,43 @@
   "radarSeries": [
     {
       "label": "China",
-      "tone": "red",
-      "fillColor": "rgba(255,71,87,0.18)",
-      "values": [75, 95, 98, 85, 40, 90]
+      "tone": "sideA",
+      "values": [
+        75,
+        95,
+        98,
+        85,
+        40,
+        90
+      ]
     },
     {
       "label": "Japan",
-      "tone": "blue",
-      "fillColor": "rgba(46,134,222,0.18)",
-      "values": [90, 80, 50, 40, 95, 70]
+      "tone": "sideB",
+      "values": [
+        90,
+        80,
+        50,
+        40,
+        95,
+        70
+      ]
     }
   ],
   "minValue": 0,
   "maxValue": 100,
-  "ticks": [20, 40, 60, 80, 100],
+  "ticks": [
+    20,
+    40,
+    60,
+    80,
+    100
+  ],
   "insight": {
     "title": "Strategic Divergence",
     "text": "China excels in scale, rapid commercialization, and digital ecosystem growth (\"Speed & Scale\"). Japan maintains superiority in fundamental research, precision engineering, and robotics (\"Quality & Precision\").",
     "icon": "microscope",
-    "tone": "purple"
+    "tone": "comparison"
   },
   "metrics": [
     {
@@ -56,12 +74,12 @@
         {
           "value": "2.6%",
           "sublabel": "of GDP",
-          "tone": "red"
+          "tone": "sideA"
         },
         {
           "value": "3.3%",
           "sublabel": "of GDP",
-          "tone": "blue"
+          "tone": "sideB"
         }
       ]
     },
@@ -72,12 +90,12 @@
         {
           "value": "High",
           "sublabel": "Volume",
-          "tone": "red"
+          "tone": "sideA"
         },
         {
           "value": "High",
           "sublabel": "Quality/Global",
-          "tone": "blue"
+          "tone": "sideB"
         }
       ]
     },
@@ -88,12 +106,12 @@
         {
           "value": "$942B",
           "sublabel": "Dominant",
-          "tone": "red"
+          "tone": "sideA"
         },
         {
           "value": "$120B",
           "sublabel": "Specialized",
-          "tone": "blue"
+          "tone": "sideB"
         }
       ]
     },
@@ -104,12 +122,12 @@
         {
           "value": "1.6k",
           "sublabel": "per million",
-          "tone": "red"
+          "tone": "sideA"
         },
         {
           "value": "5.3k",
           "sublabel": "per million",
-          "tone": "blue"
+          "tone": "sideB"
         }
       ]
     },
@@ -120,12 +138,12 @@
         {
           "value": "300+",
           "sublabel": "Vibrant Scene",
-          "tone": "red"
+          "tone": "sideA"
         },
         {
           "value": "~12",
           "sublabel": "Emerging",
-          "tone": "blue"
+          "tone": "sideB"
         }
       ]
     }

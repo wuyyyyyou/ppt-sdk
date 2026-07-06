@@ -1,6 +1,6 @@
 import React from "react";
 
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 import CardAccentRail from "./CardAccentRail.tsx";
 
 export type TrendInsightIconName = "trend" | "decline" | "outlook" | "users";
@@ -9,7 +9,7 @@ type TrendInsightCardProps = {
   title: string;
   value: string;
   description: string;
-  tone?: RedBlueTone;
+  tone?: ComparisonTone;
   icon?: TrendInsightIconName;
   height?: number;
 };
@@ -68,7 +68,7 @@ const TrendInsightCard = ({
   title,
   value,
   description,
-  tone = "purple",
+  tone = "comparison",
   icon = "trend",
   height = 142,
 }: TrendInsightCardProps) => {
@@ -76,11 +76,12 @@ const TrendInsightCard = ({
 
   return (
     <div
-      className="relative flex min-w-0 flex-col overflow-hidden border bg-white px-[20px] py-[16px]"
+      className="relative flex min-w-0 flex-col overflow-hidden border px-[20px] py-[16px]"
       style={{
         height,
         borderRadius: redBlueComparisonTheme.radius.xl,
-        borderColor: "rgba(45,52,54,0.05)",
+        backgroundColor: redBlueComparisonTheme.colors.card,
+        borderColor: redBlueComparisonTheme.colors.neutralBorder,
         boxShadow: redBlueComparisonTheme.shadow.card,
       }}
     >
@@ -102,7 +103,7 @@ const TrendInsightCard = ({
       </div>
       <div
         className="relative z-10 overflow-hidden text-[12px] font-medium leading-[1.35]"
-        style={{ color: redBlueComparisonTheme.colors.mutedText, maxHeight: 66 }}
+        style={{ color: redBlueComparisonTheme.colors.textMuted, maxHeight: 66 }}
       >
         {description}
       </div>

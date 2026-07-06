@@ -5,15 +5,15 @@
     {
       "icon": "email",
       "label": "contact@example.com",
-      "tone": "purple"
+      "tone": "comparison"
     },
     {
       "icon": "phone",
       "label": "+1-555-000-0000",
-      "tone": "purple"
+      "tone": "comparison"
     }
   ],
   "footerNote": "China vs Japan | Closing",
-  "accentTone": "purple",
+  "accentTone": "comparison",
   "showDecorations": true
 }

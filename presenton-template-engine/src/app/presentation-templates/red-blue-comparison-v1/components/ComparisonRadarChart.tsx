@@ -7,11 +7,11 @@ import {
   RadarChart,
 } from "recharts";
 
-import { redBlueComparisonTheme, type RedBlueTone } from "../theme/tokens.ts";
+import { redBlueComparisonTheme, type ComparisonTone } from "../theme/tokens.ts";
 
 export type ComparisonRadarSeries = {
   label: string;
-  tone?: RedBlueTone;
+  tone?: ComparisonTone;
   color?: string;
   fillColor?: string;
   values: number[];
@@ -42,8 +42,8 @@ const resolveColor = (entry: ComparisonRadarSeries, index: number) => {
   }
 
   return index === 0
-    ? redBlueComparisonTheme.colors.chinaRed
-    : redBlueComparisonTheme.colors.japanBlue;
+    ? redBlueComparisonTheme.colors.sideA
+    : redBlueComparisonTheme.colors.sideB;
 };
 
 const buildRadarData = (
@@ -93,13 +93,13 @@ const ComparisonRadarChart = ({
       >
         <PolarGrid
           gridType="polygon"
-          stroke="rgba(45,52,54,0.08)"
+          stroke={redBlueComparisonTheme.colors.grid}
           radialLines
         />
         <PolarAngleAxis
           dataKey="label"
           tick={{
-            fill: redBlueComparisonTheme.colors.mutedText,
+            fill: redBlueComparisonTheme.colors.textMuted,
             fontSize: labelFontSize,
             fontWeight: 800,
           }}
