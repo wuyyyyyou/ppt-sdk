@@ -54,6 +54,13 @@ const SUPPORTED_SEMANTIC_INLINE_RICH_TEXT_TAGS = [
   "br",
 ] as const;
 
+const SVG_COLOR_PRESENTATION_ATTRIBUTES = [
+  "color",
+  "fill",
+  "stroke",
+  "stop-color",
+] as const;
+
 function debugLog(...args: unknown[]) {
   if (!DEBUG_HTML_TO_PPTX) {
     return;
@@ -213,11 +220,104 @@ async function screenshotElement(
 
 async function convertSvgToPng(element: ElementAttributes): Promise<Buffer> {
   const svgHtml =
-    (await element.element?.evaluate((el) => {
-      const fontColor = window.getComputedStyle(el).color;
-      (el as HTMLElement).style.color = fontColor;
-      return el.outerHTML;
-    })) ?? "";
+    (await element.element?.evaluate((el, colorAttributes) => {
+      const shouldResolveSvgPaintValue = (value: string | null): boolean => {
+        if (!value) {
+          return false;
+        }
+
+        const normalized = value.trim().toLowerCase();
+        if (
+          normalized === "" ||
+          normalized === "none" ||
+          normalized === "transparent" ||
+          normalized.startsWith("url(")
+        ) {
+          return false;
+        }
+
+        return normalized.includes("var(") || normalized.includes("currentcolor");
+      };
+
+      const isSerializableSvgPaintValue = (value: string): boolean => {
+        const normalized = value.trim().toLowerCase();
+        return Boolean(
+          normalized &&
+          normalized !== "none" &&
+          normalized !== "transparent" &&
+          normalized !== "currentcolor" &&
+          !normalized.includes("var(") &&
+          !normalized.startsWith("url("),
+        );
+      };
+
+      const resolveComputedSvgPaintValue = (
+        computedStyles: CSSStyleDeclaration,
+        attribute: string,
+      ): string | null => {
+        const computedValue = computedStyles.getPropertyValue(attribute).trim();
+        const normalized = computedValue.toLowerCase();
+
+        if (
+          !computedValue ||
+          normalized === "none" ||
+          normalized === "transparent" ||
+          normalized === "currentcolor" ||
+          normalized.includes("var(") ||
+          normalized.startsWith("url(")
+        ) {
+          if (attribute === "color") {
+            return null;
+          }
+
+          const colorValue = computedStyles.color.trim();
+          return isSerializableSvgPaintValue(colorValue) ? colorValue : null;
+        }
+
+        return isSerializableSvgPaintValue(computedValue) ? computedValue : null;
+      };
+
+      const resolveSvgPaintAttribute = (
+        sourceNode: Element,
+        clonedNode: SVGElement,
+        computedStyles: CSSStyleDeclaration,
+        attribute: string,
+      ) => {
+        const rawAttributeValue = sourceNode.getAttribute(attribute);
+        const inlineValue = (sourceNode as SVGElement).style?.getPropertyValue(attribute);
+        const value = rawAttributeValue || inlineValue;
+
+        if (!shouldResolveSvgPaintValue(value)) {
+          return;
+        }
+
+        const resolvedValue = resolveComputedSvgPaintValue(computedStyles, attribute);
+        if (!resolvedValue) {
+          return;
+        }
+
+        clonedNode.setAttribute(attribute, resolvedValue);
+        clonedNode.style.removeProperty(attribute);
+      };
+
+      const svg = el.cloneNode(true) as SVGElement;
+      const sourceNodes = [el, ...Array.from(el.querySelectorAll("*"))];
+      const clonedNodes = [svg, ...Array.from(svg.querySelectorAll("*"))] as SVGElement[];
+
+      sourceNodes.forEach((sourceNode, index) => {
+        const clonedNode = clonedNodes[index];
+        if (!clonedNode) {
+          return;
+        }
+
+        const computedStyles = window.getComputedStyle(sourceNode);
+        for (const attribute of colorAttributes) {
+          resolveSvgPaintAttribute(sourceNode, clonedNode, computedStyles, attribute);
+        }
+      });
+
+      return svg.outerHTML;
+    }, SVG_COLOR_PRESENTATION_ATTRIBUTES)) ?? "";
 
   const sharpModule = await import("sharp");
   const sharp = sharpModule.default ?? sharpModule;

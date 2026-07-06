@@ -26,7 +26,10 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function camelToKebab(value: string): string {
-  return value.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/([a-zA-Z])([0-9])/g, "$1-$2")
+    .toLowerCase();
 }
 
 function hexToRgb(value: string): string {
