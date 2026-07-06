@@ -68,15 +68,15 @@ const ChartEvidenceCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }
         <ChartPanelShell
           title={parsed.chartTitle}
           subtitle={parsed.chartSubtitle}
-          legend={[{ label: parsed.legendLabel, color: chartAnalyticsTheme.colors.primary }]}
+          legend={[{ label: parsed.legendLabel, color: chartAnalyticsTheme.colors.signalPrimary }]}
         >
           {parsed.showSlotGuides ? (
             <div
               className="flex h-full min-h-0 items-center justify-center rounded-[8px] border border-dashed"
               style={{
-                borderColor: "#BFDBFE",
-                backgroundColor: "#EFF6FF",
-                color: chartAnalyticsTheme.colors.primary,
+                borderColor: chartAnalyticsTheme.colors.signalPrimaryBorder,
+                backgroundColor: chartAnalyticsTheme.colors.signalPrimaryTint,
+                color: chartAnalyticsTheme.colors.signalPrimary,
               }}
             >
               <div className="w-[560px] text-center text-[22px] font-black uppercase leading-[1.45]">
@@ -93,8 +93,12 @@ const ChartEvidenceCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }
           </div>
           <div className="mt-[18px] flex flex-1 flex-col gap-[14px]">
             {parsed.insights.map((insight) => (
-              <div key={insight.label} className="rounded-[8px] border border-white/10 bg-white/[0.06] p-[16px]">
-                <div className="text-[11px] font-bold uppercase leading-none" style={{ color: "#60A5FA" }}>
+              <div
+                key={insight.label}
+                className="rounded-[8px] border p-[16px]"
+                style={{ borderColor: chartAnalyticsTheme.colors.darkBorder, backgroundColor: chartAnalyticsTheme.colors.darkCallout }}
+              >
+                <div className="text-[11px] font-bold uppercase leading-none" style={{ color: chartAnalyticsTheme.colors.signalPrimary }}>
                   {insight.label}
                 </div>
                 <div className="mt-[8px] text-[14px] font-medium leading-[1.42]" style={{ color: chartAnalyticsTheme.colors.darkMutedText }}>

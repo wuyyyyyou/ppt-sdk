@@ -7,7 +7,7 @@ import { AnalyticsIcon } from "./AnalyticsIcons.tsx";
 export type StrategicInsightItem = {
   label: string;
   text: string;
-  color: string;
+  color?: string;
 };
 
 type StrategicInsightPanelProps = {
@@ -18,8 +18,8 @@ type StrategicInsightPanelProps = {
   statLabel: string;
   statValue: string;
   statBadge: string;
-  statBadgeColor: string;
-  statBadgeBackground: string;
+  statBadgeColor?: string;
+  statBadgeBackground?: string;
 };
 
 const StrategicInsightPanel = ({
@@ -37,10 +37,10 @@ const StrategicInsightPanel = ({
     <div className="min-h-0 flex-1">
       <AnalyticsCardShell dark padding={20}>
         <div className="pointer-events-none absolute right-[14px] top-[12px] opacity-[0.1]">
-          <AnalyticsIcon name={icon} className="h-[78px] w-[78px]" stroke="#FFFFFF" />
+          <AnalyticsIcon name={icon} className="h-[78px] w-[78px]" stroke={chartAnalyticsTheme.colors.textInverse} />
         </div>
 
-        <div className="text-[12px] font-bold uppercase leading-[1.2]" style={{ color: "#60A5FA" }}>
+        <div className="text-[12px] font-bold uppercase leading-[1.2]" style={{ color: chartAnalyticsTheme.colors.chart1 }}>
           {eyebrow}
         </div>
         <div className="mt-[10px] text-[20px] font-light leading-[1.15]" style={{ color: chartAnalyticsTheme.colors.darkText }}>
@@ -48,9 +48,12 @@ const StrategicInsightPanel = ({
         </div>
 
         <div className="mt-[16px] grid flex-1 content-start gap-[12px]">
-          {items.map((item) => (
+          {items.map((item, index) => (
             <div key={item.label} className="flex items-start gap-[9px]">
-              <div className="mt-[5px] h-[7px] w-[7px] flex-none rounded-full" style={{ backgroundColor: item.color }} />
+              <div
+                className="mt-[5px] h-[7px] w-[7px] flex-none rounded-full"
+                style={{ backgroundColor: item.color ?? chartAnalyticsTheme.palette.chart[index % chartAnalyticsTheme.palette.chart.length] }}
+              />
               <div className="flex min-w-0 flex-1 items-start gap-[5px]">
                 <div className="w-[48px] flex-none text-[12px] font-bold leading-[1.2]" style={{ color: chartAnalyticsTheme.colors.darkText }}>
                   {item.label}:
@@ -69,14 +72,20 @@ const StrategicInsightPanel = ({
       <AnalyticsCardShell padding={16}>
         <div className="flex h-full items-center justify-between gap-[18px]">
           <div className="min-w-0">
-            <div className="truncate text-[10px] font-bold uppercase" style={{ color: chartAnalyticsTheme.colors.mutedText }}>
+            <div className="truncate text-[10px] font-bold uppercase" style={{ color: chartAnalyticsTheme.colors.textMuted }}>
               {statLabel}
             </div>
-            <div className="mt-[5px] truncate text-[25px] font-black leading-none" style={{ color: "#1E293B" }}>
+            <div className="mt-[5px] truncate text-[25px] font-black leading-none" style={{ color: chartAnalyticsTheme.colors.textPrimary }}>
               {statValue}
             </div>
           </div>
-          <div className="flex-none rounded-[4px] px-[9px] py-[6px] text-[10px] font-bold" style={{ color: statBadgeColor, backgroundColor: statBadgeBackground }}>
+          <div
+            className="flex-none rounded-[4px] px-[9px] py-[6px] text-[10px] font-bold"
+            style={{
+              color: statBadgeColor ?? chartAnalyticsTheme.colors.signalPrimary,
+              backgroundColor: statBadgeBackground ?? chartAnalyticsTheme.colors.signalPrimaryTint,
+            }}
+          >
             {statBadge}
           </div>
         </div>

@@ -59,15 +59,15 @@ const ContentCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
           <div
             className="flex h-full w-full items-center justify-center rounded-[8px] border border-dashed"
             style={{
-              borderColor: "#BFDBFE",
-              backgroundColor: "#EFF6FF",
+              borderColor: chartAnalyticsTheme.colors.signalPrimaryBorder,
+              backgroundColor: chartAnalyticsTheme.colors.signalPrimaryTint,
             }}
           >
             <div className="w-[660px] text-center">
-              <div className="text-[28px] font-black leading-[1.1]" style={{ color: chartAnalyticsTheme.colors.primary }}>
+              <div className="text-[28px] font-black leading-[1.1]" style={{ color: chartAnalyticsTheme.colors.signalPrimary }}>
                 {parsed.guideTitle}
               </div>
-              <div className="mt-[18px] text-[18px] font-medium leading-[1.5]" style={{ color: chartAnalyticsTheme.colors.subtleText }}>
+              <div className="mt-[18px] text-[18px] font-medium leading-[1.5]" style={{ color: chartAnalyticsTheme.colors.textSubtle }}>
                 {parsed.guideText}
               </div>
             </div>

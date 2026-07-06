@@ -10,19 +10,17 @@ import { chartAnalyticsTheme } from "../theme/tokens.ts";
 
 const EntitySchema = z.object({
   name: z.string().min(1).max(28),
-  accentColor: z.string().min(3).max(64),
+  accentColor: z.string().min(3).max(64).optional(),
   prompt: z.string().min(4).max(96),
 });
 
 const DEFAULT_ENTITIES: z.infer<typeof EntitySchema>[] = [
   {
     name: "Entity A",
-    accentColor: chartAnalyticsTheme.colors.primary,
     prompt: "Replace with evidence cards, metrics, chart fragments, or short findings.",
   },
   {
     name: "Entity B",
-    accentColor: chartAnalyticsTheme.colors.accentTeal,
     prompt: "Mirror or contrast the same slots so the comparison remains scannable.",
   },
 ];
@@ -62,6 +60,12 @@ export const density = "high";
 export const visualWeight = "balanced";
 export const editableTextPriority = "high";
 
+const comparisonEntityColors = [
+  chartAnalyticsTheme.colors.entityPrimary,
+  chartAnalyticsTheme.colors.entitySecondary,
+  chartAnalyticsTheme.colors.signalTertiary,
+] as const;
+
 const ComparisonCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
   const parsed = readTemplateData(Schema, data);
   const columns = `repeat(${parsed.entities.length}, minmax(0, 1fr))`;
@@ -78,26 +82,30 @@ const ComparisonCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
 
       <div className="flex h-[582px] flex-col gap-[22px] px-[48px] py-[32px]">
         <div className="grid flex-1 gap-[22px]" style={{ gridTemplateColumns: columns }}>
-          {parsed.entities.map((entity) => (
-            <AnalyticsCardShell key={entity.name} accentColor={entity.accentColor} padding={24}>
-              <div className="text-[22px] font-black leading-[1.1]" style={{ color: "#0F172A" }}>
-                {entity.name}
-              </div>
-              <div className="mt-[10px] h-[3px] w-[58px]" style={{ backgroundColor: entity.accentColor }} />
-              {parsed.showSlotGuides ? (
-                <div
-                  className="mt-[22px] flex flex-1 items-center justify-center rounded-[8px] border border-dashed px-[26px] text-center"
-                  style={{
-                    borderColor: "#BFDBFE",
-                    backgroundColor: "#F8FAFC",
-                    color: chartAnalyticsTheme.colors.subtleText,
-                  }}
-                >
-                  <div className="text-[15px] font-semibold leading-[1.45]">{entity.prompt}</div>
+          {parsed.entities.map((entity, index) => {
+            const accentColor = entity.accentColor ?? comparisonEntityColors[index] ?? chartAnalyticsTheme.colors.signalPrimary;
+
+            return (
+              <AnalyticsCardShell key={entity.name} accentColor={accentColor} padding={24}>
+                <div className="text-[22px] font-black leading-[1.1]" style={{ color: chartAnalyticsTheme.colors.textPrimary }}>
+                  {entity.name}
                 </div>
-              ) : null}
-            </AnalyticsCardShell>
-          ))}
+                <div className="mt-[10px] h-[3px] w-[58px]" style={{ backgroundColor: accentColor }} />
+                {parsed.showSlotGuides ? (
+                  <div
+                    className="mt-[22px] flex flex-1 items-center justify-center rounded-[8px] border border-dashed px-[26px] text-center"
+                    style={{
+                      borderColor: chartAnalyticsTheme.colors.signalPrimaryBorder,
+                      backgroundColor: chartAnalyticsTheme.colors.surface,
+                      color: chartAnalyticsTheme.colors.textSubtle,
+                    }}
+                  >
+                    <div className="text-[15px] font-semibold leading-[1.45]">{entity.prompt}</div>
+                  </div>
+                ) : null}
+              </AnalyticsCardShell>
+            );
+          })}
         </div>
 
         {parsed.showSlotGuides ? (

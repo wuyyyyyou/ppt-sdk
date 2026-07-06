@@ -43,8 +43,6 @@ export const density = "low";
 export const visualWeight = "visual-heavy";
 export const editableTextPriority = "high";
 
-const guideBorder = "rgba(96,165,250,0.42)";
-
 const CoverCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
   const parsed = readTemplateData(Schema, data);
 
@@ -56,9 +54,18 @@ const CoverCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
         showImage={parsed.showBackgroundImage}
       />
 
-      <div className="absolute left-[820px] top-[0px] z-[1] h-[360px] w-[360px] rounded-full border border-white/10" />
-      <div className="absolute left-[904px] top-[0px] z-[1] h-[300px] w-[300px] rounded-full border border-blue-500/20" />
-      <div className="absolute left-[0px] top-[392px] z-[1] h-[328px] w-[328px] rounded-full border border-white/10" />
+      <div
+        className="absolute left-[820px] top-[0px] z-[1] h-[360px] w-[360px] rounded-full border"
+        style={{ borderColor: chartAnalyticsTheme.colors.darkBorder }}
+      />
+      <div
+        className="absolute left-[904px] top-[0px] z-[1] h-[300px] w-[300px] rounded-full border"
+        style={{ borderColor: chartAnalyticsTheme.alpha.signalPrimary(0.2) }}
+      />
+      <div
+        className="absolute left-[0px] top-[392px] z-[1] h-[328px] w-[328px] rounded-full border"
+        style={{ borderColor: chartAnalyticsTheme.colors.darkBorder }}
+      />
 
       <div className="relative z-10 flex h-full flex-col justify-center px-[78px] pb-[92px] pt-[74px]">
         <ExpandedLabel text={parsed.seriesLabel} />
@@ -66,21 +73,28 @@ const CoverCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
         <div className="mt-[72px] grid grid-cols-[690px_minmax(0,1fr)] gap-[58px]">
           <div>
             <div
-              className="text-[72px] font-black leading-[0.98] text-white"
-              style={{ fontFamily: chartAnalyticsTheme.fonts.display }}
+              className="text-[72px] font-black leading-[0.98]"
+              style={{ color: chartAnalyticsTheme.colors.textInverse, fontFamily: chartAnalyticsTheme.fonts.display }}
             >
               {parsed.headline}
             </div>
-            <div className="mt-[28px] w-[620px] text-[25px] font-light leading-[1.32] text-slate-100">{parsed.subtitle}</div>
-            <div className="mt-[16px] w-[620px] text-[17px] leading-[1.35] text-slate-400">{parsed.scope}</div>
+            <div className="mt-[28px] w-[620px] text-[25px] font-light leading-[1.32]" style={{ color: chartAnalyticsTheme.colors.darkText }}>
+              {parsed.subtitle}
+            </div>
+            <div className="mt-[16px] w-[620px] text-[17px] leading-[1.35]" style={{ color: chartAnalyticsTheme.colors.darkMutedText }}>
+              {parsed.scope}
+            </div>
           </div>
 
           {parsed.showSlotGuides ? (
             <div
-              className="flex h-[310px] items-center justify-center rounded-[8px] border border-dashed bg-white/[0.06] px-[38px] text-center"
-              style={{ borderColor: guideBorder }}
+              className="flex h-[310px] items-center justify-center rounded-[8px] border border-dashed px-[38px] text-center"
+              style={{
+                borderColor: chartAnalyticsTheme.alpha.signalPrimary(0.42),
+                backgroundColor: chartAnalyticsTheme.colors.darkCallout,
+              }}
             >
-              <div className="text-[18px] font-bold uppercase leading-[1.45]" style={{ color: "#93C5FD" }}>
+              <div className="text-[18px] font-bold uppercase leading-[1.45]" style={{ color: chartAnalyticsTheme.colors.signalPrimary }}>
                 Compose cover visual, evidence cue, or compact metric cluster here
               </div>
             </div>

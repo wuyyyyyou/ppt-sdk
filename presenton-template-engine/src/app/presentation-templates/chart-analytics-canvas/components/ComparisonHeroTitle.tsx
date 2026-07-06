@@ -12,13 +12,19 @@ type ComparisonHeroTitleProps = {
 const ComparisonHeroTitle = ({ primary, secondary, dividerLabel }: ComparisonHeroTitleProps) => {
   return (
     <div className="flex flex-col items-center" style={{ fontFamily: chartAnalyticsTheme.fonts.display }}>
-      <div className="flex h-[112px] items-center justify-center whitespace-nowrap text-[130px] font-black leading-none tracking-normal text-white drop-shadow-2xl">
+      <div
+        className="flex h-[112px] items-center justify-center whitespace-nowrap text-[130px] font-black leading-none tracking-normal drop-shadow-2xl"
+        style={{ color: chartAnalyticsTheme.colors.textInverse }}
+      >
         {primary}
       </div>
       <div className="my-[17px]">
         <ComparisonDivider label={dividerLabel} />
       </div>
-      <div className="flex h-[112px] items-center justify-center whitespace-nowrap text-[130px] font-black leading-none tracking-normal text-white drop-shadow-2xl">
+      <div
+        className="flex h-[112px] items-center justify-center whitespace-nowrap text-[130px] font-black leading-none tracking-normal drop-shadow-2xl"
+        style={{ color: chartAnalyticsTheme.colors.textInverse }}
+      >
         {secondary}
       </div>
     </div>

@@ -22,7 +22,7 @@ const AnalyticsCardShell = ({
     style={{
       backgroundColor: dark ? chartAnalyticsTheme.colors.darkPanel : chartAnalyticsTheme.colors.card,
       borderColor: dark ? "transparent" : chartAnalyticsTheme.colors.stroke,
-      boxShadow: dark ? "0 10px 18px rgba(15,23,42,0.18)" : "0 4px 8px rgba(15,23,42,0.05)",
+      boxShadow: dark ? chartAnalyticsTheme.shadows.darkPanel : chartAnalyticsTheme.shadows.card,
       padding,
     }}
   >

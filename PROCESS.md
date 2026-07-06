@@ -56,6 +56,16 @@
 - 暗色主题回归时修复过 `bg-white` card 和 `border-white` 时间线节点描边这类硬编码白色。后续迁移同族模板时要重点扫描 `bg-white`、`border-white`、`#FFFFFF`、`rgba(...)`、旧 CSS var 和旧 tone 字符串。
 - 已通过 `presenton-template-engine` 的 `npm run check` 和 `npm run build`。
 
+`chart-analytics-canvas` 已按 `chart-analytics-v1` 的 analytics-native token 契约完成迁移：
+
+- 增加 `theme/token.schema.json`、`theme/token.default.json`、中文 `theme/README.md`，并保留 `theme/token.executive-amber.json` 作为命名预设。
+- 不提交 `theme/token.json`；该文件继续作为本地测试/工作区主题文件。
+- 移除 `manifest.theme`，真实颜色来源改为 theme token。
+- `theme/tokens.ts` 已对齐 `chart-analytics-v1`，统一读取 `--theme-color-*` / `--theme-shadow-*`。
+- components 已同步 `chart-analytics-v1` 的 tokenized 实现，canvas 独有 blueprints 的 slot guide 和占位视觉复用 analytics-native token。
+- 当前没有新增 canvas-only token；canvas 大块结构仍复用 `signal*`、`entity*`、`dark*`、`chart*` 等现有语义。
+- demo data 默认不再写 `accentColor`；`ComparisonCanvas` 的 `accentColor` 仅作为 optional 兼容输入，缺省时按实体序号回退到 theme token。
+
 ## Canvas 模板关系
 
 `red-finance-canvas` 和 `red-finance-v3` 的关系：
@@ -71,10 +81,18 @@
 - 主要差异在蓝图形态：`red-blue-comparison-v1` 是较完整的页面蓝图；`red-blue-comparison-canvas` 提供 `CoverCanvas`、`ContentCanvas`、`ComparisonCanvas`、`ChartEvidenceCanvas`、`ClosingCanvas`，让 AI Agent 在画布槽位上组合组件生成页面。
 - 迁移 `red-blue-comparison-canvas` 时，应优先对齐 `red-blue-comparison-v1` 的 token 契约和组件实现，而不是重新设计一套红/蓝命名或照搬 red-finance 的 accent 契约。
 
+`chart-analytics-canvas` 和 `chart-analytics-v1` 的关系：
+
+- `chart-analytics-canvas` 是开放性 canvas 蓝图模板。
+- 它的 components 基本来自 `chart-analytics-v1` / 同一套 analytics-native 组件体系。
+- 主要差异在蓝图形态：`chart-analytics-v1` 是较完整的分析报告页面蓝图；`chart-analytics-canvas` 提供 `CoverCanvas`、`ContentCanvas`、`ComparisonCanvas`、`ChartEvidenceCanvas`、`ClosingCanvas`，让 AI Agent 在大块画布槽位上组合组件生成页面。
+- 迁移 `chart-analytics-canvas` 时，应优先对齐 `chart-analytics-v1` 的 analytics-native token 契约和组件实现；只有发现稳定的 canvas-only 视觉角色时才新增 token。
+
 ## 注意事项
 
 - 先读 `red-finance-v3` 的最终实现，再迁移 canvas；不要凭记忆手改。
 - 迁移 `red-blue-comparison-canvas` 时，先读 `red-blue-comparison-v1` 的最终实现，再对照 canvas 独有 blueprints；不要只复制 red-finance-canvas 的 token 文件。
+- 迁移 `chart-analytics-canvas` 时，先读 `chart-analytics-v1` 的最终实现，再对照 canvas 独有 blueprints；不要机械套用 red-blue 或 red-finance 的 token 语义。
 - 不要迁移 `reference-slides/` 这类参考材料，除非后续明确要求。
 - data 默认不要再写颜色；只有明确业务覆盖才允许 data color。
 - 允许 `tokens.ts` 做机械派生，例如 alpha helper；语义颜色应进入 token json。

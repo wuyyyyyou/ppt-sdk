@@ -1,23 +1,5 @@
 {
   "title": "Dark Analytics Canvas Starter Deck",
-  "theme": {
-    "company_name": "ANALYTICS AUTHORING WORKSPACE",
-    "colors": {
-      "background": "#0F172A",
-      "background_text": "#F8FAFC",
-      "primary": "#2563EB",
-      "primary_text": "#FFFFFF",
-      "card": "#FFFFFF",
-      "stroke": "#E2E8F0",
-      "secondary": "#14B8A6",
-      "text_muted": "#94A3B8",
-      "text_subtle": "#64748B",
-      "panel": "#1E293B",
-      "surface": "#F8FAFC",
-      "accent_indigo": "#4F46E5",
-      "accent_teal": "#14B8A6"
-    }
-  },
   "slides": [
     {
       "id": "chart-analytics-canvas-cover",

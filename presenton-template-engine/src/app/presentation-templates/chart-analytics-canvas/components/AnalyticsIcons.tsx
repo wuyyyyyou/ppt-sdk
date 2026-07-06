@@ -48,7 +48,7 @@ type AnalyticsIconProps = {
   fill?: string;
 };
 
-const defaultStroke = chartAnalyticsTheme.colors.primary;
+const defaultStroke = chartAnalyticsTheme.colors.signalPrimary;
 
 export const AnalyticsIcon = ({
   name,

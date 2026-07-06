@@ -13,6 +13,7 @@
 - 标题、KPI 数值、矩阵文字、时间线事件、图表标题、来源说明必须尽量保持真实文本节点。
 - 图表本体可以使用组件内既有截图导出边界；图表外的解释、legend、结论仍保持可编辑文本。
 - 颜色、字体、阴影等视觉语言优先来自 `theme/tokens.ts`。
+- 默认 data 不写 `color`、`fillColor`、`textColor`、`accentColor`、`tintColor`、`badgeColor`、`badgeBackground` 这类颜色字段；需要兼容外部输入时可在 schema 中保留 optional 字段，并在组件内回退到 theme token。
 
 ## Canvas 到组件的工作流
 
@@ -79,6 +80,6 @@
 - 改某一页布局、slot、列宽、组件组合：改 `slides/*.tsx`。
 - 改某一页默认内容：改对应 data JSON 和 schema 默认值。
 - 改多个页面共享视觉单元：改 `components/*.tsx` 并同步本 README。
-- 改色彩、字体、阴影、边框：优先改 `theme/tokens.ts`。
+- 改色彩、字体、阴影、边框：优先改 `theme/token.json` 或模板提交的 `theme/token.default.json` / 命名预设，组件只通过 `theme/tokens.ts` 消费 token。
 - 优先复用现有组件；只有出现跨页稳定新语义时才新增组件。
 - 如果页面看起来像 `the original Dark Analytics Charts template` 的成品业务页换了文案，说明没有完成 canvas-first 目标。

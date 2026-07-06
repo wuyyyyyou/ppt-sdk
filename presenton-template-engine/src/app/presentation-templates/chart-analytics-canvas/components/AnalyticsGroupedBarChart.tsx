@@ -5,7 +5,7 @@ import { chartAnalyticsTheme } from "../theme/tokens.ts";
 
 export type AnalyticsBarSeries = {
   label: string;
-  color: string;
+  color?: string;
   values: number[];
 };
 
@@ -52,14 +52,14 @@ const AnalyticsGroupedBarChart = ({
       style={{ width, height }}
     >
       <BarChart width={width} height={height} data={data} margin={{ top: 10, right: 18, bottom: 0, left: 0 }} barGap={8} barCategoryGap="22%">
-        <CartesianGrid vertical={false} stroke="#F1F5F9" strokeWidth={1} />
+        <CartesianGrid vertical={false} stroke={chartAnalyticsTheme.colors.grid} strokeWidth={1} />
         <XAxis
           dataKey="label"
           axisLine={false}
           tickLine={false}
           interval={0}
           height={42}
-          tick={{ fill: chartAnalyticsTheme.colors.subtleText, fontSize: 11, fontWeight: 500 }}
+          tick={{ fill: chartAnalyticsTheme.colors.textSubtle, fontSize: 11, fontWeight: 500 }}
         />
         <YAxis
           width={40}
@@ -68,10 +68,16 @@ const AnalyticsGroupedBarChart = ({
           axisLine={false}
           tickLine={false}
           tickFormatter={(value) => `${Number(value)}${tickSuffix}`}
-          tick={{ fill: chartAnalyticsTheme.colors.mutedText, fontSize: 10 }}
+          tick={{ fill: chartAnalyticsTheme.colors.textMuted, fontSize: 10 }}
         />
-        {series.map((entry) => (
-          <Bar key={entry.label} dataKey={entry.label} fill={entry.color} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+        {series.map((entry, index) => (
+          <Bar
+            key={entry.label}
+            dataKey={entry.label}
+            fill={entry.color ?? chartAnalyticsTheme.palette.chart[index % chartAnalyticsTheme.palette.chart.length]}
+            radius={[4, 4, 0, 0]}
+            isAnimationActive={false}
+          />
         ))}
       </BarChart>
     </div>

@@ -1,10 +1,12 @@
 import React from "react";
 import { Cell, Pie, PieChart } from "recharts";
 
+import { chartAnalyticsTheme } from "../theme/tokens.ts";
+
 export type AnalyticsDonutSegment = {
   label: string;
   value: number;
-  color: string;
+  color?: string;
 };
 
 type AnalyticsDonutChartProps = {
@@ -24,10 +26,10 @@ const AnalyticsDonutChart = ({
 }: AnalyticsDonutChartProps) => {
   const outerRadius = size / 2 - 8;
   const innerRadius = Math.max(34, outerRadius - strokeWidth);
-  const chartData = segments.map((segment) => ({
+  const chartData = segments.map((segment, index) => ({
     name: segment.label,
     value: Math.max(0, segment.value),
-    color: segment.color,
+    color: segment.color ?? chartAnalyticsTheme.palette.structure[index % chartAnalyticsTheme.palette.structure.length],
   }));
 
   return (
@@ -56,10 +58,10 @@ const AnalyticsDonutChart = ({
       </div>
 
       <div className="absolute left-1/2 top-1/2 flex w-[120px] -translate-x-1/2 -translate-y-1/2 flex-col items-center text-center">
-        <div className="text-[10px] font-bold uppercase leading-[1.1]" style={{ color: "#94A3B8" }}>
+        <div className="text-[10px] font-bold uppercase leading-[1.1]" style={{ color: chartAnalyticsTheme.colors.textMuted }}>
           {centerLabel}
         </div>
-        <div className="mt-[5px] text-[40px] font-black leading-none" style={{ color: "#334155" }}>
+        <div className="mt-[5px] text-[40px] font-black leading-none" style={{ color: chartAnalyticsTheme.colors.signalNeutral }}>
           {centerValue}
         </div>
       </div>

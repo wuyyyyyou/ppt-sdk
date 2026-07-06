@@ -10,8 +10,8 @@ type ComparisonDividerProps = {
 
 const ComparisonDivider = ({
   label,
-  lineColor = "#64748B",
-  labelColor = chartAnalyticsTheme.colors.primary,
+  lineColor = chartAnalyticsTheme.colors.darkMutedText,
+  labelColor = chartAnalyticsTheme.colors.signalPrimary,
 }: ComparisonDividerProps) => {
   return (
     <div className="flex h-[62px] items-center justify-center gap-[26px]">
