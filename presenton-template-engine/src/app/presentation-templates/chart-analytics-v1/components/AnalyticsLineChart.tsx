@@ -12,7 +12,7 @@ import { chartAnalyticsTheme } from "../theme/tokens.ts";
 
 export type AnalyticsLineSeries = {
   label: string;
-  color: string;
+  color?: string;
   values: number[];
 };
 
@@ -71,7 +71,7 @@ const AnalyticsLineChart = ({
         data={data}
         margin={{ top: 18, right: 18, bottom: 2, left: 0 }}
       >
-        <CartesianGrid vertical={false} stroke="#F1F5F9" strokeWidth={1} />
+        <CartesianGrid vertical={false} stroke={chartAnalyticsTheme.colors.grid} strokeWidth={1} />
         <XAxis
           dataKey="label"
           axisLine={false}
@@ -79,7 +79,7 @@ const AnalyticsLineChart = ({
           interval="preserveStartEnd"
           minTickGap={18}
           height={34}
-          tick={{ fill: chartAnalyticsTheme.colors.subtleText, fontSize: 10, fontWeight: 500 }}
+          tick={{ fill: chartAnalyticsTheme.colors.textSubtle, fontSize: 10, fontWeight: 500 }}
         />
         <YAxis
           width={46}
@@ -88,19 +88,19 @@ const AnalyticsLineChart = ({
           axisLine={false}
           tickLine={false}
           tickFormatter={(value) => `${Number(value)}${tickSuffix}`}
-          tick={{ fill: chartAnalyticsTheme.colors.subtleText, fontSize: 10 }}
+          tick={{ fill: chartAnalyticsTheme.colors.textSubtle, fontSize: 10 }}
         />
         {showZeroLine ? (
-          <ReferenceLine y={0} stroke="#94A3B8" strokeDasharray="5 5" strokeWidth={1} />
+          <ReferenceLine y={0} stroke={chartAnalyticsTheme.colors.textMuted} strokeDasharray="5 5" strokeWidth={1} />
         ) : null}
-        {series.map((entry) => (
+        {series.map((entry, index) => (
           <Line
             key={entry.label}
             type="monotone"
             dataKey={entry.label}
-            stroke={entry.color}
+            stroke={entry.color ?? chartAnalyticsTheme.palette.chart[index % chartAnalyticsTheme.palette.chart.length]}
             strokeWidth={2.5}
-            dot={{ r: 2.5, strokeWidth: 1.5, fill: "#FFFFFF" }}
+            dot={{ r: 2.5, strokeWidth: 1.5, fill: chartAnalyticsTheme.colors.card }}
             activeDot={{ r: 5 }}
             isAnimationActive={false}
           />

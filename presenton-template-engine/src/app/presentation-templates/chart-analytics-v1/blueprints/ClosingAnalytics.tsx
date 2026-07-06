@@ -49,11 +49,19 @@ export const editableTextPriority = "high";
 
 
 const ClosingCallout = ({ label, value }: { label: string; value: string }) => (
-  <div className="min-w-0 rounded-[8px] border border-white/10 bg-white/[0.06] px-[24px] py-[18px] text-left">
-    <div className="text-[11px] font-bold uppercase leading-[1.2]" style={{ color: "#60A5FA" }}>
+  <div
+    className="min-w-0 rounded-[8px] border px-[24px] py-[18px] text-left"
+    style={{
+      backgroundColor: chartAnalyticsTheme.alpha.textInverse(0.06),
+      borderColor: chartAnalyticsTheme.alpha.textInverse(0.1),
+    }}
+  >
+    <div className="text-[11px] font-bold uppercase leading-[1.2]" style={{ color: chartAnalyticsTheme.colors.signalPrimary }}>
       {label}
     </div>
-    <div className="mt-[8px] truncate text-[18px] font-bold leading-[1.25] text-white">{value}</div>
+    <div className="mt-[8px] truncate text-[18px] font-bold leading-[1.25]" style={{ color: chartAnalyticsTheme.colors.textInverse }}>
+      {value}
+    </div>
   </div>
 );
 
@@ -75,13 +83,17 @@ const ClosingAnalytics = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
       <div className="relative z-10 flex h-full flex-col justify-center px-[68px] pb-[112px] pt-[116px]">
         <div className="max-w-[880px]">
           <div
-            className="text-[98px] font-black leading-none tracking-normal text-white"
-            style={{ fontFamily: chartAnalyticsTheme.fonts.display }}
+            className="text-[98px] font-black leading-none tracking-normal"
+            style={{ color: chartAnalyticsTheme.colors.textInverse, fontFamily: chartAnalyticsTheme.fonts.display }}
           >
             {parsed.headline}
           </div>
-          <div className="mt-[24px] text-[28px] font-light leading-[1.2] text-slate-100">{parsed.subtitle}</div>
-          <div className="mt-[18px] max-w-[720px] text-[17px] leading-[1.5] text-slate-400">{parsed.closingMessage}</div>
+          <div className="mt-[24px] text-[28px] font-light leading-[1.2]" style={{ color: chartAnalyticsTheme.colors.darkText }}>
+            {parsed.subtitle}
+          </div>
+          <div className="mt-[18px] max-w-[720px] text-[17px] leading-[1.5]" style={{ color: chartAnalyticsTheme.colors.darkMutedText }}>
+            {parsed.closingMessage}
+          </div>
         </div>
 
         <div className="mt-[42px] grid w-[760px] grid-cols-2 gap-[18px]">

@@ -31,7 +31,7 @@ const MilestoneSchema = z.object({
   title: z.string().min(2).max(34),
   description: z.string().min(8).max(170),
   icon: IconSchema.default("chart-column"),
-  color: z.string().min(3).max(64),
+  color: z.string().min(3).max(64).optional(),
 });
 
 const DEFAULT_MILESTONES: z.infer<typeof MilestoneSchema>[] = [
@@ -40,42 +40,36 @@ const DEFAULT_MILESTONES: z.infer<typeof MilestoneSchema>[] = [
     title: "Opening Window",
     description: "Use this milestone to introduce the starting condition, first catalyst, or earliest period in the timeline.",
     icon: "broadcast",
-    color: "#64748B",
   },
   {
     period: "Phase 2",
     title: "Formal Alignment",
     description: "Describe the agreement, policy shift, launch moment, or public commitment that reset the relationship.",
     icon: "users",
-    color: chartAnalyticsTheme.colors.primary,
   },
   {
     period: "Phase 3",
     title: "Institutional Build",
     description: "Capture the treaty, operating model, platform, or repeated mechanism that converted intent into structure.",
     icon: "file-signature",
-    color: chartAnalyticsTheme.colors.accentTeal,
   },
   {
     period: "Phase 4",
     title: "Strategic Expansion",
     description: "Summarize the period when cooperation, scale, or geographic reach broadened beyond the initial scope.",
     icon: "chart-line",
-    color: chartAnalyticsTheme.colors.accentIndigo,
   },
   {
     period: "Phase 5",
     title: "Pressure Point",
     description: "Use this card for a dispute, market shock, execution risk, or turning point that changed the trajectory.",
     icon: "shield",
-    color: "#E11D48",
   },
   {
     period: "Current",
     title: "New Equilibrium",
     description: "Close with the present operating balance, unresolved tension, next action window, or strategic implication.",
     icon: "gauge",
-    color: "#D97706",
   },
 ];
 

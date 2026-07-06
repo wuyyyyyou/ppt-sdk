@@ -24,8 +24,8 @@ const ExecutiveHeader = ({
   >
     <div className="min-w-0 flex-1">
       <div className="mb-[6px] flex items-center gap-[12px]">
-        <div className="h-[4px] w-[32px]" style={{ backgroundColor: chartAnalyticsTheme.colors.primary }} />
-        <div className="text-[12px] font-bold uppercase" style={{ color: "#60A5FA" }}>
+        <div className="h-[4px] w-[32px]" style={{ backgroundColor: chartAnalyticsTheme.colors.signalPrimary }} />
+        <div className="text-[12px] font-bold uppercase" style={{ color: chartAnalyticsTheme.colors.chart1 }}>
           {eyebrow}
         </div>
       </div>
@@ -36,7 +36,7 @@ const ExecutiveHeader = ({
 
     <div className="flex flex-none items-center gap-[16px] pl-[28px]">
       <div className="text-right">
-        <div className="text-[12px] font-medium uppercase" style={{ color: chartAnalyticsTheme.colors.mutedText }}>
+        <div className="text-[12px] font-medium uppercase" style={{ color: chartAnalyticsTheme.colors.textMuted }}>
           {metaLabel}
         </div>
         <div className="mt-[3px] text-[14px] font-semibold" style={{ color: chartAnalyticsTheme.colors.darkText }}>
@@ -45,9 +45,9 @@ const ExecutiveHeader = ({
       </div>
       <div
         className="flex h-[40px] w-[40px] items-center justify-center rounded-[8px]"
-        style={{ backgroundColor: chartAnalyticsTheme.colors.primary }}
+        style={{ backgroundColor: chartAnalyticsTheme.colors.signalPrimary }}
       >
-        <AnalyticsIcon name={icon} className="h-[22px] w-[22px]" stroke="#FFFFFF" />
+        <AnalyticsIcon name={icon} className="h-[22px] w-[22px]" stroke={chartAnalyticsTheme.colors.textInverse} />
       </div>
     </div>
   </div>

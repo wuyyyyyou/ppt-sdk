@@ -32,14 +32,14 @@ const RingEntitySchema = z.object({
   label: z.string().min(1).max(10),
   valueLabel: z.string().min(1).max(12),
   progress: z.number().min(0).max(100),
-  color: z.string().min(3).max(64),
+  color: z.string().min(3).max(64).optional(),
   emphasized: z.boolean().default(false),
 });
 
 const RingMetricSchema = z.object({
   category: z.string().min(2).max(32),
   title: z.string().min(2).max(40),
-  accentColor: z.string().min(3).max(64),
+  accentColor: z.string().min(3).max(64).optional(),
   icon: IconSchema.default("chart-column"),
   entities: z.array(RingEntitySchema).min(2).max(2),
   footerLabel: z.string().min(2).max(18),
@@ -56,18 +56,17 @@ const AdvantageItemSchema = z.object({
 const InsightItemSchema = z.object({
   label: z.string().min(1).max(18),
   text: z.string().min(8).max(180),
-  color: z.string().min(3).max(64),
+  color: z.string().min(3).max(64).optional(),
 });
 
 const DEFAULT_RING_METRICS: z.infer<typeof RingMetricSchema>[] = [
   {
     category: "Capability A",
     title: "Adoption Rate",
-    accentColor: chartAnalyticsTheme.colors.primary,
     icon: "robot",
     entities: [
-      { label: "A", valueLabel: "72%", progress: 72, color: chartAnalyticsTheme.colors.primary, emphasized: true },
-      { label: "B", valueLabel: "48%", progress: 48, color: chartAnalyticsTheme.colors.accentTeal, emphasized: false },
+      { label: "A", valueLabel: "72%", progress: 72, emphasized: true },
+      { label: "B", valueLabel: "48%", progress: 48, emphasized: false },
     ],
     footerLabel: "Gap",
     footerValue: "+24 pts",
@@ -75,11 +74,10 @@ const DEFAULT_RING_METRICS: z.infer<typeof RingMetricSchema>[] = [
   {
     category: "Investment",
     title: "R&D Intensity",
-    accentColor: chartAnalyticsTheme.colors.accentTeal,
     icon: "flask",
     entities: [
-      { label: "B", valueLabel: "64%", progress: 64, color: chartAnalyticsTheme.colors.accentTeal, emphasized: true },
-      { label: "A", valueLabel: "52%", progress: 52, color: chartAnalyticsTheme.colors.primary, emphasized: false },
+      { label: "B", valueLabel: "64%", progress: 64, emphasized: true },
+      { label: "A", valueLabel: "52%", progress: 52, emphasized: false },
     ],
     footerLabel: "Lead",
     footerValue: "Entity B",
@@ -87,11 +85,10 @@ const DEFAULT_RING_METRICS: z.infer<typeof RingMetricSchema>[] = [
   {
     category: "Infrastructure",
     title: "Network Scale",
-    accentColor: chartAnalyticsTheme.colors.primary,
     icon: "broadcast",
     entities: [
-      { label: "A", valueLabel: "88", progress: 88, color: chartAnalyticsTheme.colors.primary, emphasized: true },
-      { label: "B", valueLabel: "34", progress: 34, color: chartAnalyticsTheme.colors.accentTeal, emphasized: false },
+      { label: "A", valueLabel: "88", progress: 88, emphasized: true },
+      { label: "B", valueLabel: "34", progress: 34, emphasized: false },
     ],
     footerLabel: "Scale",
     footerValue: "2.6x",
@@ -99,11 +96,10 @@ const DEFAULT_RING_METRICS: z.infer<typeof RingMetricSchema>[] = [
   {
     category: "Output",
     title: "Patent Volume",
-    accentColor: "#94A3B8",
     icon: "file-signature",
     entities: [
-      { label: "A", valueLabel: "69k", progress: 74, color: chartAnalyticsTheme.colors.primary, emphasized: true },
-      { label: "B", valueLabel: "48k", progress: 56, color: chartAnalyticsTheme.colors.accentTeal, emphasized: false },
+      { label: "A", valueLabel: "69k", progress: 74, emphasized: true },
+      { label: "B", valueLabel: "48k", progress: 56, emphasized: false },
     ],
     footerLabel: "Volume",
     footerValue: "A Lead",
@@ -126,9 +122,9 @@ export const Schema = z.object({
   ringMetrics: z.array(RingMetricSchema).min(4).max(4).default(DEFAULT_RING_METRICS),
   advantageTitle: z.string().min(2).max(52).default("Sector Dominance Analysis"),
   advantageLeftLabel: z.string().min(2).max(24).default("Entity A Advantage"),
-  advantageLeftColor: z.string().min(3).max(64).default(chartAnalyticsTheme.colors.primary),
+  advantageLeftColor: z.string().min(3).max(64).optional(),
   advantageRightLabel: z.string().min(2).max(24).default("Entity B Advantage"),
-  advantageRightColor: z.string().min(3).max(64).default(chartAnalyticsTheme.colors.accentTeal),
+  advantageRightColor: z.string().min(3).max(64).optional(),
   advantageItems: z.array(AdvantageItemSchema).min(3).max(5).default(DEFAULT_ADVANTAGE_ITEMS),
   insightEyebrow: z.string().min(2).max(32).default("Strategic Divergence"),
   insightHeadline: z.string().min(2).max(44).default("Speed vs. Precision"),
@@ -137,19 +133,17 @@ export const Schema = z.object({
     {
       label: "Entity A",
       text: "Deploy-first operating model scales digital capabilities quickly and iterates through broad user feedback loops.",
-      color: chartAnalyticsTheme.colors.primary,
     },
     {
       label: "Entity B",
       text: "Quality-first engineering concentrates advantage in precision components, standards, and upstream supply-chain roles.",
-      color: chartAnalyticsTheme.colors.accentTeal,
     },
   ]),
   statLabel: z.string().min(2).max(28).default("Startup Momentum"),
   statValue: z.string().min(1).max(24).default("300+ vs 10+"),
   statBadge: z.string().min(2).max(16).default("A Lead"),
-  statBadgeColor: z.string().min(3).max(64).default("#2563EB"),
-  statBadgeBackground: z.string().min(3).max(64).default("#EFF6FF"),
+  statBadgeColor: z.string().min(3).max(64).optional(),
+  statBadgeBackground: z.string().min(3).max(64).optional(),
   sourceNote: z.string().min(2).max(140).default("Sources: public reports and company filings"),
   slideLabel: z.string().min(2).max(18).default("SLIDE 08"),
 });
@@ -184,7 +178,7 @@ const TechnologyCapabilityDashboard = ({ data }: { data: Partial<z.infer<typeof 
         icon={parsed.headerIcon}
       />
 
-      <div className="flex h-[620px] flex-col gap-[20px] px-[48px] py-[24px]" style={{ backgroundColor: "#F8FAFC" }}>
+      <div className="flex h-[620px] flex-col gap-[20px] px-[48px] py-[24px]" style={{ backgroundColor: chartAnalyticsTheme.colors.surface }}>
         <div className="grid h-[214px] grid-cols-4 gap-[24px]">
           {parsed.ringMetrics.map((metric) => (
             <CircularComparisonMetricCard key={metric.title} {...metric} />

@@ -19,22 +19,19 @@
       "label": "Primary Signal",
       "value": "Command center",
       "description": "The visual establishes a high-density monitoring environment with strong executive-report tone.",
-      "icon": "binoculars",
-      "accentColor": "#2563EB"
+      "icon": "binoculars"
     },
     {
       "label": "Audience Task",
       "value": "Inspect first",
       "description": "The layout gives the image most of the canvas so stakeholders can read the asset directly.",
-      "icon": "grid",
-      "accentColor": "#14B8A6"
+      "icon": "grid"
     },
     {
       "label": "Traceability",
       "value": "Source retained",
       "description": "Caption and footer preserve asset provenance without turning the page into a citation block.",
-      "icon": "file-signature",
-      "accentColor": "#4F46E5"
+      "icon": "file-signature"
     }
   ],
   "tags": ["Evidence", "Screenshot", "Context"],

@@ -42,7 +42,7 @@ const ObservationSchema = z.object({
   value: z.string().min(1).max(34),
   description: z.string().min(6).max(110),
   icon: IconSchema.default("grid"),
-  accentColor: z.string().min(3).max(64).default(chartAnalyticsTheme.colors.primary),
+  accentColor: z.string().min(3).max(64).optional(),
 });
 
 const DEFAULT_OBSERVATIONS: z.infer<typeof ObservationSchema>[] = [
@@ -51,21 +51,18 @@ const DEFAULT_OBSERVATIONS: z.infer<typeof ObservationSchema>[] = [
     value: "Single Image",
     description: "Use one strong photo, screenshot, map, or research visual as the main evidence.",
     icon: "grid",
-    accentColor: chartAnalyticsTheme.colors.primary,
   },
   {
     label: "Reading Path",
     value: "Fast Scan",
     description: "Keep supporting notes short so the audience inspects the image first.",
     icon: "binoculars",
-    accentColor: chartAnalyticsTheme.colors.accentTeal,
   },
   {
     label: "Evidence Credit",
     value: "Traceable",
     description: "Preserve image source, credit, or collection note without crowding the page.",
     icon: "file-signature",
-    accentColor: chartAnalyticsTheme.colors.accentIndigo,
   },
 ];
 
@@ -115,6 +112,10 @@ export const editableTextPriority = "medium";
 
 const ImageEvidenceShowcase = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
   const parsed = readTemplateData(Schema, data);
+  const observations = parsed.observations.map((item, index) => ({
+    ...item,
+    accentColor: item.accentColor ?? chartAnalyticsTheme.palette.chart[index % chartAnalyticsTheme.palette.chart.length],
+  }));
 
   return (
     <AnalyticsCanvas variant="light">
@@ -125,12 +126,12 @@ const ImageEvidenceShowcase = ({ data }: { data: Partial<z.infer<typeof Schema>>
         metaValue={parsed.headerMetaValue}
         icon={parsed.headerIcon}
       />
-      <div className="h-[4px] w-full" style={{ backgroundColor: chartAnalyticsTheme.colors.primary }} />
+      <div className="h-[4px] w-full" style={{ backgroundColor: chartAnalyticsTheme.colors.signalPrimary }} />
 
       <div className="grid h-[578px] grid-cols-[minmax(0,812px)_332px] gap-[24px] px-[48px] py-[28px]">
         <AnalyticsImageShowcasePanel image={parsed.image as AnalyticsShowcaseImage} captionMaxLines={2} sourceMaxLines={1} />
 
-        <AnalyticsCardShell accentColor={chartAnalyticsTheme.colors.accentTeal} padding={22}>
+        <AnalyticsCardShell accentColor={chartAnalyticsTheme.colors.signalSecondary} padding={22}>
           <div className="flex h-full min-h-0 flex-col">
             <div className="flex-none">
               <div className="mb-[10px] flex flex-wrap gap-[8px]">
@@ -138,34 +139,34 @@ const ImageEvidenceShowcase = ({ data }: { data: Partial<z.infer<typeof Schema>>
                   <span
                     key={tag}
                     className="rounded-[999px] px-[9px] py-[4px] text-[10px] font-bold uppercase"
-                    style={{ backgroundColor: "#EFF6FF", color: chartAnalyticsTheme.colors.primary }}
+                    style={{ backgroundColor: chartAnalyticsTheme.colors.signalPrimaryTint, color: chartAnalyticsTheme.colors.signalPrimary }}
                   >
                     {tag}
                   </span>
                 ))}
               </div>
-              <h2 className="m-0 text-[24px] font-bold leading-[1.15]" style={{ color: "#0F172A" }}>
+              <h2 className="m-0 text-[24px] font-bold leading-[1.15]" style={{ color: chartAnalyticsTheme.colors.textPrimary }}>
                 {parsed.insightTitle}
               </h2>
               <p
                 data-validation-role="multi-line-body-text"
                 className="m-0 mt-[10px] text-[13px] leading-[1.45]"
-                style={{ color: "#475569" }}
+                style={{ color: chartAnalyticsTheme.colors.textSubtle }}
               >
                 {parsed.insightSummary}
               </p>
             </div>
 
             <div className="mt-[18px] flex min-h-0 flex-1 flex-col gap-[12px]">
-              {parsed.observations.map((item) => (
+              {observations.map((item) => (
                 <div
                   key={`${item.label}-${item.value}`}
                   className="flex min-h-0 flex-1 gap-[12px] rounded-[8px] border p-[12px]"
-                  style={{ borderColor: chartAnalyticsTheme.colors.stroke, backgroundColor: "#F8FAFC" }}
+                  style={{ borderColor: chartAnalyticsTheme.colors.stroke, backgroundColor: chartAnalyticsTheme.colors.surface }}
                 >
                   <div
                     className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[8px]"
-                    style={{ backgroundColor: "#FFFFFF", color: item.accentColor }}
+                    style={{ backgroundColor: chartAnalyticsTheme.colors.card, color: item.accentColor }}
                   >
                     <AnalyticsIcon name={item.icon} className="h-[18px] w-[18px]" stroke={item.accentColor} />
                   </div>
@@ -173,13 +174,13 @@ const ImageEvidenceShowcase = ({ data }: { data: Partial<z.infer<typeof Schema>>
                     <div className="text-[10px] font-bold uppercase leading-[1.2]" style={{ color: item.accentColor }}>
                       {item.label}
                     </div>
-                    <div className="mt-[3px] truncate text-[16px] font-bold leading-[1.15]" style={{ color: "#0F172A" }}>
+                    <div className="mt-[3px] truncate text-[16px] font-bold leading-[1.15]" style={{ color: chartAnalyticsTheme.colors.textPrimary }}>
                       {item.value}
                     </div>
                     <div
                       data-validation-role="multi-line-body-text"
                       className="mt-[5px] max-h-[34px] overflow-hidden text-[11px] leading-[1.45]"
-                      style={{ color: "#64748B" }}
+                      style={{ color: chartAnalyticsTheme.colors.textMuted }}
                     >
                       {item.description}
                     </div>

@@ -8,7 +8,7 @@ import ProgressMeter from "./ProgressMeter.tsx";
 type TimelineItem = {
   period: string;
   text: string;
-  color: string;
+  color?: string;
 };
 
 type OutlookPanelProps = {
@@ -18,7 +18,7 @@ type OutlookPanelProps = {
   progressLabel: string;
   progressValueLabel: string;
   progressValue: number;
-  progressColor: string;
+  progressColor?: string;
 };
 
 const OutlookPanel = ({
@@ -29,46 +29,54 @@ const OutlookPanel = ({
   progressValueLabel,
   progressValue,
   progressColor,
-}: OutlookPanelProps) => (
+}: OutlookPanelProps) => {
+  const resolvedProgressColor = progressColor ?? chartAnalyticsTheme.colors.signalSuccess;
+
+  return (
   <AnalyticsCardShell dark padding={24}>
-    <div className="mb-[18px] flex items-center gap-[9px] border-b pb-[14px]" style={{ borderColor: "#334155" }}>
-      <AnalyticsIcon name={icon} className="h-[18px] w-[18px]" stroke="#60A5FA" />
+    <div className="mb-[18px] flex items-center gap-[9px] border-b pb-[14px]" style={{ borderColor: chartAnalyticsTheme.colors.darkBorder }}>
+      <AnalyticsIcon name={icon} className="h-[18px] w-[18px]" stroke={chartAnalyticsTheme.colors.chart1} />
       <h3 className="m-0 text-[13px] font-bold uppercase" style={{ color: chartAnalyticsTheme.colors.darkText }}>
         {title}
       </h3>
     </div>
 
     <div className="grid gap-[18px]">
-      {timelineItems.map((item) => (
-        <div key={item.period} className="border-l-[2px] pl-[14px]" style={{ borderColor: item.color }}>
-          <div className="text-[12px] font-bold" style={{ color: item.color }}>
+      {timelineItems.map((item, index) => {
+        const itemColor = item.color ?? chartAnalyticsTheme.palette.chart[index % chartAnalyticsTheme.palette.chart.length];
+
+        return (
+        <div key={item.period} className="border-l-[2px] pl-[14px]" style={{ borderColor: itemColor }}>
+          <div className="text-[12px] font-bold" style={{ color: itemColor }}>
             {item.period}
           </div>
           <div className="mt-[5px] text-[14px] font-medium leading-[1.25]" style={{ color: chartAnalyticsTheme.colors.darkText }}>
             {item.text}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
 
-    <div className="mt-auto border-t pt-[16px]" style={{ borderColor: "#334155" }}>
+    <div className="mt-auto border-t pt-[16px]" style={{ borderColor: chartAnalyticsTheme.colors.darkBorder }}>
       <div className="flex justify-between gap-[12px] text-[12px]">
         <span className="truncate" style={{ color: chartAnalyticsTheme.colors.darkMutedText }}>
           {progressLabel}
         </span>
-        <span className="flex-none font-bold" style={{ color: progressColor }}>
+        <span className="flex-none font-bold" style={{ color: resolvedProgressColor }}>
           {progressValueLabel}
         </span>
       </div>
       <div className="mt-[8px]">
-        <ProgressMeter value={progressValue} color={progressColor} backgroundColor="#334155" height={6} />
+        <ProgressMeter value={progressValue} color={resolvedProgressColor} backgroundColor={chartAnalyticsTheme.colors.darkBorder} height={6} />
       </div>
     </div>
 
     <div className="pointer-events-none absolute bottom-[-28px] right-[-24px] opacity-[0.08]">
-      <AnalyticsIcon name="chart-line" className="h-[128px] w-[128px]" stroke="#FFFFFF" />
+      <AnalyticsIcon name="chart-line" className="h-[128px] w-[128px]" stroke={chartAnalyticsTheme.colors.textInverse} />
     </div>
   </AnalyticsCardShell>
-);
+  );
+};
 
 export default OutlookPanel;

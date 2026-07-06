@@ -9,43 +9,37 @@
       "period": "1860s",
       "title": "Modernization",
       "description": "Meiji Restoration sparks large-scale trade. Cultural exchange grows alongside modernization efforts.",
-      "icon": "broadcast",
-      "color": "#64748B"
+      "icon": "broadcast"
     },
     {
       "period": "1972",
       "title": "Normalization",
       "description": "Joint Communique establishes diplomatic ties and introduces the One China policy framework.",
-      "icon": "users",
-      "color": "#2563EB"
+      "icon": "users"
     },
     {
       "period": "1978",
       "title": "Peace Treaty",
       "description": "Peace and Friendship Treaty is signed. Japanese ODA and investment into China begin to scale.",
-      "icon": "file-signature",
-      "color": "#14B8A6"
+      "icon": "file-signature"
     },
     {
       "period": "2008",
       "title": "Strategic Ties",
       "description": "Mutually beneficial relationship is established with focus on East China Sea resource cooperation.",
-      "icon": "chart-line",
-      "color": "#4F46E5"
+      "icon": "chart-line"
     },
     {
       "period": "2012",
       "title": "High Tensions",
       "description": "Island disputes escalate, triggering protests and temporarily freezing parts of trade relations.",
-      "icon": "shield",
-      "color": "#E11D48"
+      "icon": "shield"
     },
     {
       "period": "2020s",
       "title": "Eco Security",
       "description": "Hot economics, cold politics: deep integration persists alongside supply chain de-risking.",
-      "icon": "gauge",
-      "color": "#D97706"
+      "icon": "gauge"
     }
   ],
   "footerSource": "Sources: MOFA Japan, Nippon.com history of relations, CSIS",

@@ -33,16 +33,16 @@ const TrendCardSchema = z.object({
   subject: z.string().min(2).max(28),
   symbol: z.string().max(8).optional(),
   statusLabel: z.string().min(2).max(18),
-  statusColor: z.string().min(3).max(64),
-  statusBackground: z.string().min(3).max(64),
-  accentColor: z.string().min(3).max(64),
+  statusColor: z.string().min(3).max(64).optional(),
+  statusBackground: z.string().min(3).max(64).optional(),
+  accentColor: z.string().min(3).max(64).optional(),
   metrics: z.array(MetricSchema).min(2).max(2),
   narrative: z.string().min(12).max(170),
 });
 
 const ChartSeriesSchema = z.object({
   label: z.string().min(2).max(24),
-  color: z.string().min(3).max(64),
+  color: z.string().min(3).max(64).optional(),
   values: z.array(z.number().finite()).min(2).max(40),
 });
 
@@ -51,9 +51,6 @@ const DEFAULT_TREND_CARDS: z.infer<typeof TrendCardSchema>[] = [
     subject: "Entity A",
     symbol: "A",
     statusLabel: "High Beta",
-    statusColor: chartAnalyticsTheme.colors.primary,
-    statusBackground: "#EFF6FF",
-    accentColor: chartAnalyticsTheme.colors.primary,
     metrics: [
       { label: "Peak Growth", value: "18.0%", note: "'70" },
       { label: "Recent Avg", value: "~5.0%" },
@@ -64,9 +61,6 @@ const DEFAULT_TREND_CARDS: z.infer<typeof TrendCardSchema>[] = [
     subject: "Entity B",
     symbol: "B",
     statusLabel: "Mature",
-    statusColor: "#0D9488",
-    statusBackground: "#F0FDFA",
-    accentColor: chartAnalyticsTheme.colors.accentTeal,
     metrics: [
       { label: "Peak Growth", value: "12.5%", note: "'68" },
       { label: "Recent Avg", value: "~1.0%" },
@@ -94,8 +88,8 @@ export const Schema = z.object({
   chartSubtitle: z.string().min(4).max(110).default("Comparing historical volatility and stabilization across two entities"),
   chartLabels: z.array(z.string().min(1).max(12)).min(2).max(40).default(["1965", "1975", "1985", "1995", "2005", "2015", "2024"]),
   chartSeries: z.array(ChartSeriesSchema).min(1).max(3).default([
-    { label: "Entity A", color: chartAnalyticsTheme.colors.primary, values: [17, 9, 13, 11, 10, 7, 5] },
-    { label: "Entity B", color: chartAnalyticsTheme.colors.accentTeal, values: [6, 3, 5, 2, 2, 1.6, 0.9] },
+    { label: "Entity A", values: [17, 9, 13, 11, 10, 7, 5] },
+    { label: "Entity B", values: [6, 3, 5, 2, 2, 1.6, 0.9] },
   ]),
   minValue: z.number().default(-30),
   maxValue: z.number().default(25),
@@ -173,7 +167,7 @@ const GrowthTrendComparison = ({ data }: { data: Partial<z.infer<typeof Schema>>
                   height={378}
                 />
               </div>
-              <div className="flex-none pt-[8px] text-right text-[10px] leading-[1.2]" style={{ color: chartAnalyticsTheme.colors.mutedText }}>
+              <div className="flex-none pt-[8px] text-right text-[10px] leading-[1.2]" style={{ color: chartAnalyticsTheme.colors.textMuted }}>
                 {parsed.sourceNote}
               </div>
             </div>

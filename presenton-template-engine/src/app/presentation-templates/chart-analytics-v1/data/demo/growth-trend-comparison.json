@@ -9,9 +9,6 @@
       "subject": "China",
       "symbol": "CN",
       "statusLabel": "High Beta",
-      "statusColor": "#2563EB",
-      "statusBackground": "#EFF6FF",
-      "accentColor": "#2563EB",
       "metrics": [
         {
           "label": "Peak Growth",
@@ -29,9 +26,6 @@
       "subject": "Japan",
       "symbol": "JP",
       "statusLabel": "Mature",
-      "statusColor": "#0D9488",
-      "statusBackground": "#F0FDFA",
-      "accentColor": "#14B8A6",
       "metrics": [
         {
           "label": "Peak Growth",
@@ -90,7 +84,6 @@
   "chartSeries": [
     {
       "label": "China",
-      "color": "#2563EB",
       "values": [
         -27.3,
         10.3,
@@ -129,7 +122,6 @@
     },
     {
       "label": "Japan",
-      "color": "#14B8A6",
       "values": [
         12.0,
         8.5,

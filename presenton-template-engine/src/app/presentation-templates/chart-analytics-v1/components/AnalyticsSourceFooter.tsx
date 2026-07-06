@@ -19,7 +19,7 @@ const AnalyticsSourceFooter = ({
   confidentialityLabel,
   height = 38,
   padded = true,
-  backgroundColor = "#FFFFFF",
+  backgroundColor = chartAnalyticsTheme.colors.card,
 }: AnalyticsSourceFooterProps) => {
   const resolvedSlideLabel = slideLabel ?? (pageNumber ? `SLIDE ${pageNumber}` : undefined);
 
@@ -30,12 +30,12 @@ const AnalyticsSourceFooter = ({
         height,
         backgroundColor,
         borderColor: chartAnalyticsTheme.colors.stroke,
-        color: chartAnalyticsTheme.colors.mutedText,
+        color: chartAnalyticsTheme.colors.textMuted,
       }}
     >
       <div className="min-w-0 truncate">{source}</div>
       {resolvedSlideLabel || confidentialityLabel ? (
-        <div className="flex flex-none items-center gap-[18px] pl-[20px]" style={{ color: chartAnalyticsTheme.colors.subtleText }}>
+        <div className="flex flex-none items-center gap-[18px] pl-[20px]" style={{ color: chartAnalyticsTheme.colors.textSubtle }}>
           {confidentialityLabel ? <span>{confidentialityLabel}</span> : null}
           {resolvedSlideLabel ? <span className="font-bold">{resolvedSlideLabel}</span> : null}
         </div>

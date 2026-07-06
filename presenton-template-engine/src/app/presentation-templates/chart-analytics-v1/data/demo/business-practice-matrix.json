@@ -9,15 +9,11 @@
     {
       "name": "China",
       "tagline": "Speed & Pragmatism",
-      "accentColor": "#2563EB",
-      "tintColor": "#EFF6FF",
       "icon": "chart-line"
     },
     {
       "name": "Japan",
       "tagline": "Quality & Consensus",
-      "accentColor": "#14B8A6",
-      "tintColor": "#F0FDFA",
       "icon": "scale"
     }
   ],
@@ -96,6 +92,5 @@
   "implicationLabel": "Implication",
   "implicationText": "Innovation requires distinct styles: agile pilots for China, rigorous validation for Japan.",
   "implicationIcon": "bolt",
-  "implicationAccentColor": "#8B5CF6",
   "slideLabel": "SLIDE 09"
 }

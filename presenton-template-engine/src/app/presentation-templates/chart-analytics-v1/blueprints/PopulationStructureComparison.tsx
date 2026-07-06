@@ -24,20 +24,20 @@ const IconSchema = z.enum([
 const SegmentSchema = z.object({
   label: z.string().min(1).max(24),
   value: z.number().min(0).max(100),
-  color: z.string().min(3).max(64),
+  color: z.string().min(3).max(64).optional(),
 });
 
 const LegendItemSchema = z.object({
   label: z.string().min(1).max(24),
-  color: z.string().min(3).max(64),
+  color: z.string().min(3).max(64).optional(),
 });
 
 const EntitySchema = z.object({
   name: z.string().min(2).max(28),
   symbol: z.string().min(1).max(6),
   statusLabel: z.string().min(2).max(30),
-  accentColor: z.string().min(3).max(64),
-  symbolTint: z.string().min(3).max(64),
+  accentColor: z.string().min(3).max(64).optional(),
+  symbolTint: z.string().min(3).max(64).optional(),
   totalValue: z.string().min(1).max(16),
   totalLabel: z.string().min(2).max(20),
   centerMetricLabel: z.string().min(2).max(24),
@@ -46,15 +46,15 @@ const EntitySchema = z.object({
   footerLabel: z.string().min(2).max(32),
   footerValue: z.string().min(1).max(12),
   footerSuffix: z.string().max(6).optional(),
-  footerTint: z.string().min(3).max(64),
-  footerTextColor: z.string().min(3).max(64),
+  footerTint: z.string().min(3).max(64).optional(),
+  footerTextColor: z.string().min(3).max(64).optional(),
   footerIcon: IconSchema.default("users"),
 });
 
 const DEFAULT_LEGEND_ITEMS: z.infer<typeof LegendItemSchema>[] = [
-  { label: "Segment A", color: "#CBD5E1" },
-  { label: "Segment B", color: "#475569" },
-  { label: "Segment C", color: "#F43F5E" },
+  { label: "Segment A" },
+  { label: "Segment B" },
+  { label: "Segment C" },
 ];
 
 const DEFAULT_ENTITIES: z.infer<typeof EntitySchema>[] = [
@@ -62,44 +62,36 @@ const DEFAULT_ENTITIES: z.infer<typeof EntitySchema>[] = [
     name: "Entity A",
     symbol: "A",
     statusLabel: "Maturing Structure",
-    accentColor: chartAnalyticsTheme.colors.primary,
-    symbolTint: "#EFF6FF",
     totalValue: "1.20B",
     totalLabel: "Total Base",
     centerMetricLabel: "Median",
     centerMetricValue: "39.5",
     segments: [
-      { label: "Segment A", value: 17, color: "#CBD5E1" },
-      { label: "Segment B", value: 68, color: "#475569" },
-      { label: "Segment C", value: 15, color: "#F43F5E" },
+      { label: "Segment A", value: 17 },
+      { label: "Segment B", value: 68 },
+      { label: "Segment C", value: 15 },
     ],
     footerLabel: "Dependency Ratio",
     footerValue: "22.5",
     footerSuffix: "%",
-    footerTint: "#EFF6FF",
-    footerTextColor: "#1E40AF",
     footerIcon: "users",
   },
   {
     name: "Entity B",
     symbol: "B",
     statusLabel: "Advanced Structure",
-    accentColor: "#F43F5E",
-    symbolTint: "#FFF1F2",
     totalValue: "125M",
     totalLabel: "Total Base",
     centerMetricLabel: "Median",
     centerMetricValue: "49.5",
     segments: [
-      { label: "Segment A", value: 11, color: "#CBD5E1" },
-      { label: "Segment B", value: 59, color: "#475569" },
-      { label: "Segment C", value: 30, color: "#F43F5E" },
+      { label: "Segment A", value: 11 },
+      { label: "Segment B", value: 59 },
+      { label: "Segment C", value: 30 },
     ],
     footerLabel: "Dependency Ratio",
     footerValue: "54.2",
     footerSuffix: "%",
-    footerTint: "#FFF1F2",
-    footerTextColor: "#9F1239",
     footerIcon: "users",
   },
 ];
@@ -135,6 +127,13 @@ export const editableTextPriority = "high";
 
 const PopulationStructureComparison = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
   const parsed = readTemplateData(Schema, data);
+  const entities = parsed.entities.map((entity, index) => ({
+    ...entity,
+    accentColor: entity.accentColor ?? (index === 0 ? chartAnalyticsTheme.colors.entityPrimary : chartAnalyticsTheme.colors.signalRisk),
+    symbolTint: entity.symbolTint ?? (index === 0 ? chartAnalyticsTheme.colors.entityPrimaryTint : chartAnalyticsTheme.colors.signalRiskTint),
+    footerTint: entity.footerTint ?? (index === 0 ? chartAnalyticsTheme.colors.entityPrimaryTint : chartAnalyticsTheme.colors.signalRiskTint),
+    footerTextColor: entity.footerTextColor ?? (index === 0 ? chartAnalyticsTheme.colors.entityPrimary : chartAnalyticsTheme.colors.signalRisk),
+  }));
 
   return (
     <AnalyticsCanvas variant="light">
@@ -152,7 +151,7 @@ const PopulationStructureComparison = ({ data }: { data: Partial<z.infer<typeof 
         </div>
 
         <div className="mt-[24px] grid min-h-0 flex-1 grid-cols-2 gap-[40px]">
-          {parsed.entities.map((entity) => (
+          {entities.map((entity) => (
             <StructureComparisonCard key={entity.name} entity={entity as StructureComparisonCardData} />
           ))}
         </div>

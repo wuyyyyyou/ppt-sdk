@@ -13,8 +13,8 @@ const clamp = (value: number) => Math.max(0, Math.min(100, Number.isFinite(value
 
 const ProgressMeter = ({
   value,
-  color = chartAnalyticsTheme.colors.primary,
-  backgroundColor = "#F1F5F9",
+  color = chartAnalyticsTheme.colors.signalPrimary,
+  backgroundColor = chartAnalyticsTheme.colors.strokeSoft,
   height = 8,
 }: ProgressMeterProps) => (
   <div className="w-full overflow-hidden rounded-full" style={{ height, backgroundColor }}>

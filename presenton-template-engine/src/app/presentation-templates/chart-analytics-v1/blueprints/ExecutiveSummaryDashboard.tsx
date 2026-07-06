@@ -27,27 +27,27 @@ const ProgressItemSchema = z.object({
   label: z.string().min(2).max(32),
   valueLabel: z.string().min(1).max(18),
   value: z.number().min(0).max(100),
-  color: z.string().min(3).max(64),
+  color: z.string().min(3).max(64).optional(),
 });
 
 const ValueTileSchema = z.object({
   label: z.string().min(2).max(18),
   value: z.string().min(1).max(18),
   note: z.string().min(2).max(32),
-  tint: z.string().min(3).max(64),
-  labelColor: z.string().min(3).max(64),
+  tint: z.string().min(3).max(64).optional(),
+  labelColor: z.string().min(3).max(64).optional(),
 });
 
 const StatusItemSchema = z.object({
   title: z.string().min(2).max(28),
   description: z.string().min(2).max(42),
   badge: z.string().min(2).max(16),
-  badgeColor: z.string().min(3).max(64),
-  badgeBackground: z.string().min(3).max(64),
+  badgeColor: z.string().min(3).max(64).optional(),
+  badgeBackground: z.string().min(3).max(64).optional(),
 });
 
 const MetricCardSchema = z.object({
-  accentColor: z.string().min(3).max(64),
+  accentColor: z.string().min(3).max(64).optional(),
   icon: IconSchema.default("chart-column"),
   label: z.string().min(2).max(32),
   value: z.string().min(1).max(18),
@@ -59,7 +59,7 @@ const MetricCardSchema = z.object({
 
 const ChartSeriesSchema = z.object({
   label: z.string().min(2).max(24),
-  color: z.string().min(3).max(64),
+  color: z.string().min(3).max(64).optional(),
   values: z.array(z.number().finite()).min(2).max(6),
 });
 
@@ -67,45 +67,42 @@ const ChartInsightSchema = z.object({
   icon: IconSchema.default("bolt"),
   title: z.string().min(2).max(24),
   description: z.string().min(8).max(120),
-  color: z.string().min(3).max(64),
-  tint: z.string().min(3).max(64),
+  color: z.string().min(3).max(64).optional(),
+  tint: z.string().min(3).max(64).optional(),
 });
 
 const TimelineItemSchema = z.object({
   period: z.string().min(2).max(18),
   text: z.string().min(8).max(96),
-  color: z.string().min(3).max(64),
+  color: z.string().min(3).max(64).optional(),
 });
 
 const DEFAULT_METRIC_CARDS: z.infer<typeof MetricCardSchema>[] = [
   {
-    accentColor: chartAnalyticsTheme.colors.primary,
     icon: "scale",
     label: "Economic Scale Gap",
     value: "4.6x",
     qualifier: "China Larger",
     progressItems: [
-      { label: "China ($20.65T)", valueLabel: "82%", value: 82, color: chartAnalyticsTheme.colors.primary },
-      { label: "Japan ($4.46T)", valueLabel: "18%", value: 18, color: "#94A3B8" },
+      { label: "China ($20.65T)", valueLabel: "82%", value: 82 },
+      { label: "Japan ($4.46T)", valueLabel: "18%", value: 18 },
     ],
     valueTiles: [],
     statusItems: [],
   },
   {
-    accentColor: chartAnalyticsTheme.colors.accentTeal,
     icon: "wallet",
     label: "Per Capita Income",
     value: "2.5x",
     qualifier: "Japan Lead",
     progressItems: [],
     valueTiles: [
-      { label: "Japan", value: "$34K", note: "High income", tint: "#F0FDFA", labelColor: "#0D9488" },
-      { label: "China", value: "$14K", note: "Upper middle", tint: "#F8FAFC", labelColor: "#64748B" },
+      { label: "Japan", value: "$34K", note: "High income" },
+      { label: "China", value: "$14K", note: "Upper middle" },
     ],
     statusItems: [],
   },
   {
-    accentColor: chartAnalyticsTheme.colors.accentIndigo,
     icon: "users",
     label: "Aging Crisis",
     value: "65+",
@@ -117,15 +114,11 @@ const DEFAULT_METRIC_CARDS: z.infer<typeof MetricCardSchema>[] = [
         title: "Japan Status",
         description: "Super-aged society",
         badge: "Critical",
-        badgeColor: "#4338CA",
-        badgeBackground: "#E0E7FF",
       },
       {
         title: "China Trend",
         description: "Births < 8M (2025)",
         badge: "Declining",
-        badgeColor: "#DC2626",
-        badgeBackground: "#FEE2E2",
       },
     ],
   },
@@ -142,8 +135,8 @@ export const Schema = z.object({
   chartSubtitle: z.string().min(4).max(96).default("Comparison of adoption rates and strategic focus areas"),
   chartLabels: z.array(z.string().min(1).max(18)).min(2).max(6).default(["AI Usage", "Mobile Payment", "5G Adoption", "R&D % GDP"]),
   chartSeries: z.array(ChartSeriesSchema).min(1).max(3).default([
-    { label: "China", color: chartAnalyticsTheme.colors.primary, values: [81, 92, 75, 2.4] },
-    { label: "Japan", color: "#CBD5E1", values: [26.7, 45, 50, 3.3] },
+    { label: "China", values: [81, 92, 75, 2.4] },
+    { label: "Japan", values: [26.7, 45, 50, 3.3] },
   ]),
   minValue: z.number().default(0),
   maxValue: z.number().default(100),
@@ -154,15 +147,11 @@ export const Schema = z.object({
       icon: "bolt",
       title: "China Speed",
       description: "Rapid deployment model drives broad AI adoption and faster commercial rollout.",
-      color: chartAnalyticsTheme.colors.primary,
-      tint: "#EFF6FF",
     },
     {
       icon: "shield",
       title: "Japan Trust",
       description: "Reliability, safety standards, and social consensus shape the adoption pace.",
-      color: "#475569",
-      tint: "#F1F5F9",
     },
   ]),
   outlookTitle: z.string().min(2).max(28).default("Future Outlook"),
@@ -171,18 +160,16 @@ export const Schema = z.object({
     {
       period: "2026-2028",
       text: "China growth normalization vs Japan structural reforms.",
-      color: "#60A5FA",
     },
     {
       period: "2028-2030",
       text: "AI impact on productivity to offset labor shrinkage.",
-      color: "#64748B",
     },
   ]),
   progressLabel: z.string().min(2).max(32).default("Trade Interdependence"),
   progressValueLabel: z.string().min(2).max(18).default("High"),
   progressValue: z.number().min(0).max(100).default(85),
-  progressColor: z.string().min(3).max(64).default("#22C55E"),
+  progressColor: z.string().min(3).max(64).optional(),
 });
 
 export const layoutId = "executive-summary-dashboard";
@@ -214,7 +201,7 @@ const ExecutiveSummaryDashboard = ({ data }: { data: Partial<z.infer<typeof Sche
         metaValue={parsed.headerMetaValue}
         icon={parsed.headerIcon}
       />
-      <div className="h-[4px] w-full" style={{ backgroundColor: chartAnalyticsTheme.colors.primary }} />
+      <div className="h-[4px] w-full" style={{ backgroundColor: chartAnalyticsTheme.colors.signalPrimary }} />
 
       <div className="grid h-[616px] w-full grid-cols-3 grid-rows-[206px_minmax(0,1fr)] gap-[24px] px-[48px] pb-[32px] pt-[24px]">
         {parsed.metricCards.map((card) => (
@@ -241,22 +228,28 @@ const ExecutiveSummaryDashboard = ({ data }: { data: Partial<z.infer<typeof Sche
                 />
               </div>
 
-              <div className="flex min-w-0 flex-1 flex-col justify-center gap-[18px] border-l pl-[22px]" style={{ borderColor: "#F1F5F9" }}>
-                {parsed.chartInsights.map((item) => (
+              <div className="flex min-w-0 flex-1 flex-col justify-center gap-[18px] border-l pl-[22px]" style={{ borderColor: chartAnalyticsTheme.colors.strokeSoft }}>
+                {parsed.chartInsights.map((item, index) => {
+                  const tone = index === 0 ? chartAnalyticsTheme.tone.signalPrimary : chartAnalyticsTheme.tone.signalNeutral;
+                  const itemColor = item.color ?? tone.color;
+                  const itemTint = item.tint ?? tone.tint;
+
+                  return (
                   <div key={item.title}>
                     <div className="mb-[6px] flex items-center gap-[11px]">
-                      <div className="flex h-[32px] w-[32px] flex-none items-center justify-center rounded-full" style={{ backgroundColor: item.tint }}>
-                        <AnalyticsIcon name={item.icon} className="h-[16px] w-[16px]" stroke={item.color} />
+                      <div className="flex h-[32px] w-[32px] flex-none items-center justify-center rounded-full" style={{ backgroundColor: itemTint }}>
+                        <AnalyticsIcon name={item.icon} className="h-[16px] w-[16px]" stroke={itemColor} />
                       </div>
-                      <div className="truncate text-[14px] font-bold" style={{ color: "#1E293B" }}>
+                      <div className="truncate text-[14px] font-bold" style={{ color: chartAnalyticsTheme.colors.textPrimary }}>
                         {item.title}
                       </div>
                     </div>
-                    <div className="pl-[43px] text-[12px] leading-[1.35]" style={{ color: chartAnalyticsTheme.colors.subtleText }}>
+                    <div className="pl-[43px] text-[12px] leading-[1.35]" style={{ color: chartAnalyticsTheme.colors.textSubtle }}>
                       {item.description}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </ChartPanelShell>

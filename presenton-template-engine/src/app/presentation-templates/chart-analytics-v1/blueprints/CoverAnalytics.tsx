@@ -7,6 +7,7 @@ import ComparisonHeroTitle from "../components/ComparisonHeroTitle.tsx";
 import DarkAnalyticsBackdrop from "../components/DarkAnalyticsBackdrop.tsx";
 import ExpandedLabel from "../components/ExpandedLabel.tsx";
 import ReportMetaFooter from "../components/ReportMetaFooter.tsx";
+import { chartAnalyticsTheme } from "../theme/tokens.ts";
 
 export const Schema = z.object({
   seriesLabel: z.string().min(2).max(64).default("Global Intelligence Series"),
@@ -46,9 +47,18 @@ export const editableTextPriority = "high";
 
 const CoverRings = () => (
   <div className="absolute inset-0 z-[1] pointer-events-none">
-    <div className="absolute left-[820px] top-[0px] h-[360px] w-[360px] rounded-full border border-white/10" />
-    <div className="absolute left-[902px] top-[0px] h-[300px] w-[300px] rounded-full border border-blue-500/20" />
-    <div className="absolute left-[0px] top-[385px] h-[335px] w-[335px] rounded-full border border-white/10" />
+    <div
+      className="absolute left-[820px] top-[0px] h-[360px] w-[360px] rounded-full border"
+      style={{ borderColor: chartAnalyticsTheme.alpha.textInverse(0.1) }}
+    />
+    <div
+      className="absolute left-[902px] top-[0px] h-[300px] w-[300px] rounded-full border"
+      style={{ borderColor: chartAnalyticsTheme.alpha.signalPrimary(0.2) }}
+    />
+    <div
+      className="absolute left-[0px] top-[385px] h-[335px] w-[335px] rounded-full border"
+      style={{ borderColor: chartAnalyticsTheme.alpha.textInverse(0.1) }}
+    />
   </div>
 );
 
@@ -77,8 +87,12 @@ const CoverAnalytics = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
         />
 
         <div className="mt-[42px] max-w-[820px]">
-          <div className="text-[26px] font-light leading-[1.25] tracking-wide text-slate-100">{parsed.subtitle}</div>
-          <div className="mt-[10px] text-[18px] font-light leading-[1.35] text-slate-400">{parsed.scope}</div>
+          <div className="text-[26px] font-light leading-[1.25] tracking-wide" style={{ color: chartAnalyticsTheme.colors.darkText }}>
+            {parsed.subtitle}
+          </div>
+          <div className="mt-[10px] text-[18px] font-light leading-[1.35]" style={{ color: chartAnalyticsTheme.colors.darkMutedText }}>
+            {parsed.scope}
+          </div>
         </div>
       </div>
 

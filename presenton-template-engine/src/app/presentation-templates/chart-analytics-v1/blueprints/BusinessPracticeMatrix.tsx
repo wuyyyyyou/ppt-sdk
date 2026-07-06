@@ -29,8 +29,8 @@ const IconSchema = z.enum([
 const EntitySchema = z.object({
   name: z.string().min(1).max(24),
   tagline: z.string().min(2).max(32),
-  accentColor: z.string().min(3).max(64),
-  tintColor: z.string().min(3).max(64),
+  accentColor: z.string().min(3).max(64).optional(),
+  tintColor: z.string().min(3).max(64).optional(),
   icon: IconSchema.default("chart-column"),
 });
 
@@ -51,15 +51,11 @@ const DEFAULT_ENTITIES: z.infer<typeof EntitySchema>[] = [
   {
     name: "Entity A",
     tagline: "Speed & Scale",
-    accentColor: chartAnalyticsTheme.colors.primary,
-    tintColor: "#EFF6FF",
     icon: "chart-line",
   },
   {
     name: "Entity B",
     tagline: "Quality & Control",
-    accentColor: chartAnalyticsTheme.colors.accentTeal,
-    tintColor: "#F0FDFA",
     icon: "scale",
   },
 ];
@@ -149,7 +145,7 @@ export const Schema = z.object({
   implicationLabel: z.string().min(2).max(24).default("Implication"),
   implicationText: z.string().min(8).max(160).default("Use the matrix to choose different engagement styles for each entity instead of forcing one operating model."),
   implicationIcon: IconSchema.default("bolt"),
-  implicationAccentColor: z.string().min(3).max(64).default(chartAnalyticsTheme.colors.accentIndigo),
+  implicationAccentColor: z.string().min(3).max(64).optional(),
   slideLabel: z.string().min(2).max(18).default("SLIDE 09"),
 });
 
@@ -173,6 +169,7 @@ export const editableTextPriority = "high";
 const BusinessPracticeMatrix = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
   const parsed = readTemplateData(Schema, data);
   const entities = parsed.entities as [z.infer<typeof EntitySchema>, z.infer<typeof EntitySchema>];
+  const implicationAccentColor = parsed.implicationAccentColor ?? chartAnalyticsTheme.colors.signalTertiary;
 
   return (
     <AnalyticsCanvas variant="light">
@@ -193,15 +190,15 @@ const BusinessPracticeMatrix = ({ data }: { data: Partial<z.infer<typeof Schema>
           className="mt-[16px] flex h-[54px] flex-none items-center justify-between rounded-[8px] px-[18px]"
           style={{
             backgroundColor: chartAnalyticsTheme.colors.darkPanel,
-            boxShadow: "0 10px 18px rgba(15,23,42,0.16)",
+            boxShadow: chartAnalyticsTheme.shadows.darkPanel,
           }}
         >
           <div className="flex min-w-0 items-center gap-[14px]">
-            <div className="flex h-[32px] w-[32px] flex-none items-center justify-center rounded-[6px]" style={{ backgroundColor: parsed.implicationAccentColor }}>
-              <AnalyticsIcon name={parsed.implicationIcon} className="h-[17px] w-[17px]" stroke="#FFFFFF" />
+            <div className="flex h-[32px] w-[32px] flex-none items-center justify-center rounded-[6px]" style={{ backgroundColor: implicationAccentColor }}>
+              <AnalyticsIcon name={parsed.implicationIcon} className="h-[17px] w-[17px]" stroke={chartAnalyticsTheme.colors.textInverse} />
             </div>
             <div className="flex min-w-0 flex-1 items-center gap-[8px]">
-              <div className="flex-none text-[14px] font-bold uppercase leading-[1.25]" style={{ color: "#C4B5FD" }}>
+              <div className="flex-none text-[14px] font-bold uppercase leading-[1.25]" style={{ color: chartAnalyticsTheme.colors.signalTertiaryBorder }}>
                 {parsed.implicationLabel}:
               </div>
               <div className="min-w-0 flex-1 text-[14px] font-medium leading-[1.25]" style={{ color: chartAnalyticsTheme.colors.darkMutedText }}>

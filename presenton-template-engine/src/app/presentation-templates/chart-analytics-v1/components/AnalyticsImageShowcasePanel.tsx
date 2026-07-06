@@ -32,9 +32,9 @@ const ImagePlaceholder = ({ message }: { message: string }) => (
     className="flex h-full min-h-0 w-full flex-col items-center justify-center border border-dashed text-center"
     style={{
       gap: 14,
-      borderColor: "#BFDBFE",
-      backgroundColor: "#EFF6FF",
-      color: chartAnalyticsTheme.colors.primary,
+      borderColor: chartAnalyticsTheme.colors.signalPrimaryBorder,
+      backgroundColor: chartAnalyticsTheme.colors.signalPrimaryTint,
+      color: chartAnalyticsTheme.colors.signalPrimary,
       borderRadius: 8,
       padding: 32,
     }}
@@ -44,10 +44,10 @@ const ImagePlaceholder = ({ message }: { message: string }) => (
       style={{
         width: 52,
         height: 52,
-        backgroundColor: "#DBEAFE",
+        backgroundColor: chartAnalyticsTheme.colors.signalPrimaryBorder,
       }}
     >
-      <AnalyticsIcon name="grid" className="h-[24px] w-[24px]" stroke={chartAnalyticsTheme.colors.primary} />
+      <AnalyticsIcon name="grid" className="h-[24px] w-[24px]" stroke={chartAnalyticsTheme.colors.signalPrimary} />
     </div>
     <div className="text-[13px] font-bold leading-[1.35]">{message}</div>
   </div>
@@ -79,7 +79,7 @@ const AnalyticsImageShowcasePanel = ({
       style={{
         backgroundColor: chartAnalyticsTheme.colors.card,
         borderColor: chartAnalyticsTheme.colors.stroke,
-        boxShadow: "0 8px 18px rgba(15,23,42,0.08)",
+        boxShadow: chartAnalyticsTheme.shadows.panel,
         padding,
       }}
     >
@@ -87,7 +87,7 @@ const AnalyticsImageShowcasePanel = ({
         <div
           className="flex-none font-bold"
           style={{
-            color: "#0F172A",
+            color: chartAnalyticsTheme.colors.textPrimary,
             fontSize: 18,
             lineHeight: 1.22,
             maxHeight: textMaxHeight(18, 1.22, titleMaxLines),
@@ -123,7 +123,7 @@ const AnalyticsImageShowcasePanel = ({
           data-validation-role="multi-line-body-text"
           className="flex-none"
           style={{
-            color: "#334155",
+            color: chartAnalyticsTheme.colors.signalNeutral,
             fontSize: 12,
             lineHeight: 1.42,
             maxHeight: textMaxHeight(12, 1.42, captionMaxLines),
@@ -139,7 +139,7 @@ const AnalyticsImageShowcasePanel = ({
         <div
           className="flex-none pt-[6px] text-[10px] font-medium uppercase"
           style={{
-            color: chartAnalyticsTheme.colors.subtleText,
+            color: chartAnalyticsTheme.colors.textSubtle,
             lineHeight: "14px",
             maxHeight: textMaxHeight(10, 1.4, sourceMaxLines),
             overflow: "hidden",
