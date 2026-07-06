@@ -9,9 +9,6 @@ import ImageShowcasePanel, { type ImageShowcaseImage } from "../components/Image
 import InfoListItem from "../components/InfoListItem.tsx";
 import InsightCallout from "../components/InsightCallout.tsx";
 
-const demoImageUrl =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 960 620'%3E%3Crect width='960' height='620' fill='%23f8fafc'/%3E%3Crect x='60' y='58' width='840' height='504' rx='28' fill='%23ffffff' stroke='%23e5e7eb' stroke-width='3'/%3E%3Crect x='100' y='100' width='318' height='384' rx='22' fill='%23fff4f4' stroke='%23f1caca' stroke-width='3'/%3E%3Cpath d='M142 416 C210 320 276 335 344 220 C374 170 392 148 418 132 L418 484 L100 484 L100 452 C116 444 129 434 142 416Z' fill='%23b71c1c' opacity='0.9'/%3E%3Cpath d='M111 469 C168 378 239 370 301 268 C343 199 371 159 418 134' fill='none' stroke='%238e0000' stroke-width='8' stroke-linecap='round'/%3E%3Ccircle cx='173' cy='374' r='12' fill='%23ffffff'/%3E%3Ccircle cx='284' cy='292' r='12' fill='%23ffffff'/%3E%3Ccircle cx='382' cy='160' r='12' fill='%23ffffff'/%3E%3Crect x='466' y='116' width='352' height='72' rx='14' fill='%23fafafa' stroke='%23e5e7eb' stroke-width='3'/%3E%3Crect x='494' y='140' width='128' height='14' rx='7' fill='%23b71c1c'/%3E%3Crect x='642' y='140' width='138' height='14' rx='7' fill='%231565c0' opacity='0.78'/%3E%3Crect x='466' y='220' width='352' height='72' rx='14' fill='%23fafafa' stroke='%23e5e7eb' stroke-width='3'/%3E%3Crect x='494' y='244' width='206' height='14' rx='7' fill='%23b71c1c'/%3E%3Crect x='718' y='244' width='62' height='14' rx='7' fill='%231565c0' opacity='0.78'/%3E%3Crect x='466' y='324' width='352' height='72' rx='14' fill='%23fafafa' stroke='%23e5e7eb' stroke-width='3'/%3E%3Crect x='494' y='348' width='92' height='14' rx='7' fill='%23b71c1c'/%3E%3Crect x='606' y='348' width='174' height='14' rx='7' fill='%231565c0' opacity='0.78'/%3E%3Crect x='466' y='428' width='352' height='72' rx='14' fill='%23fafafa' stroke='%23e5e7eb' stroke-width='3'/%3E%3Crect x='494' y='452' width='250' height='14' rx='7' fill='%23b71c1c'/%3E%3Ccircle cx='814' cy='116' r='72' fill='%23ffebee'/%3E%3Ccircle cx='814' cy='116' r='42' fill='%23b71c1c' opacity='0.9'/%3E%3Cpath d='M790 117h48M814 93v48' stroke='%23ffffff' stroke-width='9' stroke-linecap='round'/%3E%3C/svg%3E";
-
 const IconSchema = z.enum([
   "bank",
   "bolt",
@@ -59,7 +56,7 @@ export const Schema = z.object({
   ),
   density: z.enum(["medium", "high"]).default("medium"),
   image: ImageSchema.default({
-    url: demoImageUrl,
+    url: "",
     title: "Primary visual asset",
     caption: "Use this area for one photo, product screenshot, map, evidence image, or generated visual.",
     source: "SOURCE: TBD",

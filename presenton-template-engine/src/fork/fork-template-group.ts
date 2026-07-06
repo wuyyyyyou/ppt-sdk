@@ -374,6 +374,20 @@ async function rewriteForkedCatalogGroupId(catalogJsonPath: string, forkedGroupI
   await writeFile(catalogJsonPath, `${JSON.stringify(catalog, null, 2)}\n`, "utf8");
 }
 
+async function initializeForkedThemeToken(outDir: string): Promise<void> {
+  const tokenPath = path.join(outDir, "theme", "token.json");
+  const defaultTokenPath = path.join(outDir, "theme", "token.default.json");
+  if (await pathExists(tokenPath)) {
+    return;
+  }
+  if (!(await pathExists(defaultTokenPath))) {
+    return;
+  }
+
+  await mkdir(path.dirname(tokenPath), { recursive: true });
+  await copyFile(defaultTokenPath, tokenPath);
+}
+
 export async function forkTemplateGroup(
   input: ForkTemplateGroupInput,
 ): Promise<ForkTemplateGroupResult> {
@@ -422,6 +436,7 @@ export async function forkTemplateGroup(
   );
   await writeFile(`${manifestPath}`, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
   await rewriteForkedCatalogGroupId(catalogJsonPath, forkedGroupMetadata.group_id);
+  await initializeForkedThemeToken(outDir);
 
   return {
     outDir,

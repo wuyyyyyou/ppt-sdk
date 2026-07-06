@@ -97,6 +97,12 @@ function applyThemeVariables(
     }
   }
 
+  for (const [key, value] of Object.entries(theme.variables ?? {})) {
+    if (value) {
+      container.style.setProperty(key, value);
+    }
+  }
+
   if (theme.fontName) {
     container.style.setProperty("font-family", `"${theme.fontName}"`);
     container.style.setProperty("--heading-font-family", `"${theme.fontName}"`);

@@ -12,12 +12,10 @@
   "series": [
     {
       "label": "Current",
-      "color": "var(--primary-color,#B71C1C)",
       "values": [42, 48, 55, 61]
     },
     {
       "label": "Target",
-      "color": "var(--secondary-color,var(--graph-1,#1565C0))",
       "values": [40, 45, 50, 58]
     }
   ],

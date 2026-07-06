@@ -87,28 +87,28 @@ const SectionDivider = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
           <div
             className="mb-[24px] flex h-[72px] w-[72px] items-center justify-center rounded-[6px] text-[34px] font-black leading-none"
             style={{
-              color: redFinanceTheme.colors.primaryText,
-              backgroundColor: redFinanceTheme.colors.primary,
+              color: redFinanceTheme.colors.accentText,
+              backgroundColor: redFinanceTheme.colors.accent,
             }}
           >
             {parsed.sectionNumber}
           </div>
           <div
             className="mb-[18px] flex items-center gap-[12px] text-[16px] font-black uppercase leading-none"
-            style={{ color: redFinanceTheme.colors.primary }}
+            style={{ color: redFinanceTheme.colors.accent }}
           >
             <FinanceIcon name="compass" className="h-[22px] w-[22px]" />
             {parsed.eyebrow}
           </div>
           <div
             className="mb-[26px] text-[64px] font-black leading-[1.04]"
-            style={{ color: redFinanceTheme.colors.backgroundText, fontSize: titleFontSize }}
+            style={{ color: redFinanceTheme.colors.textPrimary, fontSize: titleFontSize }}
           >
             {parsed.title}
           </div>
           <div
             className="w-[510px] text-[22px] font-medium leading-[1.45]"
-            style={{ color: redFinanceTheme.colors.mutedText }}
+            style={{ color: redFinanceTheme.colors.textMuted }}
           >
             {parsed.subtitle}
           </div>

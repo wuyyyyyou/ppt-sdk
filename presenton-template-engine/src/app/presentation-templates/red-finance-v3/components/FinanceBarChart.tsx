@@ -11,7 +11,7 @@ import { redFinanceTheme } from "../theme/tokens.ts";
 
 export type FinanceBarChartSeries = {
   label: string;
-  color: string;
+  color?: string;
   values: number[];
 };
 
@@ -39,6 +39,14 @@ const clampValue = (value: number, min: number, max: number) =>
 const defaultTickFormatter = (value: number) =>
   Number.isInteger(value) ? String(value) : value.toFixed(1);
 const defaultXAxisReserve = 30;
+const chartColors = [
+  redFinanceTheme.colors.chart1,
+  redFinanceTheme.colors.chart2,
+  redFinanceTheme.colors.chart3,
+  redFinanceTheme.colors.chart4,
+  redFinanceTheme.colors.chart5,
+  redFinanceTheme.colors.chart6,
+];
 
 const buildBarData = (
   labels: string[],
@@ -119,7 +127,7 @@ const FinanceBarChart = ({
             dataKey="label"
             axisLine={{ stroke: redFinanceTheme.colors.axis, strokeWidth: 1 }}
             tickLine={false}
-            tick={{ fill: redFinanceTheme.colors.mutedText, fontSize: labelFontSize }}
+            tick={{ fill: redFinanceTheme.colors.textMuted, fontSize: labelFontSize }}
             interval={0}
             height={defaultXAxisReserve}
           />
@@ -130,13 +138,13 @@ const FinanceBarChart = ({
             axisLine={false}
             tickLine={false}
             tickFormatter={(value) => tickFormatter(Number(value))}
-            tick={{ fill: redFinanceTheme.colors.subtleText, fontSize: 10 }}
+            tick={{ fill: redFinanceTheme.colors.textSubtle, fontSize: 10 }}
           />
-          {series.map((entry) => (
+          {series.map((entry, index) => (
             <Bar
               key={entry.label}
               dataKey={entry.label}
-              fill={entry.color}
+              fill={entry.color ?? chartColors[index % chartColors.length]}
               radius={[4, 4, 0, 0]}
               isAnimationActive={false}
             />

@@ -65,7 +65,7 @@ const CoverStatement = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
                     style={{
                       marginLeft: columnIndex === 0 ? 0 : 28,
                       marginTop: 14,
-                      backgroundColor: redFinanceTheme.colors.softStroke,
+                      backgroundColor: redFinanceTheme.colors.strokeSoft,
                     }}
                   />
                 ))}
@@ -76,7 +76,7 @@ const CoverStatement = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
 
         <div
           className="absolute left-0 top-[114px] h-[188px] w-[12px]"
-          style={{ backgroundColor: redFinanceTheme.colors.primary }}
+          style={{ backgroundColor: redFinanceTheme.colors.accent }}
         />
 
         <div className="absolute left-[96px] right-[72px] top-[42px] z-20 flex items-center justify-between">
@@ -94,24 +94,24 @@ const CoverStatement = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
           <div className="flex w-[320px] flex-col items-end">
             <div
               className="w-full whitespace-nowrap text-right text-[14px] font-bold uppercase leading-none"
-              style={{ color: redFinanceTheme.colors.primary }}
+              style={{ color: redFinanceTheme.colors.accent }}
             >
               {parsed.reportTag}
             </div>
-            <div className="mt-[8px] h-[2px] w-full" style={{ backgroundColor: redFinanceTheme.colors.primary }} />
+            <div className="mt-[8px] h-[2px] w-full" style={{ backgroundColor: redFinanceTheme.colors.accent }} />
           </div>
         </div>
 
         <div
           className="absolute left-[96px] top-[228px] z-10 flex h-[80px] w-[650px] items-center whitespace-nowrap text-[76px] font-black leading-none"
-          style={{ color: redFinanceTheme.colors.backgroundText, fontSize: titleFontSize }}
+          style={{ color: redFinanceTheme.colors.textPrimary, fontSize: titleFontSize }}
         >
           {parsed.titleLineOne}
         </div>
 
         <div
           className="absolute left-[96px] top-[312px] z-10 flex h-[80px] w-[650px] items-center whitespace-nowrap text-[76px] font-black leading-none"
-          style={{ color: redFinanceTheme.colors.primary, fontSize: titleFontSize }}
+          style={{ color: redFinanceTheme.colors.accent, fontSize: titleFontSize }}
         >
           {parsed.titleLineTwo}
         </div>
@@ -120,15 +120,15 @@ const CoverStatement = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
           <div
             className="flex h-[58px] w-[560px] items-center justify-center"
             style={{
-              backgroundColor: redFinanceTheme.colors.primary,
-              color: redFinanceTheme.colors.primaryText,
+              backgroundColor: redFinanceTheme.colors.accent,
+              color: redFinanceTheme.colors.accentText,
             }}
           >
             <div className="flex h-full w-full items-center justify-center whitespace-nowrap text-center text-[23px] font-medium">
               {parsed.subtitle}
             </div>
           </div>
-          <div className="h-[58px] w-[10px]" style={{ backgroundColor: redFinanceTheme.colors.deepRed }} />
+          <div className="h-[58px] w-[10px]" style={{ backgroundColor: redFinanceTheme.colors.accentStrong }} />
         </div>
 
         {showNotes ? (
@@ -136,7 +136,7 @@ const CoverStatement = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
           <SectionPanelShell paddingX={22} paddingY={22} radius={8} backgroundColor={redFinanceTheme.colors.surface}>
             <div
               className="mb-[18px] text-[20px] font-black uppercase leading-none"
-              style={{ color: redFinanceTheme.colors.primary }}
+              style={{ color: redFinanceTheme.colors.accent }}
             >
               {parsed.noteTitle}
             </div>
@@ -146,15 +146,15 @@ const CoverStatement = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
                   <div
                     className="mt-[3px] flex h-[22px] w-[22px] flex-none items-center justify-center rounded-[4px] text-[12px] font-black"
                     style={{
-                      color: redFinanceTheme.colors.primaryText,
-                      backgroundColor: redFinanceTheme.colors.primary,
+                      color: redFinanceTheme.colors.accentText,
+                      backgroundColor: redFinanceTheme.colors.accent,
                     }}
                   >
                     {index + 1}
                   </div>
                   <div
                     className="min-w-0 text-[15px] font-semibold leading-[1.45]"
-                    style={{ color: redFinanceTheme.colors.backgroundText }}
+                    style={{ color: redFinanceTheme.colors.textPrimary }}
                   >
                     {note}
                   </div>

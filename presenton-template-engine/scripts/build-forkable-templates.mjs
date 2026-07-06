@@ -365,6 +365,11 @@ async function copyOptionalGroupAssets(groupRoot, groupOutputDir, options = {}) 
     );
   }
 
+  await copyDirectorySupplement(
+    path.join(groupRoot, "theme"),
+    path.join(groupOutputDir, "theme"),
+  );
+
   await copyFileIfExists(
     path.join(groupRoot, "slides", "README.md"),
     path.join(groupOutputDir, "slides", "README.md"),

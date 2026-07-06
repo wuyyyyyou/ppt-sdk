@@ -1,31 +1,5 @@
 {
   "title": "Business Professional Demo Deck",
-  "theme": {
-    "company_name": "GLOBAL FINANCE INSIGHTS",
-    "colors": {
-      "background": "#FFFFFF",
-      "background_text": "#212121",
-      "primary": "#B71C1C",
-      "primary_text": "#FFFFFF",
-      "card": "#FAFAFA",
-      "stroke": "#E5E7EB",
-      "secondary": "#1565C0",
-      "text_muted": "#616161",
-      "text_subtle": "#757575",
-      "stroke_soft": "#E0E0E0",
-      "axis": "#D0D0D0",
-      "icon_muted": "#D6D6D6",
-      "panel": "#FAFAFA",
-      "surface": "#FFFFFF",
-      "accent_soft": "#FFEBEE",
-      "accent_tint": "#FFF4F4",
-      "accent_border": "#F1CACA",
-      "accent_subtle_text": "#9D2E2E",
-      "primary_dark": "#8E0000",
-      "shadow_primary": "rgba(183,28,28,0.2)",
-      "row_accent": "rgba(183,28,28,0.03)"
-    }
-  },
   "slides": [
     {
       "id": "red-finance-v3-cover-statement",

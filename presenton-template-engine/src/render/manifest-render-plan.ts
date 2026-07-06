@@ -13,6 +13,10 @@ import {
   type LocalRuntimeEntry,
 } from "./local-runtime-bundle.js";
 import { getBrowserRenderRuntimeBundle } from "./runtime-bundle.js";
+import {
+  buildThemeTokenCssVariables,
+  readThemeTokenBundle,
+} from "./theme-tokens.js";
 import type {
   BrowserRenderContext,
   BrowserRenderTheme,
@@ -102,8 +106,26 @@ function normalizeTheme(input?: TemplateRenderThemeInput | null): BrowserRenderT
     logoUrl: input?.logo_url ?? null,
     companyName: input?.company_name ?? null,
     colors: { ...colors },
+    variables: {},
     fontName: font?.name ?? null,
     fontUrl: font?.url ?? null,
+  };
+}
+
+async function normalizeThemeForTemplate(
+  templateDir: string,
+  input?: TemplateRenderThemeInput | null,
+): Promise<BrowserRenderTheme> {
+  const theme = normalizeTheme(input);
+  const token = await readThemeTokenBundle(templateDir);
+  if (!token) {
+    return theme;
+  }
+
+  return {
+    ...theme,
+    colors: {},
+    variables: buildThemeTokenCssVariables(token),
   };
 }
 
@@ -439,7 +461,10 @@ export async function prepareManifestRenderPlan(
     slideEntries.map(async ({ slide, sourceIndex }) => {
       const resolvedSlide = await resolveManifestSlide(slide, manifestCwd);
       const slideData = await resolveSlideData(slide, manifestCwd);
-      const theme = normalizeTheme(slide.theme ?? manifest.theme);
+      const theme = await normalizeThemeForTemplate(
+        manifestCwd,
+        slide.theme ?? manifest.theme,
+      );
       const runtimeLayoutId = resolvedSlide.localEntryPath
         ? `${resolvedSlide.templateGroup}:${slide.id}`
         : resolvedSlide.layoutId;

@@ -9,6 +9,7 @@ import InsightCallout from "../components/InsightCallout.tsx";
 import KpiMetricItem from "../components/KpiMetricItem.tsx";
 import TimelineBoard, { type TimelineBoardItem } from "../components/TimelineBoard.tsx";
 import VerticalMilestoneTimeline, { type VerticalMilestoneTimelineItem } from "../components/VerticalMilestoneTimeline.tsx";
+import { redFinanceTheme } from "../theme/tokens.ts";
 
 const PhaseSchema = z.object({
   label: z.string().min(1).max(8),
@@ -119,7 +120,14 @@ const TimelinePlan = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
               <div className="flex flex-col gap-[14px]">
                 <div className="grid grid-cols-3 gap-[10px]">
                   {parsed.metrics.map((metric) => (
-                    <div key={metric.label} className="rounded-[8px] border bg-white px-[14px] py-[12px]">
+                    <div
+                      key={metric.label}
+                      className="rounded-[8px] border px-[14px] py-[12px]"
+                      style={{
+                        backgroundColor: redFinanceTheme.colors.panel,
+                        borderColor: redFinanceTheme.colors.stroke,
+                      }}
+                    >
                       <KpiMetricItem value={metric.value} label={metric.label} />
                     </div>
                   ))}
@@ -132,7 +140,14 @@ const TimelinePlan = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
               <TimelineBoard phases={parsed.phases as TimelineBoardItem[]} density={density} />
               <div className="grid grid-cols-3 gap-[10px]">
                 {parsed.metrics.map((metric) => (
-                  <div key={metric.label} className="rounded-[8px] border bg-white px-[14px] py-[12px]">
+                  <div
+                    key={metric.label}
+                    className="rounded-[8px] border px-[14px] py-[12px]"
+                    style={{
+                      backgroundColor: redFinanceTheme.colors.panel,
+                      borderColor: redFinanceTheme.colors.stroke,
+                    }}
+                  >
                     <KpiMetricItem value={metric.value} label={metric.label} />
                   </div>
                 ))}

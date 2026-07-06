@@ -41,7 +41,7 @@ const NarrativeItemSchema = z.object({
 
 const SeriesSchema = z.object({
   label: z.string().min(2).max(24),
-  color: z.string().min(3).max(64),
+  color: z.string().min(3).max(64).optional(),
   values: z.array(z.number().finite()).min(2).max(8),
 });
 
@@ -64,12 +64,10 @@ export const Schema = z.object({
   series: z.array(SeriesSchema).min(1).max(3).default([
     {
       label: "Current",
-      color: "var(--primary-color,#B71C1C)",
       values: [42, 48, 55, 61],
     },
     {
       label: "Target",
-      color: "var(--secondary-color,var(--graph-1,#1565C0))",
       values: [40, 45, 50, 58],
     },
   ]),

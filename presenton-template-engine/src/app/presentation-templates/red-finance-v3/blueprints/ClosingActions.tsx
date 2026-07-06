@@ -96,24 +96,24 @@ const ClosingActions = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => 
             <SectionPanelShell
               className="min-h-0 flex-1 justify-center"
               backgroundColor={redFinanceTheme.colors.surface}
-              shadow="0 4px 8px rgba(0,0,0,0.03)"
+              shadow={redFinanceTheme.shadows.card}
               paddingX={18}
               paddingY={18}
             >
-              <div className="text-[13px] font-bold uppercase tracking-[0.06em]" style={{ color: redFinanceTheme.colors.primary }}>
+              <div className="text-[13px] font-bold uppercase tracking-[0.06em]" style={{ color: redFinanceTheme.colors.accent }}>
                 {parsed.finalTitle}
               </div>
-              <div className="mt-[10px] text-[15px] leading-[1.55]" style={{ color: redFinanceTheme.colors.backgroundText }}>
+              <div className="mt-[10px] text-[15px] leading-[1.55]" style={{ color: redFinanceTheme.colors.textPrimary }}>
                 {parsed.summary}
               </div>
               <div className="my-[18px] h-px w-full" style={{ backgroundColor: redFinanceTheme.colors.stroke }} />
               {parsed.decisionAskTitle ? (
-                <div className="text-[13px] font-bold uppercase tracking-[0.06em]" style={{ color: redFinanceTheme.colors.primary }}>
+                <div className="text-[13px] font-bold uppercase tracking-[0.06em]" style={{ color: redFinanceTheme.colors.accent }}>
                   {parsed.decisionAskTitle}
                 </div>
               ) : null}
               {decisionAsk ? (
-                <div className="mt-[10px] text-[15px] leading-[1.55]" style={{ color: redFinanceTheme.colors.mutedText }}>
+                <div className="mt-[10px] text-[15px] leading-[1.55]" style={{ color: redFinanceTheme.colors.textMuted }}>
                   {decisionAsk}
                 </div>
               ) : null}

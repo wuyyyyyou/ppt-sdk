@@ -916,6 +916,11 @@ async function applyWorkspaceThemeToManifest(
     return;
   }
 
+  const manifestDir = path.dirname(manifestPath);
+  if (await fileExists(path.join(manifestDir, "theme", "token.default.json"))) {
+    return;
+  }
+
   const manifestRecord = getPlainRecord(JSON.parse(await readFile(manifestPath, "utf8")) as unknown);
   const colors = { ...(theme.data?.colors ?? {}) };
   await writeJsonFile(manifestPath, {

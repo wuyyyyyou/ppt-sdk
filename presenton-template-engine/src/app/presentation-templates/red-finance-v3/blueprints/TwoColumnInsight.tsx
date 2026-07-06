@@ -182,7 +182,7 @@ const TwoColumnInsight = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =
             cardPaddingTop={14}
             cardPaddingBottom={12}
             minHeight={118}
-            iconBackgroundColor={redFinanceTheme.colors.paleRed}
+            iconBackgroundColor={redFinanceTheme.colors.accentSoft}
           />
         ))}
       </div>

@@ -98,13 +98,13 @@ const StableMatrixGrid = ({
   columns,
   rows,
   density = "normal",
-  outerBorderColor = redFinanceTheme.colors.softStroke,
-  headerBackgroundColor = redFinanceTheme.colors.primary,
-  headerTextColor = redFinanceTheme.colors.primaryText,
+  outerBorderColor = redFinanceTheme.colors.strokeSoft,
+  headerBackgroundColor = redFinanceTheme.colors.accent,
+  headerTextColor = redFinanceTheme.colors.accentText,
   rowDividerColor = redFinanceTheme.colors.stroke,
   stripeColors = [redFinanceTheme.colors.surface, redFinanceTheme.colors.panel],
   rowHeaderBackgroundColor = redFinanceTheme.colors.surface,
-  shadow = "0 4px 6px rgba(0,0,0,0.03)",
+  shadow = redFinanceTheme.shadows.card,
   borderRadius = 8,
   rowHeaderAlign = "center",
   headerPaddingY: headerPaddingYOverride,
@@ -129,7 +129,7 @@ const StableMatrixGrid = ({
     <div
       className="relative h-full overflow-hidden"
       style={{
-        backgroundColor: redFinanceTheme.colors.background,
+        backgroundColor: redFinanceTheme.colors.canvas,
         boxShadow: shadow,
         borderRadius,
       }}
@@ -213,7 +213,7 @@ const StableMatrixGrid = ({
                   className="font-bold"
                   style={{
                     fontSize: rowHeaderFontSize,
-                    color: redFinanceTheme.colors.backgroundText,
+                    color: redFinanceTheme.colors.textPrimary,
                   }}
                 >
                   {row.header}
@@ -261,8 +261,8 @@ const StableMatrixGrid = ({
                               color:
                                 cell.leadColor ??
                                 (tone === "accent"
-                                  ? redFinanceTheme.colors.primary
-                                  : redFinanceTheme.colors.mutedText),
+                                  ? redFinanceTheme.colors.accent
+                                  : redFinanceTheme.colors.textMuted),
                             }}
                           >
                             {cell.lead}
@@ -274,8 +274,8 @@ const StableMatrixGrid = ({
                                 color:
                                   cell.supportColor ??
                                   (tone === "accent"
-                                    ? redFinanceTheme.colors.accentSubtleText
-                                    : redFinanceTheme.colors.subtleText),
+                                    ? redFinanceTheme.colors.accentMutedText
+                                    : redFinanceTheme.colors.textSubtle),
                               }}
                             >
                               {cell.support}

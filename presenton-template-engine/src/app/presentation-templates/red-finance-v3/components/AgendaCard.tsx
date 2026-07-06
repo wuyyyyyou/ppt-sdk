@@ -17,31 +17,31 @@ const AgendaCard = ({
   highlighted = false,
 }: AgendaCardProps) => {
   const textColor = highlighted
-    ? redFinanceTheme.colors.primary
-    : redFinanceTheme.colors.backgroundText;
-  const iconStroke = highlighted ? redFinanceTheme.colors.primary : redFinanceTheme.colors.iconMuted;
+    ? redFinanceTheme.colors.accent
+    : redFinanceTheme.colors.textPrimary;
+  const iconStroke = highlighted ? redFinanceTheme.colors.accent : redFinanceTheme.colors.iconMuted;
 
   return (
     <div
       className="relative flex h-[70px] items-center overflow-hidden rounded-[4px] border px-[24px]"
       style={{
         backgroundColor: highlighted
-          ? redFinanceTheme.colors.paleRed
-          : redFinanceTheme.colors.background,
+          ? redFinanceTheme.colors.accentSoft
+          : redFinanceTheme.colors.canvas,
         borderColor: redFinanceTheme.colors.stroke,
-        boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
+        boxShadow: redFinanceTheme.shadows.card,
       }}
     >
       {highlighted ? (
         <div
           className="absolute left-0 top-0 h-[70px] w-[5px]"
-          style={{ backgroundColor: redFinanceTheme.colors.primary }}
+          style={{ backgroundColor: redFinanceTheme.colors.accent }}
         />
       ) : null}
 
       <div
         className="flex h-[28px] w-[42px] flex-none items-center justify-end whitespace-nowrap text-right text-[24px] font-black leading-[28px]"
-        style={{ color: redFinanceTheme.colors.primary }}
+        style={{ color: redFinanceTheme.colors.accent }}
       >
         {number}
       </div>

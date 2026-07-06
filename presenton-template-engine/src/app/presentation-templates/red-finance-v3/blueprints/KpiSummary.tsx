@@ -119,7 +119,14 @@ const KpiSummary = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
           />
           <div className={`grid ${gridClass} gap-[10px]`}>
             {parsed.metrics.map((metric) => (
-              <div key={metric.label} className="rounded-[8px] border bg-white px-[14px] py-[12px]">
+              <div
+                key={metric.label}
+                className="rounded-[8px] border px-[14px] py-[12px]"
+                style={{
+                  backgroundColor: redFinanceTheme.colors.panel,
+                  borderColor: redFinanceTheme.colors.stroke,
+                }}
+              >
                 <KpiMetricItem value={metric.value} label={metric.label} />
               </div>
             ))}
@@ -140,7 +147,7 @@ const KpiSummary = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
               status={card.status}
               className="h-full justify-center"
               minHeight={0}
-              progressColor={index === 1 ? redFinanceTheme.colors.secondary : redFinanceTheme.colors.primary}
+              progressColor={index === 1 ? redFinanceTheme.colors.chart4 : redFinanceTheme.colors.accent}
             />
           ))}
         </div>

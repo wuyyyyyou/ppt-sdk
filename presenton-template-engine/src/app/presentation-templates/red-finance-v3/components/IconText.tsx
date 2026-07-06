@@ -27,7 +27,7 @@ const IconText = ({
   minTextWidth,
   fontSize = 16,
   fontWeight = 500,
-  textColor = redFinanceTheme.colors.backgroundText,
+  textColor = redFinanceTheme.colors.textPrimary,
   noWrap = true,
 }: IconTextProps) => {
   return (

@@ -177,6 +177,7 @@ export interface BrowserRenderTheme {
   logoUrl: string | null;
   companyName: string | null;
   colors: Record<string, string>;
+  variables?: Record<string, string>;
   fontName: string | null;
   fontUrl: string | null;
 }

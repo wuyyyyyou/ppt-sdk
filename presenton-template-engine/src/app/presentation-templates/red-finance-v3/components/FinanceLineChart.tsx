@@ -11,7 +11,7 @@ import { redFinanceTheme } from "../theme/tokens.ts";
 
 export type FinanceLineChartSeries = {
   label: string;
-  color: string;
+  color?: string;
   values: number[];
 };
 
@@ -34,6 +34,14 @@ const clampValue = (value: number, min: number, max: number) =>
 
 const defaultTickFormatter = (value: number) => `${value}%`;
 const defaultXAxisReserve = 30;
+const chartColors = [
+  redFinanceTheme.colors.chart1,
+  redFinanceTheme.colors.chart2,
+  redFinanceTheme.colors.chart3,
+  redFinanceTheme.colors.chart4,
+  redFinanceTheme.colors.chart5,
+  redFinanceTheme.colors.chart6,
+];
 
 const buildLineData = (
   labels: string[],
@@ -107,7 +115,7 @@ const FinanceLineChart = ({
             dataKey="label"
             axisLine={{ stroke: redFinanceTheme.colors.axis, strokeWidth: 1 }}
             tickLine={false}
-            tick={{ fill: redFinanceTheme.colors.mutedText, fontSize: 11, fontWeight: 700 }}
+            tick={{ fill: redFinanceTheme.colors.textMuted, fontSize: 11, fontWeight: 700 }}
             interval={0}
             height={defaultXAxisReserve}
             padding={{ left: 6, right: 18 }}
@@ -119,14 +127,14 @@ const FinanceLineChart = ({
             axisLine={false}
             tickLine={false}
             tickFormatter={(value) => tickFormatter(Number(value))}
-            tick={{ fill: redFinanceTheme.colors.subtleText, fontSize: 10 }}
+            tick={{ fill: redFinanceTheme.colors.textSubtle, fontSize: 10 }}
           />
-          {series.map((entry) => (
+          {series.map((entry, index) => (
             <Line
               key={entry.label}
               type="monotone"
               dataKey={entry.label}
-              stroke={entry.color}
+              stroke={entry.color ?? chartColors[index % chartColors.length]}
               strokeWidth={3}
               dot={{ r: 4, strokeWidth: 2, fill: redFinanceTheme.colors.surface }}
               activeDot={{ r: 5 }}

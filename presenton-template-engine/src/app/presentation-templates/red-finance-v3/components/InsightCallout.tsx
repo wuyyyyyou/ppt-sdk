@@ -33,9 +33,9 @@ const InsightCallout = ({
       style={{
         gap: isDense ? 10 : 15,
         padding: `${paddingY}px ${paddingX}px`,
-        backgroundColor: redFinanceTheme.colors.primary,
-        color: redFinanceTheme.colors.primaryText,
-        boxShadow: `0 4px 10px ${redFinanceTheme.colors.shadowPrimary}`,
+        backgroundColor: redFinanceTheme.colors.accent,
+        color: redFinanceTheme.colors.accentText,
+        boxShadow: `0 4px 10px ${redFinanceTheme.shadows.accent}`,
       }}
     >
       <div
@@ -45,7 +45,7 @@ const InsightCallout = ({
         <FinanceIcon
           name={icon}
           className={iconClassName}
-          stroke={redFinanceTheme.colors.primaryText}
+          stroke={redFinanceTheme.colors.accentText}
         />
       </div>
       <div

@@ -24,8 +24,8 @@ const CoverBarDecoration = () => {
           style={{
             height: `${bar.height}px`,
             opacity: bar.opacity,
-            backgroundColor: redFinanceTheme.colors.primary,
-            boxShadow: "4px 4px 10px rgba(0,0,0,0.1)",
+            backgroundColor: redFinanceTheme.colors.accent,
+            boxShadow: redFinanceTheme.shadows.accent,
           }}
         />
       ))}
