@@ -40,16 +40,16 @@ const TimelineBoard = ({
         .filter(Boolean)
         .join(" ")}
       style={{
-        backgroundColor: redFinanceTheme.colors.background,
+        backgroundColor: redFinanceTheme.colors.canvas,
         borderColor: redFinanceTheme.colors.stroke,
-        boxShadow: "0 4px 10px rgba(0,0,0,0.03)",
+        boxShadow: redFinanceTheme.shadows.panel,
       }}
     >
       <div className="relative flex min-h-0 flex-1 gap-[14px] pt-[6px]">
         {showConnectorLine ? (
           <div
             className="absolute left-[56px] right-[56px] top-[20px] h-[2px] rounded-full"
-            style={{ backgroundColor: redFinanceTheme.colors.softStroke }}
+            style={{ backgroundColor: redFinanceTheme.colors.strokeSoft }}
           />
         ) : null}
         {phases.map((phase) => (
@@ -63,7 +63,7 @@ const TimelineBoard = ({
               paddingBottom: cardPaddingBottom,
               backgroundColor: redFinanceTheme.colors.surface,
               borderColor: redFinanceTheme.colors.stroke,
-              boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
+              boxShadow: redFinanceTheme.shadows.card,
             }}
           >
             <div
@@ -71,9 +71,9 @@ const TimelineBoard = ({
               style={{
                 width: nodeSize,
                 height: nodeSize,
-                backgroundColor: redFinanceTheme.colors.primary,
-                color: redFinanceTheme.colors.primaryText,
-                boxShadow: `0 3px 6px ${redFinanceTheme.colors.shadowPrimary}`,
+                backgroundColor: redFinanceTheme.colors.accent,
+                color: redFinanceTheme.colors.accentText,
+                boxShadow: `0 3px 6px ${redFinanceTheme.shadows.accent}`,
               }}
             >
               {phase.label}
@@ -82,7 +82,7 @@ const TimelineBoard = ({
               className="text-[15px] font-bold leading-[1.2]"
               style={{
                 marginBottom: titleMarginBottom,
-                color: redFinanceTheme.colors.backgroundText,
+                color: redFinanceTheme.colors.textPrimary,
               }}
             >
               {phase.title}
@@ -99,12 +99,12 @@ const TimelineBoard = ({
                       width: 5,
                       height: 5,
                       marginTop: bulletTopOffset,
-                      backgroundColor: redFinanceTheme.colors.primary,
+                      backgroundColor: redFinanceTheme.colors.accent,
                     }}
                   />
                   <div
                     className="min-w-0 text-[12px] leading-[1.35]"
-                    style={{ color: redFinanceTheme.colors.mutedText }}
+                    style={{ color: redFinanceTheme.colors.textMuted }}
                   >
                     {item}
                   </div>

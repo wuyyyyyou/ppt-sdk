@@ -119,7 +119,7 @@ const FinanceRadarChart = ({
           <PolarAngleAxis
             dataKey="label"
             tick={{
-              fill: redFinanceTheme.colors.mutedText,
+              fill: redFinanceTheme.colors.textMuted,
               fontSize: labelFontSize,
               fontWeight: 700,
             }}
@@ -131,7 +131,7 @@ const FinanceRadarChart = ({
             domain={[minValue, maxValue]}
             tickCount={ticks.length}
             tick={{
-              fill: redFinanceTheme.colors.subtleText,
+              fill: redFinanceTheme.colors.textSubtle,
               fontSize: 9,
             }}
             tickFormatter={(value) => tickFormatter(Number(value))}

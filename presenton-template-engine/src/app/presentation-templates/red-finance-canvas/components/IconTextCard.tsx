@@ -42,8 +42,8 @@ const IconTextCard = ({
   density = "normal",
   descriptionMaxLines = 2,
   align = "center",
-  accentColor = redFinanceTheme.colors.primary,
-  iconBackgroundColor = redFinanceTheme.colors.paleRed,
+  accentColor = redFinanceTheme.colors.accent,
+  iconBackgroundColor = redFinanceTheme.colors.accentSoft,
   variant = "compact",
   className,
   cardPaddingX,
@@ -80,7 +80,7 @@ const IconTextCard = ({
     descriptionFontSize ?? (isSummary ? 13 : isDense ? 10 : isCompact ? 11 : 12);
   const descriptionLineHeight = isSummary ? 1.52 : isDense ? 1.3 : 1.4;
   const resolvedShadow =
-    shadow ?? (isSummary ? "0 4px 10px rgba(0,0,0,0.03)" : "0 2px 4px rgba(0,0,0,0.03)");
+    shadow ?? (isSummary ? redFinanceTheme.shadows.panel : redFinanceTheme.shadows.card);
   const iconRadius = iconShape === "rounded" ? 12 : 9999;
   const resolvedBorderRadius = borderRadius ?? 6;
   const resolvedTitleLines =
@@ -102,7 +102,7 @@ const IconTextCard = ({
         paddingTop: resolvedCardPaddingTop,
         paddingBottom: resolvedCardPaddingBottom,
         borderColor: cardBorderColor ?? redFinanceTheme.colors.stroke,
-        backgroundColor: cardBackgroundColor ?? redFinanceTheme.colors.background,
+        backgroundColor: cardBackgroundColor ?? redFinanceTheme.colors.canvas,
         boxShadow: resolvedShadow,
         minHeight,
         borderRadius: resolvedBorderRadius,
@@ -157,7 +157,7 @@ const IconTextCard = ({
               style={{
                 fontSize: resolvedTitleFontSize,
                 lineHeight: isSummary ? 1.2 : isDense ? 1.18 : 1.3,
-                color: redFinanceTheme.colors.backgroundText,
+                color: redFinanceTheme.colors.textPrimary,
               }}
             >
               {line}
@@ -173,7 +173,7 @@ const IconTextCard = ({
             lineHeight: descriptionLineHeight,
             maxHeight: descriptionMaxLines * resolvedDescriptionFontSize * descriptionLineHeight,
             overflow: "hidden",
-            color: redFinanceTheme.colors.mutedText,
+            color: redFinanceTheme.colors.textMuted,
           }}
         >
           {description}

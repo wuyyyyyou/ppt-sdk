@@ -41,7 +41,7 @@ const VerticalMilestoneTimeline = ({
   const cardMinHeight = isCompact ? 68 : 76;
   const periodFontSize = isCompact ? 22 : 24;
   const stageFontSize = isCompact ? 11 : 12;
-  const timelineStroke = redFinanceTheme.colors.softStroke;
+  const timelineStroke = redFinanceTheme.colors.strokeSoft;
 
   return (
     <div className={["relative h-full overflow-hidden", className].filter(Boolean).join(" ")}>
@@ -60,8 +60,8 @@ const VerticalMilestoneTimeline = ({
           const tone = item.tone ?? "default";
           const isFuture = tone === "future";
           const yearColor = isFuture
-            ? redFinanceTheme.colors.primary
-            : redFinanceTheme.colors.primary;
+            ? redFinanceTheme.colors.accent
+            : redFinanceTheme.colors.accent;
 
           return (
             <div
@@ -88,7 +88,7 @@ const VerticalMilestoneTimeline = ({
                   className="mt-[5px] whitespace-nowrap font-medium leading-none"
                   style={{
                     fontSize: stageFontSize,
-                    color: redFinanceTheme.colors.mutedText,
+                    color: redFinanceTheme.colors.textMuted,
                   }}
                 >
                   {item.stage}
@@ -106,10 +106,10 @@ const VerticalMilestoneTimeline = ({
                     height: dotSize,
                     borderWidth: dotBorderWidth,
                     borderColor: isFuture
-                      ? redFinanceTheme.colors.primary
-                      : redFinanceTheme.colors.primary,
+                      ? redFinanceTheme.colors.accent
+                      : redFinanceTheme.colors.accent,
                     backgroundColor: isFuture
-                      ? redFinanceTheme.colors.primary
+                      ? redFinanceTheme.colors.accent
                       : redFinanceTheme.colors.surface,
                     boxShadow: dotHalo,
                   }}
@@ -139,11 +139,11 @@ const VerticalMilestoneTimeline = ({
                   minHeight={cardMinHeight}
                   tagUppercase={false}
                   railColor={
-                    isFuture ? redFinanceTheme.colors.primary : undefined
+                    isFuture ? redFinanceTheme.colors.accent : undefined
                   }
-                  iconBackgroundColor={isFuture ? redFinanceTheme.colors.paleRed : undefined}
+                  iconBackgroundColor={isFuture ? redFinanceTheme.colors.accentSoft : undefined}
                   iconStroke={
-                    isFuture ? redFinanceTheme.colors.primary : undefined
+                    isFuture ? redFinanceTheme.colors.accent : undefined
                   }
                 />
               </div>

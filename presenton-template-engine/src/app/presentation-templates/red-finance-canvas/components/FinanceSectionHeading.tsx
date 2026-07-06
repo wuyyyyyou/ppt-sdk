@@ -23,19 +23,19 @@ const FinanceSectionHeading = ({
       >
         <div
           className="mt-[2px] h-[22px] w-[4px] flex-none rounded-full"
-          style={{ backgroundColor: redFinanceTheme.colors.primary }}
+          style={{ backgroundColor: redFinanceTheme.colors.accent }}
         />
         <div className="min-w-0">
           <h2
             className="text-[18px] font-bold leading-[22px]"
-            style={{ color: redFinanceTheme.colors.backgroundText }}
+            style={{ color: redFinanceTheme.colors.textPrimary }}
           >
             {title}
           </h2>
           {subtitle ? (
             <p
               className="mt-[4px] text-[12px] leading-[16px]"
-              style={{ color: redFinanceTheme.colors.subtleText }}
+              style={{ color: redFinanceTheme.colors.textSubtle }}
             >
               {subtitle}
             </p>
@@ -53,11 +53,11 @@ const FinanceSectionHeading = ({
       <div className="flex items-center gap-[10px]">
         <div
           className="h-[22px] w-[4px] rounded-full"
-          style={{ backgroundColor: redFinanceTheme.colors.primary }}
+          style={{ backgroundColor: redFinanceTheme.colors.accent }}
         />
         <h2
           className="text-[18px] font-bold"
-          style={{ color: redFinanceTheme.colors.backgroundText }}
+          style={{ color: redFinanceTheme.colors.textPrimary }}
         >
           {title}
         </h2>
@@ -65,7 +65,7 @@ const FinanceSectionHeading = ({
       {subtitle ? (
         <div
           className="whitespace-nowrap text-[12px]"
-          style={{ color: redFinanceTheme.colors.subtleText }}
+          style={{ color: redFinanceTheme.colors.textSubtle }}
         >
           {subtitle}
         </div>

@@ -97,7 +97,7 @@ type FinanceIconProps = {
   stroke?: string;
 };
 
-const defaultStroke = redFinanceTheme.colors.primary;
+const defaultStroke = redFinanceTheme.colors.accent;
 
 export const FinanceIcon = ({
   name,

@@ -16,8 +16,8 @@ const FinanceCanvas = ({ children }: FinanceCanvasProps) => {
       <div
         className="relative h-[720px] w-[1280px] overflow-hidden"
         style={{
-          backgroundColor: redFinanceTheme.colors.background,
-          color: redFinanceTheme.colors.backgroundText,
+          backgroundColor: redFinanceTheme.colors.canvas,
+          color: redFinanceTheme.colors.textPrimary,
           fontFamily: redFinanceTheme.fonts.body,
         }}
       >

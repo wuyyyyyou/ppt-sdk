@@ -1,45 +1,60 @@
 # PPT App Theme Tokenization Process
 
-## 当前进度
+## 目标
 
-`red-finance-v3` 主题 token 试点已完成首轮实现，并已通过 `presenton-template-engine` 的 `npm run check` 和 `npm run build`。
+将模板主题从“固定主题集合 + `manifest.theme.colors`”迁移到“模板本地 theme token”。长期目标是让 LLM 根据用户输入和模板 token 契约生成 `theme/token.json`，模板组件只消费 token，不再依赖固定 6 组颜色。
 
-## 已确认方向
+当前阶段先做模板级基础设施和模板迁移，不接入 LLM 生成流程。
 
-长期方向是将主题逻辑从“LLM 在固定预设主题中选择”改为“LLM 根据用户输入和模板主题契约生成主题 token”。本阶段先不接 LLM 主题生成，只打通 `red-finance-v3` 的 token 主题基础设施。
+## 当前约定
 
-核心原则：
+- tokenized template 的主题主源是 workspace/local 的 `theme/token.json`，不存在时 fallback 到源模板提交的 `theme/token.default.json`。
+- 模板 theme 目录提交 `token.schema.json`、`token.default.json`、`README.md`，也可以提交命名预设，例如 `token.dark-orange.json`；源模板不提交 `token.json`。
+- `theme/token.json` 是本地可变测试/工作区主题文件，用于快速修改后观察渲染效果，应通过 `.gitignore` 排除。
+- `manifest.theme.colors` 不再作为 tokenized template 的颜色来源；tokenized template 应移除 `manifest.theme`，避免两套主题源打架。
+- `tokens.ts` 负责把组件消费层统一到 `--theme-color-*` / `--theme-shadow-*` CSS vars；组件、slides、blueprints 不应继续散落主题色硬编码。
+- render layer 已支持读取 token 文件并注入 `--theme-*` 和 `*-rgb` CSS vars。
+- fork/build 链路已支持复制 `theme/`，workspace fork 时会从 token default 初始化工作区主题。
+- 本阶段不做硬编码颜色扫描校验，靠模板迁移和 review 控制。
 
-- `red-finance-v3` 作为 tokenized template 试点。
-- 主题主源为 workspace 内的 `theme/token.json`，不存在时 fallback 到 `theme/token.default.json`。
-- 源模板只提交：
-  - `token.schema.json`：机器校验字段、类型、必填项和颜色格式。
-  - `token.default.json`：模板默认主题。
-  - `README.md`：说明每个 token 的语义和使用场景。
-- 源模板不提交 `token.json`；workspace fork 时由 `token.default.json` 初始化。
-- 直接移除 `red-finance-v3/manifest.theme`，该模板不再从 `manifest.theme.colors` 取色。
-- token schema 先做模板私有 schema，不抽全局通用 schema。
-- `tokens.ts` 使用新的 `--theme-color-*` / `--theme-shadow-*` CSS vars，不保留颜色字面量 fallback。
-- render layer 从 token hex 自动注入对应 `*-rgb` CSS vars；`tokens.ts` 可提供受控 `alpha()` 派生能力。
-- 组件不散落颜色公式；语义派生色进 token，机械透明度/阴影层级可集中受控派生。
-- data 默认不写 `color`，图表颜色由 `chart1..chart6` token 控制；data color 只作为极少数显式业务覆盖。
-- 模板自带 fallback/placeholder 视觉也要 token-aware，不能继续用硬编码主题色的 data URI SVG。
-- tokenized template 现阶段忽略旧 preset theme，不再把旧 6 组主题写回 `manifest.theme`，也不映射到 `token.json`。
-- 本阶段不做硬编码颜色扫描校验；先靠人工迁移和 review。
-- 实现前补一篇 ADR，记录 token 主题源替代 `manifest.theme.colors` 的架构决策。
+## 已完成
 
-## 本轮已实现
+`red-finance-v3` 已完成首轮 token 试点：
 
-1. 新增 ADR，记录 token 主题源替代 `manifest.theme.colors` 的方向。
-2. 为 `red-finance-v3` 增加 `theme/token.schema.json`、`theme/token.default.json`、`theme/README.md`。
-3. 移除 `red-finance-v3/manifest.theme`，真实颜色来源改为 theme token。
-4. 调整 render 注入链路，读取 `theme/token.json`，fallback 到 `theme/token.default.json`，并注入 `--theme-*` 与 `*-rgb` CSS vars。
-5. 调整 fork/build 链路，复制 theme 文件，并在 workspace fork 时用 `token.default.json` 初始化 `theme/token.json`。
-6. 迁移 `red-finance-v3` 真实生成路径的 components、blueprints、slides、demo data，使颜色/阴影尽量统一从 `tokens.ts` 消费。
-7. 图表 demo data 默认不再写颜色，组件按 `chart1..chart6` token 自动分配色板。
-8. 图片 placeholder 改为 token-aware，移除 demo data 中携带主题色的 data URI SVG。
-9. `reference-slides/` 仍保持只读参考，不参与本阶段迁移；为避免旧 token 名阻断编译，已从 engine TS 编译范围排除。
+- 增加 `theme/token.schema.json`、`theme/token.default.json`、`theme/README.md`，并保留 `theme/token.dark-orange.json` 作为命名预设。
+- 默认 fallback 主题为红色金融风格；本地 `theme/token.json` 可用于临时测试黑橙暗色等效果，但不提交。
+- 移除 `manifest.theme`，真实颜色来源改为 theme token。
+- `theme/tokens.ts` 已改为读取 `--theme-color-*` / `--theme-shadow-*`。
+- 真实生成路径中的 components、blueprints、slides、demo data 已尽量迁移为从 token 消费颜色。
+- 图表默认不再从 data 写颜色，改由 `chart1..chart6` token 控制。
+- placeholder / fallback 视觉已改为 token-aware。
+- `reference-slides/` 保持只读参考，不作为本阶段迁移目标。
 
-## 后续
+相关架构记录见 `docs/adr/0013-template-theme-token-source.md`。
 
-若继续推进，需要接入 LLM 生成 `token.json` 的流程，并按模板逐个细调 token 覆盖度。
+`red-finance-canvas` 已按同一机制完成迁移：
+
+- 增加 `theme/token.schema.json`、`theme/token.default.json`、`theme/README.md`，并保留 `theme/token.dark-orange.json` 作为命名预设。
+- 不提交 `theme/token.json`；该文件继续作为本地测试/工作区主题文件。
+- 移除 `manifest.theme`，真实颜色来源改为 theme token。
+- `theme/tokens.ts` 已改为读取 `--theme-color-*` / `--theme-shadow-*`。
+- components 已对齐 `red-finance-v3` 的 token 消费方式，图表默认由 `chart1..chart6` token 控制。
+- canvas 独有的 `blueprints/ContentCanvas.tsx`、`blueprints/CoverCanvas.tsx`、`blueprints/SectionFocusCanvas.tsx` 已迁移 slot guide 和占位视觉用色。
+- 已通过 `presenton-template-engine` 的 `npm run check` 和 `npm run build`。
+
+## Canvas 模板关系
+
+这个模板和 `red-finance-v3` 的关系：
+
+- `red-finance-canvas` 是开放性 canvas 蓝图模板。
+- 它的组件基本来自 `red-finance-v3` / 同一套红色金融组件体系。
+- 主要差异在蓝图形态：`red-finance-v3` 是较完整的页面蓝图；`red-finance-canvas` 提供 cover/content/section 级 canvas，让 AI Agent 自行组合组件。
+
+## 注意事项
+
+- 先读 `red-finance-v3` 的最终实现，再迁移 canvas；不要凭记忆手改。
+- 不要迁移 `reference-slides/` 这类参考材料，除非后续明确要求。
+- data 默认不要再写颜色；只有明确业务覆盖才允许 data color。
+- 允许 `tokens.ts` 做机械派生，例如 alpha helper；语义颜色应进入 token json。
+- 页面级一次性改色可以改具体 TSX，但模板级主题能力必须走 token。
+- 暂时不要接 LLM 生成 `token.json`，那是下一阶段工作；当前 `token.json` 只作为本地可变测试文件。

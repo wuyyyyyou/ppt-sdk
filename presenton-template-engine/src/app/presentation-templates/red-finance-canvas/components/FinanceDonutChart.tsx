@@ -92,7 +92,7 @@ const FinanceDonutChart = ({
         cy={centerY}
         r={radius}
         fill="none"
-        stroke={redFinanceTheme.colors.softStroke}
+        stroke={redFinanceTheme.colors.strokeSoft}
         strokeWidth={strokeWidth}
       />
       {arcNodes}
@@ -102,7 +102,7 @@ const FinanceDonutChart = ({
         textAnchor="middle"
         fontSize={innerLabelFontSize}
         fontWeight="700"
-        fill={redFinanceTheme.colors.mutedText}
+        fill={redFinanceTheme.colors.textMuted}
         fontFamily={redFinanceTheme.fonts.body}
       >
         {centerLabel}
@@ -126,7 +126,7 @@ const FinanceDonutChart = ({
               y={rowY}
               fontSize={legendLabelFontSize}
               fontWeight="700"
-              fill={redFinanceTheme.colors.backgroundText}
+              fill={redFinanceTheme.colors.textPrimary}
               fontFamily={redFinanceTheme.fonts.body}
             >
               {segment.label}
@@ -136,7 +136,7 @@ const FinanceDonutChart = ({
               y={rowY}
               textAnchor="end"
               fontSize={legendValueFontSize}
-              fill={redFinanceTheme.colors.subtleText}
+              fill={redFinanceTheme.colors.textSubtle}
               fontFamily={redFinanceTheme.fonts.body}
             >
               {percentage}

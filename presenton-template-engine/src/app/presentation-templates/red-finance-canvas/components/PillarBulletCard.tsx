@@ -47,8 +47,8 @@ const PillarBulletCard = ({
   icon,
   title,
   items,
-  accentColor = redFinanceTheme.colors.primary,
-  iconBackgroundColor = redFinanceTheme.colors.paleRed,
+  accentColor = redFinanceTheme.colors.accent,
+  iconBackgroundColor = redFinanceTheme.colors.accentSoft,
   density = "normal",
   titlePlacement = "below",
   showWatermark = true,
@@ -114,9 +114,9 @@ const PillarBulletCard = ({
   return (
     <SectionPanelShell
       className="relative h-full min-h-0 rounded-[8px]"
-      backgroundColor={redFinanceTheme.colors.background}
+      backgroundColor={redFinanceTheme.colors.canvas}
       borderColor={redFinanceTheme.colors.stroke}
-      shadow="0 4px 6px rgba(0,0,0,0.02)"
+      shadow={redFinanceTheme.shadows.card}
       radius={8}
       paddingX={cardPaddingX}
       paddingY={0}
@@ -136,7 +136,7 @@ const PillarBulletCard = ({
       {showWatermark && resolvedWatermarkText ? (
         <div
           className="absolute right-[16px] top-[14px] text-[42px] font-black leading-none"
-          style={{ color: redFinanceTheme.colors.paleRed }}
+          style={{ color: redFinanceTheme.colors.accentSoft }}
         >
           {resolvedWatermarkText}
         </div>
@@ -176,7 +176,7 @@ const PillarBulletCard = ({
         <h2
           className="font-bold"
           style={{
-            color: redFinanceTheme.colors.backgroundText,
+            color: redFinanceTheme.colors.textPrimary,
             fontSize: titleFontSize,
             lineHeight: titleLineHeight,
           }}
@@ -254,7 +254,7 @@ const PillarBulletCard = ({
                 style={{
                   fontSize: leadFontSize,
                   fontWeight: 700,
-                  color: redFinanceTheme.colors.backgroundText,
+                  color: redFinanceTheme.colors.textPrimary,
                 }}
               >
                 <span>{item.lead}：</span>
@@ -264,7 +264,7 @@ const PillarBulletCard = ({
                 style={{
                   fontSize: bodyFontSize,
                   lineHeight: bodyLineHeight,
-                  color: redFinanceTheme.colors.mutedText,
+                  color: redFinanceTheme.colors.textMuted,
                 }}
               >
                 {item.body}

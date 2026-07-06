@@ -27,10 +27,10 @@ const ProgressStatusCard = ({
   marker,
   progress,
   status,
-  progressColor = redFinanceTheme.colors.primary,
-  trackColor = redFinanceTheme.colors.softStroke,
-  titleColor = redFinanceTheme.colors.backgroundText,
-  statusColor = redFinanceTheme.colors.mutedText,
+  progressColor = redFinanceTheme.colors.accent,
+  trackColor = redFinanceTheme.colors.strokeSoft,
+  titleColor = redFinanceTheme.colors.textPrimary,
+  statusColor = redFinanceTheme.colors.textMuted,
   minHeight = 96,
   className,
 }: ProgressStatusCardProps) => {
@@ -48,7 +48,7 @@ const ProgressStatusCard = ({
         minHeight,
         backgroundColor: redFinanceTheme.colors.surface,
         borderColor: redFinanceTheme.colors.stroke,
-        boxShadow: "0 6px 14px rgba(0,0,0,0.04)",
+        boxShadow: redFinanceTheme.shadows.panel,
       }}
     >
       <div className="mb-[10px] flex items-start justify-between gap-[10px]">

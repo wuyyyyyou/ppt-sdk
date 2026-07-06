@@ -26,8 +26,8 @@ const ComparisonPanel = ({
   title,
   icon,
   sections,
-  headerBackgroundColor = redFinanceTheme.colors.backgroundText,
-  headerTextColor = redFinanceTheme.colors.primaryText,
+  headerBackgroundColor = redFinanceTheme.colors.panel,
+  headerTextColor = redFinanceTheme.colors.textPrimary,
   dividerColor = redFinanceTheme.colors.stroke,
   className,
   density = "normal",
@@ -51,7 +51,7 @@ const ComparisonPanel = ({
       style={{
         backgroundColor: redFinanceTheme.colors.surface,
         borderColor: redFinanceTheme.colors.stroke,
-        boxShadow: "0 4px 6px rgba(0,0,0,0.02)",
+        boxShadow: redFinanceTheme.shadows.card,
       }}
     >
       {title ? (
@@ -96,12 +96,13 @@ const ComparisonPanel = ({
               }}
             >
               <div
-                className="mt-[3px] flex flex-none items-center justify-center rounded-[2px] text-[10px] font-bold leading-none text-white"
+                className="mt-[3px] flex flex-none items-center justify-center rounded-[2px] text-[10px] font-bold leading-none"
                 style={{
                   width: badgeWidth,
                   height: badgeHeight,
+                  color: redFinanceTheme.colors.accentText,
                   backgroundColor:
-                    section.badgeColor ?? redFinanceTheme.colors.primary,
+                    section.badgeColor ?? redFinanceTheme.colors.accent,
                 }}
               >
                 {section.badge}
@@ -111,7 +112,7 @@ const ComparisonPanel = ({
                   className="mb-[2px] font-bold leading-[1.25]"
                   style={{
                     fontSize: titleFontSize,
-                    color: redFinanceTheme.colors.backgroundText,
+                    color: redFinanceTheme.colors.textPrimary,
                   }}
                 >
                   {section.title}
@@ -120,7 +121,7 @@ const ComparisonPanel = ({
                   style={{
                     fontSize: descriptionFontSize,
                     lineHeight: 1.42,
-                    color: redFinanceTheme.colors.mutedText,
+                    color: redFinanceTheme.colors.textMuted,
                   }}
                 >
                   {section.description}

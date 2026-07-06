@@ -29,7 +29,7 @@ const ChartCardShell = ({
       padding,
       backgroundColor: redFinanceTheme.colors.panel,
       borderColor: redFinanceTheme.colors.stroke,
-      boxShadow: "0 4px 6px rgba(0,0,0,0.02)",
+      boxShadow: redFinanceTheme.shadows.card,
     }}
   >
     <div
@@ -40,11 +40,11 @@ const ChartCardShell = ({
         <div className="flex min-w-0 items-center gap-[10px]">
           <div
             className="h-[18px] w-[3px] rounded-full"
-            style={{ backgroundColor: redFinanceTheme.colors.primary }}
+            style={{ backgroundColor: redFinanceTheme.colors.accent }}
           />
           <h3
             className="min-w-0 truncate text-[16px] font-bold"
-            style={{ color: redFinanceTheme.colors.backgroundText }}
+            style={{ color: redFinanceTheme.colors.textPrimary }}
           >
             {title}
           </h3>
@@ -52,7 +52,7 @@ const ChartCardShell = ({
         {subtitle ? (
           <div
             className="mt-[6px] pl-[13px] text-[12px]"
-            style={{ color: redFinanceTheme.colors.mutedText }}
+            style={{ color: redFinanceTheme.colors.textMuted }}
           >
             {subtitle}
           </div>
@@ -64,7 +64,7 @@ const ChartCardShell = ({
           className="flex-none rounded-[4px] border px-[8px] py-[2px] text-[12px]"
           style={{
             borderColor: redFinanceTheme.colors.stroke,
-            color: redFinanceTheme.colors.mutedText,
+            color: redFinanceTheme.colors.textMuted,
             backgroundColor: redFinanceTheme.colors.surface,
           }}
         >

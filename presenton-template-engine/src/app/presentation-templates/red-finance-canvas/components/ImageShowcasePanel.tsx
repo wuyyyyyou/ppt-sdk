@@ -19,6 +19,7 @@ type ImageShowcasePanelProps = {
   className?: string;
   titleMaxLines?: number;
   captionMaxLines?: number;
+  sourceMaxLines?: number;
   imageRadius?: number;
 };
 
@@ -32,7 +33,7 @@ const ImagePlaceholder = ({ message }: { message: string }) => (
       gap: 12,
       borderColor: redFinanceTheme.colors.accentBorder,
       backgroundColor: redFinanceTheme.colors.accentTint,
-      color: redFinanceTheme.colors.accentSubtleText,
+      color: redFinanceTheme.colors.accentMutedText,
       borderRadius: 6,
       padding: 24,
     }}
@@ -42,7 +43,7 @@ const ImagePlaceholder = ({ message }: { message: string }) => (
       style={{
         width: 46,
         height: 46,
-        backgroundColor: redFinanceTheme.colors.paleRed,
+        backgroundColor: redFinanceTheme.colors.accentSoft,
       }}
     >
       <FinanceIcon name="image" className="h-[22px] w-[22px]" />
@@ -76,7 +77,7 @@ const ImageShowcasePanel = ({
         backgroundColor: redFinanceTheme.colors.panel,
         borderColor: redFinanceTheme.colors.stroke,
         borderRadius: 8,
-        boxShadow: "0 4px 10px rgba(0,0,0,0.03)",
+        boxShadow: redFinanceTheme.shadows.panel,
         padding: 16,
       }}
     >
@@ -84,7 +85,7 @@ const ImageShowcasePanel = ({
         <div
           className="flex-none font-bold"
           style={{
-            color: redFinanceTheme.colors.backgroundText,
+            color: redFinanceTheme.colors.textPrimary,
             fontSize: 17,
             lineHeight: 1.25,
             maxHeight: textMaxHeight(17, 1.25, titleMaxLines),
@@ -120,7 +121,7 @@ const ImageShowcasePanel = ({
           data-validation-role="multi-line-body-text"
           className="flex-none"
           style={{
-            color: redFinanceTheme.colors.mutedText,
+            color: redFinanceTheme.colors.textMuted,
             fontSize: 12,
             lineHeight: 1.4,
             maxHeight: textMaxHeight(12, 1.4, captionMaxLines),
@@ -136,7 +137,7 @@ const ImageShowcasePanel = ({
         <div
           className="flex-none truncate pt-[6px] text-[10px] font-medium uppercase"
           style={{
-            color: redFinanceTheme.colors.subtleText,
+            color: redFinanceTheme.colors.textSubtle,
             lineHeight: "14px",
             overflow: "hidden",
           }}

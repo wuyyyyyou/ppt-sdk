@@ -79,7 +79,7 @@ const InfoListItem = ({
         style={{
           width: iconSize,
           height: iconSize,
-          backgroundColor: redFinanceTheme.colors.paleRed,
+          backgroundColor: redFinanceTheme.colors.accentSoft,
         }}
       >
         <FinanceIcon name={icon} className={iconClassName} />
@@ -93,7 +93,7 @@ const InfoListItem = ({
           style={{
             fontSize: titleFontSize,
             marginBottom: titleMarginBottom,
-            color: redFinanceTheme.colors.backgroundText,
+            color: redFinanceTheme.colors.textPrimary,
           }}
         >
           <div className="min-w-0 truncate leading-[1.15]">
@@ -108,7 +108,7 @@ const InfoListItem = ({
         <div
           data-validation-role="multi-line-body-text"
           style={{
-            color: redFinanceTheme.colors.mutedText,
+            color: redFinanceTheme.colors.textMuted,
             fontSize: descriptionFontSize,
             lineHeight: `${descriptionLineHeight}px`,
             maxHeight: descriptionLineHeight * descriptionMaxLines,

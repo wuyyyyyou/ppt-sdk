@@ -40,30 +40,30 @@ const toneDefaults = (tone: HorizontalFeatureCardTone) => {
   switch (tone) {
     case "accent":
       return {
-        railColor: redFinanceTheme.colors.primary,
-        iconBackgroundColor: redFinanceTheme.colors.paleRed,
-        iconStroke: redFinanceTheme.colors.primary,
+        railColor: redFinanceTheme.colors.accent,
+        iconBackgroundColor: redFinanceTheme.colors.accentSoft,
+        iconStroke: redFinanceTheme.colors.accent,
         tagBorderColor: redFinanceTheme.colors.accentBorder,
         tagBackgroundColor: redFinanceTheme.colors.accentTint,
-        tagTextColor: redFinanceTheme.colors.primary,
+        tagTextColor: redFinanceTheme.colors.accent,
       };
     case "future":
       return {
-        railColor: redFinanceTheme.colors.primary,
-        iconBackgroundColor: redFinanceTheme.colors.paleRed,
-        iconStroke: redFinanceTheme.colors.primary,
+        railColor: redFinanceTheme.colors.accent,
+        iconBackgroundColor: redFinanceTheme.colors.accentSoft,
+        iconStroke: redFinanceTheme.colors.accent,
         tagBorderColor: redFinanceTheme.colors.accentBorder,
         tagBackgroundColor: redFinanceTheme.colors.accentTint,
-        tagTextColor: redFinanceTheme.colors.primary,
+        tagTextColor: redFinanceTheme.colors.accent,
       };
     default:
       return {
         railColor: redFinanceTheme.colors.iconMuted,
-        iconBackgroundColor: redFinanceTheme.colors.paleRed,
-        iconStroke: redFinanceTheme.colors.primary,
+        iconBackgroundColor: redFinanceTheme.colors.accentSoft,
+        iconStroke: redFinanceTheme.colors.accent,
         tagBorderColor: redFinanceTheme.colors.stroke,
         tagBackgroundColor: redFinanceTheme.colors.panel,
-        tagTextColor: redFinanceTheme.colors.mutedText,
+        tagTextColor: redFinanceTheme.colors.textMuted,
       };
   }
 };
@@ -127,8 +127,8 @@ const HorizontalFeatureCard = ({
         minHeight,
         borderRadius: cardRadius,
         borderColor: borderColor ?? redFinanceTheme.colors.stroke,
-        backgroundColor: cardBackgroundColor ?? redFinanceTheme.colors.background,
-        boxShadow: shadow ?? "0 4px 6px rgba(0,0,0,0.02)",
+        backgroundColor: cardBackgroundColor ?? redFinanceTheme.colors.canvas,
+        boxShadow: shadow ?? redFinanceTheme.shadows.card,
       }}
     >
       {railSide === "left" ? (
@@ -187,7 +187,7 @@ const HorizontalFeatureCard = ({
                 .join(" ")}
               style={{
                 fontSize: resolvedTitleFontSize,
-                color: titleColor ?? redFinanceTheme.colors.backgroundText,
+                color: titleColor ?? redFinanceTheme.colors.textPrimary,
               }}
             >
               {title}
@@ -210,7 +210,7 @@ const HorizontalFeatureCard = ({
             style={{
               fontSize: resolvedDescriptionFontSize,
               lineHeight: resolvedDescriptionLineHeight,
-              color: descriptionColor ?? redFinanceTheme.colors.mutedText,
+              color: descriptionColor ?? redFinanceTheme.colors.textMuted,
             }}
           >
             {description}

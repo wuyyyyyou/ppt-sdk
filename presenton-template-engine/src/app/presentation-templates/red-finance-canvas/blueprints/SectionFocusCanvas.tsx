@@ -4,6 +4,7 @@ import { readTemplateData } from "../utils/templateData.ts";
 
 import FinanceSectionFocusFrame from "../components/FinanceSectionFocusFrame.tsx";
 import { FinanceIcon } from "../components/FinanceIcons.tsx";
+import IconText from "../components/IconText.tsx";
 import { redFinanceTheme } from "../theme/tokens.ts";
 
 export const Schema = z.object({
@@ -56,20 +57,28 @@ const SectionFocusCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> })
           <div
             className="mb-[24px] flex h-[72px] w-[72px] items-center justify-center rounded-[6px] text-[34px] font-black leading-none"
             style={{
-              color: redFinanceTheme.colors.primaryText,
-              backgroundColor: redFinanceTheme.colors.primary,
+              color: redFinanceTheme.colors.accentText,
+              backgroundColor: redFinanceTheme.colors.accent,
             }}
           >
             {parsed.sectionNumber}
           </div>
-          <div className="mb-[18px] flex items-center gap-[12px] text-[16px] font-black uppercase leading-none" style={{ color: redFinanceTheme.colors.primary }}>
-            <FinanceIcon name="compass" className="h-[22px] w-[22px]" />
-            {parsed.eyebrow}
+          <div className="mb-[18px]">
+            <IconText
+              icon={<FinanceIcon name="compass" className="h-[22px] w-[22px]" />}
+              label={parsed.eyebrow.toUpperCase()}
+              height={22}
+              iconSize={22}
+              gap={12}
+              fontSize={16}
+              fontWeight={900}
+              textColor={redFinanceTheme.colors.accent}
+            />
           </div>
-          <div className="mb-[26px] text-[62px] font-black leading-[1.04]" style={{ color: redFinanceTheme.colors.backgroundText }}>
+          <div className="mb-[26px] text-[62px] font-black leading-[1.04]" style={{ color: redFinanceTheme.colors.textPrimary }}>
             {parsed.title}
           </div>
-          <div className="w-[510px] text-[22px] font-medium leading-[1.45]" style={{ color: redFinanceTheme.colors.mutedText }}>
+          <div className="w-[510px] text-[22px] font-medium leading-[1.45]" style={{ color: redFinanceTheme.colors.textMuted }}>
             {parsed.subtitle}
           </div>
         </div>
@@ -85,10 +94,10 @@ const SectionFocusCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> })
               }}
             >
               <div className="px-[42px] text-center">
-                <div className="text-[24px] font-black leading-none" style={{ color: redFinanceTheme.colors.primary }}>
+                <div className="text-[24px] font-black leading-none" style={{ color: redFinanceTheme.colors.accent }}>
                   {parsed.rightGuideTitle}
                 </div>
-                <div className="mt-[18px] text-[17px] font-medium leading-[1.5]" style={{ color: redFinanceTheme.colors.mutedText }}>
+                <div className="mt-[18px] text-[17px] font-medium leading-[1.5]" style={{ color: redFinanceTheme.colors.textMuted }}>
                   {parsed.rightGuideText}
                 </div>
               </div>

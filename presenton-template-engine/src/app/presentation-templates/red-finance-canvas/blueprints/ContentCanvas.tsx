@@ -59,10 +59,10 @@ const ContentCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
           }}
         >
           <div className="w-[560px] text-center">
-            <div className="text-[26px] font-black leading-none" style={{ color: redFinanceTheme.colors.primary }}>
+            <div className="text-[26px] font-black leading-none" style={{ color: redFinanceTheme.colors.accent }}>
               {parsed.guideTitle}
             </div>
-            <div className="mt-[18px] text-[18px] font-medium leading-[1.5]" style={{ color: redFinanceTheme.colors.mutedText }}>
+            <div className="mt-[18px] text-[18px] font-medium leading-[1.5]" style={{ color: redFinanceTheme.colors.textMuted }}>
               {parsed.guideText}
             </div>
           </div>

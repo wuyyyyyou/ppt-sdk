@@ -1,0 +1,9 @@
+{
+  "title": "Content Canvas",
+  "metaLabel": "COMPONENT-FIRST",
+  "footerText": "Red Finance Canvas | Component-first Workspace",
+  "pageNumber": "02",
+  "guideTitle": "Compose page-specific components here",
+  "guideText": "Read components/README.md, choose the right component families, and replace this guide with the final TSX composition.",
+  "showSlotGuides": true
+}

@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "mode": "light",
+  "colors": {
+    "canvas": "#FFFFFF",
+    "surface": "#FFFFFF",
+    "panel": "#FAFAFA",
+    "card": "#FAFAFA",
+    "textPrimary": "#212121",
+    "textSecondary": "#424242",
+    "textMuted": "#616161",
+    "textSubtle": "#757575",
+    "textInverse": "#FFFFFF",
+    "accent": "#B71C1C",
+    "accentText": "#FFFFFF",
+    "accentStrong": "#8E0000",
+    "accentSoft": "#FFEBEE",
+    "accentTint": "#FFF4F4",
+    "accentBorder": "#F1CACA",
+    "accentMutedText": "#9D2E2E",
+    "stroke": "#E5E7EB",
+    "strokeSoft": "#E0E0E0",
+    "axis": "#D0D0D0",
+    "iconMuted": "#D6D6D6",
+    "rowAccent": "#FFF4F4",
+    "chart1": "#B71C1C",
+    "chart2": "#1565C0",
+    "chart3": "#2E7D32",
+    "chart4": "#F57C00",
+    "chart5": "#6A1B9A",
+    "chart6": "#455A64"
+  },
+  "shadows": {
+    "card": "0 4px 6px rgba(0,0,0,0.02)",
+    "panel": "0 4px 10px rgba(0,0,0,0.03)",
+    "accent": "0 4px 12px rgba(183,28,28,0.20)"
+  }
+}

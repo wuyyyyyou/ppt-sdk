@@ -49,7 +49,7 @@ const CoverCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
 
   return (
     <FinanceCanvas>
-      <div className="absolute left-0 top-[116px] h-[190px] w-[12px]" style={{ backgroundColor: redFinanceTheme.colors.primary }} />
+      <div className="absolute left-0 top-[116px] h-[190px] w-[12px]" style={{ backgroundColor: redFinanceTheme.colors.accent }} />
 
       <div className="absolute left-[96px] right-[80px] top-[46px] z-20 flex items-center justify-between">
         <IconText
@@ -62,23 +62,23 @@ const CoverCanvas = ({ data }: { data: Partial<z.infer<typeof Schema>> }) => {
           fontSize={20}
           fontWeight={700}
         />
-        <div className="text-[14px] font-black uppercase leading-none" style={{ color: redFinanceTheme.colors.primary }}>
+        <div className="text-[14px] font-black uppercase leading-none" style={{ color: redFinanceTheme.colors.accent }}>
           {parsed.canvasLabel}
         </div>
       </div>
 
       <div className="absolute left-[96px] top-[210px] z-10 w-[720px]">
-        <div className="text-[70px] font-black leading-[0.98]" style={{ color: redFinanceTheme.colors.backgroundText }}>
+        <div className="text-[70px] font-black leading-[0.98]" style={{ color: redFinanceTheme.colors.textPrimary }}>
           {parsed.title}
         </div>
-        <div className="mt-[26px] w-[600px] text-[24px] font-medium leading-[1.38]" style={{ color: redFinanceTheme.colors.mutedText }}>
+        <div className="mt-[26px] w-[600px] text-[24px] font-medium leading-[1.38]" style={{ color: redFinanceTheme.colors.textMuted }}>
           {parsed.subtitle}
         </div>
       </div>
 
       {parsed.showSlotGuides ? (
         <div className="absolute right-[86px] top-[178px] z-10 flex h-[330px] w-[330px] items-center justify-center rounded-[8px]" style={guideStyle}>
-          <div className="px-[36px] text-center text-[18px] font-black uppercase leading-[1.35]" style={{ color: redFinanceTheme.colors.accentSubtleText }}>
+          <div className="px-[36px] text-center text-[18px] font-black uppercase leading-[1.35]" style={{ color: redFinanceTheme.colors.accentMutedText }}>
             Compose cover visual here
           </div>
         </div>

@@ -19,7 +19,7 @@ const KpiMetricItem = ({ value, label }: KpiMetricItemProps) => (
         lineHeight: `${KPI_ROW_HEIGHT}px`,
         fontSize: 17,
         fontWeight: 900,
-        color: redFinanceTheme.colors.primary,
+        color: redFinanceTheme.colors.accent,
       }}
     >
       {value}
@@ -30,7 +30,7 @@ const KpiMetricItem = ({ value, label }: KpiMetricItemProps) => (
         height: KPI_ROW_HEIGHT,
         lineHeight: `${KPI_ROW_HEIGHT}px`,
         fontSize: 12,
-        color: redFinanceTheme.colors.mutedText,
+        color: redFinanceTheme.colors.textMuted,
       }}
     >
       {label}

@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "red-finance-canvas theme tokens",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "mode", "colors", "shadows"],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "mode": {
+      "enum": ["light", "dark"]
+    },
+    "colors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canvas",
+        "surface",
+        "panel",
+        "card",
+        "textPrimary",
+        "textSecondary",
+        "textMuted",
+        "textSubtle",
+        "textInverse",
+        "accent",
+        "accentText",
+        "accentStrong",
+        "accentSoft",
+        "accentTint",
+        "accentBorder",
+        "accentMutedText",
+        "stroke",
+        "strokeSoft",
+        "axis",
+        "iconMuted",
+        "rowAccent",
+        "chart1",
+        "chart2",
+        "chart3",
+        "chart4",
+        "chart5",
+        "chart6"
+      ],
+      "properties": {
+        "canvas": { "$ref": "#/$defs/hexColor" },
+        "surface": { "$ref": "#/$defs/hexColor" },
+        "panel": { "$ref": "#/$defs/hexColor" },
+        "card": { "$ref": "#/$defs/hexColor" },
+        "textPrimary": { "$ref": "#/$defs/hexColor" },
+        "textSecondary": { "$ref": "#/$defs/hexColor" },
+        "textMuted": { "$ref": "#/$defs/hexColor" },
+        "textSubtle": { "$ref": "#/$defs/hexColor" },
+        "textInverse": { "$ref": "#/$defs/hexColor" },
+        "accent": { "$ref": "#/$defs/hexColor" },
+        "accentText": { "$ref": "#/$defs/hexColor" },
+        "accentStrong": { "$ref": "#/$defs/hexColor" },
+        "accentSoft": { "$ref": "#/$defs/hexColor" },
+        "accentTint": { "$ref": "#/$defs/hexColor" },
+        "accentBorder": { "$ref": "#/$defs/hexColor" },
+        "accentMutedText": { "$ref": "#/$defs/hexColor" },
+        "stroke": { "$ref": "#/$defs/hexColor" },
+        "strokeSoft": { "$ref": "#/$defs/hexColor" },
+        "axis": { "$ref": "#/$defs/hexColor" },
+        "iconMuted": { "$ref": "#/$defs/hexColor" },
+        "rowAccent": { "$ref": "#/$defs/hexColor" },
+        "chart1": { "$ref": "#/$defs/hexColor" },
+        "chart2": { "$ref": "#/$defs/hexColor" },
+        "chart3": { "$ref": "#/$defs/hexColor" },
+        "chart4": { "$ref": "#/$defs/hexColor" },
+        "chart5": { "$ref": "#/$defs/hexColor" },
+        "chart6": { "$ref": "#/$defs/hexColor" }
+      }
+    },
+    "shadows": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["card", "panel", "accent"],
+      "properties": {
+        "card": { "type": "string", "minLength": 1 },
+        "panel": { "type": "string", "minLength": 1 },
+        "accent": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "$defs": {
+    "hexColor": {
+      "type": "string",
+      "pattern": "^#[0-9A-Fa-f]{6}$"
+    }
+  }
+}

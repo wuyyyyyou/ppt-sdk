@@ -59,7 +59,7 @@ const FinanceContentFrame = ({
             style={{
               left: titleLeft,
               top: titleTop + (titleHeight - 42) / 2,
-              backgroundColor: redFinanceTheme.colors.primary,
+              backgroundColor: redFinanceTheme.colors.accent,
             }}
           />
         ) : null}
@@ -74,7 +74,7 @@ const FinanceContentFrame = ({
         >
           <div
             className="flex h-[58px] items-center whitespace-nowrap text-[48px] font-black leading-[58px]"
-            style={{ color: redFinanceTheme.colors.backgroundText }}
+            style={{ color: redFinanceTheme.colors.textPrimary }}
           >
             {title}
           </div>
@@ -87,7 +87,7 @@ const FinanceContentFrame = ({
               gap={10}
               fontSize={16}
               fontWeight={700}
-              textColor={redFinanceTheme.colors.mutedText}
+              textColor={redFinanceTheme.colors.textMuted}
             />
           ) : null}
         </div>
@@ -110,7 +110,7 @@ const FinanceContentFrame = ({
             style={{
               left: titleLeft,
               top: headerDividerTop - 6,
-              backgroundColor: redFinanceTheme.colors.primary,
+              backgroundColor: redFinanceTheme.colors.accent,
             }}
           />
         ) : null}
@@ -137,8 +137,8 @@ const FinanceContentFrame = ({
             className="absolute bottom-0 left-0 z-20 flex w-full items-center justify-between px-[60px] text-[12px]"
             style={{
               height: footerHeight,
-              color: redFinanceTheme.colors.subtleText,
-              backgroundColor: redFinanceTheme.colors.background,
+              color: redFinanceTheme.colors.textSubtle,
+              backgroundColor: redFinanceTheme.colors.canvas,
             }}
           >
             {showFooterDivider ? (
@@ -152,7 +152,7 @@ const FinanceContentFrame = ({
             </div>
             <div
               className="flex h-[16px] items-center whitespace-nowrap font-bold leading-[16px]"
-              style={{ color: redFinanceTheme.colors.primary }}
+              style={{ color: redFinanceTheme.colors.accent }}
             >
               {pageNumber}
             </div>

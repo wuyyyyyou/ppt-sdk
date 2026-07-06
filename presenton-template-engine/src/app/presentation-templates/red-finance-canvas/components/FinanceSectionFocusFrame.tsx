@@ -24,7 +24,7 @@ const FinanceSectionFocusFrame = ({
   footerText,
   pageNumber,
   backgroundDecoration,
-  topBarColor = redFinanceTheme.colors.primary,
+  topBarColor = redFinanceTheme.colors.accent,
   leftWidth = 596,
   contentTop = 82,
   contentBottom = 58,
@@ -65,7 +65,7 @@ const FinanceSectionFocusFrame = ({
 
         <div
           className="absolute bottom-0 left-0 right-0 z-20 h-[50px]"
-          style={{ backgroundColor: redFinanceTheme.colors.background }}
+          style={{ backgroundColor: redFinanceTheme.colors.canvas }}
         >
           <div
             className="absolute left-[60px] right-[60px] top-0 h-px"
@@ -74,13 +74,13 @@ const FinanceSectionFocusFrame = ({
           <div className="flex h-full items-center justify-between px-[60px]">
             <div
               className="whitespace-nowrap text-[12px] font-medium tracking-[0.08em]"
-              style={{ color: redFinanceTheme.colors.subtleText }}
+              style={{ color: redFinanceTheme.colors.textSubtle }}
             >
               {footerText}
             </div>
             <div
               className="whitespace-nowrap text-[14px] font-black leading-none"
-              style={{ color: redFinanceTheme.colors.primary }}
+              style={{ color: redFinanceTheme.colors.accent }}
             >
               {pageNumber}
             </div>

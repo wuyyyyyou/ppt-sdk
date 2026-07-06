@@ -31,8 +31,8 @@ const DualValueMetricCard = ({
   rightValue,
   leftShare,
   rightShare,
-  leftColor = redFinanceTheme.colors.primary,
-  rightColor = redFinanceTheme.colors.secondary,
+  leftColor = redFinanceTheme.colors.accent,
+  rightColor = redFinanceTheme.colors.chart2,
   density = "normal",
   progressMode = "split",
   cardHeight,
@@ -66,7 +66,7 @@ const DualValueMetricCard = ({
         paddingBottom: bodyPaddingY,
         backgroundColor: redFinanceTheme.colors.panel,
         borderColor: redFinanceTheme.colors.stroke,
-        boxShadow: "0 3px 6px rgba(0,0,0,0.02)",
+        boxShadow: redFinanceTheme.shadows.card,
       }}
     >
       <div className="mb-[10px] flex items-center justify-between gap-[10px]">
@@ -74,7 +74,7 @@ const DualValueMetricCard = ({
           className="min-w-0 font-bold leading-none"
           style={{
             fontSize: titleFontSize,
-            color: redFinanceTheme.colors.mutedText,
+            color: redFinanceTheme.colors.textMuted,
           }}
         >
           {title}
@@ -99,7 +99,7 @@ const DualValueMetricCard = ({
 
       <div
         className="mb-[7px] flex items-center justify-between font-medium leading-none"
-        style={{ fontSize: 11, color: redFinanceTheme.colors.subtleText }}
+        style={{ fontSize: 11, color: redFinanceTheme.colors.textSubtle }}
       >
         <IconText
           icon={
@@ -114,7 +114,7 @@ const DualValueMetricCard = ({
           gap={6}
           fontSize={11}
           fontWeight={500}
-          textColor={redFinanceTheme.colors.subtleText}
+          textColor={redFinanceTheme.colors.textSubtle}
         />
         <IconText
           icon={
@@ -129,7 +129,7 @@ const DualValueMetricCard = ({
           gap={6}
           fontSize={11}
           fontWeight={500}
-          textColor={redFinanceTheme.colors.subtleText}
+          textColor={redFinanceTheme.colors.textSubtle}
         />
       </div>
 
@@ -137,7 +137,7 @@ const DualValueMetricCard = ({
         <div className="flex flex-col gap-[5px]">
           <div
             className="relative h-[4px] overflow-hidden rounded-full"
-            style={{ backgroundColor: redFinanceTheme.colors.softStroke }}
+            style={{ backgroundColor: redFinanceTheme.colors.strokeSoft }}
           >
             <div
               className="absolute inset-y-0 left-0 rounded-full"
@@ -149,7 +149,7 @@ const DualValueMetricCard = ({
           </div>
           <div
             className="relative h-[4px] overflow-hidden rounded-full"
-            style={{ backgroundColor: redFinanceTheme.colors.softStroke }}
+            style={{ backgroundColor: redFinanceTheme.colors.strokeSoft }}
           >
             <div
               className="absolute inset-y-0 left-0 rounded-full"
@@ -163,7 +163,7 @@ const DualValueMetricCard = ({
       ) : (
         <div
           className="relative h-[6px] overflow-hidden rounded-full"
-          style={{ backgroundColor: redFinanceTheme.colors.softStroke }}
+          style={{ backgroundColor: redFinanceTheme.colors.strokeSoft }}
         >
           <div
             className="absolute inset-y-0 left-0"
