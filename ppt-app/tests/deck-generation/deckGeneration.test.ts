@@ -574,7 +574,14 @@ function createHarness(options: {
         : researchEvidence.pages.length > 0
           ? "partial"
           : "empty";
-      return clone(researchEvidence);
+      return {
+        workspace_dir: workspace.workspace_dir,
+        page_id: pageEvidence.page_id,
+        status: pageEvidence.status,
+        evidence_index_path: `${workspace.workspace_dir}/research/evidence-index.json`,
+        page_count: researchEvidence.pages.length,
+        updated_at: researchEvidence.updated_at,
+      };
     },
     getResearchEvidence: async () => clone(researchEvidence),
     finalizeResearchVisualAssets: async (input) => ({

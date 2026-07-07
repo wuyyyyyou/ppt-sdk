@@ -384,6 +384,15 @@ export interface RecordAppResearchEvidencePageInput {
   page_evidence: unknown;
 }
 
+export interface RecordAppResearchEvidencePageResult {
+  workspace_dir: string;
+  page_id: string;
+  status: string;
+  evidence_index_path: string;
+  page_count: number;
+  updated_at: string;
+}
+
 export interface GetAppResearchEvidenceInput {
   workspace_dir: string;
 }

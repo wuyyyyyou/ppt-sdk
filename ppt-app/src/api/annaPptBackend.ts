@@ -21,6 +21,7 @@ import type {
   PptxExportJob,
   ResearchCurationDraftFingerprint,
   ResearchEvidenceIndex,
+  RecordResearchEvidencePageResult,
   ResearchPlan,
   ResearchStatus,
   RenderDeckHtmlResult,
@@ -367,7 +368,7 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         input
       ),
     recordResearchEvidencePage: (input) =>
-      invoke<ResearchEvidenceIndex>(
+      invoke<RecordResearchEvidencePageResult>(
         toolIds.pptEngine,
         "app_record_research_evidence_page",
         input

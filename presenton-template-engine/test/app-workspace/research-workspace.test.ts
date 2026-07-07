@@ -199,9 +199,14 @@ test("workspace research tools prepare directories and persist metadata", async 
         markdown_path: path.join(prepared.evidence_pages_dir, "page-02.md"),
       },
     });
-    assert.equal(evidenceAfterPageUpserts.status, "partial");
+    assert.equal(evidenceAfterPageUpserts.page_id, "page-02");
+    assert.equal(evidenceAfterPageUpserts.status, "curated");
+    assert.equal(evidenceAfterPageUpserts.evidence_index_path, prepared.evidence_index_path);
+    assert.equal(evidenceAfterPageUpserts.page_count, 2);
+    const evidenceAfterPageUpsertRead = await getAppResearchEvidence({ workspace_dir: workspace.workspace_dir });
+    assert.equal(evidenceAfterPageUpsertRead.status, "partial");
     assert.deepEqual(
-      evidenceAfterPageUpserts.pages.map((page) => page.page_id).sort(),
+      evidenceAfterPageUpsertRead.pages.map((page) => page.page_id).sort(),
       ["page-01", "page-02"],
     );
 
@@ -218,10 +223,15 @@ test("workspace research tools prepare directories and persist metadata", async 
         markdown_path: path.join(prepared.evidence_pages_dir, "page-01.md"),
       },
     });
+    assert.equal(replacementEvidence.page_id, "page-01");
     assert.equal(replacementEvidence.status, "curated");
-    assert.equal(replacementEvidence.pages.length, 2);
+    assert.equal(replacementEvidence.evidence_index_path, prepared.evidence_index_path);
+    assert.equal(replacementEvidence.page_count, 2);
+    const replacementEvidenceRead = await getAppResearchEvidence({ workspace_dir: workspace.workspace_dir });
+    assert.equal(replacementEvidenceRead.status, "curated");
+    assert.equal(replacementEvidenceRead.pages.length, 2);
     assert.equal(
-      replacementEvidence.pages.find((page) => page.page_id === "page-01")?.facts?.[0]?.id,
+      replacementEvidenceRead.pages.find((page) => page.page_id === "page-01")?.facts?.[0]?.id,
       "fact-1b",
     );
 

@@ -655,7 +655,14 @@ describe("Uploaded Source Analysis research discovery freshness", () => {
       recordResearchEvidencePageMarkdown: async () => ({}),
       recordResearchEvidencePage: async (input: { page_evidence: { facts: Array<{ id: string }>; gaps: string[] } }) => {
         recordedPageEvidence = input.page_evidence;
-        return { version: 1, status: "gap", pages: [input.page_evidence], updated_at: "now" };
+        return {
+          workspace_dir: "/tmp/workspace",
+          page_id: "page-01",
+          status: "gap",
+          evidence_index_path: "/tmp/workspace/research/evidence-index.json",
+          page_count: 1,
+          updated_at: "now",
+        };
       },
       recordResearchStatusPage: async () => ({}),
       recordResearchEvidence: async (input: { evidence: unknown }) => input.evidence,

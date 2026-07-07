@@ -700,7 +700,7 @@
     },
     {
       "name": "app_record_research_evidence_page",
-      "description": "Upsert one page-level Research Evidence record into the workspace Research Evidence index.",
+      "description": "Upsert one page-level Research Evidence record into the workspace Research Evidence index and return a compact write summary.",
       "parameters": [
         {
           "name": "workspace_dir",

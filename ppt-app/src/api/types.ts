@@ -574,6 +574,15 @@ export interface PrepareResearchWorkspaceResult extends ResearchPaths {
   prepared_at: string;
 }
 
+export interface RecordResearchEvidencePageResult {
+  workspace_dir: string;
+  page_id: string;
+  status: string;
+  evidence_index_path: string;
+  page_count: number;
+  updated_at: string;
+}
+
 export type ResearchSourceType = "user_provided" | "web_source" | "image_source";
 
 export interface ResearchRequirement {

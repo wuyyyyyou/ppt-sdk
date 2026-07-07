@@ -26,6 +26,7 @@ import type {
   PptxExportJob,
   ResearchEvidenceIndex,
   ResearchCurationDraftFingerprint,
+  RecordResearchEvidencePageResult,
   VisualResearchCurationDraft,
   ResearchPlan,
   ResearchStatus,
@@ -155,7 +156,7 @@ export interface PptBackend {
     page_evidence: Omit<ResearchEvidenceIndex["pages"][number], "updated_at"> & {
       updated_at?: string;
     };
-  }): Promise<ResearchEvidenceIndex>;
+  }): Promise<RecordResearchEvidencePageResult>;
   getResearchEvidence(input: { workspace_dir: string }): Promise<ResearchEvidenceIndex>;
   finalizeResearchVisualAssets(input: {
     workspace_dir: string;

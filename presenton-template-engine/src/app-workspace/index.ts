@@ -106,6 +106,7 @@ import type {
   GetAppResearchCurationDraftFingerprintInput,
   RecordAppResearchEvidenceInput,
   RecordAppResearchEvidencePageInput,
+  RecordAppResearchEvidencePageResult,
   RecordAppResearchCurationDraftInput,
   RecordAppResearchEvidencePageMarkdownInput,
   RecordAppResearchEvidencePageMarkdownResult,
@@ -2668,7 +2669,7 @@ export async function recordAppResearchEvidence(input: RecordAppResearchEvidence
 
 export async function recordAppResearchEvidencePage(
   input: RecordAppResearchEvidencePageInput,
-): Promise<Record<string, unknown>> {
+): Promise<RecordAppResearchEvidencePageResult> {
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
   const paths = await ensureResearchDirectories(workspace.workspace_dir);
   const updatedAt = new Date().toISOString();
@@ -2696,7 +2697,14 @@ export async function recordAppResearchEvidencePage(
   };
   await writeJsonFile(paths.evidence_index_path, next);
   await touchWorkspaceTask(workspace, updatedAt);
-  return next;
+  return {
+    workspace_dir: workspace.workspace_dir,
+    page_id: normalizeString(pageEvidence.page_id),
+    status: normalizeString(pageEvidence.status),
+    evidence_index_path: paths.evidence_index_path,
+    page_count: pages.length,
+    updated_at: updatedAt,
+  };
 }
 
 export async function getAppResearchEvidence(input: GetAppResearchEvidenceInput): Promise<Record<string, unknown>> {
