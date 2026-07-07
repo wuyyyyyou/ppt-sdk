@@ -78,7 +78,12 @@ test("workspace research tools prepare directories and persist metadata", async 
       },
     });
     assert.equal(evidence.status, "partial");
-    assert.deepEqual((await getAppResearchEvidence({ workspace_dir: workspace.workspace_dir })).pages, evidence.pages);
+    assert.equal(evidence.workspace_dir, workspace.workspace_dir);
+    assert.equal(path.basename(evidence.evidence_index_path), "evidence-index.json");
+    assert.equal(evidence.page_count, 1);
+    assert.ok(evidence.updated_at);
+    const recordedEvidence = await getAppResearchEvidence({ workspace_dir: workspace.workspace_dir });
+    assert.deepEqual(recordedEvidence.pages, [{ page_id: "page-01", status: "gap", gaps: ["No result"] }]);
 
     const missingDraftFingerprint = await getAppResearchCurationDraftFingerprint({
       workspace_dir: workspace.workspace_dir,

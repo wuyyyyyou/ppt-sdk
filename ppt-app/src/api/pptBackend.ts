@@ -26,6 +26,7 @@ import type {
   PptxExportJob,
   ResearchEvidenceIndex,
   ResearchCurationDraftFingerprint,
+  RecordResearchEvidenceResult,
   RecordResearchEvidencePageResult,
   VisualResearchCurationDraft,
   ResearchPlan,
@@ -150,7 +151,7 @@ export interface PptBackend {
   prepareResearchWorkspace(input: { workspace_dir: string }): Promise<PrepareResearchWorkspaceResult>;
   recordResearchPlan(input: { workspace_dir: string; research_plan: ResearchPlan }): Promise<ResearchPlan>;
   getResearchPlan(input: { workspace_dir: string }): Promise<ResearchPlan>;
-  recordResearchEvidence(input: { workspace_dir: string; evidence: ResearchEvidenceIndex }): Promise<ResearchEvidenceIndex>;
+  recordResearchEvidence(input: { workspace_dir: string; evidence: ResearchEvidenceIndex }): Promise<RecordResearchEvidenceResult>;
   recordResearchEvidencePage(input: {
     workspace_dir: string;
     page_evidence: Omit<ResearchEvidenceIndex["pages"][number], "updated_at"> & {

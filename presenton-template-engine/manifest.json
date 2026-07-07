@@ -682,7 +682,7 @@
     },
     {
       "name": "app_record_research_evidence",
-      "description": "Write the Research Evidence index artifact for a workspace.",
+      "description": "Write the Research Evidence index artifact for a workspace and return a compact write summary.",
       "parameters": [
         {
           "name": "workspace_dir",
@@ -718,7 +718,7 @@
     },
     {
       "name": "app_get_research_evidence",
-      "description": "Read the Research Evidence index artifact for a workspace.",
+      "description": "Read the Research Evidence index artifact for a workspace. Large results may be returned by result_url.",
       "parameters": [
         {
           "name": "workspace_dir",

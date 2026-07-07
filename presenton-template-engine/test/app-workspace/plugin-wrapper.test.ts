@@ -111,6 +111,22 @@ test("app_get_rendered_deck_html is declared and routed", async () => {
   assert.ok(manifest.tools.some((tool) => tool.name === "app_get_rendered_deck_html"));
 });
 
+test("app_get_research_evidence returns a JSON result reference", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+  const manifest = JSON.parse(
+    await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
+  ) as { tools: Array<{ name: string; description?: string }> };
+
+  assert.match(source, /app_get_research_evidence:\s*toolAppGetResearchEvidence/);
+  assert.match(source, /registerJsonReference\(\s*await getAppResearchEvidence/);
+  assert.match(source, /"research-evidence\.json"/);
+  assert.match(source, /"result_url"/);
+  assert.match(
+    manifest.tools.find((tool) => tool.name === "app_get_research_evidence")?.description ?? "",
+    /result_url/,
+  );
+});
+
 test("workspace theme token tools are declared and routed", async () => {
   const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
   const manifest = JSON.parse(

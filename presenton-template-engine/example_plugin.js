@@ -1419,7 +1419,11 @@ async function toolAppGetResearchEvidence(args) {
   }
 
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  return getAppResearchEvidence({ workspace_dir: workspaceDir });
+  return registerJsonReference(
+    await getAppResearchEvidence({ workspace_dir: workspaceDir }),
+    "research-evidence.json",
+    "result_url",
+  );
 }
 
 async function toolAppFinalizeResearchVisualAssets(args) {

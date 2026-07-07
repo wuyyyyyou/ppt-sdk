@@ -554,7 +554,13 @@ function createHarness(options: {
     recordResearchEvidence: async (input) => {
       recordResearchEvidenceCalls += 1;
       researchEvidence = clone(input.evidence);
-      return clone(researchEvidence);
+      return {
+        workspace_dir: workspace.workspace_dir,
+        status: researchEvidence.status,
+        evidence_index_path: `${workspace.workspace_dir}/research/evidence-index.json`,
+        page_count: researchEvidence.pages.length,
+        updated_at: researchEvidence.updated_at ?? "2026-05-23T00:00:00.000Z",
+      };
     },
     recordResearchEvidencePage: async (input) => {
       recordResearchEvidencePageCalls += 1;

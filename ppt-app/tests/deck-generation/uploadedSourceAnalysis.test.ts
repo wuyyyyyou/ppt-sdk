@@ -665,7 +665,13 @@ describe("Uploaded Source Analysis research discovery freshness", () => {
         };
       },
       recordResearchStatusPage: async () => ({}),
-      recordResearchEvidence: async (input: { evidence: unknown }) => input.evidence,
+      recordResearchEvidence: async () => ({
+        workspace_dir: "/tmp/workspace",
+        status: "partial",
+        evidence_index_path: "/tmp/workspace/research/evidence-index.json",
+        page_count: 1,
+        updated_at: "now",
+      }),
       recordResearchStatus: async (input: { status: unknown }) => input.status,
     };
     const runtime = {

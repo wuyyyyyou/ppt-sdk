@@ -574,6 +574,14 @@ export interface PrepareResearchWorkspaceResult extends ResearchPaths {
   prepared_at: string;
 }
 
+export interface RecordResearchEvidenceResult {
+  workspace_dir: string;
+  status: string;
+  evidence_index_path: string;
+  page_count: number;
+  updated_at: string;
+}
+
 export interface RecordResearchEvidencePageResult {
   workspace_dir: string;
   page_id: string;

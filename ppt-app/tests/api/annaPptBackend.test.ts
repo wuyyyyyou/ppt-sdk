@@ -82,4 +82,41 @@ describe("Anna PPT Backend", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it("fetches HTTP JSON references for research evidence results", async () => {
+    setToolIds();
+    const evidence = {
+      version: 1,
+      status: "curated",
+      pages: [{ page_id: "page-01", status: "curated" }],
+      shared: { facts: [], visual_assets: [], gaps: [] },
+      updated_at: "2026-07-07T00:00:00.000Z",
+    };
+    const originalFetch = globalThis.fetch;
+    const fetchMock = mock.fn(async () =>
+      new Response(JSON.stringify(evidence), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
+    );
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    try {
+      const backend = createAnnaPptBackend(createRuntime({
+        success: true,
+        data: {
+          result_url: "http://127.0.0.1:12345/json/demo/research-evidence.json",
+        },
+      }));
+
+      const result = await backend.getResearchEvidence({ workspace_dir: "/tmp/workspaces/demo" });
+
+      assert.equal(result.status, "curated");
+      assert.equal(result.pages[0]?.page_id, "page-01");
+      assert.equal(fetchMock.mock.callCount(), 1);
+      assert.equal(fetchMock.mock.calls[0].arguments[0], "http://127.0.0.1:12345/json/demo/research-evidence.json");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

@@ -379,6 +379,14 @@ export interface RecordAppResearchEvidenceInput {
   evidence: unknown;
 }
 
+export interface RecordAppResearchEvidenceResult {
+  workspace_dir: string;
+  status: string;
+  evidence_index_path: string;
+  page_count: number;
+  updated_at: string;
+}
+
 export interface RecordAppResearchEvidencePageInput {
   workspace_dir: string;
   page_evidence: unknown;
