@@ -310,7 +310,7 @@
         {
           "name": "channel",
           "type": "string",
-          "description": "Workspace log channel. Supports ai-outline, ai-outline-interactions, ai-page-plan, ai-page-plan-interactions, ai-page-agent, ai-page-agent-interactions, ai-page-agent-stream, ai-research, and ai-research-interactions.",
+          "description": "Workspace log channel. Supports ai-outline, ai-outline-interactions, ai-page-plan, ai-page-plan-interactions, ai-page-agent, ai-page-agent-interactions, ai-page-agent-stream, ai-research, ai-research-interactions, ai-theme, and ai-theme-interactions.",
           "required": true
         },
         {

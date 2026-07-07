@@ -1054,6 +1054,8 @@ async function toolAppAppendWorkspaceLog(args) {
     "ai-page-agent-stream",
     "ai-research",
     "ai-research-interactions",
+    "ai-theme",
+    "ai-theme-interactions",
   ];
   if (!supportedChannels.includes(channel)) {
     throw new Error(`"channel" must be one of: ${supportedChannels.join(", ")}`);

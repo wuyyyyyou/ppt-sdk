@@ -308,6 +308,9 @@ function buildThemeTokenPrompt(input: Parameters<AiClient["generateThemeToken"]>
     isRefinement
       ? "For Deck Refinement, use current_token as the baseline and apply only the requested whole-deck theme/style change."
       : "For initial Deck Generation, use the brief and context rows to infer theme intent.",
+    "Contrast requirements are hard requirements.",
+    "Before returning the token, self-check key foreground/background pairs for readable contrast.",
+    "If the user asks for black backgrounds with white/orange text, do not set any token used as foreground on dark backgrounds to black or near-black.",
     "Do not use Uploaded Source Analysis, web research, component source code, or fixed theme IDs.",
     "",
     "Input JSON:",

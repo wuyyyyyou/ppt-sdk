@@ -5,7 +5,8 @@
 ## 颜色 token
 
 - `canvas`, `surface`, `card`：页面底色、安静的页面承载面、重复卡片背景。
-- `textPrimary`, `textMuted`, `textSubtle`, `textInverse`：浅色卡片和强填充区域上的前景层级。
+- `textPrimary`, `textMuted`, `textSubtle`：浅色卡片、浅色页面承载面上的前景层级。
+- `textInverse`：强填充、暗色或强调色背景上的高对比前景色，通常应为白色或接近白色。
 - `stroke`, `strokeSoft`, `grid`：常规边框、弱分隔线、图表网格线。
 - `darkCanvas`, `darkPanel`, `darkText`, `darkMutedText`, `darkBorder`, `darkCallout`：暗色分析面板、封面/结尾背景、暗色 callout 表面。
 - `signalPrimary`, `signalSecondary`, `signalTertiary`：主要分析强调色，用于 KPI 卡片、图表系列、徽标和图标标记。
@@ -15,6 +16,13 @@
 - `entityPrimaryTint`, `entityPrimaryBorder`, `entitySecondaryTint`, `entitySecondaryBorder`：实体色对应的可见浅底和边框。
 - `chart1` 到 `chart6`：通用图表系列 fallback 色板。时间线节点也按索引复用这组色板。
 - `chartStructureSegment1` 到 `chartStructureSegment3`：结构图、组成图、donut 图专用分段颜色。
+
+## 对比度约束
+
+- `textInverse` 必须能在 `darkCanvas`、`darkPanel`、`darkCallout` 以及主要 `signal*` 强填充色上清晰可读；不要生成与这些背景低对比的深色 `textInverse`。
+- `darkText` 必须能在 `darkCanvas`、`darkPanel`、`darkCallout` 上清晰可读；`darkMutedText` 也必须保持可辨识，不能接近背景色。
+- `textPrimary` 必须能在 `card`、`surface` 上清晰可读；`textMuted`、`textSubtle` 可以更弱，但不能低到影响正文和图表标注识别。
+- `signal*Tint`、`entity*Tint` 是浅色低强调背景时，其对应文字或图标应使用可读的深色前景，不要直接复用低对比的 tint 色作为文字色。
 
 ## 阴影 token
 

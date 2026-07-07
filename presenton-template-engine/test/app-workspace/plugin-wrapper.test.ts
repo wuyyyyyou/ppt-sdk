@@ -19,7 +19,16 @@ type JsonRpcResponse = {
   error?: { message?: string };
 };
 
-function getToolParameter(manifest: { tools: Array<{ name: string; parameters?: Array<{ name: string; required?: boolean }> }> }, toolName: string, parameterName: string) {
+function getToolParameter(
+  manifest: {
+    tools: Array<{
+      name: string;
+      parameters?: Array<{ name: string; required?: boolean; description?: string }>;
+    }>;
+  },
+  toolName: string,
+  parameterName: string,
+) {
   const tool = manifest.tools.find((item) => item.name === toolName);
   assert.ok(tool, `Missing tool ${toolName}`);
   const parameter = tool.parameters?.find((item) => item.name === parameterName);
@@ -120,6 +129,13 @@ test("workspace theme token tools are declared and routed", async () => {
   assert.equal(
     getToolParameter(manifest, "app_record_workspace_theme_token", "use_default").required,
     false,
+  );
+
+  assert.match(source, /"ai-theme"/);
+  assert.match(source, /"ai-theme-interactions"/);
+  assert.match(
+    getToolParameter(manifest, "app_append_workspace_log", "channel").description ?? "",
+    /ai-theme-interactions/,
   );
 });
 
@@ -226,6 +242,47 @@ test("research curation draft plugin invoke uses scoped draft_id paths", { skip:
     assert.ok(!legacy.error, legacy.error?.message);
     assert.equal(legacy.result?.data?.exists, false);
     assert.equal(path.basename(String(legacy.result?.data?.draft_path)), "page-01-web.json");
+  } finally {
+    await plugin.close();
+    if (previousHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = previousHome;
+    }
+    await rm(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("app_append_workspace_log plugin wrapper accepts theme log channels", { skip: pluginInvokeSkip }, async () => {
+  const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-plugin-theme-log-home-"));
+  const workspaceDir = path.join(homeDir, "anna-workspace", "ppt", "ppt-20260701-000002");
+  const previousHome = process.env.HOME;
+  process.env.HOME = homeDir;
+  const plugin = await startPluginProcess();
+
+  try {
+    for (const channel of ["ai-theme", "ai-theme-interactions"] as const) {
+      const response = await plugin.request("invoke", {
+        tool: "app_append_workspace_log",
+        arguments: {
+          workspace_dir: workspaceDir,
+          channel,
+          entry: {
+            event: `${channel}.test`,
+            schema_version: 1,
+          },
+        },
+      });
+      assert.ok(!response.error, response.error?.message);
+    }
+
+    const themeLog = await readFile(path.join(workspaceDir, ".log", "ai-theme.jsonl"), "utf8");
+    const themeInteractionLog = await readFile(
+      path.join(workspaceDir, ".log", "ai-theme-interactions.jsonl"),
+      "utf8",
+    );
+    assert.match(themeLog, /ai-theme\.test/);
+    assert.match(themeInteractionLog, /ai-theme-interactions\.test/);
   } finally {
     await plugin.close();
     if (previousHome === undefined) {
