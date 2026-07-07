@@ -328,7 +328,9 @@ export interface AppendAppWorkspaceLogInput {
     | "ai-page-agent-interactions"
     | "ai-page-agent-stream"
     | "ai-research"
-    | "ai-research-interactions";
+    | "ai-research-interactions"
+    | "ai-theme"
+    | "ai-theme-interactions";
   entry: Record<string, unknown>;
   payload_keys?: string[];
   inline_payload_max_bytes?: number;
@@ -581,6 +583,49 @@ export interface AppTemplatePlanningContext {
 
 export interface GetAppTemplatePlanningContextInput {
   workspace_dir: string;
+}
+
+export interface GetAppWorkspaceThemeContextInput {
+  workspace_dir: string;
+}
+
+export interface AppWorkspaceThemeValidationResult {
+  ok: boolean;
+  errors: string[];
+}
+
+export interface AppWorkspaceThemeContext {
+  workspace_dir: string;
+  template_dir: string;
+  token_path: string;
+  schema_path: string;
+  default_token_path: string;
+  readme_path: string;
+  schema: Record<string, unknown>;
+  default_token: unknown;
+  current_token: unknown | null;
+  current_token_validation: AppWorkspaceThemeValidationResult | null;
+  readme: string;
+}
+
+export interface ValidateAppWorkspaceThemeTokenInput {
+  workspace_dir: string;
+  token: unknown;
+}
+
+export interface RecordAppWorkspaceThemeTokenInput {
+  workspace_dir: string;
+  token?: unknown;
+  use_default?: boolean;
+}
+
+export interface RecordAppWorkspaceThemeTokenResult {
+  workspace: AppWorkspaceResult;
+  workspace_dir: string;
+  token_path: string;
+  fallback_used: boolean;
+  validation: AppWorkspaceThemeValidationResult;
+  token: unknown;
 }
 
 export interface AppPagePlanItem {

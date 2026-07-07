@@ -13,7 +13,7 @@ export const TSX_AUTHORING_RULES_SUMMARY = [
   "Use explicit widths, heights, nowrap, and text alignment for single-line key text.",
   "Chart-heavy or graphic-heavy regions may use data-pptx-export=\"screenshot\"; keep surrounding titles and explanations as normal text.",
   "Use .js suffix for local component imports, for example ../components/Foo.js.",
-  "Only edit the current page TSX/data by default; shared components/theme may be changed only with a clear reason.",
+  "Only edit the current page TSX/data by default; shared components may be changed only with a clear reason.",
 ].join("\n");
 
 export const AUTHORING_COMPOSITION_STRATEGY = [
@@ -25,7 +25,7 @@ export const AUTHORING_COMPOSITION_STRATEGY = [
   "- If the blueprint's default structure does not fit the page message, actively restructure the current slides/*.tsx implementation. Add, remove, reorder, resize, or reconfigure components when it improves clarity, hierarchy, or fit.",
   "- Avoid mechanically cloning the selected blueprint structure across pages. Do not only fill the blueprint's existing fields. Each page should make page-specific composition decisions so the structure serves that page's message.",
   "- Keep business content in the current data JSON where practical, and pass it into components through props. Use TSX mainly for component composition, layout, hierarchy, data mapping, and stable visual structure.",
-  "- Prefer existing shared/template components for export stability. Create page-local markup only when no suitable component exists, and create or modify shared components/theme only when multiple pages need the same new visual unit or there is another clear reason.",
+  "- Prefer existing shared/template components for export stability. Create page-local markup only when no suitable component exists, and create or modify shared components only when multiple pages need the same new visual unit or there is another clear reason.",
   "- If a failure report is provided, prioritize fixing the reported failure. Do not perform broad page-structure redesigns during render-fix, visual-review-fix, or content-review-fix unless the failure cannot be fixed without changing structure.",
 ].join("\n");
 

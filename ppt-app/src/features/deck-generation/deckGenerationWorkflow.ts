@@ -27,9 +27,24 @@ import {
 import { runResearchDiscoveryForPagePlan } from "./researchDiscoveryWorkflow";
 import { ensureFreshUploadedSourceAnalysis } from "./uploadedSourceAnalysisWorkflow";
 import { uploadedSourceDependencyMatchesAnalysis } from "./uploadedSourceAnalysis";
+import { shouldResumePageGenerationStatus } from "./pageStatusPolicy";
 
 function getActiveGenerationRunKind(input: RunDeckGenerationInput): NonNullable<PageProgress["recovery"]>["run_kind"] {
   return input.refinementRunKind ?? (input.pageRefinementRequests ? "page-refinement" : "deck-generation");
+}
+
+function getAuthoringPageIds(
+  input: RunDeckGenerationInput,
+  pagePlan: PagePlan,
+  progress: PageProgress,
+) {
+  return pagePlan.pages
+    .filter((page) => {
+      const pageProgress = getProgressPage(progress, page.page_id);
+      return Boolean(input.pageRefinementRequests?.[page.page_id]?.trim()) ||
+        shouldResumePageGenerationStatus(pageProgress?.status ?? "pending");
+    })
+    .map((page) => page.page_id);
 }
 
 export async function runDeckGeneration(
@@ -162,16 +177,23 @@ export async function runDeckGeneration(
           },
         });
       }
-      const preflightFailure = await preflightAgentToolAccess({
-        agentClient: input.agentClient,
-        locale: input.locale,
-        onProgress: input.onProgress,
-        progress: resumeArtifacts.progress,
-        attemptLimits,
-        totalPages: resumeArtifacts.pagePlan.pages.length,
-        currentPageIndex: null,
-      });
-      if (preflightFailure) return preflightFailure;
+      const authoringPageIds = getAuthoringPageIds(
+        input,
+        resumeArtifacts.pagePlan,
+        resumeArtifacts.progress,
+      );
+      if (authoringPageIds.length > 0) {
+        const preflightFailure = await preflightAgentToolAccess({
+          agentClient: input.agentClient,
+          locale: input.locale,
+          onProgress: input.onProgress,
+          progress: resumeArtifacts.progress,
+          attemptLimits,
+          totalPages: resumeArtifacts.pagePlan.pages.length,
+          currentPageIndex: null,
+        });
+        if (preflightFailure) return preflightFailure;
+      }
       artifacts = resumeArtifacts;
     } else {
       const preflightFailure = await preflightAgentToolAccess({

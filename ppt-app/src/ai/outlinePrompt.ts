@@ -65,7 +65,6 @@ function buildSettingSummary(
     output_language: readSettingString(setting, "output_language"),
     slide_count: readContextRowString(contextRows, "slides") || "auto",
     text_density: readSettingString(setting, "text_density"),
-    visual_tone: readSettingString(setting, "visual_tone"),
   };
 }
 

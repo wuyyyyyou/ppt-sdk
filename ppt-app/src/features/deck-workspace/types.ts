@@ -25,6 +25,7 @@ export type LoadingKind =
   | "none"
   | "template"
   | "context"
+  | "theme"
   | "uploadedSourceAnalysis"
   | "deck"
   | "outline"

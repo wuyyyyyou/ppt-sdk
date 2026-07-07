@@ -34,6 +34,18 @@ The selected visual style family used to shape the deck.
 **Template Data Contract**:
 The recommended data shape for a Template layout. It guides authoring and tooling, but it is not necessarily a render-time gate.
 
+**Template Theme Contract**:
+The selected Template's requirements and guidance for a valid Workspace Theme Token. It defines the theme shape and default theme baseline used by Workspace Theme Creation.
+_Avoid_: Template Data Contract, Preset Theme Catalog
+
+**Workspace Theme Creation**:
+The generation-time step that creates a Workspace-owned theme for the selected Template from the Template's theme contract, the user's style intent, and deck context before downstream generation proceeds. It happens before Uploaded Source Analysis and does not depend on Uploaded Source Analysis results.
+_Avoid_: Theme ID Selection, Preset Theme Selection
+
+**Workspace Theme Token**:
+A Workspace-owned theme object created for the selected Template. It must satisfy that Template's theme contract and is the current theme source for downstream rendering.
+_Avoid_: Theme ID, Preset Theme
+
 **Page Plan**:
 The slide-by-slide mapping from Confirmed Outline entries to planned pages, with one Page Plan entry per outline item. It owns page identity, template blueprint selection, and, after Evidence-Aware Page Planning, page-level content direction and assigned Research Evidence references. Page-level content direction should reference Research Evidence by identity rather than copying full evidence content. During Page Refinement, only the target page entries should be revised when target page outlines change.
 

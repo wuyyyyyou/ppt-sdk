@@ -1,6 +1,6 @@
 import type { AppendWorkspaceLogInput } from "../api/types";
 
-export type AiLogDomain = "outline" | "page_plan" | "page_agent" | "research";
+export type AiLogDomain = "outline" | "page_plan" | "page_agent" | "research" | "theme";
 export type AiInteractionStatus =
   | "started"
   | "succeeded"
@@ -52,6 +52,7 @@ const INTERACTION_CHANNELS = {
   page_plan: "ai-page-plan-interactions",
   page_agent: "ai-page-agent-interactions",
   research: "ai-research-interactions",
+  theme: "ai-theme-interactions",
 } as const satisfies Record<AiLogDomain, AppendWorkspaceLogInput["channel"]>;
 
 const SEMANTIC_CHANNELS = {
@@ -59,6 +60,7 @@ const SEMANTIC_CHANNELS = {
   page_plan: "ai-page-plan",
   page_agent: "ai-page-agent",
   research: "ai-research",
+  theme: "ai-theme",
 } as const satisfies Record<AiLogDomain, AppendWorkspaceLogInput["channel"]>;
 
 function nowIso() {
@@ -107,6 +109,7 @@ function domainEventPrefix(domain: AiLogDomain) {
   if (domain === "research") return "ai.research";
   if (domain === "page_plan") return "ai.page_plan";
   if (domain === "page_agent") return "ai.page_agent";
+  if (domain === "theme") return "ai.theme";
   return "ai.outline";
 }
 

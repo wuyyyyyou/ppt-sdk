@@ -102,6 +102,27 @@ test("app_get_rendered_deck_html is declared and routed", async () => {
   assert.ok(manifest.tools.some((tool) => tool.name === "app_get_rendered_deck_html"));
 });
 
+test("workspace theme token tools are declared and routed", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+  const manifest = JSON.parse(
+    await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
+  ) as { tools: Array<{ name: string; parameters?: Array<{ name: string; required?: boolean }> }> };
+
+  for (const [toolName, handlerName] of [
+    ["app_get_workspace_theme_context", "toolAppGetWorkspaceThemeContext"],
+    ["app_validate_workspace_theme_token", "toolAppValidateWorkspaceThemeToken"],
+    ["app_record_workspace_theme_token", "toolAppRecordWorkspaceThemeToken"],
+  ] as const) {
+    assert.match(source, new RegExp(`${toolName}:\\s*${handlerName}`));
+    assert.ok(manifest.tools.some((tool) => tool.name === toolName), `Missing ${toolName}`);
+  }
+
+  assert.equal(
+    getToolParameter(manifest, "app_record_workspace_theme_token", "use_default").required,
+    false,
+  );
+});
+
 test("research curation draft tools declare optional draft_id", async () => {
   const manifest = JSON.parse(
     await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),

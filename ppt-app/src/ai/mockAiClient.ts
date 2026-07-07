@@ -147,17 +147,22 @@ export function createMockAiClient(): AiClient {
             audience: ["企业管理层", "业务负责人"],
             goal: ["说明 AI Agent 的能力与落地路径"],
             style: ["Business Professional"],
-            theme: ["digital-indigo"],
             slides: "7",
           }
         : {
             audience: ["Executive stakeholders", "Business owners"],
             goal: ["Explain AI Agent capabilities and adoption path"],
             style: ["Business Professional"],
-            theme: ["digital-indigo"],
             slides: "7",
           };
       await logMockInteraction(input.logContext, { method: "suggestContext", input }, result);
+      return result;
+    },
+
+    async generateThemeToken(input) {
+      await sleep(120);
+      const result = input.themeContext.default_token;
+      await logMockInteraction(input.logContext, { method: "generateThemeToken", input }, result);
       return result;
     },
 
@@ -320,6 +325,7 @@ export function createMockAiClient(): AiClient {
       const lower = input.instruction.toLowerCase();
       const wantsNoOp = /no.?op|不用改|无需|没变化/.test(lower);
       const wantsTemplate = /template|模板/.test(lower) && /换|change|switch|更换/.test(lower);
+      const wantsThemeChange = /theme|palette|brand|color|dark|light|主题|配色|品牌色|深色|浅色|视觉风格/.test(lower);
       const wantsEnglish = /english|英文|英语/.test(lower);
       const wantsChinese = /中文|chinese|汉语/.test(lower);
       const wantsAdd = /add|增加|新增|加一页|加页/.test(lower);
@@ -332,6 +338,7 @@ export function createMockAiClient(): AiClient {
             route: "unsupported" as const,
             blocking_reason: "Mock: selected Template changes are unsupported in Deck Refinement.",
             output_language_change: { changed: false },
+            theme_change_required: false,
             operations: [],
             reason: "Template migration is outside Deck Refinement.",
           }
@@ -339,6 +346,7 @@ export function createMockAiClient(): AiClient {
           ? {
               route: "no_op" as const,
               output_language_change: { changed: false },
+              theme_change_required: false,
               operations: [],
               reason: "Mock no-op Deck Refinement.",
             }
@@ -349,6 +357,8 @@ export function createMockAiClient(): AiClient {
                 output_language: wantsEnglish ? "English" : wantsChinese ? "中文" : "",
                 reason: wantsEnglish || wantsChinese ? "Mock explicit output language change." : "",
               },
+              theme_change_required: wantsThemeChange,
+              theme_change_reason: wantsThemeChange ? "Mock explicit whole-deck theme change." : "",
               operations: input.pagePlan.pages.flatMap((page, index): DeckRefinementOutlineOperation[] => {
                 if (wantsDelete && index === input.pagePlan.pages.length - 1) {
                   return [{ op: "delete" as const, page_id: page.page_id, reason: "Mock delete last page." }];

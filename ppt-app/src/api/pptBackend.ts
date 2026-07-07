@@ -54,6 +54,9 @@ import type {
   ImageFetchResult,
   ImageSearchResult,
   TemplatePlanningContext,
+  WorkspaceThemeContext,
+  WorkspaceThemeValidationResult,
+  RecordWorkspaceThemeTokenResult,
   UpdateWorkspaceSettingsInput,
   UpdateWorkspaceOutlineInput,
   UpdateWorkspacePagesInput,
@@ -125,6 +128,9 @@ export interface PptBackend {
   listTemplates(): Promise<ListTemplatesResult>;
   selectTemplate(input: SelectTemplateInput): Promise<SelectTemplateResult>;
   getTemplatePlanningContext(input: { workspace_dir: string }): Promise<TemplatePlanningContext>;
+  getWorkspaceThemeContext(input: { workspace_dir: string }): Promise<WorkspaceThemeContext>;
+  validateWorkspaceThemeToken(input: { workspace_dir: string; token: unknown }): Promise<WorkspaceThemeValidationResult>;
+  recordWorkspaceThemeToken(input: { workspace_dir: string; token?: unknown; use_default?: boolean }): Promise<RecordWorkspaceThemeTokenResult>;
   recordPagePlan(input: RecordPagePlanInput): Promise<PagePlan>;
   getPagePlan(input: { workspace_dir: string }): Promise<PagePlan>;
   preparePageFiles(input: PreparePageFilesInput): Promise<PreparePageFilesResult>;

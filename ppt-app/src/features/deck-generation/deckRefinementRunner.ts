@@ -16,6 +16,7 @@ import {
   type DeckGenerationStream,
   type RunDeckRefinementInput,
 } from "./types";
+import { ensureWorkspaceThemeToken } from "./themeTokenWorkflow";
 import { getAttemptLimits, readWorkspaceSetting } from "./settings";
 import {
   failedCompletion,
@@ -81,6 +82,18 @@ function emit(
     activeStreams,
     input.workspace ? getAttemptLimits({ workspace: input.workspace }) : ATTEMPT_LIMITS,
   );
+}
+
+function readLlmContextRows(value: unknown): Array<{ id: string; value: string }> {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    const record = item && typeof item === "object" && !Array.isArray(item)
+      ? item as Record<string, unknown>
+      : {};
+    const id = typeof record.id === "string" ? record.id.trim() : "";
+    const rowValue = typeof record.value === "string" ? record.value.trim() : "";
+    return id ? [{ id, value: rowValue }] : [];
+  });
 }
 
 export async function runDeckRefinementWorkflow(args: {
@@ -269,6 +282,49 @@ export async function runDeckRefinementWorkflow(args: {
     };
   }
 
+  let flowInput = input;
+  if (review.theme_change_required) {
+    emit(
+      input,
+      {
+        step: "page-plan",
+        message: input.locale === "zh" ? "正在重写工作区主题" : "Regenerating workspace theme",
+        currentPageIndex: null,
+        totalPages: pagePlan.pages.length,
+      },
+      progress,
+    );
+    const themeResult = await ensureWorkspaceThemeToken({
+      backend: input.backend,
+      aiClient: input.aiClient,
+      aiLogger: input.aiLogger,
+      workspace: input.workspace,
+      prompt: input.confirmedOutline.source?.prompt ?? "",
+      contextRows: readLlmContextRows(input.confirmedOutline.source?.context),
+      locale: input.locale,
+      runKind: "deck-refinement",
+      refinementRequest: instruction,
+    });
+    if (themeResult.fallbackUsed) {
+      emit(
+        { ...input, workspace: themeResult.workspace },
+        {
+          step: "page-plan",
+          message: input.locale === "zh"
+            ? "主题定制失败，已使用模板默认主题继续精修"
+            : "Theme customization failed. Continuing refinement with the template default theme.",
+          currentPageIndex: null,
+          totalPages: pagePlan.pages.length,
+        },
+        progress,
+      );
+    }
+    flowInput = {
+      ...input,
+      workspace: themeResult.workspace,
+    };
+  }
+
   const addedOutlineItems = review.operations
     .filter((operation): operation is Extract<typeof operation, { op: "add" }> => operation.op === "add")
     .map((operation) => ({
@@ -276,37 +332,37 @@ export async function runDeckRefinementWorkflow(args: {
       outline: operation.outline,
     }));
   const addedPagePlan = addedOutlineItems.length > 0
-    ? await input.aiClient.generateAddedPagePlan({
+    ? await flowInput.aiClient.generateAddedPagePlan({
         outlineItems: addedOutlineItems,
-        baseOutline: input.confirmedOutline,
+        baseOutline: flowInput.confirmedOutline,
         planningContext,
-        locale: input.locale,
-        logContext: input.aiLogger
+        locale: flowInput.locale,
+        logContext: flowInput.aiLogger
           ? {
-              logger: input.aiLogger,
-              workspace_dir: input.workspace.workspace_dir,
+              logger: flowInput.aiLogger,
+              workspace_dir: flowInput.workspace.workspace_dir,
               domain: "page_plan" as const,
               operation: "deck_refinement_added_page_plan",
-              operation_id: input.aiLogger.createOperationId("page_plan", "deck_refinement_added_page_plan"),
+              operation_id: flowInput.aiLogger.createOperationId("page_plan", "deck_refinement_added_page_plan"),
               provider: "anna",
               runtime_mode: "anna",
             }
           : undefined,
       })
     : null;
-  throwIfCancelled(input);
+  throwIfCancelled(flowInput);
 
   const now = new Date().toISOString();
   const reconciliation = reconcileDeckRefinement({
     instruction,
-    outline: input.confirmedOutline,
+    outline: flowInput.confirmedOutline,
     pagePlan,
     review,
     addedPagePlan,
     now,
   });
   if (!reconciliation.renderRequired) {
-    const rendered = readRenderedDeckFromWorkspace(input.workspace);
+    const rendered = readRenderedDeckFromWorkspace(flowInput.workspace);
     if (!rendered) {
       const message = input.locale === "zh"
         ? "整套优化没有产生可执行变更，但现有渲染产物不可用。"
@@ -324,7 +380,7 @@ export async function runDeckRefinementWorkflow(args: {
     return {
       status: "completed",
       result: {
-        outline: input.confirmedOutline,
+        outline: flowInput.confirmedOutline,
         pagePlan,
         progress,
         rendered,
@@ -336,8 +392,8 @@ export async function runDeckRefinementWorkflow(args: {
   if (needsAuthoring) {
     const preflightFailure = await preflightAgentToolAccess({
       agentClient: input.agentClient,
-      locale: input.locale,
-      onProgress: input.onProgress,
+      locale: flowInput.locale,
+      onProgress: flowInput.onProgress,
       progress,
       attemptLimits,
       totalPages: pagePlan.pages.length,
@@ -347,13 +403,13 @@ export async function runDeckRefinementWorkflow(args: {
   }
 
   const persisted = await persistDeckRefinementArtifacts({
-    flowInput: input,
+    flowInput,
     review,
     reconciliation,
     now,
   });
   await prepareDeckRefinementGenerationArtifacts({
-    flowInput: input,
+    flowInput,
     instruction,
     pagePlan: persisted.activePagePlan,
     review,
@@ -362,17 +418,17 @@ export async function runDeckRefinementWorkflow(args: {
   });
 
   return runDeckGeneration({
-    backend: input.backend,
-    aiClient: input.aiClient,
-    agentClient: input.agentClient,
-    aiLogger: input.aiLogger,
+    backend: flowInput.backend,
+    aiClient: flowInput.aiClient,
+    agentClient: flowInput.agentClient,
+    aiLogger: flowInput.aiLogger,
     workspace: persisted.activeWorkspace,
     confirmedOutline: persisted.persistedOutline,
-    locale: input.locale,
+    locale: flowInput.locale,
     startMode: "resume",
-    onProgress: input.onProgress,
-    isCancelled: input.isCancelled,
-    cancelSignal: input.cancelSignal,
+    onProgress: flowInput.onProgress,
+    isCancelled: flowInput.isCancelled,
+    cancelSignal: flowInput.cancelSignal,
     pageRefinementRequests: reconciliation.pageRefinementRequests,
     refinementRunKind: "deck-refinement",
   });

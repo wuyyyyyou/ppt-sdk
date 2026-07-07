@@ -20,6 +20,7 @@ import {
   getAppWorkspaceDefaults,
   getAppTemplateGroup,
   getAppTemplatePlanningContext,
+  getAppWorkspaceThemeContext,
   getAppTemplatePreview,
   getAppWorkspacePageFileFingerprints,
   getAppPagePlan,
@@ -60,6 +61,7 @@ import {
   recordAppResearchPlan,
   recordAppResearchStatus,
   recordAppResearchStatusPage,
+  recordAppWorkspaceThemeToken,
   removeAppUploadedSource,
   recordAppUploadedSourceAnalysis,
   recordAppUploadedSourceAnalysisDraft,
@@ -74,6 +76,7 @@ import {
   updateAppWorkspaceSettings,
   updateAppWorkspaceTitle,
   uploadAppUploadedSource,
+  validateAppWorkspaceThemeToken,
 } from "./dist/index.js";
 
 const TASK_STATE_MACHINE_TOOL_NAMES = [
@@ -1225,6 +1228,48 @@ async function toolAppGetTemplatePlanningContext(args) {
   return getAppTemplatePlanningContext({ workspace_dir: workspaceDir });
 }
 
+async function toolAppGetWorkspaceThemeContext(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return getAppWorkspaceThemeContext({ workspace_dir: workspaceDir });
+}
+
+async function toolAppValidateWorkspaceThemeToken(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  if (args.token === undefined) {
+    throw new Error('"token" is required');
+  }
+
+  return validateAppWorkspaceThemeToken({
+    workspace_dir: workspaceDir,
+    token: args.token,
+  });
+}
+
+async function toolAppRecordWorkspaceThemeToken(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  if (args.use_default !== true && args.token === undefined) {
+    throw new Error('"token" is required unless "use_default" is true');
+  }
+
+  return registerWorkspaceJsonReference(await recordAppWorkspaceThemeToken({
+    workspace_dir: workspaceDir,
+    token: args.token,
+    use_default: args.use_default === true,
+  }));
+}
+
 async function toolAppRecordPagePlan(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -1957,6 +2002,9 @@ const TOOL_DISPATCH = {
   app_get_template_preview: toolAppGetTemplatePreview,
   app_select_workspace_template: toolAppSelectWorkspaceTemplate,
   app_get_template_planning_context: toolAppGetTemplatePlanningContext,
+  app_get_workspace_theme_context: toolAppGetWorkspaceThemeContext,
+  app_validate_workspace_theme_token: toolAppValidateWorkspaceThemeToken,
+  app_record_workspace_theme_token: toolAppRecordWorkspaceThemeToken,
   app_record_page_plan: toolAppRecordPagePlan,
   app_get_page_plan: toolAppGetPagePlan,
   app_prepare_page_files: toolAppPreparePageFiles,

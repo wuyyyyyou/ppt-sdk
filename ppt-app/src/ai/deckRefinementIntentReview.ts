@@ -103,6 +103,8 @@ export function normalizeDeckRefinementIntentReview(
       route,
       blocking_reason: blockingReason || reason || "This Deck Refinement request is unsupported.",
       output_language_change: { changed: false },
+      theme_change_required: false,
+      theme_change_reason: undefined,
       operations: [],
       reason: reason || blockingReason || "Unsupported Deck Refinement request.",
     };
@@ -113,6 +115,8 @@ export function normalizeDeckRefinementIntentReview(
       route,
       blocking_reason: undefined,
       output_language_change: { changed: false },
+      theme_change_required: false,
+      theme_change_reason: undefined,
       operations: [],
       reason: reason || "No Deck Refinement changes are needed.",
     };
@@ -131,6 +135,8 @@ export function normalizeDeckRefinementIntentReview(
   if (operations.length === 0) {
     throw new Error("Deck Refinement proceed route requires operation-based outline reconciliation.");
   }
+  const themeChangeRequired = record.theme_change_required === true;
+  const themeChangeReason = cleanString(record.theme_change_reason);
 
   return {
     route,
@@ -140,6 +146,10 @@ export function normalizeDeckRefinementIntentReview(
       output_language: outputLanguageChanged ? outputLanguage : undefined,
       reason: cleanString(outputLanguageRecord.reason) || undefined,
     },
+    theme_change_required: themeChangeRequired,
+    theme_change_reason: themeChangeRequired
+      ? themeChangeReason || "Whole-deck theme token should be regenerated."
+      : undefined,
     operations,
     reason: reason || "Proceed with Deck Refinement.",
   };
@@ -171,6 +181,8 @@ export function buildDeckRefinementIntentReviewLlmRequest(
       output_language: "",
       reason: "",
     },
+    theme_change_required: false,
+    theme_change_reason: "",
     operations: [
       { op: "keep", page_id: "page-01", reason: "" },
       { op: "update", page_id: "page-02", title: "", outline: "", reason: "", additional_research_required: false, additional_web_query_intents: [], additional_image_query_intents: [], evidence_needs: [], visual_needs: [] },
@@ -205,7 +217,7 @@ export function buildDeckRefinementIntentReviewLlmRequest(
             "Return exactly one JSON object. Do not edit files. Do not include markdown, comments, or code fences.",
             "",
             "Route rules:",
-            '- Use route "unsupported" for selected Template/template group changes, theme_id changes, unsafe template migrations, or requests that cannot be handled by editing existing/new pages.',
+            '- Use route "unsupported" for selected Template/template group changes, unsafe template migrations, or requests that cannot be handled by theme token regeneration or editing existing/new pages.',
             '- Use route "no_op" when the request does not require output language, outline, research, page, manifest, progress, or render changes.',
             '- Use route "proceed" when any deck-level artifact or Page Generation Unit should change.',
             "",
@@ -213,6 +225,12 @@ export function buildDeckRefinementIntentReviewLlmRequest(
             "- Set output_language_change.changed=true only when the user explicitly asks to change generated content language.",
             "- Mentions of foreign terms, source language, market names, or translation examples are not enough by themselves.",
             "- When output_language_change.changed=true, every retained Page Generation Unit will be targeted.",
+            "",
+            "Theme rules:",
+            "- Set theme_change_required=true only for explicit whole-deck visual theme, palette, brand-color, dark/light mode, or visual identity changes.",
+            "- Theme-only Deck Refinement is valid: route must be proceed, operations may all be keep, and theme_change_required must be true.",
+            "- Do not use fixed theme IDs. The system will regenerate workspace/local theme/token.json from the selected Template's theme contract.",
+            "- Do not set theme_change_required for single-slide color tweaks, chart-specific color tweaks, content additions, or vague 'make it better' requests unless they clearly ask for a whole-deck theme change.",
             "",
             "Operation rules:",
             "- operations must be operation-based and keyed by existing page_id for keep, update, and delete.",
@@ -233,7 +251,7 @@ export function buildDeckRefinementIntentReviewLlmRequest(
             "- Set per-operation additional_research_required and query intents only for added or changed-intent pages that need external facts, latest data, citations, cases, real visuals, or updated visual assets.",
             "- Output-language-only changes do not need research by default.",
             "",
-            "Do not return context_updates, global_change, global_change_reason, workspace settings, local file paths, or template paths.",
+            "Do not return context_updates, global_change, global_change_reason, workspace settings, local file paths, template paths, or theme_id.",
             "Expected JSON shape:",
             JSON.stringify(expectedShape, null, 2),
           ].join("\n"),

@@ -40,7 +40,7 @@ function hexToRgb(value: string): string {
   return `${red}, ${green}, ${blue}`;
 }
 
-function validateTokenRecord(
+export function validateThemeTokenRecord(
   value: unknown,
   sourcePath: string,
 ): ThemeTokenBundle {
@@ -97,12 +97,12 @@ export async function readThemeTokenBundle(
   const defaultTokenPath = path.join(templateDir, "theme", "token.default.json");
   const token = await readJsonFileIfExists(tokenPath);
   if (token !== null) {
-    return validateTokenRecord(token, tokenPath);
+    return validateThemeTokenRecord(token, tokenPath);
   }
 
   const defaultToken = await readJsonFileIfExists(defaultTokenPath);
   if (defaultToken !== null) {
-    return validateTokenRecord(defaultToken, defaultTokenPath);
+    return validateThemeTokenRecord(defaultToken, defaultTokenPath);
   }
 
   return null;

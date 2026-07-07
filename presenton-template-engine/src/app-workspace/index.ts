@@ -3,6 +3,8 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { appendFile, copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { Ajv2020 } from "ajv/dist/2020.js";
+import type { ErrorObject } from "ajv";
 import {
   getDiscoveredTemplateGroup,
   listDiscoveredTemplateGroupSummaries,
@@ -14,13 +16,13 @@ import {
   readTemplatePreviewDataUrl,
   type TemplatePreviewImage,
 } from "../template-previews/index.js";
-import { getThemePreset } from "../themes/default-theme-presets.js";
 import {
   buildDeckHtmlFromManifest,
   buildDeckHtmlPagesAndScreenshotsFromManifest,
   buildDeckPageScreenshotFromManifest,
 } from "../render/build-deck-from-manifest.js";
 import type { DeckManifestInput, DeckManifestSlideInput } from "../render/types.js";
+import { validateThemeTokenRecord } from "../render/theme-tokens.js";
 import { resolveLocalModulePath } from "../local-template/loader.js";
 import { assertLocalTemplateTypecheck } from "../local-template/typecheck.js";
 import { launchManagedBrowser } from "../runtime/browser-runtime.js";
@@ -65,6 +67,7 @@ import type {
   GetAppTemplateGroupInput,
   GetAppTemplatePlanningContextInput,
   GetAppTemplatePreviewInput,
+  GetAppWorkspaceThemeContextInput,
   GetAppWorkspaceOutlineInput,
   GetAppWorkspacePageFileFingerprintsInput,
   GetAppWorkspacePageFileFingerprintsResult,
@@ -86,6 +89,8 @@ import type {
   AppResearchPaths,
   RecordAppPagePlanInput,
   RecordAppPageProgressInput,
+  RecordAppWorkspaceThemeTokenInput,
+  RecordAppWorkspaceThemeTokenResult,
   RecordAppPdfExportInput,
   RecordAppPptxExportInput,
   GetAppResearchEvidenceInput,
@@ -120,6 +125,9 @@ import type {
   UpdateAppWorkspaceTitleInput,
   UploadAppUploadedSourceInput,
   UploadAppUploadedSourceResult,
+  ValidateAppWorkspaceThemeTokenInput,
+  AppWorkspaceThemeContext,
+  AppWorkspaceThemeValidationResult,
 } from "./types.js";
 
 const WORKSPACE_ROOT = path.join(os.homedir(), "anna-workspace", "ppt");
@@ -145,6 +153,8 @@ const WORKSPACE_LOG_FILE_NAMES = {
   "ai-page-agent-stream": "ai-page-agent-stream.jsonl",
   "ai-research": "ai-research.jsonl",
   "ai-research-interactions": "ai-research-interactions.jsonl",
+  "ai-theme": "ai-theme.jsonl",
+  "ai-theme-interactions": "ai-theme-interactions.jsonl",
 } as const;
 const WORKSPACE_LOG_INLINE_PAYLOAD_MAX_BYTES = 64 * 1024;
 const PPTX_EXPORT_STATUS_FILE_NAME = "generate_ppt.json";
@@ -685,6 +695,7 @@ async function writeJsonFile(filePath: string, data: unknown): Promise<void> {
 
 const pageProgressWriteQueues = new Map<string, Promise<unknown>>();
 const uploadedSourceWriteQueues = new Map<string, Promise<unknown>>();
+const themeTokenWriteQueues = new Map<string, Promise<unknown>>();
 
 async function withPageProgressWriteQueue<T>(
   workspaceDir: string,
@@ -828,8 +839,6 @@ function createDefaultSettingJson() {
     style_notes: "",
     output_language: "auto",
     text_density: "balanced",
-    visual_tone: "",
-    theme_id: "finance-red-classic",
     page_generation_concurrency: 3,
     content_review_enabled: false,
     content_review_failure_limit: 5,
@@ -897,45 +906,6 @@ function normalizeSettingJson(setting: unknown): Record<string, unknown> {
   );
 
   return nextSetting;
-}
-
-async function applyWorkspaceThemeToManifest(
-  workspace: AppWorkspaceResult,
-  setting: Record<string, unknown>,
-): Promise<void> {
-  const themeId = typeof setting.theme_id === "string" ? setting.theme_id.trim() : "";
-  const theme = getThemePreset(themeId);
-  if (!theme) {
-    return;
-  }
-
-  let manifestPath: string;
-  try {
-    manifestPath = readSelectedTemplateManifestPath(workspace);
-  } catch {
-    return;
-  }
-
-  const manifestDir = path.dirname(manifestPath);
-  if (await fileExists(path.join(manifestDir, "theme", "token.default.json"))) {
-    return;
-  }
-
-  const manifestRecord = getPlainRecord(JSON.parse(await readFile(manifestPath, "utf8")) as unknown);
-  const colors = { ...(theme.data?.colors ?? {}) };
-  await writeJsonFile(manifestPath, {
-    ...manifestRecord,
-    theme: {
-      logo_url: theme.logo_url ?? null,
-      company_name: theme.company_name ?? null,
-      colors,
-      fonts: theme.fonts,
-      data: {
-        colors,
-        fonts: theme.data?.fonts,
-      },
-    },
-  });
 }
 
 async function ensureWorkspaceSetting(): Promise<Record<string, unknown>> {
@@ -1752,7 +1722,6 @@ export async function updateAppWorkspaceSettings(
   if (input.persist_as_default === true) {
     await updateGlobalWorkspaceDefaults(input.setting);
   }
-  await applyWorkspaceThemeToManifest(workspace, nextSetting);
   return ensureWorkspaceFiles(input.workspace_dir);
 }
 
@@ -3298,6 +3267,218 @@ export async function getAppTemplatePlanningContext(
   };
 }
 
+function buildWorkspaceThemePaths(templateDir: string) {
+  return {
+    themeDir: path.join(templateDir, "theme"),
+    tokenPath: path.join(templateDir, "theme", "token.json"),
+    schemaPath: path.join(templateDir, "theme", "token.schema.json"),
+    defaultTokenPath: path.join(templateDir, "theme", "token.default.json"),
+    readmePath: path.join(templateDir, "theme", "README.md"),
+  };
+}
+
+function assertTemplateContainedPath(templateDir: string, filePath: string, fieldName: string): void {
+  const normalizedTemplateDir = path.normalize(templateDir);
+  const normalizedFilePath = path.normalize(filePath);
+  const relativePath = path.relative(normalizedTemplateDir, normalizedFilePath);
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    throw new Error(`"${fieldName}" must stay inside the selected template directory`);
+  }
+}
+
+async function readRequiredThemeJsonFile(filePath: string, label: string): Promise<unknown> {
+  try {
+    return JSON.parse(await readFile(filePath, "utf8")) as unknown;
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      throw new Error(`Selected template is missing ${label}: ${filePath}`);
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to read ${label}: ${message}`);
+  }
+}
+
+async function readRequiredThemeTextFile(filePath: string, label: string): Promise<string> {
+  try {
+    return await readFile(filePath, "utf8");
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      throw new Error(`Selected template is missing ${label}: ${filePath}`);
+    }
+    throw error;
+  }
+}
+
+function formatAjvError(error: ErrorObject): string {
+  const pathText = error.instancePath || "/";
+  const message = error.message ?? "is invalid";
+  const params = Object.keys(error.params ?? {}).length > 0
+    ? ` ${JSON.stringify(error.params)}`
+    : "";
+  return `${pathText} ${message}${params}`;
+}
+
+function validateThemeTokenAgainstSchema(
+  token: unknown,
+  schema: Record<string, unknown>,
+  sourcePath: string,
+): AppWorkspaceThemeValidationResult {
+  const ajv = new Ajv2020({ allErrors: true, strict: false });
+  const validate = ajv.compile(schema);
+  const schemaOk = validate(token);
+  const errors = schemaOk
+    ? []
+    : (validate.errors ?? []).map(formatAjvError);
+
+  if (schemaOk) {
+    try {
+      validateThemeTokenRecord(token, sourcePath);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
+  };
+}
+
+async function readSelectedTemplateThemeContext(
+  workspace: AppWorkspaceResult,
+): Promise<Omit<AppWorkspaceThemeContext, "current_token" | "current_token_validation">> {
+  const templateDir = readSelectedTemplateDir(workspace);
+  const paths = buildWorkspaceThemePaths(templateDir);
+  for (const [fieldName, filePath] of Object.entries(paths)) {
+    if (fieldName === "themeDir") continue;
+    assertTemplateContainedPath(templateDir, filePath, fieldName);
+  }
+
+  const schemaValue = await readRequiredThemeJsonFile(paths.schemaPath, "Template Theme Contract schema");
+  const schema = getPlainRecord(schemaValue);
+  if (Object.keys(schema).length === 0) {
+    throw new Error(`Template Theme Contract schema must be a JSON object: ${paths.schemaPath}`);
+  }
+
+  const defaultToken = await readRequiredThemeJsonFile(paths.defaultTokenPath, "Template Theme Contract default token");
+  const defaultValidation = validateThemeTokenAgainstSchema(defaultToken, schema, paths.defaultTokenPath);
+  if (!defaultValidation.ok) {
+    throw new Error(
+      `Template default theme token does not satisfy its schema: ${defaultValidation.errors.join("; ")}`,
+    );
+  }
+
+  const readme = await readRequiredThemeTextFile(paths.readmePath, "Template Theme Contract README");
+
+  return {
+    workspace_dir: workspace.workspace_dir,
+    template_dir: templateDir,
+    token_path: paths.tokenPath,
+    schema_path: paths.schemaPath,
+    default_token_path: paths.defaultTokenPath,
+    readme_path: paths.readmePath,
+    schema,
+    default_token: defaultToken,
+    readme,
+  };
+}
+
+async function readCurrentWorkspaceThemeToken(
+  tokenPath: string,
+  schema: Record<string, unknown>,
+): Promise<Pick<AppWorkspaceThemeContext, "current_token" | "current_token_validation">> {
+  if (!(await fileExists(tokenPath))) {
+    return {
+      current_token: null,
+      current_token_validation: null,
+    };
+  }
+
+  try {
+    const token = JSON.parse(await readFile(tokenPath, "utf8")) as unknown;
+    return {
+      current_token: token,
+      current_token_validation: validateThemeTokenAgainstSchema(token, schema, tokenPath),
+    };
+  } catch (error) {
+    return {
+      current_token: null,
+      current_token_validation: {
+        ok: false,
+        errors: [error instanceof Error ? error.message : String(error)],
+      },
+    };
+  }
+}
+
+async function withThemeTokenWriteQueue<T>(
+  workspaceDir: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const queueKey = path.normalize(workspaceDir);
+  const previous = themeTokenWriteQueues.get(queueKey) ?? Promise.resolve();
+  const run = previous.catch(() => undefined).then(operation);
+  const tail = run.catch(() => undefined);
+  themeTokenWriteQueues.set(queueKey, tail);
+
+  try {
+    return await run;
+  } finally {
+    if (themeTokenWriteQueues.get(queueKey) === tail) {
+      themeTokenWriteQueues.delete(queueKey);
+    }
+  }
+}
+
+export async function getAppWorkspaceThemeContext(
+  input: GetAppWorkspaceThemeContextInput,
+): Promise<AppWorkspaceThemeContext> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const context = await readSelectedTemplateThemeContext(workspace);
+  const current = await readCurrentWorkspaceThemeToken(context.token_path, context.schema);
+  return {
+    ...context,
+    ...current,
+  };
+}
+
+export async function validateAppWorkspaceThemeToken(
+  input: ValidateAppWorkspaceThemeTokenInput,
+): Promise<AppWorkspaceThemeValidationResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const context = await readSelectedTemplateThemeContext(workspace);
+  return validateThemeTokenAgainstSchema(input.token, context.schema, context.token_path);
+}
+
+export async function recordAppWorkspaceThemeToken(
+  input: RecordAppWorkspaceThemeTokenInput,
+): Promise<RecordAppWorkspaceThemeTokenResult> {
+  return withThemeTokenWriteQueue(input.workspace_dir, async () => {
+    const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+    const context = await readSelectedTemplateThemeContext(workspace);
+    const fallbackUsed = input.use_default === true;
+    const token = fallbackUsed ? context.default_token : input.token;
+    if (token === undefined) {
+      throw new Error('"token" is required unless "use_default" is true');
+    }
+
+    const validation = validateThemeTokenAgainstSchema(token, context.schema, context.token_path);
+    if (validation.ok) {
+      await writeJsonFile(context.token_path, token);
+      await touchWorkspaceTask(workspace, new Date().toISOString());
+    }
+
+    return {
+      workspace: await ensureWorkspaceFiles(input.workspace_dir),
+      workspace_dir: workspace.workspace_dir,
+      token_path: context.token_path,
+      fallback_used: fallbackUsed,
+      validation,
+      token,
+    };
+  });
+}
+
 export async function selectAppWorkspaceTemplate(
   input: SelectAppWorkspaceTemplateInput,
 ): Promise<SelectAppWorkspaceTemplateResult> {
@@ -4371,6 +4552,7 @@ export type {
   GetAppTemplateGroupInput,
   GetAppTemplatePlanningContextInput,
   GetAppTemplatePreviewInput,
+  GetAppWorkspaceThemeContextInput,
   GetAppWorkspaceOutlineInput,
   ListAppTemplateGroupsResult,
   ListAppWorkspacesResult,
@@ -4381,6 +4563,8 @@ export type {
   PrepareAppExportModelResult,
   RecordAppPagePlanInput,
   RecordAppPageProgressInput,
+  RecordAppWorkspaceThemeTokenInput,
+  RecordAppWorkspaceThemeTokenResult,
   RecordAppPdfExportInput,
   RecordAppPptxExportInput,
   GetAppExportArtifactInput,
@@ -4394,4 +4578,7 @@ export type {
   UpdateAppWorkspacePagesInput,
   UpdateAppWorkspaceSettingsInput,
   UpdateAppWorkspaceTitleInput,
+  ValidateAppWorkspaceThemeTokenInput,
+  AppWorkspaceThemeContext,
+  AppWorkspaceThemeValidationResult,
 } from "./types.js";

@@ -169,7 +169,7 @@ export function buildAuthoringPrompt(input: {
   return [
     "You are a local file-editing Agent authoring one TSX-first PPT slide.",
     "You are a local file-editing Agent generating one PPT slide.",
-    "Edit files directly on disk. Work only on the current page unless a shared component or theme change is truly necessary.",
+    "Edit files directly on disk. Work only on the current page unless a shared component change is truly necessary.",
     "",
     `Authoring mode: ${input.attemptKind}`,
     "",
@@ -370,7 +370,7 @@ export function buildAuthoringPrompt(input: {
       "- Treat exported TypeScript props as the component API contract.",
       "- Do not invent prop names from component names or README descriptions.",
       "- Every JSX component call must provide required props with the correct shape.",
-      "- Modify shared components or theme only when multiple pages need the same new visual unit or another clear reason exists.",
+      "- Modify shared components only when multiple pages need the same new visual unit or another clear reason exists.",
     ].join("\n"),
     "",
     [
@@ -385,7 +385,7 @@ export function buildAuthoringPrompt(input: {
       "- Keep key titles, body copy, labels, KPIs, and chart explanations as real DOM text, not images or canvas.",
       "- Chart-heavy or graphic-heavy regions may use data-pptx-export=\"screenshot\"; keep surrounding titles and explanations as normal text.",
       "- Follow template/slides/README.md for PPTX export stability guidance.",
-      "- Edit only the current page TSX/data by default. Change shared components or theme only when clearly necessary.",
+      "- Edit only the current page TSX/data by default. Change shared components only when clearly necessary.",
     ].join("\n"),
     "",
     [

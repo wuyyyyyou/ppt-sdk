@@ -9,6 +9,7 @@ import type {
   ResearchEvidenceIndex,
   ResearchRequirement,
   TemplatePlanningContext,
+  WorkspaceThemeContext,
   WorkspaceOutlineItem,
   WorkspaceOutline,
 } from "../api/types";
@@ -46,8 +47,19 @@ export interface ContextSuggestionResult {
   audience: string[];
   goal: string[];
   style: string[];
-  theme: string[];
   slides: string;
+}
+
+export interface GenerateThemeTokenInput {
+  prompt: string;
+  contextRows: LlmContextRow[];
+  locale: Locale;
+  themeContext: WorkspaceThemeContext;
+  refinementRequest?: string;
+  currentToken?: unknown;
+  validationErrors?: string[];
+  previousResponse?: unknown;
+  logContext?: AiOperationLogContext;
 }
 
 export interface ReviseOutlineInput {
@@ -194,6 +206,8 @@ export interface DeckRefinementIntentReviewResult {
     output_language?: string;
     reason?: string;
   };
+  theme_change_required: boolean;
+  theme_change_reason?: string;
   operations: DeckRefinementOutlineOperation[];
   reason: string;
 }
@@ -247,6 +261,7 @@ export interface AiClient {
     outline?: OutlineDetail[];
   }): Promise<{ output_language: string }>;
   suggestContext(input: SuggestContextInput): Promise<ContextSuggestionResult>;
+  generateThemeToken(input: GenerateThemeTokenInput): Promise<unknown>;
   generatePagePlan(input: GeneratePagePlanInput): Promise<PagePlan>;
   generateAddedPagePlan(input: GenerateAddedPagePlanInput): Promise<PagePlan>;
   generateResearchDiscoveryDecision(input: GenerateResearchDiscoveryDecisionInput): Promise<ResearchDiscoveryDecision>;

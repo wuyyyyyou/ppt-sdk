@@ -28,6 +28,9 @@ import type {
   RecordPdfExportInput,
   SelectTemplateResult,
   TemplatePlanningContext,
+  WorkspaceThemeContext,
+  WorkspaceThemeValidationResult,
+  RecordWorkspaceThemeTokenResult,
   WorkspaceDefaultsResult,
   WorkspaceResult,
   BeginUploadedSourceUploadResult,
@@ -309,6 +312,24 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invoke<TemplatePlanningContext>(
         toolIds.pptEngine,
         "app_get_template_planning_context",
+        input
+      ),
+    getWorkspaceThemeContext: (input) =>
+      invoke<WorkspaceThemeContext>(
+        toolIds.pptEngine,
+        "app_get_workspace_theme_context",
+        input
+      ),
+    validateWorkspaceThemeToken: (input) =>
+      invoke<WorkspaceThemeValidationResult>(
+        toolIds.pptEngine,
+        "app_validate_workspace_theme_token",
+        input
+      ),
+    recordWorkspaceThemeToken: (input) =>
+      invokeHttpJson<RecordWorkspaceThemeTokenResult>(
+        toolIds.pptEngine,
+        "app_record_workspace_theme_token",
         input
       ),
     recordPagePlan: (input) =>

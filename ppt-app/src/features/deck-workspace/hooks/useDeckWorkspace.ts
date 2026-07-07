@@ -60,6 +60,7 @@ import {
   type DeckGenerationError,
   type DeckGenerationProgress,
 } from "../../deck-generation";
+import { ensureWorkspaceThemeToken as generateWorkspaceThemeToken } from "../../deck-generation/themeTokenWorkflow";
 import {
   ensureFreshUploadedSourceAnalysis,
   type UploadedSourceAnalysisWorkflowEvent,
@@ -109,7 +110,6 @@ import type {
   UploadedSourceAnalysisProgress,
   UploadedSourceAnalysisViewState
 } from "../types";
-import { getThemePreset, THEME_PRESET_IDS } from "../themePresets";
 import {
   buildGenerationViewState,
   type ActiveGenerationRun,
@@ -323,7 +323,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   function buildAiLogContext(
     workspace: WorkspaceResult,
-    domain: "outline" | "page_plan" | "page_agent",
+    domain: "outline" | "page_plan" | "page_agent" | "theme",
     operation: string,
     extra: {
       page_id?: string;
@@ -799,14 +799,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           label: t.brief.contextLabels.styleNotes,
           placeholder: t.brief.contextPlaceholders.styleNotes,
         };
-      case "theme":
-        return {
-          ...baseRow,
-          label: t.brief.contextLabels.theme,
-          value: getThemePreset(baseRow.value)?.theme_id ?? "finance-red-classic",
-          type: "select",
-          options: THEME_PRESET_IDS,
-        };
       case "content":
         return {
           ...baseRow,
@@ -1219,6 +1211,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   const currentStatus = useMemo(() => {
     if (loading === "template") return t.template.loading;
+    if (loading === "theme") {
+      return locale === "zh" ? "正在定制主题" : "Customizing theme";
+    }
     if (loading === "uploadedSourceAnalysis") return t.status.analyzingUploadedSource;
     if (loading === "outline") return t.status.creatingOutline;
     if (generationViewState.status === "running") {
@@ -1240,7 +1235,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (stage === "outline") return t.status.outlineReady;
     if (generated) return deckReadyStatus(t, deck.length);
     return "";
-  }, [createDeckProgress?.message, deck.length, generated, generationViewState.status, loading, stage, t, uploadedSourceAnalysisProgress.message]);
+  }, [createDeckProgress?.message, deck.length, generated, generationViewState.status, loading, locale, stage, t, uploadedSourceAnalysisProgress.message]);
 
   const uploadedSourceAnalysisState = useMemo<UploadedSourceAnalysisViewState>(() => {
     if (uploadedSources.length === 0) {
@@ -1436,10 +1431,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   function addContextRow(row: ContextRow) {
     setContextRows((rows) => {
       if (rows.some((item) => item.id === row.id)) return rows;
-      if (row.id === "theme") {
-        const currentThemeId = readWorkspaceThemeId(currentWorkspace) || row.value;
-        return [...rows, buildContextRowFromPatch("theme", currentThemeId)];
-      }
       return [...rows, row];
     });
   }
@@ -1556,9 +1547,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const style = readFeedbackContextValue(feedback, ["风格", "视觉风格", "语气", "style", "tone"]);
     if (style) patch.style = style;
 
-    const theme = readFeedbackContextValue(feedback, ["主题色", "主题", "配色", "theme", "color theme"]);
-    if (theme && getThemePreset(theme)) patch.theme = theme;
-
     const content = readFeedbackContextValue(feedback, ["内容来源", "参考材料", "材料", "content source", "source"]);
     if (content) patch.content = content;
 
@@ -1666,7 +1654,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         templateWorkspace,
         contextRows
       );
-      const themedWorkspace = await ensureWorkspaceTheme(
+      const themedWorkspace = await ensureWorkspaceThemeTokenForGeneration(
         templateWorkspace,
         generationContextRows
       );
@@ -1834,20 +1822,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     let activeRunWorkspaceDir: string | undefined;
     let shouldReconcileActiveRun = false;
-    const cancelSignal = beginCancellableGeneration();
-    const workspace = await refreshCurrentWorkspaceSnapshot();
-    if (!workspace) return;
-    if (!selectedTemplateGroupId) {
-      showToast(t.template.helper);
-      return;
-    }
-    const templateWorkspace = await ensureWorkspaceTheme(
-      await ensureWorkspaceTemplate(workspace)
-    );
-
-    setLoading("outline");
     resetGenerationProgress();
     try {
+      const cancelSignal = beginCancellableGeneration();
+      const workspace = await refreshCurrentWorkspaceSnapshot();
+      if (!workspace) return;
+      if (!selectedTemplateGroupId) {
+        showToast(t.template.helper);
+        return;
+      }
+      const templateWorkspace = await ensureWorkspaceThemeTokenForGeneration(
+        await ensureWorkspaceTemplate(workspace)
+      );
+      setLoading("outline");
       const setting = workspaceSettingsToState(templateWorkspace);
       const uploadedSourceAnalysis = await ensureUploadedSourceAnalysisForOutline(
         templateWorkspace,
@@ -2448,37 +2435,37 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       : "";
   }
 
-  function readWorkspaceThemeId(workspace: WorkspaceResult | null) {
-    const setting = workspaceSettingsToState(workspace);
-    const settingThemeId = typeof setting.theme_id === "string" ? setting.theme_id : "";
-    return getThemePreset(settingThemeId)?.theme_id ?? "";
-  }
-
-  function readSelectedThemeId(rows: ContextRow[] = contextRows, workspace: WorkspaceResult | null = currentWorkspace) {
-    const rowValue = rows.find((row) => row.id === "theme")?.value;
-    const rowThemeId = getThemePreset(rowValue)?.theme_id ?? "";
-    return rowThemeId || readWorkspaceThemeId(workspace) || "finance-red-classic";
-  }
-
-  async function ensureWorkspaceTheme(workspace: WorkspaceResult, rows: ContextRow[] = contextRows) {
-    if (!backend) return workspace;
-    const themeId = readSelectedThemeId(rows, workspace);
-    const setting = workspaceSettingsToState(workspace);
-    const currentThemeId = typeof setting.theme_id === "string" ? setting.theme_id : "";
-    if (currentThemeId === themeId) {
-      return workspace;
-    }
-
-    const updatedWorkspace = await backend.updateWorkspaceSettings({
-      workspace_dir: workspace.workspace_dir,
-      setting: {
-        ...setting,
-        theme_id: themeId,
-      },
+  async function ensureWorkspaceThemeTokenForGeneration(
+    workspace: WorkspaceResult,
+    rows: ContextRow[] = contextRows,
+    options: {
+      runKind?: "deck-generation" | "deck-refinement";
+      refinementRequest?: string;
+    } = {},
+  ) {
+    if (!backend || !aiClient) return workspace;
+    setLoading("theme");
+    const result = await generateWorkspaceThemeToken({
+      backend,
+      aiClient,
+      aiLogger,
+      workspace,
+      prompt,
+      contextRows: buildLlmContextRows(rows),
+      locale,
+      runKind: options.runKind ?? "deck-generation",
+      refinementRequest: options.refinementRequest,
     });
-    applyWorkspace(updatedWorkspace);
+    applyWorkspace(result.workspace);
     setWorkspaceScan(await backend.listWorkspaces());
-    return updatedWorkspace;
+    if (result.fallbackUsed) {
+      showToast(
+        locale === "zh"
+          ? "主题定制失败，已使用模板默认主题继续生成。"
+          : "Theme customization failed. Continuing with the template default theme."
+      );
+    }
+    return result.workspace;
   }
 
   async function ensureWorkspaceTemplate(workspace: WorkspaceResult) {
@@ -2737,8 +2724,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         workspace_dir: workspace.workspace_dir,
         template_group: groupId
       });
-      const themedWorkspace = await ensureWorkspaceTheme(result.workspace);
-      applyWorkspace(themedWorkspace);
+      applyWorkspace(result.workspace);
       setSelectedTemplateGroupId(result.selection.selected_template_group);
       setWorkspaceScan(await backend.listWorkspaces());
       setStage("brief");
@@ -3024,12 +3010,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }));
 
     try {
-      const themedWorkspace = await ensureWorkspaceTheme(workspace);
       const result = await backend.renderDeckHtml({
-        workspace_dir: themedWorkspace.workspace_dir
+        workspace_dir: workspace.workspace_dir
       });
       const refreshedWorkspace = await backend.openWorkspace({
-        workspace_dir: themedWorkspace.workspace_dir
+        workspace_dir: workspace.workspace_dir
       });
       const renderKey = workspaceReviewRenderKey(refreshedWorkspace);
       applyWorkspace(refreshedWorkspace);

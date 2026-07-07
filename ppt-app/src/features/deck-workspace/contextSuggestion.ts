@@ -1,13 +1,11 @@
 import type { ContextSuggestionResult } from "../../ai/types";
 import type { Messages } from "../../i18n/messages";
 import type { ContextRow } from "./types";
-import { getThemePreset, THEME_PRESET_IDS } from "./themePresets";
 
 export type ContextPatchId =
   | "audience"
   | "goal"
   | "style"
-  | "theme"
   | "content"
   | "slides";
 
@@ -56,14 +54,6 @@ export function buildContextRowFromPatch(
         value,
         placeholder: t.brief.contextPlaceholders.styleNotes,
       };
-    case "theme":
-      return {
-        id,
-        label: t.brief.contextLabels.theme,
-        value: getThemePreset(value)?.theme_id ?? "finance-red-classic",
-        type: "select",
-        options: THEME_PRESET_IDS,
-      };
     case "content":
       return {
         id,
@@ -84,7 +74,7 @@ export function buildContextRowFromPatch(
 }
 
 function buildSuggestedContextRow(
-  id: "audience" | "goal" | "style" | "theme",
+  id: "audience" | "goal" | "style",
   values: string[],
   t: Messages
 ): ContextRow | null {
@@ -99,7 +89,7 @@ function buildSuggestedContextRow(
   if (uniqueValues.length === 0) return null;
 
   const row = buildContextRowFromPatch(id, uniqueValues[0], t);
-  if (uniqueValues.length === 1 || id === "theme") {
+  if (uniqueValues.length === 1) {
     return row;
   }
 
@@ -119,7 +109,6 @@ export function buildContextRowsFromSuggestion(
     buildSuggestedContextRow("audience", result.audience, t),
     buildSuggestedContextRow("goal", result.goal, t),
     buildSuggestedContextRow("style", result.style, t),
-    buildSuggestedContextRow("theme", result.theme, t),
     buildContextRowFromPatch("slides", result.slides, t),
   ].filter((row): row is ContextRow => Boolean(row));
 }

@@ -268,7 +268,8 @@ export function reconcileDeckRefinement(input: {
     renderRequired:
       targetPageIds.size > 0 ||
       deletedPageIds.length > 0 ||
-      input.review.output_language_change.changed,
+      input.review.output_language_change.changed ||
+      input.review.theme_change_required,
   };
 }
 

@@ -34,10 +34,6 @@ import {
   buildStructuredJsonRepairPrompt,
   parseStructuredJson,
 } from "./structuredJson";
-import {
-  buildThemeCatalogForPrompt,
-  THEME_PRESET_IDS,
-} from "../features/deck-workspace/themePresets";
 import { CONTENT_GROUNDING_RULES } from "./groundingRules";
 import type { AiOperationLogContext } from "./interactionLog";
 import type {
@@ -278,11 +274,45 @@ function normalizeContextSuggestions(value: unknown): ContextSuggestionResult {
     audience: normalizeStringArray(record.audience),
     goal: normalizeStringArray(record.goal),
     style: normalizeStringArray(record.style),
-    theme: normalizeStringArray(record.theme).filter((themeId) =>
-      THEME_PRESET_IDS.includes(themeId),
-    ),
     slides: normalizeSlideCountValue(record.slides),
   };
+}
+
+function buildThemeTokenPrompt(input: Parameters<AiClient["generateThemeToken"]>[0]) {
+  const isRefinement = Boolean(input.refinementRequest?.trim());
+  const userInput = {
+    locale: input.locale,
+    run_kind: isRefinement ? "deck-refinement" : "deck-generation",
+    brief: input.prompt,
+    context_rows: input.contextRows,
+    refinement_request: input.refinementRequest ?? "",
+    current_token: isRefinement ? input.currentToken ?? null : null,
+    previous_invalid_response: input.previousResponse ?? null,
+    validation_errors: input.validationErrors ?? [],
+    template_theme_contract: {
+      schema_path: input.themeContext.schema_path,
+      default_token_path: input.themeContext.default_token_path,
+      readme_path: input.themeContext.readme_path,
+      schema: input.themeContext.schema,
+      default_token: input.themeContext.default_token,
+      readme: input.themeContext.readme,
+    },
+  };
+
+  return [
+    "Generate a complete Workspace Theme Token JSON object for the selected presentation Template.",
+    "Return only the bare JSON object. Do not include markdown, code fences, comments, explanations, rationale, patches, or an envelope.",
+    "The output must be a full replacement token that satisfies the provided JSON Schema.",
+    "Use the template README and default token as the baseline. Preserve the template's intended visual system unless the user clearly asks for a different whole-deck style.",
+    "Do not invent schema keys. Do not omit required keys. Do not use values outside enum/const/pattern requirements.",
+    isRefinement
+      ? "For Deck Refinement, use current_token as the baseline and apply only the requested whole-deck theme/style change."
+      : "For initial Deck Generation, use the brief and context rows to infer theme intent.",
+    "Do not use Uploaded Source Analysis, web research, component source code, or fixed theme IDs.",
+    "",
+    "Input JSON:",
+    JSON.stringify(userInput, null, 2),
+  ].join("\n");
 }
 
 async function completeOutlineWithRetry(
@@ -416,22 +446,41 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         "optional context suggestions",
         [
           "Infer optional context fields for a presentation from the user's prompt.",
-          "Return only a JSON object with exactly these properties: audience, goal, style, theme, slides.",
-          "audience, goal, style, and theme must be arrays of concise strings.",
+          "Return only a JSON object with exactly these properties: audience, goal, style, slides.",
+          "audience, goal, and style must be arrays of concise strings.",
           "slides must be a string: use a positive integer such as \"8\" when a concrete page count is reasonable, or \"auto\" when the count should be left open.",
-          "For theme, choose only theme_id values from theme_catalog. Do not invent theme IDs.",
           "Prefer fewer options. If the prompt clearly determines a field, return a one-item array for that field.",
           "If an array field is ambiguous, return 2-3 plausible options. Do not return more than 4 items for any array field.",
           "Do not include markdown or explanation.",
-          `theme_catalog: ${JSON.stringify(buildThemeCatalogForPrompt())}`,
           `Locale: ${input.locale}`,
           `Prompt: ${input.prompt}`,
         ].join("\n"),
-        '{"audience":["..."],"goal":["..."],"style":["..."],"theme":["theme_id"],"slides":"auto"}',
+        '{"audience":["..."],"goal":["..."],"style":["..."],"slides":"auto"}',
         input.logContext
       );
 
       return normalizeContextSuggestions(result);
+    },
+
+    async generateThemeToken(input) {
+      const result = await completeJsonRequest<unknown>(
+        runtime,
+        "workspace theme token",
+        {
+          messages: [
+            {
+              role: "user",
+              content: {
+                type: "text",
+                text: buildThemeTokenPrompt(input),
+              },
+            },
+          ],
+        },
+        JSON.stringify(input.themeContext.default_token),
+        input.logContext,
+      );
+      return result;
     },
 
     async generatePagePlan(input) {
@@ -552,7 +601,7 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         runtime,
         "deck refinement intent review",
         buildDeckRefinementIntentReviewLlmRequest(input),
-        '{"route":"proceed","blocking_reason":"","output_language_change":{"changed":false,"output_language":"","reason":""},"operations":[{"op":"keep","page_id":"page-01","reason":""}],"reason":"..."}',
+        '{"route":"proceed","blocking_reason":"","output_language_change":{"changed":false,"output_language":"","reason":""},"theme_change_required":false,"theme_change_reason":"","operations":[{"op":"keep","page_id":"page-01","reason":""}],"reason":"..."}',
         input.logContext,
       );
       return normalizeDeckRefinementIntentReview(result);

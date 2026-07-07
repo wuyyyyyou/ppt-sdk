@@ -489,6 +489,60 @@
       ]
     },
     {
+      "name": "app_get_workspace_theme_context",
+      "description": "Return the selected workspace template theme schema, default token, README, and current workspace theme token.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_validate_workspace_theme_token",
+      "description": "Validate a candidate Workspace Theme Token against the selected template theme schema.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "token",
+          "type": "object",
+          "description": "Candidate complete Workspace Theme Token JSON object.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_record_workspace_theme_token",
+      "description": "Validate and write the Workspace Theme Token into the selected workspace template, or write the template default token as fallback.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "token",
+          "type": "object",
+          "description": "Candidate complete Workspace Theme Token JSON object. Required unless use_default is true.",
+          "required": false
+        },
+        {
+          "name": "use_default",
+          "type": "boolean",
+          "description": "When true, write the selected template default token instead of a generated token.",
+          "required": false
+        }
+      ]
+    },
+    {
       "name": "app_record_page_plan",
       "description": "Validate and write page-plan.json for a workspace.",
       "parameters": [

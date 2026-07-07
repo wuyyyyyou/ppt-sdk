@@ -312,7 +312,9 @@ export interface AppendWorkspaceLogInput {
     | "ai-page-agent-interactions"
     | "ai-page-agent-stream"
     | "ai-research"
-    | "ai-research-interactions";
+    | "ai-research-interactions"
+    | "ai-theme"
+    | "ai-theme-interactions";
   entry: Record<string, unknown>;
   payload_keys?: string[];
   inline_payload_max_bytes?: number;
@@ -420,6 +422,34 @@ export interface TemplatePlanningContext {
   catalog_path: string;
   blueprints: TemplatePlanningBlueprint[];
   rules: string[];
+}
+
+export interface WorkspaceThemeValidationResult {
+  ok: boolean;
+  errors: string[];
+}
+
+export interface WorkspaceThemeContext {
+  workspace_dir: string;
+  template_dir: string;
+  token_path: string;
+  schema_path: string;
+  default_token_path: string;
+  readme_path: string;
+  schema: Record<string, unknown>;
+  default_token: unknown;
+  current_token: unknown | null;
+  current_token_validation: WorkspaceThemeValidationResult | null;
+  readme: string;
+}
+
+export interface RecordWorkspaceThemeTokenResult {
+  workspace: WorkspaceResult;
+  workspace_dir: string;
+  token_path: string;
+  fallback_used: boolean;
+  validation: WorkspaceThemeValidationResult;
+  token: unknown;
 }
 
 export interface PagePlanItem {

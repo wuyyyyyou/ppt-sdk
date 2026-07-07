@@ -52,7 +52,8 @@ export function OutlinePage(props: OutlinePageProps) {
     ? [...DEFAULT_OUTPUT_LANGUAGE_OPTIONS]
     : [...DEFAULT_OUTPUT_LANGUAGE_OPTIONS, outputLanguageDraft];
   const analyzingUploadedSources = loading === "uploadedSourceAnalysis";
-  const generating = loading === "deck" || loading === "deckFromOutline" || analyzingUploadedSources;
+  const customizingTheme = loading === "theme";
+  const generating = loading === "deck" || loading === "deckFromOutline" || customizingTheme || analyzingUploadedSources;
 
   return (
     <section className="page active outline-page">
@@ -80,7 +81,7 @@ export function OutlinePage(props: OutlinePageProps) {
           />
           <div className="feedback-actions">
             <button className="primary-btn" onClick={applyFeedback} disabled={loading === "outline" || generating}>
-              {loading === "outline" || analyzingUploadedSources ? <span className="spinner small" /> : <Sparkles size={14} />}
+              {loading === "outline" || customizingTheme || analyzingUploadedSources ? <span className="spinner small" /> : <Sparkles size={14} />}
               {t.controls.reviseOutline}
             </button>
           </div>
