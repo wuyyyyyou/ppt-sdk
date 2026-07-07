@@ -1,8 +1,8 @@
 import type { WorkspaceSettings } from "../../api/types";
 
 export const PAGE_GENERATION_CONCURRENCY_MIN = 1;
-export const PAGE_GENERATION_CONCURRENCY_MAX = 6;
-export const DEFAULT_PAGE_GENERATION_CONCURRENCY = 3;
+export const PAGE_GENERATION_CONCURRENCY_MAX = 10;
+export const DEFAULT_PAGE_GENERATION_CONCURRENCY = 5;
 
 export function normalizePageGenerationConcurrency(
   value: unknown,

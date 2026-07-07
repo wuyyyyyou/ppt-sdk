@@ -839,32 +839,32 @@ function createDefaultSettingJson() {
     style_notes: "",
     output_language: "auto",
     text_density: "balanced",
-    page_generation_concurrency: 3,
+    page_generation_concurrency: 5,
     content_review_enabled: false,
     content_review_failure_limit: 5,
     visual_review_enabled: false,
-    visual_review_failure_limit: 5,
+    visual_review_failure_limit: 2,
     disable_web_research: false,
     disable_image_research: false,
   };
 }
 
-function normalizeReviewFailureLimit(value: unknown): number {
+function normalizeReviewFailureLimit(value: unknown, fallback = 5): number {
   const numericValue = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(numericValue)) {
-    return 5;
+    return fallback;
   }
 
-  return Math.max(0, Math.min(10, Math.floor(numericValue)));
+  return Math.max(1, Math.min(5, Math.floor(numericValue)));
 }
 
 function normalizePageGenerationConcurrency(value: unknown): number {
   const numericValue = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(numericValue)) {
-    return 3;
+    return 5;
   }
 
-  return Math.max(1, Math.min(6, Math.floor(numericValue)));
+  return Math.max(1, Math.min(10, Math.floor(numericValue)));
 }
 
 function normalizeSettingJson(setting: unknown): Record<string, unknown> {
@@ -903,6 +903,7 @@ function normalizeSettingJson(setting: unknown): Record<string, unknown> {
   );
   nextSetting.visual_review_failure_limit = normalizeReviewFailureLimit(
     nextSetting.visual_review_failure_limit,
+    2,
   );
 
   return nextSetting;

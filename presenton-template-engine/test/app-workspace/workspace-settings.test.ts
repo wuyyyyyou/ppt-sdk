@@ -46,10 +46,10 @@ test("workspace settings can be saved as defaults for newly created workspaces",
     assert.equal(firstSetting.content_review_enabled, false);
     assert.equal(firstSetting.content_review_failure_limit, 5);
     assert.equal(firstSetting.visual_review_enabled, false);
-    assert.equal(firstSetting.visual_review_failure_limit, 5);
+    assert.equal(firstSetting.visual_review_failure_limit, 2);
     assert.equal(firstSetting.disable_web_research, false);
     assert.equal(firstSetting.disable_image_research, false);
-    assert.equal(firstSetting.page_generation_concurrency, 3);
+    assert.equal(firstSetting.page_generation_concurrency, 5);
     assert.equal("aspect_ratio" in firstSetting, false);
     assert.equal("typography" in firstSetting, false);
     assert.equal("language" in firstSetting, false);
@@ -106,12 +106,12 @@ test("workspace settings can be saved as defaults for newly created workspaces",
     assert.equal(updatedGlobalSetting.output_language, "中文");
     assert.equal(updatedGlobalSetting.text_density, "light");
     assert.equal(updatedGlobalSetting.content_review_enabled, false);
-    assert.equal(updatedGlobalSetting.content_review_failure_limit, 10);
+    assert.equal(updatedGlobalSetting.content_review_failure_limit, 5);
     assert.equal(updatedGlobalSetting.visual_review_enabled, false);
-    assert.equal(updatedGlobalSetting.visual_review_failure_limit, 0);
+    assert.equal(updatedGlobalSetting.visual_review_failure_limit, 1);
     assert.equal(updatedGlobalSetting.disable_web_research, true);
     assert.equal(updatedGlobalSetting.disable_image_research, false);
-    assert.equal(updatedGlobalSetting.page_generation_concurrency, 6);
+    assert.equal(updatedGlobalSetting.page_generation_concurrency, 10);
     assert.equal("aspect_ratio" in updatedGlobalSetting, false);
     assert.equal("typography" in updatedGlobalSetting, false);
 
@@ -121,12 +121,12 @@ test("workspace settings can be saved as defaults for newly created workspaces",
     assert.equal(inheritedSetting.output_language, "中文");
     assert.equal(inheritedSetting.text_density, "light");
     assert.equal(inheritedSetting.content_review_enabled, false);
-    assert.equal(inheritedSetting.content_review_failure_limit, 10);
+    assert.equal(inheritedSetting.content_review_failure_limit, 5);
     assert.equal(inheritedSetting.visual_review_enabled, false);
-    assert.equal(inheritedSetting.visual_review_failure_limit, 0);
+    assert.equal(inheritedSetting.visual_review_failure_limit, 1);
     assert.equal(inheritedSetting.disable_web_research, true);
     assert.equal(inheritedSetting.disable_image_research, false);
-    assert.equal(inheritedSetting.page_generation_concurrency, 6);
+    assert.equal(inheritedSetting.page_generation_concurrency, 10);
     assert.equal("aspect_ratio" in inheritedSetting, false);
     assert.equal("typography" in inheritedSetting, false);
 

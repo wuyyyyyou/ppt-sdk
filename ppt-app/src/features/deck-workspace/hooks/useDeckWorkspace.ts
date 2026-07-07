@@ -123,6 +123,7 @@ import {
   createUploadedSourceAnalysisProgress,
   failUploadedSourceAnalysisProgress,
 } from "../uploadedSourceAnalysisProgress";
+import { shouldAutoSyncWorkspaceTitleFromOutline } from "../workspaceTitleSync";
 
 const DEFAULT_TEMPLATE_GROUP_ID = "red-finance-canvas";
 const AGENT_TOOL_ACCESS_POLICY = resolveAgentToolAccessPolicy(
@@ -142,6 +143,11 @@ function formatWorkspaceDate(date = new Date()) {
     padDatePart(date.getMonth() + 1),
     padDatePart(date.getDate())
   ].join("-");
+}
+
+function clampSlideIndex(index: number, slideCount: number) {
+  const maxIndex = Math.max(0, slideCount - 1);
+  return Math.min(Math.max(0, index), maxIndex);
 }
 
 function uploadedSourceDependencyMatchesActiveSources(input: {
@@ -1005,7 +1011,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   function applyWorkspace(
     workspace: WorkspaceResult,
-    options: { syncEmptyContextRows?: boolean } = {}
+    options: { syncEmptyContextRows?: boolean; preserveCurrentSlide?: boolean } = {}
   ) {
     setCurrentWorkspace(workspace);
     void refreshUploadedSources(workspace);
@@ -1048,7 +1054,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       setDeck(workspacePages.deck);
       setOutline(workspaceOutline.length > 0 ? workspaceOutline : workspacePages.outline);
       setOutlineDraft(workspaceOutline.length > 0 ? workspaceOutline : workspacePages.outline);
-      setCurrentSlide(0);
+      setCurrentSlide((index) =>
+        options.preserveCurrentSlide ? clampSlideIndex(index, workspacePages.deck.length) : 0
+      );
       setStage("deck");
     } else {
       setGenerated(false);
@@ -2216,6 +2224,32 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       : workspace.task_id ?? workspace.workspace_id;
   }
 
+  async function autoSyncWorkspaceTitleFromOutline(
+    previousWorkspace: WorkspaceResult,
+    updatedWorkspace: WorkspaceResult,
+    title: string
+  ) {
+    if (!backend) return updatedWorkspace;
+
+    const nextTitle = title.trim();
+    if (!nextTitle || !shouldAutoSyncWorkspaceTitleFromOutline(previousWorkspace, nextTitle)) {
+      return updatedWorkspace;
+    }
+
+    try {
+      return await backend.updateWorkspaceTitle({
+        workspace_dir: updatedWorkspace.workspace_dir,
+        title: nextTitle
+      });
+    } catch (error) {
+      console.warn(
+        "Failed to sync workspace title from outline",
+        error instanceof Error ? error.message : error
+      );
+      return updatedWorkspace;
+    }
+  }
+
   function readWorkspaceExportArtifactPath(workspace: WorkspaceResult): ExportArtifact | null {
     if (!workspace.task || typeof workspace.task !== "object" || Array.isArray(workspace.task)) {
       return null;
@@ -2569,10 +2603,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const workspace = workspaceOverride ?? (await ensureCurrentWorkspace());
     if (!workspace) return null;
 
+    const outlineTitle = title.trim();
     const updatedWorkspace = await backend.updateWorkspaceOutline({
       workspace_dir: workspace.workspace_dir,
       outline: {
-        ...buildOutlineArtifact(items, title, outputLanguage, status),
+        ...buildOutlineArtifact(items, outlineTitle || title, outputLanguage, status),
         source: {
           prompt,
           context: buildLlmContextRows(contextRowsOverride ?? contextRows),
@@ -2586,13 +2621,18 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         }
       }
     });
+    const syncedWorkspace = await autoSyncWorkspaceTitleFromOutline(
+      workspace,
+      updatedWorkspace,
+      outlineTitle
+    );
     if (applyWorkspaceState) {
-      applyWorkspace(updatedWorkspace);
+      applyWorkspace(syncedWorkspace);
       setWorkspaceScan(await backend.listWorkspaces());
     } else {
-      setCurrentWorkspace(updatedWorkspace);
+      setCurrentWorkspace(syncedWorkspace);
     }
-    return updatedWorkspace;
+    return syncedWorkspace;
   }
 
   function autosaveOutline(items: OutlineDetail[]) {
@@ -2747,7 +2787,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         persist_as_default: true,
         setting
       });
-      applyWorkspace(workspace);
+      applyWorkspace(workspace, { preserveCurrentSlide: true });
       setWorkspaceScan(await backend.listWorkspaces());
       showToast(t.status.settingsSaved);
     } catch (error) {
@@ -2778,7 +2818,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         persist_as_default: true,
         setting: pageReviewSettingsToWorkspaceSettings(nextReviewSettings),
       });
-      applyWorkspace(updatedWorkspace);
+      applyWorkspace(updatedWorkspace, { preserveCurrentSlide: true });
       setWorkspaceScan(await backend.listWorkspaces());
       showToast(t.status.settingsSaved);
     } catch (error) {
@@ -2804,7 +2844,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         persist_as_default: true,
         setting: researchSearchControlSettingsToWorkspaceSettings(settings),
       });
-      applyWorkspace(updatedWorkspace);
+      applyWorkspace(updatedWorkspace, { preserveCurrentSlide: true });
       setWorkspaceScan(await backend.listWorkspaces());
       showToast(t.status.settingsSaved);
     } catch (error) {

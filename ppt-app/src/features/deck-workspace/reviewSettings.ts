@@ -1,11 +1,11 @@
 import type { WorkspaceSettings } from "../../api/types";
 
-export const REVIEW_FAILURE_LIMIT_MIN = 0;
-export const REVIEW_FAILURE_LIMIT_MAX = 10;
+export const REVIEW_FAILURE_LIMIT_MIN = 1;
+export const REVIEW_FAILURE_LIMIT_MAX = 5;
 export const DEFAULT_CONTENT_REVIEW_ENABLED = false;
 export const DEFAULT_CONTENT_REVIEW_FAILURE_LIMIT = 5;
 export const DEFAULT_VISUAL_REVIEW_ENABLED = false;
-export const DEFAULT_VISUAL_REVIEW_FAILURE_LIMIT = 3;
+export const DEFAULT_VISUAL_REVIEW_FAILURE_LIMIT = 2;
 
 export interface PageReviewSettings {
   contentReviewEnabled: boolean;
