@@ -34,6 +34,7 @@ examples/anna-app-focus-flow/executas/focus-session-go/focus-session-go
 **/bundle/
 **/node_modules/
 **/.anna
+ppt-app/public/template-previews/
 
 **/.build/
 **/.cache/

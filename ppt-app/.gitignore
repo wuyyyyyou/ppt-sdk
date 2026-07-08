@@ -1,1 +1,39 @@
-public/template-previews/
+# dependencies
+node_modules/
+
+# local runtime state
+.anna/
+.env
+
+# Python local environments and caches
+.venv/
+.uv-cache/
+.pytest_cache/
+__pycache__/
+*.egg-info/
+*.pyc
+
+# build/cache outputs that are not part of the committed Anna app bundle
+.build/
+.cache/
+coverage/
+reports/
+sea-prep/
+dist-anna/
+*.blob
+*.spec.bak
+
+# editor / OS
+.DS_Store
+
+# Anna runtime generated sidecar; bundle assets themselves are synced.
+bundle/anna-tool-ids.js
+
+# Local mutable template/theme artifacts.
+**/theme/token.json
+**/presenton_sdk_pptx_generator/_embedded_manifest.py
+**/anna_search_executa/_embedded_manifest.py
+
+# Keep Python lockfiles visible even when a parent repository ignores uv.lock.
+!executas/ppt-gener/uv.lock
+!executas/anna-search/uv.lock
