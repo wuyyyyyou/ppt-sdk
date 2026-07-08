@@ -1,0 +1,15 @@
+{
+  "tool_id": "tool-lightvoss-anna-search-7ym3jyqv",
+  "name": "Anna Search",
+  "slug": "anna-search",
+  "type": "python",
+  "command": [
+    "uv",
+    "run",
+    "--project",
+    ".",
+    "python",
+    "example_plugin.py"
+  ],
+  "enabled": true
+}

@@ -1,24 +1,21 @@
 #!/usr/bin/env node
 
 import { spawn } from "node:child_process";
-import { createInterface } from "node:readline";
 import { readFile, stat } from "node:fs/promises";
+import { createInterface } from "node:readline";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const shimDir = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(shimDir, "../../..");
-const engineDir = path.join(repoRoot, "presenton-template-engine");
+const pluginDir = path.dirname(fileURLToPath(import.meta.url));
 
 // Anna runtime does not currently understand the plugin's __file_transport
-// pointer protocol, so this shim reads the file and inlines the JSON-RPC
-// response back into stdout. Very large payloads (e.g. base64 PNGs) can
-// crash the runtime's line-based parser, so we cap the inlined size and
-// surface a clear JSON-RPC error instead of letting the process die.
+// pointer protocol, so this adapter reads the file and inlines the JSON-RPC
+// response back into stdout. Very large payloads can crash the runtime's
+// line-based parser, so cap the inlined size and return a JSON-RPC error.
 const MAX_INLINE_TRANSPORT_BYTES = 1024 * 1024;
 
 const child = spawn(process.execPath, ["example_plugin.js"], {
-  cwd: engineDir,
+  cwd: pluginDir,
   stdio: ["pipe", "pipe", "pipe"],
 });
 
@@ -28,7 +25,7 @@ child.stderr.on("data", (chunk) => {
 
 child.on("exit", (code, signal) => {
   process.stderr.write(
-    `ppt-engine-local child exited code=${code ?? "null"} signal=${signal ?? "none"}\n`
+    `ppt-engine app stdio child exited code=${code ?? "null"} signal=${signal ?? "none"}\n`,
   );
   process.exit(code ?? (signal ? 1 : 0));
 });
@@ -76,7 +73,7 @@ async function resolveFileTransportLine(line) {
     const transportStat = await stat(transportPath);
     if (transportStat.size > MAX_INLINE_TRANSPORT_BYTES) {
       process.stderr.write(
-        `ppt-engine-local refusing to inline ${transportStat.size} bytes from ${transportPath}; ` +
+        `ppt-engine app stdio refusing to inline ${transportStat.size} bytes from ${transportPath}; ` +
           `payload exceeds ${MAX_INLINE_TRANSPORT_BYTES} byte cap. ` +
           `Return a URL or external reference instead of embedding large data in the JSON-RPC response.\n`,
       );
@@ -86,7 +83,7 @@ async function resolveFileTransportLine(line) {
         error: {
           code: -32603,
           message:
-            `ppt-engine-local refusing to inline ${transportStat.size}-byte tool response ` +
+            `ppt-engine app stdio refusing to inline ${transportStat.size}-byte tool response ` +
             `(cap ${MAX_INLINE_TRANSPORT_BYTES}). ` +
             `Have the tool return a URL or external reference instead of embedding the data.`,
         },
@@ -100,7 +97,7 @@ async function resolveFileTransportLine(line) {
       id: parsed.id ?? null,
       error: {
         code: -32603,
-        message: `ppt-engine-local failed to read file transport response: ${message}`,
+        message: `ppt-engine app stdio failed to read file transport response: ${message}`,
       },
     });
   }

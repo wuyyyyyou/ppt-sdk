@@ -7,8 +7,8 @@
 - [`CONTEXT.md`](CONTEXT.md)
 - [`docs/adr/`](docs/adr/)
 - [`ppt-app/README.md`](ppt-app/README.md)
-- [`presenton-template-engine/README.md`](presenton-template-engine/README.md)
-- [`presenton-pptx-generator/README.md`](presenton-pptx-generator/README.md)
+- [`ppt-app/executas/ppt-engine/README.md`](ppt-app/executas/ppt-engine/README.md)
+- [`ppt-app/executas/ppt-gener/README.md`](ppt-app/executas/ppt-gener/README.md)
 
 如果 `CONTEXT.md` 或 `docs/adr/` 暂时不存在，静默跳过即可。不要同时创建 `context.md` 和 `CONTEXT.md`；在大小写不敏感文件系统上它们会指向同一路径。
 
@@ -16,11 +16,11 @@
 
 当前主线是 [`ppt-app/`](ppt-app/)：把现有 PPT 生成链路包装成可交互的 Anna App 工作台。
 
-相关子项目：
+相关子项目都收敛在 `ppt-app/executas/` 下：
 
-- [`presenton-template-engine/`](presenton-template-engine/)：模板发现、HTML 渲染、PPTX model 转换、校验、任务状态机、工作区能力。
-- [`presenton-pptx-generator/`](presenton-pptx-generator/)：把 `PptxPresentationModel` 写成最终 `.pptx`。
-- [`devtools/state-machine-debugger/`](devtools/state-machine-debugger/)：只在排查任务状态机时使用。
+- [`ppt-app/executas/ppt-engine/`](ppt-app/executas/ppt-engine/)：模板发现、HTML 渲染、PPTX model 转换、校验、任务状态机、工作区能力。
+- [`ppt-app/executas/ppt-gener/`](ppt-app/executas/ppt-gener/)：把 `PptxPresentationModel` 写成最终 `.pptx`。
+- [`ppt-app/executas/anna-search/`](ppt-app/executas/anna-search/)：Anna App 内置搜索 Executa。
 
 完整链路仍然是：
 
@@ -39,7 +39,7 @@ manifest.json -> deck.html -> ppt-model.json -> .pptx
 - `src/ai/`、`src/agent/`：LLM 提示词、解析和 agent 相关逻辑。
 - `src/state/`：本地状态管理。
 
-### `presenton-template-engine`
+### `ppt-app/executas/ppt-engine`
 
 - `src/app/presentation-templates/`：内置模板、蓝图和主题。
 - `src/app-workspace/`：工作区 artifact 读写和聚合。
@@ -49,7 +49,7 @@ manifest.json -> deck.html -> ppt-model.json -> .pptx
 - `src/task-state-machine/`：任务状态机、恢复、查询与持久化。
 - `src/discovery/`、`src/local-template/`、`src/browser/`、`src/http/`、`src/cli.ts`：发现、本地模板、浏览器渲染、HTTP 和 CLI 入口。
 
-### `presenton-pptx-generator`
+### `ppt-app/executas/ppt-gener`
 
 - `src/presenton_sdk_pptx_generator/`：Python 端的最终 `.pptx` 生成逻辑。
 - `example_plugin.py`：Anna Executa 插件入口。
@@ -69,7 +69,7 @@ manifest.json -> deck.html -> ppt-model.json -> .pptx
 `window.__ANNA_TOOL_IDS__` 读取运行时生成的真实 tool id；缺失 sidecar 或 handle
 应直接失败，不要回退到 `.env` 或硬编码真实 id。
 
-以下位置必须通过 [`scripts/sync-tool-manifests.mjs`](scripts/sync-tool-manifests.mjs)
+以下位置必须通过 [`ppt-app/scripts/sync-tool-manifests.mjs`](ppt-app/scripts/sync-tool-manifests.mjs)
 保持同步：
 
 - [`ppt-app/manifest.json`](ppt-app/manifest.json) 的 `required_executas[].tool_id`：固定为 `bundled:ppt-engine`、`bundled:ppt-gener`、`bundled:anna-search`
@@ -108,49 +108,48 @@ cd ppt-app && npm run dev:mock-llm:retry
 
 `npm run dev` 仍然是正式的本地入口，但只在用户明确要求时配合使用。
 
-`presenton-template-engine` 里常用命令是：
+`ppt-engine` 里常用命令是：
 
 ```bash
-cd presenton-template-engine && npm run build
-cd presenton-template-engine && npm run build:full
-cd presenton-template-engine && npm run check
-cd presenton-template-engine && npm run test:unit
-cd presenton-template-engine && npm run start
-cd presenton-template-engine && npm run start:plugin
+cd ppt-app/executas/ppt-engine && npm run build
+cd ppt-app/executas/ppt-engine && npm run build:full
+cd ppt-app/executas/ppt-engine && npm run check
+cd ppt-app/executas/ppt-engine && npm run test:unit
+cd ppt-app/executas/ppt-engine && npm run start
+cd ppt-app/executas/ppt-engine && npm run start:plugin
 ```
 
-`presenton-pptx-generator` 里常用命令是：
+`ppt-gener` 里常用命令是：
 
 ```bash
-cd presenton-pptx-generator && uv venv .venv
-cd presenton-pptx-generator && UV_CACHE_DIR=$(pwd)/.uv-cache uv pip install --python .venv/bin/python -e .
-cd presenton-pptx-generator && .venv/bin/python example_plugin.py
+cd ppt-app/executas/ppt-gener && uv sync
+cd ppt-app/executas/ppt-gener && printf '%s\n' '{"jsonrpc":"2.0","method":"describe","id":1}' | uv run --project . python example_plugin.py
 ```
 
 ## 构建与验证顺序
 
 如果改动涉及下游产物，优先按这个顺序：
 
-1. `cd presenton-template-engine && npm run build`
-2. 如果模板预览图变了，再跑 `cd presenton-template-engine && npm run build:full`
+1. `cd ppt-app/executas/ppt-engine && npm run build`
+2. 如果模板预览图变了，再跑 `cd ppt-app/executas/ppt-engine && npm run build:full`
 3. `cd ppt-app && npm run build`
 4. `cd ppt-app && npm run validate`
 
-如果修改了 `presenton-template-engine/src/**`，要先重建 engine，因为 `example_plugin.js` 从 `dist/index.js` 导入。
+如果修改了 `ppt-app/executas/ppt-engine/src/**`，要先重建 engine，因为 `example_plugin.js` 从 `dist/index.js` 导入。
 
 如果改动只在 `ppt-app/src/**`，通常先跑 `npm run check`，再根据需要跑 `npm run build` 或 `npm run validate`。
 
 ## 测试
 
-- `presenton-template-engine/test/**/*.test.ts` 是主要的单测入口，命令是 `npm run test:unit`。
+- `ppt-app/executas/ppt-engine/test/**/*.test.ts` 是主要的单测入口，命令是 `npm run test:unit`。
 - `ppt-app` 目前主要靠 `npm run check`、`npm run build` 和 `npm run validate` 做回归。
-- `presenton-pptx-generator` 主要靠插件启动和 `build_binary.sh --test` 做冒烟验证。
+- `ppt-app/executas/ppt-gener` 主要靠插件启动和 `build_binary.sh --test` 做冒烟验证。
 - 新增测试时，优先沿用现有目录和命名：`*.test.ts`。
 
 ## 模板与预览
 
 - 模板选择器使用静态图片 URL，不使用 data URL。
-- 预览图来源：`presenton-template-engine/dist/template-previews/groups/<group>/*.png`
+- 预览图来源：`ppt-app/executas/ppt-engine/dist/template-previews/groups/<group>/*.png`
 - 前端同步目标：`ppt-app/public/template-previews/<group>/`
 - `ppt-app/scripts/sync-template-previews.mjs` 已接到 `predev` / `prebuild`。
 - 普通 `npm run build` 不会重新生成预览图；模板预览变更时用 `npm run build:full`。
@@ -158,15 +157,15 @@ cd presenton-pptx-generator && .venv/bin/python example_plugin.py
 ## Anna Runtime 与 tool 返回值
 
 - Anna runtime 目前还不能原生理解 `__file_transport` pointer response。
-- `ppt-app/executas/ppt-engine-local/ppt_engine_local.js` 会把 pointer file 内联回 stdout，原生支持 pointer 之前不要删除它。
+- `ppt-app/executas/ppt-engine/app_stdio.js` 会把 pointer file 内联回 stdout，原生支持 pointer 之前不要删除它。
 - 适配器有 1 MB 内联上限。超过上限的 tool response 应返回 URL / path / artifact ID。
 - 长期规则：超过约 64 KB 的 tool response 尽量返回引用，不要返回字节本身。
 
 ## 常见坑
 
-- `presenton-template-engine` runtime/SDK 产物采用 ESM-only 构建；路径解析优先使用 `import.meta.url`，不要为这些产物重新引入 CJS 输出兼容。`scripts/sea-bootstrap.cjs` 是 Node SEA 启动器例外，不代表包级 CommonJS 支持。
+- `ppt-app/executas/ppt-engine` runtime/SDK 产物采用 ESM-only 构建；路径解析优先使用 `import.meta.url`，不要为这些产物重新引入 CJS 输出兼容。`scripts/sea-bootstrap.cjs` 是 Node SEA 启动器例外，不代表包级 CommonJS 支持。
 - GitHub Actions 的 Windows runner 可能把文本文件 checkout 成 CRLF。同步脚本如果解析 `pyproject.toml`、`uv.lock`、manifest 等文本文件，不能把 `\n` 当作唯一换行；要么先归一化行尾，要么用 `\r?\n`，并加 CRLF 回归测试。否则 Windows job 里 `npm run sync:tool-manifests && git diff --exit-code` 会因为误改文件失败。
-- Windows release zip 不要依赖 PowerShell `Compress-Archive` 保留空目录。`presenton-template-engine` 的 Anna Binary archive 需要顶层 `bin/`、`lib/`、`data/`，其中 `lib/`、`data/` 可能为空；Windows zip 打包必须显式创建目录 entry，不能用 placeholder 文件污染包内容。
+- Windows release zip 不要依赖 PowerShell `Compress-Archive` 保留空目录。`ppt-engine` 的 Anna Binary archive 需要顶层 `bin/`、`lib/`、`data/`，其中 `lib/`、`data/` 可能为空；Windows zip 打包必须显式创建目录 entry，不能用 placeholder 文件污染包内容。
 - Puppeteer 相关命令可能需要本机 Chrome / Chrome for Testing。
 - AI agent 编辑 `<workspace>/template/` 里的 TSX 时，不要复用静态图片选择器路径，也不要把未受信任的运行时代码放进 `ppt-app` 自己的 bundle 里渲染。
 - `AGENTS.md` 是本仓库 canonical 的 agent guidance；不要把新约束写回别的旧指导文件。

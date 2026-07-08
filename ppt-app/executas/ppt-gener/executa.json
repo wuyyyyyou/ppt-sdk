@@ -1,0 +1,15 @@
+{
+  "tool_id": "tool-lightvoss-ppt-gener-2r765c57",
+  "name": "ppt-gener",
+  "slug": "ppt-gener",
+  "type": "python",
+  "command": [
+    "uv",
+    "run",
+    "--project",
+    ".",
+    "python",
+    "example_plugin.py"
+  ],
+  "enabled": true
+}

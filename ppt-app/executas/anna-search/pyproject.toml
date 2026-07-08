@@ -1,6 +1,6 @@
 [project]
 name = "anna-search-executa"
-version = "0.1.0"
+version = "0.1.1"
 description = "Anna Executa web search tool backed by pluggable providers."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -18,6 +18,7 @@ build = [
 
 [project.scripts]
 anna-search-executa = "anna_search_executa.plugin:main"
+tool-lightvoss-anna-search-7ym3jyqv = "anna_search_executa.plugin:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -3,10 +3,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncPyprojectText, syncUvLockText } from "./sync-tool-manifests.mjs";
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const MANIFEST_PATH = "presenton-pptx-generator/manifest.json";
-const PYPROJECT_PATH = "presenton-pptx-generator/pyproject.toml";
-const UV_LOCK_PATH = "presenton-pptx-generator/uv.lock";
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const MANIFEST_PATH = "ppt-app/executas/ppt-gener/manifest.json";
+const PYPROJECT_PATH = "ppt-app/executas/ppt-gener/pyproject.toml";
+const UV_LOCK_PATH = "ppt-app/executas/ppt-gener/uv.lock";
 const PYTHON_SCRIPT_TARGET = "presenton_pptx_generator_plugin:main";
 const PYTHON_PACKAGE_NAME = "presenton-pptx-generator-executa";
 
@@ -52,7 +52,7 @@ async function main() {
   await writeText(PYPROJECT_PATH, syncPyprojectText(await readText(PYPROJECT_PATH), tool));
   await writeText(UV_LOCK_PATH, syncUvLockText(await readText(UV_LOCK_PATH), tool));
 
-  console.log(`Synced presenton-pptx-generator manifest: ${manifest.display_name}@${manifest.version}`);
+  console.log(`Synced ppt-gener manifest: ${manifest.display_name}@${manifest.version}`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

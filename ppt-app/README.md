@@ -1,12 +1,12 @@
 # PPT App
 
-`ppt-app` is the Anna App shell for the existing PPT generation toolchain.
+`ppt-app` is the Anna App shell for the PPT generation toolchain.
 
 The app is intentionally thin:
 
 - UI is shipped as a static SPA bundle.
 - Production backend calls go through `AnnaAppRuntime.tools.invoke`.
-- Local development uses `anna-app dev` with local Executa shims.
+- Local development uses `anna-app dev` with bundled Executa source directories.
 - Workflow logic should live in `ppt-engine` app-facing tools, not in the frontend.
 
 ## Scripts
@@ -22,18 +22,20 @@ npm run validate
 
 `npm run dev` starts the Anna App harness via `anna-app dev`.
 
-For this mode the app root contains local Executa shims under `executas/`:
+For this mode the app root contains bundled Executa projects under `executas/`:
 
 ```text
 executas/
-├── anna-search-local/
-│   └── executa.json
-├── ppt-engine-local/
+├── anna-search/
 │   ├── executa.json
-│   └── ppt_engine_local.js
-└── ppt-gener-local/
+│   └── example_plugin.py
+├── ppt-engine/
+│   ├── executa.json
+│   ├── app_stdio.js
+│   └── example_plugin.js
+└── ppt-gener/
     ├── executa.json
-    └── ppt_gener_local.py
+    └── example_plugin.py
 ```
 
 `anna-app dev` discovers those `executa.json` files, registers their `tool_id`
@@ -55,9 +57,10 @@ id fallbacks.
 
 The important invariant is split by layer:
 
-- `manifest.json` `required_executas[].tool_id` and `ui.host_api.tools` use `bundled:<handle>`.
+- `manifest.json` `required_executas[].tool_id` uses `bundled:<handle>`.
+- `manifest.json` `ui.host_api.tools` uses `required:bundled:<handle>`.
 - `manifest.json` `required_executas[].min_version` follows each Executa manifest version.
-- `app.json` `bundled_executas` maps each handle to its local Executa shim directory.
+- `app.json` `bundled_executas` maps each handle to its bundled Executa project directory.
 - `executas/*/executa.json` keeps the real local `tool_id`.
 - the real plugin `describe` manifest `name` matches the real local `tool_id`.
 
@@ -69,10 +72,9 @@ ppt-gener:   tool-lightvoss_5433-ppt-gener-dc7ftcep
 anna-search: tool-lightvoss-anna-search-xkx84a3z
 ```
 
-The engine shim starts `presenton-template-engine/example_plugin.js` from the
-engine directory. The generator shim starts `presenton-pptx-generator/example_plugin.py`
-through `uv run`. The search shim starts `anna-search-executa/example_plugin.py`
-through `uv run`.
+The engine adapter starts `executas/ppt-engine/example_plugin.js` through
+`app_stdio.js`, preserving pointer response compatibility for Anna runtime.
+The generator and search Executas start their plugin entries through `uv run`.
 
 Before using the harness, rebuild the static bundle:
 

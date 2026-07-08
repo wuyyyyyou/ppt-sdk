@@ -10,13 +10,13 @@
   "pricing_model": "free",
   "bundled_executas": {
     "ppt-engine": {
-      "path": "executas/ppt-engine-local"
+      "path": "executas/ppt-engine"
     },
     "ppt-gener": {
-      "path": "executas/ppt-gener-local"
+      "path": "executas/ppt-gener"
     },
     "anna-search": {
-      "path": "executas/anna-search-local"
+      "path": "executas/anna-search"
     }
   }
 }

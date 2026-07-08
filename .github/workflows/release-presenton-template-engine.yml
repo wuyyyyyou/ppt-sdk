@@ -1,4 +1,4 @@
-name: Release presenton-template-engine
+name: Release ppt-engine
 
 on:
   workflow_dispatch:
@@ -23,8 +23,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          name="$(python3 -c "import json; print(json.load(open('presenton-template-engine/manifest.json', encoding='utf-8'))['name'])")"
-          version="$(python3 -c "import json; print(json.load(open('presenton-template-engine/manifest.json', encoding='utf-8'))['version'])")"
+          name="$(python3 -c "import json; print(json.load(open('ppt-app/executas/ppt-engine/manifest.json', encoding='utf-8'))['name'])")"
+          version="$(python3 -c "import json; print(json.load(open('ppt-app/executas/ppt-engine/manifest.json', encoding='utf-8'))['version'])")"
           release_tag="${name}-v${version}"
           release_name="${name} v${version}"
 
@@ -37,7 +37,7 @@ jobs:
   prepare-previews:
     runs-on: ubuntu-22.04
     env:
-      PROJECT_DIR: presenton-template-engine
+      PROJECT_DIR: ppt-app/executas/ppt-engine
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -47,7 +47,7 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: presenton-template-engine/package-lock.json
+          cache-dependency-path: ppt-app/executas/ppt-engine/package-lock.json
 
       - name: Install dependencies
         working-directory: ${{ env.PROJECT_DIR }}
@@ -60,8 +60,8 @@ jobs:
       - name: Upload template previews
         uses: actions/upload-artifact@v4
         with:
-          name: presenton-template-engine-template-previews
-          path: presenton-template-engine/dist/template-previews
+          name: ppt-engine-template-previews
+          path: ppt-app/executas/ppt-engine/dist/template-previews
           if-no-files-found: error
 
   build:
@@ -87,7 +87,7 @@ jobs:
       run:
         shell: bash
     env:
-      PROJECT_DIR: presenton-template-engine
+      PROJECT_DIR: ppt-app/executas/ppt-engine
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -97,7 +97,7 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: presenton-template-engine/package-lock.json
+          cache-dependency-path: ppt-app/executas/ppt-engine/package-lock.json
 
       - name: Install dependencies
         working-directory: ${{ env.PROJECT_DIR }}
@@ -106,8 +106,8 @@ jobs:
       - name: Download template previews
         uses: actions/download-artifact@v4
         with:
-          name: presenton-template-engine-template-previews
-          path: presenton-template-engine/dist/template-previews
+          name: ppt-engine-template-previews
+          path: ppt-app/executas/ppt-engine/dist/template-previews
 
       - name: Verify tool manifest synchronization
         working-directory: ${{ env.PROJECT_DIR }}
@@ -125,9 +125,9 @@ jobs:
         with:
           name: release-assets-${{ matrix.asset_suffix }}
           path: |
-            presenton-template-engine/bundle/*.tar.gz
-            presenton-template-engine/bundle/*.zip
-            presenton-template-engine/bundle/*.sha256
+            ppt-app/executas/ppt-engine/bundle/*.tar.gz
+            ppt-app/executas/ppt-engine/bundle/*.zip
+            ppt-app/executas/ppt-engine/bundle/*.sha256
           if-no-files-found: error
 
   release:

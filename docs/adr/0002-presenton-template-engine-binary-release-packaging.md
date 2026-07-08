@@ -1,6 +1,6 @@
 # presenton-template-engine 打包脚本产出 Binary 分发包
 
-`presenton-template-engine` 的二进制发布入口由 `build_binary.sh` 负责产出最终 Anna Binary 分发包，而不是只产出中间裸二进制后再由 GitHub Actions 组装。这样本地打包和 CI 打包共享同一套产物规则，GitHub Actions 只负责在不同 Anna 平台 key 对应的 runner 上执行脚本、验证产物并发布 Release。
+`presenton-template-engine` 的二进制发布入口由 `ppt-app/executas/ppt-engine/build_binary.sh` 负责产出最终 Anna Binary 分发包，而不是只产出中间裸二进制后再由 GitHub Actions 组装。这样本地打包和 CI 打包共享同一套产物规则，GitHub Actions 只负责在不同 Anna 平台 key 对应的 runner 上执行脚本、验证产物并发布 Release。
 
 **考虑过的方案**
 

@@ -9,27 +9,27 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
-const WORKSPACE_DIR = path.resolve(path.dirname(SCRIPT_PATH), "..");
+const WORKSPACE_DIR = path.resolve(path.dirname(SCRIPT_PATH), "..", "..");
+const PPT_APP_DIR = path.join(WORKSPACE_DIR, "ppt-app");
 const OUTPUT_ROOT = path.join(WORKSPACE_DIR, ".vscode", "pipeline-output");
-const ENGINE_DIR = path.join(WORKSPACE_DIR, "presenton-template-engine");
-const GENERATOR_DIR = path.join(WORKSPACE_DIR, "presenton-pptx-generator");
-const GENERATOR_PYTHON = process.platform === "win32"
-  ? path.join(GENERATOR_DIR, ".venv", "Scripts", "python.exe")
-  : path.join(GENERATOR_DIR, ".venv", "bin", "python");
+const ENGINE_DIR = path.join(PPT_APP_DIR, "executas", "ppt-engine");
+const GENERATOR_DIR = path.join(PPT_APP_DIR, "executas", "ppt-gener");
+const GENERATOR_COMMAND = "uv";
+const GENERATOR_ARGS = ["run", "--project", GENERATOR_DIR, "python", "example_plugin.py"];
 
 const GENERATE_TIMEOUT_MS = 15 * 60 * 1000;
 const CHECK_TIMEOUT_MS = 30 * 1000;
 const BROWSER_TROUBLESHOOTING_HINT = [
   "Ensure Chrome is available for Puppeteer.",
-  "Try: cd presenton-template-engine && npx puppeteer browsers install chrome",
+  "Try: cd ppt-app/executas/ppt-engine && npx puppeteer browsers install chrome",
 ].join(" ");
 
 function printUsage() {
   process.stdout.write(
     [
       "Usage:",
-      "  node scripts/run-ppt-pipeline.mjs check-env",
-      "  node scripts/run-ppt-pipeline.mjs generate --manifest <manifest.json> [--name <presentation-name>]",
+      "  node ppt-app/scripts/run-ppt-pipeline.mjs check-env",
+      "  node ppt-app/scripts/run-ppt-pipeline.mjs generate --manifest <manifest.json> [--name <presentation-name>]",
       "",
       "Commands:",
       "  check-env    Validate the local toolchain needed by the VS Code PPT tasks.",
@@ -361,23 +361,18 @@ async function collectEnvironmentIssues() {
   const checks = [
     {
       filePath: path.join(ENGINE_DIR, "node_modules"),
-      message: "presenton-template-engine dependencies are missing",
-      hint: "Run: cd presenton-template-engine && npm install",
+      message: "ppt-engine dependencies are missing",
+      hint: "Run: cd ppt-app/executas/ppt-engine && npm install",
     },
     {
       filePath: path.join(ENGINE_DIR, "dist", "index.js"),
-      message: "presenton-template-engine is not built",
-      hint: "Run: cd presenton-template-engine && npm run build",
+      message: "ppt-engine is not built",
+      hint: "Run: cd ppt-app/executas/ppt-engine && npm run build",
     },
     {
-      filePath: GENERATOR_PYTHON,
-      message: "presenton-pptx-generator virtualenv is missing",
-      hint: [
-        "Run:",
-        "  cd presenton-pptx-generator",
-        "  uv venv .venv",
-        "  UV_CACHE_DIR=$(pwd)/.uv-cache uv pip install --python .venv/bin/python -e .",
-      ].join("\n"),
+      filePath: path.join(GENERATOR_DIR, "pyproject.toml"),
+      message: "ppt-gener project file is missing",
+      hint: "Expected: ppt-app/executas/ppt-gener/pyproject.toml",
     },
   ];
 
@@ -404,8 +399,8 @@ async function runDescribeChecks() {
 
   await invokeRpcStage({
     stageName: "generator-describe",
-    command: GENERATOR_PYTHON,
-    args: ["example_plugin.py"],
+    command: GENERATOR_COMMAND,
+    args: GENERATOR_ARGS,
     cwd: GENERATOR_DIR,
     request: describeRequest,
     timeoutMs: CHECK_TIMEOUT_MS,
@@ -608,8 +603,8 @@ async function generatePipeline(options) {
   });
   const generatorStage = await invokeRpcStage({
     stageName: "generator",
-    command: GENERATOR_PYTHON,
-    args: ["example_plugin.py"],
+    command: GENERATOR_COMMAND,
+    args: GENERATOR_ARGS,
     cwd: GENERATOR_DIR,
     request: generatorRequest,
     timeoutMs: GENERATE_TIMEOUT_MS,

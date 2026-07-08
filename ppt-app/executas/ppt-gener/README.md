@@ -20,22 +20,21 @@
 ### 安装依赖
 
 ```bash
-cd /Users/leyouming/company_program/anna/anna-executa-examples/presenton-pptx-generator
-uv venv .venv
-UV_CACHE_DIR=$(pwd)/.uv-cache uv pip install --python .venv/bin/python -e .
+cd ppt-app/executas/ppt-gener
+uv sync
 ```
 
 ### 启动插件
 
 ```bash
-cd /Users/leyouming/company_program/anna/anna-executa-examples/presenton-pptx-generator
-.venv/bin/python example_plugin.py
+cd ppt-app/executas/ppt-gener
+uv run --project . python example_plugin.py
 ```
 
 ### 最小协议测试
 
 ```bash
-echo '{"jsonrpc":"2.0","method":"describe","id":1}' | .venv/bin/python example_plugin.py 2>/dev/null
+printf '%s\n' '{"jsonrpc":"2.0","method":"describe","id":1}' | uv run --project . python example_plugin.py 2>/dev/null
 ```
 
 ## 打包二进制
@@ -43,14 +42,14 @@ echo '{"jsonrpc":"2.0","method":"describe","id":1}' | .venv/bin/python example_p
 使用 Nuitka 打包，产物会写到 `bundle/` 目录下的 Anna Binary 分发包：
 
 ```bash
-cd presenton-pptx-generator
+cd ppt-app/executas/ppt-gener
 ./build_binary.sh
 ```
 
 如果希望构建后顺手做一次协议和真实生成自测：
 
 ```bash
-cd presenton-pptx-generator
+cd ppt-app/executas/ppt-gener
 ./build_binary.sh --test
 ```
 
@@ -121,13 +120,13 @@ Presenton 的独立 Python SDK，用来把 `PptxPresentationModel` 或兼容 JSO
 ## 安装
 
 ```bash
-pip install presenton-sdk-pptx-generator
+uv pip install presenton-sdk-pptx-generator
 ```
 
 本地开发时也可以：
 
 ```bash
-pip install -e ./presenton-sdk/pptx-generator
+uv pip install -e .
 ```
 
 ## 最常用用法

@@ -1,0 +1,11 @@
+{
+  "tool_id": "tool-lightvoss-ppt-engine-kqhra9hy",
+  "name": "ppt-engine",
+  "slug": "ppt-engine",
+  "type": "node",
+  "command": [
+    "node",
+    "app_stdio.js"
+  ],
+  "enabled": true
+}

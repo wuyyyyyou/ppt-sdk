@@ -17,8 +17,8 @@
 - `AGENTS.md`
 - `CONTEXT.md`
 - `ppt-app/README.md`
-- `presenton-template-engine/README.md`
-- `presenton-pptx-generator/README.md`
+- `ppt-app/executas/ppt-engine/README.md`
+- `ppt-app/executas/ppt-gener/README.md`
 
 ## 注意
 

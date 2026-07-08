@@ -75,7 +75,7 @@ async function loadTemplatePreviewIndex() {
       }
 
       throw new Error(
-        `Template preview assets not found in any known location: ${TEMPLATE_PREVIEW_DIR_CANDIDATES.join(", ")}. Run npm run build:full or npm run build:template-previews in presenton-template-engine.`,
+        `Template preview assets not found in any known location: ${TEMPLATE_PREVIEW_DIR_CANDIDATES.join(", ")}. Run npm run build:full or npm run build:template-previews in ppt-app/executas/ppt-engine.`,
       );
     })();
   }

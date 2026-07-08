@@ -6,10 +6,10 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const pptAppDir = path.resolve(scriptDir, "..");
-const repoRoot = path.resolve(pptAppDir, "..");
 const sourceDir = path.join(
-  repoRoot,
-  "presenton-template-engine",
+  pptAppDir,
+  "executas",
+  "ppt-engine",
   "dist",
   "template-previews",
   "groups",
@@ -56,7 +56,7 @@ async function syncGroupPreviewImages(fromGroupDir, toGroupDir) {
 async function main() {
   if (!(await pathExists(sourceDir))) {
     logWarn(
-      `Source not found: ${sourceDir}. Run "npm run build:full" (or "npm run build:template-previews") in presenton-template-engine to generate previews. Skipping.`,
+      `Source not found: ${sourceDir}. Run "npm run build:full" (or "npm run build:template-previews") in ppt-app/executas/ppt-engine to generate previews. Skipping.`,
     );
     return;
   }

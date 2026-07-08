@@ -2,10 +2,10 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const MANIFEST_PATH = "presenton-template-engine/manifest.json";
-const PACKAGE_PATH = "presenton-template-engine/package.json";
-const PACKAGE_LOCK_PATH = "presenton-template-engine/package-lock.json";
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const MANIFEST_PATH = "ppt-app/executas/ppt-engine/manifest.json";
+const PACKAGE_PATH = "ppt-app/executas/ppt-engine/package.json";
+const PACKAGE_LOCK_PATH = "ppt-app/executas/ppt-engine/package-lock.json";
 const PACKAGE_BIN_TARGET = "./example_plugin.js";
 const PACKAGE_LOCK_BIN_TARGET = "example_plugin.js";
 
@@ -59,7 +59,7 @@ async function main() {
   syncNodePackageBin(lock.packages[""], manifest, PACKAGE_LOCK_BIN_TARGET);
   await writeJson(PACKAGE_LOCK_PATH, lock);
 
-  console.log(`Synced presenton-template-engine manifest: ${manifest.display_name}@${manifest.version}`);
+  console.log(`Synced ppt-engine manifest: ${manifest.display_name}@${manifest.version}`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -4,9 +4,9 @@
       "mode": "auto"
     }
   ],
-  "python.defaultInterpreterPath": "${workspaceFolder}/presenton-pptx-generator/.venv/bin/python",
   "python.analysis.extraPaths": [
-    "${workspaceFolder}/presenton-pptx-generator/src"
+    "${workspaceFolder}/ppt-app/executas/ppt-gener/src",
+    "${workspaceFolder}/ppt-app/executas/anna-search/src"
   ],
   "files.exclude": {
     "**/.DS_Store": true,

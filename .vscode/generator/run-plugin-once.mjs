@@ -5,8 +5,8 @@ import { spawn } from "node:child_process";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const WORKSPACE_DIR = path.resolve(SCRIPT_DIR, "..", "..");
-const PROJECT_DIR = path.join(WORKSPACE_DIR, "presenton-pptx-generator");
-const PYTHON_PATH = path.join(PROJECT_DIR, ".venv", "bin", "python");
+const PROJECT_DIR = path.join(WORKSPACE_DIR, "ppt-app", "executas", "ppt-gener");
+const UV_ARGS = ["run", "--project", PROJECT_DIR, "python", "example_plugin.py"];
 const DEFAULT_STDIN_FILE = path.join(SCRIPT_DIR, "describe-stdin.json");
 const DEFAULT_STDOUT_FILE = path.join(SCRIPT_DIR, "stdout.json");
 
@@ -44,7 +44,7 @@ async function main() {
   const request = expandWorkspacePlaceholders(JSON.parse(rawInput));
   const serializedRequest = `${JSON.stringify(request)}\n`;
 
-  const child = spawn(PYTHON_PATH, ["example_plugin.py"], {
+  const child = spawn("uv", UV_ARGS, {
     cwd: PROJECT_DIR,
     env: process.env,
     stdio: ["pipe", "pipe", "pipe"],

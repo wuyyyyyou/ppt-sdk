@@ -5,7 +5,7 @@
   "description": "Anna App workspace for the PPT generation workflow.",
   "type": "module",
   "scripts": {
-    "sync:tool-manifests": "node ../scripts/sync-tool-manifests.mjs",
+    "sync:tool-manifests": "node ./scripts/sync-tool-manifests.mjs",
     "sync:template-previews": "node ./scripts/sync-template-previews.mjs",
     "predev": "npm run sync:tool-manifests && npm run sync:template-previews",
     "predev:mock-llm": "npm run sync:tool-manifests && npm run sync:template-previews",

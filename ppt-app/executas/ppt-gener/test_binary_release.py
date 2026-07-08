@@ -125,7 +125,7 @@ class BinaryReleaseTest(unittest.TestCase):
         candidates = plugin.build_tool_manifest_candidates(
             module_path=Path("/opt/ppt-gener/bin/presenton_pptx_generator_plugin.py"),
             executable_path=Path("/opt/ppt-gener/bin/ppt-gener"),
-            cwd=Path("/opt/repo/presenton-pptx-generator"),
+            cwd=Path("/opt/repo/ppt-app/executas/ppt-gener"),
         )
 
         self.assertEqual(
@@ -133,7 +133,7 @@ class BinaryReleaseTest(unittest.TestCase):
             [
                 Path("/opt/ppt-gener/bin/manifest.json"),
                 Path("/opt/ppt-gener/manifest.json"),
-                Path("/opt/repo/presenton-pptx-generator/manifest.json"),
+                Path("/opt/repo/ppt-app/executas/ppt-gener/manifest.json"),
             ],
         )
 

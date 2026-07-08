@@ -30,8 +30,8 @@
     "tool-lightvoss-ppt-engine-kqhra9hy": "./example_plugin.js"
   },
   "scripts": {
-    "sync:tool-manifests": "node ../scripts/sync-tool-manifests.mjs",
-    "sync:engine-manifest": "node ../scripts/sync-presenton-template-engine-manifest.mjs",
+    "sync:tool-manifests": "node ../../scripts/sync-tool-manifests.mjs",
+    "sync:engine-manifest": "node ../../scripts/sync-ppt-engine-manifest.mjs",
     "prebuild": "npm run sync:engine-manifest",
     "dev": "tsx src/cli.ts",
     "build": "node ./scripts/build-template-registry.mjs && node ./scripts/preserve-dist-template-previews.mjs save && tsup && node ./scripts/preserve-dist-template-previews.mjs restore && node ./scripts/build-forkable-templates.mjs",

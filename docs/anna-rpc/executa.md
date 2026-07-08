@@ -9,14 +9,14 @@
 先确保二进制已经打好：
 
 ```fish
-./presenton-template-engine/build_binary.sh --test
-./presenton-pptx-generator/build_binary.sh --test
+./ppt-app/executas/ppt-engine/build_binary.sh --test
+./ppt-app/executas/ppt-gener/build_binary.sh --test
 ```
 
-`presenton-template-engine` 现在打包成 Anna Binary 分发 archive。`--test` 会自动解压 archive 并调用 `describe` 冒烟；如果要手工执行下面的 Engine 命令，先解压当前平台 archive 并设置 `PPT_ENGINE_BIN`：
+`ppt-engine` 现在打包成 Anna Binary 分发 archive。`--test` 会自动解压 archive 并调用 `describe` 冒烟；如果要手工执行下面的 Engine 命令，先解压当前平台 archive 并设置 `PPT_ENGINE_BIN`：
 
 ```fish
-set engine_archive (ls ./presenton-template-engine/bundle/tool-lightvoss_5433-ppt-engine-6443rj2a-v*-*.tar.gz | head -n 1)
+set engine_archive (ls ./ppt-app/executas/ppt-engine/bundle/ppt-engine-v*-*.tar.gz | head -n 1)
 rm -rf /tmp/ppt-engine-binary
 mkdir -p /tmp/ppt-engine-binary
 tar -C /tmp/ppt-engine-binary -xzf $engine_archive
@@ -25,10 +25,10 @@ set PPT_ENGINE_BIN /tmp/ppt-engine-binary/bin/ppt-engine
 
 Windows 平台 archive 是 `.zip`，包内入口是 `bin/ppt-engine.exe`。archive 顶层的 `manifest.json` 是 Anna Binary 分发入口配置；插件 `describe` 返回的 Executa tool manifest 仍来自 engine 包内嵌的 tool manifest。
 
-`presenton-pptx-generator` 也打包成 Anna Binary 分发 archive。`--test` 会自动解压 archive 并做协议和真实生成冒烟；如果要手工执行下面的 Generator 命令，先解压当前平台 archive 并设置 `PPT_GENER_BIN`：
+`ppt-gener` 也打包成 Anna Binary 分发 archive。`--test` 会自动解压 archive 并做协议和真实生成冒烟；如果要手工执行下面的 Generator 命令，先解压当前平台 archive 并设置 `PPT_GENER_BIN`：
 
 ```fish
-set generator_archive (ls ./presenton-pptx-generator/bundle/ppt-gener-v*-*.tar.gz | head -n 1)
+set generator_archive (ls ./ppt-app/executas/ppt-gener/bundle/ppt-gener-v*-*.tar.gz | head -n 1)
 rm -rf /tmp/ppt-gener-binary
 mkdir -p /tmp/ppt-gener-binary
 tar -C /tmp/ppt-gener-binary -xzf $generator_archive

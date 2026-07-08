@@ -1,6 +1,6 @@
 # presenton-template-engine 采用 ESM-only 产物
 
-`presenton-template-engine` 在本仓库中按内部 Anna Executa 工具包维护，不作为公开的 CommonJS 兼容 npm SDK。它的 runtime/SDK 产物面向 Node 20+ 采用 ESM-only 构建和导出，移除 CommonJS `require` 包契约；非导出的 CommonJS 文件只保留在 Node SEA bootstrap 这类启动胶水场景中。这样可以避免 ESM/CJS 双产物的长期维护成本和构建 warning 噪音，同时让支持的模块边界更明确。
+`presenton-template-engine` 在本仓库中按内部 Anna Executa 工具包维护，当前源码目录是 `ppt-app/executas/ppt-engine/`，不作为公开的 CommonJS 兼容 npm SDK。它的 runtime/SDK 产物面向 Node 20+ 采用 ESM-only 构建和导出，移除 CommonJS `require` 包契约；非导出的 CommonJS 文件只保留在 Node SEA bootstrap 这类启动胶水场景中。这样可以避免 ESM/CJS 双产物的长期维护成本和构建 warning 噪音，同时让支持的模块边界更明确。
 
 **考虑过的方案**
 

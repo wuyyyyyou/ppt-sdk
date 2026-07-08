@@ -20,10 +20,12 @@ function createRuntime(handler: (input: { method: string; args: Record<string, u
 }
 
 describe("Search Adapter", () => {
+  const testSearchToolId = "tool-test-anna-search";
+
   it("normalizes web search results and does not pass region by default", async () => {
     let receivedArgs: Record<string, unknown> = {};
     const adapter = createSearchAdapter({
-      toolId: "tool-anna-search-local",
+      toolId: testSearchToolId,
       runtime: createRuntime(({ args }) => {
         receivedArgs = args;
         return {
@@ -57,7 +59,7 @@ describe("Search Adapter", () => {
     let timeoutMs: unknown = null;
     let optionTimeoutMs: unknown = null;
     const adapter = createSearchAdapter({
-      toolId: "tool-anna-search-local",
+      toolId: testSearchToolId,
       runtime: createRuntime((input) => {
         timeoutMs = (input as { timeoutMs?: unknown }).timeoutMs;
         optionTimeoutMs = (input as { optionTimeoutMs?: unknown }).optionTimeoutMs;
@@ -73,13 +75,13 @@ describe("Search Adapter", () => {
 
   it("normalizes no-result and malformed web search responses", async () => {
     const emptyAdapter = createSearchAdapter({
-      toolId: "tool-anna-search-local",
+      toolId: testSearchToolId,
       runtime: createRuntime(() => ({ success: true, data: { query: "missing", provider: "ddgs", results: [], count: 0 } })),
     });
     assert.deepEqual((await emptyAdapter.webSearch({ query: "missing" })).results, []);
 
     const malformedAdapter = createSearchAdapter({
-      toolId: "tool-anna-search-local",
+      toolId: testSearchToolId,
       runtime: createRuntime(() => ({ success: true, data: { results: [{ title: "No URL" }] } })),
     });
     const malformed = await malformedAdapter.webSearch({ query: "fallback" });
@@ -89,7 +91,7 @@ describe("Search Adapter", () => {
 
   it("keeps per-item web fetch failures as normalized result records", async () => {
     const adapter = createSearchAdapter({
-      toolId: "tool-anna-search-local",
+      toolId: testSearchToolId,
       runtime: createRuntime(() => ({
         success: true,
         data: {
@@ -119,7 +121,7 @@ describe("Search Adapter", () => {
 
   it("normalizes image search and image fetch responses", async () => {
     const adapter = createSearchAdapter({
-      toolId: "tool-anna-search-local",
+      toolId: testSearchToolId,
       runtime: createRuntime(({ method }) => {
         if (method === "image_search") {
           return {

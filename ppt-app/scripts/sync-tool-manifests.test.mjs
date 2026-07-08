@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   applyPptAppListingSync,
@@ -10,6 +12,13 @@ import {
   syncUvLockText,
 } from "./sync-tool-manifests.mjs";
 
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(SCRIPT_DIR, "..", "..");
+
+function repoPath(relativePath) {
+  return path.join(REPO_ROOT, relativePath);
+}
+
 const tool = {
   manifest: {
     name: "tool-lightvoss_5433-ppt-gener-dc7ftcep",
@@ -17,7 +26,7 @@ const tool = {
   },
   pythonPackageName: "presenton-pptx-generator-executa",
   pythonScriptTarget: "presenton_pptx_generator_plugin:main",
-  uvLockPath: "presenton-pptx-generator/uv.lock",
+  uvLockPath: "ppt-app/executas/ppt-gener/uv.lock",
 };
 
 test("syncPyprojectText keeps script entry inside project scripts with Windows CRLF line endings", () => {
@@ -58,8 +67,8 @@ test("syncPyprojectText keeps script entry inside project scripts with Windows C
 });
 
 test("syncPyprojectText is idempotent for the current pyproject with Windows CRLF line endings", async () => {
-  const content = (await readFile("presenton-pptx-generator/pyproject.toml", "utf8")).replace(/\r?\n/g, "\r\n");
-  const manifest = JSON.parse(await readFile("presenton-pptx-generator/manifest.json", "utf8"));
+  const content = (await readFile(repoPath("ppt-app/executas/ppt-gener/pyproject.toml"), "utf8")).replace(/\r?\n/g, "\r\n");
+  const manifest = JSON.parse(await readFile(repoPath("ppt-app/executas/ppt-gener/manifest.json"), "utf8"));
 
   assert.equal(syncPyprojectText(content, {
     ...tool,
@@ -91,8 +100,8 @@ test("syncUvLockText updates uv.lock package entry with Windows CRLF line ending
 const tools = [
   {
     bundledHandle: "ppt-engine",
-    manifestPath: "presenton-template-engine/manifest.json",
-    bundledExecutaDir: "ppt-app/executas/ppt-engine-local",
+    manifestPath: "ppt-app/executas/ppt-engine/manifest.json",
+    bundledExecutaDir: "ppt-app/executas/ppt-engine",
     generatedConstName: "PPT_ENGINE_TOOL",
     manifest: {
       name: "tool-real-engine",
@@ -102,8 +111,8 @@ const tools = [
   },
   {
     bundledHandle: "ppt-gener",
-    manifestPath: "presenton-pptx-generator/manifest.json",
-    bundledExecutaDir: "ppt-app/executas/ppt-gener-local",
+    manifestPath: "ppt-app/executas/ppt-gener/manifest.json",
+    bundledExecutaDir: "ppt-app/executas/ppt-gener",
     generatedConstName: "PPT_GENER_TOOL",
     manifest: {
       name: "tool-real-gener",
@@ -113,8 +122,8 @@ const tools = [
   },
   {
     bundledHandle: "anna-search",
-    manifestPath: "anna-search-executa/manifest.json",
-    bundledExecutaDir: "ppt-app/executas/anna-search-local",
+    manifestPath: "ppt-app/executas/anna-search/manifest.json",
+    bundledExecutaDir: "ppt-app/executas/anna-search",
     generatedConstName: "ANNA_SEARCH_TOOL",
     manifest: {
       name: "tool-real-search",
@@ -154,9 +163,9 @@ test("applyPptAppListingSync maps bundled handles to local executa shim director
   const listing = applyPptAppListingSync({ name: "Anna Deck" }, tools);
 
   assert.deepEqual(listing.bundled_executas, {
-    "ppt-engine": { path: "executas/ppt-engine-local" },
-    "ppt-gener": { path: "executas/ppt-gener-local" },
-    "anna-search": { path: "executas/anna-search-local" },
+    "ppt-engine": { path: "executas/ppt-engine" },
+    "ppt-gener": { path: "executas/ppt-gener" },
+    "anna-search": { path: "executas/anna-search" },
   });
 });
 
@@ -168,9 +177,9 @@ test("applyPptAppListingSync writes POSIX paths from Windows relative paths", ()
   );
 
   assert.deepEqual(listing.bundled_executas, {
-    "ppt-engine": { path: "executas/ppt-engine-local" },
-    "ppt-gener": { path: "executas/ppt-gener-local" },
-    "anna-search": { path: "executas/anna-search-local" },
+    "ppt-engine": { path: "executas/ppt-engine" },
+    "ppt-gener": { path: "executas/ppt-gener" },
+    "anna-search": { path: "executas/anna-search" },
   });
 });
 
@@ -183,15 +192,15 @@ test("buildGeneratedFrontendConstants emits bundled handles without real tool id
   assert.doesNotMatch(generated, /tool-real-search/);
 });
 
-test("anna-search local executa starts through the repository shim", async () => {
-  const executa = JSON.parse(await readFile("ppt-app/executas/anna-search-local/executa.json", "utf8"));
+test("anna-search executa starts through uv in the bundled project directory", async () => {
+  const executa = JSON.parse(await readFile(repoPath("ppt-app/executas/anna-search/executa.json"), "utf8"));
 
   assert.deepEqual(executa.command, [
     "uv",
     "run",
     "--project",
-    "../../../anna-search-executa",
+    ".",
     "python",
-    "anna_search_local.py",
+    "example_plugin.py",
   ]);
 });
