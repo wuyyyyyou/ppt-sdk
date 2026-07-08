@@ -1,55 +1,21 @@
-# PPT App Theme Tokenization Process
+# 风格画像需求总目标
 
-## 目标
+为 `ppt-app` 增加一条独立的风格画像链路：用户可以上传参考 PPT 截图或图片，通过 Agent 分析其视觉风格，生成一份可复用的本地 `style-profiles`（风格画像库）记录。
 
-模板主题已经从“固定主题集合 + `manifest.theme.colors`”迁移到“模板本地 theme token”。下一阶段要改 `ppt-app` 生成流程：不再让 LLM 选择固定 theme id，而是让 LLM 基于目标模板的 token 契约生成 workspace/local 的 `theme/token.json`。
+总体方向：
 
-## 已完成
+- 新增全局可复用的 `style-profiles` 存储，不绑定单个 workspace，方便用户创建新 PPT 时选择。
+- 新增独立入口用于“分析参考资料并保存风格画像”，该入口不负责生成 PPT。
+- 新建 PPT 时允许选择已有风格画像，并把选择结果记录到当前 workspace，保证可追踪、可复现。
+- 生成链路中，主题生成 prompt 需要加入选中的 style profile；页面 authoring prompt 也需要加入同一份简短风格指导。
 
-六个内置蓝图模板已经完成 theme token 迁移：
+实施阶段：
 
-- `red-finance-v3`
-- `red-finance-canvas`
-- `red-blue-comparison-v1`
-- `red-blue-comparison-canvas`
-- `chart-analytics-v1`
-- `chart-analytics-canvas`
+1. 后端先补 PPT 转图片能力。Agent 可以直接分析图片，但不能直接稳定分析 PPTX；因此 `ppt-engine` 需要提供把 `.pptx` 转为逐页 PNG 并返回图片路径/页码/尺寸等元数据的通用工具。该工具只接受调用方传入的绝对 PPTX 输入路径和绝对输出目录，不绑定 `style-profiles` 或任何具体 app 工作流。第一版优先评估并使用 `pptx-svg`，避免依赖本机 LibreOffice；对外以 PNG 作为 Reference Slide Image，SVG 只作为中间/诊断产物保留。PNG 按原 PPTX 页面比例输出，目标高度固定为 720，不裁剪、不拉伸。该方案允许 `ppt-engine` 运行和打包基线提升到 Node.js 22+。
+2. 新增风格画像后端链路。支持用户上传 PPT/图片，触发 Agent 基于图片集合分析视觉风格，输出并保存 style profile；同时建立全局风格画像存储和 API，并在主题生成、页面 authoring 中注入选中的风格画像。
+3. 前端适配。新增独立的风格画像创建/分析入口；新建 PPT 时支持选择已有风格画像，并把选择结果写入当前 workspace。
 
-这些模板都应满足：
+边界约束：
 
-- 源模板提交 `theme/token.schema.json`、`theme/token.default.json`、`theme/README.md`，可提交 `token.*.json` 命名预设。
-- 源模板不提交 `theme/token.json`；该文件是 workspace/local 的可变主题文件，并由 `.gitignore` 排除。
-- `manifest.theme` 已移除，真实颜色来源是 theme token。
-- `theme/tokens.ts` 统一消费 `--theme-color-*` / `--theme-shadow-*` CSS vars。
-- 组件、slides、blueprints 默认不依赖旧固定主题字段或散落的主题色硬编码。
-- demo/default data 默认不再写 `color`、`fillColor`、`textColor`、`accentColor`、`tintColor`、`badgeColor`、`badgeBackground` 这类颜色字段；兼容外部输入时只能作为 optional 覆盖。
-
-相关架构记录见 `docs/adr/0013-template-theme-token-source.md`。
-
-## 当前主题来源约定
-
-- 渲染时优先读取 workspace/local 的 `theme/token.json`。
-- 如果 workspace/local 没有 `theme/token.json`，fallback 到源模板提交的 `theme/token.default.json`。
-- render layer 已支持读取 token 文件并注入 `--theme-*` 和 `*-rgb` CSS vars。
-- fork/build 链路已支持复制 `theme/`，workspace fork 时会从 token default 初始化工作区主题。
-- 命名预设如 `token.dark-orange.json`、`token.executive-amber.json` 只是可选参考或测试输入，不替代 workspace/local 的 `theme/token.json` 主源。
-
-## 下一阶段：ppt-app 生成 token.json
-
-目标是把当前“LLM 决定 theme id”的流程改成“LLM 决定 token.json”：
-
-1. 生成任务选定模板后，读取该模板的 `theme/token.schema.json`、`theme/token.default.json`、`theme/README.md`。
-2. 将模板 token 契约、用户风格要求、材料语气和必要的命名预设信息传给 LLM。
-3. LLM 输出完整 `theme/token.json`，字段必须覆盖 schema required keys，不允许只输出 patch。
-4. 写入 workspace/local 的 `theme/token.json`，不写回源模板。
-5. 写入前或写入后用 `token.schema.json` 校验；校验失败应重试或 fallback 到 `token.default.json`。
-6. 后续 slide 生成、HTML 渲染、PPTX 转换都只消费注入后的 CSS vars，不再读取固定 theme id。
-
-## 实现注意事项
-
-- 不要重新引入 `manifest.theme` 或固定 6 组 theme id 作为模板主题主源。
-- 不要让 LLM 修改 `theme/tokens.ts`；它只生成 JSON token。
-- 不要让 LLM 省略 token 字段；缺字段会导致部分组件 fallback 失效。
-- 不要把 data 当主题载体；data 只表达内容，颜色只允许作为显式业务覆盖。
-- 不需要新增硬编码颜色扫描校验；当前阶段靠 schema、渲染回归和 review 控制。
-- `reference-slides/` 仍保持参考材料角色，不作为主题生成或迁移目标。
+- 风格画像不是事实证据，不应混入 Research Evidence 或 Uploaded Source Analysis 的 grounding 链路。
+- MVP 优先支持图片/截图风格参考；PPTX 导入可作为后续扩展。

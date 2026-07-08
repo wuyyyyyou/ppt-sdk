@@ -65,6 +65,7 @@ import {
   removeAppUploadedSource,
   recordAppUploadedSourceAnalysis,
   recordAppUploadedSourceAnalysisDraft,
+  rasterizePptxToImages,
   renderAppWorkspaceDeckHtml,
   renderAppWorkspacePagePreview,
   runDeckValidation,
@@ -892,6 +893,31 @@ async function toolAppCommitUploadedSourceUpload(args) {
     uploadedSourceUploadSessions.delete(uploadId);
     await unlink(session.stagingPath).catch(() => undefined);
   }
+}
+
+async function toolAppRasterizePptxToImages(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const pptxPath = readRequiredAbsolutePathArg(args, "pptx_path");
+  const outputDir = readRequiredAbsolutePathArg(args, "output_dir");
+  const targetHeight = args.target_height === undefined
+    ? undefined
+    : Number(args.target_height);
+  if (
+    targetHeight !== undefined
+    && (!Number.isInteger(targetHeight) || targetHeight <= 0)
+  ) {
+    throw new Error('"target_height" must be a positive integer');
+  }
+
+  return rasterizePptxToImages({
+    pptx_path: pptxPath,
+    output_dir: outputDir,
+    target_height: targetHeight,
+    overwrite: args.overwrite === true,
+  });
 }
 
 async function toolAppUploadUploadedSource(args) {
@@ -1987,6 +2013,7 @@ const TOOL_DISPATCH = {
   app_open_workspace: toolAppOpenWorkspace,
   app_begin_uploaded_source_upload: toolAppBeginUploadedSourceUpload,
   app_commit_uploaded_source_upload: toolAppCommitUploadedSourceUpload,
+  app_rasterize_pptx_to_images: toolAppRasterizePptxToImages,
   app_upload_uploaded_source: toolAppUploadUploadedSource,
   app_list_uploaded_sources: toolAppListUploadedSources,
   app_remove_uploaded_source: toolAppRemoveUploadedSource,

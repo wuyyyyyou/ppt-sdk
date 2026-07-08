@@ -12,7 +12,7 @@ export default defineConfig([
     sourcemap: true,
     clean: true,
     splitting: false,
-    target: "node20",
+    target: "node22",
     outDir: "dist",
     shims: false,
     external: ["esbuild", "typescript"],

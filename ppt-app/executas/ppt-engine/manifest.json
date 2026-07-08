@@ -118,6 +118,38 @@
       ]
     },
     {
+      "name": "app_rasterize_pptx_to_images",
+      "description": "Convert a PPTX file into per-slide PNG Reference Slide Images, keeping SVG diagnostics and writing rasterization-manifest.json.",
+      "parameters": [
+        {
+          "name": "pptx_path",
+          "type": "string",
+          "description": "Absolute path to the .pptx file to rasterize. The first version supports .pptx only.",
+          "required": true
+        },
+        {
+          "name": "output_dir",
+          "type": "string",
+          "description": "Absolute output directory where page-*.svg, page-*.png, and rasterization-manifest.json should be written.",
+          "required": true
+        },
+        {
+          "name": "target_height",
+          "type": "integer",
+          "description": "Optional PNG target height in pixels. Defaults to 720 while preserving the slide aspect ratio.",
+          "required": false,
+          "default": 720
+        },
+        {
+          "name": "overwrite",
+          "type": "boolean",
+          "description": "When true, overwrite generated output files for this run. Defaults to false.",
+          "required": false,
+          "default": false
+        }
+      ]
+    },
+    {
       "name": "app_list_uploaded_sources",
       "description": "List Workspace-owned Uploaded Source Material entries for a PPT Workspace.",
       "parameters": [

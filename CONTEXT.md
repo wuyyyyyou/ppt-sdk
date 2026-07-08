@@ -46,6 +46,18 @@ _Avoid_: Theme ID Selection, Preset Theme Selection
 A Workspace-owned theme object created for the selected Template. It must satisfy that Template's theme contract and is the current theme source for downstream rendering.
 _Avoid_: Theme ID, Preset Theme
 
+**PPTX Rasterization**:
+The process that turns a user-provided PPTX into page-level images for visual inspection. It is a reusable preparation step and is not itself Style Profile Creation or Uploaded Source Analysis.
+_Avoid_: PPT parsing, PPT import, PPT analysis
+
+**Reference Slide Image**:
+A PNG page image produced from reference material so an Agent can inspect visual style. Reference Slide Images may guide Style Profile Creation, but they are not factual grounding evidence for Page Authoring.
+_Avoid_: Research Evidence, Visual Research Evidence
+
+**Style Profile Creation**:
+The process that turns reference slide images or uploaded style-reference images into a reusable Style Profile. It is separate from Deck Generation and does not produce a Deck.
+_Avoid_: Deck Generation, Uploaded Source Analysis
+
 **Page Plan**:
 The slide-by-slide mapping from Confirmed Outline entries to planned pages, with one Page Plan entry per outline item. It owns page identity, template blueprint selection, and, after Evidence-Aware Page Planning, page-level content direction and assigned Research Evidence references. Page-level content direction should reference Research Evidence by identity rather than copying full evidence content. During Page Refinement, only the target page entries should be revised when target page outlines change.
 
