@@ -88,6 +88,11 @@ export function buildAuthoringPrompt(input: {
   contentReview?: AgentPageContentReviewResult | null;
   pageRefinementVisualContext?: PageRefinementVisualContext;
   noChangeRetry?: NoChangeAuthoringRetry | null;
+  selectedStyleProfile?: {
+    displayName?: string;
+    profilePath: string;
+    content: string;
+  } | null;
 }) {
   const hasFailureFix = Boolean(input.renderError || input.visualReview || input.contentReview);
   const pageRefinementRequest = input.pageRefinementRequest?.trim() ?? "";
@@ -111,6 +116,9 @@ export function buildAuthoringPrompt(input: {
       label,
       path: toAgentFileToolPath(agentPathContext, absolutePath),
     });
+  const selectedStyleProfile = input.selectedStyleProfile?.content.trim()
+    ? input.selectedStyleProfile
+    : null;
   const visualReviewScreenshotPath = input.visualReviewScreenshotPath?.trim() ?? "";
   const visualReviewScreenshotToolPath = visualReviewScreenshotPath
     ? toAgentFileToolPath(agentPathContext, visualReviewScreenshotPath)
@@ -295,8 +303,24 @@ export function buildAuthoringPrompt(input: {
       `7. ${formatToolPath("Slide authoring guide", slideGuidePath)}`,
       `8. REQUIRED when present, ${formatToolPath("Current-page Research Evidence", currentPageEvidencePath)}`,
       `Also read the current-page Research Evidence file if it exists, using its Agent file-tool path above.`,
-      "9. Before using any component from template/components, read that component's source file.",
+      selectedStyleProfile
+        ? `9. Read-only style guidance already inlined below; diagnostic path: ${formatToolPath("Selected Style Profile", selectedStyleProfile.profilePath)}`
+        : "9. No Selected Style Profile is active for this workspace.",
+      "10. Before using any component from template/components, read that component's source file.",
     ].join("\n"),
+    "",
+    selectedStyleProfile
+      ? [
+          "Selected Style Profile:",
+          `- Display name: ${selectedStyleProfile.displayName || "Untitled Style Profile"}`,
+          `- Workspace copy path: ${selectedStyleProfile.profilePath}`,
+          "Use this Markdown as visual style guidance only: color palette, contrast, typography tone, hierarchy, spacing, layout rhythm, graphic language, chart treatment, and image treatment.",
+          "Style priority: Template Theme Contract/schema/contrast requirements > explicit workspace/user style intent > Selected Style Profile > template default baseline.",
+          "The Selected Style Profile is not a grounding source. Do not use it for facts, numbers, dates, entity names, source names, chart/table data, business conclusions, or claims.",
+          "Selected Style Profile Markdown:",
+          selectedStyleProfile.content,
+        ].join("\n")
+      : "",
     "",
     [
       "Authoring composition strategy:",
@@ -316,6 +340,7 @@ export function buildAuthoringPrompt(input: {
       "- Allowed grounding sources are only: the user's original prompt; context rows; task_context; Confirmed Outline source prompt/context/task_context; Confirmed Outline text; current Page Plan title/outline/reason/content_plan when they restate or directly derive from the Confirmed Outline or assigned Research Evidence; current-page Research Evidence; explicitly marked Shared Research Evidence inside the current-page evidence markdown; and, in page-refinement mode, facts, numbers, dates, names, and claims explicitly stated in the current Page Refinement Request.",
       "- Uploaded-source-derived facts and visual assets are grounding sources only after they appear in current-page Research Evidence / Visual Assets sections. Do not read raw uploaded files or full Uploaded Source Analysis during Page Authoring.",
       "- The Research Discovery Evidence Pool, research/evidence-index.json, and Uploaded Source Analysis are diagnostic/planning artifacts, not Page Authoring grounding sources. Do not read or use them unless a current-page Research Evidence file explicitly points to a shared evidence excerpt.",
+      "- Selected Style Profile is visual style guidance only and is never a factual grounding source.",
       "- Not grounding sources: current generated data JSON or slide TSX; generated pages; rendered HTML; screenshots; visual review output; Agent summaries; Raw Research Material; raw Uploaded Source Material files; full Uploaded Source Analysis; and other pages' Research Evidence unless it is explicitly Shared Research Evidence.",
       "- Do not use Raw Research Material or raw Uploaded Source Material as evidence unless it has been curated/materialized into current-page Research Evidence.",
       "- Do not call search tools during Page Authoring.",

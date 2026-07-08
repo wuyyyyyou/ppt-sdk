@@ -54,6 +54,22 @@ _Avoid_: PPT parsing, PPT import, PPT analysis
 A PNG page image produced from reference material so an Agent can inspect visual style. Reference Slide Images may guide Style Profile Creation, but they are not factual grounding evidence for Page Authoring.
 _Avoid_: Research Evidence, Visual Research Evidence
 
+**Style Profile**:
+A reusable textual visual style guide created from reference slide images or uploaded style-reference images. It can guide Workspace Theme Creation and Page Authoring style direction, but it does not preserve factual content from its references and is not Research Evidence, Uploaded Source Material, a Template, or an Agent Skill.
+_Avoid_: Research Evidence, Uploaded Source Material, Template, Skill
+
+**Style Profile Library**:
+The app-level collection of reusable Style Profiles available across Workspaces. It is separate from Workspace-owned artifacts, Research Evidence, and the Template catalog.
+_Avoid_: Workspace, Template Catalog
+
+**Style Profile Creation Workspace**:
+A temporary app-level work area used while creating one Style Profile from reference material. It is not a deck Workspace and does not participate in Outline Creation, Uploaded Source Analysis, Research Discovery, or Deck Generation.
+_Avoid_: Workspace, Uploaded Source Material
+
+**Selected Style Profile**:
+A Workspace-owned copy of the Style Profile guidance chosen for that Workspace. It preserves the style guidance used by that Workspace even if the original Style Profile later changes; when present, it is a required Workspace input and guides style after Template Theme Contract requirements and the Workspace's explicit style intent. Changing or clearing it after Deck Generation makes the current Deck stale until the affected generation work is rerun.
+_Avoid_: Live Style Profile Reference
+
 **Style Profile Creation**:
 The process that turns reference slide images or uploaded style-reference images into a reusable Style Profile. It is separate from Deck Generation and does not produce a Deck.
 _Avoid_: Deck Generation, Uploaded Source Analysis

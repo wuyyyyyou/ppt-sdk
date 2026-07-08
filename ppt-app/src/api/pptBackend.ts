@@ -65,8 +65,23 @@ import type {
   UpdateWorkspaceTitleInput,
   BeginUploadedSourceUploadInput,
   BeginUploadedSourceUploadResult,
+  BeginStyleProfileReferenceUploadInput,
+  BeginStyleProfileReferenceUploadResult,
+  ClearWorkspaceStyleProfileResult,
   CommitUploadedSourceUploadInput,
   CommitUploadedSourceUploadResult,
+  CommitStyleProfileReferenceUploadInput,
+  CommitStyleProfileReferenceUploadResult,
+  GetStyleProfileCreationContextResult,
+  StyleProfileDraftFingerprint,
+  GetStyleProfileDraftResult,
+  GetWorkspaceStyleProfileResult,
+  ListStyleProfilesResult,
+  PrepareStyleProfileCreationInput,
+  PrepareStyleProfileCreationResult,
+  PublishStyleProfileInput,
+  PublishStyleProfileResult,
+  SelectWorkspaceStyleProfileResult,
   UploadUploadedSourceInput,
   UploadUploadedSourceResult,
   ListUploadedSourcesResult,
@@ -90,6 +105,17 @@ export interface PptBackend {
   openWorkspace(input: OpenWorkspaceInput): Promise<WorkspaceResult>;
   beginUploadedSourceUpload?(input: BeginUploadedSourceUploadInput): Promise<BeginUploadedSourceUploadResult>;
   commitUploadedSourceUpload?(input: CommitUploadedSourceUploadInput): Promise<CommitUploadedSourceUploadResult>;
+  listStyleProfiles(): Promise<ListStyleProfilesResult>;
+  prepareStyleProfileCreation(input?: PrepareStyleProfileCreationInput): Promise<PrepareStyleProfileCreationResult>;
+  beginStyleProfileReferenceUpload(input: BeginStyleProfileReferenceUploadInput): Promise<BeginStyleProfileReferenceUploadResult>;
+  commitStyleProfileReferenceUpload(input: CommitStyleProfileReferenceUploadInput): Promise<CommitStyleProfileReferenceUploadResult>;
+  getStyleProfileCreationContext(input: { creation_id: string }): Promise<GetStyleProfileCreationContextResult>;
+  getStyleProfileDraftFingerprint(input: { creation_id: string }): Promise<StyleProfileDraftFingerprint>;
+  getStyleProfileDraft(input: { creation_id: string }): Promise<GetStyleProfileDraftResult>;
+  publishStyleProfile(input: PublishStyleProfileInput): Promise<PublishStyleProfileResult>;
+  selectWorkspaceStyleProfile(input: { workspace_dir: string; style_profile_id: string }): Promise<SelectWorkspaceStyleProfileResult>;
+  getWorkspaceStyleProfile(input: { workspace_dir: string }): Promise<GetWorkspaceStyleProfileResult>;
+  clearWorkspaceStyleProfile(input: { workspace_dir: string }): Promise<ClearWorkspaceStyleProfileResult>;
   uploadUploadedSource(input: UploadUploadedSourceInput): Promise<UploadUploadedSourceResult>;
   listUploadedSources(input: { workspace_dir: string; include_removed?: boolean }): Promise<ListUploadedSourcesResult>;
   removeUploadedSource(input: RemoveUploadedSourceInput): Promise<RemoveUploadedSourceResult>;

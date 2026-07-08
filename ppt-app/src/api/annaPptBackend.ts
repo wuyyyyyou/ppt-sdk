@@ -36,9 +36,20 @@ import type {
   WorkspaceDefaultsResult,
   WorkspaceResult,
   BeginUploadedSourceUploadResult,
+  BeginStyleProfileReferenceUploadResult,
+  ClearWorkspaceStyleProfileResult,
   CommitUploadedSourceUploadResult,
+  CommitStyleProfileReferenceUploadResult,
+  GetStyleProfileCreationContextResult,
+  GetStyleProfileDraftResult,
+  GetWorkspaceStyleProfileResult,
+  ListStyleProfilesResult,
+  PrepareStyleProfileCreationResult,
   UploadUploadedSourceResult,
   ListUploadedSourcesResult,
+  PublishStyleProfileResult,
+  SelectWorkspaceStyleProfileResult,
+  StyleProfileDraftFingerprint,
   RemoveUploadedSourceResult,
   PrepareUploadedSourceAnalysisWorkspaceResult,
   UploadedSourceAnalysisDraftFingerprint,
@@ -202,6 +213,72 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invoke<CommitUploadedSourceUploadResult>(
         toolIds.pptEngine,
         "app_commit_uploaded_source_upload",
+        input
+      ),
+    listStyleProfiles: () =>
+      invoke<ListStyleProfilesResult>(
+        toolIds.pptEngine,
+        "app_list_style_profiles",
+        {}
+      ),
+    prepareStyleProfileCreation: (input = {}) =>
+      invoke<PrepareStyleProfileCreationResult>(
+        toolIds.pptEngine,
+        "app_prepare_style_profile_creation",
+        input
+      ),
+    beginStyleProfileReferenceUpload: (input) =>
+      invoke<BeginStyleProfileReferenceUploadResult>(
+        toolIds.pptEngine,
+        "app_begin_style_profile_reference_upload",
+        input
+      ),
+    commitStyleProfileReferenceUpload: (input) =>
+      invoke<CommitStyleProfileReferenceUploadResult>(
+        toolIds.pptEngine,
+        "app_commit_style_profile_reference_upload",
+        input
+      ),
+    getStyleProfileCreationContext: (input) =>
+      invoke<GetStyleProfileCreationContextResult>(
+        toolIds.pptEngine,
+        "app_get_style_profile_creation_context",
+        input
+      ),
+    getStyleProfileDraftFingerprint: (input) =>
+      invoke<StyleProfileDraftFingerprint>(
+        toolIds.pptEngine,
+        "app_get_style_profile_draft_fingerprint",
+        input
+      ),
+    getStyleProfileDraft: (input) =>
+      invoke<GetStyleProfileDraftResult>(
+        toolIds.pptEngine,
+        "app_get_style_profile_draft",
+        input
+      ),
+    publishStyleProfile: (input) =>
+      invoke<PublishStyleProfileResult>(
+        toolIds.pptEngine,
+        "app_publish_style_profile",
+        input
+      ),
+    selectWorkspaceStyleProfile: (input) =>
+      invokeHttpJson<SelectWorkspaceStyleProfileResult>(
+        toolIds.pptEngine,
+        "app_select_workspace_style_profile",
+        input
+      ),
+    getWorkspaceStyleProfile: (input) =>
+      invoke<GetWorkspaceStyleProfileResult>(
+        toolIds.pptEngine,
+        "app_get_workspace_style_profile",
+        input
+      ),
+    clearWorkspaceStyleProfile: (input) =>
+      invokeHttpJson<ClearWorkspaceStyleProfileResult>(
+        toolIds.pptEngine,
+        "app_clear_workspace_style_profile",
         input
       ),
     uploadUploadedSource: (input) =>

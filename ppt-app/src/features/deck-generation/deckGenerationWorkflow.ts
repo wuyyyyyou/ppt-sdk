@@ -149,6 +149,42 @@ export async function runDeckGeneration(
     }
   }
 
+  let selectedStyleProfile: RunDeckGenerationInput["selectedStyleProfile"] = null;
+  try {
+    const workspaceStyleProfile = await input.backend.getWorkspaceStyleProfile({
+      workspace_dir: input.workspace.workspace_dir,
+    });
+    selectedStyleProfile = workspaceStyleProfile.selected
+      ? {
+          displayName: workspaceStyleProfile.selection?.display_name,
+          profilePath: workspaceStyleProfile.profile_path,
+          content: workspaceStyleProfile.content,
+        }
+      : null;
+  } catch (error) {
+    const message = `Selected Style Profile is unavailable: ${error instanceof Error ? error.message : String(error)}`;
+    const progress = createProgress(
+      {
+        step: "failed",
+        message,
+        currentPageIndex: null,
+        totalPages: input.confirmedOutline.items.length,
+      },
+      null,
+      undefined,
+      undefined,
+      attemptLimits,
+    );
+    input.onProgress(progress);
+    return failedCompletion({
+      progress,
+      error: {
+        type: "stale_artifacts",
+        message,
+      },
+    });
+  }
+
   const startMode = input.startMode ?? "restart";
   let artifacts: { pagePlan: PagePlan; progress: PageProgress };
 
@@ -238,6 +274,7 @@ export async function runDeckGeneration(
   let { pagePlan, progress } = artifacts;
   const runtime: DeckGenerationRuntime = {
     ...input,
+    selectedStyleProfile,
     activeStreams: new Map(),
     getProgress: () => progress,
     setProgress: (nextProgress) => {

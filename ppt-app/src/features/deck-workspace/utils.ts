@@ -115,6 +115,10 @@ export function isWorkspaceDeckStale(workspace: WorkspaceResult) {
     return true;
   }
 
+  if (readString(isRecord(workspace.pages) ? workspace.pages : null, "status") === "stale") {
+    return true;
+  }
+
   if (outlineUpdatedAt && pagePlanOutlineUpdatedAt && outlineUpdatedAt !== pagePlanOutlineUpdatedAt) {
     return !outlineMatchesPagePlan(outlineRecord, pagePlanRecord);
   }

@@ -1,8 +1,9 @@
 import os from "node:os";
 import path from "node:path";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { appendFile, copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { appendFile, copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import sharp from "sharp";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import type { ErrorObject } from "ajv";
 import {
@@ -27,6 +28,7 @@ import { resolveLocalModulePath } from "../local-template/loader.js";
 import { assertLocalTemplateTypecheck } from "../local-template/typecheck.js";
 import { launchManagedBrowser } from "../runtime/browser-runtime.js";
 import { convertDeckHtmlToPptxModel } from "../html-to-pptx-model/index.js";
+import { rasterizePptxToImages } from "../pptx-rasterization/index.js";
 import type {
   AppendAppWorkspaceLogInput,
   AppendAppWorkspaceLogResult,
@@ -34,6 +36,13 @@ import type {
   AppUploadedSourceMaterial,
   AppUploadedSourceAnalysisDraftFingerprint,
   AppUploadedSourceAnalysisPaths,
+  AppReferenceSlideImage,
+  AppStyleProfileCreationManifest,
+  AppStyleProfileCreationPaths,
+  AppStyleProfileDraftFingerprint,
+  AppStyleProfileIndex,
+  AppStyleProfileIndexEntry,
+  AppStyleProfileReferenceMaterial,
   AppTemplateGroupSummary,
   AppTemplatePreviewRef,
   AppTemplatePreviewResult,
@@ -57,6 +66,14 @@ import type {
   DuplicateAppWorkspacePageInput,
   ListAppUploadedSourcesInput,
   ListAppUploadedSourcesResult,
+  ListAppStyleProfilesResult,
+  GetAppStyleProfileCreationContextInput,
+  GetAppStyleProfileCreationContextResult,
+  GetAppStyleProfileDraftFingerprintInput,
+  GetAppStyleProfileDraftInput,
+  GetAppStyleProfileDraftResult,
+  GetAppWorkspaceStyleProfileInput,
+  GetAppWorkspaceStyleProfileResult,
   GetAppUploadedSourceAnalysisDraftFingerprintInput,
   GetAppUploadedSourceAnalysisDraftInput,
   GetAppUploadedSourceAnalysisInput,
@@ -76,7 +93,11 @@ import type {
   OpenAppWorkspaceInput,
   RemoveAppUploadedSourceInput,
   RemoveAppUploadedSourceResult,
+  ClearAppWorkspaceStyleProfileInput,
+  ClearAppWorkspaceStyleProfileResult,
   CommitAppUploadedSourceUploadResult,
+  CommitAppStyleProfileReferenceUploadInput,
+  CommitAppStyleProfileReferenceUploadResult,
   RecordAppUploadedSourceAnalysisDraftInput,
   RecordAppUploadedSourceAnalysisInput,
   PrepareAppDeckRefinementPageFilesInput,
@@ -102,6 +123,8 @@ import type {
   PrepareAppResearchWorkspaceResult,
   PrepareAppUploadedSourceAnalysisWorkspaceInput,
   PrepareAppUploadedSourceAnalysisWorkspaceResult,
+  PrepareAppStyleProfileCreationInput,
+  PrepareAppStyleProfileCreationResult,
   GetAppResearchCurationDraftInput,
   GetAppResearchCurationDraftFingerprintInput,
   RecordAppResearchEvidenceInput,
@@ -120,6 +143,8 @@ import type {
   RenderAppWorkspaceDeckHtmlResult,
   SelectAppWorkspaceTemplateInput,
   SelectAppWorkspaceTemplateResult,
+  SelectAppWorkspaceStyleProfileInput,
+  SelectAppWorkspaceStyleProfileResult,
   StartAppPptxExportModelInput,
   UpdateAppWorkspacePagesInput,
   UpdateAppWorkspaceOutlineInput,
@@ -130,6 +155,8 @@ import type {
   ValidateAppWorkspaceThemeTokenInput,
   AppWorkspaceThemeContext,
   AppWorkspaceThemeValidationResult,
+  PublishAppStyleProfileInput,
+  PublishAppStyleProfileResult,
 } from "./types.js";
 
 const WORKSPACE_ROOT = path.join(os.homedir(), "anna-workspace", "ppt");
@@ -215,6 +242,15 @@ const UPLOADED_SOURCE_REJECTED_EXTENSIONS = new Set([
   ".mkv",
   ".pdf",
 ]);
+const STYLE_PROFILE_LIBRARY_DIR = path.join(WORKSPACE_ROOT, "style-profiles");
+const STYLE_PROFILE_CREATING_DIR = path.join(STYLE_PROFILE_LIBRARY_DIR, "creating");
+const STYLE_PROFILE_PROFILES_DIR = path.join(STYLE_PROFILE_LIBRARY_DIR, "profiles");
+const STYLE_PROFILE_INDEX_PATH = path.join(STYLE_PROFILE_LIBRARY_DIR, "index.json");
+const STYLE_PROFILE_ALLOWED_EXTENSIONS = new Set([".pptx", ".png", ".jpg", ".jpeg", ".webp"]);
+const STYLE_PROFILE_SINGLE_FILE_MAX_BYTES = 100 * 1024 * 1024;
+const STYLE_PROFILE_DRAFT_MIN_BYTES = 200;
+const STYLE_PROFILE_DRAFT_MAX_BYTES = 8 * 1024;
+const STYLE_PROFILE_REFERENCE_ANALYSIS_LIMIT = 5;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -697,6 +733,7 @@ async function writeJsonFile(filePath: string, data: unknown): Promise<void> {
 
 const pageProgressWriteQueues = new Map<string, Promise<unknown>>();
 const uploadedSourceWriteQueues = new Map<string, Promise<unknown>>();
+const styleProfileWriteQueues = new Map<string, Promise<unknown>>();
 const themeTokenWriteQueues = new Map<string, Promise<unknown>>();
 
 async function withPageProgressWriteQueue<T>(
@@ -733,6 +770,25 @@ async function withUploadedSourceWriteQueue<T>(
   } finally {
     if (uploadedSourceWriteQueues.get(queueKey) === tail) {
       uploadedSourceWriteQueues.delete(queueKey);
+    }
+  }
+}
+
+async function withStyleProfileWriteQueue<T>(
+  key: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const queueKey = path.normalize(key);
+  const previous = styleProfileWriteQueues.get(queueKey) ?? Promise.resolve();
+  const run = previous.catch(() => undefined).then(operation);
+  const tail = run.catch(() => undefined);
+  styleProfileWriteQueues.set(queueKey, tail);
+
+  try {
+    return await run;
+  } finally {
+    if (styleProfileWriteQueues.get(queueKey) === tail) {
+      styleProfileWriteQueues.delete(queueKey);
     }
   }
 }
@@ -1858,6 +1914,748 @@ export async function commitAppUploadedSourceUpload(input: {
   return {
     ...result,
     upload_id: input.upload_id,
+  };
+}
+
+function buildStyleProfileCreationPaths(creationId: string): AppStyleProfileCreationPaths {
+  const creationDir = path.join(STYLE_PROFILE_CREATING_DIR, creationId);
+  return {
+    library_dir: STYLE_PROFILE_LIBRARY_DIR,
+    creation_dir: creationDir,
+    uploads_dir: path.join(creationDir, "uploads"),
+    references_dir: path.join(creationDir, "references"),
+    rasterized_dir: path.join(creationDir, "rasterized"),
+    draft_dir: path.join(creationDir, "draft"),
+    draft_profile_path: path.join(creationDir, "draft", "profile.md"),
+    manifest_path: path.join(creationDir, "manifest.json"),
+  };
+}
+
+function buildStyleProfileStoragePaths(styleProfileId: string) {
+  const profileDir = path.join(STYLE_PROFILE_PROFILES_DIR, styleProfileId);
+  return {
+    profile_dir: profileDir,
+    profile_path: path.join(profileDir, "profile.md"),
+    metadata_path: path.join(profileDir, "metadata.json"),
+    references_dir: path.join(profileDir, "references"),
+  };
+}
+
+function buildWorkspaceStyleProfilePaths(workspaceDir: string) {
+  const profileDir = path.join(workspaceDir, "profile");
+  return {
+    profile_dir: profileDir,
+    profile_path: path.join(profileDir, "style-profile.md"),
+    selection_path: path.join(profileDir, "selection.json"),
+  };
+}
+
+async function markWorkspaceRenderedPagesStaleIfPresent(
+  workspace: AppWorkspaceResult,
+  updatedAt: string,
+): Promise<void> {
+  const pagesRecord = getPlainRecord(await readJsonFileIfExists(workspace.files.pages));
+  const pages = Array.isArray(pagesRecord.pages) ? pagesRecord.pages : [];
+  if (pages.length === 0) return;
+  await writeJsonFile(workspace.files.pages, {
+    ...pagesRecord,
+    status: "stale",
+    updated_at: updatedAt,
+  });
+}
+
+function assertStyleProfileCreationId(value: string): string {
+  const creationId = sanitizeFileNamePart(value, "");
+  if (!creationId || creationId !== value || !creationId.startsWith("style-profile-creation-")) {
+    throw new Error('"creation_id" must be a valid Style Profile Creation Workspace id.');
+  }
+  const paths = buildStyleProfileCreationPaths(creationId);
+  if (!isPathInsideDir(STYLE_PROFILE_CREATING_DIR, paths.creation_dir)) {
+    throw new Error('"creation_id" resolves outside the Style Profile Creation directory.');
+  }
+  return creationId;
+}
+
+function assertStyleProfileId(value: string): string {
+  const styleProfileId = sanitizeFileNamePart(value, "");
+  if (!styleProfileId || styleProfileId !== value || !styleProfileId.startsWith("style-profile-")) {
+    throw new Error('"style_profile_id" must be a valid Style Profile id.');
+  }
+  const paths = buildStyleProfileStoragePaths(styleProfileId);
+  if (!isPathInsideDir(STYLE_PROFILE_PROFILES_DIR, paths.profile_dir)) {
+    throw new Error('"style_profile_id" resolves outside the Style Profile Library profiles directory.');
+  }
+  return styleProfileId;
+}
+
+function createStyleProfileCreationId(now: Date): string {
+  const datePart = [
+    now.getFullYear(),
+    padDatePart(now.getMonth() + 1),
+    padDatePart(now.getDate()),
+    padDatePart(now.getHours()),
+    padDatePart(now.getMinutes()),
+    padDatePart(now.getSeconds()),
+  ].join("");
+  return `style-profile-creation-${datePart}-${randomUUID().slice(0, 8)}`;
+}
+
+function createStyleProfileId(now: Date, sha256: string, existingIds: Set<string>): string {
+  const datePart = [
+    now.getFullYear(),
+    padDatePart(now.getMonth() + 1),
+    padDatePart(now.getDate()),
+    padDatePart(now.getHours()),
+    padDatePart(now.getMinutes()),
+    padDatePart(now.getSeconds()),
+  ].join("");
+  const base = `style-profile-${datePart}-${sha256.slice(0, 8)}`;
+  if (!existingIds.has(base)) return base;
+  for (let index = 2; index < 10_000; index += 1) {
+    const candidate = `${base}-${index}`;
+    if (!existingIds.has(candidate)) return candidate;
+  }
+  throw new Error("Could not create a unique Style Profile id.");
+}
+
+function createDefaultStyleProfileIndex(): AppStyleProfileIndex {
+  return {
+    version: 1,
+    library_dir: STYLE_PROFILE_LIBRARY_DIR,
+    profiles: [],
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function normalizeStyleProfileIndexEntry(value: unknown): AppStyleProfileIndexEntry | null {
+  const record = getPlainRecord(value);
+  const styleProfileId = normalizeString(record.style_profile_id);
+  const profilePath = normalizeString(record.profile_path);
+  const profileDir = normalizeString(record.profile_dir);
+  if (!styleProfileId || !profilePath || !profileDir) return null;
+  return {
+    version: 1,
+    style_profile_id: styleProfileId,
+    display_name: normalizeString(record.display_name) || styleProfileId,
+    profile_dir: profileDir,
+    profile_path: profilePath,
+    metadata_path: normalizeString(record.metadata_path) || path.join(profileDir, "metadata.json"),
+    profile_sha256: normalizeString(record.profile_sha256),
+    size_bytes: typeof record.size_bytes === "number" && Number.isFinite(record.size_bytes)
+      ? Math.max(0, Math.floor(record.size_bytes))
+      : 0,
+    reference_count: typeof record.reference_count === "number" && Number.isFinite(record.reference_count)
+      ? Math.max(0, Math.floor(record.reference_count))
+      : 0,
+    source_file_count: typeof record.source_file_count === "number" && Number.isFinite(record.source_file_count)
+      ? Math.max(0, Math.floor(record.source_file_count))
+      : 0,
+    created_at: normalizeString(record.created_at) || new Date().toISOString(),
+    updated_at: normalizeString(record.updated_at) || new Date().toISOString(),
+  };
+}
+
+function normalizeStyleProfileIndex(value: unknown): AppStyleProfileIndex {
+  const record = getPlainRecord(value);
+  const profiles = Array.isArray(record.profiles)
+    ? record.profiles
+        .map(normalizeStyleProfileIndexEntry)
+        .filter((item): item is AppStyleProfileIndexEntry => item !== null)
+    : [];
+  profiles.sort((left, right) => right.updated_at.localeCompare(left.updated_at));
+  return {
+    version: 1,
+    library_dir: STYLE_PROFILE_LIBRARY_DIR,
+    profiles,
+    updated_at: normalizeString(record.updated_at) || new Date().toISOString(),
+  };
+}
+
+async function readStyleProfileIndex(): Promise<AppStyleProfileIndex> {
+  const existing = await readJsonFileIfExists(STYLE_PROFILE_INDEX_PATH);
+  return normalizeStyleProfileIndex(existing ?? createDefaultStyleProfileIndex());
+}
+
+async function writeStyleProfileIndex(index: AppStyleProfileIndex): Promise<AppStyleProfileIndex> {
+  const normalized = normalizeStyleProfileIndex(index);
+  await writeJsonFile(STYLE_PROFILE_INDEX_PATH, normalized);
+  return normalized;
+}
+
+function normalizeStyleProfileReferenceMaterial(value: unknown): AppStyleProfileReferenceMaterial | null {
+  const record = getPlainRecord(value);
+  const referenceId = normalizeString(record.reference_id);
+  const filePath = normalizeString(record.file_path);
+  if (!referenceId || !filePath) return null;
+  return {
+    reference_id: referenceId,
+    original_filename: normalizeString(record.original_filename) || referenceId,
+    display_name: normalizeString(record.display_name) || normalizeString(record.original_filename) || referenceId,
+    mime_type: normalizeString(record.mime_type),
+    extension: normalizeString(record.extension),
+    size_bytes: typeof record.size_bytes === "number" && Number.isFinite(record.size_bytes)
+      ? Math.max(0, Math.floor(record.size_bytes))
+      : 0,
+    sha256: normalizeString(record.sha256),
+    file_path: filePath,
+    kind: record.kind === "pptx" ? "pptx" : "image",
+    created_at: normalizeString(record.created_at) || new Date().toISOString(),
+  };
+}
+
+function normalizeStyleProfileReferenceImage(value: unknown): AppReferenceSlideImage | null {
+  const record = getPlainRecord(value);
+  const referenceImageId = normalizeString(record.reference_image_id);
+  const sourceReferenceId = normalizeString(record.source_reference_id);
+  const filePath = normalizeString(record.file_path);
+  if (!referenceImageId || !sourceReferenceId || !filePath) return null;
+  return {
+    reference_image_id: referenceImageId,
+    source_reference_id: sourceReferenceId,
+    source_file_path: normalizeString(record.source_file_path),
+    page_number: typeof record.page_number === "number" && Number.isFinite(record.page_number)
+      ? Math.max(1, Math.floor(record.page_number))
+      : null,
+    file_path: filePath,
+    width: typeof record.width === "number" && Number.isFinite(record.width) ? Math.max(0, Math.floor(record.width)) : null,
+    height: typeof record.height === "number" && Number.isFinite(record.height) ? Math.max(0, Math.floor(record.height)) : null,
+    selected_for_analysis: record.selected_for_analysis === true,
+    order: typeof record.order === "number" && Number.isFinite(record.order) ? Math.max(1, Math.floor(record.order)) : 1,
+  };
+}
+
+function normalizeStyleProfileCreationManifest(
+  value: unknown,
+  creationId: string,
+  displayName: string,
+): AppStyleProfileCreationManifest {
+  const record = getPlainRecord(value);
+  const referenceMaterials = Array.isArray(record.reference_materials)
+    ? record.reference_materials
+        .map(normalizeStyleProfileReferenceMaterial)
+        .filter((item): item is AppStyleProfileReferenceMaterial => item !== null)
+    : [];
+  const referenceImages = Array.isArray(record.reference_images)
+    ? record.reference_images
+        .map(normalizeStyleProfileReferenceImage)
+        .filter((item): item is AppReferenceSlideImage => item !== null)
+    : [];
+  const selectedIds = new Set(normalizeStringArray(record.selected_reference_image_ids));
+  return {
+    version: 1,
+    creation_id: creationId,
+    display_name: normalizeString(record.display_name) || displayName,
+    status: record.status === "published" ? "published" : referenceMaterials.length > 0 ? "uploaded" : "prepared",
+    reference_materials: referenceMaterials,
+    reference_images: referenceImages
+      .slice()
+      .sort((left, right) => left.order - right.order)
+      .map((item) => ({
+        ...item,
+        selected_for_analysis: selectedIds.size > 0
+          ? selectedIds.has(item.reference_image_id)
+          : item.selected_for_analysis,
+      })),
+    selected_reference_image_ids: selectedIds.size > 0
+      ? Array.from(selectedIds)
+      : referenceImages.filter((item) => item.selected_for_analysis).map((item) => item.reference_image_id),
+    created_at: normalizeString(record.created_at) || new Date().toISOString(),
+    updated_at: normalizeString(record.updated_at) || new Date().toISOString(),
+    published_style_profile_id: normalizeString(record.published_style_profile_id) || undefined,
+  };
+}
+
+async function readStyleProfileCreationManifest(
+  creationId: string,
+): Promise<AppStyleProfileCreationManifest> {
+  const paths = buildStyleProfileCreationPaths(creationId);
+  const existing = await readJsonFileIfExists(paths.manifest_path);
+  if (!existing) {
+    throw new Error(`Style Profile Creation Workspace not found: ${creationId}`);
+  }
+  return normalizeStyleProfileCreationManifest(existing, creationId, creationId);
+}
+
+async function writeStyleProfileCreationManifest(
+  manifest: AppStyleProfileCreationManifest,
+): Promise<AppStyleProfileCreationManifest> {
+  const normalized = normalizeStyleProfileCreationManifest(
+    manifest,
+    manifest.creation_id,
+    manifest.display_name,
+  );
+  await writeJsonFile(buildStyleProfileCreationPaths(normalized.creation_id).manifest_path, normalized);
+  return normalized;
+}
+
+export function selectEvenlySpacedReferenceImages<T>(items: T[], limit = STYLE_PROFILE_REFERENCE_ANALYSIS_LIMIT): T[] {
+  if (items.length <= limit) return items.slice();
+  if (limit <= 1) return [items[0]];
+  const selectedIndexes = new Set<number>();
+  for (let index = 0; index < limit; index += 1) {
+    selectedIndexes.add(Math.round(index * (items.length - 1) / (limit - 1)));
+  }
+  return Array.from(selectedIndexes)
+    .sort((left, right) => left - right)
+    .map((index) => items[index]);
+}
+
+function applyStyleProfileReferenceSelection(
+  manifest: AppStyleProfileCreationManifest,
+): AppStyleProfileCreationManifest {
+  const orderedImages = manifest.reference_images
+    .slice()
+    .sort((left, right) => left.order - right.order);
+  const selectedIds = new Set(
+    selectEvenlySpacedReferenceImages(orderedImages, STYLE_PROFILE_REFERENCE_ANALYSIS_LIMIT)
+      .map((item) => item.reference_image_id),
+  );
+  return {
+    ...manifest,
+    reference_images: orderedImages.map((item) => ({
+      ...item,
+      selected_for_analysis: selectedIds.has(item.reference_image_id),
+    })),
+    selected_reference_image_ids: Array.from(selectedIds),
+  };
+}
+
+function assertAllowedStyleProfileReferenceFile(filename: string, sizeBytes: number): string {
+  const extension = path.extname(filename).trim().toLowerCase();
+  if (!extension || !STYLE_PROFILE_ALLOWED_EXTENSIONS.has(extension)) {
+    throw new Error(`Unsupported Style Profile reference file type: ${extension || "(none)"}`);
+  }
+  if (sizeBytes <= 0) {
+    throw new Error("Style Profile reference file must not be empty.");
+  }
+  if (sizeBytes > STYLE_PROFILE_SINGLE_FILE_MAX_BYTES) {
+    throw new Error(`Style Profile reference file exceeds the single-file limit of ${STYLE_PROFILE_SINGLE_FILE_MAX_BYTES} bytes.`);
+  }
+  return extension;
+}
+
+async function readImageDimensions(filePath: string): Promise<{ width: number | null; height: number | null }> {
+  try {
+    const metadata = await sharp(filePath).metadata();
+    return {
+      width: typeof metadata.width === "number" ? metadata.width : null,
+      height: typeof metadata.height === "number" ? metadata.height : null,
+    };
+  } catch {
+    return { width: null, height: null };
+  }
+}
+
+function buildReferenceImageId(materialId: string, pageNumber: number | null): string {
+  return pageNumber === null
+    ? `${materialId}-image`
+    : `${materialId}-page-${String(pageNumber).padStart(3, "0")}`;
+}
+
+async function materialToReferenceImages(input: {
+  paths: AppStyleProfileCreationPaths;
+  material: AppStyleProfileReferenceMaterial;
+  extension: string;
+  nextOrder: number;
+}): Promise<AppReferenceSlideImage[]> {
+  if (input.extension === ".pptx") {
+    const outputDir = path.join(input.paths.rasterized_dir, input.material.reference_id);
+    const rasterized = await rasterizePptxToImages({
+      pptx_path: input.material.file_path,
+      output_dir: outputDir,
+      target_height: 720,
+      overwrite: false,
+    });
+    return rasterized.slides.map((slide, index) => ({
+      reference_image_id: buildReferenceImageId(input.material.reference_id, slide.page_number),
+      source_reference_id: input.material.reference_id,
+      source_file_path: input.material.file_path,
+      page_number: slide.page_number,
+      file_path: slide.image_path,
+      width: slide.width,
+      height: slide.height,
+      selected_for_analysis: false,
+      order: input.nextOrder + index,
+    }));
+  }
+
+  const storedFileName = `${input.material.reference_id}${input.extension}`;
+  const referenceImagePath = path.join(input.paths.references_dir, storedFileName);
+  await mkdir(input.paths.references_dir, { recursive: true });
+  await copyFile(input.material.file_path, referenceImagePath);
+  const dimensions = await readImageDimensions(referenceImagePath);
+  return [{
+    reference_image_id: buildReferenceImageId(input.material.reference_id, null),
+    source_reference_id: input.material.reference_id,
+    source_file_path: input.material.file_path,
+    page_number: null,
+    file_path: referenceImagePath,
+    width: dimensions.width,
+    height: dimensions.height,
+    selected_for_analysis: false,
+    order: input.nextOrder,
+  }];
+}
+
+export async function listAppStyleProfiles(): Promise<ListAppStyleProfilesResult> {
+  const index = await readStyleProfileIndex();
+  return {
+    library_dir: STYLE_PROFILE_LIBRARY_DIR,
+    index,
+    profiles: index.profiles,
+  };
+}
+
+export async function prepareAppStyleProfileCreation(
+  input: PrepareAppStyleProfileCreationInput = {},
+): Promise<PrepareAppStyleProfileCreationResult> {
+  const now = new Date();
+  const creationId = createStyleProfileCreationId(now);
+  const displayName = normalizeString(input.display_name).trim() || `Style Profile ${now.toISOString().slice(0, 10)}`;
+  const paths = buildStyleProfileCreationPaths(creationId);
+  await Promise.all([
+    mkdir(paths.uploads_dir, { recursive: true }),
+    mkdir(paths.references_dir, { recursive: true }),
+    mkdir(paths.rasterized_dir, { recursive: true }),
+    mkdir(paths.draft_dir, { recursive: true }),
+  ]);
+  const manifest = normalizeStyleProfileCreationManifest(null, creationId, displayName);
+  await writeStyleProfileCreationManifest(manifest);
+  return {
+    ...paths,
+    creation_id: creationId,
+    display_name: displayName,
+    prepared_at: manifest.created_at,
+  };
+}
+
+export async function commitAppStyleProfileReferenceUpload(
+  input: CommitAppStyleProfileReferenceUploadInput,
+): Promise<CommitAppStyleProfileReferenceUploadResult> {
+  const creationId = assertStyleProfileCreationId(input.creation_id);
+  const paths = buildStyleProfileCreationPaths(creationId);
+  const originalFilename = sanitizeUploadedSourceDisplayName(input.filename);
+  const stagingPath = path.normalize(input.staging_file_path);
+  const stagingStat = await stat(stagingPath);
+  if (!stagingStat.isFile()) {
+    throw new Error(`Style Profile reference staging path is not a file: ${stagingPath}`);
+  }
+  if (stagingStat.size !== input.expected_size_bytes) {
+    throw new Error(`Style Profile reference staging size mismatch: expected ${input.expected_size_bytes} bytes, got ${stagingStat.size} bytes.`);
+  }
+  const extension = assertAllowedStyleProfileReferenceFile(originalFilename, stagingStat.size);
+
+  return withStyleProfileWriteQueue(creationId, async () => {
+    const manifest = await readStyleProfileCreationManifest(creationId);
+    const bytes = await readFile(stagingPath);
+    const sha256 = sha256BufferHex(bytes);
+    const referenceId = `reference-${String(manifest.reference_materials.length + 1).padStart(3, "0")}-${sha256.slice(0, 8)}`;
+    const storageDir = path.join(paths.uploads_dir, referenceId);
+    const storedFileName = `${sanitizeFileNamePart(path.basename(originalFilename, extension), "reference")}${extension}`;
+    const storedPath = path.join(storageDir, storedFileName);
+    if (!isPathInsideDir(paths.uploads_dir, storedPath)) {
+      throw new Error("Style Profile reference file path escapes uploads directory.");
+    }
+    await mkdir(storageDir, { recursive: true });
+    await copyFile(stagingPath, storedPath);
+    const now = new Date().toISOString();
+    const material: AppStyleProfileReferenceMaterial = {
+      reference_id: referenceId,
+      original_filename: originalFilename,
+      display_name: originalFilename,
+      mime_type: normalizeString(input.mime_type),
+      extension,
+      size_bytes: stagingStat.size,
+      sha256,
+      file_path: storedPath,
+      kind: extension === ".pptx" ? "pptx" : "image",
+      created_at: now,
+    };
+    const referenceImages = await materialToReferenceImages({
+      paths,
+      material,
+      extension,
+      nextOrder: manifest.reference_images.length + 1,
+    });
+    const nextManifest = await writeStyleProfileCreationManifest(
+      applyStyleProfileReferenceSelection({
+        ...manifest,
+        status: "uploaded",
+        reference_materials: [...manifest.reference_materials, material],
+        reference_images: [...manifest.reference_images, ...referenceImages],
+        updated_at: now,
+      }),
+    );
+    return {
+      creation_id: creationId,
+      upload_id: input.upload_id,
+      material,
+      manifest: nextManifest,
+      warnings: [],
+    };
+  });
+}
+
+export async function getAppStyleProfileCreationContext(
+  input: GetAppStyleProfileCreationContextInput,
+): Promise<GetAppStyleProfileCreationContextResult> {
+  const creationId = assertStyleProfileCreationId(input.creation_id);
+  const paths = buildStyleProfileCreationPaths(creationId);
+  const manifest = await readStyleProfileCreationManifest(creationId);
+  const selectedIds = new Set(manifest.selected_reference_image_ids);
+  const selectedReferenceImages = manifest.reference_images
+    .filter((item) => selectedIds.has(item.reference_image_id))
+    .sort((left, right) => left.order - right.order);
+  return {
+    ...paths,
+    creation_id: creationId,
+    manifest,
+    selected_reference_images: selectedReferenceImages,
+  };
+}
+
+async function fingerprintStyleProfileDraft(creationId: string): Promise<AppStyleProfileDraftFingerprint> {
+  const draftPath = buildStyleProfileCreationPaths(creationId).draft_profile_path;
+  try {
+    const fingerprint = await fingerprintFile(draftPath);
+    return {
+      creation_id: creationId,
+      draft_path: draftPath,
+      exists: true,
+      sha256: fingerprint.sha256,
+      size_bytes: fingerprint.size_bytes,
+    };
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return {
+        creation_id: creationId,
+        draft_path: draftPath,
+        exists: false,
+      };
+    }
+    throw error;
+  }
+}
+
+function assertValidStyleProfileDraft(content: string, sizeBytes: number): void {
+  if (sizeBytes < STYLE_PROFILE_DRAFT_MIN_BYTES) {
+    throw new Error(`Style Profile draft is too short. Expected at least ${STYLE_PROFILE_DRAFT_MIN_BYTES} bytes.`);
+  }
+  if (sizeBytes > STYLE_PROFILE_DRAFT_MAX_BYTES) {
+    throw new Error(`Style Profile draft exceeds the ${STYLE_PROFILE_DRAFT_MAX_BYTES} byte limit.`);
+  }
+  if (content.trim().length === 0) {
+    throw new Error("Style Profile draft must not be empty.");
+  }
+}
+
+export async function getAppStyleProfileDraftFingerprint(
+  input: GetAppStyleProfileDraftFingerprintInput,
+): Promise<AppStyleProfileDraftFingerprint> {
+  const creationId = assertStyleProfileCreationId(input.creation_id);
+  return fingerprintStyleProfileDraft(creationId);
+}
+
+export async function getAppStyleProfileDraft(
+  input: GetAppStyleProfileDraftInput,
+): Promise<GetAppStyleProfileDraftResult> {
+  const creationId = assertStyleProfileCreationId(input.creation_id);
+  const draftPath = buildStyleProfileCreationPaths(creationId).draft_profile_path;
+  const content = await readFile(draftPath, "utf8");
+  const sizeBytes = Buffer.byteLength(content, "utf8");
+  const sha256 = sha256Hex(content);
+  return {
+    creation_id: creationId,
+    draft_path: draftPath,
+    exists: true,
+    content,
+    size_bytes: sizeBytes,
+    sha256,
+  };
+}
+
+export async function publishAppStyleProfile(
+  input: PublishAppStyleProfileInput,
+): Promise<PublishAppStyleProfileResult> {
+  const creationId = assertStyleProfileCreationId(input.creation_id);
+  return withStyleProfileWriteQueue(STYLE_PROFILE_INDEX_PATH, async () => {
+    const manifest = await readStyleProfileCreationManifest(creationId);
+    const draft = await getAppStyleProfileDraft({ creation_id: creationId });
+    assertValidStyleProfileDraft(draft.content, draft.size_bytes);
+    const index = await readStyleProfileIndex();
+    const now = new Date();
+    const updatedAt = now.toISOString();
+    const styleProfileId = createStyleProfileId(
+      now,
+      draft.sha256,
+      new Set(index.profiles.map((item) => item.style_profile_id)),
+    );
+    const storage = buildStyleProfileStoragePaths(styleProfileId);
+    await Promise.all([
+      mkdir(storage.profile_dir, { recursive: true }),
+      mkdir(storage.references_dir, { recursive: true }),
+    ]);
+    await writeFile(storage.profile_path, draft.content, "utf8");
+
+    const selectedIds = new Set(manifest.selected_reference_image_ids);
+    const selectedImages = manifest.reference_images
+      .filter((item) => selectedIds.has(item.reference_image_id))
+      .sort((left, right) => left.order - right.order);
+    for (const image of selectedImages) {
+      const extension = path.extname(image.file_path).toLowerCase() || ".png";
+      const targetPath = path.join(
+        storage.references_dir,
+        `reference-${String(image.order).padStart(3, "0")}${extension}`,
+      );
+      await copyFile(image.file_path, targetPath);
+    }
+
+    const displayName = normalizeString(input.display_name).trim() || manifest.display_name || styleProfileId;
+    const entry: AppStyleProfileIndexEntry = {
+      version: 1,
+      style_profile_id: styleProfileId,
+      display_name: displayName,
+      profile_dir: storage.profile_dir,
+      profile_path: storage.profile_path,
+      metadata_path: storage.metadata_path,
+      profile_sha256: draft.sha256,
+      size_bytes: draft.size_bytes,
+      reference_count: selectedImages.length,
+      source_file_count: manifest.reference_materials.length,
+      created_at: updatedAt,
+      updated_at: updatedAt,
+    };
+    await writeJsonFile(storage.metadata_path, entry);
+    const nextIndex = await writeStyleProfileIndex({
+      version: 1,
+      library_dir: STYLE_PROFILE_LIBRARY_DIR,
+      profiles: [entry, ...index.profiles],
+      updated_at: updatedAt,
+    });
+    await writeStyleProfileCreationManifest({
+      ...manifest,
+      status: "published",
+      display_name: displayName,
+      updated_at: updatedAt,
+      published_style_profile_id: styleProfileId,
+    });
+    return {
+      style_profile: entry,
+      index: nextIndex,
+      profile_path: storage.profile_path,
+      reference_count: selectedImages.length,
+    };
+  });
+}
+
+export async function selectAppWorkspaceStyleProfile(
+  input: SelectAppWorkspaceStyleProfileInput,
+): Promise<SelectAppWorkspaceStyleProfileResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const styleProfileId = assertStyleProfileId(input.style_profile_id);
+  const index = await readStyleProfileIndex();
+  const profile = index.profiles.find((item) => item.style_profile_id === styleProfileId);
+  if (!profile) {
+    throw new Error(`Style Profile not found: ${styleProfileId}`);
+  }
+  const content = await readFile(profile.profile_path, "utf8");
+  const sizeBytes = Buffer.byteLength(content, "utf8");
+  if (content.trim().length === 0) {
+    throw new Error(`Style Profile is empty: ${styleProfileId}`);
+  }
+  const sha256 = sha256Hex(content);
+  const paths = buildWorkspaceStyleProfilePaths(workspace.workspace_dir);
+  await mkdir(paths.profile_dir, { recursive: true });
+  await writeFile(paths.profile_path, content, "utf8");
+  const selectedAt = new Date().toISOString();
+  const selection = {
+    version: 1 as const,
+    style_profile_id: styleProfileId,
+    display_name: profile.display_name,
+    source_profile_path: profile.profile_path,
+    workspace_profile_path: paths.profile_path,
+    selection_path: paths.selection_path,
+    profile_sha256: sha256,
+    size_bytes: sizeBytes,
+    selected_at: selectedAt,
+  };
+  await writeJsonFile(paths.selection_path, selection);
+  await markWorkspaceRenderedPagesStaleIfPresent(workspace, selectedAt);
+  await touchWorkspaceTask(workspace, selectedAt);
+  return {
+    workspace: await ensureWorkspaceFiles(workspace.workspace_dir),
+    selection,
+    content,
+  };
+}
+
+export async function getAppWorkspaceStyleProfile(
+  input: GetAppWorkspaceStyleProfileInput,
+): Promise<GetAppWorkspaceStyleProfileResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = buildWorkspaceStyleProfilePaths(workspace.workspace_dir);
+  const selectionRecord = await readJsonFileIfExists(paths.selection_path);
+  const selection = getPlainRecord(selectionRecord);
+  const hasSelection = Boolean(normalizeString(selection.style_profile_id));
+  const content = await readFile(paths.profile_path, "utf8").catch((error) => {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      if (hasSelection) {
+        throw new Error("Selected Style Profile file is missing. Select or clear the workspace Style Profile before generation.");
+      }
+      return "";
+    }
+    throw error;
+  });
+  const sizeBytes = Buffer.byteLength(content, "utf8");
+  if (hasSelection && content.trim().length === 0) {
+    throw new Error("Selected Style Profile file is empty. Select or clear the workspace Style Profile before generation.");
+  }
+  const sha256 = content ? sha256Hex(content) : "";
+  return {
+    workspace_dir: workspace.workspace_dir,
+    selected: hasSelection,
+    profile_path: paths.profile_path,
+    selection_path: paths.selection_path,
+    selection: hasSelection
+      ? {
+          version: 1,
+          style_profile_id: normalizeString(selection.style_profile_id),
+          display_name: normalizeString(selection.display_name),
+          source_profile_path: normalizeString(selection.source_profile_path),
+          workspace_profile_path: paths.profile_path,
+          selection_path: paths.selection_path,
+          profile_sha256: normalizeString(selection.profile_sha256),
+          size_bytes: typeof selection.size_bytes === "number" && Number.isFinite(selection.size_bytes)
+            ? Math.max(0, Math.floor(selection.size_bytes))
+            : sizeBytes,
+          selected_at: normalizeString(selection.selected_at),
+        }
+      : null,
+    content,
+    size_bytes: sizeBytes,
+    sha256,
+  };
+}
+
+export async function clearAppWorkspaceStyleProfile(
+  input: ClearAppWorkspaceStyleProfileInput,
+): Promise<ClearAppWorkspaceStyleProfileResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = buildWorkspaceStyleProfilePaths(workspace.workspace_dir);
+  const existed = await fileExists(paths.profile_path).then(Boolean).catch(() => false);
+  const selectionExisted = await fileExists(paths.selection_path).then(Boolean).catch(() => false);
+  await Promise.all([
+    rm(paths.profile_path, { force: true }),
+    rm(paths.selection_path, { force: true }),
+  ]);
+  if (existed || selectionExisted) {
+    const updatedAt = new Date().toISOString();
+    await markWorkspaceRenderedPagesStaleIfPresent(workspace, updatedAt);
+    await touchWorkspaceTask(workspace, updatedAt);
+  }
+  return {
+    workspace: await ensureWorkspaceFiles(workspace.workspace_dir),
+    cleared: existed || selectionExisted,
   };
 }
 

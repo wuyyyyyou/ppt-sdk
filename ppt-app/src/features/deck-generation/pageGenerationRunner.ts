@@ -182,6 +182,7 @@ export async function runPageGeneration(
         ? input.pageRefinementVisualContexts?.[page.page_id]
         : undefined,
       noChangeRetry,
+      selectedStyleProfile: input.selectedStyleProfile,
     });
     const authoringKind = attemptKind === "initial"
       ? "authoring"

@@ -42,6 +42,16 @@ import {
   getAppWorkspaceOutline,
   getDiscoveredTemplateGroup,
   listAppWorkspaces,
+  listAppStyleProfiles,
+  prepareAppStyleProfileCreation,
+  commitAppStyleProfileReferenceUpload,
+  getAppStyleProfileCreationContext,
+  getAppStyleProfileDraft,
+  getAppStyleProfileDraftFingerprint,
+  publishAppStyleProfile,
+  selectAppWorkspaceStyleProfile,
+  getAppWorkspaceStyleProfile,
+  clearAppWorkspaceStyleProfile,
   listAppTemplateGroups,
   listDiscoveredTemplateGroupSummaries,
   openAppWorkspace,
@@ -242,14 +252,22 @@ const previewImageFiles = new Map();
 const artifactFiles = new Map();
 const jsonPayloads = new Map();
 const uploadedSourceUploadSessions = new Map();
+const styleProfileReferenceUploadSessions = new Map();
 let previewServerPromise = null;
 
 const UPLOADED_SOURCE_UPLOAD_TTL_MS = 15 * 60 * 1000;
 const UPLOADED_SOURCE_SINGLE_FILE_MAX_BYTES = 25 * 1024 * 1024;
+const STYLE_PROFILE_REFERENCE_UPLOAD_TTL_MS = 15 * 60 * 1000;
+const STYLE_PROFILE_REFERENCE_SINGLE_FILE_MAX_BYTES = 100 * 1024 * 1024;
 const UPLOADED_SOURCE_STAGING_DIR = path.join(
   os.tmpdir(),
   "presenton-template-engine-executa",
   "uploaded-source-staging",
+);
+const STYLE_PROFILE_REFERENCE_STAGING_DIR = path.join(
+  os.tmpdir(),
+  "presenton-template-engine-executa",
+  "style-profile-reference-staging",
 );
 
 function encodeRfc5987Value(value) {
@@ -307,6 +325,15 @@ function cleanupExpiredUploadedSourceUploadSessions() {
   }
 }
 
+function cleanupExpiredStyleProfileReferenceUploadSessions() {
+  const now = Date.now();
+  for (const [uploadId, session] of styleProfileReferenceUploadSessions) {
+    if (Date.parse(session.expiresAt) > now) continue;
+    styleProfileReferenceUploadSessions.delete(uploadId);
+    void unlink(session.stagingPath).catch(() => undefined);
+  }
+}
+
 async function writeUploadedSourceStagingFile(request, session) {
   await mkdir(path.dirname(session.stagingPath), { recursive: true });
   const handle = await open(session.stagingPath, "w");
@@ -331,11 +358,44 @@ async function writeUploadedSourceStagingFile(request, session) {
   return received;
 }
 
+async function writeStyleProfileReferenceStagingFile(request, session) {
+  await mkdir(path.dirname(session.stagingPath), { recursive: true });
+  const handle = await open(session.stagingPath, "w");
+  let received = 0;
+  try {
+    for await (const chunk of request) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      received += buffer.byteLength;
+      if (received > session.expectedSizeBytes || received > STYLE_PROFILE_REFERENCE_SINGLE_FILE_MAX_BYTES) {
+        throw new Error(`Style Profile reference body exceeds expected size of ${session.expectedSizeBytes} bytes.`);
+      }
+      await handle.write(buffer);
+    }
+  } finally {
+    await handle.close();
+  }
+
+  if (received !== session.expectedSizeBytes) {
+    await unlink(session.stagingPath).catch(() => undefined);
+    throw new Error(`Style Profile reference body size mismatch: expected ${session.expectedSizeBytes} bytes, got ${received} bytes.`);
+  }
+  return received;
+}
+
 async function handlePreviewRequest(request, response) {
   const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
   const parts = requestUrl.pathname.split("/").filter(Boolean);
 
   if (request.method === "OPTIONS" && parts.length === 3 && parts[0] === "upload") {
+    response.writeHead(204, {
+      "cache-control": "no-store",
+      ...getUploadCorsHeaders(),
+    });
+    response.end();
+    return;
+  }
+
+  if (request.method === "OPTIONS" && parts.length === 3 && parts[0] === "style-profile-upload") {
     response.writeHead(204, {
       "cache-control": "no-store",
       ...getUploadCorsHeaders(),
@@ -387,6 +447,54 @@ async function handlePreviewRequest(request, response) {
       session.receivedBytes = 0;
       await unlink(session.stagingPath).catch(() => undefined);
       const message = error instanceof Error ? error.message : "Failed to receive uploaded source body";
+      writePlainResponse(response, 413, message, getUploadCorsHeaders());
+    }
+    return;
+  }
+
+  if (parts.length === 3 && parts[0] === "style-profile-upload") {
+    cleanupExpiredStyleProfileReferenceUploadSessions();
+    const uploadId = parts[1];
+    const token = parts[2];
+    const session = styleProfileReferenceUploadSessions.get(uploadId);
+    if (!session || session.token !== token) {
+      writePlainResponse(response, 404, "Style Profile reference upload session expired or not found", getUploadCorsHeaders());
+      return;
+    }
+    if (request.method !== "PUT") {
+      writePlainResponse(response, 405, "Upload endpoint only accepts PUT", getUploadCorsHeaders());
+      return;
+    }
+    if (Date.parse(session.expiresAt) <= Date.now()) {
+      styleProfileReferenceUploadSessions.delete(uploadId);
+      await unlink(session.stagingPath).catch(() => undefined);
+      writePlainResponse(response, 410, "Style Profile reference upload session expired", getUploadCorsHeaders());
+      return;
+    }
+    if (session.committed) {
+      writePlainResponse(response, 409, "Upload session already committed", getUploadCorsHeaders());
+      return;
+    }
+    if (session.uploaded) {
+      writePlainResponse(response, 409, "Upload session already received a binary body", getUploadCorsHeaders());
+      return;
+    }
+    try {
+      const received = await writeStyleProfileReferenceStagingFile(request, session);
+      session.receivedBytes = received;
+      session.uploaded = true;
+      response.writeHead(200, {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+        ...getUploadCorsHeaders(),
+      });
+      response.end(JSON.stringify({ ok: true, upload_id: uploadId, size_bytes: received }));
+    } catch (error) {
+      session.uploaded = false;
+      session.receivedBytes = 0;
+      await unlink(session.stagingPath).catch(() => undefined);
+      const message = error instanceof Error ? error.message : "Failed to receive Style Profile reference body";
       writePlainResponse(response, 413, message, getUploadCorsHeaders());
     }
     return;
@@ -893,6 +1001,186 @@ async function toolAppCommitUploadedSourceUpload(args) {
     uploadedSourceUploadSessions.delete(uploadId);
     await unlink(session.stagingPath).catch(() => undefined);
   }
+}
+
+async function toolAppListStyleProfiles() {
+  return listAppStyleProfiles();
+}
+
+async function toolAppPrepareStyleProfileCreation(args) {
+  if (args !== undefined && (!args || typeof args !== "object" || Array.isArray(args))) {
+    throw new Error("Arguments must be an object");
+  }
+
+  return prepareAppStyleProfileCreation({
+    display_name: readOptionalStringArg(args ?? {}, "display_name"),
+  });
+}
+
+async function toolAppBeginStyleProfileReferenceUpload(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  cleanupExpiredStyleProfileReferenceUploadSessions();
+  if (typeof args.creation_id !== "string" || args.creation_id.trim().length === 0) {
+    throw new Error('"creation_id" must be a non-empty string');
+  }
+  if (typeof args.filename !== "string" || args.filename.trim().length === 0) {
+    throw new Error('"filename" must be a non-empty string');
+  }
+  const sizeBytes = Number(args.size_bytes);
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+    throw new Error('"size_bytes" must be a positive number');
+  }
+  if (sizeBytes > STYLE_PROFILE_REFERENCE_SINGLE_FILE_MAX_BYTES) {
+    throw new Error(`Style Profile reference file exceeds the single-file limit of ${STYLE_PROFILE_REFERENCE_SINGLE_FILE_MAX_BYTES} bytes.`);
+  }
+
+  const { port } = await ensurePreviewServer();
+  const uploadId = randomUUID();
+  const token = randomUUID();
+  const expiresAt = new Date(Date.now() + STYLE_PROFILE_REFERENCE_UPLOAD_TTL_MS).toISOString();
+  const stagingPath = path.join(STYLE_PROFILE_REFERENCE_STAGING_DIR, `${uploadId}.upload`);
+  styleProfileReferenceUploadSessions.set(uploadId, {
+    uploadId,
+    token,
+    creationId: args.creation_id,
+    filename: args.filename,
+    mimeType: typeof args.mime_type === "string" ? args.mime_type : "",
+    expectedSizeBytes: Math.floor(sizeBytes),
+    stagingPath,
+    expiresAt,
+    uploaded: false,
+    committed: false,
+    receivedBytes: 0,
+  });
+
+  return {
+    creation_id: args.creation_id,
+    upload_id: uploadId,
+    upload_url: `http://127.0.0.1:${port}/style-profile-upload/${encodeURIComponent(uploadId)}/${encodeURIComponent(token)}`,
+    expires_at: expiresAt,
+    size_bytes: Math.floor(sizeBytes),
+  };
+}
+
+async function toolAppCommitStyleProfileReferenceUpload(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  cleanupExpiredStyleProfileReferenceUploadSessions();
+  if (typeof args.creation_id !== "string" || args.creation_id.trim().length === 0) {
+    throw new Error('"creation_id" must be a non-empty string');
+  }
+  if (typeof args.upload_id !== "string" || args.upload_id.trim().length === 0) {
+    throw new Error('"upload_id" must be a non-empty string');
+  }
+  const uploadId = args.upload_id;
+  const session = styleProfileReferenceUploadSessions.get(uploadId);
+  if (!session) {
+    throw new Error(`Style Profile reference upload session not found or expired: ${uploadId}`);
+  }
+  if (session.creationId !== args.creation_id) {
+    throw new Error("Style Profile reference upload session creation workspace mismatch.");
+  }
+  if (Date.parse(session.expiresAt) <= Date.now()) {
+    styleProfileReferenceUploadSessions.delete(uploadId);
+    await unlink(session.stagingPath).catch(() => undefined);
+    throw new Error(`Style Profile reference upload session expired: ${uploadId}`);
+  }
+  if (!session.uploaded || session.receivedBytes !== session.expectedSizeBytes) {
+    throw new Error(`Style Profile reference upload session has not received the expected binary body: ${uploadId}`);
+  }
+
+  try {
+    session.committed = true;
+    return await commitAppStyleProfileReferenceUpload({
+      creation_id: args.creation_id,
+      upload_id: uploadId,
+      filename: session.filename,
+      mime_type: session.mimeType,
+      staging_file_path: session.stagingPath,
+      expected_size_bytes: session.expectedSizeBytes,
+    });
+  } finally {
+    styleProfileReferenceUploadSessions.delete(uploadId);
+    await unlink(session.stagingPath).catch(() => undefined);
+  }
+}
+
+async function toolAppGetStyleProfileCreationContext(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  if (typeof args.creation_id !== "string" || args.creation_id.trim().length === 0) {
+    throw new Error('"creation_id" must be a non-empty string');
+  }
+  return getAppStyleProfileCreationContext({ creation_id: args.creation_id });
+}
+
+async function toolAppGetStyleProfileDraftFingerprint(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  if (typeof args.creation_id !== "string" || args.creation_id.trim().length === 0) {
+    throw new Error('"creation_id" must be a non-empty string');
+  }
+  return getAppStyleProfileDraftFingerprint({ creation_id: args.creation_id });
+}
+
+async function toolAppGetStyleProfileDraft(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  if (typeof args.creation_id !== "string" || args.creation_id.trim().length === 0) {
+    throw new Error('"creation_id" must be a non-empty string');
+  }
+  return getAppStyleProfileDraft({ creation_id: args.creation_id });
+}
+
+async function toolAppPublishStyleProfile(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  if (typeof args.creation_id !== "string" || args.creation_id.trim().length === 0) {
+    throw new Error('"creation_id" must be a non-empty string');
+  }
+  return publishAppStyleProfile({
+    creation_id: args.creation_id,
+    display_name: readOptionalStringArg(args, "display_name"),
+  });
+}
+
+async function toolAppSelectWorkspaceStyleProfile(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  if (typeof args.style_profile_id !== "string" || args.style_profile_id.trim().length === 0) {
+    throw new Error('"style_profile_id" must be a non-empty string');
+  }
+  return registerWorkspaceJsonReference(await selectAppWorkspaceStyleProfile({
+    workspace_dir: workspaceDir,
+    style_profile_id: args.style_profile_id,
+  }));
+}
+
+async function toolAppGetWorkspaceStyleProfile(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return getAppWorkspaceStyleProfile({ workspace_dir: workspaceDir });
+}
+
+async function toolAppClearWorkspaceStyleProfile(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return registerWorkspaceJsonReference(await clearAppWorkspaceStyleProfile({ workspace_dir: workspaceDir }));
 }
 
 async function toolAppRasterizePptxToImages(args) {
@@ -2013,6 +2301,17 @@ const TOOL_DISPATCH = {
   app_open_workspace: toolAppOpenWorkspace,
   app_begin_uploaded_source_upload: toolAppBeginUploadedSourceUpload,
   app_commit_uploaded_source_upload: toolAppCommitUploadedSourceUpload,
+  app_list_style_profiles: toolAppListStyleProfiles,
+  app_prepare_style_profile_creation: toolAppPrepareStyleProfileCreation,
+  app_begin_style_profile_reference_upload: toolAppBeginStyleProfileReferenceUpload,
+  app_commit_style_profile_reference_upload: toolAppCommitStyleProfileReferenceUpload,
+  app_get_style_profile_creation_context: toolAppGetStyleProfileCreationContext,
+  app_get_style_profile_draft_fingerprint: toolAppGetStyleProfileDraftFingerprint,
+  app_get_style_profile_draft: toolAppGetStyleProfileDraft,
+  app_publish_style_profile: toolAppPublishStyleProfile,
+  app_select_workspace_style_profile: toolAppSelectWorkspaceStyleProfile,
+  app_get_workspace_style_profile: toolAppGetWorkspaceStyleProfile,
+  app_clear_workspace_style_profile: toolAppClearWorkspaceStyleProfile,
   app_rasterize_pptx_to_images: toolAppRasterizePptxToImages,
   app_upload_uploaded_source: toolAppUploadUploadedSource,
   app_list_uploaded_sources: toolAppListUploadedSources,

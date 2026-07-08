@@ -59,6 +59,11 @@ export interface GenerateThemeTokenInput {
   currentToken?: unknown;
   validationErrors?: string[];
   previousResponse?: unknown;
+  selectedStyleProfile?: {
+    displayName?: string;
+    profilePath: string;
+    content: string;
+  } | null;
   logContext?: AiOperationLogContext;
 }
 

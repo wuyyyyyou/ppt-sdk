@@ -118,6 +118,167 @@
       ]
     },
     {
+      "name": "app_list_style_profiles",
+      "description": "List published global Style Profiles available to PPT workspaces.",
+      "parameters": []
+    },
+    {
+      "name": "app_prepare_style_profile_creation",
+      "description": "Create a Style Profile Creation Workspace for uploaded PPTX/image references and draft/profile.md.",
+      "parameters": [
+        {
+          "name": "display_name",
+          "type": "string",
+          "description": "Optional display name for the Style Profile being created.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "app_begin_style_profile_reference_upload",
+      "description": "Create a short-lived local HTTP upload session for one Style Profile reference file.",
+      "parameters": [
+        {
+          "name": "creation_id",
+          "type": "string",
+          "description": "Style Profile Creation Workspace id returned by app_prepare_style_profile_creation.",
+          "required": true
+        },
+        {
+          "name": "filename",
+          "type": "string",
+          "description": "Original display filename selected by the user.",
+          "required": true
+        },
+        {
+          "name": "mime_type",
+          "type": "string",
+          "description": "Optional browser-provided MIME type.",
+          "required": false
+        },
+        {
+          "name": "size_bytes",
+          "type": "number",
+          "description": "Expected binary upload body size in bytes.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_commit_style_profile_reference_upload",
+      "description": "Commit a completed Style Profile reference upload into its Creation Workspace and normalize it to Reference Slide Images.",
+      "parameters": [
+        {
+          "name": "creation_id",
+          "type": "string",
+          "description": "Style Profile Creation Workspace id.",
+          "required": true
+        },
+        {
+          "name": "upload_id",
+          "type": "string",
+          "description": "Upload session id returned by app_begin_style_profile_reference_upload.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_style_profile_creation_context",
+      "description": "Read Style Profile Creation Workspace paths, manifest, and up to five selected Reference Slide Images for Agent analysis.",
+      "parameters": [
+        {
+          "name": "creation_id",
+          "type": "string",
+          "description": "Style Profile Creation Workspace id.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_style_profile_draft_fingerprint",
+      "description": "Read existence and file fingerprint metadata for draft/profile.md in a Style Profile Creation Workspace.",
+      "parameters": [
+        {
+          "name": "creation_id",
+          "type": "string",
+          "description": "Style Profile Creation Workspace id.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_style_profile_draft",
+      "description": "Read draft/profile.md from a Style Profile Creation Workspace.",
+      "parameters": [
+        {
+          "name": "creation_id",
+          "type": "string",
+          "description": "Style Profile Creation Workspace id.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_publish_style_profile",
+      "description": "Publish a valid draft/profile.md into the global Style Profile Library and update the library index.",
+      "parameters": [
+        {
+          "name": "creation_id",
+          "type": "string",
+          "description": "Style Profile Creation Workspace id.",
+          "required": true
+        },
+        {
+          "name": "display_name",
+          "type": "string",
+          "description": "Optional final display name. Defaults to the creation workspace display name.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "app_select_workspace_style_profile",
+      "description": "Copy one published Style Profile markdown file into a PPT Workspace as the Selected Style Profile.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "style_profile_id",
+          "type": "string",
+          "description": "Published Style Profile id from app_list_style_profiles.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_workspace_style_profile",
+      "description": "Read the Selected Style Profile markdown text copied into a PPT Workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_clear_workspace_style_profile",
+      "description": "Clear the Selected Style Profile from a PPT Workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
       "name": "app_rasterize_pptx_to_images",
       "description": "Convert a PPTX file into per-slide PNG Reference Slide Images, keeping SVG diagnostics and writing rasterization-manifest.json.",
       "parameters": [

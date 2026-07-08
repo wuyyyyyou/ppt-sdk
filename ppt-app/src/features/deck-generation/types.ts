@@ -185,6 +185,11 @@ export interface RunDeckGenerationInput {
   pageRefinementRequests?: Record<string, string>;
   pageRefinementVisualContexts?: Record<string, PageRefinementVisualContext>;
   refinementRunKind?: "page-refinement" | "deck-refinement";
+  selectedStyleProfile?: {
+    displayName?: string;
+    profilePath: string;
+    content: string;
+  } | null;
 }
 
 export interface RunDeckRefinementInput extends RunDeckGenerationInput {

@@ -125,6 +125,39 @@ test("app_rasterize_pptx_to_images is declared and routed", async () => {
   assert.equal(getToolParameter(manifest, "app_rasterize_pptx_to_images", "overwrite").required, false);
 });
 
+test("style profile app tools are declared and routed", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+  const manifest = JSON.parse(
+    await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
+  ) as { tools: Array<{ name: string; parameters?: Array<{ name: string; required?: boolean }> }> };
+
+  for (const [toolName, handlerName] of [
+    ["app_list_style_profiles", "toolAppListStyleProfiles"],
+    ["app_prepare_style_profile_creation", "toolAppPrepareStyleProfileCreation"],
+    ["app_begin_style_profile_reference_upload", "toolAppBeginStyleProfileReferenceUpload"],
+    ["app_commit_style_profile_reference_upload", "toolAppCommitStyleProfileReferenceUpload"],
+    ["app_get_style_profile_creation_context", "toolAppGetStyleProfileCreationContext"],
+    ["app_get_style_profile_draft_fingerprint", "toolAppGetStyleProfileDraftFingerprint"],
+    ["app_get_style_profile_draft", "toolAppGetStyleProfileDraft"],
+    ["app_publish_style_profile", "toolAppPublishStyleProfile"],
+    ["app_select_workspace_style_profile", "toolAppSelectWorkspaceStyleProfile"],
+    ["app_get_workspace_style_profile", "toolAppGetWorkspaceStyleProfile"],
+    ["app_clear_workspace_style_profile", "toolAppClearWorkspaceStyleProfile"],
+  ] as const) {
+    assert.match(source, new RegExp(`${toolName}:\\s*${handlerName}`));
+    assert.ok(manifest.tools.some((tool) => tool.name === toolName), `Missing ${toolName}`);
+  }
+
+  assert.equal(
+    getToolParameter(manifest, "app_begin_style_profile_reference_upload", "creation_id").required,
+    true,
+  );
+  assert.equal(
+    getToolParameter(manifest, "app_publish_style_profile", "display_name").required,
+    false,
+  );
+});
+
 test("app_get_research_evidence returns a JSON result reference", async () => {
   const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
   const manifest = JSON.parse(

@@ -108,6 +108,190 @@ export interface CommitUploadedSourceUploadResult extends UploadUploadedSourceRe
   upload_id: string;
 }
 
+export interface StyleProfileIndexEntry {
+  version: 1;
+  style_profile_id: string;
+  display_name: string;
+  profile_dir: string;
+  profile_path: string;
+  metadata_path: string;
+  profile_sha256: string;
+  size_bytes: number;
+  reference_count: number;
+  source_file_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StyleProfileIndex {
+  version: 1;
+  library_dir: string;
+  profiles: StyleProfileIndexEntry[];
+  updated_at: string;
+}
+
+export interface ListStyleProfilesResult {
+  library_dir: string;
+  index: StyleProfileIndex;
+  profiles: StyleProfileIndexEntry[];
+}
+
+export interface PrepareStyleProfileCreationInput {
+  display_name?: string;
+}
+
+export interface StyleProfileCreationPaths {
+  library_dir: string;
+  creation_dir: string;
+  uploads_dir: string;
+  references_dir: string;
+  rasterized_dir: string;
+  draft_dir: string;
+  draft_profile_path: string;
+  manifest_path: string;
+}
+
+export interface PrepareStyleProfileCreationResult extends StyleProfileCreationPaths {
+  creation_id: string;
+  display_name: string;
+  prepared_at: string;
+}
+
+export interface BeginStyleProfileReferenceUploadInput {
+  creation_id: string;
+  filename: string;
+  mime_type?: string;
+  size_bytes: number;
+}
+
+export interface BeginStyleProfileReferenceUploadResult {
+  creation_id: string;
+  upload_id: string;
+  upload_url: string;
+  expires_at: string;
+  size_bytes: number;
+}
+
+export interface CommitStyleProfileReferenceUploadInput {
+  creation_id: string;
+  upload_id: string;
+}
+
+export interface StyleProfileReferenceMaterial {
+  reference_id: string;
+  original_filename: string;
+  display_name: string;
+  mime_type: string;
+  extension: string;
+  size_bytes: number;
+  sha256: string;
+  file_path: string;
+  kind: "pptx" | "image";
+  created_at: string;
+}
+
+export interface ReferenceSlideImage {
+  reference_image_id: string;
+  source_reference_id: string;
+  source_file_path: string;
+  page_number: number | null;
+  file_path: string;
+  width: number | null;
+  height: number | null;
+  selected_for_analysis: boolean;
+  order: number;
+}
+
+export interface StyleProfileCreationManifest {
+  version: 1;
+  creation_id: string;
+  display_name: string;
+  status: "prepared" | "uploaded" | "published";
+  reference_materials: StyleProfileReferenceMaterial[];
+  reference_images: ReferenceSlideImage[];
+  selected_reference_image_ids: string[];
+  created_at: string;
+  updated_at: string;
+  published_style_profile_id?: string;
+}
+
+export interface CommitStyleProfileReferenceUploadResult {
+  creation_id: string;
+  upload_id: string;
+  material: StyleProfileReferenceMaterial;
+  manifest: StyleProfileCreationManifest;
+  warnings: string[];
+}
+
+export interface GetStyleProfileCreationContextResult extends StyleProfileCreationPaths {
+  creation_id: string;
+  manifest: StyleProfileCreationManifest;
+  selected_reference_images: ReferenceSlideImage[];
+}
+
+export interface StyleProfileDraftFingerprint {
+  creation_id: string;
+  draft_path: string;
+  exists: boolean;
+  sha256?: string;
+  size_bytes?: number;
+}
+
+export interface GetStyleProfileDraftResult {
+  creation_id: string;
+  draft_path: string;
+  exists: boolean;
+  content: string;
+  size_bytes: number;
+  sha256: string;
+}
+
+export interface PublishStyleProfileInput {
+  creation_id: string;
+  display_name?: string;
+}
+
+export interface PublishStyleProfileResult {
+  style_profile: StyleProfileIndexEntry;
+  index: StyleProfileIndex;
+  profile_path: string;
+  reference_count: number;
+}
+
+export interface WorkspaceStyleProfileSelection {
+  version: 1;
+  style_profile_id: string;
+  display_name: string;
+  source_profile_path: string;
+  workspace_profile_path: string;
+  selection_path: string;
+  profile_sha256: string;
+  size_bytes: number;
+  selected_at: string;
+}
+
+export interface SelectWorkspaceStyleProfileResult {
+  workspace: WorkspaceResult;
+  selection: WorkspaceStyleProfileSelection;
+  content: string;
+}
+
+export interface GetWorkspaceStyleProfileResult {
+  workspace_dir: string;
+  selected: boolean;
+  profile_path: string;
+  selection_path: string;
+  selection: WorkspaceStyleProfileSelection | null;
+  content: string;
+  size_bytes: number;
+  sha256: string;
+}
+
+export interface ClearWorkspaceStyleProfileResult {
+  workspace: WorkspaceResult;
+  cleared: boolean;
+}
+
 export interface ListUploadedSourcesResult {
   workspace_dir: string;
   index: UploadedSourceIndex;

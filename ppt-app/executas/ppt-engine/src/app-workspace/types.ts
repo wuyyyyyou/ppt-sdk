@@ -253,6 +253,204 @@ export interface GetAppUploadedSourceAnalysisInput {
   workspace_dir: string;
 }
 
+export interface AppStyleProfileIndexEntry {
+  version: 1;
+  style_profile_id: string;
+  display_name: string;
+  profile_dir: string;
+  profile_path: string;
+  metadata_path: string;
+  profile_sha256: string;
+  size_bytes: number;
+  reference_count: number;
+  source_file_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AppStyleProfileIndex {
+  version: 1;
+  library_dir: string;
+  profiles: AppStyleProfileIndexEntry[];
+  updated_at: string;
+}
+
+export interface ListAppStyleProfilesResult {
+  library_dir: string;
+  index: AppStyleProfileIndex;
+  profiles: AppStyleProfileIndexEntry[];
+}
+
+export interface PrepareAppStyleProfileCreationInput {
+  display_name?: string;
+}
+
+export interface AppStyleProfileCreationPaths {
+  library_dir: string;
+  creation_dir: string;
+  uploads_dir: string;
+  references_dir: string;
+  rasterized_dir: string;
+  draft_dir: string;
+  draft_profile_path: string;
+  manifest_path: string;
+}
+
+export interface PrepareAppStyleProfileCreationResult extends AppStyleProfileCreationPaths {
+  creation_id: string;
+  display_name: string;
+  prepared_at: string;
+}
+
+export interface AppStyleProfileReferenceMaterial {
+  reference_id: string;
+  original_filename: string;
+  display_name: string;
+  mime_type: string;
+  extension: string;
+  size_bytes: number;
+  sha256: string;
+  file_path: string;
+  kind: "pptx" | "image";
+  created_at: string;
+}
+
+export interface AppReferenceSlideImage {
+  reference_image_id: string;
+  source_reference_id: string;
+  source_file_path: string;
+  page_number: number | null;
+  file_path: string;
+  width: number | null;
+  height: number | null;
+  selected_for_analysis: boolean;
+  order: number;
+}
+
+export interface AppStyleProfileCreationManifest {
+  version: 1;
+  creation_id: string;
+  display_name: string;
+  status: "prepared" | "uploaded" | "published";
+  reference_materials: AppStyleProfileReferenceMaterial[];
+  reference_images: AppReferenceSlideImage[];
+  selected_reference_image_ids: string[];
+  created_at: string;
+  updated_at: string;
+  published_style_profile_id?: string;
+}
+
+export interface CommitAppStyleProfileReferenceUploadInput {
+  creation_id: string;
+  upload_id: string;
+  filename: string;
+  mime_type?: string;
+  staging_file_path: string;
+  expected_size_bytes: number;
+}
+
+export interface CommitAppStyleProfileReferenceUploadResult {
+  creation_id: string;
+  upload_id: string;
+  material: AppStyleProfileReferenceMaterial;
+  manifest: AppStyleProfileCreationManifest;
+  warnings: string[];
+}
+
+export interface GetAppStyleProfileCreationContextInput {
+  creation_id: string;
+}
+
+export interface GetAppStyleProfileCreationContextResult extends AppStyleProfileCreationPaths {
+  creation_id: string;
+  manifest: AppStyleProfileCreationManifest;
+  selected_reference_images: AppReferenceSlideImage[];
+}
+
+export interface AppStyleProfileDraftFingerprint {
+  creation_id: string;
+  draft_path: string;
+  exists: boolean;
+  sha256?: string;
+  size_bytes?: number;
+}
+
+export interface GetAppStyleProfileDraftInput {
+  creation_id: string;
+}
+
+export interface GetAppStyleProfileDraftFingerprintInput {
+  creation_id: string;
+}
+
+export interface GetAppStyleProfileDraftResult {
+  creation_id: string;
+  draft_path: string;
+  exists: boolean;
+  content: string;
+  size_bytes: number;
+  sha256: string;
+}
+
+export interface PublishAppStyleProfileInput {
+  creation_id: string;
+  display_name?: string;
+}
+
+export interface PublishAppStyleProfileResult {
+  style_profile: AppStyleProfileIndexEntry;
+  index: AppStyleProfileIndex;
+  profile_path: string;
+  reference_count: number;
+}
+
+export interface SelectAppWorkspaceStyleProfileInput {
+  workspace_dir: string;
+  style_profile_id: string;
+}
+
+export interface AppWorkspaceStyleProfileSelection {
+  version: 1;
+  style_profile_id: string;
+  display_name: string;
+  source_profile_path: string;
+  workspace_profile_path: string;
+  selection_path: string;
+  profile_sha256: string;
+  size_bytes: number;
+  selected_at: string;
+}
+
+export interface SelectAppWorkspaceStyleProfileResult {
+  workspace: AppWorkspaceResult;
+  selection: AppWorkspaceStyleProfileSelection;
+  content: string;
+}
+
+export interface GetAppWorkspaceStyleProfileInput {
+  workspace_dir: string;
+}
+
+export interface GetAppWorkspaceStyleProfileResult {
+  workspace_dir: string;
+  selected: boolean;
+  profile_path: string;
+  selection_path: string;
+  selection: AppWorkspaceStyleProfileSelection | null;
+  content: string;
+  size_bytes: number;
+  sha256: string;
+}
+
+export interface ClearAppWorkspaceStyleProfileInput {
+  workspace_dir: string;
+}
+
+export interface ClearAppWorkspaceStyleProfileResult {
+  workspace: AppWorkspaceResult;
+  cleared: boolean;
+}
+
 export interface ListAppWorkspacesResult {
   workspace_root: string;
   task_root: string;

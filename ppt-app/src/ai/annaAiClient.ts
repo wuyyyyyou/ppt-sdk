@@ -297,6 +297,13 @@ function buildThemeTokenPrompt(input: Parameters<AiClient["generateThemeToken"]>
       default_token: input.themeContext.default_token,
       readme: input.themeContext.readme,
     },
+    selected_style_profile: input.selectedStyleProfile
+      ? {
+          display_name: input.selectedStyleProfile.displayName ?? "",
+          profile_path: input.selectedStyleProfile.profilePath,
+          markdown: input.selectedStyleProfile.content,
+        }
+      : null,
   };
 
   return [
@@ -309,6 +316,9 @@ function buildThemeTokenPrompt(input: Parameters<AiClient["generateThemeToken"]>
       ? "For Deck Refinement, use current_token as the baseline and apply only the requested whole-deck theme/style change."
       : "For initial Deck Generation, use the brief and context rows to infer theme intent.",
     "Contrast requirements are hard requirements.",
+    "Style priority: template theme contract/schema/contrast requirements > explicit user or workspace style intent > Selected Style Profile > template default token baseline.",
+    "When selected_style_profile is present, use it as visual style guidance only: colors, contrast, typography tone, hierarchy, spacing, layout rhythm, graphic language, and chart/image treatment.",
+    "Selected Style Profile is not factual evidence. Do not use it for claims, numbers, dates, source names, chart data, or business conclusions.",
     "Before returning the token, self-check key foreground/background pairs for readable contrast.",
     "If the user asks for black backgrounds with white/orange text, do not set any token used as foreground on dark backgrounds to black or near-black.",
     "Do not use Uploaded Source Analysis, web research, component source code, or fixed theme IDs.",

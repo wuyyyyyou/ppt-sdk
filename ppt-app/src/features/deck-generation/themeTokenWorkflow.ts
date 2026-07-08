@@ -83,6 +83,16 @@ export async function ensureWorkspaceThemeToken(
   const themeContext = await input.backend.getWorkspaceThemeContext({
     workspace_dir: input.workspace.workspace_dir,
   });
+  const selectedStyleProfileResult = await input.backend.getWorkspaceStyleProfile({
+    workspace_dir: input.workspace.workspace_dir,
+  });
+  const selectedStyleProfile = selectedStyleProfileResult.selected
+    ? {
+        displayName: selectedStyleProfileResult.selection?.display_name,
+        profilePath: selectedStyleProfileResult.profile_path,
+        content: selectedStyleProfileResult.content,
+      }
+    : null;
   const currentToken =
     input.runKind === "deck-refinement"
       ? themeContext.current_token_validation?.ok
@@ -103,6 +113,7 @@ export async function ensureWorkspaceThemeToken(
         currentToken,
         previousResponse,
         validationErrors,
+        selectedStyleProfile,
         logContext,
       });
       const validation = await input.backend.validateWorkspaceThemeToken({
