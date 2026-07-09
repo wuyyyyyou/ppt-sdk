@@ -27,7 +27,6 @@ plugin_spec.loader.exec_module(plugin)
 
 
 TOOL_MANIFEST = {
-    "name": "tool-lightvoss_5433-ppt-gener-dc7ftcep",
     "display_name": "ppt-gener",
     "version": "2.0.2",
     "tools": [{"name": "generatePptx", "parameters": []}],
@@ -42,7 +41,7 @@ class BinaryReleaseTest(unittest.TestCase):
                 binary_name="ppt-gener",
             ),
             {
-                "name": "tool-lightvoss_5433-ppt-gener-dc7ftcep",
+                "display_name": "ppt-gener",
                 "version": "2.0.2",
                 "runtime": {
                     "binary": {
@@ -116,7 +115,7 @@ class BinaryReleaseTest(unittest.TestCase):
         # any on-disk manifest.json, so binary builds need no bin/manifest.json.
         original = plugin.EMBEDDED_MANIFEST
         try:
-            plugin.EMBEDDED_MANIFEST = {"name": "embedded", "version": "9.9.9", "tools": []}
+            plugin.EMBEDDED_MANIFEST = {"display_name": "embedded", "version": "9.9.9", "tools": []}
             self.assertEqual(plugin.read_tool_manifest(), plugin.EMBEDDED_MANIFEST)
         finally:
             plugin.EMBEDDED_MANIFEST = original

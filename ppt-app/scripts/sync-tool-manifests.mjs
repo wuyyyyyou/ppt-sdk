@@ -76,7 +76,6 @@ function assertNonEmptyString(value, label) {
 }
 
 function validateToolManifest(manifest, relativePath) {
-  assertNonEmptyString(manifest.name, `${relativePath}.name`);
   assertNonEmptyString(manifest.version, `${relativePath}.version`);
   assertNonEmptyString(manifest.display_name, `${relativePath}.display_name`);
   if (!Array.isArray(manifest.tools)) {
@@ -94,12 +93,21 @@ function validateToolManifest(manifest, relativePath) {
   }
 }
 
+function validateLocalExecuta(executa, relativePath) {
+  assertNonEmptyString(executa.slug, `${relativePath}.slug`);
+  assertNonEmptyString(executa.tool_id, `${relativePath}.tool_id`);
+}
+
 async function loadToolManifests() {
   const loaded = [];
   for (const tool of TOOLS) {
     const manifest = await readJson(tool.manifestPath);
     validateToolManifest(manifest, tool.manifestPath);
-    loaded.push({ ...tool, manifest });
+    const localExecuta = tool.localExecutaPath ? await readJson(tool.localExecutaPath) : null;
+    if (localExecuta) {
+      validateLocalExecuta(localExecuta, tool.localExecutaPath);
+    }
+    loaded.push({ ...tool, manifest, localExecuta });
   }
   return loaded;
 }
@@ -142,10 +150,18 @@ export function applyPptAppListingSync(appListing, tools, relativePath = path.re
 async function syncLocalExecutas(tools) {
   for (const tool of tools) {
     if (!tool.localExecutaPath) continue;
-    const executa = await readJson(tool.localExecutaPath);
-    executa.tool_id = tool.manifest.name;
-    await writeJson(tool.localExecutaPath, executa);
+    applyLocalExecutaSync(tool.localExecuta, tool);
+    await writeJson(tool.localExecutaPath, tool.localExecuta);
   }
+}
+
+export function applyLocalExecutaSync(executa, tool) {
+  executa.name = tool.manifest.display_name;
+  executa.version = tool.manifest.version;
+  if (typeof tool.manifest.description === "string" && tool.manifest.description.length > 0) {
+    executa.description = tool.manifest.description;
+  }
+  return executa;
 }
 
 async function syncGeneratedFrontendConstants(tools) {
@@ -174,12 +190,13 @@ export function buildGeneratedFrontendConstants(tools) {
 function syncNodePackageBin(pkg, tool, binTarget = tool.packageBinTarget) {
   pkg.version = tool.manifest.version;
   pkg.bin ??= {};
+  const toolId = tool.localExecuta.tool_id;
   for (const key of Object.keys(pkg.bin)) {
-    if (key.startsWith("tool-") && pkg.bin[key] === binTarget && key !== tool.manifest.name) {
+    if (key.startsWith("tool-") && pkg.bin[key] === binTarget && key !== toolId) {
       delete pkg.bin[key];
     }
   }
-  pkg.bin[tool.manifest.name] = binTarget;
+  pkg.bin[toolId] = binTarget;
 }
 
 async function syncNodePackage(tool) {
@@ -218,7 +235,7 @@ export function syncPyprojectText(content, tool) {
     .filter((line) => !line.trimStart().startsWith("tool-"))
     .filter((line) => line.length > 0);
 
-  bodyLines.push(`${tool.manifest.name} = ${JSON.stringify(tool.pythonScriptTarget)}`);
+  bodyLines.push(`${tool.localExecuta.tool_id} = ${JSON.stringify(tool.pythonScriptTarget)}`);
   const replacement = [
     lines[headingIndex],
     ...bodyLines,

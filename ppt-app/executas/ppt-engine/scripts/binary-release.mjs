@@ -56,8 +56,8 @@ async function readToolManifest(filePath) {
   if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
     throw new Error("Tool manifest must be a JSON object");
   }
-  if (typeof manifest.name !== "string" || manifest.name.length === 0) {
-    throw new Error("Tool manifest must include a non-empty name");
+  if (typeof manifest.display_name !== "string" || manifest.display_name.length === 0) {
+    throw new Error("Tool manifest must include a non-empty display_name");
   }
   if (typeof manifest.version !== "string" || manifest.version.length === 0) {
     throw new Error("Tool manifest must include a non-empty version");
@@ -67,7 +67,7 @@ async function readToolManifest(filePath) {
 
 export function buildDistributionManifest(toolManifest) {
   return {
-    name: toolManifest.name,
+    display_name: toolManifest.display_name,
     version: toolManifest.version,
     runtime: {
       binary: {
@@ -167,8 +167,8 @@ async function verifyDescribe(options) {
   if (!result || typeof result !== "object") {
     throw new Error("Describe response must include a result object");
   }
-  if (result.name !== toolManifest.name) {
-    throw new Error(`Describe name mismatch: expected ${toolManifest.name}, got ${result.name}`);
+  if (result.display_name !== toolManifest.display_name) {
+    throw new Error(`Describe display_name mismatch: expected ${toolManifest.display_name}, got ${result.display_name}`);
   }
   if (result.version !== toolManifest.version) {
     throw new Error(`Describe version mismatch: expected ${toolManifest.version}, got ${result.version}`);

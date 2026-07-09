@@ -65,8 +65,8 @@ npm run build:full
 
 生成产物：
 
-- `bundle/<manifest.name>-v<manifest.version>-<anna-platform-key>.tar.gz`
-- `bundle/<manifest.name>-v<manifest.version>-<anna-platform-key>.tar.gz.sha256`
+- `bundle/<binary-name>-v<manifest.version>-<anna-platform-key>.tar.gz`
+- `bundle/<binary-name>-v<manifest.version>-<anna-platform-key>.tar.gz.sha256`
 - Windows 平台生成 `.zip` 和 `.zip.sha256`
 
 说明：

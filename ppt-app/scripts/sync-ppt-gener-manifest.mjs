@@ -5,6 +5,7 @@ import { syncPyprojectText, syncUvLockText } from "./sync-tool-manifests.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const MANIFEST_PATH = "ppt-app/executas/ppt-gener/manifest.json";
+const EXECUTA_PATH = "ppt-app/executas/ppt-gener/executa.json";
 const PYPROJECT_PATH = "ppt-app/executas/ppt-gener/pyproject.toml";
 const UV_LOCK_PATH = "ppt-app/executas/ppt-gener/uv.lock";
 const PYTHON_SCRIPT_TARGET = "presenton_pptx_generator_plugin:main";
@@ -33,16 +34,34 @@ function assertNonEmptyString(value, label) {
 }
 
 function validateToolManifest(manifest) {
-  assertNonEmptyString(manifest.name, `${MANIFEST_PATH}.name`);
   assertNonEmptyString(manifest.version, `${MANIFEST_PATH}.version`);
   assertNonEmptyString(manifest.display_name, `${MANIFEST_PATH}.display_name`);
+}
+
+function validateLocalExecuta(executa) {
+  assertNonEmptyString(executa.slug, `${EXECUTA_PATH}.slug`);
+  assertNonEmptyString(executa.tool_id, `${EXECUTA_PATH}.tool_id`);
+}
+
+async function writeJson(relativePath, value) {
+  await writeText(relativePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 async function main() {
   const manifest = await readJson(MANIFEST_PATH);
   validateToolManifest(manifest);
+  const executa = await readJson(EXECUTA_PATH);
+  validateLocalExecuta(executa);
+  executa.name = manifest.display_name;
+  executa.version = manifest.version;
+  if (typeof manifest.description === "string" && manifest.description.length > 0) {
+    executa.description = manifest.description;
+  }
+  await writeJson(EXECUTA_PATH, executa);
+
   const tool = {
     manifest,
+    localExecuta: executa,
     pyprojectPath: PYPROJECT_PATH,
     uvLockPath: UV_LOCK_PATH,
     pythonScriptTarget: PYTHON_SCRIPT_TARGET,

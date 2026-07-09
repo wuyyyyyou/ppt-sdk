@@ -18,7 +18,7 @@ def read_json(path: Path) -> dict[str, Any]:
 
 def read_tool_manifest(path: Path) -> dict[str, Any]:
     manifest = read_json(path)
-    for key in ("name", "version"):
+    for key in ("display_name", "version"):
         value = manifest.get(key)
         if not isinstance(value, str) or not value:
             raise ValueError(f"Tool manifest must include a non-empty {key}: {path}")
@@ -32,7 +32,7 @@ def build_distribution_manifest(
 ) -> dict[str, Any]:
     windows_binary_name = f"{binary_name}.exe"
     return {
-        "name": tool_manifest["name"],
+        "display_name": tool_manifest["display_name"],
         "version": tool_manifest["version"],
         "runtime": {
             "binary": {

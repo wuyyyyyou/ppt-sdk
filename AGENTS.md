@@ -77,14 +77,18 @@ manifest.json -> deck.html -> ppt-model.json -> .pptx
 - [`ppt-app/manifest.json`](ppt-app/manifest.json) 的 `ui.host_api.tools`：固定为 `required:bundled:<handle>`
 - [`ppt-app/app.json`](ppt-app/app.json) 的 `bundled_executas`
 - [`ppt-app/executas/*/executa.json`](ppt-app/executas/) 的真实 `tool_id`
-- 真实插件 `describe` 返回的 manifest `name`
+- [`ppt-app/executas/*/executa.json`](ppt-app/executas/) 的发布元数据 `name`、`version`、`description`
+- 真实插件 `describe` 返回的 manifest `display_name` 和 `version`
+
+各 Executa 的 `manifest.json` 是 JSON-RPC `describe` 返回的 tool protocol manifest，
+不再承载真实 `tool_id`；真实 `tool_id` 只放在对应 `executa.json`。
 
 当前真实 ID：
 
 ```text
-ppt-engine:  tool-lightvoss_5433-ppt-engine-6443rj2a
-ppt-gener:   tool-lightvoss_5433-ppt-gener-dc7ftcep
-anna-search: tool-lightvoss-anna-search-xkx84a3z
+ppt-engine:  tool-lightvoss-ppt-engine-kqhra9hy
+ppt-gener:   tool-lightvoss-ppt-gener-2r765c57
+anna-search: tool-lightvoss-anna-search-7ym3jyqv
 ```
 
 ## 开发与运行

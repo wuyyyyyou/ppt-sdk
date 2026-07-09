@@ -33,7 +33,6 @@ read_manifest_value() {
   python -c 'import json, sys; print(json.load(open("manifest.json", encoding="utf-8"))[sys.argv[1]])' "$key"
 }
 
-PLUGIN_NAME="$(read_manifest_value name)"
 PLUGIN_VERSION="$(read_manifest_value version)"
 
 for arg in "$@"; do
@@ -208,7 +207,7 @@ ARCHIVE_EXT="tar.gz"
 if [[ "$PLATFORM" == "windows" ]]; then
   ARCHIVE_EXT="zip"
 fi
-ARCHIVE_NAME="${PLUGIN_NAME}-v${PLUGIN_VERSION}-${PLATFORM_KEY}.${ARCHIVE_EXT}"
+ARCHIVE_NAME="${BINARY_NAME}-v${PLUGIN_VERSION}-${PLATFORM_KEY}.${ARCHIVE_EXT}"
 ARCHIVE_PATH="$BUNDLE_DIR/$ARCHIVE_NAME"
 
 echo "[1/7] Ensuring runtime and build dependencies..."

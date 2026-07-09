@@ -25,7 +25,6 @@ async function writeToolManifest(dir: string) {
   await writeFile(
     manifestPath,
     `${JSON.stringify({
-      name: "tool-example-ppt-engine",
       display_name: "ppt-engine",
       version: "9.8.7",
       tools: [],
@@ -83,7 +82,7 @@ test("write-manifest writes the Anna binary distribution manifest", async () => 
 
   const manifest = JSON.parse(await readFile(outputPath, "utf8"));
   assert.deepEqual(manifest, {
-    name: "tool-example-ppt-engine",
+    display_name: "ppt-engine",
     version: "9.8.7",
     runtime: {
       binary: {
@@ -155,7 +154,7 @@ test("verifyArchiveDirectory accepts empty lib and data directories", async () =
   const dir = await makeTempDir();
   const extractDir = path.join(dir, "extract");
   const toolManifest = {
-    name: "tool-example-ppt-engine",
+    display_name: "ppt-engine",
     version: "9.8.7",
   };
 
@@ -180,7 +179,7 @@ test("verifyArchiveDirectory accepts Linux platform keys", async () => {
   const dir = await makeTempDir();
   const extractDir = path.join(dir, "extract");
   const toolManifest = {
-    name: "tool-example-ppt-engine",
+    display_name: "ppt-engine",
     version: "9.8.7",
   };
 
@@ -213,7 +212,7 @@ test("verify-describe validates Executa tool identity", async () => {
     jsonrpc: "2.0",
     id: 1,
     result: {
-      name: "tool-example-ppt-engine",
+      display_name: "ppt-engine",
       version: "9.8.7",
     },
   })}\n`);

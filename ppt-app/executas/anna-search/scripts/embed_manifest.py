@@ -15,7 +15,7 @@ def read_tool_manifest(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"Expected JSON object in tool manifest: {path}")
-    for key in ("name", "version"):
+    for key in ("display_name", "version"):
         value = payload.get(key)
         if not isinstance(value, str) or not value:
             raise ValueError(f"Tool manifest must include a non-empty {key}: {path}")

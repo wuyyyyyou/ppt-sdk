@@ -40,7 +40,11 @@ bundled:anna-search
 - `manifest.json` 的 `ui.host_api.tools`
 - `app.json` 的 `bundled_executas`
 - `executas/*/executa.json` 的真实本地 `tool_id`
-- 各 Executa `describe` 返回的 manifest `name`
+- `executas/*/executa.json` 的发布元数据 `name`、`version`、`description`
+- 各 Executa `describe` 返回的 manifest `display_name` 和 `version`
+
+`executas/*/manifest.json` 只作为 JSON-RPC `describe` 的 tool protocol manifest，
+不再保存真实 `tool_id`。
 
 ## 本地环境
 
@@ -129,12 +133,12 @@ npm run dev:mock-llm:retry
 
 ## 同步 manifest
 
-修改任一 Executa manifest、版本号或 tool id 后，运行：
+修改任一 Executa tool protocol manifest、版本号或 `executa.json` 里的 tool id 后，运行：
 
 ```bash
 cd ppt-app
 npm run sync:tool-manifests
 ```
 
-这个脚本会同步 app manifest、marketplace metadata 和前端生成的
-`src/api/toolManifests.generated.ts`。
+这个脚本会同步 app manifest、`executa.json` 发布元数据、package/pyproject
+入口、marketplace metadata 和前端生成的 `src/api/toolManifests.generated.ts`。

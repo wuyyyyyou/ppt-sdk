@@ -5,7 +5,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-PLUGIN_NAME="$(node -e "const fs=require('node:fs'); console.log(JSON.parse(fs.readFileSync('manifest.json','utf8')).name)")"
 PLUGIN_VERSION="$(node -e "const fs=require('node:fs'); console.log(JSON.parse(fs.readFileSync('manifest.json','utf8')).version)")"
 BINARY_NAME="ppt-engine"
 WINDOWS_BINARY_NAME="${BINARY_NAME}.exe"
@@ -207,8 +206,8 @@ extract_zip() {
 }
 
 NODE_MAJOR="$(node -p 'process.versions.node.split(`.`)[0]')"
-if [[ "$NODE_MAJOR" -lt 22 ]]; then
-  echo "Node.js 22+ is required for SEA builds. Current version: $(node -v)" >&2
+if [[ "$NODE_MAJOR" -lt 20 ]]; then
+  echo "Node.js 20+ is required for SEA builds. Current version: $(node -v)" >&2
   exit 1
 fi
 
@@ -231,7 +230,7 @@ ARCHIVE_EXT="tar.gz"
 if [[ "$PLATFORM" == "windows" ]]; then
   ARCHIVE_EXT="zip"
 fi
-ARCHIVE_NAME="${PLUGIN_NAME}-v${PLUGIN_VERSION}-${PLATFORM_KEY}.${ARCHIVE_EXT}"
+ARCHIVE_NAME="${BINARY_NAME}-v${PLUGIN_VERSION}-${PLATFORM_KEY}.${ARCHIVE_EXT}"
 ARCHIVE_PATH="$BUNDLE_DIR/$ARCHIVE_NAME"
 
 rm -rf "$BUNDLE_DIR" "$RAW_BINARY_DIR" "$RELEASE_STAGE_DIR" "$TEST_EXTRACT_DIR"

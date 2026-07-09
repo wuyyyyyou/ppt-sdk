@@ -145,11 +145,10 @@ def rpc(
     return response
 
 
-def test_describe_reads_name_and_version_from_manifest() -> None:
+def test_describe_reads_display_name_and_version_from_manifest() -> None:
     manifest = load_test_manifest()
     response = rpc("describe")
 
-    assert response["result"]["name"] == manifest["name"]
     assert response["result"]["version"] == manifest["version"]
     assert response["result"]["display_name"] == manifest["display_name"]
     assert [tool["name"] for tool in response["result"]["tools"]] == [
@@ -161,7 +160,7 @@ def test_describe_reads_name_and_version_from_manifest() -> None:
 
 
 def test_load_manifest_prefers_embedded_manifest(monkeypatch: Any) -> None:
-    embedded_manifest = {"name": "embedded", "version": "9.9.9", "tools": []}
+    embedded_manifest = {"display_name": "embedded", "version": "9.9.9", "tools": []}
     monkeypatch.setattr(plugin_module, "EMBEDDED_MANIFEST", embedded_manifest)
 
     plugin = make_plugin()

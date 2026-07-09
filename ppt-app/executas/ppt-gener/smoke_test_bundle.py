@@ -51,7 +51,7 @@ def main() -> None:
         binary_path,
         {"jsonrpc": "2.0", "method": "describe", "id": 1},
     )
-    assert describe["result"]["name"] == manifest["name"]
+    assert describe["result"]["display_name"] == manifest["display_name"]
 
     health = invoke_rpc(
         binary_path,

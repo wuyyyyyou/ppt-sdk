@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  applyLocalExecutaSync,
   applyPptAppListingSync,
   applyPptAppManifestSync,
   buildGeneratedFrontendConstants,
@@ -21,8 +22,12 @@ function repoPath(relativePath) {
 
 const tool = {
   manifest: {
-    name: "tool-lightvoss_5433-ppt-gener-dc7ftcep",
     version: "3.4.5",
+    display_name: "ppt-gener",
+    description: "Generate PPTX files.",
+  },
+  localExecuta: {
+    tool_id: "tool-lightvoss_5433-ppt-gener-dc7ftcep",
   },
   pythonPackageName: "presenton-pptx-generator-executa",
   pythonScriptTarget: "presenton_pptx_generator_plugin:main",
@@ -69,10 +74,12 @@ test("syncPyprojectText keeps script entry inside project scripts with Windows C
 test("syncPyprojectText is idempotent for the current pyproject with Windows CRLF line endings", async () => {
   const content = (await readFile(repoPath("ppt-app/executas/ppt-gener/pyproject.toml"), "utf8")).replace(/\r?\n/g, "\r\n");
   const manifest = JSON.parse(await readFile(repoPath("ppt-app/executas/ppt-gener/manifest.json"), "utf8"));
+  const localExecuta = JSON.parse(await readFile(repoPath("ppt-app/executas/ppt-gener/executa.json"), "utf8"));
 
   assert.equal(syncPyprojectText(content, {
     ...tool,
     manifest,
+    localExecuta,
   }), content);
 });
 
@@ -104,9 +111,11 @@ const tools = [
     bundledExecutaDir: "ppt-app/executas/ppt-engine",
     generatedConstName: "PPT_ENGINE_TOOL",
     manifest: {
-      name: "tool-real-engine",
       version: "3.2.1",
       display_name: "ppt-engine",
+    },
+    localExecuta: {
+      tool_id: "tool-real-engine",
     },
   },
   {
@@ -115,9 +124,11 @@ const tools = [
     bundledExecutaDir: "ppt-app/executas/ppt-gener",
     generatedConstName: "PPT_GENER_TOOL",
     manifest: {
-      name: "tool-real-gener",
       version: "3.1.1",
       display_name: "ppt-gener",
+    },
+    localExecuta: {
+      tool_id: "tool-real-gener",
     },
   },
   {
@@ -126,9 +137,11 @@ const tools = [
     bundledExecutaDir: "ppt-app/executas/anna-search",
     generatedConstName: "ANNA_SEARCH_TOOL",
     manifest: {
-      name: "tool-real-search",
       version: "0.1.0",
       display_name: "Anna Search",
+    },
+    localExecuta: {
+      tool_id: "tool-real-search",
     },
   },
 ];
@@ -190,6 +203,28 @@ test("buildGeneratedFrontendConstants emits bundled handles without real tool id
   assert.match(generated, /handle: "anna-search"/);
   assert.doesNotMatch(generated, /tool-real-engine/);
   assert.doesNotMatch(generated, /tool-real-search/);
+});
+
+test("applyLocalExecutaSync mirrors publish metadata while preserving tool id", () => {
+  const executa = applyLocalExecutaSync({
+    tool_id: "tool-keep-me",
+    name: "Old Name",
+    version: "0.0.1",
+    description: "Old description",
+  }, {
+    manifest: {
+      display_name: "New Name",
+      version: "1.2.3",
+      description: "New description",
+    },
+  });
+
+  assert.deepEqual(executa, {
+    tool_id: "tool-keep-me",
+    name: "New Name",
+    version: "1.2.3",
+    description: "New description",
+  });
 });
 
 test("anna-search executa starts through uv in the bundled project directory", async () => {
