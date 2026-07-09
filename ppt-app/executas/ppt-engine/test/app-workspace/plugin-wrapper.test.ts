@@ -134,8 +134,7 @@ test("style profile app tools are declared and routed", async () => {
   for (const [toolName, handlerName] of [
     ["app_list_style_profiles", "toolAppListStyleProfiles"],
     ["app_prepare_style_profile_creation", "toolAppPrepareStyleProfileCreation"],
-    ["app_begin_style_profile_reference_upload", "toolAppBeginStyleProfileReferenceUpload"],
-    ["app_commit_style_profile_reference_upload", "toolAppCommitStyleProfileReferenceUpload"],
+    ["app_commit_style_profile_reference_host_upload", "toolAppCommitStyleProfileReferenceHostUpload"],
     ["app_get_style_profile_creation_context", "toolAppGetStyleProfileCreationContext"],
     ["app_get_style_profile_draft_fingerprint", "toolAppGetStyleProfileDraftFingerprint"],
     ["app_get_style_profile_draft", "toolAppGetStyleProfileDraft"],
@@ -149,7 +148,11 @@ test("style profile app tools are declared and routed", async () => {
   }
 
   assert.equal(
-    getToolParameter(manifest, "app_begin_style_profile_reference_upload", "creation_id").required,
+    getToolParameter(manifest, "app_commit_style_profile_reference_host_upload", "creation_id").required,
+    true,
+  );
+  assert.equal(
+    getToolParameter(manifest, "app_commit_style_profile_reference_host_upload", "host_upload").required,
     true,
   );
   assert.equal(
@@ -167,10 +170,10 @@ test("app_get_research_evidence returns a JSON result reference", async () => {
   assert.match(source, /app_get_research_evidence:\s*toolAppGetResearchEvidence/);
   assert.match(source, /registerJsonReference\(\s*await getAppResearchEvidence/);
   assert.match(source, /"research-evidence\.json"/);
-  assert.match(source, /"result_url"/);
+  assert.match(source, /"result_upload"/);
   assert.match(
     manifest.tools.find((tool) => tool.name === "app_get_research_evidence")?.description ?? "",
-    /result_url/,
+    /result_upload/,
   );
 });
 

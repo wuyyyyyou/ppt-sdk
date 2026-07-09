@@ -207,8 +207,8 @@ extract_zip() {
 }
 
 NODE_MAJOR="$(node -p 'process.versions.node.split(`.`)[0]')"
-if [[ "$NODE_MAJOR" -lt 20 ]]; then
-  echo "Node.js 20+ is required for SEA builds. Current version: $(node -v)" >&2
+if [[ "$NODE_MAJOR" -lt 22 ]]; then
+  echo "Node.js 22+ is required for SEA builds. Current version: $(node -v)" >&2
   exit 1
 fi
 

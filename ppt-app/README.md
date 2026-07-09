@@ -46,7 +46,7 @@ bundled:anna-search
 
 需要先安装：
 
-- Node.js 20+
+- Node.js 22+
 - npm
 - uv
 - Anna App CLI（通常来自 `@anna-ai/cli`）
