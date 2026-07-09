@@ -1,12 +1,17 @@
 {
   "name": "Anna Deck",
   "slug": "anna-presenton",
+  "version": "0.1.0",
   "tagline": "Shape rough ideas into polished decks.",
   "description": "Turns notes, docs, and half-formed thoughts into a structured presentation flow, with reviewable outlines and editable slide direction.",
   "category": "productivity",
-  "homepage_url": "https://example.com/ppt-app",
-  "support_url": "https://example.com/ppt-app/support",
-  "privacy_url": "https://example.com/ppt-app/privacy",
+  "logo_file": "bundle/icon.png",
+  "screenshots": [
+    "screenshots/screenshot-1.jpg"
+  ],
+  "homepage_url": "",
+  "support_url": "",
+  "privacy_url": "",
   "pricing_model": "free",
   "bundled_executas": {
     "ppt-engine": {
