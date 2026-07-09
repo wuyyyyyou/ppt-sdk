@@ -2,9 +2,13 @@ import type { OutlineDetail, Slide } from "../../data/mockDeck";
 import type {
   ListWorkspacesResult,
   PageProgress,
+  GetStyleProfileResult,
+  GetStyleProfilePreviewResult,
+  StyleProfileIndexEntry,
   RenderDeckHtmlResult,
   TemplateSummary,
   UploadedSourceMaterial,
+  WorkspaceStyleProfileSelection,
   WorkspaceResult,
   WorkspaceSettings
 } from "../../api/types";
@@ -17,7 +21,7 @@ import type { PageReviewSettings } from "./reviewSettings";
 import type { ResearchSearchControlSettings } from "./researchSearchControl";
 
 export type MainStage = "brief" | "uploaded-source-analysis" | "outline" | "generating" | "deck";
-export type PageId = "main" | "library" | "review" | "refine" | "export";
+export type PageId = "main" | "library" | "review" | "refine" | "export" | "style-profile-creation";
 export type PanelMode = "visible" | "minimized" | "closed";
 export type RefineScope = "deck" | "slide";
 export type PreviewMode = "grid" | "organize" | "present";
@@ -110,6 +114,13 @@ export interface DeckWorkspaceState {
   workspaceSettingsSaving: boolean;
   templateGroups: TemplateSummary[];
   selectedTemplateGroupId: string | null;
+  styleProfiles: StyleProfileIndexEntry[];
+  styleProfilePreviews: Record<string, GetStyleProfilePreviewResult | undefined>;
+  selectedStyleProfile: WorkspaceStyleProfileSelection | null;
+  styleProfileLibraryLoading: boolean;
+  styleProfileLibraryError: string;
+  styleProfileCreation: StyleProfileCreationViewState;
+  styleProfileDetail: StyleProfileDetailState;
 }
 
 export type { WorkspaceSettings };
@@ -179,4 +190,42 @@ export interface UploadedSourceAnalysisProgress {
   message: string;
   records: UploadedSourceAnalysisRecord[];
   resultSummary?: UploadedSourceAnalysisResultSummary;
+}
+
+export type StyleProfileCreationRunStatus =
+  | "idle"
+  | "running"
+  | "completed"
+  | "failed"
+  | "stopped";
+
+export type StyleProfileCreationStageId = "prepare" | "analyze" | "publish";
+
+export interface StyleProfileCreationStageRecord {
+  id: StyleProfileCreationStageId;
+  label: string;
+  state: "pending" | "active" | "completed" | "failed" | "stopped";
+  summaryLines: string[];
+  activities: string[];
+  lines: string[];
+  error?: string;
+}
+
+export interface StyleProfileCreationViewState {
+  status: StyleProfileCreationRunStatus;
+  displayName: string;
+  files: File[];
+  creationId: string;
+  canRetryAnalysis: boolean;
+  message: string;
+  stages: StyleProfileCreationStageRecord[];
+  createdStyleProfileId: string;
+  error: string;
+}
+
+export interface StyleProfileDetailState {
+  status: "closed" | "loading" | "ready" | "error";
+  styleProfileId: string;
+  detail: GetStyleProfileResult | null;
+  error: string;
 }

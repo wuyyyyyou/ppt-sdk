@@ -72,6 +72,7 @@ _Avoid_: Live Style Profile Reference
 
 **Style Profile Creation**:
 The process that turns reference slide images or uploaded style-reference images into a reusable Style Profile. It is separate from Deck Generation and does not produce a Deck.
+User-facing Chinese label: 创建风格画像
 _Avoid_: Deck Generation, Uploaded Source Analysis
 
 **Page Plan**:

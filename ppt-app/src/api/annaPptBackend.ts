@@ -40,6 +40,8 @@ import type {
   CommitStyleProfileReferenceHostUploadResult,
   GetStyleProfileCreationContextResult,
   GetStyleProfileDraftResult,
+  GetStyleProfilePreviewResult,
+  GetStyleProfileResult,
   GetWorkspaceStyleProfileResult,
   ListStyleProfilesResult,
   PrepareStyleProfileCreationResult,
@@ -214,6 +216,18 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         toolIds.pptEngine,
         "app_list_style_profiles",
         {}
+      ),
+    getStyleProfilePreview: (input) =>
+      invoke<GetStyleProfilePreviewResult>(
+        toolIds.pptEngine,
+        "app_get_style_profile_preview",
+        input
+      ),
+    getStyleProfile: (input) =>
+      invoke<GetStyleProfileResult>(
+        toolIds.pptEngine,
+        "app_get_style_profile",
+        input
       ),
     prepareStyleProfileCreation: (input = {}) =>
       invoke<PrepareStyleProfileCreationResult>(

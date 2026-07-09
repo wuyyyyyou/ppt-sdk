@@ -28,6 +28,14 @@ function createRuntime(result: unknown): AnnaRuntime {
   };
 }
 
+function createRuntimeWithInvoke(invoke: AnnaRuntime["tools"]["invoke"]): AnnaRuntime {
+  return {
+    tools: { invoke },
+    llm: { complete: async () => ({}) },
+    agent: { session: async () => { throw new Error("not used"); } },
+  };
+}
+
 function createWorkspace(patch: Partial<WorkspaceResult> = {}): WorkspaceResult {
   return {
     workspace_root: "/tmp/workspaces",
@@ -130,5 +138,32 @@ describe("Anna PPT Backend", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  it("routes Style Profile preview and detail tools through ppt-engine", async () => {
+    setToolIds();
+    const calls: Array<{ method?: unknown; args?: unknown; tool_id?: unknown }> = [];
+    const backend = createAnnaPptBackend(createRuntimeWithInvoke(async (input) => {
+      calls.push(input as { method?: unknown; args?: unknown; tool_id?: unknown });
+      return {
+        success: true,
+        data: {
+          style_profile: { style_profile_id: "style-profile-1" },
+          cover_image: null,
+          reference_images: [],
+          content: "",
+          size_bytes: 0,
+          sha256: "",
+        },
+      };
+    }));
+
+    await backend.getStyleProfilePreview({ style_profile_id: "style-profile-1" });
+    await backend.getStyleProfile({ style_profile_id: "style-profile-1" });
+
+    assert.equal(calls[0]?.tool_id, "tool-ppt-engine");
+    assert.equal(calls[0]?.method, "app_get_style_profile_preview");
+    assert.deepEqual(calls[0]?.args, { style_profile_id: "style-profile-1" });
+    assert.equal(calls[1]?.method, "app_get_style_profile");
   });
 });

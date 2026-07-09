@@ -133,6 +133,8 @@ test("style profile app tools are declared and routed", async () => {
 
   for (const [toolName, handlerName] of [
     ["app_list_style_profiles", "toolAppListStyleProfiles"],
+    ["app_get_style_profile_preview", "toolAppGetStyleProfilePreview"],
+    ["app_get_style_profile", "toolAppGetStyleProfile"],
     ["app_prepare_style_profile_creation", "toolAppPrepareStyleProfileCreation"],
     ["app_commit_style_profile_reference_host_upload", "toolAppCommitStyleProfileReferenceHostUpload"],
     ["app_get_style_profile_creation_context", "toolAppGetStyleProfileCreationContext"],
@@ -146,6 +148,18 @@ test("style profile app tools are declared and routed", async () => {
     assert.match(source, new RegExp(`${toolName}:\\s*${handlerName}`));
     assert.ok(manifest.tools.some((tool) => tool.name === toolName), `Missing ${toolName}`);
   }
+
+  assert.equal(
+    getToolParameter(manifest, "app_get_style_profile_preview", "style_profile_id").required,
+    true,
+  );
+  assert.equal(
+    getToolParameter(manifest, "app_get_style_profile", "style_profile_id").required,
+    true,
+  );
+  assert.match(source, /uploadStyleProfileReferenceImagePreview/);
+  assert.match(source, /const\s+\{\s*file_path,\s*\.\.\.publicImage\s*\}\s*=\s*image/);
+  assert.match(source, /image_upload:\s*await uploadLocalFileToHost/);
 
   assert.equal(
     getToolParameter(manifest, "app_commit_style_profile_reference_host_upload", "creation_id").required,

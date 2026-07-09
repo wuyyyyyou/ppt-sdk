@@ -1,6 +1,8 @@
 {
   "schema": 2,
-  "permissions": ["tools.invoke"],
+  "permissions": [
+    "tools.invoke"
+  ],
   "required_executas": [
     {
       "tool_id": "bundled:ppt-engine",
@@ -19,7 +21,11 @@
     }
   ],
   "optional_executas": [],
-  "tags": ["presentation", "ppt", "workflow"],
+  "tags": [
+    "presentation",
+    "ppt",
+    "workflow"
+  ],
   "ui": {
     "bundle": {
       "format": "static-spa",
@@ -51,10 +57,15 @@
         "required:bundled:ppt-gener",
         "required:bundled:anna-search"
       ],
-      "upload": ["negotiate", "confirm"],
+      "upload": [
+        "negotiate",
+        "confirm"
+      ],
       "chat": [],
       "artifact": [],
-      "llm": ["complete"],
+      "llm": [
+        "complete"
+      ],
       "agent": {
         "session": {
           "auto": true,
@@ -68,11 +79,26 @@
       "window": []
     },
     "csp_overrides": {
-      "connect-src": ["'self'", "https:"],
-      "img-src": ["'self'", "data:", "blob:", "https:"],
-      "font-src": ["'self'", "data:"],
-      "style-src": ["'self'"],
-      "script-src": ["'self'"]
+      "connect-src": [
+        "'self'",
+        "https:"
+      ],
+      "img-src": [
+        "'self'",
+        "data:",
+        "blob:",
+        "https:"
+      ],
+      "font-src": [
+        "'self'",
+        "data:"
+      ],
+      "style-src": [
+        "'self'"
+      ],
+      "script-src": [
+        "'self'"
+      ]
     }
   }
 }

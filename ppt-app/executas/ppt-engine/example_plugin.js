@@ -43,6 +43,8 @@ import {
   getDiscoveredTemplateGroup,
   listAppWorkspaces,
   listAppStyleProfiles,
+  getAppStyleProfile,
+  getAppStyleProfilePreview,
   prepareAppStyleProfileCreation,
   commitAppStyleProfileReferenceUpload,
   getAppStyleProfileCreationContext,
@@ -847,6 +849,51 @@ async function toolAppCommitUploadedSourceHostUpload(args) {
 
 async function toolAppListStyleProfiles() {
   return listAppStyleProfiles();
+}
+
+async function readStyleProfileIdArg(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  if (typeof args.style_profile_id !== "string" || args.style_profile_id.trim().length === 0) {
+    throw new Error('"style_profile_id" must be a non-empty string');
+  }
+  return args.style_profile_id;
+}
+
+async function uploadStyleProfileReferenceImagePreview(image) {
+  const { file_path, ...publicImage } = image;
+  return {
+    ...publicImage,
+    image_upload: await uploadLocalFileToHost({
+      filePath: file_path,
+      filename: image.filename,
+      mimeType: image.mime_type,
+      purpose: "image_reference",
+    }),
+  };
+}
+
+async function toolAppGetStyleProfilePreview(args) {
+  const styleProfileId = await readStyleProfileIdArg(args);
+  const result = await getAppStyleProfilePreview({ style_profile_id: styleProfileId });
+  return {
+    ...result,
+    cover_image: result.cover_image
+      ? await uploadStyleProfileReferenceImagePreview(result.cover_image)
+      : null,
+  };
+}
+
+async function toolAppGetStyleProfile(args) {
+  const styleProfileId = await readStyleProfileIdArg(args);
+  const result = await getAppStyleProfile({ style_profile_id: styleProfileId });
+  return {
+    ...result,
+    reference_images: await Promise.all(
+      result.reference_images.map((image) => uploadStyleProfileReferenceImagePreview(image)),
+    ),
+  };
 }
 
 async function toolAppPrepareStyleProfileCreation(args) {
@@ -2081,6 +2128,8 @@ const TOOL_DISPATCH = {
   app_open_workspace: toolAppOpenWorkspace,
   app_commit_uploaded_source_host_upload: toolAppCommitUploadedSourceHostUpload,
   app_list_style_profiles: toolAppListStyleProfiles,
+  app_get_style_profile_preview: toolAppGetStyleProfilePreview,
+  app_get_style_profile: toolAppGetStyleProfile,
   app_prepare_style_profile_creation: toolAppPrepareStyleProfileCreation,
   app_commit_style_profile_reference_host_upload: toolAppCommitStyleProfileReferenceHostUpload,
   app_get_style_profile_creation_context: toolAppGetStyleProfileCreationContext,

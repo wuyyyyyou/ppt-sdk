@@ -20,7 +20,9 @@ import {
 import type {
   ListWorkspacesResult,
   PageProgress,
+  GetStyleProfilePreviewResult,
   PptxExportJob,
+  StyleProfileIndexEntry,
   TemplateSummary,
   UploadedSourceAnalysisDependency,
   UploadedSourceIndex,
@@ -30,6 +32,7 @@ import type {
   WorkspaceOutlineItem,
   WorkspacePageItem,
   WorkspacePages,
+  WorkspaceStyleProfileSelection,
   WorkspaceSettings
 } from "../../../api/types";
 import {
@@ -76,6 +79,11 @@ import {
   uploadedSourceDependencyMatchesAnalysis,
   type UploadedSourceAnalysis,
 } from "../../deck-generation/uploadedSourceAnalysis";
+import {
+  createStyleProfile,
+  isStyleProfileCreationCancelledError,
+  type CreateStyleProfileWorkflowEvent,
+} from "../../deck-generation/styleProfileWorkflow";
 import { reconcileInterruptedPageProgress } from "../../deck-generation/interruptedReconciliation";
 import {
   createArtifactExportProgress,
@@ -112,6 +120,9 @@ import type {
   PreviewMode,
   RefineScope,
   UploadedSourceAnalysisProgress,
+  StyleProfileCreationStageRecord,
+  StyleProfileCreationViewState,
+  StyleProfileDetailState,
   UploadedSourceAnalysisViewState
 } from "../types";
 import {
@@ -191,6 +202,152 @@ function createEmptyUploadedSourceAnalysisViewState(): UploadedSourceAnalysisVie
   };
 }
 
+function defaultStyleProfileName(date = new Date()) {
+  return `风格画像-${formatWorkspaceDate(date)}`;
+}
+
+function createStyleProfileCreationStages(): StyleProfileCreationStageRecord[] {
+  return [
+    { id: "prepare", label: "准备参考资料", state: "pending", summaryLines: [], activities: [], lines: [] },
+    { id: "analyze", label: "分析视觉风格", state: "pending", summaryLines: [], activities: [], lines: [] },
+    { id: "publish", label: "发布风格画像", state: "pending", summaryLines: [], activities: [], lines: [] },
+  ];
+}
+
+function createIdleStyleProfileCreationState(): StyleProfileCreationViewState {
+  return {
+    status: "idle",
+    displayName: defaultStyleProfileName(),
+    files: [],
+    creationId: "",
+    canRetryAnalysis: false,
+    message: "上传 PPTX 或图片参考资料后开始分析。",
+    stages: createStyleProfileCreationStages(),
+    createdStyleProfileId: "",
+    error: "",
+  };
+}
+
+function updateStyleProfileStage(
+  stages: StyleProfileCreationStageRecord[],
+  id: StyleProfileCreationStageRecord["id"],
+  patch: Partial<StyleProfileCreationStageRecord>,
+) {
+  return stages.map((stage) => stage.id === id ? { ...stage, ...patch } : stage);
+}
+
+function appendBounded(items: string[], value: string, limit: number) {
+  const trimmed = value.trim();
+  if (!trimmed) return items;
+  return [...items, trimmed].slice(-limit);
+}
+
+function appendStreamText(lines: string[], text: string) {
+  if (!text) return lines;
+  const current = lines.length > 0 ? lines.slice() : [""];
+  const parts = text.split(/\r?\n/);
+  current[current.length - 1] = `${current[current.length - 1]}${parts[0] ?? ""}`;
+  for (const part of parts.slice(1)) current.push(part);
+  return current.slice(-80);
+}
+
+function applyStyleProfileCreationEvent(
+  current: StyleProfileCreationViewState,
+  event: CreateStyleProfileWorkflowEvent,
+): StyleProfileCreationViewState {
+  if (event.type === "creation-prepared") {
+    return {
+      ...current,
+      creationId: event.creationId,
+      displayName: event.displayName,
+    };
+  }
+  if (event.type === "phase-start") {
+    return {
+      ...current,
+      message: event.message,
+      stages: updateStyleProfileStage(current.stages, event.phase, {
+        state: "active",
+        error: "",
+        summaryLines: appendBounded(
+          current.stages.find((stage) => stage.id === event.phase)?.summaryLines ?? [],
+          event.message,
+          6,
+        ),
+      }),
+    };
+  }
+  if (event.type === "phase-complete") {
+    return {
+      ...current,
+      message: event.message,
+      stages: updateStyleProfileStage(current.stages, event.phase, {
+        state: "completed",
+        summaryLines: appendBounded(
+          current.stages.find((stage) => stage.id === event.phase)?.summaryLines ?? [],
+          event.message,
+          6,
+        ),
+      }),
+    };
+  }
+  if (event.type === "phase-error") {
+    return {
+      ...current,
+      status: "failed",
+      canRetryAnalysis: event.phase === "analyze" || event.phase === "publish",
+      message: event.message,
+      error: event.message,
+      stages: updateStyleProfileStage(current.stages, event.phase, {
+        state: "failed",
+        error: event.message,
+      }),
+    };
+  }
+  if (event.type === "attempt") {
+    const analyze = current.stages.find((stage) => stage.id === "analyze");
+    return {
+      ...current,
+      message: event.message,
+      stages: updateStyleProfileStage(current.stages, "analyze", {
+        state: "active",
+        activities: appendBounded(analyze?.activities ?? [], `${event.message}（第 ${event.attempt} 次）`, 20),
+      }),
+    };
+  }
+  const analyze = current.stages.find((stage) => stage.id === "analyze");
+  if (event.event.type === "content") {
+    return {
+      ...current,
+      stages: updateStyleProfileStage(current.stages, "analyze", {
+        lines: appendStreamText(analyze?.lines ?? [], event.event.text),
+      }),
+    };
+  }
+  if (event.event.type === "activity") {
+    return {
+      ...current,
+      stages: updateStyleProfileStage(current.stages, "analyze", {
+        activities: appendBounded(analyze?.activities ?? [], event.event.message, 20),
+      }),
+    };
+  }
+  if (event.event.type === "error") {
+    return {
+      ...current,
+      stages: updateStyleProfileStage(current.stages, "analyze", {
+        activities: appendBounded(analyze?.activities ?? [], event.event.message, 20),
+      }),
+    };
+  }
+  return {
+    ...current,
+    stages: updateStyleProfileStage(current.stages, "analyze", {
+      activities: appendBounded(analyze?.activities ?? [], "Agent run completed", 20),
+    }),
+  };
+}
+
 export interface DeckWorkspaceActions {
   setPanelMode: (mode: PanelMode) => void;
   setPrompt: (value: string) => void;
@@ -233,6 +390,19 @@ export interface DeckWorkspaceActions {
   createWorkspace: () => Promise<void>;
   uploadUploadedSource: (file: File) => Promise<void>;
   removeUploadedSource: (uploadedSourceId: string) => Promise<void>;
+  openStyleProfileCreation: () => void;
+  setStyleProfileCreationName: (value: string) => void;
+  setStyleProfileCreationFiles: (files: File[]) => void;
+  startStyleProfileCreation: () => Promise<void>;
+  retryStyleProfileAnalysis: () => Promise<void>;
+  stopStyleProfileCreation: () => void;
+  resetStyleProfileCreation: () => void;
+  refreshStyleProfiles: () => Promise<void>;
+  loadStyleProfilePreview: (styleProfileId: string) => Promise<void>;
+  openStyleProfileDetail: (styleProfileId: string) => Promise<void>;
+  closeStyleProfileDetail: () => void;
+  selectStyleProfile: (styleProfileId: string) => Promise<void>;
+  clearStyleProfile: () => Promise<void>;
   saveWorkspaceSettings: (setting: WorkspaceSettings) => Promise<void>;
   saveWorkspaceTitle: (title: string) => Promise<void>;
   selectTemplate: (groupId: string) => Promise<void>;
@@ -324,6 +494,22 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [workspaceSettingsSaving, setWorkspaceSettingsSaving] = useState(false);
   const [templateGroups, setTemplateGroups] = useState<TemplateSummary[]>([]);
   const [selectedTemplateGroupId, setSelectedTemplateGroupId] = useState<string | null>(DEFAULT_TEMPLATE_GROUP_ID);
+  const [styleProfiles, setStyleProfiles] = useState<StyleProfileIndexEntry[]>([]);
+  const [styleProfilePreviews, setStyleProfilePreviews] =
+    useState<Record<string, GetStyleProfilePreviewResult | undefined>>({});
+  const [selectedStyleProfile, setSelectedStyleProfile] =
+    useState<WorkspaceStyleProfileSelection | null>(null);
+  const [styleProfileLibraryLoading, setStyleProfileLibraryLoading] = useState(false);
+  const [styleProfileLibraryError, setStyleProfileLibraryError] = useState("");
+  const [styleProfileCreation, setStyleProfileCreation] =
+    useState<StyleProfileCreationViewState>(() => createIdleStyleProfileCreationState());
+  const [styleProfileDetail, setStyleProfileDetail] = useState<StyleProfileDetailState>({
+    status: "closed",
+    styleProfileId: "",
+    detail: null,
+    error: "",
+  });
+  const styleProfileCreationAbortRef = useRef<AbortController | null>(null);
   const aiLogger = useMemo(() => backend ? createAiInteractionLogger(backend) : null, [backend]);
 
   function getDefaultWorkspaceTitle(date = new Date()) {
@@ -970,6 +1156,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   ) {
     setCurrentWorkspace(workspace);
     void refreshUploadedSources(workspace);
+    if (backend) {
+      void backend.getWorkspaceStyleProfile({ workspace_dir: workspace.workspace_dir })
+        .then((result) => setSelectedStyleProfile(result.selection))
+        .catch(() => setSelectedStyleProfile(null));
+    }
     setPageReviewSettings(workspacePageReviewSettings(workspace));
     setResearchSearchControlSettingsState(workspaceResearchSearchControlSettings(workspace));
     if (!exportInFlightRef.current) {
@@ -1080,6 +1271,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         const templates = await nextBackend.listTemplates();
         if (cancelled) return;
         setTemplateGroups(templates.templates);
+        const profileList = await nextBackend.listStyleProfiles();
+        if (cancelled) return;
+        setStyleProfiles(profileList.profiles);
       } catch (error) {
         if (!cancelled) {
           setWorkspaceError(
@@ -3367,6 +3561,217 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
+  function openStyleProfileCreation() {
+    setPage("style-profile-creation");
+    setHistory((items) => (items.at(-1) === "style-profile-creation" ? items : [...items, "style-profile-creation"]));
+    void refreshStyleProfiles();
+  }
+
+  function resetStyleProfileCreation() {
+    styleProfileCreationAbortRef.current?.abort();
+    styleProfileCreationAbortRef.current = null;
+    setStyleProfileCreation(createIdleStyleProfileCreationState());
+  }
+
+  function setStyleProfileCreationName(value: string) {
+    setStyleProfileCreation((current) => ({ ...current, displayName: value }));
+  }
+
+  function setStyleProfileCreationFiles(files: File[]) {
+    setStyleProfileCreation((current) => ({
+      ...current,
+      files,
+      error: "",
+      message: files.length > 0 ? `已选择 ${files.length} 个参考资料。` : "上传 PPTX 或图片参考资料后开始分析。",
+    }));
+  }
+
+  async function refreshStyleProfiles() {
+    if (!backend) return;
+    setStyleProfileLibraryLoading(true);
+    setStyleProfileLibraryError("");
+    try {
+      const result = await backend.listStyleProfiles();
+      setStyleProfiles(result.profiles);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "风格画像库加载失败。";
+      setStyleProfileLibraryError(message);
+    } finally {
+      setStyleProfileLibraryLoading(false);
+    }
+  }
+
+  async function loadStyleProfilePreview(styleProfileId: string) {
+    if (!backend || styleProfilePreviews[styleProfileId]) return;
+    try {
+      const preview = await backend.getStyleProfilePreview({ style_profile_id: styleProfileId });
+      setStyleProfilePreviews((current) => ({ ...current, [styleProfileId]: preview }));
+    } catch (error) {
+      console.warn("Failed to load Style Profile preview", error);
+    }
+  }
+
+  async function openStyleProfileDetail(styleProfileId: string) {
+    if (!backend) return;
+    setStyleProfileDetail({ status: "loading", styleProfileId, detail: null, error: "" });
+    try {
+      const detail = await backend.getStyleProfile({ style_profile_id: styleProfileId });
+      setStyleProfileDetail({ status: "ready", styleProfileId, detail, error: "" });
+    } catch (error) {
+      setStyleProfileDetail({
+        status: "error",
+        styleProfileId,
+        detail: null,
+        error: error instanceof Error ? error.message : "风格画像详情加载失败。",
+      });
+    }
+  }
+
+  function closeStyleProfileDetail() {
+    setStyleProfileDetail({ status: "closed", styleProfileId: "", detail: null, error: "" });
+  }
+
+  async function runStyleProfileCreation(options: { retryAnalysis: boolean }) {
+    if (!backend || !hostUploadClient || !agentClient) {
+      showToast("风格画像创建能力尚未就绪。");
+      return;
+    }
+    const displayName = styleProfileCreation.displayName.trim();
+    if (!displayName) {
+      showToast("请填写风格画像名称。");
+      return;
+    }
+    if (!options.retryAnalysis && styleProfileCreation.files.length === 0) {
+      showToast("请先上传 PPTX 或图片参考资料。");
+      return;
+    }
+    const abortController = new AbortController();
+    styleProfileCreationAbortRef.current = abortController;
+    setStyleProfileCreation((current) => ({
+      ...current,
+      status: "running",
+      displayName,
+      error: "",
+      canRetryAnalysis: false,
+      createdStyleProfileId: "",
+      message: options.retryAnalysis ? "正在重试分析视觉风格。" : "正在准备参考资料。",
+      stages: options.retryAnalysis
+        ? current.stages.map((stage) => (
+            stage.id === "analyze" || stage.id === "publish"
+              ? { ...stage, state: "pending", error: "", activities: [], lines: [], summaryLines: [] }
+              : stage
+          ))
+        : createStyleProfileCreationStages(),
+    }));
+    try {
+      const result = await createStyleProfile({
+        backend,
+        hostUploadClient,
+        agentClient,
+        displayName,
+        files: options.retryAnalysis ? [] : styleProfileCreation.files,
+        creationId: options.retryAnalysis ? styleProfileCreation.creationId : undefined,
+        skipUpload: options.retryAnalysis,
+        signal: abortController.signal,
+        isCancelled: () => abortController.signal.aborted,
+        onProgress: (event) => {
+          setStyleProfileCreation((current) => applyStyleProfileCreationEvent(current, event));
+        },
+      });
+      setStyleProfileCreation((current) => ({
+        ...current,
+        status: "completed",
+        creationId: result.creationContext.creation_id,
+        createdStyleProfileId: result.publishResult.style_profile.style_profile_id,
+        canRetryAnalysis: false,
+        message: "创建成功。",
+        stages: current.stages.map((stage) => ({ ...stage, state: stage.state === "pending" ? "completed" : stage.state })),
+      }));
+      setStyleProfiles(result.publishResult.index.profiles);
+      setStyleProfilePreviews((current) => {
+        const next = { ...current };
+        delete next[result.publishResult.style_profile.style_profile_id];
+        return next;
+      });
+      void loadStyleProfilePreview(result.publishResult.style_profile.style_profile_id);
+      showToast("风格画像创建成功。");
+    } catch (error) {
+      if (isStyleProfileCreationCancelledError(error) || abortController.signal.aborted) {
+        setStyleProfileCreation((current) => ({
+          ...current,
+          status: "stopped",
+          message: "已停止。",
+          stages: current.stages.map((stage) =>
+            stage.state === "active" ? { ...stage, state: "stopped" } : stage
+          ),
+        }));
+        return;
+      }
+      const message = error instanceof Error ? error.message : "风格画像创建失败。";
+      setStyleProfileCreation((current) => ({
+        ...current,
+        status: "failed",
+        error: message,
+        message,
+        canRetryAnalysis: Boolean(current.creationId),
+      }));
+      showToast(message);
+    } finally {
+      if (styleProfileCreationAbortRef.current === abortController) {
+        styleProfileCreationAbortRef.current = null;
+      }
+    }
+  }
+
+  async function startStyleProfileCreation() {
+    await runStyleProfileCreation({ retryAnalysis: false });
+  }
+
+  async function retryStyleProfileAnalysis() {
+    await runStyleProfileCreation({ retryAnalysis: true });
+  }
+
+  function stopStyleProfileCreation() {
+    styleProfileCreationAbortRef.current?.abort();
+  }
+
+  async function selectStyleProfile(styleProfileId: string) {
+    if (!backend || !currentWorkspace) return;
+    if (hasDownstreamArtifacts(currentWorkspace)) {
+      const ok = window.confirm("更换风格画像后，当前成稿会标记为需要重新生成。是否继续？");
+      if (!ok) return;
+    }
+    try {
+      const result = await backend.selectWorkspaceStyleProfile({
+        workspace_dir: currentWorkspace.workspace_dir,
+        style_profile_id: styleProfileId,
+      });
+      setSelectedStyleProfile(result.selection);
+      applyWorkspace(result.workspace);
+      showToast("已选择风格画像，当前成稿需要重新生成。");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "风格画像选择失败。");
+    }
+  }
+
+  async function clearStyleProfile() {
+    if (!backend || !currentWorkspace || !selectedStyleProfile) return;
+    if (hasDownstreamArtifacts(currentWorkspace)) {
+      const ok = window.confirm("清除风格画像后，当前成稿会标记为需要重新生成。是否继续？");
+      if (!ok) return;
+    }
+    try {
+      const result = await backend.clearWorkspaceStyleProfile({
+        workspace_dir: currentWorkspace.workspace_dir,
+      });
+      setSelectedStyleProfile(null);
+      applyWorkspace(result.workspace);
+      showToast("已清除风格画像，当前成稿需要重新生成。");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "风格画像清除失败。");
+    }
+  }
+
   const state: DeckWorkspaceState = {
     panelMode,
     page,
@@ -3408,7 +3813,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     workspaceError,
     workspaceSettingsSaving,
     templateGroups,
-    selectedTemplateGroupId
+    selectedTemplateGroupId,
+    styleProfiles,
+    styleProfilePreviews,
+    selectedStyleProfile,
+    styleProfileLibraryLoading,
+    styleProfileLibraryError,
+    styleProfileCreation,
+    styleProfileDetail,
   };
 
   const actions: DeckWorkspaceActions = {
@@ -3453,6 +3865,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     createWorkspace,
     uploadUploadedSource,
     removeUploadedSource,
+    openStyleProfileCreation,
+    setStyleProfileCreationName,
+    setStyleProfileCreationFiles,
+    startStyleProfileCreation,
+    retryStyleProfileAnalysis,
+    stopStyleProfileCreation,
+    resetStyleProfileCreation,
+    refreshStyleProfiles,
+    loadStyleProfilePreview,
+    openStyleProfileDetail,
+    closeStyleProfileDetail,
+    selectStyleProfile,
+    clearStyleProfile,
     saveWorkspaceSettings,
     saveWorkspaceTitle,
     selectTemplate,

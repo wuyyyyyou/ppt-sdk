@@ -9,6 +9,7 @@ import { PanelHeader } from "../features/deck-workspace/components/PanelHeader";
 import { ProgressLine } from "../features/deck-workspace/components/ProgressLine";
 import { RefinePage } from "../features/deck-workspace/components/RefinePage";
 import { ReviewPage } from "../features/deck-workspace/components/ReviewPage";
+import { StyleProfileCreationPage } from "../features/deck-workspace/components/StyleProfilePage";
 import { UploadedSourceAnalysisPage } from "../features/deck-workspace/components/UploadedSourceAnalysisPage";
 import { WorkspaceDialog } from "../features/deck-workspace/components/WorkspaceDialog";
 import { useDeckWorkspace } from "../features/deck-workspace/hooks/useDeckWorkspace";
@@ -44,16 +45,19 @@ export function App() {
       <section className={`deck-panel ${state.panelMode === "visible" ? "visible" : ""}`}>
         <div className={`toast ${state.toast ? "visible" : ""}`}>{state.toast}</div>
 
-        <WorkspaceDialog
-          locale={locale}
-          scan={state.workspaceScan}
-          task={state.currentWorkspace}
-          loading={state.workspaceLoading}
-          error={state.workspaceError}
-          onUseLatest={actions.useLatestWorkspace}
-          onCreate={actions.createWorkspace}
-          onOpen={actions.openWorkspace}
-        />
+        {state.page !== "style-profile-creation" ? (
+          <WorkspaceDialog
+            locale={locale}
+            scan={state.workspaceScan}
+            task={state.currentWorkspace}
+            loading={state.workspaceLoading}
+            error={state.workspaceError}
+            onUseLatest={actions.useLatestWorkspace}
+            onCreate={actions.createWorkspace}
+            onCreateStyleProfile={actions.openStyleProfileCreation}
+            onOpen={actions.openWorkspace}
+          />
+        ) : null}
 
         <PanelHeader
           t={t}
@@ -83,8 +87,20 @@ export function App() {
               setPrompt={actions.setPrompt}
               templates={state.templateGroups}
               selectedTemplateGroupId={state.selectedTemplateGroupId}
+              styleProfiles={state.styleProfiles}
+              styleProfilePreviews={state.styleProfilePreviews}
+              selectedStyleProfile={state.selectedStyleProfile}
+              styleProfileLibraryLoading={state.styleProfileLibraryLoading}
+              styleProfileLibraryError={state.styleProfileLibraryError}
+              styleProfileDetail={state.styleProfileDetail}
               loading={state.loading}
               selectTemplate={actions.selectTemplate}
+              refreshStyleProfiles={actions.refreshStyleProfiles}
+              loadStyleProfilePreview={actions.loadStyleProfilePreview}
+              openStyleProfileDetail={actions.openStyleProfileDetail}
+              closeStyleProfileDetail={actions.closeStyleProfileDetail}
+              selectStyleProfile={actions.selectStyleProfile}
+              clearStyleProfile={actions.clearStyleProfile}
               reviewOutlineFirst={state.reviewOutlineFirst}
               setReviewOutlineFirst={actions.setReviewOutlineFirst}
               pageReviewSettings={state.pageReviewSettings}
@@ -240,6 +256,28 @@ export function App() {
               loading={state.loading}
               onBack={actions.goBack}
               onExport={actions.exportFile}
+            />
+          ) : null}
+
+          {state.page === "style-profile-creation" ? (
+            <StyleProfileCreationPage
+              creation={state.styleProfileCreation}
+              profiles={state.styleProfiles}
+              previews={state.styleProfilePreviews}
+              libraryLoading={state.styleProfileLibraryLoading}
+              libraryError={state.styleProfileLibraryError}
+              detail={state.styleProfileDetail}
+              onBack={actions.showWorkspacePicker}
+              onNameChange={actions.setStyleProfileCreationName}
+              onFilesChange={actions.setStyleProfileCreationFiles}
+              onStart={actions.startStyleProfileCreation}
+              onRetry={actions.retryStyleProfileAnalysis}
+              onStop={actions.stopStyleProfileCreation}
+              onReset={actions.resetStyleProfileCreation}
+              onRefreshLibrary={actions.refreshStyleProfiles}
+              onLoadPreview={actions.loadStyleProfilePreview}
+              onOpenDetail={actions.openStyleProfileDetail}
+              onCloseDetail={actions.closeStyleProfileDetail}
             />
           ) : null}
         </div>

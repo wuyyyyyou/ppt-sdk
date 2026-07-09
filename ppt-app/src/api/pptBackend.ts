@@ -68,6 +68,8 @@ import type {
   ClearWorkspaceStyleProfileResult,
   CommitStyleProfileReferenceHostUploadInput,
   CommitStyleProfileReferenceHostUploadResult,
+  GetStyleProfilePreviewResult,
+  GetStyleProfileResult,
   GetStyleProfileCreationContextResult,
   StyleProfileDraftFingerprint,
   GetStyleProfileDraftResult,
@@ -99,6 +101,8 @@ export interface PptBackend {
   openWorkspace(input: OpenWorkspaceInput): Promise<WorkspaceResult>;
   commitUploadedSourceHostUpload(input: CommitUploadedSourceHostUploadInput): Promise<CommitUploadedSourceHostUploadResult>;
   listStyleProfiles(): Promise<ListStyleProfilesResult>;
+  getStyleProfilePreview(input: { style_profile_id: string }): Promise<GetStyleProfilePreviewResult>;
+  getStyleProfile(input: { style_profile_id: string }): Promise<GetStyleProfileResult>;
   prepareStyleProfileCreation(input?: PrepareStyleProfileCreationInput): Promise<PrepareStyleProfileCreationResult>;
   commitStyleProfileReferenceHostUpload(input: CommitStyleProfileReferenceHostUploadInput): Promise<CommitStyleProfileReferenceHostUploadResult>;
   getStyleProfileCreationContext(input: { creation_id: string }): Promise<GetStyleProfileCreationContextResult>;

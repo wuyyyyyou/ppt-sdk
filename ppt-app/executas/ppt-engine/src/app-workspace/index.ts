@@ -67,6 +67,11 @@ import type {
   ListAppUploadedSourcesInput,
   ListAppUploadedSourcesResult,
   ListAppStyleProfilesResult,
+  AppStyleProfileReferenceImagePreview,
+  GetAppStyleProfileInput,
+  GetAppStyleProfilePreviewInput,
+  GetAppStyleProfilePreviewResult,
+  GetAppStyleProfileResult,
   GetAppStyleProfileCreationContextInput,
   GetAppStyleProfileCreationContextResult,
   GetAppStyleProfileDraftFingerprintInput,
@@ -1950,6 +1955,14 @@ function buildWorkspaceStyleProfilePaths(workspaceDir: string) {
   };
 }
 
+function getImageMimeType(filePath: string): string {
+  const extension = path.extname(filePath).trim().toLowerCase();
+  if (extension === ".jpg" || extension === ".jpeg") return "image/jpeg";
+  if (extension === ".webp") return "image/webp";
+  if (extension === ".gif") return "image/gif";
+  return "image/png";
+}
+
 async function markWorkspaceRenderedPagesStaleIfPresent(
   workspace: AppWorkspaceResult,
   updatedAt: string,
@@ -2303,6 +2316,79 @@ export async function listAppStyleProfiles(): Promise<ListAppStyleProfilesResult
     library_dir: STYLE_PROFILE_LIBRARY_DIR,
     index,
     profiles: index.profiles,
+  };
+}
+
+async function readPublishedStyleProfileEntry(styleProfileId: string): Promise<AppStyleProfileIndexEntry> {
+  const normalizedId = assertStyleProfileId(styleProfileId);
+  const index = await readStyleProfileIndex();
+  const profile = index.profiles.find((item) => item.style_profile_id === normalizedId);
+  if (!profile) {
+    throw new Error(`Style Profile not found: ${normalizedId}`);
+  }
+  return profile;
+}
+
+async function listStyleProfileReferenceImagePreviews(
+  styleProfileId: string,
+): Promise<AppStyleProfileReferenceImagePreview[]> {
+  const storage = buildStyleProfileStoragePaths(styleProfileId);
+  let filenames: string[];
+  try {
+    filenames = await readdir(storage.references_dir);
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
+
+  const previews = await Promise.all(
+    filenames
+      .filter((filename) => /\.(?:png|jpe?g|webp|gif)$/i.test(filename))
+      .sort((left, right) => left.localeCompare(right))
+      .map(async (filename, index): Promise<AppStyleProfileReferenceImagePreview | null> => {
+        const filePath = path.join(storage.references_dir, filename);
+        if (!isPathInsideDir(storage.references_dir, filePath)) return null;
+        const imageStat = await stat(filePath).catch(() => null);
+        if (!imageStat?.isFile()) return null;
+        return {
+          reference_image_id: `${styleProfileId}-reference-${String(index + 1).padStart(3, "0")}`,
+          file_path: filePath,
+          filename,
+          mime_type: getImageMimeType(filePath),
+          size_bytes: imageStat.size,
+          order: index + 1,
+        };
+      }),
+  );
+  return previews.filter((item): item is AppStyleProfileReferenceImagePreview => item !== null);
+}
+
+export async function getAppStyleProfilePreview(
+  input: GetAppStyleProfilePreviewInput,
+): Promise<GetAppStyleProfilePreviewResult> {
+  const styleProfile = await readPublishedStyleProfileEntry(input.style_profile_id);
+  const referenceImages = await listStyleProfileReferenceImagePreviews(styleProfile.style_profile_id);
+  return {
+    style_profile: styleProfile,
+    cover_image: referenceImages[0] ?? null,
+  };
+}
+
+export async function getAppStyleProfile(
+  input: GetAppStyleProfileInput,
+): Promise<GetAppStyleProfileResult> {
+  const styleProfile = await readPublishedStyleProfileEntry(input.style_profile_id);
+  const content = await readFile(styleProfile.profile_path, "utf8");
+  const sizeBytes = Buffer.byteLength(content, "utf8");
+  const sha256 = sha256Hex(content);
+  return {
+    style_profile: styleProfile,
+    content,
+    size_bytes: sizeBytes,
+    sha256,
+    reference_images: await listStyleProfileReferenceImagePreviews(styleProfile.style_profile_id),
   };
 }
 

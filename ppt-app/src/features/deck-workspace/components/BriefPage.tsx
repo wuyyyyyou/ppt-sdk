@@ -1,9 +1,16 @@
 import { AlertTriangle, Check, CheckCircle2, ChevronDown, File, HelpCircle, ImageIcon, Search, Sparkles, Upload, X } from "lucide-react";
 import { useRef, useState, type ChangeEvent } from "react";
-import type { TemplateSummary, UploadedSourceMaterial } from "../../../api/types";
+import type {
+  GetStyleProfilePreviewResult,
+  StyleProfileIndexEntry,
+  TemplateSummary,
+  UploadedSourceMaterial,
+  WorkspaceStyleProfileSelection,
+} from "../../../api/types";
 import type { Messages } from "../../../i18n/messages";
-import type { ContextRow, LoadingKind } from "../types";
+import type { ContextRow, LoadingKind, StyleProfileDetailState } from "../types";
 import { TemplatePreviewModal } from "./TemplatePreviewModal";
+import { StyleProfileBriefSelection } from "./StyleProfilePage";
 import { isStrictReviewModeEnabled, type PageReviewSettings } from "../reviewSettings";
 import type { ResearchSearchControlSettings } from "../researchSearchControl";
 import { filterSelectableTemplates } from "../templateSelectionPolicy";
@@ -17,8 +24,20 @@ interface BriefPageProps {
   setPrompt: (value: string) => void;
   templates: TemplateSummary[];
   selectedTemplateGroupId: string | null;
+  styleProfiles: StyleProfileIndexEntry[];
+  styleProfilePreviews: Record<string, GetStyleProfilePreviewResult | undefined>;
+  selectedStyleProfile: WorkspaceStyleProfileSelection | null;
+  styleProfileLibraryLoading: boolean;
+  styleProfileLibraryError: string;
+  styleProfileDetail: StyleProfileDetailState;
   loading: LoadingKind;
   selectTemplate: (groupId: string) => Promise<void>;
+  refreshStyleProfiles: () => Promise<void>;
+  loadStyleProfilePreview: (styleProfileId: string) => Promise<void>;
+  openStyleProfileDetail: (styleProfileId: string) => Promise<void>;
+  closeStyleProfileDetail: () => void;
+  selectStyleProfile: (styleProfileId: string) => Promise<void>;
+  clearStyleProfile: () => Promise<void>;
   reviewOutlineFirst: boolean;
   setReviewOutlineFirst: (value: boolean) => void;
   pageReviewSettings: PageReviewSettings;
@@ -45,8 +64,20 @@ export function BriefPage(props: BriefPageProps) {
     setPrompt,
     templates,
     selectedTemplateGroupId,
+    styleProfiles,
+    styleProfilePreviews,
+    selectedStyleProfile,
+    styleProfileLibraryLoading,
+    styleProfileLibraryError,
+    styleProfileDetail,
     loading,
     selectTemplate,
+    refreshStyleProfiles,
+    loadStyleProfilePreview,
+    openStyleProfileDetail,
+    closeStyleProfileDetail,
+    selectStyleProfile,
+    clearStyleProfile,
     reviewOutlineFirst,
     setReviewOutlineFirst,
     pageReviewSettings,
@@ -66,6 +97,7 @@ export function BriefPage(props: BriefPageProps) {
     generateDeck,
   } = props;
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [styleProfilePickerOpen, setStyleProfilePickerOpen] = useState(false);
   const [strictReviewConfirmOpen, setStrictReviewConfirmOpen] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const isCreating =
@@ -302,9 +334,22 @@ export function BriefPage(props: BriefPageProps) {
             </button>
             <button
               className={`chip-btn ${templatePickerOpen ? "active" : ""}`}
-              onClick={() => setTemplatePickerOpen((value) => !value)}
+              onClick={() => {
+                setTemplatePickerOpen((value) => !value);
+                setStyleProfilePickerOpen(false);
+              }}
             >
               {t.brief.chips.template}
+            </button>
+            <button
+              className={`chip-btn ${styleProfilePickerOpen ? "active" : ""}`}
+              onClick={() => {
+                setStyleProfilePickerOpen((value) => !value);
+                setTemplatePickerOpen(false);
+                void refreshStyleProfiles();
+              }}
+            >
+              风格画像
             </button>
           </div>
           <input
@@ -326,6 +371,23 @@ export function BriefPage(props: BriefPageProps) {
             selectedTemplateGroupId={selectedTemplateGroupId}
             loading={loading}
             selectTemplate={selectTemplate}
+          />
+        ) : null}
+
+        {styleProfilePickerOpen ? (
+          <StyleProfileBriefSelection
+            profiles={styleProfiles}
+            previews={styleProfilePreviews}
+            selectedStyleProfile={selectedStyleProfile}
+            libraryLoading={styleProfileLibraryLoading}
+            libraryError={styleProfileLibraryError}
+            detail={styleProfileDetail}
+            onRefresh={refreshStyleProfiles}
+            onLoadPreview={loadStyleProfilePreview}
+            onOpenDetail={openStyleProfileDetail}
+            onCloseDetail={closeStyleProfileDetail}
+            onSelect={selectStyleProfile}
+            onClear={clearStyleProfile}
           />
         ) : null}
 

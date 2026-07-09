@@ -281,6 +281,36 @@ export interface ListAppStyleProfilesResult {
   profiles: AppStyleProfileIndexEntry[];
 }
 
+export interface AppStyleProfileReferenceImagePreview {
+  reference_image_id: string;
+  file_path: string;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  order: number;
+}
+
+export interface GetAppStyleProfilePreviewInput {
+  style_profile_id: string;
+}
+
+export interface GetAppStyleProfilePreviewResult {
+  style_profile: AppStyleProfileIndexEntry;
+  cover_image: AppStyleProfileReferenceImagePreview | null;
+}
+
+export interface GetAppStyleProfileInput {
+  style_profile_id: string;
+}
+
+export interface GetAppStyleProfileResult {
+  style_profile: AppStyleProfileIndexEntry;
+  content: string;
+  size_bytes: number;
+  sha256: string;
+  reference_images: AppStyleProfileReferenceImagePreview[];
+}
+
 export interface PrepareAppStyleProfileCreationInput {
   display_name?: string;
 }

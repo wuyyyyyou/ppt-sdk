@@ -130,6 +130,28 @@ export interface ListStyleProfilesResult {
   profiles: StyleProfileIndexEntry[];
 }
 
+export interface StyleProfileReferenceImagePreview {
+  reference_image_id: string;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  order: number;
+  image_upload: HostUploadRef;
+}
+
+export interface GetStyleProfilePreviewResult {
+  style_profile: StyleProfileIndexEntry;
+  cover_image: StyleProfileReferenceImagePreview | null;
+}
+
+export interface GetStyleProfileResult {
+  style_profile: StyleProfileIndexEntry;
+  content: string;
+  size_bytes: number;
+  sha256: string;
+  reference_images: StyleProfileReferenceImagePreview[];
+}
+
 export interface PrepareStyleProfileCreationInput {
   display_name?: string;
 }

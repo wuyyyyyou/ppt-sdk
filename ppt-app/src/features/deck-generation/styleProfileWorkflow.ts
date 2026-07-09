@@ -1,4 +1,4 @@
-import type { AgentClient, AgentRunSummary } from "../../agent/agentClient";
+import { isAgentRunCancelledError, type AgentClient, type AgentRunSummary, type AgentStreamEvent } from "../../agent/agentClient";
 import type { PptBackend } from "../../api/pptBackend";
 import type { AppHostUploadClient } from "../../runtime/appHostUploadClient";
 import type {
@@ -23,8 +23,11 @@ export interface CreateStyleProfileInput {
   agentClient: AgentClient;
   displayName?: string;
   files: File[];
+  creationId?: string;
+  skipUpload?: boolean;
   isCancelled?: () => boolean;
   signal?: AbortSignal;
+  onProgress?: (event: CreateStyleProfileWorkflowEvent) => void;
 }
 
 export interface CreateStyleProfileResult {
@@ -35,7 +38,34 @@ export interface CreateStyleProfileResult {
     summary: AgentRunSummary;
     fingerprint: StyleProfileDraftFingerprint;
     gate_error?: string;
-  }>;
+    }>;
+}
+
+export type StyleProfileCreationPhase = "prepare" | "analyze" | "publish";
+
+export type CreateStyleProfileWorkflowEvent =
+  | { type: "phase-start"; phase: StyleProfileCreationPhase; message: string }
+  | { type: "phase-complete"; phase: StyleProfileCreationPhase; message: string }
+  | { type: "phase-error"; phase: StyleProfileCreationPhase; message: string }
+  | { type: "creation-prepared"; creationId: string; displayName: string }
+  | { type: "stream"; phase: "analyze"; event: AgentStreamEvent }
+  | { type: "attempt"; phase: "analyze"; attempt: number; message: string };
+
+export class StyleProfileCreationCancelledError extends Error {
+  constructor() {
+    super("Style Profile creation cancelled.");
+    this.name = "StyleProfileCreationCancelledError";
+  }
+}
+
+export function isStyleProfileCreationCancelledError(error: unknown): error is StyleProfileCreationCancelledError {
+  return error instanceof StyleProfileCreationCancelledError;
+}
+
+function throwIfCancelled(input: Pick<CreateStyleProfileInput, "isCancelled" | "signal">) {
+  if (input.isCancelled?.() || input.signal?.aborted) {
+    throw new StyleProfileCreationCancelledError();
+  }
 }
 
 async function uploadStyleProfileReferenceFile(
@@ -170,20 +200,48 @@ function buildStyleProfileCreationPrompt(input: {
 export async function createStyleProfile(
   input: CreateStyleProfileInput,
 ): Promise<CreateStyleProfileResult> {
-  if (input.files.length === 0) {
+  if (!input.skipUpload && input.files.length === 0) {
     throw new Error("At least one PPTX or image file is required to create a Style Profile.");
   }
 
-  const prepared = await input.backend.prepareStyleProfileCreation({
-    display_name: input.displayName,
-  });
-  for (const file of input.files) {
-    if (input.isCancelled?.()) throw new Error("Style Profile creation cancelled.");
-    await uploadStyleProfileReferenceFile(input.backend, input.hostUploadClient, prepared.creation_id, file);
+  let creationId = input.creationId ?? "";
+  let preparedDisplayName = input.displayName ?? "";
+  if (!input.skipUpload) {
+    input.onProgress?.({ type: "phase-start", phase: "prepare", message: "准备参考资料" });
+    try {
+      throwIfCancelled(input);
+      const prepared = creationId
+        ? await input.backend.getStyleProfileCreationContext({ creation_id: creationId })
+        : await input.backend.prepareStyleProfileCreation({
+            display_name: input.displayName,
+          });
+      creationId = prepared.creation_id;
+      preparedDisplayName = input.displayName ||
+        ("display_name" in prepared ? prepared.display_name : prepared.manifest.display_name);
+      input.onProgress?.({
+        type: "creation-prepared",
+        creationId,
+        displayName: preparedDisplayName,
+      });
+      for (const file of input.files) {
+        throwIfCancelled(input);
+        await uploadStyleProfileReferenceFile(input.backend, input.hostUploadClient, creationId, file);
+      }
+      input.onProgress?.({ type: "phase-complete", phase: "prepare", message: "参考资料已准备" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      input.onProgress?.({ type: "phase-error", phase: "prepare", message });
+      throw error;
+    }
+  } else {
+    if (!creationId) {
+      throw new Error("creationId is required when skipUpload is true.");
+    }
+    preparedDisplayName = input.displayName ?? "";
   }
 
   const context = await input.backend.getStyleProfileCreationContext({
-    creation_id: prepared.creation_id,
+    creation_id: creationId,
   });
   if (context.selected_reference_images.length === 0) {
     throw new Error("No Reference Slide Images were created from the uploaded files.");
@@ -193,32 +251,60 @@ export async function createStyleProfile(
   let retryGateError = "";
   let previousSummary: AgentRunSummary | undefined;
 
+  input.onProgress?.({ type: "phase-start", phase: "analyze", message: "分析视觉风格" });
   for (let attempt = 1; attempt <= STYLE_PROFILE_CREATION_ATTEMPT_LIMIT; attempt += 1) {
-    if (input.isCancelled?.()) throw new Error("Style Profile creation cancelled.");
+    throwIfCancelled(input);
+    input.onProgress?.({
+      type: "attempt",
+      phase: "analyze",
+      attempt,
+      message: attempt === 1 ? "开始分析视觉风格" : "重试分析视觉风格",
+    });
     const before = await input.backend.getStyleProfileDraftFingerprint({
-      creation_id: prepared.creation_id,
+      creation_id: creationId,
     });
     const prompt = buildStyleProfileCreationPrompt({
       context,
-      displayName: input.displayName || prepared.display_name,
+      displayName: input.displayName || preparedDisplayName || context.manifest.display_name,
       retryGateError,
       previousSummary,
     });
-    const summary = await input.agentClient.runAuthoringPrompt(prompt, {
-      signal: input.signal,
-      isCancelled: input.isCancelled,
-    });
+    let summary: AgentRunSummary;
+    try {
+      summary = await input.agentClient.runAuthoringPrompt(prompt, {
+        signal: input.signal,
+        isCancelled: input.isCancelled,
+        onStreamEvent: (event) => input.onProgress?.({ type: "stream", phase: "analyze", event }),
+      });
+    } catch (error) {
+      if (isAgentRunCancelledError(error)) {
+        throw new StyleProfileCreationCancelledError();
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      input.onProgress?.({ type: "phase-error", phase: "analyze", message });
+      throw error;
+    }
     const after = await input.backend.getStyleProfileDraftFingerprint({
-      creation_id: prepared.creation_id,
+      creation_id: creationId,
     });
 
     try {
       validateDraftFingerprint(before, after);
       attempts.push({ attempt, summary, fingerprint: after });
-      const publishResult = await input.backend.publishStyleProfile({
-        creation_id: prepared.creation_id,
-        display_name: input.displayName,
-      });
+      input.onProgress?.({ type: "phase-complete", phase: "analyze", message: "视觉风格分析完成" });
+      input.onProgress?.({ type: "phase-start", phase: "publish", message: "发布风格画像" });
+      let publishResult: PublishStyleProfileResult;
+      try {
+        publishResult = await input.backend.publishStyleProfile({
+          creation_id: creationId,
+          display_name: input.displayName,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        input.onProgress?.({ type: "phase-error", phase: "publish", message });
+        throw error;
+      }
+      input.onProgress?.({ type: "phase-complete", phase: "publish", message: "风格画像已发布" });
       return {
         creationContext: context,
         publishResult,
@@ -229,6 +315,7 @@ export async function createStyleProfile(
       previousSummary = summary;
       attempts.push({ attempt, summary, fingerprint: after, gate_error: retryGateError });
       if (attempt === STYLE_PROFILE_CREATION_ATTEMPT_LIMIT) {
+        input.onProgress?.({ type: "phase-error", phase: "analyze", message: retryGateError });
         throw error;
       }
     }

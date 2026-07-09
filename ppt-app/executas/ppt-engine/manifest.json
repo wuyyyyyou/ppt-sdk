@@ -84,6 +84,30 @@
       "parameters": []
     },
     {
+      "name": "app_get_style_profile_preview",
+      "description": "Read one published Style Profile's metadata and first reference image as a Host Upload reference.",
+      "parameters": [
+        {
+          "name": "style_profile_id",
+          "type": "string",
+          "description": "Published Style Profile id from app_list_style_profiles.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_style_profile",
+      "description": "Read one published Style Profile's metadata, Markdown content, and selected reference images as Host Upload references.",
+      "parameters": [
+        {
+          "name": "style_profile_id",
+          "type": "string",
+          "description": "Published Style Profile id from app_list_style_profiles.",
+          "required": true
+        }
+      ]
+    },
+    {
       "name": "app_prepare_style_profile_creation",
       "description": "Create a Style Profile Creation Workspace for uploaded PPTX/image references and draft/profile.md.",
       "parameters": [
