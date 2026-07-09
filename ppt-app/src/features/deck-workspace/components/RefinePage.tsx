@@ -50,7 +50,7 @@ export function RefinePage(props: RefinePageProps) {
   const renderedSlides = reviewRender.result?.slides ?? [];
   const renderedSlide = renderedSlides[slideIndex] ?? null;
   const showRenderedSlide =
-    reviewRender.status === "ready" && Boolean(renderedSlide?.screenshot_url);
+    reviewRender.status === "ready" && Boolean(renderedSlide?.screenshot_upload);
 
   useEffect(() => {
     if (refineScope === "deck") {

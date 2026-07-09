@@ -29,7 +29,7 @@ export function ThumbnailStrip({
             className={`thumb ${index === currentSlide ? "active" : ""}`}
             onClick={() => setCurrentSlide(index)}
           >
-          {renderedSlide?.screenshot_url ? (
+          {renderedSlide?.screenshot_upload ? (
             <div className="thumb-html-frame">
               <RenderedSlideImage slide={renderedSlide} />
             </div>

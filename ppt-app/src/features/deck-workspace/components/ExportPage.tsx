@@ -1,5 +1,7 @@
 import { Download, File, FileText } from "lucide-react";
+import { useState } from "react";
 import type { Messages } from "../../../i18n/messages";
+import { downloadExportArtifact } from "../exportArtifactDownload";
 import type { ExportArtifact, ExportProgressState } from "../types";
 import type { LoadingKind } from "../types";
 import { PageHeader } from "./PageHeader";
@@ -17,37 +19,8 @@ function downloadLabel(t: Messages, artifact: ExportArtifact | null) {
   return artifact ? `${t.exportPage.download} ${artifact.type}` : t.exportPage.download;
 }
 
-function getDownloadDocument(): Document | null {
-  if (!window.parent || window.parent === window) {
-    return document.body ? document : null;
-  }
-
-  try {
-    if (window.parent.document?.body) {
-      return window.parent.document;
-    }
-  } catch {
-    // Cross-origin hosts cannot expose parent.document. Fall back to a popup.
-  }
-
-  return null;
-}
-
-function triggerArtifactDownload(artifact: ExportArtifact) {
-  const targetDocument = getDownloadDocument();
-  if (!targetDocument) {
-    window.open(artifact.href, "_blank", "noopener,noreferrer");
-    return;
-  }
-
-  const link = targetDocument.createElement("a");
-  link.href = artifact.href;
-  link.download = artifact.fileName ?? "";
-  link.rel = "noopener";
-  link.style.display = "none";
-  targetDocument.body.appendChild(link);
-  link.click();
-  link.remove();
+function downloadButtonLabel(t: Messages, artifact: ExportArtifact | null, active: boolean) {
+  return active ? t.exportPage.downloadPreparing : downloadLabel(t, artifact);
 }
 
 function isDeterminateProgress(progress: ExportProgressState) {
@@ -57,6 +30,7 @@ function isDeterminateProgress(progress: ExportProgressState) {
 }
 
 export function ExportPage({ t, progress, artifact, loading, onBack, onExport }: ExportPageProps) {
+  const [downloadInProgress, setDownloadInProgress] = useState(false);
   const downloadableArtifact = artifact?.href ? artifact : null;
   const progressClass = [
     "export-progress-track",
@@ -67,6 +41,17 @@ export function ExportPage({ t, progress, artifact, loading, onBack, onExport }:
     ? { width: `${progress.percent}%` }
     : undefined;
   const ariaValueNow = isDeterminateProgress(progress) ? progress.percent : undefined;
+  const downloadDisabled = downloadInProgress;
+
+  async function handleArtifactDownload(targetArtifact: ExportArtifact) {
+    if (downloadInProgress) return;
+    setDownloadInProgress(true);
+    try {
+      await downloadExportArtifact(targetArtifact);
+    } finally {
+      setDownloadInProgress(false);
+    }
+  }
 
   return (
     <section className="page active export-page">
@@ -102,10 +87,14 @@ export function ExportPage({ t, progress, artifact, loading, onBack, onExport }:
             <button
               className="export-download-btn"
               type="button"
-              onClick={() => triggerArtifactDownload(downloadableArtifact)}
+              disabled={downloadDisabled}
+              aria-busy={downloadInProgress}
+              onClick={() => {
+                void handleArtifactDownload(downloadableArtifact);
+              }}
             >
               <Download size={16} />
-              <span>{downloadLabel(t, downloadableArtifact)}</span>
+              <span>{downloadButtonLabel(t, downloadableArtifact, downloadInProgress)}</span>
             </button>
           ) : (
             <button className="export-download-btn" type="button" disabled>

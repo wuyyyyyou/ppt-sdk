@@ -9,6 +9,10 @@ import {
 import { createPptBackend, type PptBackend } from "../../../api/pptBackend";
 import { connectAnnaRuntime } from "../../../runtime/annaRuntime";
 import {
+  createAppHostUploadClient,
+  type AppHostUploadClient,
+} from "../../../runtime/appHostUploadClient";
+import {
   AUTO_OUTPUT_LANGUAGE,
   normalizeOutputLanguage,
   readSettingOutputLanguage,
@@ -301,6 +305,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const exportRefreshVersionRef = useRef(0);
   const exportInFlightRef = useRef(false);
   const [backend, setBackend] = useState<PptBackend | null>(null);
+  const [hostUploadClient, setHostUploadClient] = useState<AppHostUploadClient | null>(null);
   const [aiClient, setAiClient] = useState<AiClient | null>(null);
   const [agentClient, setAgentClient] = useState<AgentClient | null>(null);
   const cancelCreateDeckRef = useRef(false);
@@ -557,76 +562,26 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return new Promise((resolve) => window.setTimeout(resolve, ms));
   }
 
-  function readFileAsBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(reader.error ?? new Error("Failed to read file."));
-      reader.onload = () => {
-        const result = reader.result;
-        if (typeof result !== "string") {
-          reject(new Error("Failed to read file as base64."));
-          return;
-        }
-        const commaIndex = result.indexOf(",");
-        resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  const RPC_UPLOAD_FALLBACK_MAX_BYTES = 768 * 1024;
-
-  function isUploadSessionUnsupported(error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    return /app_begin_uploaded_source_upload|app_commit_uploaded_source_upload|unknown|not found|unsupported|no such tool/i.test(message);
-  }
-
-  async function uploadUploadedSourceViaRpcFallback(workspace: WorkspaceResult, file: File) {
-    if (file.size > RPC_UPLOAD_FALLBACK_MAX_BYTES) {
-      throw new Error(
-        locale === "zh"
-          ? "当前运行时不支持大文件 HTTP 上传，请升级 ppt-engine 后重试。"
-          : "This runtime does not support large HTTP uploads. Upgrade ppt-engine and try again."
-      );
+  async function uploadUploadedSourceFile(workspace: WorkspaceResult, file: File) {
+    if (!backend || !hostUploadClient) {
+      throw new Error("Host Upload is not available.");
     }
-    const contentBase64 = await readFileAsBase64(file);
-    return backend!.uploadUploadedSource({
+    const hostUpload = await hostUploadClient.uploadFile(file, {
+      purpose: "user_artifact",
+      filename: file.name,
+      mimeType: file.type || undefined,
+      metadata: {
+        source: "ppt-app.uploaded-source",
+        workspace_dir: workspace.workspace_dir,
+      },
+    });
+    return backend.commitUploadedSourceHostUpload({
       workspace_dir: workspace.workspace_dir,
       filename: file.name,
-      mime_type: file.type,
-      content_base64: contentBase64,
+      mime_type: hostUpload.mime_type,
+      size_bytes: file.size,
+      host_upload: hostUpload,
     });
-  }
-
-  async function uploadUploadedSourceFile(workspace: WorkspaceResult, file: File) {
-    if (!backend?.beginUploadedSourceUpload || !backend.commitUploadedSourceUpload) {
-      return uploadUploadedSourceViaRpcFallback(workspace, file);
-    }
-    try {
-      const session = await backend.beginUploadedSourceUpload({
-        workspace_dir: workspace.workspace_dir,
-        filename: file.name,
-        mime_type: file.type,
-        size_bytes: file.size,
-      });
-      const response = await fetch(session.upload_url, {
-        method: "PUT",
-        body: file,
-      });
-      if (!response.ok) {
-        const message = await response.text().catch(() => "");
-        throw new Error(message || `Uploaded source HTTP upload failed: HTTP ${response.status}`);
-      }
-      return backend.commitUploadedSourceUpload({
-        workspace_dir: workspace.workspace_dir,
-        upload_id: session.upload_id,
-      });
-    } catch (error) {
-      if (!isUploadSessionUnsupported(error)) {
-        throw error;
-      }
-      return uploadUploadedSourceViaRpcFallback(workspace, file);
-    }
   }
 
   async function refreshUploadedSources(workspace: WorkspaceResult | null = currentWorkspace) {
@@ -1109,8 +1064,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         nextAgentClient = await createAgentClient(runtime, {
           toolAccessPolicy: AGENT_TOOL_ACCESS_POLICY,
         });
+        const nextHostUploadClient = createAppHostUploadClient(runtime);
         if (cancelled) return;
         setBackend(nextBackend);
+        setHostUploadClient(nextHostUploadClient);
         setAiClient(nextAiClient);
         setAgentClient(nextAgentClient);
         const scan = await nextBackend.listWorkspaces();
@@ -1397,7 +1354,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       reviewRender.status === "ready" &&
       reviewRender.result !== null &&
       reviewRender.renderKey === renderKey &&
-      Boolean(reviewRender.result.slides[index]?.screenshot_url);
+      Boolean(reviewRender.result.slides[index]?.screenshot_upload);
     if (hasCurrentSlidePreview) return;
 
     const rendered = await loadDeckHtmlForWorkspace(currentWorkspace, "review");
@@ -2259,11 +2216,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       artifacts?: {
         pptx?: {
           path?: unknown;
-          url?: unknown;
           updated_at?: unknown;
-          generator_result?: { artifact_url?: unknown };
         };
-        pdf?: { path?: unknown; url?: unknown; updated_at?: unknown };
+        pdf?: { path?: unknown; updated_at?: unknown };
       };
     };
     const pptx = task.artifacts?.pptx;
@@ -2272,18 +2227,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       {
         type: "PPTX" as const,
         path: typeof pptx?.path === "string" ? pptx.path : "",
-        href:
-          typeof pptx?.url === "string" && pptx.url
-            ? pptx.url
-            : typeof pptx?.generator_result?.artifact_url === "string"
-              ? pptx.generator_result.artifact_url
-              : "",
         updatedAt: typeof pptx?.updated_at === "string" ? pptx.updated_at : ""
       },
       {
         type: "PDF" as const,
         path: typeof pdf?.path === "string" ? pdf.path : "",
-        href: typeof pdf?.url === "string" ? pdf.url : "",
         updatedAt: typeof pdf?.updated_at === "string" ? pdf.updated_at : ""
       }
     ].filter((item) => item.path);
@@ -2306,42 +2254,76 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     };
   }
 
-  async function buildWorkspaceExportArtifact(workspace: WorkspaceResult): Promise<ExportArtifact | null> {
-    if (!backend) return readWorkspaceExportArtifactPath(workspace);
+  function formatExportHostUploadError(error: unknown) {
+    const detail = error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "";
+    const fallback = locale === "zh"
+      ? "Host Upload 下载链接生成失败。"
+      : "Failed to create a Host Upload download link.";
+    if (!detail) return fallback;
+    return locale === "zh"
+      ? `Host Upload 下载链接生成失败：${detail}`
+      : `Failed to create a Host Upload download link: ${detail}`;
+  }
 
+  async function buildWorkspaceExportArtifact(workspace: WorkspaceResult): Promise<ExportArtifact | null> {
     const artifact = readWorkspaceExportArtifactPath(workspace);
     if (!artifact) return null;
 
-    try {
-      const result = await backend.getExportArtifactDownloadUrl({
-        workspace_dir: workspace.workspace_dir,
-        artifact_type: artifact.type.toLowerCase() as "pptx" | "pdf"
-      });
-
-      return {
-        type: result.artifact_type === "pptx" ? "PPTX" : "PDF",
-        path: result.path,
-        href: result.download_url,
-        fileName: result.filename
-      };
-    } catch (error) {
-      console.warn(
-        "Failed to register export artifact download URL",
-        error instanceof Error ? error.message : error
-      );
-      return artifact;
+    if (!backend) {
+      throw new Error("PptBackend is not available.");
     }
+
+    const result = await backend.getExportArtifactDownloadUrl({
+      workspace_dir: workspace.workspace_dir,
+      artifact_type: artifact.type.toLowerCase() as "pptx" | "pdf"
+    });
+    if (
+      !result.download_upload ||
+      result.download_upload.transport !== "host_upload" ||
+      typeof result.download_upload.url !== "string" ||
+      result.download_upload.url.length === 0
+    ) {
+      throw new Error("Export artifact response did not include a valid HostUploadRef.");
+    }
+
+    return {
+      type: result.artifact_type === "pptx" ? "PPTX" : "PDF",
+      path: result.path,
+      href: result.download_upload.url,
+      fileName: result.filename
+    };
   }
 
   async function refreshWorkspaceExportArtifact(
     workspace: WorkspaceResult,
-    refreshVersion = exportRefreshVersionRef.current
+    refreshVersion = exportRefreshVersionRef.current,
+    options: { rethrow?: boolean } = {},
   ) {
-    const artifact = await buildWorkspaceExportArtifact(workspace);
-    if (refreshVersion !== exportRefreshVersionRef.current) {
-      return;
+    try {
+      const artifact = await buildWorkspaceExportArtifact(workspace);
+      if (refreshVersion !== exportRefreshVersionRef.current) {
+        return;
+      }
+      setExportArtifactWithProgress(artifact);
+    } catch (error) {
+      if (refreshVersion !== exportRefreshVersionRef.current) {
+        return;
+      }
+      const artifact = readWorkspaceExportArtifactPath(workspace);
+      const message = formatExportHostUploadError(error);
+      console.warn("Failed to create Host Upload download link", error);
+      setExportArtifact(artifact);
+      setExportProgress((current) =>
+        createExportErrorProgress(message, artifact?.type ?? current.type, current.percent)
+      );
+      if (options.rethrow) {
+        throw new Error(message);
+      }
     }
-    setExportArtifactWithProgress(artifact);
   }
 
   async function ensureCurrentWorkspace() {
@@ -3357,7 +3339,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           generatorResult: completed.generator_result ?? completed
         });
         applyWorkspace(updatedWorkspace);
-        await refreshWorkspaceExportArtifact(updatedWorkspace, exportVersion);
+        await refreshWorkspaceExportArtifact(updatedWorkspace, exportVersion, { rethrow: true });
       } else {
         setExportProgress(createExportStartProgress(t, "PDF"));
         const pdfResult = await backend.exportPdf({
@@ -3369,7 +3351,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           pdfPath
         });
         applyWorkspace(updatedWorkspace);
-        await refreshWorkspaceExportArtifact(updatedWorkspace, exportVersion);
+        await refreshWorkspaceExportArtifact(updatedWorkspace, exportVersion, { rethrow: true });
       }
 
       showToast(type === "PPTX" ? t.toasts.pptxExported : t.toasts.pdfExported);

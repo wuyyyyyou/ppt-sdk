@@ -1,5 +1,6 @@
 import type { AgentClient, AgentRunSummary } from "../../agent/agentClient";
 import type { PptBackend } from "../../api/pptBackend";
+import type { AppHostUploadClient } from "../../runtime/appHostUploadClient";
 import type {
   GetStyleProfileCreationContextResult,
   PublishStyleProfileResult,
@@ -18,6 +19,7 @@ const STYLE_PROFILE_DRAFT_MAX_BYTES = 8 * 1024;
 
 export interface CreateStyleProfileInput {
   backend: PptBackend;
+  hostUploadClient: AppHostUploadClient;
   agentClient: AgentClient;
   displayName?: string;
   files: File[];
@@ -38,26 +40,25 @@ export interface CreateStyleProfileResult {
 
 async function uploadStyleProfileReferenceFile(
   backend: PptBackend,
+  hostUploadClient: AppHostUploadClient,
   creationId: string,
   file: File,
 ) {
-  const session = await backend.beginStyleProfileReferenceUpload({
+  const hostUpload = await hostUploadClient.uploadFile(file, {
+    purpose: "image_reference",
+    filename: file.name,
+    mimeType: file.type || undefined,
+    metadata: {
+      source: "ppt-app.style-profile-reference",
+      creation_id: creationId,
+    },
+  });
+  return backend.commitStyleProfileReferenceHostUpload({
     creation_id: creationId,
     filename: file.name,
-    mime_type: file.type,
+    mime_type: hostUpload.mime_type,
     size_bytes: file.size,
-  });
-  const response = await fetch(session.upload_url, {
-    method: "PUT",
-    body: file,
-  });
-  if (!response.ok) {
-    const message = await response.text().catch(() => "");
-    throw new Error(message || `Style Profile reference HTTP upload failed: HTTP ${response.status}`);
-  }
-  return backend.commitStyleProfileReferenceUpload({
-    creation_id: creationId,
-    upload_id: session.upload_id,
+    host_upload: hostUpload,
   });
 }
 
@@ -178,7 +179,7 @@ export async function createStyleProfile(
   });
   for (const file of input.files) {
     if (input.isCancelled?.()) throw new Error("Style Profile creation cancelled.");
-    await uploadStyleProfileReferenceFile(input.backend, prepared.creation_id, file);
+    await uploadStyleProfileReferenceFile(input.backend, input.hostUploadClient, prepared.creation_id, file);
   }
 
   const context = await input.backend.getStyleProfileCreationContext({

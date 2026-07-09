@@ -9,13 +9,14 @@ export function RenderedSlideImage({
   slide,
   loading = "lazy"
 }: RenderedSlideImageProps) {
-  if (!slide.screenshot_url) {
+  const screenshotUrl = slide.screenshot_upload?.url;
+  if (!screenshotUrl) {
     return null;
   }
 
   return (
     <img
-      src={slide.screenshot_url}
+      src={screenshotUrl}
       alt={slide.title}
       loading={loading}
       decoding="async"

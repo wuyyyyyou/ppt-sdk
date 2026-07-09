@@ -38,6 +38,29 @@ export interface AnnaAgentSession {
   delete(): Promise<unknown>;
 }
 
+export interface AnnaUploadNegotiateInput {
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  purpose?: "user_artifact" | "image_reference" | "image_input";
+  metadata?: Record<string, unknown>;
+}
+
+export interface AnnaUploadNegotiateResult {
+  put_url: string;
+  headers?: Record<string, string>;
+  r2_key: string;
+  expires_at?: string;
+}
+
+export interface AnnaUploadConfirmResult {
+  download_url: string;
+  r2_key: string;
+  size_bytes?: number;
+  expires_at?: string;
+  expires_in?: number;
+}
+
 export interface AnnaRuntime {
   call?<T = unknown>(
     ns: string,
@@ -56,6 +79,10 @@ export interface AnnaRuntime {
   };
   agent: {
     session(input: { submode: "auto" }): Promise<AnnaAgentSession>;
+  };
+  upload?: {
+    negotiate(input: AnnaUploadNegotiateInput): Promise<AnnaUploadNegotiateResult>;
+    confirm(input: { r2_key: string }): Promise<AnnaUploadConfirmResult>;
   };
 }
 

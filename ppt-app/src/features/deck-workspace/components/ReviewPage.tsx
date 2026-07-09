@@ -2,7 +2,6 @@ import {
   AlertTriangle,
   ChevronDown,
   Copy,
-  ExternalLink,
   GripVertical,
   LayoutGrid,
   LoaderCircle,
@@ -108,19 +107,6 @@ export function ReviewPage(props: ReviewPageProps) {
               </span>
             ) : null}
           </div>
-          <div className="deck-html-review-actions">
-            {selectedRenderedSlide?.preview_url ? (
-              <a
-                className="icon-action-btn"
-                href={selectedRenderedSlide.preview_url}
-                target="_blank"
-                rel="noreferrer"
-                title={t.review.openHtml}
-              >
-                <ExternalLink size={14} />
-              </a>
-            ) : null}
-          </div>
         </header>
 
         {reviewRender.status === "loading" ? (
@@ -140,7 +126,7 @@ export function ReviewPage(props: ReviewPageProps) {
           </div>
         ) : null}
 
-        {reviewRender.status === "ready" && !selectedRenderedSlide?.screenshot_url ? (
+        {reviewRender.status === "ready" && !selectedRenderedSlide?.screenshot_upload ? (
           <div className="deck-html-review-state">
             <span>{t.review.renderFailed}</span>
           </div>
@@ -159,7 +145,7 @@ export function ReviewPage(props: ReviewPageProps) {
                 onClick={() => setCurrentSlide(index)}
               >
               <span>{formatSlideNumber(index)}</span>
-              {renderedSlide?.screenshot_url ? (
+              {renderedSlide?.screenshot_upload ? (
                 <div className="grid-card-html-frame">
                   <RenderedSlideImage slide={renderedSlide} />
                 </div>
@@ -237,7 +223,7 @@ export function ReviewPage(props: ReviewPageProps) {
 
       {previewMode === "present" ? (
         <div className="preview-present-view">
-          {selectedRenderedSlide?.screenshot_url ? (
+          {selectedRenderedSlide?.screenshot_upload ? (
             <div className="present-html-frame">
               <RenderedSlideImage slide={selectedRenderedSlide} loading="eager" />
             </div>

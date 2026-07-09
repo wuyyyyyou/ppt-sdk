@@ -20,7 +20,6 @@ const readyReviewRender: DeckReviewRenderState = {
     workspace_dir: "/tmp/workspaces/demo",
     manifest_path: "/tmp/workspaces/demo/template/manifest.json",
     output_dir: "/tmp/workspaces/demo/output/app-render",
-    preview_url: "file:///tmp/workspaces/demo/output/app-render/page-01.html",
     slide_count: 1,
     title: "Demo",
     rendered_at: "2026-06-02T00:00:00.000Z",
@@ -30,8 +29,15 @@ const readyReviewRender: DeckReviewRenderState = {
         layout_id: "timeline-plan",
         title: slide.title,
         html_path: "/tmp/workspaces/demo/output/app-render/page-01.html",
-        preview_url: "file:///tmp/workspaces/demo/output/app-render/page-01.html",
-        screenshot_url: "http://127.0.0.1:4173/preview/page-01.png",
+        screenshot_upload: {
+          transport: "host_upload",
+          r2_key: "uploads/page-01.png",
+          url: "https://upload.example/page-01.png",
+          mime_type: "image/png",
+          size_bytes: 1024,
+          filename: "page-01.png",
+          mode: "negotiate+confirm",
+        },
         speaker_note: "Future timeline",
       },
     ],
@@ -84,11 +90,11 @@ function assertDisabledButtonWithLabel(html: string, label: string) {
 }
 
 describe("RefinePage", () => {
-  it("shows the rendered slide image when a screenshot URL is available", () => {
+  it("shows the rendered slide image when a screenshot upload is available", () => {
     const html = renderRefinePage(readyReviewRender);
 
     assert.match(html, /<img/);
-    assert.match(html, /src="http:\/\/127\.0\.0\.1:4173\/preview\/page-01\.png"/);
+    assert.match(html, /src="https:\/\/upload\.example\/page-01\.png"/);
     assert.doesNotMatch(html, /slide-preview-card/);
   });
 

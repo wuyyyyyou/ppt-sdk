@@ -247,6 +247,18 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function createPngUploadRef(filename: string) {
+  return {
+    transport: "host_upload" as const,
+    r2_key: `uploads/${filename}`,
+    url: `https://upload.example/${filename}`,
+    mime_type: "image/png",
+    size_bytes: 1024,
+    filename,
+    mode: "negotiate+confirm" as const,
+  };
+}
+
 function createPreview(pageIndex: number, page?: PagePlanItem): RenderWorkspacePagePreviewResult {
   const pageNumber = pageIndex + 1;
   const slideId = page?.manifest_slide_id ?? page?.page_id ?? `page-${String(pageNumber).padStart(2, "0")}`;
@@ -255,8 +267,8 @@ function createPreview(pageIndex: number, page?: PagePlanItem): RenderWorkspaceP
     workspace_dir: workspace.workspace_dir,
     manifest_path: "/tmp/workspaces/demo/template/manifest.json",
     html_path: `/tmp/workspaces/demo/output/page-preview-html/${baseName}.html`,
-    preview_url: `file:///tmp/workspaces/demo/output/page-preview-html/${baseName}.html`,
     screenshot_path: `/tmp/workspaces/demo/output/screenshots/${baseName}.png`,
+    screenshot_upload: createPngUploadRef(`${baseName}.png`),
     page_index: pageIndex,
     page_number: pageNumber,
     slide_id: slideId,
@@ -437,6 +449,16 @@ function createHarness(options: {
     listTemplates: async () => ({ templates: [], count: 0 }),
     selectTemplate: async () => ({ workspace, selection: {} as never }),
     getTemplatePlanningContext: async () => planningContext,
+    getWorkspaceStyleProfile: async () => ({
+      workspace_dir: workspace.workspace_dir,
+      selected: false,
+      profile_path: "",
+      selection_path: "",
+      selection: null,
+      content: "",
+      size_bytes: 0,
+      sha256: "",
+    }),
     recordPagePlan: async (input) => {
       recordPagePlanCalls += 1;
       pagePlan = clone(input.page_plan);
@@ -746,13 +768,12 @@ function createHarness(options: {
         workspace_dir: workspace.workspace_dir,
         manifest_path: "/tmp/workspaces/demo/template/manifest.json",
         output_dir: "/tmp/workspaces/demo/output",
-        preview_url: "file:///tmp/workspaces/demo/output/deck.html",
         slides: pagePlan.pages.map((page) => ({
           slide_id: page.manifest_slide_id,
           layout_id: page.blueprint_id,
           title: page.title,
           html_path: `/tmp/workspaces/demo/output/${page.page_id}.html`,
-          preview_url: `file:///tmp/workspaces/demo/output/${page.page_id}.html`,
+          screenshot_upload: createPngUploadRef(`${page.page_id}.png`),
           speaker_note: page.outline,
         })),
         slide_count: pagePlan.pages.length,

@@ -3,6 +3,18 @@ export interface ToolIds {
   pptGener: string;
 }
 
+export interface HostUploadRef {
+  transport: "host_upload";
+  r2_key: string;
+  url: string;
+  mime_type: string;
+  size_bytes: number;
+  filename?: string;
+  expires_at?: string;
+  expires_in?: number;
+  mode?: "negotiate+confirm";
+}
+
 export interface WorkspaceSummary {
   workspace_id: string;
   task_id?: string;
@@ -70,13 +82,6 @@ export interface UploadedSourceIndex {
   updated_at: string;
 }
 
-export interface UploadUploadedSourceInput {
-  workspace_dir: string;
-  filename: string;
-  mime_type?: string;
-  content_base64: string;
-}
-
 export interface UploadUploadedSourceResult {
   workspace_dir: string;
   material: UploadedSourceMaterial;
@@ -84,28 +89,17 @@ export interface UploadUploadedSourceResult {
   warnings: string[];
 }
 
-export interface BeginUploadedSourceUploadInput {
+export interface CommitUploadedSourceHostUploadInput {
   workspace_dir: string;
   filename: string;
   mime_type?: string;
   size_bytes: number;
+  host_upload: HostUploadRef;
 }
 
-export interface BeginUploadedSourceUploadResult {
-  workspace_dir: string;
+export interface CommitUploadedSourceHostUploadResult extends UploadUploadedSourceResult {
   upload_id: string;
-  upload_url: string;
-  expires_at: string;
-  size_bytes: number;
-}
-
-export interface CommitUploadedSourceUploadInput {
-  workspace_dir: string;
-  upload_id: string;
-}
-
-export interface CommitUploadedSourceUploadResult extends UploadUploadedSourceResult {
-  upload_id: string;
+  host_upload: HostUploadRef;
 }
 
 export interface StyleProfileIndexEntry {
@@ -157,26 +151,6 @@ export interface PrepareStyleProfileCreationResult extends StyleProfileCreationP
   prepared_at: string;
 }
 
-export interface BeginStyleProfileReferenceUploadInput {
-  creation_id: string;
-  filename: string;
-  mime_type?: string;
-  size_bytes: number;
-}
-
-export interface BeginStyleProfileReferenceUploadResult {
-  creation_id: string;
-  upload_id: string;
-  upload_url: string;
-  expires_at: string;
-  size_bytes: number;
-}
-
-export interface CommitStyleProfileReferenceUploadInput {
-  creation_id: string;
-  upload_id: string;
-}
-
 export interface StyleProfileReferenceMaterial {
   reference_id: string;
   original_filename: string;
@@ -221,6 +195,18 @@ export interface CommitStyleProfileReferenceUploadResult {
   material: StyleProfileReferenceMaterial;
   manifest: StyleProfileCreationManifest;
   warnings: string[];
+}
+
+export interface CommitStyleProfileReferenceHostUploadInput {
+  creation_id: string;
+  filename: string;
+  mime_type?: string;
+  size_bytes: number;
+  host_upload: HostUploadRef;
+}
+
+export interface CommitStyleProfileReferenceHostUploadResult extends CommitStyleProfileReferenceUploadResult {
+  host_upload: HostUploadRef;
 }
 
 export interface GetStyleProfileCreationContextResult extends StyleProfileCreationPaths {
@@ -1217,9 +1203,8 @@ export interface RenderWorkspacePagePreviewResult {
   workspace_dir: string;
   manifest_path: string;
   html_path: string;
-  preview_url: string;
   screenshot_path: string;
-  screenshot_url?: string;
+  screenshot_upload: HostUploadRef;
   page_index: number;
   page_number: number;
   slide_id: string;
@@ -1241,15 +1226,13 @@ export interface RenderDeckHtmlResult {
   workspace_dir: string;
   manifest_path: string;
   output_dir: string;
-  preview_url?: string | null;
   slides: Array<{
     slide_id: string;
     layout_id: string;
     title: string;
     html_path: string;
-    preview_url: string;
     screenshot_path?: string;
-    screenshot_url?: string;
+    screenshot_upload?: HostUploadRef;
     speaker_note: string;
   }>;
   slide_count: number;
@@ -1357,5 +1340,5 @@ export interface ExportArtifactDownloadUrlResult {
   path: string;
   filename: string;
   updated_at: string | null;
-  download_url: string;
+  download_upload: HostUploadRef;
 }

@@ -26,7 +26,7 @@ export function SlidePreviewNavigator(props: SlidePreviewNavigatorProps) {
 
   return (
     <>
-      {reviewRender.status === "ready" && selectedRenderedSlide?.screenshot_url ? (
+      {reviewRender.status === "ready" && selectedRenderedSlide?.screenshot_upload ? (
         <div className="deck-stage-html-frame">
           <RenderedSlideImage slide={selectedRenderedSlide} loading="eager" />
         </div>

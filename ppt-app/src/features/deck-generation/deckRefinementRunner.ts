@@ -48,9 +48,7 @@ function readRenderedDeckFromWorkspace(workspace: WorkspaceResult): RenderDeckHt
       layout_id: typeof slide.layout_id === "string" ? slide.layout_id : "",
       title: typeof slide.title === "string" ? slide.title : "",
       html_path: typeof slide.html_path === "string" ? slide.html_path : "",
-      preview_url: typeof slide.preview_url === "string" ? slide.preview_url : "",
       screenshot_path: typeof slide.screenshot_path === "string" ? slide.screenshot_path : undefined,
-      screenshot_url: typeof slide.screenshot_url === "string" ? slide.screenshot_url : undefined,
       speaker_note: typeof slide.speaker_note === "string" ? slide.speaker_note : "",
     };
   });
@@ -59,7 +57,6 @@ function readRenderedDeckFromWorkspace(workspace: WorkspaceResult): RenderDeckHt
     workspace_dir: workspace.workspace_dir,
     manifest_path: typeof pages.manifest_path === "string" ? pages.manifest_path : "",
     output_dir: typeof pages.output_dir === "string" ? pages.output_dir : "",
-    preview_url: typeof pages.preview_url === "string" ? pages.preview_url : null,
     slides,
     slide_count: slides.length,
     title: typeof pages.title === "string" ? pages.title : "",

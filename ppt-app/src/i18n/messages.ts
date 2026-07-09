@@ -344,6 +344,7 @@ export interface Messages {
     ready: string;
     noFile: string;
     download: string;
+    downloadPreparing: string;
     pptxPreparingModel: string;
     pptxModelReady: string;
     pptxGenerating: string;
@@ -754,6 +755,7 @@ export const messages: Record<Locale, Messages> = {
       ready: "{type} ready",
       noFile: "No export file ready",
       download: "Download",
+      downloadPreparing: "Preparing download...",
       pptxPreparingModel: "Preparing PPTX model",
       pptxModelReady: "PPTX model ready",
       pptxGenerating: "Generating PPTX file",
@@ -1159,6 +1161,7 @@ export const messages: Record<Locale, Messages> = {
       ready: "{type} 已就绪",
       noFile: "暂无可下载文件",
       download: "下载",
+      downloadPreparing: "准备下载...",
       pptxPreparingModel: "正在准备 PPTX 模型",
       pptxModelReady: "PPTX 模型已准备",
       pptxGenerating: "正在生成 PPTX 文件",

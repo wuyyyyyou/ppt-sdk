@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
 import { randomUUID } from "node:crypto";
-import { createServer } from "node:http";
 import readline from "node:readline";
-import { readFileSync } from "node:fs";
+import { createReadStream, readFileSync } from "node:fs";
 import { mkdir, open, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { Readable } from "node:stream";
 
 import {
   appendAppWorkspaceLog,
@@ -86,7 +86,6 @@ import {
   updateAppWorkspacePages,
   updateAppWorkspaceSettings,
   updateAppWorkspaceTitle,
-  uploadAppUploadedSource,
   validateAppWorkspaceThemeToken,
 } from "./dist/index.js";
 
@@ -115,6 +114,11 @@ const FILE_TRANSPORT_FALLBACK_DIR = path.join(
   "file-transport",
 );
 const MAX_STDOUT_RESPONSE_BYTES = 512 * 1024;
+const PROTOCOL_VERSION_V2 = "2.0";
+const HOST_UPLOAD_METHOD = "host/uploadFile";
+const UPLOAD_ERR_NOT_GRANTED = -32201;
+const UPLOAD_ERR_TIMEOUT = -32208;
+const UPLOAD_ERR_NOT_NEGOTIATED = -32210;
 
 function readToolManifest() {
   return JSON.parse(readFileSync(new URL("./manifest.json", import.meta.url), "utf8"));
@@ -135,6 +139,114 @@ function makeResponse(id, result, error) {
 function createInvalidParamsError(message) {
   return { code: -32602, message };
 }
+
+class HostUploadError extends Error {
+  constructor(code, message, data) {
+    super(message);
+    this.name = "HostUploadError";
+    this.code = code;
+    this.data = data;
+  }
+}
+
+class ExecutaHostUploadClient {
+  constructor() {
+    this.pending = new Map();
+    this.disabledReason = "host/uploadFile has not been negotiated; call initialize with Executa protocol 2.0 first.";
+  }
+
+  enable() {
+    this.disabledReason = "";
+  }
+
+  disable(reason) {
+    this.disabledReason = reason || "host/uploadFile is not available.";
+  }
+
+  dispatchResponse(message) {
+    if (!message || typeof message !== "object" || Array.isArray(message) || "method" in message) {
+      return false;
+    }
+    const pending = this.pending.get(message.id);
+    if (!pending) {
+      return false;
+    }
+    this.pending.delete(message.id);
+    if (message.error) {
+      pending.reject(new HostUploadError(
+        Number.isInteger(message.error.code) ? message.error.code : -32603,
+        typeof message.error.message === "string" ? message.error.message : "host/uploadFile failed",
+        message.error.data,
+      ));
+      return true;
+    }
+    pending.resolve(message.result ?? {});
+    return true;
+  }
+
+  async negotiate({ filename, mimeType, sizeBytes, purpose, metadata }) {
+    return this.call({
+      mode: "negotiate",
+      filename,
+      mime_type: mimeType,
+      size_bytes: sizeBytes,
+      purpose,
+      metadata,
+    });
+  }
+
+  async confirm(r2Key) {
+    return this.call({
+      mode: "confirm",
+      r2_key: r2Key,
+    });
+  }
+
+  async call(params, timeoutMs = 120_000) {
+    if (this.disabledReason) {
+      process.stderr.write(
+        `host/uploadFile proceeding without negotiated initialize: ${this.disabledReason}\n`,
+      );
+    }
+
+    const id = `host-upload-${Date.now()}-${process.pid}-${randomUUID()}`;
+    const message = {
+      jsonrpc: "2.0",
+      id,
+      method: HOST_UPLOAD_METHOD,
+      params: Object.fromEntries(
+        Object.entries(params).filter(([, value]) => value !== undefined),
+      ),
+    };
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new HostUploadError(
+          UPLOAD_ERR_TIMEOUT,
+          `${HOST_UPLOAD_METHOD} timed out after ${timeoutMs}ms`,
+        ));
+      }, timeoutMs);
+      this.pending.set(id, {
+        resolve: (value) => {
+          clearTimeout(timeout);
+          resolve(value);
+        },
+        reject: (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        },
+      });
+      writeStdoutLine(JSON.stringify(message)).catch((error) => {
+        clearTimeout(timeout);
+        this.pending.delete(id);
+        reject(error);
+      });
+    });
+  }
+}
+
+const hostUploadClient = new ExecutaHostUploadClient();
 
 function formatRpcId(id) {
   if (id === null) {
@@ -247,18 +359,6 @@ function readOptionalStringArg(args, parameterName) {
   return value;
 }
 
-const previewFiles = new Map();
-const previewImageFiles = new Map();
-const artifactFiles = new Map();
-const jsonPayloads = new Map();
-const uploadedSourceUploadSessions = new Map();
-const styleProfileReferenceUploadSessions = new Map();
-let previewServerPromise = null;
-
-const UPLOADED_SOURCE_UPLOAD_TTL_MS = 15 * 60 * 1000;
-const UPLOADED_SOURCE_SINGLE_FILE_MAX_BYTES = 25 * 1024 * 1024;
-const STYLE_PROFILE_REFERENCE_UPLOAD_TTL_MS = 15 * 60 * 1000;
-const STYLE_PROFILE_REFERENCE_SINGLE_FILE_MAX_BYTES = 100 * 1024 * 1024;
 const UPLOADED_SOURCE_STAGING_DIR = path.join(
   os.tmpdir(),
   "presenton-template-engine-executa",
@@ -270,24 +370,6 @@ const STYLE_PROFILE_REFERENCE_STAGING_DIR = path.join(
   "style-profile-reference-staging",
 );
 
-function encodeRfc5987Value(value) {
-  return encodeURIComponent(value)
-    .replace(/['()]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
-    .replace(/\*/g, "%2A");
-}
-
-function sanitizeHeaderFileName(value) {
-  const fallback = value
-    .normalize("NFKC")
-    .replace(/[\u0000-\u001f\u007f<>:"/\\|?*]+/g, " ")
-    .replace(/[^\x20-\x7e]+/g, "_")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/[. ]+$/g, "");
-
-  return fallback || "deck";
-}
-
 function getArtifactContentType(artifactType) {
   if (artifactType === "pptx") {
     return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
@@ -298,52 +380,80 @@ function getArtifactContentType(artifactType) {
   return "application/octet-stream";
 }
 
-function writePlainResponse(response, statusCode, message, extraHeaders = {}) {
-  response.writeHead(statusCode, {
-    "content-type": "text/plain; charset=utf-8",
-    "cache-control": "no-store",
-    "x-content-type-options": "nosniff",
-    ...extraHeaders,
-  });
-  response.end(message);
+function assertSafeUploadFilename(filename) {
+  if (typeof filename !== "string" || filename.trim().length === 0) {
+    throw new Error('"filename" must be a non-empty string');
+  }
+  const trimmed = filename.trim();
+  if (trimmed.includes("/") || trimmed.includes("\\") || path.basename(trimmed) !== trimmed) {
+    throw new Error('"filename" must not contain path separators');
+  }
+  return trimmed;
 }
 
-function getUploadCorsHeaders() {
+function readHostUploadRefArg(args, parameterName = "host_upload") {
+  const value = args?.[parameterName];
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`"${parameterName}" must be a HostUploadRef object`);
+  }
+  if (value.transport !== "host_upload") {
+    throw new Error(`"${parameterName}.transport" must be "host_upload"`);
+  }
+  if (typeof value.r2_key !== "string" || value.r2_key.trim().length === 0) {
+    throw new Error(`"${parameterName}.r2_key" must be a non-empty string`);
+  }
+  if (typeof value.url !== "string" || value.url.trim().length === 0) {
+    throw new Error(`"${parameterName}.url" must be a non-empty string`);
+  }
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(value.url);
+  } catch {
+    throw new Error(`"${parameterName}.url" must be a valid URL`);
+  }
+  if (parsedUrl.protocol !== "https:") {
+    throw new Error(`"${parameterName}.url" must use HTTPS`);
+  }
+  if (typeof value.mime_type !== "string" || value.mime_type.trim().length === 0) {
+    throw new Error(`"${parameterName}.mime_type" must be a non-empty string`);
+  }
+  const sizeBytes = Number(value.size_bytes);
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+    throw new Error(`"${parameterName}.size_bytes" must be a positive number`);
+  }
   return {
-    "access-control-allow-origin": "*",
-    "access-control-allow-methods": "PUT, OPTIONS",
-    "access-control-allow-headers": "content-type, content-length",
+    transport: "host_upload",
+    r2_key: value.r2_key,
+    url: value.url,
+    mime_type: value.mime_type,
+    size_bytes: Math.floor(sizeBytes),
+    filename: typeof value.filename === "string" ? value.filename : undefined,
+    expires_at: typeof value.expires_at === "string" ? value.expires_at : undefined,
+    expires_in: typeof value.expires_in === "number" ? value.expires_in : undefined,
+    mode: "negotiate+confirm",
   };
 }
 
-function cleanupExpiredUploadedSourceUploadSessions() {
-  const now = Date.now();
-  for (const [uploadId, session] of uploadedSourceUploadSessions) {
-    if (Date.parse(session.expiresAt) > now) continue;
-    uploadedSourceUploadSessions.delete(uploadId);
-    void unlink(session.stagingPath).catch(() => undefined);
+async function downloadHostUploadToStaging({ hostUpload, stagingPath, expectedSizeBytes }) {
+  const response = await fetch(hostUpload.url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Host Upload download failed: HTTP ${response.status}`);
   }
-}
-
-function cleanupExpiredStyleProfileReferenceUploadSessions() {
-  const now = Date.now();
-  for (const [uploadId, session] of styleProfileReferenceUploadSessions) {
-    if (Date.parse(session.expiresAt) > now) continue;
-    styleProfileReferenceUploadSessions.delete(uploadId);
-    void unlink(session.stagingPath).catch(() => undefined);
+  if (!response.body) {
+    throw new Error("Host Upload download returned an empty response body.");
   }
-}
 
-async function writeUploadedSourceStagingFile(request, session) {
-  await mkdir(path.dirname(session.stagingPath), { recursive: true });
-  const handle = await open(session.stagingPath, "w");
-  let received = 0;
+  await mkdir(path.dirname(stagingPath), { recursive: true });
+  const handle = await open(stagingPath, "w");
+  let receivedBytes = 0;
   try {
-    for await (const chunk of request) {
+    for await (const chunk of Readable.fromWeb(response.body)) {
       const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      received += buffer.byteLength;
-      if (received > session.expectedSizeBytes || received > UPLOADED_SOURCE_SINGLE_FILE_MAX_BYTES) {
-        throw new Error(`Uploaded source body exceeds expected size of ${session.expectedSizeBytes} bytes.`);
+      receivedBytes += buffer.byteLength;
+      if (receivedBytes > expectedSizeBytes) {
+        throw new Error(
+          `Host Upload size mismatch: expected ${expectedSizeBytes} bytes, got more than ${expectedSizeBytes} bytes.`,
+        );
       }
       await handle.write(buffer);
     }
@@ -351,380 +461,151 @@ async function writeUploadedSourceStagingFile(request, session) {
     await handle.close();
   }
 
-  if (received !== session.expectedSizeBytes) {
-    await unlink(session.stagingPath).catch(() => undefined);
-    throw new Error(`Uploaded source body size mismatch: expected ${session.expectedSizeBytes} bytes, got ${received} bytes.`);
+  if (receivedBytes !== expectedSizeBytes || receivedBytes !== hostUpload.size_bytes) {
+    throw new Error(
+      `Host Upload size mismatch: expected ${expectedSizeBytes} bytes, got ${receivedBytes} bytes.`,
+    );
   }
-  return received;
+  return receivedBytes;
 }
 
-async function writeStyleProfileReferenceStagingFile(request, session) {
-  await mkdir(path.dirname(session.stagingPath), { recursive: true });
-  const handle = await open(session.stagingPath, "w");
-  let received = 0;
-  try {
-    for await (const chunk of request) {
-      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      received += buffer.byteLength;
-      if (received > session.expectedSizeBytes || received > STYLE_PROFILE_REFERENCE_SINGLE_FILE_MAX_BYTES) {
-        throw new Error(`Style Profile reference body exceeds expected size of ${session.expectedSizeBytes} bytes.`);
-      }
-      await handle.write(buffer);
-    }
-  } finally {
-    await handle.close();
+async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose }) {
+  const normalizedPath = path.normalize(filePath);
+  const fileStat = await stat(normalizedPath);
+  if (!fileStat.isFile()) {
+    throw new Error(`Host Upload source path is not a file: ${normalizedPath}`);
   }
-
-  if (received !== session.expectedSizeBytes) {
-    await unlink(session.stagingPath).catch(() => undefined);
-    throw new Error(`Style Profile reference body size mismatch: expected ${session.expectedSizeBytes} bytes, got ${received} bytes.`);
+  const safeFilename = assertSafeUploadFilename(filename || path.basename(normalizedPath));
+  if (typeof mimeType !== "string" || mimeType.trim().length === 0 || mimeType === "application/octet-stream") {
+    throw new Error(`Host Upload MIME type must be specific for ${safeFilename}`);
   }
-  return received;
-}
-
-async function handlePreviewRequest(request, response) {
-  const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
-  const parts = requestUrl.pathname.split("/").filter(Boolean);
-
-  if (request.method === "OPTIONS" && parts.length === 3 && parts[0] === "upload") {
-    response.writeHead(204, {
-      "cache-control": "no-store",
-      ...getUploadCorsHeaders(),
-    });
-    response.end();
-    return;
-  }
-
-  if (request.method === "OPTIONS" && parts.length === 3 && parts[0] === "style-profile-upload") {
-    response.writeHead(204, {
-      "cache-control": "no-store",
-      ...getUploadCorsHeaders(),
-    });
-    response.end();
-    return;
-  }
-
-  if (parts.length === 3 && parts[0] === "upload") {
-    cleanupExpiredUploadedSourceUploadSessions();
-    const uploadId = parts[1];
-    const token = parts[2];
-    const session = uploadedSourceUploadSessions.get(uploadId);
-    if (!session || session.token !== token) {
-      writePlainResponse(response, 404, "Upload session expired or not found", getUploadCorsHeaders());
-      return;
-    }
-    if (request.method !== "PUT") {
-      writePlainResponse(response, 405, "Upload endpoint only accepts PUT", getUploadCorsHeaders());
-      return;
-    }
-    if (Date.parse(session.expiresAt) <= Date.now()) {
-      uploadedSourceUploadSessions.delete(uploadId);
-      await unlink(session.stagingPath).catch(() => undefined);
-      writePlainResponse(response, 410, "Upload session expired", getUploadCorsHeaders());
-      return;
-    }
-    if (session.committed) {
-      writePlainResponse(response, 409, "Upload session already committed", getUploadCorsHeaders());
-      return;
-    }
-    if (session.uploaded) {
-      writePlainResponse(response, 409, "Upload session already received a binary body", getUploadCorsHeaders());
-      return;
-    }
-    try {
-      const received = await writeUploadedSourceStagingFile(request, session);
-      session.receivedBytes = received;
-      session.uploaded = true;
-      response.writeHead(200, {
-        "content-type": "application/json; charset=utf-8",
-        "cache-control": "no-store",
-        "x-content-type-options": "nosniff",
-        ...getUploadCorsHeaders(),
-      });
-      response.end(JSON.stringify({ ok: true, upload_id: uploadId, size_bytes: received }));
-    } catch (error) {
-      session.uploaded = false;
-      session.receivedBytes = 0;
-      await unlink(session.stagingPath).catch(() => undefined);
-      const message = error instanceof Error ? error.message : "Failed to receive uploaded source body";
-      writePlainResponse(response, 413, message, getUploadCorsHeaders());
-    }
-    return;
-  }
-
-  if (parts.length === 3 && parts[0] === "style-profile-upload") {
-    cleanupExpiredStyleProfileReferenceUploadSessions();
-    const uploadId = parts[1];
-    const token = parts[2];
-    const session = styleProfileReferenceUploadSessions.get(uploadId);
-    if (!session || session.token !== token) {
-      writePlainResponse(response, 404, "Style Profile reference upload session expired or not found", getUploadCorsHeaders());
-      return;
-    }
-    if (request.method !== "PUT") {
-      writePlainResponse(response, 405, "Upload endpoint only accepts PUT", getUploadCorsHeaders());
-      return;
-    }
-    if (Date.parse(session.expiresAt) <= Date.now()) {
-      styleProfileReferenceUploadSessions.delete(uploadId);
-      await unlink(session.stagingPath).catch(() => undefined);
-      writePlainResponse(response, 410, "Style Profile reference upload session expired", getUploadCorsHeaders());
-      return;
-    }
-    if (session.committed) {
-      writePlainResponse(response, 409, "Upload session already committed", getUploadCorsHeaders());
-      return;
-    }
-    if (session.uploaded) {
-      writePlainResponse(response, 409, "Upload session already received a binary body", getUploadCorsHeaders());
-      return;
-    }
-    try {
-      const received = await writeStyleProfileReferenceStagingFile(request, session);
-      session.receivedBytes = received;
-      session.uploaded = true;
-      response.writeHead(200, {
-        "content-type": "application/json; charset=utf-8",
-        "cache-control": "no-store",
-        "x-content-type-options": "nosniff",
-        ...getUploadCorsHeaders(),
-      });
-      response.end(JSON.stringify({ ok: true, upload_id: uploadId, size_bytes: received }));
-    } catch (error) {
-      session.uploaded = false;
-      session.receivedBytes = 0;
-      await unlink(session.stagingPath).catch(() => undefined);
-      const message = error instanceof Error ? error.message : "Failed to receive Style Profile reference body";
-      writePlainResponse(response, 413, message, getUploadCorsHeaders());
-    }
-    return;
-  }
-
-  if (parts.length === 3 && parts[0] === "preview" && parts[2] === "deck.html") {
-    const previewId = parts[1];
-    const htmlPath = previewFiles.get(previewId);
-    if (!htmlPath) {
-      response.writeHead(404, {
-        "content-type": "text/plain; charset=utf-8",
-        "cache-control": "no-store",
-      });
-      response.end("Preview expired or not found");
-      return;
-    }
-
-    try {
-      const html = await readFile(htmlPath, "utf8");
-      response.writeHead(200, {
-        "content-type": "text/html; charset=utf-8",
-        "cache-control": "no-store",
-        "x-content-type-options": "nosniff",
-      });
-      response.end(html);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to read preview HTML";
-      response.writeHead(500, {
-        "content-type": "text/plain; charset=utf-8",
-        "cache-control": "no-store",
-      });
-      response.end(message);
-    }
-    return;
-  }
-
-  if (parts.length === 3 && parts[0] === "preview" && parts[2] === "slide.png") {
-    const previewId = parts[1];
-    const imagePath = previewImageFiles.get(previewId);
-    if (!imagePath) {
-      response.writeHead(404, {
-        "content-type": "text/plain; charset=utf-8",
-        "cache-control": "no-store",
-      });
-      response.end("Preview image expired or not found");
-      return;
-    }
-
-    try {
-      const imageBuffer = await readFile(imagePath);
-      response.writeHead(200, {
-        "content-type": "image/png",
-        "content-length": imageBuffer.byteLength,
-        "cache-control": "no-store",
-        "x-content-type-options": "nosniff",
-      });
-      response.end(imageBuffer);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to read preview image";
-      response.writeHead(500, {
-        "content-type": "text/plain; charset=utf-8",
-        "cache-control": "no-store",
-      });
-      response.end(message);
-    }
-    return;
-  }
-
-  if (parts.length === 3 && parts[0] === "artifact") {
-    const artifactId = parts[1];
-    const artifact = artifactFiles.get(artifactId);
-    if (!artifact) {
-      response.writeHead(404, {
-        "content-type": "text/plain; charset=utf-8",
-        "cache-control": "no-store",
-      });
-      response.end("Artifact expired or not found");
-      return;
-    }
-
-    try {
-      const fileBuffer = await readFile(artifact.path);
-      const fallbackFileName = sanitizeHeaderFileName(artifact.filename);
-      response.writeHead(200, {
-        "content-type": getArtifactContentType(artifact.artifactType),
-        "content-length": fileBuffer.byteLength,
-        "content-disposition": `attachment; filename="${fallbackFileName}"; filename*=UTF-8''${encodeRfc5987Value(artifact.filename)}`,
-        "cache-control": "no-store",
-        "x-content-type-options": "nosniff",
-      });
-      response.end(fileBuffer);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to read artifact";
-      response.writeHead(500, {
-        "content-type": "text/plain; charset=utf-8",
-        "cache-control": "no-store",
-      });
-      response.end(message);
-    }
-    return;
-  }
-
-  if (parts.length === 3 && parts[0] === "json") {
-    const payloadId = parts[1];
-    const payload = jsonPayloads.get(payloadId);
-    if (!payload) {
-      response.writeHead(404, {
-        "content-type": "text/plain; charset=utf-8",
-        "cache-control": "no-store",
-        "access-control-allow-origin": "*",
-      });
-      response.end("JSON payload expired or not found");
-      return;
-    }
-
-    response.writeHead(200, {
-      "content-type": "application/json; charset=utf-8",
-      "content-length": payload.byteLength,
-      "cache-control": "no-store",
-      "x-content-type-options": "nosniff",
-      "access-control-allow-origin": "*",
-    });
-    response.end(payload.body);
-    return;
-  }
-
-  {
-    response.writeHead(404, {
-      "content-type": "text/plain; charset=utf-8",
-      "cache-control": "no-store",
-    });
-    response.end("Not found");
-    return;
-  }
-}
-
-function ensurePreviewServer() {
-  if (previewServerPromise) {
-    return previewServerPromise;
-  }
-
-  previewServerPromise = new Promise((resolve, reject) => {
-    const server = createServer((request, response) => {
-      void handlePreviewRequest(request, response);
-    });
-
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        reject(new Error("Failed to bind local preview server"));
-        return;
-      }
-
-      process.stderr.write(`Preview server listening on 127.0.0.1:${address.port}\n`);
-      resolve({ server, port: address.port });
-    });
+  const sizeBytes = fileStat.size;
+  const negotiated = await hostUploadClient.negotiate({
+    filename: safeFilename,
+    mimeType: mimeType.trim(),
+    sizeBytes,
+    purpose: purpose || "user_artifact",
   });
-
-  return previewServerPromise;
-}
-
-async function registerPreviewHtml(htmlPath) {
-  const normalizedHtmlPath = path.normalize(htmlPath);
-  const htmlStat = await stat(normalizedHtmlPath);
-  if (!htmlStat.isFile()) {
-    throw new Error(`Preview HTML is not a file: ${normalizedHtmlPath}`);
+  if (!negotiated || typeof negotiated.put_url !== "string" || typeof negotiated.r2_key !== "string") {
+    throw new Error("host/uploadFile negotiate returned an invalid response");
   }
-
-  const { port } = await ensurePreviewServer();
-  const previewId = randomUUID();
-  previewFiles.set(previewId, normalizedHtmlPath);
-
-  return `http://127.0.0.1:${port}/preview/${previewId}/deck.html`;
-}
-
-async function registerPreviewImage(imagePath) {
-  const normalizedImagePath = path.normalize(imagePath);
-  const imageStat = await stat(normalizedImagePath);
-  if (!imageStat.isFile()) {
-    throw new Error(`Preview image is not a file: ${normalizedImagePath}`);
-  }
-
-  const { port } = await ensurePreviewServer();
-  const previewId = randomUUID();
-  previewImageFiles.set(previewId, normalizedImagePath);
-
-  return `http://127.0.0.1:${port}/preview/${previewId}/slide.png`;
-}
-
-async function registerArtifactDownload({ path: artifactPath, filename, artifact_type: artifactType }) {
-  const normalizedArtifactPath = path.normalize(artifactPath);
-  const artifactStat = await stat(normalizedArtifactPath);
-  if (!artifactStat.isFile()) {
-    throw new Error(`Export artifact is not a file: ${normalizedArtifactPath}`);
-  }
-
-  const { port } = await ensurePreviewServer();
-  const artifactId = randomUUID();
-  const safeUrlName = encodeURIComponent(filename);
-  artifactFiles.set(artifactId, {
-    path: normalizedArtifactPath,
-    filename,
-    artifactType,
+  const putResponse = await fetch(negotiated.put_url, {
+    method: "PUT",
+    headers: {
+      ...(negotiated.headers ?? {}),
+      "Content-Length": String(sizeBytes),
+    },
+    body: createReadStream(normalizedPath),
+    duplex: "half",
   });
-
-  return `http://127.0.0.1:${port}/artifact/${artifactId}/${safeUrlName}`;
-}
-
-async function registerJsonPayload(value, filename) {
-  const body = `${JSON.stringify(value)}\n`;
-  const { port } = await ensurePreviewServer();
-  const payloadId = randomUUID();
-  const safeUrlName = encodeURIComponent(sanitizeHeaderFileName(filename || "payload.json"));
-  jsonPayloads.set(payloadId, {
-    body,
-    byteLength: Buffer.byteLength(body, "utf8"),
-  });
-
-  return `http://127.0.0.1:${port}/json/${payloadId}/${safeUrlName}`;
-}
-
-async function registerJsonReference(value, filename, urlFieldName) {
+  if (!putResponse.ok) {
+    const message = await putResponse.text().catch(() => "");
+    throw new Error(message || `Host Upload PUT failed: HTTP ${putResponse.status}`);
+  }
+  const confirmed = await hostUploadClient.confirm(negotiated.r2_key);
+  const url = confirmed.download_url;
+  if (typeof url !== "string" || url.length === 0) {
+    throw new Error("host/uploadFile confirm did not return download_url");
+  }
   return {
-    [urlFieldName]: await registerJsonPayload(value, filename),
+    transport: "host_upload",
+    r2_key: typeof confirmed.r2_key === "string" && confirmed.r2_key.length > 0
+      ? confirmed.r2_key
+      : negotiated.r2_key,
+    url,
+    mime_type: mimeType.trim(),
+    size_bytes: typeof confirmed.size_bytes === "number" ? confirmed.size_bytes : sizeBytes,
+    filename: safeFilename,
+    expires_at: typeof confirmed.expires_at === "string"
+      ? confirmed.expires_at
+      : typeof negotiated.expires_at === "string"
+        ? negotiated.expires_at
+        : undefined,
+    expires_in: typeof confirmed.expires_in === "number" ? confirmed.expires_in : undefined,
+    mode: "negotiate+confirm",
+  };
+}
+
+async function uploadJsonToHost(value, filename) {
+  const body = Buffer.from(`${JSON.stringify(value)}\n`, "utf8");
+  return uploadBufferToHost({
+    buffer: body,
+    filename,
+    mimeType: "application/json",
+    purpose: "user_artifact",
+  });
+}
+
+async function uploadBufferToHost({ buffer, filename, mimeType, purpose }) {
+  const safeFilename = assertSafeUploadFilename(filename);
+  if (!Buffer.isBuffer(buffer) || buffer.byteLength <= 0) {
+    throw new Error(`Host Upload buffer must not be empty for ${safeFilename}`);
+  }
+  if (typeof mimeType !== "string" || mimeType.trim().length === 0 || mimeType === "application/octet-stream") {
+    throw new Error(`Host Upload MIME type must be specific for ${safeFilename}`);
+  }
+  const negotiated = await hostUploadClient.negotiate({
+    filename: safeFilename,
+    mimeType: mimeType.trim(),
+    sizeBytes: buffer.byteLength,
+    purpose: purpose || "user_artifact",
+  });
+  if (!negotiated || typeof negotiated.put_url !== "string" || typeof negotiated.r2_key !== "string") {
+    throw new Error("host/uploadFile negotiate returned an invalid response");
+  }
+  const putResponse = await fetch(negotiated.put_url, {
+    method: "PUT",
+    headers: {
+      ...(negotiated.headers ?? {}),
+      "Content-Length": String(buffer.byteLength),
+    },
+    body: buffer,
+  });
+  if (!putResponse.ok) {
+    const message = await putResponse.text().catch(() => "");
+    throw new Error(message || `Host Upload PUT failed: HTTP ${putResponse.status}`);
+  }
+  const confirmed = await hostUploadClient.confirm(negotiated.r2_key);
+  const url = confirmed.download_url;
+  if (typeof url !== "string" || url.length === 0) {
+    throw new Error("host/uploadFile confirm did not return download_url");
+  }
+  return {
+    transport: "host_upload",
+    r2_key: typeof confirmed.r2_key === "string" && confirmed.r2_key.length > 0
+      ? confirmed.r2_key
+      : negotiated.r2_key,
+    url,
+    mime_type: mimeType.trim(),
+    size_bytes: typeof confirmed.size_bytes === "number" ? confirmed.size_bytes : buffer.byteLength,
+    filename: safeFilename,
+    expires_at: typeof confirmed.expires_at === "string"
+      ? confirmed.expires_at
+      : typeof negotiated.expires_at === "string"
+        ? negotiated.expires_at
+        : undefined,
+    expires_in: typeof confirmed.expires_in === "number" ? confirmed.expires_in : undefined,
+    mode: "negotiate+confirm",
+  };
+}
+
+async function uploadPreviewImage(imagePath) {
+  return uploadLocalFileToHost({
+    filePath: imagePath,
+    filename: `${path.basename(imagePath, path.extname(imagePath)) || "slide"}.png`,
+    mimeType: "image/png",
+    purpose: "user_artifact",
+  });
+}
+
+async function registerJsonReference(value, filename, uploadFieldName) {
+  return {
+    [uploadFieldName]: await uploadJsonToHost(value, filename),
   };
 }
 
 async function registerWorkspaceJsonReference(value) {
-  return registerJsonReference(value, "workspace.json", "workspace_url");
+  return registerJsonReference(value, "workspace.json", "workspace_upload");
 }
 
 function parseRequestLine(line) {
@@ -914,92 +795,53 @@ async function toolAppOpenWorkspace(args) {
   return registerWorkspaceJsonReference(await openAppWorkspace({ workspace_dir: workspaceDir }));
 }
 
-async function toolAppBeginUploadedSourceUpload(args) {
+async function toolAppCommitUploadedSourceHostUpload(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
   }
 
-  cleanupExpiredUploadedSourceUploadSessions();
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  if (typeof args.filename !== "string" || args.filename.trim().length === 0) {
-    throw new Error('"filename" must be a non-empty string');
-  }
+  const filename = assertSafeUploadFilename(args.filename);
+  const hostUpload = readHostUploadRefArg(args, "host_upload");
   const sizeBytes = Number(args.size_bytes);
   if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
     throw new Error('"size_bytes" must be a positive number');
   }
-  if (sizeBytes > UPLOADED_SOURCE_SINGLE_FILE_MAX_BYTES) {
-    throw new Error(`Uploaded source file exceeds the single-file limit of ${UPLOADED_SOURCE_SINGLE_FILE_MAX_BYTES} bytes.`);
+  if (Math.floor(sizeBytes) !== hostUpload.size_bytes) {
+    throw new Error(`Host Upload size mismatch: input size_bytes=${Math.floor(sizeBytes)} host_upload.size_bytes=${hostUpload.size_bytes}`);
+  }
+  const mimeType = typeof args.mime_type === "string" && args.mime_type.trim().length > 0
+    ? args.mime_type.trim()
+    : hostUpload.mime_type;
+  if (mimeType !== hostUpload.mime_type) {
+    throw new Error("Host Upload MIME type mismatch.");
+  }
+  if (filename !== (hostUpload.filename || filename)) {
+    throw new Error("Host Upload filename mismatch.");
   }
 
-  const { port } = await ensurePreviewServer();
   const uploadId = randomUUID();
-  const token = randomUUID();
-  const expiresAt = new Date(Date.now() + UPLOADED_SOURCE_UPLOAD_TTL_MS).toISOString();
   const stagingPath = path.join(UPLOADED_SOURCE_STAGING_DIR, `${uploadId}.upload`);
-  uploadedSourceUploadSessions.set(uploadId, {
-    uploadId,
-    token,
-    workspaceDir,
-    filename: args.filename,
-    mimeType: typeof args.mime_type === "string" ? args.mime_type : "",
-    expectedSizeBytes: Math.floor(sizeBytes),
-    stagingPath,
-    expiresAt,
-    uploaded: false,
-    committed: false,
-    receivedBytes: 0,
-  });
-
-  return {
-    workspace_dir: workspaceDir,
-    upload_id: uploadId,
-    upload_url: `http://127.0.0.1:${port}/upload/${encodeURIComponent(uploadId)}/${encodeURIComponent(token)}`,
-    expires_at: expiresAt,
-    size_bytes: Math.floor(sizeBytes),
-  };
-}
-
-async function toolAppCommitUploadedSourceUpload(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  cleanupExpiredUploadedSourceUploadSessions();
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  if (typeof args.upload_id !== "string" || args.upload_id.trim().length === 0) {
-    throw new Error('"upload_id" must be a non-empty string');
-  }
-  const uploadId = args.upload_id;
-  const session = uploadedSourceUploadSessions.get(uploadId);
-  if (!session) {
-    throw new Error(`Uploaded source upload session not found or expired: ${uploadId}`);
-  }
-  if (session.workspaceDir !== workspaceDir) {
-    throw new Error("Uploaded source upload session workspace mismatch.");
-  }
-  if (Date.parse(session.expiresAt) <= Date.now()) {
-    uploadedSourceUploadSessions.delete(uploadId);
-    await unlink(session.stagingPath).catch(() => undefined);
-    throw new Error(`Uploaded source upload session expired: ${uploadId}`);
-  }
-  if (!session.uploaded || session.receivedBytes !== session.expectedSizeBytes) {
-    throw new Error(`Uploaded source upload session has not received the expected binary body: ${uploadId}`);
-  }
-
   try {
-    session.committed = true;
-    return await commitAppUploadedSourceUpload({
+    await downloadHostUploadToStaging({
+      hostUpload,
+      stagingPath,
+      expectedSizeBytes: Math.floor(sizeBytes),
+    });
+    const result = await commitAppUploadedSourceUpload({
       workspace_dir: workspaceDir,
       upload_id: uploadId,
-      filename: session.filename,
-      mime_type: session.mimeType,
-      staging_file_path: session.stagingPath,
-      expected_size_bytes: session.expectedSizeBytes,
+      filename,
+      mime_type: mimeType,
+      staging_file_path: stagingPath,
+      expected_size_bytes: Math.floor(sizeBytes),
     });
+    return {
+      ...result,
+      host_upload: hostUpload,
+    };
   } finally {
-    uploadedSourceUploadSessions.delete(uploadId);
-    await unlink(session.stagingPath).catch(() => undefined);
+    await unlink(stagingPath).catch(() => undefined);
   }
 }
 
@@ -1017,96 +859,55 @@ async function toolAppPrepareStyleProfileCreation(args) {
   });
 }
 
-async function toolAppBeginStyleProfileReferenceUpload(args) {
+async function toolAppCommitStyleProfileReferenceHostUpload(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
   }
-
-  cleanupExpiredStyleProfileReferenceUploadSessions();
   if (typeof args.creation_id !== "string" || args.creation_id.trim().length === 0) {
     throw new Error('"creation_id" must be a non-empty string');
   }
-  if (typeof args.filename !== "string" || args.filename.trim().length === 0) {
-    throw new Error('"filename" must be a non-empty string');
-  }
+  const creationId = args.creation_id;
+  const filename = assertSafeUploadFilename(args.filename);
+  const hostUpload = readHostUploadRefArg(args, "host_upload");
   const sizeBytes = Number(args.size_bytes);
   if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
     throw new Error('"size_bytes" must be a positive number');
   }
-  if (sizeBytes > STYLE_PROFILE_REFERENCE_SINGLE_FILE_MAX_BYTES) {
-    throw new Error(`Style Profile reference file exceeds the single-file limit of ${STYLE_PROFILE_REFERENCE_SINGLE_FILE_MAX_BYTES} bytes.`);
+  if (Math.floor(sizeBytes) !== hostUpload.size_bytes) {
+    throw new Error(`Host Upload size mismatch: input size_bytes=${Math.floor(sizeBytes)} host_upload.size_bytes=${hostUpload.size_bytes}`);
+  }
+  const mimeType = typeof args.mime_type === "string" && args.mime_type.trim().length > 0
+    ? args.mime_type.trim()
+    : hostUpload.mime_type;
+  if (mimeType !== hostUpload.mime_type) {
+    throw new Error("Host Upload MIME type mismatch.");
+  }
+  if (filename !== (hostUpload.filename || filename)) {
+    throw new Error("Host Upload filename mismatch.");
   }
 
-  const { port } = await ensurePreviewServer();
   const uploadId = randomUUID();
-  const token = randomUUID();
-  const expiresAt = new Date(Date.now() + STYLE_PROFILE_REFERENCE_UPLOAD_TTL_MS).toISOString();
   const stagingPath = path.join(STYLE_PROFILE_REFERENCE_STAGING_DIR, `${uploadId}.upload`);
-  styleProfileReferenceUploadSessions.set(uploadId, {
-    uploadId,
-    token,
-    creationId: args.creation_id,
-    filename: args.filename,
-    mimeType: typeof args.mime_type === "string" ? args.mime_type : "",
-    expectedSizeBytes: Math.floor(sizeBytes),
-    stagingPath,
-    expiresAt,
-    uploaded: false,
-    committed: false,
-    receivedBytes: 0,
-  });
-
-  return {
-    creation_id: args.creation_id,
-    upload_id: uploadId,
-    upload_url: `http://127.0.0.1:${port}/style-profile-upload/${encodeURIComponent(uploadId)}/${encodeURIComponent(token)}`,
-    expires_at: expiresAt,
-    size_bytes: Math.floor(sizeBytes),
-  };
-}
-
-async function toolAppCommitStyleProfileReferenceUpload(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  cleanupExpiredStyleProfileReferenceUploadSessions();
-  if (typeof args.creation_id !== "string" || args.creation_id.trim().length === 0) {
-    throw new Error('"creation_id" must be a non-empty string');
-  }
-  if (typeof args.upload_id !== "string" || args.upload_id.trim().length === 0) {
-    throw new Error('"upload_id" must be a non-empty string');
-  }
-  const uploadId = args.upload_id;
-  const session = styleProfileReferenceUploadSessions.get(uploadId);
-  if (!session) {
-    throw new Error(`Style Profile reference upload session not found or expired: ${uploadId}`);
-  }
-  if (session.creationId !== args.creation_id) {
-    throw new Error("Style Profile reference upload session creation workspace mismatch.");
-  }
-  if (Date.parse(session.expiresAt) <= Date.now()) {
-    styleProfileReferenceUploadSessions.delete(uploadId);
-    await unlink(session.stagingPath).catch(() => undefined);
-    throw new Error(`Style Profile reference upload session expired: ${uploadId}`);
-  }
-  if (!session.uploaded || session.receivedBytes !== session.expectedSizeBytes) {
-    throw new Error(`Style Profile reference upload session has not received the expected binary body: ${uploadId}`);
-  }
-
   try {
-    session.committed = true;
-    return await commitAppStyleProfileReferenceUpload({
-      creation_id: args.creation_id,
-      upload_id: uploadId,
-      filename: session.filename,
-      mime_type: session.mimeType,
-      staging_file_path: session.stagingPath,
-      expected_size_bytes: session.expectedSizeBytes,
+    await downloadHostUploadToStaging({
+      hostUpload,
+      stagingPath,
+      expectedSizeBytes: Math.floor(sizeBytes),
     });
+    const result = await commitAppStyleProfileReferenceUpload({
+      creation_id: creationId,
+      upload_id: uploadId,
+      filename,
+      mime_type: mimeType,
+      staging_file_path: stagingPath,
+      expected_size_bytes: Math.floor(sizeBytes),
+    });
+    return {
+      ...result,
+      host_upload: hostUpload,
+    };
   } finally {
-    styleProfileReferenceUploadSessions.delete(uploadId);
-    await unlink(session.stagingPath).catch(() => undefined);
+    await unlink(stagingPath).catch(() => undefined);
   }
 }
 
@@ -1205,27 +1006,6 @@ async function toolAppRasterizePptxToImages(args) {
     output_dir: outputDir,
     target_height: targetHeight,
     overwrite: args.overwrite === true,
-  });
-}
-
-async function toolAppUploadUploadedSource(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  if (typeof args.filename !== "string" || args.filename.trim().length === 0) {
-    throw new Error('"filename" must be a non-empty string');
-  }
-  if (typeof args.content_base64 !== "string" || args.content_base64.trim().length === 0) {
-    throw new Error('"content_base64" must be a non-empty base64 string');
-  }
-
-  return uploadAppUploadedSource({
-    workspace_dir: workspaceDir,
-    filename: args.filename,
-    mime_type: typeof args.mime_type === "string" ? args.mime_type : undefined,
-    content_base64: args.content_base64,
   });
 }
 
@@ -1532,7 +1312,7 @@ async function toolAppSelectWorkspaceTemplate(args) {
   return registerJsonReference(await selectAppWorkspaceTemplate({
     workspace_dir: workspaceDir,
     template_group: args.template_group,
-  }), "select-template.json", "result_url");
+  }), "select-template.json", "result_upload");
 }
 
 async function toolAppGetTemplatePlanningContext(args) {
@@ -1736,7 +1516,7 @@ async function toolAppGetResearchEvidence(args) {
   return registerJsonReference(
     await getAppResearchEvidence({ workspace_dir: workspaceDir }),
     "research-evidence.json",
-    "result_url",
+    "result_upload",
   );
 }
 
@@ -1940,8 +1720,7 @@ async function toolAppRenderWorkspacePagePreview(args) {
 
   return {
     ...result,
-    preview_url: await registerPreviewHtml(result.html_path),
-    screenshot_url: await registerPreviewImage(result.screenshot_path),
+    screenshot_upload: await uploadPreviewImage(result.screenshot_path),
   };
 }
 
@@ -1957,15 +1736,13 @@ async function toolAppRenderDeckHtml(args) {
   const slides = await Promise.all(
     result.slides.map(async (slide) => ({
       ...slide,
-      preview_url: await registerPreviewHtml(slide.html_path),
-      screenshot_url: await registerPreviewImage(slide.screenshot_path),
+      screenshot_upload: await uploadPreviewImage(slide.screenshot_path),
     })),
   );
 
   return {
     ...result,
     slides,
-    preview_url: slides[0]?.preview_url ?? null,
   };
 }
 
@@ -1981,15 +1758,13 @@ async function toolAppGetRenderedDeckHtml(args) {
   const slides = await Promise.all(
     result.slides.map(async (slide) => ({
       ...slide,
-      preview_url: await registerPreviewHtml(slide.html_path),
-      screenshot_url: await registerPreviewImage(slide.screenshot_path),
+      screenshot_upload: await uploadPreviewImage(slide.screenshot_path),
     })),
   );
 
   return {
     ...result,
     slides,
-    preview_url: slides[0]?.preview_url ?? null,
   };
 }
 
@@ -2041,11 +1816,16 @@ async function toolAppGetExportArtifactDownloadUrl(args) {
     workspace_dir: workspaceDir,
     artifact_type: artifactType,
   });
-  const downloadUrl = await registerArtifactDownload(artifact);
+  const downloadUpload = await uploadLocalFileToHost({
+    filePath: artifact.path,
+    filename: artifact.filename,
+    mimeType: getArtifactContentType(artifact.artifact_type),
+    purpose: "user_artifact",
+  });
 
   return {
     ...artifact,
-    download_url: downloadUrl,
+    download_upload: downloadUpload,
   };
 }
 
@@ -2299,12 +2079,10 @@ const TOOL_DISPATCH = {
   app_get_workspace_defaults: toolAppGetWorkspaceDefaults,
   app_create_workspace: toolAppCreateWorkspace,
   app_open_workspace: toolAppOpenWorkspace,
-  app_begin_uploaded_source_upload: toolAppBeginUploadedSourceUpload,
-  app_commit_uploaded_source_upload: toolAppCommitUploadedSourceUpload,
+  app_commit_uploaded_source_host_upload: toolAppCommitUploadedSourceHostUpload,
   app_list_style_profiles: toolAppListStyleProfiles,
   app_prepare_style_profile_creation: toolAppPrepareStyleProfileCreation,
-  app_begin_style_profile_reference_upload: toolAppBeginStyleProfileReferenceUpload,
-  app_commit_style_profile_reference_upload: toolAppCommitStyleProfileReferenceUpload,
+  app_commit_style_profile_reference_host_upload: toolAppCommitStyleProfileReferenceHostUpload,
   app_get_style_profile_creation_context: toolAppGetStyleProfileCreationContext,
   app_get_style_profile_draft_fingerprint: toolAppGetStyleProfileDraftFingerprint,
   app_get_style_profile_draft: toolAppGetStyleProfileDraft,
@@ -2313,7 +2091,6 @@ const TOOL_DISPATCH = {
   app_get_workspace_style_profile: toolAppGetWorkspaceStyleProfile,
   app_clear_workspace_style_profile: toolAppClearWorkspaceStyleProfile,
   app_rasterize_pptx_to_images: toolAppRasterizePptxToImages,
-  app_upload_uploaded_source: toolAppUploadUploadedSource,
   app_list_uploaded_sources: toolAppListUploadedSources,
   app_remove_uploaded_source: toolAppRemoveUploadedSource,
   app_prepare_uploaded_source_analysis_workspace: toolAppPrepareUploadedSourceAnalysisWorkspace,
@@ -2452,6 +2229,13 @@ async function handleInvoke(id, params = {}) {
     const data = await fn(args);
     return makeResponse(id, { success: true, data, tool });
   } catch (error) {
+    if (error instanceof HostUploadError) {
+      return makeResponse(id, undefined, {
+        code: error.code,
+        message: error.message,
+        data: error.data,
+      });
+    }
     const message = error instanceof SyntaxError
       ? `Invalid JSON content: ${error.message}`
       : error instanceof Error
@@ -2467,6 +2251,28 @@ async function handleRequest(request) {
   const { id, method, params = {} } = request;
 
   switch (method) {
+    case "initialize": {
+      const protocolVersion = params?.protocolVersion === PROTOCOL_VERSION_V2
+        ? PROTOCOL_VERSION_V2
+        : params?.protocolVersion === "1.1"
+          ? "1.1"
+          : PROTOCOL_VERSION_V2;
+      if (protocolVersion === PROTOCOL_VERSION_V2) {
+        hostUploadClient.enable();
+      } else {
+        hostUploadClient.disable(
+          `host did not negotiate Executa protocol 2.0 (protocolVersion=${JSON.stringify(params?.protocolVersion)})`,
+        );
+      }
+      return makeResponse(id, {
+        protocolVersion,
+        serverInfo: {
+          name: MANIFEST.display_name ?? MANIFEST.name ?? "ppt-engine",
+          version: MANIFEST.version,
+        },
+        client_capabilities: protocolVersion === PROTOCOL_VERSION_V2 ? { upload: {} } : {},
+      });
+    }
     case "describe": {
       return makeResponse(id, MANIFEST);
     }
@@ -2521,6 +2327,12 @@ rl.on("line", async (line) => {
   }
 
   const { request, parseErrorResponse } = parseRequestLine(trimmed);
+  if (!parseErrorResponse && request && typeof request === "object" && !Array.isArray(request) && !("method" in request)) {
+    if (!hostUploadClient.dispatchResponse(request)) {
+      process.stderr.write(`← unmatched-response id=${formatRpcId(request.id)}\n`);
+    }
+    return;
+  }
   process.stderr.write(`${summarizeIncomingRequest(request, trimmed)}\n`);
 
   pendingRequests += 1;

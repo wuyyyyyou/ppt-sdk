@@ -7,5 +7,19 @@
     "node",
     "app_stdio.js"
   ],
-  "enabled": true
+  "enabled": true,
+  "distribution": {
+    "active": "local",
+    "profiles": {
+      "local": {
+        "type": "local",
+        "supports_protocol": true,
+        "capabilities": [
+          "app_commit_uploaded_source_host_upload",
+          "app_commit_style_profile_reference_host_upload",
+          "app_get_export_artifact_download_url"
+        ]
+      }
+    }
+  }
 }

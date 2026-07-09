@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";
 
 import { createAnnaPptBackend } from "../../src/api/annaPptBackend.ts";
-import type { WorkspaceResult } from "../../src/api/types.ts";
+import type { HostUploadRef, WorkspaceResult } from "../../src/api/types.ts";
 import type { AnnaRuntime } from "../../src/runtime/annaRuntime.ts";
 
 function setToolIds() {
@@ -52,8 +52,20 @@ function createWorkspace(patch: Partial<WorkspaceResult> = {}): WorkspaceResult 
   };
 }
 
+function createJsonUploadRef(filename: string): HostUploadRef {
+  return {
+    transport: "host_upload",
+    r2_key: `uploads/${filename}`,
+    url: `https://upload.example/${filename}`,
+    mime_type: "application/json",
+    size_bytes: 128,
+    filename,
+    mode: "negotiate+confirm",
+  };
+}
+
 describe("Anna PPT Backend", () => {
-  it("fetches HTTP JSON references for workspace results", async () => {
+  it("fetches Host Upload JSON references for workspace results", async () => {
     setToolIds();
     const workspace = createWorkspace({ workspace_id: "from-http" });
     const originalFetch = globalThis.fetch;
@@ -69,7 +81,7 @@ describe("Anna PPT Backend", () => {
       const backend = createAnnaPptBackend(createRuntime({
         success: true,
         data: {
-          workspace_url: "http://127.0.0.1:12345/json/demo/workspace.json",
+          workspace_upload: createJsonUploadRef("workspace.json"),
         },
       }));
 
@@ -77,13 +89,13 @@ describe("Anna PPT Backend", () => {
 
       assert.equal(result.workspace_id, "from-http");
       assert.equal(fetchMock.mock.callCount(), 1);
-      assert.equal(fetchMock.mock.calls[0].arguments[0], "http://127.0.0.1:12345/json/demo/workspace.json");
+      assert.equal(fetchMock.mock.calls[0].arguments[0], "https://upload.example/workspace.json");
     } finally {
       globalThis.fetch = originalFetch;
     }
   });
 
-  it("fetches HTTP JSON references for research evidence results", async () => {
+  it("fetches Host Upload JSON references for research evidence results", async () => {
     setToolIds();
     const evidence = {
       version: 1,
@@ -105,7 +117,7 @@ describe("Anna PPT Backend", () => {
       const backend = createAnnaPptBackend(createRuntime({
         success: true,
         data: {
-          result_url: "http://127.0.0.1:12345/json/demo/research-evidence.json",
+          result_upload: createJsonUploadRef("research-evidence.json"),
         },
       }));
 
@@ -114,7 +126,7 @@ describe("Anna PPT Backend", () => {
       assert.equal(result.status, "curated");
       assert.equal(result.pages[0]?.page_id, "page-01");
       assert.equal(fetchMock.mock.callCount(), 1);
-      assert.equal(fetchMock.mock.calls[0].arguments[0], "http://127.0.0.1:12345/json/demo/research-evidence.json");
+      assert.equal(fetchMock.mock.calls[0].arguments[0], "https://upload.example/research-evidence.json");
     } finally {
       globalThis.fetch = originalFetch;
     }

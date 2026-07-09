@@ -47,15 +47,16 @@ describe("ReviewPage", () => {
   it("hides template subtitles and shows loading previews in grid mode", () => {
     const html = renderReviewPage("grid");
 
-    assert.match(html, /slide-preview-loading/);
-    assert.match(html, /spinner/);
+    assert.match(html, /preview-loading-frame compact/);
+    assert.match(html, /role="status"/);
+    assert.match(html, /正在渲染 HTML 预览/);
     assert.doesNotMatch(html, /template:cover-statement/);
   });
 
   it("shows loading previews in present mode and thumbnails while screenshots are rendering", () => {
     const html = renderReviewPage("present");
 
-    assert.match(html, /present-html-frame/);
+    assert.match(html, /preview-loading-frame/);
     assert.match(html, /thumb-html-frame/);
     assert.match(html, /slide-preview-loading/);
     assert.doesNotMatch(html, /slide-preview-card large/);

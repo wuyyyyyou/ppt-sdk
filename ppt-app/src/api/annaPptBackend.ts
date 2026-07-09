@@ -35,17 +35,15 @@ import type {
   RecordWorkspaceThemeTokenResult,
   WorkspaceDefaultsResult,
   WorkspaceResult,
-  BeginUploadedSourceUploadResult,
-  BeginStyleProfileReferenceUploadResult,
   ClearWorkspaceStyleProfileResult,
-  CommitUploadedSourceUploadResult,
-  CommitStyleProfileReferenceUploadResult,
+  CommitUploadedSourceHostUploadResult,
+  CommitStyleProfileReferenceHostUploadResult,
   GetStyleProfileCreationContextResult,
   GetStyleProfileDraftResult,
   GetWorkspaceStyleProfileResult,
   ListStyleProfilesResult,
   PrepareStyleProfileCreationResult,
-  UploadUploadedSourceResult,
+  HostUploadRef,
   ListUploadedSourcesResult,
   PublishStyleProfileResult,
   SelectWorkspaceStyleProfileResult,
@@ -59,9 +57,9 @@ import { resolvePptBundledToolIds } from "./bundledToolIds";
 
 const PPTX_EXPORT_TIMEOUT_MS = 600_000;
 
-interface HttpJsonReference {
-  workspace_url?: string;
-  result_url?: string;
+interface HostUploadJsonReference {
+  workspace_upload?: HostUploadRef;
+  result_upload?: HostUploadRef;
 }
 
 function unwrapToolResult<T>(result: unknown): T {
@@ -82,29 +80,37 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function readHttpJsonReferenceUrl(value: unknown): string {
+function readHostUploadJsonReferenceUrl(value: unknown): string {
   if (!isRecord(value)) {
     return "";
   }
 
-  const workspaceUrl = value.workspace_url;
-  if (typeof workspaceUrl === "string" && workspaceUrl.length > 0) {
-    return workspaceUrl;
+  const upload = isRecord(value.workspace_upload)
+    ? value.workspace_upload
+    : isRecord(value.result_upload)
+      ? value.result_upload
+      : null;
+  if (!upload) {
+    return "";
   }
-
-  const resultUrl = value.result_url;
-  return typeof resultUrl === "string" && resultUrl.length > 0 ? resultUrl : "";
+  if (upload.transport !== "host_upload") {
+    throw new Error("Tool JSON reference upload transport must be host_upload.");
+  }
+  if (upload.mime_type !== "application/json") {
+    throw new Error("Tool JSON reference upload MIME type must be application/json.");
+  }
+  return typeof upload.url === "string" && upload.url.length > 0 ? upload.url : "";
 }
 
-async function resolveHttpJsonReference<T>(value: T | HttpJsonReference): Promise<T> {
-  const url = readHttpJsonReferenceUrl(value);
+async function resolveHostUploadJsonReference<T>(value: T | HostUploadJsonReference): Promise<T> {
+  const url = readHostUploadJsonReferenceUrl(value);
   if (!url) {
     return value as T;
   }
 
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
-    throw new Error(`Failed to fetch tool JSON reference: HTTP ${response.status}`);
+    throw new Error(`Failed to fetch tool JSON Host Upload reference: HTTP ${response.status}`);
   }
 
   return (await response.json()) as T;
@@ -174,21 +180,21 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       await runtime.tools.invoke(input, options)
     );
   }
-  async function invokeHttpJson<T>(
+  async function invokeHostUploadJson<T>(
     toolId: string,
     method: string,
     args: object,
     options?: { timeoutMs?: number }
   ): Promise<T> {
-    return resolveHttpJsonReference<T>(
-      await invoke<T | HttpJsonReference>(toolId, method, args, options)
+    return resolveHostUploadJsonReference<T>(
+      await invoke<T | HostUploadJsonReference>(toolId, method, args, options)
     );
   }
   const invokeWorkspaceResult = (
     method: string,
     args: object,
     options?: { timeoutMs?: number }
-  ) => invokeHttpJson<WorkspaceResult>(toolIds.pptEngine, method, args, options);
+  ) => invokeHostUploadJson<WorkspaceResult>(toolIds.pptEngine, method, args, options);
   const searchAdapter = createSearchAdapter({
     runtime,
     toolId: toolIds.annaSearch,
@@ -203,18 +209,6 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invokeWorkspaceResult("app_create_workspace", input),
     openWorkspace: (input) =>
       invokeWorkspaceResult("app_open_workspace", input),
-    beginUploadedSourceUpload: (input) =>
-      invoke<BeginUploadedSourceUploadResult>(
-        toolIds.pptEngine,
-        "app_begin_uploaded_source_upload",
-        input
-      ),
-    commitUploadedSourceUpload: (input) =>
-      invoke<CommitUploadedSourceUploadResult>(
-        toolIds.pptEngine,
-        "app_commit_uploaded_source_upload",
-        input
-      ),
     listStyleProfiles: () =>
       invoke<ListStyleProfilesResult>(
         toolIds.pptEngine,
@@ -227,17 +221,17 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         "app_prepare_style_profile_creation",
         input
       ),
-    beginStyleProfileReferenceUpload: (input) =>
-      invoke<BeginStyleProfileReferenceUploadResult>(
+    commitStyleProfileReferenceHostUpload: (input) =>
+      invoke<CommitStyleProfileReferenceHostUploadResult>(
         toolIds.pptEngine,
-        "app_begin_style_profile_reference_upload",
-        input
-      ),
-    commitStyleProfileReferenceUpload: (input) =>
-      invoke<CommitStyleProfileReferenceUploadResult>(
-        toolIds.pptEngine,
-        "app_commit_style_profile_reference_upload",
-        input
+        "app_commit_style_profile_reference_host_upload",
+        {
+          creation_id: input.creation_id,
+          filename: input.filename,
+          mime_type: input.mime_type,
+          size_bytes: input.size_bytes,
+          host_upload: input.host_upload,
+        }
       ),
     getStyleProfileCreationContext: (input) =>
       invoke<GetStyleProfileCreationContextResult>(
@@ -264,7 +258,7 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         input
       ),
     selectWorkspaceStyleProfile: (input) =>
-      invokeHttpJson<SelectWorkspaceStyleProfileResult>(
+      invokeHostUploadJson<SelectWorkspaceStyleProfileResult>(
         toolIds.pptEngine,
         "app_select_workspace_style_profile",
         input
@@ -276,20 +270,21 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         input
       ),
     clearWorkspaceStyleProfile: (input) =>
-      invokeHttpJson<ClearWorkspaceStyleProfileResult>(
+      invokeHostUploadJson<ClearWorkspaceStyleProfileResult>(
         toolIds.pptEngine,
         "app_clear_workspace_style_profile",
         input
       ),
-    uploadUploadedSource: (input) =>
-      invoke<UploadUploadedSourceResult>(
+    commitUploadedSourceHostUpload: (input) =>
+      invoke<CommitUploadedSourceHostUploadResult>(
         toolIds.pptEngine,
-        "app_upload_uploaded_source",
+        "app_commit_uploaded_source_host_upload",
         {
           workspace_dir: input.workspace_dir,
           filename: input.filename,
           mime_type: input.mime_type,
-          content_base64: input.content_base64,
+          size_bytes: input.size_bytes,
+          host_upload: input.host_upload,
         }
       ),
     listUploadedSources: (input) =>
@@ -382,7 +377,7 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         count: result.count ?? result.groups?.length ?? 0,
       })),
     selectTemplate: (input) =>
-      invokeHttpJson<SelectTemplateResult>(
+      invokeHostUploadJson<SelectTemplateResult>(
         toolIds.pptEngine,
         "app_select_workspace_template",
         input
@@ -406,7 +401,7 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         input
       ),
     recordWorkspaceThemeToken: (input) =>
-      invokeHttpJson<RecordWorkspaceThemeTokenResult>(
+      invokeHostUploadJson<RecordWorkspaceThemeTokenResult>(
         toolIds.pptEngine,
         "app_record_workspace_theme_token",
         input
@@ -452,7 +447,7 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         input
       ),
     getResearchEvidence: (input) =>
-      invokeHttpJson<ResearchEvidenceIndex>(
+      invokeHostUploadJson<ResearchEvidenceIndex>(
         toolIds.pptEngine,
         "app_get_research_evidence",
         input

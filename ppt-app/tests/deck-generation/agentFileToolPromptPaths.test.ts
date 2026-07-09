@@ -72,7 +72,7 @@ describe("Agent file-tool path prompt blocks", () => {
     assert.match(prompt, /Agent file-tool root: \/tmp\/anna-workspace/);
     assert.match(prompt, /Current slide TSX Agent file-tool path: ppt\/ppt-20260630-152620\/template\/slides\/page-02\.tsx/);
     assert.match(prompt, /Agent file-tool path: ppt\/ppt-20260630-152620\/research\/evidence\/pages\/page-02\.md/);
-    assert.match(prompt, /Agent file-tool path: ppt\/ppt-20260630-152620\/research\/evidence-index\.json/);
+    assert.doesNotMatch(prompt, /Agent file-tool path: ppt\/ppt-20260630-152620\/research\/evidence-index\.json/);
     assert.match(prompt, /"changed_files": \[\n    "template\/slides\/page-02\.tsx",\n    "template\/data\/page-02\.json"\n  \]/);
     assert.doesNotMatch(prompt, /"changed_files": \[\n    "ppt\/ppt-20260630-152620/);
   });
@@ -102,8 +102,16 @@ describe("Agent file-tool path prompt blocks", () => {
       layout_id: "simple",
       title: page.title,
       html_path: `${workspaceDir}/output/page-02.html`,
-      preview_url: "http://localhost/page-02.html",
       screenshot_path: `${workspaceDir}/output/page-02.png`,
+      screenshot_upload: {
+        transport: "host_upload",
+        r2_key: "uploads/page-02.png",
+        url: "https://upload.example/page-02.png",
+        mime_type: "image/png",
+        size_bytes: 1024,
+        filename: "page-02.png",
+        mode: "negotiate+confirm",
+      },
       rendered_at: "2026-06-30T00:00:00.000Z",
     };
     const prompt = buildPageVisualReviewPrompt({

@@ -44,11 +44,11 @@ describe("ExportPage", () => {
     const html = renderExportPage({
       type: "PPTX",
       path: "/Users/leyouming/anna-workspace/ppt/demo/output/deck.pptx",
-      href: "http://127.0.0.1:51824/artifact/demo/deck.pptx",
+      href: "https://uploads.example.test/artifact/demo/deck.pptx",
       fileName: "deck.pptx",
     });
 
-    assert.match(html, /<button class="export-download-btn" type="button">/);
+    assert.match(html, /<button class="export-download-btn" type="button" aria-busy="false">/);
     assert.match(html, /下载 PPTX/);
     assert.doesNotMatch(html, /anna-workspace/);
     assert.doesNotMatch(html, /href=/);

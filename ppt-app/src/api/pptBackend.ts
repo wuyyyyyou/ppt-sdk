@@ -63,15 +63,11 @@ import type {
   UpdateWorkspaceOutlineInput,
   UpdateWorkspacePagesInput,
   UpdateWorkspaceTitleInput,
-  BeginUploadedSourceUploadInput,
-  BeginUploadedSourceUploadResult,
-  BeginStyleProfileReferenceUploadInput,
-  BeginStyleProfileReferenceUploadResult,
+  CommitUploadedSourceHostUploadInput,
+  CommitUploadedSourceHostUploadResult,
   ClearWorkspaceStyleProfileResult,
-  CommitUploadedSourceUploadInput,
-  CommitUploadedSourceUploadResult,
-  CommitStyleProfileReferenceUploadInput,
-  CommitStyleProfileReferenceUploadResult,
+  CommitStyleProfileReferenceHostUploadInput,
+  CommitStyleProfileReferenceHostUploadResult,
   GetStyleProfileCreationContextResult,
   StyleProfileDraftFingerprint,
   GetStyleProfileDraftResult,
@@ -82,8 +78,6 @@ import type {
   PublishStyleProfileInput,
   PublishStyleProfileResult,
   SelectWorkspaceStyleProfileResult,
-  UploadUploadedSourceInput,
-  UploadUploadedSourceResult,
   ListUploadedSourcesResult,
   RemoveUploadedSourceInput,
   RemoveUploadedSourceResult,
@@ -103,12 +97,10 @@ export interface PptBackend {
   getWorkspaceDefaults(): Promise<WorkspaceDefaultsResult>;
   createWorkspace(input: CreateWorkspaceInput): Promise<WorkspaceResult>;
   openWorkspace(input: OpenWorkspaceInput): Promise<WorkspaceResult>;
-  beginUploadedSourceUpload?(input: BeginUploadedSourceUploadInput): Promise<BeginUploadedSourceUploadResult>;
-  commitUploadedSourceUpload?(input: CommitUploadedSourceUploadInput): Promise<CommitUploadedSourceUploadResult>;
+  commitUploadedSourceHostUpload(input: CommitUploadedSourceHostUploadInput): Promise<CommitUploadedSourceHostUploadResult>;
   listStyleProfiles(): Promise<ListStyleProfilesResult>;
   prepareStyleProfileCreation(input?: PrepareStyleProfileCreationInput): Promise<PrepareStyleProfileCreationResult>;
-  beginStyleProfileReferenceUpload(input: BeginStyleProfileReferenceUploadInput): Promise<BeginStyleProfileReferenceUploadResult>;
-  commitStyleProfileReferenceUpload(input: CommitStyleProfileReferenceUploadInput): Promise<CommitStyleProfileReferenceUploadResult>;
+  commitStyleProfileReferenceHostUpload(input: CommitStyleProfileReferenceHostUploadInput): Promise<CommitStyleProfileReferenceHostUploadResult>;
   getStyleProfileCreationContext(input: { creation_id: string }): Promise<GetStyleProfileCreationContextResult>;
   getStyleProfileDraftFingerprint(input: { creation_id: string }): Promise<StyleProfileDraftFingerprint>;
   getStyleProfileDraft(input: { creation_id: string }): Promise<GetStyleProfileDraftResult>;
@@ -116,7 +108,6 @@ export interface PptBackend {
   selectWorkspaceStyleProfile(input: { workspace_dir: string; style_profile_id: string }): Promise<SelectWorkspaceStyleProfileResult>;
   getWorkspaceStyleProfile(input: { workspace_dir: string }): Promise<GetWorkspaceStyleProfileResult>;
   clearWorkspaceStyleProfile(input: { workspace_dir: string }): Promise<ClearWorkspaceStyleProfileResult>;
-  uploadUploadedSource(input: UploadUploadedSourceInput): Promise<UploadUploadedSourceResult>;
   listUploadedSources(input: { workspace_dir: string; include_removed?: boolean }): Promise<ListUploadedSourcesResult>;
   removeUploadedSource(input: RemoveUploadedSourceInput): Promise<RemoveUploadedSourceResult>;
   prepareUploadedSourceAnalysisWorkspace(input: { workspace_dir: string }): Promise<PrepareUploadedSourceAnalysisWorkspaceResult>;
