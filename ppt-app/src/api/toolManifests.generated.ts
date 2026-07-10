@@ -15,6 +15,6 @@ export const PPT_GENER_TOOL = {
 
 export const ANNA_SEARCH_TOOL = {
   handle: "anna-search",
-  version: "0.1.2",
+  version: "0.1.3",
   displayName: "Anna Search",
 } as const;
