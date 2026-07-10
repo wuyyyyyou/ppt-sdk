@@ -8,6 +8,8 @@ import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
 
+import { parseHostUploadConfirmation } from "./host-upload-confirmation.js";
+
 import {
   appendAppWorkspaceLog,
   buildDeckHtmlFromManifest,
@@ -506,27 +508,13 @@ async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose }) 
     throw new Error(message || `Host Upload PUT failed: HTTP ${putResponse.status}`);
   }
   const confirmed = await hostUploadClient.confirm(negotiated.r2_key);
-  const url = confirmed.download_url;
-  if (typeof url !== "string" || url.length === 0) {
-    throw new Error("host/uploadFile confirm did not return download_url");
-  }
-  return {
-    transport: "host_upload",
-    r2_key: typeof confirmed.r2_key === "string" && confirmed.r2_key.length > 0
-      ? confirmed.r2_key
-      : negotiated.r2_key,
-    url,
-    mime_type: mimeType.trim(),
-    size_bytes: typeof confirmed.size_bytes === "number" ? confirmed.size_bytes : sizeBytes,
+  return parseHostUploadConfirmation({
+    confirmed,
+    negotiated,
+    mimeType: mimeType.trim(),
+    fallbackSizeBytes: sizeBytes,
     filename: safeFilename,
-    expires_at: typeof confirmed.expires_at === "string"
-      ? confirmed.expires_at
-      : typeof negotiated.expires_at === "string"
-        ? negotiated.expires_at
-        : undefined,
-    expires_in: typeof confirmed.expires_in === "number" ? confirmed.expires_in : undefined,
-    mode: "negotiate+confirm",
-  };
+  });
 }
 
 async function uploadJsonToHost(value, filename) {
@@ -569,27 +557,13 @@ async function uploadBufferToHost({ buffer, filename, mimeType, purpose }) {
     throw new Error(message || `Host Upload PUT failed: HTTP ${putResponse.status}`);
   }
   const confirmed = await hostUploadClient.confirm(negotiated.r2_key);
-  const url = confirmed.download_url;
-  if (typeof url !== "string" || url.length === 0) {
-    throw new Error("host/uploadFile confirm did not return download_url");
-  }
-  return {
-    transport: "host_upload",
-    r2_key: typeof confirmed.r2_key === "string" && confirmed.r2_key.length > 0
-      ? confirmed.r2_key
-      : negotiated.r2_key,
-    url,
-    mime_type: mimeType.trim(),
-    size_bytes: typeof confirmed.size_bytes === "number" ? confirmed.size_bytes : buffer.byteLength,
+  return parseHostUploadConfirmation({
+    confirmed,
+    negotiated,
+    mimeType: mimeType.trim(),
+    fallbackSizeBytes: buffer.byteLength,
     filename: safeFilename,
-    expires_at: typeof confirmed.expires_at === "string"
-      ? confirmed.expires_at
-      : typeof negotiated.expires_at === "string"
-        ? negotiated.expires_at
-        : undefined,
-    expires_in: typeof confirmed.expires_in === "number" ? confirmed.expires_in : undefined,
-    mode: "negotiate+confirm",
-  };
+  });
 }
 
 async function uploadPreviewImage(imagePath) {
