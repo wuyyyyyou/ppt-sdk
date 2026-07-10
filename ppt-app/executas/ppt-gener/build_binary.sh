@@ -104,9 +104,9 @@ detect_output_name() {
 
 detect_nuitka_output_name() {
   if [[ "$PLATFORM" == "windows" ]]; then
-    echo "${PLUGIN_NAME}.exe"
+    echo "${BINARY_NAME}.exe"
   else
-    echo "$PLUGIN_NAME"
+    echo "$BINARY_NAME"
   fi
 }
 
@@ -428,7 +428,7 @@ NUITKA_CACHE_DIR="$NUITKA_CACHE_DIR" "$PYTHON_BIN" -m nuitka \
   --remove-output \
   --assume-yes-for-downloads \
   --output-dir="$NUITKA_BUILD_DIR" \
-  --output-filename="$PLUGIN_NAME" \
+  --output-filename="$BINARY_NAME" \
   --include-module=presenton_pptx_generator_plugin \
   --include-package=presenton_sdk_pptx_generator \
   --include-package-data=presenton_sdk_pptx_generator \
