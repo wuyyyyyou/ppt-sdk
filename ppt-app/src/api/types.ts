@@ -361,6 +361,7 @@ export interface WorkspaceSettings {
   content_review_failure_limit?: number;
   visual_review_enabled?: boolean;
   visual_review_failure_limit?: number;
+  review_outline_first?: boolean;
   disable_web_research?: boolean;
   disable_image_research?: boolean;
   updated_at?: string;
@@ -447,6 +448,12 @@ export interface UpdateWorkspaceSettingsInput {
   workspace_dir: string;
   setting: WorkspaceSettings;
   persist_as_default?: boolean;
+}
+
+export interface UpdateWorkspaceSettingsResult {
+  workspace_dir: string;
+  setting: WorkspaceSettings;
+  persisted_as_default: boolean;
 }
 
 export interface WorkspaceDefaultsResult {

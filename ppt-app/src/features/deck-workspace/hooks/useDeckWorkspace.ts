@@ -105,6 +105,10 @@ import {
   researchSearchControlSettingsToWorkspaceSettings,
   type ResearchSearchControlSettings,
 } from "../researchSearchControl";
+import {
+  outlineReviewPreferenceToWorkspaceSettings,
+  readOutlineReviewPreference,
+} from "../outlineReviewPreference";
 import { createWorkspaceReviewRenderKey } from "../workspaceReviewRenderKey";
 import type {
   ContextRow,
@@ -351,7 +355,7 @@ function applyStyleProfileCreationEvent(
 export interface DeckWorkspaceActions {
   setPanelMode: (mode: PanelMode) => void;
   setPrompt: (value: string) => void;
-  setReviewOutlineFirst: (value: boolean) => void;
+  setReviewOutlineFirst: (value: boolean) => Promise<void>;
   setStrictReviewMode: (enabled: boolean) => Promise<void>;
   setResearchSearchControlSettings: (settings: ResearchSearchControlSettings) => Promise<void>;
   setDeckTitle: (value: string) => void;
@@ -429,7 +433,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [history, setHistory] = useState<PageId[]>(["main"]);
   const [toast, setToast] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [reviewOutlineFirst, setReviewOutlineFirst] = useState(false);
+  const [reviewOutlineFirst, setReviewOutlineFirstState] = useState(false);
   const [pageReviewSettings, setPageReviewSettings] = useState<PageReviewSettings>(
     DEFAULT_PAGE_REVIEW_SETTINGS
   );
@@ -646,13 +650,17 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     settingOverride: WorkspaceSettings | null = null
   ) {
     if (!backend) return workspace;
-    return backend.updateWorkspaceSettings({
+    const result = await backend.updateWorkspaceSettings({
       workspace_dir: workspace.workspace_dir,
       setting: withOutputLanguage(
         settingOverride ?? workspaceSettingsToState(workspace),
         outputLanguage
       ),
     });
+    return {
+      ...workspace,
+      setting: result.setting,
+    };
   }
 
   async function resolveOutputLanguageForOutline(input: {
@@ -900,6 +908,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   function workspaceResearchSearchControlSettings(workspace: WorkspaceResult | null) {
     return readResearchSearchControlSettings(workspaceSettingsToState(workspace));
+  }
+
+  function applyWorkspaceSetting(setting: WorkspaceSettings) {
+    setCurrentWorkspace((workspace) => workspace ? { ...workspace, setting } : workspace);
+    setReviewOutlineFirstState(readOutlineReviewPreference(setting));
+    setPageReviewSettings(readPageReviewSettings(setting));
+    setResearchSearchControlSettingsState(readResearchSearchControlSettings(setting));
   }
 
   function normalizePersistedContextRow(value: unknown): ContextRow | null {
@@ -1163,6 +1178,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
     setPageReviewSettings(workspacePageReviewSettings(workspace));
     setResearchSearchControlSettingsState(workspaceResearchSearchControlSettings(workspace));
+    setReviewOutlineFirstState(readOutlineReviewPreference(workspaceSettingsToState(workspace)));
     if (!exportInFlightRef.current) {
       setExportArtifactWithProgress(readWorkspaceExportArtifactPath(workspace));
       void refreshWorkspaceExportArtifact(workspace, exportRefreshVersionRef.current);
@@ -1268,6 +1284,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         if (cancelled) return;
         setPageReviewSettings(readPageReviewSettings(defaults.setting));
         setResearchSearchControlSettingsState(readResearchSearchControlSettings(defaults.setting));
+        setReviewOutlineFirstState(readOutlineReviewPreference(defaults.setting));
         const templates = await nextBackend.listTemplates();
         if (cancelled) return;
         setTemplateGroups(templates.templates);
@@ -2958,15 +2975,44 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setWorkspaceSettingsSaving(true);
     setWorkspaceError("");
     try {
-      const workspace = await backend.updateWorkspaceSettings({
+      const result = await backend.updateWorkspaceSettings({
         workspace_dir: currentWorkspace.workspace_dir,
         persist_as_default: true,
         setting
       });
-      applyWorkspace(workspace, { preserveCurrentSlide: true });
-      setWorkspaceScan(await backend.listWorkspaces());
+      applyWorkspaceSetting(result.setting);
       showToast(t.status.settingsSaved);
     } catch (error) {
+      setWorkspaceError(
+        error instanceof Error ? error.message : "Failed to save settings."
+      );
+    } finally {
+      setWorkspaceSettingsSaving(false);
+    }
+  }
+
+  async function setReviewOutlineFirst(enabled: boolean) {
+    if (!backend) return;
+
+    const previous = reviewOutlineFirst;
+    setWorkspaceSettingsSaving(true);
+    setWorkspaceError("");
+    setReviewOutlineFirstState(enabled);
+    try {
+      const workspace = await ensureCurrentWorkspace();
+      if (!workspace) {
+        setReviewOutlineFirstState(previous);
+        return;
+      }
+      const result = await backend.updateWorkspaceSettings({
+        workspace_dir: workspace.workspace_dir,
+        persist_as_default: true,
+        setting: outlineReviewPreferenceToWorkspaceSettings(enabled),
+      });
+      applyWorkspaceSetting(result.setting);
+      showToast(t.status.settingsSaved);
+    } catch (error) {
+      setReviewOutlineFirstState(previous);
       setWorkspaceError(
         error instanceof Error ? error.message : "Failed to save settings."
       );
@@ -2989,13 +3035,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         ...currentReviewSettings,
         visualReviewEnabled: enabled,
       };
-      const updatedWorkspace = await backend.updateWorkspaceSettings({
+      const result = await backend.updateWorkspaceSettings({
         workspace_dir: workspace.workspace_dir,
         persist_as_default: true,
         setting: pageReviewSettingsToWorkspaceSettings(nextReviewSettings),
       });
-      applyWorkspace(updatedWorkspace, { preserveCurrentSlide: true });
-      setWorkspaceScan(await backend.listWorkspaces());
+      applyWorkspaceSetting(result.setting);
       showToast(t.status.settingsSaved);
     } catch (error) {
       setWorkspaceError(
@@ -3015,13 +3060,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     try {
       const workspace = await ensureCurrentWorkspace();
       if (!workspace) return;
-      const updatedWorkspace = await backend.updateWorkspaceSettings({
+      const result = await backend.updateWorkspaceSettings({
         workspace_dir: workspace.workspace_dir,
         persist_as_default: true,
         setting: researchSearchControlSettingsToWorkspaceSettings(settings),
       });
-      applyWorkspace(updatedWorkspace, { preserveCurrentSlide: true });
-      setWorkspaceScan(await backend.listWorkspaces());
+      applyWorkspaceSetting(result.setting);
       showToast(t.status.settingsSaved);
     } catch (error) {
       setWorkspaceError(

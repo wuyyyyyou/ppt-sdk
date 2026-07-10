@@ -1,5 +1,5 @@
 {
-  "version": "0.1.1",
+  "version": "0.1.2",
   "display_name": "Anna Search",
   "description": "Search the web through pluggable search providers. The initial provider is ddgs.",
   "tools": [

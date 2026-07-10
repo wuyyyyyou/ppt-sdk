@@ -62,7 +62,7 @@ export async function persistDeckRefinementArtifacts(input: {
   const { flowInput, review, reconciliation, now } = input;
   let activeWorkspace = flowInput.workspace;
   if (review.output_language_change.changed) {
-    activeWorkspace = await flowInput.backend.updateWorkspaceSettings({
+    const result = await flowInput.backend.updateWorkspaceSettings({
       workspace_dir: flowInput.workspace.workspace_dir,
       setting: applyDeckRefinementSettingUpdates({
         setting: readWorkspaceSetting(flowInput.workspace),
@@ -70,6 +70,10 @@ export async function persistDeckRefinementArtifacts(input: {
         now,
       }),
     });
+    activeWorkspace = {
+      ...activeWorkspace,
+      setting: result.setting,
+    };
   }
   const updatedWorkspace = await flowInput.backend.updateWorkspaceOutline({
     workspace_dir: flowInput.workspace.workspace_dir,

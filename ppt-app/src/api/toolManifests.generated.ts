@@ -3,18 +3,18 @@
 
 export const PPT_ENGINE_TOOL = {
   handle: "ppt-engine",
-  version: "4.0.4",
+  version: "4.0.5",
   displayName: "ppt-engine",
 } as const;
 
 export const PPT_GENER_TOOL = {
   handle: "ppt-gener",
-  version: "3.1.2",
+  version: "3.1.3",
   displayName: "ppt-gener",
 } as const;
 
 export const ANNA_SEARCH_TOOL = {
   handle: "anna-search",
-  version: "0.1.1",
+  version: "0.1.2",
   displayName: "Anna Search",
 } as const;

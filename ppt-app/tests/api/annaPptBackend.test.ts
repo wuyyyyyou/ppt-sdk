@@ -103,6 +103,36 @@ describe("Anna PPT Backend", () => {
     }
   });
 
+  it("returns inline workspace setting patches without fetching Host Upload JSON", async () => {
+    setToolIds();
+    const originalFetch = globalThis.fetch;
+    const fetchMock = mock.fn(async () => new Response(null, { status: 500 }));
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    try {
+      const backend = createAnnaPptBackend(createRuntime({
+        success: true,
+        data: {
+          workspace_dir: "/tmp/workspaces/demo",
+          setting: { review_outline_first: true },
+          persisted_as_default: true,
+        },
+      }));
+
+      const result = await backend.updateWorkspaceSettings({
+        workspace_dir: "/tmp/workspaces/demo",
+        setting: { review_outline_first: true },
+        persist_as_default: true,
+      });
+
+      assert.equal(result.setting.review_outline_first, true);
+      assert.equal(result.persisted_as_default, true);
+      assert.equal(fetchMock.mock.callCount(), 0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("fetches Host Upload JSON references for research evidence results", async () => {
     setToolIds();
     const evidence = {

@@ -100,6 +100,7 @@ export interface AppWorkspaceSettings {
   content_review_failure_limit?: number;
   visual_review_enabled?: boolean;
   visual_review_failure_limit?: number;
+  review_outline_first?: boolean;
   disable_web_research?: boolean;
   disable_image_research?: boolean;
   updated_at?: string;
@@ -504,6 +505,12 @@ export interface UpdateAppWorkspaceSettingsInput {
   workspace_dir: string;
   setting: AppWorkspaceSettings;
   persist_as_default?: boolean;
+}
+
+export interface PatchAppWorkspaceSettingsResult {
+  workspace_dir: string;
+  setting: AppWorkspaceSettings;
+  persisted_as_default: boolean;
 }
 
 export interface GetAppWorkspaceDefaultsResult {

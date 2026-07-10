@@ -441,7 +441,18 @@ function createHarness(options: {
       currentWorkspace = { ...currentWorkspace, outline: currentOutline };
       return clone(currentWorkspace);
     },
-    updateWorkspaceSettings: async () => currentWorkspace,
+    updateWorkspaceSettings: async (input) => {
+      const currentSetting = currentWorkspace.setting && typeof currentWorkspace.setting === "object"
+        ? currentWorkspace.setting as Record<string, unknown>
+        : {};
+      const setting = { ...currentSetting, ...input.setting };
+      currentWorkspace = { ...currentWorkspace, setting };
+      return {
+        workspace_dir: input.workspace_dir,
+        setting,
+        persisted_as_default: input.persist_as_default === true,
+      };
+    },
     updateWorkspaceTitle: async () => currentWorkspace,
     createProject: async () => ({ projectDir: "", state: {} }),
     getProject: async () => ({ projectDir: "", state: {} }),

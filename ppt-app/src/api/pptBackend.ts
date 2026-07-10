@@ -60,6 +60,7 @@ import type {
   WorkspaceThemeValidationResult,
   RecordWorkspaceThemeTokenResult,
   UpdateWorkspaceSettingsInput,
+  UpdateWorkspaceSettingsResult,
   UpdateWorkspaceOutlineInput,
   UpdateWorkspacePagesInput,
   UpdateWorkspaceTitleInput,
@@ -141,7 +142,7 @@ export interface PptBackend {
   updateWorkspaceOutline(input: UpdateWorkspaceOutlineInput): Promise<WorkspaceResult>;
   updateWorkspaceSettings(
     input: UpdateWorkspaceSettingsInput
-  ): Promise<WorkspaceResult>;
+  ): Promise<UpdateWorkspaceSettingsResult>;
   updateWorkspacePages(input: UpdateWorkspacePagesInput): Promise<WorkspaceResult>;
   duplicateWorkspacePage(input: DuplicateWorkspacePageInput): Promise<WorkspaceResult>;
   updateWorkspaceTitle(input: UpdateWorkspaceTitleInput): Promise<WorkspaceResult>;

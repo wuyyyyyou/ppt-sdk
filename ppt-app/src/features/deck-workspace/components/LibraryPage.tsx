@@ -24,6 +24,7 @@ import {
   REVIEW_FAILURE_LIMIT_MIN,
   type PageReviewSettings,
 } from "../reviewSettings";
+import { readOutlineReviewPreference } from "../outlineReviewPreference";
 import { PageHeader } from "./PageHeader";
 
 interface LibraryPageProps {
@@ -70,6 +71,7 @@ function toEditableSettings(workspace: WorkspaceResult | null) {
     text_density: normalizeSettingValue(setting.text_density, EMPTY_SETTINGS.text_density),
     output_language: normalizeSettingValue(setting.output_language, EMPTY_SETTINGS.output_language),
     page_generation_concurrency: readPageGenerationConcurrency(setting),
+    review_outline_first: readOutlineReviewPreference(setting),
     ...pageReviewSettingsToWorkspaceSettings(readPageReviewSettings(setting))
   };
 }
@@ -283,6 +285,13 @@ export function LibraryPage({
           }
           editing={editing}
           onChange={(value) => setDraft((next) => ({ ...next, output_language: value }))}
+        />
+        <PreferenceSwitch
+          label={t.brief.reviewOutlineFirst}
+          value={draft.review_outline_first === true}
+          editing={editing}
+          t={t}
+          onChange={(value) => setDraft((next) => ({ ...next, review_outline_first: value }))}
         />
         <PreferenceSwitch
           label={t.preferences.visualReviewEnabled}

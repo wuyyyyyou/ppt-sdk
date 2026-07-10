@@ -39,7 +39,7 @@ interface BriefPageProps {
   selectStyleProfile: (styleProfileId: string) => Promise<void>;
   clearStyleProfile: () => Promise<void>;
   reviewOutlineFirst: boolean;
-  setReviewOutlineFirst: (value: boolean) => void;
+  setReviewOutlineFirst: (value: boolean) => Promise<void>;
   pageReviewSettings: PageReviewSettings;
   setStrictReviewMode: (enabled: boolean) => Promise<void>;
   researchSearchControlSettings: ResearchSearchControlSettings;
@@ -185,9 +185,10 @@ export function BriefPage(props: BriefPageProps) {
           <button
             type="button"
             className={`checkbox-row ${reviewOutlineFirst ? "active" : ""}`}
-            onClick={() => setReviewOutlineFirst(!reviewOutlineFirst)}
+            onClick={() => void setReviewOutlineFirst(!reviewOutlineFirst)}
             aria-checked={reviewOutlineFirst}
             role="switch"
+            disabled={isCreating || isSuggestingContext || workspaceSettingsSaving}
           >
             <span className="checkbox-custom">
               {reviewOutlineFirst ? <Check size={11} strokeWidth={3} /> : null}
@@ -202,7 +203,7 @@ export function BriefPage(props: BriefPageProps) {
               onClick={toggleStrictReviewMode}
               aria-checked={strictReviewMode}
               role="switch"
-              disabled={isCreating || isSuggestingContext}
+              disabled={isCreating || isSuggestingContext || workspaceSettingsSaving}
             >
               <span className="checkbox-custom">
                 {strictReviewMode ? <Check size={11} strokeWidth={3} /> : null}

@@ -43,7 +43,7 @@ function renderBriefPage(options: { loading?: LoadingKind; workspaceSettingsSavi
       loading: options.loading ?? "none",
       selectTemplate: async () => undefined,
       reviewOutlineFirst: false,
-      setReviewOutlineFirst: () => undefined,
+      setReviewOutlineFirst: async () => undefined,
       pageReviewSettings: {
         contentReviewEnabled: false,
         contentReviewFailureLimit: 5,
@@ -142,6 +142,8 @@ describe("BriefPage", () => {
     const html = renderBriefPage({ workspaceSettingsSaving: true });
 
     assert.match(html, /<button class="inline-create-btn" disabled="">/);
+    assertDisabledButtonWithLabel(html, "先审阅大纲");
+    assertDisabledButtonWithLabel(html, "视觉检查");
     assertDisabledButtonWithLabel(html, "禁止网络资料搜索");
     assertDisabledButtonWithLabel(html, "禁止图片搜索");
   });

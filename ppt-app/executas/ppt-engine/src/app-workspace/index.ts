@@ -130,6 +130,7 @@ import type {
   PrepareAppUploadedSourceAnalysisWorkspaceResult,
   PrepareAppStyleProfileCreationInput,
   PrepareAppStyleProfileCreationResult,
+  PatchAppWorkspaceSettingsResult,
   GetAppResearchCurationDraftInput,
   GetAppResearchCurationDraftFingerprintInput,
   RecordAppResearchEvidenceInput,
@@ -907,6 +908,7 @@ function createDefaultSettingJson() {
     content_review_failure_limit: 5,
     visual_review_enabled: false,
     visual_review_failure_limit: 2,
+    review_outline_first: false,
     disable_web_research: false,
     disable_image_research: false,
   };
@@ -956,6 +958,7 @@ function normalizeSettingJson(setting: unknown): Record<string, unknown> {
 
   nextSetting.content_review_enabled = nextSetting.content_review_enabled === true;
   nextSetting.visual_review_enabled = nextSetting.visual_review_enabled === true;
+  nextSetting.review_outline_first = nextSetting.review_outline_first === true;
   nextSetting.disable_web_research = nextSetting.disable_web_research === true;
   nextSetting.disable_image_research = nextSetting.disable_image_research === true;
   nextSetting.page_generation_concurrency = normalizePageGenerationConcurrency(
@@ -1621,7 +1624,16 @@ async function ensureWorkspaceFiles(
   }
 
   const currentTaskSetting = await readJsonFileIfExists(files.setting);
-  const normalizedTaskSetting = normalizeSettingJson(currentTaskSetting);
+  const currentTaskSettingRecord =
+    currentTaskSetting && typeof currentTaskSetting === "object" && !Array.isArray(currentTaskSetting)
+      ? (currentTaskSetting as Record<string, unknown>)
+      : {};
+  const normalizedTaskSetting = normalizeSettingJson({
+    ...(Object.prototype.hasOwnProperty.call(currentTaskSettingRecord, "review_outline_first")
+      ? {}
+      : { review_outline_first: workspaceSettingDefaults.review_outline_first === true }),
+    ...currentTaskSettingRecord,
+  });
   if (JSON.stringify(currentTaskSetting) !== JSON.stringify(normalizedTaskSetting)) {
     await writeJsonFile(files.setting, normalizedTaskSetting);
   }
@@ -1772,6 +1784,13 @@ export async function openAppWorkspace(
 export async function updateAppWorkspaceSettings(
   input: UpdateAppWorkspaceSettingsInput,
 ): Promise<AppWorkspaceResult> {
+  await patchAppWorkspaceSettings(input);
+  return ensureWorkspaceFiles(input.workspace_dir);
+}
+
+export async function patchAppWorkspaceSettings(
+  input: UpdateAppWorkspaceSettingsInput,
+): Promise<PatchAppWorkspaceSettingsResult> {
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
   const existing = normalizeSettingJson(await readJsonFileIfExists(workspace.files.setting));
   const nextSetting = {
@@ -1786,7 +1805,11 @@ export async function updateAppWorkspaceSettings(
   if (input.persist_as_default === true) {
     await updateGlobalWorkspaceDefaults(input.setting);
   }
-  return ensureWorkspaceFiles(input.workspace_dir);
+  return {
+    workspace_dir: workspace.workspace_dir,
+    setting: nextSetting,
+    persisted_as_default: input.persist_as_default === true,
+  };
 }
 
 export async function updateAppWorkspaceTitle(
@@ -5459,6 +5482,7 @@ export type {
   ListAppTemplateGroupsResult,
   ListAppWorkspacesResult,
   OpenAppWorkspaceInput,
+  PatchAppWorkspaceSettingsResult,
   PrepareAppPageFilesInput,
   PrepareAppPageFilesResult,
   PrepareAppExportModelInput,

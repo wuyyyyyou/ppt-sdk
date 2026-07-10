@@ -57,6 +57,7 @@ import {
   listAppTemplateGroups,
   listDiscoveredTemplateGroupSummaries,
   openAppWorkspace,
+  patchAppWorkspaceSettings,
   prepareAppDeckRefinementPageFiles,
   prepareAppPageFiles,
   prepareAppExportModel,
@@ -1258,6 +1259,24 @@ async function toolAppUpdateWorkspaceSettings(args) {
   }));
 }
 
+async function toolAppPatchWorkspaceSettings(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const setting = args.setting;
+  if (!setting || typeof setting !== "object" || Array.isArray(setting)) {
+    throw new Error('"setting" must be an object');
+  }
+
+  return patchAppWorkspaceSettings({
+    workspace_dir: workspaceDir,
+    setting,
+    persist_as_default: args.persist_as_default === true,
+  });
+}
+
 async function toolAppUpdateWorkspacePages(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -2154,6 +2173,7 @@ const TOOL_DISPATCH = {
   app_update_workspace_pages: toolAppUpdateWorkspacePages,
   app_duplicate_workspace_page: toolAppDuplicateWorkspacePage,
   app_update_workspace_settings: toolAppUpdateWorkspaceSettings,
+  app_patch_workspace_settings: toolAppPatchWorkspaceSettings,
   app_update_workspace_title: toolAppUpdateWorkspaceTitle,
   app_list_template_groups: toolAppListTemplateGroups,
   app_get_template_group: toolAppGetTemplateGroup,

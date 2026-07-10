@@ -1,6 +1,6 @@
 {
   "display_name": "ppt-engine",
-  "version": "4.0.4",
+  "version": "4.0.5",
   "description": "Anna Executa plugin for Presenton template discovery, manifest-based deck HTML generation, deck HTML to PPTX model conversion, and stability validation.",
   "author": "Anna Developer",
   "host_capabilities": [
@@ -441,6 +441,30 @@
     {
       "name": "app_update_workspace_settings",
       "description": "Update the PPT workspace-level setting.json and return the refreshed task workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "setting",
+          "type": "object",
+          "description": "Partial settings object to merge into the workspace-level setting.json.",
+          "required": true
+        },
+        {
+          "name": "persist_as_default",
+          "type": "boolean",
+          "description": "When true, also merge these settings into the global PPT defaults used by newly created workspaces.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "app_patch_workspace_settings",
+      "description": "Patch the PPT workspace-level setting.json and return only the normalized settings result.",
       "parameters": [
         {
           "name": "workspace_dir",

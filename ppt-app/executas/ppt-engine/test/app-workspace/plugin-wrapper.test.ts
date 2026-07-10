@@ -91,6 +91,79 @@ test("app_update_workspace_settings plugin wrapper forwards persist_as_default",
   );
 });
 
+test("app_patch_workspace_settings is declared and returns settings without a workspace upload", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+  const manifest = JSON.parse(
+    await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
+  ) as { tools: Array<{ name: string }> };
+
+  assert.match(source, /app_patch_workspace_settings:\s*toolAppPatchWorkspaceSettings/);
+  assert.match(source, /return patchAppWorkspaceSettings\(\{/);
+  assert.ok(manifest.tools.some((tool) => tool.name === "app_patch_workspace_settings"));
+});
+
+let patchSettingsInvokeSkip: string | false = false;
+try {
+  const distIndex = await readFile(new URL("../../dist/index.js", import.meta.url), "utf8");
+  if (!distIndex.includes("patchAppWorkspaceSettings")) {
+    patchSettingsInvokeSkip = "requires a built dist/index.js with patchAppWorkspaceSettings support";
+  }
+} catch {
+  patchSettingsInvokeSkip = "requires a built dist/index.js";
+}
+
+test(
+  "app_patch_workspace_settings plugin invoke returns inline settings data",
+  { skip: patchSettingsInvokeSkip, timeout: 5_000 },
+  async () => {
+    const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-plugin-settings-home-"));
+    const workspaceDir = path.join(homeDir, "anna-workspace", "ppt", "ppt-20260710-000001");
+    const previousHome = process.env.HOME;
+    process.env.HOME = homeDir;
+    const plugin = await startPluginProcess();
+
+    try {
+      const response = await plugin.request("invoke", {
+        tool: "app_patch_workspace_settings",
+        arguments: {
+          workspace_dir: workspaceDir,
+          setting: { review_outline_first: true },
+          persist_as_default: true,
+        },
+      });
+
+      assert.ok(!response.error, response.error?.message);
+      assert.equal(response.result?.data?.workspace_dir, workspaceDir);
+      assert.deepEqual(response.result?.data?.setting, {
+        audience: "",
+        goal: "",
+        style_notes: "",
+        output_language: "auto",
+        text_density: "balanced",
+        page_generation_concurrency: 5,
+        content_review_enabled: false,
+        content_review_failure_limit: 5,
+        visual_review_enabled: false,
+        visual_review_failure_limit: 2,
+        review_outline_first: true,
+        disable_web_research: false,
+        disable_image_research: false,
+        updated_at: (response.result?.data?.setting as Record<string, unknown>)?.updated_at,
+      });
+      assert.equal(response.result?.data?.persisted_as_default, true);
+      assert.equal("workspace_upload" in (response.result?.data ?? {}), false);
+    } finally {
+      await plugin.close();
+      if (previousHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = previousHome;
+      }
+      await rm(homeDir, { recursive: true, force: true });
+    }
+  },
+);
+
 test("app_get_workspace_defaults is declared and routed", async () => {
   const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
   const manifest = JSON.parse(

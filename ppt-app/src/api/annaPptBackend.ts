@@ -53,6 +53,7 @@ import type {
   RemoveUploadedSourceResult,
   PrepareUploadedSourceAnalysisWorkspaceResult,
   UploadedSourceAnalysisDraftFingerprint,
+  UpdateWorkspaceSettingsResult,
 } from "./types";
 import { createSearchAdapter } from "./searchAdapter";
 import { resolvePptBundledToolIds } from "./bundledToolIds";
@@ -364,7 +365,11 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
     updateWorkspaceOutline: (input) =>
       invokeWorkspaceResult("app_update_workspace_outline", input),
     updateWorkspaceSettings: (input) =>
-      invokeWorkspaceResult("app_update_workspace_settings", input),
+      invoke<UpdateWorkspaceSettingsResult>(
+        toolIds.pptEngine,
+        "app_patch_workspace_settings",
+        input
+      ),
     updateWorkspacePages: (input) =>
       invokeWorkspaceResult("app_update_workspace_pages", input),
     duplicateWorkspacePage: (input) =>
