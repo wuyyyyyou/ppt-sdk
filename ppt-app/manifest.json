@@ -17,7 +17,7 @@
     {
       "tool_id": "bundled:anna-search",
       "version": "latest",
-      "min_version": "0.1.3"
+      "min_version": "0.1.4"
     }
   ],
   "optional_executas": [],
