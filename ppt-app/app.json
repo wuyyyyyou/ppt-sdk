@@ -1,7 +1,7 @@
 {
   "name": "Anna Deck",
   "slug": "anna-presenton",
-  "version": "0.1.0",
+  "version": "0.2.17",
   "tagline": "Shape rough ideas into polished decks.",
   "description": "Turns notes, docs, and half-formed thoughts into a structured presentation flow, with reviewable outlines and editable slide direction.",
   "category": "productivity",
