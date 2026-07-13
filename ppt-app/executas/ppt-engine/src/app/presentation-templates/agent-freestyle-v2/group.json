@@ -1,0 +1,15 @@
+{
+  "group_id": "agent-freestyle-v2",
+  "group_name": "Agent Freestyle v2",
+  "group_description": "A TSX-first canvas with neutral technical primitives and optional reference component source for AI Agent authoring.",
+  "group_brief": "Use original page-specific composition. Reuse technical primitives when useful and consult reference components for implementation patterns without treating them as blueprints.",
+  "style_tags": ["freestyle", "neutral", "tsx-first", "component-assisted"],
+  "industry_tags": [],
+  "use_cases": ["custom-presentation", "visual-quality-experiment", "agent-authored-deck"],
+  "audience_tags": ["general"],
+  "tone_tags": ["custom"],
+  "ordered": true,
+  "default": false,
+  "registry_order": 97,
+  "layouts": ["slides/BlankSlide.tsx"]
+}

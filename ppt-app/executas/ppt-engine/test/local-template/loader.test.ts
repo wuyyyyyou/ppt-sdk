@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import {
-  assertLocalTemplateModule,
+  assertDiscoverableLocalTemplateModule,
   importLocalTemplateModule,
 } from "../../src/local-template/loader.ts";
 
@@ -47,7 +47,7 @@ test("imports a TSX local template without template-local node_modules", async (
       rootDir,
     );
 
-    assertLocalTemplateModule(moduleValue, path.join(rootDir, "slides", "Slide.tsx"));
+    assertDiscoverableLocalTemplateModule(moduleValue, path.join(rootDir, "slides", "Slide.tsx"));
     assert.equal(moduleValue.layoutId, "loader-fixture");
     assert.deepEqual(moduleValue.Schema.parse({}), { title: "Title" });
     assert.equal(typeof moduleValue.default, "function");
@@ -96,7 +96,7 @@ test("imports a Recharts local template through runtime React shims", async () =
       rootDir,
     );
 
-    assertLocalTemplateModule(moduleValue, path.join(rootDir, "slides", "ChartSlide.tsx"));
+    assertDiscoverableLocalTemplateModule(moduleValue, path.join(rootDir, "slides", "ChartSlide.tsx"));
     assert.equal(moduleValue.layoutId, "recharts-fixture");
     assert.deepEqual(moduleValue.Schema.parse({}), { title: "Chart" });
     assert.equal(typeof moduleValue.default, "function");
@@ -139,7 +139,7 @@ test("imports a use-resize-observer local template through runtime React shims",
       rootDir,
     );
 
-    assertLocalTemplateModule(moduleValue, path.join(rootDir, "slides", "MeasuredSlide.tsx"));
+    assertDiscoverableLocalTemplateModule(moduleValue, path.join(rootDir, "slides", "MeasuredSlide.tsx"));
     assert.equal(moduleValue.layoutId, "resize-observer-fixture");
     assert.deepEqual(moduleValue.Schema.parse({}), { title: "Measured" });
     assert.equal(typeof moduleValue.default, "function");

@@ -81,6 +81,21 @@ test("valid TSX slide satisfies VE-03 AST rules", async () => {
   });
 });
 
+test("TSX-only slide without Schema or layout metadata satisfies AST rules", async () => {
+  await withDeckFixture(
+    `import React from "react";
+
+export default function MinimalSlide() {
+  return <div className="w-[1280px] h-[720px]">TSX content</div>;
+}
+`,
+    async (manifestPath) => {
+      const diagnostics = await runStaticRules({ manifestPath });
+      assert.deepEqual(diagnostics, []);
+    },
+  );
+});
+
 test("missing zod-backed Schema reports STATIC-005", async () => {
   await withDeckFixture(
     VALID_SLIDE.replace('import * as z from "zod";\n\nexport const Schema = z.object({\n  title: z.string().default("Title"),\n  subtitle: z.string().default("Subtitle"),\n});', 'export const Schema = { parse(value) { return value ?? {}; } };'),

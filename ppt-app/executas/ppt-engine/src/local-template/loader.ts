@@ -16,10 +16,10 @@ type RenderToStaticMarkup = (element: React.ReactElement) => string;
 
 export type LocalTemplateModule = {
   default: LocalSlideComponent;
-  Schema: ZodTypeAny;
-  layoutId: string;
-  layoutName: string;
-  layoutDescription: string;
+  Schema?: ZodTypeAny;
+  layoutId?: string;
+  layoutName?: string;
+  layoutDescription?: string;
   sampleData?: Record<string, unknown>;
   layoutTags?: string[];
   layoutRole?: string;
@@ -509,6 +509,15 @@ export function assertLocalTemplateModule(
   if (typeof moduleValue.default !== "function") {
     throw new Error(`Local template must default export a React component: ${absolutePath}`);
   }
+}
+
+export function assertDiscoverableLocalTemplateModule(
+  moduleValue: LocalTemplateModule,
+  absolutePath: string,
+): asserts moduleValue is LocalTemplateModule & Required<Pick<LocalTemplateModule,
+  "Schema" | "layoutId" | "layoutName" | "layoutDescription"
+>> {
+  assertLocalTemplateModule(moduleValue, absolutePath);
 
   if (!moduleValue.layoutId || typeof moduleValue.layoutId !== "string") {
     throw new Error(`Local template must export "layoutId": ${absolutePath}`);

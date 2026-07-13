@@ -1,0 +1,17 @@
+{
+  "group_id": "agent-freestyle-v1",
+  "group_name": "Agent Freestyle",
+  "group_description": "A neutral TSX-first canvas for AI Agents to design presentation pages without blueprint or component-layout constraints.",
+  "group_brief": "Use this group when visual quality should be driven by an Agent-authored art direction and page-specific composition. The template provides only a fixed slide canvas, neutral theme values, and the minimum exports required by the rendering pipeline.",
+  "style_tags": ["freestyle", "neutral", "tsx-first", "agent-authored"],
+  "industry_tags": [],
+  "use_cases": ["custom-presentation", "visual-quality-experiment", "agent-authored-deck"],
+  "audience_tags": ["general"],
+  "tone_tags": ["custom"],
+  "ordered": true,
+  "default": false,
+  "registry_order": 96,
+  "layouts": [
+    "slides/BlankSlide.tsx"
+  ]
+}

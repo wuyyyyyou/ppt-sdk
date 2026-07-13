@@ -42,11 +42,13 @@ import chart_analytics_v1_HistoricalMilestoneTimelineComponent, * as chart_analy
 import chart_analytics_v1_ImageEvidenceShowcaseComponent, * as chart_analytics_v1_ImageEvidenceShowcaseModule from "./chart-analytics-v1/slides/ImageEvidenceShowcase.tsx";
 import chart_analytics_v1_StrategicSummaryTakeawaysComponent, * as chart_analytics_v1_StrategicSummaryTakeawaysModule from "./chart-analytics-v1/slides/StrategicSummaryTakeaways.tsx";
 import chart_analytics_v1_ClosingAnalyticsComponent, * as chart_analytics_v1_ClosingAnalyticsModule from "./chart-analytics-v1/slides/ClosingAnalytics.tsx";
+import agent_freestyle_v1_BlankSlideComponent, * as agent_freestyle_v1_BlankSlideModule from "./agent-freestyle-v1/slides/BlankSlide.tsx";
 import chart_analytics_canvas_CoverCanvasComponent, * as chart_analytics_canvas_CoverCanvasModule from "./chart-analytics-canvas/slides/CoverCanvas.tsx";
 import chart_analytics_canvas_ContentCanvasComponent, * as chart_analytics_canvas_ContentCanvasModule from "./chart-analytics-canvas/slides/ContentCanvas.tsx";
 import chart_analytics_canvas_ComparisonCanvasComponent, * as chart_analytics_canvas_ComparisonCanvasModule from "./chart-analytics-canvas/slides/ComparisonCanvas.tsx";
 import chart_analytics_canvas_ChartEvidenceCanvasComponent, * as chart_analytics_canvas_ChartEvidenceCanvasModule from "./chart-analytics-canvas/slides/ChartEvidenceCanvas.tsx";
 import chart_analytics_canvas_ClosingCanvasComponent, * as chart_analytics_canvas_ClosingCanvasModule from "./chart-analytics-canvas/slides/ClosingCanvas.tsx";
+import agent_freestyle_v2_BlankSlideComponent, * as agent_freestyle_v2_BlankSlideModule from "./agent-freestyle-v2/slides/BlankSlide.tsx";
 
 const red_finance_canvasGroupMeta = {
   "group_id": "red-finance-canvas",
@@ -375,6 +377,55 @@ const chart_analytics_v1Layouts: TemplateWithData[] = [
   createTemplateEntry(chart_analytics_v1_ClosingAnalyticsComponent, chart_analytics_v1_ClosingAnalyticsModule.Schema, chart_analytics_v1_ClosingAnalyticsModule.layoutId, chart_analytics_v1_ClosingAnalyticsModule.layoutName, chart_analytics_v1_ClosingAnalyticsModule.layoutDescription, "chart-analytics-v1", "ClosingAnalytics", {"sampleData":{"seriesLabel":"Global Intelligence Series","backgroundImageUrl":"https://page.talentsecsite.com/slides_images/6722217b327d461901b4f6677362a773.webp","backgroundImageAlt":"City skyline background","headline":"Thank You","subtitle":"Questions, decisions, and next steps","closingMessage":"Use this closing page to restate the key decision, request feedback, or point the audience to the next action.","primaryLabel":"Next Step","primaryValue":"Align on priority actions","secondaryLabel":"Follow-up","secondaryValue":"Share supporting evidence pack","contactLabel":"Contact","contactValue":"Talentsec AI Analytics","dateLabel":"Report Date","reportDate":"March 03, 2026","showBackgroundImage":true},"layoutTags":["closing","thank-you","next-steps","analytics","dark","tsx-first"],"layoutRole":"closing","contentElements":["headline","closing-message","next-step-callouts","contact-meta","date-meta"],"useCases":["closing","thank-you","decision-request","next-steps"],"suitableFor":"Suitable for the final page of an analytics deck when the presenter needs a polished close and clear next steps.","avoidFor":"Avoid using this layout for body analysis, chart-heavy pages, agendas, or dense evidence summaries.","density":"low","visualWeight":"visual-heavy","editableTextPriority":"high"}),
 ];
 
+const agent_freestyle_v1GroupMeta = {
+  "group_id": "agent-freestyle-v1",
+  "group_name": "Agent Freestyle",
+  "group_description": "A neutral TSX-first canvas for AI Agents to design presentation pages without blueprint or component-layout constraints.",
+  "ordered": true,
+  "default": false,
+  "group_brief": "Use this group when visual quality should be driven by an Agent-authored art direction and page-specific composition. The template provides only a fixed slide canvas, neutral theme values, and the minimum exports required by the rendering pipeline.",
+  "style_tags": [
+    "freestyle",
+    "neutral",
+    "tsx-first",
+    "agent-authored"
+  ],
+  "industry_tags": [],
+  "use_cases": [
+    "custom-presentation",
+    "visual-quality-experiment",
+    "agent-authored-deck"
+  ],
+  "audience_tags": [
+    "general"
+  ],
+  "tone_tags": [
+    "custom"
+  ],
+  "cover_layout_id": null,
+  "agenda_layout_id": null,
+  "closing_layout_id": null,
+  "default_theme_id": null
+};
+const agent_freestyle_v1Settings: TemplateGroupSettings = {
+  description: agent_freestyle_v1GroupMeta.group_description,
+  ordered: agent_freestyle_v1GroupMeta.ordered,
+  default: agent_freestyle_v1GroupMeta.default,
+  groupBrief: agent_freestyle_v1GroupMeta.group_brief ?? undefined,
+  styleTags: agent_freestyle_v1GroupMeta.style_tags ? [...agent_freestyle_v1GroupMeta.style_tags] : undefined,
+  industryTags: agent_freestyle_v1GroupMeta.industry_tags ? [...agent_freestyle_v1GroupMeta.industry_tags] : undefined,
+  useCases: agent_freestyle_v1GroupMeta.use_cases ? [...agent_freestyle_v1GroupMeta.use_cases] : undefined,
+  audienceTags: agent_freestyle_v1GroupMeta.audience_tags ? [...agent_freestyle_v1GroupMeta.audience_tags] : undefined,
+  toneTags: agent_freestyle_v1GroupMeta.tone_tags ? [...agent_freestyle_v1GroupMeta.tone_tags] : undefined,
+  coverLayoutId: agent_freestyle_v1GroupMeta.cover_layout_id ?? undefined,
+  agendaLayoutId: agent_freestyle_v1GroupMeta.agenda_layout_id ?? undefined,
+  closingLayoutId: agent_freestyle_v1GroupMeta.closing_layout_id ?? undefined,
+  defaultThemeId: agent_freestyle_v1GroupMeta.default_theme_id ?? undefined,
+};
+const agent_freestyle_v1Layouts: TemplateWithData[] = [
+  createTemplateEntry(agent_freestyle_v1_BlankSlideComponent, agent_freestyle_v1_BlankSlideModule.Schema, agent_freestyle_v1_BlankSlideModule.layoutId, agent_freestyle_v1_BlankSlideModule.layoutName, agent_freestyle_v1_BlankSlideModule.layoutDescription, "agent-freestyle-v1", "BlankSlide", {"sampleData":{},"layoutTags":["blank","freestyle","agent-authored","tsx-first"],"layoutRole":"content","useCases":["custom-composition","agent-authored-slide","visual-quality-experiment"],"suitableFor":"Suitable as a technical starting canvas when an AI Agent should design the final page from an approved art direction and visual page plan.","avoidFor":"Avoid treating this starter as a finished page or adding generic cards, headers, and placeholders before the concrete page has been designed.","density":"low","visualWeight":"balanced","editableTextPriority":"high"}),
+];
+
 const chart_analytics_canvasGroupMeta = {
   "group_id": "chart-analytics-canvas",
   "group_name": "Dark Analytics Canvas",
@@ -440,6 +491,55 @@ const chart_analytics_canvasLayouts: TemplateWithData[] = [
   createTemplateEntry(chart_analytics_canvas_ClosingCanvasComponent, chart_analytics_canvas_ClosingCanvasModule.Schema, chart_analytics_canvas_ClosingCanvasModule.layoutId, chart_analytics_canvas_ClosingCanvasModule.layoutName, chart_analytics_canvas_ClosingCanvasModule.layoutDescription, "chart-analytics-canvas", "ClosingCanvas", {"sampleData":{"seriesLabel":"Analytics Canvas Series","headline":"Thank You","subtitle":"Decisions, questions, and next steps","closingMessage":"Use this low-density closing canvas for contact details, a decision request, or follow-up actions.","primaryLabel":"Next Step","primaryValue":"Confirm decision path","secondaryLabel":"Follow-up","secondaryValue":"Share source appendix","contactLabel":"Contact","contactValue":"Analytics Authoring Workspace","dateLabel":"Report Date","reportDate":"2026"},"layoutTags":["closing","thank-you","canvas","analytics","component-first","tsx-first"],"layoutRole":"closing","contentElements":["headline","closing-message","next-step-callouts","footer-meta"],"useCases":["closing","thank-you","contact","next-steps"],"suitableFor":"Suitable for final thank-you, contact, or next-step slides.","avoidFor":"Avoid for analytical conclusions that still need charts, matrices, or dense recommendations.","density":"low","visualWeight":"visual-heavy","editableTextPriority":"high"}),
 ];
 
+const agent_freestyle_v2GroupMeta = {
+  "group_id": "agent-freestyle-v2",
+  "group_name": "Agent Freestyle v2",
+  "group_description": "A TSX-first canvas with neutral technical primitives and optional reference component source for AI Agent authoring.",
+  "ordered": true,
+  "default": false,
+  "group_brief": "Use original page-specific composition. Reuse technical primitives when useful and consult reference components for implementation patterns without treating them as blueprints.",
+  "style_tags": [
+    "freestyle",
+    "neutral",
+    "tsx-first",
+    "component-assisted"
+  ],
+  "industry_tags": [],
+  "use_cases": [
+    "custom-presentation",
+    "visual-quality-experiment",
+    "agent-authored-deck"
+  ],
+  "audience_tags": [
+    "general"
+  ],
+  "tone_tags": [
+    "custom"
+  ],
+  "cover_layout_id": null,
+  "agenda_layout_id": null,
+  "closing_layout_id": null,
+  "default_theme_id": null
+};
+const agent_freestyle_v2Settings: TemplateGroupSettings = {
+  description: agent_freestyle_v2GroupMeta.group_description,
+  ordered: agent_freestyle_v2GroupMeta.ordered,
+  default: agent_freestyle_v2GroupMeta.default,
+  groupBrief: agent_freestyle_v2GroupMeta.group_brief ?? undefined,
+  styleTags: agent_freestyle_v2GroupMeta.style_tags ? [...agent_freestyle_v2GroupMeta.style_tags] : undefined,
+  industryTags: agent_freestyle_v2GroupMeta.industry_tags ? [...agent_freestyle_v2GroupMeta.industry_tags] : undefined,
+  useCases: agent_freestyle_v2GroupMeta.use_cases ? [...agent_freestyle_v2GroupMeta.use_cases] : undefined,
+  audienceTags: agent_freestyle_v2GroupMeta.audience_tags ? [...agent_freestyle_v2GroupMeta.audience_tags] : undefined,
+  toneTags: agent_freestyle_v2GroupMeta.tone_tags ? [...agent_freestyle_v2GroupMeta.tone_tags] : undefined,
+  coverLayoutId: agent_freestyle_v2GroupMeta.cover_layout_id ?? undefined,
+  agendaLayoutId: agent_freestyle_v2GroupMeta.agenda_layout_id ?? undefined,
+  closingLayoutId: agent_freestyle_v2GroupMeta.closing_layout_id ?? undefined,
+  defaultThemeId: agent_freestyle_v2GroupMeta.default_theme_id ?? undefined,
+};
+const agent_freestyle_v2Layouts: TemplateWithData[] = [
+  createTemplateEntry(agent_freestyle_v2_BlankSlideComponent, agent_freestyle_v2_BlankSlideModule.Schema, agent_freestyle_v2_BlankSlideModule.layoutId, agent_freestyle_v2_BlankSlideModule.layoutName, agent_freestyle_v2_BlankSlideModule.layoutDescription, "agent-freestyle-v2", "BlankSlide", {"sampleData":{},"layoutTags":["blank","freestyle","agent-authored","component-assisted"],"layoutRole":"content","useCases":["custom-composition","agent-authored-slide","visual-quality-experiment"],"suitableFor":"A technical starting point for original page-specific composition.","avoidFor":"Do not treat the starter or reference components as a fixed page blueprint.","density":"low","visualWeight":"balanced","editableTextPriority":"high"}),
+];
+
 export const templates: TemplateLayoutsWithSettings[] = [
   {
     id: red_finance_canvasGroupMeta.group_id,
@@ -477,11 +577,25 @@ export const templates: TemplateLayoutsWithSettings[] = [
     layouts: chart_analytics_v1Layouts,
   },
   {
+    id: agent_freestyle_v1GroupMeta.group_id,
+    name: agent_freestyle_v1GroupMeta.group_name,
+    description: agent_freestyle_v1GroupMeta.group_description,
+    settings: agent_freestyle_v1Settings,
+    layouts: agent_freestyle_v1Layouts,
+  },
+  {
     id: chart_analytics_canvasGroupMeta.group_id,
     name: chart_analytics_canvasGroupMeta.group_name,
     description: chart_analytics_canvasGroupMeta.group_description,
     settings: chart_analytics_canvasSettings,
     layouts: chart_analytics_canvasLayouts,
+  },
+  {
+    id: agent_freestyle_v2GroupMeta.group_id,
+    name: agent_freestyle_v2GroupMeta.group_name,
+    description: agent_freestyle_v2GroupMeta.group_description,
+    settings: agent_freestyle_v2Settings,
+    layouts: agent_freestyle_v2Layouts,
   },
 ];
 

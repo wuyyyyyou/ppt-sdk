@@ -382,6 +382,9 @@ export const ZOD_SCHEMA_RULE: StabilityRule = {
       const parsedSource = await loadParsedSourceFile(resolution.absolutePath);
       const zodImports = collectZodImportNames(parsedSource.sourceFile);
       const schemaInitializer = findExportedSchemaInitializer(parsedSource.sourceFile);
+      if (!schemaInitializer) {
+        continue;
+      }
 
       if (!schemaUsesZod(schemaInitializer, zodImports)) {
         diagnostics.push(createRuleDiagnostic(this, {
@@ -423,6 +426,9 @@ export const SCHEMA_PARSE_RULE: StabilityRule = {
       }
 
       const parsedSource = await loadParsedSourceFile(resolution.absolutePath);
+      if (!findExportedSchemaInitializer(parsedSource.sourceFile)) {
+        continue;
+      }
       if (!hasTemplateDataContractReadOnData(parsedSource.sourceFile)) {
         diagnostics.push(createRuleDiagnostic(this, {
           message: `Local slide "${slideRef.slideId}" does not read data through Schema or a Template Data Contract helper`,

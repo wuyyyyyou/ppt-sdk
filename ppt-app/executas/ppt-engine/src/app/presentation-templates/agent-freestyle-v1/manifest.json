@@ -1,0 +1,14 @@
+{
+  "title": "Agent Freestyle Starter Deck",
+  "slides": [
+    {
+      "id": "agent-freestyle-v1-blank-slide",
+      "title": "Blank Slide",
+      "speaker_note": "A neutral starter slide. Replace it with Agent-authored pages for the concrete deck.",
+      "source": {
+        "type": "local",
+        "path": "./slides/BlankSlide.tsx"
+      }
+    }
+  ]
+}

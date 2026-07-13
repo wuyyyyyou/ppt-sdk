@@ -274,8 +274,11 @@ function buildManifestFromOriginal(
         type: "local",
         path: toManifestSourcePath(matchingSlide.sourcePath),
       },
-      data: isPlainRecord(originalSlide.data) ? originalSlide.data : {},
     };
+
+    if (isPlainRecord(originalSlide.data)) {
+      nextSlide.data = originalSlide.data;
+    }
 
     if (
       nextSlide.title === undefined &&

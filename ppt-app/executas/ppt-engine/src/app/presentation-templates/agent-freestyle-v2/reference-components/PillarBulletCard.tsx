@@ -1,0 +1,281 @@
+import React from "react";
+
+import {
+  FinanceIcon,
+  type FinanceIconName,
+} from "./FinanceIcons.js";
+import { theme } from "../theme.ts";
+import SectionPanelShell from "./SectionPanelShell.js";
+import StableInlineRow from "./StableInlineRow.js";
+
+export type PillarBulletItem = {
+  lead: string;
+  body: string;
+};
+
+type PillarBulletCardProps = {
+  number?: string;
+  watermarkText?: string;
+  icon: FinanceIconName;
+  title: string;
+  items: PillarBulletItem[];
+  accentColor?: string;
+  iconBackgroundColor?: string;
+  density?: "normal" | "compact";
+  titlePlacement?: "below" | "right";
+  showWatermark?: boolean;
+  dividerStyle?: "solid" | "dashed";
+  headerDensity?: "normal" | "compact" | "tight";
+  textScale?: "normal" | "small" | "xsmall";
+  dividerThickness?: number;
+  dividerDash?: string;
+};
+
+const BULLET_ITEM_LINE_HEIGHT = 19;
+const DEFAULT_DIVIDER_ESTIMATED_WIDTH = 280;
+
+const parseDividerDash = (dividerDash: string) => {
+  const [segmentToken, gapToken] = dividerDash.split(/\s+/);
+  const segment = Math.max(2, Number.parseFloat(segmentToken || "8") || 8);
+  const gap = Math.max(0, Number.parseFloat(gapToken || "6") || 6);
+  return { segment, gap };
+};
+
+const PillarBulletCard = ({
+  number,
+  watermarkText,
+  icon,
+  title,
+  items,
+  accentColor = theme.colors.accent,
+  iconBackgroundColor = theme.colors.accentSoft,
+  density = "normal",
+  titlePlacement = "below",
+  showWatermark = true,
+  dividerStyle = "solid",
+  headerDensity = "normal",
+  textScale = "normal",
+  dividerThickness = 1,
+  dividerDash = "8 6",
+}: PillarBulletCardProps) => {
+  const resolvedWatermarkText = watermarkText ?? number;
+  const isCompact = density === "compact";
+  const isTitleRight = titlePlacement === "right";
+  const isHeaderCompact = headerDensity === "compact";
+  const isHeaderTight = headerDensity === "tight";
+  const isSmallText = textScale === "small";
+  const isXSmallText = textScale === "xsmall";
+  const cardPaddingX = isCompact ? 18 : 20;
+  const cardPaddingTop = isCompact ? 20 : 22;
+  const cardPaddingBottom = isCompact ? 16 : 18;
+  const iconBoxSize = isHeaderTight ? 40 : isHeaderCompact ? 46 : isCompact ? 52 : 56;
+  const iconMarginBottom = isHeaderTight ? 8 : isHeaderCompact ? 10 : isCompact ? 12 : 14;
+  const titleFontSizeBase = isHeaderTight ? 14 : isHeaderCompact ? 15 : isCompact ? 17 : 18;
+  const titleFontSize = isSmallText
+    ? Math.max(13, titleFontSizeBase - 1)
+    : isXSmallText
+      ? Math.max(12, titleFontSizeBase - 2)
+      : titleFontSizeBase;
+  const dividerMarginTop = isCompact ? 6 : 8;
+  const dividerMarginBottom = isCompact ? 10 : 12;
+  const itemGap = isXSmallText ? 5 : isSmallText ? 6 : isCompact ? 8 : 10;
+  const leadFontSizeBase = isCompact ? 12 : 13;
+  const bodyFontSizeBase = isCompact ? 12 : 13;
+  const leadFontSize = isSmallText
+    ? `${Math.max(11, leadFontSizeBase - 1)}px`
+    : isXSmallText
+      ? `${Math.max(10, leadFontSizeBase - 2)}px`
+      : `${leadFontSizeBase}px`;
+  const bodyFontSizeValue = isSmallText
+    ? Math.max(11, bodyFontSizeBase - 1)
+    : isXSmallText
+      ? Math.max(10, bodyFontSizeBase - 2)
+      : bodyFontSizeBase;
+  const bodyFontSize = `${bodyFontSizeValue}px`;
+  const bodyLineHeight = isXSmallText ? "1.25" : isSmallText ? "1.3" : isCompact ? "1.4" : "1.45";
+  const headerGap = isHeaderTight ? 10 : isHeaderCompact ? 12 : isCompact ? 12 : 14;
+  const dividerBorderStyle = dividerStyle === "dashed" ? "dashed" : "solid";
+  const titleLineHeight = isHeaderTight ? 1.12 : 1.2;
+  const bulletSize = isXSmallText ? 5 : 6;
+  const bulletLineHeight = isXSmallText ? 17 : isSmallText ? 18 : BULLET_ITEM_LINE_HEIGHT;
+  const dividerColor = theme.colors.stroke;
+  const { segment: dividerSegmentLength, gap: dividerGap } = parseDividerDash(dividerDash);
+  const dividerSegmentCount =
+    dividerStyle === "dashed"
+      ? Math.max(
+          8,
+          Math.round(
+            (DEFAULT_DIVIDER_ESTIMATED_WIDTH + dividerGap) /
+              (dividerSegmentLength + dividerGap),
+          ),
+        )
+      : 1;
+
+  return (
+    <SectionPanelShell
+      className="relative h-full min-h-0 rounded-[8px]"
+      backgroundColor={theme.colors.canvas}
+      borderColor={theme.colors.stroke}
+      shadow={theme.shadows.card}
+      radius={8}
+      paddingX={cardPaddingX}
+      paddingY={0}
+    >
+      <div
+        style={{
+          paddingTop: cardPaddingTop,
+          paddingBottom: cardPaddingBottom,
+          minHeight: "100%",
+        }}
+      >
+      <div
+        className="absolute left-0 top-0 h-[6px] w-full"
+        style={{ backgroundColor: accentColor }}
+      />
+
+      {showWatermark && resolvedWatermarkText ? (
+        <div
+          className="absolute right-[16px] top-[14px] text-[42px] font-black leading-none"
+          style={{ color: theme.colors.accentSoft }}
+        >
+          {resolvedWatermarkText}
+        </div>
+      ) : null}
+
+      <div
+        className={`flex ${isTitleRight ? "items-center" : "flex-col"}`}
+        style={{
+          gap: headerGap,
+          marginBottom: isTitleRight ? 0 : iconMarginBottom,
+        }}
+      >
+        <div
+          className="flex flex-none items-center justify-center rounded-[12px]"
+          style={{
+            backgroundColor: iconBackgroundColor,
+            width: iconBoxSize,
+            height: iconBoxSize,
+            marginBottom: isTitleRight ? 0 : undefined,
+          }}
+        >
+          <FinanceIcon
+            name={icon}
+            className={
+              isHeaderTight
+                ? "h-[18px] w-[18px]"
+                : isHeaderCompact
+                  ? "h-5 w-5"
+                  : isCompact
+                    ? "h-[22px] w-[22px]"
+                    : "h-6 w-6"
+            }
+            stroke={accentColor}
+          />
+        </div>
+
+        <h2
+          className="font-bold"
+          style={{
+            color: theme.colors.textPrimary,
+            fontSize: titleFontSize,
+            lineHeight: titleLineHeight,
+          }}
+        >
+          {title}
+        </h2>
+      </div>
+
+      <div
+        className="w-full"
+        style={{
+          marginTop: dividerMarginTop,
+          marginBottom: dividerMarginBottom,
+        }}
+      >
+        {dividerStyle === "dashed" ? (
+          <div
+            className="flex w-full"
+            style={{
+              gap: dividerGap,
+              height: dividerThickness,
+              overflow: "hidden",
+            }}
+          >
+            {Array.from({ length: dividerSegmentCount }).map((_, index) => (
+              <div
+                key={index}
+                className="flex-1"
+                style={{
+                  height: dividerThickness,
+                  backgroundColor: dividerColor,
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <div
+            className="w-full"
+            style={{
+              height: dividerThickness,
+              backgroundColor: dividerColor,
+            }}
+          />
+        )}
+      </div>
+
+      <div
+        className="flex min-h-0 flex-1 flex-col"
+        style={{ gap: itemGap }}
+      >
+        {items.map((item, index) => (
+          <div
+            key={`${title}-${index}`}
+            className="flex items-start gap-[12px]"
+          >
+            <StableInlineRow
+              height={bulletLineHeight}
+              gap={0}
+              inline={false}
+              className="w-[6px] flex-none"
+            >
+              <div
+                className="rounded-full"
+                style={{
+                  width: bulletSize,
+                  height: bulletSize,
+                  backgroundColor: accentColor,
+                }}
+              />
+            </StableInlineRow>
+            <div className="flex min-w-0 flex-1 flex-col">
+              <StableInlineRow
+                height={bulletLineHeight}
+                gap={0}
+                style={{
+                  fontSize: leadFontSize,
+                  fontWeight: 700,
+                  color: theme.colors.textPrimary,
+                }}
+              >
+                <span>{item.lead}：</span>
+              </StableInlineRow>
+              <div
+                className="mt-[1px]"
+                style={{
+                  fontSize: bodyFontSize,
+                  lineHeight: bodyLineHeight,
+                  color: theme.colors.textMuted,
+                }}
+              >
+                {item.body}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      </div>
+    </SectionPanelShell>
+  );
+};
+
+export default PillarBulletCard;

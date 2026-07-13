@@ -16,6 +16,8 @@ const registryManifestPath = path.join(
 );
 const outputRoot = path.join(projectDir, "dist", "forkable-templates");
 const workspaceAssetTemplateGroups = new Set([
+  "agent-freestyle-v1",
+  "agent-freestyle-v2",
   "chart-analytics-canvas",
   "red-blue-comparison-canvas",
   "red-finance-canvas",
@@ -358,7 +360,12 @@ async function copyOptionalGroupAssets(groupRoot, groupOutputDir, options = {}) 
     return;
   }
 
-  for (const relativeDir of ["blueprints", "components", "reference-slides"]) {
+  for (const relativeDir of [
+    "blueprints",
+    "components",
+    "reference-components",
+    "reference-slides",
+  ]) {
     await copyDirectorySupplement(
       path.join(groupRoot, relativeDir),
       path.join(groupOutputDir, relativeDir),

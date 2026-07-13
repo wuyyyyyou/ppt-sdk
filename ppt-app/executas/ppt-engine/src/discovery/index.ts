@@ -10,7 +10,7 @@ import {
 } from "../app/presentation-templates/utils.js";
 import {
   ALLOWED_LOCAL_EXTENSIONS,
-  assertLocalTemplateModule,
+  assertDiscoverableLocalTemplateModule,
   importLocalTemplateModule,
   resolveLocalModulePath,
 } from "../local-template/loader.js";
@@ -709,7 +709,7 @@ async function loadLocalGroup(
       `Template group "${metadata.group_id}"`,
     );
     const moduleValue = await importLocalTemplateModule(absolutePath, groupRoot);
-    assertLocalTemplateModule(moduleValue, absolutePath);
+    assertDiscoverableLocalTemplateModule(moduleValue, absolutePath);
 
     if (seenLayoutIds.has(moduleValue.layoutId)) {
       throw new Error(

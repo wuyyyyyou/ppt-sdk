@@ -1,0 +1,11 @@
+{
+  "title": "Agent Freestyle v2 Starter Deck",
+  "slides": [
+    {
+      "id": "agent-freestyle-v2-blank-slide",
+      "title": "Blank Slide",
+      "speaker_note": "Replace this starter with Agent-authored pages.",
+      "source": { "type": "local", "path": "./slides/BlankSlide.tsx" }
+    }
+  ]
+}

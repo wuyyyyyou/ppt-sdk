@@ -304,9 +304,9 @@ async function resolveLocalSlide(
 
   return {
     slideId: slide.id,
-    layoutId: `${templateGroup}:${moduleValue.layoutId}`,
-    layoutName: moduleValue.layoutName,
-    layoutDescription: moduleValue.layoutDescription,
+    layoutId: `${templateGroup}:${moduleValue.layoutId ?? slide.id}`,
+    layoutName: moduleValue.layoutName ?? slide.title ?? slide.id,
+    layoutDescription: moduleValue.layoutDescription ?? "",
     templateGroup,
     localEntryPath: absolutePath,
   };
@@ -517,6 +517,9 @@ export async function prepareManifestRenderPlan(
           {
             layoutId: slide.runtimeLayoutId,
             absolutePath: slide.localEntryPath,
+            fallbackLayoutId: slide.slideId,
+            fallbackLayoutName: slide.context.title,
+            fallbackLayoutDescription: "",
           } satisfies LocalRuntimeEntry,
         ]),
     ).values(),

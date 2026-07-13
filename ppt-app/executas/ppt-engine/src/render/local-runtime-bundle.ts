@@ -14,6 +14,9 @@ const CURRENT_MODULE_DIR = path.dirname(CURRENT_MODULE_PATH);
 export type LocalRuntimeEntry = {
   layoutId: string;
   absolutePath: string;
+  fallbackLayoutId: string;
+  fallbackLayoutName: string;
+  fallbackLayoutDescription: string;
 };
 
 type LocalRuntimeBundleMode = "deck" | "slide";
@@ -83,8 +86,9 @@ function buildLocalRuntimeEntrySource(input: {
         normalizePathForImport(entry.absolutePath),
       )};`,
     );
+    const fallbackSchema = `z.object({})`;
     registryItems.push(
-      `${JSON.stringify(entry.layoutId)}: createTemplateEntry(${componentName}, ${moduleName}.Schema, ${moduleName}.layoutId, ${moduleName}.layoutName, ${moduleName}.layoutDescription, ${JSON.stringify(
+      `${JSON.stringify(entry.layoutId)}: createTemplateEntry(${componentName}, ${moduleName}.Schema ?? ${fallbackSchema}, ${moduleName}.layoutId ?? ${JSON.stringify(entry.fallbackLayoutId)}, ${moduleName}.layoutName ?? ${JSON.stringify(entry.fallbackLayoutName)}, ${moduleName}.layoutDescription ?? ${JSON.stringify(entry.fallbackLayoutDescription)}, ${JSON.stringify(
         entry.layoutId.split(":")[0] ?? "local",
       )}, ${JSON.stringify(path.basename(entry.absolutePath))}, { sampleData: ${moduleName}.sampleData ?? {} }),`,
     );
@@ -97,6 +101,7 @@ function buildLocalRuntimeEntrySource(input: {
       : "renderPresentonSlideWithErrorBoundary";
 
   return [
+    `import * as z from "zod";`,
     `import { ${renderFunction} } from ${JSON.stringify(normalizePathForImport(renderEntry))};`,
     `import { createTemplateEntry } from ${JSON.stringify(
       normalizePathForImport(resolveTemplateUtilsEntry()),

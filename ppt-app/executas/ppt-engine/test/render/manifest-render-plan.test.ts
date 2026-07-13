@@ -24,18 +24,16 @@ export default function LocalFixtureSlide({ data }) {
 `;
 
 const BROKEN_LOCAL_SLIDE = `import React from "react";
-import * as z from "zod";
 
-export const Schema = z.object({
-  title: z.string().default("Broken title"),
-});
+export function BrokenLocalFixtureSlide() {
+  return <div>Missing default export</div>;
+}
+`;
 
-export const layoutId = "broken-local-fixture";
-export const layoutName = "Broken Local Fixture";
+const MINIMAL_LOCAL_SLIDE = `import React from "react";
 
-export default function BrokenLocalFixtureSlide({ data }) {
-  const parsed = Schema.parse(data ?? {});
-  return <div data-manifest-slide-id="broken-local-fixture">{parsed.title}</div>;
+export default function MinimalLocalSlide() {
+  return <div data-manifest-slide-id="minimal-local">TSX content</div>;
 }
 `;
 
@@ -170,6 +168,31 @@ test("prepareManifestRenderPlan resolves local slides, data paths, and theme nor
   });
 });
 
+test("prepareManifestRenderPlan accepts a TSX-only local slide without data or metadata exports", async () => {
+  await withFixture(async ({ manifestPath, outputDir, deckDir }) => {
+    await writeFile(path.join(deckDir, "slides", "MinimalSlide.tsx"), MINIMAL_LOCAL_SLIDE, "utf8");
+    await writeFile(
+      manifestPath,
+      `${JSON.stringify({
+        title: "Minimal Deck",
+        slides: [{
+          id: "minimal-1",
+          title: "Minimal Slide",
+          source: { type: "local", path: "./slides/MinimalSlide.tsx" },
+        }],
+      }, null, 2)}\n`,
+      "utf8",
+    );
+
+    const plan = await prepareManifestRenderPlan({ manifestPath, outputDir });
+
+    assert.equal(plan.slides[0]?.layoutId, "render-plan-group:minimal-1");
+    assert.equal(plan.slides[0]?.context.title, "Minimal Slide");
+    assert.deepEqual(plan.slides[0]?.context.slideData, {});
+    assert.match(plan.deckRuntimeBundle ?? "", /MinimalLocalSlide/);
+  });
+});
+
 test("prepareManifestRenderPlan isolates local slides in single-page mode", async () => {
   await withFixture(async ({ manifestPath, outputDir, deckDir }) => {
     await writeFile(path.join(deckDir, "slides", "LocalSlide.tsx"), LOCAL_SLIDE, "utf8");
@@ -237,7 +260,7 @@ test("prepareManifestRenderPlan still validates all local slides in full-deck mo
         outputDir,
       }),
       (error: Error) => {
-        assert.match(error.message, /Local template must export "layoutDescription"/);
+        assert.match(error.message, /default export a React component/);
         return true;
       },
     );

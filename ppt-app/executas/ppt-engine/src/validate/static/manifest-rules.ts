@@ -293,7 +293,7 @@ export const LOCAL_MODULE_EXPORT_RULE: StabilityRule = {
       if ("error" in moduleValidation) {
         diagnostics.push(createRuleDiagnostic(this, {
           message: moduleValidation.error,
-          suggestion: 'Ensure the local slide exports default, Schema, layoutId, layoutName, and layoutDescription.',
+          suggestion: "Ensure the local slide default exports a React component.",
           locations: [{
             filePath: resolution.absolutePath,
             jsonPath: slideRef.jsonPath,

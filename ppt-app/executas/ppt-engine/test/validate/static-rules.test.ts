@@ -24,11 +24,7 @@ const ExampleSlide = ({ data }) => {
 export default ExampleSlide;
 `;
 
-const MISSING_SCHEMA_SLIDE_MODULE = `export const layoutId = "broken-slide";
-export const layoutName = "Broken Slide";
-export const layoutDescription = "Broken slide missing Schema.";
-
-export default function BrokenSlide() {
+const MISSING_DEFAULT_EXPORT_SLIDE_MODULE = `export function BrokenSlide() {
   return "broken";
 }
 `;
@@ -174,10 +170,10 @@ test("path outside manifest root reports STATIC-003", async () => {
   );
 });
 
-test("missing required local template exports report STATIC-004", async () => {
+test("missing default local template export reports STATIC-004", async () => {
   await withDeckFixture(
     (deckDir) => writeBaseDeckFiles(deckDir, {
-      slideTsx: MISSING_SCHEMA_SLIDE_MODULE,
+      slideTsx: MISSING_DEFAULT_EXPORT_SLIDE_MODULE,
     }),
     async (manifestPath) => {
       const diagnostics = await runStaticRules({ manifestPath });
@@ -206,7 +202,7 @@ test("single-page mode limits static validation to the selected slide", async ()
   await withDeckFixture(
     async (deckDir) => {
       await mkdir(path.join(deckDir, "slides"), { recursive: true });
-      await writeFile(path.join(deckDir, "slides", "BrokenSlide.ts"), MISSING_SCHEMA_SLIDE_MODULE, "utf8");
+      await writeFile(path.join(deckDir, "slides", "BrokenSlide.ts"), MISSING_DEFAULT_EXPORT_SLIDE_MODULE, "utf8");
       await writeFile(path.join(deckDir, "slides", "ValidSlide.ts"), VALID_SLIDE_MODULE, "utf8");
       await writeFile(
         path.join(deckDir, "group.json"),
