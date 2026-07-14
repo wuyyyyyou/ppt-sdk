@@ -29,7 +29,7 @@
       "tools": [],
       "chat": [],
       "artifact": [],
-      "llm": [],
+      "llm": ["complete"],
       "agent": {
         "session": {
           "auto": true,

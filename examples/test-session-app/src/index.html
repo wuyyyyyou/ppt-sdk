@@ -12,93 +12,184 @@
       <header class="topbar">
         <div>
           <h1>Session 生命周期测试</h1>
-          <p>使用 raw agent.session.create / run / delete 测试 app_session_uuid 的创建、持有、持久化和复用行为。</p>
+          <p>测试 raw Agent session 生命周期和 Anna LLM complete 调用，并持久化完整调用记录与精确耗时。</p>
         </div>
-        <div class="status">
-          <span id="conn-dot" class="dot dot--off"></span>
-          <span id="conn-label">未连接</span>
+        <div class="topbar__status">
+          <div class="status">
+            <span id="conn-dot" class="dot dot--off"></span>
+            <span id="conn-label">未连接</span>
+          </div>
+          <div class="status">
+            <span>后台仍有</span>
+            <strong id="background-count">0</strong>
+            <span>个请求</span>
+          </div>
         </div>
       </header>
 
-      <section class="layout">
-        <section class="panel controls">
-          <div class="panel__head">
-            <h2>Session 操作</h2>
-            <button id="refresh-runtime" class="btn btn--ghost" type="button">重新连接</button>
-          </div>
+      <nav class="tabs" aria-label="测试类型">
+        <button class="tab tab--active" type="button" data-tab="session">Session 测试</button>
+        <button class="tab" type="button" data-tab="llm">LLM 测试</button>
+        <button class="tab" type="button" data-tab="records">调用记录 <span id="record-count" class="pill">0</span></button>
+      </nav>
 
-          <div class="actions">
-            <button id="create-session" class="btn btn--primary" type="button" disabled>创建 session</button>
-            <button id="delete-selected" class="btn" type="button" disabled>删除选中</button>
-            <button id="delete-all" class="btn btn--danger" type="button" disabled>清理全部</button>
-          </div>
-
-          <label class="field">
-            <span>手动输入 / 持久化恢复的 app_session_uuid</span>
-            <input id="manual-session-id" placeholder="例如 aps_xxx，用于测试 raw run/delete" />
-          </label>
-
-          <div class="actions">
-            <button id="attach-manual" class="btn" type="button" disabled>加入持有列表</button>
-            <button id="save-selected" class="btn" type="button" disabled>保存选中 ID</button>
-            <button id="clear-saved" class="btn btn--ghost" type="button">清空持久化 ID</button>
-          </div>
-
-          <section class="subpanel">
+      <section id="tab-session" class="tab-panel tab-panel--active">
+        <section class="layout">
+          <section class="panel controls">
             <div class="panel__head">
-              <h2>当前持有的 sessions</h2>
-              <span id="session-count" class="pill">0</span>
+              <h2>Session 操作</h2>
+              <button id="refresh-runtime" class="btn btn--ghost" type="button">重新连接</button>
             </div>
-            <ul id="session-list" class="session-list" aria-label="当前 session 列表"></ul>
+
+            <div class="actions">
+              <button id="create-session" class="btn btn--primary" type="button" disabled>创建 session</button>
+              <button id="delete-selected" class="btn" type="button" disabled>删除选中</button>
+              <button id="delete-all" class="btn btn--danger" type="button" disabled>清理全部</button>
+              <button id="stop-session-wait" class="btn btn--warn" type="button" disabled>停止等待</button>
+            </div>
+
+            <label class="field">
+              <span>手动输入 / 持久化恢复的 app_session_uuid</span>
+              <input id="manual-session-id" placeholder="例如 aps_xxx，用于测试 raw run/delete" />
+            </label>
+
+            <div class="actions">
+              <button id="attach-manual" class="btn" type="button" disabled>加入持有列表</button>
+              <button id="save-selected" class="btn" type="button" disabled>保存选中 ID</button>
+              <button id="clear-saved" class="btn btn--ghost" type="button">清空持久化 ID</button>
+            </div>
+
+            <section class="subpanel">
+              <div class="panel__head">
+                <h2>当前持有的 sessions</h2>
+                <span id="session-count" class="pill">0</span>
+              </div>
+              <ul id="session-list" class="session-list" aria-label="当前 session 列表"></ul>
+            </section>
+
+            <section class="subpanel">
+              <div class="panel__head">
+                <h2>localStorage 中的 ID</h2>
+                <span id="saved-count" class="pill">0</span>
+              </div>
+              <ul id="saved-list" class="session-list" aria-label="持久化 session id 列表"></ul>
+            </section>
           </section>
 
-          <section class="subpanel">
+          <section class="panel run-panel">
             <div class="panel__head">
-              <h2>localStorage 中的 ID</h2>
-              <span id="saved-count" class="pill">0</span>
+              <h2>session.run 测试</h2>
+              <button id="copy-result" class="btn btn--ghost" type="button" disabled>复制最近结果</button>
             </div>
-            <ul id="saved-list" class="session-list" aria-label="持久化 session id 列表"></ul>
+
+            <dl class="kv">
+              <div><dt>选中 ID</dt><dd id="selected-session-id">-</dd></div>
+              <div><dt>来源</dt><dd id="selected-session-source">-</dd></div>
+              <div><dt>状态</dt><dd id="selected-session-state">-</dd></div>
+              <div><dt>当前调用</dt><dd id="active-session-record">-</dd></div>
+            </dl>
+
+            <label class="field">
+              <span>Prompt</span>
+              <textarea id="run-content" rows="8">请用一句中文说明你收到了这个 session.run 请求，并返回当前可见的 session 上下文摘要。</textarea>
+            </label>
+
+            <div class="actions">
+              <button id="run-selected" class="btn btn--primary" type="button" disabled>运行选中 session</button>
+              <button id="run-manual" class="btn" type="button" disabled>运行手动 ID</button>
+            </div>
+
+            <pre id="result-json" class="json">{}</pre>
           </section>
         </section>
+      </section>
 
-        <section class="panel run-panel">
+      <section id="tab-llm" class="tab-panel">
+        <section class="panel llm-panel">
           <div class="panel__head">
-            <h2>session.run 测试</h2>
-            <button id="copy-result" class="btn btn--ghost" type="button" disabled>复制最近结果</button>
+            <div>
+              <h2>llm.complete 测试</h2>
+              <p class="hint">优先复刻 PPT App 的 runtime.call 调用路径；不可用时回退到 runtime.llm.complete。</p>
+            </div>
+            <button id="copy-llm-result" class="btn btn--ghost" type="button" disabled>复制最近结果</button>
           </div>
 
-          <dl class="kv">
-            <div>
-              <dt>选中 ID</dt>
-              <dd id="selected-session-id">-</dd>
-            </div>
-            <div>
-              <dt>来源</dt>
-              <dd id="selected-session-source">-</dd>
-            </div>
-            <div>
-              <dt>状态</dt>
-              <dd id="selected-session-state">-</dd>
-            </div>
-          </dl>
-
           <label class="field">
-            <span>Prompt</span>
-            <textarea id="run-content" rows="8">请用一句中文说明你收到了这个 session.run 请求，并返回当前可见的 session 上下文摘要。</textarea>
+            <span>System prompt（可选）</span>
+            <textarea id="llm-system-prompt" rows="4" placeholder="例如：请始终用中文简洁回答。"></textarea>
+          </label>
+          <label class="field">
+            <span>User prompt（必填）</span>
+            <textarea id="llm-user-prompt" rows="8">请用一句中文回复，并说明你已经收到这条 LLM 测试请求。</textarea>
+          </label>
+          <label class="field field--compact">
+            <span>Anna Runtime 超时时间（秒，10～600）</span>
+            <input id="llm-timeout-seconds" type="number" min="10" max="600" step="1" value="120" />
           </label>
 
           <div class="actions">
-            <button id="run-selected" class="btn btn--primary" type="button" disabled>运行选中 session</button>
-            <button id="run-manual" class="btn" type="button" disabled>运行手动 ID</button>
+            <button id="run-llm" class="btn btn--primary" type="button" disabled>调用 LLM</button>
+            <button id="stop-llm-wait" class="btn btn--warn" type="button" disabled>停止等待</button>
           </div>
 
-          <pre id="result-json" class="json">{}</pre>
+          <dl class="kv metrics">
+            <div><dt>当前调用</dt><dd id="active-llm-record">-</dd></div>
+            <div><dt>调用路径</dt><dd id="llm-invocation-path">-</dd></div>
+            <div><dt>耗时</dt><dd id="llm-duration">-</dd></div>
+          </dl>
+          <pre id="llm-result-json" class="json">{}</pre>
+        </section>
+      </section>
+
+      <section id="tab-records" class="tab-panel">
+        <section class="panel">
+          <div class="panel__head panel__head--wrap">
+            <div>
+              <h2>IndexedDB 调用记录</h2>
+              <p class="hint">保存完整请求、响应、stream frames、事件时间线和耗时；不会自动删除。</p>
+            </div>
+            <div class="actions">
+              <select id="record-category-filter" aria-label="调用类型筛选">
+                <option value="all">全部类型</option>
+                <option value="session">Session</option>
+                <option value="llm">LLM</option>
+              </select>
+              <select id="record-status-filter" aria-label="状态筛选">
+                <option value="all">全部状态</option>
+                <option value="running">运行中</option>
+                <option value="waiting_stopped">已停止等待</option>
+                <option value="succeeded">成功</option>
+                <option value="failed">失败</option>
+                <option value="interrupted">已中断</option>
+              </select>
+              <button id="refresh-records" class="btn btn--ghost" type="button">刷新</button>
+              <button id="copy-all-records" class="btn btn--ghost" type="button">复制全部</button>
+              <button id="clear-records" class="btn btn--danger" type="button">清空全部</button>
+            </div>
+          </div>
+
+          <div class="records-layout">
+            <ul id="record-list" class="record-list" aria-label="调用记录列表"></ul>
+            <section class="record-detail">
+              <div class="panel__head">
+                <h2>完整记录</h2>
+                <div class="actions">
+                  <button id="copy-record" class="btn btn--ghost" type="button" disabled>复制当前</button>
+                  <button id="delete-record" class="btn btn--danger" type="button" disabled>删除当前</button>
+                </div>
+              </div>
+              <pre id="record-json" class="json record-json">{}</pre>
+            </section>
+          </div>
         </section>
       </section>
 
       <section class="panel logs-panel">
         <div class="panel__head">
-          <h2>详细日志</h2>
+          <div>
+            <h2>实时日志</h2>
+            <p class="hint">API 事件会写入对应调用记录；复制、切换页签等纯 UI 日志只显示在这里。</p>
+          </div>
           <div class="actions">
             <button id="copy-logs" class="btn btn--ghost" type="button">复制日志</button>
             <button id="clear-logs" class="btn btn--ghost" type="button">清空日志</button>

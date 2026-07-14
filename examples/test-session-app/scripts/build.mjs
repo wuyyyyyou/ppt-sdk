@@ -9,7 +9,15 @@ const out = resolve(root, "bundle");
 await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
 
-for (const file of ["index.html", "app.js", "style.css", "icon.svg"]) {
+for (const file of [
+  "index.html",
+  "app.js",
+  "anna-llm.js",
+  "record-store.js",
+  "record-utils.js",
+  "style.css",
+  "icon.svg",
+]) {
   await copyFile(resolve(src, file), resolve(out, file));
 }
 

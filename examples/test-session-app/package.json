@@ -7,6 +7,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "anna-app dev",
+    "test": "node --test test/*.test.mjs",
     "validate": "anna-app validate --strict"
   },
   "devDependencies": {
