@@ -13,6 +13,7 @@ import { StyleProfileCreationPage } from "../features/deck-workspace/components/
 import { UploadedSourceAnalysisPage } from "../features/deck-workspace/components/UploadedSourceAnalysisPage";
 import { WorkspaceDialog } from "../features/deck-workspace/components/WorkspaceDialog";
 import { useDeckWorkspace } from "../features/deck-workspace/hooks/useDeckWorkspace";
+import { PresentationEditorShell } from "../features/presentation-editor/PresentationEditorShell";
 import { useI18n } from "../i18n/useI18n";
 import { formatSlideNumber } from "../features/deck-workspace/utils";
 
@@ -20,6 +21,37 @@ export function App() {
   const { locale, setLocale, t } = useI18n();
   const { state, actions } = useDeckWorkspace(t, locale);
   const selectedSlide = state.deck[state.currentSlide] ?? state.deck[0];
+
+  if (state.page === "editor") {
+    return (
+      <main className="anna-stage">
+        <PresentationEditorShell
+          t={t}
+          document={state.presentationEditor.document}
+          status={state.presentationEditor.status}
+          saveStatus={state.presentationEditor.saveStatus}
+          error={state.presentationEditor.error}
+          canUndo={state.presentationEditor.canUndo}
+          canRedo={state.presentationEditor.canRedo}
+          loading={state.loading}
+          exportArtifact={state.exportArtifact}
+          imageAssets={state.presentationEditor.imageAssets}
+          onBack={actions.goBack}
+          onSave={actions.savePresentation}
+          onRestore={actions.restorePresentation}
+          onUndo={actions.undoPresentationEdit}
+          onRedo={actions.redoPresentationEdit}
+          onExport={(type) => {
+            void actions.exportFile(type);
+          }}
+          updateDocument={actions.updatePresentationDocument}
+          updateElement={actions.updatePresentationElement}
+          updateElementTransient={actions.updatePresentationElementTransient}
+        />
+        {state.toast ? <div className="editor-global-toast">{state.toast}</div> : null}
+      </main>
+    );
+  }
 
   return (
     <main className="anna-stage">
@@ -187,6 +219,13 @@ export function App() {
               }}
               onPreview={() => actions.navigate("review")}
               onExport={() => actions.navigate("export")}
+              onAdvancedEdit={() => {
+                void actions.openPresentationEditor();
+              }}
+              presentationDocument={state.presentationEditor.document}
+              presentationStatus={state.presentationEditor.status}
+              presentationError={state.presentationEditor.error}
+              presentationImageAssets={state.presentationEditor.imageAssets}
             />
           ) : null}
 
@@ -218,14 +257,14 @@ export function App() {
               reviewRender={state.reviewRender}
               renderDeckHtml={actions.renderDeckHtml}
               onBack={actions.goBack}
-              updateDeckTitle={actions.updateDeckTitle}
-              moveSlide={actions.moveSlide}
-              duplicateSlide={actions.duplicateSlide}
-              deleteSlide={actions.deleteSlide}
-              addSlide={actions.addSlide}
               onRefineSlide={(index) => {
                 void actions.openRefineSlide(index);
               }}
+              presentationDocument={state.presentationEditor.document}
+              presentationStatus={state.presentationEditor.status}
+              presentationError={state.presentationEditor.error}
+              presentationImageAssets={state.presentationEditor.imageAssets}
+              onAdvancedEdit={() => { void actions.openPresentationEditor(); }}
             />
           ) : null}
 

@@ -1,8 +1,9 @@
 import type { Slide } from "../../../data/mockDeck";
-import type { RenderDeckHtmlResult } from "../../../api/types";
+import type { PresentationDocument, RenderDeckHtmlResult } from "../../../api/types";
 import { formatSlideNumber } from "../utils";
 import { RenderedSlideImage } from "./RenderedSlideImage";
 import { SlidePreviewLoading } from "./SlidePreviewLoading";
+import { PresentationRenderer } from "../../presentation-editor/PresentationRenderer";
 
 interface ThumbnailStripProps {
   deck: Slide[];
@@ -10,6 +11,8 @@ interface ThumbnailStripProps {
   setCurrentSlide: (index: number) => void;
   renderedSlides?: RenderDeckHtmlResult["slides"];
   loadingPreviews?: boolean;
+  presentationDocument?: PresentationDocument | null;
+  presentationImageAssets?: Record<string, string>;
 }
 
 export function ThumbnailStrip({
@@ -17,19 +20,36 @@ export function ThumbnailStrip({
   currentSlide,
   setCurrentSlide,
   renderedSlides = [],
-  loadingPreviews = false
+  loadingPreviews = false,
+  presentationDocument = null,
+  presentationImageAssets,
 }: ThumbnailStripProps) {
+  const items = presentationDocument?.slides ?? deck;
   return (
     <div className="thumbnail-strip">
-      {deck.map((slide, index) => {
+      {items.map((item, index) => {
+        const structuredSlide = presentationDocument?.slides[index];
+        const slide = structuredSlide
+          ? deck[structuredSlide.metadata.sourceSlideIndex] ?? deck[index]
+          : item as Slide;
         const renderedSlide = renderedSlides[index];
         return (
           <button
-            key={`${slide.title}-${index}`}
+            key={structuredSlide?.id ?? `${slide?.title ?? "slide"}-${index}`}
             className={`thumb ${index === currentSlide ? "active" : ""}`}
             onClick={() => setCurrentSlide(index)}
           >
-          {renderedSlide?.screenshot_upload ? (
+          {structuredSlide ? (
+            <div className="thumb-html-frame">
+              <PresentationRenderer
+                slide={structuredSlide}
+                width={presentationDocument?.width}
+                height={presentationDocument?.height}
+                mode="thumbnail"
+                imageAssets={presentationImageAssets}
+              />
+            </div>
+          ) : renderedSlide?.screenshot_upload ? (
             <div className="thumb-html-frame">
               <RenderedSlideImage slide={renderedSlide} />
             </div>
@@ -39,7 +59,7 @@ export function ThumbnailStrip({
             </div>
           ) : null}
           <span>{formatSlideNumber(index)}</span>
-          <strong>{slide.title}</strong>
+          <strong>{slide?.title ?? structuredSlide?.id}</strong>
           </button>
         );
       })}

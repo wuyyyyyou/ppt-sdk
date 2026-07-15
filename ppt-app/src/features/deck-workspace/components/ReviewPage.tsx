@@ -1,15 +1,11 @@
 import {
   AlertTriangle,
-  ChevronDown,
-  Copy,
-  GripVertical,
   LayoutGrid,
   LoaderCircle,
   Maximize2,
-  Plus,
-  RefreshCw,
-  Trash2
+  RefreshCw
 } from "lucide-react";
+import type { PresentationDocument } from "../../../api/types";
 import type { Slide } from "../../../data/mockDeck";
 import type { Messages } from "../../../i18n/messages";
 import { visibleSlideSubtitle } from "../slideDisplay";
@@ -18,6 +14,7 @@ import { formatSlideNumber } from "../utils";
 import { PageHeader } from "./PageHeader";
 import { RenderedSlideImage } from "./RenderedSlideImage";
 import { ThumbnailStrip } from "./ThumbnailStrip";
+import { PresentationRenderer } from "../../presentation-editor/PresentationRenderer";
 
 interface ReviewPageProps {
   t: Messages;
@@ -29,12 +26,12 @@ interface ReviewPageProps {
   reviewRender: DeckReviewRenderState;
   renderDeckHtml: () => Promise<void>;
   onBack: () => void;
-  updateDeckTitle: (index: number, title: string) => void;
-  moveSlide: (index: number, direction: -1 | 1) => Promise<void>;
-  duplicateSlide: (index: number) => Promise<void>;
-  deleteSlide: (index: number) => Promise<void>;
-  addSlide: () => void;
   onRefineSlide: (index: number) => void;
+  presentationDocument: PresentationDocument | null;
+  presentationStatus: "idle" | "loading" | "ready" | "readonly" | "error";
+  presentationError: string;
+  presentationImageAssets?: Record<string, string>;
+  onAdvancedEdit: () => void;
 }
 
 export function ReviewPage(props: ReviewPageProps) {
@@ -48,17 +45,24 @@ export function ReviewPage(props: ReviewPageProps) {
     reviewRender,
     renderDeckHtml,
     onBack,
-    updateDeckTitle,
-    moveSlide,
-    duplicateSlide,
-    deleteSlide,
-    addSlide,
-    onRefineSlide
+    onRefineSlide,
+    presentationDocument,
+    presentationStatus,
+    presentationError,
+    onAdvancedEdit
   } = props;
   const selected = deck[currentSlide] ?? deck[0];
   const renderedSlides = reviewRender.result?.slides ?? [];
   const selectedRenderedSlide = renderedSlides[currentSlide] ?? renderedSlides[0];
   const renderWaiting = reviewRender.status === "loading";
+  const orderedPresentationDocument = presentationDocument
+    ? {
+        ...presentationDocument,
+        slides: [...presentationDocument.slides].sort((left, right) => left.order - right.order),
+      }
+    : null;
+  const structuredSlide = orderedPresentationDocument?.slides[currentSlide] ?? null;
+  const structuredReady = presentationStatus === "ready" && orderedPresentationDocument !== null;
 
   return (
     <section className="page active review-page">
@@ -67,30 +71,30 @@ export function ReviewPage(props: ReviewPageProps) {
         onBack={onBack}
         t={t}
         actions={
-          <button
-            className="icon-action-btn"
-            onClick={() => void renderDeckHtml()}
-            disabled={reviewRender.status === "loading"}
-            title={t.review.renderAgain}
-          >
-            <RefreshCw size={14} />
-          </button>
+          <>
+            <button className="grid-action-btn primary" onClick={onAdvancedEdit}>
+              <Maximize2 size={14} />
+              {t.editor.advanced}
+            </button>
+            <button
+              className="icon-action-btn"
+              onClick={() => void renderDeckHtml()}
+              disabled={reviewRender.status === "loading"}
+              title={t.review.renderAgain}
+            >
+              <RefreshCw size={14} />
+            </button>
+          </>
         }
       />
       <div className="mode-toggle">
-        {(["grid", "organize", "present"] as PreviewMode[]).map((mode) => (
+        {(["grid", "present"] as PreviewMode[]).map((mode) => (
           <button
             key={mode}
             className={previewMode === mode ? "active" : ""}
             onClick={() => setPreviewMode(mode)}
           >
-            {mode === "grid" ? (
-              <LayoutGrid size={14} />
-            ) : mode === "organize" ? (
-              <GripVertical size={14} />
-            ) : (
-              <Maximize2 size={14} />
-            )}
+            {mode === "grid" ? <LayoutGrid size={14} /> : <Maximize2 size={14} />}
             {t.review[mode]}
           </button>
         ))}
@@ -126,6 +130,16 @@ export function ReviewPage(props: ReviewPageProps) {
           </div>
         ) : null}
 
+        {presentationStatus === "readonly" || presentationStatus === "error" ? (
+          <div className="deck-html-review-error">
+            <AlertTriangle size={18} />
+            <div>
+              <strong>{t.editor.structuredUnavailable}</strong>
+              {presentationError ? <pre>{presentationError}</pre> : null}
+            </div>
+          </div>
+        ) : null}
+
         {reviewRender.status === "ready" && !selectedRenderedSlide?.screenshot_upload ? (
           <div className="deck-html-review-state">
             <span>{t.review.renderFailed}</span>
@@ -135,95 +149,71 @@ export function ReviewPage(props: ReviewPageProps) {
 
       {previewMode === "grid" ? (
         <div className="preview-grid-view">
-          {deck.map((slide, index) => {
+          {(structuredReady ? orderedPresentationDocument.slides : deck).map((item, index) => {
+            const structured = structuredReady ? orderedPresentationDocument.slides[index] : null;
+            const slide = structured
+              ? deck[structured.metadata.sourceSlideIndex] ?? deck[index]
+              : item as Slide;
             const renderedSlide = renderedSlides[index];
-            const subtitle = visibleSlideSubtitle(slide);
+            const subtitle = slide ? visibleSlideSubtitle(slide) : "";
             return (
               <article
-                key={`${slide.title}-${index}`}
+                key={structured?.id ?? `${slide?.title ?? "slide"}-${index}`}
                 className={`grid-card ${index === currentSlide ? "active" : ""}`}
                 onClick={() => setCurrentSlide(index)}
               >
               <span>{formatSlideNumber(index)}</span>
-              {renderedSlide?.screenshot_upload ? (
+              {presentationStatus === "ready" && orderedPresentationDocument?.slides[index] ? (
+                <div className="grid-card-html-frame">
+                  <PresentationRenderer
+                    slide={orderedPresentationDocument.slides[index]!}
+                    width={orderedPresentationDocument.width}
+                    height={orderedPresentationDocument.height}
+                    mode="thumbnail"
+                    imageAssets={props.presentationImageAssets}
+                  />
+                </div>
+              ) : renderedSlide?.screenshot_upload ? (
                 <div className="grid-card-html-frame">
                   <RenderedSlideImage slide={renderedSlide} />
                 </div>
               ) : renderWaiting ? (
                 <PreviewLoadingFrame compact label={t.review.rendering} />
               ) : null}
-              <strong>{slide.title}</strong>
+              <strong>{slide?.title ?? structured?.id}</strong>
               {subtitle ? <p>{subtitle}</p> : null}
-              <div className="grid-card-actions">
-                <button
-                  className="grid-action-btn primary"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onRefineSlide(index);
-                  }}
-                >
-                  {t.controls.refineSlide}
-                </button>
-                <button
-                  className="grid-action-btn"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    void duplicateSlide(index);
-                  }}
-                >
-                  <Copy size={12} />
-                  {t.controls.duplicate}
-                </button>
-                <button
-                  className="grid-action-btn"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    void deleteSlide(index);
-                  }}
-                  disabled={deck.length <= 1}
-                >
-                  <Trash2 size={12} />
-                  {t.controls.delete}
-                </button>
-              </div>
+              {!structuredReady ? (
+                <div className="grid-card-actions">
+                  <button
+                    className="grid-action-btn primary"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onRefineSlide(index);
+                    }}
+                  >
+                    {t.controls.refineSlide}
+                  </button>
+                </div>
+              ) : null}
               </article>
             );
           })}
         </div>
       ) : null}
 
-      {previewMode === "organize" ? (
-        <div className="preview-organize-view">
-          {deck.map((slide, index) => (
-            <div key={`${slide.title}-${index}`} className="organize-item">
-              <span>{formatSlideNumber(index)}</span>
-              <input
-                value={slide.title}
-                onChange={(event) => updateDeckTitle(index, event.target.value)}
-              />
-              <div className="organize-actions">
-                <button onClick={() => void moveSlide(index, -1)} disabled={index === 0}>
-                  <ChevronDown className="up" size={14} />
-                </button>
-                <button onClick={() => void moveSlide(index, 1)} disabled={index === deck.length - 1}>
-                  <ChevronDown size={14} />
-                </button>
-                <button onClick={() => void deleteSlide(index)} disabled={deck.length <= 1}>
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-          ))}
-          <button className="organize-add-btn" onClick={addSlide}>
-            <Plus size={14} />
-            {t.controls.addSlide}
-          </button>
-        </div>
-      ) : null}
-
       {previewMode === "present" ? (
         <div className="preview-present-view">
-          {selectedRenderedSlide?.screenshot_upload ? (
+          {presentationStatus === "ready" && structuredSlide && orderedPresentationDocument ? (
+            <div className="present-html-frame structured-preview-frame">
+              <PresentationRenderer
+                slide={structuredSlide}
+                width={orderedPresentationDocument.width}
+                height={orderedPresentationDocument.height}
+                mode="preview"
+                imageAssets={props.presentationImageAssets}
+              />
+            </div>
+          ) : selectedRenderedSlide?.screenshot_upload ? (
             <div className="present-html-frame">
               <RenderedSlideImage slide={selectedRenderedSlide} loading="eager" />
             </div>
@@ -238,6 +228,7 @@ export function ReviewPage(props: ReviewPageProps) {
             setCurrentSlide={setCurrentSlide}
             renderedSlides={renderedSlides}
             loadingPreviews={renderWaiting}
+            presentationDocument={presentationStatus === "ready" ? orderedPresentationDocument : null}
           />
         </div>
       ) : null}

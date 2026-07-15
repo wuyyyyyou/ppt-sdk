@@ -1,7 +1,8 @@
-import { ChevronDown, Layers, LayoutTemplate, MessageCircle, RefreshCw, Wand2 } from "lucide-react";
+import { ChevronDown, Download, Layers, LayoutTemplate, MessageCircle, Settings2, RefreshCw, Wand2 } from "lucide-react";
 import { useState } from "react";
+import type { PresentationDocument } from "../../../api/types";
 import type { Slide } from "../../../data/mockDeck";
-import type { Messages } from "../../../i18n/messages";
+import { formatMessage, type Messages } from "../../../i18n/messages";
 import type { DeckReviewRenderState } from "../types";
 import { SlidePreviewNavigator } from "./SlidePreviewNavigator";
 
@@ -19,6 +20,11 @@ interface DeckPageProps {
   onRefreshPreview: () => void;
   onPreview: () => void;
   onExport: () => void;
+  onAdvancedEdit: () => void;
+  presentationDocument: PresentationDocument | null;
+  presentationStatus: "idle" | "loading" | "ready" | "readonly" | "error";
+  presentationError: string;
+  presentationImageAssets?: Record<string, string>;
 }
 
 export type SlideLayoutMode = "simpler" | "visual" | "comparison" | "process" | "report";
@@ -49,6 +55,11 @@ export function DeckPage(props: DeckPageProps) {
     { mode: "process", label: t.controls.layoutProcess },
     { mode: "report", label: t.controls.layoutReport },
   ];
+  const revisionLabel = props.presentationStatus === "ready" && props.presentationDocument
+    ? props.presentationDocument.revision > 0
+      ? formatMessage(t.editor.revisionEdited, { revision: String(props.presentationDocument.revision) })
+      : t.editor.revisionOriginal
+    : "";
   return (
     <section className="page active deck-page">
       <div className="deck-top-actions">
@@ -105,6 +116,23 @@ export function DeckPage(props: DeckPageProps) {
             {t.review.renderAgain}
           </button>
         </div>
+        <div className="primary-deck-actions">
+          {revisionLabel ? (
+            <span className="deck-revision-state">{revisionLabel}</span>
+          ) : null}
+          <button
+            className="primary-btn compact"
+            onClick={props.onAdvancedEdit}
+            disabled={props.presentationStatus !== "ready"}
+          >
+            <Settings2 size={14} />
+            {t.editor.advanced}
+          </button>
+          <button className="secondary-btn compact" onClick={props.onExport}>
+            <Download size={14} />
+            {t.controls.export}
+          </button>
+        </div>
       </div>
 
       <SlidePreviewNavigator
@@ -113,6 +141,10 @@ export function DeckPage(props: DeckPageProps) {
         currentSlide={currentSlide}
         setCurrentSlide={setCurrentSlide}
         reviewRender={reviewRender}
+        presentationDocument={props.presentationDocument}
+        presentationStatus={props.presentationStatus}
+        presentationError={props.presentationError}
+        presentationImageAssets={props.presentationImageAssets}
       />
 
       <div className="action-bar">

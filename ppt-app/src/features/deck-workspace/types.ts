@@ -4,6 +4,7 @@ import type {
   PageProgress,
   GetStyleProfileResult,
   GetStyleProfilePreviewResult,
+  PresentationDocument,
   StyleProfileIndexEntry,
   RenderDeckHtmlResult,
   TemplateSummary,
@@ -21,10 +22,10 @@ import type { PageReviewSettings } from "./reviewSettings";
 import type { ResearchSearchControlSettings } from "./researchSearchControl";
 
 export type MainStage = "brief" | "uploaded-source-analysis" | "outline" | "generating" | "deck";
-export type PageId = "main" | "library" | "review" | "refine" | "export" | "style-profile-creation";
+export type PageId = "main" | "library" | "review" | "editor" | "refine" | "export" | "style-profile-creation";
 export type PanelMode = "visible" | "minimized" | "closed";
 export type RefineScope = "deck" | "slide";
-export type PreviewMode = "grid" | "organize" | "present";
+export type PreviewMode = "grid" | "present";
 export type LoadingKind =
   | "none"
   | "template"
@@ -94,6 +95,15 @@ export interface DeckWorkspaceState {
   outlineFeedback: string;
   previewMode: PreviewMode;
   reviewRender: DeckReviewRenderState;
+  presentationEditor: {
+    document: PresentationDocument | null;
+    status: "idle" | "loading" | "ready" | "readonly" | "error";
+    saveStatus: "saved" | "saving" | "unsaved" | "conflict" | "error";
+    error: string;
+    imageAssets: Record<string, string>;
+    canUndo: boolean;
+    canRedo: boolean;
+  };
   createDeckProgress: DeckGenerationProgress | null;
   uploadedSourceAnalysisProgress: UploadedSourceAnalysisProgress;
   generationHistory: GenerationStreamSnapshot[];

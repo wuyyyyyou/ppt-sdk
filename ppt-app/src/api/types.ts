@@ -1276,6 +1276,130 @@ export interface RecordDeckReviewInput {
   feedback?: string;
 }
 
+export type PresentationElement =
+  | PresentationTextElement
+  | PresentationImageElement
+  | PresentationShapeElement
+  | PresentationUnsupportedElement;
+
+export interface PresentationDocument {
+  id: string;
+  revision: number;
+  title: string;
+  width: number;
+  height: number;
+  aspectRatio: string;
+  slides: PresentationSlideDocument[];
+  metadata: {
+    sourceModelVersion: 1;
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+
+export interface PresentationSlideDocument {
+  id: string;
+  order: number;
+  background?: { color: string; opacity: number };
+  elements: PresentationElement[];
+  metadata: {
+    sourceSlideIndex: number;
+    note?: string;
+  };
+}
+
+export interface PresentationBaseElement {
+  id: string;
+  sourceElementId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  zIndex: number;
+  opacity?: number;
+  locked?: boolean;
+  hidden?: boolean;
+  metadata: {
+    sourceShapeIndex: number;
+    sourceShapeType: string;
+  };
+}
+
+export interface PresentationTextElement extends PresentationBaseElement {
+  type: "text";
+  text: string;
+  sourceData: Record<string, unknown>;
+}
+
+export interface PresentationImageElement extends PresentationBaseElement {
+  type: "image";
+  src: string;
+  sourceData: Record<string, unknown>;
+}
+
+export interface PresentationShapeElement extends PresentationBaseElement {
+  type: "shape";
+  shapeType: "rectangle" | "rounded_rectangle";
+  text: string;
+  sourceData: Record<string, unknown>;
+}
+
+export interface PresentationUnsupportedElement extends PresentationBaseElement {
+  type: "unsupported";
+  editable: false;
+  sourceData: unknown;
+}
+
+export interface ValidationIssue {
+  code: string;
+  message: string;
+  severity: "error" | "warning";
+  slideId?: string;
+  elementId?: string;
+}
+
+export interface PresentationValidationResult {
+  valid: boolean;
+  errors: ValidationIssue[];
+  warnings: ValidationIssue[];
+}
+
+export interface PresentationRevision {
+  presentationId: string;
+  revision: number;
+  baseRevision: number;
+  document: PresentationDocument;
+  updatedAt: string;
+}
+
+export interface AppPresentationResult {
+  workspace_dir: string;
+  revision: PresentationRevision;
+  validation: PresentationValidationResult;
+  /** Local image `src` references resolved to data URLs for browser rendering. */
+  image_assets?: Record<string, string>;
+}
+
+export interface SavePresentationInput {
+  workspace_dir: string;
+  base_revision: number;
+  document: PresentationDocument;
+}
+
+export interface PrepareEditedExportModelInput {
+  workspace_dir: string;
+  expected_revision: number;
+}
+
+export interface PrepareEditedExportModelResult {
+  workspace_dir: string;
+  revision: number;
+  model_path: string;
+  output_dir: string;
+  validation: PresentationValidationResult;
+  prepared_at: string;
+}
+
 export interface PrepareExportModelInput {
   workspace_dir: string;
 }
@@ -1343,6 +1467,7 @@ export interface RecordPptxExportInput {
 
 export interface ExportPdfInput {
   workspace_dir: string;
+  expected_revision?: number;
 }
 
 export interface ExportPdfResult {

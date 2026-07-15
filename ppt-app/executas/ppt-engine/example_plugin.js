@@ -28,6 +28,7 @@ import {
   getAppPagePlan,
   getAppPageProgress,
   getAppPptxExportStatus,
+  getAppPresentation,
   getRenderedAppWorkspaceDeckHtml,
   listAppUploadedSources,
   commitAppUploadedSourceUpload,
@@ -63,12 +64,14 @@ import {
   prepareAppDeckRefinementPageFiles,
   prepareAppPageFiles,
   prepareAppExportModel,
+  prepareEditedAppExportModel,
   prepareAppUploadedSourceAnalysisWorkspace,
   prepareAppResearchWorkspace,
   recordAppPagePlan,
   recordAppPageProgress,
   recordAppPdfExport,
   recordAppPptxExport,
+  restoreAppPresentation,
   recordAppResearchCurationDraft,
   recordAppResearchEvidence,
   recordAppResearchEvidencePage,
@@ -86,6 +89,7 @@ import {
   runDeckValidation,
   selectAppWorkspaceTemplate,
   startAppPptxExportModel,
+  saveAppPresentation,
   invokeTaskStateMachine,
   updateAppWorkspaceOutline,
   updateAppWorkspacePages,
@@ -1875,8 +1879,60 @@ async function toolAppExportPdf(args) {
   }
 
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  if (args.expected_revision !== undefined && (!Number.isInteger(args.expected_revision) || args.expected_revision < 0)) {
+    throw new Error('"expected_revision" must be a non-negative integer');
+  }
   return exportAppPdf({
     workspace_dir: workspaceDir,
+    expected_revision: args.expected_revision,
+  });
+}
+
+async function toolAppGetPresentation(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  return registerJsonReference(await getAppPresentation({
+    workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir"),
+  }), "presentation.json", "result_upload");
+}
+
+async function toolAppSavePresentation(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  if (!Number.isInteger(args.base_revision) || args.base_revision < 0) {
+    throw new Error('"base_revision" must be a non-negative integer');
+  }
+  if (!args.document || typeof args.document !== "object" || Array.isArray(args.document)) {
+    throw new Error('"document" must be an object');
+  }
+  return registerJsonReference(await saveAppPresentation({
+    workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir"),
+    base_revision: args.base_revision,
+    document: args.document,
+  }), "presentation.json", "result_upload");
+}
+
+async function toolAppRestorePresentation(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  return registerJsonReference(await restoreAppPresentation({
+    workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir"),
+  }), "presentation.json", "result_upload");
+}
+
+async function toolAppPrepareEditedExportModel(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  if (!Number.isInteger(args.expected_revision) || args.expected_revision < 0) {
+    throw new Error('"expected_revision" must be a non-negative integer');
+  }
+  return prepareEditedAppExportModel({
+    workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir"),
+    expected_revision: args.expected_revision,
   });
 }
 
@@ -2185,6 +2241,10 @@ const TOOL_DISPATCH = {
   app_get_pptx_export_status: toolAppGetPptxExportStatus,
   app_get_export_artifact_download_url: toolAppGetExportArtifactDownloadUrl,
   app_prepare_export_model: toolAppPrepareExportModel,
+  app_get_presentation: toolAppGetPresentation,
+  app_save_presentation: toolAppSavePresentation,
+  app_restore_presentation: toolAppRestorePresentation,
+  app_prepare_edited_export_model: toolAppPrepareEditedExportModel,
   app_export_pdf: toolAppExportPdf,
   app_record_pptx_export: toolAppRecordPptxExport,
   app_record_pdf_export: toolAppRecordPdfExport,

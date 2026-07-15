@@ -28,6 +28,21 @@ import { resolveLocalModulePath } from "../local-template/loader.js";
 import { assertLocalTemplateTypecheck } from "../local-template/typecheck.js";
 import { launchManagedBrowser } from "../runtime/browser-runtime.js";
 import { convertDeckHtmlToPptxModel } from "../html-to-pptx-model/index.js";
+import type { PptxPresentationModel } from "../html-to-pptx-model/types/pptx-models.js";
+import {
+  collectPresentationImageAssets,
+  initializePresentationStore,
+  pptxModelToPresentationDocument,
+  presentationDocumentToPptxModel,
+  readPresentationRevision,
+  readPresentationSnapshot,
+  restoreOriginalPresentation,
+  savePresentationRevision,
+  validatePresentationAssets,
+  validatePresentationDocument,
+  validatePptxModelForExport,
+  writePresentationDocumentHtmlSlides,
+} from "../presentation-document/index.js";
 import { rasterizePptxToImages } from "../pptx-rasterization/index.js";
 import type {
   AppendAppWorkspaceLogInput,
@@ -111,6 +126,12 @@ import type {
   PrepareAppPageFilesResult,
   PrepareAppExportModelInput,
   PrepareAppExportModelResult,
+  PrepareEditedAppExportModelInput,
+  PrepareEditedAppExportModelResult,
+  GetAppPresentationInput,
+  AppPresentationResult,
+  SaveAppPresentationInput,
+  RestoreAppPresentationInput,
   AppPptxExportJob,
   AppResearchPaths,
   RecordAppPagePlanInput,
@@ -4765,6 +4786,149 @@ export async function prepareAppExportModel(
   };
 }
 
+async function readWorkspaceSlideIds(workspace: AppWorkspaceResult): Promise<string[]> {
+  const manifestPath = readSelectedTemplateManifestPath(workspace);
+  const manifest = getPlainRecord(JSON.parse(await readFile(manifestPath, "utf8")) as unknown);
+  const slides = Array.isArray(manifest.slides) ? manifest.slides : [];
+  return slides.map((slide, index) => readPageIdFromManifestSlide(slide) || `${workspace.workspace_id}-slide-${index + 1}`);
+}
+
+async function archivePresentationModelAssets(
+  workspaceDir: string,
+  model: PptxPresentationModel,
+): Promise<PptxPresentationModel> {
+  const archived = structuredClone(model);
+  const assetsDir = path.join(workspaceDir, "presentation", "assets");
+  for (const slide of archived.slides) {
+    for (const shape of slide.shapes) {
+      if (shape.shape_type !== "picture" || shape.picture.is_network) continue;
+      let sourcePath = shape.picture.path;
+      if (sourcePath.startsWith("data:")) continue;
+      if (sourcePath.startsWith("file://")) {
+        try {
+          sourcePath = fileURLToPath(sourcePath);
+        } catch {
+          continue;
+        }
+      }
+      if (!path.isAbsolute(sourcePath)) continue;
+      const relative = path.relative(workspaceDir, sourcePath);
+      if (relative.length > 0 && !relative.startsWith("..") && !path.isAbsolute(relative)) continue;
+      try {
+        const sourceStat = await stat(sourcePath);
+        if (!sourceStat.isFile()) continue;
+      } catch {
+        continue;
+      }
+      const extension = path.extname(sourcePath) || ".png";
+      const digest = createHash("sha256").update(await readFile(sourcePath)).digest("hex").slice(0, 20);
+      const archivedPath = path.join(assetsDir, `${digest}${extension}`);
+      await mkdir(assetsDir, { recursive: true });
+      if (!(await fileExists(archivedPath))) await copyFile(sourcePath, archivedPath);
+      shape.picture.path = archivedPath;
+    }
+  }
+  return archived;
+}
+
+export async function getAppPresentation(
+  input: GetAppPresentationInput,
+): Promise<AppPresentationResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  let revision = await readPresentationRevision(workspace.workspace_dir);
+  if (!revision) {
+    const prepared = await prepareAppExportModel({ workspace_dir: workspace.workspace_dir });
+    const sourceModel = JSON.parse(await readFile(prepared.model_path, "utf8")) as PptxPresentationModel;
+    const model = await archivePresentationModelAssets(workspace.workspace_dir, sourceModel);
+    const snapshot = pptxModelToPresentationDocument({
+      model,
+      presentationId: workspace.workspace_id,
+      slideIds: await readWorkspaceSlideIds(workspace),
+    });
+    revision = await initializePresentationStore(workspace.workspace_dir, snapshot);
+  }
+  return {
+    workspace_dir: workspace.workspace_dir,
+    revision,
+    validation: validatePresentationDocument(revision.document),
+    image_assets: await collectPresentationImageAssets(revision.document),
+  };
+}
+
+export async function saveAppPresentation(
+  input: SaveAppPresentationInput,
+): Promise<AppPresentationResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const revision = await savePresentationRevision({
+    workspaceDir: workspace.workspace_dir,
+    baseRevision: input.base_revision,
+    document: input.document,
+  });
+  await touchWorkspaceTask(workspace, revision.updatedAt);
+  return {
+    workspace_dir: workspace.workspace_dir,
+    revision,
+    validation: validatePresentationDocument(revision.document),
+    image_assets: await collectPresentationImageAssets(revision.document),
+  };
+}
+
+export async function restoreAppPresentation(
+  input: RestoreAppPresentationInput,
+): Promise<AppPresentationResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const revision = await restoreOriginalPresentation(workspace.workspace_dir);
+  await touchWorkspaceTask(workspace, revision.updatedAt);
+  return {
+    workspace_dir: workspace.workspace_dir,
+    revision,
+    validation: validatePresentationDocument(revision.document),
+    image_assets: await collectPresentationImageAssets(revision.document),
+  };
+}
+
+export async function prepareEditedAppExportModel(
+  input: PrepareEditedAppExportModelInput,
+): Promise<PrepareEditedAppExportModelResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const snapshot = await readPresentationSnapshot(workspace.workspace_dir);
+  if (!snapshot) throw new Error("Presentation Document has not been initialized.");
+  if (snapshot.document.revision !== input.expected_revision) {
+    throw new Error(
+      `Presentation revision conflict: expected ${input.expected_revision}, latest is ${snapshot.document.revision}.`,
+    );
+  }
+  const validation = await validatePresentationAssets(snapshot.document);
+  if (!validation.valid) {
+    throw new Error(`Presentation validation failed: ${validation.errors.map((item) => item.message).join("; ")}`);
+  }
+  const model = presentationDocumentToPptxModel({
+    document: snapshot.document,
+    originalModel: snapshot.originalModel,
+  });
+  const modelValidation = validatePptxModelForExport(model);
+  if (!modelValidation.valid) {
+    throw new Error(`Generated PPTX model validation failed: ${modelValidation.errors.map((item) => item.message).join("; ")}`);
+  }
+  const outputDir = path.join(workspace.workspace_dir, "output");
+  const modelPath = path.join(outputDir, `ppt-model-edited-r${snapshot.document.revision}.json`);
+  const preparedAt = new Date().toISOString();
+  await writeJsonFile(modelPath, model);
+  await touchWorkspaceTask(workspace, preparedAt);
+  return {
+    workspace_dir: workspace.workspace_dir,
+    revision: snapshot.document.revision,
+    model_path: modelPath,
+    output_dir: outputDir,
+    validation: {
+      valid: true,
+      errors: [],
+      warnings: [...validation.warnings, ...modelValidation.warnings],
+    },
+    prepared_at: preparedAt,
+  };
+}
+
 async function runPptxExportModelJob(job: AppPptxExportJob): Promise<void> {
   try {
     const prepared = await prepareAppExportModel({
@@ -4849,11 +5013,30 @@ export async function exportAppPdf(
   const outputDir = path.join(workspace.workspace_dir, "output");
   const pdfPath = path.join(outputDir, "deck.pdf");
   const exportedAt = new Date().toISOString();
+  const editedSnapshot = input.expected_revision === undefined
+    ? null
+    : await readPresentationSnapshot(workspace.workspace_dir);
+  if (input.expected_revision !== undefined && !editedSnapshot) {
+    throw new Error("Presentation Document has not been initialized.");
+  }
+  if (editedSnapshot && editedSnapshot.document.revision !== input.expected_revision) {
+    throw new Error(
+      `Presentation revision conflict: expected ${input.expected_revision}, latest is ${editedSnapshot.document.revision}.`,
+    );
+  }
+  if (editedSnapshot) {
+    const validation = await validatePresentationAssets(editedSnapshot.document);
+    if (!validation.valid) {
+      throw new Error(`Presentation validation failed: ${validation.errors.map((item) => item.message).join("; ")}`);
+    }
+  }
   const pagesRecord =
     workspace.pages && typeof workspace.pages === "object" && !Array.isArray(workspace.pages)
       ? (workspace.pages as Record<string, unknown>)
       : null;
-  const existingHtmlPaths = Array.isArray(pagesRecord?.pages)
+  const existingHtmlPaths = editedSnapshot
+    ? []
+    : Array.isArray(pagesRecord?.pages)
     ? pagesRecord.pages
         .map((page) =>
           page && typeof page === "object" && !Array.isArray(page) && typeof (page as { html_path?: unknown }).html_path === "string"
@@ -4862,13 +5045,17 @@ export async function exportAppPdf(
         )
         .filter((htmlPath): htmlPath is string => htmlPath.length > 0)
     : [];
-  const rendered = existingHtmlPaths.length > 0
+  const rendered = editedSnapshot || existingHtmlPaths.length > 0
     ? null
     : await renderAppWorkspaceDeckHtml({
       workspace_dir: workspace.workspace_dir,
     });
-  const htmlPaths =
-    existingHtmlPaths.length > 0
+  const htmlPaths = editedSnapshot
+    ? await writePresentationDocumentHtmlSlides({
+        document: editedSnapshot.document,
+        outputDir: path.join(outputDir, `presentation-pdf-r${editedSnapshot.document.revision}`),
+      })
+    : existingHtmlPaths.length > 0
       ? existingHtmlPaths
       : rendered?.slides.map((slide) => slide.html_path) ?? [];
 

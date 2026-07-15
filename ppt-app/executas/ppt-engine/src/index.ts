@@ -119,6 +119,7 @@ import {
   writeValidationReport,
 } from "./validate/index.js";
 export * from "./app-workspace/index.js";
+export * from "./presentation-document/index.js";
 export * from "./pptx-rasterization/index.js";
 export * from "./task-state-machine/index.js";
 

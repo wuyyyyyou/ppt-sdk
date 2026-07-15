@@ -20,6 +20,8 @@ import {
 import type {
   ListWorkspacesResult,
   PageProgress,
+  PresentationDocument,
+  PresentationElement,
   GetStyleProfilePreviewResult,
   PptxExportJob,
   StyleProfileIndexEntry,
@@ -93,6 +95,7 @@ import {
   createPptxJobExportProgress,
 } from "../exportProgressDisplay";
 import { restoreDeckGenerationProgress } from "../workspaceRecovery";
+import { usePresentationEditor } from "../../presentation-editor/usePresentationEditor";
 import {
   DEFAULT_PAGE_REVIEW_SETTINGS,
   pageReviewSettingsToWorkspaceSettings,
@@ -417,6 +420,24 @@ export interface DeckWorkspaceActions {
   rewriteCurrentSlide: () => Promise<void>;
   changeCurrentSlideLayout: (mode: "simpler" | "visual" | "comparison" | "process" | "report") => Promise<void>;
   renderDeckHtml: () => Promise<void>;
+  openPresentationEditor: () => Promise<void>;
+  savePresentation: () => Promise<unknown>;
+  restorePresentation: () => Promise<unknown>;
+  updatePresentationDocument: (
+    update: (current: PresentationDocument) => PresentationDocument
+  ) => void;
+  updatePresentationElement: (
+    slideId: string,
+    elementId: string,
+    update: (element: PresentationElement) => void
+  ) => void;
+  updatePresentationElementTransient: (
+    slideId: string,
+    elementId: string,
+    update: (element: PresentationElement) => void
+  ) => void;
+  undoPresentationEdit: () => void;
+  redoPresentationEdit: () => void;
   exportFile: (type: "PPTX" | "PDF") => Promise<void>;
   returnToOutlineFromGeneration: () => void;
   returnToBriefFromUploadedSourceAnalysis: () => void;
@@ -514,7 +535,30 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     error: "",
   });
   const styleProfileCreationAbortRef = useRef<AbortController | null>(null);
+  const presentationEditor = usePresentationEditor(
+    backend,
+    currentWorkspace?.workspace_dir ?? null,
+  );
   const aiLogger = useMemo(() => backend ? createAiInteractionLogger(backend) : null, [backend]);
+
+  useEffect(() => {
+    if (
+      backend &&
+      currentWorkspace &&
+      generated &&
+      stage === "deck" &&
+      presentationEditor.state.status === "idle"
+    ) {
+      void presentationEditor.actions.load();
+    }
+  }, [
+    backend,
+    currentWorkspace,
+    generated,
+    presentationEditor.actions,
+    presentationEditor.state.status,
+    stage,
+  ]);
 
   function getDefaultWorkspaceTitle(date = new Date()) {
     return formatMessage(t.library.defaultWorkspaceTitle, {
@@ -1516,6 +1560,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         reviewRender.renderKey === renderKey;
       if (!hasCurrentRender && currentWorkspace) {
         void loadDeckHtmlForWorkspace(currentWorkspace, "review");
+      }
+      if (presentationEditor.state.status === "idle") {
+        void presentationEditor.actions.load();
       }
     }
     if (nextPage === "export" && currentWorkspace) {
@@ -3351,6 +3398,22 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     await renderDeckHtmlForWorkspace(workspace, "review");
   }
 
+  async function openPresentationEditor() {
+    if (!generated) {
+      showToast(t.toasts.createDeckFirst);
+      return;
+    }
+    if (presentationEditor.state.status !== "ready") {
+      const loaded = await presentationEditor.actions.load();
+      if (!loaded) {
+        showToast(presentationEditor.state.error || "Structured editing is unavailable.");
+        return;
+      }
+    }
+    setPage("editor");
+    setHistory((items) => items.at(-1) === "editor" ? items : [...items, "editor"]);
+  }
+
   function returnToOutlineFromGeneration() {
     setGenerationUnresumable(false);
     if (outline.length === 0) {
@@ -3536,28 +3599,61 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         setLoading("export");
         setExportProgress(createExportStartProgress(t, type));
       }
+      let activePresentation = presentationEditor.state.result;
+      if (
+        activePresentation &&
+        presentationEditor.state.saveStatus !== "saved"
+      ) {
+        activePresentation = await presentationEditor.actions.save();
+      }
+      const editedRevision =
+        activePresentation && activePresentation.revision.revision > 0
+          ? activePresentation.revision.revision
+          : null;
 
       if (type === "PPTX") {
-        const startedModel = await backend.startPptxExportModel({
-          workspace_dir: workspace.workspace_dir
-        });
-        setExportProgress(createPptxJobExportProgress(t, startedModel));
+        let modelPath: string;
+        let outputPath: string;
+        let jobId: string;
+        if (editedRevision !== null) {
+          const prepared = await backend.prepareEditedExportModel({
+            workspace_dir: workspace.workspace_dir,
+            expected_revision: editedRevision,
+          });
+          if (
+            prepared.validation.warnings.length > 0 &&
+            !window.confirm(prepared.validation.warnings.map((warning) => warning.message).join("\n"))
+          ) {
+            throw new Error("Export cancelled because validation warnings were not confirmed.");
+          }
+          modelPath = prepared.model_path;
+          outputPath = `${prepared.output_dir.replace(/\/$/, "")}/deck.pptx`;
+          jobId = `presentation-r${editedRevision}-${Date.now()}`;
+        } else {
+          const startedModel = await backend.startPptxExportModel({
+            workspace_dir: workspace.workspace_dir
+          });
+          setExportProgress(createPptxJobExportProgress(t, startedModel));
 
-        const modelReady = await waitForPptxExportStatus(
-          workspace.workspace_dir,
-          (job) => job.status === "model_ready" || job.status === "failed"
-        );
-        if (modelReady.status === "failed") {
-          throw new Error(getPptxExportErrorMessage(modelReady));
+          const modelReady = await waitForPptxExportStatus(
+            workspace.workspace_dir,
+            (job) => job.status === "model_ready" || job.status === "failed"
+          );
+          if (modelReady.status === "failed") {
+            throw new Error(getPptxExportErrorMessage(modelReady));
+          }
+          assertPptxExportPath(modelReady.model_path, "model_path");
+          assertPptxExportPath(modelReady.pptx_path, "pptx_path");
+          modelPath = modelReady.model_path;
+          outputPath = modelReady.pptx_path;
+          jobId = modelReady.job_id;
         }
-        assertPptxExportPath(modelReady.model_path, "model_path");
-        assertPptxExportPath(modelReady.pptx_path, "pptx_path");
 
         const startedPptx = await backend.startGeneratePptx({
           workspace_dir: workspace.workspace_dir,
-          job_id: modelReady.job_id,
-          modelPath: modelReady.model_path,
-          outputPath: modelReady.pptx_path
+          job_id: jobId,
+          modelPath,
+          outputPath
         });
         setExportProgress(createPptxJobExportProgress(t, startedPptx));
 
@@ -3580,8 +3676,21 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         await refreshWorkspaceExportArtifact(updatedWorkspace, exportVersion, { rethrow: true });
       } else {
         setExportProgress(createExportStartProgress(t, "PDF"));
+        if (editedRevision !== null) {
+          const prepared = await backend.prepareEditedExportModel({
+            workspace_dir: workspace.workspace_dir,
+            expected_revision: editedRevision,
+          });
+          if (
+            prepared.validation.warnings.length > 0 &&
+            !window.confirm(prepared.validation.warnings.map((warning) => warning.message).join("\n"))
+          ) {
+            throw new Error("Export cancelled because validation warnings were not confirmed.");
+          }
+        }
         const pdfResult = await backend.exportPdf({
-          workspace_dir: workspace.workspace_dir
+          workspace_dir: workspace.workspace_dir,
+          ...(editedRevision === null ? {} : { expected_revision: editedRevision }),
         });
         const pdfPath = pdfResult.pdfPath;
         const updatedWorkspace = await backend.recordPdfExport({
@@ -3838,6 +3947,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     outlineFeedback,
     previewMode,
     reviewRender,
+    presentationEditor: presentationEditor.state,
     createDeckProgress,
     uploadedSourceAnalysisProgress,
     generationHistory,
@@ -3932,6 +4042,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     rewriteCurrentSlide,
     changeCurrentSlideLayout,
     renderDeckHtml,
+    openPresentationEditor,
+    savePresentation: presentationEditor.actions.save,
+    restorePresentation: presentationEditor.actions.restore,
+    updatePresentationDocument: presentationEditor.actions.replaceDocument,
+    updatePresentationElement: presentationEditor.actions.updateElement,
+    updatePresentationElementTransient: presentationEditor.actions.updateElementTransient,
+    undoPresentationEdit: presentationEditor.actions.undo,
+    redoPresentationEdit: presentationEditor.actions.redo,
     exportFile,
     returnToOutlineFromGeneration,
     returnToBriefFromUploadedSourceAnalysis,

@@ -324,6 +324,80 @@ export interface Messages {
     renderFailed: string;
     openHtml: string;
   };
+  editor: {
+    title: string;
+    edit: string;
+    preview: string;
+    advanced: string;
+    save: string;
+    restore: string;
+    undo: string;
+    redo: string;
+    addText: string;
+    addImage: string;
+    addShape: string;
+    delete: string;
+    duplicateSlide: string;
+    addSlide: string;
+    saved: string;
+    saving: string;
+    unsaved: string;
+    conflict: string;
+    error: string;
+    properties: string;
+    noSelection: string;
+    text: string;
+    structuredUnavailable: string;
+    structuredLoading: string;
+    structuredReady: string;
+    structuredFallback: string;
+    back: string;
+    more: string;
+    pageBackground: string;
+    fontFamily: string;
+    fontSize: string;
+    bold: string;
+    italic: string;
+    underline: string;
+    strike: string;
+    alignLeft: string;
+    alignCenter: string;
+    alignRight: string;
+    textColor: string;
+    fillColor: string;
+    clearFill: string;
+    borderColor: string;
+    borderWidth: string;
+    opacity: string;
+    replaceImage: string;
+    imageFit: string;
+    fitCover: string;
+    fitContain: string;
+    fitFill: string;
+    arrange: string;
+    bringToFront: string;
+    bringForward: string;
+    sendBackward: string;
+    sendToBack: string;
+    deleteSlide: string;
+    moveSlideUp: string;
+    moveSlideDown: string;
+    collapseFilmstrip: string;
+    expandFilmstrip: string;
+    zoomFit: string;
+    exportPptx: string;
+    exportPdf: string;
+    exporting: string;
+    restoreConfirm: string;
+    exitSaveFailedWarning: string;
+    exitConflictWarning: string;
+    unsupportedElement: string;
+    shortcuts: string;
+    shortcutList: Array<[string, string]>;
+    close: string;
+    revisionEdited: string;
+    revisionOriginal: string;
+  };
   refine: {
     title: string;
     deckScope: string;
@@ -726,6 +800,92 @@ export const messages: Record<Locale, Messages> = {
       renderAgain: "Render again",
       renderFailed: "Render failed",
       openHtml: "Open HTML"
+    },
+    editor: {
+      title: "Advanced editor",
+      edit: "Edit",
+      preview: "Preview",
+      advanced: "Advanced editing",
+      save: "Save",
+      restore: "Restore original",
+      undo: "Undo",
+      redo: "Redo",
+      addText: "Add text",
+      addImage: "Add image",
+      addShape: "Add shape",
+      delete: "Delete",
+      duplicateSlide: "Duplicate slide",
+      addSlide: "Add slide",
+      saved: "Saved",
+      saving: "Saving",
+      unsaved: "Unsaved",
+      conflict: "Revision conflict",
+      error: "Save failed",
+      properties: "Properties",
+      noSelection: "Select an element to edit it.",
+      text: "Text",
+      structuredUnavailable: "Structured preview is unavailable. The original screenshot preview remains available.",
+      structuredLoading: "Loading structured preview",
+      structuredReady: "Editable",
+      structuredFallback: "Read-only PNG fallback",
+      back: "Back",
+      more: "More",
+      pageBackground: "Page background",
+      fontFamily: "Font family",
+      fontSize: "Font size",
+      bold: "Bold",
+      italic: "Italic",
+      underline: "Underline",
+      strike: "Strikethrough",
+      alignLeft: "Align left",
+      alignCenter: "Align center",
+      alignRight: "Align right",
+      textColor: "Text color",
+      fillColor: "Fill color",
+      clearFill: "No fill",
+      borderColor: "Border color",
+      borderWidth: "Border width",
+      opacity: "Opacity",
+      replaceImage: "Replace image",
+      imageFit: "Image fit",
+      fitCover: "Fill (cover)",
+      fitContain: "Fit (contain)",
+      fitFill: "Stretch",
+      arrange: "Arrange",
+      bringToFront: "Bring to front",
+      bringForward: "Bring forward",
+      sendBackward: "Send backward",
+      sendToBack: "Send to back",
+      deleteSlide: "Delete slide",
+      moveSlideUp: "Move up",
+      moveSlideDown: "Move down",
+      collapseFilmstrip: "Collapse panel",
+      expandFilmstrip: "Expand panel",
+      zoomFit: "Fit",
+      exportPptx: "Export PPTX",
+      exportPdf: "Export PDF",
+      exporting: "Exporting…",
+      restoreConfirm: "Restore the original version? Your edits will be discarded.",
+      exitSaveFailedWarning: "Saving failed. Leave anyway? Unsaved changes will be lost.",
+      exitConflictWarning: "There is a revision conflict; your changes cannot overwrite the newer revision. Leave anyway?",
+      unsupportedElement: "This element cannot be edited yet.",
+      shortcuts: "Keyboard shortcuts",
+      shortcutList: [
+        ["Ctrl/Cmd + Z", "Undo"],
+        ["Ctrl/Cmd + Shift + Z", "Redo"],
+        ["Ctrl/Cmd + C", "Copy element"],
+        ["Ctrl/Cmd + V", "Paste element"],
+        ["Ctrl/Cmd + D", "Duplicate element or slide"],
+        ["Delete / Backspace", "Delete element"],
+        ["Arrow keys", "Move by 1 px"],
+        ["Shift + Arrow keys", "Move by 10 px"],
+        ["Enter", "Edit text"],
+        ["Escape", "Exit text editing / clear selection"],
+        ["Double click", "Edit text or replace image"]
+      ],
+      close: "Close",
+      revisionEdited: "Edited · r{revision}",
+      revisionOriginal: "Original version"
     },
     refine: {
       title: "Refine",
@@ -1134,6 +1294,92 @@ export const messages: Record<Locale, Messages> = {
       renderAgain: "重新渲染",
       renderFailed: "渲染失败",
       openHtml: "打开 HTML"
+    },
+    editor: {
+      title: "高级编辑",
+      edit: "编辑",
+      preview: "预览",
+      advanced: "高级编辑",
+      save: "保存",
+      restore: "恢复原始版本",
+      undo: "撤销",
+      redo: "重做",
+      addText: "添加文本",
+      addImage: "添加图片",
+      addShape: "添加形状",
+      delete: "删除",
+      duplicateSlide: "复制页面",
+      addSlide: "添加页面",
+      saved: "已保存",
+      saving: "保存中",
+      unsaved: "未保存",
+      conflict: "版本冲突",
+      error: "保存失败",
+      properties: "属性",
+      noSelection: "请选择要编辑的元素。",
+      text: "文本",
+      structuredUnavailable: "结构化预览暂不可用，已保留原截图预览。",
+      structuredLoading: "正在加载结构化预览",
+      structuredReady: "可编辑",
+      structuredFallback: "只读 PNG 回退",
+      back: "返回",
+      more: "更多",
+      pageBackground: "页面背景",
+      fontFamily: "字体",
+      fontSize: "字号",
+      bold: "加粗",
+      italic: "斜体",
+      underline: "下划线",
+      strike: "删除线",
+      alignLeft: "左对齐",
+      alignCenter: "居中对齐",
+      alignRight: "右对齐",
+      textColor: "文字颜色",
+      fillColor: "填充颜色",
+      clearFill: "无填充",
+      borderColor: "边框颜色",
+      borderWidth: "边框粗细",
+      opacity: "不透明度",
+      replaceImage: "替换图片",
+      imageFit: "图片填充方式",
+      fitCover: "填充",
+      fitContain: "适应",
+      fitFill: "拉伸",
+      arrange: "图层",
+      bringToFront: "置于顶层",
+      bringForward: "上移一层",
+      sendBackward: "下移一层",
+      sendToBack: "置于底层",
+      deleteSlide: "删除页面",
+      moveSlideUp: "上移",
+      moveSlideDown: "下移",
+      collapseFilmstrip: "折叠面板",
+      expandFilmstrip: "展开面板",
+      zoomFit: "适应",
+      exportPptx: "导出 PPTX",
+      exportPdf: "导出 PDF",
+      exporting: "正在导出…",
+      restoreConfirm: "确认恢复到原始版本？当前所有修改将被放弃。",
+      exitSaveFailedWarning: "保存失败，仍要离开吗？未保存的修改将丢失。",
+      exitConflictWarning: "存在版本冲突，当前修改无法覆盖更新的版本。仍要离开吗？",
+      unsupportedElement: "该元素暂不支持编辑。",
+      shortcuts: "快捷键",
+      shortcutList: [
+        ["Ctrl/Cmd + Z", "撤销"],
+        ["Ctrl/Cmd + Shift + Z", "重做"],
+        ["Ctrl/Cmd + C", "复制元素"],
+        ["Ctrl/Cmd + V", "粘贴元素"],
+        ["Ctrl/Cmd + D", "复制元素或页面"],
+        ["Delete / Backspace", "删除元素"],
+        ["方向键", "移动 1px"],
+        ["Shift + 方向键", "移动 10px"],
+        ["Enter", "进入文本编辑"],
+        ["Escape", "退出文本编辑 / 取消选择"],
+        ["双击", "编辑文本或替换图片"]
+      ],
+      close: "关闭",
+      revisionEdited: "已编辑 · r{revision}",
+      revisionOriginal: "原始版本"
     },
     refine: {
       title: "优化",

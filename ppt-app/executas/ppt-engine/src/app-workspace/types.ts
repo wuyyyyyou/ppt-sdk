@@ -1,3 +1,9 @@
+import type {
+  PresentationDocument,
+  PresentationRevision,
+  ValidationResult,
+} from "../presentation-document/types.js";
+
 export interface AppWorkspaceSummary {
   workspace_id: string;
   task_id: string;
@@ -1159,8 +1165,45 @@ export interface PrepareAppExportModelResult {
   prepared_at: string;
 }
 
+export interface GetAppPresentationInput {
+  workspace_dir: string;
+}
+
+export interface AppPresentationResult {
+  workspace_dir: string;
+  revision: PresentationRevision;
+  validation: ValidationResult;
+  /** Local image `src` references resolved to data URLs for browser rendering. */
+  image_assets: Record<string, string>;
+}
+
+export interface SaveAppPresentationInput {
+  workspace_dir: string;
+  base_revision: number;
+  document: PresentationDocument;
+}
+
+export interface RestoreAppPresentationInput {
+  workspace_dir: string;
+}
+
+export interface PrepareEditedAppExportModelInput {
+  workspace_dir: string;
+  expected_revision: number;
+}
+
+export interface PrepareEditedAppExportModelResult {
+  workspace_dir: string;
+  revision: number;
+  model_path: string;
+  output_dir: string;
+  validation: ValidationResult;
+  prepared_at: string;
+}
+
 export interface ExportAppPdfInput {
   workspace_dir: string;
+  expected_revision?: number;
 }
 
 export interface ExportAppPdfResult {

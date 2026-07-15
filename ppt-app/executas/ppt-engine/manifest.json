@@ -1,6 +1,6 @@
 {
   "display_name": "ppt-engine",
-  "version": "4.0.6",
+  "version": "4.1.0",
   "description": "Anna Executa plugin for Presenton template discovery, manifest-based deck HTML generation, deck HTML to PPTX model conversion, and stability validation.",
   "author": "Anna Developer",
   "host_capabilities": [
@@ -1194,6 +1194,72 @@
       ]
     },
     {
+      "name": "app_get_presentation",
+      "description": "Initialize or read the latest structured Presentation Document revision for manual preview and editing.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_save_presentation",
+      "description": "Validate and save a complete Presentation Document as a new conflict-safe revision.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "base_revision",
+          "type": "number",
+          "description": "Latest revision observed by the editor.",
+          "required": true
+        },
+        {
+          "name": "document",
+          "type": "object",
+          "description": "Complete structured Presentation Document to save.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_restore_presentation",
+      "description": "Restore the original Model0-derived Presentation Document as a new revision.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_prepare_edited_export_model",
+      "description": "Validate the latest saved Presentation Document and write a revision-specific PPTX model for export.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "expected_revision",
+          "type": "number",
+          "description": "Saved revision that must be exported.",
+          "required": true
+        }
+      ]
+    },
+    {
       "name": "app_start_pptx_export_model",
       "description": "Start preparing the PPTX export HTML and model in the background, writing progress to output/generate_ppt.json.",
       "parameters": [
@@ -1244,6 +1310,12 @@
           "type": "string",
           "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
           "required": true
+        },
+        {
+          "name": "expected_revision",
+          "type": "number",
+          "description": "Optional saved Presentation Document revision to render instead of the original HTML.",
+          "required": false
         }
       ]
     },

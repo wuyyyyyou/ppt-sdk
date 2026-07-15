@@ -12,6 +12,8 @@ import type {
   ImageSearchResult,
   PagePlan,
   PageProgress,
+  AppPresentationResult,
+  PrepareEditedExportModelResult,
   TemplateSummary,
   WorkspaceOutline,
   ListWorkspacesResult,
@@ -83,9 +85,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function readHostUploadJsonReferenceUrl(value: unknown): string {
+function readHostUploadJsonReference(
+  value: unknown
+): { url: string; sizeBytes?: number } | null {
   if (!isRecord(value)) {
-    return "";
+    return null;
   }
 
   const upload = isRecord(value.workspace_upload)
@@ -94,7 +98,7 @@ function readHostUploadJsonReferenceUrl(value: unknown): string {
       ? value.result_upload
       : null;
   if (!upload) {
-    return "";
+    return null;
   }
   if (upload.transport !== "host_upload") {
     throw new Error("Tool JSON reference upload transport must be host_upload.");
@@ -102,18 +106,34 @@ function readHostUploadJsonReferenceUrl(value: unknown): string {
   if (upload.mime_type !== "application/json") {
     throw new Error("Tool JSON reference upload MIME type must be application/json.");
   }
-  return typeof upload.url === "string" && upload.url.length > 0 ? upload.url : "";
+  if (typeof upload.url !== "string" || upload.url.length === 0) {
+    return null;
+  }
+  return {
+    url: upload.url,
+    ...(typeof upload.size_bytes === "number"
+      ? { sizeBytes: upload.size_bytes }
+      : {}),
+  };
 }
 
 async function resolveHostUploadJsonReference<T>(value: T | HostUploadJsonReference): Promise<T> {
-  const url = readHostUploadJsonReferenceUrl(value);
-  if (!url) {
+  const reference = readHostUploadJsonReference(value);
+  if (!reference) {
     return value as T;
   }
 
-  const response = await fetch(url, { cache: "no-store" });
+  const response = await fetch("/api/host-upload/json", {
+    method: "POST",
+    cache: "no-store",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      url: reference.url,
+      size_bytes: reference.sizeBytes,
+    }),
+  });
   if (!response.ok) {
-    throw new Error(`Failed to fetch tool JSON Host Upload reference: HTTP ${response.status}`);
+    throw new Error(`Failed to proxy tool JSON Host Upload reference: HTTP ${response.status}`);
   }
 
   return (await response.json()) as T;
@@ -552,6 +572,32 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         input,
         { timeoutMs: PPTX_EXPORT_TIMEOUT_MS }
       ).then(normalizePrepareExportModelResult),
+    getPresentation: (input) =>
+      invokeHostUploadJson<AppPresentationResult>(
+        toolIds.pptEngine,
+        "app_get_presentation",
+        input,
+        { timeoutMs: PPTX_EXPORT_TIMEOUT_MS }
+      ),
+    savePresentation: (input) =>
+      invokeHostUploadJson<AppPresentationResult>(
+        toolIds.pptEngine,
+        "app_save_presentation",
+        input
+      ),
+    restorePresentation: (input) =>
+      invokeHostUploadJson<AppPresentationResult>(
+        toolIds.pptEngine,
+        "app_restore_presentation",
+        input
+      ),
+    prepareEditedExportModel: (input) =>
+      invoke<PrepareEditedExportModelResult>(
+        toolIds.pptEngine,
+        "app_prepare_edited_export_model",
+        input,
+        { timeoutMs: PPTX_EXPORT_TIMEOUT_MS }
+      ),
     startPptxExportModel: (input) =>
       invoke<PptxExportJob>(
         toolIds.pptEngine,

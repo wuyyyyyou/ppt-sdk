@@ -15,6 +15,10 @@ import type {
   PagePlan,
   PageProgress,
   OpenWorkspaceInput,
+  AppPresentationResult,
+  SavePresentationInput,
+  PrepareEditedExportModelInput,
+  PrepareEditedExportModelResult,
   PrepareExportModelInput,
   PrepareExportModelResult,
   PrepareDeckRefinementPageFilesInput,
@@ -261,6 +265,12 @@ export interface PptBackend {
   prepareExportModel(
     input: PrepareExportModelInput
   ): Promise<PrepareExportModelResult>;
+  getPresentation(input: { workspace_dir: string }): Promise<AppPresentationResult>;
+  savePresentation(input: SavePresentationInput): Promise<AppPresentationResult>;
+  restorePresentation(input: { workspace_dir: string }): Promise<AppPresentationResult>;
+  prepareEditedExportModel(
+    input: PrepareEditedExportModelInput
+  ): Promise<PrepareEditedExportModelResult>;
   startPptxExportModel(input: StartPptxExportModelInput): Promise<PptxExportJob>;
   getPptxExportStatus(input: { workspace_dir: string }): Promise<PptxExportJob>;
   generatePptx(input: GeneratePptxInput): Promise<GeneratePptxResult>;

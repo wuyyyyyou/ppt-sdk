@@ -1,0 +1,660 @@
+diff --git a/node_modules/@anna-ai/cli/dist/app-bundle-upload-DmVKWAj9.js b/node_modules/@anna-ai/cli/dist/app-bundle-upload-B6TJeyOq.js
+similarity index 98%
+rename from node_modules/@anna-ai/cli/dist/app-bundle-upload-DmVKWAj9.js
+rename to node_modules/@anna-ai/cli/dist/app-bundle-upload-B6TJeyOq.js
+index 87c20a6..ead24c2 100644
+--- a/node_modules/@anna-ai/cli/dist/app-bundle-upload-DmVKWAj9.js
++++ b/node_modules/@anna-ai/cli/dist/app-bundle-upload-B6TJeyOq.js
+@@ -1,6 +1,6 @@
+ import { finalizeBundle, finalizeWorkingBundle, getBundle, initBundle, initWorkingBundle, uploadBundleFile, uploadWorkingBundleFile } from "./apps-DlVsVHQ5.js";
+ import { CliError } from "./client-D-_z1ALk.js";
+-import { canonicalize } from "./executa-publish-kh4Ucd3o.js";
++import { canonicalize } from "./executa-publish-DueD_0hh.js";
+ import { join, relative, sep } from "node:path";
+ import { readFileSync, readdirSync, statSync } from "node:fs";
+ import { createHash } from "node:crypto";
+diff --git a/node_modules/@anna-ai/cli/dist/apps-cut-MjSe2ph7.js b/node_modules/@anna-ai/cli/dist/apps-cut-Cc0XCFm3.js
+similarity index 97%
+rename from node_modules/@anna-ai/cli/dist/apps-cut-MjSe2ph7.js
+rename to node_modules/@anna-ai/cli/dist/apps-cut-Cc0XCFm3.js
+index 6f9c3dd..da213cc 100644
+--- a/node_modules/@anna-ai/cli/dist/apps-cut-MjSe2ph7.js
++++ b/node_modules/@anna-ai/cli/dist/apps-cut-Cc0XCFm3.js
+@@ -7,13 +7,13 @@ import { readExecutaIdentity } from "./executa-cache-BFoUtb4J.js";
+ import { readExecutasLock, writeExecutasLock } from "./bundled-executas-rSIkaA6-.js";
+ import { loadAppManifest, loadExecutaManifest } from "./manifest-CAF3_r1T.js";
+ import "./executas-CvQY_w2U.js";
+-import "./executa-publish-kh4Ucd3o.js";
++import "./executa-publish-DueD_0hh.js";
+ import "./binary-upload-CKMU5Rfw.js";
+ import { uploadExecutaBinaries } from "./executa-upload-binaries-DURJTXRI.js";
+-import "./dev-GUFWek03.js";
+-import "./executa-install-Dz7hBUsn.js";
++import "./dev-DBk4WVRp.js";
++import "./executa-install-C_n6Kd04.js";
+ import "./app-cache-Cr3tKbux.js";
+-import { resolveAppBySlugOrCache } from "./working-orchestration-D7cW2Bf2.js";
++import { resolveAppBySlugOrCache } from "./working-orchestration-BR6kmngc.js";
+ import { resolve } from "node:path";
+ import { existsSync } from "node:fs";
+ import { bold, cyan, dim, green, yellow } from "kleur/colors";
+diff --git a/node_modules/@anna-ai/cli/dist/apps-discard-BWLVVMu7.js b/node_modules/@anna-ai/cli/dist/apps-discard-CUmXXvm1.js
+similarity index 91%
+rename from node_modules/@anna-ai/cli/dist/apps-discard-BWLVVMu7.js
+rename to node_modules/@anna-ai/cli/dist/apps-discard-CUmXXvm1.js
+index bd3f0e0..ce44a2d 100644
+--- a/node_modules/@anna-ai/cli/dist/apps-discard-BWLVVMu7.js
++++ b/node_modules/@anna-ai/cli/dist/apps-discard-CUmXXvm1.js
+@@ -7,13 +7,13 @@ import "./executa-cache-BFoUtb4J.js";
+ import "./bundled-executas-rSIkaA6-.js";
+ import "./manifest-CAF3_r1T.js";
+ import "./executas-CvQY_w2U.js";
+-import "./executa-publish-kh4Ucd3o.js";
++import "./executa-publish-DueD_0hh.js";
+ import "./binary-upload-CKMU5Rfw.js";
+ import "./executa-upload-binaries-DURJTXRI.js";
+-import "./dev-GUFWek03.js";
+-import "./executa-install-Dz7hBUsn.js";
++import "./dev-DBk4WVRp.js";
++import "./executa-install-C_n6Kd04.js";
+ import "./app-cache-Cr3tKbux.js";
+-import { resolveAppBySlugOrCache } from "./working-orchestration-D7cW2Bf2.js";
++import { resolveAppBySlugOrCache } from "./working-orchestration-BR6kmngc.js";
+ import { dim, green, yellow } from "kleur/colors";
+ 
+ //#region src/commands/apps-discard.ts
+diff --git a/node_modules/@anna-ai/cli/dist/apps-publish-B7reDBe1.js b/node_modules/@anna-ai/cli/dist/apps-publish-DnU-B7YF.js
+similarity index 72%
+rename from node_modules/@anna-ai/cli/dist/apps-publish-B7reDBe1.js
+rename to node_modules/@anna-ai/cli/dist/apps-publish-DnU-B7YF.js
+index 955c6d6..ada6795 100644
+--- a/node_modules/@anna-ai/cli/dist/apps-publish-B7reDBe1.js
++++ b/node_modules/@anna-ai/cli/dist/apps-publish-DnU-B7YF.js
+@@ -6,12 +6,12 @@ import "./executa-cache-BFoUtb4J.js";
+ import "./bundled-executas-rSIkaA6-.js";
+ import "./manifest-CAF3_r1T.js";
+ import "./executas-CvQY_w2U.js";
+-import "./executa-publish-kh4Ucd3o.js";
++import "./executa-publish-DueD_0hh.js";
+ import "./binary-upload-CKMU5Rfw.js";
+ import "./executa-upload-binaries-DURJTXRI.js";
+ import "./app-cache-Cr3tKbux.js";
+ import "./listing-meta-CtVtyaWu.js";
+-import "./app-bundle-upload-DmVKWAj9.js";
+-import { runAppsPublish } from "./apps-publish--EmBa0zN.js";
++import "./app-bundle-upload-B6TJeyOq.js";
++import { runAppsPublish } from "./apps-publish-bcqO88S0.js";
+ 
+ export { runAppsPublish };
+\ No newline at end of file
+diff --git a/node_modules/@anna-ai/cli/dist/apps-publish--EmBa0zN.js b/node_modules/@anna-ai/cli/dist/apps-publish-bcqO88S0.js
+similarity index 99%
+rename from node_modules/@anna-ai/cli/dist/apps-publish--EmBa0zN.js
+rename to node_modules/@anna-ai/cli/dist/apps-publish-bcqO88S0.js
+index f649c90..a033632 100644
+--- a/node_modules/@anna-ai/cli/dist/apps-publish--EmBa0zN.js
++++ b/node_modules/@anna-ai/cli/dist/apps-publish-bcqO88S0.js
+@@ -4,10 +4,10 @@ import { CliError } from "./client-D-_z1ALk.js";
+ import { resolveClient, withErrorHandling } from "./_lifecycle-shared-RyiRITI5.js";
+ import { parseExecutaIdOverrides, readExecutasLock, substituteBundledRefs, validateBundledHandles, writeBundleToolIdSidecar, writeExecutasLock } from "./bundled-executas-rSIkaA6-.js";
+ import { loadAppManifest } from "./manifest-CAF3_r1T.js";
+-import { bumpVersion, bundleHash, manifestHash, rewriteVersion, runExecutaPublish } from "./executa-publish-kh4Ucd3o.js";
++import { bumpVersion, bundleHash, manifestHash, rewriteVersion, runExecutaPublish } from "./executa-publish-DueD_0hh.js";
+ import { appCacheMatches, readAppIdentity, writeAppIdentity } from "./app-cache-Cr3tKbux.js";
+ import { syncAppListingMeta } from "./listing-meta-CtVtyaWu.js";
+-import { isExistingDir, uploadAppBundle } from "./app-bundle-upload-DmVKWAj9.js";
++import { isExistingDir, uploadAppBundle } from "./app-bundle-upload-B6TJeyOq.js";
+ import { resolve } from "node:path";
+ import { bold, cyan, dim, green, yellow } from "kleur/colors";
+ 
+diff --git a/node_modules/@anna-ai/cli/dist/apps-push-CkJ1gtpy.js b/node_modules/@anna-ai/cli/dist/apps-push-CFDmMwaR.js
+similarity index 96%
+rename from node_modules/@anna-ai/cli/dist/apps-push-CkJ1gtpy.js
+rename to node_modules/@anna-ai/cli/dist/apps-push-CFDmMwaR.js
+index bfe50d7..1a701cf 100644
+--- a/node_modules/@anna-ai/cli/dist/apps-push-CkJ1gtpy.js
++++ b/node_modules/@anna-ai/cli/dist/apps-push-CFDmMwaR.js
+@@ -7,15 +7,15 @@ import "./executa-cache-BFoUtb4J.js";
+ import "./bundled-executas-rSIkaA6-.js";
+ import { loadAppManifest } from "./manifest-CAF3_r1T.js";
+ import "./executas-CvQY_w2U.js";
+-import { bumpVersion, bundleHash, manifestHash, rewriteVersion } from "./executa-publish-kh4Ucd3o.js";
++import { bumpVersion, bundleHash, manifestHash, rewriteVersion } from "./executa-publish-DueD_0hh.js";
+ import "./binary-upload-CKMU5Rfw.js";
+ import "./executa-upload-binaries-DURJTXRI.js";
+-import "./dev-GUFWek03.js";
+-import "./executa-install-Dz7hBUsn.js";
++import "./dev-DBk4WVRp.js";
++import "./executa-install-C_n6Kd04.js";
+ import "./app-cache-Cr3tKbux.js";
+-import { installLocalBundledShims, resolveAppIdentity, resolveBundledExecutas } from "./working-orchestration-D7cW2Bf2.js";
++import { installLocalBundledShims, resolveAppIdentity, resolveBundledExecutas } from "./working-orchestration-BR6kmngc.js";
+ import { syncAppListingMeta } from "./listing-meta-CtVtyaWu.js";
+-import { isExistingDir, uploadWorkingBundle } from "./app-bundle-upload-DmVKWAj9.js";
++import { isExistingDir, uploadWorkingBundle } from "./app-bundle-upload-B6TJeyOq.js";
+ import { resolve } from "node:path";
+ import { bold, cyan, dim, green, yellow } from "kleur/colors";
+ 
+diff --git a/node_modules/@anna-ai/cli/dist/apps-release-J-Sjkoym.js b/node_modules/@anna-ai/cli/dist/apps-release-CX7FtoOH.js
+similarity index 98%
+rename from node_modules/@anna-ai/cli/dist/apps-release-J-Sjkoym.js
+rename to node_modules/@anna-ai/cli/dist/apps-release-CX7FtoOH.js
+index fae23ab..79c28c6 100644
+--- a/node_modules/@anna-ai/cli/dist/apps-release-J-Sjkoym.js
++++ b/node_modules/@anna-ai/cli/dist/apps-release-CX7FtoOH.js
+@@ -59,7 +59,7 @@ async function runAppsRelease(opts) {
+ 		if (!target) {
+ 			if (opts.allowCreate) {
+ 				if (!opts.json) console.log(yellow(`version ${opts.version} not found remotely; running 'apps publish' first (--allow-create)…`));
+-				const { runAppsPublish } = await import("./apps-publish-B7reDBe1.js");
++				const { runAppsPublish } = await import("./apps-publish-DnU-B7YF.js");
+ 				const code = await runAppsPublish({
+ 					cwd: opts.cwd,
+ 					account: opts.account,
+diff --git a/node_modules/@anna-ai/cli/dist/bridge-Dvck0e9c.js b/node_modules/@anna-ai/cli/dist/bridge-C_Vpmwag.js
+similarity index 99%
+rename from node_modules/@anna-ai/cli/dist/bridge-Dvck0e9c.js
+rename to node_modules/@anna-ai/cli/dist/bridge-C_Vpmwag.js
+index e23c96c..f060b09 100644
+--- a/node_modules/@anna-ai/cli/dist/bridge-Dvck0e9c.js
++++ b/node_modules/@anna-ai/cli/dist/bridge-C_Vpmwag.js
+@@ -9,7 +9,7 @@ import { createInterface } from "node:readline";
+ * `uvx <pkg>@<version>` so end users always run the dispatcher version
+ * the CLI was tested against.
+ */
+-const PINNED_RUNTIME_VERSION = "0.2.0a12";
++const PINNED_RUNTIME_VERSION = "0.2.0a14";
+ /**
+ * Throwable from a {@link RequestHandler} to send a structured JSON-RPC
+ * error back to the python bridge with a stable string ``code`` (e.g.
+diff --git a/node_modules/@anna-ai/cli/dist/bridge-CzeSuRRL.js b/node_modules/@anna-ai/cli/dist/bridge-CzeSuRRL.js
+deleted file mode 100644
+index a081d8c..0000000
+--- a/node_modules/@anna-ai/cli/dist/bridge-CzeSuRRL.js
++++ /dev/null
+@@ -1,3 +0,0 @@
+-import { BridgeRequestError, PINNED_RUNTIME_VERSION, PythonBridge } from "./bridge-Dvck0e9c.js";
+-
+-export { PINNED_RUNTIME_VERSION, PythonBridge };
+\ No newline at end of file
+diff --git a/node_modules/@anna-ai/cli/dist/bridge-D_J1ql-k.js b/node_modules/@anna-ai/cli/dist/bridge-D_J1ql-k.js
+new file mode 100644
+index 0000000..c5da75b
+--- /dev/null
++++ b/node_modules/@anna-ai/cli/dist/bridge-D_J1ql-k.js
+@@ -0,0 +1,3 @@
++import { BridgeRequestError, PINNED_RUNTIME_VERSION, PythonBridge } from "./bridge-C_Vpmwag.js";
++
++export { PINNED_RUNTIME_VERSION, PythonBridge };
+\ No newline at end of file
+diff --git a/node_modules/@anna-ai/cli/dist/cli.js b/node_modules/@anna-ai/cli/dist/cli.js
+index 42ebad5..5c917ef 100755
+--- a/node_modules/@anna-ai/cli/dist/cli.js
++++ b/node_modules/@anna-ai/cli/dist/cli.js
+@@ -145,6 +145,10 @@ function hostApiAllows(manifest, ns, method) {
+ 		const declared = (manifest.required_executas?.length ?? 0) + (manifest.optional_executas?.length ?? 0);
+ 		return declared > 0;
+ 	}
++	if (ns === "credentials" && (method === "list_accounts" || method === "get_token")) {
++		const providers = grants.credentials;
++		return !!providers && providers.length > 0;
++	}
+ 	const methods = grants[ns];
+ 	if (!methods || methods.length === 0) return false;
+ 	if (methods.includes("*")) return true;
+@@ -470,7 +474,7 @@ program.command("validate").description("Run schema + ACL checks on a manifest+b
+ 	process.exit(code);
+ });
+ program.command("dev").description("Run a local harness (in-process dispatcher + iframe + SSE relay)").option("--manifest <path>", "manifest.json path", "manifest.json").option("--bundle <dir>", "bundle directory (default: ./bundle)").option("--slug <slug>", "App slug (overrides manifest.slug/name)").option("--view <name>", "View name to open (default: manifest default)").option("--matrix-nexus-root <path>", "matrix-nexus checkout (auto-detected if omitted; can also use $ANNA_NEXUS_ROOT)").option("--port <number>", "HTTP port", "5180").option("--user-id <id>", "Harness user_id", "1").option("--cwd <dir>", "Project root (default: cwd)").option("--no-watch", "Disable bundle file watcher (default: enabled)").option("--executa <spec>", "Explicit executa registration; repeatable. Spec: comma-separated key=value (dir=<path>[,tool_id=<id>][,type=python|node|go|binary][,command=\"<argv>\"]). When only `dir=` is given, the executa is auto-detected from executa.json / pyproject.toml / package.json / go.mod. Overrides directory auto-discovery under <manifest-dir>/executas/.", (val, prev) => prev ? [...prev, val] : [val]).option("--no-llm", "Disable LLM bridge (anna.llm/agent return llm_disabled)").option("--mock-llm <fixture>", "Serve canned LLM responses from a JSONL fixture").option("--llm-account <host>", "Saved account host to use (default: current)").option("--llm-app-slug <slug>", "Override the manifest slug used to register / look up the dev AnnaApp (default: manifest.slug)").option("--storage <mode>", "Storage backend: \"legacy\" (in-memory runtime_state, default) or \"aps\" (real nexus APS via /api/v1/storage/* — requires `anna-app login`).", "legacy").action(async (opts) => {
+-	const { runDev, parseExecutaSpec } = await import("./dev-CZLOk2qE.js");
++	const { runDev, parseExecutaSpec } = await import("./dev-CgOVdKgK.js");
+ 	const cwd = opts.cwd ?? process.cwd();
+ 	let executas;
+ 	if (opts.executa && opts.executa.length > 0) {
+@@ -529,7 +533,7 @@ fixture.command("replay <file>").description("Dry-run replay of a harness record
+ 	process.exit(code);
+ });
+ program.command("doctor").description("Check environment for `anna-app dev` (uv, matrix-nexus, dev key)").option("--matrix-nexus-root <path>", "matrix-nexus checkout (optional)").action(async (opts) => {
+-	const { runDoctor } = await import("./doctor-C3Nx8E2L.js");
++	const { runDoctor } = await import("./doctor-jwjNoAwf.js");
+ 	const code = await runDoctor({ matrixNexusRoot: opts.matrixNexusRoot });
+ 	process.exit(code);
+ });
+@@ -592,7 +596,7 @@ executa.command("register").description("Register a HARNESS AnnaApp(kind=executa
+ 	process.exit(code);
+ });
+ executa.command("install").description("Install a local-dev shim for an Executa under its minted tool_id so the Agent can discover it via 'Rediscover Local' (for distribution_type: local). Resolves the tool_id from .anna/executa.json (written by `executa publish` / `apps push`) unless --tool-id is given.").option("--dir <path>", "Executa project dir (default: CWD)").option("--tool-id <id>", "Install the shim under this exact id (default: minted id from .anna/executa.json, else executa.json tool_id)").option("--bin-dir <path>", "Install dir for the shim (default: ~/.anna/executa/bin)").option("--force", "Overwrite an existing shim of the same name", false).option("--json", "Emit machine-readable JSON", false).action(async (opts) => {
+-	const { runExecutaInstall } = await import("./executa-install-nOFLBwxv.js");
++	const { runExecutaInstall } = await import("./executa-install-CgB-pvR9.js");
+ 	const code = await runExecutaInstall({
+ 		dir: opts.dir,
+ 		toolId: opts.toolId,
+@@ -603,7 +607,7 @@ executa.command("install").description("Install a local-dev shim for an Executa
+ 	process.exit(code);
+ });
+ executa.command("dev").description("Run one Executa plugin in isolation (REPL or one-shot describe/invoke)").option("--dir <path>", "Executa project dir (default: CWD)").option("--spec <spec>", "Override discovery: comma-separated key=value (tool_id=...,type=...,command=\"...\")").option("--describe", "Print MANIFEST and exit", false).option("--health", "Print health and exit", false).option("--invoke <tool>", "Invoke one tool and exit").option("--args <json>", "JSON object passed as tool arguments", "{}").option("--json", "One-shot: emit compact JSON (no banners)", false).option("--no-sampling", "Hard-disable sampling reverse RPC (returns sampling_disabled)").option("--mock-sampling <fixture>", "Serve canned sampling responses from a JSONL fixture (offline)").option("--sampling-unsupported-format", "Simulate a model without json_schema support — exercises responseFormat onUnsupported branches (-32010 / downgrade)").option("--app-slug <slug>", "Forward sampling to nexus on behalf of this dev AnnaApp slug").option("--sampling-account <host>", "Saved account host for nexus sampling (default: current)").option("--no-agent", "Hard-disable agent reverse RPC (returns agent_not_granted)").option("--mock-agent <fixture>", "Serve canned agent/* responses from a JSONL fixture (offline)").option("--agent-account <host>", "Saved account host for nexus agent (default: --sampling-account or current)").option("--storage <mode>", "Storage backend: off | memory | mock | real (default: memory)").option("--mock-storage <fixture>", "Serve canned storage/* + files/* responses from a JSONL fixture").option("--storage-account <host>", "Saved account host for nexus storage (default: --sampling-account or current)").option("--storage-scopes <list>", "Comma-separated scopes for real storage tokens (default: user,app,tool)").option("--no-image", "Hard-disable image reverse RPC (returns image_not_granted)").option("--mock-image <fixture>", "Serve canned image/generate + image/edit responses from a JSONL fixture").option("--image-account <host>", "Saved account host for nexus image (default: --sampling-account or current)").option("--no-upload", "Hard-disable host/uploadFile reverse RPC (returns upload_not_granted)").option("--mock-upload <fixture>", "Serve canned host/uploadFile responses from a JSONL fixture").option("--upload-account <host>", "Saved account host for nexus uploads (default: --sampling-account or current)").action(async (opts) => {
+-	const { runExecutaDev } = await import("./executa-dev-CAw5X64R.js");
++	const { runExecutaDev } = await import("./executa-dev-BOYF0I4H.js");
+ 	const storageMode = opts.storage === void 0 ? void 0 : (() => {
+ 		const m = opts.storage;
+ 		if (m === "off" || m === "memory" || m === "mock" || m === "real") return m;
+@@ -666,7 +670,7 @@ apps.command("publish").description("Publish or update an Anna App (manifest.jso
+ 		console.error(`✗ --bump must be patch|minor|major (got: ${opts.bump})`);
+ 		process.exit(2);
+ 	}
+-	const { runAppsPublish } = await import("./apps-publish-B7reDBe1.js");
++	const { runAppsPublish } = await import("./apps-publish-DnU-B7YF.js");
+ 	process.exit(await runAppsPublish({
+ 		cwd: opts.cwd,
+ 		manifest: opts.manifest,
+@@ -700,7 +704,7 @@ apps.command("push").description("Upsert the mutable working draft (manifest + b
+ 			process.exit(2);
+ 		}
+ 	}
+-	const { runAppsPush } = await import("./apps-push-CkJ1gtpy.js");
++	const { runAppsPush } = await import("./apps-push-CFDmMwaR.js");
+ 	process.exit(await runAppsPush({
+ 		cwd: opts.cwd,
+ 		manifest: opts.manifest,
+@@ -720,7 +724,7 @@ apps.command("push").description("Upsert the mutable working draft (manifest + b
+ 	}));
+ });
+ apps.command("cut <version>").description("Snapshot the working draft into an immutable version (freeze deps)").option("--changelog <text>", "Override the working draft changelog for this version").option("--slug <slug>", "App slug (default: resolve from .anna/app.json cache)").option("--cwd <dir>", "Project root for identity cache (default: cwd)").option("--dry-run", "Resolve target but don't cut", false).option("--account <host>", "Saved account host (default: current)").option("--json", "Emit machine-readable JSON", false).action(async (version, opts) => {
+-	const { runAppsCut } = await import("./apps-cut-MjSe2ph7.js");
++	const { runAppsCut } = await import("./apps-cut-Cc0XCFm3.js");
+ 	process.exit(await runAppsCut({
+ 		version,
+ 		changelog: opts.changelog,
+@@ -732,7 +736,7 @@ apps.command("cut <version>").description("Snapshot the working draft into an im
+ 	}));
+ });
+ apps.command("discard").description("Drop the mutable working draft (leaves cut versions intact)").option("--slug <slug>", "App slug (default: resolve from .anna/app.json cache)").option("--cwd <dir>", "Project root for identity cache (default: cwd)").option("--dry-run", "Resolve target but don't discard", false).option("--account <host>", "Saved account host (default: current)").option("--json", "Emit machine-readable JSON", false).action(async (opts) => {
+-	const { runAppsDiscard } = await import("./apps-discard-BWLVVMu7.js");
++	const { runAppsDiscard } = await import("./apps-discard-CUmXXvm1.js");
+ 	process.exit(await runAppsDiscard({
+ 		slug: opts.slug,
+ 		cwd: opts.cwd,
+@@ -742,7 +746,7 @@ apps.command("discard").description("Drop the mutable working draft (leaves cut
+ 	}));
+ });
+ apps.command("release <version>").description("Freeze & publish an existing remote version (go live)").option("--slug <slug>", "App slug (default: resolve from .anna/app.json cache)").option("--cwd <dir>", "Project root for identity cache (default: cwd)").option("--allow-create", "If the version isn't on the server, run 'apps publish' first, then release", false).option("--dry-run", "Resolve target + pre-flight but don't publish", false).option("--account <host>", "Saved account host (default: current)").option("--json", "Emit machine-readable JSON", false).action(async (version, opts) => {
+-	const { runAppsRelease } = await import("./apps-release-J-Sjkoym.js");
++	const { runAppsRelease } = await import("./apps-release-CX7FtoOH.js");
+ 	process.exit(await runAppsRelease({
+ 		version,
+ 		slug: opts.slug,
+@@ -868,7 +872,7 @@ executa.command("publish").description("Mint or update an Executa (executa.json
+ 		console.error(`✗ --bump must be patch|minor|major (got: ${opts.bump})`);
+ 		process.exit(2);
+ 	}
+-	const { runExecutaPublish } = await import("./executa-publish-B_7k1gOf.js");
++	const { runExecutaPublish } = await import("./executa-publish-2lAhRQvN.js");
+ 	process.exit(await runExecutaPublish({
+ 		cwd: opts.cwd,
+ 		manifest: opts.manifest,
+@@ -996,7 +1000,7 @@ program.command("publish").description("Auto-detect cwd and publish (apps publis
+ 		console.error(`✗ --bump must be patch|minor|major (got: ${opts.bump})`);
+ 		process.exit(2);
+ 	}
+-	const { runTopLevelPublish } = await import("./publish-DwIJWl46.js");
++	const { runTopLevelPublish } = await import("./publish-BQL5NDnd.js");
+ 	process.exit(await runTopLevelPublish({
+ 		cwd: opts.cwd,
+ 		bump: opts.bump,
+diff --git a/node_modules/@anna-ai/cli/dist/dev-CZLOk2qE.js b/node_modules/@anna-ai/cli/dist/dev-CZLOk2qE.js
+deleted file mode 100644
+index 1fcb20e..0000000
+--- a/node_modules/@anna-ai/cli/dist/dev-CZLOk2qE.js
++++ /dev/null
+@@ -1,4 +0,0 @@
+-import "./nexus-root-BlPwOusj.js";
+-import { parseExecutaSpec, runDev } from "./dev-GUFWek03.js";
+-
+-export { parseExecutaSpec, runDev };
+\ No newline at end of file
+diff --git a/node_modules/@anna-ai/cli/dist/dev-CgOVdKgK.js b/node_modules/@anna-ai/cli/dist/dev-CgOVdKgK.js
+new file mode 100644
+index 0000000..e1dacc5
+--- /dev/null
++++ b/node_modules/@anna-ai/cli/dist/dev-CgOVdKgK.js
+@@ -0,0 +1,4 @@
++import "./nexus-root-BlPwOusj.js";
++import { parseExecutaSpec, runDev } from "./dev-DBk4WVRp.js";
++
++export { parseExecutaSpec, runDev };
+\ No newline at end of file
+diff --git a/node_modules/@anna-ai/cli/dist/dev-GUFWek03.js b/node_modules/@anna-ai/cli/dist/dev-DBk4WVRp.js
+similarity index 99%
+rename from node_modules/@anna-ai/cli/dist/dev-GUFWek03.js
+rename to node_modules/@anna-ai/cli/dist/dev-DBk4WVRp.js
+index cf2f408..11fb0ec 100644
+--- a/node_modules/@anna-ai/cli/dist/dev-GUFWek03.js
++++ b/node_modules/@anna-ai/cli/dist/dev-DBk4WVRp.js
+@@ -49,8 +49,8 @@ async function runDev(opts) {
+ 		}
+ 		process.env.ANNA_APP_RUNTIME_STORAGE_MODE = "aps";
+ 	}
+-	const { PythonBridge, PINNED_RUNTIME_VERSION } = await import("./bridge-CzeSuRRL.js");
+-	const { HarnessServer } = await import("./server-BHWGGZsf.js");
++	const { PythonBridge, PINNED_RUNTIME_VERSION } = await import("./bridge-D_J1ql-k.js");
++	const { HarnessServer } = await import("./server-Cg13x19g.js");
+ 	const bridge = new PythonBridge({
+ 		mode,
+ 		matrixNexusRoot: matrixNexusRoot ?? void 0,
+diff --git a/node_modules/@anna-ai/cli/dist/doctor-C3Nx8E2L.js b/node_modules/@anna-ai/cli/dist/doctor-jwjNoAwf.js
+similarity index 96%
+rename from node_modules/@anna-ai/cli/dist/doctor-C3Nx8E2L.js
+rename to node_modules/@anna-ai/cli/dist/doctor-jwjNoAwf.js
+index 328b942..25269cb 100644
+--- a/node_modules/@anna-ai/cli/dist/doctor-C3Nx8E2L.js
++++ b/node_modules/@anna-ai/cli/dist/doctor-jwjNoAwf.js
+@@ -1,5 +1,5 @@
+ import { findMatrixNexusRoot, nexusSchemaDir } from "./nexus-root-BlPwOusj.js";
+-import { PINNED_RUNTIME_VERSION } from "./bridge-Dvck0e9c.js";
++import { PINNED_RUNTIME_VERSION } from "./bridge-C_Vpmwag.js";
+ import { resolve } from "node:path";
+ import { existsSync, statSync } from "node:fs";
+ import { spawnSync } from "node:child_process";
+diff --git a/node_modules/@anna-ai/cli/dist/executa-dev-CAw5X64R.js b/node_modules/@anna-ai/cli/dist/executa-dev-BOYF0I4H.js
+similarity index 99%
+rename from node_modules/@anna-ai/cli/dist/executa-dev-CAw5X64R.js
+rename to node_modules/@anna-ai/cli/dist/executa-dev-BOYF0I4H.js
+index 7262835..e793238 100644
+--- a/node_modules/@anna-ai/cli/dist/executa-dev-CAw5X64R.js
++++ b/node_modules/@anna-ai/cli/dist/executa-dev-BOYF0I4H.js
+@@ -1,5 +1,5 @@
+ import "./nexus-root-BlPwOusj.js";
+-import { parseExecutaSpec } from "./dev-GUFWek03.js";
++import { parseExecutaSpec } from "./dev-DBk4WVRp.js";
+ import { isAbsolute, resolve } from "node:path";
+ import { existsSync } from "node:fs";
+ import { bold, cyan, dim, green, red, yellow } from "kleur/colors";
+diff --git a/node_modules/@anna-ai/cli/dist/executa-install-Dz7hBUsn.js b/node_modules/@anna-ai/cli/dist/executa-install-C_n6Kd04.js
+similarity index 97%
+rename from node_modules/@anna-ai/cli/dist/executa-install-Dz7hBUsn.js
+rename to node_modules/@anna-ai/cli/dist/executa-install-C_n6Kd04.js
+index e3a22df..9733815 100644
+--- a/node_modules/@anna-ai/cli/dist/executa-install-Dz7hBUsn.js
++++ b/node_modules/@anna-ai/cli/dist/executa-install-C_n6Kd04.js
+@@ -1,5 +1,5 @@
+ import { readExecutaIdentity } from "./executa-cache-BFoUtb4J.js";
+-import { parseExecutaSpec } from "./dev-GUFWek03.js";
++import { parseExecutaSpec } from "./dev-DBk4WVRp.js";
+ import { isAbsolute, join, resolve } from "node:path";
+ import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+ import { bold, cyan, dim, green, red, yellow } from "kleur/colors";
+diff --git a/node_modules/@anna-ai/cli/dist/executa-install-CgB-pvR9.js b/node_modules/@anna-ai/cli/dist/executa-install-CgB-pvR9.js
+new file mode 100644
+index 0000000..6592e5c
+--- /dev/null
++++ b/node_modules/@anna-ai/cli/dist/executa-install-CgB-pvR9.js
+@@ -0,0 +1,7 @@
++import "./credentials-BTv2IfUZ.js";
++import "./nexus-root-BlPwOusj.js";
++import "./executa-cache-BFoUtb4J.js";
++import "./dev-DBk4WVRp.js";
++import { runExecutaInstall } from "./executa-install-C_n6Kd04.js";
++
++export { runExecutaInstall };
+\ No newline at end of file
+diff --git a/node_modules/@anna-ai/cli/dist/executa-install-nOFLBwxv.js b/node_modules/@anna-ai/cli/dist/executa-install-nOFLBwxv.js
+deleted file mode 100644
+index 2a21a4f..0000000
+--- a/node_modules/@anna-ai/cli/dist/executa-install-nOFLBwxv.js
++++ /dev/null
+@@ -1,7 +0,0 @@
+-import "./credentials-BTv2IfUZ.js";
+-import "./nexus-root-BlPwOusj.js";
+-import "./executa-cache-BFoUtb4J.js";
+-import "./dev-GUFWek03.js";
+-import { runExecutaInstall } from "./executa-install-Dz7hBUsn.js";
+-
+-export { runExecutaInstall };
+\ No newline at end of file
+diff --git a/node_modules/@anna-ai/cli/dist/executa-publish-B_7k1gOf.js b/node_modules/@anna-ai/cli/dist/executa-publish-2lAhRQvN.js
+similarity index 76%
+rename from node_modules/@anna-ai/cli/dist/executa-publish-B_7k1gOf.js
+rename to node_modules/@anna-ai/cli/dist/executa-publish-2lAhRQvN.js
+index 8a07ecc..68102be 100644
+--- a/node_modules/@anna-ai/cli/dist/executa-publish-B_7k1gOf.js
++++ b/node_modules/@anna-ai/cli/dist/executa-publish-2lAhRQvN.js
+@@ -4,7 +4,7 @@ import "./_lifecycle-shared-RyiRITI5.js";
+ import "./executa-cache-BFoUtb4J.js";
+ import "./manifest-CAF3_r1T.js";
+ import "./executas-CvQY_w2U.js";
+-import { runExecutaPublish } from "./executa-publish-kh4Ucd3o.js";
++import { runExecutaPublish } from "./executa-publish-DueD_0hh.js";
+ import "./binary-upload-CKMU5Rfw.js";
+ import "./executa-upload-binaries-DURJTXRI.js";
+ 
+diff --git a/node_modules/@anna-ai/cli/dist/executa-publish-kh4Ucd3o.js b/node_modules/@anna-ai/cli/dist/executa-publish-DueD_0hh.js
+similarity index 99%
+rename from node_modules/@anna-ai/cli/dist/executa-publish-kh4Ucd3o.js
+rename to node_modules/@anna-ai/cli/dist/executa-publish-DueD_0hh.js
+index 74eac24..7861a11 100644
+--- a/node_modules/@anna-ai/cli/dist/executa-publish-kh4Ucd3o.js
++++ b/node_modules/@anna-ai/cli/dist/executa-publish-DueD_0hh.js
+@@ -205,6 +205,7 @@ async function runExecutaPublish(opts) {
+ 		else await updateMyTool(client, executaId, {
+ 			name: manifest.name,
+ 			description: manifest.description,
++			version: manifest.version,
+ 			...distributionPayload(manifest.distribution)
+ 		});
+ 		if (!isSkill && manifest.distribution?.binaryArtifacts && opts.freeze !== false) {
+diff --git a/node_modules/@anna-ai/cli/dist/publish-DwIJWl46.js b/node_modules/@anna-ai/cli/dist/publish-BQL5NDnd.js
+similarity index 90%
+rename from node_modules/@anna-ai/cli/dist/publish-DwIJWl46.js
+rename to node_modules/@anna-ai/cli/dist/publish-BQL5NDnd.js
+index 184c5b3..43af449 100644
+--- a/node_modules/@anna-ai/cli/dist/publish-DwIJWl46.js
++++ b/node_modules/@anna-ai/cli/dist/publish-BQL5NDnd.js
+@@ -6,13 +6,13 @@ import "./executa-cache-BFoUtb4J.js";
+ import "./bundled-executas-rSIkaA6-.js";
+ import "./manifest-CAF3_r1T.js";
+ import "./executas-CvQY_w2U.js";
+-import { runExecutaPublish } from "./executa-publish-kh4Ucd3o.js";
++import { runExecutaPublish } from "./executa-publish-DueD_0hh.js";
+ import "./binary-upload-CKMU5Rfw.js";
+ import "./executa-upload-binaries-DURJTXRI.js";
+ import "./app-cache-Cr3tKbux.js";
+ import "./listing-meta-CtVtyaWu.js";
+-import "./app-bundle-upload-DmVKWAj9.js";
+-import { runAppsPublish } from "./apps-publish--EmBa0zN.js";
++import "./app-bundle-upload-B6TJeyOq.js";
++import { runAppsPublish } from "./apps-publish-bcqO88S0.js";
+ import { resolve } from "node:path";
+ import { existsSync } from "node:fs";
+ import { red, yellow } from "kleur/colors";
+diff --git a/node_modules/@anna-ai/cli/dist/server-BHWGGZsf.js b/node_modules/@anna-ai/cli/dist/server-Cg13x19g.js
+similarity index 90%
+rename from node_modules/@anna-ai/cli/dist/server-BHWGGZsf.js
+rename to node_modules/@anna-ai/cli/dist/server-Cg13x19g.js
+index 166ebf2..aebf236 100644
+--- a/node_modules/@anna-ai/cli/dist/server-BHWGGZsf.js
++++ b/node_modules/@anna-ai/cli/dist/server-Cg13x19g.js
+@@ -1,14 +1,39 @@
+ import { canonicalHost, getAccount } from "./credentials-BTv2IfUZ.js";
+-import { BridgeRequestError } from "./bridge-Dvck0e9c.js";
++import { BridgeRequestError } from "./bridge-C_Vpmwag.js";
+ import { dirname, join, normalize, resolve } from "node:path";
+ import { createRequire } from "node:module";
+ import { createReadStream, existsSync, readFileSync, statSync, watch } from "node:fs";
+ import { fileURLToPath } from "node:url";
+ import { readFile } from "node:fs/promises";
+ import { createServer } from "node:http";
++import { lookup } from "node:dns/promises";
++import { isIP } from "node:net";
+ import { WebSocketServer } from "ws";
+ import { setTimeout as setTimeout$1 } from "node:timers/promises";
+ 
++const HOST_UPLOAD_JSON_MAX_BYTES = 8 * 1024 * 1024;
++const HOST_UPLOAD_PROXY_TIMEOUT_MS = 10_000;
++function isPrivateAddress(address) {
++	if (isIP(address) === 4) {
++		const [a, b] = address.split(".").map(Number);
++		return a === 10 || a === 127 || a === 0 || a === 169 && b === 254 || a === 172 && b >= 16 && b <= 31 || a === 192 && b === 168 || a >= 224;
++	}
++	if (isIP(address) === 6) {
++		const normalized = address.toLowerCase();
++		return normalized === "::" || normalized === "::1" || normalized.startsWith("fc") || normalized.startsWith("fd") || normalized.startsWith("fe8") || normalized.startsWith("fe9") || normalized.startsWith("fea") || normalized.startsWith("feb") || normalized.startsWith("ff");
++	}
++	return true;
++}
++function isSignedHostUploadUrl(url) {
++	return url.searchParams.get("X-Amz-Algorithm") === "AWS4-HMAC-SHA256" && [
++		"X-Amz-Credential",
++		"X-Amz-Date",
++		"X-Amz-Expires",
++		"X-Amz-SignedHeaders",
++		"X-Amz-Signature"
++	].every((key) => url.searchParams.has(key));
++}
++
+ //#region src/harness/llm-bridge.ts
+ /** APS-mode ``storage`` methods the bridge forwards to ``/api/v1/storage/*``.
+ *  ``get/set/delete/list`` are the KV family; ``files_*`` are the object/blob
+@@ -1408,6 +1433,7 @@ var HarnessServer = class {
+ 				executas: (this.cfg.executas ?? []).map((e) => e.tool_id),
+ 				watch: !!this.cfg.watch
+ 			});
++			if (method === "POST" && url.pathname === "/api/host-upload/json") return await this.proxyHostUploadJson(req, res);
+ 			if (method === "POST" && url.pathname === "/api/session/create") return await this.createSession(res);
+ 			if (method === "POST" && url.pathname === "/api/session/call") return await this.proxyCall(req, res);
+ 			if (method === "POST" && url.pathname === "/api/session/refresh-token") return await this.refreshToken(res);
+@@ -1421,6 +1447,76 @@ var HarnessServer = class {
+ 			this.text(res, 500, `harness error: ${e.message}`);
+ 		}
+ 	}
++	async proxyHostUploadJson(req, res) {
++		let parsed;
++		try {
++			parsed = JSON.parse(await readBody(req));
++		} catch {
++			return this.json(res, 400, { error: "invalid json body" });
++		}
++		if (!parsed || typeof parsed.url !== "string") return this.json(res, 400, { error: "url is required" });
++		let target;
++		try {
++			target = new URL(parsed.url);
++		} catch {
++			return this.json(res, 400, { error: "invalid url" });
++		}
++		const allowedHosts = new Set((process.env.ANNA_HOST_UPLOAD_PROXY_HOSTS ?? "").split(",").map((host) => host.trim().toLowerCase()).filter(Boolean));
++		if (target.protocol !== "https:" || target.username || target.password || target.port || target.hash) return this.json(res, 400, { error: "unsafe host upload url" });
++		if (!allowedHosts.has(target.hostname.toLowerCase())) return this.json(res, 403, { error: "host upload origin is not allowed" });
++		if (!isSignedHostUploadUrl(target)) return this.json(res, 400, { error: "unsigned host upload url" });
++		const expires = Number(target.searchParams.get("X-Amz-Expires"));
++		const signedAt = target.searchParams.get("X-Amz-Date") ?? "";
++		const signedAtMs = Date.UTC(Number(signedAt.slice(0, 4)), Number(signedAt.slice(4, 6)) - 1, Number(signedAt.slice(6, 8)), Number(signedAt.slice(9, 11)), Number(signedAt.slice(11, 13)), Number(signedAt.slice(13, 15)));
++		if (!Number.isFinite(expires) || expires <= 0 || expires > 3600 || !Number.isFinite(signedAtMs) || Date.now() > signedAtMs + expires * 1e3) return this.json(res, 400, { error: "expired host upload url" });
++		let addresses;
++		try {
++			addresses = await lookup(target.hostname, { all: true });
++		} catch {
++			return this.json(res, 502, { error: "host upload DNS lookup failed" });
++		}
++		if (addresses.length === 0 || addresses.some(({ address }) => isPrivateAddress(address))) return this.json(res, 403, { error: "host upload address is not public" });
++		const controller = new AbortController();
++		const timeout = setTimeout(() => controller.abort(), HOST_UPLOAD_PROXY_TIMEOUT_MS);
++		try {
++			const response = await fetch(target, {
++				signal: controller.signal,
++				redirect: "manual",
++				headers: { accept: "application/json" }
++			});
++			if (response.status >= 300 && response.status < 400) return this.json(res, 502, { error: "host upload redirect rejected" });
++			if (!response.ok) return this.json(res, 502, { error: `host upload returned HTTP ${response.status}` });
++			const contentType = (response.headers.get("content-type") ?? "").split(";", 1)[0].trim().toLowerCase();
++			if (contentType !== "application/json" && !contentType.endsWith("+json")) return this.json(res, 415, { error: "host upload response is not JSON" });
++			const declaredLength = Number(response.headers.get("content-length"));
++			if (Number.isFinite(declaredLength) && declaredLength > HOST_UPLOAD_JSON_MAX_BYTES) return this.json(res, 413, { error: "host upload JSON is too large" });
++			if (!response.body) return this.json(res, 502, { error: "host upload response has no body" });
++			const reader = response.body.getReader();
++			const chunks = [];
++			let total = 0;
++			while (true) {
++				const { done, value } = await reader.read();
++				if (done) break;
++				total += value.byteLength;
++				if (total > HOST_UPLOAD_JSON_MAX_BYTES) {
++					await reader.cancel();
++					return this.json(res, 413, { error: "host upload JSON is too large" });
++				}
++				chunks.push(Buffer.from(value));
++			}
++			let body;
++			try {
++				body = JSON.parse(Buffer.concat(chunks, total).toString("utf-8"));
++			} catch {
++				return this.json(res, 502, { error: "host upload returned invalid JSON" });
++			}
++			return this.json(res, 200, body);
++		} catch (error) {
++			return this.json(res, error?.name === "AbortError" ? 504 : 502, { error: error?.name === "AbortError" ? "host upload request timed out" : "host upload request failed" });
++		} finally {
++			clearTimeout(timeout);
++		}
++	}
+ 	async serveDashboard(res) {
+ 		const file = join(__dirname, "dashboard.html");
+ 		const html = await readFile(file, "utf-8");
+diff --git a/node_modules/@anna-ai/cli/dist/test/index.d.ts b/node_modules/@anna-ai/cli/dist/test/index.d.ts
+index 7b5787b..a9430ea 100644
+--- a/node_modules/@anna-ai/cli/dist/test/index.d.ts
++++ b/node_modules/@anna-ai/cli/dist/test/index.d.ts
+@@ -16,6 +16,8 @@ interface HostApi {
+   storage?: string[];
+   prefs?: string[];
+   window?: string[];
++  /** Provider ids (e.g. "google") — NOT method names. */
++  credentials?: string[];
+ }
+ interface ManifestForAcl {
+   required_executas?: Array<{
+diff --git a/node_modules/@anna-ai/cli/dist/test/index.js b/node_modules/@anna-ai/cli/dist/test/index.js
+index b178aee..cacacef 100644
+--- a/node_modules/@anna-ai/cli/dist/test/index.js
++++ b/node_modules/@anna-ai/cli/dist/test/index.js
+@@ -7,7 +7,8 @@ const NAMESPACED = {
+ 	fs: true,
+ 	storage: true,
+ 	prefs: true,
+-	window: true
++	window: true,
++	credentials: true
+ };
+ function deriveAcl(manifest) {
+ 	const ha = manifest.ui?.host_api ?? {};
+@@ -26,8 +27,12 @@ function deriveAcl(manifest) {
+ 		for (const r of [...manifest.required_executas ?? [], ...manifest.optional_executas ?? []]) if (r.tool_id) allowedTools.add(r.tool_id);
+ 	}
+ 	if (allowedTools.size > 0 || toolsWildcard) allowed.add("tools.invoke");
++	if ((ha.credentials ?? []).length > 0) {
++		allowed.add("credentials.list_accounts");
++		allowed.add("credentials.get_token");
++	}
+ 	for (const ns of Object.keys(NAMESPACED)) {
+-		if (ns === "tools") continue;
++		if (ns === "tools" || ns === "credentials") continue;
+ 		for (const method of ha[ns] ?? []) allowed.add(`${ns}.${method}`);
+ 	}
+ 	return {
+diff --git a/node_modules/@anna-ai/cli/dist/working-orchestration-D7cW2Bf2.js b/node_modules/@anna-ai/cli/dist/working-orchestration-BR6kmngc.js
+similarity index 98%
+rename from node_modules/@anna-ai/cli/dist/working-orchestration-D7cW2Bf2.js
+rename to node_modules/@anna-ai/cli/dist/working-orchestration-BR6kmngc.js
+index 02c89c3..2bed3e0 100644
+--- a/node_modules/@anna-ai/cli/dist/working-orchestration-D7cW2Bf2.js
++++ b/node_modules/@anna-ai/cli/dist/working-orchestration-BR6kmngc.js
+@@ -3,8 +3,8 @@ import { createApp, findAppBySlug, getApp } from "./apps-DlVsVHQ5.js";
+ import { CliError } from "./client-D-_z1ALk.js";
+ import { parseExecutaIdOverrides, readExecutasLock, substituteBundledRefs, validateBundledHandles, writeBundleToolIdSidecar, writeExecutasLock } from "./bundled-executas-rSIkaA6-.js";
+ import { loadExecutaManifest } from "./manifest-CAF3_r1T.js";
+-import { runExecutaPublish } from "./executa-publish-kh4Ucd3o.js";
+-import { runExecutaInstall } from "./executa-install-Dz7hBUsn.js";
++import { runExecutaPublish } from "./executa-publish-DueD_0hh.js";
++import { runExecutaInstall } from "./executa-install-C_n6Kd04.js";
+ import { appCacheMatches, readAppIdentity, writeAppIdentity } from "./app-cache-Cr3tKbux.js";
+ import { join, resolve } from "node:path";
+ import { dim, green, yellow } from "kleur/colors";
