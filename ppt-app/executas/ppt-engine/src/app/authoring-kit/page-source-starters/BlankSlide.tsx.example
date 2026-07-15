@@ -1,0 +1,5 @@
+import SlideCanvas from "../authoring-kit/foundations/SlideCanvas.tsx";
+
+export default function Page() {
+  return <SlideCanvas />;
+}

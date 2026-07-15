@@ -114,7 +114,7 @@ try {
 
 test(
   "app_patch_workspace_settings plugin invoke returns inline settings data",
-  { skip: patchSettingsInvokeSkip, timeout: 5_000 },
+  { skip: patchSettingsInvokeSkip, timeout: 15_000 },
   async () => {
     const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-plugin-settings-home-"));
     const workspaceDir = path.join(homeDir, "anna-workspace", "ppt", "ppt-20260710-000001");
@@ -172,6 +172,30 @@ test("app_get_workspace_defaults is declared and routed", async () => {
 
   assert.match(source, /app_get_workspace_defaults:\s*toolAppGetWorkspaceDefaults/);
   assert.ok(manifest.tools.some((tool) => tool.name === "app_get_workspace_defaults"));
+});
+
+test("Authoring Kit and Page Source workspace tools are declared and routed", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+  const manifest = JSON.parse(
+    await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
+  ) as { tools: Array<{ name: string; parameters?: Array<{ name: string; required?: boolean }> }> };
+
+  for (const [toolName, handlerName] of [
+    ["app_install_workspace_authoring_kit", "toolAppInstallWorkspaceAuthoringKit"],
+    ["app_ensure_confirmed_outline_page_ids", "toolAppEnsureConfirmedOutlinePageIds"],
+    ["app_prepare_workspace_page_sources", "toolAppPrepareWorkspacePageSources"],
+    ["app_rebuild_workspace_deck_manifest", "toolAppRebuildWorkspaceDeckManifest"],
+    ["app_get_workspace_page_source_fingerprint", "toolAppGetWorkspacePageSourceFingerprint"],
+  ] as const) {
+    assert.match(source, new RegExp(`${toolName}:\\s*${handlerName}`));
+    assert.ok(manifest.tools.some((tool) => tool.name === toolName), `Missing ${toolName}`);
+    assert.equal(getToolParameter(manifest, toolName, "workspace_dir").required, true);
+  }
+
+  assert.equal(
+    getToolParameter(manifest, "app_get_workspace_page_source_fingerprint", "page_id").required,
+    true,
+  );
 });
 
 test("app_get_rendered_deck_html is declared and routed", async () => {

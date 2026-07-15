@@ -6,34 +6,18 @@ import path from "node:path";
 import { buildSinglePagePreviewBaseFileName } from "../../src/render/build-deck-from-manifest.tsx";
 import { prepareManifestRenderPlan } from "../../src/render/manifest-render-plan.ts";
 
-const LOCAL_SLIDE = `import React from "react";
-import * as z from "zod";
+const PAGE_1 = "page-11111111-1111-4111-8111-111111111111";
+const PAGE_2 = "page-22222222-2222-4222-8222-222222222222";
 
-export const Schema = z.object({
-  title: z.string().default("Local title"),
-});
-
-export const layoutId = "local-fixture";
-export const layoutName = "Local Fixture";
-export const layoutDescription = "Local fixture slide for render plan tests.";
-
-export default function LocalFixtureSlide({ data }) {
-  const parsed = Schema.parse(data ?? {});
-  return <div data-manifest-slide-id="local-fixture">{parsed.title}</div>;
+const PAGE_SOURCE = `import React from "react";
+export default function Page() {
+  return <div style={{ width: "1280px", height: "720px" }}>TSX content</div>;
 }
 `;
 
-const BROKEN_LOCAL_SLIDE = `import React from "react";
-
-export function BrokenLocalFixtureSlide() {
+const BROKEN_PAGE_SOURCE = `import React from "react";
+export function Page() {
   return <div>Missing default export</div>;
-}
-`;
-
-const MINIMAL_LOCAL_SLIDE = `import React from "react";
-
-export default function MinimalLocalSlide() {
-  return <div data-manifest-slide-id="minimal-local">TSX content</div>;
 }
 `;
 
@@ -41,11 +25,11 @@ test("buildSinglePagePreviewBaseFileName includes stable slide id", () => {
   assert.equal(
     buildSinglePagePreviewBaseFileName({
       pageNumber: 5,
-      deckBaseName: "ppt-20260701-page-preview",
-      slideId: "page-06-2026",
-      layoutId: "content-canvas",
+      deckBaseName: "ppt-page-preview",
+      slideId: PAGE_1,
+      layoutId: PAGE_1,
     }),
-    "05-ppt-20260701-page-preview-page-06-2026-content-canvas",
+    `05-ppt-page-preview-${PAGE_1}-${PAGE_1}`,
   );
 });
 
@@ -54,166 +38,78 @@ async function withFixture(
 ) {
   const tempRoot = path.join(process.cwd(), "test", ".tmp");
   await mkdir(tempRoot, { recursive: true });
-  const rootDir = await mkdtemp(path.join(tempRoot, "presenton-render-plan-"));
-  const deckDir = path.join(rootDir, "deck");
-  const outputDir = path.join(rootDir, "out");
-
+  const deckDir = await mkdtemp(path.join(tempRoot, "page-source-render-plan-"));
+  const outputDir = path.join(deckDir, "out");
   try {
     await mkdir(path.join(deckDir, "slides"), { recursive: true });
-    await writeFile(path.join(deckDir, "group.json"), `${JSON.stringify({
-      group_id: "render-plan-group",
-      group_name: "Render Plan Group",
-      group_description: "Render plan fixture group",
-      ordered: false,
-      default: false,
-    }, null, 2)}\n`, "utf8");
-    await fn({
-      manifestPath: path.join(deckDir, "manifest.json"),
-      outputDir,
-      deckDir,
-    });
+    await fn({ manifestPath: path.join(deckDir, "manifest.json"), outputDir, deckDir });
   } finally {
-    await rm(rootDir, { recursive: true, force: true });
+    await rm(deckDir, { recursive: true, force: true });
   }
 }
 
-test("prepareManifestRenderPlan resolves builtin slides", async () => {
-  await withFixture(async ({ manifestPath, outputDir }) => {
-    await writeFile(
-      manifestPath,
-      `${JSON.stringify({
-        title: "Builtin Deck",
-        slides: [
-          {
-            id: "cover",
-            title: "Cover",
-            source: {
-              type: "builtin",
-              template_group: "red-finance-v3",
-              layout_id: "cover-statement",
-            },
-          },
-        ],
-      }, null, 2)}\n`,
-      "utf8",
-    );
+async function writeManifest(
+  manifestPath: string,
+  slides: Array<Record<string, unknown>>,
+) {
+  await writeFile(
+    manifestPath,
+    `${JSON.stringify({ title: "Authoring Deck", slides }, null, 2)}\n`,
+    "utf8",
+  );
+}
 
-    const plan = await prepareManifestRenderPlan({
-      manifestPath,
-      outputDir,
-    });
-
-    assert.equal(plan.title, "Builtin Deck");
-    assert.equal(plan.singlePageIndex, null);
-    assert.equal(plan.slides.length, 1);
-    assert.equal(plan.slides[0]?.layoutId, "red-finance-v3:cover-statement");
-    assert.match(plan.slides[0]?.html ?? "", /presentation-slides-wrapper/);
-  });
-});
-
-test("prepareManifestRenderPlan resolves local slides, data paths, and theme normalization", async () => {
+test("prepareManifestRenderPlan renders default-export-only Page Sources", async () => {
   await withFixture(async ({ manifestPath, outputDir, deckDir }) => {
-    await writeFile(path.join(deckDir, "slides", "LocalSlide.tsx"), LOCAL_SLIDE, "utf8");
-    await writeFile(path.join(deckDir, "data.json"), `${JSON.stringify({
-      title: "Data path title",
-    }, null, 2)}\n`, "utf8");
-
-    await writeFile(
-      manifestPath,
-      `${JSON.stringify({
-        title: "Local Deck",
-        slides: [
-          {
-            id: "local-1",
-            title: "Local Slide",
-            source: {
-              type: "local",
-              path: "./slides/LocalSlide.tsx",
-            },
-            data_path: "./data.json",
-            theme: {
-              data: {
-                colors: {
-                  background: "#f8f1e4",
-                },
-                fonts: {
-                  textFont: {
-                    name: "Inter",
-                    url: "https://example.com/inter.woff2",
-                  },
-                },
-              },
-            },
-          },
-        ],
-      }, null, 2)}\n`,
-      "utf8",
-    );
-
-    const plan = await prepareManifestRenderPlan({
-      manifestPath,
-      outputDir,
-    });
-
-    assert.equal(plan.slides.length, 1);
-    assert.equal(plan.slides[0]?.slideId, "local-1");
-    assert.equal(plan.slides[0]?.context.theme.colors.background, "#f8f1e4");
-    assert.equal(plan.slides[0]?.context.theme.fontName, "Inter");
-    assert.equal(plan.slides[0]?.context.theme.fontUrl, "https://example.com/inter.woff2");
-    assert.deepEqual(plan.slides[0]?.context.slideData, {
-      title: "Data path title",
-    });
-    assert.ok(plan.deckRuntimeBundle);
-    assert.match(plan.slides[0]?.html ?? "", /__PRESENTON_RENDER_CONTEXT__/);
-  });
-});
-
-test("prepareManifestRenderPlan accepts a TSX-only local slide without data or metadata exports", async () => {
-  await withFixture(async ({ manifestPath, outputDir, deckDir }) => {
-    await writeFile(path.join(deckDir, "slides", "MinimalSlide.tsx"), MINIMAL_LOCAL_SLIDE, "utf8");
-    await writeFile(
-      manifestPath,
-      `${JSON.stringify({
-        title: "Minimal Deck",
-        slides: [{
-          id: "minimal-1",
-          title: "Minimal Slide",
-          source: { type: "local", path: "./slides/MinimalSlide.tsx" },
-        }],
-      }, null, 2)}\n`,
-      "utf8",
-    );
+    await writeFile(path.join(deckDir, "slides", `${PAGE_1}.tsx`), PAGE_SOURCE, "utf8");
+    await writeManifest(manifestPath, [{ id: PAGE_1, source: `./slides/${PAGE_1}.tsx` }]);
 
     const plan = await prepareManifestRenderPlan({ manifestPath, outputDir });
 
-    assert.equal(plan.slides[0]?.layoutId, "render-plan-group:minimal-1");
-    assert.equal(plan.slides[0]?.context.title, "Minimal Slide");
+    assert.equal(plan.title, "Authoring Deck");
+    assert.equal(plan.slides.length, 1);
+    assert.equal(plan.slides[0]?.slideId, PAGE_1);
+    assert.equal(plan.slides[0]?.layoutId, PAGE_1);
     assert.deepEqual(plan.slides[0]?.context.slideData, {});
-    assert.match(plan.deckRuntimeBundle ?? "", /MinimalLocalSlide/);
+    assert.deepEqual(plan.slides[0]?.context.theme.colors, {});
+    assert.match(plan.slides[0]?.html ?? "", /__PRESENTON_RENDER_CONTEXT__/);
+    assert.match(plan.slides[0]?.html ?? "", /TSX content/);
+    assert.ok(plan.deckRuntimeBundle);
   });
 });
 
-test("prepareManifestRenderPlan isolates local slides in single-page mode", async () => {
-  await withFixture(async ({ manifestPath, outputDir, deckDir }) => {
-    await writeFile(path.join(deckDir, "slides", "LocalSlide.tsx"), LOCAL_SLIDE, "utf8");
-    await writeFile(path.join(deckDir, "slides", "BrokenLocalSlide.tsx"), BROKEN_LOCAL_SLIDE, "utf8");
-    await writeFile(
-      manifestPath,
-      `${JSON.stringify({
-        title: "Single Page Deck",
-        slides: [
-          {
-            id: "page-1",
-            source: { type: "local", path: "./slides/BrokenLocalSlide.tsx" },
-          },
-          {
-            id: "page-2",
-            source: { type: "local", path: "./slides/LocalSlide.tsx" },
-          },
-        ],
-      }, null, 2)}\n`,
-      "utf8",
+test("prepareManifestRenderPlan rejects legacy and extra manifest fields", async () => {
+  await withFixture(async ({ manifestPath, outputDir }) => {
+    await writeManifest(manifestPath, [{
+      id: PAGE_1,
+      source: { type: "local", path: `./slides/${PAGE_1}.tsx` },
+      data_path: "./data/page.json",
+    }]);
+    await assert.rejects(
+      () => prepareManifestRenderPlan({ manifestPath, outputDir }),
+      /unsupported field "data_path"/,
     );
+  });
+});
+
+test("prepareManifestRenderPlan requires deterministic Page Source paths", async () => {
+  await withFixture(async ({ manifestPath, outputDir }) => {
+    await writeManifest(manifestPath, [{ id: PAGE_1, source: "./slides/custom.tsx" }]);
+    await assert.rejects(
+      () => prepareManifestRenderPlan({ manifestPath, outputDir }),
+      new RegExp(`source.*slides/${PAGE_1}\\.tsx`),
+    );
+  });
+});
+
+test("single-page mode compiles only the selected Page Source", async () => {
+  await withFixture(async ({ manifestPath, outputDir, deckDir }) => {
+    await writeFile(path.join(deckDir, "slides", `${PAGE_1}.tsx`), BROKEN_PAGE_SOURCE, "utf8");
+    await writeFile(path.join(deckDir, "slides", `${PAGE_2}.tsx`), PAGE_SOURCE, "utf8");
+    await writeManifest(manifestPath, [
+      { id: PAGE_1, source: `./slides/${PAGE_1}.tsx` },
+      { id: PAGE_2, source: `./slides/${PAGE_2}.tsx` },
+    ]);
 
     const plan = await prepareManifestRenderPlan({
       manifestPath,
@@ -221,81 +117,23 @@ test("prepareManifestRenderPlan isolates local slides in single-page mode", asyn
       singlePage: true,
       page: 2,
     });
-
-    assert.equal(plan.singlePageIndex, 1);
-    assert.equal(plan.slideCount, 2);
     assert.equal(plan.slides.length, 1);
-    assert.equal(plan.slides[0]?.slideId, "page-2");
-    assert.equal(plan.slides[0]?.sourceIndex, 1);
+    assert.equal(plan.slides[0]?.slideId, PAGE_2);
     assert.equal(plan.slides[0]?.pageNumber, 2);
-    assert.equal(plan.deckRuntimeBundle, null);
   });
 });
 
-test("prepareManifestRenderPlan still validates all local slides in full-deck mode", async () => {
+test("full-deck mode validates every Page Source default export", async () => {
   await withFixture(async ({ manifestPath, outputDir, deckDir }) => {
-    await writeFile(path.join(deckDir, "slides", "LocalSlide.tsx"), LOCAL_SLIDE, "utf8");
-    await writeFile(path.join(deckDir, "slides", "BrokenLocalSlide.tsx"), BROKEN_LOCAL_SLIDE, "utf8");
-    await writeFile(
-      manifestPath,
-      `${JSON.stringify({
-        title: "Full Deck",
-        slides: [
-          {
-            id: "page-1",
-            source: { type: "local", path: "./slides/BrokenLocalSlide.tsx" },
-          },
-          {
-            id: "page-2",
-            source: { type: "local", path: "./slides/LocalSlide.tsx" },
-          },
-        ],
-      }, null, 2)}\n`,
-      "utf8",
-    );
-
+    await writeFile(path.join(deckDir, "slides", `${PAGE_1}.tsx`), BROKEN_PAGE_SOURCE, "utf8");
+    await writeFile(path.join(deckDir, "slides", `${PAGE_2}.tsx`), PAGE_SOURCE, "utf8");
+    await writeManifest(manifestPath, [
+      { id: PAGE_1, source: `./slides/${PAGE_1}.tsx` },
+      { id: PAGE_2, source: `./slides/${PAGE_2}.tsx` },
+    ]);
     await assert.rejects(
-      () => prepareManifestRenderPlan({
-        manifestPath,
-        outputDir,
-      }),
-      (error: Error) => {
-        assert.match(error.message, /default export a React component/);
-        return true;
-      },
-    );
-  });
-});
-
-test("prepareManifestRenderPlan rejects illegal manifests", async () => {
-  await withFixture(async ({ manifestPath, outputDir }) => {
-    await writeFile(
-      manifestPath,
-      `${JSON.stringify({
-        title: "Broken Deck",
-        slides: [
-          {
-            id: "dup",
-            source: { type: "local", path: "./slides/Missing.tsx" },
-          },
-          {
-            id: "dup",
-            source: { type: "local", path: "./slides/Missing.tsx" },
-          },
-        ],
-      }, null, 2)}\n`,
-      "utf8",
-    );
-
-    await assert.rejects(
-      () => prepareManifestRenderPlan({
-        manifestPath,
-        outputDir,
-      }),
-      (error: Error) => {
-        assert.match(error.message, /Duplicate manifest slide id "dup"/);
-        return true;
-      },
+      () => prepareManifestRenderPlan({ manifestPath, outputDir }),
+      /must default export a React component/,
     );
   });
 });

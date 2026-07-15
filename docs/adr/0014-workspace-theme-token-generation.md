@@ -1,3 +1,7 @@
+---
+status: superseded by ADR-0020
+---
+
 # Workspace theme token generation
 
 PPT App generation uses Workspace Theme Creation to create a Workspace Theme Token from the selected Template Theme Contract, the user's brief, and general context rows. The fixed `theme_id` and preset theme catalog are no longer part of the generation theme source, and Context Suggestion no longer returns a theme field.

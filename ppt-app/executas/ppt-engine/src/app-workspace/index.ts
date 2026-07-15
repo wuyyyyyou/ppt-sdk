@@ -22,7 +22,10 @@ import {
   buildDeckHtmlPagesAndScreenshotsFromManifest,
   buildDeckPageScreenshotFromManifest,
 } from "../render/build-deck-from-manifest.js";
-import type { DeckManifestInput, DeckManifestSlideInput } from "../render/types.js";
+import type {
+  LegacyDeckManifestInput,
+  LegacyDeckManifestSlideInput,
+} from "../render/types.js";
 import { validateThemeTokenRecord } from "../render/theme-tokens.js";
 import { resolveLocalModulePath } from "../local-template/loader.js";
 import { assertLocalTemplateTypecheck } from "../local-template/typecheck.js";
@@ -1527,8 +1530,8 @@ async function readManifestLocalSlideSourcePath(input: {
     throw new Error("Selected template manifest root must be a JSON object");
   }
 
-  const manifest = rawValue as unknown as DeckManifestInput;
-  const slide = manifest.slides?.[input.pageIndex] as DeckManifestSlideInput | undefined;
+  const manifest = rawValue as unknown as LegacyDeckManifestInput;
+  const slide = manifest.slides?.[input.pageIndex] as LegacyDeckManifestSlideInput | undefined;
   if (!slide) {
     throw new Error(`Manifest does not contain page index ${input.pageIndex}`);
   }

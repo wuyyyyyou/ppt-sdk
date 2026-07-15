@@ -3,7 +3,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { LocalTemplateGroupMetadata } from "../discovery/index.js";
-import type { DeckManifestInput, DeckManifestSlideInput } from "../render/types.js";
+import type {
+  LegacyDeckManifestInput,
+  LegacyDeckManifestSlideInput,
+} from "../render/types.js";
 
 const CURRENT_MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 
@@ -34,7 +37,7 @@ type ForkableGroupAsset = {
   closingLayoutId?: string | null;
   dependencies: Record<string, string>;
   packageJson?: Record<string, unknown> | null;
-  originalManifest?: DeckManifestInput | null;
+  originalManifest?: LegacyDeckManifestInput | null;
   slides: ForkableGroupSlideAsset[];
 };
 
@@ -56,7 +59,7 @@ export interface ForkTemplateGroupResult {
   manifestPath: string;
   catalogJsonPath?: string;
   dataDirPath?: string;
-  manifest: DeckManifestInput;
+  manifest: LegacyDeckManifestInput;
 }
 
 type LoadedForkableTemplatesAssets = {
@@ -168,7 +171,7 @@ function normalizePackageName(value: string): string {
     .slice(0, 214);
 }
 
-function buildManifest(group: ForkableGroupAsset, manifestTitle: string): DeckManifestInput {
+function buildManifest(group: ForkableGroupAsset, manifestTitle: string): LegacyDeckManifestInput {
   return {
     title: manifestTitle,
     slides: group.slides.map((slide) => ({
@@ -223,7 +226,7 @@ function addSlidePathMapping(
 function buildManifestFromOriginal(
   group: ForkableGroupAsset,
   manifestTitle: string,
-): DeckManifestInput | null {
+): LegacyDeckManifestInput | null {
   const originalManifest = group.originalManifest;
   if (!isPlainRecord(originalManifest) || !Array.isArray(originalManifest.slides)) {
     return null;
@@ -264,7 +267,7 @@ function buildManifestFromOriginal(
       );
     }
 
-    const nextSlide: DeckManifestSlideInput = {
+    const nextSlide: LegacyDeckManifestSlideInput = {
       ...originalSlide,
       id:
         typeof originalSlide.id === "string" && originalSlide.id.length > 0

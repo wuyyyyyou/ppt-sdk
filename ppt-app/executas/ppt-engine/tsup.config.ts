@@ -37,6 +37,7 @@ export default defineConfig([
     entry: {
       "browser/local-render-slide": "src/browser/local-render-slide.ts",
       "browser/local-render-deck": "src/browser/local-render-deck.ts",
+      "browser/page-source-render": "src/browser/page-source-render.tsx",
       "browser/template-entry": "src/browser/template-entry.ts",
     },
     format: ["esm"],

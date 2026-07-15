@@ -1,3 +1,7 @@
+---
+status: superseded by ADR-0020
+---
+
 # Template theme token source
 
 Tokenized presentation templates use template-local theme token files as their theme source. A workspace reads `theme/token.json` first and falls back to `theme/token.default.json`. Source templates commit `theme/token.schema.json`, `theme/token.default.json`, and `theme/README.md`; source templates do not commit `theme/token.json`. Forking a tokenized template initializes workspace `theme/token.json` from `theme/token.default.json`.

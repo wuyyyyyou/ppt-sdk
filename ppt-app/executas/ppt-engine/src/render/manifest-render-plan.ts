@@ -1,38 +1,25 @@
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 
-import { getLayoutByLayoutId } from "../app/presentation-templates/index.js";
-import type { TemplateWithData } from "../app/presentation-templates/utils.js";
 import {
   assertLocalTemplateModule,
   importLocalTemplateModule,
   resolveLocalModulePath,
 } from "../local-template/loader.js";
 import {
-  buildLocalBrowserRuntimeBundle,
-  type LocalRuntimeEntry,
-} from "./local-runtime-bundle.js";
+  buildPageSourceRuntimeBundle,
+  type PageSourceRuntimeEntry,
+} from "./page-source-runtime-bundle.js";
 import { getBrowserRenderRuntimeBundle } from "./runtime-bundle.js";
-import {
-  buildThemeTokenCssVariables,
-  readThemeTokenBundle,
-} from "./theme-tokens.js";
 import type {
   BrowserRenderContext,
-  BrowserRenderTheme,
   DeckManifestInput,
   DeckManifestSlideInput,
-  TemplateRenderThemeInput,
 } from "./types.js";
 
-type ResolvedManifestSlide = {
-  slideId: string;
-  layoutId: string;
-  layoutName: string;
-  layoutDescription: string;
-  templateGroup: string;
-  localEntryPath?: string;
-};
+const PAGE_ID_PATTERN = /^page-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const MANIFEST_FIELDS = new Set(["title", "slides"]);
+const SLIDE_FIELDS = new Set(["id", "source"]);
 
 type PreparedManifestSlide = {
   context: BrowserRenderContext;
@@ -45,7 +32,7 @@ type PreparedManifestSlide = {
   fileName: string;
   outputPath: string;
   speaker_note: string;
-  localEntryPath?: string;
+  localEntryPath: string;
 };
 
 export interface ManifestRenderPlan {
@@ -64,11 +51,9 @@ function resolveAbsolutePath(targetPath: string, fieldName: string): string {
   if (!targetPath || typeof targetPath !== "string") {
     throw new Error(`Field "${fieldName}" must be a non-empty string`);
   }
-
   if (!path.isAbsolute(targetPath)) {
     throw new Error(`Field "${fieldName}" must be an absolute path`);
   }
-
   return path.normalize(targetPath);
 }
 
@@ -76,15 +61,62 @@ function resolveOptionalAbsolutePath(
   targetPath: string | null | undefined,
   fieldName: string,
 ): string | undefined {
-  if (targetPath === undefined || targetPath === null) {
-    return undefined;
-  }
-
-  return resolveAbsolutePath(targetPath, fieldName);
+  return targetPath === undefined || targetPath === null
+    ? undefined
+    : resolveAbsolutePath(targetPath, fieldName);
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function assertOnlyFields(
+  value: Record<string, unknown>,
+  allowed: Set<string>,
+  label: string,
+) {
+  const unsupported = Object.keys(value).filter((key) => !allowed.has(key));
+  if (unsupported.length > 0) {
+    throw new Error(`${label} contains unsupported field "${unsupported[0]}"`);
+  }
+}
+
+function expectedPageSource(pageId: string): string {
+  return `./slides/${pageId}.tsx`;
+}
+
+export function validateDeckManifest(value: unknown): asserts value is DeckManifestInput {
+  if (!isPlainRecord(value)) {
+    throw new Error('Field "manifest" must be an object');
+  }
+  assertOnlyFields(value, MANIFEST_FIELDS, "Manifest");
+  if (typeof value.title !== "string" || value.title.trim().length === 0) {
+    throw new Error('Field "manifest.title" must be a non-empty string');
+  }
+  if (!Array.isArray(value.slides) || value.slides.length === 0) {
+    throw new Error('Field "manifest.slides" must be a non-empty array');
+  }
+
+  const seenPageIds = new Set<string>();
+  value.slides.forEach((slideValue, index) => {
+    if (!isPlainRecord(slideValue)) {
+      throw new Error(`Slide at index ${index} must be an object`);
+    }
+    assertOnlyFields(slideValue, SLIDE_FIELDS, `Slide at index ${index}`);
+    if (typeof slideValue.id !== "string" || !PAGE_ID_PATTERN.test(slideValue.id)) {
+      throw new Error(`Slide at index ${index} field "id" must be an opaque page UUID`);
+    }
+    if (seenPageIds.has(slideValue.id)) {
+      throw new Error(`Duplicate manifest slide id "${slideValue.id}"`);
+    }
+    seenPageIds.add(slideValue.id);
+    const expectedSource = expectedPageSource(slideValue.id);
+    if (slideValue.source !== expectedSource) {
+      throw new Error(
+        `Slide "${slideValue.id}" field "source" must equal "${expectedSource}"`,
+      );
+    }
+  });
 }
 
 function sanitizeFileNamePart(value: string): string {
@@ -94,58 +126,7 @@ function sanitizeFileNamePart(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-
   return normalized || "deck";
-}
-
-function normalizeTheme(input?: TemplateRenderThemeInput | null): BrowserRenderTheme {
-  const colors = { ...(input?.colors ?? {}), ...(input?.data?.colors ?? {}) };
-  const font = input?.fonts?.body ?? input?.data?.fonts?.textFont ?? null;
-
-  return {
-    logoUrl: input?.logo_url ?? null,
-    companyName: input?.company_name ?? null,
-    colors: { ...colors },
-    variables: {},
-    fontName: font?.name ?? null,
-    fontUrl: font?.url ?? null,
-  };
-}
-
-async function normalizeThemeForTemplate(
-  templateDir: string,
-  input?: TemplateRenderThemeInput | null,
-): Promise<BrowserRenderTheme> {
-  const theme = normalizeTheme(input);
-  const token = await readThemeTokenBundle(templateDir);
-  if (!token) {
-    return theme;
-  }
-
-  return {
-    ...theme,
-    colors: {},
-    variables: buildThemeTokenCssVariables(token),
-  };
-}
-
-async function resolveLocalTemplateGroupId(manifestCwd: string): Promise<string> {
-  const groupPath = path.join(manifestCwd, "group.json");
-
-  try {
-    const rawValue = JSON.parse(await readFile(groupPath, "utf8")) as unknown;
-    if (
-      isPlainRecord(rawValue) &&
-      typeof rawValue.group_id === "string" &&
-      rawValue.group_id.length > 0
-    ) {
-      return rawValue.group_id;
-    }
-  } catch {
-    // Fall back to the manifest directory name when no group metadata exists.
-  }
-
-  return path.basename(manifestCwd);
 }
 
 function escapeJsonForInlineScript(value: unknown): string {
@@ -157,186 +138,12 @@ function escapeJsonForInlineScript(value: unknown): string {
     .replace(/\u2029/g, "\\u2029");
 }
 
-function validateDeckManifest(manifest: DeckManifestInput): void {
-  if (!manifest || typeof manifest !== "object") {
-    throw new Error('Field "manifest" must be an object');
-  }
-
-  if (!Array.isArray(manifest.slides) || manifest.slides.length === 0) {
-    throw new Error('Field "manifest.slides" must be a non-empty array');
-  }
-
-  const seenSlideIds = new Set<string>();
-  manifest.slides.forEach((slide, index) => {
-    if (!slide || typeof slide !== "object") {
-      throw new Error(`Slide at index ${index} must be an object`);
-    }
-
-    if (!slide.id || typeof slide.id !== "string") {
-      throw new Error(`Slide at index ${index} is missing required field "id"`);
-    }
-
-    if (seenSlideIds.has(slide.id)) {
-      throw new Error(`Duplicate manifest slide id "${slide.id}"`);
-    }
-    seenSlideIds.add(slide.id);
-
-    if (!slide.source || typeof slide.source !== "object") {
-      throw new Error(`Slide "${slide.id}" is missing required field "source"`);
-    }
-
-    if (!slide.source.type || typeof slide.source.type !== "string") {
-      throw new Error(`Slide "${slide.id}" is missing required field "source.type"`);
-    }
-
-    if (
-      slide.data !== undefined &&
-      slide.data !== null &&
-      !isPlainRecord(slide.data)
-    ) {
-      throw new Error(`Slide "${slide.id}" field "data" must be an object when provided`);
-    }
-
-    if (
-      slide.data_path !== undefined &&
-      slide.data_path !== null &&
-      (typeof slide.data_path !== "string" || slide.data_path.length === 0)
-    ) {
-      throw new Error(`Slide "${slide.id}" field "data_path" must be a non-empty string when provided`);
-    }
-  });
-}
-
-async function resolveSlideData(
-  slide: DeckManifestSlideInput,
-  manifestCwd: string,
-): Promise<Record<string, unknown>> {
-  if (typeof slide.data_path === "string" && slide.data_path.length > 0) {
-    const absolutePath = path.resolve(manifestCwd, slide.data_path);
-    const rawValue = JSON.parse(await readFile(absolutePath, "utf8")) as unknown;
-    if (!isPlainRecord(rawValue)) {
-      throw new Error(`Slide "${slide.id}" data_path must point to a JSON object: ${slide.data_path}`);
-    }
-    return rawValue;
-  }
-
-  if (isPlainRecord(slide.data)) {
-    return slide.data;
-  }
-
-  return {};
-}
-
-function normalizeBuiltinLayoutId(templateGroup: string, layoutId: string): string {
-  if (!layoutId) {
-    throw new Error('Missing required field "source.layout_id"');
-  }
-
-  if (layoutId.includes(":")) {
-    const [groupId] = layoutId.split(":");
-    if (groupId !== templateGroup) {
-      throw new Error(
-        `Layout "${layoutId}" does not belong to template group "${templateGroup}"`,
-      );
-    }
-    return layoutId;
-  }
-
-  return `${templateGroup}:${layoutId}`;
-}
-
-function resolveBuiltinSlide(slide: DeckManifestSlideInput): ResolvedManifestSlide {
-  if (slide.source.type !== "builtin") {
-    throw new Error(`Slide "${slide.id}" is not a builtin source`);
-  }
-
-  if (
-    !slide.source.template_group ||
-    typeof slide.source.template_group !== "string"
-  ) {
-    throw new Error(
-      `Slide "${slide.id}" is missing required field "source.template_group"`,
-    );
-  }
-
-  const layoutId = normalizeBuiltinLayoutId(
-    slide.source.template_group,
-    slide.source.layout_id,
-  );
-  const layout = getLayoutByLayoutId(layoutId);
-
-  if (!layout) {
-    throw new Error(
-      `Slide "${slide.id}" references unknown builtin layout "${layoutId}"`,
-    );
-  }
-
-  const typedLayout = layout as TemplateWithData;
-  return {
-    slideId: slide.id,
-    layoutId: typedLayout.layoutId,
-    layoutName: typedLayout.layoutName,
-    layoutDescription: typedLayout.layoutDescription,
-    templateGroup: slide.source.template_group,
-  };
-}
-
-async function resolveLocalSlide(
-  slide: DeckManifestSlideInput,
-  cwd: string,
-  templateGroup: string,
-): Promise<ResolvedManifestSlide> {
-  if (slide.source.type !== "local") {
-    throw new Error(`Slide "${slide.id}" is not a local source`);
-  }
-
-  if (!slide.source.path || typeof slide.source.path !== "string") {
-    throw new Error(`Slide "${slide.id}" is missing required field "source.path"`);
-  }
-
-  const absolutePath = await resolveLocalModulePath(
-    slide.source.path,
-    cwd,
-    `Slide "${slide.id}"`,
-  );
-  const moduleValue = await importLocalTemplateModule(absolutePath, cwd);
-  assertLocalTemplateModule(moduleValue, absolutePath);
-
-  return {
-    slideId: slide.id,
-    layoutId: `${templateGroup}:${moduleValue.layoutId ?? slide.id}`,
-    layoutName: moduleValue.layoutName ?? slide.title ?? slide.id,
-    layoutDescription: moduleValue.layoutDescription ?? "",
-    templateGroup,
-    localEntryPath: absolutePath,
-  };
-}
-
-async function resolveManifestSlide(
-  slide: DeckManifestSlideInput,
-  manifestCwd: string,
-): Promise<ResolvedManifestSlide> {
-  switch (slide.source.type) {
-    case "builtin":
-      return resolveBuiltinSlide(slide);
-    case "local": {
-      const templateGroup = await resolveLocalTemplateGroupId(manifestCwd);
-      return resolveLocalSlide(slide, manifestCwd, templateGroup);
-    }
-    default:
-      throw new Error(
-        `Slide "${slide.id}" uses unsupported source type "${String((slide.source as { type?: unknown }).type)}"`,
-      );
-  }
-}
-
 function buildSlideDocumentHtml(input: {
   context: BrowserRenderContext;
   runtimeBundle?: string | null;
 }): string {
   const runtimeBundle = input.runtimeBundle ?? getBrowserRenderRuntimeBundle();
   const serializedContext = escapeJsonForInlineScript(input.context);
-
   return [
     "<!doctype html>",
     '<html lang="en">',
@@ -345,36 +152,12 @@ function buildSlideDocumentHtml(input: {
     '  <meta name="viewport" content="width=1280, initial-scale=1" />',
     `  <title>${input.context.title}</title>`,
     "  <style>",
-    "    html, body {",
-    "      margin: 0;",
-    "      padding: 0;",
-    "      width: 1280px;",
-    "      min-height: 720px;",
-    "      overflow: hidden;",
-    `      background: ${input.context.theme.colors.background ?? "#ffffff"};`,
-    "    }",
-    "    body {",
-    "      position: relative;",
-    "      font-family: system-ui, sans-serif;",
-    "    }",
-    "    #presentation-slides-wrapper {",
-    "      width: 1280px;",
-    "      min-height: 720px;",
-    "    }",
-    '    [data-presenton-render-status="error"] {',
-    "      display: flex;",
-    "      align-items: center;",
-    "      justify-content: center;",
-    "      color: #991b1b;",
-    "      background: #fef2f2;",
-    "      font-size: 14px;",
-    "      padding: 24px;",
-    "      box-sizing: border-box;",
-    "    }",
+    "    html, body { margin: 0; padding: 0; width: 1280px; min-height: 720px; overflow: hidden; background: #ffffff; }",
+    "    body { position: relative; font-family: system-ui, sans-serif; }",
+    "    #presentation-slides-wrapper { width: 1280px; min-height: 720px; }",
+    '    [data-presenton-render-status="error"] { display: flex; align-items: center; justify-content: center; color: #991b1b; background: #fef2f2; font-size: 14px; padding: 24px; box-sizing: border-box; }',
     "  </style>",
-    "  <script>",
-    "    window.tailwind = window.tailwind || {};",
-    "  </script>",
+    "  <script>window.tailwind = window.tailwind || {};</script>",
     '  <script src="https://cdn.tailwindcss.com"></script>',
     "</head>",
     "<body>",
@@ -394,169 +177,122 @@ function parseSinglePageIndex(
   input: { singlePage?: boolean | null; page?: number | null },
   slideCount: number,
 ): number | null {
-  if (!input.singlePage) {
-    return null;
-  }
-
+  if (!input.singlePage) return null;
   if (input.page === undefined || input.page === null) {
     throw new Error('Field "page" is required when "singlePage" is true');
   }
-
   if (!Number.isInteger(input.page)) {
     throw new Error('Field "page" must be an integer');
   }
-
   if (input.page < 1 || input.page > slideCount) {
     throw new Error(`Field "page" must be between 1 and ${slideCount}`);
   }
-
   return input.page - 1;
 }
 
-export async function prepareManifestRenderPlan(
-  input: {
-    manifestPath: string;
-    outputDir: string;
-    name?: string | null;
-    singlePage?: boolean | null;
-    page?: number | null;
-    cwd?: string | null;
-  },
-): Promise<ManifestRenderPlan> {
+async function resolvePageSource(
+  slide: DeckManifestSlideInput,
+  manifestCwd: string,
+): Promise<string> {
+  const absolutePath = await resolveLocalModulePath(
+    slide.source,
+    manifestCwd,
+    `Slide "${slide.id}"`,
+  );
+  const moduleValue = await importLocalTemplateModule(absolutePath, manifestCwd);
+  assertLocalTemplateModule(moduleValue, absolutePath);
+  return absolutePath;
+}
+
+export async function prepareManifestRenderPlan(input: {
+  manifestPath: string;
+  outputDir: string;
+  name?: string | null;
+  singlePage?: boolean | null;
+  page?: number | null;
+  cwd?: string | null;
+}): Promise<ManifestRenderPlan> {
   if (!input || typeof input !== "object") {
     throw new Error("Manifest build input must be an object");
   }
-
-  if (!input.manifestPath || typeof input.manifestPath !== "string") {
-    throw new Error('Field "manifestPath" must be a non-empty string');
-  }
-
-  if (!input.outputDir || typeof input.outputDir !== "string") {
-    throw new Error('Field "outputDir" must be a non-empty string');
-  }
-
   resolveOptionalAbsolutePath(input.cwd, "cwd");
   const manifestPath = resolveAbsolutePath(input.manifestPath, "manifestPath");
-  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as DeckManifestInput;
-  validateDeckManifest(manifest);
-
-  const manifestCwd = path.dirname(manifestPath);
   const outputDir = resolveAbsolutePath(input.outputDir, "outputDir");
-  const deckBaseName = sanitizeFileNamePart(
-    input.name ??
-    (typeof manifest.title === "string" && manifest.title.length > 0
-      ? manifest.title
-      : "presenton-manifest-deck"),
-  );
+  const manifestValue = JSON.parse(await readFile(manifestPath, "utf8")) as unknown;
+  validateDeckManifest(manifestValue);
+  const manifest = manifestValue;
+  const manifestCwd = path.dirname(manifestPath);
+  const deckBaseName = sanitizeFileNamePart(input.name ?? manifest.title);
   const singlePageIndex = parseSinglePageIndex(input, manifest.slides.length);
-  const slideEntries =
-    singlePageIndex === null
-      ? manifest.slides.map((slide, sourceIndex) => ({ slide, sourceIndex }))
-      : [{
-        slide: manifest.slides[singlePageIndex],
-        sourceIndex: singlePageIndex,
-      }];
+  const selected = singlePageIndex === null
+    ? manifest.slides.map((slide, sourceIndex) => ({ slide, sourceIndex }))
+    : [{ slide: manifest.slides[singlePageIndex]!, sourceIndex: singlePageIndex }];
 
-  const slides = await Promise.all(
-    slideEntries.map(async ({ slide, sourceIndex }) => {
-      const resolvedSlide = await resolveManifestSlide(slide, manifestCwd);
-      const slideData = await resolveSlideData(slide, manifestCwd);
-      const theme = await normalizeThemeForTemplate(
-        manifestCwd,
-        slide.theme ?? manifest.theme,
-      );
-      const runtimeLayoutId = resolvedSlide.localEntryPath
-        ? `${resolvedSlide.templateGroup}:${slide.id}`
-        : resolvedSlide.layoutId;
-      const slideTitle =
-        slide.title ??
-        `${resolvedSlide.templateGroup} - ${resolvedSlide.layoutName}`;
-
-      const context: BrowserRenderContext = {
-        templateGroup: resolvedSlide.templateGroup,
-        layoutId: resolvedSlide.layoutId,
-        runtimeLayoutId,
-        slideData,
-        speakerNote: slide.speaker_note ?? "",
-        title: slideTitle,
-        theme,
-      };
-
-      const html = buildSlideDocumentHtml({ context });
-      const pageNumber = sourceIndex + 1;
-      const slideFileName = `${pageNumber}-${deckBaseName}-${sanitizeFileNamePart(
-        resolvedSlide.layoutId,
-      )}.png`;
-      const slideOutputPath = path.join(outputDir, slideFileName);
-
-      return {
-        context,
-        html,
-        sourceIndex,
-        pageNumber,
-        slideId: slide.id,
-        layoutId: resolvedSlide.layoutId,
-        runtimeLayoutId,
-        fileName: slideFileName,
-        outputPath: slideOutputPath,
-        speaker_note: slide.speaker_note ?? "",
-        localEntryPath: resolvedSlide.localEntryPath,
-      };
-    }),
-  );
-
-  const localRuntimeEntries = Array.from(
-    new Map(
-      slides
-        .filter(
-          (slide): slide is typeof slide & { localEntryPath: string } =>
-            typeof slide.localEntryPath === "string" && slide.localEntryPath.length > 0,
-        )
-        .map((slide) => [
-          slide.runtimeLayoutId,
-          {
-            layoutId: slide.runtimeLayoutId,
-            absolutePath: slide.localEntryPath,
-            fallbackLayoutId: slide.slideId,
-            fallbackLayoutName: slide.context.title,
-            fallbackLayoutDescription: "",
-          } satisfies LocalRuntimeEntry,
-        ]),
-    ).values(),
-  );
-  const localSlideRuntimeBundle =
-    localRuntimeEntries.length > 0
-      ? await buildLocalBrowserRuntimeBundle({
-        mode: "slide",
-        cwd: manifestCwd,
-        entries: localRuntimeEntries,
-      })
-      : null;
-  const localDeckRuntimeBundle =
-    singlePageIndex === null && localRuntimeEntries.length > 0
-      ? await buildLocalBrowserRuntimeBundle({
-        mode: "deck",
-        cwd: manifestCwd,
-        entries: localRuntimeEntries,
-      })
-      : null;
-  const slidesWithRuntime = slides.map((slide) => ({
-    ...slide,
-    html: buildSlideDocumentHtml({
-      context: slide.context,
-      runtimeBundle: slide.localEntryPath ? localSlideRuntimeBundle : null,
-    }),
+  const resolved = await Promise.all(selected.map(async ({ slide, sourceIndex }) => ({
+    slide,
+    sourceIndex,
+    absolutePath: await resolvePageSource(slide, manifestCwd),
+  })));
+  const runtimeEntries: PageSourceRuntimeEntry[] = resolved.map((entry) => ({
+    pageId: entry.slide.id,
+    absolutePath: entry.absolutePath,
   }));
+  const slideRuntimeBundle = await buildPageSourceRuntimeBundle({
+    mode: "slide",
+    cwd: manifestCwd,
+    entries: runtimeEntries,
+  });
+  const deckRuntimeBundle = singlePageIndex === null
+    ? await buildPageSourceRuntimeBundle({
+      mode: "deck",
+      cwd: manifestCwd,
+      entries: runtimeEntries,
+    })
+    : null;
+
+  const slides: PreparedManifestSlide[] = resolved.map(({ slide, sourceIndex, absolutePath }) => {
+    const pageNumber = sourceIndex + 1;
+    const context: BrowserRenderContext = {
+      templateGroup: "authoring-kit",
+      layoutId: slide.id,
+      runtimeLayoutId: slide.id,
+      slideData: {},
+      speakerNote: "",
+      title: `${manifest.title} – ${pageNumber}`,
+      theme: {
+        logoUrl: null,
+        companyName: null,
+        colors: {},
+        variables: {},
+        fontName: null,
+        fontUrl: null,
+      },
+    };
+    const fileName = `${pageNumber}-${deckBaseName}-${sanitizeFileNamePart(slide.id)}.png`;
+    return {
+      context,
+      html: buildSlideDocumentHtml({ context, runtimeBundle: slideRuntimeBundle }),
+      sourceIndex,
+      pageNumber,
+      slideId: slide.id,
+      layoutId: slide.id,
+      runtimeLayoutId: slide.id,
+      fileName,
+      outputPath: path.join(outputDir, fileName),
+      speaker_note: "",
+      localEntryPath: absolutePath,
+    };
+  });
 
   return {
     manifestPath,
     manifestCwd,
     outputDir,
     deckBaseName,
-    title: manifest.title ?? "Presenton Manifest Deck",
+    title: manifest.title,
     singlePageIndex,
     slideCount: manifest.slides.length,
-    slides: slidesWithRuntime,
-    deckRuntimeBundle: localDeckRuntimeBundle,
+    slides,
+    deckRuntimeBundle,
   };
 }

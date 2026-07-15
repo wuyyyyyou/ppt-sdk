@@ -50,24 +50,24 @@ export interface BuildStandaloneDeckHtmlInput {
   runtimeBundle?: string | null;
 }
 
-export interface BuiltinDeckManifestSlideSource {
+export interface LegacyBuiltinDeckManifestSlideSource {
   type: "builtin";
   template_group: string;
   layout_id: string;
 }
 
-export interface LocalDeckManifestSlideSource {
+export interface LegacyLocalDeckManifestSlideSource {
   type: "local";
   path: string;
 }
 
-export type DeckManifestSlideSource =
-  | BuiltinDeckManifestSlideSource
-  | LocalDeckManifestSlideSource;
+export type LegacyDeckManifestSlideSource =
+  | LegacyBuiltinDeckManifestSlideSource
+  | LegacyLocalDeckManifestSlideSource;
 
-export interface DeckManifestSlideInput {
+export interface LegacyDeckManifestSlideInput {
   id: string;
-  source: DeckManifestSlideSource;
+  source: LegacyDeckManifestSlideSource;
   data?: Record<string, unknown> | null;
   data_path?: string | null;
   title?: string | null;
@@ -75,9 +75,19 @@ export interface DeckManifestSlideInput {
   theme?: TemplateRenderThemeInput | null;
 }
 
-export interface DeckManifestInput {
+export interface LegacyDeckManifestInput {
   title?: string | null;
   theme?: TemplateRenderThemeInput | null;
+  slides: LegacyDeckManifestSlideInput[];
+}
+
+export interface DeckManifestSlideInput {
+  id: string;
+  source: string;
+}
+
+export interface DeckManifestInput {
+  title: string;
   slides: DeckManifestSlideInput[];
 }
 

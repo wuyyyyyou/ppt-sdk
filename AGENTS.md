@@ -18,7 +18,7 @@
 
 相关子项目都收敛在 `ppt-app/executas/` 下：
 
-- [`ppt-app/executas/ppt-engine/`](ppt-app/executas/ppt-engine/)：模板发现、HTML 渲染、PPTX model 转换、校验、任务状态机、工作区能力。
+- [`ppt-app/executas/ppt-engine/`](ppt-app/executas/ppt-engine/)：Authoring Kit 与 Page Source 工作区能力、模板发现、HTML 渲染、PPTX model 转换和任务状态机。
 - [`ppt-app/executas/ppt-gener/`](ppt-app/executas/ppt-gener/)：把 `PptxPresentationModel` 写成最终 `.pptx`。
 - [`ppt-app/executas/anna-search/`](ppt-app/executas/anna-search/)：Anna App 内置搜索 Executa。
 
@@ -42,10 +42,11 @@ manifest.json -> deck.html -> ppt-model.json -> .pptx
 ### `ppt-app/executas/ppt-engine`
 
 - `src/app/presentation-templates/`：内置模板、蓝图和主题。
+- `src/app/authoring-kit/`：新创作主路径使用的 Foundation Modules、Reference Library 和 Page Source Bootstrap 资源。
+- `src/authoring-kit-workspace/`：Authoring Kit 安装、稳定页面标识、Page Source 初始化和最小 manifest 重建。
 - `src/app-workspace/`：工作区 artifact 读写和聚合。
 - `src/html-to-pptx-model/`：HTML / DOM 到 PPTX model 的抽取与转换。
 - `src/render/`：Deck / slide 渲染与运行时 bundle。
-- `src/validate/`：静态与渲染后校验。
 - `src/task-state-machine/`：任务状态机、恢复、查询与持久化。
 - `src/discovery/`、`src/local-template/`、`src/browser/`、`src/http/`、`src/cli.ts`：发现、本地模板、浏览器渲染、HTTP 和 CLI 入口。
 

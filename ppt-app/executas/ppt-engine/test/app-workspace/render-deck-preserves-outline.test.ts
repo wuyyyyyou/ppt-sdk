@@ -5,6 +5,12 @@ import { randomInt } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 
+const PAGE_1 = "page-11111111-1111-4111-8111-111111111111";
+const PAGE_2 = "page-22222222-2222-4222-8222-222222222222";
+const PAGE_3 = "page-33333333-3333-4333-8333-333333333333";
+const PAGE_4 = "page-44444444-4444-4444-8444-444444444444";
+const PAGE_5 = "page-66666666-6666-4666-8666-666666666666";
+
 async function writeJson(filePath: string, value: unknown) {
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
@@ -12,6 +18,23 @@ async function writeJson(filePath: string, value: unknown) {
 
 async function readJson<T>(filePath: string): Promise<T> {
   return JSON.parse(await readFile(filePath, "utf8")) as T;
+}
+
+async function writePageSource(templateDir: string, pageId: string) {
+  const sourcePath = path.join(templateDir, "slides", `${pageId}.tsx`);
+  await mkdir(path.dirname(sourcePath), { recursive: true });
+  await writeFile(
+    sourcePath,
+    [
+      'import React from "react";',
+      "",
+      "export default function Page() {",
+      `  return <main data-page-id="${pageId}" />;`,
+      "}",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
 }
 
 function createWorkspaceDir(homeDir: string) {
@@ -68,17 +91,12 @@ test("renderAppWorkspaceDeckHtml preserves the confirmed outline artifact", asyn
       title: "Rendered Deck",
       slides: [
         {
-          id: "page-01",
-          title: "Rendered Page",
-          speaker_note: "Rendered speaker note",
-          source: {
-            type: "builtin",
-            template_group: "red-finance-v3",
-            layout_id: "cover-statement",
-          },
+          id: PAGE_1,
+          source: `./slides/${PAGE_1}.tsx`,
         },
       ],
     });
+    await writePageSource(templateDir, PAGE_1);
 
     const rendered = await renderAppWorkspaceDeckHtml({
       workspace_dir: workspaceDir,
@@ -102,7 +120,7 @@ test("renderAppWorkspaceDeckHtml preserves the confirmed outline artifact", asyn
       path.join(workspaceDir, "pages.json"),
     );
     assert.equal(pages.title, "Rendered Deck");
-    assert.deepEqual(pages.pages.map((page) => page.title), ["Rendered Page"]);
+    assert.deepEqual(pages.pages.map((page) => page.title), ["Rendered Deck – 1"]);
     assert.match(pages.pages[0]?.screenshot_path ?? "", /\.png$/);
   } finally {
     if (previousHome === undefined) {
@@ -143,37 +161,31 @@ test("renderAppWorkspacePagePreview includes stable slide id in preview filename
     });
     await writeJson(manifestPath, {
       title: "Preview Deck",
-      slides: [
-        "page-01",
-        "page-02",
-        "page-03",
-        "page-04",
-        "page-06",
-      ].map((id) => ({
+      slides: [PAGE_1, PAGE_2, PAGE_3, PAGE_4, PAGE_5].map((id) => ({
         id,
-        title: id,
-        source: {
-          type: "builtin",
-          template_group: "red-finance-canvas",
-          layout_id: "content-canvas",
-        },
+        source: `./slides/${id}.tsx`,
       })),
     });
+    await Promise.all(
+      [PAGE_1, PAGE_2, PAGE_3, PAGE_4, PAGE_5].map((pageId) =>
+        writePageSource(templateDir, pageId),
+      ),
+    );
 
     const preview = await renderAppWorkspacePagePreview({
       workspace_dir: workspaceDir,
       page_index: 4,
     });
 
-    assert.equal(preview.slide_id, "page-06");
-    assert.equal(preview.layout_id, "red-finance-canvas:content-canvas");
+    assert.equal(preview.slide_id, PAGE_5);
+    assert.equal(preview.layout_id, PAGE_5);
     assert.match(
       path.basename(preview.html_path),
-      /^05-ppt-20260602-\d{6}-page-preview-page-06-red-finance-canvas-content-canvas\.html$/,
+      new RegExp(`^05-ppt-20260602-\\d{6}-page-preview-${PAGE_5}-${PAGE_5}\\.html$`),
     );
     assert.match(
       path.basename(preview.screenshot_path),
-      /^05-ppt-20260602-\d{6}-page-preview-page-06-red-finance-canvas-content-canvas\.png$/,
+      new RegExp(`^05-ppt-20260602-\\d{6}-page-preview-${PAGE_5}-${PAGE_5}\\.png$`),
     );
   } finally {
     if (previousHome === undefined) {

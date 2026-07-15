@@ -16,6 +16,7 @@ import {
   convertDeckHtmlToPptxModel,
   createAppWorkspace,
   duplicateAppWorkspacePage,
+  ensureConfirmedOutlinePageIds,
   getAppExportArtifact,
   exportAppPdf,
   forkTemplateGroup,
@@ -29,6 +30,8 @@ import {
   getAppPageProgress,
   getAppPptxExportStatus,
   getRenderedAppWorkspaceDeckHtml,
+  fingerprintWorkspacePageSource,
+  installWorkspaceAuthoringKit,
   listAppUploadedSources,
   commitAppUploadedSourceUpload,
   getAppUploadedSourceAnalysis,
@@ -65,6 +68,7 @@ import {
   prepareAppExportModel,
   prepareAppUploadedSourceAnalysisWorkspace,
   prepareAppResearchWorkspace,
+  prepareWorkspacePageSources,
   recordAppPagePlan,
   recordAppPageProgress,
   recordAppPdfExport,
@@ -77,13 +81,13 @@ import {
   recordAppResearchStatus,
   recordAppResearchStatusPage,
   recordAppWorkspaceThemeToken,
+  rebuildWorkspaceDeckManifest,
   removeAppUploadedSource,
   recordAppUploadedSourceAnalysis,
   recordAppUploadedSourceAnalysisDraft,
   rasterizePptxToImages,
   renderAppWorkspaceDeckHtml,
   renderAppWorkspacePagePreview,
-  runDeckValidation,
   selectAppWorkspaceTemplate,
   startAppPptxExportModel,
   invokeTaskStateMachine,
@@ -770,6 +774,37 @@ async function toolAppOpenWorkspace(args) {
 
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
   return registerWorkspaceJsonReference(await openAppWorkspace({ workspace_dir: workspaceDir }));
+}
+
+async function toolAppInstallWorkspaceAuthoringKit(args) {
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return installWorkspaceAuthoringKit({ workspace_dir: workspaceDir });
+}
+
+async function toolAppEnsureConfirmedOutlinePageIds(args) {
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return ensureConfirmedOutlinePageIds({ workspace_dir: workspaceDir });
+}
+
+async function toolAppPrepareWorkspacePageSources(args) {
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return prepareWorkspacePageSources({ workspace_dir: workspaceDir });
+}
+
+async function toolAppRebuildWorkspaceDeckManifest(args) {
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return rebuildWorkspaceDeckManifest({ workspace_dir: workspaceDir });
+}
+
+async function toolAppGetWorkspacePageSourceFingerprint(args) {
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  if (typeof args?.page_id !== "string" || args.page_id.length === 0) {
+    throw new Error('Missing required parameter: "page_id"');
+  }
+  return fingerprintWorkspacePageSource({
+    workspace_dir: workspaceDir,
+    page_id: args.page_id,
+  });
 }
 
 async function toolAppCommitUploadedSourceHostUpload(args) {
@@ -1980,47 +2015,6 @@ async function toolBuildDeckHtmlFromManifest(args) {
   };
 }
 
-async function toolValidateDeckFromManifest(args) {
-  if (!args || typeof args !== "object") {
-    throw new Error("Arguments must be an object");
-  }
-
-  const manifestPath = readRequiredAbsolutePathArg(args, "manifest_path");
-  const outputDir = readRequiredAbsolutePathArg(args, "output_dir");
-  const cwd = readOptionalAbsolutePathArg(args, "cwd");
-  const deckHtmlPath = readOptionalAbsolutePathArg(args, "deck_html_path");
-
-  const includeRenderedChecks = args.include_rendered_checks !== undefined
-    ? Boolean(args.include_rendered_checks)
-    : args.includeRenderedChecks !== undefined
-      ? Boolean(args.includeRenderedChecks)
-      : false;
-  const page = args.page !== undefined ? Number(args.page) : undefined;
-  if (args.page !== undefined && !Number.isFinite(page)) {
-    throw new Error('"page" must be an integer');
-  }
-
-  const report = await runDeckValidation({
-    cwd,
-    manifestPath,
-    outputDir,
-    name: typeof args.name === "string" && args.name.length > 0 ? args.name : undefined,
-    singlePage: args.single_page !== undefined ? Boolean(args.single_page) : undefined,
-    page,
-    includeRenderedChecks,
-    renderedArtifacts: deckHtmlPath
-      ? { deckHtmlPath }
-      : undefined,
-  });
-
-  return {
-    ok: report.ok,
-    summary: report.summary,
-    diagnostics: report.diagnostics,
-    artifacts: report.artifacts ?? null,
-  };
-}
-
 async function toolConvertDeckHtmlToPptxModel(args) {
   if (!args || typeof args !== "object") {
     throw new Error("Arguments must be an object");
@@ -2119,6 +2113,11 @@ const TOOL_DISPATCH = {
   app_get_workspace_defaults: toolAppGetWorkspaceDefaults,
   app_create_workspace: toolAppCreateWorkspace,
   app_open_workspace: toolAppOpenWorkspace,
+  app_install_workspace_authoring_kit: toolAppInstallWorkspaceAuthoringKit,
+  app_ensure_confirmed_outline_page_ids: toolAppEnsureConfirmedOutlinePageIds,
+  app_prepare_workspace_page_sources: toolAppPrepareWorkspacePageSources,
+  app_rebuild_workspace_deck_manifest: toolAppRebuildWorkspaceDeckManifest,
+  app_get_workspace_page_source_fingerprint: toolAppGetWorkspacePageSourceFingerprint,
   app_commit_uploaded_source_host_upload: toolAppCommitUploadedSourceHostUpload,
   app_list_style_profiles: toolAppListStyleProfiles,
   app_get_style_profile_preview: toolAppGetStyleProfilePreview,
@@ -2192,7 +2191,6 @@ const TOOL_DISPATCH = {
   getAllDiscoveredTemplateGroups: toolGetAllDiscoveredTemplateGroups,
   getDiscoveredTemplateGroup: toolGetDiscoveredTemplateGroup,
   buildDeckHtmlFromManifest: toolBuildDeckHtmlFromManifest,
-  validateDeckFromManifest: toolValidateDeckFromManifest,
   convertDeckHtmlToPptxModel: toolConvertDeckHtmlToPptxModel,
   forkTemplateGroup: toolForkTemplateGroup,
 };
