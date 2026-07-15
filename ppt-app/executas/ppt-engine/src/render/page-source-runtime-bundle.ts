@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -18,6 +18,12 @@ export interface PageSourceRuntimeEntry {
 }
 
 type RuntimeMode = "deck" | "slide";
+
+export interface PageSourceRuntimeBundleRequest {
+  key: string;
+  mode: RuntimeMode;
+  entries: PageSourceRuntimeEntry[];
+}
 
 function normalizeImportPath(value: string): string {
   return value.replace(/\\/g, "/");
@@ -60,51 +66,112 @@ function buildEntrySource(mode: RuntimeMode, entries: PageSourceRuntimeEntry[]):
   ].join("\n");
 }
 
+export async function buildPageSourceRuntimeBundles(input: {
+  cwd: string;
+  bundles: PageSourceRuntimeBundleRequest[];
+}): Promise<Map<string, string>> {
+  if (input.bundles.length === 0) {
+    throw new Error("Page Source runtime bundles require at least one bundle request");
+  }
+  const duplicateKeys = input.bundles
+    .map((bundle) => bundle.key)
+    .filter((key, index, keys) => keys.indexOf(key) !== index);
+  if (duplicateKeys.length > 0) {
+    throw new Error(`Duplicate Page Source runtime bundle key "${duplicateKeys[0]}"`);
+  }
+  for (const bundle of input.bundles) {
+    if (bundle.entries.length === 0) {
+      throw new Error(`Page Source runtime bundle "${bundle.key}" requires at least one entry`);
+    }
+  }
+  const { build } = await import("esbuild");
+  const compileRoot = await mkdtemp(path.join(tmpdir(), "ppt-page-source-runtime-"));
+  await mkdir(compileRoot, { recursive: true });
+  const preparedBundles = input.bundles.map((bundle, index) => {
+    const hash = createHash("sha256")
+      .update(bundle.mode)
+      .update("\0")
+      .update(input.cwd)
+      .update("\0")
+      .update(bundle.entries.map((entry) => `${entry.pageId}:${entry.absolutePath}`).join("\0"))
+      .digest("hex")
+      .slice(0, 16);
+    const entryName = `page-source-${index}-${hash}`;
+    return {
+      ...bundle,
+      entryName,
+      entryPath: path.join(compileRoot, `${entryName}.tsx`),
+    };
+  });
+  try {
+    await Promise.all(preparedBundles.map((bundle) =>
+      writeFile(
+        bundle.entryPath,
+        buildEntrySource(bundle.mode, bundle.entries),
+        "utf8",
+      )
+    ));
+    const result = await build({
+      entryPoints: Object.fromEntries(
+        preparedBundles.map((bundle) => [bundle.entryName, bundle.entryPath]),
+      ),
+      outdir: path.join(compileRoot, "out"),
+      entryNames: "[name]",
+      absWorkingDir: input.cwd,
+      bundle: true,
+      write: false,
+      format: "iife",
+      platform: "browser",
+      target: "es2020",
+      jsx: "automatic",
+      minify: true,
+      define: {
+        "process.env.NODE_ENV": JSON.stringify("production"),
+      },
+      tsconfig: await resolveLocalTemplateTsconfigPath(input.cwd),
+      logLevel: "silent",
+      alias: {
+        react: engineRequire.resolve("react"),
+        "react/jsx-runtime": engineRequire.resolve("react/jsx-runtime"),
+        "react/jsx-dev-runtime": engineRequire.resolve("react/jsx-dev-runtime"),
+        "react-dom": engineRequire.resolve("react-dom"),
+        "react-dom/client": engineRequire.resolve("react-dom/client"),
+        "react-dom/server": engineRequire.resolve("react-dom/server"),
+        recharts: engineRequire.resolve("recharts"),
+        "use-resize-observer": engineRequire.resolve("use-resize-observer"),
+      },
+    });
+    const outputsByEntryName = new Map(
+      (result.outputFiles ?? []).map((outputFile) => [
+        path.basename(outputFile.path, path.extname(outputFile.path)),
+        outputFile.text,
+      ]),
+    );
+    const outputs = new Map<string, string>();
+    for (const bundle of preparedBundles) {
+      const output = outputsByEntryName.get(bundle.entryName);
+      if (!output) {
+        throw new Error(`Failed to build Page Source browser runtime bundle "${bundle.key}"`);
+      }
+      outputs.set(bundle.key, output);
+    }
+    return outputs;
+  } finally {
+    await rm(compileRoot, { recursive: true, force: true });
+  }
+}
+
 export async function buildPageSourceRuntimeBundle(input: {
   mode: RuntimeMode;
   cwd: string;
   entries: PageSourceRuntimeEntry[];
 }): Promise<string> {
-  if (input.entries.length === 0) {
-    throw new Error("Page Source runtime bundle requires at least one entry");
-  }
-  const { build } = await import("esbuild");
-  const compileRoot = await mkdtemp(path.join(tmpdir(), "ppt-page-source-runtime-"));
-  await mkdir(compileRoot, { recursive: true });
-  const hash = createHash("sha256")
-    .update(input.mode)
-    .update("\0")
-    .update(input.cwd)
-    .update("\0")
-    .update(input.entries.map((entry) => `${entry.pageId}:${entry.absolutePath}`).join("\0"))
-    .digest("hex")
-    .slice(0, 16);
-  const entryPath = path.join(compileRoot, `page-source-${hash}.tsx`);
-  await writeFile(entryPath, buildEntrySource(input.mode, input.entries), "utf8");
-  const result = await build({
-    entryPoints: [entryPath],
-    absWorkingDir: input.cwd,
-    bundle: true,
-    write: false,
-    format: "iife",
-    platform: "browser",
-    target: "es2020",
-    jsx: "automatic",
-    minify: false,
-    tsconfig: await resolveLocalTemplateTsconfigPath(input.cwd),
-    logLevel: "silent",
-    alias: {
-      react: engineRequire.resolve("react"),
-      "react/jsx-runtime": engineRequire.resolve("react/jsx-runtime"),
-      "react/jsx-dev-runtime": engineRequire.resolve("react/jsx-dev-runtime"),
-      "react-dom": engineRequire.resolve("react-dom"),
-      "react-dom/client": engineRequire.resolve("react-dom/client"),
-      "react-dom/server": engineRequire.resolve("react-dom/server"),
-      recharts: engineRequire.resolve("recharts"),
-      "use-resize-observer": engineRequire.resolve("use-resize-observer"),
-    },
+  const key = "runtime";
+  const outputs = await buildPageSourceRuntimeBundles({
+    cwd: input.cwd,
+    bundles: [{ key, mode: input.mode, entries: input.entries }],
   });
-  const output = result.outputFiles?.[0]?.text;
+  const output = outputs.get(key);
   if (!output) {
     throw new Error("Failed to build Page Source browser runtime bundle");
   }

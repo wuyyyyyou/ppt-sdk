@@ -21,6 +21,14 @@ export function Page() {
 }
 `;
 
+function pageSourceWithMarker(marker: string): string {
+  return `import React from "react";
+export default function Page() {
+  return <div>${marker}</div>;
+}
+`;
+}
+
 test("buildSinglePagePreviewBaseFileName includes stable slide id", () => {
   assert.equal(
     buildSinglePagePreviewBaseFileName({
@@ -75,6 +83,50 @@ test("prepareManifestRenderPlan renders default-export-only Page Sources", async
     assert.match(plan.slides[0]?.html ?? "", /__PRESENTON_RENDER_CONTEXT__/);
     assert.match(plan.slides[0]?.html ?? "", /TSX content/);
     assert.ok(plan.deckRuntimeBundle);
+  });
+});
+
+test("Page Source HTML uses a production minified runtime", async () => {
+  await withFixture(async ({ manifestPath, outputDir, deckDir }) => {
+    await writeFile(path.join(deckDir, "slides", `${PAGE_1}.tsx`), PAGE_SOURCE, "utf8");
+    await writeManifest(manifestPath, [{ id: PAGE_1, source: `./slides/${PAGE_1}.tsx` }]);
+
+    const plan = await prepareManifestRenderPlan({ manifestPath, outputDir });
+    const html = plan.slides[0]?.html ?? "";
+
+    assert.doesNotMatch(html, /react(?:-dom)?\.development\.js/);
+    assert.ok(
+      Buffer.byteLength(html, "utf8") < 256 * 1024,
+      `Expected blank Page Source HTML to stay below 256 KiB, got ${Buffer.byteLength(html, "utf8")} bytes`,
+    );
+  });
+});
+
+test("full-deck render plans isolate each single-page runtime", async () => {
+  await withFixture(async ({ manifestPath, outputDir, deckDir }) => {
+    await writeFile(
+      path.join(deckDir, "slides", `${PAGE_1}.tsx`),
+      pageSourceWithMarker("PAGE_ONE_ONLY"),
+      "utf8",
+    );
+    await writeFile(
+      path.join(deckDir, "slides", `${PAGE_2}.tsx`),
+      pageSourceWithMarker("PAGE_TWO_ONLY"),
+      "utf8",
+    );
+    await writeManifest(manifestPath, [
+      { id: PAGE_1, source: `./slides/${PAGE_1}.tsx` },
+      { id: PAGE_2, source: `./slides/${PAGE_2}.tsx` },
+    ]);
+
+    const plan = await prepareManifestRenderPlan({ manifestPath, outputDir });
+
+    assert.match(plan.slides[0]?.html ?? "", /PAGE_ONE_ONLY/);
+    assert.doesNotMatch(plan.slides[0]?.html ?? "", /PAGE_TWO_ONLY/);
+    assert.match(plan.slides[1]?.html ?? "", /PAGE_TWO_ONLY/);
+    assert.doesNotMatch(plan.slides[1]?.html ?? "", /PAGE_ONE_ONLY/);
+    assert.match(plan.deckRuntimeBundle ?? "", /PAGE_ONE_ONLY/);
+    assert.match(plan.deckRuntimeBundle ?? "", /PAGE_TWO_ONLY/);
   });
 });
 

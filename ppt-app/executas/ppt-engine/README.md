@@ -114,6 +114,12 @@ workspace/
 
 `buildDeckHtmlFromManifest` 读取 `manifest_path` 指向的 JSON 文件，把结果写到 `output_dir`，并返回输出文件路径和基础元数据。它会输出整体的 `*-deck.html`，并为每一页输出浏览器渲染后的 PNG 截图，便于多模态 Agent 检查页面视觉结果。
 
+Page Source HTML 是从权威 Page Source 重建的机器产物，不应直接编辑。当前产物仍是自包含、可执行的 React HTML，但 browser runtime 固定使用 production 构建并压缩：
+
+- 每个单页 HTML 只打包当前 Page Source 及其真实依赖，不包含其他页面的 Page Source。
+- Deck HTML 一次性打包当前 manifest 中的全部 Page Source。
+- 不同单页共同使用的 React、Recharts 等依赖仍会分别内联，以保证每个单页 HTML 可以独立打开。
+
 `manifest_path` 和 `output_dir` 必须是绝对路径。逐页 PNG 需要真实浏览器渲染，运行时需要本机有可用的 Chrome / Chrome for Testing。
 
 ### HTML 到 PPTX Model

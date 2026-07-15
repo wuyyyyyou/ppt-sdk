@@ -7,7 +7,7 @@ import {
   resolveLocalModulePath,
 } from "../local-template/loader.js";
 import {
-  buildPageSourceRuntimeBundle,
+  buildPageSourceRuntimeBundles,
   type PageSourceRuntimeEntry,
 } from "./page-source-runtime-bundle.js";
 import { getBrowserRenderRuntimeBundle } from "./runtime-bundle.js";
@@ -20,6 +20,11 @@ import type {
 const PAGE_ID_PATTERN = /^page-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const MANIFEST_FIELDS = new Set(["title", "slides"]);
 const SLIDE_FIELDS = new Set(["id", "source"]);
+const DECK_RUNTIME_BUNDLE_KEY = "deck";
+
+function slideRuntimeBundleKey(pageId: string): string {
+  return `slide:${pageId}`;
+}
 
 type PreparedManifestSlide = {
   context: BrowserRenderContext;
@@ -237,20 +242,35 @@ export async function prepareManifestRenderPlan(input: {
     pageId: entry.slide.id,
     absolutePath: entry.absolutePath,
   }));
-  const slideRuntimeBundle = await buildPageSourceRuntimeBundle({
-    mode: "slide",
+  const runtimeBundles = await buildPageSourceRuntimeBundles({
     cwd: manifestCwd,
-    entries: runtimeEntries,
+    bundles: [
+      ...runtimeEntries.map((entry) => ({
+        key: slideRuntimeBundleKey(entry.pageId),
+        mode: "slide" as const,
+        entries: [entry],
+      })),
+      ...(singlePageIndex === null
+        ? [{
+          key: DECK_RUNTIME_BUNDLE_KEY,
+          mode: "deck" as const,
+          entries: runtimeEntries,
+        }]
+        : []),
+    ],
   });
   const deckRuntimeBundle = singlePageIndex === null
-    ? await buildPageSourceRuntimeBundle({
-      mode: "deck",
-      cwd: manifestCwd,
-      entries: runtimeEntries,
-    })
+    ? runtimeBundles.get(DECK_RUNTIME_BUNDLE_KEY) ?? null
     : null;
+  if (singlePageIndex === null && !deckRuntimeBundle) {
+    throw new Error("Failed to build Page Source deck runtime bundle");
+  }
 
   const slides: PreparedManifestSlide[] = resolved.map(({ slide, sourceIndex, absolutePath }) => {
+    const slideRuntimeBundle = runtimeBundles.get(slideRuntimeBundleKey(slide.id));
+    if (!slideRuntimeBundle) {
+      throw new Error(`Failed to build Page Source slide runtime bundle "${slide.id}"`);
+    }
     const pageNumber = sourceIndex + 1;
     const context: BrowserRenderContext = {
       templateGroup: "authoring-kit",
