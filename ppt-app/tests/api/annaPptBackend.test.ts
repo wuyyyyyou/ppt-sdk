@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";
 
 import { createAnnaPptBackend } from "../../src/api/annaPptBackend.ts";
-import type { HostUploadRef, WorkspaceResult } from "../../src/api/types.ts";
+import type {
+  CreateWorkspaceResult,
+  HostUploadRef,
+  WorkspaceResult,
+} from "../../src/api/types.ts";
 import type { AnnaRuntime } from "../../src/runtime/annaRuntime.ts";
 
 function setToolIds() {
@@ -73,6 +77,40 @@ function createJsonUploadRef(filename: string): HostUploadRef {
 }
 
 describe("Anna PPT Backend", () => {
+  it("returns bounded create workspace results inline", async () => {
+    setToolIds();
+    const created: CreateWorkspaceResult = {
+      version: 1,
+      workspace_root: "/tmp/workspaces",
+      workspace_id: "demo",
+      workspace_dir: "/tmp/workspaces/demo",
+      title: "Demo",
+      setting: {
+        output_language: "auto",
+        text_density: "balanced",
+        page_generation_concurrency: 5,
+        content_review_enabled: false,
+        content_review_failure_limit: 5,
+        visual_review_enabled: false,
+        visual_review_failure_limit: 2,
+        review_outline_first: false,
+        disable_web_research: false,
+        disable_image_research: false,
+      },
+    };
+    const originalFetch = globalThis.fetch;
+    const fetchMock = mock.fn(async () => new Response(null, { status: 500 }));
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    try {
+      const backend = createAnnaPptBackend(createRuntime({ success: true, data: created }));
+      assert.deepEqual(await backend.createWorkspace({ title: "Demo" }), created);
+      assert.equal(fetchMock.mock.callCount(), 0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("fetches Host Upload JSON references for workspace results", async () => {
     setToolIds();
     const workspace = createWorkspace({ workspace_id: "from-http" });

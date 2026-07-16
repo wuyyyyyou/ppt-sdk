@@ -107,6 +107,28 @@ export interface AppWorkspaceSettings {
   [key: string]: unknown;
 }
 
+export interface AppCreateWorkspaceSetting {
+  output_language: string;
+  text_density: string;
+  page_generation_concurrency: number;
+  content_review_enabled: boolean;
+  content_review_failure_limit: number;
+  visual_review_enabled: boolean;
+  visual_review_failure_limit: number;
+  review_outline_first: boolean;
+  disable_web_research: boolean;
+  disable_image_research: boolean;
+}
+
+export interface CreateAppWorkspaceResult {
+  version: 1;
+  workspace_root: string;
+  workspace_id: string;
+  workspace_dir: string;
+  title: string;
+  setting: AppCreateWorkspaceSetting;
+}
+
 export type AppUploadedSourceStatus = "active" | "removed";
 
 export interface AppUploadedSourceMaterial {

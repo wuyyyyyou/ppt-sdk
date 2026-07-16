@@ -37,9 +37,32 @@ test("workspace settings can be saved as defaults for newly created workspaces",
       output_language: "English",
       language: "en",
       text_density: "detailed",
+      ignored_creation_result_field: { large: "value" },
     });
 
     const first = await createAppWorkspace({ title: "First" });
+    assert.deepEqual(Object.keys(first).sort(), [
+      "setting",
+      "title",
+      "version",
+      "workspace_dir",
+      "workspace_id",
+      "workspace_root",
+    ]);
+    assert.equal(first.version, 1);
+    assert.equal(first.title, "First");
+    assert.deepEqual(first.setting, {
+      output_language: "English",
+      text_density: "detailed",
+      page_generation_concurrency: 5,
+      content_review_enabled: false,
+      content_review_failure_limit: 5,
+      visual_review_enabled: false,
+      visual_review_failure_limit: 2,
+      review_outline_first: false,
+      disable_web_research: false,
+      disable_image_research: false,
+    });
     const firstSettingPath = path.join(first.workspace_dir, "setting.json");
     const firstSetting = await readJson<Record<string, unknown>>(firstSettingPath);
 

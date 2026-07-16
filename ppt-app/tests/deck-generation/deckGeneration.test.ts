@@ -13,6 +13,7 @@ import type {
 } from "../../src/ai/types.ts";
 import type { PptBackend } from "../../src/api/pptBackend.ts";
 import type {
+  CreateWorkspaceResult,
   PagePlan,
   PageProgress,
   ResearchEvidenceIndex,
@@ -77,6 +78,26 @@ const workspace: WorkspaceResult = {
   template: {
     selected_template_group: "default",
     manifest_path: "/tmp/workspaces/demo/template/manifest.json",
+  },
+};
+
+const createdWorkspace: CreateWorkspaceResult = {
+  version: 1,
+  workspace_root: workspace.workspace_root,
+  workspace_id: workspace.workspace_id,
+  workspace_dir: workspace.workspace_dir,
+  title: "Demo Deck",
+  setting: {
+    output_language: "English",
+    text_density: "balanced",
+    page_generation_concurrency: 5,
+    content_review_enabled: true,
+    content_review_failure_limit: 5,
+    visual_review_enabled: true,
+    visual_review_failure_limit: 2,
+    review_outline_first: false,
+    disable_web_research: false,
+    disable_image_research: false,
   },
 };
 
@@ -387,7 +408,7 @@ function createHarness(options: {
   const backend: PptBackend = {
     listWorkspaces: async () => ({ workspace_root: "", has_workspaces: false, latest_workspace: null, workspaces: [] }),
     getWorkspaceDefaults: async () => ({ workspace_root: workspace.workspace_root, setting: {} }),
-    createWorkspace: async () => currentWorkspace,
+    createWorkspace: async () => createdWorkspace,
     openWorkspace: async () => currentWorkspace,
     listUploadedSources: async () => ({
       workspace_dir: workspace.workspace_dir,

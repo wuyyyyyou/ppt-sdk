@@ -37,6 +37,7 @@ import type {
   WorkspaceResult,
   ClearWorkspaceStyleProfileResult,
   CommitUploadedSourceHostUploadResult,
+  CreateWorkspaceResult,
   CommitStyleProfileReferenceHostUploadResult,
   GetStyleProfileCreationContextResult,
   GetStyleProfileDraftResult,
@@ -209,7 +210,7 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
     getWorkspaceDefaults: () =>
       invoke<WorkspaceDefaultsResult>(toolIds.pptEngine, "app_get_workspace_defaults", {}),
     createWorkspace: (input) =>
-      invokeWorkspaceResult("app_create_workspace", input),
+      invoke<CreateWorkspaceResult>(toolIds.pptEngine, "app_create_workspace", input),
     openWorkspace: (input) =>
       invokeWorkspaceResult("app_open_workspace", input),
     listStyleProfiles: () =>

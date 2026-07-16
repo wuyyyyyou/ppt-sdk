@@ -43,10 +43,10 @@ export interface WorkspaceResult {
   task_dir?: string;
   workspace_id: string;
   task_id?: string;
-  initialized: boolean;
-  created_files: string[];
-  missing_files: string[];
-  files: WorkspaceFiles;
+  initialized?: boolean;
+  created_files?: string[];
+  missing_files?: string[];
+  files?: WorkspaceFiles;
   task: unknown;
   setting: unknown;
   outline: unknown;
@@ -366,6 +366,31 @@ export interface WorkspaceSettings {
   disable_image_research?: boolean;
   updated_at?: string;
   [key: string]: unknown;
+}
+
+export type CreatedWorkspaceSetting = Required<
+  Pick<
+    WorkspaceSettings,
+    | "output_language"
+    | "text_density"
+    | "page_generation_concurrency"
+    | "content_review_enabled"
+    | "content_review_failure_limit"
+    | "visual_review_enabled"
+    | "visual_review_failure_limit"
+    | "review_outline_first"
+    | "disable_web_research"
+    | "disable_image_research"
+  >
+>;
+
+export interface CreateWorkspaceResult {
+  version: 1;
+  workspace_root: string;
+  workspace_id: string;
+  workspace_dir: string;
+  title: string;
+  setting: CreatedWorkspaceSetting;
 }
 
 export interface WorkspaceOutlineItem {

@@ -764,7 +764,7 @@ async function toolAppCreateWorkspace(args) {
       ? args.title.trim()
       : undefined;
 
-  return registerWorkspaceJsonReference(await createAppWorkspace({ title }));
+  return createAppWorkspace({ title });
 }
 
 async function toolAppOpenWorkspace(args) {

@@ -117,11 +117,11 @@ test("confirmation falls back to negotiated key and local byte size", () => {
   assert.equal(result.size_bytes, 1_024);
 });
 
-test("Executa reverse RPC accepts platform host/uploadFile confirmation", { timeout: 10_000 }, async () => {
+test("create stays inline while full Workspace results use Host Upload", { timeout: 10_000 }, async () => {
   const homeDir = await mkdtemp(path.join(os.tmpdir(), "ppt-engine-host-upload-home-"));
   const uploadServer = createServer(async (request, response) => {
     for await (const _chunk of request) {
-      // Drain the uploaded workspace JSON body.
+      // Drain the uploaded full Workspace JSON body.
     }
     response.writeHead(200).end();
   });
@@ -138,6 +138,7 @@ test("Executa reverse RPC accepts platform host/uploadFile confirmation", { time
   const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
   const pending = new Map<number, (message: Record<string, unknown>) => void>();
   let nextId = 1;
+  let hostUploadRequests = 0;
 
   lines.on("line", async (line) => {
     let message = JSON.parse(line) as {
@@ -152,6 +153,7 @@ test("Executa reverse RPC accepts platform host/uploadFile confirmation", { time
       message = JSON.parse(await readFile(transportPath, "utf8")) as typeof message;
     }
     if (message.method === "host/uploadFile") {
+      hostUploadRequests += 1;
       const result = message.params?.mode === "negotiate"
         ? {
             put_url: `http://127.0.0.1:${address.port}/upload`,
@@ -182,19 +184,40 @@ test("Executa reverse RPC accepts platform host/uploadFile confirmation", { time
 
   try {
     await request("initialize", { protocolVersion: "2.0" });
-    const response = await request("invoke", {
+    const createResponse = await request("invoke", {
       tool: "app_create_workspace",
-      arguments: { title: "Host Upload compatibility" },
+      arguments: { title: "Inline creation result" },
+    }) as {
+      result?: {
+        data?: {
+          version?: number;
+          workspace_dir?: string;
+          workspace_upload?: Record<string, unknown>;
+        };
+      };
+      error?: { message?: string };
+    };
+
+    assert.ok(!createResponse.error, createResponse.error?.message);
+    assert.equal(createResponse.result?.data?.version, 1);
+    assert.ok(createResponse.result?.data?.workspace_dir);
+    assert.equal(createResponse.result?.data?.workspace_upload, undefined);
+    assert.equal(hostUploadRequests, 0);
+
+    const openResponse = await request("invoke", {
+      tool: "app_open_workspace",
+      arguments: { workspace_dir: createResponse.result?.data?.workspace_dir },
     }) as {
       result?: { data?: { workspace_upload?: Record<string, unknown> } };
       error?: { message?: string };
     };
 
-    assert.ok(!response.error, response.error?.message);
-    assert.ok(response.result?.data?.workspace_upload, JSON.stringify(response));
-    assert.equal(response.result?.data?.workspace_upload?.url, "https://uploads.example/platform-workspace");
-    assert.equal(response.result?.data?.workspace_upload?.size_bytes, 256);
-    assert.equal(response.result?.data?.workspace_upload?.expires_in, 1_800);
+    assert.ok(!openResponse.error, openResponse.error?.message);
+    assert.ok(openResponse.result?.data?.workspace_upload, JSON.stringify(openResponse));
+    assert.equal(openResponse.result?.data?.workspace_upload?.url, "https://uploads.example/platform-workspace");
+    assert.equal(openResponse.result?.data?.workspace_upload?.size_bytes, 256);
+    assert.equal(openResponse.result?.data?.workspace_upload?.expires_in, 1_800);
+    assert.equal(hostUploadRequests, 2);
   } finally {
     lines.close();
     child.kill("SIGTERM");

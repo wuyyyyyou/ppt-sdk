@@ -19,7 +19,7 @@
     },
     {
       "name": "app_create_workspace",
-      "description": "Create a new PPT task workspace under the default workspace root and initialize core JSON files.",
+      "description": "Create a new PPT task workspace, initialize core JSON files, and return a bounded creation result inline.",
       "parameters": [
         {
           "name": "title",

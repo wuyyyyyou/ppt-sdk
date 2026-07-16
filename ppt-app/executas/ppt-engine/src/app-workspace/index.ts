@@ -49,6 +49,7 @@ import type {
   AppTemplateGroupSummary,
   AppTemplatePreviewRef,
   AppTemplatePreviewResult,
+  AppCreateWorkspaceSetting,
   AppWorkspaceResult,
   AppWorkspaceSummary,
   AppWorkspaceOutline,
@@ -66,6 +67,7 @@ import type {
   AppTemplatePlanningBlueprint,
   AppTemplatePlanningContext,
   CreateAppWorkspaceInput,
+  CreateAppWorkspaceResult,
   DuplicateAppWorkspacePageInput,
   ListAppUploadedSourcesInput,
   ListAppUploadedSourcesResult,
@@ -1759,7 +1761,7 @@ export async function listAppWorkspaces(): Promise<ListAppWorkspacesResult> {
 
 export async function createAppWorkspace(
   input: CreateAppWorkspaceInput = {},
-): Promise<AppWorkspaceResult> {
+): Promise<CreateAppWorkspaceResult> {
   const createdAt = new Date();
   let workspaceId = formatWorkspaceId(createdAt);
   let workspaceDir = path.join(WORKSPACE_ROOT, workspaceId);
@@ -1775,7 +1777,43 @@ export async function createAppWorkspace(
       ? input.title.trim()
       : formatDefaultWorkspaceTitle(createdAt);
 
-  return ensureWorkspaceFiles(workspaceDir, { title });
+  const workspace = await ensureWorkspaceFiles(workspaceDir, { title });
+  const setting = normalizeSettingJson(workspace.setting);
+  const defaults = createDefaultSettingJson();
+  const createSetting: AppCreateWorkspaceSetting = {
+    output_language:
+      typeof setting.output_language === "string"
+        ? setting.output_language
+        : defaults.output_language,
+    text_density:
+      typeof setting.text_density === "string"
+        ? setting.text_density
+        : defaults.text_density,
+    page_generation_concurrency: normalizePageGenerationConcurrency(
+      setting.page_generation_concurrency,
+    ),
+    content_review_enabled: setting.content_review_enabled === true,
+    content_review_failure_limit: normalizeReviewFailureLimit(
+      setting.content_review_failure_limit,
+    ),
+    visual_review_enabled: setting.visual_review_enabled === true,
+    visual_review_failure_limit: normalizeReviewFailureLimit(
+      setting.visual_review_failure_limit,
+      2,
+    ),
+    review_outline_first: setting.review_outline_first === true,
+    disable_web_research: setting.disable_web_research === true,
+    disable_image_research: setting.disable_image_research === true,
+  };
+
+  return {
+    version: 1,
+    workspace_root: workspace.workspace_root,
+    workspace_id: workspace.workspace_id,
+    workspace_dir: workspace.workspace_dir,
+    title,
+    setting: createSetting,
+  };
 }
 
 export async function openAppWorkspace(
@@ -5467,6 +5505,7 @@ export type {
   AppTemplateGroupSummary,
   AppTemplatePreviewRef,
   AppTemplatePreviewResult,
+  AppCreateWorkspaceSetting,
   AppWorkspaceFiles,
   AppWorkspaceOutline,
   AppWorkspaceOutlineItem,
@@ -5474,6 +5513,7 @@ export type {
   AppWorkspaceSummary,
   AppWorkspaceTemplateSelection,
   CreateAppWorkspaceInput,
+  CreateAppWorkspaceResult,
   DuplicateAppWorkspacePageInput,
   GetAppPagePlanInput,
   GetAppPageProgressInput,

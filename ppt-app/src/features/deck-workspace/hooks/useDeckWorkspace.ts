@@ -110,6 +110,7 @@ import {
   readOutlineReviewPreference,
 } from "../outlineReviewPreference";
 import { createWorkspaceReviewRenderKey } from "../workspaceReviewRenderKey";
+import { createInitialWorkspaceSnapshot } from "../createdWorkspace";
 import type {
   ContextRow,
   DeckReviewRenderState,
@@ -1255,6 +1256,52 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (persistedContextRows.shouldSync || options.syncEmptyContextRows) {
       setContextRows(persistedContextRows.rows);
     }
+  }
+
+  function applyCreatedWorkspace(
+    result: Awaited<ReturnType<PptBackend["createWorkspace"]>>,
+  ): WorkspaceResult {
+    const workspace = createInitialWorkspaceSnapshot(result);
+    const outputLanguage = normalizeOutputLanguage(result.setting.output_language);
+
+    setCurrentWorkspace(workspace);
+    setUploadedSources([]);
+    setCurrentUploadedSourceAnalysis(null);
+    setUploadedSourceAnalysisError("");
+    setUploadedSourceAnalysisProgress(createSkippedUploadedSourceAnalysisProgress(t));
+    setSelectedStyleProfile(null);
+    setPageReviewSettings(readPageReviewSettings(result.setting));
+    setResearchSearchControlSettingsState(readResearchSearchControlSettings(result.setting));
+    setReviewOutlineFirstState(readOutlineReviewPreference(result.setting));
+    setExportArtifactWithProgress(null);
+    setReviewRender({
+      status: "idle",
+      result: null,
+      error: "",
+      renderKey: createWorkspaceReviewRenderKey(workspace),
+    });
+    setPrompt("");
+    setContextRows([]);
+    setDeckTitle(result.title);
+    setDeck([]);
+    setOutline([]);
+    setOutlineDraft([]);
+    setOutlineDraftTitle(result.title);
+    setOutlineOutputLanguage(outputLanguage);
+    setOutlineDraftOutputLanguage(outputLanguage);
+    setOutlineEditMode(false);
+    setOutlineFeedback("");
+    setGenerated(false);
+    setCurrentSlide(0);
+    setPageProgress(null);
+    setCreateDeckProgress(null);
+    setGenerationHistory([]);
+    setActiveGenerationRun(null);
+    setSelectedTemplateGroupId(DEFAULT_TEMPLATE_GROUP_ID);
+    setStage("brief");
+    resetGenerationUiState();
+
+    return workspace;
   }
 
   useEffect(() => {
@@ -2541,10 +2588,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (!backend) return null;
     if (currentWorkspace) return currentWorkspace;
 
-    const workspace = await backend.createWorkspace({
+    const created = await backend.createWorkspace({
       title: getDefaultWorkspaceTitle()
     });
-    applyWorkspace(workspace);
+    const workspace = applyCreatedWorkspace(created);
     setWorkspaceScan(await backend.listWorkspaces());
     return workspace;
   }
@@ -2926,10 +2973,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setWorkspaceLoading(true);
     setWorkspaceError("");
     try {
-      const workspace = await backend.createWorkspace({
+      const created = await backend.createWorkspace({
         title: getDefaultWorkspaceTitle()
       });
-      applyWorkspace(workspace, { syncEmptyContextRows: true });
+      const workspace = applyCreatedWorkspace(created);
       setWorkspaceScan(await backend.listWorkspaces());
       setPage("main");
       showToast(formatMessage(t.toasts.workspaceCreated, { id: workspace.task_id ?? workspace.workspace_id }));

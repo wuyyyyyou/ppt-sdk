@@ -3,6 +3,7 @@ import type {
   AppendWorkspaceLogResult,
   CreateProjectInput,
   CreateWorkspaceInput,
+  CreateWorkspaceResult,
   DuplicateWorkspacePageInput,
   GeneratePptxInput,
   GeneratePptxResult,
@@ -98,7 +99,7 @@ import { detectRuntimeMode } from "../runtime/runtimeMode";
 export interface PptBackend {
   listWorkspaces(): Promise<ListWorkspacesResult>;
   getWorkspaceDefaults(): Promise<WorkspaceDefaultsResult>;
-  createWorkspace(input: CreateWorkspaceInput): Promise<WorkspaceResult>;
+  createWorkspace(input: CreateWorkspaceInput): Promise<CreateWorkspaceResult>;
   openWorkspace(input: OpenWorkspaceInput): Promise<WorkspaceResult>;
   commitUploadedSourceHostUpload(input: CommitUploadedSourceHostUploadInput): Promise<CommitUploadedSourceHostUploadResult>;
   listStyleProfiles(): Promise<ListStyleProfilesResult>;
