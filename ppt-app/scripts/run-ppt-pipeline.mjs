@@ -13,6 +13,7 @@ const WORKSPACE_DIR = path.resolve(path.dirname(SCRIPT_PATH), "..", "..");
 const PPT_APP_DIR = path.join(WORKSPACE_DIR, "ppt-app");
 const OUTPUT_ROOT = path.join(WORKSPACE_DIR, ".vscode", "pipeline-output");
 const ENGINE_DIR = path.join(PPT_APP_DIR, "executas", "ppt-engine");
+const PREVIEW_SCRIPT = path.join(ENGINE_DIR, "scripts", "preview-page-source.ts");
 const GENERATOR_DIR = path.join(PPT_APP_DIR, "executas", "ppt-gener");
 const GENERATOR_COMMAND = "uv";
 const GENERATOR_ARGS = ["run", "--project", GENERATOR_DIR, "python", "example_plugin.py"];
@@ -30,15 +31,22 @@ function printUsage() {
       "Usage:",
       "  node ppt-app/scripts/run-ppt-pipeline.mjs check-env",
       "  node ppt-app/scripts/run-ppt-pipeline.mjs generate --manifest <manifest.json> [--name <presentation-name>]",
+      "  node ppt-app/scripts/run-ppt-pipeline.mjs generate-tsx --entry <page.preview.tsx> [--name <presentation-name>]",
+      "  node ppt-app/scripts/run-ppt-pipeline.mjs generate-current --file <active-editor-file>",
       "",
       "Commands:",
       "  check-env    Validate the local toolchain needed by the VS Code PPT tasks.",
       "  generate     Run manifest -> deck html -> model json -> pptx.",
+      "  generate-tsx Run one TSX Page Source -> static html/png -> model json -> pptx.",
+      "  generate-current  Dispatch the active TSX/JSX or manifest.json to the matching pipeline.",
       "",
       "Options:",
       "  --manifest   Path to the manifest JSON file to render.",
+      "  --entry      Path to a TSX/JSX Preview Source or Page Source.",
+      "  --file       Active editor path used by generate-current.",
       "  --name       Optional presentation name used for output file names.",
       "  --out-root   Optional output root directory. Defaults to .vscode/pipeline-output.",
+      "  --rasterize <0|1>  Render the generated PPTX back to PNG for visual verification.",
       "  --require-manifest-json-name  Require the selected manifest file to be named manifest.json.",
       "  --help       Show this message.",
       "",
@@ -155,10 +163,10 @@ async function loadManifest(manifestPath) {
   return { manifest, manifestText };
 }
 
-function buildRunContext({ manifestPath, presentationName, outRoot }) {
+function buildRunContext({ sourcePath, presentationName, outRoot }) {
   const slug = sanitizeSegment(presentationName, "")
-    || sanitizeSegment(path.basename(path.dirname(manifestPath)), "")
-    || sanitizeSegment(path.basename(manifestPath, path.extname(manifestPath)), "")
+    || sanitizeSegment(path.basename(path.dirname(sourcePath)), "")
+    || sanitizeSegment(path.basename(sourcePath, path.extname(sourcePath)), "")
     || "presentation";
   const timestamp = formatTimestamp(new Date());
   const runDir = path.join(outRoot, slug, timestamp);
@@ -169,14 +177,23 @@ function buildRunContext({ manifestPath, presentationName, outRoot }) {
     timestamp,
     runDir,
     manifestCopyPath: path.join(runDir, "manifest.json"),
+    previewOutputDir: path.join(runDir, "preview"),
     engineOutputDir: path.join(runDir, "engine"),
     modelOutputDir: path.join(runDir, "model"),
     generatorOutputDir: path.join(runDir, "generator"),
     logsDir: path.join(runDir, "logs"),
     modelOutputPath: path.join(runDir, "model", `${slug}-model.json`),
     pptxOutputPath: path.join(runDir, "generator", `${slug}.pptx`),
+    rasterizedOutputDir: path.join(runDir, "pptx-rasterized"),
     summaryPath: path.join(runDir, "run-summary.json"),
   };
+}
+
+function deriveTsxPresentationName(entryPath) {
+  return path.basename(entryPath, path.extname(entryPath))
+    .replace(/\.preview$/i, "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .trim() || "page-source-preview";
 }
 
 function createRpcRequest(id, method, params) {
@@ -347,6 +364,84 @@ async function invokeRpcStage({
   return { response, logPaths, stdout, stderr, transportPath };
 }
 
+async function invokeJsonCommandStage({
+  stageName,
+  command,
+  args,
+  cwd,
+  timeoutMs,
+  logDir,
+}) {
+  const child = spawn(command, args, {
+    cwd,
+    env: process.env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  let stdout = "";
+  let stderr = "";
+  let timedOut = false;
+
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
+  child.stdout.on("data", (chunk) => {
+    stdout += chunk;
+  });
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk;
+  });
+
+  const timeoutHandle = setTimeout(() => {
+    timedOut = true;
+    child.kill("SIGKILL");
+  }, timeoutMs);
+
+  let exitCode;
+  try {
+    exitCode = await new Promise((resolve, reject) => {
+      child.once("error", reject);
+      child.once("close", resolve);
+    });
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+
+  const response = parseLastJsonLine(stdout);
+  const request = { command, args, cwd };
+  const logPaths = logDir
+    ? await writeStageLogs(logDir, stageName, { request, response, stdout, stderr })
+    : null;
+
+  if (timedOut) {
+    throw new Error(
+      `${stageName} timed out after ${Math.floor(timeoutMs / 1000)}s${
+        logPaths ? `; see ${relativeToWorkspace(logPaths.stderrPath)}` : ""
+      }`,
+    );
+  }
+
+  if (exitCode !== 0) {
+    const browserHint = stderr.includes("Failed to launch the browser process")
+      ? ` ${BROWSER_TROUBLESHOOTING_HINT}`
+      : "";
+    throw new Error(
+      `${stageName} exited with code ${exitCode}.${browserHint}${
+        logPaths ? ` See ${relativeToWorkspace(logPaths.stderrPath)}` : ""
+      }`,
+    );
+  }
+
+  if (!response || typeof response !== "object") {
+    throw new Error(
+      `${stageName} did not emit a JSON response${
+        logPaths ? `; see ${relativeToWorkspace(logPaths.stdoutPath)}` : ""
+      }`,
+    );
+  }
+
+  return { response, logPaths, stdout, stderr };
+}
+
 async function collectEnvironmentIssues() {
   const issues = [];
 
@@ -481,6 +576,65 @@ async function checkEnvironment() {
   process.stdout.write("- Engine HTML-to-model smoke check: passed\n");
 }
 
+function optionIsEnabled(value) {
+  if (value === undefined || value === null) return false;
+  return !["0", "false", "no", "off"].includes(String(value).trim().toLowerCase());
+}
+
+async function generatePptxFromModel({ modelPath, runContext }) {
+  const generatorRequest = createRpcRequest(3, "invoke", {
+    tool: "generatePptx",
+    arguments: {
+      cwd: runContext.generatorOutputDir,
+      model_path: modelPath,
+      output_path: runContext.pptxOutputPath,
+    },
+  });
+  const generatorStage = await invokeRpcStage({
+    stageName: "generator",
+    command: GENERATOR_COMMAND,
+    args: GENERATOR_ARGS,
+    cwd: GENERATOR_DIR,
+    request: generatorRequest,
+    timeoutMs: GENERATE_TIMEOUT_MS,
+    logDir: runContext.logsDir,
+  });
+
+  const finalPptxPath = generatorStage.response.result?.data?.path;
+  if (typeof finalPptxPath !== "string" || finalPptxPath.length === 0) {
+    throw new Error("Generator stage did not return path");
+  }
+
+  return { finalPptxPath, generatorStage };
+}
+
+async function rasterizeGeneratedPptx({ pptxPath, runContext }) {
+  await ensureDirectory(runContext.rasterizedOutputDir);
+  const rasterizeRequest = createRpcRequest(4, "invoke", {
+    tool: "app_rasterize_pptx_to_images",
+    arguments: {
+      pptx_path: pptxPath,
+      output_dir: runContext.rasterizedOutputDir,
+      target_height: 720,
+      overwrite: true,
+    },
+  });
+  const rasterizeStage = await invokeRpcStage({
+    stageName: "pptx-rasterize",
+    command: process.execPath,
+    args: ["example_plugin.js"],
+    cwd: ENGINE_DIR,
+    request: rasterizeRequest,
+    timeoutMs: GENERATE_TIMEOUT_MS,
+    logDir: runContext.logsDir,
+  });
+  const data = rasterizeStage.response.result?.data;
+  if (!data || typeof data !== "object" || typeof data.output_dir !== "string") {
+    throw new Error("PPTX rasterization stage did not return output_dir");
+  }
+  return { rasterizeStage, rasterized: data };
+}
+
 async function generatePipeline(options) {
   const manifestOption = options.manifest;
   if (!manifestOption) {
@@ -525,7 +679,7 @@ async function generatePipeline(options) {
       : path.basename(manifestPath, path.extname(manifestPath));
   const outRoot = options["out-root"] ? resolveCliPath(options["out-root"]) : OUTPUT_ROOT;
   const runContext = buildRunContext({
-    manifestPath,
+    sourcePath: manifestPath,
     presentationName: derivedName,
     outRoot,
   });
@@ -593,28 +747,13 @@ async function generatePipeline(options) {
   }
 
   process.stdout.write(`[3/3] Generate PPTX...\n`);
-  const generatorRequest = createRpcRequest(3, "invoke", {
-    tool: "generatePptx",
-    arguments: {
-      cwd: runContext.generatorOutputDir,
-      model_path: modelOutputPath,
-      output_path: runContext.pptxOutputPath,
-    },
+  const { finalPptxPath, generatorStage } = await generatePptxFromModel({
+    modelPath: modelOutputPath,
+    runContext,
   });
-  const generatorStage = await invokeRpcStage({
-    stageName: "generator",
-    command: GENERATOR_COMMAND,
-    args: GENERATOR_ARGS,
-    cwd: GENERATOR_DIR,
-    request: generatorRequest,
-    timeoutMs: GENERATE_TIMEOUT_MS,
-    logDir: runContext.logsDir,
-  });
-
-  const finalPptxPath = generatorStage.response.result?.data?.path;
-  if (typeof finalPptxPath !== "string" || finalPptxPath.length === 0) {
-    throw new Error("Generator stage did not return path");
-  }
+  const rasterization = optionIsEnabled(options.rasterize)
+    ? await rasterizeGeneratedPptx({ pptxPath: finalPptxPath, runContext })
+    : null;
 
   const summary = {
     created_at: new Date().toISOString(),
@@ -641,7 +780,16 @@ async function generatePipeline(options) {
       presentation_name: generatorStage.response.result?.data?.presentation_name ?? null,
       log_paths: generatorStage.logPaths,
     },
-    validation: null,
+    validation: rasterization
+      ? {
+          rasterized_output_dir: rasterization.rasterized.output_dir,
+          rasterization_manifest_path:
+            rasterization.rasterized.rasterization_manifest_path ?? null,
+          slide_count: rasterization.rasterized.slide_count ?? null,
+          slides: rasterization.rasterized.slides ?? [],
+          log_paths: rasterization.rasterizeStage.logPaths,
+        }
+      : null,
   };
 
   await writeFile(runContext.summaryPath, `${JSON.stringify(summary, null, 2)}\n`, "utf8");
@@ -650,8 +798,177 @@ async function generatePipeline(options) {
   process.stdout.write(`- Deck HTML: ${relativeToWorkspace(deckOutputPath)}\n`);
   process.stdout.write(`- Model JSON: ${relativeToWorkspace(modelOutputPath)}\n`);
   process.stdout.write(`- PPTX: ${relativeToWorkspace(finalPptxPath)}\n`);
+  if (rasterization) {
+    process.stdout.write(
+      `- PPTX verification images: ${relativeToWorkspace(rasterization.rasterized.output_dir)}\n`,
+    );
+  }
   process.stdout.write(`- Summary: ${relativeToWorkspace(runContext.summaryPath)}\n`);
   process.stdout.write(`- Logs: ${relativeToWorkspace(runContext.logsDir)}\n`);
+}
+
+async function generateTsxPipeline(options) {
+  const entryOption = options.entry;
+  if (!entryOption) {
+    throw new Error('Missing required option: "--entry"');
+  }
+
+  const entryPath = resolveCliPath(entryOption);
+  await ensureFileReadable(entryPath);
+  const entryStat = await stat(entryPath);
+  if (!entryStat.isFile()) {
+    throw new Error(`TSX entry path is not a file: ${entryPath}`);
+  }
+  const extension = path.extname(entryPath).toLowerCase();
+  if (![".tsx", ".jsx"].includes(extension)) {
+    throw new Error(`generate-tsx expects a .tsx or .jsx file. Current file: ${entryPath}`);
+  }
+
+  const issues = await collectEnvironmentIssues();
+  if (issues.length > 0) {
+    throw new Error(
+      [
+        "Environment is not ready:",
+        ...issues.map((issue, index) => `${index + 1}. ${issue.message}\n   ${issue.hint}`),
+      ].join("\n"),
+    );
+  }
+
+  const derivedName = typeof options.name === "string" && options.name.trim().length > 0
+    ? options.name.trim()
+    : deriveTsxPresentationName(entryPath);
+  const outRoot = options["out-root"] ? resolveCliPath(options["out-root"]) : OUTPUT_ROOT;
+  const runContext = buildRunContext({
+    sourcePath: entryPath,
+    presentationName: derivedName,
+    outRoot,
+  });
+
+  await Promise.all([
+    ensureDirectory(runContext.previewOutputDir),
+    ensureDirectory(runContext.generatorOutputDir),
+    ensureDirectory(runContext.logsDir),
+  ]);
+
+  process.stdout.write(`Page Source: ${relativeToWorkspace(entryPath)}\n`);
+  process.stdout.write(`Run directory: ${relativeToWorkspace(runContext.runDir)}\n`);
+  process.stdout.write(`[1/3] Render Page Source and build PPTX Model...\n`);
+
+  const previewStage = await invokeJsonCommandStage({
+    stageName: "tsx-preview",
+    command: process.execPath,
+    args: [
+      "--import",
+      "tsx/esm",
+      PREVIEW_SCRIPT,
+      entryPath,
+      "--model",
+      "--json",
+      `--name=${derivedName}`,
+      `--output=${runContext.previewOutputDir}`,
+    ],
+    cwd: ENGINE_DIR,
+    timeoutMs: GENERATE_TIMEOUT_MS,
+    logDir: runContext.logsDir,
+  });
+  const preview = previewStage.response;
+  for (const fieldName of ["html_path", "browser_png_path", "model_path"]) {
+    if (typeof preview[fieldName] !== "string" || preview[fieldName].length === 0) {
+      throw new Error(`TSX preview stage did not return ${fieldName}`);
+    }
+  }
+
+  process.stdout.write(`[2/3] Generate PPTX...\n`);
+  const { finalPptxPath, generatorStage } = await generatePptxFromModel({
+    modelPath: preview.model_path,
+    runContext,
+  });
+
+  let rasterization = null;
+  if (optionIsEnabled(options.rasterize)) {
+    process.stdout.write(`[3/3] Rasterize generated PPTX for visual verification...\n`);
+    rasterization = await rasterizeGeneratedPptx({
+      pptxPath: finalPptxPath,
+      runContext,
+    });
+  } else {
+    process.stdout.write(`[3/3] PPTX visual verification skipped.\n`);
+  }
+
+  const summary = {
+    created_at: new Date().toISOString(),
+    source_type: "tsx",
+    entry_path: entryPath,
+    presentation_name: derivedName,
+    slug: runContext.slug,
+    run_dir: runContext.runDir,
+    preview: {
+      html_path: preview.html_path ?? null,
+      browser_png_path: preview.browser_png_path ?? null,
+      model_path: preview.model_path,
+      model_assets_dir: preview.model_assets_dir ?? null,
+      log_paths: previewStage.logPaths,
+    },
+    generator: {
+      output_path: finalPptxPath,
+      slide_count: generatorStage.response.result?.data?.slide_count ?? null,
+      presentation_name: generatorStage.response.result?.data?.presentation_name ?? null,
+      log_paths: generatorStage.logPaths,
+    },
+    validation: rasterization
+      ? {
+          rasterized_output_dir: rasterization.rasterized.output_dir,
+          rasterization_manifest_path:
+            rasterization.rasterized.rasterization_manifest_path ?? null,
+          slide_count: rasterization.rasterized.slide_count ?? null,
+          slides: rasterization.rasterized.slides ?? [],
+          log_paths: rasterization.rasterizeStage.logPaths,
+        }
+      : null,
+  };
+  await writeFile(runContext.summaryPath, `${JSON.stringify(summary, null, 2)}\n`, "utf8");
+
+  process.stdout.write("Pipeline completed.\n");
+  process.stdout.write(`- Static HTML: ${relativeToWorkspace(preview.html_path)}\n`);
+  process.stdout.write(`- Browser PNG: ${relativeToWorkspace(preview.browser_png_path)}\n`);
+  process.stdout.write(`- Model JSON: ${relativeToWorkspace(preview.model_path)}\n`);
+  process.stdout.write(`- PPTX: ${relativeToWorkspace(finalPptxPath)}\n`);
+  if (rasterization) {
+    process.stdout.write(
+      `- PPTX verification images: ${relativeToWorkspace(rasterization.rasterized.output_dir)}\n`,
+    );
+  }
+  process.stdout.write(`- Summary: ${relativeToWorkspace(runContext.summaryPath)}\n`);
+  process.stdout.write(`- Logs: ${relativeToWorkspace(runContext.logsDir)}\n`);
+}
+
+async function generateCurrentFile(options) {
+  const fileOption = options.file;
+  if (!fileOption) {
+    throw new Error('Missing required option: "--file"');
+  }
+  const filePath = resolveCliPath(fileOption);
+  const extension = path.extname(filePath).toLowerCase();
+  if ([".tsx", ".jsx"].includes(extension)) {
+    await generateTsxPipeline({ ...options, entry: filePath });
+    return;
+  }
+  if (path.basename(filePath) === "manifest.json") {
+    await generatePipeline({
+      ...options,
+      manifest: filePath,
+      "require-manifest-json-name": "1",
+    });
+    return;
+  }
+  throw new Error(
+    [
+      "PPT: Generate From Current File only supports:",
+      "- a .tsx or .jsx Page Source / Preview Source",
+      "- a file named manifest.json",
+      `Current file: ${filePath}`,
+    ].join("\n"),
+  );
 }
 
 async function main() {
@@ -668,6 +985,12 @@ async function main() {
       return;
     case "generate":
       await generatePipeline(options);
+      return;
+    case "generate-tsx":
+      await generateTsxPipeline(options);
+      return;
+    case "generate-current":
+      await generateCurrentFile(options);
       return;
     default:
       throw new Error(`Unknown command: ${command}`);

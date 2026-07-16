@@ -47,6 +47,7 @@ npm run preview:tsx -- src/app/authoring-kit/foundations/SlideCanvas.preview.tsx
 可用参数：
 
 - `--model`：额外生成单页 PPTX Model JSON 和模型截图资产目录。
+- `--json`：只输出机器可读的单行 JSON，供 `ppt-app` 流水线编排使用。
 - `--name=<name>`：覆盖从入口文件名推导的产物名称。
 - `--output=<absolute-path>`：覆盖默认输出目录，必须使用绝对路径。
 
@@ -76,7 +77,25 @@ npm run preview:tsx -- src/app/authoring-kit/foundations/SlideCanvas.preview.tsx
 - Preview 使用与正式 Page Source 相同的 React、Recharts、Tailwind、Chrome、渲染就绪和静态化实现。
 - npm 依赖必须属于正式 Page Source 运行时允许的依赖；本地相对 import 必须留在最近 `tsconfig.json` 定义的项目根目录内。
 - `buildPageSourcePreview` 本身只负责构建产物，不执行完整 TypeScript 检查；`preview:tsx` 命令负责先检查再构建，与 ppt-app 的现有编排方式一致。
-- `--model` 只验证到 HTML → PPTX Model，不生成最终 `.pptx`。最终 PPT 视觉保真检查应由后续跨 ppt-engine 和 ppt-gener 的开发工具完成。
+- `--model` 只验证到 HTML → PPTX Model，不生成最终 `.pptx`。
+
+## 最终 PPTX 验证
+
+需要验证最终 PowerPoint 产物时，从 `ppt-app` 目录运行跨 Executa 流水线：
+
+```bash
+npm run ppt:generate-tsx -- \
+  --entry executas/ppt-engine/src/app/authoring-kit/foundations/SlideCanvas.preview.tsx \
+  --rasterize 1
+```
+
+该命令依次生成静态 HTML、浏览器 PNG、PPTX Model、最终 `.pptx`，并在启用
+`--rasterize` 时把最终 PPTX 重新渲染成 PNG。统一产物和分阶段日志写入仓库根目录的
+`.vscode/pipeline-output/`。
+
+在 VS Code 中打开目标 `*.tsx` 或 `*.jsx` 后，可以直接执行默认 Build Task
+`PPT: Generate From Current File`。该任务也兼容当前编辑器是 `manifest.json` 的整套
+Deck 流程。
 
 ## 安装与发布
 

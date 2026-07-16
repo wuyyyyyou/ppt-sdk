@@ -65,6 +65,39 @@ test("installs the Authoring Kit once and leaves an existing copy unchanged", as
       )),
       /ENOENT/,
     );
+    for (const foundationName of ["SlideCanvas.tsx", "StableInlineRow.tsx", "IconText.tsx", "MeasuredChartArea.tsx"]) {
+      await access(path.join(workspaceDir, "authoring-kit", "foundations", foundationName));
+    }
+    for (const referencePath of [
+      ["charts", "BarChart.tsx"],
+      ["charts", "LineChart.tsx"],
+      ["charts", "RadarChart.tsx"],
+      ["charts", "DonutChart.tsx"],
+      ["cards", "NumberedAgendaCard.tsx"],
+      ["cards", "NarrativeListItem.tsx"],
+      ["cards", "DualValueMetricCard.tsx"],
+      ["cards", "ProgressStatusCard.tsx"],
+      ["comparison", "ComparisonPanel.tsx"],
+      ["comparison", "ComparisonMatrix.tsx"],
+      ["timelines", "HorizontalRoadmap.tsx"],
+      ["timelines", "VerticalMilestones.tsx"],
+      ["media", "ImageShowcase.tsx"],
+      ["pages", "ChartWithNarrative.tsx"],
+      ["pages", "ImageNarrative.tsx"],
+      ["pages", "KpiSummary.tsx"],
+    ]) {
+      await access(path.join(workspaceDir, "authoring-kit", "references", ...referencePath));
+    }
+    await assert.rejects(
+      () => access(path.join(
+        workspaceDir,
+        "authoring-kit",
+        "references",
+        "charts",
+        "BarChart.preview.tsx",
+      )),
+      /ENOENT/,
+    );
     await assert.rejects(
       () => access(path.join(workspaceDir, "authoring-kit", "DEVELOPMENT.md")),
       /ENOENT/,

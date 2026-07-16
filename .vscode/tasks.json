@@ -58,6 +58,68 @@
       "dependsOrder": "sequence",
       "group": {
         "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "runOptions": {
+        "reevaluateOnRerun": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "PPT: Generate PPTX From Current TSX",
+      "type": "process",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/ppt-app/scripts/run-ppt-pipeline.mjs",
+        "generate-tsx",
+        "--entry",
+        "${file}",
+        "--rasterize",
+        "1"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": [
+        "PPT: Build Template Engine"
+      ],
+      "dependsOrder": "sequence",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "runOptions": {
+        "reevaluateOnRerun": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "PPT: Generate From Current File",
+      "type": "process",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/ppt-app/scripts/run-ppt-pipeline.mjs",
+        "generate-current",
+        "--file",
+        "${file}",
+        "--rasterize",
+        "1"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build",
         "isDefault": true
       },
       "presentation": {

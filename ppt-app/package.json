@@ -7,6 +7,9 @@
   "scripts": {
     "sync:tool-manifests": "node ./scripts/sync-tool-manifests.mjs",
     "sync:template-previews": "node ./scripts/sync-template-previews.mjs",
+    "ppt:check-env": "node ./scripts/run-ppt-pipeline.mjs check-env",
+    "ppt:generate": "node ./scripts/run-ppt-pipeline.mjs generate",
+    "ppt:generate-tsx": "node ./scripts/run-ppt-pipeline.mjs generate-tsx",
     "predev": "npm run sync:tool-manifests && npm run sync:template-previews",
     "predev:mock-llm": "npm run sync:tool-manifests && npm run sync:template-previews",
     "predev:mock-llm:retry": "npm run sync:tool-manifests && npm run sync:template-previews",

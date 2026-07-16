@@ -13,6 +13,7 @@ const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 type ParsedArguments = {
   entryPath: string;
   generatePptxModel: boolean;
+  jsonOutput: boolean;
   name: string | null;
   outputDir: string | null;
 };
@@ -25,12 +26,17 @@ function readOptionValue(argument: string, optionName: string): string | null {
 function parseArguments(argv: string[]): ParsedArguments {
   let entryPath: string | null = null;
   let generatePptxModel = false;
+  let jsonOutput = false;
   let name: string | null = null;
   let outputDir: string | null = null;
 
   for (const argument of argv) {
     if (argument === "--model") {
       generatePptxModel = true;
+      continue;
+    }
+    if (argument === "--json") {
+      jsonOutput = true;
       continue;
     }
     const outputValue = readOptionValue(argument, "--output");
@@ -60,11 +66,11 @@ function parseArguments(argv: string[]): ParsedArguments {
 
   if (!entryPath) {
     throw new Error(
-      "Usage: npm run preview:tsx -- <preview-source> [--model] [--name=<name>] [--output=<absolute-path>]",
+      "Usage: npm run preview:tsx -- <preview-source> [--model] [--json] [--name=<name>] [--output=<absolute-path>]",
     );
   }
 
-  return { entryPath, generatePptxModel, name, outputDir };
+  return { entryPath, generatePptxModel, jsonOutput, name, outputDir };
 }
 
 async function main() {
@@ -84,6 +90,19 @@ async function main() {
     name,
     generatePptxModel: parsed.generatePptxModel,
   });
+
+  if (parsed.jsonOutput) {
+    process.stdout.write(`${JSON.stringify({
+      entry_path: result.entryPath,
+      output_dir: result.outputDir,
+      name: result.name,
+      html_path: result.htmlPath,
+      browser_png_path: result.screenshotPath,
+      model_path: result.modelPath,
+      model_assets_dir: result.modelAssetsDir,
+    })}\n`);
+    return;
+  }
 
   const lines = [
     "Page Source preview generated:",

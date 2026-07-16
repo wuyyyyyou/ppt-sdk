@@ -117,6 +117,8 @@ cd ppt-app
 npm run build
 npm run check
 npm run validate
+npm run ppt:check-env
+npm run ppt:generate-tsx -- --entry <page.preview.tsx> --rasterize 1
 npm run dev
 npm run dev:mock-llm
 npm run dev:mock-llm:retry
@@ -130,6 +132,25 @@ npm run dev:mock-llm:retry
 
 `npm run dev:mock-llm:retry` 使用 `fixtures/mock-outline-retry.jsonl`，第一轮
 返回无效 JSON，后续 repair 请求返回有效 JSON，用来测试重试逻辑。
+
+### 从 Page Source 生成最终 PPTX
+
+Authoring Kit（创作套件）的 `*.preview.tsx` 或可独立渲染的 Page Source（页面源码）
+可以直接经过完整开发验证链路：
+
+```bash
+cd ppt-app
+npm run ppt:generate-tsx -- \
+  --entry executas/ppt-engine/src/app/authoring-kit/foundations/SlideCanvas.preview.tsx \
+  --rasterize 1
+```
+
+流水线生成静态 HTML、浏览器 PNG、PPTX Model、最终 `.pptx`，并可把最终 PPTX
+重新栅格化为 PNG，方便和浏览器渲染结果对比。产物默认写入仓库根目录的
+`.vscode/pipeline-output/`。
+
+VS Code 默认 Build Task 是 `PPT: Generate From Current File`：当前编辑器为
+`*.tsx` / `*.jsx` 时运行单页链路，为 `manifest.json` 时运行现有整套 Deck 链路。
 
 ## 同步 manifest
 
