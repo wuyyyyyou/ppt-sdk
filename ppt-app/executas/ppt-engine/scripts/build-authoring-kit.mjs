@@ -15,6 +15,7 @@ async function main() {
   for (const directoryName of ["foundations", "references"]) {
     await cp(path.join(sourceDir, directoryName), path.join(kitDir, directoryName), {
       recursive: true,
+      filter: (sourcePath) => !sourcePath.endsWith(".preview.tsx"),
     });
   }
   await cp(path.join(sourceDir, "README.md"), path.join(kitDir, "README.md"));

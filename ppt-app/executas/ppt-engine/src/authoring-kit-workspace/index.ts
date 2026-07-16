@@ -108,6 +108,7 @@ async function copyDirectory(sourceDir: string, targetDir: string) {
     if (entry.isDirectory()) {
       await copyDirectory(sourcePath, targetPath);
     } else if (entry.isFile()) {
+      if (entry.name.endsWith(".preview.tsx")) continue;
       await mkdir(path.dirname(targetPath), { recursive: true });
       await copyFile(sourcePath, targetPath);
     }

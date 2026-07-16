@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -9,8 +9,28 @@ import {
   buildDeckHtmlPagesFromManifest,
   buildDeckPageScreenshotFromManifest,
 } from "../../src/render/build-deck-from-manifest.tsx";
+import {
+  buildPageSourcePreview,
+  resolvePageSourcePreviewName,
+} from "../../src/render/build-page-source-preview.ts";
 
 const PAGE_ID = "page-11111111-1111-4111-8111-111111111111";
+
+async function writeProjectFile(filePath: string, source: string) {
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, source, "utf8");
+}
+
+test("derives stable Preview Source output names", () => {
+  assert.equal(
+    resolvePageSourcePreviewName("/tmp/MetricCard.preview.tsx"),
+    "metric-card",
+  );
+  assert.equal(
+    resolvePageSourcePreviewName("/tmp/MetricCard.tsx", "Revenue Card"),
+    "revenue-card",
+  );
+});
 
 test("single-page manifest rendering persists static DOM and Tailwind CSS", async () => {
   const tempRoot = path.join(process.cwd(), "test", ".tmp");
@@ -237,5 +257,121 @@ export default function Page() {
     assert.doesNotMatch(result.deckHtml, /__PRESENTON_RENDER_CONTEXTS__|react-dom/);
   } finally {
     await rm(workspaceDir, { recursive: true, force: true });
+  }
+});
+
+test("buildPageSourcePreview writes static HTML, PNG, and an optional PPTX Model", async () => {
+  const tempRoot = path.join(process.cwd(), "test", ".tmp");
+  await mkdir(tempRoot, { recursive: true });
+  const projectRoot = await mkdtemp(path.join(tempRoot, "page-source-preview-"));
+  const entryPath = path.join(projectRoot, "previews", "MetricCard.preview.tsx");
+  const outputDir = path.join(projectRoot, "output");
+
+  try {
+    await writeProjectFile(
+      path.join(projectRoot, "tsconfig.json"),
+      `${JSON.stringify({
+        compilerOptions: {
+          target: "ES2022",
+          module: "NodeNext",
+          moduleResolution: "NodeNext",
+          jsx: "react-jsx",
+        },
+      }, null, 2)}\n`,
+    );
+    await writeProjectFile(
+      path.join(projectRoot, "components", "MetricCard.tsx"),
+      `export default function MetricCard() {
+  return (
+    <section
+      id="preview-card"
+      data-pptx-export="screenshot"
+      className="flex items-center bg-blue-500"
+      style={{ width: "360px", height: "180px", color: "white" }}
+    >
+      Preview metric
+    </section>
+  );
+}
+`,
+    );
+    await writeProjectFile(
+      entryPath,
+      `import MetricCard from "../components/MetricCard.tsx";
+export default function Preview() {
+  return (
+    <main style={{ position: "relative", width: "1280px", height: "720px" }}>
+      <MetricCard />
+    </main>
+  );
+}
+`,
+    );
+
+    const result = await buildPageSourcePreview({
+      entryPath,
+      outputDir,
+      generatePptxModel: true,
+    });
+
+    assert.equal(result.name, "metric-card");
+    assert.equal(result.entryPath, entryPath);
+    assert.match(result.html, /data-presenton-render-document="static"/);
+    assert.match(result.html, /id="preview-card"/);
+    assert.match(result.html, /Preview metric/);
+    assert.match(result.html, /\.flex\s*\{/);
+    assert.doesNotMatch(
+      result.html,
+      /__PRESENTON_RENDER_CONTEXT__|react-dom|createRoot\(|tailwind-runtime/,
+    );
+    assert.equal(result.htmlPath, path.join(outputDir, "metric-card.html"));
+    assert.equal(result.screenshotPath, path.join(outputDir, "metric-card-browser.png"));
+    assert.equal(result.modelPath, path.join(outputDir, "metric-card-ppt-model.json"));
+    assert.equal(result.modelAssetsDir, path.join(outputDir, "metric-card-ppt-assets"));
+    assert.equal(result.pptxModel?.slides.length, 1);
+
+    const png = await readFile(result.screenshotPath);
+    assert.deepEqual(Array.from(png.subarray(0, 8)), [137, 80, 78, 71, 13, 10, 26, 10]);
+    assert.ok(result.modelPath);
+    assert.ok(result.modelAssetsDir);
+    await access(result.modelPath);
+    const assetFiles = await readdir(result.modelAssetsDir);
+    assert.ok(assetFiles.some((file) => file.endsWith(".png")));
+    const modelJson = await readFile(result.modelPath, "utf8");
+    assert.match(modelJson, /metric-card-ppt-assets/);
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test("buildPageSourcePreview rejects imports outside the nearest tsconfig project root", async () => {
+  const tempRoot = path.join(process.cwd(), "test", ".tmp");
+  await mkdir(tempRoot, { recursive: true });
+  const fixtureRoot = await mkdtemp(path.join(tempRoot, "page-source-preview-boundary-"));
+  const projectRoot = path.join(fixtureRoot, "project");
+  const entryPath = path.join(projectRoot, "Preview.tsx");
+
+  try {
+    await writeProjectFile(path.join(projectRoot, "tsconfig.json"), "{}\n");
+    await writeProjectFile(
+      path.join(fixtureRoot, "Outside.tsx"),
+      "export default function Outside() { return <div />; }\n",
+    );
+    await writeProjectFile(
+      entryPath,
+      `import Outside from "../Outside.tsx";
+export default function Preview() { return <Outside />; }
+`,
+    );
+
+    await assert.rejects(
+      () => buildPageSourcePreview({
+        entryPath,
+        outputDir: path.join(projectRoot, "output"),
+      }),
+      /local imports must stay within the template project root/,
+    );
+  } finally {
+    await rm(fixtureRoot, { recursive: true, force: true });
   }
 });

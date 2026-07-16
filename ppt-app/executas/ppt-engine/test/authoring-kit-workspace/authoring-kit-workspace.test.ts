@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import {
@@ -55,6 +55,19 @@ test("installs the Authoring Kit once and leaves an existing copy unchanged", as
     await assert.rejects(
       () => readFile(path.join(workspaceDir, "authoring-kit", "page-source-starters"), "utf8"),
       /ENOENT|EISDIR/,
+    );
+    await assert.rejects(
+      () => access(path.join(
+        workspaceDir,
+        "authoring-kit",
+        "foundations",
+        "SlideCanvas.preview.tsx",
+      )),
+      /ENOENT/,
+    );
+    await assert.rejects(
+      () => access(path.join(workspaceDir, "authoring-kit", "DEVELOPMENT.md")),
+      /ENOENT/,
     );
   });
 });

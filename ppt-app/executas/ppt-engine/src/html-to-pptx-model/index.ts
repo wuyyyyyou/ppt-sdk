@@ -71,6 +71,14 @@ const DEFAULT_VIEWPORT = {
 const DEFAULT_DECK_SELECTOR = "#presentation-slides-wrapper";
 const DECK_VIEWER_MODE_CLASS = "presenton-viewer-mode";
 const DEBUG_HTML_TO_PPTX = process.env.PRESENTON_DEBUG_HTML_TO_PPTX === "1";
+const SOURCE_TRANSFORM_RUNTIME_SCRIPT = String.raw`
+Object.defineProperty(window, "__name", {
+  configurable: true,
+  value: function(target, value) {
+    return Object.defineProperty(target, "name", { configurable: true, value: value });
+  }
+});
+`;
 
 function debugLog(...args: unknown[]) {
   if (!DEBUG_HTML_TO_PPTX) {
@@ -106,6 +114,7 @@ export async function convertDeckHtmlToPptxModel(
     }
 
     if (runtime.page.evaluateOnNewDocument) {
+      await runtime.page.evaluateOnNewDocument(SOURCE_TRANSFORM_RUNTIME_SCRIPT);
       debugLog("evaluateOnNewDocument.disableViewerMode.start");
       await runtime.page.evaluateOnNewDocument(() => {
         (window as typeof window & {

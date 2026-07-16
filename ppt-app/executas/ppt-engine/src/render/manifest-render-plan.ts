@@ -10,7 +10,11 @@ import {
   buildPageSourceRuntimeBundles,
   type PageSourceRuntimeEntry,
 } from "./page-source-runtime-bundle.js";
-import { getBrowserRenderRuntimeBundle } from "./runtime-bundle.js";
+import { sanitizeFileNamePart } from "./file-names.js";
+import {
+  buildPageSourceDocumentHtml,
+  createPageSourceRenderContext,
+} from "./page-source-document.js";
 import { getTailwindBrowserRuntimeBundle } from "./tailwind-runtime.js";
 import type {
   BrowserRenderContext,
@@ -126,62 +130,6 @@ export function validateDeckManifest(value: unknown): asserts value is DeckManif
   });
 }
 
-function sanitizeFileNamePart(value: string): string {
-  const normalized = value
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return normalized || "deck";
-}
-
-function escapeJsonForInlineScript(value: unknown): string {
-  return JSON.stringify(value)
-    .replace(/</g, "\\u003c")
-    .replace(/>/g, "\\u003e")
-    .replace(/&/g, "\\u0026")
-    .replace(/\u2028/g, "\\u2028")
-    .replace(/\u2029/g, "\\u2029");
-}
-
-function buildSlideDocumentHtml(input: {
-  context: BrowserRenderContext;
-  runtimeBundle?: string | null;
-  tailwindRuntimeBundle: string;
-}): string {
-  const runtimeBundle = input.runtimeBundle ?? getBrowserRenderRuntimeBundle();
-  const serializedContext = escapeJsonForInlineScript(input.context);
-  return [
-    "<!doctype html>",
-    '<html lang="en">',
-    "<head>",
-    '  <meta charset="utf-8" />',
-    '  <meta name="viewport" content="width=1280, initial-scale=1" />',
-    `  <title>${input.context.title}</title>`,
-    "  <style>",
-    "    html, body { margin: 0; padding: 0; width: 1280px; min-height: 720px; overflow: hidden; background: #ffffff; }",
-    "    body { position: relative; font-family: system-ui, sans-serif; }",
-    "    #presentation-slides-wrapper { width: 1280px; min-height: 720px; }",
-    '    [data-presenton-render-status="error"] { display: flex; align-items: center; justify-content: center; color: #991b1b; background: #fef2f2; font-size: 14px; padding: 24px; box-sizing: border-box; }',
-    "  </style>",
-    '  <script data-presenton-runtime="tailwind">',
-    input.tailwindRuntimeBundle,
-    "  </script>",
-    "</head>",
-    "<body>",
-    '  <div id="presentation-slides-wrapper" data-presenton-render-status="loading"></div>',
-    "  <script>",
-    `    window.__PRESENTON_RENDER_CONTEXT__ = ${serializedContext};`,
-    "  </script>",
-    "  <script>",
-    runtimeBundle,
-    "  </script>",
-    "</body>",
-    "</html>",
-  ].join("\n");
-}
-
 function parseSinglePageIndex(
   input: { singlePage?: boolean | null; page?: number | null },
   slideCount: number,
@@ -277,26 +225,14 @@ export async function prepareManifestRenderPlan(input: {
       throw new Error(`Failed to build Page Source slide runtime bundle "${slide.id}"`);
     }
     const pageNumber = sourceIndex + 1;
-    const context: BrowserRenderContext = {
-      templateGroup: "authoring-kit",
-      layoutId: slide.id,
-      runtimeLayoutId: slide.id,
-      slideData: {},
-      speakerNote: "",
+    const context = createPageSourceRenderContext({
+      id: slide.id,
       title: `${manifest.title} – ${pageNumber}`,
-      theme: {
-        logoUrl: null,
-        companyName: null,
-        colors: {},
-        variables: {},
-        fontName: null,
-        fontUrl: null,
-      },
-    };
+    });
     const fileName = `${pageNumber}-${deckBaseName}-${sanitizeFileNamePart(slide.id)}.png`;
     return {
       context,
-      html: buildSlideDocumentHtml({
+      html: buildPageSourceDocumentHtml({
         context,
         runtimeBundle: slideRuntimeBundle,
         tailwindRuntimeBundle,

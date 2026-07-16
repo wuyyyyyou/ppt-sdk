@@ -116,6 +116,25 @@ async function findNearestTsconfig(startDir: string): Promise<string | null> {
   }
 }
 
+export async function resolveLocalTemplateProjectRoot(entryPath: string): Promise<string> {
+  if (!path.isAbsolute(entryPath)) {
+    throw new Error('Field "entryPath" must be an absolute path');
+  }
+  const normalizedEntryPath = path.normalize(entryPath);
+  const extension = path.extname(normalizedEntryPath).toLowerCase();
+  if (!ALLOWED_LOCAL_EXTENSIONS.has(extension)) {
+    throw new Error(
+      `Preview entry must use one of: ${Array.from(ALLOWED_LOCAL_EXTENSIONS).join(", ")}`,
+    );
+  }
+  await access(normalizedEntryPath, fsConstants.R_OK);
+  const entryDir = path.dirname(normalizedEntryPath);
+  const tsconfigPath = await findNearestTsconfig(entryDir);
+  const projectRoot = tsconfigPath ? path.dirname(tsconfigPath) : entryDir;
+  assertWithinCwd(normalizedEntryPath, projectRoot, "Preview entry");
+  return projectRoot;
+}
+
 let fallbackLocalTemplateTsconfigPathPromise: Promise<string> | null = null;
 
 async function getFallbackLocalTemplateTsconfigPath(): Promise<string> {
@@ -353,6 +372,16 @@ function createLocalTemplateRuntimeResolver(
         const specifier = args.path;
 
         if (isRelativeOrAbsoluteSpecifier(specifier)) {
+          if (args.importer && isPathWithinDirectory(args.importer, templateRoot)) {
+            const candidatePath = path.isAbsolute(specifier)
+              ? specifier
+              : path.resolve(args.resolveDir, specifier);
+            if (!isPathWithinDirectory(candidatePath, templateRoot)) {
+              throw new Error(
+                `This template imports "${specifier}", but local imports must stay within the template project root: ${cwd}`,
+              );
+            }
+          }
           return;
         }
 

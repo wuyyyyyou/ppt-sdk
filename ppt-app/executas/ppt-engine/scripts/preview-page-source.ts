@@ -1,0 +1,100 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { assertLocalTemplateTypecheck } from "../src/local-template/typecheck.js";
+import { resolveLocalTemplateProjectRoot } from "../src/local-template/loader.js";
+import {
+  buildPageSourcePreview,
+  resolvePageSourcePreviewName,
+} from "../src/render/build-page-source-preview.js";
+
+const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+type ParsedArguments = {
+  entryPath: string;
+  generatePptxModel: boolean;
+  name: string | null;
+  outputDir: string | null;
+};
+
+function readOptionValue(argument: string, optionName: string): string | null {
+  const prefix = `${optionName}=`;
+  return argument.startsWith(prefix) ? argument.slice(prefix.length) : null;
+}
+
+function parseArguments(argv: string[]): ParsedArguments {
+  let entryPath: string | null = null;
+  let generatePptxModel = false;
+  let name: string | null = null;
+  let outputDir: string | null = null;
+
+  for (const argument of argv) {
+    if (argument === "--model") {
+      generatePptxModel = true;
+      continue;
+    }
+    const outputValue = readOptionValue(argument, "--output");
+    if (outputValue !== null) {
+      if (!outputValue || !path.isAbsolute(outputValue)) {
+        throw new Error("--output must be a non-empty absolute path");
+      }
+      outputDir = path.normalize(outputValue);
+      continue;
+    }
+    const nameValue = readOptionValue(argument, "--name");
+    if (nameValue !== null) {
+      if (!nameValue.trim()) {
+        throw new Error("--name must be a non-empty string");
+      }
+      name = nameValue;
+      continue;
+    }
+    if (argument.startsWith("--")) {
+      throw new Error(`Unsupported option: ${argument}`);
+    }
+    if (entryPath) {
+      throw new Error(`Unexpected additional Preview Source path: ${argument}`);
+    }
+    entryPath = path.resolve(process.cwd(), argument);
+  }
+
+  if (!entryPath) {
+    throw new Error(
+      "Usage: npm run preview:tsx -- <preview-source> [--model] [--name=<name>] [--output=<absolute-path>]",
+    );
+  }
+
+  return { entryPath, generatePptxModel, name, outputDir };
+}
+
+async function main() {
+  const parsed = parseArguments(process.argv.slice(2));
+  const name = resolvePageSourcePreviewName(parsed.entryPath, parsed.name);
+  const outputDir = parsed.outputDir ?? path.join(projectDir, ".preview-output", name);
+  const projectRoot = await resolveLocalTemplateProjectRoot(parsed.entryPath);
+
+  await assertLocalTemplateTypecheck({
+    entryPath: parsed.entryPath,
+    cwd: projectRoot,
+    label: `Preview Source "${path.relative(projectRoot, parsed.entryPath)}"`,
+  });
+  const result = await buildPageSourcePreview({
+    entryPath: parsed.entryPath,
+    outputDir,
+    name,
+    generatePptxModel: parsed.generatePptxModel,
+  });
+
+  const lines = [
+    "Page Source preview generated:",
+    `HTML: ${result.htmlPath}`,
+    `PNG: ${result.screenshotPath}`,
+    result.modelPath ? `PPTX Model: ${result.modelPath}` : "PPTX Model: not requested",
+    result.modelAssetsDir
+      ? `PPTX assets: ${result.modelAssetsDir}`
+      : "PPTX assets: not requested",
+  ];
+  process.stdout.write(`${lines.join("\n")}\n`);
+}
+
+await main();

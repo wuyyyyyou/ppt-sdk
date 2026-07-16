@@ -3,5 +3,6 @@ node_modules
 bundle
 .build
 sea-prep
+.preview-output
 .pkg-cache
 src/app/presentation-templates/generated-registry-manifest.json

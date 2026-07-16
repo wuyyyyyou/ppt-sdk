@@ -54,6 +54,11 @@ import {
   buildDeckHtmlPagesFromManifest,
   buildDeckPageScreenshotFromManifest,
 } from "./render/build-deck-from-manifest.js";
+import {
+  buildPageSourcePreview,
+  type BuildPageSourcePreviewInput,
+  type BuildPageSourcePreviewResult,
+} from "./render/build-page-source-preview.js";
 import { buildDeckHtml, buildStandaloneDeckHtml } from "./render/build-deck.js";
 import { renderSlideHtml } from "./render/render-slide.js";
 import type {
@@ -260,6 +265,8 @@ export type {
   BuildDeckHtmlFromManifestInput,
   BuildDeckHtmlPagesAndScreenshotsFromManifestResult,
   BuildDeckHtmlPagesFromManifestResult,
+  BuildPageSourcePreviewInput,
+  BuildPageSourcePreviewResult,
   BuildDeckHtmlInput,
   BuildDeckHtmlSlideInput,
   BuildStandaloneDeckHtmlInput,
@@ -299,6 +306,7 @@ export {
   buildDeckHtmlPagesAndScreenshotsFromManifest,
   buildDeckHtmlPagesFromManifest,
   buildDeckPageScreenshotFromManifest,
+  buildPageSourcePreview,
   buildStandaloneDeckHtml,
   convertDeckHtmlToPptxModel,
   convertDeckPageToPptxModel,
