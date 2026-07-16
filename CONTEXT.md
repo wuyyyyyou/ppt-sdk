@@ -198,6 +198,16 @@ Its stable identity is the Confirmed Outline entry's `page_id`; the identity is 
 The Workspace-owned TSX entry point for exactly one Page Generation Unit and the sole authoritative render source for that page's visible content and composition. The Confirmed Outline provides intent and Research Evidence provides factual grounding without acting as separate render data; Page Authoring modifies only the current Page Source and its page-owned assets.
 _Avoid_: Deck Source, Shared Page Entry, Template Layout, Page Data JSON
 
+**Rendered HTML Snapshot**:
+The Workspace-owned, engine-generated static DOM representation captured after Page Sources have completed browser rendering at the fixed slide viewport. A Page Generation Unit owns one page snapshot, while Final Deck Render produces a separate ordered Deck snapshot from all accepted Page Sources; both are rebuildable derived artifacts rather than authoritative Page Authoring sources, and the Deck snapshot may retain engine-owned viewing behaviour without executing Page Source code to create visible content.
+User-facing Chinese label: 渲染后 HTML 快照
+_Avoid_: Page Source, Executable React HTML, Runtime HTML
+
+**Render Readiness**:
+The condition in which all tracked dependencies affecting visible content have settled and the rendered DOM and layout are stable enough to capture. A Rendered HTML Snapshot may be published only after this condition is reached; timeout or cancellation leaves rendering unfinished and produces no partial snapshot.
+User-facing Chinese label: 渲染就绪
+_Avoid_: Fixed Settle Time, Best-effort Ready
+
 **Deck Manifest**:
 The engine-owned, rebuildable rendering index that maps the current Confirmed Outline page sequence to Page Sources. It carries no page-planning, evidence-assignment, generation-state, or authoring decisions and is not edited by an Agent.
 _Avoid_: Page Plan, Page Source of Truth, Agent-authored Manifest
@@ -327,3 +337,7 @@ Expert: "No. It may import a Foundation Module, but a Reference Implementation i
 Dev: "How do independently authored pages keep a consistent style without a Theme Token?"
 
 Expert: "Every Page Authoring Agent reads the same Workspace Style Guide and applies its exact values, qualitative rules, and allowed variation in the Page Source."
+
+Dev: "Is the generated Deck HTML another source that Page Authoring can edit?"
+
+Expert: "No. It is a Rendered HTML Snapshot derived from Page Sources after browser rendering; Page Sources remain authoritative and the snapshot is rebuilt when needed."

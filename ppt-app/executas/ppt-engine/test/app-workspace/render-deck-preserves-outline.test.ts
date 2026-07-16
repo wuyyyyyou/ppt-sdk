@@ -103,6 +103,12 @@ test("renderAppWorkspaceDeckHtml preserves the confirmed outline artifact", asyn
     });
 
     assert.match(rendered.slides[0]?.screenshot_path ?? "", /\.png$/);
+    const renderedHtml = await readFile(rendered.slides[0]!.html_path, "utf8");
+    assert.match(renderedHtml, /data-presenton-render-document="static"/);
+    assert.doesNotMatch(
+      renderedHtml,
+      /__PRESENTON_RENDER_CONTEXT__|cdn\.tailwindcss\.com|react-dom|createRoot\(/,
+    );
 
     const outline = await readJson<{
       title: string;
@@ -186,6 +192,12 @@ test("renderAppWorkspacePagePreview includes stable slide id in preview filename
     assert.match(
       path.basename(preview.screenshot_path),
       new RegExp(`^05-ppt-20260602-\\d{6}-page-preview-${PAGE_5}-${PAGE_5}\\.png$`),
+    );
+    const previewHtml = await readFile(preview.html_path, "utf8");
+    assert.match(previewHtml, /data-presenton-render-document="static"/);
+    assert.doesNotMatch(
+      previewHtml,
+      /__PRESENTON_RENDER_CONTEXT__|cdn\.tailwindcss\.com|react-dom|createRoot\(/,
     );
   } finally {
     if (previousHome === undefined) {

@@ -11,6 +11,7 @@ import {
   type PageSourceRuntimeEntry,
 } from "./page-source-runtime-bundle.js";
 import { getBrowserRenderRuntimeBundle } from "./runtime-bundle.js";
+import { getTailwindBrowserRuntimeBundle } from "./tailwind-runtime.js";
 import type {
   BrowserRenderContext,
   DeckManifestInput,
@@ -50,6 +51,7 @@ export interface ManifestRenderPlan {
   slideCount: number;
   slides: PreparedManifestSlide[];
   deckRuntimeBundle: string | null;
+  tailwindRuntimeBundle: string;
 }
 
 function resolveAbsolutePath(targetPath: string, fieldName: string): string {
@@ -146,6 +148,7 @@ function escapeJsonForInlineScript(value: unknown): string {
 function buildSlideDocumentHtml(input: {
   context: BrowserRenderContext;
   runtimeBundle?: string | null;
+  tailwindRuntimeBundle: string;
 }): string {
   const runtimeBundle = input.runtimeBundle ?? getBrowserRenderRuntimeBundle();
   const serializedContext = escapeJsonForInlineScript(input.context);
@@ -162,8 +165,9 @@ function buildSlideDocumentHtml(input: {
     "    #presentation-slides-wrapper { width: 1280px; min-height: 720px; }",
     '    [data-presenton-render-status="error"] { display: flex; align-items: center; justify-content: center; color: #991b1b; background: #fef2f2; font-size: 14px; padding: 24px; box-sizing: border-box; }',
     "  </style>",
-    "  <script>window.tailwind = window.tailwind || {};</script>",
-    '  <script src="https://cdn.tailwindcss.com"></script>',
+    '  <script data-presenton-runtime="tailwind">',
+    input.tailwindRuntimeBundle,
+    "  </script>",
     "</head>",
     "<body>",
     '  <div id="presentation-slides-wrapper" data-presenton-render-status="loading"></div>',
@@ -242,6 +246,7 @@ export async function prepareManifestRenderPlan(input: {
     pageId: entry.slide.id,
     absolutePath: entry.absolutePath,
   }));
+  const tailwindRuntimeBundle = await getTailwindBrowserRuntimeBundle();
   const runtimeBundles = await buildPageSourceRuntimeBundles({
     cwd: manifestCwd,
     bundles: [
@@ -291,7 +296,11 @@ export async function prepareManifestRenderPlan(input: {
     const fileName = `${pageNumber}-${deckBaseName}-${sanitizeFileNamePart(slide.id)}.png`;
     return {
       context,
-      html: buildSlideDocumentHtml({ context, runtimeBundle: slideRuntimeBundle }),
+      html: buildSlideDocumentHtml({
+        context,
+        runtimeBundle: slideRuntimeBundle,
+        tailwindRuntimeBundle,
+      }),
       sourceIndex,
       pageNumber,
       slideId: slide.id,
@@ -314,5 +323,6 @@ export async function prepareManifestRenderPlan(input: {
     slideCount: manifest.slides.length,
     slides,
     deckRuntimeBundle,
+    tailwindRuntimeBundle,
   };
 }

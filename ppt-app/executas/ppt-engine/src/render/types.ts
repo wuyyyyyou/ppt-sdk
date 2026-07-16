@@ -37,6 +37,7 @@ export interface BuildDeckHtmlInput {
   slides: BuildDeckHtmlSlideInput[];
   title?: string | null;
   runtimeBundle?: string | null;
+  tailwindRuntimeBundle?: string | null;
 }
 
 export interface BuildStandaloneDeckHtmlSlideInput {
@@ -48,6 +49,7 @@ export interface BuildStandaloneDeckHtmlInput {
   slides: BuildStandaloneDeckHtmlSlideInput[];
   title?: string | null;
   runtimeBundle?: string | null;
+  tailwindRuntimeBundle?: string | null;
 }
 
 export interface LegacyBuiltinDeckManifestSlideSource {

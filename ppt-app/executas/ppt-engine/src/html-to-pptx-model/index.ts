@@ -20,6 +20,10 @@ import {
   launchManagedBrowser,
   waitForRenderReady,
 } from "../runtime/browser-runtime.js";
+import {
+  installRenderReadinessTracking,
+  waitForRenderReadiness,
+} from "../render/static-html.js";
 
 export * from "./types/browser.js";
 export * from "./types/element-attributes.js";
@@ -110,6 +114,7 @@ export async function convertDeckHtmlToPptxModel(
       });
       debugLog("evaluateOnNewDocument.disableViewerMode.done");
     }
+    await installRenderReadinessTracking(runtime.page);
 
     const deckSelector = input.deckSelector ?? DEFAULT_DECK_SELECTOR;
     const contentTimeoutMs = input.contentTimeoutMs ?? 300000;
@@ -149,6 +154,10 @@ export async function convertDeckHtmlToPptxModel(
       input.renderReadyTimeoutMs ?? contentTimeoutMs,
     );
     debugLog("waitForDeckRenderReady.done");
+    await waitForRenderReadiness(runtime.page, {
+      timeoutMs: input.renderReadyTimeoutMs ?? contentTimeoutMs,
+      requireTailwind: false,
+    });
 
     if (input.settleTimeMs && input.settleTimeMs > 0) {
       debugLog("settle.start", { settleTimeMs: input.settleTimeMs });

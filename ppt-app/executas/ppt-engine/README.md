@@ -114,11 +114,13 @@ workspace/
 
 `buildDeckHtmlFromManifest` 读取 `manifest_path` 指向的 JSON 文件，把结果写到 `output_dir`，并返回输出文件路径和基础元数据。它会输出整体的 `*-deck.html`，并为每一页输出浏览器渲染后的 PNG 截图，便于多模态 Agent 检查页面视觉结果。
 
-Page Source HTML 是从权威 Page Source 重建的机器产物，不应直接编辑。当前产物仍是自包含、可执行的 React HTML，但 browser runtime 固定使用 production 构建并压缩：
+Page Source HTML 是从权威 Page Source 重建的机器产物，不应直接编辑。按照 [ADR-0021](../../../docs/adr/0021-persist-browser-rendered-static-html-snapshots.md)，所有 manifest 渲染入口内部先执行 Page Source，再只把浏览器完成渲染后的静态 DOM HTML 写入正式输出。
 
-- 每个单页 HTML 只打包当前 Page Source 及其真实依赖，不包含其他页面的 Page Source。
-- Deck HTML 一次性打包当前 manifest 中的全部 Page Source。
-- 不同单页共同使用的 React、Recharts 等依赖仍会分别内联，以保证每个单页 HTML 可以独立打开。
+- 单页 HTML 和 Deck HTML 的可见 DOM、Tailwind 最终 CSS、Recharts SVG 等内容在文件中已经存在，重新打开时不执行 React 或 Page Source。
+- 普通图片、字体和其他资源链接保持原有引用语义，不额外复制到新的资源目录。
+- Deck HTML 可以保留引擎自有的小型查看器脚本；页面内部 React 交互不会进入静态产物。
+- Tailwind 使用随 ppt-engine 和 SEA 二进制发布的固定 `@tailwindcss/browser` 4.3.2，正式 HTML 不加载 Tailwind CDN 或携带 Tailwind runtime。
+- 截图和 HTML 到 PPTX Model 转换从重新打开的静态 HTML 生成。
 
 `manifest_path` 和 `output_dir` 必须是绝对路径。逐页 PNG 需要真实浏览器渲染，运行时需要本机有可用的 Chrome / Chrome for Testing。
 

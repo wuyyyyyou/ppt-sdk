@@ -95,10 +95,6 @@ test("Page Source HTML uses a production minified runtime", async () => {
     const html = plan.slides[0]?.html ?? "";
 
     assert.doesNotMatch(html, /react(?:-dom)?\.development\.js/);
-    assert.ok(
-      Buffer.byteLength(html, "utf8") < 256 * 1024,
-      `Expected blank Page Source HTML to stay below 256 KiB, got ${Buffer.byteLength(html, "utf8")} bytes`,
-    );
   });
 });
 

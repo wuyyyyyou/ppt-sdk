@@ -564,6 +564,7 @@ function buildDeckDocumentHtml(input: {
   title: string;
   parsedSlides: ParsedSlideInput[];
   runtimeBundle?: string | null;
+  tailwindRuntimeBundle?: string | null;
 }): string {
   const runtimeBundle = input.runtimeBundle ?? getBrowserRenderDeckRuntimeBundle();
   const contexts = input.parsedSlides
@@ -591,10 +592,18 @@ function buildDeckDocumentHtml(input: {
     "      box-sizing: border-box;",
     "    }",
     "  </style>",
-    "  <script>",
-    "    window.tailwind = window.tailwind || {};",
-    "  </script>",
-    '  <script src="https://cdn.tailwindcss.com"></script>',
+    ...(input.tailwindRuntimeBundle
+      ? [
+        '  <script data-presenton-runtime="tailwind">',
+        input.tailwindRuntimeBundle,
+        "  </script>",
+      ]
+      : [
+        "  <script>",
+        "    window.tailwind = window.tailwind || {};",
+        "  </script>",
+        '  <script src="https://cdn.tailwindcss.com"></script>',
+      ]),
     "</head>",
     "<body>",
     ...buildDeckViewerShellStart(input.title),
@@ -616,7 +625,7 @@ function buildDeckDocumentHtml(input: {
     contexts.length > 0
       ? ["  <script>", runtimeBundle, "  </script>"].join("\n")
       : ["  <script>", buildDeckReadyScript(), "  </script>"].join("\n"),
-    "  <script>",
+    '  <script data-presenton-static-script="viewer">',
     buildDeckViewerScript(),
     "  </script>",
     "</body>",
@@ -653,6 +662,7 @@ export function buildDeckHtml(input: BuildDeckHtmlInput): string {
     title,
     parsedSlides,
     runtimeBundle: input.runtimeBundle,
+    tailwindRuntimeBundle: input.tailwindRuntimeBundle,
   });
 }
 
@@ -663,5 +673,6 @@ export function buildStandaloneDeckHtml(
     title: input.title,
     slides: input.slides,
     runtimeBundle: input.runtimeBundle,
+    tailwindRuntimeBundle: input.tailwindRuntimeBundle,
   });
 }

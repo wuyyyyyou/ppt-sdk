@@ -35,7 +35,7 @@
     "sync:engine-manifest": "node ../../scripts/sync-ppt-engine-manifest.mjs",
     "prebuild": "npm run sync:engine-manifest",
     "dev": "tsx src/cli.ts",
-    "build": "node ./scripts/build-template-registry.mjs && node ./scripts/preserve-dist-template-previews.mjs save && tsup && node ./scripts/preserve-dist-template-previews.mjs restore && node ./scripts/build-authoring-kit.mjs && node ./scripts/build-forkable-templates.mjs",
+    "build": "node ./scripts/build-template-registry.mjs && node ./scripts/preserve-dist-template-previews.mjs save && tsup && node ./scripts/build-tailwind-runtime.mjs && node ./scripts/preserve-dist-template-previews.mjs restore && node ./scripts/build-authoring-kit.mjs && node ./scripts/build-forkable-templates.mjs",
     "build:full": "npm run build && npm run build:template-previews",
     "build:template-previews": "node ./scripts/build-template-previews.mjs",
     "check": "tsc --noEmit",
@@ -46,6 +46,7 @@
     "test": "node -e \"console.log('No vendored automated tests in this example package')\""
   },
   "dependencies": {
+    "@tailwindcss/browser": "4.3.2",
     "ajv": "^8.20.0",
     "esbuild": "^0.27.4",
     "pptx-svg": "^0.6.4",
