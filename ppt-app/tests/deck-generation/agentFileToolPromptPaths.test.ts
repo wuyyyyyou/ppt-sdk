@@ -17,17 +17,18 @@ const workspaceRoot = "/tmp/anna-workspace/ppt";
 const workspaceDir = "/tmp/anna-workspace/ppt/ppt-20260630-152620";
 
 const outline: WorkspaceOutline = {
-  version: 2,
+  version: 3,
   title: "Demo Deck",
   output_language: "English",
   status: "confirmed",
-  items: [{ title: "Intro", outline: "Set context" }],
+  items: [{ title: "Intro", core_message: "Set context", required_content: "- Establish the context." }],
   source: {
     prompt: "make a deck",
     context: [],
     setting: { output_language: "English" },
   },
   updated_at: "2026-06-30T00:00:00.000Z",
+  confirmed_at: "2026-06-30T00:00:00.000Z",
 };
 
 const page: PagePlanItem = {

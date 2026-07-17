@@ -23,9 +23,7 @@ function normalizeNonEmptyString(value: unknown): string {
 
 export function validateGeneratedOutline(
   value: unknown,
-  expectedSlideCount: number | null
 ): GeneratedOutline {
-  void expectedSlideCount;
   const errors: string[] = [];
 
   if (!isRecord(value)) {
@@ -35,11 +33,6 @@ export function validateGeneratedOutline(
   const title = normalizeNonEmptyString(value.title);
   if (!title) {
     errors.push("title must be a non-empty string");
-  }
-
-  const outputLanguage = normalizeNonEmptyString(value.output_language);
-  if (!outputLanguage) {
-    errors.push("output_language must be a non-empty string");
   }
 
   if (!Array.isArray(value.items)) {
@@ -54,27 +47,43 @@ export function validateGeneratedOutline(
   const items: OutlineDetail[] = rawItems.map((item, index) => {
     if (!isRecord(item)) {
       errors.push(`items[${index}] must be an object`);
-      return { title: "", outline: "" };
+      return { title: "", core_message: "", required_content: "" };
     }
 
     const keys = Object.keys(item);
-    const unsupportedKeys = keys.filter((key) => key !== "title" && key !== "outline");
+    const unsupportedKeys = keys.filter(
+      (key) => key !== "title" && key !== "core_message" && key !== "required_content",
+    );
     if (unsupportedKeys.length > 0) {
       errors.push(`items[${index}] has unsupported fields: ${unsupportedKeys.join(", ")}`);
     }
 
     const itemTitle = normalizeNonEmptyString(item.title);
-    const outline = normalizeNonEmptyString(item.outline);
+    const coreMessage = normalizeNonEmptyString(item.core_message);
     if (!itemTitle) {
       errors.push(`items[${index}].title must be a non-empty string`);
     }
-    if (!outline) {
-      errors.push(`items[${index}].outline must be a non-empty string`);
+    if (/\r|\n/u.test(itemTitle)) {
+      errors.push(`items[${index}].title must be a single line`);
+    }
+    if (!coreMessage) {
+      errors.push(`items[${index}].core_message must be a non-empty string`);
+    } else if (/\r|\n/u.test(coreMessage)) {
+      errors.push(`items[${index}].core_message must be a single line`);
+    }
+    const requiredContent = Array.isArray(item.required_content)
+      ? item.required_content.map(normalizeNonEmptyString)
+      : [];
+    if (!Array.isArray(item.required_content) || requiredContent.length === 0) {
+      errors.push(`items[${index}].required_content must be a non-empty array`);
+    } else if (requiredContent.some((entry) => !entry || /\r|\n/u.test(entry))) {
+      errors.push(`items[${index}].required_content entries must be non-empty single-line strings`);
     }
 
     return {
       title: itemTitle,
-      outline,
+      core_message: coreMessage,
+      required_content: requiredContent.map((entry) => `- ${entry}`).join("\n"),
     };
   });
 
@@ -84,7 +93,6 @@ export function validateGeneratedOutline(
 
   return {
     title,
-    output_language: outputLanguage,
     items,
   };
 }

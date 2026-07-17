@@ -102,8 +102,6 @@ export function App() {
               closeStyleProfileDetail={actions.closeStyleProfileDetail}
               selectStyleProfile={actions.selectStyleProfile}
               clearStyleProfile={actions.clearStyleProfile}
-              reviewOutlineFirst={state.reviewOutlineFirst}
-              setReviewOutlineFirst={actions.setReviewOutlineFirst}
               pageReviewSettings={state.pageReviewSettings}
               setStrictReviewMode={actions.setStrictReviewMode}
               researchSearchControlSettings={state.researchSearchControlSettings}
@@ -138,22 +136,24 @@ export function App() {
           {state.page === "main" && state.stage === "outline" ? (
             <OutlinePage
               t={t}
-              outline={state.outline}
-              outlineDraft={state.outlineDraft}
-              outputLanguage={state.outlineOutputLanguage}
-              outputLanguageDraft={state.outlineDraftOutputLanguage}
-              outlineEditMode={state.outlineEditMode}
-              beginOutlineEdit={actions.beginOutlineEdit}
-              cancelOutlineEdit={actions.cancelOutlineEdit}
-              saveOutlineEdit={actions.saveOutlineEdit}
-              updateOutlineDraftItem={actions.updateOutlineDraftItem}
-              setOutputLanguageDraft={actions.setOutlineDraftOutputLanguage}
+              title={state.outlineDraftTitle}
+              outline={state.outlineDraft}
+              dirty={state.outlineDirty}
+              error={state.outlineError}
+              setTitle={actions.setOutlineDraftTitle}
+              updateItem={actions.updateOutlineDraftItem}
+              addItem={actions.addOutlineDraftItem}
+              insertItem={actions.insertOutlineDraftItem}
+              deleteItem={actions.deleteOutlineDraftItem}
+              moveItem={actions.moveOutlineDraftItem}
+              save={actions.saveOutlineDraft}
+              retry={actions.retryOutlineCreation}
+              backToRequirements={actions.returnToRequirementsFromOutline}
               feedback={state.outlineFeedback}
               setFeedback={actions.setOutlineFeedback}
               applyFeedback={actions.applyOutlineFeedback}
-              createDeck={actions.createDeckFromOutline}
+              confirm={actions.createDeckFromOutline}
               loading={state.loading}
-              uploadedSourceAnalysisState={state.uploadedSourceAnalysisState}
             />
           ) : null}
 

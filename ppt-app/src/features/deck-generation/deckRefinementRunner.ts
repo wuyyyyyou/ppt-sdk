@@ -27,6 +27,7 @@ import {
   prepareDeckRefinementGenerationArtifacts,
   reconcileDeckRefinement,
 } from "./deckRefinementArtifacts";
+import { legacyOutlineTextToDetail } from "../../data/mockDeck";
 import {
   recordDeckRecovery,
   throwIfCancelled,
@@ -325,8 +326,7 @@ export async function runDeckRefinementWorkflow(args: {
   const addedOutlineItems = review.operations
     .filter((operation): operation is Extract<typeof operation, { op: "add" }> => operation.op === "add")
     .map((operation) => ({
-      title: operation.title,
-      outline: operation.outline,
+      ...legacyOutlineTextToDetail(operation.title, operation.outline),
     }));
   const addedPagePlan = addedOutlineItems.length > 0
     ? await flowInput.aiClient.generateAddedPagePlan({

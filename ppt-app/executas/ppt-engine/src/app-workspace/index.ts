@@ -58,7 +58,6 @@ import type {
   AppWorkspaceSummary,
   AppWorkspaceOutline,
   AppWorkspaceOutlineItem,
-  AppWorkspaceOutlineSource,
   AppPagePlan,
   AppPagePlanItem,
   AppPageProgress,
@@ -163,7 +162,9 @@ import type {
   SelectAppWorkspaceStyleProfileResult,
   StartAppPptxExportModelInput,
   UpdateAppWorkspacePagesInput,
-  UpdateAppWorkspaceOutlineInput,
+  ConfirmAppWorkspaceOutlineInput,
+  ResetAppWorkspaceOutlineInput,
+  SaveAppWorkspaceOutlineDraftInput,
   UpdateAppWorkspaceRequirementsInput,
   UpdateAppWorkspaceSettingsInput,
   UpdateAppWorkspaceTitleInput,
@@ -923,7 +924,6 @@ function createDefaultSettingJson() {
     content_review_failure_limit: 5,
     visual_review_enabled: false,
     visual_review_failure_limit: 2,
-    review_outline_first: false,
     disable_web_research: false,
     disable_image_research: false,
   };
@@ -973,7 +973,6 @@ function normalizeSettingJson(setting: unknown): Record<string, unknown> {
 
   nextSetting.content_review_enabled = nextSetting.content_review_enabled === true;
   nextSetting.visual_review_enabled = nextSetting.visual_review_enabled === true;
-  nextSetting.review_outline_first = nextSetting.review_outline_first === true;
   nextSetting.disable_web_research = nextSetting.disable_web_research === true;
   nextSetting.disable_image_research = nextSetting.disable_image_research === true;
   nextSetting.page_generation_concurrency = normalizePageGenerationConcurrency(
@@ -1241,91 +1240,118 @@ function sanitizeFileNameBase(value: string): string {
   return normalized || "deck";
 }
 
-function normalizeOutlineItem(value: unknown): AppWorkspaceOutlineItem | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
+const OUTLINE_BULLET_PATTERN = /^(\s*)(?:[-*+•]|\d+[.)])\s+(.+)$/;
+const OUTLINE_EMPTY_BULLET_PATTERN = /^(\s*)(?:[-*+•]|\d+[.)])\s*$/;
+
+function normalizeRequiredContentMarkdown(value: unknown, fieldName: string): string {
+  if (typeof value !== "string") {
+    throw new Error(`${fieldName} must be a Markdown string`);
   }
+  const lines = value
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+$/u, ""))
+    .filter((line) => line.trim().length > 0);
+  const normalized = lines.map((line, index) => {
+    const match = OUTLINE_BULLET_PATTERN.exec(line);
+    if (OUTLINE_EMPTY_BULLET_PATTERN.test(line)) {
+      throw new Error(`${fieldName} line ${index + 1} must not be empty`);
+    }
+    const indentation = match?.[1] ?? line.match(/^(\s*)/)?.[1] ?? "";
+    const content = (match?.[2] ?? line).trim();
+    if (!content) {
+      throw new Error(`${fieldName} line ${index + 1} must not be empty`);
+    }
+    return `${indentation}- ${content}`;
+  });
+  if (normalized.length === 0) {
+    throw new Error(`${fieldName} must contain at least one Markdown list item`);
+  }
+  return normalized.join("\n");
+}
 
-  const record = value as Record<string, unknown>;
+function normalizeOutlineLine(value: unknown, fieldName: string): string {
+  const normalized = normalizeString(value).trim();
+  if (!normalized) throw new Error(`${fieldName} must be a non-empty string`);
+  if (/\r|\n/u.test(normalized)) throw new Error(`${fieldName} must be a single line`);
+  return normalized;
+}
 
+function normalizeValidOutlineItem(value: unknown, index: number): AppWorkspaceOutlineItem {
+  if (!isRecord(value)) throw new Error(`outline.items[${index}] must be an object`);
+  assertExactKeys(value, ["title", "core_message", "required_content"], `outline.items[${index}]`);
   return {
-    title: normalizeString(record.title),
-    outline: normalizeString(record.outline),
+    title: normalizeOutlineLine(value.title, `outline.items[${index}].title`),
+    core_message: normalizeOutlineLine(value.core_message, `outline.items[${index}].core_message`),
+    required_content: normalizeRequiredContentMarkdown(
+      value.required_content,
+      `outline.items[${index}].required_content`,
+    ),
   };
 }
 
-function normalizeUploadedSourceAnalysisDependency(value: unknown): AppWorkspaceOutlineSource["uploaded_source_analysis"] | undefined {
-  const record =
-    value && typeof value === "object" && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
-      : null;
-  if (!record) return undefined;
-  const status = record.status === "ready" || record.status === "blocked" || record.status === "gap"
-    ? record.status
-    : "";
-  const updatedAt = normalizeString(record.updated_at);
-  const activeUploadedSources = Array.isArray(record.active_uploaded_sources)
-    ? record.active_uploaded_sources
-        .map((item) => {
-          const source =
-            item && typeof item === "object" && !Array.isArray(item)
-              ? (item as Record<string, unknown>)
-              : {};
-          const uploadedSourceId = normalizeString(source.uploaded_source_id);
-          const sha256 = normalizeString(source.sha256);
-          const sizeBytes = typeof source.size_bytes === "number" ? source.size_bytes : NaN;
-          if (!uploadedSourceId || !sha256 || !Number.isFinite(sizeBytes)) return null;
-          return {
-            uploaded_source_id: uploadedSourceId,
-            sha256,
-            size_bytes: sizeBytes,
-            ...(normalizeString(source.file_path) ? { file_path: normalizeString(source.file_path) } : {}),
-          };
-        })
-        .filter((item): item is NonNullable<typeof item> => item !== null)
-    : [];
-  if (!status || !updatedAt || activeUploadedSources.length === 0) return undefined;
+function outlineItemFromLegacyText(titleValue: unknown, textValue: unknown): AppWorkspaceOutlineItem {
+  const title = normalizeString(titleValue).trim() || "Untitled Page";
+  const lines = normalizeString(textValue).split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const coreMessage = lines[0] ?? title;
+  const requiredLines = lines.length > 1 ? lines.slice(1) : [coreMessage];
   return {
-    status,
-    updated_at: updatedAt,
-    active_uploaded_sources: activeUploadedSources,
+    title: title.replace(/\r|\n/gu, " "),
+    core_message: coreMessage.replace(/\r|\n/gu, " "),
+    required_content: requiredLines
+      .map((line) => `- ${line.replace(/^(?:[-*+•]|\d+[.)])\s+/u, "")}`)
+      .join("\n"),
+  };
+}
+
+function createEmptyOutlineJson(): AppWorkspaceOutline {
+  return {
+    version: 3,
+    status: "empty",
+    title: "",
+    items: [],
+    updated_at: null,
+    confirmed_at: null,
   };
 }
 
 function normalizeOutlineJson(outline: unknown): AppWorkspaceOutline {
-  const existing =
-    outline && typeof outline === "object" && !Array.isArray(outline)
-      ? (outline as Record<string, unknown>)
-      : {};
-  const source =
-    existing.source && typeof existing.source === "object" && !Array.isArray(existing.source)
-      ? (existing.source as Record<string, unknown>)
-      : {};
-  const items = Array.isArray(existing.items)
-    ? existing.items
-        .map(normalizeOutlineItem)
-        .filter((item): item is AppWorkspaceOutlineItem => item !== null)
-    : [];
-  const uploadedSourceAnalysisDependency = normalizeUploadedSourceAnalysisDependency(source.uploaded_source_analysis);
-
+  if (!isRecord(outline) || outline.version !== 3) return createEmptyOutlineJson();
+  assertExactKeys(
+    outline,
+    ["version", "status", "title", "items", "updated_at", "confirmed_at"],
+    "outline.json",
+  );
+  if (outline.status !== "empty" && outline.status !== "draft" && outline.status !== "confirmed") {
+    throw new Error('outline.status must be "empty", "draft", or "confirmed"');
+  }
+  if (outline.status === "empty") {
+    if (outline.title !== "" || !Array.isArray(outline.items) || outline.items.length !== 0 ||
+      outline.updated_at !== null || outline.confirmed_at !== null) {
+      throw new Error("empty outline cannot include content or timestamps");
+    }
+    return createEmptyOutlineJson();
+  }
+  const title = normalizeOutlineLine(outline.title, "outline.title");
+  if (!Array.isArray(outline.items) || outline.items.length === 0) {
+    throw new Error("outline.items must contain at least one page");
+  }
+  const items = outline.items.map(normalizeValidOutlineItem);
+  const updatedAt = normalizeString(outline.updated_at).trim();
+  if (!updatedAt) throw new Error("persisted outline.updated_at must be a non-empty string");
+  const confirmedAt = outline.confirmed_at === null ? null : normalizeString(outline.confirmed_at).trim();
+  if (outline.status === "confirmed" && !confirmedAt) {
+    throw new Error("confirmed outline.confirmed_at must be a non-empty string");
+  }
+  if (outline.status === "draft" && confirmedAt !== null) {
+    throw new Error("draft outline.confirmed_at must be null");
+  }
   return {
-    version: 2,
-    title: normalizeString(existing.title),
-    output_language: normalizeString(existing.output_language) || "auto",
-    status: existing.status === "confirmed" ? "confirmed" : "draft",
+    version: 3,
+    status: outline.status,
+    title,
     items,
-    source: {
-      prompt: normalizeString(source.prompt),
-      context: Array.isArray(source.context) ? source.context : [],
-      ...(Array.isArray(source.task_context) ? { task_context: source.task_context } : {}),
-      setting:
-        source.setting && typeof source.setting === "object" && !Array.isArray(source.setting)
-          ? (source.setting as Record<string, unknown>)
-          : {},
-      kind: normalizeString(source.kind) || undefined,
-      ...(uploadedSourceAnalysisDependency ? { uploaded_source_analysis: uploadedSourceAnalysisDependency } : {}),
-    },
-    updated_at: typeof existing.updated_at === "string" ? existing.updated_at : null,
+    updated_at: updatedAt,
+    confirmed_at: confirmedAt,
   };
 }
 
@@ -1831,12 +1857,7 @@ async function ensureWorkspaceFiles(
     currentTaskSetting && typeof currentTaskSetting === "object" && !Array.isArray(currentTaskSetting)
       ? (currentTaskSetting as Record<string, unknown>)
       : {};
-  const normalizedTaskSetting = normalizeSettingJson({
-    ...(Object.prototype.hasOwnProperty.call(currentTaskSettingRecord, "review_outline_first")
-      ? {}
-      : { review_outline_first: workspaceSettingDefaults.review_outline_first === true }),
-    ...currentTaskSettingRecord,
-  });
+  const normalizedTaskSetting = normalizeSettingJson(currentTaskSettingRecord);
   if (JSON.stringify(currentTaskSetting) !== JSON.stringify(normalizedTaskSetting)) {
     await writeJsonFile(files.setting, normalizedTaskSetting);
   }
@@ -2004,7 +2025,6 @@ export async function createAppWorkspace(
       setting.visual_review_failure_limit,
       2,
     ),
-    review_outline_first: setting.review_outline_first === true,
     disable_web_research: setting.disable_web_research === true,
     disable_image_research: setting.disable_image_research === true,
   };
@@ -3352,10 +3372,10 @@ export async function updateAppWorkspacePages(
   const outlineRecord = normalizeOutlineJson(await readJsonFileIfExists(workspace.files.outline));
   await writeJsonFile(workspace.files.outline, {
     ...outlineRecord,
-    items: nextManifestSlides.map((slide) => ({
-      title: normalizeString(slide.title),
-      outline: normalizeString(slide.speaker_note) || normalizeString(slide.id),
-    })),
+    items: nextManifestSlides.map((slide) => outlineItemFromLegacyText(
+      slide.title,
+      normalizeString(slide.speaker_note) || normalizeString(slide.id),
+    )),
     updated_at: updatedAt,
   });
 
@@ -3488,10 +3508,10 @@ export async function duplicateAppWorkspacePage(
   const outlineRecord = normalizeOutlineJson(await readJsonFileIfExists(workspace.files.outline));
   await writeJsonFile(workspace.files.outline, {
     ...outlineRecord,
-    items: nextManifestSlides.map((slide) => ({
-      title: normalizeString(slide.title),
-      outline: normalizeString(slide.speaker_note) || normalizeString(slide.id),
-    })),
+    items: nextManifestSlides.map((slide) => outlineItemFromLegacyText(
+      slide.title,
+      normalizeString(slide.speaker_note) || normalizeString(slide.id),
+    )),
     updated_at: updatedAt,
   });
 
@@ -4305,24 +4325,80 @@ export async function getAppResearchStatus(input: GetAppResearchStatusInput): Pr
   return normalizeResearchArtifact(existing, "idle");
 }
 
-export async function updateAppWorkspaceOutline(
-  input: UpdateAppWorkspaceOutlineInput,
+function buildPersistedOutline(
+  outline: SaveAppWorkspaceOutlineDraftInput["outline"],
+  status: "draft" | "confirmed",
+  updatedAt: string,
+): AppWorkspaceOutline {
+  const title = normalizeOutlineLine(outline.title, "outline.title");
+  if (!Array.isArray(outline.items) || outline.items.length === 0) {
+    throw new Error("outline.items must contain at least one page");
+  }
+  return {
+    version: 3,
+    status,
+    title,
+    items: outline.items.map(normalizeValidOutlineItem),
+    updated_at: updatedAt,
+    confirmed_at: status === "confirmed" ? updatedAt : null,
+  };
+}
+
+async function persistAppWorkspaceOutline(
+  input: SaveAppWorkspaceOutlineDraftInput,
+  status: "draft" | "confirmed",
 ): Promise<AppWorkspaceResult> {
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
   const requirements = normalizePresentationRequirements(workspace.requirements);
   if (requirements.status !== "confirmed") {
-    throw new Error("Confirmed Presentation Requirements are required before Outline Creation.");
+    throw new Error("Confirmed Presentation Requirements are required before saving an Outline.");
   }
   const updatedAt = new Date().toISOString();
-  const nextOutline = normalizeOutlineJson({
-    ...normalizeOutlineJson(workspace.outline),
-    ...input.outline,
+  const nextOutline = buildPersistedOutline(input.outline, status, updatedAt);
+  const nextRequirements: AppPresentationRequirements = {
+    ...requirements,
+    selections: {
+      ...requirements.selections,
+      slide_count: nextOutline.items.length,
+    },
+    updated_at: updatedAt,
+    confirmed_at: updatedAt,
+  };
+  const currentTask = getPlainRecord(workspace.task);
+  await writeJsonFile(workspace.files.outline, nextOutline);
+  await writeJsonFile(workspace.files.requirements, nextRequirements);
+  await writeJsonFile(workspace.files.task, {
+    ...currentTask,
+    title: nextOutline.title,
     updated_at: updatedAt,
   });
+  return ensureWorkspaceFiles(input.workspace_dir);
+}
 
-  await writeJsonFile(workspace.files.outline, nextOutline);
+export async function resetAppWorkspaceOutline(
+  input: ResetAppWorkspaceOutlineInput,
+): Promise<AppWorkspaceResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const requirements = normalizePresentationRequirements(workspace.requirements);
+  if (requirements.status !== "confirmed") {
+    throw new Error("Confirmed Presentation Requirements are required before resetting an Outline.");
+  }
+  const updatedAt = new Date().toISOString();
+  await writeJsonFile(workspace.files.outline, createEmptyOutlineJson());
   await touchWorkspaceTask(workspace, updatedAt);
   return ensureWorkspaceFiles(input.workspace_dir);
+}
+
+export async function saveAppWorkspaceOutlineDraft(
+  input: SaveAppWorkspaceOutlineDraftInput,
+): Promise<AppWorkspaceResult> {
+  return persistAppWorkspaceOutline(input, "draft");
+}
+
+export async function confirmAppWorkspaceOutline(
+  input: ConfirmAppWorkspaceOutlineInput,
+): Promise<AppWorkspaceResult> {
+  return persistAppWorkspaceOutline(input, "confirmed");
 }
 
 function buildTemplatePreviewUrl(image: TemplatePreviewImage): string {
@@ -5778,7 +5854,9 @@ export type {
   RenderAppWorkspacePagePreviewResult,
   SelectAppWorkspaceTemplateInput,
   SelectAppWorkspaceTemplateResult,
-  UpdateAppWorkspaceOutlineInput,
+  ConfirmAppWorkspaceOutlineInput,
+  ResetAppWorkspaceOutlineInput,
+  SaveAppWorkspaceOutlineDraftInput,
   UpdateAppWorkspaceRequirementsInput,
   UpdateAppWorkspacePagesInput,
   UpdateAppWorkspaceSettingsInput,

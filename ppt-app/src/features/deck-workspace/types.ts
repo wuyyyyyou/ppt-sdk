@@ -79,7 +79,6 @@ export interface DeckWorkspaceState {
   stage: MainStage;
   toast: string;
   prompt: string;
-  reviewOutlineFirst: boolean;
   pageReviewSettings: PageReviewSettings;
   researchSearchControlSettings: ResearchSearchControlSettings;
   contextRows: ContextRow[];
@@ -93,9 +92,9 @@ export interface DeckWorkspaceState {
   deck: Slide[];
   outline: OutlineDetail[];
   outlineDraft: OutlineDetail[];
-  outlineOutputLanguage: string;
-  outlineDraftOutputLanguage: string;
-  outlineEditMode: boolean;
+  outlineDraftTitle: string;
+  outlineDirty: boolean;
+  outlineError: string;
   generated: boolean;
   currentSlide: number;
   outlineFeedback: string;

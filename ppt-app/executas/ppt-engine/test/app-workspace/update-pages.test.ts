@@ -37,12 +37,16 @@ test("workspace page updates reorder, delete, and duplicate rendered pages", asy
     });
     await writeJson(path.join(workspaceDir, "setting.json"), {});
     await writeJson(path.join(workspaceDir, "outline.json"), {
-      version: 2,
+      version: 3,
       title: "Update pages fixture",
       status: "confirmed",
-      items: [],
-      source: { prompt: "", context: [], setting: {} },
-      updated_at: null,
+      items: [
+        { title: "Slide A", core_message: "A", required_content: "- A note" },
+        { title: "Slide B", core_message: "B", required_content: "- B note" },
+        { title: "Slide C", core_message: "C", required_content: "- C note" },
+      ],
+      updated_at: "2026-05-28T00:00:00.000Z",
+      confirmed_at: "2026-05-28T00:00:00.000Z",
     });
     await writeJson(path.join(workspaceDir, "template.json"), {
       version: 1,

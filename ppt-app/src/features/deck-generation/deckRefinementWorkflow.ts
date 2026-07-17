@@ -9,6 +9,7 @@ import type {
   WorkspaceOutline,
   WorkspaceSettings,
 } from "../../api/types";
+import { legacyOutlineTextToDetail } from "../../data/mockDeck";
 
 function cleanSegment(value: string): string {
   const ascii = value
@@ -199,20 +200,24 @@ export function reconcileDeckRefinement(input: {
   const outputLanguage = input.review.output_language_change.changed
     ? input.review.output_language_change.output_language || input.outline.output_language
     : input.outline.output_language;
+  const source = input.outline.source ?? {
+    prompt: "",
+    context: [],
+    setting: {},
+  };
   const nextOutline: WorkspaceOutline = {
     ...input.outline,
     status: "confirmed",
     output_language: outputLanguage,
     source: {
-      ...input.outline.source,
+      ...source,
       setting: {
-        ...input.outline.source.setting,
+        ...source.setting,
         ...(input.review.output_language_change.changed ? { output_language: outputLanguage } : {}),
       },
     },
     items: reindexedPages.map((page) => ({
-      title: page.title,
-      outline: page.outline,
+      ...legacyOutlineTextToDetail(page.title, page.outline),
     })),
     updated_at: input.now,
   };

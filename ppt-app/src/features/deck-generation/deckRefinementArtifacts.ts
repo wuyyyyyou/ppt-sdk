@@ -75,22 +75,18 @@ export async function persistDeckRefinementArtifacts(input: {
       setting: result.setting,
     };
   }
-  const updatedWorkspace = await flowInput.backend.updateWorkspaceOutline({
+  const updatedWorkspace = await flowInput.backend.confirmWorkspaceOutline({
     workspace_dir: flowInput.workspace.workspace_dir,
     outline: {
       title: reconciliation.outline.title,
-      output_language: reconciliation.outline.output_language,
-      status: "confirmed",
       items: reconciliation.outline.items,
-      source: {
-        prompt: reconciliation.outline.source.prompt,
-        context: reconciliation.outline.source.context,
-        task_context: reconciliation.outline.source.task_context,
-        setting: reconciliation.outline.source.setting,
-      },
     },
   });
-  const persistedOutline = updatedWorkspace.outline as WorkspaceOutline;
+  const persistedOutline = {
+    ...updatedWorkspace.outline as WorkspaceOutline,
+    output_language: reconciliation.outline.output_language,
+    source: reconciliation.outline.source,
+  };
   const persistedPagePlan = alignDeckRefinementPagePlanToOutline({
     pagePlan: reconciliation.pagePlan,
     outline: persistedOutline,

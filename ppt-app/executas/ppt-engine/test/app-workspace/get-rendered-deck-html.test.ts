@@ -32,12 +32,12 @@ async function createRenderedWorkspace(homeDir: string) {
   });
   await writeJson(path.join(workspaceDir, "setting.json"), {});
   await writeJson(path.join(workspaceDir, "outline.json"), {
-    version: 2,
+    version: 3,
     title: "Cached render fixture",
     status: "confirmed",
-    items: [{ title: "Slide A", outline: "A note" }],
-    source: { prompt: "", context: [], setting: {} },
-    updated_at: null,
+    items: [{ title: "Slide A", core_message: "A note", required_content: "- Render the cached page." }],
+    updated_at: "2026-06-30T00:00:00.000Z",
+    confirmed_at: "2026-06-30T00:00:00.000Z",
   });
   await writeJson(path.join(workspaceDir, "template.json"), {
     version: 1,

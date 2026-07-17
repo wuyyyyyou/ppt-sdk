@@ -1,8 +1,9 @@
 import type { AnnaLlmCompleteInput } from "../runtime/annaRuntime";
-import type { WorkspaceSettings } from "../api/types";
-import type { Locale } from "../i18n/messages";
+import type {
+  PresentationRequirementCandidate,
+  PresentationRequirements,
+} from "../api/types";
 import type { OutlineDetail } from "../data/mockDeck";
-import type { LlmContextRow } from "./types";
 import {
   buildGenerateOutlineUserPrompt,
   buildOutlineRepairPrompt,
@@ -11,10 +12,7 @@ import {
 } from "./outlinePromptMessages";
 
 interface GenerateOutlinePromptInput {
-  prompt: string;
-  contextRows: LlmContextRow[];
-  locale: Locale;
-  setting?: WorkspaceSettings;
+  requirements: PresentationRequirements;
   uploadedSourceAnalysisContext?: unknown;
 }
 
@@ -22,73 +20,52 @@ interface ReviseOutlinePromptInput {
   title?: string;
   outline: OutlineDetail[];
   feedback: string;
-  locale: Locale;
-  setting?: WorkspaceSettings;
-  contextRows?: LlmContextRow[];
+  requirements: PresentationRequirements;
   uploadedSourceAnalysisContext?: unknown;
 }
 
-function readSettingString(setting: WorkspaceSettings | undefined, key: string): string {
-  const value = setting?.[key];
-  return typeof value === "string" ? value.trim() : "";
+function semanticRequirementValue(
+  requirements: PresentationRequirements,
+  field: "audience" | "purpose" | "desired_outcome" | "visual_tone",
+): Record<string, string> | null {
+  const selection = requirements.selections[field];
+  if (!selection) return null;
+  const isCandidate = requirements.candidates[field].some(
+    (candidate: PresentationRequirementCandidate) =>
+      candidate.label === selection.label && candidate.description === selection.description,
+  );
+  return isCandidate
+    ? { label: selection.label, description: selection.description }
+    : { description: selection.description };
 }
 
-function readContextRowString(contextRows: LlmContextRow[] | undefined, id: string): string {
-  const row = contextRows?.find((item) => item.id === id);
-  return typeof row?.value === "string" ? row.value.trim() : "";
-}
-
-export function getExpectedSlideCount(
-  setting?: WorkspaceSettings,
-  explicitCountText?: string,
-  contextRows?: LlmContextRow[]
-): number | null {
-  void setting;
-  void explicitCountText;
-  void contextRows;
-  return null;
-}
-
-export function getExpectedSlideCountForRevision(
-  setting?: WorkspaceSettings,
-  feedback?: string,
-  contextRows?: LlmContextRow[]
-): number | null {
-  return getExpectedSlideCount(setting, undefined, contextRows);
-}
-
-function buildSettingSummary(
-  setting?: WorkspaceSettings,
-  contextRows?: LlmContextRow[]
-): Record<string, string> {
+function buildConfirmedRequirementsInput(requirements: PresentationRequirements) {
+  if (requirements.status !== "confirmed" || !requirements.source) {
+    throw new Error("Confirmed Presentation Requirements are required for Outline Creation.");
+  }
   return {
-    output_language: readSettingString(setting, "output_language"),
-    slide_count: readContextRowString(contextRows, "slides") || "auto",
-    text_density: readSettingString(setting, "text_density"),
+    brief: requirements.source.brief,
+    requirements: {
+      audience: semanticRequirementValue(requirements, "audience"),
+      purpose: semanticRequirementValue(requirements, "purpose"),
+      desired_outcome: semanticRequirementValue(requirements, "desired_outcome"),
+      slide_count: requirements.selections.slide_count,
+      output_language: requirements.selections.output_language,
+      visual_tone: semanticRequirementValue(requirements, "visual_tone"),
+    },
   };
-}
-
-function buildSlideCountContext(contextRows?: LlmContextRow[]): string {
-  return readContextRowString(contextRows, "slides") || "auto";
 }
 
 function buildGenerateUserPrompt(input: GenerateOutlinePromptInput): string {
   return buildGenerateOutlineUserPrompt({
-    slideCountContext: buildSlideCountContext(input.contextRows),
-    locale: input.locale,
-    settingSummaryJson: JSON.stringify(buildSettingSummary(input.setting, input.contextRows)),
-    prompt: input.prompt,
-    contextRowsJson: JSON.stringify(input.contextRows),
+    confirmedRequirementsJson: JSON.stringify(buildConfirmedRequirementsInput(input.requirements)),
     uploadedSourceAnalysisContextJson: JSON.stringify(input.uploadedSourceAnalysisContext ?? null),
   });
 }
 
 function buildReviseUserPrompt(input: ReviseOutlinePromptInput): string {
   return buildReviseOutlineUserPrompt({
-    slideCountContext: buildSlideCountContext(input.contextRows),
-    locale: input.locale,
-    settingSummaryJson: JSON.stringify(buildSettingSummary(input.setting, input.contextRows)),
-    contextRowsJson: JSON.stringify(input.contextRows ?? []),
+    confirmedRequirementsJson: JSON.stringify(buildConfirmedRequirementsInput(input.requirements)),
     uploadedSourceAnalysisContextJson: JSON.stringify(input.uploadedSourceAnalysisContext ?? null),
     title: input.title,
     feedback: input.feedback,

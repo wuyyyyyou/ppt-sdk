@@ -62,7 +62,8 @@ import type {
   RecordWorkspaceThemeTokenResult,
   UpdateWorkspaceSettingsInput,
   UpdateWorkspaceSettingsResult,
-  UpdateWorkspaceOutlineInput,
+  ResetWorkspaceOutlineInput,
+  SaveWorkspaceOutlineInput,
   UpdateWorkspacePagesInput,
   UpdateWorkspaceTitleInput,
   CommitUploadedSourceHostUploadInput,
@@ -146,7 +147,9 @@ export interface PptBackend {
     requirements: PresentationRequirements;
   }): Promise<WorkspaceResult>;
   getWorkspaceOutline(input: GetWorkspaceOutlineInput): Promise<WorkspaceOutline>;
-  updateWorkspaceOutline(input: UpdateWorkspaceOutlineInput): Promise<WorkspaceResult>;
+  resetWorkspaceOutline(input: ResetWorkspaceOutlineInput): Promise<WorkspaceResult>;
+  saveWorkspaceOutlineDraft(input: SaveWorkspaceOutlineInput): Promise<WorkspaceResult>;
+  confirmWorkspaceOutline(input: SaveWorkspaceOutlineInput): Promise<WorkspaceResult>;
   updateWorkspaceSettings(
     input: UpdateWorkspaceSettingsInput
   ): Promise<UpdateWorkspaceSettingsResult>;

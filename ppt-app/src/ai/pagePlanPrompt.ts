@@ -4,6 +4,7 @@ import type { Locale } from "../i18n/messages";
 import { parseStructuredJson } from "./structuredJson";
 import { CONTENT_GROUNDING_RULES } from "./groundingRules";
 import { readOutlineOutputLanguage } from "./outputLanguage";
+import { outlineDetailToText } from "../data/mockDeck";
 
 function readOutputLanguage(outline: WorkspaceOutline, locale: Locale) {
   void locale;
@@ -24,6 +25,13 @@ export function buildGeneratePagePlanLlmRequest(input: {
     suitable_for: blueprint.suitable_for,
     avoid_for: blueprint.avoid_for,
   }));
+  const planningOutline = {
+    ...input.outline,
+    items: input.outline.items.map((item) => ({
+      title: item.title,
+      outline: outlineDetailToText(item),
+    })),
+  };
 
   return {
     messages: [
@@ -52,7 +60,7 @@ export function buildGeneratePagePlanLlmRequest(input: {
             `Template group: ${input.planningContext.template_group}`,
             `Template manifest path: ${input.planningContext.manifest_path}`,
             `Blueprints: ${JSON.stringify(blueprints)}`,
-            `Outline: ${JSON.stringify(input.outline)}`,
+            `Outline: ${JSON.stringify(planningOutline)}`,
             "Return exactly this JSON shape:",
             '{"version":1,"status":"planned","title":"...","source":{"outline_updated_at":null,"template_group":"...","template_manifest_path":"...","generated_by":"llm.complete"},"pages":[{"page_id":"page-01","index":0,"title":"...","outline":"...","blueprint_id":"...","blueprint_source":"./blueprints/Name.tsx","slide_path":"./slides/page-01-short-name.tsx","data_path":"./data/page-01-short-name.json","manifest_slide_id":"page-01-short-name","reason":"..."}],"updated_at":"..."}',
             "Rules:",

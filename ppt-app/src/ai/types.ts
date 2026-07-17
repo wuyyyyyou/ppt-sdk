@@ -1,6 +1,6 @@
 import type { OutlineDetail, Slide } from "../data/mockDeck";
 import type { AnnaLlmCompleteInput } from "../runtime/annaRuntime";
-import type { PresentationRequirementsCandidates, WorkspaceSettings } from "../api/types";
+import type { PresentationRequirements, PresentationRequirementsCandidates, WorkspaceSettings } from "../api/types";
 import type {
   PagePlan,
   PagePlanItem,
@@ -29,8 +29,10 @@ export interface DeckBriefInput {
   logContext?: AiOperationLogContext;
 }
 
-export interface GenerateOutlineInput extends DeckBriefInput {
+export interface GenerateOutlineInput {
+  requirements: PresentationRequirements;
   uploadedSourceAnalysisContext?: unknown;
+  logContext?: AiOperationLogContext;
 }
 
 export interface GenerateDeckInput extends DeckBriefInput {
@@ -63,9 +65,7 @@ export interface ReviseOutlineInput {
   title?: string;
   outline: OutlineDetail[];
   feedback: string;
-  locale: Locale;
-  setting?: WorkspaceSettings;
-  contextRows?: LlmContextRow[];
+  requirements: PresentationRequirements;
   uploadedSourceAnalysisContext?: unknown;
   logContext?: AiOperationLogContext;
 }
@@ -97,7 +97,6 @@ export interface GeneratedDeck {
 
 export interface GeneratedOutline {
   title: string;
-  output_language: string;
   items: OutlineDetail[];
 }
 
@@ -256,10 +255,6 @@ export interface AiClient {
     input: GeneratePresentationRequirementsInput
   ): Promise<PresentationRequirementsCandidates>;
   generateOutline(input: GenerateOutlineInput): Promise<OutlineGenerationResult>;
-  detectOutputLanguage(input: GenerateOutlineInput & {
-    title?: string;
-    outline?: OutlineDetail[];
-  }): Promise<{ output_language: string }>;
   generateThemeToken(input: GenerateThemeTokenInput): Promise<unknown>;
   generatePagePlan(input: GeneratePagePlanInput): Promise<PagePlan>;
   generateAddedPagePlan(input: GenerateAddedPagePlanInput): Promise<PagePlan>;

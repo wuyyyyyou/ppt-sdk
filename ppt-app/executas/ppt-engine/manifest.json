@@ -631,8 +631,20 @@
       ]
     },
     {
-      "name": "app_update_workspace_outline",
-      "description": "Write outline.json for an existing PPT task workspace and return the refreshed workspace.",
+      "name": "app_reset_workspace_outline",
+      "description": "Reset outline.json to the empty Outline lifecycle state after Presentation Requirements Confirmation.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_save_workspace_outline_draft",
+      "description": "Validate and save a complete Outline Draft while synchronizing Presentation Requirements slide_count and the Workspace title.",
       "parameters": [
         {
           "name": "workspace_dir",
@@ -643,7 +655,25 @@
         {
           "name": "outline",
           "type": "object",
-          "description": "Outline artifact with title, items, source, status, and updated_at fields.",
+          "description": "Outline content with a non-empty title and ordered title/core_message/required_content items.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_confirm_workspace_outline",
+      "description": "Validate, save, and confirm the current Outline while synchronizing Presentation Requirements slide_count and the Workspace title.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "outline",
+          "type": "object",
+          "description": "Outline content with a non-empty title and ordered title/core_message/required_content items.",
           "required": true
         }
       ]

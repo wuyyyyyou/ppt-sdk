@@ -30,15 +30,16 @@ import {
   runPageGenerationRetry,
   type DeckGenerationProgress,
 } from "../../src/features/deck-generation/index.ts";
+import { legacyOutlineTextToDetail, outlineDetailToText } from "../../src/data/mockDeck.ts";
 
 const outline: WorkspaceOutline = {
-  version: 2,
+  version: 3,
   title: "Demo Deck",
   output_language: "English",
   status: "confirmed",
   items: [
-    { title: "Intro", outline: "Set context" },
-    { title: "Close", outline: "Close the deck" },
+    { title: "Intro", core_message: "Set context", required_content: "- Establish the presentation context." },
+    { title: "Close", core_message: "Close the deck", required_content: "- End with a clear conclusion." },
   ],
   source: {
     prompt: "make a deck",
@@ -46,6 +47,7 @@ const outline: WorkspaceOutline = {
     setting: { output_language: "English" },
   },
   updated_at: "2026-05-23T00:00:00.000Z",
+  confirmed_at: "2026-05-23T00:00:00.000Z",
 };
 
 const STRICT_REVIEW_SETTING = {
@@ -95,7 +97,6 @@ const createdWorkspace: CreateWorkspaceResult = {
     content_review_failure_limit: 5,
     visual_review_enabled: true,
     visual_review_failure_limit: 2,
-    review_outline_first: false,
     disable_web_research: false,
     disable_image_research: false,
   },
@@ -126,7 +127,8 @@ function makePagePlan(overrides: Partial<PagePlan> = {}): PagePlan {
     { length: overrides.pages?.length ?? outline.items.length },
     (_, index) => outline.items[index] ?? {
       title: `Page ${index + 1}`,
-      outline: `Outline ${index + 1}`,
+      core_message: `Outline ${index + 1}`,
+      required_content: `- Page ${index + 1} content`,
     },
   );
   return {
@@ -145,7 +147,7 @@ function makePagePlan(overrides: Partial<PagePlan> = {}): PagePlan {
         page_id: `page-${pageNumber}`,
         index,
         title: item.title,
-        outline: item.outline,
+        outline: outlineDetailToText(item),
         blueprint_id: "simple",
         blueprint_source: "./blueprints/Simple.tsx",
         slide_path: `./slides/page-${pageNumber}.tsx`,
@@ -357,7 +359,7 @@ function createHarness(options: {
   const logs: unknown[] = [];
   const progressEvents: DeckGenerationProgress[] = [];
   let generatePagePlanCalls = 0;
-  let updateWorkspaceOutlineCalls = 0;
+  let persistWorkspaceOutlineCalls = 0;
   let recordPagePlanCalls = 0;
   let recordResearchPlanCalls = 0;
   let renderCalls = 0;
@@ -441,23 +443,40 @@ function createHarness(options: {
       return { workspace_dir: input.workspace_dir, log_file: "log.jsonl", appended: true };
     },
     getWorkspaceOutline: async () => clone(currentOutline),
-    updateWorkspaceOutline: async (input) => {
-      updateWorkspaceOutlineCalls += 1;
+    resetWorkspaceOutline: async () => {
+      currentOutline = {
+        version: 3,
+        title: "",
+        status: "empty",
+        items: [],
+        updated_at: null,
+        confirmed_at: null,
+      };
+      currentWorkspace = { ...currentWorkspace, outline: currentOutline };
+      return clone(currentWorkspace);
+    },
+    saveWorkspaceOutlineDraft: async (input) => {
+      persistWorkspaceOutlineCalls += 1;
       currentOutline = {
         ...currentOutline,
-        title: input.outline.title ?? currentOutline.title,
-        output_language: input.outline.output_language ?? currentOutline.output_language,
-        status: input.outline.status ?? currentOutline.status,
-        items: input.outline.items ? clone(input.outline.items) : currentOutline.items,
-        source: input.outline.source
-          ? {
-              prompt: input.outline.source.prompt,
-              context: input.outline.source.context ?? [],
-              task_context: input.outline.source.task_context,
-              setting: input.outline.source.setting ?? {},
-            }
-          : currentOutline.source,
+        title: input.outline.title,
+        status: "draft",
+        items: clone(input.outline.items),
         updated_at: "2026-05-23T00:00:00.000Z",
+        confirmed_at: null,
+      };
+      currentWorkspace = { ...currentWorkspace, outline: currentOutline };
+      return clone(currentWorkspace);
+    },
+    confirmWorkspaceOutline: async (input) => {
+      persistWorkspaceOutlineCalls += 1;
+      currentOutline = {
+        ...currentOutline,
+        title: input.outline.title,
+        status: "confirmed",
+        items: clone(input.outline.items),
+        updated_at: "2026-05-23T00:00:00.000Z",
+        confirmed_at: "2026-05-23T00:00:00.000Z",
       };
       currentWorkspace = { ...currentWorkspace, outline: currentOutline };
       return clone(currentWorkspace);
@@ -822,7 +841,7 @@ function createHarness(options: {
   };
 
   const aiClient: AiClient = {
-    generateOutline: async () => ({ outline: { title: outline.title, output_language: "English", items: outline.items }, attempts: [] }),
+    generateOutline: async () => ({ outline: { title: outline.title, items: outline.items }, attempts: [] }),
     detectOutputLanguage: async () => ({ output_language: "English" }),
     generatePagePlan: async () => {
       generatePagePlanCalls += 1;
@@ -924,7 +943,7 @@ function createHarness(options: {
       };
     },
     generateDeck: async () => ({ title: "", outline: [], slides: [] }),
-    reviseOutline: async () => ({ outline: { title: outline.title, output_language: "English", items: outline.items }, attempts: [] }),
+    reviseOutline: async () => ({ outline: { title: outline.title, items: outline.items }, attempts: [] }),
     generateSlidesFromOutline: async () => [],
     refineDeck: async () => [],
     refineSlide: async () => ({ title: "", subtitle: "" }),
@@ -1080,8 +1099,8 @@ function createHarness(options: {
     get generatePagePlanCalls() {
       return generatePagePlanCalls;
     },
-    get updateWorkspaceOutlineCalls() {
-      return updateWorkspaceOutlineCalls;
+    get persistWorkspaceOutlineCalls() {
+      return persistWorkspaceOutlineCalls;
     },
     get recordPagePlanCalls() {
       return recordPagePlanCalls;
@@ -1228,11 +1247,11 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(harness.pagePlan.source.outline_updated_at, outline.updated_at);
     assert.deepEqual(
       harness.pagePlan.pages.map((page) => ({ title: page.title, outline: page.outline })),
-      outline.items,
+      outline.items.map((item) => ({ title: item.title, outline: outlineDetailToText(item) })),
     );
     assert.deepEqual(
       completion.result.pagePlan.pages.map((page) => ({ title: page.title, outline: page.outline })),
-      outline.items,
+      outline.items.map((item) => ({ title: item.title, outline: outlineDetailToText(item) })),
     );
     const pagePlanLog = harness.logs.find((entry) =>
       (entry as { entry?: { event?: string } }).entry?.event === "ai.page_plan.operation.finished"
@@ -1831,7 +1850,7 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(completion.status, "failed");
     assert.match(completion.error.message, /cannot add a new appendix slide/);
     assert.equal(harness.checkToolAccessCalls, 0);
-    assert.equal(harness.updateWorkspaceOutlineCalls, 0);
+    assert.equal(harness.persistWorkspaceOutlineCalls, 0);
     assert.equal(harness.recordPagePlanCalls, 0);
     assert.equal(harness.recordResearchPlanCalls, 0);
     assert.equal(harness.recordPageProgressInputs.length, 0);
@@ -1879,7 +1898,7 @@ describe("Deck Generation Flow Module", () => {
     });
 
     assert.equal(completion.status, "completed");
-    assert.equal(harness.updateWorkspaceOutlineCalls, 1);
+    assert.equal(harness.persistWorkspaceOutlineCalls, 1);
     assert.equal(harness.outline.title, outline.title);
     assert.equal(harness.outline.output_language, outline.output_language);
     assert.equal(harness.outline.items.length, outline.items.length);
@@ -1893,7 +1912,7 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(revisedPage.data_path, "./data/page-01.json");
     assert.equal(revisedPage.manifest_slide_id, "page-01");
     assert.equal(revisedPage.title, persistedOutlineItem.title);
-    assert.equal(revisedPage.outline, persistedOutlineItem.outline);
+    assert.equal(revisedPage.outline, outlineDetailToText(persistedOutlineItem));
     assert.equal(harness.pagePlan.source.outline_updated_at, harness.outline.updated_at);
     assert.equal(revisedPage.blueprint_id, pagePlan.pages[0]?.blueprint_id);
     assert.equal(revisedPage.blueprint_source, pagePlan.pages[0]?.blueprint_source);
@@ -2681,7 +2700,7 @@ describe("Deck Generation Flow Module", () => {
       workspace,
       confirmedOutline: {
         ...outline,
-        items: pagePlan.pages.map((page) => ({ title: page.title, outline: page.outline })),
+        items: pagePlan.pages.map((page) => legacyOutlineTextToDetail(page.title, page.outline)),
       },
       locale: "zh",
       startMode: "resume",
@@ -2769,7 +2788,7 @@ describe("Deck Generation Flow Module", () => {
       workspace,
       confirmedOutline: {
         ...outline,
-        items: pagePlan.pages.map((page) => ({ title: page.title, outline: page.outline })),
+        items: pagePlan.pages.map((page) => legacyOutlineTextToDetail(page.title, page.outline)),
       },
       locale: "zh",
       startMode: "resume",
@@ -2849,7 +2868,7 @@ describe("Deck Generation Flow Module", () => {
       workspace,
       confirmedOutline: {
         ...outline,
-        items: pagePlan.pages.map((page) => ({ title: page.title, outline: page.outline })),
+        items: pagePlan.pages.map((page) => legacyOutlineTextToDetail(page.title, page.outline)),
       },
       locale: "zh",
       startMode: "resume",

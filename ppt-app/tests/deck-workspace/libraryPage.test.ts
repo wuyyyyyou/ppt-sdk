@@ -23,14 +23,14 @@ const workspace: WorkspaceResult = {
     template: "/tmp/workspaces/demo/template.json",
   },
   task: { title: "Demo" },
-  setting: { review_outline_first: true },
+  setting: {},
   outline: {},
   pages: [],
   template: {},
 };
 
 describe("LibraryPage", () => {
-  it("shows the persisted outline review preference", () => {
+  it("does not expose an optional outline review preference", () => {
     const html = renderToStaticMarkup(createElement(LibraryPage, {
       t: messages.zh,
       locale: "zh",
@@ -46,7 +46,6 @@ describe("LibraryPage", () => {
       onSaveTitle: async () => undefined,
     }));
 
-    assert.match(html, /先审阅大纲/);
-    assert.match(html, /开启/);
+    assert.doesNotMatch(html, /先审阅大纲/);
   });
 });

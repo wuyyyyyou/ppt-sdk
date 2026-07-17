@@ -396,7 +396,6 @@ export interface WorkspaceSettings {
   content_review_failure_limit?: number;
   visual_review_enabled?: boolean;
   visual_review_failure_limit?: number;
-  review_outline_first?: boolean;
   disable_web_research?: boolean;
   disable_image_research?: boolean;
   updated_at?: string;
@@ -413,7 +412,6 @@ export type CreatedWorkspaceSetting = Required<
     | "content_review_failure_limit"
     | "visual_review_enabled"
     | "visual_review_failure_limit"
-    | "review_outline_first"
     | "disable_web_research"
     | "disable_image_research"
   >
@@ -430,16 +428,21 @@ export interface CreateWorkspaceResult {
 
 export interface WorkspaceOutlineItem {
   title: string;
-  outline: string;
+  core_message: string;
+  required_content: string;
 }
 
 export interface WorkspaceOutline {
-  version: 2;
+  version: 3;
   title: string;
-  output_language: string;
-  status: "draft" | "confirmed";
+  status: "empty" | "draft" | "confirmed";
   items: WorkspaceOutlineItem[];
-  source: {
+  updated_at: string | null;
+  confirmed_at: string | null;
+  /** Temporary in-memory compatibility for downstream stages that have not been refactored yet. */
+  output_language?: string;
+  /** Temporary in-memory compatibility for downstream stages that have not been refactored yet. */
+  source?: {
     prompt: string;
     context: unknown[];
     task_context?: unknown[];
@@ -447,7 +450,6 @@ export interface WorkspaceOutline {
     kind?: string;
     uploaded_source_analysis?: UploadedSourceAnalysisDependency;
   };
-  updated_at: string | null;
 }
 
 export interface UploadedSourceAnalysisDependency {
@@ -544,19 +546,15 @@ export interface GetWorkspaceOutlineInput {
   workspace_dir: string;
 }
 
-export interface UpdateWorkspaceOutlineInput {
+export interface ResetWorkspaceOutlineInput {
+  workspace_dir: string;
+}
+
+export interface SaveWorkspaceOutlineInput {
   workspace_dir: string;
   outline: {
-    title?: string;
-    output_language?: string;
-    status?: "draft" | "confirmed";
-    items?: WorkspaceOutlineItem[];
-    source?: {
-      prompt: string;
-      context?: unknown[];
-      task_context?: unknown[];
-      setting?: Record<string, unknown>;
-    };
+    title: string;
+    items: WorkspaceOutlineItem[];
   };
 }
 

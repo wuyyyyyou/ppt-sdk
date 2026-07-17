@@ -199,7 +199,6 @@ export function buildDeckRefinementIntentReviewLlmRequest(
     },
     confirmed_outline_summary: {
       title: input.outline.title,
-      output_language: input.outline.output_language,
       status: input.outline.status,
     },
     current_pages: currentPages,

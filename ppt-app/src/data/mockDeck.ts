@@ -5,7 +5,25 @@ export interface Slide {
 
 export interface OutlineDetail {
   title: string;
-  outline: string;
+  core_message: string;
+  required_content: string;
+}
+
+export function outlineDetailToText(item: OutlineDetail): string {
+  return [item.core_message, item.required_content].filter(Boolean).join("\n");
+}
+
+export function legacyOutlineTextToDetail(title: string, value: string): OutlineDetail {
+  const lines = value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const coreMessage = lines[0] ?? title;
+  const contentLines = lines.length > 1 ? lines.slice(1) : [coreMessage];
+  return {
+    title,
+    core_message: coreMessage,
+    required_content: contentLines
+      .map((line) => `- ${line.replace(/^(?:[-*+•]|\d+[.)])\s+/, "")}`)
+      .join("\n"),
+  };
 }
 
 export interface LocalDeck {
@@ -52,38 +70,38 @@ export const initialDeck: Slide[] = [
 export const outlineDetails: OutlineDetail[] = [
   {
     title: "AI Agents That Do the Work",
-    outline:
-      "Frame the shift from chat-based AI to agents that execute repeatable workflows. Show that repeated processes can become reusable AI skills, and position Anna as the system that turns instructions into executable work."
+    core_message: "AI is shifting from answering questions to executing repeatable work.",
+    required_content: "- Contrast chat-based AI with agents that execute workflows.\n- Explain how repeated processes become reusable AI skills.\n- Position Anna as the system that turns instructions into executable work."
   },
   {
     title: "The Cost of Manual Work",
-    outline:
-      "Show the hidden operational drag of research, notes, spreadsheets, and emails. Emphasize fragmented work, copy-paste errors, and repeated weekly processes that slow teams down."
+    core_message: "Fragmented manual workflows create hidden operational drag.",
+    required_content: "- Cover research, notes, spreadsheets, and email handoffs.\n- Highlight copy-paste errors and fragmentation.\n- Show the cost of repeated weekly processes."
   },
   {
     title: "From Tasks to Reusable Skills",
-    outline:
-      "Explain how one-off tasks become repeatable AI capabilities. Cover capturing the workflow once, packaging the steps as a reusable skill, and running it again with new inputs."
+    core_message: "One-off tasks become more valuable when captured as reusable skills.",
+    required_content: "- Capture the workflow once.\n- Package the steps as a reusable skill.\n- Run the same capability again with new inputs."
   },
   {
     title: "How Anna Executes Across Tools",
-    outline:
-      "Introduce Anna's hybrid execution model across local tools, browser, and approved services. Explain the split between reasoning in conversation and execution through approved tools while users stay in control."
+    core_message: "Anna combines reasoning with controlled execution across approved tools.",
+    required_content: "- Introduce local tools, browser actions, and approved services.\n- Separate conversational reasoning from execution.\n- Emphasize that users remain in control."
   },
   {
     title: "Business Development Example",
-    outline:
-      "Use business development research as a concrete workflow example. Start with one company name, research and organize findings, then produce a pitch-ready brief."
+    core_message: "A reusable agent workflow can turn one company name into a pitch-ready brief.",
+    required_content: "- Start with one company name.\n- Research and organize the findings.\n- Produce a pitch-ready collaboration brief."
   },
   {
     title: "Security Boundaries",
-    outline:
-      "Explain why real agent action needs boundaries for authority, data, and execution. Make clear that prompts are not a security boundary and that credentials, files, and tools should be mediated."
+    core_message: "Useful agent action requires explicit boundaries for authority, data, and execution.",
+    required_content: "- Explain why prompts are not a security boundary.\n- Cover mediated access to credentials, files, and tools.\n- Show how authority remains bounded."
   },
   {
     title: "Build Your First AI Skill",
-    outline:
-      "End with a clear next step for turning one repeated workflow into a skill. Ask the audience to pick one repeated process, define inputs and outputs, and let Anna run it again."
+    core_message: "The best first AI skill starts with one repeated workflow.",
+    required_content: "- Choose one repeated process.\n- Define its inputs and outputs.\n- Package it so Anna can run it again."
   }
 ];
 

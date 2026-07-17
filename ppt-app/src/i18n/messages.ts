@@ -73,7 +73,6 @@ export interface Messages {
   brief: {
     title: string;
     placeholder: string;
-    reviewOutlineFirst: string;
     strictReviewMode: string;
     strictReviewModeHelp: string;
     strictReviewConfirmTitle: string;
@@ -160,12 +159,30 @@ export interface Messages {
     title: string;
     helper: string;
     cardTitle: string;
-    editOutline: string;
     saveChanges: string;
-    cancelChanges: string;
-    readOnlyHint: string;
     feedbackPlaceholder: string;
-    fallbackSummary: string;
+    presentationTitle: string;
+    pageTitle: string;
+    coreMessage: string;
+    requiredContent: string;
+    requiredContentHint: string;
+    requiredContentCount: string;
+    clickToEdit: string;
+    expandAll: string;
+    collapseAll: string;
+    addPage: string;
+    deletePage: string;
+    moveUp: string;
+    moveDown: string;
+    undo: string;
+    deleted: string;
+    unsaved: string;
+    saved: string;
+    loadingTitle: string;
+    loadingBody: string;
+    errorTitle: string;
+    retry: string;
+    backToRequirements: string;
   };
   uploadedSourceAnalysis: {
     title: string;
@@ -467,7 +484,6 @@ export const messages: Record<Locale, Messages> = {
       title: "What deck should Anna create?",
       placeholder:
         "Create a 7-slide investor deck about AI agent workflows. Keep it visual, concise, and premium.",
-      reviewOutlineFirst: "Review outline first",
       strictReviewMode: "Visual check",
       strictReviewModeHelp:
         "Visual check calls the model again after each page is generated to inspect screenshot usability, layout fit, overlap, cutoff, and readability. It may increase generation time and token usage.",
@@ -563,13 +579,31 @@ export const messages: Record<Locale, Messages> = {
       title: "Review outline",
       helper: "Adjust the structure before Anna designs the deck.",
       cardTitle: "Outline",
-      editOutline: "Modify outline",
       saveChanges: "Save changes",
-      cancelChanges: "Cancel editing",
-      readOnlyHint: "Read-only until you choose to modify the outline.",
       feedbackPlaceholder:
         "Enter a rewrite request, such as adding a security slide, making it more executive-facing, or reducing to 5 slides...",
-      fallbackSummary: "Add supporting points and details for this slide."
+      presentationTitle: "Presentation title",
+      pageTitle: "Page title",
+      coreMessage: "Core message",
+      requiredContent: "Required content",
+      requiredContentHint: "Write one item per line; saving will format it as a Markdown list",
+      requiredContentCount: "{count} items",
+      clickToEdit: "Click to edit Markdown",
+      expandAll: "Expand all",
+      collapseAll: "Collapse all",
+      addPage: "Add page",
+      deletePage: "Delete page",
+      moveUp: "Move up",
+      moveDown: "Move down",
+      undo: "Undo",
+      deleted: "Page removed",
+      unsaved: "Unsaved changes",
+      saved: "Draft saved",
+      loadingTitle: "Creating your outline",
+      loadingBody: "Anna is turning the confirmed presentation requirements into a concrete page-by-page storyline.",
+      errorTitle: "Outline creation failed",
+      retry: "Retry outline creation",
+      backToRequirements: "Back to presentation requirements"
     },
     uploadedSourceAnalysis: {
       title: "Source material analysis",
@@ -895,7 +929,6 @@ export const messages: Record<Locale, Messages> = {
       title: "Anna 要创建什么演示文稿？",
       placeholder:
         "创建一份 7 页的 AI Agent 工作流投资人演示，要求视觉化、简洁、有高级感。",
-      reviewOutlineFirst: "先审阅大纲",
       strictReviewMode: "视觉检查",
       strictReviewModeHelp:
         "开启后会在每页生成后额外调用模型检查截图可用性、布局适配、元素覆盖、裁切和可读性，可能增加生成时间和 token 消耗。",
@@ -991,12 +1024,30 @@ export const messages: Record<Locale, Messages> = {
       title: "审阅大纲",
       helper: "先改结构，再确认后继续生成。",
       cardTitle: "大纲",
-      editOutline: "修改大纲",
       saveChanges: "保存修改",
-      cancelChanges: "取消修改",
-      readOnlyHint: "默认只读，点击修改后才能编辑大纲。",
       feedbackPlaceholder: "输入重构需求，例如增加安全页、改成更面向高管，或缩减到 5 页...",
-      fallbackSummary: "为这一页补充要点和细节。"
+      presentationTitle: "演示文稿标题",
+      pageTitle: "页面标题",
+      coreMessage: "核心信息",
+      requiredContent: "必要内容",
+      requiredContentHint: "每行填写一项，保存时会自动整理为 Markdown 列表",
+      requiredContentCount: "{count} 项",
+      clickToEdit: "点击编辑 Markdown",
+      expandAll: "全部展开",
+      collapseAll: "全部收起",
+      addPage: "新增页面",
+      deletePage: "删除页面",
+      moveUp: "上移",
+      moveDown: "下移",
+      undo: "撤销",
+      deleted: "已删除页面",
+      unsaved: "有未保存的修改",
+      saved: "大纲草稿已保存",
+      loadingTitle: "正在创建大纲",
+      loadingBody: "Anna 正在把已确认演示需求整理成具体的逐页叙事结构。",
+      errorTitle: "大纲创建失败",
+      retry: "重试创建大纲",
+      backToRequirements: "返回演示需求"
     },
     uploadedSourceAnalysis: {
       title: "上传资料分析",

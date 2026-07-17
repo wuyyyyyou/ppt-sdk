@@ -7,6 +7,7 @@ import type {
   WorkspaceResult,
 } from "../../api/types";
 import type { RunDeckRefinementInput } from "./types";
+import { legacyOutlineTextToDetail, outlineDetailToText } from "../../data/mockDeck";
 import { recordDeckRecovery } from "./runtimeSupport";
 
 export function normalizeResearchQueryKey(query: string): string {
@@ -28,10 +29,7 @@ export function applyTargetOutlineRevision(input: {
     status: "confirmed",
     items: input.outline.items.map((item, index) =>
       index === input.pageIndex
-        ? {
-            title: input.revisedItem.title,
-            outline: input.revisedItem.outline,
-          }
+        ? legacyOutlineTextToDetail(input.revisedItem.title, input.revisedItem.outline)
         : item,
     ),
     updated_at: input.now,
@@ -57,7 +55,7 @@ export function reviseTargetPagePlanEntry(input: {
       return {
         ...page,
         title: outlineItem?.title || page.title,
-        outline: outlineItem?.outline || page.outline,
+        outline: outlineItem ? outlineDetailToText(outlineItem) : page.outline,
       };
     }),
     updated_at: input.now,
@@ -91,23 +89,19 @@ export async function persistPageRefinementArtifacts(input: {
       revisedItem: review.target_outline_item,
       now,
     });
-    const updatedWorkspace = await flowInput.backend.updateWorkspaceOutline({
+    const updatedWorkspace = await flowInput.backend.confirmWorkspaceOutline({
       workspace_dir: flowInput.workspace.workspace_dir,
       outline: {
         title: activeOutline.title,
-        output_language: activeOutline.output_language,
-        status: "confirmed",
         items: activeOutline.items,
-        source: {
-          prompt: activeOutline.source.prompt,
-          context: activeOutline.source.context,
-          task_context: activeOutline.source.task_context,
-          setting: activeOutline.source.setting,
-        },
       },
     });
     if (updatedWorkspace.outline) {
-      activeOutline = updatedWorkspace.outline as WorkspaceOutline;
+      activeOutline = {
+        ...updatedWorkspace.outline as WorkspaceOutline,
+        output_language: activeOutline.output_language,
+        source: activeOutline.source,
+      };
     }
     activeWorkspace = {
       ...updatedWorkspace,

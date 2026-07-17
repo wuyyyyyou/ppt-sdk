@@ -27,10 +27,29 @@ describe("MockAiClient AI Interaction Log", () => {
 
     const client = createMockAiClient();
     await client.generateOutline({
-      prompt: "demo",
-      contextRows: [],
-      locale: "zh",
-      setting: { output_language: "中文" },
+      requirements: {
+        version: 1,
+        status: "confirmed",
+        source: { brief: "demo" },
+        candidates: {
+          audience: [{ label: "通用受众", description: "面向一般读者。" }],
+          purpose: [{ label: "说明", description: "清晰说明主题。" }],
+          desired_outcome: [{ label: "理解", description: "让受众理解核心内容。" }],
+          slide_count: [3],
+          output_language: ["中文"],
+          visual_tone: [{ label: "简洁", description: "简洁清晰。" }],
+        },
+        selections: {
+          audience: { label: "通用受众", description: "面向一般读者。" },
+          purpose: { label: "说明", description: "清晰说明主题。" },
+          desired_outcome: { label: "理解", description: "让受众理解核心内容。" },
+          slide_count: 3,
+          output_language: "中文",
+          visual_tone: { label: "简洁", description: "简洁清晰。" },
+        },
+        updated_at: "2026-07-17T00:00:00.000Z",
+        confirmed_at: "2026-07-17T00:00:00.000Z",
+      },
       logContext,
     });
 

@@ -12,7 +12,7 @@ The user's initial input that describes what the deck should cover.
 User-facing Chinese label: 需求描述
 
 **Presentation Requirements**:
-The Workspace-owned structured requirements for a Deck, derived from the Brief and resolved through user choices. They contain an explicit audience, purpose, desired outcome, positive page count, output language, and visual tone; the user's later explicit choices override the corresponding expression in the Brief.
+The Workspace-owned structured requirements for a Deck, derived from the Brief and resolved through user choices. They contain an explicit audience, purpose, desired outcome, positive page count, output language, and visual tone; the user's later explicit choices override the corresponding expression in the Brief, while Outline Review may synchronize the page count to the saved Outline without changing the other requirements.
 User-facing Chinese label: 演示需求
 _Avoid_: Context, Background
 
@@ -24,7 +24,7 @@ _Avoid_: Confirmed Presentation Requirements
 A selectable proposed value within a Presentation Requirements Draft. Each field has one candidate when the Brief is explicit and two to four materially distinct candidates only when genuine ambiguity remains; semantic candidates pair a concise label with a one-sentence description, while page-count and output-language candidates are simple values.
 
 **Confirmed Presentation Requirements**:
-The complete Presentation Requirements accepted by the user as the primary constraints for downstream creation; page count and output language are always concrete rather than automatically deferred. Any later field change returns them to a draft until the whole set is confirmed again, while the Brief remains the original source record without overriding a conflicting confirmed field.
+The complete Presentation Requirements accepted by the user as the primary constraints for downstream creation; page count and output language are always concrete rather than automatically deferred. Any later field change returns them to a draft until the whole set is confirmed again, except that saving a valid Outline synchronizes `slide_count` to the Outline entry count while the requirements remain confirmed; the Brief remains the original source record without overriding a conflicting confirmed field.
 
 **Presentation Requirements Creation**:
 The explicit user-requested process that derives a new Presentation Requirements Draft solely from the current Brief. It may infer missing requirements but never content facts; each resulting draft retains its source Brief, and a successful new creation replaces and persists the current review draft as a whole while a failed attempt leaves it unchanged. Later review edits are persisted only when the user explicitly saves or confirms them.
@@ -49,22 +49,38 @@ User-facing Chinese label: 视觉气质
 _Avoid_: Theme, Template, Style Guide
 
 **Outline**:
-An ordered list of slide-level entries, each with a title and a short outline.
+A Workspace-owned presentation title and ordered list of slide-level Outline Entries. It has an `empty`, `draft`, or `confirmed` lifecycle and does not own output language, template selection, or visual theme creation.
+
+**Outline Entry**:
+The content intent for one planned slide, consisting of a one-line title, a one-line Core Message, and Required Content expressed as a Markdown bullet list.
+
+**Core Message**:
+The single idea the audience should remember from an Outline Entry; on an analytical page it will usually be the page's core conclusion.
+User-facing Chinese label: 核心信息
+_Avoid_: Page Summary, Speaker Note
+
+**Required Content**:
+The non-empty set of content requirements that a generated page must cover, stored as a Markdown string whose primary structure is unordered bullet points with optional nested bullets. It describes required coverage rather than final page copy or layout.
+User-facing Chinese label: 必要内容
+_Avoid_: Final Copy, Page Layout
 
 **Outline Draft**:
-An outline that is still open to manual edits or LLM revision.
+A complete and deterministically valid Outline that is still open to user confirmation. Manual edits remain local until explicitly saved, while a successful Rewrite Request saves the resulting Outline Draft automatically.
 
 **Confirmed Outline**:
-An outline that has been accepted for downstream generation. Each entry owns an opaque, position-independent `page_id` for its Page Generation Unit; user-visible page numbers are derived from the current ordering rather than encoded in identity.
+An Outline accepted by the user for downstream generation. Confirming it first saves and validates the current content, then automatically starts the downstream workflow; any later saved content change returns it to an Outline Draft.
 
 **Outline Review**:
-The user step where the outline is inspected, edited, or revised before continuing.
+The required user step where an Outline Draft is directly edited, reordered, expanded, reduced, saved, or revised through a Rewrite Request before explicit confirmation. It is never skipped, and saving synchronizes the confirmed Presentation Requirements page count to the current Outline entry count.
 
 **Outline Creation**:
-The process that turns a brief into an outline draft or a confirmed outline.
+The process that automatically starts after Presentation Requirements Confirmation and creates a new Outline Draft from the current Confirmed Presentation Requirements. It uses the source Brief only through those requirements, treats their explicit selections as authoritative over conflicting Brief wording, and does not perform template selection or visual theme creation.
 
 **Rewrite Request**:
-A natural-language instruction used to revise the current outline draft as a whole.
+A natural-language instruction used to revise the currently displayed Outline Draft, including unsaved manual edits. A successful revision must be complete and valid, may add, remove, merge, split, or reorder entries, and is saved automatically; failure preserves the displayed Outline unchanged.
+
+**Outline Confirmation**:
+The explicit user action that saves the currently displayed Outline, validates every entry, marks it confirmed, and then automatically starts the downstream workflow. If an existing Deck is present, confirmation replaces its current generation state rather than maintaining parallel Deck versions.
 
 **Authoring Kit**:
 The released page-authoring foundation used to initialize Deck Generation work. It provides a stable Page Source Bootstrap together with reusable foundations and reference guidance, but it is not a selectable visual style and does not determine a Deck's final visual identity.
@@ -366,11 +382,15 @@ Expert: "No. Editing the Brief does not change the current requirements. Only an
 
 Dev: "The workspace has a draft outline, but not a confirmed outline yet."
 
-Expert: "Good. Let the user review the outline first, then confirm it so each entry receives a stable page identity before Deck Generation starts."
+Expert: "Good. Outline Review is required. Let the user edit the title, Core Message, and Required Content for every entry, then explicitly confirm the valid Outline before the downstream workflow starts."
 
 Dev: "If they edit the outline after confirmation, what happens?"
 
 Expert: "It becomes a draft again until they confirm it one more time."
+
+Dev: "The confirmed requirements requested eight pages, but the user saved a six-page Outline. Do the requirements become a draft again?"
+
+Expert: "No. Outline Review is allowed to synchronize `slide_count` to six while the requirements remain confirmed; output language and every other requirement still belong to Presentation Requirements Review."
 
 Dev: "Does a new page choose a Template or blueprint?"
 

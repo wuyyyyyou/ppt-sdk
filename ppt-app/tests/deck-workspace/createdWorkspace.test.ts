@@ -20,7 +20,6 @@ describe("created Workspace snapshot", () => {
         content_review_failure_limit: 5,
         visual_review_enabled: true,
         visual_review_failure_limit: 2,
-        review_outline_first: true,
         disable_web_research: false,
         disable_image_research: true,
       },

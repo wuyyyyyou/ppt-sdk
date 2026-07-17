@@ -12,11 +12,6 @@ import {
   createAppHostUploadClient,
   type AppHostUploadClient,
 } from "../../../runtime/appHostUploadClient";
-import {
-  AUTO_OUTPUT_LANGUAGE,
-  normalizeOutputLanguage,
-  readSettingOutputLanguage,
-} from "../../../ai/outputLanguage";
 import type {
   ListWorkspacesResult,
   PageProgress,
@@ -49,13 +44,10 @@ import {
   deckReadyStatus,
   hasDownstreamArtifacts,
   isWorkspaceDeckStale,
-  syncSlideCountContextRow,
 } from "../utils";
 import {
-  buildContextRowFromPatch as buildContextRowFromPatchBase,
   normalizeSlideCountContextValue,
   SLIDE_COUNT_CONTEXT_OPTIONS,
-  type ContextPatchId,
 } from "../contextSuggestion";
 import {
   createDeckGenerationStreamSnapshot,
@@ -105,9 +97,11 @@ import {
   type ResearchSearchControlSettings,
 } from "../researchSearchControl";
 import {
-  outlineReviewPreferenceToWorkspaceSettings,
-  readOutlineReviewPreference,
-} from "../outlineReviewPreference";
+  cloneOutlineItems,
+  createEmptyOutlineItem,
+  normalizeValidOutline,
+  outlinesEqual,
+} from "../../outline";
 import { createWorkspaceReviewRenderKey } from "../workspaceReviewRenderKey";
 import { createInitialWorkspaceSnapshot } from "../createdWorkspace";
 import type {
@@ -142,12 +136,10 @@ import {
   createUploadedSourceAnalysisProgress,
   failUploadedSourceAnalysisProgress,
 } from "../uploadedSourceAnalysisProgress";
-import { shouldAutoSyncWorkspaceTitleFromOutline } from "../workspaceTitleSync";
 import {
   createEmptyPresentationRequirements,
   createManualRequirementsDraft,
   createRequirementsDraft,
-  projectRequirementsToLegacyInputs,
   requirementsAreComplete,
 } from "../../requirements";
 
@@ -197,10 +189,8 @@ function uploadedSourceDependencyMatchesActiveSources(input: {
 function readWorkspaceUploadedSourceDependency(
   workspace: WorkspaceResult | null,
 ): UploadedSourceAnalysisDependency | undefined {
-  const outline = workspace?.outline && typeof workspace.outline === "object" && !Array.isArray(workspace.outline)
-    ? workspace.outline as Partial<WorkspaceOutline>
-    : null;
-  return outline?.source?.uploaded_source_analysis;
+  void workspace;
+  return undefined;
 }
 
 function createEmptyUploadedSourceAnalysisViewState(): UploadedSourceAnalysisViewState {
@@ -362,7 +352,6 @@ function applyStyleProfileCreationEvent(
 export interface DeckWorkspaceActions {
   setPanelMode: (mode: PanelMode) => void;
   setPrompt: (value: string) => void;
-  setReviewOutlineFirst: (value: boolean) => Promise<void>;
   setStrictReviewMode: (enabled: boolean) => Promise<void>;
   setResearchSearchControlSettings: (settings: ResearchSearchControlSettings) => Promise<void>;
   setDeckTitle: (value: string) => void;
@@ -391,11 +380,15 @@ export interface DeckWorkspaceActions {
   confirmPresentationRequirements: () => Promise<void>;
   createDeckFromOutline: () => Promise<void>;
   applyOutlineFeedback: () => Promise<void>;
-  beginOutlineEdit: () => void;
-  cancelOutlineEdit: () => void;
-  saveOutlineEdit: () => Promise<void>;
+  retryOutlineCreation: () => Promise<void>;
+  returnToRequirementsFromOutline: () => void;
+  saveOutlineDraft: () => Promise<void>;
+  setOutlineDraftTitle: (value: string) => void;
   updateOutlineDraftItem: (index: number, patch: Partial<WorkspaceOutlineItem>) => void;
-  setOutlineDraftOutputLanguage: (value: string) => void;
+  addOutlineDraftItem: () => void;
+  insertOutlineDraftItem: (index: number, item: OutlineDetail) => void;
+  deleteOutlineDraftItem: (index: number) => void;
+  moveOutlineDraftItem: (fromIndex: number, toIndex: number) => void;
   updateDeckTitle: (index: number, title: string) => void;
   moveSlide: (index: number, direction: -1 | 1) => Promise<void>;
   duplicateSlide: (index: number) => Promise<void>;
@@ -448,7 +441,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [history, setHistory] = useState<PageId[]>(["main"]);
   const [toast, setToast] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [reviewOutlineFirst, setReviewOutlineFirstState] = useState(false);
   const [pageReviewSettings, setPageReviewSettings] = useState<PageReviewSettings>(
     DEFAULT_PAGE_REVIEW_SETTINGS
   );
@@ -468,14 +460,27 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [outline, setOutline] = useState(outlineDetails);
   const [outlineDraft, setOutlineDraft] = useState(outlineDetails);
   const [outlineDraftTitle, setOutlineDraftTitle] = useState(t.deck.title);
-  const [outlineOutputLanguage, setOutlineOutputLanguage] =
-    useState<string>(AUTO_OUTPUT_LANGUAGE);
-  const [outlineDraftOutputLanguage, setOutlineDraftOutputLanguage] =
-    useState<string>(AUTO_OUTPUT_LANGUAGE);
-  const [outlineEditMode, setOutlineEditMode] = useState(false);
+  const [outlineError, setOutlineError] = useState("");
   const [generated, setGenerated] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [outlineFeedback, setOutlineFeedback] = useState("");
+  const outlineDirty = useMemo(
+    () => !outlinesEqual(
+      { title: deckTitle, items: outline },
+      { title: outlineDraftTitle, items: outlineDraft },
+    ),
+    [deckTitle, outline, outlineDraft, outlineDraftTitle],
+  );
+  useEffect(() => {
+    const dirty = (stage === "requirements" && requirementsDirty) || (stage === "outline" && outlineDirty);
+    if (!dirty) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [outlineDirty, requirementsDirty, stage]);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("grid");
   const [reviewRender, setReviewRender] = useState<DeckReviewRenderState>({
     status: "idle",
@@ -509,7 +514,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const cancelCreateDeckAbortRef = useRef<AbortController | null>(null);
   const pendingUploadedSourceAnalysisActionRef = useRef<(() => Promise<void>) | null>(null);
   const forceUploadedSourceAnalysisRefreshRef = useRef(false);
-  const outlineAutosaveTimerRef = useRef<number | null>(null);
   const requirementsOperationRef = useRef(0);
   const [workspaceScan, setWorkspaceScan] = useState<ListWorkspacesResult | null>(null);
   const [currentWorkspace, setCurrentWorkspace] = useState<WorkspaceResult | null>(null);
@@ -585,7 +589,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       )
       .map((item) => ({
         title: item.title,
-        outline: typeof item.outline === "string" ? item.outline : ""
+        core_message: typeof item.core_message === "string" ? item.core_message : "",
+        required_content: typeof item.required_content === "string" ? item.required_content : "",
       }));
   }
 
@@ -642,86 +647,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       })),
       outline: pages.map((page) => ({
         title: page.title,
-        outline: page.speaker_note
+        core_message: page.speaker_note,
+        required_content: page.speaker_note ? `- ${page.speaker_note}` : "- Page content",
       }))
-    };
-  }
-
-  function workspaceOutlineOutputLanguage(workspace: WorkspaceResult | null) {
-    const outlineRecord =
-      workspace?.outline && typeof workspace.outline === "object" && !Array.isArray(workspace.outline)
-        ? (workspace.outline as { output_language?: unknown })
-        : null;
-    const outlineLanguage = normalizeOutputLanguage(outlineRecord?.output_language);
-    if (outlineLanguage !== AUTO_OUTPUT_LANGUAGE) return outlineLanguage;
-
-    return readSettingOutputLanguage(workspaceSettingsToState(workspace));
-  }
-
-  function withOutputLanguage(
-    setting: WorkspaceSettings,
-    outputLanguage: string
-  ): WorkspaceSettings {
-    return {
-      ...setting,
-      output_language: normalizeOutputLanguage(outputLanguage),
-    };
-  }
-
-  async function persistWorkspaceOutputLanguage(
-    workspace: WorkspaceResult,
-    outputLanguage: string,
-    settingOverride: WorkspaceSettings | null = null
-  ) {
-    if (!backend) return workspace;
-    const result = await backend.updateWorkspaceSettings({
-      workspace_dir: workspace.workspace_dir,
-      setting: withOutputLanguage(
-        settingOverride ?? workspaceSettingsToState(workspace),
-        outputLanguage
-      ),
-    });
-    return {
-      ...workspace,
-      setting: result.setting,
-    };
-  }
-
-  async function resolveOutputLanguageForOutline(input: {
-    workspace: WorkspaceResult;
-    setting: WorkspaceSettings;
-    title: string;
-    items: OutlineDetail[];
-  }) {
-    const currentLanguage = normalizeOutputLanguage(input.setting.output_language);
-    if (currentLanguage !== AUTO_OUTPUT_LANGUAGE || !aiClient) {
-      return {
-        workspace: input.workspace,
-        setting: withOutputLanguage(input.setting, currentLanguage),
-        outputLanguage: currentLanguage,
-      };
-    }
-
-    const result = await aiClient.detectOutputLanguage({
-      prompt,
-      contextRows: buildLlmContextRows(),
-      locale,
-      setting: input.setting,
-      title: input.title,
-      outline: input.items,
-      logContext: buildAiLogContext(input.workspace, "outline", "detect_output_language"),
-    });
-    const outputLanguage = normalizeOutputLanguage(result.output_language);
-    const workspace = await persistWorkspaceOutputLanguage(
-      input.workspace,
-      outputLanguage,
-      input.setting
-    );
-
-    return {
-      workspace,
-      setting: withOutputLanguage(input.setting, outputLanguage),
-      outputLanguage,
     };
   }
 
@@ -926,6 +854,23 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return setting;
   }
 
+  function workspaceOutlineForDownstream(workspace: WorkspaceResult): WorkspaceOutline {
+    const outline = workspace.outline as WorkspaceOutline;
+    const outputLanguage = workspace.requirements.selections.output_language ?? "中文";
+    return {
+      ...outline,
+      output_language: outputLanguage,
+      source: {
+        prompt: workspace.requirements.source?.brief ?? "",
+        context: [],
+        setting: {
+          ...workspaceSettingsToState(workspace),
+          output_language: outputLanguage,
+        },
+      },
+    };
+  }
+
   function workspacePageReviewSettings(workspace: WorkspaceResult | null) {
     return readPageReviewSettings(workspaceSettingsToState(workspace));
   }
@@ -936,103 +881,16 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   function applyWorkspaceSetting(setting: WorkspaceSettings) {
     setCurrentWorkspace((workspace) => workspace ? { ...workspace, setting } : workspace);
-    setReviewOutlineFirstState(readOutlineReviewPreference(setting));
     setPageReviewSettings(readPageReviewSettings(setting));
     setResearchSearchControlSettingsState(readResearchSearchControlSettings(setting));
-  }
-
-  function normalizePersistedContextRow(value: unknown): ContextRow | null {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return null;
-    }
-
-    const record = value as Partial<ContextRow>;
-    if (typeof record.id !== "string" || !record.id) {
-      return null;
-    }
-
-    const baseRow: ContextRow = {
-      id: record.id,
-      label: typeof record.label === "string" && record.label ? record.label : record.id,
-      value: typeof record.value === "string" ? record.value : "",
-      placeholder: typeof record.placeholder === "string" ? record.placeholder : undefined,
-      type:
-        record.type === "select" || record.type === "attachment" || record.type === "text"
-          ? record.type
-          : undefined,
-      options: Array.isArray(record.options)
-        ? record.options.filter((option): option is string => typeof option === "string")
-        : undefined,
-      allowCustomValue: record.allowCustomValue === true,
-    };
-
-    switch (baseRow.id) {
-      case "audience":
-        return {
-          ...baseRow,
-          label: t.brief.contextLabels.audience,
-          placeholder: t.brief.contextPlaceholders.audience,
-        };
-      case "goal":
-        return {
-          ...baseRow,
-          label: t.brief.contextLabels.goal,
-          placeholder: t.brief.contextPlaceholders.goal,
-        };
-      case "style":
-        return {
-          ...baseRow,
-          label: t.brief.contextLabels.styleNotes,
-          placeholder: t.brief.contextPlaceholders.styleNotes,
-        };
-      case "content":
-        return {
-          ...baseRow,
-          label: t.brief.contextLabels.contentSource,
-          placeholder: t.brief.contextPlaceholders.contentSource,
-        };
-      case "attachment":
-        return {
-          ...baseRow,
-          label: t.brief.contextLabels.attachment,
-          type: "attachment",
-        };
-      case "slides":
-      case "slide_count":
-        return {
-          ...baseRow,
-          id: "slides",
-          label: t.brief.contextLabels.slides,
-          value: normalizeSlideCountContextValue(baseRow.value),
-          type: "select",
-          options: SLIDE_COUNT_CONTEXT_OPTIONS,
-          allowCustomValue: true,
-        };
-      default:
-        return baseRow;
-    }
   }
 
   function workspaceContextRowsToState(workspace: WorkspaceResult): {
     rows: ContextRow[];
     shouldSync: boolean;
   } {
-    const outlineRecord =
-      workspace.outline && typeof workspace.outline === "object" && !Array.isArray(workspace.outline)
-        ? (workspace.outline as { items?: unknown; source?: { prompt?: unknown; context?: unknown; task_context?: unknown } })
-        : null;
-    const source = outlineRecord?.source;
-    const rawContext = Array.isArray(source?.context) ? source.context : [];
-    const rows = rawContext
-      .map(normalizePersistedContextRow)
-      .filter((row): row is ContextRow => row !== null);
-    return {
-      rows,
-      shouldSync:
-        rows.length > 0 ||
-        (Array.isArray(outlineRecord?.items) && outlineRecord.items.length > 0) ||
-        (typeof source?.prompt === "string" && source.prompt.length > 0),
-    };
+    void workspace;
+    return { rows: [], shouldSync: false };
   }
 
   const workspaceReviewRenderKey = createWorkspaceReviewRenderKey;
@@ -1053,36 +911,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         return id && value ? { id, value } : null;
       })
       .filter((row): row is LlmContextRow => row !== null);
-  }
-
-  function syncContextRowsToOutlineCount(
-    rows: Array<ContextRow | LlmContextRow>,
-    items: OutlineDetail[]
-  ): ContextRow[] {
-    return syncSlideCountContextRow(
-      rows,
-      items.length,
-      t.brief.contextLabels.slides
-    );
-  }
-
-  function buildOutlineArtifact(
-    items = outline,
-    title = deckTitle,
-    outputLanguage = outlineOutputLanguage,
-    status: "draft" | "confirmed" = "draft"
-  ) {
-    return {
-      title,
-      output_language: normalizeOutputLanguage(outputLanguage),
-      status,
-      items,
-      source: {
-        prompt,
-        context: buildLlmContextRows(),
-        setting: workspaceSettingsToState(currentWorkspace)
-      }
-    };
   }
 
   async function ensureUploadedSourceAnalysisForOutline(
@@ -1182,7 +1010,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setOutline(
       result.slides.map((slide) => ({
         title: slide.title,
-        outline: slide.speaker_note
+        core_message: slide.speaker_note,
+        required_content: slide.speaker_note ? `- ${slide.speaker_note}` : "- Page content",
       }))
     );
     setCurrentSlide(0);
@@ -1210,7 +1039,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
     setPageReviewSettings(workspacePageReviewSettings(workspace));
     setResearchSearchControlSettingsState(workspaceResearchSearchControlSettings(workspace));
-    setReviewOutlineFirstState(readOutlineReviewPreference(workspaceSettingsToState(workspace)));
     if (!exportInFlightRef.current) {
       setExportArtifactWithProgress(readWorkspaceExportArtifactPath(workspace));
       void refreshWorkspaceExportArtifact(workspace, exportRefreshVersionRef.current);
@@ -1227,10 +1055,20 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           }
     );
     setDeckTitle(getWorkspaceTitle(workspace));
-    const workspaceOutputLanguage = workspaceOutlineOutputLanguage(workspace);
-    setOutlineOutputLanguage(workspaceOutputLanguage);
-    setOutlineDraftOutputLanguage(workspaceOutputLanguage);
     const workspaceOutline = workspaceOutlineToState(workspace.outline);
+    const outlineRecord = workspace.outline && typeof workspace.outline === "object" && !Array.isArray(workspace.outline)
+      ? workspace.outline as Partial<WorkspaceOutline>
+      : null;
+    const outlineStatus = outlineRecord?.status ?? "empty";
+    const outlineTitle = typeof outlineRecord?.title === "string" && outlineRecord.title.trim()
+      ? outlineRecord.title
+      : getWorkspaceTitle(workspace);
+    setOutlineDraftTitle(outlineTitle);
+    setOutlineError("");
+    if (workspaceOutline.length === 0) {
+      setOutline([]);
+      setOutlineDraft([]);
+    }
     const staleDeck = isWorkspaceDeckStale(workspace);
     const workspacePages = staleDeck ? null : workspacePagesToState(workspace.pages);
     const workspacePageProgress = normalizeWorkspacePageProgress(workspace.page_progress);
@@ -1261,12 +1099,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
     if (workspaceOutline.length > 0) {
       setOutline(workspaceOutline);
-      setOutlineDraft(workspaceOutline);
+      setOutlineDraft(cloneOutlineItems(workspaceOutline));
       if (!workspacePages && workspacePageProgress && !staleDeck) {
         setStage("generating");
       } else if (!workspacePages) {
         setStage("outline");
       }
+      if (outlineStatus === "draft") setStage("outline");
     }
     const templateRecord =
       workspace.template && typeof workspace.template === "object" && !Array.isArray(workspace.template)
@@ -1279,7 +1118,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (selectedTemplate) {
       setSelectedTemplateGroupId(selectedTemplate);
       if (!workspacePages && workspaceOutline.length === 0) {
-        setStage(workspace.requirements.status === "empty" ? "brief" : "requirements");
+        setStage(
+          workspace.requirements.status === "empty"
+            ? "brief"
+            : workspace.requirements.status === "draft"
+              ? "requirements"
+              : "outline"
+        );
       }
     }
 
@@ -1293,8 +1138,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     result: Awaited<ReturnType<PptBackend["createWorkspace"]>>,
   ): WorkspaceResult {
     const workspace = createInitialWorkspaceSnapshot(result);
-    const outputLanguage = normalizeOutputLanguage(result.setting.output_language);
-
     setCurrentWorkspace(workspace);
     setUploadedSources([]);
     setCurrentUploadedSourceAnalysis(null);
@@ -1303,7 +1146,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setSelectedStyleProfile(null);
     setPageReviewSettings(readPageReviewSettings(result.setting));
     setResearchSearchControlSettingsState(readResearchSearchControlSettings(result.setting));
-    setReviewOutlineFirstState(readOutlineReviewPreference(result.setting));
     setExportArtifactWithProgress(null);
     setReviewRender({
       status: "idle",
@@ -1324,9 +1166,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setOutline([]);
     setOutlineDraft([]);
     setOutlineDraftTitle(result.title);
-    setOutlineOutputLanguage(outputLanguage);
-    setOutlineDraftOutputLanguage(outputLanguage);
-    setOutlineEditMode(false);
+    setOutlineError("");
     setOutlineFeedback("");
     setGenerated(false);
     setCurrentSlide(0);
@@ -1368,7 +1208,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         if (cancelled) return;
         setPageReviewSettings(readPageReviewSettings(defaults.setting));
         setResearchSearchControlSettingsState(readResearchSearchControlSettings(defaults.setting));
-        setReviewOutlineFirstState(readOutlineReviewPreference(defaults.setting));
         const templates = await nextBackend.listTemplates();
         if (cancelled) return;
         setTemplateGroups(templates.templates);
@@ -1392,9 +1231,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     return () => {
       cancelled = true;
-      if (outlineAutosaveTimerRef.current !== null) {
-        window.clearTimeout(outlineAutosaveTimerRef.current);
-      }
       void nextAgentClient?.close();
     };
   }, []);
@@ -1583,7 +1419,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     window.setTimeout(() => setToast(""), 2400);
   }
 
+  function canLeaveCurrentEditor() {
+    const dirty = (stage === "requirements" && requirementsDirty) || (stage === "outline" && outlineDirty);
+    if (!dirty) return true;
+    return window.confirm(
+      locale === "zh"
+        ? "当前页面有未保存修改，确定不保存并离开吗？"
+        : "This page has unsaved changes. Leave without saving?",
+    );
+  }
+
   function navigate(nextPage: PageId) {
+    if (activeGenerationRun || stage === "generating") return;
+    if (nextPage !== page && !canLeaveCurrentEditor()) return;
     if (!generated && nextPage !== "main" && nextPage !== "library") {
       showToast(t.toasts.createDeckFirst);
       return;
@@ -1660,16 +1508,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   function navigateMain(nextStage: MainStage) {
+    if (activeGenerationRun || stage === "generating") return;
+    if (nextStage !== stage && !canLeaveCurrentEditor()) return;
     if (stage === "requirements" && requirementsStatus === "loading" && nextStage !== "requirements") {
       requirementsOperationRef.current += 1;
       setLoading("none");
     }
     if (nextStage === "requirements" && presentationRequirements.status === "empty") {
       showToast(t.toasts.promptRequired);
-      return;
-    }
-    if (nextStage === "requirements" && (outline.length > 0 || generated)) {
-      showToast(locale === "zh" ? "已有大纲后不能修改演示需求。" : "Requirements cannot be changed after an outline exists.");
       return;
     }
     if (nextStage === "uploaded-source-analysis" && uploadedSources.length === 0) {
@@ -1693,6 +1539,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   function goBack() {
+    if (activeGenerationRun || stage === "generating") return;
+    if (!canLeaveCurrentEditor()) return;
     setHistory((items) => {
       const next = items.slice(0, -1);
       const previous = next.at(-1) ?? "main";
@@ -1725,10 +1573,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       value: "",
       placeholder: t.brief.contextPlaceholders.styleNotes
     });
-  }
-
-  function buildContextRowFromPatch(id: ContextPatchId, value: string): ContextRow {
-    return buildContextRowFromPatchBase(id, value, t);
   }
 
   async function generatePresentationRequirements() {
@@ -1818,6 +1662,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   function returnToBriefFromRequirements() {
+    if (requirementsDirty && !canLeaveCurrentEditor()) return;
     requirementsOperationRef.current += 1;
     setLoading("none");
     setPage("main");
@@ -1865,75 +1710,27 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         workspace_dir: workspace.workspace_dir,
         requirements: confirmed,
       });
-      const projection = projectRequirementsToLegacyInputs(confirmed);
-      const settingResult = await backend.updateWorkspaceSettings({
+      const resetWorkspace = await backend.resetWorkspaceOutline({
         workspace_dir: workspace.workspace_dir,
-        setting: {
-          ...workspaceSettingsToState(confirmedWorkspace),
-          output_language: projection.outputLanguage,
-        },
       });
-      const projectedWorkspace = { ...confirmedWorkspace, setting: settingResult.setting };
       setPresentationRequirements(confirmed);
-      setContextRows(projection.contextRows);
-      setCurrentWorkspace(projectedWorkspace);
+      setCurrentWorkspace(resetWorkspace);
       setRequirementsStatus("ready");
       setRequirementsDirty(false);
       setRequirementsHasSavedDraft(true);
-      await generateDeck({
-        brief: confirmed.source!.brief,
-        contextRows: projection.contextRows,
-      });
+      setDeckTitle(getWorkspaceTitle(resetWorkspace));
+      setOutline([]);
+      setOutlineDraft([]);
+      setOutlineDraftTitle(getWorkspaceTitle(resetWorkspace));
+      setOutlineError("");
+      setPage("main");
+      setStage("outline");
+      await createOutlineFromConfirmedRequirements(resetWorkspace);
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error));
     } finally {
       setRequirementsSaving(false);
     }
-  }
-
-  function readFeedbackContextValue(feedback: string, labels: string[]): string | null {
-    const escapedLabels = labels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-    const pattern = new RegExp(
-      `(?:${escapedLabels.join("|")})\\s*(?:改成|调整为|设为|设置为|是|为|:|：|to|as)?\\s*([^。；;，,\\n]+)`,
-      "i",
-    );
-    const match = pattern.exec(feedback);
-    const value = match?.[1]?.trim().replace(/[，,]$/, "");
-    return value && value.length > 0 ? value : null;
-  }
-
-  function deriveContextRowsFromOutlineFeedback(rows: ContextRow[], feedback: string): ContextRow[] {
-    const patch: Partial<Record<ContextPatchId, string>> = {};
-
-    const audience = readFeedbackContextValue(feedback, ["受众", "面向对象", "面向", "audience"]);
-    if (audience) patch.audience = audience;
-
-    const goal = readFeedbackContextValue(feedback, ["目标", "目的", "goal"]);
-    if (goal) patch.goal = goal;
-
-    const style = readFeedbackContextValue(feedback, ["风格", "视觉风格", "语气", "style", "tone"]);
-    if (style) patch.style = style;
-
-    const content = readFeedbackContextValue(feedback, ["内容来源", "参考材料", "材料", "content source", "source"]);
-    if (content) patch.content = content;
-
-    const patchEntries = Object.entries(patch) as Array<[ContextPatchId, string]>;
-    if (patchEntries.length === 0) return rows;
-
-    const patchedIds = new Set(patchEntries.map(([id]) => id));
-    const nextRows = rows.map((row) =>
-      patchedIds.has(row.id as ContextPatchId)
-        ? buildContextRowFromPatch(row.id as ContextPatchId, patch[row.id as ContextPatchId] ?? row.value)
-        : row
-    );
-
-    for (const [id, value] of patchEntries) {
-      if (!nextRows.some((row) => row.id === id)) {
-        nextRows.push(buildContextRowFromPatch(id, value));
-      }
-    }
-
-    return nextRows;
   }
 
   function isUnresumableDeckGenerationError(error: DeckGenerationError) {
@@ -1995,171 +1792,62 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setHistory((items) => (items.at(-1) === "main" ? items : [...items, "main"]));
   }
 
-  async function generateDeck(input: { brief?: string; contextRows?: ContextRow[] } = {}) {
+  async function createOutlineFromConfirmedRequirements(
+    workspaceOverride: WorkspaceResult | null = null,
+  ) {
     if (!backend || !aiClient) return;
-    if (!agentClient) {
-      if (uploadedSources.length > 0) {
-        showToast(t.errors.uploadedSourceAnalysisUnavailable);
-      }
-      return;
-    }
-
-    let activeRunWorkspaceDir: string | undefined;
-    let shouldReconcileActiveRun = false;
+    let workspace: WorkspaceResult | null = workspaceOverride;
+    setPage("main");
+    setStage("outline");
+    setLoading("outline");
+    setOutlineError("");
     try {
-      const cancelSignal = beginCancellableGeneration();
-      const generationBrief = input.brief ?? prompt;
-      const generationContextRows = input.contextRows ?? contextRows;
-      setLoading("outline");
-      resetGenerationProgress();
-      const workspace = await refreshCurrentWorkspaceSnapshot();
+      workspace = workspace ?? await refreshCurrentWorkspaceSnapshot();
       if (!workspace) return;
-      if (!selectedTemplateGroupId) {
-        showToast(t.template.helper);
-        return;
+      if (workspace.requirements.status !== "confirmed") {
+        throw new Error("请先确认演示需求，再创建大纲。");
       }
-      const templateWorkspace = await ensureWorkspaceTemplate(workspace);
-      const themedWorkspace = await ensureWorkspaceThemeTokenForGeneration(
-        templateWorkspace,
-        generationContextRows,
-        { brief: generationBrief },
-      );
-      const uploadedSourceAnalysis = await ensureUploadedSourceAnalysisForOutline(
-        themedWorkspace,
-        () => generateDeck(input),
-      );
-      const uploadedSourceAnalysisContext = compactUploadedSourceAnalysisForPrompt(uploadedSourceAnalysis);
-
-      const setting = workspaceSettingsToState(themedWorkspace);
-
-      if (reviewOutlineFirst) {
-        setLoading("outline");
-        const llmContextRows = buildLlmContextRows(generationContextRows);
-        const outlineLogContext = buildAiLogContext(themedWorkspace, "outline", "generate_outline");
-        const result = await aiClient.generateOutline({
-          prompt: generationBrief,
-          contextRows: llmContextRows,
-          locale,
-          setting,
-          uploadedSourceAnalysisContext,
-          logContext: outlineLogContext,
-        });
-        await appendOutlineAiAttemptLogs(themedWorkspace, result.attempts, outlineLogContext);
-        const syncedContextRows = syncContextRowsToOutlineCount(
-          generationContextRows,
-          result.outline.items
-        );
-        const outputLanguage = normalizeOutputLanguage(result.outline.output_language);
-        const languageWorkspace = await persistWorkspaceOutputLanguage(
-          themedWorkspace,
-          outputLanguage,
-          setting
-        );
-        const languageSetting = withOutputLanguage(setting, outputLanguage);
-        setContextRows(syncedContextRows);
-        setDeckTitle(result.outline.title);
-        setOutline(result.outline.items);
-        setOutlineOutputLanguage(outputLanguage);
-        const updatedWorkspace = await saveOutlineArtifact(
-          result.outline.items,
-          result.outline.title,
-          outputLanguage,
-          languageWorkspace,
-          languageSetting,
-          "draft",
-          true,
-          syncedContextRows,
-          uploadedSourceAnalysis,
-          generationBrief,
-        );
-        if (updatedWorkspace) {
-          applyWorkspace(updatedWorkspace);
-        }
-        showToast(t.status.outlineReady);
-        return;
-      }
-
+      const uploadedSourceAnalysis = backend
+        ? await ensureUploadedSourceAnalysisForOutline(workspace, () => createOutlineFromConfirmedRequirements())
+        : null;
+      setStage("outline");
       setLoading("outline");
-      const llmContextRows = buildLlmContextRows(generationContextRows);
-      const outlineLogContext = buildAiLogContext(themedWorkspace, "outline", "generate_outline");
-      const outlineResult = await aiClient.generateOutline({
-        prompt: generationBrief,
-        contextRows: llmContextRows,
-        locale,
-        setting,
-        uploadedSourceAnalysisContext,
+      const outlineLogContext = buildAiLogContext(workspace, "outline", "generate_outline");
+      const result = await aiClient.generateOutline({
+        requirements: workspace.requirements,
+        uploadedSourceAnalysisContext: compactUploadedSourceAnalysisForPrompt(uploadedSourceAnalysis),
         logContext: outlineLogContext,
       });
-      await appendOutlineAiAttemptLogs(themedWorkspace, outlineResult.attempts, outlineLogContext);
-      const syncedContextRows = syncContextRowsToOutlineCount(
-        generationContextRows,
-        outlineResult.outline.items
-      );
-      const outputLanguage = normalizeOutputLanguage(outlineResult.outline.output_language);
-      const languageWorkspace = await persistWorkspaceOutputLanguage(
-        themedWorkspace,
-        outputLanguage,
-        setting
-      );
-      const languageSetting = withOutputLanguage(setting, outputLanguage);
-      setContextRows(syncedContextRows);
-      const confirmedWorkspace = await saveOutlineArtifact(
-        outlineResult.outline.items,
-        outlineResult.outline.title,
-        outputLanguage,
-        languageWorkspace,
-        languageSetting,
-        "confirmed",
-        true,
-        syncedContextRows,
-        uploadedSourceAnalysis,
-        generationBrief,
-      );
-      if (!confirmedWorkspace) return;
-      if (cancelCreateDeckRef.current) {
-        setCreateDeckProgress({
-          step: "cancelled",
-          message: t.generating.cancelled,
-          currentPageIndex: null,
-          totalPages: outlineResult.outline.items.length,
-          pages: [],
-        });
-        return;
-      }
-
-      setDeckTitle(outlineResult.outline.title);
-      setOutline(outlineResult.outline.items);
-      setOutlineOutputLanguage(outputLanguage);
-      beginActiveGenerationRun("deck-generation");
-      activeRunWorkspaceDir = confirmedWorkspace.workspace_dir;
-      shouldReconcileActiveRun = true;
-      setLoading("deck");
-      setStage("generating");
-      setPage("main");
-      const completion = await runDeckGeneration({
-        backend,
-        aiClient,
-        agentClient,
-        aiLogger,
-        workspace: confirmedWorkspace,
-        confirmedOutline: confirmedWorkspace.outline as WorkspaceOutline,
-        locale,
-        startMode: "restart",
-        onProgress: recordGenerationProgress,
-        isCancelled: () => cancelCreateDeckRef.current,
-        cancelSignal,
+      await appendOutlineAiAttemptLogs(workspace, result.attempts, outlineLogContext);
+      const normalized = normalizeValidOutline({
+        title: result.outline.title,
+        items: result.outline.items,
       });
-      await applyDeckGenerationCompletion(completion, confirmedWorkspace);
-      shouldReconcileActiveRun = false;
+      const updatedWorkspace = await backend.saveWorkspaceOutlineDraft({
+        workspace_dir: workspace.workspace_dir,
+        outline: normalized,
+      });
+      applyWorkspace(updatedWorkspace);
+      setDeckTitle(normalized.title);
+      setOutline(cloneOutlineItems(normalized.items));
+      setOutlineDraft(cloneOutlineItems(normalized.items));
+      setOutlineDraftTitle(normalized.title);
+      setOutlineFeedback("");
+      setOutlineError("");
+      setStage("outline");
+      setWorkspaceScan(await backend.listWorkspaces());
+      showToast(t.status.outlineReady);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
+      await appendOutlineErrorLog(workspace, "generateOutline", error);
+      const message = error instanceof Error ? error.message : t.toasts.createOutlineFirst;
+      setOutlineError(message);
     } finally {
       setLoading("none");
-      await finishActiveGenerationRun({
-        workspaceDir: activeRunWorkspaceDir,
-        reconcileInterrupted: shouldReconcileActiveRun,
-      });
     }
+  }
+
+  async function generateDeck() {
+    await createOutlineFromConfirmedRequirements();
   }
 
   function cancelGenerateDeck() {
@@ -2195,42 +1883,33 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const cancelSignal = beginCancellableGeneration();
       const workspace = await refreshCurrentWorkspaceSnapshot();
       if (!workspace) return;
+      const normalized = normalizeValidOutline({
+        title: outlineDraftTitle,
+        items: outlineDraft,
+      });
+      const confirmedWorkspace = await backend.confirmWorkspaceOutline({
+        workspace_dir: workspace.workspace_dir,
+        outline: normalized,
+      });
+      setDeckTitle(normalized.title);
+      setOutline(cloneOutlineItems(normalized.items));
+      setOutlineDraft(cloneOutlineItems(normalized.items));
+      setOutlineDraftTitle(normalized.title);
+      setCurrentWorkspace(confirmedWorkspace);
       if (!selectedTemplateGroupId) {
         showToast(t.template.helper);
         return;
       }
       const templateWorkspace = await ensureWorkspaceThemeTokenForGeneration(
-        await ensureWorkspaceTemplate(workspace)
+        await ensureWorkspaceTemplate(confirmedWorkspace)
       );
-      setLoading("outline");
-      const setting = workspaceSettingsToState(templateWorkspace);
-      const uploadedSourceAnalysis = await ensureUploadedSourceAnalysisForOutline(
+      await ensureUploadedSourceAnalysisForOutline(
         templateWorkspace,
         createDeckFromOutline,
       );
-      setLoading("outline");
-      const resolved = await resolveOutputLanguageForOutline({
-        workspace: templateWorkspace,
-        setting,
-        title: deckTitle,
-        items: outline,
-      });
-      const confirmedWorkspace = await saveOutlineArtifact(
-        outline,
-        deckTitle,
-        resolved.outputLanguage,
-        resolved.workspace,
-        resolved.setting,
-        "confirmed",
-        true,
-        null,
-        uploadedSourceAnalysis
-      );
-      if (!confirmedWorkspace) return;
       beginActiveGenerationRun("deck-generation");
-      activeRunWorkspaceDir = confirmedWorkspace.workspace_dir;
+      activeRunWorkspaceDir = templateWorkspace.workspace_dir;
       shouldReconcileActiveRun = true;
-      setOutlineOutputLanguage(resolved.outputLanguage);
       setLoading("deck");
       setStage("generating");
       setPage("main");
@@ -2240,15 +1919,15 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         aiClient,
         agentClient,
         aiLogger,
-        workspace: confirmedWorkspace,
-        confirmedOutline: confirmedWorkspace.outline as WorkspaceOutline,
+        workspace: templateWorkspace,
+        confirmedOutline: workspaceOutlineForDownstream(templateWorkspace),
         locale,
         startMode: "restart",
         onProgress: recordGenerationProgress,
         isCancelled: () => cancelCreateDeckRef.current,
         cancelSignal,
       });
-      await applyDeckGenerationCompletion(completion, confirmedWorkspace);
+      await applyDeckGenerationCompletion(completion, templateWorkspace);
       shouldReconcileActiveRun = false;
     } catch (error) {
       showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
@@ -2262,19 +1941,16 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function applyOutlineFeedback() {
-    if (!aiClient) return;
+    if (!backend || !aiClient) return;
     if (!outlineFeedback.trim()) return;
     setLoading("outline");
     let workspace: WorkspaceResult | null = null;
     try {
       workspace = await ensureCurrentWorkspace();
       if (!workspace) return;
-      let setting = workspaceSettingsToState(workspace);
-      const baseTitle = outlineEditMode ? outlineDraftTitle : deckTitle;
-      const baseOutline = outlineEditMode ? outlineDraft : outline;
-      const nextContextRows = deriveContextRowsFromOutlineFeedback(contextRows, outlineFeedback);
-      setContextRows(nextContextRows);
-      const llmContextRows = buildLlmContextRows(nextContextRows);
+      if (workspace.requirements.status !== "confirmed") {
+        throw new Error("请先确认演示需求，再改写大纲。");
+      }
       const uploadedSourceAnalysis = backend
         ? await ensureUploadedSourceAnalysisForOutline(workspace, applyOutlineFeedback)
         : null;
@@ -2282,43 +1958,29 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const uploadedSourceAnalysisContext = compactUploadedSourceAnalysisForPrompt(uploadedSourceAnalysis);
       const outlineLogContext = buildAiLogContext(workspace, "outline", "revise_outline");
       const result = await aiClient.reviseOutline({
-        title: baseTitle,
-        outline: baseOutline,
+        title: outlineDraftTitle,
+        outline: outlineDraft,
         feedback: outlineFeedback,
-        locale,
-        setting,
-        contextRows: llmContextRows,
+        requirements: workspace.requirements,
         uploadedSourceAnalysisContext,
         logContext: outlineLogContext,
       });
       await appendOutlineAiAttemptLogs(workspace, result.attempts, outlineLogContext);
-      const syncedContextRows = syncContextRowsToOutlineCount(
-        nextContextRows,
-        result.outline.items
-      );
-      const outputLanguage = normalizeOutputLanguage(result.outline.output_language);
-      workspace = await persistWorkspaceOutputLanguage(workspace, outputLanguage, setting);
-      setting = withOutputLanguage(setting, outputLanguage);
-      setContextRows(syncedContextRows);
-      await saveOutlineArtifact(
-        result.outline.items,
-        result.outline.title,
-        outputLanguage,
-        workspace,
-        setting,
-        "draft",
-        false,
-        syncedContextRows,
-        uploadedSourceAnalysis
-      );
-      if (backend) {
-        setWorkspaceScan(await backend.listWorkspaces());
-      }
-      setOutlineDraftTitle(result.outline.title);
-      setOutlineDraft(result.outline.items);
-      setOutlineDraftOutputLanguage(outputLanguage);
-      setOutlineEditMode(true);
+      const normalized = normalizeValidOutline({
+        title: result.outline.title,
+        items: result.outline.items,
+      });
+      const updatedWorkspace = await backend.saveWorkspaceOutlineDraft({
+        workspace_dir: workspace.workspace_dir,
+        outline: normalized,
+      });
+      setCurrentWorkspace(updatedWorkspace);
+      setDeckTitle(normalized.title);
+      setOutline(cloneOutlineItems(normalized.items));
+      setOutlineDraft(cloneOutlineItems(normalized.items));
+      setOutlineDraftTitle(normalized.title);
       setOutlineFeedback("");
+      setWorkspaceScan(await backend.listWorkspaces());
       showToast(t.toasts.outlineUpdated);
     } catch (error) {
       await appendOutlineErrorLog(workspace, "reviseOutline", error);
@@ -2328,76 +1990,24 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
-  function beginOutlineEdit() {
-    if (loading === "deck" || loading === "deckFromOutline") {
-      showToast(t.status.creatingDeck);
-      return;
-    }
-    setOutlineDraft(outline.map((item) => ({ ...item })));
-    setOutlineDraftTitle(deckTitle);
-    setOutlineDraftOutputLanguage(outlineOutputLanguage);
-    setOutlineEditMode(true);
-  }
-
-  function cancelOutlineEdit() {
-    setOutlineDraft(outline.map((item) => ({ ...item })));
-    setOutlineDraftTitle(deckTitle);
-    setOutlineDraftOutputLanguage(outlineOutputLanguage);
-    setOutlineFeedback("");
-    setOutlineEditMode(false);
-  }
-
-  async function saveOutlineEdit() {
-    if (!outlineEditMode) return;
+  async function saveOutlineDraft() {
+    if (!backend) return;
     try {
       const workspace = await ensureCurrentWorkspace();
       if (!workspace) return;
-      const setting = workspaceSettingsToState(workspace);
-      const outputLanguage = normalizeOutputLanguage(outlineDraftOutputLanguage);
-      const languageWorkspace = await persistWorkspaceOutputLanguage(
-        workspace,
-        outputLanguage,
-        setting
-      );
-      const languageSetting = withOutputLanguage(setting, outputLanguage);
-      const uploadedSourceAnalysis = await ensureUploadedSourceAnalysisForOutline(
-        languageWorkspace,
-        saveOutlineEdit,
-      );
       setLoading("outline");
-      const downstreamExists = hasDownstreamArtifacts(workspace);
-      const syncedContextRows = syncContextRowsToOutlineCount(contextRows, outlineDraft);
-      setContextRows(syncedContextRows);
-      const updatedWorkspace = await saveOutlineArtifact(
-        outlineDraft,
-        outlineDraftTitle,
-        outputLanguage,
-        languageWorkspace,
-        languageSetting,
-        "draft",
-        true,
-        syncedContextRows,
-        uploadedSourceAnalysis
-      );
-      if (updatedWorkspace) {
-        setDeckTitle(outlineDraftTitle);
-        setOutline(outlineDraft);
-        setOutlineOutputLanguage(outputLanguage);
-        setOutlineEditMode(false);
-        if (downstreamExists) {
-          setGenerated(false);
-          setReviewRender({
-            status: "idle",
-            result: null,
-            error: "",
-            renderKey: workspaceReviewRenderKey(updatedWorkspace)
-          });
-          resetGenerationProgress();
-          setStage("outline");
-          setPage("main");
-        }
-        showToast(t.toasts.outlineUpdated);
-      }
+      const normalized = normalizeValidOutline({ title: outlineDraftTitle, items: outlineDraft });
+      const updatedWorkspace = await backend.saveWorkspaceOutlineDraft({
+        workspace_dir: workspace.workspace_dir,
+        outline: normalized,
+      });
+      setCurrentWorkspace(updatedWorkspace);
+      setDeckTitle(normalized.title);
+      setOutline(cloneOutlineItems(normalized.items));
+      setOutlineDraft(cloneOutlineItems(normalized.items));
+      setOutlineDraftTitle(normalized.title);
+      setWorkspaceScan(await backend.listWorkspaces());
+      showToast(t.toasts.outlineUpdated);
     } catch (error) {
       showToast(error instanceof Error ? error.message : t.toasts.createOutlineFirst);
     } finally {
@@ -2406,12 +2016,45 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   function updateOutlineDraftItem(index: number, patch: Partial<WorkspaceOutlineItem>) {
-    if (!outlineEditMode) return;
     setOutlineDraft((items) =>
       items.map((item, itemIndex) =>
         itemIndex === index ? { ...item, ...patch } : item
       )
     );
+  }
+
+  function addOutlineDraftItem() {
+    setOutlineDraft((items) => [...items, createEmptyOutlineItem()]);
+  }
+
+  function insertOutlineDraftItem(index: number, item: OutlineDetail) {
+    setOutlineDraft((items) => [
+      ...items.slice(0, index),
+      { ...item },
+      ...items.slice(index),
+    ]);
+  }
+
+  function deleteOutlineDraftItem(index: number) {
+    setOutlineDraft((items) => items.length <= 1 ? items : items.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  function moveOutlineDraftItem(fromIndex: number, toIndex: number) {
+    setOutlineDraft((items) => {
+      if (fromIndex < 0 || fromIndex >= items.length || toIndex < 0 || toIndex >= items.length) return items;
+      const next = [...items];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }
+
+  async function retryOutlineCreation() {
+    await createOutlineFromConfirmedRequirements();
+  }
+
+  function returnToRequirementsFromOutline() {
+    navigateMain("requirements");
   }
 
   function updateDeckTitle(index: number, title: string) {
@@ -2421,11 +2064,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       )
     );
     setOutline((items) => {
-      const next = items.map((item, itemIndex) =>
+      return items.map((item, itemIndex) =>
         itemIndex === index ? { ...item, title } : item
       );
-      autosaveOutline(next);
-      return next;
     });
   }
 
@@ -2457,7 +2098,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setOutline(
       nextRenderedSlides.map((slide, index) => ({
         title: nextDeck[index]?.title ?? slide.title,
-        outline: slide.speaker_note
+        core_message: slide.speaker_note,
+        required_content: slide.speaker_note ? `- ${slide.speaker_note}` : "- Page content",
       }))
     );
     setCurrentSlide(nextCurrentSlide);
@@ -2554,9 +2196,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const subtitle = locale === "zh" ? "新的页面内容" : "New slide content";
     setDeck((items) => [...items, { title, subtitle }]);
     setOutline((items) => {
-      const next = [...items, { title, outline: t.outline.fallbackSummary }];
-      autosaveOutline(next);
-      return next;
+      return [...items, {
+        title,
+        core_message: subtitle,
+        required_content: `- ${subtitle}`,
+      }];
     });
   }
 
@@ -2567,7 +2211,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setOutline(
       nextDeck.map((slide) => ({
         title: slide.title,
-        outline: slide.subtitle
+        core_message: slide.subtitle,
+        required_content: `- ${slide.subtitle}`,
       }))
     );
     setGenerated(true);
@@ -2582,32 +2227,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       typeof (workspace.task as { title?: unknown }).title === "string"
       ? (workspace.task as { title: string }).title
       : workspace.task_id ?? workspace.workspace_id;
-  }
-
-  async function autoSyncWorkspaceTitleFromOutline(
-    previousWorkspace: WorkspaceResult,
-    updatedWorkspace: WorkspaceResult,
-    title: string
-  ) {
-    if (!backend) return updatedWorkspace;
-
-    const nextTitle = title.trim();
-    if (!nextTitle || !shouldAutoSyncWorkspaceTitleFromOutline(previousWorkspace, nextTitle)) {
-      return updatedWorkspace;
-    }
-
-    try {
-      return await backend.updateWorkspaceTitle({
-        workspace_dir: updatedWorkspace.workspace_dir,
-        title: nextTitle
-      });
-    } catch (error) {
-      console.warn(
-        "Failed to sync workspace title from outline",
-        error instanceof Error ? error.message : error
-      );
-      return updatedWorkspace;
-    }
   }
 
   function readWorkspaceExportArtifactPath(workspace: WorkspaceResult): ExportArtifact | null {
@@ -2974,80 +2593,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     });
   }
 
-  async function saveOutlineArtifact(
-    items = outline,
-    title = deckTitle,
-    outputLanguage = outlineOutputLanguage,
-    workspaceOverride: WorkspaceResult | null = null,
-    settingOverride: WorkspaceSettings | null = null,
-    status: "draft" | "confirmed" = "draft",
-    applyWorkspaceState = true,
-    contextRowsOverride: Array<ContextRow | LlmContextRow> | null = null,
-    uploadedSourceAnalysis: UploadedSourceAnalysis | null = null,
-    promptOverride: string | null = null,
-  ) {
-    if (!backend) return null;
-    const workspace = workspaceOverride ?? (await ensureCurrentWorkspace());
-    if (!workspace) return null;
-
-    const outlineTitle = title.trim();
-    const updatedWorkspace = await backend.updateWorkspaceOutline({
-      workspace_dir: workspace.workspace_dir,
-      outline: {
-        ...buildOutlineArtifact(items, outlineTitle || title, outputLanguage, status),
-        source: {
-          prompt: promptOverride ?? prompt,
-          context: buildLlmContextRows(contextRowsOverride ?? contextRows),
-          setting: withOutputLanguage(
-            settingOverride ?? workspaceSettingsToState(workspace),
-            outputLanguage
-          ),
-          ...(uploadedSourceAnalysis
-            ? { uploaded_source_analysis: createUploadedSourceAnalysisDependency(uploadedSourceAnalysis) }
-            : {})
-        }
-      }
-    });
-    const syncedWorkspace = await autoSyncWorkspaceTitleFromOutline(
-      workspace,
-      updatedWorkspace,
-      outlineTitle
-    );
-    if (applyWorkspaceState) {
-      applyWorkspace(syncedWorkspace);
-      setWorkspaceScan(await backend.listWorkspaces());
-    } else {
-      setCurrentWorkspace(syncedWorkspace);
-    }
-    return syncedWorkspace;
-  }
-
-  function autosaveOutline(items: OutlineDetail[]) {
-    if (outlineAutosaveTimerRef.current !== null) {
-      window.clearTimeout(outlineAutosaveTimerRef.current);
-    }
-
-    outlineAutosaveTimerRef.current = window.setTimeout(() => {
-      outlineAutosaveTimerRef.current = null;
-      void saveOutlineArtifact(
-        items,
-        deckTitle,
-        outlineOutputLanguage,
-        null,
-        null,
-        "draft",
-        false
-      ).catch(
-        (error) => {
-          console.warn(
-            "Failed to autosave outline",
-            error instanceof Error ? error.message : error
-          );
-        }
-      );
-    }, 500);
-  }
-
   async function scanWorkspaces() {
     if (!backend) return;
 
@@ -3187,36 +2732,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
-  async function setReviewOutlineFirst(enabled: boolean) {
-    if (!backend) return;
-
-    const previous = reviewOutlineFirst;
-    setWorkspaceSettingsSaving(true);
-    setWorkspaceError("");
-    setReviewOutlineFirstState(enabled);
-    try {
-      const workspace = await ensureCurrentWorkspace();
-      if (!workspace) {
-        setReviewOutlineFirstState(previous);
-        return;
-      }
-      const result = await backend.updateWorkspaceSettings({
-        workspace_dir: workspace.workspace_dir,
-        persist_as_default: true,
-        setting: outlineReviewPreferenceToWorkspaceSettings(enabled),
-      });
-      applyWorkspaceSetting(result.setting);
-      showToast(t.status.settingsSaved);
-    } catch (error) {
-      setReviewOutlineFirstState(previous);
-      setWorkspaceError(
-        error instanceof Error ? error.message : "Failed to save settings."
-      );
-    } finally {
-      setWorkspaceSettingsSaving(false);
-    }
-  }
-
   async function setStrictReviewMode(enabled: boolean) {
     if (!backend) return;
 
@@ -3325,7 +2840,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         agentClient,
         aiLogger,
         workspace: refreshedWorkspace,
-        confirmedOutline: refreshedWorkspace.outline as WorkspaceOutline,
+        confirmedOutline: workspaceOutlineForDownstream(refreshedWorkspace),
         locale,
         instruction: trimmedInstruction,
         scope: "deck",
@@ -3377,7 +2892,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         agentClient,
         aiLogger,
         workspace: refreshedWorkspace,
-        confirmedOutline: refreshedWorkspace.outline as WorkspaceOutline,
+        confirmedOutline: workspaceOutlineForDownstream(refreshedWorkspace),
         locale,
         instruction: trimmedInstruction,
         scope: "slide",
@@ -3626,7 +3141,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
             agentClient,
             aiLogger,
             workspace: refreshedWorkspace,
-            confirmedOutline: refreshedWorkspace.outline as WorkspaceOutline,
+            confirmedOutline: workspaceOutlineForDownstream(refreshedWorkspace),
             locale,
             instruction:
               recovery.page_refinement_request ||
@@ -3646,7 +3161,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
             agentClient,
             aiLogger,
             workspace: refreshedWorkspace,
-            confirmedOutline: refreshedWorkspace.outline as WorkspaceOutline,
+            confirmedOutline: workspaceOutlineForDownstream(refreshedWorkspace),
             locale,
             startMode: "resume",
             onProgress: recordGenerationProgress,
@@ -3688,7 +3203,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         agentClient,
         aiLogger,
         workspace: refreshedWorkspace,
-        confirmedOutline: refreshedWorkspace.outline as WorkspaceOutline,
+        confirmedOutline: workspaceOutlineForDownstream(refreshedWorkspace),
         locale,
         pageId,
         onProgress: recordGenerationProgress,
@@ -4018,7 +3533,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     stage,
     toast,
     prompt,
-    reviewOutlineFirst,
     pageReviewSettings,
     researchSearchControlSettings,
     contextRows,
@@ -4032,9 +3546,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     deck,
     outline,
     outlineDraft,
-    outlineOutputLanguage,
-    outlineDraftOutputLanguage,
-    outlineEditMode,
+    outlineDraftTitle,
+    outlineDirty,
+    outlineError,
     generated,
     currentSlide,
     outlineFeedback,
@@ -4072,7 +3586,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const actions: DeckWorkspaceActions = {
     setPanelMode,
     setPrompt,
-    setReviewOutlineFirst,
     setStrictReviewMode,
     setResearchSearchControlSettings,
     setDeckTitle,
@@ -4098,11 +3611,15 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     confirmPresentationRequirements,
     createDeckFromOutline,
     applyOutlineFeedback,
-    beginOutlineEdit,
-    cancelOutlineEdit,
-    saveOutlineEdit,
+    retryOutlineCreation,
+    returnToRequirementsFromOutline,
+    saveOutlineDraft,
+    setOutlineDraftTitle,
     updateOutlineDraftItem,
-    setOutlineDraftOutputLanguage,
+    addOutlineDraftItem,
+    insertOutlineDraftItem,
+    deleteOutlineDraftItem,
+    moveOutlineDraftItem,
     updateDeckTitle,
     moveSlide,
     duplicateSlide,

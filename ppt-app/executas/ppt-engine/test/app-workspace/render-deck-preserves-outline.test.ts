@@ -61,21 +61,18 @@ test("renderAppWorkspaceDeckHtml preserves the confirmed outline artifact", asyn
     });
     await writeJson(path.join(workspaceDir, "setting.json"), {});
     await writeJson(outlinePath, {
-      version: 2,
+      version: 3,
       title: "Original Outline",
       status: "confirmed",
       items: [
         {
           title: "Original Page",
-          outline: "This outline came from the user's confirmed outline.",
+          core_message: "This outline came from the user's confirmed outline.",
+          required_content: "- Preserve the confirmed page content.",
         },
       ],
-      source: {
-        prompt: "original prompt",
-        context: [],
-        setting: {},
-      },
       updated_at: "2026-06-02T00:00:00.000Z",
+      confirmed_at: "2026-06-02T00:00:00.000Z",
     });
     await writeJson(path.join(workspaceDir, "template.json"), {
       version: 1,
@@ -112,12 +109,15 @@ test("renderAppWorkspaceDeckHtml preserves the confirmed outline artifact", asyn
 
     const outline = await readJson<{
       title: string;
-      source: { prompt: string };
+      items: Array<{ core_message: string; required_content: string }>;
       updated_at: string;
+      confirmed_at: string;
     }>(outlinePath);
     assert.equal(outline.title, "Original Outline");
-    assert.equal(outline.source.prompt, "original prompt");
+    assert.equal(outline.items[0]?.core_message, "This outline came from the user's confirmed outline.");
+    assert.equal(outline.items[0]?.required_content, "- Preserve the confirmed page content.");
     assert.equal(outline.updated_at, "2026-06-02T00:00:00.000Z");
+    assert.equal(outline.confirmed_at, "2026-06-02T00:00:00.000Z");
 
     const pages = await readJson<{
       title: string;

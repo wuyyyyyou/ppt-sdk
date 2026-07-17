@@ -372,8 +372,12 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         "app_get_workspace_outline",
         input
       ),
-    updateWorkspaceOutline: (input) =>
-      invokeWorkspaceResult("app_update_workspace_outline", input),
+    resetWorkspaceOutline: (input) =>
+      invokeWorkspaceResult("app_reset_workspace_outline", input),
+    saveWorkspaceOutlineDraft: (input) =>
+      invokeWorkspaceResult("app_save_workspace_outline_draft", input),
+    confirmWorkspaceOutline: (input) =>
+      invokeWorkspaceResult("app_confirm_workspace_outline", input),
     updateWorkspaceSettings: (input) =>
       invoke<UpdateWorkspaceSettingsResult>(
         toolIds.pptEngine,

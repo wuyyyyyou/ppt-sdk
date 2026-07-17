@@ -102,6 +102,22 @@ test("app_patch_workspace_settings is declared and returns settings without a wo
   assert.ok(manifest.tools.some((tool) => tool.name === "app_patch_workspace_settings"));
 });
 
+test("dedicated Outline lifecycle tools are declared and routed", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+  const manifest = JSON.parse(
+    await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
+  ) as { tools: Array<{ name: string }> };
+  const toolNames = manifest.tools.map((tool) => tool.name);
+
+  assert.match(source, /app_reset_workspace_outline:\s*toolAppResetWorkspaceOutline/);
+  assert.match(source, /app_save_workspace_outline_draft:\s*toolAppSaveWorkspaceOutlineDraft/);
+  assert.match(source, /app_confirm_workspace_outline:\s*toolAppConfirmWorkspaceOutline/);
+  assert.ok(toolNames.includes("app_reset_workspace_outline"));
+  assert.ok(toolNames.includes("app_save_workspace_outline_draft"));
+  assert.ok(toolNames.includes("app_confirm_workspace_outline"));
+  assert.equal(toolNames.includes("app_update_workspace_outline"), false);
+});
+
 let patchSettingsInvokeSkip: string | false = false;
 try {
   const distIndex = await readFile(new URL("../../dist/index.js", import.meta.url), "utf8");
@@ -127,7 +143,7 @@ test(
         tool: "app_patch_workspace_settings",
         arguments: {
           workspace_dir: workspaceDir,
-          setting: { review_outline_first: true },
+          setting: { visual_review_enabled: true },
           persist_as_default: true,
         },
       });
@@ -143,9 +159,8 @@ test(
         page_generation_concurrency: 5,
         content_review_enabled: false,
         content_review_failure_limit: 5,
-        visual_review_enabled: false,
+        visual_review_enabled: true,
         visual_review_failure_limit: 2,
-        review_outline_first: true,
         disable_web_research: false,
         disable_image_research: false,
         updated_at: (response.result?.data?.setting as Record<string, unknown>)?.updated_at,

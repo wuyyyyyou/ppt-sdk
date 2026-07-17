@@ -32,17 +32,18 @@ const page: PagePlanItem = {
 };
 
 const outline: WorkspaceOutline = {
-  version: 2,
+  version: 3,
   title: "Uploaded Source Deck",
   output_language: "English",
   status: "confirmed",
-  items: [{ title: page.title, outline: page.outline }],
+  items: [{ title: page.title, core_message: page.outline, required_content: "- Use assigned evidence." }],
   source: {
     prompt: "Build from uploaded source material",
     context: [],
     setting: { output_language: "English" },
   },
   updated_at: "2026-07-01T00:00:00.000Z",
+  confirmed_at: "2026-07-01T00:00:00.000Z",
 };
 
 const pagePlan: PagePlan = {

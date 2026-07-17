@@ -103,7 +103,6 @@ describe("Anna PPT Backend", () => {
         content_review_failure_limit: 5,
         visual_review_enabled: false,
         visual_review_failure_limit: 2,
-        review_outline_first: false,
         disable_web_research: false,
         disable_image_research: false,
       },
@@ -162,18 +161,18 @@ describe("Anna PPT Backend", () => {
         success: true,
         data: {
           workspace_dir: "/tmp/workspaces/demo",
-          setting: { review_outline_first: true },
+          setting: { visual_review_enabled: true },
           persisted_as_default: true,
         },
       }));
 
       const result = await backend.updateWorkspaceSettings({
         workspace_dir: "/tmp/workspaces/demo",
-        setting: { review_outline_first: true },
+        setting: { visual_review_enabled: true },
         persist_as_default: true,
       });
 
-      assert.equal(result.setting.review_outline_first, true);
+      assert.equal(result.setting.visual_review_enabled, true);
       assert.equal(result.persisted_as_default, true);
       assert.equal(fetchMock.mock.callCount(), 0);
     } finally {
@@ -270,5 +269,32 @@ describe("Anna PPT Backend", () => {
 
     assert.equal(calls[0]?.method, "app_get_workspace_requirements");
     assert.equal(calls[1]?.method, "app_update_workspace_requirements");
+  });
+
+  it("routes the Outline lifecycle through the dedicated ppt-engine tools", async () => {
+    setToolIds();
+    const calls: Array<{ method?: unknown; args?: unknown }> = [];
+    const backend = createAnnaPptBackend(createRuntimeWithInvoke(async (input) => {
+      calls.push(input as { method?: unknown; args?: unknown });
+      return { success: true, data: createWorkspace() };
+    }));
+    const outline = {
+      title: "Demo Outline",
+      items: [{
+        title: "Opening",
+        core_message: "Open with one clear idea.",
+        required_content: "- Establish the context.",
+      }],
+    };
+
+    await backend.resetWorkspaceOutline({ workspace_dir: "/tmp/workspaces/demo" });
+    await backend.saveWorkspaceOutlineDraft({ workspace_dir: "/tmp/workspaces/demo", outline });
+    await backend.confirmWorkspaceOutline({ workspace_dir: "/tmp/workspaces/demo", outline });
+
+    assert.deepEqual(calls.map((call) => call.method), [
+      "app_reset_workspace_outline",
+      "app_save_workspace_outline_draft",
+      "app_confirm_workspace_outline",
+    ]);
   });
 });

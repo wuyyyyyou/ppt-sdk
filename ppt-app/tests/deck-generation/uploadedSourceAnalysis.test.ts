@@ -567,17 +567,22 @@ describe("Uploaded Source Analysis workflow gates", () => {
 describe("Uploaded Source Analysis research discovery freshness", () => {
   it("does not use stale uploaded-source analysis when active uploads are empty", async () => {
     const outline = {
-      version: 2,
+      version: 3,
       title: "Uploaded Source Deck",
       output_language: "English",
       status: "confirmed",
-      items: [{ title: "Metrics", outline: "Use only current active sources." }],
+      items: [{
+        title: "Metrics",
+        core_message: "Use only current active sources.",
+        required_content: "- Ground metrics in active sources.",
+      }],
       source: {
         prompt: "Build from uploaded source material",
         context: [],
         setting: { output_language: "English" },
       },
       updated_at: "2026-07-01T00:00:00.000Z",
+      confirmed_at: "2026-07-01T00:00:00.000Z",
     };
     const pagePlan = {
       version: 1,

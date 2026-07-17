@@ -58,35 +58,17 @@ export interface AppPresentationRequirements {
 
 export interface AppWorkspaceOutlineItem {
   title: string;
-  outline: string;
-}
-
-export interface AppWorkspaceOutlineSource {
-  prompt: string;
-  context: unknown[];
-  task_context?: unknown[];
-  setting: Record<string, unknown>;
-  kind?: string;
-  uploaded_source_analysis?: {
-    status: "ready" | "blocked" | "gap";
-    updated_at: string;
-    active_uploaded_sources: Array<{
-      uploaded_source_id: string;
-      sha256: string;
-      size_bytes: number;
-      file_path?: string;
-    }>;
-  };
+  core_message: string;
+  required_content: string;
 }
 
 export interface AppWorkspaceOutline {
-  version: 2;
+  version: 3;
   title: string;
-  output_language: string;
-  status: "draft" | "confirmed";
+  status: "empty" | "draft" | "confirmed";
   items: AppWorkspaceOutlineItem[];
-  source: AppWorkspaceOutlineSource;
   updated_at: string | null;
+  confirmed_at: string | null;
 }
 
 export interface AppPageContentPlan {
@@ -135,7 +117,6 @@ export interface AppWorkspaceSettings {
   content_review_failure_limit?: number;
   visual_review_enabled?: boolean;
   visual_review_failure_limit?: number;
-  review_outline_first?: boolean;
   disable_web_research?: boolean;
   disable_image_research?: boolean;
   updated_at?: string;
@@ -150,7 +131,6 @@ export interface AppCreateWorkspaceSetting {
   content_review_failure_limit: number;
   visual_review_enabled: boolean;
   visual_review_failure_limit: number;
-  review_outline_first: boolean;
   disable_web_research: boolean;
   disable_image_research: boolean;
 }
@@ -593,16 +573,19 @@ export interface UpdateAppWorkspaceRequirementsInput {
   requirements: unknown;
 }
 
-export interface UpdateAppWorkspaceOutlineInput {
+export interface ResetAppWorkspaceOutlineInput {
+  workspace_dir: string;
+}
+
+export interface SaveAppWorkspaceOutlineDraftInput {
   workspace_dir: string;
   outline: {
-    title?: string;
-    output_language?: string;
-    status?: string;
-    items?: unknown;
-    source?: unknown;
+    title: string;
+    items: unknown;
   };
 }
+
+export interface ConfirmAppWorkspaceOutlineInput extends SaveAppWorkspaceOutlineDraftInput {}
 
 export interface UpdateAppWorkspacePagesInput {
   workspace_dir: string;

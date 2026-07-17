@@ -1,159 +1,82 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createAnnaAiClient } from "../../src/ai/annaAiClient.ts";
-import {
-  buildGenerateOutlineLlmRequest,
-  buildReviseOutlineLlmRequest,
-  getExpectedSlideCount,
-  getExpectedSlideCountForRevision,
-} from "../../src/ai/outlinePrompt.ts";
+import { buildGenerateOutlineLlmRequest, buildReviseOutlineLlmRequest } from "../../src/ai/outlinePrompt.ts";
 import { validateGeneratedOutline } from "../../src/ai/outlineParser.ts";
-import type { AnnaRuntime } from "../../src/runtime/annaRuntime.ts";
+import type { PresentationRequirements } from "../../src/api/types.ts";
 
-function createRuntimeWithLlmResponse(response: unknown): AnnaRuntime {
+function confirmedRequirements(): PresentationRequirements {
+  const semantic = (label: string, description: string) => ({ label, description });
   return {
-    tools: {
-      invoke: async () => ({}),
+    version: 1,
+    status: "confirmed",
+    source: { brief: "为投资人制作一份 8 页的 AI 客服方案。" },
+    candidates: {
+      audience: [semantic("投资人", "关注市场机会与回报的投资人。")],
+      purpose: [semantic("融资沟通", "说明方案价值与增长路径。")],
+      desired_outcome: [semantic("进入尽调", "推动投资人进入下一轮尽调。")],
+      slide_count: [8],
+      output_language: ["中文"],
+      visual_tone: [semantic("编辑式", "专业、清晰、有观点。")],
     },
-    llm: {
-      complete: async () => response,
+    selections: {
+      audience: semantic("投资人", "关注市场机会与回报的投资人。"),
+      purpose: semantic("融资沟通", "说明方案价值与增长路径。"),
+      desired_outcome: semantic("进入尽调", "推动投资人进入下一轮尽调。"),
+      slide_count: 8,
+      output_language: "中文",
+      visual_tone: semantic("其他", "体育杂志式的强标题与高能节奏。"),
     },
-    agent: {
-      session: async () => {
-        throw new Error("agent session is not used in this test");
-      },
-    },
+    updated_at: "2026-07-17T00:00:00.000Z",
+    confirmed_at: "2026-07-17T00:00:00.000Z",
   };
 }
 
-describe("outline prompt slide count handling", () => {
-  it("does not create a hard expected slide count from brief or context rows", () => {
-    assert.equal(
-      getExpectedSlideCount(undefined, "Please make 9 slides", []),
-      null,
-    );
-    assert.equal(
-      getExpectedSlideCount(undefined, "Please make 9 slides", [
-        { id: "slides", value: "12" },
-      ]),
-      null,
-    );
+describe("outline prompts", () => {
+  it("consumes confirmed requirements without legacy context rows or workspace settings", () => {
+    const request = buildGenerateOutlineLlmRequest({ requirements: confirmedRequirements() });
+    const prompt = request.messages[1]?.content.text ?? "";
+    assert.match(prompt, /Confirmed Presentation Requirements input/);
+    assert.match(prompt, /投资人/);
+    assert.match(prompt, /体育杂志式的强标题/);
+    assert.doesNotMatch(prompt, /contextRows/);
+    assert.doesNotMatch(prompt, /workspace setting/i);
+    assert.doesNotMatch(prompt, /\"label\":\"其他\"/);
   });
 
-  it("does not create a hard expected slide count from outline revision feedback or context rows", () => {
-    assert.equal(
-      getExpectedSlideCountForRevision(undefined, "改成 5 页", []),
-      null,
-    );
-    assert.equal(
-      getExpectedSlideCountForRevision(undefined, "改成 5 页", [
-        { id: "slides", value: "8" },
-      ]),
-      null,
-    );
-  });
-
-  it("leaves brief slide count decisions to the model when slides context is auto", () => {
-    const request = buildGenerateOutlineLlmRequest({
-      prompt: "做一份 AI Agent 工作流介绍，5 页",
-      contextRows: [{ id: "slides", value: "auto" }],
-      locale: "zh",
-      setting: { output_language: "Chinese" },
-    });
-    const userPrompt = request.messages[1]?.content.text ?? "";
-
-    assert.match(userPrompt, /follow the page-count intent in the user brief exactly/);
-    assert.doesNotMatch(userPrompt, /items 中必须严格返回 5 页/);
-  });
-
-  it("passes explicit slides context as a lower-priority prompt signal", () => {
-    const request = buildGenerateOutlineLlmRequest({
-      prompt: "做一份 AI Agent 工作流介绍",
-      contextRows: [{ id: "slides", value: "25" }],
-      locale: "zh",
-      setting: { output_language: "Chinese" },
-    });
-    const userPrompt = request.messages[1]?.content.text ?? "";
-
-    assert.match(userPrompt, /contextRows\.slides = 25/);
-    assert.match(userPrompt, /only consult contextRows\.slides when the user brief does not express any page-count requirement/);
-    assert.doesNotMatch(userPrompt, /items 中必须严格返回 25 页/);
-  });
-
-  it("does not parse revision feedback into an exact slide count", () => {
+  it("passes current unsaved outline content into rewrite requests", () => {
     const request = buildReviseOutlineLlmRequest({
       title: "Demo",
-      outline: [{ title: "Intro", outline: "Set context" }],
-      feedback: "改成 5 页",
-      contextRows: [],
-      locale: "zh",
-      setting: { output_language: "Chinese" },
+      outline: [{ title: "Intro", core_message: "Set context", required_content: "- Explain the context" }],
+      feedback: "增加一页并重排顺序",
+      requirements: confirmedRequirements(),
     });
-    const userPrompt = request.messages[1]?.content.text ?? "";
+    const prompt = request.messages[1]?.content.text ?? "";
+    assert.match(prompt, /增加一页并重排顺序/);
+    assert.match(prompt, /core_message/);
+    assert.match(prompt, /required_content/);
+  });
+});
 
-    assert.doesNotMatch(userPrompt, /items 中必须严格返回 5 页/);
-    assert.match(userPrompt, /follow the page-count intent in the highest-priority feedback exactly/);
+describe("outline validation", () => {
+  it("converts structured required_content arrays to canonical Markdown", () => {
+    const outline = validateGeneratedOutline({
+      title: "Valid outline",
+      items: [{
+        title: "Opening",
+        core_message: "One idea to remember.",
+        required_content: ["First requirement", "Second requirement"],
+      }],
+    });
+    assert.equal(outline.items[0]?.required_content, "- First requirement\n- Second requirement");
   });
 
-  it("does not reject outlines that differ from a provided expected slide count", () => {
-    const outline = validateGeneratedOutline(
-      {
-        title: "One Page",
-        output_language: "English",
-        items: [{ title: "Only", outline: "A focused one-page outline." }],
-      },
-      12,
-    );
-
-    assert.equal(outline.items.length, 1);
-  });
-
-  it("requires generated outlines to include output_language", () => {
+  it("rejects incomplete or unexpected AI output", () => {
     assert.throws(
-      () =>
-        validateGeneratedOutline(
-          {
-            title: "Missing Language",
-            items: [{ title: "Only", outline: "A focused one-page outline." }],
-          },
-          null,
-        ),
-      /output_language/,
+      () => validateGeneratedOutline({
+        title: "Invalid",
+        items: [{ title: "Only", core_message: "", required_content: "- Wrong protocol" }],
+      }),
+      /core_message|required_content/,
     );
-  });
-
-  it("asks the model to infer output language when setting is auto", () => {
-    const request = buildGenerateOutlineLlmRequest({
-      prompt: "帮我做一份发布会复盘",
-      contextRows: [],
-      locale: "en",
-      setting: { output_language: "auto" },
-    });
-    const userPrompt = request.messages[1]?.content.text ?? "";
-
-    assert.match(userPrompt, /output_language/);
-    assert.match(userPrompt, /auto/);
-    assert.doesNotMatch(userPrompt, /Locale: en[\s\S]*content language must be English/);
-  });
-
-  it("passes compact uploaded source analysis context into outline generation", () => {
-    const request = buildGenerateOutlineLlmRequest({
-      prompt: "根据上传材料做一份经营复盘",
-      contextRows: [],
-      locale: "zh",
-      setting: { output_language: "Chinese" },
-      uploadedSourceAnalysisContext: {
-        status: "ready",
-        facts: [{ id: "fact-1", claim: "ARR grew 12%." }],
-        visual_assets: [],
-        gaps: [],
-      },
-    });
-    const userPrompt = request.messages[1]?.content.text ?? "";
-
-    assert.match(userPrompt, /Uploaded Source Analysis context/);
-    assert.match(userPrompt, /ARR grew 12%/);
-    assert.match(userPrompt, /high-priority user-provided source material/);
-    assert.match(userPrompt, /Do not mention raw uploaded file paths/);
   });
 });

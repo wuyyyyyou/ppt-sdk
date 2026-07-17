@@ -1,5 +1,6 @@
 import {
   initialDeck,
+  outlineDetailToText,
   outlineDetails,
   type OutlineDetail,
   type Slide
@@ -8,8 +9,6 @@ import { sleep } from "../features/deck-workspace/utils";
 import {
   buildGenerateOutlineLlmRequest,
   buildReviseOutlineLlmRequest,
-  getExpectedSlideCount,
-  getExpectedSlideCountForRevision,
 } from "./outlinePrompt";
 import { validateGeneratedOutline } from "./outlineParser";
 import type {
@@ -75,8 +74,8 @@ function fitOutlineCount(outline: OutlineDetail[], count: number | null): Outlin
   while (next.length < count) {
     next.push({
       title: `Supporting Point ${next.length + 1}`,
-      outline:
-        "Add a focused supporting page that extends the core argument with one clear takeaway.",
+      core_message: "Add one focused supporting point that extends the core argument.",
+      required_content: "- Add one clear takeaway.\n- Connect it to the surrounding storyline.",
     });
   }
   return next;
@@ -131,14 +130,18 @@ export function createMockAiClient(): AiClient {
     async generateOutline(input) {
       await sleep(900);
       const llmRequest = buildGenerateOutlineLlmRequest(input);
-      const expectedSlideCount = getExpectedSlideCount(input.setting, input.prompt, input.contextRows);
+      const expectedSlideCount = input.requirements.selections.slide_count;
+      const usesChinese = input.requirements.selections.output_language === "中文";
       const rawOutline = {
-        title: input.locale === "zh" ? "AI Agent 工作流" : "AI Agent Workflows",
-        output_language: readOutputLanguage(
-          input.setting?.output_language,
-          input.locale === "zh" ? "中文" : "English"
-        ),
-        items: fitOutlineCount(outlineDetails, expectedSlideCount),
+        title: usesChinese ? "AI Agent 工作流" : "AI Agent Workflows",
+        items: fitOutlineCount(outlineDetails, expectedSlideCount).map((item) => ({
+          title: item.title,
+          core_message: item.core_message,
+          required_content: item.required_content
+            .split(/\r?\n/)
+            .map((line) => line.replace(/^\s*[-*+•]\s+/, "").trim())
+            .filter(Boolean),
+        })),
       };
       const llmRawResponse = {
         content: {
@@ -148,7 +151,7 @@ export function createMockAiClient(): AiClient {
         model: "mock",
       };
       await logMockInteraction(input.logContext, llmRequest, llmRawResponse);
-      const outline = validateGeneratedOutline(rawOutline, expectedSlideCount);
+      const outline = validateGeneratedOutline(rawOutline);
       return {
         outline,
         attempts: [
@@ -165,18 +168,6 @@ export function createMockAiClient(): AiClient {
           },
         ],
       };
-    },
-
-    async detectOutputLanguage(input) {
-      await sleep(200);
-      const result = {
-        output_language: readOutputLanguage(
-          input.setting?.output_language,
-          input.locale === "zh" ? "中文" : "English"
-        ),
-      };
-      await logMockInteraction(input.logContext, { method: "detectOutputLanguage", input }, result);
-      return result;
     },
 
     async generateThemeToken(input) {
@@ -213,7 +204,7 @@ export function createMockAiClient(): AiClient {
             page_id: `page-${pageNumber}`,
             index,
             title: item.title,
-            outline: item.outline,
+            outline: outlineDetailToText(item),
             blueprint_id: blueprint.id,
             blueprint_source: blueprint.blueprint_source,
             slide_path: `./slides/page-${pageNumber}.tsx`,
@@ -250,7 +241,7 @@ export function createMockAiClient(): AiClient {
             page_id: `added-${pageNumber}`,
             index,
             title: item.title,
-            outline: item.outline,
+            outline: outlineDetailToText(item),
             blueprint_id: content.id,
             blueprint_source: content.blueprint_source,
             slide_path: `./slides/added-${pageNumber}.tsx`,
@@ -438,23 +429,23 @@ export function createMockAiClient(): AiClient {
     async reviseOutline(input: ReviseOutlineInput) {
       await sleep(700);
       const llmRequest = buildReviseOutlineLlmRequest(input);
-      const expectedSlideCount = getExpectedSlideCountForRevision(input.setting, input.feedback, input.contextRows);
       const revisedItems = !input.feedback.trim()
-        ? fitOutlineCount(input.outline, expectedSlideCount)
-        : fitOutlineCount(input.outline, expectedSlideCount).map((item, index) =>
+        ? cloneOutline(input.outline)
+        : cloneOutline(input.outline).map((item, index) =>
             index === 5
               ? { ...item, title: "Security Boundaries for Real Action" }
               : { ...item }
           );
       const rawOutline = {
-        title:
-          input.title ||
-          (input.locale === "zh" ? "AI Agent 工作流" : "AI Agent Workflows"),
-        output_language: readOutputLanguage(
-          input.setting?.output_language,
-          input.locale === "zh" ? "中文" : "English"
-        ),
-        items: revisedItems,
+        title: input.title || "AI Agent Workflows",
+        items: revisedItems.map((item) => ({
+          title: item.title,
+          core_message: item.core_message,
+          required_content: item.required_content
+            .split(/\r?\n/)
+            .map((line) => line.replace(/^\s*[-*+•]\s+/, "").trim())
+            .filter(Boolean),
+        })),
       };
       const llmRawResponse = {
         content: {
@@ -464,7 +455,7 @@ export function createMockAiClient(): AiClient {
         model: "mock",
       };
       await logMockInteraction(input.logContext, llmRequest, llmRawResponse);
-      const outline = validateGeneratedOutline(rawOutline, expectedSlideCount);
+      const outline = validateGeneratedOutline(rawOutline);
 
       return {
         outline,
@@ -488,7 +479,7 @@ export function createMockAiClient(): AiClient {
       await sleep(1200);
       const slides = input.outline.map((item) => ({
         title: item.title,
-        subtitle: item.outline
+        subtitle: outlineDetailToText(item)
       }));
       await logMockInteraction(input.logContext, { method: "generateSlidesFromOutline", input }, slides);
       return slides;

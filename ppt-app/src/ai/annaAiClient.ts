@@ -3,8 +3,6 @@ import {
   buildGenerateOutlineLlmRequest,
   buildOutlineRepairRequest,
   buildReviseOutlineLlmRequest,
-  getExpectedSlideCount,
-  getExpectedSlideCountForRevision,
 } from "./outlinePrompt";
 import {
   buildGeneratePagePlanLlmRequest,
@@ -327,7 +325,6 @@ async function completeOutlineWithRetry(
   runtime: AnnaRuntime,
   operation: "generateOutline" | "reviseOutline",
   initialRequest: AnnaLlmCompleteInput,
-  validationSlideCount: number | null,
   logContext?: AiOperationLogContext
 ): Promise<OutlineGenerationResult> {
   const attempts: AiAttemptLog[] = [];
@@ -341,7 +338,7 @@ async function completeOutlineWithRetry(
 
       try {
         const parsed = parseOutlineJson(rawText);
-        const outline = validateGeneratedOutline(parsed, validationSlideCount);
+        const outline = validateGeneratedOutline(parsed);
         attempts.push({
           operation,
           attempt,
@@ -419,41 +416,8 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         runtime,
         "generateOutline",
         buildGenerateOutlineLlmRequest(input),
-        getExpectedSlideCount(input.setting, input.prompt, input.contextRows),
         input.logContext
       );
-    },
-
-    async detectOutputLanguage(input) {
-      const result = await completeJson<unknown>(
-        runtime,
-        "output language",
-        [
-          "Decide the content language for a presentation.",
-          "Return only one JSON object with exactly one property: output_language.",
-          "Use the user's brief, optional context rows, current outline, and workspace setting.",
-          "If workspace output_language is a concrete language and not auto, return that exact value.",
-          "If workspace output_language is auto or missing, infer the best content language from the brief and outline.",
-          "Do not rewrite the outline. Do not include markdown or explanation.",
-          `Locale: ${input.locale}`,
-          `Prompt: ${input.prompt}`,
-          `Context: ${JSON.stringify(input.contextRows)}`,
-          `Setting: ${JSON.stringify(input.setting ?? {})}`,
-          `Outline title: ${input.title ?? ""}`,
-          `Outline items: ${JSON.stringify(input.outline ?? [])}`,
-        ].join("\n"),
-        '{"output_language":"中文"}',
-        input.logContext
-      );
-      const record =
-        result && typeof result === "object" && !Array.isArray(result)
-          ? (result as Record<string, unknown>)
-          : {};
-      const outputLanguage =
-        typeof record.output_language === "string"
-          ? record.output_language.trim()
-          : "";
-      return { output_language: outputLanguage || "auto" };
     },
 
     async generateThemeToken(input) {
@@ -625,7 +589,6 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         runtime,
         "reviseOutline",
         buildReviseOutlineLlmRequest(input),
-        getExpectedSlideCountForRevision(input.setting, input.feedback, input.contextRows),
         input.logContext
       );
     },

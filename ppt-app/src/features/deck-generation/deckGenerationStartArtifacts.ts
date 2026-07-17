@@ -6,6 +6,7 @@ import type {
   WorkspaceResult,
 } from "../../api/types";
 import type { AiOperationLogContext } from "../../ai/interactionLog";
+import { outlineDetailToText } from "../../data/mockDeck";
 import { generationText } from "./messages";
 import { emit } from "./progressProjection";
 import {
@@ -36,7 +37,7 @@ function pagePlanMatchesOutlineItems(pagePlan: PagePlan, outline: WorkspaceOutli
     return (
       item &&
       page.title.trim() === item.title.trim() &&
-      page.outline.trim() === item.outline.trim()
+      page.outline.trim() === outlineDetailToText(item).trim()
     );
   });
 }
@@ -90,7 +91,7 @@ export function alignPagePlanWithOutline(pagePlan: PagePlan, outline: WorkspaceO
       return {
         ...page,
         title: outlineItem.title,
-        outline: outlineItem.outline,
+        outline: outlineDetailToText(outlineItem),
       };
     }),
   };

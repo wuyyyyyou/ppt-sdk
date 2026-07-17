@@ -38,8 +38,6 @@ interface BriefPageProps {
   closeStyleProfileDetail: () => void;
   selectStyleProfile: (styleProfileId: string) => Promise<void>;
   clearStyleProfile: () => Promise<void>;
-  reviewOutlineFirst: boolean;
-  setReviewOutlineFirst: (value: boolean) => Promise<void>;
   pageReviewSettings: PageReviewSettings;
   setStrictReviewMode: (enabled: boolean) => Promise<void>;
   researchSearchControlSettings: ResearchSearchControlSettings;
@@ -72,8 +70,6 @@ export function BriefPage(props: BriefPageProps) {
     closeStyleProfileDetail,
     selectStyleProfile,
     clearStyleProfile,
-    reviewOutlineFirst,
-    setReviewOutlineFirst,
     pageReviewSettings,
     setStrictReviewMode,
     researchSearchControlSettings,
@@ -158,20 +154,6 @@ export function BriefPage(props: BriefPageProps) {
 
       <div className="brief-toggle-columns">
         <div className="brief-toggle-column">
-          <button
-            type="button"
-            className={`checkbox-row ${reviewOutlineFirst ? "active" : ""}`}
-            onClick={() => void setReviewOutlineFirst(!reviewOutlineFirst)}
-            aria-checked={reviewOutlineFirst}
-            role="switch"
-            disabled={isCreating || isSuggestingContext || workspaceSettingsSaving}
-          >
-            <span className="checkbox-custom">
-              {reviewOutlineFirst ? <Check size={11} strokeWidth={3} /> : null}
-            </span>
-            <span>{t.brief.reviewOutlineFirst}</span>
-          </button>
-
           <div className="checkbox-row-with-help">
             <button
               type="button"

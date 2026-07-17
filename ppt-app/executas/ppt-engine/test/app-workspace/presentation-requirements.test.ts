@@ -41,8 +41,10 @@ test("Presentation Requirements own Workspace recovery and gate Outline Creation
 
   const {
     createAppWorkspace,
+    confirmAppWorkspaceOutline,
     getAppWorkspaceRequirements,
-    updateAppWorkspaceOutline,
+    resetAppWorkspaceOutline,
+    saveAppWorkspaceOutlineDraft,
     updateAppWorkspaceRequirements,
   } = await import("../../src/app-workspace/index.ts");
 
@@ -69,13 +71,11 @@ test("Presentation Requirements own Workspace recovery and gate Outline Creation
     assert.equal(persistedDraft.confirmed_at, null);
 
     await assert.rejects(
-      updateAppWorkspaceOutline({
+      saveAppWorkspaceOutlineDraft({
         workspace_dir: created.workspace_dir,
         outline: {
           title: "Blocked",
-          status: "draft",
-          items: [],
-          source: { prompt: "", context: [], setting: {} },
+          items: [{ title: "Page", core_message: "Message", required_content: "- Content" }],
         },
       }),
       /Confirmed Presentation Requirements are required/,
@@ -89,16 +89,67 @@ test("Presentation Requirements own Workspace recovery and gate Outline Creation
     assert.equal(confirmed.status, "confirmed");
     assert.ok(confirmed.confirmed_at);
 
-    const workspace = await updateAppWorkspaceOutline({
+    const workspace = await saveAppWorkspaceOutlineDraft({
       workspace_dir: created.workspace_dir,
       outline: {
         title: "Allowed",
-        status: "draft",
-        items: [],
-        source: { prompt: confirmed.source?.brief ?? "", context: [], setting: {} },
+        items: [
+          {
+            title: "Page one",
+            core_message: "One clear message",
+            required_content: "* First requirement\nSecond requirement\n1. Third requirement",
+          },
+          {
+            title: "Page two",
+            core_message: "Another clear message",
+            required_content: "Fourth requirement",
+          },
+        ],
       },
     });
     assert.equal((workspace.outline as { title: string }).title, "Allowed");
+    assert.equal((workspace.outline as { status: string }).status, "draft");
+    assert.equal(
+      (workspace.outline as { items: Array<{ required_content: string }> }).items[0]?.required_content,
+      "- First requirement\n- Second requirement\n- Third requirement",
+    );
+    assert.equal(
+      (workspace.outline as { items: Array<{ required_content: string }> }).items[1]?.required_content,
+      "- Fourth requirement",
+    );
+    assert.equal(workspace.requirements.selections.slide_count, 2);
+    assert.equal((workspace.task as { title: string }).title, "Allowed");
+
+    const confirmedWorkspace = await confirmAppWorkspaceOutline({
+      workspace_dir: created.workspace_dir,
+      outline: {
+        title: "Allowed",
+        items: (workspace.outline as { items: unknown[] }).items,
+      },
+    });
+    assert.equal((confirmedWorkspace.outline as { status: string }).status, "confirmed");
+    assert.ok((confirmedWorkspace.outline as { confirmed_at: string | null }).confirmed_at);
+
+    const resetWorkspace = await resetAppWorkspaceOutline({ workspace_dir: created.workspace_dir });
+    assert.deepEqual(resetWorkspace.outline, {
+      version: 3,
+      status: "empty",
+      title: "",
+      items: [],
+      updated_at: null,
+      confirmed_at: null,
+    });
+
+    await assert.rejects(
+      saveAppWorkspaceOutlineDraft({
+        workspace_dir: created.workspace_dir,
+        outline: {
+          title: "Invalid",
+          items: [{ title: "Page", core_message: "", required_content: "plain text" }],
+        },
+      }),
+      /core_message must be a non-empty string/,
+    );
 
     await assert.rejects(
       updateAppWorkspaceRequirements({

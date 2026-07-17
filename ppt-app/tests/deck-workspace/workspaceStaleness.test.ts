@@ -2,10 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { WorkspaceResult } from "../../src/api/types.ts";
-import {
-  isWorkspaceDeckStale,
-  syncSlideCountContextRow,
-} from "../../src/features/deck-workspace/utils.ts";
+import { isWorkspaceDeckStale } from "../../src/features/deck-workspace/utils.ts";
 
 function makeWorkspace(overrides: Partial<WorkspaceResult> = {}): WorkspaceResult {
   return {
@@ -30,17 +27,18 @@ function makeWorkspace(overrides: Partial<WorkspaceResult> = {}): WorkspaceResul
     task: {},
     setting: {},
     outline: {
-      version: 2,
+      version: 3,
       title: "AI: Our Smart Robot Friend",
       status: "confirmed",
       items: [
         {
           title: "What is AI?",
-          outline: "Artificial Intelligence is like giving a computer a smart brain.",
+          core_message: "Artificial Intelligence is like giving a computer a smart brain.",
+          required_content: "- Explain AI with an accessible analogy.",
         },
       ],
-      source: { prompt: "", context: [], setting: {} },
       updated_at: "2026-06-02T03:47:38.344Z",
+      confirmed_at: "2026-06-02T03:47:38.344Z",
     },
     page_plan: {
       version: 1,
@@ -99,76 +97,45 @@ describe("Workspace Deck Staleness", () => {
     assert.equal(isWorkspaceDeckStale(makeWorkspace()), false);
   });
 
-  it("marks rendered pages stale when outline content differs from the page plan", () => {
+  it("keeps the existing deck available when confirmed outline content changes", () => {
     const workspace = makeWorkspace({
       outline: {
-        version: 2,
+        version: 3,
         title: "AI: Our Smart Robot Friend",
         status: "confirmed",
         items: [
           {
             title: "What is AI?",
-            outline: "A changed outline should require a new deck.",
+            core_message: "A changed outline can be confirmed to generate a new deck.",
+            required_content: "- Keep the existing deck until confirmation.",
           },
         ],
-        source: { prompt: "", context: [], setting: {} },
         updated_at: "2026-06-02T03:47:38.344Z",
+        confirmed_at: "2026-06-02T03:47:38.344Z",
       },
     });
 
-    assert.equal(isWorkspaceDeckStale(workspace), true);
+    assert.equal(isWorkspaceDeckStale(workspace), false);
   });
 
-  it("keeps draft outlines stale when downstream artifacts already exist", () => {
+  it("keeps the existing deck available while a draft outline is being edited", () => {
     const workspace = makeWorkspace({
       outline: {
-        version: 2,
+        version: 3,
         title: "AI: Our Smart Robot Friend",
         status: "draft",
         items: [
           {
             title: "What is AI?",
-            outline: "Artificial Intelligence is like giving a computer a smart brain.",
+            core_message: "Artificial Intelligence is like giving a computer a smart brain.",
+            required_content: "- Explain AI with an accessible analogy.",
           },
         ],
-        source: { prompt: "", context: [], setting: {} },
         updated_at: "2026-06-02T03:44:57.562Z",
+        confirmed_at: null,
       },
     });
 
-    assert.equal(isWorkspaceDeckStale(workspace), true);
-  });
-});
-
-describe("Workspace outline context rows", () => {
-  it("adds a slides context row from the current outline page count", () => {
-    const rows = syncSlideCountContextRow(
-      [{ id: "audience", label: "Audience", value: "Executives" }],
-      3,
-      "Slides",
-    );
-
-    assert.deepEqual(rows.map((row) => [row.id, row.value]), [
-      ["audience", "Executives"],
-      ["slides", "3"],
-    ]);
-    assert.equal(rows[1]?.allowCustomValue, true);
-  });
-
-  it("overwrites an existing slides context row unconditionally", () => {
-    const rows = syncSlideCountContextRow(
-      [
-        { id: "slides", label: "Slides", value: "7", type: "select" },
-        { id: "goal", label: "Goal", value: "Explain the plan" },
-      ],
-      4,
-      "Slides",
-    );
-
-    assert.deepEqual(rows.map((row) => [row.id, row.value]), [
-      ["slides", "4"],
-      ["goal", "Explain the plan"],
-    ]);
-    assert.equal(rows[0]?.allowCustomValue, true);
+    assert.equal(isWorkspaceDeckStale(workspace), false);
   });
 });

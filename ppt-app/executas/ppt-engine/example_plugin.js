@@ -92,7 +92,9 @@ import {
   selectAppWorkspaceTemplate,
   startAppPptxExportModel,
   invokeTaskStateMachine,
-  updateAppWorkspaceOutline,
+  confirmAppWorkspaceOutline,
+  resetAppWorkspaceOutline,
+  saveAppWorkspaceOutlineDraft,
   updateAppWorkspaceRequirements,
   updateAppWorkspacePages,
   updateAppWorkspaceSettings,
@@ -1246,18 +1248,48 @@ async function toolAppAppendWorkspaceLog(args) {
   });
 }
 
-async function toolAppUpdateWorkspaceOutline(args) {
+function readOutlineInput(args) {
+  const outline = args.outline;
+  if (!outline || typeof outline !== "object" || Array.isArray(outline)) {
+    throw new Error('"outline" must be an object');
+  }
+  return outline;
+}
+
+async function toolAppResetWorkspaceOutline(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
   }
 
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const outline = args.outline;
-  if (!outline || typeof outline !== "object" || Array.isArray(outline)) {
-    throw new Error('"outline" must be an object');
+  return registerWorkspaceJsonReference(await resetAppWorkspaceOutline({
+    workspace_dir: workspaceDir,
+  }));
+}
+
+async function toolAppSaveWorkspaceOutlineDraft(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
   }
 
-  return registerWorkspaceJsonReference(await updateAppWorkspaceOutline({
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const outline = readOutlineInput(args);
+
+  return registerWorkspaceJsonReference(await saveAppWorkspaceOutlineDraft({
+    workspace_dir: workspaceDir,
+    outline,
+  }));
+}
+
+async function toolAppConfirmWorkspaceOutline(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const outline = readOutlineInput(args);
+
+  return registerWorkspaceJsonReference(await confirmAppWorkspaceOutline({
     workspace_dir: workspaceDir,
     outline,
   }));
@@ -2174,7 +2206,9 @@ const TOOL_DISPATCH = {
   app_get_workspace_requirements: toolAppGetWorkspaceRequirements,
   app_update_workspace_requirements: toolAppUpdateWorkspaceRequirements,
   app_get_workspace_outline: toolAppGetWorkspaceOutline,
-  app_update_workspace_outline: toolAppUpdateWorkspaceOutline,
+  app_reset_workspace_outline: toolAppResetWorkspaceOutline,
+  app_save_workspace_outline_draft: toolAppSaveWorkspaceOutlineDraft,
+  app_confirm_workspace_outline: toolAppConfirmWorkspaceOutline,
   app_update_workspace_pages: toolAppUpdateWorkspacePages,
   app_duplicate_workspace_page: toolAppDuplicateWorkspacePage,
   app_update_workspace_settings: toolAppUpdateWorkspaceSettings,

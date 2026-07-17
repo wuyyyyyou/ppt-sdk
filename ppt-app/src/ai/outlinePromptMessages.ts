@@ -1,19 +1,12 @@
 import { CONTENT_GROUNDING_RULES } from "./groundingRules";
 
 interface GenerateOutlinePromptMessageInput {
-  slideCountContext: string;
-  locale: string;
-  settingSummaryJson: string;
-  prompt: string;
-  contextRowsJson: string;
+  confirmedRequirementsJson: string;
   uploadedSourceAnalysisContextJson: string;
 }
 
 interface ReviseOutlinePromptMessageInput {
-  slideCountContext: string;
-  locale: string;
-  settingSummaryJson: string;
-  contextRowsJson: string;
+  confirmedRequirementsJson: string;
   uploadedSourceAnalysisContextJson: string;
   title?: string;
   feedback: string;
@@ -21,15 +14,16 @@ interface ReviseOutlinePromptMessageInput {
 }
 
 const OUTLINE_JSON_SHAPE =
-  '{"title":"...","output_language":"...","items":[{"title":"...","outline":"..."}]}';
+  '{"title":"...","items":[{"title":"...","core_message":"...","required_content":["...","..."]}]}';
 
 const OUTLINE_OUTPUT_REQUIREMENTS = [
   "- Return one valid JSON object only.",
   "- title must be the presentation title.",
-  "- output_language must be the final content language; if workspace output_language is auto or missing, infer it from the user brief and additional context.",
   "- items must be the page outline array.",
-  "- Every page item must have title and outline.",
-  "- If workspace output_language is not auto, title and outline content language must follow that value.",
+  "- Every page item must contain only title, core_message, and required_content.",
+  "- title and core_message must each be one non-empty line.",
+  "- required_content must be a non-empty array of non-empty single-line content requirements; do not include Markdown bullet prefixes.",
+  "- Use the confirmed output_language for all generated title, core_message, and required_content text.",
 ] as const;
 
 const OUTLINE_STORYLINE_RULES = [
@@ -53,8 +47,9 @@ export function buildOutlineSystemPrompt(): string {
     "Return JSON only. Do not include markdown, code fences, comments, explanations, or extra text.",
     `The JSON shape must be exactly: ${OUTLINE_JSON_SHAPE}.`,
     "Each item represents one slide/page.",
-    "Each item must contain only title and outline.",
-    "outline must be one concise natural-language paragraph, not an array and not a bullet list.",
+    "Each item must contain only title, core_message, and required_content.",
+    "core_message is the single idea the audience should remember from that page.",
+    "required_content is a JSON array of concrete content requirements that the page must cover.",
     "The outline must satisfy these storyline quality rules:",
     ...OUTLINE_STORYLINE_RULES,
     "Do not add cover, agenda, appendix, or thank-you slides unless the user explicitly requests them.",
@@ -67,12 +62,9 @@ export function buildGenerateOutlineUserPrompt(
 ): string {
   return [
     "Create a presentation outline from the user brief.",
-    `Slide count context: contextRows.slides = ${input.slideCountContext}.`,
-    "Slide count priority: follow the page-count intent in the user brief exactly; only consult contextRows.slides when the user brief does not express any page-count requirement; if contextRows.slides is auto or missing, choose a reasonable count based on the content.",
-    `Locale: ${input.locale}`,
-    `Relevant workspace setting: ${input.settingSummaryJson}`,
-    `User brief: ${input.prompt}`,
-    `Additional context rows: ${input.contextRowsJson}`,
+    `Confirmed Presentation Requirements input: ${input.confirmedRequirementsJson}`,
+    "Treat confirmed selections as authoritative over conflicting wording in the source brief.",
+    "Use the confirmed slide_count as the initial planning intent, but choose the page count that produces the strongest coherent outline.",
     `Uploaded Source Analysis context: ${input.uploadedSourceAnalysisContextJson}`,
     "Uploaded Source Analysis rules:",
     "- If this context is not null, treat it as high-priority user-provided source material for outline strategy.",
@@ -89,14 +81,10 @@ export function buildReviseOutlineUserPrompt(
 ): string {
   return [
     "Revise the existing presentation outline according to the feedback.",
-    "Priority rule: feedback overrides only the parts it explicitly mentions; for anything not mentioned, strictly follow the lower-priority workspace settings and optional context rows.",
+    "Use the feedback, current outline, and Confirmed Presentation Requirements together; resolve any tension as a senior presentation strategist.",
     "Preservation rule: keep the current presentation title, slide count, page order, and every outline item unchanged unless the feedback explicitly asks to change them.",
-    "Only edit the specific pages, fields, language, structure, or slide count requested by the feedback; copy all unrelated title and outline values from the current outline.",
-    `Slide count context: contextRows.slides = ${input.slideCountContext}.`,
-    "Slide count priority: follow the page-count intent in the highest-priority feedback exactly; only consult contextRows.slides when the feedback does not express any page-count requirement; if contextRows.slides is auto or missing, choose a reasonable count based on the current outline and feedback.",
-    `Locale: ${input.locale}`,
-    `Lower-priority workspace setting: ${input.settingSummaryJson}`,
-    `Optional context rows: ${input.contextRowsJson}`,
+    "Only edit the specific pages, fields, structure, or page count requested by the feedback; copy all unrelated values from the current outline.",
+    `Confirmed Presentation Requirements input: ${input.confirmedRequirementsJson}`,
     `Uploaded Source Analysis context: ${input.uploadedSourceAnalysisContextJson}`,
     `Current presentation title: ${input.title || ""}`,
     `Highest-priority feedback: ${input.feedback}`,
@@ -108,12 +96,10 @@ export function buildReviseOutlineUserPrompt(
     "Output requirements:",
     "- Return one valid JSON object only.",
     "- title must be the presentation title.",
-    "- output_language must be the final content language; if feedback specifies language, use that language; otherwise keep or infer workspace output_language.",
     "- items must be the revised page outline array.",
-    "- Every page item must have title and outline.",
-    "- If the feedback specifies language, slide count, content inclusion/exclusion, or structure, follow the feedback first.",
-    "- For audience, goal, style, content source, language, and slide count not specified in the feedback, strictly follow workspace settings and optional context rows.",
-    "- If workspace output_language is auto or missing, infer the content language from the user brief, current outline, and optional context rows.",
+    "- Every page item must contain only title, core_message, and required_content.",
+    "- title and core_message must each be one non-empty line.",
+    "- required_content must be a non-empty array of non-empty single-line content requirements without Markdown bullet prefixes.",
   ].join("\n");
 }
 
