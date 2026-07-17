@@ -560,10 +560,6 @@ button {
 }
 
 .requirements-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.78fr);
-  gap: 34px;
-  align-items: end;
   padding-bottom: 24px;
   border-bottom: 1px solid rgba(17, 24, 39, 0.09);
 }
@@ -588,25 +584,68 @@ button {
 
 .requirements-brief {
   min-width: 0;
-  padding-left: 18px;
+  padding: 4px 0 4px 18px;
   border-left: 3px solid #159a8c;
 }
 
-.requirements-brief span {
-  display: block;
-  margin-bottom: 5px;
+.requirements-brief summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  align-items: start;
+  cursor: pointer;
+  list-style: none;
+}
+
+.requirements-brief summary::-webkit-details-marker {
+  display: none;
+}
+
+.requirements-brief-label {
+  grid-column: 1;
   color: #0f766e;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
-  text-transform: uppercase;
+}
+
+.requirements-brief-preview {
+  display: -webkit-box;
+  grid-column: 1;
+  overflow: hidden;
+  color: var(--text-main);
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.requirements-brief summary svg {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  margin-top: 2px;
+  color: var(--text-muted);
+  transition: transform 0.18s ease;
+}
+
+.requirements-brief[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.requirements-brief[open] .requirements-brief-preview {
+  display: none;
 }
 
 .requirements-brief p {
+  margin: 12px 30px 0 0;
+  white-space: pre-wrap;
+  color: var(--text-main);
+  line-height: 1.65;
+}
+
+.requirements-brief:not([open]) p {
   display: -webkit-box;
   overflow: hidden;
-  color: var(--text-main);
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
 }
 
 .requirements-groups {
@@ -747,6 +786,12 @@ button {
   color: var(--text-muted);
   font-size: 12px;
   text-align: right;
+}
+
+.requirements-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .requirements-footer button,
@@ -4190,22 +4235,22 @@ details.generation-history-panel > summary::-webkit-details-marker {
     padding: 18px;
   }
 
-  .requirements-header,
   .requirement-options {
     grid-template-columns: 1fr;
   }
 
-  .requirements-header {
-    align-items: start;
-  }
-
   .requirements-footer {
     bottom: -18px;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
   }
 
   .requirements-footer > span {
     display: none;
+  }
+
+  .requirements-footer-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 
   .prompt-label {

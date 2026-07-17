@@ -27,10 +27,10 @@ A selectable proposed value within a Presentation Requirements Draft. Each field
 The complete Presentation Requirements accepted by the user as the primary constraints for downstream creation; page count and output language are always concrete rather than automatically deferred. Any later field change returns them to a draft until the whole set is confirmed again, while the Brief remains the original source record without overriding a conflicting confirmed field.
 
 **Presentation Requirements Creation**:
-The explicit user-requested process that derives a new Presentation Requirements Draft solely from the current Brief. It may infer missing requirements but never content facts; each resulting draft retains its source Brief, and a successful new creation replaces the active draft as a whole while a failed attempt leaves it unchanged.
+The explicit user-requested process that derives a new Presentation Requirements Draft solely from the current Brief. It may infer missing requirements but never content facts; each resulting draft retains its source Brief, and a successful new creation replaces the current review draft as a whole while a failed attempt leaves it unchanged. The review draft and later edits are persisted only when the user explicitly saves or confirms them.
 
 **Presentation Requirements Review**:
-The required user step where every Presentation Requirements field is resolved from generated candidates or manual entry and the whole set is explicitly confirmed by the user; it is never skipped automatically. Default selections remain a draft until this confirmation action occurs.
+The required user step where every Presentation Requirements field is resolved from generated candidates or manual entry and the whole set is explicitly confirmed by the user; it is never skipped automatically. Default selections remain a draft until this confirmation action occurs. Editing does not auto-save: Save persists a draft, while confirmation saves the complete set as confirmed before downstream work begins.
 User-facing Chinese label: 确认演示需求
 
 **Presentation Purpose**:

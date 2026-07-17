@@ -387,6 +387,7 @@ export interface DeckWorkspaceActions {
     value: PresentationRequirementsSelections[K],
   ) => void;
   returnToBriefFromRequirements: () => void;
+  savePresentationRequirements: () => Promise<void>;
   confirmPresentationRequirements: () => Promise<void>;
   createDeckFromOutline: () => Promise<void>;
   applyOutlineFeedback: () => Promise<void>;
@@ -460,6 +461,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     useState<"idle" | "loading" | "ready" | "error">("idle");
   const [requirementsError, setRequirementsError] = useState("");
   const [requirementsSaving, setRequirementsSaving] = useState(false);
+  const [requirementsDirty, setRequirementsDirty] = useState(false);
   const [deckTitle, setDeckTitle] = useState(t.deck.title);
   const [deck, setDeck] = useState<Slide[]>(initialDeck);
   const [outline, setOutline] = useState(outlineDetails);
@@ -508,8 +510,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const forceUploadedSourceAnalysisRefreshRef = useRef(false);
   const outlineAutosaveTimerRef = useRef<number | null>(null);
   const requirementsOperationRef = useRef(0);
-  const requirementsSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
-  const requirementsSavePendingRef = useRef(0);
   const [workspaceScan, setWorkspaceScan] = useState<ListWorkspacesResult | null>(null);
   const [currentWorkspace, setCurrentWorkspace] = useState<WorkspaceResult | null>(null);
   const [uploadedSources, setUploadedSources] = useState<UploadedSourceMaterial[]>([]);
@@ -1196,6 +1196,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setPresentationRequirements(workspace.requirements);
     setRequirementsStatus(workspace.requirements.status === "empty" ? "idle" : "ready");
     setRequirementsError("");
+    setRequirementsDirty(false);
     if (workspace.requirements.source?.brief) {
       setPrompt(workspace.requirements.source.brief);
     }
@@ -1314,6 +1315,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setRequirementsStatus("idle");
     setRequirementsError("");
     setRequirementsSaving(false);
+    setRequirementsDirty(false);
     setDeckTitle(result.title);
     setDeck([]);
     setOutline([]);
@@ -1726,28 +1728,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return buildContextRowFromPatchBase(id, value, t);
   }
 
-  function queueRequirementsSave(requirements: PresentationRequirements) {
-    if (!backend || !currentWorkspace) return Promise.resolve(null);
-    requirementsSavePendingRef.current += 1;
-    setRequirementsSaving(true);
-    const workspaceDir = currentWorkspace.workspace_dir;
-    const save = requirementsSaveQueueRef.current
-      .catch(() => undefined)
-      .then(() => backend.updateWorkspaceRequirements({
-        workspace_dir: workspaceDir,
-        requirements,
-      }))
-      .then((workspace) => {
-        setCurrentWorkspace(workspace);
-        return workspace;
-      });
-    requirementsSaveQueueRef.current = save.finally(() => {
-      requirementsSavePendingRef.current = Math.max(0, requirementsSavePendingRef.current - 1);
-      if (requirementsSavePendingRef.current === 0) setRequirementsSaving(false);
-    });
-    return save;
-  }
-
   async function generatePresentationRequirements() {
     if (!backend || !aiClient) return;
     const brief = prompt.trim();
@@ -1773,17 +1753,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         logContext: buildAiLogContext(workspace, "requirements", "generate_requirements"),
       });
       if (requirementsOperationRef.current !== operation) return;
-      await requirementsSaveQueueRef.current.catch(() => undefined);
-      if (requirementsOperationRef.current !== operation) return;
       const draft = createRequirementsDraft(brief, candidates);
-      const updatedWorkspace = await backend.updateWorkspaceRequirements({
-        workspace_dir: workspace.workspace_dir,
-        requirements: draft,
-      });
-      if (requirementsOperationRef.current !== operation) return;
       setPresentationRequirements(draft);
-      setCurrentWorkspace(updatedWorkspace);
       setRequirementsStatus("ready");
+      setRequirementsDirty(true);
       await backend.appendWorkspaceLog({
         workspace_dir: workspace.workspace_dir,
         channel: "ai-requirements",
@@ -1813,7 +1786,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setPresentationRequirements(draft);
     setRequirementsStatus("ready");
     setRequirementsError("");
-    await queueRequirementsSave(draft);
+    setRequirementsDirty(true);
   }
 
   function selectPresentationRequirement<K extends keyof PresentationRequirementsSelections>(
@@ -1828,7 +1801,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         updated_at: new Date().toISOString(),
         confirmed_at: null,
       };
-      void queueRequirementsSave(next);
+      setRequirementsDirty(true);
       return next;
     });
   }
@@ -1840,9 +1813,32 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setStage("brief");
   }
 
+  async function savePresentationRequirements() {
+    if (!backend || !currentWorkspace || !presentationRequirements.source) return;
+    const draft: PresentationRequirements = {
+      ...presentationRequirements,
+      status: "draft",
+      updated_at: new Date().toISOString(),
+      confirmed_at: null,
+    };
+    setRequirementsSaving(true);
+    try {
+      const workspace = await backend.updateWorkspaceRequirements({
+        workspace_dir: currentWorkspace.workspace_dir,
+        requirements: draft,
+      });
+      setPresentationRequirements(workspace.requirements);
+      setCurrentWorkspace(workspace);
+      setRequirementsDirty(false);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+    } finally {
+      setRequirementsSaving(false);
+    }
+  }
+
   async function confirmPresentationRequirements() {
     if (!backend || !requirementsAreComplete(presentationRequirements)) return;
-    await requirementsSaveQueueRef.current.catch(() => undefined);
     const confirmed: PresentationRequirements = {
       ...presentationRequirements,
       status: "confirmed",
@@ -1870,6 +1866,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       setContextRows(projection.contextRows);
       setCurrentWorkspace(projectedWorkspace);
       setRequirementsStatus("ready");
+      setRequirementsDirty(false);
       await generateDeck({
         brief: confirmed.source!.brief,
         contextRows: projection.contextRows,
@@ -4016,6 +4013,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     requirementsStatus,
     requirementsError,
     requirementsSaving,
+    requirementsDirty,
     deckTitle,
     deck,
     outline,
@@ -4082,6 +4080,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     useManualPresentationRequirements,
     selectPresentationRequirement,
     returnToBriefFromRequirements,
+    savePresentationRequirements,
     confirmPresentationRequirements,
     createDeckFromOutline,
     applyOutlineFeedback,

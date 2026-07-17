@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, RefreshCw, Save, Sparkles } from "lucide-react";
 import { useState } from "react";
 import type {
   PresentationRequirementCandidate,
@@ -17,6 +17,7 @@ export interface PresentationRequirementsPageProps {
   status: "idle" | "loading" | "ready" | "error";
   error: string;
   saving: boolean;
+  dirty: boolean;
   onSelect: <K extends keyof PresentationRequirementsSelections>(
     field: K,
     value: PresentationRequirementsSelections[K],
@@ -24,6 +25,7 @@ export interface PresentationRequirementsPageProps {
   onRetry: () => void;
   onManual: () => void;
   onBack: () => void;
+  onSave: () => void;
   onConfirm: () => void;
 }
 
@@ -41,7 +43,7 @@ function semanticMatches(
 }
 
 export function PresentationRequirementsPage(props: PresentationRequirementsPageProps) {
-  const { t, brief, requirements, status, error, saving, onSelect, onRetry, onManual, onBack, onConfirm } = props;
+  const { t, brief, requirements, status, error, saving, dirty, onSelect, onRetry, onManual, onBack, onSave, onConfirm } = props;
   const [customValues, setCustomValues] = useState<Record<string, string>>(() => {
     const values: Record<string, string> = {};
     for (const field of ["audience", "purpose", "desired_outcome", "visual_tone"] as const) {
@@ -107,8 +109,16 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
     <section className="page active requirements-page">
       <header className="requirements-header">
         <div><h1>{t.requirements.title}</h1><p>{t.requirements.helper}</p></div>
-        <div className="requirements-brief"><span>{t.requirements.briefLabel}</span><p>{brief}</p></div>
       </header>
+
+      <details className="requirements-brief">
+        <summary>
+          <span className="requirements-brief-label">{t.requirements.briefLabel}</span>
+          <span className="requirements-brief-preview">{brief}</span>
+          <ChevronDown size={17} />
+        </summary>
+        <p>{brief}</p>
+      </details>
 
       <div className="requirements-groups">
         {GROUPS.map((group) => (
@@ -169,10 +179,15 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
 
       <footer className="requirements-footer">
         <button className="secondary-btn" type="button" onClick={onBack}><ArrowLeft size={16} />{t.requirements.back}</button>
-        <span>{saving ? t.requirements.saving : t.requirements.saved}</span>
-        <button className="primary-btn" type="button" disabled={saving || !Object.values(requirements.selections).every(Boolean) || requirements.selections.output_language?.trim().toLowerCase() === "auto"} onClick={onConfirm}>
-          <Check size={16} />{t.requirements.confirm}
-        </button>
+        <span>{saving ? t.requirements.saving : dirty ? t.requirements.unsaved : t.requirements.saved}</span>
+        <div className="requirements-footer-actions">
+          <button className="secondary-btn" type="button" disabled={saving || !dirty} onClick={onSave}>
+            <Save size={16} />{t.controls.save}
+          </button>
+          <button className="primary-btn" type="button" disabled={saving || !Object.values(requirements.selections).every(Boolean) || requirements.selections.output_language?.trim().toLowerCase() === "auto"} onClick={onConfirm}>
+            <Check size={16} />{t.requirements.confirm}
+          </button>
+        </div>
       </footer>
     </section>
   );

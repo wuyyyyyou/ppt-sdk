@@ -135,6 +135,7 @@ export interface Messages {
     confirm: string;
     saving: string;
     saved: string;
+    unsaved: string;
     recommended: string;
     other: string;
     groups: Record<"content" | "specifications" | "visual", string>;
@@ -526,17 +527,18 @@ export const messages: Record<Locale, Messages> = {
     requirements: {
       title: "Confirm presentation requirements",
       helper: "Review the recommended choices and adjust anything before generation continues.",
-      briefLabel: "Brief",
+      briefLabel: "User request",
       loadingTitle: "Shaping your presentation requirements...",
       loadingBody: "Anna is reading the Brief and identifying the decisions that will guide the deck.",
       errorTitle: "Requirements could not be generated",
       errorBody: "Try again, or fill in the six requirements manually.",
       retry: "Generate again",
       manual: "Fill manually",
-      back: "Back to Brief",
+      back: "Back",
       confirm: "Confirm and continue",
       saving: "Saving draft...",
       saved: "Draft saved",
+      unsaved: "Unsaved changes",
       recommended: "Recommended",
       other: "Other",
       groups: { content: "Content goals", specifications: "Generation specifications", visual: "Visual direction" },
@@ -953,17 +955,18 @@ export const messages: Record<Locale, Messages> = {
     requirements: {
       title: "确认演示需求",
       helper: "请审阅推荐选项，并在继续生成前确认这份演示文稿的关键要求。",
-      briefLabel: "需求描述",
+      briefLabel: "用户需求",
       loadingTitle: "正在梳理演示需求...",
       loadingBody: "Anna 正在阅读需求描述，提炼会影响后续生成的关键决策。",
       errorTitle: "未能生成演示需求",
       errorBody: "你可以重新生成，或直接手动填写六项需求。",
       retry: "重新生成",
       manual: "手动填写",
-      back: "返回修改需求",
+      back: "返回",
       confirm: "确认并继续",
       saving: "正在保存草稿...",
       saved: "草稿已保存",
+      unsaved: "有未保存的修改",
       recommended: "推荐",
       other: "其他",
       groups: { content: "内容目标", specifications: "生成规格", visual: "视觉方向" },

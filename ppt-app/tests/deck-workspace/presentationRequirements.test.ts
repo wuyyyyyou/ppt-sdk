@@ -37,15 +37,21 @@ test("renders loading, candidates, Other inputs, and the final confirmation acti
     requirements: draft,
     error: "",
     saving: false,
+    dirty: true,
     onSelect: () => undefined,
     onRetry: () => undefined,
     onManual: () => undefined,
     onBack: () => undefined,
+    onSave: () => undefined,
     onConfirm: () => undefined,
   };
   const ready = renderToStaticMarkup(createElement(PresentationRequirementsPage, { ...common, status: "ready" }));
   assert.match(ready, /体育媒体特刊/);
   assert.equal((ready.match(/>其他</g) ?? []).length, 6);
+  assert.match(ready, /<details class="requirements-brief">/);
+  assert.match(ready, /用户需求/);
+  assert.match(ready, />保存</);
+  assert.match(ready, />返回</);
   assert.match(ready, /确认并继续/);
   const loading = renderToStaticMarkup(createElement(PresentationRequirementsPage, { ...common, status: "loading" }));
   assert.match(loading, /正在梳理演示需求\.\.\./);

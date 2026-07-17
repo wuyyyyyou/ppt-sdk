@@ -124,10 +124,12 @@ export function App() {
               status={state.requirementsStatus}
               error={state.requirementsError}
               saving={state.requirementsSaving}
+              dirty={state.requirementsDirty}
               onSelect={actions.selectPresentationRequirement}
               onRetry={() => void actions.generatePresentationRequirements()}
               onManual={() => void actions.useManualPresentationRequirements()}
               onBack={actions.returnToBriefFromRequirements}
+              onSave={() => void actions.savePresentationRequirements()}
               onConfirm={() => void actions.confirmPresentationRequirements()}
             />
           ) : null}
