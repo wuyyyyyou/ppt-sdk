@@ -88,6 +88,7 @@ export interface DeckWorkspaceState {
   requirementsError: string;
   requirementsSaving: boolean;
   requirementsDirty: boolean;
+  requirementsHasSavedDraft: boolean;
   deckTitle: string;
   deck: Slide[];
   outline: OutlineDetail[];

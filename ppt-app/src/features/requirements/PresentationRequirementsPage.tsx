@@ -18,6 +18,7 @@ export interface PresentationRequirementsPageProps {
   error: string;
   saving: boolean;
   dirty: boolean;
+  hasSavedDraft: boolean;
   onSelect: <K extends keyof PresentationRequirementsSelections>(
     field: K,
     value: PresentationRequirementsSelections[K],
@@ -43,7 +44,7 @@ function semanticMatches(
 }
 
 export function PresentationRequirementsPage(props: PresentationRequirementsPageProps) {
-  const { t, brief, requirements, status, error, saving, dirty, onSelect, onRetry, onManual, onBack, onSave, onConfirm } = props;
+  const { t, brief, requirements, status, error, saving, dirty, hasSavedDraft, onSelect, onRetry, onManual, onBack, onSave, onConfirm } = props;
   const [customValues, setCustomValues] = useState<Record<string, string>>(() => {
     const values: Record<string, string> = {};
     for (const field of ["audience", "purpose", "desired_outcome", "visual_tone"] as const) {
@@ -179,7 +180,7 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
 
       <footer className="requirements-footer">
         <button className="secondary-btn" type="button" onClick={onBack}><ArrowLeft size={16} />{t.requirements.back}</button>
-        <span>{saving ? t.requirements.saving : dirty ? t.requirements.unsaved : t.requirements.saved}</span>
+        <span>{saving ? t.requirements.saving : dirty ? t.requirements.unsaved : hasSavedDraft ? t.requirements.saved : ""}</span>
         <div className="requirements-footer-actions">
           <button className="secondary-btn" type="button" disabled={saving || !dirty} onClick={onSave}>
             <Save size={16} />{t.controls.save}

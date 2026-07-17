@@ -462,6 +462,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [requirementsError, setRequirementsError] = useState("");
   const [requirementsSaving, setRequirementsSaving] = useState(false);
   const [requirementsDirty, setRequirementsDirty] = useState(false);
+  const [requirementsHasSavedDraft, setRequirementsHasSavedDraft] = useState(false);
   const [deckTitle, setDeckTitle] = useState(t.deck.title);
   const [deck, setDeck] = useState<Slide[]>(initialDeck);
   const [outline, setOutline] = useState(outlineDetails);
@@ -1197,6 +1198,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setRequirementsStatus(workspace.requirements.status === "empty" ? "idle" : "ready");
     setRequirementsError("");
     setRequirementsDirty(false);
+    setRequirementsHasSavedDraft(workspace.requirements.status !== "empty");
     if (workspace.requirements.source?.brief) {
       setPrompt(workspace.requirements.source.brief);
     }
@@ -1316,6 +1318,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setRequirementsError("");
     setRequirementsSaving(false);
     setRequirementsDirty(false);
+    setRequirementsHasSavedDraft(false);
     setDeckTitle(result.title);
     setDeck([]);
     setOutline([]);
@@ -1754,9 +1757,16 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       });
       if (requirementsOperationRef.current !== operation) return;
       const draft = createRequirementsDraft(brief, candidates);
-      setPresentationRequirements(draft);
+      const updatedWorkspace = await backend.updateWorkspaceRequirements({
+        workspace_dir: workspace.workspace_dir,
+        requirements: draft,
+      });
+      if (requirementsOperationRef.current !== operation) return;
+      setPresentationRequirements(updatedWorkspace.requirements);
+      setCurrentWorkspace(updatedWorkspace);
       setRequirementsStatus("ready");
-      setRequirementsDirty(true);
+      setRequirementsDirty(false);
+      setRequirementsHasSavedDraft(true);
       await backend.appendWorkspaceLog({
         workspace_dir: workspace.workspace_dir,
         channel: "ai-requirements",
@@ -1766,7 +1776,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           candidate_counts: Object.fromEntries(
             Object.entries(candidates).map(([field, values]) => [field, values.length]),
           ),
-          updated_at: draft.updated_at,
+          updated_at: updatedWorkspace.requirements.updated_at,
         },
       }).catch(() => undefined);
     } catch (error) {
@@ -1786,7 +1796,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setPresentationRequirements(draft);
     setRequirementsStatus("ready");
     setRequirementsError("");
-    setRequirementsDirty(true);
+    setRequirementsDirty(false);
+    setRequirementsHasSavedDraft(false);
   }
 
   function selectPresentationRequirement<K extends keyof PresentationRequirementsSelections>(
@@ -1830,6 +1841,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       setPresentationRequirements(workspace.requirements);
       setCurrentWorkspace(workspace);
       setRequirementsDirty(false);
+      setRequirementsHasSavedDraft(true);
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error));
     } finally {
@@ -1867,6 +1879,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       setCurrentWorkspace(projectedWorkspace);
       setRequirementsStatus("ready");
       setRequirementsDirty(false);
+      setRequirementsHasSavedDraft(true);
       await generateDeck({
         brief: confirmed.source!.brief,
         contextRows: projection.contextRows,
@@ -4014,6 +4027,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     requirementsError,
     requirementsSaving,
     requirementsDirty,
+    requirementsHasSavedDraft,
     deckTitle,
     deck,
     outline,

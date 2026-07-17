@@ -6,7 +6,7 @@ status: accepted
 
 Presentation Requirements will be a required, user-confirmed stage between the Brief and Outline Creation. Its draft candidates, current selections, source Brief, and confirmed values belong to a standalone Workspace requirements artifact, and its LLM activity belongs to a separate requirements interaction log; this gives the requirements an explicit lifecycle and authority instead of treating them as temporary UI context owned by the Outline.
 
-Presentation Requirements Creation occurs only when the user explicitly requests it, and Presentation Requirements Review is never skipped automatically. Editing the Brief does not implicitly invalidate or regenerate existing requirements; a successful explicit regeneration replaces the current review draft. Candidate changes remain local until the user explicitly saves the draft, while confirmation saves concrete values for every field before downstream work may continue.
+Presentation Requirements Creation occurs only when the user explicitly requests it, and Presentation Requirements Review is never skipped automatically. Editing the Brief does not implicitly invalidate or regenerate existing requirements; a successful explicit regeneration replaces and persists the current review draft. Later candidate changes remain local until the user explicitly saves the draft, while confirmation saves concrete values for every field before downstream work may continue.
 
 **Considered Options**
 

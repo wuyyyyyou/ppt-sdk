@@ -38,6 +38,7 @@ test("renders loading, candidates, Other inputs, and the final confirmation acti
     error: "",
     saving: false,
     dirty: true,
+    hasSavedDraft: true,
     onSelect: () => undefined,
     onRetry: () => undefined,
     onManual: () => undefined,
@@ -56,4 +57,28 @@ test("renders loading, candidates, Other inputs, and the final confirmation acti
   const loading = renderToStaticMarkup(createElement(PresentationRequirementsPage, { ...common, status: "loading" }));
   assert.match(loading, /正在梳理演示需求\.\.\./);
   assert.match(loading, /requirements-breathing-mark/);
+});
+
+test("shows a generated draft as saved until the user edits it", () => {
+  const draft = createRequirementsDraft("制作一份 5 页中文方案", candidates);
+  const html = renderToStaticMarkup(createElement(PresentationRequirementsPage, {
+    t: messages.zh,
+    brief: draft.source!.brief,
+    requirements: draft,
+    status: "ready",
+    error: "",
+    saving: false,
+    dirty: false,
+    hasSavedDraft: true,
+    onSelect: () => undefined,
+    onRetry: () => undefined,
+    onManual: () => undefined,
+    onBack: () => undefined,
+    onSave: () => undefined,
+    onConfirm: () => undefined,
+  }));
+
+  assert.match(html, /草稿已保存/);
+  assert.doesNotMatch(html, /有未保存的修改/);
+  assert.match(html, /<button class="secondary-btn" type="button" disabled="">/);
 });

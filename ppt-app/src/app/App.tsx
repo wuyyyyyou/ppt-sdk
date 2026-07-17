@@ -125,6 +125,7 @@ export function App() {
               error={state.requirementsError}
               saving={state.requirementsSaving}
               dirty={state.requirementsDirty}
+              hasSavedDraft={state.requirementsHasSavedDraft}
               onSelect={actions.selectPresentationRequirement}
               onRetry={() => void actions.generatePresentationRequirements()}
               onManual={() => void actions.useManualPresentationRequirements()}
