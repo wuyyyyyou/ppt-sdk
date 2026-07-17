@@ -32,6 +32,7 @@ import type { PptxPresentationModel } from "../html-to-pptx-model/types/pptx-mod
 import {
   collectPresentationImageAssets,
   initializePresentationStore,
+  materializeEmbeddedPresentationImages,
   pptxModelToPresentationDocument,
   presentationDocumentToPptxModel,
   readPresentationRevision,
@@ -4859,10 +4860,16 @@ export async function saveAppPresentation(
   input: SaveAppPresentationInput,
 ): Promise<AppPresentationResult> {
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  // Uploaded images arrive as embedded data URLs; persist them to
+  // presentation/assets/ so stored revisions only hold path references.
+  const document = await materializeEmbeddedPresentationImages(
+    workspace.workspace_dir,
+    input.document,
+  );
   const revision = await savePresentationRevision({
     workspaceDir: workspace.workspace_dir,
     baseRevision: input.base_revision,
-    document: input.document,
+    document,
   });
   await touchWorkspaceTask(workspace, revision.updatedAt);
   return {

@@ -16,7 +16,9 @@ import {
   type PresentationShapeElement,
   type PresentationSnapshot,
   type PresentationSourceMapEntry,
+  type PresentationTableElement,
 } from "./types.js";
+import { normalizeTableData, plainTextFromParagraphs } from "./table.js";
 import { validatePresentationDocument } from "./validation.js";
 
 function clone<T>(value: T): T {
@@ -87,11 +89,13 @@ function toElement(
   const fingerprint = shapeFingerprint(shape);
   const elementId = makeElementId(slideId, shapeIndex, shapeType, fingerprint);
   const position = readPosition(shape);
+  const hyperlink = (shape as { hyperlink?: unknown }).hyperlink;
   const base = {
     id: elementId,
     sourceElementId: elementId,
     ...position,
     zIndex: shapeIndex,
+    ...(typeof hyperlink === "string" && hyperlink ? { hyperlink } : {}),
     metadata: {
       sourceShapeIndex: shapeIndex,
       sourceShapeType: shapeType,
@@ -221,9 +225,95 @@ function replaceShapeText<T extends PptxTextBoxModel | PptxAutoShapeBoxModel>(
   return next;
 }
 
-function elementToShape(element: PresentationElement): PptxSlideModel["shapes"][number] {
+/**
+ * Model0 has no table shape: expand the table into one autoshape per cell
+ * (per-cell fill + run-level paragraphs), matching the flat structure the
+ * HTML-to-model extractor produces for template tables.
+ */
+function tableElementToShapes(element: PresentationTableElement): PptxAutoShapeBoxModel[] {
+  const { cells, style } = normalizeTableData(element.table);
+  const rowCount = cells.length;
+  const columnCount = cells[0]?.length ?? 0;
+  if (rowCount === 0 || columnCount === 0) return [];
+
+  const left = Math.round(element.x);
+  const top = Math.round(element.y);
+  const columnEdges = Array.from({ length: columnCount + 1 }, (_, index) =>
+    left + Math.round((element.width * index) / columnCount));
+  const rowEdges = Array.from({ length: rowCount + 1 }, (_, index) =>
+    top + Math.round((element.height * index) / rowCount));
+
+  const shapes: PptxAutoShapeBoxModel[] = [];
+  cells.forEach((row, rowIndex) => {
+    row.forEach((cell, columnIndex) => {
+      const paragraphs: PptxParagraphModel[] = (cell.paragraphs.length > 0
+        ? cell.paragraphs
+        : [{ text: "", font: { name: style.fontName, size: style.fontSize, font_weight: 400, italic: false, color: style.textColor } }]
+      ).map((paragraph): PptxParagraphModel => {
+        const raw = paragraph as Record<string, unknown>;
+        const fontRaw = (raw.font ?? {}) as Record<string, unknown>;
+        const font = {
+          name: typeof fontRaw.name === "string" ? fontRaw.name : style.fontName,
+          size: typeof fontRaw.size === "number" ? fontRaw.size : style.fontSize,
+          font_weight: typeof fontRaw.font_weight === "number" ? fontRaw.font_weight : 400,
+          italic: fontRaw.italic === true,
+          color: typeof fontRaw.color === "string" ? fontRaw.color : style.textColor,
+          ...(fontRaw.underline === true ? { underline: true as const } : {}),
+          ...(fontRaw.strike === true ? { strike: true as const } : {}),
+        };
+        const runs = Array.isArray(raw.text_runs)
+          ? (raw.text_runs as Array<Record<string, unknown>>).map((run) => {
+              const runFontRaw = (run.font ?? font) as Record<string, unknown>;
+              return {
+                text: typeof run.text === "string" ? run.text : "",
+                font: {
+                  name: typeof runFontRaw.name === "string" ? runFontRaw.name : font.name,
+                  size: typeof runFontRaw.size === "number" ? runFontRaw.size : font.size,
+                  font_weight: typeof runFontRaw.font_weight === "number" ? runFontRaw.font_weight : font.font_weight,
+                  italic: runFontRaw.italic === true,
+                  color: typeof runFontRaw.color === "string" ? runFontRaw.color : font.color,
+                  ...(runFontRaw.underline === true || font.underline ? { underline: true as const } : {}),
+                  ...(runFontRaw.strike === true || font.strike ? { strike: true as const } : {}),
+                },
+              };
+            })
+          : undefined;
+        return {
+          alignment: typeof raw.alignment === "number" ? raw.alignment as PptxParagraphModel["alignment"] : 2,
+          ...(typeof raw.line_height === "number" ? { line_height: raw.line_height } : {}),
+          ...(raw.spacing && typeof raw.spacing === "object"
+            ? { spacing: raw.spacing as NonNullable<PptxParagraphModel["spacing"]> }
+            : {}),
+          font,
+          ...(runs ? { text_runs: runs } : { text: plainTextFromParagraphs([raw]) }),
+        };
+      });
+      shapes.push({
+        shape_type: "autoshape",
+        type: 1,
+        position: {
+          left: columnEdges[columnIndex]!,
+          top: rowEdges[rowIndex]!,
+          width: columnEdges[columnIndex + 1]! - columnEdges[columnIndex]!,
+          height: rowEdges[rowIndex + 1]! - rowEdges[rowIndex]!,
+        },
+        text_wrap: true,
+        fill: { color: cell.fill ?? "FFFFFF", opacity: 1 },
+        stroke: { color: style.borderColor, thickness: 1, opacity: 1 },
+        vertical_alignment: 3,
+        paragraphs,
+      });
+    });
+  });
+  return shapes;
+}
+
+function elementToShapes(element: PresentationElement): PptxSlideModel["shapes"] {
   if (element.type === "unsupported") {
-    return clone(element.sourceData as PptxSlideModel["shapes"][number]);
+    return [clone(element.sourceData as PptxSlideModel["shapes"][number])];
+  }
+  if (element.type === "table") {
+    return tableElementToShapes(element);
   }
 
   let shape: PptxTextBoxModel | PptxPictureBoxModel | PptxAutoShapeBoxModel;
@@ -245,7 +335,9 @@ function elementToShape(element: PresentationElement): PptxSlideModel["shapes"][
     width: Math.round(element.width),
     height: Math.round(element.height),
   };
-  return shape;
+  if (element.hyperlink) shape.hyperlink = element.hyperlink;
+  else delete shape.hyperlink;
+  return [shape];
 }
 
 export function presentationDocumentToPptxModel(input: {
@@ -273,7 +365,7 @@ export function presentationDocumentToPptxModel(input: {
       const shapes = [...slide.elements]
         .filter((element) => !element.hidden)
         .sort((left, right) => left.zIndex - right.zIndex)
-        .map(elementToShape);
+        .flatMap(elementToShapes);
       const nextSlide = { ...clone(sourceSlide), shapes };
       if (slide.background) nextSlide.background = clone(slide.background);
       else delete nextSlide.background;

@@ -65,7 +65,34 @@ function validateElement(
   ) {
     issues.push(issue("error", "element_text_invalid", "Editable text must be a string.", location));
   }
-  if (!["text", "image", "shape", "unsupported"].includes(element.type)) {
+  if (element.type === "table") {
+    // Accept both the current `{ cells }` shape and the legacy `{ rows }` shape.
+    const table = element.table as {
+      cells?: unknown;
+      rows?: unknown;
+    } | undefined;
+    const matrix = Array.isArray(table?.cells) ? table.cells
+      : Array.isArray(table?.rows) ? table.rows
+        : null;
+    const columnCount = Array.isArray(matrix?.[0]) ? (matrix[0] as unknown[]).length : 0;
+    const valid =
+      Array.isArray(matrix) &&
+      matrix.length > 0 &&
+      columnCount > 0 &&
+      matrix.every((row) =>
+        Array.isArray(row) &&
+        row.length === columnCount &&
+        row.every((cell) => {
+          if (typeof cell === "string") return true;
+          if (!cell || typeof cell !== "object") return false;
+          const paragraphs = (cell as { paragraphs?: unknown }).paragraphs;
+          return Array.isArray(paragraphs);
+        }));
+    if (!valid) {
+      issues.push(issue("error", "table_rows_invalid", "Table cells must be a non-empty rectangular matrix.", location));
+    }
+  }
+  if (!["text", "image", "shape", "table", "unsupported"].includes(element.type)) {
     issues.push(issue("error", "element_type_invalid", "Element type is not supported.", location));
   }
   return issues;

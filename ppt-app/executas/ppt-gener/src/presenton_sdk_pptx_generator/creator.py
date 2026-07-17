@@ -757,7 +757,10 @@ class PptxPresentationCreator:
             picture_model.position,
             picture_model.margin,
         )
-        slide.shapes.add_picture(image_path, *margined_position.to_pt_list())
+        picture_shape = slide.shapes.add_picture(
+            image_path, *margined_position.to_pt_list()
+        )
+        self.apply_hyperlink_to_shape(picture_shape, picture_model.hyperlink)
 
     def add_autoshape(self, slide: Slide, autoshape_box_model: PptxAutoShapeBoxModel):
         position = autoshape_box_model.position
@@ -783,6 +786,7 @@ class PptxPresentationCreator:
 
         if autoshape_box_model.paragraphs:
             self.add_paragraphs(textbox, autoshape_box_model.paragraphs)
+        self.apply_hyperlink_to_text_frame(textbox, autoshape_box_model.hyperlink)
 
     def add_textbox(self, slide: Slide, textbox_model: PptxTextBoxModel):
         position = textbox_model.position
@@ -793,11 +797,13 @@ class PptxPresentationCreator:
         textbox.word_wrap = textbox_model.text_wrap
 
         self.apply_fill_to_shape(textbox_shape, textbox_model.fill)
+        self.apply_stroke_to_shape(textbox_shape, textbox_model.stroke)
         self.apply_margin_to_text_box(textbox, textbox_model.margin)
         self.apply_vertical_alignment_to_text_box(
             textbox, textbox_model.vertical_alignment
         )
         self.add_paragraphs(textbox, textbox_model.paragraphs)
+        self.apply_hyperlink_to_text_frame(textbox, textbox_model.hyperlink)
 
     def add_paragraphs(
         self,
@@ -879,6 +885,29 @@ class PptxPresentationCreator:
             shape.line.fill.fore_color.rgb = RGBColor.from_string(stroke.color)
             shape.line.width = Pt(stroke.thickness)
             self.set_fill_opacity(shape.line.fill, stroke.opacity)
+
+    def apply_hyperlink_to_shape(
+        self,
+        shape: Shape,
+        hyperlink: Optional[str] = None,
+    ):
+        if not hyperlink:
+            return
+        try:
+            shape.click_action.hyperlink.address = hyperlink
+        except Exception:
+            return
+
+    def apply_hyperlink_to_text_frame(
+        self,
+        textbox: TextFrame,
+        hyperlink: Optional[str] = None,
+    ):
+        if not hyperlink:
+            return
+        for paragraph in textbox.paragraphs:
+            for run in paragraph.runs:
+                run.hyperlink.address = hyperlink
 
     def apply_shadow_to_shape(
         self,

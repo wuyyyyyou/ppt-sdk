@@ -13,14 +13,18 @@ import { FloatingContextToolbar } from "./FloatingContextToolbar";
 import {
   addImageElement,
   addShapeElement,
+  addTableElement,
   addTextElement,
   arrangeElement,
   deleteElement,
   duplicateSlide,
   orderedSlides,
   pasteElement,
+  setTableCellContent,
   type ArrangeAction,
+  type TableCellRef,
 } from "./editor/documentOps";
+import type { RichParagraph } from "./editor/richText";
 
 const MIN_ELEMENT_SIZE = 16;
 const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 2];
@@ -83,10 +87,19 @@ export function PresentationEditorShell(props: PresentationEditorShellProps) {
   const [slideId, setSlideId] = useState<string | null>(null);
   const [elementId, setElementId] = useState<string | null>(null);
   const [editingElementId, setEditingElementId] = useState<string | null>(null);
+  const [editingTableCell, setEditingTableCell] = useState<TableCellRef | null>(null);
+  const [selectedTableCell, setSelectedTableCell] = useState<TableCellRef | null>(null);
   const [filmstripCollapsed, setFilmstripCollapsed] = useState(false);
   const [zoom, setZoom] = useState<"fit" | number>("fit");
   const [fitScale, setFitScale] = useState(1);
   const [exiting, setExiting] = useState(false);
+  // In-app dialog: window.confirm is silently blocked (returns false)
+  // inside the sandboxed host iframe, which lacks allow-modals.
+  const [confirmRequest, setConfirmRequest] = useState<{
+    message: string;
+    options: Array<{ id: string; label: string; primary?: boolean }>;
+    resolve: (id: string | null) => void;
+  } | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const clipboardRef = useRef<PresentationElement | null>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
@@ -111,6 +124,15 @@ export function PresentationEditorShell(props: PresentationEditorShellProps) {
     setElementId(null);
     setEditingElementId(null);
   }, [slide?.id]);
+
+  useEffect(() => {
+    if (!editingElementId) setEditingTableCell(null);
+  }, [editingElementId]);
+
+  // Cell selection only makes sense while its table element stays selected.
+  useEffect(() => {
+    setSelectedTableCell(null);
+  }, [elementId]);
 
   const logicalWidth = presentationDocument?.width ?? 1280;
   const logicalHeight = presentationDocument?.height ?? 720;
@@ -281,9 +303,25 @@ export function PresentationEditorShell(props: PresentationEditorShellProps) {
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
-      if (isEditableTarget(event.target)) return;
+      // While the confirm dialog is open, only Escape (= cancel) is handled.
+      if (confirmRequest) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setConfirmRequest(null);
+          confirmRequest.resolve(null);
+        }
+        return;
+      }
       const meta = event.ctrlKey || event.metaKey;
       const key = event.key;
+      // Ctrl/Cmd+S saves even while an inline text editor has focus; the
+      // browser's "save page" dialog must never appear inside the editor.
+      if (meta && key.toLowerCase() === "s") {
+        event.preventDefault();
+        void props.onSave().catch(() => undefined);
+        return;
+      }
+      if (isEditableTarget(event.target)) return;
       if (meta && key.toLowerCase() === "z") {
         event.preventDefault();
         if (event.shiftKey) props.onRedo();
@@ -349,7 +387,7 @@ export function PresentationEditorShell(props: PresentationEditorShellProps) {
     };
     window.addEventListener("keydown", keydown);
     return () => window.removeEventListener("keydown", keydown);
-  }, [duplicateSelection, element, nudgeSelectedElement, props, removeSelectedElement, slide]);
+  }, [confirmRequest, duplicateSelection, element, nudgeSelectedElement, props, removeSelectedElement, slide]);
 
   const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -395,18 +433,56 @@ export function PresentationEditorShell(props: PresentationEditorShellProps) {
     });
   };
 
+  const requestChoice = useCallback(
+    (
+      message: string,
+      options: Array<{ id: string; label: string; primary?: boolean }>,
+    ) =>
+      new Promise<string | null>((resolve) => {
+        setConfirmRequest({ message, options, resolve });
+      }),
+    [],
+  );
+
+  /** Two-button yes/no helper built on requestChoice. */
+  const requestConfirm = useCallback(
+    async (message: string) => {
+      const id = await requestChoice(message, [
+        { id: "cancel", label: t.editor.cancel },
+        { id: "confirm", label: t.editor.confirm, primary: true },
+      ]);
+      return id === "confirm";
+    },
+    [requestChoice, t.editor.cancel, t.editor.confirm],
+  );
+
+  const settleConfirm = (id: string | null) => {
+    const current = confirmRequest;
+    setConfirmRequest(null);
+    current?.resolve(id);
+  };
+
   const handleExit = async () => {
     if (exiting) return;
     setExiting(true);
     try {
       if (props.saveStatus === "conflict") {
-        if (!window.confirm(t.editor.exitConflictWarning)) return;
+        if (!(await requestConfirm(t.editor.exitConflictWarning))) return;
       } else if (props.saveStatus !== "saved") {
-        try {
-          await props.onSave();
-        } catch {
-          if (!window.confirm(t.editor.exitSaveFailedWarning)) return;
+        const choice = await requestChoice(t.editor.exitUnsavedMessage, [
+          { id: "cancel", label: t.editor.cancel },
+          { id: "discard", label: t.editor.exitWithoutSaving },
+          { id: "save", label: t.editor.saveAndExit, primary: true },
+        ]);
+        if (choice === null || choice === "cancel") return;
+        if (choice === "save") {
+          try {
+            await props.onSave();
+          } catch {
+            if (!(await requestConfirm(t.editor.exitSaveFailedWarning))) return;
+          }
         }
+        // "discard" falls through and exits without saving.
       }
       props.onBack();
     } finally {
@@ -415,7 +491,7 @@ export function PresentationEditorShell(props: PresentationEditorShellProps) {
   };
 
   const handleRestore = async () => {
-    if (!window.confirm(t.editor.restoreConfirm)) return;
+    if (!(await requestConfirm(t.editor.restoreConfirm))) return;
     try {
       await props.onRestore();
       setElementId(null);
@@ -495,6 +571,9 @@ export function PresentationEditorShell(props: PresentationEditorShellProps) {
         t={t}
         slide={slide}
         element={element}
+        editingElementId={editingElementId}
+        selectedTableCell={selectedTableCell}
+        onSelectedTableCellChange={setSelectedTableCell}
         canUndo={props.canUndo}
         canRedo={props.canRedo}
         exporting={props.loading === "export"}
@@ -515,6 +594,13 @@ export function PresentationEditorShell(props: PresentationEditorShellProps) {
         onAddShape={() => {
           props.updateDocument((current) => {
             const result = addShapeElement(current, slide.id);
+            if (result) setElementId(result.elementId);
+            return current;
+          });
+        }}
+        onAddTable={() => {
+          props.updateDocument((current) => {
+            const result = addTableElement(current, slide.id);
             if (result) setElementId(result.elementId);
             return current;
           });
@@ -549,6 +635,8 @@ export function PresentationEditorShell(props: PresentationEditorShellProps) {
               imageAssets={props.imageAssets}
               selectedElementId={elementId}
               editingElementId={editingElementId}
+              editingTableCell={editingTableCell}
+              selectedTableCell={selectedTableCell}
               onSelectElement={selectElement}
               onElementPointerDown={(target, event) => beginDrag(target, event, "move")}
               onElementResizePointerDown={(target, event, handle) => beginDrag(target, event, "resize", handle)}
@@ -566,6 +654,39 @@ export function PresentationEditorShell(props: PresentationEditorShellProps) {
                 setEditingElementId(null);
                 props.updateElement(slide.id, target.id, (item) => {
                   if (item.type === "text" || item.type === "shape") item.text = text;
+                });
+              }}
+              onRichTextCommit={(target, text, paragraphs) => {
+                setEditingElementId(null);
+                props.updateElement(slide.id, target.id, (item) => {
+                  if (item.type !== "text" && item.type !== "shape") return;
+                  item.text = text;
+                  const source = (item.sourceData ?? {}) as Record<string, unknown>;
+                  source.paragraphs = paragraphs;
+                  item.sourceData = source;
+                });
+              }}
+              onTableCellSelect={(target, row, col) => {
+                if (target.locked) return;
+                setSelectedTableCell({ row, col });
+              }}
+              onTableCellDoubleClick={(target, row, col) => {
+                if (target.locked) return;
+                setElementId(target.id);
+                setSelectedTableCell({ row, col });
+                setEditingElementId(target.id);
+                setEditingTableCell({ row, col });
+              }}
+              onTableCellCommit={(target, row, col, paragraphs: RichParagraph[]) => {
+                setEditingElementId(null);
+                setEditingTableCell(null);
+                props.updateElement(slide.id, target.id, (item) => {
+                  setTableCellContent(
+                    item,
+                    row,
+                    col,
+                    paragraphs as unknown as Array<Record<string, unknown>>,
+                  );
                 });
               }}
             />
@@ -591,8 +712,37 @@ export function PresentationEditorShell(props: PresentationEditorShellProps) {
             {saveStateLabel}
             <span className="editor-revision">{revisionLabel}</span>
           </div>
+          <button
+            type="button"
+            className="editor-btn primary editor-save-btn"
+            onClick={() => void props.onSave().catch(() => undefined)}
+            disabled={props.saveStatus === "saved" || props.saveStatus === "saving"}
+          >
+            {t.editor.save}
+          </button>
         </div>
       </div>
+
+      {confirmRequest ? (
+        <div className="editor-confirm-overlay" onPointerDown={(event) => event.stopPropagation()}>
+          <div className="editor-confirm-dialog" role="alertdialog" aria-modal="true">
+            <p className="editor-confirm-message">{confirmRequest.message}</p>
+            <div className="editor-confirm-actions">
+              {confirmRequest.options.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={`editor-btn${option.primary ? " primary" : ""}`}
+                  autoFocus={option.primary}
+                  onClick={() => settleConfirm(option.id)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

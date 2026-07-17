@@ -112,10 +112,12 @@ export interface PptxTextBoxModel extends PptxShapeModel {
   shape_type: "textbox";
   margin?: PptxSpacingModel;
   fill?: PptxFillModel;
+  stroke?: PptxStrokeModel;
   position: PptxPositionModel;
   text_wrap: boolean;
   vertical_alignment?: PptxVerticalAlignment;
   paragraphs: PptxParagraphModel[];
+  hyperlink?: string;
 }
 
 export interface PptxAutoShapeBoxModel extends PptxShapeModel {
@@ -130,6 +132,7 @@ export interface PptxAutoShapeBoxModel extends PptxShapeModel {
   vertical_alignment?: PptxVerticalAlignment;
   border_radius?: number;
   paragraphs?: PptxParagraphModel[];
+  hyperlink?: string;
 }
 
 export interface PptxPictureBoxModel extends PptxShapeModel {
@@ -143,6 +146,7 @@ export interface PptxPictureBoxModel extends PptxShapeModel {
   shape?: PptxBoxShapeEnum;
   object_fit?: PptxObjectFitModel;
   picture: PptxPictureModel;
+  hyperlink?: string;
 }
 
 export interface PptxConnectorModel extends PptxShapeModel {

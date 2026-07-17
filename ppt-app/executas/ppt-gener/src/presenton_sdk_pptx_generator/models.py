@@ -122,10 +122,12 @@ class PptxTextBoxModel(PptxShapeModel):
     shape_type: Literal["textbox"] = "textbox"
     margin: Optional[PptxSpacingModel] = None
     fill: Optional[PptxFillModel] = None
+    stroke: Optional[PptxStrokeModel] = None
     position: PptxPositionModel
     text_wrap: bool = True
     vertical_alignment: Optional[MSO_ANCHOR] = None
     paragraphs: List[PptxParagraphModel]
+    hyperlink: Optional[str] = None
 
     @field_validator("vertical_alignment", mode="before")
     @classmethod
@@ -147,6 +149,7 @@ class PptxAutoShapeBoxModel(PptxShapeModel):
     vertical_alignment: Optional[MSO_ANCHOR] = None
     border_radius: Optional[int] = None
     paragraphs: Optional[List[PptxParagraphModel]] = None
+    hyperlink: Optional[str] = None
 
     @field_validator("type", mode="before")
     @classmethod
@@ -183,6 +186,7 @@ class PptxPictureBoxModel(PptxShapeModel):
     shape: Optional[PptxBoxShapeEnum] = None
     object_fit: Optional[PptxObjectFitModel] = None
     picture: PptxPictureModel
+    hyperlink: Optional[str] = None
 
     @field_validator("border_radius", mode="before")
     @classmethod

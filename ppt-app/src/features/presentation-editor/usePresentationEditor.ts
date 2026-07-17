@@ -52,6 +52,9 @@ export function usePresentationEditor(
     setStatus("ready");
     setSaveStatus("saved");
     setError("");
+    // Undo/redo only applies to the current unsaved edits: once a revision
+    // is persisted (or loaded/restored), the history is discarded.
+    setHistory({ past: [], future: [] });
   }, []);
 
   const load = useCallback(async () => {
@@ -61,7 +64,6 @@ export function usePresentationEditor(
     try {
       const next = await backend.getPresentation({ workspace_dir: workspaceDir });
       acceptResult(next);
-      setHistory({ past: [], future: [] });
       return next;
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : "Structured preview is unavailable.";
@@ -120,13 +122,16 @@ export function usePresentationEditor(
     if (!backend || !workspaceDir || !documentRef.current || !resultRef.current) {
       return resultRef.current;
     }
-    if (saveStatus === "saved") return resultRef.current;
+    // Identity check instead of saveStatus state: a commit immediately followed
+    // by Ctrl/Cmd+S runs before React re-renders, so the state would be stale.
+    if (documentRef.current === resultRef.current.revision.document) {
+      return resultRef.current;
+    }
     setSaveStatus("saving");
     const operation = (async () => {
     try {
       // Keep saving until the latest local document has been persisted:
-      // edits can land while a request is in flight, and the debounce effect
-      // will not re-arm when saveStatus stays "unsaved" across the request.
+      // edits can still land while a request is in flight.
       while (true) {
         const currentDocument = documentRef.current!;
         const next = await backend.savePresentation({
@@ -155,23 +160,21 @@ export function usePresentationEditor(
     } finally {
       if (savePromiseRef.current === operation) savePromiseRef.current = null;
     }
-  }, [acceptResult, backend, saveStatus, workspaceDir]);
-
-  useEffect(() => {
-    if (saveStatus !== "unsaved") return;
-    const timer = window.setTimeout(() => {
-      void save().catch(() => undefined);
-    }, 600);
-    return () => window.clearTimeout(timer);
-  }, [document, save, saveStatus]);
+  }, [acceptResult, backend, workspaceDir]);
 
   const restore = useCallback(async () => {
     if (!backend || !workspaceDir) return null;
     setSaveStatus("saving");
-    const next = await backend.restorePresentation({ workspace_dir: workspaceDir });
-    acceptResult(next);
-    setHistory({ past: [], future: [] });
-    return next;
+    try {
+      const next = await backend.restorePresentation({ workspace_dir: workspaceDir });
+      acceptResult(next);
+      return next;
+    } catch (restoreError) {
+      const message = restoreError instanceof Error ? restoreError.message : "Unable to restore presentation.";
+      setSaveStatus("error");
+      setError(message);
+      throw restoreError;
+    }
   }, [acceptResult, backend, workspaceDir]);
 
   const undo = useCallback(() => {

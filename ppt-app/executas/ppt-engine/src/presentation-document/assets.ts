@@ -1,4 +1,5 @@
-import { readFile, stat } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { PresentationDocument } from "./types.js";
@@ -17,6 +18,15 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
+const EXTENSION_BY_MIME: Record<string, string> = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
+  "image/bmp": ".bmp",
+  "image/svg+xml": ".svg",
+};
+
 function localImageFilePath(src: string): string | null {
   if (src.startsWith("file://")) {
     try {
@@ -27,6 +37,59 @@ function localImageFilePath(src: string): string | null {
   }
   if (/^[a-z]+:/i.test(src)) return null;
   return src;
+}
+
+/**
+ * Uploaded images arrive from the frontend as embedded data URLs. Persist them
+ * into `<workspace>/presentation/assets/` (content-hash filenames, matching how
+ * Model0 images are archived) and rewrite the document to reference the file
+ * path, so stored revisions never carry base64 payloads.
+ */
+export async function materializeEmbeddedPresentationImages(
+  workspaceDir: string,
+  document: PresentationDocument,
+): Promise<PresentationDocument> {
+  const next = structuredClone(document);
+  const assetsDir = path.join(workspaceDir, "presentation", "assets");
+  const archivedBySrc = new Map<string, string>();
+
+  for (const slide of next.slides) {
+    for (const element of slide.elements) {
+      if (element.type !== "image" || !element.src.startsWith("data:")) continue;
+
+      let archivedPath = archivedBySrc.get(element.src);
+      if (!archivedPath) {
+        const match = /^data:([^;,]+);base64,(.+)$/s.exec(element.src);
+        if (!match) continue;
+        const [, mime, base64] = match;
+        let content: Buffer;
+        try {
+          content = Buffer.from(base64!, "base64");
+        } catch {
+          continue;
+        }
+        if (content.length === 0) continue;
+        const extension = EXTENSION_BY_MIME[mime!.toLowerCase()] ?? ".png";
+        const digest = createHash("sha256").update(content).digest("hex").slice(0, 20);
+        archivedPath = path.join(assetsDir, `${digest}${extension}`);
+        await mkdir(assetsDir, { recursive: true });
+        try {
+          await stat(archivedPath);
+        } catch {
+          await writeFile(archivedPath, content);
+        }
+        archivedBySrc.set(element.src, archivedPath);
+      }
+
+      element.src = archivedPath;
+      const picture = (element.sourceData as { picture?: { path?: string; is_network?: boolean } }).picture;
+      if (picture) {
+        picture.path = archivedPath;
+        picture.is_network = false;
+      }
+    }
+  }
+  return next;
 }
 
 /**

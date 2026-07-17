@@ -1,8 +1,23 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Link as LinkIcon } from "lucide-react";
 import type {
   PresentationElement,
   PresentationSlideDocument,
 } from "../../api/types";
+import {
+  clearRememberedSelection,
+  editorDomToParagraphs,
+  editorHtmlToParagraphs,
+  elementRichParagraphs,
+  modelColorToCss,
+  normalizeRichParagraphs,
+  paragraphsToEditorHtml,
+  rememberEditorSelection,
+  resolveRichFont,
+  type RichFont,
+  type RichParagraph,
+} from "./editor/richText";
+import { normalizeTableData } from "./editor/documentOps";
 
 export type PresentationRendererMode = "preview" | "edit" | "thumbnail";
 
@@ -19,6 +34,10 @@ interface PresentationRendererProps {
   imageAssets?: Record<string, string>;
   selectedElementId?: string | null;
   editingElementId?: string | null;
+  /** Cell being edited when `editingElementId` points at a table element. */
+  editingTableCell?: { row: number; col: number } | null;
+  /** Cell highlighted (not editing) when the selected element is a table. */
+  selectedTableCell?: { row: number; col: number } | null;
   onSelectElement?: (elementId: string | null) => void;
   onElementPointerDown?: (element: PresentationElement, event: React.PointerEvent) => void;
   onElementResizePointerDown?: (
@@ -28,6 +47,19 @@ interface PresentationRendererProps {
   ) => void;
   onElementDoubleClick?: (element: PresentationElement) => void;
   onTextCommit?: (element: PresentationElement, text: string) => void;
+  onRichTextCommit?: (
+    element: PresentationElement,
+    text: string,
+    paragraphs: RichParagraph[],
+  ) => void;
+  onTableCellSelect?: (element: PresentationElement, row: number, col: number) => void;
+  onTableCellDoubleClick?: (element: PresentationElement, row: number, col: number) => void;
+  onTableCellCommit?: (
+    element: PresentationElement,
+    row: number,
+    col: number,
+    paragraphs: RichParagraph[],
+  ) => void;
   fallback?: React.ReactNode;
 }
 
@@ -78,29 +110,85 @@ function readTextStyle(element: PresentationElement) {
   } as const;
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
+function runReactStyle(font: RichFont): React.CSSProperties {
+  const decorations = [
+    font.underline ? "underline" : "",
+    font.strike ? "line-through" : "",
+  ].filter(Boolean).join(" ");
+  return {
+    fontFamily: font.name,
+    fontSize: font.size,
+    fontWeight: font.font_weight,
+    fontStyle: font.italic ? "italic" : "normal",
+    textDecorationLine: decorations || "none",
+    color: modelColorToCss(font.color),
+  };
+}
+
+function paragraphReactStyle(paragraph: RichParagraph): React.CSSProperties {
+  const style: React.CSSProperties = {};
+  if (paragraph.alignment === 2) style.textAlign = "center";
+  else if (paragraph.alignment === 3) style.textAlign = "right";
+  else if (paragraph.alignment === 4) style.textAlign = "justify";
+  if (paragraph.line_height) style.lineHeight = paragraph.line_height;
+  if (paragraph.spacing?.top) style.marginTop = paragraph.spacing.top;
+  if (paragraph.spacing?.bottom) style.marginBottom = paragraph.spacing.bottom;
+  return style;
+}
+
+/** Static (non-editing) run-level rendering of a text/shape element's body. */
+function RichTextBody(props: { paragraphs: RichParagraph[] }) {
+  return (
+    <>
+      {props.paragraphs.map((paragraph, index) => (
+        <div key={index} style={paragraphReactStyle(paragraph)}>
+          {paragraph.text_runs.length === 0 ? (
+            <br />
+          ) : (
+            paragraph.text_runs.map((run, runIndex) => (
+              <span key={runIndex} style={runReactStyle(resolveRichFont(run.font, paragraph.font))}>
+                {run.text}
+              </span>
+            ))
+          )}
+        </div>
+      ))}
+    </>
+  );
 }
 
 /**
- * ContentEditable surface for inline text editing. It intentionally never
- * re-renders while active (memo comparator always returns true) so React does
- * not fight the browser over the edited DOM text; a remount (key change)
- * starts a fresh editing session.
+ * Rich-text variant of the inline editor for text/shape elements. Runs are
+ * rendered as styled spans so the toolbar can style the current selection
+ * (see richText.ts); committing parses the DOM back into paragraphs + text.
+ * Like InlineTextEditor it never re-renders while mounted.
  */
-const InlineTextEditor = memo(function InlineTextEditor(props: {
+const RichTextEditor = memo(function RichTextEditor(props: {
   className: string;
   style: React.CSSProperties;
-  initialText: string;
-  onCommit: (text: string) => void;
+  paragraphs: RichParagraph[];
+  fallbackFont: RichFont;
+  onCommit: (text: string, paragraphs: RichParagraph[]) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const committedRef = useRef(false);
+  const initialHtml = useRef(paragraphsToEditorHtml(props.paragraphs)).current;
+  const latestHtmlRef = useRef(initialHtml);
 
-  useEffect(() => {
+  const commit = useCallback(() => {
+    if (committedRef.current) return;
+    committedRef.current = true;
+    clearRememberedSelection();
+    const node = ref.current;
+    const result = node && node.isConnected
+      ? editorDomToParagraphs(node, props.fallbackFont)
+      : editorHtmlToParagraphs(latestHtmlRef.current, props.fallbackFont);
+    props.onCommit(result.text, result.paragraphs);
+    // The memo comparator freezes props at mount time, so this closure is safe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useLayoutEffect(() => {
     const node = ref.current;
     if (!node) return;
     node.focus();
@@ -110,8 +198,15 @@ const InlineTextEditor = memo(function InlineTextEditor(props: {
       range.selectNodeContents(node);
       selection.removeAllRanges();
       selection.addRange(range);
+      rememberEditorSelection(node);
     }
-  }, []);
+    // Commit on unmount: clicking elsewhere ends editing before blur fires.
+    return () => commit();
+  }, [commit]);
+
+  const trackSelection = () => {
+    if (ref.current) rememberEditorSelection(ref.current);
+  };
 
   return (
     <div
@@ -121,18 +216,34 @@ const InlineTextEditor = memo(function InlineTextEditor(props: {
       contentEditable
       suppressContentEditableWarning
       data-inline-text-editor="true"
+      data-rich-text-editor="true"
+      onInput={() => {
+        latestHtmlRef.current = ref.current?.innerHTML ?? latestHtmlRef.current;
+        trackSelection();
+      }}
+      onKeyUp={trackSelection}
+      onMouseUp={trackSelection}
       onPointerDown={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
+        const meta = event.ctrlKey || event.metaKey;
+        if (meta && event.key.toLowerCase() === "s") {
+          event.preventDefault();
+          ref.current?.blur();
+          return;
+        }
         event.stopPropagation();
         if (event.key === "Escape") {
           event.preventDefault();
           ref.current?.blur();
         }
       }}
-      onBlur={() => props.onCommit(ref.current?.innerText ?? props.initialText)}
-      dangerouslySetInnerHTML={{
-        __html: escapeHtml(props.initialText).replaceAll("\n", "<br>"),
+      onBlur={(event) => {
+        // Toolbar interactions (styling the selection) must not end editing.
+        const related = event.relatedTarget instanceof HTMLElement ? event.relatedTarget : null;
+        if (related?.closest(".floating-context-toolbar")) return;
+        commit();
       }}
+      dangerouslySetInnerHTML={{ __html: initialHtml }}
     />
   );
 }, () => true);
@@ -167,11 +278,26 @@ function ElementRenderer(props: {
   editing: boolean;
   mode: PresentationRendererMode;
   imageAssets?: Record<string, string>;
+  editingTableCell?: { row: number; col: number } | null;
+  selectedTableCell?: { row: number; col: number } | null;
   onSelect?: (elementId: string) => void;
   onDragStart?: (element: PresentationElement, event: React.PointerEvent) => void;
   onResizeStart?: (element: PresentationElement, event: React.PointerEvent, handle: ResizeHandle) => void;
   onDoubleClick?: (element: PresentationElement) => void;
   onTextCommit?: (element: PresentationElement, text: string) => void;
+  onRichTextCommit?: (
+    element: PresentationElement,
+    text: string,
+    paragraphs: RichParagraph[],
+  ) => void;
+  onTableCellSelect?: (element: PresentationElement, row: number, col: number) => void;
+  onTableCellDoubleClick?: (element: PresentationElement, row: number, col: number) => void;
+  onTableCellCommit?: (
+    element: PresentationElement,
+    row: number,
+    col: number,
+    paragraphs: RichParagraph[],
+  ) => void;
 }) {
   const { element } = props;
   if (element.hidden) return null;
@@ -215,6 +341,11 @@ function ElementRenderer(props: {
       : undefined,
   };
   const showChrome = interactive && props.selected && !props.editing;
+  const hyperlinkBadge = element.hyperlink && props.mode !== "thumbnail" ? (
+    <span className="presentation-hyperlink-badge" title={element.hyperlink}>
+      <LinkIcon size={11} />
+    </span>
+  ) : null;
 
   if (element.type === "image") {
     const objectFit = record(source.object_fit).fit;
@@ -232,6 +363,7 @@ function ElementRenderer(props: {
             borderRadius: style.borderRadius,
           }}
         />
+        {hyperlinkBadge}
         {showChrome ? (
           <SelectionChrome element={element} onResizeStart={props.onResizeStart} />
         ) : null}
@@ -252,7 +384,100 @@ function ElementRenderer(props: {
     return <div {...commonProps} style={{ ...baseStyle, background: "rgba(148, 163, 184, .15)" }} />;
   }
 
-  const text = element.type === "text" || element.type === "shape" ? element.text : "";
+  if (element.type === "table") {
+    const { cells, style: tableStyle } = normalizeTableData(element.table);
+    const columnCount = cells[0]?.length ?? 0;
+    const cellFallbackFont = resolveRichFont({
+      name: tableStyle.fontName,
+      size: tableStyle.fontSize,
+      color: tableStyle.textColor,
+    });
+    return (
+      <div
+        {...commonProps}
+        style={{
+          ...baseStyle,
+          display: "grid",
+          gridTemplateColumns: `repeat(${Math.max(columnCount, 1)}, 1fr)`,
+          gridTemplateRows: `repeat(${Math.max(cells.length, 1)}, 1fr)`,
+          fontFamily: tableStyle.fontName,
+          fontSize: tableStyle.fontSize,
+        }}
+      >
+        {cells.map((row, rowIndex) => row.map((cell, colIndex) => {
+          const cellStyle: React.CSSProperties = {
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            overflow: "hidden",
+            boxSizing: "border-box",
+            padding: "2px 6px",
+            border: `1px solid ${color(tableStyle.borderColor, "#e5e7eb")}`,
+            background: color(cell.fill, "#ffffff"),
+            color: color(tableStyle.textColor, "#1f2937"),
+            whiteSpace: "pre-wrap",
+            wordBreak: "normal",
+            overflowWrap: "break-word",
+          };
+          const paragraphs = normalizeRichParagraphs(cell.paragraphs, cellFallbackFont);
+          const cellEditing = interactive &&
+            props.editing &&
+            props.editingTableCell?.row === rowIndex &&
+            props.editingTableCell?.col === colIndex;
+          if (cellEditing) {
+            return (
+              <RichTextEditor
+                key={`cell-${rowIndex}-${colIndex}-editing`}
+                className="presentation-table-cell editing"
+                style={{ ...cellStyle, overflow: "visible", userSelect: "text", cursor: "text" }}
+                paragraphs={paragraphs}
+                fallbackFont={cellFallbackFont}
+                onCommit={(_, nextParagraphs) =>
+                  props.onTableCellCommit?.(element, rowIndex, colIndex, nextParagraphs)}
+              />
+            );
+          }
+          const cellSelected = props.selected &&
+            props.selectedTableCell?.row === rowIndex &&
+            props.selectedTableCell?.col === colIndex;
+          return (
+            <div
+              key={`cell-${rowIndex}-${colIndex}`}
+              className={`presentation-table-cell${cellSelected ? " selected" : ""}`}
+              style={cellStyle}
+              // Selecting a cell must not block dragging: the event still
+              // bubbles to the element's pointer-down (select + drag start).
+              onPointerDown={interactive
+                ? () => {
+                    if (props.selected) props.onTableCellSelect?.(element, rowIndex, colIndex);
+                  }
+                : undefined}
+              onDoubleClick={interactive
+                ? (event) => {
+                    event.stopPropagation();
+                    props.onTableCellDoubleClick?.(element, rowIndex, colIndex);
+                  }
+                : undefined}
+            >
+              <RichTextBody paragraphs={paragraphs} />
+            </div>
+          );
+        }))}
+        {showChrome ? (
+          <SelectionChrome element={element} onResizeStart={props.onResizeStart} />
+        ) : null}
+      </div>
+    );
+  }
+
+  const paragraphs = elementRichParagraphs(element);
+  const fallbackFont = resolveRichFont({
+    name: style.fontFamily,
+    size: style.fontSize,
+    font_weight: style.fontWeight,
+    italic: style.fontStyle === "italic",
+    color: style.color.replace(/^#/, ""),
+  });
   const textStyle: React.CSSProperties = {
     ...baseStyle,
     display: "flex",
@@ -275,7 +500,7 @@ function ElementRenderer(props: {
     borderRadius: element.type === "shape" && element.shapeType === "rounded_rectangle"
       ? Math.max(style.borderRadius, 12)
       : style.borderRadius,
-    border: element.type === "shape" && typeof stroke.thickness === "number" && stroke.thickness > 0
+    border: typeof stroke.thickness === "number" && stroke.thickness > 0
       ? `${stroke.thickness}px solid ${color(stroke.color, "transparent")}`
       : undefined,
     flexDirection: "column",
@@ -283,19 +508,21 @@ function ElementRenderer(props: {
 
   if (props.editing && interactive) {
     return (
-      <InlineTextEditor
+      <RichTextEditor
         key={`${element.id}-editing`}
         className={`${className} presentation-text-editing`}
         style={{ ...textStyle, overflow: "visible", userSelect: "text", cursor: "text" }}
-        initialText={text}
-        onCommit={(value) => props.onTextCommit?.(element, value)}
+        paragraphs={paragraphs}
+        fallbackFont={fallbackFont}
+        onCommit={(value, nextParagraphs) => props.onRichTextCommit?.(element, value, nextParagraphs)}
       />
     );
   }
 
   return (
     <div {...commonProps} style={textStyle}>
-      {text}
+      <RichTextBody paragraphs={paragraphs} />
+      {hyperlinkBadge}
       {showChrome ? (
         <SelectionChrome element={element} onResizeStart={props.onResizeStart} />
       ) : null}
@@ -350,11 +577,17 @@ export function PresentationRenderer(props: PresentationRendererProps) {
               editing={props.editingElementId === element.id}
               mode={props.mode}
               imageAssets={props.imageAssets}
+              editingTableCell={props.editingTableCell}
+              selectedTableCell={props.selectedTableCell}
               onSelect={props.onSelectElement ?? undefined}
               onDragStart={props.onElementPointerDown}
               onResizeStart={props.onElementResizePointerDown}
               onDoubleClick={props.onElementDoubleClick}
               onTextCommit={props.onTextCommit}
+              onRichTextCommit={props.onRichTextCommit}
+              onTableCellSelect={props.onTableCellSelect}
+              onTableCellDoubleClick={props.onTableCellDoubleClick}
+              onTableCellCommit={props.onTableCellCommit}
             />
           ))}
       </div>

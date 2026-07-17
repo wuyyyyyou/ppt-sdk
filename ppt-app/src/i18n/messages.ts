@@ -336,6 +336,13 @@ export interface Messages {
     addText: string;
     addImage: string;
     addShape: string;
+    addTable: string;
+    tableInsertRow: string;
+    tableDeleteRow: string;
+    tableInsertColumn: string;
+    tableDeleteColumn: string;
+    tableCellFill: string;
+    tableAllCellsFill: string;
     delete: string;
     duplicateSlide: string;
     addSlide: string;
@@ -368,6 +375,13 @@ export interface Messages {
     clearFill: string;
     borderColor: string;
     borderWidth: string;
+    lineHeight: string;
+    lineHeightAuto: string;
+    paragraphSpacing: string;
+    hyperlink: string;
+    hyperlinkPlaceholder: string;
+    hyperlinkApply: string;
+    hyperlinkRemove: string;
     opacity: string;
     replaceImage: string;
     imageFit: string;
@@ -391,6 +405,11 @@ export interface Messages {
     restoreConfirm: string;
     exitSaveFailedWarning: string;
     exitConflictWarning: string;
+    exitUnsavedMessage: string;
+    saveAndExit: string;
+    exitWithoutSaving: string;
+    confirm: string;
+    cancel: string;
     unsupportedElement: string;
     shortcuts: string;
     shortcutList: Array<[string, string]>;
@@ -813,6 +832,13 @@ export const messages: Record<Locale, Messages> = {
       addText: "Add text",
       addImage: "Add image",
       addShape: "Add shape",
+      addTable: "Insert table",
+      tableInsertRow: "+ Row",
+      tableDeleteRow: "− Row",
+      tableInsertColumn: "+ Column",
+      tableDeleteColumn: "− Column",
+      tableCellFill: "Cell fill",
+      tableAllCellsFill: "Fill all cells",
       delete: "Delete",
       duplicateSlide: "Duplicate slide",
       addSlide: "Add slide",
@@ -845,6 +871,13 @@ export const messages: Record<Locale, Messages> = {
       clearFill: "No fill",
       borderColor: "Border color",
       borderWidth: "Border width",
+      lineHeight: "Line height",
+      lineHeightAuto: "Auto",
+      paragraphSpacing: "Paragraph spacing",
+      hyperlink: "Link",
+      hyperlinkPlaceholder: "https://example.com",
+      hyperlinkApply: "Apply",
+      hyperlinkRemove: "Remove link",
       opacity: "Opacity",
       replaceImage: "Replace image",
       imageFit: "Image fit",
@@ -868,6 +901,11 @@ export const messages: Record<Locale, Messages> = {
       restoreConfirm: "Restore the original version? Your edits will be discarded.",
       exitSaveFailedWarning: "Saving failed. Leave anyway? Unsaved changes will be lost.",
       exitConflictWarning: "There is a revision conflict; your changes cannot overwrite the newer revision. Leave anyway?",
+      exitUnsavedMessage: "You have unsaved changes. Save before leaving?",
+      saveAndExit: "Save and exit",
+      exitWithoutSaving: "Exit without saving",
+      confirm: "Confirm",
+      cancel: "Cancel",
       unsupportedElement: "This element cannot be edited yet.",
       shortcuts: "Keyboard shortcuts",
       shortcutList: [
@@ -1307,6 +1345,13 @@ export const messages: Record<Locale, Messages> = {
       addText: "添加文本",
       addImage: "添加图片",
       addShape: "添加形状",
+      addTable: "插入表格",
+      tableInsertRow: "增行",
+      tableDeleteRow: "删行",
+      tableInsertColumn: "增列",
+      tableDeleteColumn: "删列",
+      tableCellFill: "单元格底色",
+      tableAllCellsFill: "全部单元格底色",
       delete: "删除",
       duplicateSlide: "复制页面",
       addSlide: "添加页面",
@@ -1339,6 +1384,13 @@ export const messages: Record<Locale, Messages> = {
       clearFill: "无填充",
       borderColor: "边框颜色",
       borderWidth: "边框粗细",
+      lineHeight: "行距",
+      lineHeightAuto: "自动",
+      paragraphSpacing: "段间距",
+      hyperlink: "超链接",
+      hyperlinkPlaceholder: "https://example.com",
+      hyperlinkApply: "应用",
+      hyperlinkRemove: "移除链接",
       opacity: "不透明度",
       replaceImage: "替换图片",
       imageFit: "图片填充方式",
@@ -1362,6 +1414,11 @@ export const messages: Record<Locale, Messages> = {
       restoreConfirm: "确认恢复到原始版本？当前所有修改将被放弃。",
       exitSaveFailedWarning: "保存失败，仍要离开吗？未保存的修改将丢失。",
       exitConflictWarning: "存在版本冲突，当前修改无法覆盖更新的版本。仍要离开吗？",
+      exitUnsavedMessage: "有未保存的修改，离开前是否保存？",
+      saveAndExit: "保存并退出",
+      exitWithoutSaving: "不保存退出",
+      confirm: "确认",
+      cancel: "取消",
       unsupportedElement: "该元素暂不支持编辑。",
       shortcuts: "快捷键",
       shortcutList: [

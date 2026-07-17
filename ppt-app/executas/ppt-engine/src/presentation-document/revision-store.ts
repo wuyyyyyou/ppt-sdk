@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type {
   PresentationDocument,
@@ -59,6 +59,29 @@ async function withRevisionQueue<T>(workspaceDir: string, operation: () => Promi
 function revisionPath(workspaceDir: string, revision: number): string {
   const paths = buildPresentationStorePaths(workspaceDir);
   return path.join(paths.revisions, `revision-${String(revision).padStart(6, "0")}.json`);
+}
+
+/**
+ * Only the original version (revision 0) and the latest saved revision are
+ * retained on disk; intermediate revision files are deleted.
+ */
+async function pruneIntermediateRevisions(workspaceDir: string, latestRevision: number): Promise<void> {
+  const paths = buildPresentationStorePaths(workspaceDir);
+  const keep = new Set([
+    path.basename(revisionPath(workspaceDir, 0)),
+    path.basename(revisionPath(workspaceDir, latestRevision)),
+  ]);
+  let entries: string[];
+  try {
+    entries = await readdir(paths.revisions);
+  } catch {
+    return;
+  }
+  await Promise.all(
+    entries
+      .filter((name) => /^revision-\d+\.json$/.test(name) && !keep.has(name))
+      .map((name) => rm(path.join(paths.revisions, name), { force: true })),
+  );
 }
 
 export async function initializePresentationStore(
@@ -139,6 +162,7 @@ export async function savePresentationRevision(input: {
     };
     await atomicWriteJson(revisionPath(input.workspaceDir, revisionNumber), revision);
     await atomicWriteJson(buildPresentationStorePaths(input.workspaceDir).currentDocument, revision);
+    await pruneIntermediateRevisions(input.workspaceDir, revisionNumber);
     return revision;
   });
 }

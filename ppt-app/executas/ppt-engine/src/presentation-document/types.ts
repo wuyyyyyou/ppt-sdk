@@ -13,6 +13,7 @@ export type PresentationElement =
   | PresentationTextElement
   | PresentationImageElement
   | PresentationShapeElement
+  | PresentationTableElement
   | PresentationUnsupportedElement;
 
 export interface PresentationDocument {
@@ -52,6 +53,8 @@ export interface PresentationBaseElement {
   opacity?: number;
   locked?: boolean;
   hidden?: boolean;
+  /** Element-level hyperlink applied to the whole text box / shape / image. */
+  hyperlink?: string;
   metadata: {
     sourceShapeIndex: number;
     sourceShapeType: string;
@@ -75,6 +78,39 @@ export interface PresentationShapeElement extends PresentationBaseElement {
   shapeType: "rectangle" | "rounded_rectangle";
   text: string;
   sourceData: PptxAutoShapeBoxModel;
+}
+
+export interface PresentationTableStyle {
+  /** Hex colors without the leading '#', consistent with PptxFontModel. */
+  borderColor: string;
+  textColor: string;
+  fontSize: number;
+  fontName: string;
+}
+
+export interface PresentationTableCell {
+  /** Run-level paragraphs, same shape as textbox sourceData.paragraphs. */
+  paragraphs: Array<Record<string, unknown>>;
+  /** Optional cell fill color (hex without '#'). */
+  fill?: string;
+}
+
+export interface PresentationTableData {
+  /** cells[rowIndex][columnIndex]. All rows share the same length. */
+  cells: PresentationTableCell[][];
+  style: PresentationTableStyle;
+}
+
+/**
+ * Editor-native table. Model0 has no table shape, so on export the table is
+ * expanded into one autoshape per cell (the same flat structure the
+ * HTML-to-model extractor produces for template tables).
+ */
+export interface PresentationTableElement extends PresentationBaseElement {
+  type: "table";
+  table: PresentationTableData;
+  /** Tables are editor-native; kept optional so generic sourceData reads type-check. */
+  sourceData?: Record<string, unknown>;
 }
 
 export interface PresentationUnsupportedElement extends PresentationBaseElement {

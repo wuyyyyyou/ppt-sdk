@@ -90,6 +90,17 @@
   color: var(--editor-text-secondary);
 }
 
+.presentation-editor-shell .editor-btn.primary {
+  height: 28px;
+  padding: 0 14px;
+  color: #fff;
+  background: var(--editor-accent);
+}
+
+.presentation-editor-shell .editor-btn.primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--editor-accent) 88%, #000);
+}
+
 /* ---- Slide filmstrip ---- */
 
 .slide-filmstrip {
@@ -263,16 +274,25 @@
   right: 16px;
   z-index: 35;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 4px;
   width: fit-content;
   max-width: min(1250px, calc(100% - 324px));
-  height: 56px;
+  min-height: 56px;
   margin-inline: auto;
-  padding: 0 12px;
+  padding: 8px 12px;
   border-radius: 14px;
   background: var(--panel-bg);
   box-shadow: var(--panel-shadow);
+}
+
+.toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
 }
 
 .slide-filmstrip.collapsed ~ .floating-context-toolbar {
@@ -390,6 +410,33 @@
 .toolbar-menu.align-right {
   right: 0;
   left: auto;
+}
+
+.toolbar-link-menu {
+  min-width: 240px;
+  gap: 8px;
+  padding: 10px;
+}
+
+.toolbar-link-input {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--editor-border, #d6d3f0);
+  border-radius: 7px;
+  color: var(--editor-text-primary);
+  background: transparent;
+  font-size: 12px;
+}
+
+.toolbar-link-input:focus {
+  outline: 2px solid var(--editor-accent, #7c6cf0);
+  outline-offset: -1px;
+}
+
+.toolbar-link-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
 }
 
 .toolbar-menu button {
@@ -544,6 +591,42 @@
   user-select: text;
 }
 
+.presentation-table-cell {
+  min-width: 0;
+  min-height: 0;
+}
+
+.presentation-table-cell.selected {
+  outline: calc(2px / var(--renderer-scale, 1)) dashed var(--editor-accent, #7c6cf0);
+  outline-offset: calc(-2px / var(--renderer-scale, 1));
+}
+
+.presentation-table-cell.editing {
+  user-select: text;
+  outline: calc(2px / var(--renderer-scale, 1)) solid var(--editor-accent, #7c6cf0);
+  outline-offset: calc(-1px / var(--renderer-scale, 1));
+}
+
+.presentation-hyperlink-badge {
+  position: absolute;
+  right: calc(4px / var(--renderer-scale, 1));
+  bottom: calc(4px / var(--renderer-scale, 1));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(18px / var(--renderer-scale, 1));
+  height: calc(18px / var(--renderer-scale, 1));
+  border-radius: 50%;
+  color: #fff;
+  background: var(--editor-accent, #7c6cf0);
+  pointer-events: none;
+}
+
+.presentation-hyperlink-badge svg {
+  width: calc(11px / var(--renderer-scale, 1));
+  height: calc(11px / var(--renderer-scale, 1));
+}
+
 .presentation-selection-label {
   position: absolute;
   bottom: 100%;
@@ -637,6 +720,42 @@
   background: rgba(17, 24, 39, 0.86);
   font-size: 12px;
   transform: translateX(-50%);
+}
+
+/* ---- In-app confirm dialog (window.confirm is blocked in the sandboxed iframe) ---- */
+
+.editor-confirm-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: rgba(17, 24, 39, 0.32);
+}
+
+.editor-confirm-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(360px, calc(100% - 48px));
+  padding: 20px;
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: var(--panel-bg);
+  box-shadow: var(--panel-shadow);
+}
+
+.editor-confirm-message {
+  margin: 0;
+  color: var(--editor-text-primary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.editor-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 @media (max-width: 1100px) {

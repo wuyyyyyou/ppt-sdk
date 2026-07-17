@@ -1280,6 +1280,7 @@ export type PresentationElement =
   | PresentationTextElement
   | PresentationImageElement
   | PresentationShapeElement
+  | PresentationTableElement
   | PresentationUnsupportedElement;
 
 export interface PresentationDocument {
@@ -1319,6 +1320,8 @@ export interface PresentationBaseElement {
   opacity?: number;
   locked?: boolean;
   hidden?: boolean;
+  /** Element-level hyperlink applied to the whole text box / shape / image. */
+  hyperlink?: string;
   metadata: {
     sourceShapeIndex: number;
     sourceShapeType: string;
@@ -1342,6 +1345,34 @@ export interface PresentationShapeElement extends PresentationBaseElement {
   shapeType: "rectangle" | "rounded_rectangle";
   text: string;
   sourceData: Record<string, unknown>;
+}
+
+export interface PresentationTableStyle {
+  /** Hex colors without the leading '#'. */
+  borderColor: string;
+  textColor: string;
+  fontSize: number;
+  fontName: string;
+}
+
+export interface PresentationTableCell {
+  /** Run-level paragraphs, same shape as textbox sourceData.paragraphs. */
+  paragraphs: Array<Record<string, unknown>>;
+  /** Optional cell fill color (hex without '#'). */
+  fill?: string;
+}
+
+export interface PresentationTableData {
+  /** cells[rowIndex][columnIndex]. All rows share the same length. */
+  cells: PresentationTableCell[][];
+  style: PresentationTableStyle;
+}
+
+export interface PresentationTableElement extends PresentationBaseElement {
+  type: "table";
+  table: PresentationTableData;
+  /** Tables are editor-native; kept optional so generic sourceData reads type-check. */
+  sourceData?: Record<string, unknown>;
 }
 
 export interface PresentationUnsupportedElement extends PresentationBaseElement {
