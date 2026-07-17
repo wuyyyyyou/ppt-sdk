@@ -1,4 +1,3 @@
-import type { ContextSuggestionResult } from "../../ai/types";
 import type { Messages } from "../../i18n/messages";
 import type { ContextRow } from "./types";
 
@@ -21,10 +20,6 @@ export function normalizeSlideCountContextValue(value: string) {
   return Number.isFinite(parsed) && parsed > 0 && String(parsed) === normalized
     ? String(parsed)
     : "auto";
-}
-
-export function shouldSuggestContextBeforeGeneration(rows: ContextRow[]) {
-  return rows.length === 0;
 }
 
 export function buildContextRowFromPatch(
@@ -71,63 +66,4 @@ export function buildContextRowFromPatch(
         allowCustomValue: true,
       };
   }
-}
-
-function buildSuggestedContextRow(
-  id: "audience" | "goal" | "style",
-  values: string[],
-  t: Messages
-): ContextRow | null {
-  const uniqueValues = values.reduce<string[]>((items, value) => {
-    const trimmed = value.trim();
-    if (trimmed && !items.includes(trimmed)) {
-      items.push(trimmed);
-    }
-    return items;
-  }, []);
-
-  if (uniqueValues.length === 0) return null;
-
-  const row = buildContextRowFromPatch(id, uniqueValues[0], t);
-  if (uniqueValues.length === 1) {
-    return row;
-  }
-
-  return {
-    ...row,
-    type: "select",
-    options: uniqueValues,
-    allowCustomValue: true,
-  };
-}
-
-export function buildContextRowsFromSuggestion(
-  result: ContextSuggestionResult,
-  t: Messages
-): ContextRow[] {
-  return [
-    buildSuggestedContextRow("audience", result.audience, t),
-    buildSuggestedContextRow("goal", result.goal, t),
-    buildSuggestedContextRow("style", result.style, t),
-    buildContextRowFromPatch("slides", result.slides, t),
-  ].filter((row): row is ContextRow => Boolean(row));
-}
-
-export function mergeSuggestedContextRows(
-  currentRows: ContextRow[],
-  suggestedRows: ContextRow[]
-): ContextRow[] {
-  if (suggestedRows.length === 0) return currentRows;
-
-  const suggestedIds = new Set(suggestedRows.map((row) => row.id));
-  return [
-    ...currentRows.map((row) =>
-      suggestedIds.has(row.id)
-        ? suggestedRows.find((suggestedRow) => suggestedRow.id === row.id) ?? row
-        : row
-    ),
-    ...suggestedRows.filter(
-      (row) => !currentRows.some((currentRow) => currentRow.id === row.id)
-    ),
-  ];
 }

@@ -20,6 +20,8 @@ import {
 import type {
   ListWorkspacesResult,
   PageProgress,
+  PresentationRequirements,
+  PresentationRequirementsSelections,
   GetStyleProfilePreviewResult,
   PptxExportJob,
   StyleProfileIndexEntry,
@@ -51,10 +53,7 @@ import {
 } from "../utils";
 import {
   buildContextRowFromPatch as buildContextRowFromPatchBase,
-  buildContextRowsFromSuggestion,
-  mergeSuggestedContextRows,
   normalizeSlideCountContextValue,
-  shouldSuggestContextBeforeGeneration,
   SLIDE_COUNT_CONTEXT_OPTIONS,
   type ContextPatchId,
 } from "../contextSuggestion";
@@ -144,6 +143,13 @@ import {
   failUploadedSourceAnalysisProgress,
 } from "../uploadedSourceAnalysisProgress";
 import { shouldAutoSyncWorkspaceTitleFromOutline } from "../workspaceTitleSync";
+import {
+  createEmptyPresentationRequirements,
+  createManualRequirementsDraft,
+  createRequirementsDraft,
+  projectRequirementsToLegacyInputs,
+  requirementsAreComplete,
+} from "../../requirements";
 
 const DEFAULT_TEMPLATE_GROUP_ID = "red-finance-canvas";
 const AGENT_TOOL_ACCESS_POLICY = resolveAgentToolAccessPolicy(
@@ -373,8 +379,15 @@ export interface DeckWorkspaceActions {
   updateContextRow: (id: string, value: string) => void;
   removeContextRow: (id: string) => void;
   addStyleRow: () => void;
-  suggestContextFromPrompt: () => Promise<void>;
   generateDeck: () => Promise<void>;
+  generatePresentationRequirements: () => Promise<void>;
+  useManualPresentationRequirements: () => Promise<void>;
+  selectPresentationRequirement: <K extends keyof PresentationRequirementsSelections>(
+    field: K,
+    value: PresentationRequirementsSelections[K],
+  ) => void;
+  returnToBriefFromRequirements: () => void;
+  confirmPresentationRequirements: () => Promise<void>;
   createDeckFromOutline: () => Promise<void>;
   applyOutlineFeedback: () => Promise<void>;
   beginOutlineEdit: () => void;
@@ -441,6 +454,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [researchSearchControlSettings, setResearchSearchControlSettingsState] =
     useState<ResearchSearchControlSettings>(DEFAULT_RESEARCH_SEARCH_CONTROL_SETTINGS);
   const [contextRows, setContextRows] = useState<ContextRow[]>([]);
+  const [presentationRequirements, setPresentationRequirements] =
+    useState<PresentationRequirements>(() => createEmptyPresentationRequirements());
+  const [requirementsStatus, setRequirementsStatus] =
+    useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [requirementsError, setRequirementsError] = useState("");
+  const [requirementsSaving, setRequirementsSaving] = useState(false);
   const [deckTitle, setDeckTitle] = useState(t.deck.title);
   const [deck, setDeck] = useState<Slide[]>(initialDeck);
   const [outline, setOutline] = useState(outlineDetails);
@@ -488,6 +507,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const pendingUploadedSourceAnalysisActionRef = useRef<(() => Promise<void>) | null>(null);
   const forceUploadedSourceAnalysisRefreshRef = useRef(false);
   const outlineAutosaveTimerRef = useRef<number | null>(null);
+  const requirementsOperationRef = useRef(0);
+  const requirementsSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const requirementsSavePendingRef = useRef(0);
   const [workspaceScan, setWorkspaceScan] = useState<ListWorkspacesResult | null>(null);
   const [currentWorkspace, setCurrentWorkspace] = useState<WorkspaceResult | null>(null);
   const [uploadedSources, setUploadedSources] = useState<UploadedSourceMaterial[]>([]);
@@ -525,7 +547,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   function buildAiLogContext(
     workspace: WorkspaceResult,
-    domain: "outline" | "page_plan" | "page_agent" | "theme",
+    domain: "requirements" | "outline" | "page_plan" | "page_agent" | "theme",
     operation: string,
     extra: {
       page_id?: string;
@@ -1171,6 +1193,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     options: { syncEmptyContextRows?: boolean; preserveCurrentSlide?: boolean } = {}
   ) {
     setCurrentWorkspace(workspace);
+    setPresentationRequirements(workspace.requirements);
+    setRequirementsStatus(workspace.requirements.status === "empty" ? "idle" : "ready");
+    setRequirementsError("");
+    if (workspace.requirements.source?.brief) {
+      setPrompt(workspace.requirements.source.brief);
+    }
     void refreshUploadedSources(workspace);
     if (backend) {
       void backend.getWorkspaceStyleProfile({ workspace_dir: workspace.workspace_dir })
@@ -1248,7 +1276,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (selectedTemplate) {
       setSelectedTemplateGroupId(selectedTemplate);
       if (!workspacePages && workspaceOutline.length === 0) {
-        setStage("brief");
+        setStage(workspace.requirements.status === "empty" ? "brief" : "requirements");
       }
     }
 
@@ -1282,6 +1310,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     });
     setPrompt("");
     setContextRows([]);
+    setPresentationRequirements(workspace.requirements);
+    setRequirementsStatus("idle");
+    setRequirementsError("");
+    setRequirementsSaving(false);
     setDeckTitle(result.title);
     setDeck([]);
     setOutline([]);
@@ -1434,6 +1466,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   const currentStatus = useMemo(() => {
     if (loading === "template") return t.template.loading;
+    if (loading === "requirements") return t.requirements.loadingTitle;
     if (loading === "theme") {
       return locale === "zh" ? "正在定制主题" : "Customizing theme";
     }
@@ -1622,6 +1655,18 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   function navigateMain(nextStage: MainStage) {
+    if (stage === "requirements" && requirementsStatus === "loading" && nextStage !== "requirements") {
+      requirementsOperationRef.current += 1;
+      setLoading("none");
+    }
+    if (nextStage === "requirements" && presentationRequirements.status === "empty") {
+      showToast(t.toasts.promptRequired);
+      return;
+    }
+    if (nextStage === "requirements" && (outline.length > 0 || generated)) {
+      showToast(locale === "zh" ? "已有大纲后不能修改演示需求。" : "Requirements cannot be changed after an outline exists.");
+      return;
+    }
     if (nextStage === "uploaded-source-analysis" && uploadedSources.length === 0) {
       setUploadedSourceAnalysisProgress(createSkippedUploadedSourceAnalysisProgress(t));
     }
@@ -1681,70 +1726,159 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return buildContextRowFromPatchBase(id, value, t);
   }
 
-  function upsertSuggestedContextRows(rows: ContextRow[]) {
-    if (rows.length === 0) return;
-    setContextRows((currentRows) => mergeSuggestedContextRows(currentRows, rows));
+  function queueRequirementsSave(requirements: PresentationRequirements) {
+    if (!backend || !currentWorkspace) return Promise.resolve(null);
+    requirementsSavePendingRef.current += 1;
+    setRequirementsSaving(true);
+    const workspaceDir = currentWorkspace.workspace_dir;
+    const save = requirementsSaveQueueRef.current
+      .catch(() => undefined)
+      .then(() => backend.updateWorkspaceRequirements({
+        workspace_dir: workspaceDir,
+        requirements,
+      }))
+      .then((workspace) => {
+        setCurrentWorkspace(workspace);
+        return workspace;
+      });
+    requirementsSaveQueueRef.current = save.finally(() => {
+      requirementsSavePendingRef.current = Math.max(0, requirementsSavePendingRef.current - 1);
+      if (requirementsSavePendingRef.current === 0) setRequirementsSaving(false);
+    });
+    return save;
   }
 
-  async function suggestContextFromPrompt() {
-    if (!aiClient) return;
-    const trimmedPrompt = prompt.trim();
-    if (!trimmedPrompt) {
+  async function generatePresentationRequirements() {
+    if (!backend || !aiClient) return;
+    const brief = prompt.trim();
+    if (!brief) {
       showToast(t.toasts.promptRequired);
       return;
     }
 
-    setLoading("context");
+    const operation = requirementsOperationRef.current + 1;
+    requirementsOperationRef.current = operation;
+    setPage("main");
+    setStage("requirements");
+    setRequirementsStatus("loading");
+    setRequirementsError("");
+    setLoading("requirements");
+
     try {
       const workspace = await ensureCurrentWorkspace();
-      if (!workspace) return;
-      const result = await aiClient.suggestContext({
-        prompt: trimmedPrompt,
-        locale,
-        logContext: buildAiLogContext(workspace, "outline", "suggest_context"),
+      if (!workspace || requirementsOperationRef.current !== operation) return;
+      setPrompt(brief);
+      const candidates = await aiClient.generatePresentationRequirements({
+        brief,
+        logContext: buildAiLogContext(workspace, "requirements", "generate_requirements"),
       });
-      const rows = buildContextRowsFromSuggestion(result, t);
-
-      if (rows.length === 0) {
-        showToast(t.toasts.contextSuggestionEmpty);
-        return;
-      }
-
-      upsertSuggestedContextRows(rows);
-      showToast(t.toasts.contextSuggested);
+      if (requirementsOperationRef.current !== operation) return;
+      await requirementsSaveQueueRef.current.catch(() => undefined);
+      if (requirementsOperationRef.current !== operation) return;
+      const draft = createRequirementsDraft(brief, candidates);
+      const updatedWorkspace = await backend.updateWorkspaceRequirements({
+        workspace_dir: workspace.workspace_dir,
+        requirements: draft,
+      });
+      if (requirementsOperationRef.current !== operation) return;
+      setPresentationRequirements(draft);
+      setCurrentWorkspace(updatedWorkspace);
+      setRequirementsStatus("ready");
+      await backend.appendWorkspaceLog({
+        workspace_dir: workspace.workspace_dir,
+        channel: "ai-requirements",
+        entry: {
+          event: "ai.requirements.generated",
+          status: "succeeded",
+          candidate_counts: Object.fromEntries(
+            Object.entries(candidates).map(([field, values]) => [field, values.length]),
+          ),
+          updated_at: draft.updated_at,
+        },
+      }).catch(() => undefined);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : t.toasts.contextSuggestionEmpty);
+      if (requirementsOperationRef.current !== operation) return;
+      setRequirementsError(error instanceof Error ? error.message : String(error));
+      setRequirementsStatus("error");
     } finally {
-      setLoading("none");
+      if (requirementsOperationRef.current === operation) setLoading("none");
     }
   }
 
-  async function suggestContextRowsForGeneration(
-    workspace: WorkspaceResult,
-    currentRows: ContextRow[]
-  ): Promise<ContextRow[]> {
-    if (!aiClient || !shouldSuggestContextBeforeGeneration(currentRows)) {
-      return currentRows;
-    }
-    const trimmedPrompt = prompt.trim();
-    if (!trimmedPrompt) {
-      throw new Error(t.toasts.promptRequired);
-    }
+  async function useManualPresentationRequirements() {
+    const brief = presentationRequirements.source?.brief ?? prompt.trim();
+    if (!brief) return;
+    requirementsOperationRef.current += 1;
+    const draft = createManualRequirementsDraft(brief);
+    setPresentationRequirements(draft);
+    setRequirementsStatus("ready");
+    setRequirementsError("");
+    await queueRequirementsSave(draft);
+  }
 
-    setLoading("context");
-    const result = await aiClient.suggestContext({
-      prompt: trimmedPrompt,
-      locale,
-      logContext: buildAiLogContext(workspace, "outline", "suggest_context"),
+  function selectPresentationRequirement<K extends keyof PresentationRequirementsSelections>(
+    field: K,
+    value: PresentationRequirementsSelections[K],
+  ) {
+    setPresentationRequirements((current) => {
+      const next: PresentationRequirements = {
+        ...current,
+        status: "draft",
+        selections: { ...current.selections, [field]: value },
+        updated_at: new Date().toISOString(),
+        confirmed_at: null,
+      };
+      void queueRequirementsSave(next);
+      return next;
     });
-    const suggestedRows = buildContextRowsFromSuggestion(result, t);
-    if (suggestedRows.length === 0) {
-      return currentRows;
-    }
+  }
 
-    const nextRows = mergeSuggestedContextRows(currentRows, suggestedRows);
-    setContextRows(nextRows);
-    return nextRows;
+  function returnToBriefFromRequirements() {
+    requirementsOperationRef.current += 1;
+    setLoading("none");
+    setPage("main");
+    setStage("brief");
+  }
+
+  async function confirmPresentationRequirements() {
+    if (!backend || !requirementsAreComplete(presentationRequirements)) return;
+    await requirementsSaveQueueRef.current.catch(() => undefined);
+    const confirmed: PresentationRequirements = {
+      ...presentationRequirements,
+      status: "confirmed",
+      updated_at: new Date().toISOString(),
+      confirmed_at: new Date().toISOString(),
+    };
+    setRequirementsSaving(true);
+    try {
+      const workspace = currentWorkspace ?? await ensureCurrentWorkspace();
+      if (!workspace) return;
+      const confirmedWorkspace = await backend.updateWorkspaceRequirements({
+        workspace_dir: workspace.workspace_dir,
+        requirements: confirmed,
+      });
+      const projection = projectRequirementsToLegacyInputs(confirmed);
+      const settingResult = await backend.updateWorkspaceSettings({
+        workspace_dir: workspace.workspace_dir,
+        setting: {
+          ...workspaceSettingsToState(confirmedWorkspace),
+          output_language: projection.outputLanguage,
+        },
+      });
+      const projectedWorkspace = { ...confirmedWorkspace, setting: settingResult.setting };
+      setPresentationRequirements(confirmed);
+      setContextRows(projection.contextRows);
+      setCurrentWorkspace(projectedWorkspace);
+      setRequirementsStatus("ready");
+      await generateDeck({
+        brief: confirmed.source!.brief,
+        contextRows: projection.contextRows,
+      });
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error));
+    } finally {
+      setRequirementsSaving(false);
+    }
   }
 
   function readFeedbackContextValue(feedback: string, labels: string[]): string | null {
@@ -1851,7 +1985,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setHistory((items) => (items.at(-1) === "main" ? items : [...items, "main"]));
   }
 
-  async function generateDeck() {
+  async function generateDeck(input: { brief?: string; contextRows?: ContextRow[] } = {}) {
     if (!backend || !aiClient) return;
     if (!agentClient) {
       if (uploadedSources.length > 0) {
@@ -1864,7 +1998,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     let shouldReconcileActiveRun = false;
     try {
       const cancelSignal = beginCancellableGeneration();
-      setLoading(shouldSuggestContextBeforeGeneration(contextRows) ? "context" : "outline");
+      const generationBrief = input.brief ?? prompt;
+      const generationContextRows = input.contextRows ?? contextRows;
+      setLoading("outline");
       resetGenerationProgress();
       const workspace = await refreshCurrentWorkspaceSnapshot();
       if (!workspace) return;
@@ -1873,17 +2009,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         return;
       }
       const templateWorkspace = await ensureWorkspaceTemplate(workspace);
-      const generationContextRows = await suggestContextRowsForGeneration(
-        templateWorkspace,
-        contextRows
-      );
       const themedWorkspace = await ensureWorkspaceThemeTokenForGeneration(
         templateWorkspace,
-        generationContextRows
+        generationContextRows,
+        { brief: generationBrief },
       );
       const uploadedSourceAnalysis = await ensureUploadedSourceAnalysisForOutline(
         themedWorkspace,
-        generateDeck,
+        () => generateDeck(input),
       );
       const uploadedSourceAnalysisContext = compactUploadedSourceAnalysisForPrompt(uploadedSourceAnalysis);
 
@@ -1894,7 +2027,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         const llmContextRows = buildLlmContextRows(generationContextRows);
         const outlineLogContext = buildAiLogContext(themedWorkspace, "outline", "generate_outline");
         const result = await aiClient.generateOutline({
-          prompt,
+          prompt: generationBrief,
           contextRows: llmContextRows,
           locale,
           setting,
@@ -1926,7 +2059,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           "draft",
           true,
           syncedContextRows,
-          uploadedSourceAnalysis
+          uploadedSourceAnalysis,
+          generationBrief,
         );
         if (updatedWorkspace) {
           applyWorkspace(updatedWorkspace);
@@ -1939,7 +2073,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const llmContextRows = buildLlmContextRows(generationContextRows);
       const outlineLogContext = buildAiLogContext(themedWorkspace, "outline", "generate_outline");
       const outlineResult = await aiClient.generateOutline({
-        prompt,
+        prompt: generationBrief,
         contextRows: llmContextRows,
         locale,
         setting,
@@ -1968,7 +2102,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         "confirmed",
         true,
         syncedContextRows,
-        uploadedSourceAnalysis
+        uploadedSourceAnalysis,
+        generationBrief,
       );
       if (!confirmedWorkspace) return;
       if (cancelCreateDeckRef.current) {
@@ -2715,6 +2850,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     options: {
       runKind?: "deck-generation" | "deck-refinement";
       refinementRequest?: string;
+      brief?: string;
     } = {},
   ) {
     if (!backend || !aiClient) return workspace;
@@ -2724,7 +2860,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       aiClient,
       aiLogger,
       workspace,
-      prompt,
+      prompt: options.brief ?? prompt,
       contextRows: buildLlmContextRows(rows),
       locale,
       runKind: options.runKind ?? "deck-generation",
@@ -2837,7 +2973,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     status: "draft" | "confirmed" = "draft",
     applyWorkspaceState = true,
     contextRowsOverride: Array<ContextRow | LlmContextRow> | null = null,
-    uploadedSourceAnalysis: UploadedSourceAnalysis | null = null
+    uploadedSourceAnalysis: UploadedSourceAnalysis | null = null,
+    promptOverride: string | null = null,
   ) {
     if (!backend) return null;
     const workspace = workspaceOverride ?? (await ensureCurrentWorkspace());
@@ -2849,7 +2986,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       outline: {
         ...buildOutlineArtifact(items, outlineTitle || title, outputLanguage, status),
         source: {
-          prompt,
+          prompt: promptOverride ?? prompt,
           context: buildLlmContextRows(contextRowsOverride ?? contextRows),
           setting: withOutputLanguage(
             settingOverride ?? workspaceSettingsToState(workspace),
@@ -2925,6 +3062,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function showWorkspacePicker() {
+    requirementsOperationRef.current += 1;
     resetGenerationUiState();
     setCurrentWorkspace(null);
     setPage("main");
@@ -2936,6 +3074,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function openWorkspace(workspaceDir: string) {
     if (!backend) return;
 
+    requirementsOperationRef.current += 1;
     resetGenerationUiState();
     setWorkspaceLoading(true);
     setWorkspaceError("");
@@ -3873,6 +4012,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     pageReviewSettings,
     researchSearchControlSettings,
     contextRows,
+    presentationRequirements,
+    requirementsStatus,
+    requirementsError,
+    requirementsSaving,
     deckTitle,
     deck,
     outline,
@@ -3934,8 +4077,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     updateContextRow,
     removeContextRow,
     addStyleRow,
-    suggestContextFromPrompt,
-    generateDeck,
+    generateDeck: () => generateDeck(),
+    generatePresentationRequirements,
+    useManualPresentationRequirements,
+    selectPresentationRequirement,
+    returnToBriefFromRequirements,
+    confirmPresentationRequirements,
     createDeckFromOutline,
     applyOutlineFeedback,
     beginOutlineEdit,

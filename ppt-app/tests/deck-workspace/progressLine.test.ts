@@ -8,15 +8,16 @@ import { ProgressLine } from "../../src/features/deck-workspace/components/Progr
 import { stageOrder } from "../../src/features/deck-workspace/utils.ts";
 
 describe("ProgressLine", () => {
-  it("orders uploaded source analysis between brief and outline", () => {
+  it("orders requirements before uploaded source analysis and outline", () => {
     assert.equal(stageOrder("brief"), 1);
-    assert.equal(stageOrder("uploaded-source-analysis"), 2);
-    assert.equal(stageOrder("outline"), 3);
-    assert.equal(stageOrder("generating"), 4);
-    assert.equal(stageOrder("deck"), 5);
+    assert.equal(stageOrder("requirements"), 2);
+    assert.equal(stageOrder("uploaded-source-analysis"), 3);
+    assert.equal(stageOrder("outline"), 4);
+    assert.equal(stageOrder("generating"), 5);
+    assert.equal(stageOrder("deck"), 6);
   });
 
-  it("renders the five navigable main stages", () => {
+  it("renders the six navigable main stages", () => {
     const html = renderToStaticMarkup(
       createElement(ProgressLine, {
         stage: "uploaded-source-analysis",
@@ -26,10 +27,11 @@ describe("ProgressLine", () => {
     );
 
     assert.match(html, /title="需求"/);
+    assert.match(html, /title="演示需求"/);
     assert.match(html, /title="上传资料分析"/);
     assert.match(html, /title="大纲"/);
     assert.match(html, /title="生成中"/);
     assert.match(html, /title="成稿"/);
-    assert.equal((html.match(/progress-node/g) ?? []).length, 5);
+    assert.equal((html.match(/progress-node/g) ?? []).length, 6);
   });
 });

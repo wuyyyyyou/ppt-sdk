@@ -86,6 +86,7 @@ import type {
   RemoveUploadedSourceInput,
   RemoveUploadedSourceResult,
   PrepareUploadedSourceAnalysisWorkspaceResult,
+  PresentationRequirements,
   UploadedSourceAnalysisDraftFingerprint,
   UploadedSourceAnalysisDraftType,
   WorkspaceOutline,
@@ -139,6 +140,11 @@ export interface PptBackend {
   }): Promise<Record<string, unknown>>;
   getUploadedSourceAnalysis(input: { workspace_dir: string }): Promise<Record<string, unknown>>;
   appendWorkspaceLog(input: AppendWorkspaceLogInput): Promise<AppendWorkspaceLogResult>;
+  getWorkspaceRequirements(input: { workspace_dir: string }): Promise<PresentationRequirements>;
+  updateWorkspaceRequirements(input: {
+    workspace_dir: string;
+    requirements: PresentationRequirements;
+  }): Promise<WorkspaceResult>;
   getWorkspaceOutline(input: GetWorkspaceOutlineInput): Promise<WorkspaceOutline>;
   updateWorkspaceOutline(input: UpdateWorkspaceOutlineInput): Promise<WorkspaceResult>;
   updateWorkspaceSettings(

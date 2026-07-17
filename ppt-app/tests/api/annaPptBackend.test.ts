@@ -51,12 +51,22 @@ function createWorkspace(patch: Partial<WorkspaceResult> = {}): WorkspaceResult 
     files: {
       task: "/tmp/workspaces/demo/task.json",
       setting: "/tmp/workspaces/demo/setting.json",
+      requirements: "/tmp/workspaces/demo/requirements.json",
       outline: "/tmp/workspaces/demo/outline.json",
       pages: "/tmp/workspaces/demo/pages.json",
       template: "/tmp/workspaces/demo/template.json",
     },
     task: {},
     setting: {},
+    requirements: {
+      version: 1,
+      status: "empty",
+      source: null,
+      candidates: { audience: [], purpose: [], desired_outcome: [], slide_count: [], output_language: [], visual_tone: [] },
+      selections: { audience: null, purpose: null, desired_outcome: null, slide_count: null, output_language: null, visual_tone: null },
+      updated_at: null,
+      confirmed_at: null,
+    },
     outline: {},
     pages: [],
     template: {},
@@ -233,5 +243,32 @@ describe("Anna PPT Backend", () => {
     assert.equal(calls[0]?.method, "app_get_style_profile_preview");
     assert.deepEqual(calls[0]?.args, { style_profile_id: "style-profile-1" });
     assert.equal(calls[1]?.method, "app_get_style_profile");
+  });
+
+  it("routes Presentation Requirements reads and writes through ppt-engine", async () => {
+    setToolIds();
+    const calls: Array<{ method?: unknown; args?: unknown }> = [];
+    const requirements = createWorkspace().requirements;
+    const backend = createAnnaPptBackend(createRuntimeWithInvoke(async (input) => {
+      calls.push(input as { method?: unknown; args?: unknown });
+      return {
+        success: true,
+        data: input.method === "app_get_workspace_requirements"
+          ? requirements
+          : createWorkspace(),
+      };
+    }));
+
+    assert.deepEqual(
+      await backend.getWorkspaceRequirements({ workspace_dir: "/tmp/workspaces/demo" }),
+      requirements,
+    );
+    await backend.updateWorkspaceRequirements({
+      workspace_dir: "/tmp/workspaces/demo",
+      requirements,
+    });
+
+    assert.equal(calls[0]?.method, "app_get_workspace_requirements");
+    assert.equal(calls[1]?.method, "app_update_workspace_requirements");
   });
 });

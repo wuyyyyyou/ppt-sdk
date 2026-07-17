@@ -1,6 +1,6 @@
 import type { AppendWorkspaceLogInput } from "../api/types";
 
-export type AiLogDomain = "outline" | "page_plan" | "page_agent" | "research" | "theme";
+export type AiLogDomain = "requirements" | "outline" | "page_plan" | "page_agent" | "research" | "theme";
 export type AiInteractionStatus =
   | "started"
   | "succeeded"
@@ -48,6 +48,7 @@ export interface FinishInteractionInput {
 const SCHEMA_VERSION = 1;
 
 const INTERACTION_CHANNELS = {
+  requirements: "ai-requirements-interactions",
   outline: "ai-outline-interactions",
   page_plan: "ai-page-plan-interactions",
   page_agent: "ai-page-agent-interactions",
@@ -56,6 +57,7 @@ const INTERACTION_CHANNELS = {
 } as const satisfies Record<AiLogDomain, AppendWorkspaceLogInput["channel"]>;
 
 const SEMANTIC_CHANNELS = {
+  requirements: "ai-requirements",
   outline: "ai-outline",
   page_plan: "ai-page-plan",
   page_agent: "ai-page-agent",
@@ -106,6 +108,7 @@ function createInteractionId(domain: AiLogDomain, operation: string) {
 }
 
 function domainEventPrefix(domain: AiLogDomain) {
+  if (domain === "requirements") return "ai.requirements";
   if (domain === "research") return "ai.research";
   if (domain === "page_plan") return "ai.page_plan";
   if (domain === "page_agent") return "ai.page_agent";

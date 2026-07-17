@@ -8,7 +8,7 @@ import {
   BriefPage,
   StyleSelection,
 } from "../../src/features/deck-workspace/components/BriefPage.tsx";
-import type { ContextRow, LoadingKind } from "../../src/features/deck-workspace/types.ts";
+import type { LoadingKind } from "../../src/features/deck-workspace/types.ts";
 import { messages } from "../../src/i18n/messages.ts";
 
 function makeTemplate(groupId: string, groupName: string): TemplateSummary {
@@ -57,15 +57,9 @@ function renderBriefPage(options: { loading?: LoadingKind; workspaceSettingsSavi
       },
       workspaceSettingsSaving: options.workspaceSettingsSaving ?? false,
       setResearchSearchControlSettings: async () => undefined,
-      contextRows: [],
       uploadedSources: [],
-      addContextRow: (_row: ContextRow) => undefined,
-      updateContextRow: () => undefined,
-      removeContextRow: () => undefined,
       uploadUploadedSource: async () => undefined,
       removeUploadedSource: async () => undefined,
-      addStyleRow: () => undefined,
-      suggestContextFromPrompt: async () => undefined,
       generateDeck: async () => undefined,
     }),
   );
@@ -117,15 +111,15 @@ describe("BriefPage", () => {
     assert.doesNotMatch(html, /Legacy Hidden Template/);
   });
 
-  it("shows the create button loading state while context is being suggested", () => {
-    const html = renderBriefPage({ loading: "context" });
+  it("shows the create button loading state while requirements are being generated", () => {
+    const html = renderBriefPage({ loading: "requirements" });
 
     assert.match(html, /inline-create-btn/);
     assert.match(html, /spinner small/);
   });
 
-  it("disables research search controls while context is being suggested", () => {
-    const html = renderBriefPage({ loading: "context" });
+  it("disables research search controls while requirements are being generated", () => {
+    const html = renderBriefPage({ loading: "requirements" });
 
     assertDisabledButtonWithLabel(html, "禁止网络资料搜索");
     assertDisabledButtonWithLabel(html, "禁止图片搜索");
@@ -136,6 +130,14 @@ describe("BriefPage", () => {
 
     assert.match(html, /禁止网络资料搜索/);
     assert.match(html, /禁止图片搜索/);
+  });
+
+  it("does not render the old context suggestion controls", () => {
+    const html = renderBriefPage();
+    assert.doesNotMatch(html, /补全上下文/);
+    assert.doesNotMatch(html, />受众</);
+    assert.doesNotMatch(html, />页数</);
+    assert.match(html, /生成演示文稿/);
   });
 
   it("disables create and research search controls while workspace settings are saving", () => {

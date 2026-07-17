@@ -31,6 +31,14 @@ import {
   validateGeneratedOutline,
 } from "./outlineParser";
 import {
+  buildPresentationRequirementsRepairRequest,
+  buildPresentationRequirementsRequest,
+} from "./requirementsPrompt";
+import {
+  parsePresentationRequirementsCandidates,
+  PresentationRequirementsValidationError,
+} from "./requirementsParser";
+import {
   buildStructuredJsonRepairPrompt,
   parseStructuredJson,
 } from "./structuredJson";
@@ -39,7 +47,6 @@ import type { AiOperationLogContext } from "./interactionLog";
 import type {
   AiAttemptLog,
   AiClient,
-  ContextSuggestionResult,
   GeneratedDeck,
   OutlineGenerationResult,
 } from "./types";
@@ -67,6 +74,13 @@ export class AiOutlineGenerationError extends Error {
   ) {
     super(message);
     this.name = "AiOutlineGenerationError";
+  }
+}
+
+export class AiPresentationRequirementsError extends Error {
+  constructor(message: string, public readonly validationErrors: string[] = []) {
+    super(message);
+    this.name = "AiPresentationRequirementsError";
   }
 }
 
@@ -230,52 +244,33 @@ async function completeJsonRequest<T>(
   throw new Error(`Anna LLM returned invalid JSON for ${label}.`);
 }
 
-function normalizeStringArray(value: unknown): string[] {
-  const rawValues = Array.isArray(value) ? value : typeof value === "string" ? [value] : [];
-  const seen = new Set<string>();
-  const values: string[] = [];
+async function completePresentationRequirementsWithRetry(
+  runtime: AnnaRuntime,
+  brief: string,
+  logContext?: AiOperationLogContext,
+) {
+  let request = buildPresentationRequirementsRequest(brief);
+  let lastErrors: string[] = [];
 
-  for (const item of rawValues) {
-    if (typeof item !== "string") continue;
-    const trimmed = item.trim();
-    if (!trimmed || seen.has(trimmed)) continue;
-    seen.add(trimmed);
-    values.push(trimmed);
-    if (values.length >= 4) break;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const rawResult = await completeLlm(runtime, request, logContext);
+    const rawText = extractCompletionText(rawResult);
+    try {
+      return parsePresentationRequirementsCandidates(rawText);
+    } catch (error) {
+      lastErrors = error instanceof PresentationRequirementsValidationError
+        ? error.errors
+        : [error instanceof Error ? error.message : String(error)];
+      if (attempt < 2) {
+        request = buildPresentationRequirementsRepairRequest(request, rawText, lastErrors);
+      }
+    }
   }
 
-  return values;
-}
-
-function normalizeSlideCountValue(value: unknown): string {
-  const rawValue = Array.isArray(value) ? value[0] : value;
-  if (typeof rawValue !== "string" && typeof rawValue !== "number") {
-    return "auto";
-  }
-
-  const normalized = String(rawValue).trim().toLowerCase();
-  if (normalized === "auto") {
-    return "auto";
-  }
-
-  const parsed = Number.parseInt(normalized, 10);
-  return Number.isFinite(parsed) && parsed > 0 && String(parsed) === normalized
-    ? String(parsed)
-    : "auto";
-}
-
-function normalizeContextSuggestions(value: unknown): ContextSuggestionResult {
-  const record =
-    value && typeof value === "object" && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
-      : {};
-
-  return {
-    audience: normalizeStringArray(record.audience),
-    goal: normalizeStringArray(record.goal),
-    style: normalizeStringArray(record.style),
-    slides: normalizeSlideCountValue(record.slides),
-  };
+  throw new AiPresentationRequirementsError(
+    `Anna LLM returned invalid Presentation Requirements JSON: ${lastErrors.join("; ")}`,
+    lastErrors,
+  );
 }
 
 function buildThemeTokenPrompt(input: Parameters<AiClient["generateThemeToken"]>[0]) {
@@ -411,6 +406,14 @@ async function completeOutlineWithRetry(
 
 export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
   return {
+    generatePresentationRequirements(input) {
+      return completePresentationRequirementsWithRetry(
+        runtime,
+        input.brief,
+        input.logContext,
+      );
+    },
+
     generateOutline(input) {
       return completeOutlineWithRetry(
         runtime,
@@ -451,28 +454,6 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
           ? record.output_language.trim()
           : "";
       return { output_language: outputLanguage || "auto" };
-    },
-
-    async suggestContext(input) {
-      const result = await completeJson<unknown>(
-        runtime,
-        "optional context suggestions",
-        [
-          "Infer optional context fields for a presentation from the user's prompt.",
-          "Return only a JSON object with exactly these properties: audience, goal, style, slides.",
-          "audience, goal, and style must be arrays of concise strings.",
-          "slides must be a string: use a positive integer such as \"8\" when a concrete page count is reasonable, or \"auto\" when the count should be left open.",
-          "Prefer fewer options. If the prompt clearly determines a field, return a one-item array for that field.",
-          "If an array field is ambiguous, return 2-3 plausible options. Do not return more than 4 items for any array field.",
-          "Do not include markdown or explanation.",
-          `Locale: ${input.locale}`,
-          `Prompt: ${input.prompt}`,
-        ].join("\n"),
-        '{"audience":["..."],"goal":["..."],"style":["..."],"slides":"auto"}',
-        input.logContext
-      );
-
-      return normalizeContextSuggestions(result);
     },
 
     async generateThemeToken(input) {

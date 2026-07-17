@@ -50,6 +50,10 @@ import type {
   AppTemplatePreviewRef,
   AppTemplatePreviewResult,
   AppCreateWorkspaceSetting,
+  AppPresentationRequirementCandidate,
+  AppPresentationRequirements,
+  AppPresentationRequirementsCandidates,
+  AppPresentationRequirementsSelections,
   AppWorkspaceResult,
   AppWorkspaceSummary,
   AppWorkspaceOutline,
@@ -96,6 +100,7 @@ import type {
   GetAppTemplatePreviewInput,
   GetAppWorkspaceThemeContextInput,
   GetAppWorkspaceOutlineInput,
+  GetAppWorkspaceRequirementsInput,
   GetAppWorkspacePageFileFingerprintsInput,
   GetAppWorkspacePageFileFingerprintsResult,
   ListAppTemplateGroupsResult,
@@ -159,6 +164,7 @@ import type {
   StartAppPptxExportModelInput,
   UpdateAppWorkspacePagesInput,
   UpdateAppWorkspaceOutlineInput,
+  UpdateAppWorkspaceRequirementsInput,
   UpdateAppWorkspaceSettingsInput,
   UpdateAppWorkspaceTitleInput,
   UploadAppUploadedSourceInput,
@@ -177,6 +183,7 @@ const WORKSPACE_DIR_PATTERN = /^ppt-\d{8}-\d{6}$/;
 const WORKSPACE_FILE_NAMES = [
   "task.json",
   "setting.json",
+  "requirements.json",
   "outline.json",
   "page-plan.json",
   "page-progress.json",
@@ -184,6 +191,8 @@ const WORKSPACE_FILE_NAMES = [
   "template.json",
 ] as const;
 const WORKSPACE_LOG_FILE_NAMES = {
+  "ai-requirements": "ai-requirements.jsonl",
+  "ai-requirements-interactions": "ai-requirements-interactions.jsonl",
   "ai-outline": "ai-outline.jsonl",
   "ai-outline-interactions": "ai-outline-interactions.jsonl",
   "ai-page-plan": "ai-page-plan.jsonl",
@@ -351,6 +360,7 @@ function buildWorkspaceFilePaths(workspaceDir: string) {
   return {
     task: path.join(workspaceDir, "task.json"),
     setting: path.join(workspaceDir, "setting.json"),
+    requirements: path.join(workspaceDir, "requirements.json"),
     outline: path.join(workspaceDir, "outline.json"),
     page_plan: path.join(workspaceDir, "page-plan.json"),
     page_progress: path.join(workspaceDir, "page-progress.json"),
@@ -1029,6 +1039,193 @@ function createDefaultOutlineJson() {
   return normalizeOutlineJson(null);
 }
 
+const PRESENTATION_REQUIREMENTS_FIELDS = [
+  "audience",
+  "purpose",
+  "desired_outcome",
+  "slide_count",
+  "output_language",
+  "visual_tone",
+] as const;
+
+function createDefaultPresentationRequirements(): AppPresentationRequirements {
+  return {
+    version: 1,
+    status: "empty",
+    source: null,
+    candidates: {
+      audience: [],
+      purpose: [],
+      desired_outcome: [],
+      slide_count: [],
+      output_language: [],
+      visual_tone: [],
+    },
+    selections: {
+      audience: null,
+      purpose: null,
+      desired_outcome: null,
+      slide_count: null,
+      output_language: null,
+      visual_tone: null,
+    },
+    updated_at: null,
+    confirmed_at: null,
+  };
+}
+
+function assertExactKeys(record: Record<string, unknown>, expected: readonly string[], label: string) {
+  const keys = Object.keys(record).sort();
+  const expectedKeys = [...expected].sort();
+  if (keys.length !== expectedKeys.length || keys.some((key, index) => key !== expectedKeys[index])) {
+    throw new Error(`${label} must contain exactly: ${expected.join(", ")}`);
+  }
+}
+
+function parseRequirementCandidate(value: unknown, label: string): AppPresentationRequirementCandidate {
+  if (!isRecord(value)) throw new Error(`${label} must be an object`);
+  assertExactKeys(value, ["label", "description"], label);
+  const candidateLabel = normalizeString(value.label).trim();
+  const description = normalizeString(value.description).trim();
+  if (!candidateLabel || !description) {
+    throw new Error(`${label} must include non-empty label and description`);
+  }
+  return { label: candidateLabel, description };
+}
+
+function assertUniqueValues(values: unknown[], label: string) {
+  const serialized = values.map((value) => JSON.stringify(value));
+  if (new Set(serialized).size !== serialized.length) {
+    throw new Error(`${label} candidates must be unique`);
+  }
+}
+
+function parseSemanticCandidateArray(value: unknown, label: string) {
+  if (!Array.isArray(value) || value.length > 4) {
+    throw new Error(`${label} must be an array with at most 4 candidates`);
+  }
+  const candidates = value.map((candidate, index) =>
+    parseRequirementCandidate(candidate, `${label}[${index}]`)
+  );
+  assertUniqueValues(candidates, label);
+  return candidates;
+}
+
+function parseRequirementsCandidates(value: unknown): AppPresentationRequirementsCandidates {
+  if (!isRecord(value)) throw new Error("requirements.candidates must be an object");
+  assertExactKeys(value, PRESENTATION_REQUIREMENTS_FIELDS, "requirements.candidates");
+  if (!Array.isArray(value.slide_count) || value.slide_count.length > 4) {
+    throw new Error("requirements.candidates.slide_count must be an array with at most 4 values");
+  }
+  const slideCount = value.slide_count.map((candidate, index) => {
+    if (!Number.isInteger(candidate) || Number(candidate) <= 0) {
+      throw new Error(`requirements.candidates.slide_count[${index}] must be a positive integer`);
+    }
+    return Number(candidate);
+  });
+  assertUniqueValues(slideCount, "requirements.candidates.slide_count");
+  if (!Array.isArray(value.output_language) || value.output_language.length > 4) {
+    throw new Error("requirements.candidates.output_language must be an array with at most 4 values");
+  }
+  const outputLanguage = value.output_language.map((candidate, index) => {
+    const language = normalizeString(candidate).trim();
+    if (!language || language.toLowerCase() === "auto") {
+      throw new Error(`requirements.candidates.output_language[${index}] must be a concrete language`);
+    }
+    return language;
+  });
+  assertUniqueValues(outputLanguage, "requirements.candidates.output_language");
+  return {
+    audience: parseSemanticCandidateArray(value.audience, "requirements.candidates.audience"),
+    purpose: parseSemanticCandidateArray(value.purpose, "requirements.candidates.purpose"),
+    desired_outcome: parseSemanticCandidateArray(value.desired_outcome, "requirements.candidates.desired_outcome"),
+    slide_count: slideCount,
+    output_language: outputLanguage,
+    visual_tone: parseSemanticCandidateArray(value.visual_tone, "requirements.candidates.visual_tone"),
+  };
+}
+
+function parseNullableRequirementCandidate(value: unknown, label: string) {
+  return value === null ? null : parseRequirementCandidate(value, label);
+}
+
+function parseRequirementsSelections(value: unknown): AppPresentationRequirementsSelections {
+  if (!isRecord(value)) throw new Error("requirements.selections must be an object");
+  assertExactKeys(value, PRESENTATION_REQUIREMENTS_FIELDS, "requirements.selections");
+  const slideCount = value.slide_count;
+  if (slideCount !== null && (!Number.isInteger(slideCount) || Number(slideCount) <= 0)) {
+    throw new Error("requirements.selections.slide_count must be null or a positive integer");
+  }
+  const outputLanguage = value.output_language;
+  if (outputLanguage !== null && (
+    typeof outputLanguage !== "string" ||
+    !outputLanguage.trim() ||
+    outputLanguage.trim().toLowerCase() === "auto"
+  )) {
+    throw new Error("requirements.selections.output_language must be null or a concrete language");
+  }
+  return {
+    audience: parseNullableRequirementCandidate(value.audience, "requirements.selections.audience"),
+    purpose: parseNullableRequirementCandidate(value.purpose, "requirements.selections.purpose"),
+    desired_outcome: parseNullableRequirementCandidate(value.desired_outcome, "requirements.selections.desired_outcome"),
+    slide_count: slideCount === null ? null : Number(slideCount),
+    output_language: outputLanguage === null ? null : outputLanguage.trim(),
+    visual_tone: parseNullableRequirementCandidate(value.visual_tone, "requirements.selections.visual_tone"),
+  };
+}
+
+function normalizePresentationRequirements(value: unknown): AppPresentationRequirements {
+  if (!isRecord(value)) throw new Error("requirements.json must contain an object");
+  assertExactKeys(
+    value,
+    ["version", "status", "source", "candidates", "selections", "updated_at", "confirmed_at"],
+    "requirements.json",
+  );
+  if (value.version !== 1) throw new Error("requirements.version must be 1");
+  if (value.status !== "empty" && value.status !== "draft" && value.status !== "confirmed") {
+    throw new Error('requirements.status must be "empty", "draft", or "confirmed"');
+  }
+  const source = value.source === null
+    ? null
+    : (() => {
+        if (!isRecord(value.source)) throw new Error("requirements.source must be null or an object");
+        assertExactKeys(value.source, ["brief"], "requirements.source");
+        const brief = normalizeString(value.source.brief).trim();
+        if (!brief) throw new Error("requirements.source.brief must be a non-empty string");
+        return { brief };
+      })();
+  const candidates = parseRequirementsCandidates(value.candidates);
+  const selections = parseRequirementsSelections(value.selections);
+  const updatedAt = value.updated_at === null ? null : normalizeString(value.updated_at);
+  const confirmedAt = value.confirmed_at === null ? null : normalizeString(value.confirmed_at);
+
+  if (value.status === "empty") {
+    if (source !== null || PRESENTATION_REQUIREMENTS_FIELDS.some((field) => candidates[field].length > 0) ||
+      PRESENTATION_REQUIREMENTS_FIELDS.some((field) => selections[field] !== null)) {
+      throw new Error("empty requirements cannot include a source, candidates, or selections");
+    }
+  } else if (!source) {
+    throw new Error(`${value.status} requirements must include source.brief`);
+  }
+
+  if (value.status === "confirmed") {
+    const missing = PRESENTATION_REQUIREMENTS_FIELDS.filter((field) => selections[field] === null);
+    if (missing.length > 0) {
+      throw new Error(`confirmed requirements are missing selections: ${missing.join(", ")}`);
+    }
+  }
+
+  return {
+    version: 1,
+    status: value.status,
+    source,
+    candidates,
+    selections,
+    updated_at: updatedAt || null,
+    confirmed_at: confirmedAt || null,
+  };
+}
+
 function normalizeString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
@@ -1613,6 +1810,7 @@ async function ensureWorkspaceFiles(
       ...createDefaultSettingJson(),
       ...workspaceSettingDefaults,
     }),
+    requirements: createDefaultPresentationRequirements(),
     outline: createDefaultOutlineJson(),
     page_plan: createDefaultPagePlanJson(),
     page_progress: createDefaultPageProgressJson(),
@@ -1643,6 +1841,10 @@ async function ensureWorkspaceFiles(
     await writeJsonFile(files.setting, normalizedTaskSetting);
   }
 
+  const normalizedRequirements = normalizePresentationRequirements(
+    await readJsonFileIfExists(files.requirements),
+  );
+
   const currentOutline = await readJsonFileIfExists(files.outline);
   const normalizedOutline = normalizeOutlineJson(currentOutline);
   if (JSON.stringify(currentOutline) !== JSON.stringify(normalizedOutline)) {
@@ -1670,6 +1872,7 @@ async function ensureWorkspaceFiles(
     files,
     task: await readJsonFileIfExists(files.task),
     setting: normalizedTaskSetting,
+    requirements: normalizedRequirements,
     outline: normalizedOutline,
     page_plan: await readJsonFileIfExists(files.page_plan),
     page_progress: await readJsonFileIfExists(files.page_progress),
@@ -3382,6 +3585,29 @@ export async function getAppWorkspaceOutline(
   return normalizeOutlineJson(workspace.outline);
 }
 
+export async function getAppWorkspaceRequirements(
+  input: GetAppWorkspaceRequirementsInput,
+): Promise<AppPresentationRequirements> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  return normalizePresentationRequirements(workspace.requirements);
+}
+
+export async function updateAppWorkspaceRequirements(
+  input: UpdateAppWorkspaceRequirementsInput,
+): Promise<AppWorkspaceResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const requirements = normalizePresentationRequirements(input.requirements);
+  const updatedAt = new Date().toISOString();
+  const nextRequirements: AppPresentationRequirements = {
+    ...requirements,
+    updated_at: updatedAt,
+    confirmed_at: requirements.status === "confirmed" ? updatedAt : null,
+  };
+  await writeJsonFile(workspace.files.requirements, nextRequirements);
+  await touchWorkspaceTask(workspace, updatedAt);
+  return ensureWorkspaceFiles(input.workspace_dir);
+}
+
 export async function appendAppWorkspaceLog(
   input: AppendAppWorkspaceLogInput,
 ): Promise<AppendAppWorkspaceLogResult> {
@@ -4083,6 +4309,10 @@ export async function updateAppWorkspaceOutline(
   input: UpdateAppWorkspaceOutlineInput,
 ): Promise<AppWorkspaceResult> {
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const requirements = normalizePresentationRequirements(workspace.requirements);
+  if (requirements.status !== "confirmed") {
+    throw new Error("Confirmed Presentation Requirements are required before Outline Creation.");
+  }
   const updatedAt = new Date().toISOString();
   const nextOutline = normalizeOutlineJson({
     ...normalizeOutlineJson(workspace.outline),
@@ -5506,6 +5736,10 @@ export type {
   AppTemplatePreviewRef,
   AppTemplatePreviewResult,
   AppCreateWorkspaceSetting,
+  AppPresentationRequirementCandidate,
+  AppPresentationRequirements,
+  AppPresentationRequirementsCandidates,
+  AppPresentationRequirementsSelections,
   AppWorkspaceFiles,
   AppWorkspaceOutline,
   AppWorkspaceOutlineItem,
@@ -5522,6 +5756,7 @@ export type {
   GetAppTemplatePreviewInput,
   GetAppWorkspaceThemeContextInput,
   GetAppWorkspaceOutlineInput,
+  GetAppWorkspaceRequirementsInput,
   ListAppTemplateGroupsResult,
   ListAppWorkspacesResult,
   OpenAppWorkspaceInput,
@@ -5544,6 +5779,7 @@ export type {
   SelectAppWorkspaceTemplateInput,
   SelectAppWorkspaceTemplateResult,
   UpdateAppWorkspaceOutlineInput,
+  UpdateAppWorkspaceRequirementsInput,
   UpdateAppWorkspacePagesInput,
   UpdateAppWorkspaceSettingsInput,
   UpdateAppWorkspaceTitleInput,

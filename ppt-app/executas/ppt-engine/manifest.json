@@ -589,6 +589,36 @@
       ]
     },
     {
+      "name": "app_get_workspace_requirements",
+      "description": "Read and validate requirements.json for an existing PPT App Workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_update_workspace_requirements",
+      "description": "Validate and write requirements.json for an existing PPT App Workspace.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "requirements",
+          "type": "object",
+          "description": "Complete Presentation Requirements artifact with status, source, candidates, and selections.",
+          "required": true
+        }
+      ]
+    },
+    {
       "name": "app_get_workspace_outline",
       "description": "Read and normalize outline.json for an existing PPT task workspace.",
       "parameters": [

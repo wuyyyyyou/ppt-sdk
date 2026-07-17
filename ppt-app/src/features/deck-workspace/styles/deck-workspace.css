@@ -551,6 +551,288 @@ button {
   width: min(100%, 1080px);
 }
 
+.view-container > .requirements-page {
+  width: min(100%, 1040px);
+}
+
+.requirements-page {
+  gap: 28px;
+}
+
+.requirements-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.78fr);
+  gap: 34px;
+  align-items: end;
+  padding-bottom: 24px;
+  border-bottom: 1px solid rgba(17, 24, 39, 0.09);
+}
+
+.requirements-header h1,
+.requirements-loading h1,
+.requirements-error h1 {
+  margin: 0 0 8px;
+  color: var(--text-main);
+  font-size: 28px;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.requirements-header p,
+.requirements-loading p,
+.requirements-error p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.requirements-brief {
+  min-width: 0;
+  padding-left: 18px;
+  border-left: 3px solid #159a8c;
+}
+
+.requirements-brief span {
+  display: block;
+  margin-bottom: 5px;
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.requirements-brief p {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-main);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.requirements-groups {
+  display: grid;
+  gap: 30px;
+}
+
+.requirements-group {
+  display: grid;
+  gap: 20px;
+}
+
+.requirements-group > h2 {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.requirement-field {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.requirement-field legend {
+  margin-bottom: 10px;
+  color: var(--text-main);
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.requirement-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.requirement-option {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  min-height: 70px;
+  padding: 14px;
+  border: 1px solid rgba(17, 24, 39, 0.11);
+  border-radius: 8px;
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.6);
+  text-align: left;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.requirement-option:hover {
+  border-color: rgba(15, 118, 110, 0.42);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.requirement-option.selected {
+  border-color: #159a8c;
+  background: rgba(236, 253, 250, 0.82);
+  box-shadow: inset 0 0 0 1px rgba(21, 154, 140, 0.12);
+}
+
+.requirement-radio {
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  margin-top: 1px;
+  border: 1px solid rgba(17, 24, 39, 0.22);
+  border-radius: 50%;
+  color: #fff;
+  background: #fff;
+}
+
+.requirement-option.selected .requirement-radio {
+  border-color: #0f766e;
+  background: #0f766e;
+}
+
+.requirement-option strong,
+.requirement-option small {
+  display: block;
+  letter-spacing: 0;
+}
+
+.requirement-option strong {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.requirement-option small {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.requirement-option em {
+  color: #0f766e;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.requirement-custom input {
+  width: 100%;
+  margin-top: 7px;
+  border: 0;
+  border-bottom: 1px solid rgba(17, 24, 39, 0.18);
+  outline: none;
+  color: var(--text-main);
+  background: transparent;
+  font: inherit;
+  line-height: 1.5;
+}
+
+.requirements-footer {
+  position: sticky;
+  bottom: -44px;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 16px;
+  align-items: center;
+  margin-top: 8px;
+  padding: 18px 0;
+  border-top: 1px solid rgba(17, 24, 39, 0.09);
+  background: rgba(247, 248, 250, 0.94);
+  backdrop-filter: blur(12px);
+}
+
+.requirements-footer > span {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.requirements-footer button,
+.requirements-error-actions button,
+.requirements-loading > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.requirements-loading,
+.requirements-error {
+  align-items: center;
+  justify-content: center;
+  min-height: 420px;
+  text-align: center;
+}
+
+.requirements-loading > p,
+.requirements-error > p {
+  max-width: 520px;
+}
+
+.requirements-loading h1 {
+  animation: requirementsTitleBreathe 2.2s ease-in-out infinite;
+}
+
+.requirements-breathing-mark {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  color: #0f766e;
+  background: rgba(204, 251, 241, 0.8);
+  animation: requirementsBreathe 2.2s ease-in-out infinite;
+}
+
+.requirements-loading-lines {
+  display: grid;
+  gap: 9px;
+  width: min(100%, 480px);
+  margin: 8px 0 4px;
+}
+
+.requirements-loading-lines span {
+  height: 11px;
+  border-radius: 4px;
+  background: rgba(17, 24, 39, 0.07);
+  animation: requirementsFade 1.8s ease-in-out infinite;
+}
+
+.requirements-loading-lines span:nth-child(2) { width: 84%; animation-delay: 0.16s; }
+.requirements-loading-lines span:nth-child(3) { width: 68%; animation-delay: 0.32s; }
+
+.requirements-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+@keyframes requirementsBreathe {
+  0%, 100% { transform: scale(0.94); opacity: 0.72; }
+  50% { transform: scale(1.04); opacity: 1; }
+}
+
+@keyframes requirementsFade {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+@keyframes requirementsTitleBreathe {
+  0%, 100% { opacity: 0.68; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .requirements-breathing-mark,
+  .requirements-loading h1,
+  .requirements-loading-lines span {
+    animation: none;
+  }
+}
+
 .view-container::-webkit-scrollbar {
   width: 8px;
 }
@@ -3906,6 +4188,24 @@ details.generation-history-panel > summary::-webkit-details-marker {
 
   .view-container {
     padding: 18px;
+  }
+
+  .requirements-header,
+  .requirement-options {
+    grid-template-columns: 1fr;
+  }
+
+  .requirements-header {
+    align-items: start;
+  }
+
+  .requirements-footer {
+    bottom: -18px;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .requirements-footer > span {
+    display: none;
   }
 
   .prompt-label {

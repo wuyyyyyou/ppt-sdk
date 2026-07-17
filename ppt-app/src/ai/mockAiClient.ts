@@ -89,6 +89,45 @@ function readOutputLanguage(value: unknown, fallback: string): string {
 
 export function createMockAiClient(): AiClient {
   return {
+    async generatePresentationRequirements(input) {
+      await sleep(700);
+      const usesChinese = /[\u3400-\u9fff]/.test(input.brief);
+      const result = {
+        audience: [{
+          label: usesChinese ? "业务决策者" : "Business decision-makers",
+          description: usesChinese
+            ? "面向需要快速理解主题并作出判断的业务决策者。"
+            : "For business decision-makers who need to understand the topic and act.",
+        }],
+        purpose: [{
+          label: usesChinese ? "方案沟通" : "Proposal communication",
+          description: usesChinese
+            ? "用于清晰说明方案、依据与后续行动。"
+            : "Communicate the proposal, rationale, and next actions clearly.",
+        }],
+        desired_outcome: [{
+          label: usesChinese ? "形成共识" : "Build alignment",
+          description: usesChinese
+            ? "让受众理解核心判断并对下一步形成共识。"
+            : "Help the audience understand the key judgment and align on next steps.",
+        }],
+        slide_count: [8],
+        output_language: [usesChinese ? "中文" : "English"],
+        visual_tone: [{
+          label: usesChinese ? "编辑式专业感" : "Editorial professionalism",
+          description: usesChinese
+            ? "采用清晰有力的标题与编辑式节奏，呈现专业而有观点的阅读体验。"
+            : "Use strong headings and editorial rhythm for a professional, opinionated reading experience.",
+        }],
+      };
+      await logMockInteraction(
+        input.logContext,
+        { method: "generatePresentationRequirements", brief: input.brief },
+        result,
+      );
+      return result;
+    },
+
     async generateOutline(input) {
       await sleep(900);
       const llmRequest = buildGenerateOutlineLlmRequest(input);
@@ -137,25 +176,6 @@ export function createMockAiClient(): AiClient {
         ),
       };
       await logMockInteraction(input.logContext, { method: "detectOutputLanguage", input }, result);
-      return result;
-    },
-
-    async suggestContext(input) {
-      await sleep(500);
-      const result = input.locale === "zh"
-        ? {
-            audience: ["企业管理层", "业务负责人"],
-            goal: ["说明 AI Agent 的能力与落地路径"],
-            style: ["Business Professional"],
-            slides: "7",
-          }
-        : {
-            audience: ["Executive stakeholders", "Business owners"],
-            goal: ["Explain AI Agent capabilities and adoption path"],
-            style: ["Business Professional"],
-            slides: "7",
-          };
-      await logMockInteraction(input.logContext, { method: "suggestContext", input }, result);
       return result;
     },
 

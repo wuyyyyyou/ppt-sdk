@@ -29,6 +29,7 @@ export interface WorkspaceSummary {
 export interface WorkspaceFiles {
   task: string;
   setting: string;
+  requirements: string;
   outline: string;
   page_plan?: string;
   page_progress?: string;
@@ -49,11 +50,45 @@ export interface WorkspaceResult {
   files?: WorkspaceFiles;
   task: unknown;
   setting: unknown;
+  requirements: PresentationRequirements;
   outline: unknown;
   page_plan?: unknown;
   page_progress?: unknown;
   pages: unknown;
   template: unknown;
+}
+
+export interface PresentationRequirementCandidate {
+  label: string;
+  description: string;
+}
+
+export interface PresentationRequirementsCandidates {
+  audience: PresentationRequirementCandidate[];
+  purpose: PresentationRequirementCandidate[];
+  desired_outcome: PresentationRequirementCandidate[];
+  slide_count: number[];
+  output_language: string[];
+  visual_tone: PresentationRequirementCandidate[];
+}
+
+export interface PresentationRequirementsSelections {
+  audience: PresentationRequirementCandidate | null;
+  purpose: PresentationRequirementCandidate | null;
+  desired_outcome: PresentationRequirementCandidate | null;
+  slide_count: number | null;
+  output_language: string | null;
+  visual_tone: PresentationRequirementCandidate | null;
+}
+
+export interface PresentationRequirements {
+  version: 1;
+  status: "empty" | "draft" | "confirmed";
+  source: { brief: string } | null;
+  candidates: PresentationRequirementsCandidates;
+  selections: PresentationRequirementsSelections;
+  updated_at: string | null;
+  confirmed_at: string | null;
 }
 
 export type UploadedSourceStatus = "active" | "removed";
@@ -528,6 +563,8 @@ export interface UpdateWorkspaceOutlineInput {
 export interface AppendWorkspaceLogInput {
   workspace_dir: string;
   channel:
+    | "ai-requirements"
+    | "ai-requirements-interactions"
     | "ai-outline"
     | "ai-outline-interactions"
     | "ai-page-plan"

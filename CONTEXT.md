@@ -9,6 +9,44 @@ The container for one PPT request and its artifacts.
 
 **Brief**:
 The user's initial input that describes what the deck should cover.
+User-facing Chinese label: 需求描述
+
+**Presentation Requirements**:
+The Workspace-owned structured requirements for a Deck, derived from the Brief and resolved through user choices. They contain an explicit audience, purpose, desired outcome, positive page count, output language, and visual tone; the user's later explicit choices override the corresponding expression in the Brief.
+User-facing Chinese label: 演示需求
+_Avoid_: Context, Background
+
+**Presentation Requirements Draft**:
+A Workspace-owned set of ordered candidate Presentation Requirements and current selections that remains open to user review and editing across app sessions. The first candidate for each field is recommended and may be selected by default without making the requirements confirmed.
+_Avoid_: Confirmed Presentation Requirements
+
+**Presentation Requirements Candidate**:
+A selectable proposed value within a Presentation Requirements Draft. Each field has one candidate when the Brief is explicit and two to four materially distinct candidates only when genuine ambiguity remains; semantic candidates pair a concise label with a one-sentence description, while page-count and output-language candidates are simple values.
+
+**Confirmed Presentation Requirements**:
+The complete Presentation Requirements accepted by the user as the primary constraints for downstream creation; page count and output language are always concrete rather than automatically deferred. Any later field change returns them to a draft until the whole set is confirmed again, while the Brief remains the original source record without overriding a conflicting confirmed field.
+
+**Presentation Requirements Creation**:
+The explicit user-requested process that derives a new Presentation Requirements Draft solely from the current Brief. It may infer missing requirements but never content facts; each resulting draft retains its source Brief, and a successful new creation replaces the active draft as a whole while a failed attempt leaves it unchanged.
+
+**Presentation Requirements Review**:
+The required user step where every Presentation Requirements field is resolved from generated candidates or manual entry and the whole set is explicitly confirmed by the user; it is never skipped automatically. Default selections remain a draft until this confirmation action occurs.
+User-facing Chinese label: 确认演示需求
+
+**Presentation Purpose**:
+The use scenario and task the Deck is intended to serve, such as an investor pitch, operating review, or training session.
+User-facing Chinese label: 用途
+_Avoid_: Goal
+
+**Desired Outcome**:
+The intended change in the audience's understanding, attitude, decision, or action after experiencing the Deck.
+User-facing Chinese label: 预期效果
+_Avoid_: Goal
+
+**Visual Tone**:
+The qualitative visual character requested for a Deck; it may use a recognizable editorial or cultural reference and describe visual intensity, headline character, compositional feel, and intended reading experience without fixing exact colors, typography, templates, or page layouts. It is an input to Workspace Style Guide Creation rather than a Style Profile or Workspace Style Guide.
+User-facing Chinese label: 视觉气质
+_Avoid_: Theme, Template, Style Guide
 
 **Outline**:
 An ordered list of slide-level entries, each with a title and a short outline.
@@ -317,6 +355,14 @@ The user action that asks an Active Deck Generation to stop starting new Page Ge
 The authoritative state-meaning module for the Task State Machine. It derives effective deck/page state, allowed operations, blockers, recommendations, and page progress synchronization from Workspace artifacts such as the Confirmed Outline, manifest, and Page Progress.
 
 ## Example Dialogue
+
+Dev: "The requirements page already selected the first candidate for every field. Can Outline Creation start now?"
+
+Expert: "No. Those selections are still a Presentation Requirements Draft until the user explicitly confirms the whole set; the requirements gate must block Outline Creation before then."
+
+Dev: "The user edited the Brief after confirming the requirements. Should we mark them stale immediately?"
+
+Expert: "No. Editing the Brief does not change the current requirements. Only an explicit Presentation Requirements Creation action can replace the active draft, and the new draft retains the Brief used to generate it."
 
 Dev: "The workspace has a draft outline, but not a confirmed outline yet."
 

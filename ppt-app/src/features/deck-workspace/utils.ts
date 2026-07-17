@@ -20,7 +20,7 @@ export function deckReadyStatus(t: Messages, count: number) {
 }
 
 export function stageOrder(stage: MainStage) {
-  return { brief: 1, "uploaded-source-analysis": 2, outline: 3, generating: 4, deck: 5 }[stage];
+  return { brief: 1, requirements: 2, "uploaded-source-analysis": 3, outline: 4, generating: 5, deck: 6 }[stage];
 }
 
 export function stageLabel(t: Messages, stage: MainStage) {

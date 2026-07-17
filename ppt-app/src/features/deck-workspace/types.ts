@@ -8,6 +8,7 @@ import type {
   RenderDeckHtmlResult,
   TemplateSummary,
   UploadedSourceMaterial,
+  PresentationRequirements,
   WorkspaceStyleProfileSelection,
   WorkspaceResult,
   WorkspaceSettings
@@ -20,7 +21,7 @@ import type { ActiveGenerationRun, GenerationViewState } from "./generationViewS
 import type { PageReviewSettings } from "./reviewSettings";
 import type { ResearchSearchControlSettings } from "./researchSearchControl";
 
-export type MainStage = "brief" | "uploaded-source-analysis" | "outline" | "generating" | "deck";
+export type MainStage = "brief" | "requirements" | "uploaded-source-analysis" | "outline" | "generating" | "deck";
 export type PageId = "main" | "library" | "review" | "refine" | "export" | "style-profile-creation";
 export type PanelMode = "visible" | "minimized" | "closed";
 export type RefineScope = "deck" | "slide";
@@ -28,7 +29,7 @@ export type PreviewMode = "grid" | "organize" | "present";
 export type LoadingKind =
   | "none"
   | "template"
-  | "context"
+  | "requirements"
   | "theme"
   | "uploadedSourceAnalysis"
   | "deck"
@@ -82,6 +83,10 @@ export interface DeckWorkspaceState {
   pageReviewSettings: PageReviewSettings;
   researchSearchControlSettings: ResearchSearchControlSettings;
   contextRows: ContextRow[];
+  presentationRequirements: PresentationRequirements;
+  requirementsStatus: "idle" | "loading" | "ready" | "error";
+  requirementsError: string;
+  requirementsSaving: boolean;
   deckTitle: string;
   deck: Slide[];
   outline: OutlineDetail[];

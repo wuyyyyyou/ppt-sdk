@@ -11,6 +11,7 @@ import { RefinePage } from "../features/deck-workspace/components/RefinePage";
 import { ReviewPage } from "../features/deck-workspace/components/ReviewPage";
 import { StyleProfileCreationPage } from "../features/deck-workspace/components/StyleProfilePage";
 import { UploadedSourceAnalysisPage } from "../features/deck-workspace/components/UploadedSourceAnalysisPage";
+import { PresentationRequirementsPage } from "../features/requirements";
 import { WorkspaceDialog } from "../features/deck-workspace/components/WorkspaceDialog";
 import { useDeckWorkspace } from "../features/deck-workspace/hooks/useDeckWorkspace";
 import { useI18n } from "../i18n/useI18n";
@@ -108,16 +109,26 @@ export function App() {
               researchSearchControlSettings={state.researchSearchControlSettings}
               workspaceSettingsSaving={state.workspaceSettingsSaving}
               setResearchSearchControlSettings={actions.setResearchSearchControlSettings}
-              contextRows={state.contextRows}
               uploadedSources={state.uploadedSources}
-              addContextRow={actions.addContextRow}
-              updateContextRow={actions.updateContextRow}
-              removeContextRow={actions.removeContextRow}
               uploadUploadedSource={actions.uploadUploadedSource}
               removeUploadedSource={actions.removeUploadedSource}
-              addStyleRow={actions.addStyleRow}
-              suggestContextFromPrompt={actions.suggestContextFromPrompt}
-              generateDeck={actions.generateDeck}
+              generateDeck={actions.generatePresentationRequirements}
+            />
+          ) : null}
+
+          {state.page === "main" && state.stage === "requirements" ? (
+            <PresentationRequirementsPage
+              t={t}
+              brief={state.presentationRequirements.source?.brief ?? state.prompt}
+              requirements={state.presentationRequirements}
+              status={state.requirementsStatus}
+              error={state.requirementsError}
+              saving={state.requirementsSaving}
+              onSelect={actions.selectPresentationRequirement}
+              onRetry={() => void actions.generatePresentationRequirements()}
+              onManual={() => void actions.useManualPresentationRequirements()}
+              onBack={actions.returnToBriefFromRequirements}
+              onConfirm={() => void actions.confirmPresentationRequirements()}
             />
           ) : null}
 

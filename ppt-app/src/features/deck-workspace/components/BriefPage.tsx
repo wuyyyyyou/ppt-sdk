@@ -45,15 +45,9 @@ interface BriefPageProps {
   researchSearchControlSettings: ResearchSearchControlSettings;
   workspaceSettingsSaving: boolean;
   setResearchSearchControlSettings: (settings: ResearchSearchControlSettings) => Promise<void>;
-  contextRows: ContextRow[];
   uploadedSources: UploadedSourceMaterial[];
-  addContextRow: (row: ContextRow) => void;
-  updateContextRow: (id: string, value: string) => void;
-  removeContextRow: (id: string) => void;
   uploadUploadedSource: (file: File) => Promise<void>;
   removeUploadedSource: (uploadedSourceId: string) => Promise<void>;
-  addStyleRow: () => void;
-  suggestContextFromPrompt: () => Promise<void>;
   generateDeck: () => Promise<void>;
 }
 
@@ -85,15 +79,9 @@ export function BriefPage(props: BriefPageProps) {
     researchSearchControlSettings,
     workspaceSettingsSaving,
     setResearchSearchControlSettings,
-    contextRows,
     uploadedSources,
-    addContextRow,
-    updateContextRow,
-    removeContextRow,
     uploadUploadedSource,
     removeUploadedSource,
-    addStyleRow,
-    suggestContextFromPrompt,
     generateDeck,
   } = props;
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
@@ -106,7 +94,7 @@ export function BriefPage(props: BriefPageProps) {
     loading === "review" ||
     loading === "theme" ||
     loading === "uploadedSourceAnalysis";
-  const isSuggestingContext = loading === "context";
+  const isSuggestingContext = loading === "requirements";
   const isCreateButtonLoading = isCreating || isSuggestingContext;
   const strictReviewMode = isStrictReviewModeEnabled(pageReviewSettings);
 
@@ -153,18 +141,6 @@ export function BriefPage(props: BriefPageProps) {
           placeholder={t.brief.placeholder}
         />
         <div className="prompt-inline-actions">
-          <button
-            className="inline-context-btn"
-            onClick={suggestContextFromPrompt}
-            disabled={isCreating || isSuggestingContext}
-          >
-            {isSuggestingContext ? (
-              <span className="spinner small" />
-            ) : (
-              <Sparkles size={14} />
-            )}
-            {t.controls.suggestContext}
-          </button>
           <button
             className="inline-create-btn"
             onClick={generateDeck}
@@ -272,66 +248,9 @@ export function BriefPage(props: BriefPageProps) {
         <div>
           <div className="section-label">{t.brief.optionalContext}</div>
           <div className="chips-row">
-            <button
-              className="chip-btn"
-              onClick={() =>
-                addContextRow({
-                  id: "audience",
-                  label: t.brief.contextLabels.audience,
-                  value: "",
-                  placeholder: t.brief.contextPlaceholders.audience
-                })
-              }
-            >
-              {t.brief.chips.audience}
-            </button>
-            <button
-              className="chip-btn"
-              onClick={() =>
-                addContextRow({
-                  id: "goal",
-                  label: t.brief.contextLabels.goal,
-                  value: "",
-                  placeholder: t.brief.contextPlaceholders.goal
-                })
-              }
-            >
-              {t.brief.chips.goal}
-            </button>
-            <button className="chip-btn" onClick={addStyleRow}>
-              {t.brief.chips.style}
-            </button>
-            <button
-              className="chip-btn"
-              onClick={() =>
-                addContextRow({
-                  id: "content",
-                  label: t.brief.contextLabels.contentSource,
-                  value: "",
-                  placeholder: t.brief.contextPlaceholders.contentSource
-                })
-              }
-            >
-              {t.brief.chips.content}
-            </button>
             <button className="chip-btn" onClick={openUploadPicker} disabled={loading === "upload" || loading === "uploadedSourceAnalysis"}>
               <Upload size={13} />
               {t.brief.chips.attachment}
-            </button>
-            <button
-              className="chip-btn"
-              onClick={() =>
-                addContextRow({
-                  id: "slides",
-                  label: t.brief.contextLabels.slides,
-                  value: "auto",
-                  type: "select",
-                  options: SLIDE_COUNT_OPTIONS,
-                  allowCustomValue: true
-                })
-              }
-            >
-              {t.brief.contextLabels.slides}
             </button>
             <button
               className={`chip-btn ${templatePickerOpen ? "active" : ""}`}
@@ -392,16 +311,6 @@ export function BriefPage(props: BriefPageProps) {
           />
         ) : null}
 
-        {contextRows.map((row) => (
-          <ContextRowView
-            key={row.id}
-            row={row}
-            t={t}
-            update={updateContextRow}
-            remove={removeContextRow}
-            onUpload={openUploadPicker}
-          />
-        ))}
         {uploadedSources.length > 0 ? (
           <div className="uploaded-source-block">
             <div className="uploaded-source-list">

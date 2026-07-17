@@ -1,0 +1,53 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { PresentationRequirementsPage } from "../../src/features/requirements/PresentationRequirementsPage";
+import {
+  createRequirementsDraft,
+  projectRequirementsToLegacyInputs,
+} from "../../src/features/requirements/presentationRequirements";
+import { messages } from "../../src/i18n/messages";
+
+const candidates = {
+  audience: [{ label: "管理层", description: "面向负责决策的管理层。" }],
+  purpose: [{ label: "方案评审", description: "用于评审方案并确定下一步。" }],
+  desired_outcome: [{ label: "批准执行", description: "推动受众批准后续执行。" }],
+  slide_count: [5],
+  output_language: ["中文"],
+  visual_tone: [{ label: "体育媒体特刊", description: "强视觉、鲜明标题和编辑式阅读节奏。" }],
+};
+
+test("defaults every field to the first recommended candidate and projects legacy inputs", () => {
+  const draft = createRequirementsDraft("制作一份 5 页中文方案", candidates);
+  assert.equal(draft.selections.slide_count, 5);
+  assert.equal(draft.selections.output_language, "中文");
+  assert.deepEqual(draft.selections.visual_tone, candidates.visual_tone[0]);
+  const projection = projectRequirementsToLegacyInputs(draft);
+  assert.equal(projection.outputLanguage, "中文");
+  assert.equal(projection.contextRows.find((row) => row.id === "slides")?.value, "5");
+  assert.match(projection.contextRows.find((row) => row.id === "visual_tone")?.value ?? "", /体育媒体特刊/);
+});
+
+test("renders loading, candidates, Other inputs, and the final confirmation action", () => {
+  const draft = createRequirementsDraft("制作一份 5 页中文方案", candidates);
+  const common = {
+    t: messages.zh,
+    brief: draft.source!.brief,
+    requirements: draft,
+    error: "",
+    saving: false,
+    onSelect: () => undefined,
+    onRetry: () => undefined,
+    onManual: () => undefined,
+    onBack: () => undefined,
+    onConfirm: () => undefined,
+  };
+  const ready = renderToStaticMarkup(createElement(PresentationRequirementsPage, { ...common, status: "ready" }));
+  assert.match(ready, /体育媒体特刊/);
+  assert.equal((ready.match(/>其他</g) ?? []).length, 6);
+  assert.match(ready, /确认并继续/);
+  const loading = renderToStaticMarkup(createElement(PresentationRequirementsPage, { ...common, status: "loading" }));
+  assert.match(loading, /正在梳理演示需求\.\.\./);
+  assert.match(loading, /requirements-breathing-mark/);
+});

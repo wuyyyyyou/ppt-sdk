@@ -12,6 +12,7 @@ export interface AppWorkspaceSummary {
 export interface AppWorkspaceFiles {
   task: string;
   setting: string;
+  requirements: string;
   outline: string;
   page_plan: string;
   page_progress: string;
@@ -20,6 +21,39 @@ export interface AppWorkspaceFiles {
   research_plan: string;
   research_evidence: string;
   research_status: string;
+}
+
+export interface AppPresentationRequirementCandidate {
+  label: string;
+  description: string;
+}
+
+export interface AppPresentationRequirementsCandidates {
+  audience: AppPresentationRequirementCandidate[];
+  purpose: AppPresentationRequirementCandidate[];
+  desired_outcome: AppPresentationRequirementCandidate[];
+  slide_count: number[];
+  output_language: string[];
+  visual_tone: AppPresentationRequirementCandidate[];
+}
+
+export interface AppPresentationRequirementsSelections {
+  audience: AppPresentationRequirementCandidate | null;
+  purpose: AppPresentationRequirementCandidate | null;
+  desired_outcome: AppPresentationRequirementCandidate | null;
+  slide_count: number | null;
+  output_language: string | null;
+  visual_tone: AppPresentationRequirementCandidate | null;
+}
+
+export interface AppPresentationRequirements {
+  version: 1;
+  status: "empty" | "draft" | "confirmed";
+  source: { brief: string } | null;
+  candidates: AppPresentationRequirementsCandidates;
+  selections: AppPresentationRequirementsSelections;
+  updated_at: string | null;
+  confirmed_at: string | null;
 }
 
 export interface AppWorkspaceOutlineItem {
@@ -80,6 +114,7 @@ export interface AppWorkspaceResult {
   files: AppWorkspaceFiles;
   task: unknown;
   setting: unknown;
+  requirements: unknown;
   outline: unknown;
   page_plan: unknown;
   page_progress: unknown;
@@ -549,6 +584,15 @@ export interface GetAppWorkspaceOutlineInput {
   workspace_dir: string;
 }
 
+export interface GetAppWorkspaceRequirementsInput {
+  workspace_dir: string;
+}
+
+export interface UpdateAppWorkspaceRequirementsInput {
+  workspace_dir: string;
+  requirements: unknown;
+}
+
 export interface UpdateAppWorkspaceOutlineInput {
   workspace_dir: string;
   outline: {
@@ -577,6 +621,8 @@ export interface DuplicateAppWorkspacePageInput {
 export interface AppendAppWorkspaceLogInput {
   workspace_dir: string;
   channel:
+    | "ai-requirements"
+    | "ai-requirements-interactions"
     | "ai-outline"
     | "ai-outline-interactions"
     | "ai-page-plan"

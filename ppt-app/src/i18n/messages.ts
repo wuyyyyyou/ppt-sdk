@@ -12,7 +12,6 @@ export interface Messages {
     edit: string;
     cancel: string;
     save: string;
-    suggestContext: string;
     suggestions: string;
     createDeck: string;
     updateDeck: string;
@@ -52,6 +51,7 @@ export interface Messages {
   stages: {
     template: string;
     brief: string;
+    requirements: string;
     uploadedSourceAnalysis: string;
     outline: string;
     generating: string;
@@ -120,6 +120,26 @@ export interface Messages {
       error: string;
       duplicate: string;
     };
+  };
+  requirements: {
+    title: string;
+    helper: string;
+    briefLabel: string;
+    loadingTitle: string;
+    loadingBody: string;
+    errorTitle: string;
+    errorBody: string;
+    retry: string;
+    manual: string;
+    back: string;
+    confirm: string;
+    saving: string;
+    saved: string;
+    recommended: string;
+    other: string;
+    groups: Record<"content" | "specifications" | "visual", string>;
+    fields: Record<"audience" | "purpose" | "desired_outcome" | "slide_count" | "output_language" | "visual_tone", string>;
+    customPlaceholders: Record<"audience" | "purpose" | "desired_outcome" | "slide_count" | "output_language" | "visual_tone", string>;
   };
   template: {
     title: string;
@@ -358,8 +378,6 @@ export interface Messages {
     outlineUpdated: string;
     outlineSkipped: string;
     promptRequired: string;
-    contextSuggested: string;
-    contextSuggestionEmpty: string;
     createOutlineFirst: string;
     createDeckFirst: string;
     workspaceOpened: string;
@@ -386,9 +404,8 @@ export const messages: Record<Locale, Messages> = {
       edit: "Edit",
       cancel: "Cancel",
       save: "Save",
-      suggestContext: "Suggest context",
       suggestions: "Suggestions",
-      createDeck: "Create deck",
+      createDeck: "Generate presentation",
       updateDeck: "Update deck",
       updateOutline: "Update outline",
       createOutline: "Create outline",
@@ -426,6 +443,7 @@ export const messages: Record<Locale, Messages> = {
     stages: {
       template: "Template",
       brief: "Brief",
+      requirements: "Requirements",
       uploadedSourceAnalysis: "Source analysis",
       outline: "Outline",
       generating: "Generating",
@@ -456,7 +474,7 @@ export const messages: Record<Locale, Messages> = {
       strictReviewConfirmBody:
         "When enabled, Anna will call the model again after each page is generated to check visual quality from the page screenshot. This may increase PPT generation time and token usage, and the review quality depends on the default model's capabilities. Are you sure you want to enable it?",
       strictReviewConfirmAction: "Enable visual check",
-      optionalContext: "Optional context",
+      optionalContext: "Sources and visual setup",
       chips: {
         audience: "Audience",
         goal: "Goal",
@@ -504,6 +522,26 @@ export const messages: Record<Locale, Messages> = {
         error: "Source material analysis failed",
         duplicate: "duplicate"
       }
+    },
+    requirements: {
+      title: "Confirm presentation requirements",
+      helper: "Review the recommended choices and adjust anything before generation continues.",
+      briefLabel: "Brief",
+      loadingTitle: "Shaping your presentation requirements...",
+      loadingBody: "Anna is reading the Brief and identifying the decisions that will guide the deck.",
+      errorTitle: "Requirements could not be generated",
+      errorBody: "Try again, or fill in the six requirements manually.",
+      retry: "Generate again",
+      manual: "Fill manually",
+      back: "Back to Brief",
+      confirm: "Confirm and continue",
+      saving: "Saving draft...",
+      saved: "Draft saved",
+      recommended: "Recommended",
+      other: "Other",
+      groups: { content: "Content goals", specifications: "Generation specifications", visual: "Visual direction" },
+      fields: { audience: "Audience", purpose: "Purpose", desired_outcome: "Desired outcome", slide_count: "Slide count", output_language: "Language", visual_tone: "Visual tone" },
+      customPlaceholders: { audience: "Describe another audience", purpose: "Describe another purpose", desired_outcome: "Describe another outcome", slide_count: "Enter a positive integer", output_language: "Enter a language", visual_tone: "Describe another visual tone" },
     },
     template: {
       title: "Choose a style",
@@ -769,8 +807,6 @@ export const messages: Record<Locale, Messages> = {
       outlineUpdated: "Outline revised",
       outlineSkipped: "Outline was skipped for this deck",
       promptRequired: "Enter a prompt first",
-      contextSuggested: "Optional context updated",
-      contextSuggestionEmpty: "No context suggestions found",
       createOutlineFirst: "Create the outline first",
       createDeckFirst: "Create the deck first",
       workspaceOpened: "Opened task {id}",
@@ -795,9 +831,8 @@ export const messages: Record<Locale, Messages> = {
       edit: "编辑",
       cancel: "取消",
       save: "保存",
-      suggestContext: "补全上下文",
       suggestions: "建议",
-      createDeck: "创建演示文稿",
+      createDeck: "生成演示文稿",
       updateDeck: "更新演示文稿",
       updateOutline: "更新大纲",
       createOutline: "创建大纲",
@@ -835,6 +870,7 @@ export const messages: Record<Locale, Messages> = {
     stages: {
       template: "模板",
       brief: "需求",
+      requirements: "演示需求",
       uploadedSourceAnalysis: "上传资料分析",
       outline: "大纲",
       generating: "生成中",
@@ -865,7 +901,7 @@ export const messages: Record<Locale, Messages> = {
       strictReviewConfirmBody:
         "开启后，Anna 会在每页生成后再次调用大模型，根据页面截图检查视觉质量。这可能延长 PPT 生成时间，并消耗更多 token；检查质量也会受默认模型能力影响。确定要开启吗？",
       strictReviewConfirmAction: "开启视觉检查",
-      optionalContext: "可选上下文",
+      optionalContext: "资料与视觉设置",
       chips: {
         audience: "受众",
         goal: "目标",
@@ -913,6 +949,26 @@ export const messages: Record<Locale, Messages> = {
         error: "上传资料分析失败",
         duplicate: "重复"
       }
+    },
+    requirements: {
+      title: "确认演示需求",
+      helper: "请审阅推荐选项，并在继续生成前确认这份演示文稿的关键要求。",
+      briefLabel: "需求描述",
+      loadingTitle: "正在梳理演示需求...",
+      loadingBody: "Anna 正在阅读需求描述，提炼会影响后续生成的关键决策。",
+      errorTitle: "未能生成演示需求",
+      errorBody: "你可以重新生成，或直接手动填写六项需求。",
+      retry: "重新生成",
+      manual: "手动填写",
+      back: "返回修改需求",
+      confirm: "确认并继续",
+      saving: "正在保存草稿...",
+      saved: "草稿已保存",
+      recommended: "推荐",
+      other: "其他",
+      groups: { content: "内容目标", specifications: "生成规格", visual: "视觉方向" },
+      fields: { audience: "受众", purpose: "用途", desired_outcome: "预期效果", slide_count: "页数", output_language: "语言", visual_tone: "视觉气质" },
+      customPlaceholders: { audience: "描述其他受众", purpose: "描述其他用途", desired_outcome: "描述其他预期效果", slide_count: "输入正整数", output_language: "输入具体语言", visual_tone: "描述其他视觉气质" },
     },
     template: {
       title: "选择风格",
@@ -1175,8 +1231,6 @@ export const messages: Record<Locale, Messages> = {
       outlineUpdated: "大纲已调整",
       outlineSkipped: "这份演示跳过了大纲审阅",
       promptRequired: "请先输入 prompt",
-      contextSuggested: "可选上下文已更新",
-      contextSuggestionEmpty: "没有生成可用的上下文建议",
       createOutlineFirst: "请先创建大纲",
       createDeckFirst: "请先创建演示文稿",
       workspaceOpened: "已打开任务 {id}",

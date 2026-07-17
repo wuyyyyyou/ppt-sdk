@@ -53,6 +53,7 @@ import type {
   StyleProfileDraftFingerprint,
   RemoveUploadedSourceResult,
   PrepareUploadedSourceAnalysisWorkspaceResult,
+  PresentationRequirements,
   UploadedSourceAnalysisDraftFingerprint,
   UpdateWorkspaceSettingsResult,
 } from "./types";
@@ -357,6 +358,14 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         "app_append_workspace_log",
         input
       ),
+    getWorkspaceRequirements: (input) =>
+      invoke<PresentationRequirements>(
+        toolIds.pptEngine,
+        "app_get_workspace_requirements",
+        input
+      ),
+    updateWorkspaceRequirements: (input) =>
+      invokeWorkspaceResult("app_update_workspace_requirements", input),
     getWorkspaceOutline: (input) =>
       invoke<WorkspaceOutline>(
         toolIds.pptEngine,

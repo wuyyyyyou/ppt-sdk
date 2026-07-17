@@ -45,6 +45,7 @@ import {
   finalizeAppResearchVisualAssets,
   getAllDiscoveredTemplateGroups,
   getAppWorkspaceOutline,
+  getAppWorkspaceRequirements,
   getDiscoveredTemplateGroup,
   listAppWorkspaces,
   listAppStyleProfiles,
@@ -92,6 +93,7 @@ import {
   startAppPptxExportModel,
   invokeTaskStateMachine,
   updateAppWorkspaceOutline,
+  updateAppWorkspaceRequirements,
   updateAppWorkspacePages,
   updateAppWorkspaceSettings,
   updateAppWorkspaceTitle,
@@ -1188,6 +1190,15 @@ async function toolAppGetWorkspaceOutline(args) {
   return getAppWorkspaceOutline({ workspace_dir: workspaceDir });
 }
 
+async function toolAppGetWorkspaceRequirements(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return getAppWorkspaceRequirements({ workspace_dir: workspaceDir });
+}
+
 async function toolAppAppendWorkspaceLog(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -1196,6 +1207,8 @@ async function toolAppAppendWorkspaceLog(args) {
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
   const channel = args.channel;
   const supportedChannels = [
+    "ai-requirements",
+    "ai-requirements-interactions",
     "ai-outline",
     "ai-outline-interactions",
     "ai-page-plan",
@@ -1247,6 +1260,23 @@ async function toolAppUpdateWorkspaceOutline(args) {
   return registerWorkspaceJsonReference(await updateAppWorkspaceOutline({
     workspace_dir: workspaceDir,
     outline,
+  }));
+}
+
+async function toolAppUpdateWorkspaceRequirements(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const requirements = args.requirements;
+  if (!requirements || typeof requirements !== "object" || Array.isArray(requirements)) {
+    throw new Error('"requirements" must be an object');
+  }
+
+  return registerWorkspaceJsonReference(await updateAppWorkspaceRequirements({
+    workspace_dir: workspaceDir,
+    requirements,
   }));
 }
 
@@ -2141,6 +2171,8 @@ const TOOL_DISPATCH = {
   app_record_uploaded_source_analysis: toolAppRecordUploadedSourceAnalysis,
   app_get_uploaded_source_analysis: toolAppGetUploadedSourceAnalysis,
   app_append_workspace_log: toolAppAppendWorkspaceLog,
+  app_get_workspace_requirements: toolAppGetWorkspaceRequirements,
+  app_update_workspace_requirements: toolAppUpdateWorkspaceRequirements,
   app_get_workspace_outline: toolAppGetWorkspaceOutline,
   app_update_workspace_outline: toolAppUpdateWorkspaceOutline,
   app_update_workspace_pages: toolAppUpdateWorkspacePages,
