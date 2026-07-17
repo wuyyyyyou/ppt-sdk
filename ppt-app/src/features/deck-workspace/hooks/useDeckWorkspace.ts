@@ -137,9 +137,11 @@ import {
   failUploadedSourceAnalysisProgress,
 } from "../uploadedSourceAnalysisProgress";
 import {
+  confirmedRequirementsAllowOutline,
   createEmptyPresentationRequirements,
   createManualRequirementsDraft,
   createRequirementsDraft,
+  requirementsOwnedRecoveryStage,
   requirementsAreComplete,
 } from "../../requirements";
 
@@ -453,6 +455,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     useState<"idle" | "loading" | "ready" | "error">("idle");
   const [requirementsError, setRequirementsError] = useState("");
   const [requirementsSaving, setRequirementsSaving] = useState(false);
+  const [requirementsConfirming, setRequirementsConfirming] = useState(false);
   const [requirementsDirty, setRequirementsDirty] = useState(false);
   const [requirementsHasSavedDraft, setRequirementsHasSavedDraft] = useState(false);
   const [deckTitle, setDeckTitle] = useState(t.deck.title);
@@ -460,6 +463,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [outline, setOutline] = useState(outlineDetails);
   const [outlineDraft, setOutlineDraft] = useState(outlineDetails);
   const [outlineDraftTitle, setOutlineDraftTitle] = useState(t.deck.title);
+  const [outlineSaving, setOutlineSaving] = useState(false);
   const [outlineError, setOutlineError] = useState("");
   const [generated, setGenerated] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -1128,6 +1132,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       }
     }
 
+    const requirementsRecoveryStage = requirementsOwnedRecoveryStage(workspace.requirements);
+    if (requirementsRecoveryStage) setStage(requirementsRecoveryStage);
+
     const persistedContextRows = workspaceContextRowsToState(workspace);
     if (persistedContextRows.shouldSync || options.syncEmptyContextRows) {
       setContextRows(persistedContextRows.rows);
@@ -1521,9 +1528,15 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (nextStage === "uploaded-source-analysis" && uploadedSources.length === 0) {
       setUploadedSourceAnalysisProgress(createSkippedUploadedSourceAnalysisProgress(t));
     }
-    if (nextStage === "outline" && outline.length === 0) {
-      showToast(t.toasts.createOutlineFirst);
-      return;
+    if (nextStage === "outline") {
+      if (!confirmedRequirementsAllowOutline(currentWorkspace?.requirements)) {
+        showToast(t.toasts.confirmRequirementsFirst);
+        return;
+      }
+      if (outline.length === 0) {
+        showToast(t.toasts.createOutlineFirst);
+        return;
+      }
     }
     if (nextStage === "generating" && !createDeckProgress) {
       showToast(t.toasts.createDeckFirst);
@@ -1702,7 +1715,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       updated_at: new Date().toISOString(),
       confirmed_at: new Date().toISOString(),
     };
-    setRequirementsSaving(true);
+    setRequirementsConfirming(true);
     try {
       const workspace = currentWorkspace ?? await ensureCurrentWorkspace();
       if (!workspace) return;
@@ -1729,7 +1742,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error));
     } finally {
-      setRequirementsSaving(false);
+      setRequirementsConfirming(false);
     }
   }
 
@@ -1883,6 +1896,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const cancelSignal = beginCancellableGeneration();
       const workspace = await refreshCurrentWorkspaceSnapshot();
       if (!workspace) return;
+      if (!confirmedRequirementsAllowOutline(workspace.requirements)) {
+        showToast(t.toasts.confirmRequirementsFirst);
+        setPage("main");
+        setStage("requirements");
+        return;
+      }
       const normalized = normalizeValidOutline({
         title: outlineDraftTitle,
         items: outlineDraft,
@@ -1992,9 +2011,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   async function saveOutlineDraft() {
     if (!backend) return;
+    setOutlineSaving(true);
     try {
       const workspace = await ensureCurrentWorkspace();
       if (!workspace) return;
+      if (!confirmedRequirementsAllowOutline(workspace.requirements)) {
+        setOutlineDraft(cloneOutlineItems(outline));
+        setOutlineDraftTitle(deckTitle);
+        setOutlineFeedback("");
+        showToast(t.toasts.confirmRequirementsFirst);
+        setPage("main");
+        setStage("requirements");
+        return;
+      }
       setLoading("outline");
       const normalized = normalizeValidOutline({ title: outlineDraftTitle, items: outlineDraft });
       const updatedWorkspace = await backend.saveWorkspaceOutlineDraft({
@@ -2012,6 +2041,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       showToast(error instanceof Error ? error.message : t.toasts.createOutlineFirst);
     } finally {
       setLoading("none");
+      setOutlineSaving(false);
     }
   }
 
@@ -2054,6 +2084,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   function returnToRequirementsFromOutline() {
+    if (!confirmedRequirementsAllowOutline(currentWorkspace?.requirements)) {
+      setOutlineDraft(cloneOutlineItems(outline));
+      setOutlineDraftTitle(deckTitle);
+      setOutlineFeedback("");
+      setPage("main");
+      setStage("requirements");
+      return;
+    }
     navigateMain("requirements");
   }
 
@@ -3540,6 +3578,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     requirementsStatus,
     requirementsError,
     requirementsSaving,
+    requirementsConfirming,
     requirementsDirty,
     requirementsHasSavedDraft,
     deckTitle,
@@ -3548,6 +3587,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     outlineDraft,
     outlineDraftTitle,
     outlineDirty,
+    outlineSaving,
     outlineError,
     generated,
     currentSlide,

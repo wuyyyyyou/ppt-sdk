@@ -132,6 +132,7 @@ export interface Messages {
     manual: string;
     back: string;
     confirm: string;
+    confirming: string;
     saving: string;
     saved: string;
     unsaved: string;
@@ -176,6 +177,7 @@ export interface Messages {
     moveDown: string;
     undo: string;
     deleted: string;
+    saving: string;
     unsaved: string;
     saved: string;
     loadingTitle: string;
@@ -396,6 +398,7 @@ export interface Messages {
     outlineUpdated: string;
     outlineSkipped: string;
     promptRequired: string;
+    confirmRequirementsFirst: string;
     createOutlineFirst: string;
     createDeckFirst: string;
     workspaceOpened: string;
@@ -552,6 +555,7 @@ export const messages: Record<Locale, Messages> = {
       manual: "Fill manually",
       back: "Back",
       confirm: "Confirm and continue",
+      confirming: "Confirming...",
       saving: "Saving draft...",
       saved: "Draft saved",
       unsaved: "Unsaved changes",
@@ -579,7 +583,7 @@ export const messages: Record<Locale, Messages> = {
       title: "Review outline",
       helper: "Adjust the structure before Anna designs the deck.",
       cardTitle: "Outline",
-      saveChanges: "Save changes",
+      saveChanges: "Save",
       feedbackPlaceholder:
         "Enter a rewrite request, such as adding a security slide, making it more executive-facing, or reducing to 5 slides...",
       presentationTitle: "Presentation title",
@@ -597,13 +601,14 @@ export const messages: Record<Locale, Messages> = {
       moveDown: "Move down",
       undo: "Undo",
       deleted: "Page removed",
+      saving: "Saving draft...",
       unsaved: "Unsaved changes",
       saved: "Draft saved",
       loadingTitle: "Creating your outline",
       loadingBody: "Anna is turning the confirmed presentation requirements into a concrete page-by-page storyline.",
       errorTitle: "Outline creation failed",
       retry: "Retry outline creation",
-      backToRequirements: "Back to presentation requirements"
+      backToRequirements: "Back"
     },
     uploadedSourceAnalysis: {
       title: "Source material analysis",
@@ -843,6 +848,7 @@ export const messages: Record<Locale, Messages> = {
       outlineUpdated: "Outline revised",
       outlineSkipped: "Outline was skipped for this deck",
       promptRequired: "Enter a prompt first",
+      confirmRequirementsFirst: "Confirm the presentation requirements before editing the outline",
       createOutlineFirst: "Create the outline first",
       createDeckFirst: "Create the deck first",
       workspaceOpened: "Opened task {id}",
@@ -997,6 +1003,7 @@ export const messages: Record<Locale, Messages> = {
       manual: "手动填写",
       back: "返回",
       confirm: "确认并继续",
+      confirming: "正在确认...",
       saving: "正在保存草稿...",
       saved: "草稿已保存",
       unsaved: "有未保存的修改",
@@ -1024,7 +1031,7 @@ export const messages: Record<Locale, Messages> = {
       title: "审阅大纲",
       helper: "先改结构，再确认后继续生成。",
       cardTitle: "大纲",
-      saveChanges: "保存修改",
+      saveChanges: "保存",
       feedbackPlaceholder: "输入重构需求，例如增加安全页、改成更面向高管，或缩减到 5 页...",
       presentationTitle: "演示文稿标题",
       pageTitle: "页面标题",
@@ -1041,13 +1048,14 @@ export const messages: Record<Locale, Messages> = {
       moveDown: "下移",
       undo: "撤销",
       deleted: "已删除页面",
+      saving: "正在保存草稿...",
       unsaved: "有未保存的修改",
-      saved: "大纲草稿已保存",
+      saved: "草稿已保存",
       loadingTitle: "正在创建大纲",
       loadingBody: "Anna 正在把已确认演示需求整理成具体的逐页叙事结构。",
       errorTitle: "大纲创建失败",
       retry: "重试创建大纲",
-      backToRequirements: "返回演示需求"
+      backToRequirements: "返回"
     },
     uploadedSourceAnalysis: {
       title: "上传资料分析",
@@ -1285,6 +1293,7 @@ export const messages: Record<Locale, Messages> = {
       outlineUpdated: "大纲已调整",
       outlineSkipped: "这份演示跳过了大纲审阅",
       promptRequired: "请先输入 prompt",
+      confirmRequirementsFirst: "演示需求已修改，请先重新确认演示需求",
       createOutlineFirst: "请先创建大纲",
       createDeckFirst: "请先创建演示文稿",
       workspaceOpened: "已打开任务 {id}",

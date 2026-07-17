@@ -17,6 +17,7 @@ export interface PresentationRequirementsPageProps {
   status: "idle" | "loading" | "ready" | "error";
   error: string;
   saving: boolean;
+  confirming: boolean;
   dirty: boolean;
   hasSavedDraft: boolean;
   onSelect: <K extends keyof PresentationRequirementsSelections>(
@@ -44,7 +45,7 @@ function semanticMatches(
 }
 
 export function PresentationRequirementsPage(props: PresentationRequirementsPageProps) {
-  const { t, brief, requirements, status, error, saving, dirty, hasSavedDraft, onSelect, onRetry, onManual, onBack, onSave, onConfirm } = props;
+  const { t, brief, requirements, status, error, saving, confirming, dirty, hasSavedDraft, onSelect, onRetry, onManual, onBack, onSave, onConfirm } = props;
   const [customValues, setCustomValues] = useState<Record<string, string>>(() => {
     const values: Record<string, string> = {};
     for (const field of ["audience", "purpose", "desired_outcome", "visual_tone"] as const) {
@@ -85,9 +86,6 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
         <h1>{t.requirements.loadingTitle}</h1>
         <p>{t.requirements.loadingBody}</p>
         <div className="requirements-loading-lines" aria-hidden="true"><span /><span /><span /></div>
-        <button className="secondary-btn" type="button" onClick={onBack}>
-          <ArrowLeft size={16} />{t.requirements.back}
-        </button>
       </section>
     );
   }
@@ -180,12 +178,12 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
 
       <footer className="requirements-footer">
         <button className="secondary-btn" type="button" onClick={onBack}><ArrowLeft size={16} />{t.requirements.back}</button>
-        <span>{saving ? t.requirements.saving : dirty ? t.requirements.unsaved : hasSavedDraft ? t.requirements.saved : ""}</span>
+        <span>{confirming ? t.requirements.confirming : saving ? t.requirements.saving : dirty ? t.requirements.unsaved : hasSavedDraft ? t.requirements.saved : ""}</span>
         <div className="requirements-footer-actions">
-          <button className="secondary-btn" type="button" disabled={saving || !dirty} onClick={onSave}>
+          <button className="secondary-btn" type="button" disabled={saving || confirming || !dirty} onClick={onSave}>
             <Save size={16} />{t.controls.save}
           </button>
-          <button className="primary-btn" type="button" disabled={saving || !Object.values(requirements.selections).every(Boolean) || requirements.selections.output_language?.trim().toLowerCase() === "auto"} onClick={onConfirm}>
+          <button className="primary-btn" type="button" disabled={saving || confirming || !Object.values(requirements.selections).every(Boolean) || requirements.selections.output_language?.trim().toLowerCase() === "auto"} onClick={onConfirm}>
             <Check size={16} />{t.requirements.confirm}
           </button>
         </div>

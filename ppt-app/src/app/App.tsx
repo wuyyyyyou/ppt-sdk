@@ -11,7 +11,10 @@ import { RefinePage } from "../features/deck-workspace/components/RefinePage";
 import { ReviewPage } from "../features/deck-workspace/components/ReviewPage";
 import { StyleProfileCreationPage } from "../features/deck-workspace/components/StyleProfilePage";
 import { UploadedSourceAnalysisPage } from "../features/deck-workspace/components/UploadedSourceAnalysisPage";
-import { PresentationRequirementsPage } from "../features/requirements";
+import {
+  confirmedRequirementsAllowOutline,
+  PresentationRequirementsPage,
+} from "../features/requirements";
 import { WorkspaceDialog } from "../features/deck-workspace/components/WorkspaceDialog";
 import { useDeckWorkspace } from "../features/deck-workspace/hooks/useDeckWorkspace";
 import { useI18n } from "../i18n/useI18n";
@@ -77,7 +80,12 @@ export function App() {
         />
 
         {state.page === "main" ? (
-          <ProgressLine stage={state.stage} t={t} onNavigate={actions.navigateMain} />
+          <ProgressLine
+            stage={state.stage}
+            t={t}
+            outlineEnabled={confirmedRequirementsAllowOutline(state.currentWorkspace?.requirements)}
+            onNavigate={actions.navigateMain}
+          />
         ) : null}
 
         <div className="view-container">
@@ -122,6 +130,7 @@ export function App() {
               status={state.requirementsStatus}
               error={state.requirementsError}
               saving={state.requirementsSaving}
+              confirming={state.requirementsConfirming}
               dirty={state.requirementsDirty}
               hasSavedDraft={state.requirementsHasSavedDraft}
               onSelect={actions.selectPresentationRequirement}
@@ -139,6 +148,7 @@ export function App() {
               title={state.outlineDraftTitle}
               outline={state.outlineDraft}
               dirty={state.outlineDirty}
+              saving={state.outlineSaving}
               error={state.outlineError}
               setTitle={actions.setOutlineDraftTitle}
               updateItem={actions.updateOutlineDraftItem}

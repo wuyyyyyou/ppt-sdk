@@ -86,6 +86,7 @@ export interface DeckWorkspaceState {
   requirementsStatus: "idle" | "loading" | "ready" | "error";
   requirementsError: string;
   requirementsSaving: boolean;
+  requirementsConfirming: boolean;
   requirementsDirty: boolean;
   requirementsHasSavedDraft: boolean;
   deckTitle: string;
@@ -94,6 +95,7 @@ export interface DeckWorkspaceState {
   outlineDraft: OutlineDetail[];
   outlineDraftTitle: string;
   outlineDirty: boolean;
+  outlineSaving: boolean;
   outlineError: string;
   generated: boolean;
   currentSlide: number;

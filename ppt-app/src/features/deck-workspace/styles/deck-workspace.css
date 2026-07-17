@@ -530,6 +530,11 @@ button {
   background: #fff;
 }
 
+.progress-node:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
 .view-container {
   position: relative;
   flex: 1;
@@ -2376,13 +2381,6 @@ button {
   gap: 10px;
 }
 
-.confirm-outline-btn {
-  justify-self: end;
-  min-height: 46px;
-  padding: 0 22px;
-  box-shadow: 0 12px 24px rgba(124, 108, 240, 0.22);
-}
-
 .outline-card,
 .generation-history-panel {
   display: grid;
@@ -2963,19 +2961,6 @@ details.generation-history-panel > summary::-webkit-details-marker {
 .outline-add-page:disabled {
   cursor: not-allowed;
   opacity: 0.45;
-}
-
-.outline-action-button {
-  width: 168px;
-  min-height: 44px;
-  justify-content: center;
-  padding: 0 16px;
-  font-size: 13px;
-}
-
-.outline-action-button.confirm-outline-btn {
-  min-height: 44px;
-  padding: 0 16px;
 }
 
 .outline-undo {

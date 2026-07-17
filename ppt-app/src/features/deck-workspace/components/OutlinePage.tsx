@@ -26,6 +26,7 @@ interface OutlinePageProps {
   title: string;
   outline: OutlineDetail[];
   dirty: boolean;
+  saving: boolean;
   error: string;
   loading: LoadingKind;
   setTitle: (value: string) => void;
@@ -80,6 +81,7 @@ export function OutlinePage(props: OutlinePageProps) {
     title,
     outline,
     dirty,
+    saving,
     error,
     loading,
     setTitle,
@@ -101,7 +103,7 @@ export function OutlinePage(props: OutlinePageProps) {
   const [expandedIndexes, setExpandedIndexes] = useState<Set<number>>(() => new Set());
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const creating = loading === "outline" && outline.length === 0;
-  const busy = loading !== "none";
+  const busy = loading !== "none" || saving;
 
   if (creating) {
     return (
@@ -403,17 +405,17 @@ export function OutlinePage(props: OutlinePageProps) {
         ) : null}
 
         <div className="outline-card-footer">
-          <button className="secondary-btn outline-action-button" type="button" onClick={backToRequirements} disabled={busy}>
-            <ArrowLeft size={14} />{t.outline.backToRequirements}
+          <button className="secondary-btn" type="button" onClick={backToRequirements} disabled={busy}>
+            <ArrowLeft size={16} />{t.outline.backToRequirements}
           </button>
           <div className="outline-footer-right">
-            <span className="outline-save-state">{dirty ? t.outline.unsaved : t.outline.saved}</span>
+            <span className="outline-save-state">{saving ? t.outline.saving : dirty ? t.outline.unsaved : t.outline.saved}</span>
             <div className="outline-footer-actions">
-              <button className="secondary-btn outline-action-button" type="button" onClick={() => void save()} disabled={busy || !dirty}>
-                <Save size={15} />{t.outline.saveChanges}
+              <button className="secondary-btn" type="button" onClick={() => void save()} disabled={busy || !dirty}>
+                <Save size={16} />{t.outline.saveChanges}
               </button>
-              <button className="primary-btn confirm-outline-btn outline-action-button" type="button" onClick={() => void confirm()} disabled={busy}>
-                {loading === "deck" ? <span className="spinner small" /> : <CheckCircle2 size={14} />}
+              <button className="primary-btn" type="button" onClick={() => void confirm()} disabled={busy}>
+                {loading === "deck" ? <span className="spinner small" /> : <CheckCircle2 size={16} />}
                 {t.controls.confirmOutline}
               </button>
             </div>

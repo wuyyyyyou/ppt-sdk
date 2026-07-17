@@ -69,6 +69,20 @@ export function requirementsAreComplete(requirements: PresentationRequirements) 
     requirements.selections.output_language?.trim().toLowerCase() !== "auto";
 }
 
+export function confirmedRequirementsAllowOutline(
+  requirements: Pick<PresentationRequirements, "status"> | null | undefined,
+) {
+  return requirements?.status === "confirmed";
+}
+
+export function requirementsOwnedRecoveryStage(
+  requirements: Pick<PresentationRequirements, "status">,
+): "brief" | "requirements" | null {
+  if (requirements.status === "empty") return "brief";
+  if (requirements.status === "draft") return "requirements";
+  return null;
+}
+
 function semanticValue(candidate: PresentationRequirementCandidate) {
   return `${candidate.label}: ${candidate.description}`;
 }

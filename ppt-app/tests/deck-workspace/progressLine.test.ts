@@ -22,6 +22,7 @@ describe("ProgressLine", () => {
       createElement(ProgressLine, {
         stage: "uploaded-source-analysis",
         t: messages.zh,
+        outlineEnabled: true,
         onNavigate: () => undefined,
       }),
     );
@@ -33,5 +34,18 @@ describe("ProgressLine", () => {
     assert.match(html, /title="生成中"/);
     assert.match(html, /title="成稿"/);
     assert.equal((html.match(/progress-node/g) ?? []).length, 6);
+  });
+
+  it("disables outline navigation until presentation requirements are confirmed", () => {
+    const html = renderToStaticMarkup(
+      createElement(ProgressLine, {
+        stage: "requirements",
+        t: messages.zh,
+        outlineEnabled: false,
+        onNavigate: () => undefined,
+      }),
+    );
+
+    assert.match(html, /title="演示需求已修改，请先重新确认演示需求" disabled=""/);
   });
 });

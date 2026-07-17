@@ -4,8 +4,10 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { PresentationRequirementsPage } from "../../src/features/requirements/PresentationRequirementsPage";
 import {
+  confirmedRequirementsAllowOutline,
   createRequirementsDraft,
   projectRequirementsToLegacyInputs,
+  requirementsOwnedRecoveryStage,
 } from "../../src/features/requirements/presentationRequirements";
 import { messages } from "../../src/i18n/messages";
 
@@ -29,6 +31,18 @@ test("defaults every field to the first recommended candidate and projects legac
   assert.match(projection.contextRows.find((row) => row.id === "visual_tone")?.value ?? "", /体育媒体特刊/);
 });
 
+test("only confirmed presentation requirements allow outline work", () => {
+  assert.equal(confirmedRequirementsAllowOutline({ status: "draft" }), false);
+  assert.equal(confirmedRequirementsAllowOutline({ status: "confirmed" }), true);
+  assert.equal(confirmedRequirementsAllowOutline(null), false);
+});
+
+test("draft presentation requirements own workspace recovery even when later artifacts exist", () => {
+  assert.equal(requirementsOwnedRecoveryStage({ status: "empty" }), "brief");
+  assert.equal(requirementsOwnedRecoveryStage({ status: "draft" }), "requirements");
+  assert.equal(requirementsOwnedRecoveryStage({ status: "confirmed" }), null);
+});
+
 test("renders loading, candidates, Other inputs, and the final confirmation action", () => {
   const draft = createRequirementsDraft("制作一份 5 页中文方案", candidates);
   const common = {
@@ -37,6 +51,7 @@ test("renders loading, candidates, Other inputs, and the final confirmation acti
     requirements: draft,
     error: "",
     saving: false,
+    confirming: false,
     dirty: true,
     hasSavedDraft: true,
     onSelect: () => undefined,
@@ -57,6 +72,7 @@ test("renders loading, candidates, Other inputs, and the final confirmation acti
   const loading = renderToStaticMarkup(createElement(PresentationRequirementsPage, { ...common, status: "loading" }));
   assert.match(loading, /正在梳理演示需求\.\.\./);
   assert.match(loading, /requirements-breathing-mark/);
+  assert.doesNotMatch(loading, />返回</);
 });
 
 test("shows a generated draft as saved until the user edits it", () => {
@@ -68,6 +84,7 @@ test("shows a generated draft as saved until the user edits it", () => {
     status: "ready",
     error: "",
     saving: false,
+    confirming: false,
     dirty: false,
     hasSavedDraft: true,
     onSelect: () => undefined,
@@ -81,4 +98,28 @@ test("shows a generated draft as saved until the user edits it", () => {
   assert.match(html, /草稿已保存/);
   assert.doesNotMatch(html, /有未保存的修改/);
   assert.match(html, /<button class="secondary-btn" type="button" disabled="">/);
+});
+
+test("shows confirmation separately from draft saving", () => {
+  const draft = createRequirementsDraft("制作一份 5 页中文方案", candidates);
+  const html = renderToStaticMarkup(createElement(PresentationRequirementsPage, {
+    t: messages.zh,
+    brief: draft.source!.brief,
+    requirements: draft,
+    status: "ready",
+    error: "",
+    saving: false,
+    confirming: true,
+    dirty: false,
+    hasSavedDraft: true,
+    onSelect: () => undefined,
+    onRetry: () => undefined,
+    onManual: () => undefined,
+    onBack: () => undefined,
+    onSave: () => undefined,
+    onConfirm: () => undefined,
+  }));
+
+  assert.match(html, /正在确认\.\.\./);
+  assert.doesNotMatch(html, /正在保存草稿\.\.\./);
 });

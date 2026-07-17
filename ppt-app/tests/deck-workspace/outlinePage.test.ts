@@ -10,7 +10,7 @@ import {
 import { normalizeRequiredContentMarkdown } from "../../src/features/outline/model.ts";
 import { messages } from "../../src/i18n/messages.ts";
 
-function renderOutlinePage(dirty: boolean) {
+function renderOutlinePage(dirty: boolean, saving = false) {
   return renderToStaticMarkup(createElement(OutlinePage, {
     t: messages.zh,
     title: "演示文稿标题",
@@ -20,6 +20,7 @@ function renderOutlinePage(dirty: boolean) {
       required_content: "- 必要内容",
     }],
     dirty,
+    saving,
     error: "",
     loading: "none",
     setTitle: () => undefined,
@@ -43,17 +44,17 @@ describe("OutlinePage", () => {
     const html = renderOutlinePage(false);
     const footer = html.match(/<div class="outline-card-footer">([\s\S]*?)<\/div><\/section>/)?.[1] ?? "";
 
-    assert.match(footer, /返回演示需求/);
-    assert.ok(footer.indexOf("返回演示需求") < footer.indexOf("大纲草稿已保存"));
+    assert.match(footer, />返回</);
+    assert.ok(footer.indexOf("返回") < footer.indexOf("草稿已保存"));
   });
 
   it("renders the save state in the footer before the save and confirm actions", () => {
     const html = renderOutlinePage(false);
     const footer = html.match(/<div class="outline-card-footer">([\s\S]*?)<\/div><\/section>/)?.[1] ?? "";
 
-    assert.match(footer, /大纲草稿已保存/);
-    assert.ok(footer.indexOf("大纲草稿已保存") < footer.indexOf("保存修改"));
-    assert.ok(footer.indexOf("保存修改") < footer.indexOf("确认并生成"));
+    assert.match(footer, /草稿已保存/);
+    assert.ok(footer.indexOf("草稿已保存") < footer.indexOf("保存</button>"));
+    assert.ok(footer.indexOf("保存</button>") < footer.indexOf("确认并生成"));
   });
 
   it("uses a compact read mode with global required-content controls", () => {
@@ -67,8 +68,15 @@ describe("OutlinePage", () => {
     assert.match(html, /outline-card-floating-actions/);
     assert.doesNotMatch(html, /outline-item-head/);
     assert.doesNotMatch(html, /outline-markdown-preview/);
-    assert.equal(html.match(/outline-action-button/g)?.length, 3);
+    assert.doesNotMatch(html, /outline-action-button/);
     assert.match(html, /class="outline-add-page"/);
+  });
+
+  it("shows the draft-saving state while saving", () => {
+    const html = renderOutlinePage(true, true);
+
+    assert.match(html, /正在保存草稿\.\.\./);
+    assert.doesNotMatch(html, /有未保存的修改/);
   });
 
   it("parses supported Markdown markers into display bullets", () => {
