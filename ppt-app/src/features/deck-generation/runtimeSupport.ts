@@ -1,4 +1,4 @@
-import { AgentRunCancelledError, type AgentPageContentReviewResult, type AgentPageVisualReviewResult, type AgentStreamEvent } from "../../agent/agentClient";
+import { AgentRunCancelledError, type AgentPageVisualReviewResult, type AgentStreamEvent } from "../../agent/agentClient";
 import type { AiOperationLogContext } from "../../ai/interactionLog";
 import type { PagePlanItem, PageProgress } from "../../api/types";
 import type { DeckRefinementIntentReviewResult } from "../../ai/types";
@@ -21,7 +21,7 @@ function isDeckLevelResearchDiscoveryStream(stream: DeckGenerationStream) {
 
 export async function recordProgress(
   input: Pick<DeckGenerationContext, "backend" | "workspace">,
-  page: PagePlanItem,
+  page: Pick<PagePlanItem, "page_id">,
   patch: Record<string, unknown>,
 ) {
   return input.backend.recordPageProgress({
@@ -72,13 +72,7 @@ export function getProgressPage(progress: PageProgress | null, pageId: string) {
 export function getStoredVisualReview(
   page: PageProgress["pages"][number] | null | undefined,
 ): AgentPageVisualReviewResult | null {
-  return (page?.visual_review ?? page?.review ?? null) as AgentPageVisualReviewResult | null;
-}
-
-export function getStoredContentReview(
-  page: PageProgress["pages"][number] | null | undefined,
-): AgentPageContentReviewResult | null {
-  return (page?.content_review ?? page?.review ?? null) as AgentPageContentReviewResult | null;
+  return (page?.visual_review ?? null) as AgentPageVisualReviewResult | null;
 }
 
 export function shortHash(value: string) {
@@ -115,7 +109,7 @@ export function appendTextToLines(lines: string[], chunk: string, limit: number)
 
 export function createAgentRunTracker(input: {
   flowInput: DeckGenerationRuntime;
-  page: PagePlanItem;
+  page: Pick<PagePlanItem, "page_id" | "index" | "title">;
   step: DeckGenerationStep;
   message: string;
   totalPages: number;

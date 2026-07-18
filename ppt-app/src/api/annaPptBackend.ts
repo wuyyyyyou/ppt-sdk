@@ -56,6 +56,11 @@ import type {
   PresentationRequirements,
   UploadedSourceAnalysisDraftFingerprint,
   UpdateWorkspaceSettingsResult,
+  WorkspaceAuthoringKitResult,
+  PrepareWorkspacePageSourcesResult,
+  WorkspacePageSourceFingerprint,
+  CommitWorkspaceStyleGuideResult,
+  WorkspaceStyleGuideStatus,
 } from "./types";
 import { createSearchAdapter } from "./searchAdapter";
 import { resolvePptBundledToolIds } from "./bundledToolIds";
@@ -214,6 +219,44 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invoke<CreateWorkspaceResult>(toolIds.pptEngine, "app_create_workspace", input),
     openWorkspace: (input) =>
       invokeWorkspaceResult("app_open_workspace", input),
+    installWorkspaceAuthoringKit: (input) =>
+      invoke<WorkspaceAuthoringKitResult>(
+        toolIds.pptEngine,
+        "app_install_workspace_authoring_kit",
+        input,
+      ),
+    prepareWorkspacePageSources: (input) =>
+      invoke<PrepareWorkspacePageSourcesResult>(
+        toolIds.pptEngine,
+        "app_prepare_workspace_page_sources",
+        input,
+      ),
+    reconcileWorkspacePageSources: (input) =>
+      invoke(
+        toolIds.pptEngine,
+        "app_reconcile_workspace_page_sources",
+        input,
+      ),
+    getWorkspacePageSourceFingerprint: (input) =>
+      invoke<WorkspacePageSourceFingerprint>(
+        toolIds.pptEngine,
+        "app_get_workspace_page_source_fingerprint",
+        input,
+      ),
+    commitWorkspaceStyleGuideHostUpload: (input) =>
+      invoke<CommitWorkspaceStyleGuideResult>(
+        toolIds.pptEngine,
+        "app_commit_workspace_style_guide_host_upload",
+        input,
+      ),
+    getWorkspaceStyleGuideStatus: (input) =>
+      invoke<WorkspaceStyleGuideStatus>(
+        toolIds.pptEngine,
+        "app_get_workspace_style_guide_status",
+        input,
+      ),
+    initializePageProgress: (input) =>
+      invoke<PageProgress>(toolIds.pptEngine, "app_initialize_page_progress", input),
     listStyleProfiles: () =>
       invoke<ListStyleProfilesResult>(
         toolIds.pptEngine,

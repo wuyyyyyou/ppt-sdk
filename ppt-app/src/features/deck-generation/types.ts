@@ -1,6 +1,5 @@
 import type {
   AgentClient,
-  AgentPageContentReviewResult,
   AgentPageVisualReviewResult,
 } from "../../agent/agentClient";
 import type { AiClient } from "../../ai/aiClient";
@@ -22,11 +21,11 @@ import type {
 } from "../../api/types";
 import type { PptBackend } from "../../api/pptBackend";
 import type { Locale } from "../../i18n/messages";
+import type { AppHostUploadClient } from "../../runtime/appHostUploadClient";
 
 export const ATTEMPT_LIMITS = {
   render: 10,
   visualReview: 5,
-  contentReview: 5,
   agent: 5,
 };
 
@@ -48,6 +47,9 @@ export interface NoChangeAuthoringRetry {
 }
 
 export type DeckGenerationStep =
+  | "authoring-kit"
+  | "style-guide"
+  | "page-sources"
   | "page-plan"
   | "research-planning"
   | "research-discovery"
@@ -56,7 +58,6 @@ export type DeckGenerationStep =
   | "evidence-page-planning"
   | "prepare"
   | "page-authoring"
-  | "page-content-review"
   | "page-render"
   | "page-visual-review"
   | "final-render"
@@ -65,7 +66,7 @@ export type DeckGenerationStep =
   | "cancelled"
   | "failed";
 
-export type DeckGenerationStartMode = "restart" | "resume";
+export type DeckGenerationStartMode = "new" | "resume";
 
 export interface DeckGenerationProgressPage {
   page_id: string;
@@ -76,8 +77,6 @@ export interface DeckGenerationProgressPage {
   render_attempt_limit: number;
   visual_review_attempts: number;
   visual_review_attempt_limit: number;
-  content_review_attempts: number;
-  content_review_attempt_limit: number;
   agent_failures: number;
   agent_failure_limit: number;
   agent_infrastructure_failures: number;
@@ -136,9 +135,22 @@ export interface DeckGenerationStreamSnapshot {
 
 export interface DeckGenerationResult {
   outline: WorkspaceOutline;
-  pagePlan: import("../../api/types").PagePlan;
+  authoringDeck: AuthoringDeck;
   progress: PageProgress;
   rendered: RenderDeckHtmlResult;
+}
+
+export interface AuthoringPage {
+  page_id: string;
+  index: number;
+  title: string;
+  outline: string;
+  slide_path: string;
+}
+
+export interface AuthoringDeck {
+  title: string;
+  pages: AuthoringPage[];
 }
 
 export interface DeckGenerationError {
@@ -174,6 +186,7 @@ export interface RunDeckGenerationInput {
   backend: PptBackend;
   aiClient: AiClient;
   agentClient: AgentClient;
+  hostUploadClient?: AppHostUploadClient | null;
   aiLogger?: AiInteractionLogger | null;
   workspace: WorkspaceResult;
   confirmedOutline: WorkspaceOutline;
@@ -208,7 +221,7 @@ export type DeckGenerationContext = Omit<RunDeckGenerationInput, "startMode">;
 export type PageTerminalReason = "accepted" | "page_failed" | "agent_infrastructure" | "cancelled";
 
 export interface PageGenerationResult {
-  page: PagePlanItem;
+  page: AuthoringPage;
   reason: PageTerminalReason;
   progress: PageProgress;
   error?: DeckGenerationError;
@@ -223,5 +236,4 @@ export interface DeckGenerationRuntime extends DeckGenerationContext {
 
 export interface StoredPageReviews {
   visualReview: AgentPageVisualReviewResult | null;
-  contentReview: AgentPageContentReviewResult | null;
 }

@@ -7,10 +7,7 @@ import { LibraryPage } from "../features/deck-workspace/components/LibraryPage";
 import { OutlinePage } from "../features/deck-workspace/components/OutlinePage";
 import { PanelHeader } from "../features/deck-workspace/components/PanelHeader";
 import { ProgressLine } from "../features/deck-workspace/components/ProgressLine";
-import { RefinePage } from "../features/deck-workspace/components/RefinePage";
 import { ReviewPage } from "../features/deck-workspace/components/ReviewPage";
-import { StyleProfileCreationPage } from "../features/deck-workspace/components/StyleProfilePage";
-import { UploadedSourceAnalysisPage } from "../features/deck-workspace/components/UploadedSourceAnalysisPage";
 import {
   confirmedRequirementsAllowOutline,
   PresentationRequirementsPage,
@@ -18,12 +15,10 @@ import {
 import { WorkspaceDialog } from "../features/deck-workspace/components/WorkspaceDialog";
 import { useDeckWorkspace } from "../features/deck-workspace/hooks/useDeckWorkspace";
 import { useI18n } from "../i18n/useI18n";
-import { formatSlideNumber } from "../features/deck-workspace/utils";
 
 export function App() {
   const { locale, setLocale, t } = useI18n();
   const { state, actions } = useDeckWorkspace(t, locale);
-  const selectedSlide = state.deck[state.currentSlide] ?? state.deck[0];
 
   return (
     <main className="anna-stage">
@@ -49,8 +44,7 @@ export function App() {
       <section className={`deck-panel ${state.panelMode === "visible" ? "visible" : ""}`}>
         <div className={`toast ${state.toast ? "visible" : ""}`}>{state.toast}</div>
 
-        {state.page !== "style-profile-creation" ? (
-          <WorkspaceDialog
+        <WorkspaceDialog
             locale={locale}
             scan={state.workspaceScan}
             task={state.currentWorkspace}
@@ -58,10 +52,8 @@ export function App() {
             error={state.workspaceError}
             onUseLatest={actions.useLatestWorkspace}
             onCreate={actions.createWorkspace}
-            onCreateStyleProfile={actions.openStyleProfileCreation}
             onOpen={actions.openWorkspace}
-          />
-        ) : null}
+        />
 
         <PanelHeader
           t={t}
@@ -69,13 +61,7 @@ export function App() {
           setLocale={setLocale}
           status={state.currentStatus}
           onLibrary={() => actions.navigate("library")}
-          navigationDisabled={
-            (state.stage === "generating" && state.generationViewState.isActive) ||
-            (
-              state.stage === "uploaded-source-analysis" &&
-              state.uploadedSourceAnalysisProgress.status === "running"
-            )
-          }
+          navigationDisabled={state.stage === "generating" && state.generationViewState.isActive}
           onHome={() => void actions.showWorkspacePicker()}
         />
 
@@ -94,30 +80,10 @@ export function App() {
               t={t}
               prompt={state.prompt}
               setPrompt={actions.setPrompt}
-              templates={state.templateGroups}
-              selectedTemplateGroupId={state.selectedTemplateGroupId}
-              styleProfiles={state.styleProfiles}
-              styleProfilePreviews={state.styleProfilePreviews}
-              selectedStyleProfile={state.selectedStyleProfile}
-              styleProfileLibraryLoading={state.styleProfileLibraryLoading}
-              styleProfileLibraryError={state.styleProfileLibraryError}
-              styleProfileDetail={state.styleProfileDetail}
               loading={state.loading}
-              selectTemplate={actions.selectTemplate}
-              refreshStyleProfiles={actions.refreshStyleProfiles}
-              loadStyleProfilePreview={actions.loadStyleProfilePreview}
-              openStyleProfileDetail={actions.openStyleProfileDetail}
-              closeStyleProfileDetail={actions.closeStyleProfileDetail}
-              selectStyleProfile={actions.selectStyleProfile}
-              clearStyleProfile={actions.clearStyleProfile}
               pageReviewSettings={state.pageReviewSettings}
               setStrictReviewMode={actions.setStrictReviewMode}
-              researchSearchControlSettings={state.researchSearchControlSettings}
               workspaceSettingsSaving={state.workspaceSettingsSaving}
-              setResearchSearchControlSettings={actions.setResearchSearchControlSettings}
-              uploadedSources={state.uploadedSources}
-              uploadUploadedSource={actions.uploadUploadedSource}
-              removeUploadedSource={actions.removeUploadedSource}
               generateDeck={actions.generatePresentationRequirements}
             />
           ) : null}
@@ -167,16 +133,6 @@ export function App() {
             />
           ) : null}
 
-          {state.page === "main" && state.stage === "uploaded-source-analysis" ? (
-            <UploadedSourceAnalysisPage
-              t={t}
-              progress={state.uploadedSourceAnalysisProgress}
-              viewState={state.uploadedSourceAnalysisState}
-              onReturnToBrief={actions.returnToBriefFromUploadedSourceAnalysis}
-              onRetry={actions.retryUploadedSourceAnalysis}
-            />
-          ) : null}
-
           {state.page === "main" && state.stage === "generating" ? (
             <GeneratingPage
               t={t}
@@ -198,14 +154,6 @@ export function App() {
               setCurrentSlide={actions.setCurrentSlide}
               reviewRender={state.reviewRender}
               loading={state.loading}
-              onRefineDeck={() => {
-                void actions.openRefineDeck();
-              }}
-              onRefineSlide={() => {
-                void actions.openRefineSlide();
-              }}
-              onRewriteSlide={actions.rewriteCurrentSlide}
-              onChangeSlideLayout={actions.changeCurrentSlideLayout}
               onRefreshPreview={() => {
                 void actions.renderDeckHtml();
               }}
@@ -242,33 +190,6 @@ export function App() {
               reviewRender={state.reviewRender}
               renderDeckHtml={actions.renderDeckHtml}
               onBack={actions.goBack}
-              updateDeckTitle={actions.updateDeckTitle}
-              moveSlide={actions.moveSlide}
-              duplicateSlide={actions.duplicateSlide}
-              deleteSlide={actions.deleteSlide}
-              addSlide={actions.addSlide}
-              onRefineSlide={(index) => {
-                void actions.openRefineSlide(index);
-              }}
-            />
-          ) : null}
-
-          {state.page === "refine" ? (
-            <RefinePage
-              t={t}
-              deck={state.deck}
-              slide={selectedSlide}
-              slideIndex={state.currentSlide}
-              slideNumber={formatSlideNumber(state.currentSlide)}
-              refineScope={state.refineScope}
-              reviewRender={state.reviewRender}
-              loading={state.loading}
-              researchSearchControlSettings={state.researchSearchControlSettings}
-              workspaceSettingsSaving={state.workspaceSettingsSaving}
-              onBack={actions.goBack}
-              setResearchSearchControlSettings={actions.setResearchSearchControlSettings}
-              onRefineDeck={actions.refineDeck}
-              onRefineSlide={actions.refineSlide}
             />
           ) : null}
 
@@ -283,27 +204,6 @@ export function App() {
             />
           ) : null}
 
-          {state.page === "style-profile-creation" ? (
-            <StyleProfileCreationPage
-              creation={state.styleProfileCreation}
-              profiles={state.styleProfiles}
-              previews={state.styleProfilePreviews}
-              libraryLoading={state.styleProfileLibraryLoading}
-              libraryError={state.styleProfileLibraryError}
-              detail={state.styleProfileDetail}
-              onBack={actions.showWorkspacePicker}
-              onNameChange={actions.setStyleProfileCreationName}
-              onFilesChange={actions.setStyleProfileCreationFiles}
-              onStart={actions.startStyleProfileCreation}
-              onRetry={actions.retryStyleProfileAnalysis}
-              onStop={actions.stopStyleProfileCreation}
-              onReset={actions.resetStyleProfileCreation}
-              onRefreshLibrary={actions.refreshStyleProfiles}
-              onLoadPreview={actions.loadStyleProfilePreview}
-              onOpenDetail={actions.openStyleProfileDetail}
-              onCloseDetail={actions.closeStyleProfileDetail}
-            />
-          ) : null}
         </div>
       </section>
     </main>

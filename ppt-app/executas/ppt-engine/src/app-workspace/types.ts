@@ -14,6 +14,9 @@ export interface AppWorkspaceFiles {
   setting: string;
   requirements: string;
   outline: string;
+  manifest: string;
+  style_guide: string;
+  authoring_kit: string;
   page_plan: string;
   page_progress: string;
   pages: string;
@@ -57,6 +60,7 @@ export interface AppPresentationRequirements {
 }
 
 export interface AppWorkspaceOutlineItem {
+  page_id?: string;
   title: string;
   core_message: string;
   required_content: string;
@@ -113,8 +117,6 @@ export interface AppWorkspaceSettings {
   visual_tone?: string;
   theme_id?: string;
   page_generation_concurrency?: number;
-  content_review_enabled?: boolean;
-  content_review_failure_limit?: number;
   visual_review_enabled?: boolean;
   visual_review_failure_limit?: number;
   disable_web_research?: boolean;
@@ -124,11 +126,7 @@ export interface AppWorkspaceSettings {
 }
 
 export interface AppCreateWorkspaceSetting {
-  output_language: string;
-  text_density: string;
   page_generation_concurrency: number;
-  content_review_enabled: boolean;
-  content_review_failure_limit: number;
   visual_review_enabled: boolean;
   visual_review_failure_limit: number;
   disable_web_research: boolean;
@@ -1017,22 +1015,15 @@ export interface GetAppWorkspacePageFileFingerprintsResult {
 
 export interface AppPageProgressItem {
   page_id: string;
-  index: number;
-  title: string;
   status: string;
   render_attempts: number;
   visual_review_attempts: number;
-  content_review_attempts: number;
   agent_failures: number;
   agent_infrastructure_failures: number;
-  slide_path: string;
-  data_path: string;
   last_html_path: string;
   last_screenshot_path: string;
   last_error: string;
-  content_review?: unknown | null;
   visual_review?: unknown | null;
-  review: unknown | null;
   updated_at: string | null;
 }
 
@@ -1075,7 +1066,6 @@ export interface AppFinalDeckRenderState {
   error: string | null;
   output_dir: string | null;
   deck_html_path: string | null;
-  pages_path: string | null;
   rendered_at: string | null;
   updated_at: string | null;
 }
@@ -1102,7 +1092,7 @@ export interface RecordAppPageProgressInput {
 
 export interface RenderAppWorkspacePagePreviewInput {
   workspace_dir: string;
-  page_index: number;
+  page_id: string;
 }
 
 export interface RenderAppWorkspacePagePreviewResult {
@@ -1118,6 +1108,37 @@ export interface RenderAppWorkspacePagePreviewResult {
   layout_id: string;
   title: string;
   rendered_at: string;
+}
+
+export interface RecordAppWorkspaceStyleGuideInput {
+  workspace_dir: string;
+  staging_file_path: string;
+  expected_size_bytes: number;
+}
+
+export interface RecordAppWorkspaceStyleGuideResult {
+  workspace_dir: string;
+  style_guide_path: string;
+  size_bytes: number;
+  sha256: string;
+  updated_at: string;
+}
+
+export interface GetAppWorkspaceStyleGuideStatusInput {
+  workspace_dir: string;
+}
+
+export interface GetAppWorkspaceStyleGuideStatusResult {
+  workspace_dir: string;
+  style_guide_path: string;
+  exists: boolean;
+  non_empty: boolean;
+  size_bytes: number;
+  sha256?: string;
+}
+
+export interface InitializeAppPageProgressInput {
+  workspace_dir: string;
 }
 
 export interface AppWorkspacePageItem {

@@ -1,4 +1,4 @@
-import { FolderOpen, FolderPlus, Sparkles, X } from "lucide-react";
+import { FolderOpen, FolderPlus, X } from "lucide-react";
 import { useState } from "react";
 import type {
   ListWorkspacesResult,
@@ -14,7 +14,6 @@ interface WorkspaceDialogProps {
   error: string;
   onUseLatest: () => void;
   onCreate: () => void;
-  onCreateStyleProfile: () => void;
   onOpen: (taskDir: string) => Promise<void>;
 }
 
@@ -30,14 +29,12 @@ const copy = {
     found: "Last task found",
     missing: "No existing task found",
     createRequired: "Create a new PPT task",
-    createHint:
-      "Anna will initialize task.json, setting.json, outline.json, and pages.json.",
+    createHint: "Anna will initialize the authoring-kit-v1 core Workspace files.",
     open: "Open project",
     recent: "Recent projects",
     noRecent: "No recent tasks",
     useLatest: "Open latest task",
     create: "Create new",
-    createStyleProfile: "Create style profile",
     close: "Close"
   },
   zh: {
@@ -47,13 +44,12 @@ const copy = {
     found: "找到上次的任务",
     missing: "没有找到已有任务",
     createRequired: "需要新建一个 PPT 任务",
-    createHint: "会自动创建 task.json、setting.json、outline.json、pages.json。",
+    createHint: "会自动创建 authoring-kit-v1 核心 Workspace 文件。",
     open: "打开项目",
     recent: "最近项目",
     noRecent: "暂无最近任务",
     useLatest: "打开上次任务",
     create: "新建任务",
-    createStyleProfile: "创建风格画像",
     close: "关闭"
   }
 } satisfies Record<Locale, Record<string, string>>;
@@ -66,7 +62,6 @@ export function WorkspaceDialog({
   error,
   onUseLatest,
   onCreate,
-  onCreateStyleProfile,
   onOpen
 }: WorkspaceDialogProps) {
   const [openPicker, setOpenPicker] = useState(false);
@@ -98,10 +93,6 @@ export function WorkspaceDialog({
               <button className="task-launch-card" onClick={onCreate} disabled={loading}>
                 <FolderPlus size={22} />
                 <strong>{text.create}</strong>
-              </button>
-              <button className="task-launch-card" onClick={onCreateStyleProfile} disabled={loading}>
-                <Sparkles size={22} />
-                <strong>{text.createStyleProfile}</strong>
               </button>
               <button
                 className="task-launch-card"

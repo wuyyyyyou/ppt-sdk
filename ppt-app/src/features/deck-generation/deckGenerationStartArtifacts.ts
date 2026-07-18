@@ -1,151 +1,122 @@
-import { isAgentRunCancelledError } from "../../agent/agentClient";
-import type {
-  PagePlan,
-  PageProgress,
-  WorkspaceOutline,
-  WorkspaceResult,
-} from "../../api/types";
-import type { AiOperationLogContext } from "../../ai/interactionLog";
+import type { PageProgress, WorkspaceOutline } from "../../api/types";
 import { outlineDetailToText } from "../../data/mockDeck";
 import { generationText } from "./messages";
 import { emit } from "./progressProjection";
-import {
-  type RunDeckGenerationInput,
-} from "./types";
-import {
-  appendWorkspaceLogSafe,
-  recordDeckRecovery,
-  recordProgress,
-  throwIfCancelled,
-} from "./runtimeSupport";
+import type { AuthoringDeck, RunDeckGenerationInput } from "./types";
 import { getAttemptLimits } from "./settings";
+import { recordDeckRecovery, throwIfCancelled } from "./runtimeSupport";
 
-function readWorkspaceTemplate(workspace: WorkspaceResult) {
-  return workspace.template && typeof workspace.template === "object" && !Array.isArray(workspace.template)
-    ? (workspace.template as { selected_template_group?: unknown; manifest_path?: unknown })
-    : null;
-}
-
-export function progressMatchesPlan(pagePlan: PagePlan, progress: PageProgress) {
-  const progressIds = new Set(progress.pages.map((page) => page.page_id));
-  return pagePlan.pages.every((page) => progressIds.has(page.page_id));
-}
-
-function pagePlanMatchesOutlineItems(pagePlan: PagePlan, outline: WorkspaceOutline) {
-  return pagePlan.pages.every((page, index) => {
-    const item = outline.items[index];
-    return (
-      item &&
-      page.title.trim() === item.title.trim() &&
-      page.outline.trim() === outlineDetailToText(item).trim()
-    );
-  });
-}
-
-export function pagePlanMatchesOutlineAndTemplate(
-  workspace: WorkspaceResult,
-  pagePlan: PagePlan,
-  progress: PageProgress | null,
-  outline: WorkspaceOutline,
-) {
-  if (
-    pagePlan.source.outline_updated_at &&
-    outline.updated_at &&
-    pagePlan.source.outline_updated_at !== outline.updated_at
-  ) {
-    if (!pagePlanMatchesOutlineItems(pagePlan, outline)) {
-      return false;
-    }
+export function authoringDeckFromConfirmedOutline(outline: WorkspaceOutline): AuthoringDeck {
+  if (outline.status !== "confirmed" || outline.items.some((item) => !item.page_id)) {
+    throw new Error("Confirmed Outline entries must all own page_id before Deck Generation");
   }
-
-  if (pagePlan.pages.length !== outline.items.length) {
-    return false;
-  }
-
-  const template = readWorkspaceTemplate(workspace);
-  const selectedTemplate =
-    typeof template?.selected_template_group === "string" ? template.selected_template_group : "";
-  const manifestPath = typeof template?.manifest_path === "string" ? template.manifest_path : "";
-  if (manifestPath && pagePlan.source.template_manifest_path !== manifestPath) {
-    return false;
-  }
-  if (!manifestPath && selectedTemplate && pagePlan.source.template_group !== selectedTemplate) {
-    return false;
-  }
-
-  return progress ? progressMatchesPlan(pagePlan, progress) : true;
-}
-
-export function alignPagePlanWithOutline(pagePlan: PagePlan, outline: WorkspaceOutline): PagePlan {
   return {
-    ...pagePlan,
     title: outline.title,
-    source: {
-      ...pagePlan.source,
-      outline_updated_at: outline.updated_at,
-    },
-    pages: pagePlan.pages.map((page, index) => {
-      const outlineItem = outline.items[index];
-      if (!outlineItem) return page;
-
-      return {
-        ...page,
-        title: outlineItem.title,
-        outline: outlineDetailToText(outlineItem),
-      };
-    }),
+    pages: outline.items.map((item, index) => ({
+      page_id: item.page_id as string,
+      index,
+      title: item.title,
+      outline: outlineDetailToText(item),
+      slide_path: `./slides/${item.page_id}.tsx`,
+    })),
   };
 }
 
-export async function loadResumeArtifacts(input: RunDeckGenerationInput) {
-  try {
-    let pagePlan = await input.backend.getPagePlan({
-      workspace_dir: input.workspace.workspace_dir,
-    });
-    let progress = await input.backend.getPageProgress({
-      workspace_dir: input.workspace.workspace_dir,
-    });
-    const hasUsablePagePlan = pagePlan.pages.length === input.confirmedOutline.items.length && pagePlan.pages.length > 0;
-    if (!hasUsablePagePlan) {
-      if (pagePlan.pages.length > 0) return null;
-      return await createRestartArtifacts(input);
-    }
-    if (!pagePlanMatchesOutlineAndTemplate(input.workspace, pagePlan, null, input.confirmedOutline)) {
-      return null;
-    }
-
-    if (!progressMatchesPlan(pagePlan, progress)) {
-      await recordDeckRecovery(input, {
-        status: "running",
-        run_kind: "deck-generation",
-        step: "prepare",
-        target_page_ids: pagePlan.pages.map((page) => page.page_id),
-        error: null,
-        deck_status: "running",
-      });
-      await input.backend.preparePageFiles({
-        workspace_dir: input.workspace.workspace_dir,
-      });
-      progress = await input.backend.getPageProgress({
-        workspace_dir: input.workspace.workspace_dir,
-      });
-    }
-
-    pagePlan = alignPagePlanWithOutline(pagePlan, input.confirmedOutline);
-    return { pagePlan, progress };
-  } catch (error) {
-    if (isAgentRunCancelledError(error)) throw error;
-    return null;
-  }
+export function progressMatchesAuthoringDeck(authoringDeck: AuthoringDeck, progress: PageProgress) {
+  const progressIds = progress.pages.map((page) => page.page_id);
+  return progressIds.length === authoringDeck.pages.length &&
+    authoringDeck.pages.every((page) => progressIds.includes(page.page_id));
 }
 
-export async function createRestartArtifacts(input: RunDeckGenerationInput) {
+function emitPreparationStep(
+  input: RunDeckGenerationInput,
+  step: "authoring-kit" | "style-guide" | "page-sources" | "prepare",
+  message: string,
+) {
+  emit(input, {
+    step,
+    message,
+    currentPageIndex: null,
+    totalPages: input.confirmedOutline.items.length,
+  }, null, undefined, undefined, getAttemptLimits(input));
+}
+
+async function ensureWorkspaceStyleGuide(input: RunDeckGenerationInput) {
+  const status = await input.backend.getWorkspaceStyleGuideStatus({
+    workspace_dir: input.workspace.workspace_dir,
+  });
+  if (status.non_empty) return;
+  if (!input.hostUploadClient) {
+    throw new Error("Host Upload is required to persist the Workspace Style Guide");
+  }
+  const requirements = input.workspace.requirements;
+  const markdown = await input.aiClient.generateWorkspaceStyleGuide({
+    brief: requirements.source?.brief ?? "",
+    requirements,
+    outline: input.confirmedOutline,
+    logContext: input.aiLogger ? {
+      logger: input.aiLogger,
+      workspace_dir: input.workspace.workspace_dir,
+      domain: "style_guide",
+      operation: "generate_style_guide",
+      operation_id: input.aiLogger.createOperationId("style_guide", "generate_style_guide"),
+      provider: "anna",
+      runtime_mode: "anna",
+    } : undefined,
+  });
+  const file = new File([markdown], "style-guide.md", { type: "text/markdown" });
+  const hostUpload = await input.hostUploadClient.uploadFile(file, {
+    purpose: "user_artifact",
+    filename: "style-guide.md",
+    mimeType: "text/markdown",
+    metadata: { workspace_dir: input.workspace.workspace_dir, artifact: "workspace-style-guide" },
+  });
+  await input.backend.commitWorkspaceStyleGuideHostUpload({
+    workspace_dir: input.workspace.workspace_dir,
+    size_bytes: hostUpload.size_bytes,
+    host_upload: hostUpload,
+  });
+}
+
+export async function loadResumeArtifacts(input: RunDeckGenerationInput) {
+  const authoringDeck = authoringDeckFromConfirmedOutline(input.confirmedOutline);
+  let progress = await input.backend.getPageProgress({
+    workspace_dir: input.workspace.workspace_dir,
+  });
+  const styleGuide = await input.backend.getWorkspaceStyleGuideStatus({
+    workspace_dir: input.workspace.workspace_dir,
+  });
+  if (progress.pages.length === 0) {
+    emitPreparationStep(input, "authoring-kit", generationText(input.locale).authoringKit);
+    await input.backend.installWorkspaceAuthoringKit({ workspace_dir: input.workspace.workspace_dir });
+    if (!styleGuide.non_empty) {
+      emitPreparationStep(input, "style-guide", generationText(input.locale).styleGuide);
+      await ensureWorkspaceStyleGuide(input);
+    }
+    emitPreparationStep(input, "page-sources", generationText(input.locale).pageSources);
+    await input.backend.prepareWorkspacePageSources({ workspace_dir: input.workspace.workspace_dir });
+    progress = await input.backend.initializePageProgress({ workspace_dir: input.workspace.workspace_dir });
+    return { authoringDeck, progress };
+  }
+  if (!styleGuide.non_empty || !progressMatchesAuthoringDeck(authoringDeck, progress)) return null;
+
+  const pageAuthoringHasStarted = progress.pages.some((page) => page.status !== "pending");
+  if (!pageAuthoringHasStarted) {
+    emitPreparationStep(input, "authoring-kit", generationText(input.locale).authoringKit);
+    await input.backend.installWorkspaceAuthoringKit({ workspace_dir: input.workspace.workspace_dir });
+  }
+  await input.backend.reconcileWorkspacePageSources({ workspace_dir: input.workspace.workspace_dir });
+  return { authoringDeck, progress };
+}
+
+export async function createInitialArtifacts(input: RunDeckGenerationInput) {
   const text = generationText(input.locale);
+  const authoringDeck = authoringDeckFromConfirmedOutline(input.confirmedOutline);
   await recordDeckRecovery(input, {
     status: "running",
     run_kind: "deck-generation",
-    step: "page-plan",
-    target_page_ids: [],
+    step: "authoring-kit",
+    target_page_ids: authoringDeck.pages.map((page) => page.page_id),
     page_refinement_request: null,
     page_refinement_requests: {},
     error: null,
@@ -155,130 +126,29 @@ export async function createRestartArtifacts(input: RunDeckGenerationInput) {
       error: null,
       output_dir: null,
       deck_html_path: null,
-      pages_path: null,
       rendered_at: null,
     },
     deck_status: "running",
   });
-  emit(
-    input,
-    {
-      step: "page-plan",
-      message: text.pagePlan,
-      currentPageIndex: null,
-      totalPages: input.confirmedOutline.items.length,
-    },
-    null,
-    undefined,
-    undefined,
-    getAttemptLimits(input),
-  );
 
-  const planningContext = await input.backend.getTemplatePlanningContext({
+  emitPreparationStep(input, "authoring-kit", text.authoringKit);
+  await input.backend.installWorkspaceAuthoringKit({ workspace_dir: input.workspace.workspace_dir });
+  throwIfCancelled(input);
+
+  emitPreparationStep(input, "style-guide", text.styleGuide);
+  await ensureWorkspaceStyleGuide(input);
+  throwIfCancelled(input);
+
+  emitPreparationStep(input, "page-sources", text.pageSources);
+  await input.backend.prepareWorkspacePageSources({
+    workspace_dir: input.workspace.workspace_dir,
+    reset_existing: true,
+  });
+  throwIfCancelled(input);
+
+  emitPreparationStep(input, "prepare", text.prepare);
+  const progress = await input.backend.initializePageProgress({
     workspace_dir: input.workspace.workspace_dir,
   });
-  throwIfCancelled(input);
-  const pagePlanLogContext: AiOperationLogContext | undefined = input.aiLogger
-    ? {
-        logger: input.aiLogger,
-        workspace_dir: input.workspace.workspace_dir,
-        domain: "page_plan" as const,
-        operation: "generate_page_plan",
-        operation_id: input.aiLogger.createOperationId("page_plan", "generate_page_plan"),
-        provider: "anna",
-        runtime_mode: "anna",
-      }
-    : undefined;
-  const pagePlan = await input.aiClient.generatePagePlan({
-    outline: input.confirmedOutline,
-    planningContext,
-    locale: input.locale,
-    logContext: pagePlanLogContext,
-  });
-  throwIfCancelled(input);
-  const alignedPagePlan = alignPagePlanWithOutline(pagePlan, input.confirmedOutline);
-  if (input.aiLogger && pagePlanLogContext) {
-    await input.aiLogger.appendSemanticLog(pagePlanLogContext, {
-      event: "ai.page_plan.operation.finished",
-      status: "succeeded",
-      title: alignedPagePlan.title,
-      page_count: alignedPagePlan.pages.length,
-      template_group: alignedPagePlan.source.template_group,
-      interaction_ids: pagePlanLogContext.interaction_ids ?? [],
-      artifact: {
-        kind: "page_plan",
-        path: "page-plan.json",
-      },
-    });
-  } else {
-    await appendWorkspaceLogSafe(input, "ai-page-plan", {
-      event: "ai.page_plan.operation.finished",
-      schema_version: 1,
-      operation: "generate_page_plan",
-      status: "succeeded",
-      title: alignedPagePlan.title,
-      page_count: alignedPagePlan.pages.length,
-      template_group: alignedPagePlan.source.template_group,
-      artifact: {
-        kind: "page_plan",
-        path: "page-plan.json",
-      },
-    });
-  }
-  await input.backend.recordPagePlan({
-    workspace_dir: input.workspace.workspace_dir,
-    page_plan: alignedPagePlan,
-  });
-  throwIfCancelled(input);
-
-  await recordDeckRecovery(input, {
-    status: "running",
-    run_kind: "deck-generation",
-    step: "prepare",
-    target_page_ids: alignedPagePlan.pages.map((page) => page.page_id),
-    error: null,
-    deck_status: "running",
-  });
-  emit(
-    input,
-    {
-      step: "prepare",
-      message: text.prepare,
-      currentPageIndex: null,
-      totalPages: alignedPagePlan.pages.length,
-    },
-    null,
-    undefined,
-    undefined,
-    getAttemptLimits(input),
-  );
-
-  await input.backend.preparePageFiles({
-    workspace_dir: input.workspace.workspace_dir,
-  });
-  throwIfCancelled(input);
-
-  let progress = await input.backend.getPageProgress({
-    workspace_dir: input.workspace.workspace_dir,
-  });
-  throwIfCancelled(input);
-
-  for (const page of alignedPagePlan.pages) {
-    progress = await recordProgress(input, page, {
-      status: "pending",
-      render_attempts: 0,
-      visual_review_attempts: 0,
-      content_review_attempts: 0,
-      agent_failures: 0,
-      agent_infrastructure_failures: 0,
-      last_error: "",
-      last_html_path: "",
-      last_screenshot_path: "",
-      content_review: null,
-      visual_review: null,
-      review: null,
-    });
-  }
-
-  return { pagePlan: alignedPagePlan, progress };
+  return { authoringDeck, progress };
 }

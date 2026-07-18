@@ -5,6 +5,7 @@ export {
   getWorkspaceAuthoringPaths,
   installWorkspaceAuthoringKit,
   prepareWorkspacePageSources,
+  reconcileWorkspacePageSources,
   rebuildWorkspaceDeckManifest,
 } from "./authoring-kit-workspace/index.js";
 export type {

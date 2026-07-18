@@ -14,7 +14,6 @@ export function getAttemptLimits(input: { workspace: WorkspaceResult }) {
   const settings = readPageReviewSettings(readWorkspaceSetting(input.workspace));
   return {
     ...ATTEMPT_LIMITS,
-    contentReview: settings.contentReviewFailureLimit,
     visualReview: settings.visualReviewFailureLimit,
   };
 }

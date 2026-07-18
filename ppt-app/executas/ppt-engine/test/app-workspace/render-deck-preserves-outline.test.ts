@@ -180,7 +180,7 @@ test("renderAppWorkspacePagePreview includes stable slide id in preview filename
 
     const preview = await renderAppWorkspacePagePreview({
       workspace_dir: workspaceDir,
-      page_index: 4,
+      page_id: PAGE_5,
     });
 
     assert.equal(preview.slide_id, PAGE_5);

@@ -31,10 +31,13 @@ export interface WorkspaceFiles {
   setting: string;
   requirements: string;
   outline: string;
+  manifest: string;
+  style_guide: string;
+  authoring_kit: string;
   page_plan?: string;
-  page_progress?: string;
-  pages: string;
-  template: string;
+  page_progress: string;
+  pages?: string;
+  template?: string;
 }
 
 export interface WorkspaceResult {
@@ -54,8 +57,8 @@ export interface WorkspaceResult {
   outline: unknown;
   page_plan?: unknown;
   page_progress?: unknown;
-  pages: unknown;
-  template: unknown;
+  pages?: unknown;
+  template?: unknown;
 }
 
 export interface PresentationRequirementCandidate {
@@ -384,16 +387,11 @@ export interface UploadedSourceAnalysisDraftFingerprint {
 }
 
 export interface WorkspaceSettings {
-  audience?: string;
-  goal?: string;
-  style_notes?: string;
+  /** Legacy isolated setting; not persisted by authoring-kit-v1 Workspaces. */
   output_language?: string;
+  /** Legacy isolated setting; not persisted by authoring-kit-v1 Workspaces. */
   text_density?: string;
-  visual_tone?: string;
-  theme_id?: string;
   page_generation_concurrency?: number;
-  content_review_enabled?: boolean;
-  content_review_failure_limit?: number;
   visual_review_enabled?: boolean;
   visual_review_failure_limit?: number;
   disable_web_research?: boolean;
@@ -405,11 +403,7 @@ export interface WorkspaceSettings {
 export type CreatedWorkspaceSetting = Required<
   Pick<
     WorkspaceSettings,
-    | "output_language"
-    | "text_density"
     | "page_generation_concurrency"
-    | "content_review_enabled"
-    | "content_review_failure_limit"
     | "visual_review_enabled"
     | "visual_review_failure_limit"
     | "disable_web_research"
@@ -427,6 +421,7 @@ export interface CreateWorkspaceResult {
 }
 
 export interface WorkspaceOutlineItem {
+  page_id?: string;
   title: string;
   core_message: string;
   required_content: string;
@@ -565,6 +560,8 @@ export interface AppendWorkspaceLogInput {
     | "ai-requirements-interactions"
     | "ai-outline"
     | "ai-outline-interactions"
+    | "ai-style-guide"
+    | "ai-style-guide-interactions"
     | "ai-page-plan"
     | "ai-page-plan-interactions"
     | "ai-page-agent"
@@ -1131,22 +1128,15 @@ export interface ImageFetchResult {
 
 export interface PageProgressItem {
   page_id: string;
-  index: number;
-  title: string;
   status: string;
   render_attempts: number;
   visual_review_attempts: number;
-  content_review_attempts: number;
   agent_failures: number;
   agent_infrastructure_failures: number;
-  slide_path: string;
-  data_path: string;
   last_html_path: string;
   last_screenshot_path: string;
   last_error: string;
-  content_review?: unknown | null;
   visual_review?: unknown | null;
-  review: unknown | null;
   updated_at: string | null;
 }
 
@@ -1189,7 +1179,6 @@ export interface FinalDeckRenderState {
   error: string | null;
   output_dir: string | null;
   deck_html_path: string | null;
-  pages_path: string | null;
   rendered_at: string | null;
   updated_at: string | null;
 }
@@ -1285,7 +1274,51 @@ export interface RecordPageProgressInput {
 
 export interface RenderWorkspacePagePreviewInput {
   workspace_dir: string;
-  page_index: number;
+  page_id: string;
+}
+
+export interface WorkspaceAuthoringKitResult {
+  workspace_dir: string;
+  authoring_kit_dir: string;
+  manifest_path: string;
+  slides_dir: string;
+  installed: boolean;
+}
+
+export interface PrepareWorkspacePageSourcesResult {
+  paths: Omit<WorkspaceAuthoringKitResult, "installed">;
+  outline: WorkspaceOutline;
+  manifest: { title: string; slides: Array<{ id: string; source: string }> };
+  created_page_ids: string[];
+}
+
+export interface WorkspacePageSourceFingerprint {
+  path: string;
+  sha256: string;
+  size_bytes: number;
+}
+
+export interface CommitWorkspaceStyleGuideHostUploadInput {
+  workspace_dir: string;
+  size_bytes: number;
+  host_upload: HostUploadRef;
+}
+
+export interface CommitWorkspaceStyleGuideResult {
+  workspace_dir: string;
+  style_guide_path: string;
+  size_bytes: number;
+  sha256: string;
+  updated_at: string;
+}
+
+export interface WorkspaceStyleGuideStatus {
+  workspace_dir: string;
+  style_guide_path: string;
+  exists: boolean;
+  non_empty: boolean;
+  size_bytes: number;
+  sha256?: string;
 }
 
 export interface RenderWorkspacePagePreviewResult {

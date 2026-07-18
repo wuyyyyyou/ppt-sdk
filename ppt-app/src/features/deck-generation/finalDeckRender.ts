@@ -1,10 +1,11 @@
-import type { PagePlan, PageProgress } from "../../api/types";
+import type { PageProgress } from "../../api/types";
 import { generationText } from "./messages";
 import { createProgress, emit as emitProgress } from "./progressProjection";
 import { recordDeckRecovery } from "./runtimeSupport";
 import { getAttemptLimits } from "./settings";
 import type {
   DeckGenerationCompletion,
+  AuthoringDeck,
   DeckGenerationContext,
   DeckGenerationError,
   DeckGenerationProgress,
@@ -45,12 +46,12 @@ function emit(
 
 export async function runFinalDeckRender(input: {
   flowInput: DeckGenerationContext;
-  pagePlan: PagePlan;
+  authoringDeck: AuthoringDeck;
   progress: PageProgress;
   activeStreams?: Iterable<DeckGenerationStream>;
   researchDiscoveryProgress?: ResearchDiscoveryProgress;
 }): Promise<DeckGenerationCompletion> {
-  const { flowInput, pagePlan, activeStreams, researchDiscoveryProgress } = input;
+  const { flowInput, authoringDeck, activeStreams, researchDiscoveryProgress } = input;
   const text = generationText(flowInput.locale);
   const attemptLimits = getAttemptLimits(flowInput);
   let progress = await recordDeckRecovery(flowInput, {
@@ -72,7 +73,7 @@ export async function runFinalDeckRender(input: {
       step: "final-render",
       message: text.finalRender,
       currentPageIndex: null,
-      totalPages: pagePlan.pages.length,
+      totalPages: authoringDeck.pages.length,
     },
     progress,
     null,
@@ -103,7 +104,7 @@ export async function runFinalDeckRender(input: {
           step: "cancelled",
           message: text.cancelled,
           currentPageIndex: null,
-          totalPages: pagePlan.pages.length,
+          totalPages: authoringDeck.pages.length,
         },
         progress,
         null,
@@ -136,7 +137,7 @@ export async function runFinalDeckRender(input: {
         step: "final-render",
         message,
         currentPageIndex: null,
-        totalPages: pagePlan.pages.length,
+        totalPages: authoringDeck.pages.length,
       },
       progress,
       null,
@@ -168,7 +169,6 @@ export async function runFinalDeckRender(input: {
       error: null,
       output_dir: rendered.output_dir,
       deck_html_path: rendered.slides[0]?.html_path ?? null,
-      pages_path: `${flowInput.workspace.workspace_dir}/pages.json`,
       rendered_at: rendered.rendered_at,
     },
     deck_status: "completed",
@@ -179,7 +179,7 @@ export async function runFinalDeckRender(input: {
       step: "complete",
       message: text.deckReady,
       currentPageIndex: null,
-      totalPages: pagePlan.pages.length,
+      totalPages: authoringDeck.pages.length,
     },
     progress,
     null,
@@ -191,7 +191,7 @@ export async function runFinalDeckRender(input: {
     status: "completed",
     result: {
       outline: flowInput.confirmedOutline,
-      pagePlan,
+      authoringDeck,
       progress,
       rendered,
     },

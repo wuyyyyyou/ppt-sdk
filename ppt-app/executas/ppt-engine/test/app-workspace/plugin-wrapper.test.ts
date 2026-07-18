@@ -151,14 +151,7 @@ test(
       assert.ok(!response.error, response.error?.message);
       assert.equal(response.result?.data?.workspace_dir, workspaceDir);
       assert.deepEqual(response.result?.data?.setting, {
-        audience: "",
-        goal: "",
-        style_notes: "",
-        output_language: "auto",
-        text_density: "balanced",
         page_generation_concurrency: 5,
-        content_review_enabled: false,
-        content_review_failure_limit: 5,
         visual_review_enabled: true,
         visual_review_failure_limit: 2,
         disable_web_research: false,
@@ -199,6 +192,10 @@ test("Authoring Kit and Page Source workspace tools are declared and routed", as
     ["app_install_workspace_authoring_kit", "toolAppInstallWorkspaceAuthoringKit"],
     ["app_ensure_confirmed_outline_page_ids", "toolAppEnsureConfirmedOutlinePageIds"],
     ["app_prepare_workspace_page_sources", "toolAppPrepareWorkspacePageSources"],
+    ["app_reconcile_workspace_page_sources", "toolAppReconcileWorkspacePageSources"],
+    ["app_commit_workspace_style_guide_host_upload", "toolAppCommitWorkspaceStyleGuideHostUpload"],
+    ["app_get_workspace_style_guide_status", "toolAppGetWorkspaceStyleGuideStatus"],
+    ["app_initialize_page_progress", "toolAppInitializePageProgress"],
     ["app_rebuild_workspace_deck_manifest", "toolAppRebuildWorkspaceDeckManifest"],
     ["app_get_workspace_page_source_fingerprint", "toolAppGetWorkspacePageSourceFingerprint"],
   ] as const) {
@@ -445,7 +442,7 @@ test("research curation draft plugin invoke uses scoped draft_id paths", { skip:
   }
 });
 
-test("app_append_workspace_log plugin wrapper accepts theme log channels", { skip: pluginInvokeSkip }, async () => {
+test("app_append_workspace_log plugin wrapper accepts theme and style-guide log channels", { skip: pluginInvokeSkip }, async () => {
   const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-plugin-theme-log-home-"));
   const workspaceDir = path.join(homeDir, "anna-workspace", "ppt", "ppt-20260701-000002");
   const previousHome = process.env.HOME;
@@ -453,7 +450,12 @@ test("app_append_workspace_log plugin wrapper accepts theme log channels", { ski
   const plugin = await startPluginProcess();
 
   try {
-    for (const channel of ["ai-theme", "ai-theme-interactions"] as const) {
+    for (const channel of [
+      "ai-theme",
+      "ai-theme-interactions",
+      "ai-style-guide",
+      "ai-style-guide-interactions",
+    ] as const) {
       const response = await plugin.request("invoke", {
         tool: "app_append_workspace_log",
         arguments: {
@@ -473,8 +475,15 @@ test("app_append_workspace_log plugin wrapper accepts theme log channels", { ski
       path.join(workspaceDir, ".log", "ai-theme-interactions.jsonl"),
       "utf8",
     );
+    const styleGuideLog = await readFile(path.join(workspaceDir, ".log", "ai-style-guide.jsonl"), "utf8");
+    const styleGuideInteractionLog = await readFile(
+      path.join(workspaceDir, ".log", "ai-style-guide-interactions.jsonl"),
+      "utf8",
+    );
     assert.match(themeLog, /ai-theme\.test/);
     assert.match(themeInteractionLog, /ai-theme-interactions\.test/);
+    assert.match(styleGuideLog, /ai-style-guide\.test/);
+    assert.match(styleGuideInteractionLog, /ai-style-guide-interactions\.test/);
   } finally {
     await plugin.close();
     if (previousHome === undefined) {

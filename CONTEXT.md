@@ -52,7 +52,7 @@ _Avoid_: Theme, Template, Style Guide
 A Workspace-owned presentation title and ordered list of slide-level Outline Entries. It has an `empty`, `draft`, or `confirmed` lifecycle and does not own output language, template selection, or visual theme creation.
 
 **Outline Entry**:
-The content intent for one planned slide, consisting of a one-line title, a one-line Core Message, and Required Content expressed as a Markdown bullet list.
+The content intent for one planned slide, consisting of a one-line title, a one-line Core Message, and Required Content expressed as a Markdown bullet list. An Outline Draft entry has no page identity; Outline Confirmation assigns a stable opaque `page_id` for the lifetime of that Confirmed Outline and its Deck Generation.
 
 **Core Message**:
 The single idea the audience should remember from an Outline Entry; on an analytical page it will usually be the page's core conclusion.
@@ -80,7 +80,7 @@ The process that automatically starts after Presentation Requirements Confirmati
 A natural-language instruction used to revise the currently displayed Outline Draft, including unsaved manual edits. A successful revision must be complete and valid, may add, remove, merge, split, or reorder entries, and is saved automatically; failure preserves the displayed Outline unchanged.
 
 **Outline Confirmation**:
-The explicit user action that saves the currently displayed Outline, validates every entry, marks it confirmed, and then automatically starts the downstream workflow. If an existing Deck is present, confirmation replaces its current generation state rather than maintaining parallel Deck versions.
+The explicit user action that saves the currently displayed Outline, validates every entry, assigns a new opaque `page_id` to every entry, marks the Outline confirmed, and then automatically starts the downstream workflow. If an existing Deck is present, confirmation replaces its current generation state and page identities rather than maintaining parallel Deck versions.
 
 **Authoring Kit**:
 The released page-authoring foundation used to initialize Deck Generation work. It provides a stable Page Source Bootstrap together with reusable foundations and reference guidance, but it is not a selectable visual style and does not determine a Deck's final visual identity.
@@ -107,11 +107,12 @@ The stable, engine-owned minimal TSX resource used to initialize a new Page Sour
 _Avoid_: Blueprint, Blank Template Layout, Example Slide
 
 **Workspace Style Guide**:
-The Workspace-owned style guidance artifact that defines the Deck's shared visual direction, including exact values, qualitative rules, and allowed page-level variation. It guides Page Authoring rather than configuring rendering at runtime; its persistence format is decided by the PPT App workflow, and changing it makes affected Page Sources stale until they are re-authored.
+The Workspace-owned Markdown style guidance artifact that defines the Deck's shared visual direction, including exact values, qualitative rules, and allowed page-level variation. It guides Page Authoring rather than configuring rendering at runtime, and changing it makes affected Page Sources stale until they are re-authored.
+User-facing Chinese label: 艺术指导
 _Avoid_: Workspace Theme Token, Runtime Theme, Preset Theme
 
 **Workspace Style Guide Creation**:
-The generation-time step that synthesizes the user's style intent, deck context, and optional Selected Style Profile into the Workspace Style Guide before Page Authoring.
+The required automatic generation-time step that synthesizes the original Brief, Confirmed Presentation Requirements, and Confirmed Outline into the Workspace Style Guide before Page Authoring. The Brief remains original user context, while later confirmed requirements and outline decisions override conflicting Brief wording; there is no separate user confirmation step, and failure leaves Page Authoring blocked until creation succeeds.
 _Avoid_: Workspace Theme Creation, Theme ID Selection, Preset Theme Selection
 
 **PPTX Rasterization**:
@@ -224,7 +225,7 @@ A deck that was generated from an earlier Confirmed Outline, Workspace Authoring
 The process that turns a confirmed outline into presentation pages; it does not include outline creation from a brief.
 
 **Deck Generation Public Facade**:
-The stable app-facing entry boundary for Deck Generation, Deck Refinement, and Page Generation Retry. It exposes the workflow capabilities without owning their internal workflow decisions.
+The stable app-facing entry boundary for Deck Generation, Deck Generation Resume, and future refinement workflows. It exposes the workflow capabilities without owning their internal workflow decisions.
 _Avoid_: Workflow implementation, orchestration module
 
 **Active Deck Generation**:
@@ -235,17 +236,17 @@ A Deck Generation that is neither running nor finished, with the Workspace Style
 _Avoid_: Cancelled Deck — cancellation is the user action that leads here, not the resulting state.
 
 **Unresumable Deck Generation**:
-A Deck Generation that is not running and cannot be safely resumed because required Workspace artifacts are missing, stale, invalid, or inconsistent with the Confirmed Outline or Workspace Authoring Kit.
+A Deck Generation that is not running and cannot be safely resumed because authoritative Workspace artifacts are missing, stale, invalid, or inconsistent with the Confirmed Outline and persisted generation state.
 _Avoid_: Failed Deck when the issue is an artifact or state blocker rather than a Page Generation failure.
 
 **Generation Step**:
-A visible part of deck generation, such as creating the Workspace Style Guide, discovering or assigning evidence, preparing Page Sources, authoring a page, content review, rendering, visual review, or final rendering.
+A visible part of deck generation, such as creating the Workspace Style Guide, discovering or assigning evidence, preparing Page Sources, authoring a page, rendering, visual review, or final rendering.
 
 **Final Deck Render**:
 The deck-level Generation Step that turns accepted Page Generation Units into final previewable Deck artifacts. It is not owned by any single Page Generation Unit, and Deck Generation is not complete until Final Deck Render has succeeded.
 
 **Page Generation Unit**:
-One planned page being authored, content-reviewed, rendered, and visual-reviewed as an independent part of Deck Generation. It owns exactly one stable Page Source together with that page's content and page-level assets; shared deck structure and Workspace Authoring Kit assets belong outside the unit.
+One planned page being authored, rendered, and optionally visual-reviewed as an independent part of Deck Generation. It owns exactly one stable Page Source together with that page's content and page-level assets; shared deck structure and Workspace Authoring Kit assets belong outside the unit.
 Its stable identity is the Confirmed Outline entry's `page_id`; the identity is never reused, while page index is ordering rather than identity.
 
 **Page Source**:
@@ -272,20 +273,18 @@ A Page Generation Unit that has started and has not yet reached an accepted, fai
 **Deck Generation Progress**:
 The aggregate progress of an Active Deck Generation across all Page Generation Units. It describes counts and overall state rather than naming one current page.
 
+**Page Progress**:
+The Workspace-owned persisted execution state for Deck Generation, keyed by Outline Entry `page_id`. It owns deck/page recovery state and the latest successful rendered HTML and screenshot references, while page title and order remain projected from the Confirmed Outline.
+_Avoid_: Pages Index, Deck Content Source
+
 **Live Page Stream**:
 The visible stream for an Active Page Generation. It shows the current page run while that page is still active.
 
 **Page Generation Stage Record**:
 The user-facing record of what happened within one Page Generation Unit across stages such as authoring, rendering, review, and fixing. It may include live or completed agent output, but it is presented as page work rather than as session history.
 
-**Page Content Review**:
-The Page Generation check that judges whether a generated page's visible textual content is grounded in the Workspace context, follows the Confirmed Outline, and uses the expected output language.
-It treats the current page's Confirmed Outline entry and assigned Research Evidence as the primary content boundary while allowing light deck-level connective text where the page role calls for it.
-It may report language, outline-alignment, or grounding issues.
-_Avoid_: Fact Review when referring to the full content check.
-
 **Page Visual Review**:
-The Page Generation check that judges whether a rendered page screenshot is visually usable as a PPT page, including layout completeness, readability, overlap, cutoff, blank areas, and fit with the Workspace Style Guide.
+The optional, user-enabled Page Generation check that judges whether a rendered page screenshot is visually usable as a PPT page, including layout completeness, readability, overlap, cutoff, blank areas, hierarchy, and fit with the Workspace Style Guide. It does not review factual grounding, output language, or content correctness; after its bounded automatic fix attempts are exhausted, the page is accepted with the unresolved review recorded so the user can inspect the completed Deck instead of being blocked.
 _Avoid_: Self Review when referring to the visual-only screenshot check.
 
 **Generation Session History**:
@@ -306,9 +305,6 @@ _Avoid_: Stopped Page, Cancelled Page — cancellation is a deck-level user acti
 **Agent Session Cache Miss**:
 A transient Agent Session infrastructure failure where the platform cannot continue an Agent run because the app session authorization is unavailable. It is treated as infrastructure failure, not as a Page Generation content or render failure.
 
-**Page Generation Retry**:
-The action of rerunning one Page Generation Unit against the current Confirmed Outline, assigned Research Evidence, and Workspace Authoring Kit with a fresh attempt budget. It is a lower-level recovery concept; the user-facing recovery action for unfinished deck work is Deck Generation Resume.
-
 **Deck Refinement**:
 A user-requested revision of an accepted Deck as a whole after Deck Generation. It may update deck-level context, output language, Confirmed Outline, page-assigned Research Evidence, and selected Page Generation Units while preserving unaffected accepted pages when safe.
 When the Confirmed Outline changes without changing output language, only Page Generation Units whose outline intent changed are affected unless the request explicitly asks for a global style, language, or narrative rewrite.
@@ -319,7 +315,7 @@ Deck Refinement may run a Research Discovery Loop when the refinement needs addi
 Target Page Generation Units in Deck Refinement receive both the deck-level request and a page-level refinement reason so page authoring can preserve useful existing work while applying the whole-deck change.
 Deck Refinement outline reconciliation is operation-based so retained Page Generation Units keep their `page_id` identity across keep, update, add, and delete decisions.
 Deck Refinement should add or delete Page Generation Units only when the user explicitly asks for a page-count or page-structure change; vague structure-improvement requests should preserve page count.
-_Avoid_: Deck Generation Restart when accepted pages can be preserved.
+_Avoid_: Starting a new Deck Generation when accepted pages can be preserved.
 
 **Deck Refinement Resume**:
 The user action that continues an unfinished Deck Refinement from persisted deck-level decisions and target pages. It does not reinterpret completed context, outline, evidence-assignment, or research-routing decisions as a new request.
@@ -338,7 +334,7 @@ Deck Refinement Context Review does not rewrite the original Brief; the Deck Ref
 **Page Refinement**:
 A user-requested revision of one or more accepted Page Generation Units after Deck Generation. It first interprets whether the request can stay within the current Confirmed Outline or must revise the target page outline; a required target-page outline revision becomes the active Confirmed Outline for downstream generation.
 When additional or updated evidence is needed, Page Refinement runs a Research Discovery Loop with the target page scope, then updates the target page-assigned Research Evidence.
-_Avoid_: Page Generation Retry, Page Visual Review, Visual Review Fix
+_Avoid_: Deck Generation Resume, Page Visual Review, Visual Review Fix
 
 **Page Refinement Request**:
 The user's active instruction for a Page Refinement during the current run. It may require target-page outline changes or additional evidence, and it is an evidence source only for facts, numbers, dates, names, and claims explicitly stated in the request.
@@ -357,12 +353,8 @@ A Page Refinement Request that cannot be handled within current-page refinement 
 The latest available rendered screenshot for a target page during Page Refinement. It guides visual and layout changes, but text, numbers, charts, and claims visible in the screenshot are not grounding evidence unless they are separately present in allowed evidence sources.
 
 **Deck Generation Resume**:
-The user action that continues unfinished Deck Generation by completing missing Workspace Style Guide, research, evidence-assignment, or Page Source preparation work, re-running any Page Generation Unit that is not accepted yet, including Interrupted Page Generations, pending pages, infrastructure failures, and Failed Page Generations, or by continuing Final Deck Render when all pages are accepted but final Deck artifacts are not ready. It keeps accepted pages and does not restart the whole Deck; an unfinished page keeps its previous current state until its resumed run actually starts.
+The user action that continues unfinished Deck Generation by completing missing Workspace Style Guide, research, evidence-assignment, or Page Source preparation work, re-running any Page Generation Unit that is not accepted yet, including Interrupted Page Generations, pending pages, infrastructure failures, and Failed Page Generations, or by continuing Final Deck Render when all pages are accepted but final Deck artifacts are not ready. It keeps accepted pages and does not discard the current Deck Generation; an unfinished page keeps its previous current state until its resumed run actually starts.
 _Avoid_: Regenerate, Restart — those discard accepted pages and start the whole Deck over.
-
-**Deck Generation Restart**:
-The user action that discards current Deck Generation artifacts and starts Deck Generation again from the current Confirmed Outline and Workspace Authoring Kit. It is different from Deck Generation Resume because it does not preserve accepted Page Generation Units as completed work.
-_Avoid_: Resume, Continue Generation
 
 **Deck Generation Cancellation**:
 The user action that asks an Active Deck Generation to stop starting new Page Generation Units and to cooperatively stop active page, research, and final-render work. Work already inside an external operation may return after cancellation, but cancelled work must not be promoted into accepted page content, Research Evidence, or final Deck artifacts; after cancellation settles, unfinished deck work is represented as an Interrupted Deck Generation.

@@ -42,6 +42,7 @@ import {
 } from "./structuredJson";
 import { CONTENT_GROUNDING_RULES } from "./groundingRules";
 import type { AiOperationLogContext } from "./interactionLog";
+import { buildWorkspaceStyleGuidePrompt } from "./styleGuidePrompt";
 import type {
   AiAttemptLog,
   AiClient,
@@ -418,6 +419,29 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         buildGenerateOutlineLlmRequest(input),
         input.logContext
       );
+    },
+
+    async generateWorkspaceStyleGuide(input) {
+      const request: AnnaLlmCompleteInput = {
+        messages: [{
+          role: "user",
+          content: { type: "text", text: buildWorkspaceStyleGuidePrompt(input) },
+        }],
+      };
+      let lastError: unknown = null;
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+          const result = await completeLlm(runtime, request, input.logContext);
+          const markdown = extractCompletionText(result).trim();
+          if (markdown) return markdown;
+          lastError = new Error("Anna LLM returned an empty Workspace Style Guide");
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError instanceof Error
+        ? lastError
+        : new Error("Workspace Style Guide generation failed");
     },
 
     async generateThemeToken(input) {

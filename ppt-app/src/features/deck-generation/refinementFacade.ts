@@ -6,7 +6,7 @@ import {
 } from "./types";
 import { getAttemptLimits } from "./settings";
 import { failedCompletion } from "./deckGenerationCompletion";
-import { pagePlanMatchesOutlineAndTemplate } from "./deckGenerationStartArtifacts";
+import { pagePlanMatchesOutlineAndTemplate } from "./legacyPagePlanCompatibility";
 import { runDeckRefinementWorkflow } from "./deckRefinementRunner";
 import { runPageRefinement } from "./pageRefinementRunner";
 

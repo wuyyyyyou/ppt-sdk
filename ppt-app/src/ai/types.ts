@@ -15,6 +15,7 @@ import type {
 } from "../api/types";
 import type { Locale } from "../i18n/messages";
 import type { AiOperationLogContext } from "./interactionLog";
+import type { GenerateWorkspaceStyleGuideInput } from "./styleGuidePrompt";
 
 export interface LlmContextRow {
   id: string;
@@ -255,6 +256,7 @@ export interface AiClient {
     input: GeneratePresentationRequirementsInput
   ): Promise<PresentationRequirementsCandidates>;
   generateOutline(input: GenerateOutlineInput): Promise<OutlineGenerationResult>;
+  generateWorkspaceStyleGuide(input: GenerateWorkspaceStyleGuideInput): Promise<string>;
   generateThemeToken(input: GenerateThemeTokenInput): Promise<unknown>;
   generatePagePlan(input: GeneratePagePlanInput): Promise<PagePlan>;
   generateAddedPagePlan(input: GenerateAddedPagePlanInput): Promise<PagePlan>;

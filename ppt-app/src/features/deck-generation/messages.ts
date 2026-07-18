@@ -4,6 +4,9 @@ import type { Locale } from "../../i18n/messages";
 export function generationText(locale: Locale) {
   const zh = locale === "zh";
   return {
+    authoringKit: zh ? "正在准备 Authoring Kit（创作套件）" : "Preparing the Authoring Kit",
+    styleGuide: zh ? "正在生成艺术指导" : "Creating the Workspace Style Guide",
+    pageSources: zh ? "正在初始化 Page Sources（页面源文件）" : "Preparing Page Sources",
     pagePlan: zh ? "正在规划页面和模板蓝图" : "Planning pages and template blueprints",
     researchPlanning: zh ? "正在规划检索需求" : "Planning research needs",
     webResearchDiscovery: zh ? "正在判断并补充网页资料" : "Discovering needed web evidence",
@@ -13,13 +16,13 @@ export function generationText(locale: Locale) {
     curatingDiscoveryFacts: zh ? "正在筛选资料证据" : "Curating discovered factual evidence",
     curatingDiscoveryImages: zh ? "正在筛选图片素材" : "Curating discovered visual assets",
     evidencePagePlanning: zh ? "正在根据证据补充页面内容规划" : "Planning page content from curated evidence",
-    collectingSources: (page: PagePlanItem) =>
+    collectingSources: (page: Pick<PagePlanItem, "index" | "title">) =>
       zh ? `正在搜索并抓取第 ${page.index + 1} 页资料` : `Collecting sources for page ${page.index + 1}`,
-    curatingEvidence: (page: PagePlanItem) =>
+    curatingEvidence: (page: Pick<PagePlanItem, "index" | "title">) =>
       zh ? `正在筛选第 ${page.index + 1} 页证据` : `Curating evidence for page ${page.index + 1}`,
-    curatingFacts: (page: PagePlanItem) =>
+    curatingFacts: (page: Pick<PagePlanItem, "index" | "title">) =>
       zh ? `正在筛选第 ${page.index + 1} 页事实证据` : `Curating facts for page ${page.index + 1}`,
-    curatingImages: (page: PagePlanItem) =>
+    curatingImages: (page: Pick<PagePlanItem, "index" | "title">) =>
       zh ? `正在筛选第 ${page.index + 1} 页图片素材` : `Curating images for page ${page.index + 1}`,
     prepare: zh ? "正在准备页面文件" : "Preparing page files",
     complete: zh ? "生成完成" : "Generation complete",
@@ -32,25 +35,21 @@ export function generationText(locale: Locale) {
     pageFailed: (page: PageProgress["pages"][number]) =>
       page.last_error ||
       (zh
-        ? `第 ${page.index + 1} 页未通过：${page.status}`
-        : `Page ${page.index + 1} did not pass: ${page.status}`),
-    pagePassed: (page: PagePlanItem) =>
+        ? `页面未通过：${page.status}`
+        : `Page did not pass: ${page.status}`),
+    pagePassed: (page: Pick<PagePlanItem, "index" | "title">) =>
       zh
         ? `第 ${page.index + 1} 页已通过，继续下一页`
         : `Page ${page.index + 1} passed; continuing to the next page`,
-    generatingPage: (page: PagePlanItem, total: number) =>
+    generatingPage: (page: Pick<PagePlanItem, "index" | "title">, total: number) =>
       zh
         ? `正在生成第 ${page.index + 1} / ${total} 页`
         : `Generating page ${page.index + 1} / ${total}`,
-    authoringPage: (page: PagePlanItem) =>
+    authoringPage: (page: Pick<PagePlanItem, "index" | "title">) =>
       zh ? `正在思考第 ${page.index + 1} 页的表达` : `Thinking through page ${page.index + 1}`,
-    renderingPage: (page: PagePlanItem) =>
+    renderingPage: (page: Pick<PagePlanItem, "index" | "title">) =>
       zh ? `正在渲染第 ${page.index + 1} 页` : `Rendering page ${page.index + 1}`,
-    reviewingContent: (page: PagePlanItem) =>
-      zh ? `正在检查第 ${page.index + 1} 页内容` : `Reviewing page ${page.index + 1} content`,
-    fixingContent: (page: PagePlanItem) =>
-      zh ? `正在修正第 ${page.index + 1} 页内容问题` : `Fixing content issues on page ${page.index + 1}`,
-    reviewingVisuals: (page: PagePlanItem) =>
+    reviewingVisuals: (page: Pick<PagePlanItem, "index" | "title">) =>
       zh ? `正在检查第 ${page.index + 1} 页视觉效果` : `Reviewing page ${page.index + 1} visuals`,
     cancelled: zh ? "已停止生成" : "Generation stopped",
     agentSessionCacheMissExhausted: zh

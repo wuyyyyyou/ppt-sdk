@@ -6,6 +6,7 @@ import type { DeckGenerationError } from "./types";
 export function createFailedPageError(
   page: PageProgress["pages"][number],
   locale: Locale,
+  pageIndex?: number,
 ): DeckGenerationError {
   const type =
     page.status === "agent_infrastructure_failed"
@@ -15,7 +16,7 @@ export function createFailedPageError(
     type,
     message: generationText(locale).pageFailed(page),
     page_id: page.page_id,
-    page_index: page.index,
+    page_index: pageIndex,
     page_status: page.status,
   };
 }

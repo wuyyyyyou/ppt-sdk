@@ -279,8 +279,6 @@ export interface Messages {
         | "researchCollecting"
         | "researchCurating"
         | "authoring"
-        | "contentReview"
-        | "contentReviewFixing"
         | "rendering"
         | "renderFixing"
         | "visualReview"
@@ -307,8 +305,6 @@ export interface Messages {
         | "prepare"
         | "authoring"
         | "deckRefinement"
-        | "contentReview"
-        | "contentReviewFix"
         | "rendering"
         | "renderFix"
         | "visualReview"
@@ -659,7 +655,7 @@ export const messages: Record<Locale, Messages> = {
       pageLabel: "Page {page}",
       steps: {
         outline: "Outline",
-        pagePlan: "Page plan",
+        pagePlan: "Authoring setup",
         researchDiscovery: "Facts collection",
         prepare: "Prepare files",
         pages: "Pages",
@@ -723,8 +719,6 @@ export const messages: Record<Locale, Messages> = {
           researchCollecting: "Collecting sources",
           researchCurating: "Curating evidence",
           authoring: "Thinking through this page",
-          contentReview: "Checking page content",
-          contentReviewFixing: "Adjusting content after review",
           rendering: "Rendering page",
           renderFixing: "Fixing render issue",
           visualReview: "Checking page visuals",
@@ -750,8 +744,6 @@ export const messages: Record<Locale, Messages> = {
           prepare: "File preparation",
           authoring: "Page expression",
           deckRefinement: "Deck refinement",
-          contentReview: "Page content review",
-          contentReviewFix: "Content review adjustment",
           rendering: "Page rendering",
           renderFix: "Render issue fix",
           visualReview: "Page visual review",
@@ -1106,7 +1098,7 @@ export const messages: Record<Locale, Messages> = {
       pageLabel: "第 {page} 页",
       steps: {
         outline: "大纲",
-        pagePlan: "页面规划",
+        pagePlan: "创作准备",
         researchDiscovery: "事实收集",
         prepare: "准备文件",
         pages: "逐页生成",
@@ -1170,8 +1162,6 @@ export const messages: Record<Locale, Messages> = {
           researchCollecting: "正在搜索并抓取资料",
           researchCurating: "正在筛选证据",
           authoring: "正在思考这一页",
-          contentReview: "正在检查页面内容",
-          contentReviewFixing: "正在根据内容检查调整",
           rendering: "正在渲染页面",
           renderFixing: "正在修复渲染问题",
           visualReview: "正在检查页面视觉",
@@ -1197,8 +1187,6 @@ export const messages: Record<Locale, Messages> = {
           prepare: "文件准备",
           authoring: "页面表达",
           deckRefinement: "整套优化",
-          contentReview: "页面内容检查",
-          contentReviewFix: "内容检查后调整",
           rendering: "页面渲染",
           renderFix: "渲染问题修复",
           visualReview: "页面视觉检查",

@@ -15,13 +15,10 @@ const INTERRUPTED_PATCH: Record<string, unknown> = {
   status: "interrupted",
   render_attempts: 0,
   visual_review_attempts: 0,
-  content_review_attempts: 0,
   agent_failures: 0,
   agent_infrastructure_failures: 0,
   last_error: "",
-  content_review: null,
   visual_review: null,
-  review: null,
 };
 
 export function reconcileInterruptedPageProgress(

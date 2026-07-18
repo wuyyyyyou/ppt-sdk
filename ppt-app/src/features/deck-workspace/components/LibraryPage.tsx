@@ -8,10 +8,6 @@ import type {
 } from "../../../api/types";
 import { formatMessage, type Locale, type Messages } from "../../../i18n/messages";
 import {
-  AUTO_OUTPUT_LANGUAGE,
-  DEFAULT_OUTPUT_LANGUAGE_OPTIONS,
-} from "../../../ai/outputLanguage";
-import {
   PAGE_GENERATION_CONCURRENCY_MAX,
   PAGE_GENERATION_CONCURRENCY_MIN,
   readPageGenerationConcurrency,
@@ -41,17 +37,6 @@ interface LibraryPageProps {
   onSaveTitle: (title: string) => Promise<void>;
 }
 
-const EMPTY_SETTINGS: Required<
-  Pick<
-    WorkspaceSettings,
-    | "text_density"
-    | "output_language"
-  >
-> = {
-  text_density: "balanced",
-  output_language: AUTO_OUTPUT_LANGUAGE
-};
-
 function readSettings(workspace: WorkspaceResult | null): WorkspaceSettings {
   if (!workspace?.setting || typeof workspace.setting !== "object" || Array.isArray(workspace.setting)) {
     return {};
@@ -60,16 +45,12 @@ function readSettings(workspace: WorkspaceResult | null): WorkspaceSettings {
   return workspace.setting as WorkspaceSettings;
 }
 
-function normalizeSettingValue(value: unknown, fallback: string) {
-  return typeof value === "string" && value.length > 0 ? value : fallback;
-}
-
 function toEditableSettings(workspace: WorkspaceResult | null) {
   const setting = readSettings(workspace);
   return {
-    text_density: normalizeSettingValue(setting.text_density, EMPTY_SETTINGS.text_density),
-    output_language: normalizeSettingValue(setting.output_language, EMPTY_SETTINGS.output_language),
     page_generation_concurrency: readPageGenerationConcurrency(setting),
+    disable_web_research: setting.disable_web_research === true,
+    disable_image_research: setting.disable_image_research === true,
     ...pageReviewSettingsToWorkspaceSettings(readPageReviewSettings(setting))
   };
 }
@@ -264,26 +245,6 @@ export function LibraryPage({
           )}
         </div>
 
-        <PreferenceSelect
-          label={t.brief.contextLabels.textPerSlide}
-          value={draft.text_density}
-          options={["light", "balanced", "detailed"]}
-          editing={editing}
-          onChange={(value) => setDraft((next) => ({ ...next, text_density: value }))}
-        />
-        <PreferenceSelect
-          label={t.brief.contextLabels.outputLanguage}
-          value={draft.output_language}
-          options={
-            DEFAULT_OUTPUT_LANGUAGE_OPTIONS.includes(
-              draft.output_language as (typeof DEFAULT_OUTPUT_LANGUAGE_OPTIONS)[number]
-            )
-              ? [...DEFAULT_OUTPUT_LANGUAGE_OPTIONS]
-              : [...DEFAULT_OUTPUT_LANGUAGE_OPTIONS, draft.output_language]
-          }
-          editing={editing}
-          onChange={(value) => setDraft((next) => ({ ...next, output_language: value }))}
-        />
         <PreferenceSwitch
           label={t.preferences.visualReviewEnabled}
           value={draft.visual_review_enabled === true}
@@ -298,6 +259,20 @@ export function LibraryPage({
           min={PAGE_GENERATION_CONCURRENCY_MIN}
           max={PAGE_GENERATION_CONCURRENCY_MAX}
           onChange={(value) => setDraft((next) => ({ ...next, page_generation_concurrency: value }))}
+        />
+        <PreferenceSwitch
+          label={locale === "zh" ? "禁用网页搜索（暂时封存）" : "Disable web research (sealed)"}
+          value={draft.disable_web_research === true}
+          editing={editing}
+          t={t}
+          onChange={(value) => setDraft((next) => ({ ...next, disable_web_research: value }))}
+        />
+        <PreferenceSwitch
+          label={locale === "zh" ? "禁用图片搜索（暂时封存）" : "Disable image research (sealed)"}
+          value={draft.disable_image_research === true}
+          editing={editing}
+          t={t}
+          onChange={(value) => setDraft((next) => ({ ...next, disable_image_research: value }))}
         />
         <PreferenceNumber
           label={t.preferences.visualReviewFailureLimit}

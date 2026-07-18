@@ -13,8 +13,10 @@ Manual edits remain local until Save or Outline Confirmation, while successful R
 **Consequences**
 
 - Outline lifecycle is `empty`, `draft`, or `confirmed`; transient creation and failure states remain UI and interaction-log concerns.
+- Outline Drafts contain no `page_id`; Outline Confirmation atomically assigns a fresh identity to every entry for the new Confirmed Outline and Deck Generation.
 - Outline Review supports editing the presentation title, editing all entry fields, adding and deleting entries, and reordering entries.
 - Every persisted Outline Draft and Confirmed Outline is complete and valid: the title is non-empty, at least one entry exists, every entry has a one-line title and Core Message, and Required Content contains at least one non-empty line. Outline Review accepts plain lines or Markdown list markers and deterministically normalizes every saved line into the canonical `- ` list form.
 - Outline page count is flexible. Saving a valid Outline synchronizes the confirmed Presentation Requirements `slide_count` to the saved entry count without reopening Presentation Requirements Review.
 - During Active Deck Generation, navigation away from generation and Outline editing are disabled. After generation completes, a saved Outline Draft may coexist with the previous Deck until the user confirms the Outline; confirmation replaces the old generation state and starts full regeneration.
+- Full regeneration after Outline reconfirmation clears Page Progress and derived render artifacts, assigns new identities to every entry, and initializes every active Page Source from the Bootstrap. Partial identity and Page Source preservation belongs to future Deck Refinement or Page Refinement instead.
 - The Workspace stores only the current Outline and does not retain a separate prior Confirmed Outline or parallel Deck version.

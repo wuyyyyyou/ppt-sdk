@@ -175,16 +175,10 @@ test("workspace page updates reorder, delete, and duplicate rendered pages", asy
       ],
     );
 
-    const pageProgress = await readJson<{
-      pages: Array<{ page_id: string; index: number; title: string }>;
-    }>(path.join(workspaceDir, "page-progress.json"));
-    assert.deepEqual(
-      pageProgress.pages.map((page) => [page.page_id, page.index, page.title]),
-      [
-        ["page-c", 0, "Renamed C"],
-        ["page-a", 1, "Slide A"],
-      ],
+    const pageProgress = await readJson<{ pages: Array<{ page_id: string }> }>(
+      path.join(workspaceDir, "page-progress.json"),
     );
+    assert.deepEqual(pageProgress.pages.map((page) => page.page_id), ["page-c", "page-a"]);
 
     await duplicateAppWorkspacePage({
       workspace_dir: workspaceDir,
@@ -226,16 +220,12 @@ test("workspace page updates reorder, delete, and duplicate rendered pages", asy
       ],
     );
 
-    const duplicatedPageProgress = await readJson<{
-      pages: Array<{ page_id: string; index: number; title: string }>;
-    }>(path.join(workspaceDir, "page-progress.json"));
+    const duplicatedPageProgress = await readJson<{ pages: Array<{ page_id: string }> }>(
+      path.join(workspaceDir, "page-progress.json"),
+    );
     assert.deepEqual(
-      duplicatedPageProgress.pages.map((page) => [page.page_id, page.index, page.title]),
-      [
-        ["page-c", 0, "Renamed C"],
-        ["page-c-copy", 1, "Renamed C Copy"],
-        ["page-a", 2, "Slide A"],
-      ],
+      duplicatedPageProgress.pages.map((page) => page.page_id),
+      ["page-c", "page-c-copy", "page-a"],
     );
   } finally {
     if (previousHome === undefined) {

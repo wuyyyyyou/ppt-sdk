@@ -24,8 +24,6 @@ type StageLabelKey =
   | "prepare"
   | "authoring"
   | "deckRefinement"
-  | "contentReview"
-  | "contentReviewFix"
   | "rendering"
   | "renderFix"
   | "visualReview"
@@ -41,8 +39,6 @@ type PageStatusLabelKey =
   | "researchCollecting"
   | "researchCurating"
   | "authoring"
-  | "contentReview"
-  | "contentReviewFixing"
   | "rendering"
   | "renderFixing"
   | "visualReview"
@@ -240,8 +236,6 @@ function sortStageRecords(records: PageGenerationStageRecord[]) {
     "visualResearchCuration",
     "authoring",
     "deckRefinement",
-    "contentReview",
-    "contentReviewFix",
     "renderFix",
     "rendering",
     "visualReview",
@@ -284,9 +278,7 @@ function stageLabelKey(
   if (kind === "authoring") return "authoring";
   if (kind === "deck-refinement") return "deckRefinement";
   if (kind === "render-fix") return "renderFix";
-  if (kind === "content-review-fix") return "contentReviewFix";
   if (kind === "visual-review-fix") return "visualReviewFix";
-  if (kind === "page-content-review") return "contentReview";
   if (kind === "page-visual-review") return "visualReview";
   if (kind === "web-research-curation") return "webResearchCuration";
   if (kind === "visual-research-curation") return "visualResearchCuration";
@@ -300,7 +292,6 @@ function stageLabelKey(
   if (phase === "evidence-page-planning") return "evidencePagePlanning";
   if (phase === "prepare") return "prepare";
   if (phase === "page-authoring") return "authoring";
-  if (phase === "page-content-review") return "contentReview";
   if (phase === "page-render") return "rendering";
   if (phase === "page-visual-review") return "visualReview";
   if (phase === "final-render") return "finalRender";
@@ -314,10 +305,6 @@ function stageLabelKey(
       return "pending";
     case "authoring":
       return "authoring";
-    case "content_review":
-      return "contentReview";
-    case "content_review_fixing":
-      return "contentReviewFix";
     case "rendering":
       return "rendering";
     case "render_fixing":
@@ -349,10 +336,6 @@ function pageStatusLabelKey(status: string): PageStatusLabelKey {
       return "pending";
     case "authoring":
       return "authoring";
-    case "content_review":
-      return "contentReview";
-    case "content_review_fixing":
-      return "contentReviewFixing";
     case "rendering":
       return "rendering";
     case "render_fixing":

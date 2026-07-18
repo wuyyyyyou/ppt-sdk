@@ -39,6 +39,8 @@ const AGENT_SESSION_CACHE_MISS_EXHAUSTED_MESSAGE =
 export interface AgentRunSummary {
   status: "ready_for_render" | "blocked";
   changed_files: string[];
+  files_read: string[];
+  authoring_kit_sources_read: string[];
   summary: string;
   needs_render: boolean;
   notes: string[];
@@ -62,25 +64,10 @@ export interface AgentPageVisualReviewResult {
   session_cache_miss_retries?: number;
 }
 
-export interface AgentPageContentReviewResult {
-  pass: boolean;
-  score: number;
-  issues: Array<{
-    type: "language" | "outline_alignment" | "grounding" | "placeholder_quality";
-    severity?: string;
-    evidence: string;
-    reason: string;
-    fix_hint?: string;
-  }>;
-  rewrite_request: string;
-  confidence: "low" | "medium" | "high";
-}
-
 export interface AgentClient {
   checkToolAccess(): Promise<void>;
   runAuthoringPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentRunSummary>;
   runPageVisualReviewPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentPageVisualReviewResult>;
-  runPageContentReviewPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentPageContentReviewResult>;
   close(): Promise<void>;
 }
 
@@ -172,6 +159,12 @@ function normalizeRunSummary(value: unknown): AgentRunSummary {
     changed_files: Array.isArray(record.changed_files)
       ? record.changed_files.filter((item): item is string => typeof item === "string")
       : [],
+    files_read: Array.isArray(record.files_read)
+      ? record.files_read.filter((item): item is string => typeof item === "string")
+      : [],
+    authoring_kit_sources_read: Array.isArray(record.authoring_kit_sources_read)
+      ? record.authoring_kit_sources_read.filter((item): item is string => typeof item === "string")
+      : [],
     summary: typeof record.summary === "string" ? record.summary : "",
     needs_render:
       typeof record.needs_render === "boolean" ? record.needs_render : status !== "blocked",
@@ -189,6 +182,8 @@ function fallbackRunSummary(
   return {
     status: "ready_for_render",
     changed_files: [],
+    files_read: [],
+    authoring_kit_sources_read: [],
     summary: text.trim().slice(0, 500),
     needs_render: true,
     notes: [],
@@ -240,38 +235,6 @@ function normalizePageVisualReview(value: unknown): AgentPageVisualReviewResult 
       : [],
     revision_request:
       typeof record.revision_request === "string" ? record.revision_request : "",
-    confidence:
-      record.confidence === "high" || record.confidence === "low"
-        ? record.confidence
-        : "medium",
-  };
-}
-
-function normalizePageContentReview(value: unknown): AgentPageContentReviewResult {
-  const record = value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Partial<AgentPageContentReviewResult>)
-    : {};
-
-  return {
-    pass: record.pass === true,
-    score: typeof record.score === "number" ? record.score : 0,
-    issues: Array.isArray(record.issues)
-      ? record.issues
-          .filter((item): item is AgentPageContentReviewResult["issues"][number] => {
-            if (!item || typeof item !== "object" || Array.isArray(item)) return false;
-            const issue = item as { type?: unknown; evidence?: unknown; reason?: unknown };
-            return (
-              (issue.type === "language" ||
-                issue.type === "outline_alignment" ||
-                issue.type === "grounding" ||
-                issue.type === "placeholder_quality") &&
-              typeof issue.evidence === "string" &&
-              typeof issue.reason === "string"
-            );
-          })
-      : [],
-    rewrite_request:
-      typeof record.rewrite_request === "string" ? record.rewrite_request : "",
     confidence:
       record.confidence === "high" || record.confidence === "low"
         ? record.confidence
@@ -951,21 +914,6 @@ export async function createAgentClient(
           session_cache_miss_retries:
             collected.sessionCacheMissRetries + repaired.sessionCacheMissRetries,
         };
-      }
-    },
-
-    async runPageContentReviewPrompt(prompt, options) {
-      const collected = await collectWithSessionRetry(prompt, options);
-      try {
-        return normalizePageContentReview(parseJsonObject(collected.text, "page content review"));
-      } catch (error) {
-        const repairPrompt = buildStructuredJsonRepairPrompt(
-          collected.text,
-          '{"pass":true,"score":8,"issues":[],"rewrite_request":"","confidence":"medium"}',
-          error instanceof Error ? error.message : String(error)
-        );
-        const repaired = await collectWithSessionRetry(repairPrompt, options);
-        return normalizePageContentReview(parseJsonObject(repaired.text, "page content review"));
       }
     },
 

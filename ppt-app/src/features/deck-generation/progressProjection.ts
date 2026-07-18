@@ -1,4 +1,4 @@
-import type { PageProgress } from "../../api/types";
+import type { PageProgress, WorkspaceOutline } from "../../api/types";
 import type { Locale } from "../../i18n/messages";
 import {
   isActivePageGenerationStatus,
@@ -45,18 +45,20 @@ function cloneResearchDiscoveryProgress(
 export function mapProgress(
   progress: PageProgress | null,
   attemptLimits: typeof ATTEMPT_LIMITS = ATTEMPT_LIMITS,
+  outline?: WorkspaceOutline | null,
 ): DeckGenerationProgressPage[] {
-  return progress?.pages.map((page) => ({
+  const outlineByPageId = new Map(
+    outline?.items.flatMap((item, index) => item.page_id ? [[item.page_id, { item, index }] as const] : []) ?? [],
+  );
+  return progress?.pages.map((page, index) => ({
     page_id: page.page_id,
-    index: page.index,
-    title: page.title,
+    index: outlineByPageId.get(page.page_id)?.index ?? index,
+    title: outlineByPageId.get(page.page_id)?.item.title ?? page.page_id,
     status: page.status,
     render_attempts: page.render_attempts,
     render_attempt_limit: attemptLimits.render,
     visual_review_attempts: page.visual_review_attempts,
     visual_review_attempt_limit: attemptLimits.visualReview,
-    content_review_attempts: page.content_review_attempts ?? 0,
-    content_review_attempt_limit: attemptLimits.contentReview,
     agent_failures: page.agent_failures,
     agent_failure_limit: attemptLimits.agent,
     agent_infrastructure_failures: page.agent_infrastructure_failures,
@@ -90,7 +92,7 @@ export function createProgress(
 }
 
 export function emit(
-  input: Pick<DeckGenerationContext, "onProgress">,
+  input: Pick<DeckGenerationContext, "onProgress"> & Partial<Pick<DeckGenerationContext, "confirmedOutline">>,
   value: Omit<DeckGenerationProgress, "pages">,
   progress: PageProgress | null,
   stream?: DeckGenerationStream | null,
@@ -98,21 +100,24 @@ export function emit(
   attemptLimits: typeof ATTEMPT_LIMITS = ATTEMPT_LIMITS,
   researchDiscovery?: ResearchDiscoveryProgress,
 ) {
-  input.onProgress(createProgress(
+  const projected = createProgress(
     value,
     progress,
     stream,
     activeStreams,
     attemptLimits,
     researchDiscovery,
-  ));
+  );
+  projected.pages = mapProgress(progress, attemptLimits, input.confirmedOutline);
+  input.onProgress(projected);
 }
 
 export function pageProgressToDeckGenerationProgress(
   storedProgress: PageProgress,
   locale: Locale = "zh",
+  outline?: WorkspaceOutline | null,
 ): DeckGenerationProgress {
-  const pages = [...storedProgress.pages].sort((left, right) => left.index - right.index);
+  const pages = [...storedProgress.pages];
   const resumablePage = pages.find((item) => isResumablePageGenerationStatus(item.status));
   const failedPage = pages.find((item) => isGenuinelyFailedPageGenerationStatus(item.status));
   const activePageCandidate = pages.find((item) => isActivePageGenerationStatus(item.status));
@@ -148,7 +153,7 @@ export function pageProgressToDeckGenerationProgress(
   return {
     step,
     message,
-    currentPageIndex: activePage ? activePage.index : null,
+    currentPageIndex: activePage ? pages.findIndex((page) => page.page_id === activePage.page_id) : null,
     totalPages: pages.length,
     recoveryRunKind: storedProgress.recovery?.run_kind ?? (
       step === "final-render" ? "final-deck-render" : undefined
@@ -156,7 +161,7 @@ export function pageProgressToDeckGenerationProgress(
     pages: mapProgress({
       ...storedProgress,
       pages,
-    }),
+    }, ATTEMPT_LIMITS, outline),
     researchDiscovery: cloneResearchDiscoveryProgress(storedProgress.research_discovery),
   };
 }

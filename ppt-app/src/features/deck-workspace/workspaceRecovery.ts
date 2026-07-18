@@ -3,16 +3,17 @@ import {
   pageProgressToDeckGenerationProgress,
   type DeckGenerationProgress,
 } from "../deck-generation";
-import type { PageProgress } from "../../api/types";
+import type { PageProgress, WorkspaceOutline } from "../../api/types";
 
 export function restoreDeckGenerationProgress(input: {
   staleDeck: boolean;
   pageProgress: PageProgress | null;
   locale: Locale;
+  outline?: WorkspaceOutline | null;
 }): DeckGenerationProgress | null {
   if (input.staleDeck || !input.pageProgress) {
     return null;
   }
 
-  return pageProgressToDeckGenerationProgress(input.pageProgress, input.locale);
+  return pageProgressToDeckGenerationProgress(input.pageProgress, input.locale, input.outline);
 }

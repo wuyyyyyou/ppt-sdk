@@ -129,6 +129,9 @@ test("Presentation Requirements own Workspace recovery and gate Outline Creation
     });
     assert.equal((confirmedWorkspace.outline as { status: string }).status, "confirmed");
     assert.ok((confirmedWorkspace.outline as { confirmed_at: string | null }).confirmed_at);
+    const confirmedItems = (confirmedWorkspace.outline as { items: Array<{ page_id?: string }> }).items;
+    assert.equal(confirmedItems.every((item) => /^page-[0-9a-f-]{36}$/.test(item.page_id ?? "")), true);
+    assert.equal(new Set(confirmedItems.map((item) => item.page_id)).size, confirmedItems.length);
 
     const resetWorkspace = await resetAppWorkspaceOutline({ workspace_dir: created.workspace_dir });
     assert.deepEqual(resetWorkspace.outline, {

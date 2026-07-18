@@ -273,7 +273,7 @@ export async function runDeckRefinementWorkflow(args: {
       status: "completed",
       result: {
         outline: input.confirmedOutline,
-        pagePlan,
+        authoringDeck: pagePlan,
         progress: nextProgress,
         rendered,
       },
@@ -378,7 +378,7 @@ export async function runDeckRefinementWorkflow(args: {
       status: "completed",
       result: {
         outline: flowInput.confirmedOutline,
-        pagePlan,
+        authoringDeck: pagePlan,
         progress,
         rendered,
       },

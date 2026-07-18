@@ -48,7 +48,7 @@ async function resolvePageRefinementVisualContext(input: {
   try {
     const preview = await input.backend.renderWorkspacePagePreview({
       workspace_dir: input.workspace.workspace_dir,
-      page_index: input.page.index,
+      page_id: input.page.page_id,
     });
     if (preview.screenshot_path?.trim()) {
       return {

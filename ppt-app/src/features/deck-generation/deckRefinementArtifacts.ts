@@ -167,7 +167,6 @@ export async function prepareDeckRefinementGenerationArtifacts(input: {
       error: null,
       output_dir: null,
       deck_html_path: null,
-      pages_path: null,
       rendered_at: null,
     },
     deck_status: "running",

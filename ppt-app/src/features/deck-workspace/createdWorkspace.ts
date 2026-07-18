@@ -37,32 +37,13 @@ export function createInitialWorkspaceSnapshot(
       confirmed_at: null,
     },
     outline: {
-      version: 2,
+      version: 3,
       title: "",
-      output_language: result.setting.output_language,
-      status: "draft",
+      status: "empty",
       items: [],
-      source: {
-        prompt: "",
-        context: [],
-        setting: result.setting,
-      },
       updated_at: null,
+      confirmed_at: null,
     },
-    pages: {
-      version: 1,
-      pages: [],
-      updated_at: null,
-    },
-    template: {
-      version: 1,
-      selected_template_group: "",
-      selected_template_group_name: "",
-      template_dir: "",
-      manifest_path: "",
-      catalog_json_path: "",
-      data_dir_path: "",
-      selected_at: null,
-    },
+    page_progress: { version: 1, status: "idle", pages: [], updated_at: null },
   };
 }

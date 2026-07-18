@@ -177,6 +177,13 @@ export function createMockAiClient(): AiClient {
       return result;
     },
 
+    async generateWorkspaceStyleGuide(input) {
+      await sleep(120);
+      const markdown = `# 艺术指导\n\n## 视觉概念\n以清晰、克制、适合屏幕演示的编辑设计为主。\n\n## 色彩\n- 背景：#F7F8FA\n- 主文字：#172033\n- 强调色：#2563EB\n- 辅助色：#14B8A6\n\n## 字体与层级\n优先使用 Arial、Helvetica、PingFang SC、Microsoft YaHei 等常见系统字体。页面标题 42–52px，核心数字 56–72px，正文 22–28px，注释不小于 16px。\n\n## 版式\n使用明确网格、充足留白和强对齐；每页只突出一个核心信息。画布固定为 1280 × 720。\n\n## 内容依据\n演示标题：${input.outline.title}`;
+      await logMockInteraction(input.logContext, { method: "generateWorkspaceStyleGuide", input }, markdown);
+      return markdown;
+    },
+
     async generatePagePlan(input) {
       await sleep(300);
       const now = new Date().toISOString();

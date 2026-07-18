@@ -50,6 +50,10 @@ async function createFingerprintWorkspace(homeDir: string) {
     title: "Fingerprint fixture",
     slides: [],
   });
+  await writeJson(path.join(workspaceDir, "task.json"), {
+    title: "Legacy fingerprint fixture",
+    updated_at: "2026-06-24T00:00:00.000Z",
+  });
   await writeJson(path.join(workspaceDir, "template.json"), {
     version: 1,
     selected_template_group: "fixture",

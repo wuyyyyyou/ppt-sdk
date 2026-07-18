@@ -23,7 +23,7 @@ export interface WorkspaceAuthoringKitResult extends WorkspaceAuthoringPaths {
 export interface WorkspaceOutlinePage {
   page_id: string;
   title: string;
-  outline: string;
+  [key: string]: unknown;
 }
 
 export interface ConfirmedWorkspaceOutline {
@@ -166,7 +166,6 @@ function normalizeConfirmedOutline(value: unknown): ConfirmedWorkspaceOutline {
       ...itemValue,
       page_id: pageId,
       title: typeof itemValue.title === "string" ? itemValue.title : "",
-      outline: typeof itemValue.outline === "string" ? itemValue.outline : "",
     };
   });
   return { ...value, title: value.title, status: "confirmed", items } as ConfirmedWorkspaceOutline;
@@ -205,6 +204,7 @@ export async function rebuildWorkspaceDeckManifest(input: {
 
 export async function prepareWorkspacePageSources(input: {
   workspace_dir: string;
+  reset_existing?: boolean;
 }): Promise<{
   paths: WorkspaceAuthoringPaths;
   outline: ConfirmedWorkspaceOutline;
@@ -217,7 +217,7 @@ export async function prepareWorkspacePageSources(input: {
   const createdPageIds: string[] = [];
   for (const item of outline.items) {
     const targetPath = path.join(installation.slides_dir, `${item.page_id}.tsx`);
-    if (await pathExists(targetPath)) continue;
+    if (!input.reset_existing && await pathExists(targetPath)) continue;
     await copyFile(pageSourceStarterPath, targetPath);
     createdPageIds.push(item.page_id);
   }
@@ -231,6 +231,42 @@ export async function prepareWorkspacePageSources(input: {
     manifest,
     created_page_ids: createdPageIds,
   };
+}
+
+export async function reconcileWorkspacePageSources(input: {
+  workspace_dir: string;
+}): Promise<{
+  paths: WorkspaceAuthoringPaths;
+  repaired_page_ids: string[];
+  manifest: DeckManifestInput;
+}> {
+  const paths = getWorkspaceAuthoringPaths(input.workspace_dir);
+  const outline = await ensureConfirmedOutlinePageIds(input);
+  const progressPath = path.join(paths.workspace_dir, "page-progress.json");
+  const progressValue = JSON.parse(await readFile(progressPath, "utf8")) as unknown;
+  const progress = isPlainRecord(progressValue) && Array.isArray(progressValue.pages)
+    ? progressValue.pages
+    : [];
+  const statusByPageId = new Map(progress.map((value) => {
+    const page = isPlainRecord(value) ? value : {};
+    return [typeof page.page_id === "string" ? page.page_id : "", typeof page.status === "string" ? page.status : ""];
+  }));
+  const { pageSourceStarterPath } = await loadAssetSource();
+  const repairedPageIds: string[] = [];
+  await mkdir(paths.slides_dir, { recursive: true });
+  for (const item of outline.items) {
+    const targetPath = path.join(paths.slides_dir, `${item.page_id}.tsx`);
+    if (await pathExists(targetPath)) continue;
+    if (statusByPageId.get(item.page_id) !== "pending") {
+      throw new Error(
+        `Page Source is missing for progressed page_id "${item.page_id}"; this generation cannot be resumed`,
+      );
+    }
+    await copyFile(pageSourceStarterPath, targetPath);
+    repairedPageIds.push(item.page_id);
+  }
+  const manifest = await rebuildWorkspaceDeckManifest({ workspace_dir: input.workspace_dir, outline });
+  return { paths, repaired_page_ids: repairedPageIds, manifest };
 }
 
 export async function fingerprintWorkspacePageSource(input: {

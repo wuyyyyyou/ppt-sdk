@@ -842,7 +842,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   function hasRenderedWorkspacePages(workspace: WorkspaceResult) {
-    return !isWorkspaceDeckStale(workspace) && workspacePagesToState(workspace.pages) !== null;
+    const progress = normalizeWorkspacePageProgress(workspace.page_progress);
+    return !isWorkspaceDeckStale(workspace) && progress?.final_deck_render?.status === "completed";
   }
 
   function workspaceSettingsToState(workspace: WorkspaceResult | null): WorkspaceSettings {
@@ -1002,22 +1003,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
-  function applyRenderedDeck(result: Awaited<ReturnType<PptBackend["renderDeckHtml"]>>) {
+  function applyRenderedDeck(
+    result: Awaited<ReturnType<PptBackend["renderDeckHtml"]>>,
+    outlineItems?: WorkspaceOutlineItem[],
+  ) {
     setGenerated(true);
     setDeckTitle(result.title);
     setDeck(
-      result.slides.map((slide) => ({
-        title: slide.title,
+      result.slides.map((slide, index) => ({
+        title: outlineItems?.[index]?.title ?? slide.title,
         subtitle: ""
       }))
     );
-    setOutline(
-      result.slides.map((slide) => ({
-        title: slide.title,
-        core_message: slide.speaker_note,
-        required_content: slide.speaker_note ? `- ${slide.speaker_note}` : "- Page content",
-      }))
-    );
+    if (outlineItems) setOutline(cloneOutlineItems(outlineItems));
     setCurrentSlide(0);
     setStage("deck");
   }
@@ -1034,12 +1032,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setRequirementsHasSavedDraft(workspace.requirements.status !== "empty");
     if (workspace.requirements.source?.brief) {
       setPrompt(workspace.requirements.source.brief);
-    }
-    void refreshUploadedSources(workspace);
-    if (backend) {
-      void backend.getWorkspaceStyleProfile({ workspace_dir: workspace.workspace_dir })
-        .then((result) => setSelectedStyleProfile(result.selection))
-        .catch(() => setSelectedStyleProfile(null));
     }
     setPageReviewSettings(workspacePageReviewSettings(workspace));
     setResearchSearchControlSettingsState(workspaceResearchSearchControlSettings(workspace));
@@ -1074,7 +1066,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       setOutlineDraft([]);
     }
     const staleDeck = isWorkspaceDeckStale(workspace);
-    const workspacePages = staleDeck ? null : workspacePagesToState(workspace.pages);
     const workspacePageProgress = normalizeWorkspacePageProgress(workspace.page_progress);
     setPageProgress(workspacePageProgress);
     setCreateDeckProgress(
@@ -1082,31 +1073,33 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         staleDeck,
         pageProgress: workspacePageProgress,
         locale,
+        outline: outlineRecord?.status === "confirmed" ? outlineRecord as WorkspaceOutline : null,
       })
     );
-    if (workspacePages) {
-      setGenerated(true);
-      setDeckTitle(getWorkspaceTitle(workspace));
-      setDeck(workspacePages.deck);
-      setOutline(workspaceOutline.length > 0 ? workspaceOutline : workspacePages.outline);
-      setOutlineDraft(workspaceOutline.length > 0 ? workspaceOutline : workspacePages.outline);
-      setCurrentSlide((index) =>
-        options.preserveCurrentSlide ? clampSlideIndex(index, workspacePages.deck.length) : 0
-      );
-      setStage("deck");
-    } else {
-      setGenerated(false);
-      setCurrentSlide(0);
-      if (staleDeck) {
-        setStage("outline");
-      }
+    if (!staleDeck && workspacePageProgress?.final_deck_render?.status === "completed" && backend) {
+      void backend.getRenderedDeckHtml({ workspace_dir: workspace.workspace_dir })
+        .then((result) => {
+          applyRenderedDeck(result, workspaceOutline);
+          setReviewRender({
+            status: "ready",
+            result,
+            error: "",
+            renderKey: workspaceReviewRenderKey(workspace),
+          });
+        })
+        .catch(() => undefined);
+    }
+    setGenerated(false);
+    setCurrentSlide(0);
+    if (staleDeck) {
+      setStage("outline");
     }
     if (workspaceOutline.length > 0) {
       setOutline(workspaceOutline);
       setOutlineDraft(cloneOutlineItems(workspaceOutline));
-      if (!workspacePages && workspacePageProgress && !staleDeck) {
+      if (workspacePageProgress && !staleDeck) {
         setStage("generating");
-      } else if (!workspacePages) {
+      } else {
         setStage("outline");
       }
       if (outlineStatus === "draft") setStage("outline");
@@ -1121,7 +1114,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         : DEFAULT_TEMPLATE_GROUP_ID;
     if (selectedTemplate) {
       setSelectedTemplateGroupId(selectedTemplate);
-      if (!workspacePages && workspaceOutline.length === 0) {
+      if (workspaceOutline.length === 0) {
         setStage(
           workspace.requirements.status === "empty"
             ? "brief"
@@ -1215,12 +1208,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         if (cancelled) return;
         setPageReviewSettings(readPageReviewSettings(defaults.setting));
         setResearchSearchControlSettingsState(readResearchSearchControlSettings(defaults.setting));
-        const templates = await nextBackend.listTemplates();
-        if (cancelled) return;
-        setTemplateGroups(templates.templates);
-        const profileList = await nextBackend.listStyleProfiles();
-        if (cancelled) return;
-        setStyleProfiles(profileList.profiles);
       } catch (error) {
         if (!cancelled) {
           setWorkspaceError(
@@ -1794,7 +1781,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setDeckTitle(completion.result.outline.title);
     setOutline(completion.result.outline.items);
     setPageProgress(completion.result.progress);
-    applyRenderedDeck(completion.result.rendered);
+    applyRenderedDeck(completion.result.rendered, completion.result.outline.items);
     setReviewRender({
       status: "ready",
       result: completion.result.rendered,
@@ -1820,15 +1807,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       if (workspace.requirements.status !== "confirmed") {
         throw new Error("请先确认演示需求，再创建大纲。");
       }
-      const uploadedSourceAnalysis = backend
-        ? await ensureUploadedSourceAnalysisForOutline(workspace, () => createOutlineFromConfirmedRequirements())
-        : null;
       setStage("outline");
       setLoading("outline");
       const outlineLogContext = buildAiLogContext(workspace, "outline", "generate_outline");
       const result = await aiClient.generateOutline({
         requirements: workspace.requirements,
-        uploadedSourceAnalysisContext: compactUploadedSourceAnalysisForPrompt(uploadedSourceAnalysis),
         logContext: outlineLogContext,
       });
       await appendOutlineAiAttemptLogs(workspace, result.attempts, outlineLogContext);
@@ -1881,7 +1864,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function createDeckFromOutline() {
-    if (!backend || !aiClient) return;
+    if (!backend || !aiClient || !hostUploadClient) return;
     if (!agentClient) {
       if (uploadedSources.length > 0) {
         showToast(t.errors.uploadedSourceAnalysisUnavailable);
@@ -1915,19 +1898,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       setOutlineDraft(cloneOutlineItems(normalized.items));
       setOutlineDraftTitle(normalized.title);
       setCurrentWorkspace(confirmedWorkspace);
-      if (!selectedTemplateGroupId) {
-        showToast(t.template.helper);
-        return;
-      }
-      const templateWorkspace = await ensureWorkspaceThemeTokenForGeneration(
-        await ensureWorkspaceTemplate(confirmedWorkspace)
-      );
-      await ensureUploadedSourceAnalysisForOutline(
-        templateWorkspace,
-        createDeckFromOutline,
-      );
       beginActiveGenerationRun("deck-generation");
-      activeRunWorkspaceDir = templateWorkspace.workspace_dir;
+      activeRunWorkspaceDir = confirmedWorkspace.workspace_dir;
       shouldReconcileActiveRun = true;
       setLoading("deck");
       setStage("generating");
@@ -1937,16 +1909,17 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         backend,
         aiClient,
         agentClient,
+        hostUploadClient,
         aiLogger,
-        workspace: templateWorkspace,
-        confirmedOutline: workspaceOutlineForDownstream(templateWorkspace),
+        workspace: confirmedWorkspace,
+        confirmedOutline: workspaceOutlineForDownstream(confirmedWorkspace),
         locale,
-        startMode: "restart",
+        startMode: "new",
         onProgress: recordGenerationProgress,
         isCancelled: () => cancelCreateDeckRef.current,
         cancelSignal,
       });
-      await applyDeckGenerationCompletion(completion, templateWorkspace);
+      await applyDeckGenerationCompletion(completion, confirmedWorkspace);
       shouldReconcileActiveRun = false;
     } catch (error) {
       showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
@@ -1970,18 +1943,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       if (workspace.requirements.status !== "confirmed") {
         throw new Error("请先确认演示需求，再改写大纲。");
       }
-      const uploadedSourceAnalysis = backend
-        ? await ensureUploadedSourceAnalysisForOutline(workspace, applyOutlineFeedback)
-        : null;
       setLoading("outline");
-      const uploadedSourceAnalysisContext = compactUploadedSourceAnalysisForPrompt(uploadedSourceAnalysis);
       const outlineLogContext = buildAiLogContext(workspace, "outline", "revise_outline");
       const result = await aiClient.reviseOutline({
         title: outlineDraftTitle,
         outline: outlineDraft,
         feedback: outlineFeedback,
         requirements: workspace.requirements,
-        uploadedSourceAnalysisContext,
         logContext: outlineLogContext,
       });
       await appendOutlineAiAttemptLogs(workspace, result.attempts, outlineLogContext);
@@ -3145,7 +3113,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function resumeDeckGeneration() {
-    if (!backend || !aiClient || !agentClient) return;
+    if (!backend || !aiClient || !agentClient || !hostUploadClient) return;
     if (loading === "deck" || loading === "deckFromOutline") return;
 
     let activeRunWorkspaceDir: string | undefined;
@@ -3161,42 +3129,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       shouldReconcileActiveRun = true;
       setStage("generating");
       setPage("main");
-      const progress = normalizeWorkspacePageProgress(refreshedWorkspace.page_progress);
-      const recovery = progress?.recovery;
-      const isPageRefinementResume = recovery?.run_kind === "page-refinement";
-      const isDeckRefinementResume = recovery?.run_kind === "deck-refinement";
-      const isRefinementResume = isPageRefinementResume || isDeckRefinementResume;
-      const resumePageIndex = progress?.pages.find((page) =>
-        recovery?.target_page_ids?.includes(page.page_id)
-      )?.index;
-      beginActiveGenerationRun(
-        isDeckRefinementResume ? "deck-refinement" : isPageRefinementResume ? "page-refinement" : "deck-generation"
-      );
-      const completion = isRefinementResume
-        ? await runDeckRefinement({
+      beginActiveGenerationRun("deck-generation");
+      const completion = await runDeckGeneration({
             backend,
             aiClient,
             agentClient,
-            aiLogger,
-            workspace: refreshedWorkspace,
-            confirmedOutline: workspaceOutlineForDownstream(refreshedWorkspace),
-            locale,
-            instruction:
-              recovery.page_refinement_request ||
-              Object.values(recovery.page_refinement_requests ?? {})[0] ||
-              "",
-            scope: isDeckRefinementResume ? "deck" : "slide",
-            pageIndex: isPageRefinementResume ? resumePageIndex : undefined,
-            resumePageIds: recovery.target_page_ids,
-            skipIntentReview: true,
-            onProgress: recordGenerationProgress,
-            isCancelled: () => cancelCreateDeckRef.current,
-            cancelSignal,
-          })
-        : await runDeckGeneration({
-            backend,
-            aiClient,
-            agentClient,
+            hostUploadClient,
             aiLogger,
             workspace: refreshedWorkspace,
             confirmedOutline: workspaceOutlineForDownstream(refreshedWorkspace),

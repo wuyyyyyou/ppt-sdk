@@ -74,6 +74,72 @@
           "type": "string",
           "description": "Absolute path to a PPT workspace containing a confirmed outline.json.",
           "required": true
+        },
+        {
+          "name": "reset_existing",
+          "type": "boolean",
+          "description": "Overwrite existing Page Sources from the Bootstrap when starting a newly confirmed Outline.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "app_commit_workspace_style_guide_host_upload",
+      "description": "Commit a non-empty text/markdown Host Upload as the Workspace-owned style-guide.md artifact.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing PPT workspace.",
+          "required": true
+        },
+        {
+          "name": "size_bytes",
+          "type": "number",
+          "description": "Expected Markdown upload size in bytes.",
+          "required": true
+        },
+        {
+          "name": "host_upload",
+          "type": "object",
+          "description": "text/markdown HostUploadRef returned by the Anna App Host Upload API.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_reconcile_workspace_page_sources",
+      "description": "Repair missing pending Page Sources from the Bootstrap and reject missing progressed Page Sources without checking the Authoring Kit directory.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing PPT workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_initialize_page_progress",
+      "description": "Initialize page-progress.json from the Confirmed Outline after the Style Guide and Page Sources exist.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing PPT workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_workspace_style_guide_status",
+      "description": "Return whether the Workspace-owned style-guide.md exists and contains non-whitespace text.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing PPT workspace.",
+          "required": true
         }
       ]
     },
@@ -1276,9 +1342,9 @@
           "required": true
         },
         {
-          "name": "page_index",
-          "type": "integer",
-          "description": "Zero-based page index to render.",
+          "name": "page_id",
+          "type": "string",
+          "description": "Stable page id from the Confirmed Outline.",
           "required": true
         }
       ]

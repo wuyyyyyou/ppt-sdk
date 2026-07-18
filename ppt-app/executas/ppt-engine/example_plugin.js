@@ -70,6 +70,10 @@ import {
   prepareAppUploadedSourceAnalysisWorkspace,
   prepareAppResearchWorkspace,
   prepareWorkspacePageSources,
+  reconcileWorkspacePageSources,
+  recordAppWorkspaceStyleGuide,
+  getAppWorkspaceStyleGuideStatus,
+  initializeAppPageProgress,
   recordAppPagePlan,
   recordAppPageProgress,
   recordAppPdfExport,
@@ -381,6 +385,11 @@ const STYLE_PROFILE_REFERENCE_STAGING_DIR = path.join(
   os.tmpdir(),
   "presenton-template-engine-executa",
   "style-profile-reference-staging",
+);
+const STYLE_GUIDE_STAGING_DIR = path.join(
+  os.tmpdir(),
+  "presenton-template-engine-executa",
+  "style-guide-staging",
 );
 
 function getArtifactContentType(artifactType) {
@@ -792,7 +801,55 @@ async function toolAppEnsureConfirmedOutlinePageIds(args) {
 
 async function toolAppPrepareWorkspacePageSources(args) {
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  return prepareWorkspacePageSources({ workspace_dir: workspaceDir });
+  return prepareWorkspacePageSources({
+    workspace_dir: workspaceDir,
+    reset_existing: args?.reset_existing === true,
+  });
+}
+
+async function toolAppReconcileWorkspacePageSources(args) {
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return reconcileWorkspacePageSources({ workspace_dir: workspaceDir });
+}
+
+async function toolAppCommitWorkspaceStyleGuideHostUpload(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const hostUpload = readHostUploadRefArg(args, "host_upload");
+  if (hostUpload.mime_type !== "text/markdown") {
+    throw new Error('Workspace Style Guide Host Upload MIME type must be "text/markdown"');
+  }
+  const sizeBytes = Number(args.size_bytes);
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0 || Math.floor(sizeBytes) !== hostUpload.size_bytes) {
+    throw new Error("Workspace Style Guide Host Upload size mismatch");
+  }
+  const stagingPath = path.join(STYLE_GUIDE_STAGING_DIR, `${randomUUID()}.md`);
+  try {
+    await downloadHostUploadToStaging({
+      hostUpload,
+      stagingPath,
+      expectedSizeBytes: Math.floor(sizeBytes),
+    });
+    return recordAppWorkspaceStyleGuide({
+      workspace_dir: workspaceDir,
+      staging_file_path: stagingPath,
+      expected_size_bytes: Math.floor(sizeBytes),
+    });
+  } finally {
+    await unlink(stagingPath).catch(() => undefined);
+  }
+}
+
+async function toolAppGetWorkspaceStyleGuideStatus(args) {
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return getAppWorkspaceStyleGuideStatus({ workspace_dir: workspaceDir });
+}
+
+async function toolAppInitializePageProgress(args) {
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return initializeAppPageProgress({ workspace_dir: workspaceDir });
 }
 
 async function toolAppRebuildWorkspaceDeckManifest(args) {
@@ -1213,6 +1270,8 @@ async function toolAppAppendWorkspaceLog(args) {
     "ai-requirements-interactions",
     "ai-outline",
     "ai-outline-interactions",
+    "ai-style-guide",
+    "ai-style-guide-interactions",
     "ai-page-plan",
     "ai-page-plan-interactions",
     "ai-page-agent",
@@ -1845,14 +1904,14 @@ async function toolAppRenderWorkspacePagePreview(args) {
   }
 
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const pageIndex = Number(args.page_index);
-  if (!Number.isInteger(pageIndex) || pageIndex < 0) {
-    throw new Error('"page_index" must be a non-negative integer');
+  const pageId = typeof args.page_id === "string" ? args.page_id.trim() : "";
+  if (!pageId) {
+    throw new Error('"page_id" must be a non-empty string');
   }
 
   const result = await renderAppWorkspacePagePreview({
     workspace_dir: workspaceDir,
-    page_index: pageIndex,
+    page_id: pageId,
   });
 
   return {
@@ -2178,6 +2237,10 @@ const TOOL_DISPATCH = {
   app_install_workspace_authoring_kit: toolAppInstallWorkspaceAuthoringKit,
   app_ensure_confirmed_outline_page_ids: toolAppEnsureConfirmedOutlinePageIds,
   app_prepare_workspace_page_sources: toolAppPrepareWorkspacePageSources,
+  app_reconcile_workspace_page_sources: toolAppReconcileWorkspacePageSources,
+  app_commit_workspace_style_guide_host_upload: toolAppCommitWorkspaceStyleGuideHostUpload,
+  app_get_workspace_style_guide_status: toolAppGetWorkspaceStyleGuideStatus,
+  app_initialize_page_progress: toolAppInitializePageProgress,
   app_rebuild_workspace_deck_manifest: toolAppRebuildWorkspaceDeckManifest,
   app_get_workspace_page_source_fingerprint: toolAppGetWorkspacePageSourceFingerprint,
   app_commit_uploaded_source_host_upload: toolAppCommitUploadedSourceHostUpload,

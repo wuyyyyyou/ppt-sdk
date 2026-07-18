@@ -38,18 +38,13 @@ function readString(record: Record<string, unknown> | null, key: string) {
 export function hasDownstreamArtifacts(workspace: WorkspaceResult) {
   const pagePlanRecord = isRecord(workspace.page_plan) ? workspace.page_plan : null;
   const progressRecord = isRecord(workspace.page_progress) ? workspace.page_progress : null;
-  const pagesRecord = isRecord(workspace.pages) ? workspace.pages : null;
 
   return (
     (Array.isArray(pagePlanRecord?.pages) && pagePlanRecord.pages.length > 0) ||
-    (Array.isArray(progressRecord?.pages) && progressRecord.pages.length > 0) ||
-    (Array.isArray(pagesRecord?.pages) && pagesRecord.pages.length > 0)
+    (Array.isArray(progressRecord?.pages) && progressRecord.pages.length > 0)
   );
 }
 
-export function isWorkspaceDeckStale(workspace: WorkspaceResult) {
-  if (readString(isRecord(workspace.pages) ? workspace.pages : null, "status") === "stale") {
-    return true;
-  }
+export function isWorkspaceDeckStale(_workspace: WorkspaceResult) {
   return false;
 }

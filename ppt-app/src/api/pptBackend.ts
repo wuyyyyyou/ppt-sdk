@@ -93,6 +93,12 @@ import type {
   WorkspaceOutline,
   WorkspaceDefaultsResult,
   WorkspaceResult
+  , WorkspaceAuthoringKitResult
+  , PrepareWorkspacePageSourcesResult
+  , WorkspacePageSourceFingerprint
+  , CommitWorkspaceStyleGuideHostUploadInput
+  , CommitWorkspaceStyleGuideResult
+  , WorkspaceStyleGuideStatus
 } from "./types";
 import { createAnnaPptBackend } from "./annaPptBackend";
 import { connectAnnaRuntime } from "../runtime/annaRuntime";
@@ -103,6 +109,17 @@ export interface PptBackend {
   getWorkspaceDefaults(): Promise<WorkspaceDefaultsResult>;
   createWorkspace(input: CreateWorkspaceInput): Promise<CreateWorkspaceResult>;
   openWorkspace(input: OpenWorkspaceInput): Promise<WorkspaceResult>;
+  installWorkspaceAuthoringKit(input: { workspace_dir: string }): Promise<WorkspaceAuthoringKitResult>;
+  prepareWorkspacePageSources(input: { workspace_dir: string; reset_existing?: boolean }): Promise<PrepareWorkspacePageSourcesResult>;
+  reconcileWorkspacePageSources(input: { workspace_dir: string }): Promise<{
+    paths: PrepareWorkspacePageSourcesResult["paths"];
+    repaired_page_ids: string[];
+    manifest: PrepareWorkspacePageSourcesResult["manifest"];
+  }>;
+  getWorkspacePageSourceFingerprint(input: { workspace_dir: string; page_id: string }): Promise<WorkspacePageSourceFingerprint>;
+  commitWorkspaceStyleGuideHostUpload(input: CommitWorkspaceStyleGuideHostUploadInput): Promise<CommitWorkspaceStyleGuideResult>;
+  getWorkspaceStyleGuideStatus(input: { workspace_dir: string }): Promise<WorkspaceStyleGuideStatus>;
+  initializePageProgress(input: { workspace_dir: string }): Promise<PageProgress>;
   commitUploadedSourceHostUpload(input: CommitUploadedSourceHostUploadInput): Promise<CommitUploadedSourceHostUploadResult>;
   listStyleProfiles(): Promise<ListStyleProfilesResult>;
   getStyleProfilePreview(input: { style_profile_id: string }): Promise<GetStyleProfilePreviewResult>;

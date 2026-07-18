@@ -124,6 +124,11 @@ import type {
   AppResearchPaths,
   RecordAppPagePlanInput,
   RecordAppPageProgressInput,
+  RecordAppWorkspaceStyleGuideInput,
+  RecordAppWorkspaceStyleGuideResult,
+  GetAppWorkspaceStyleGuideStatusInput,
+  GetAppWorkspaceStyleGuideStatusResult,
+  InitializeAppPageProgressInput,
   RecordAppWorkspaceThemeTokenInput,
   RecordAppWorkspaceThemeTokenResult,
   RecordAppPdfExportInput,
@@ -178,24 +183,25 @@ import type {
 } from "./types.js";
 
 const WORKSPACE_ROOT = path.join(os.homedir(), "anna-workspace", "ppt");
+const WORKSPACE_FORMAT = "authoring-kit-v1";
 const LEGACY_TASK_ROOT = path.join(WORKSPACE_ROOT, "tasks");
 const WORKSPACE_SETTING_PATH = path.join(WORKSPACE_ROOT, "setting.json");
 const WORKSPACE_DIR_PATTERN = /^ppt-\d{8}-\d{6}$/;
+const PAGE_ID_PATTERN = /^page-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const WORKSPACE_FILE_NAMES = [
   "task.json",
   "setting.json",
   "requirements.json",
   "outline.json",
-  "page-plan.json",
   "page-progress.json",
-  "pages.json",
-  "template.json",
 ] as const;
 const WORKSPACE_LOG_FILE_NAMES = {
   "ai-requirements": "ai-requirements.jsonl",
   "ai-requirements-interactions": "ai-requirements-interactions.jsonl",
   "ai-outline": "ai-outline.jsonl",
   "ai-outline-interactions": "ai-outline-interactions.jsonl",
+  "ai-style-guide": "ai-style-guide.jsonl",
+  "ai-style-guide-interactions": "ai-style-guide-interactions.jsonl",
   "ai-page-plan": "ai-page-plan.jsonl",
   "ai-page-plan-interactions": "ai-page-plan-interactions.jsonl",
   "ai-page-agent": "ai-page-agent.jsonl",
@@ -363,6 +369,9 @@ function buildWorkspaceFilePaths(workspaceDir: string) {
     setting: path.join(workspaceDir, "setting.json"),
     requirements: path.join(workspaceDir, "requirements.json"),
     outline: path.join(workspaceDir, "outline.json"),
+    manifest: path.join(workspaceDir, "manifest.json"),
+    style_guide: path.join(workspaceDir, "style-guide.md"),
+    authoring_kit: path.join(workspaceDir, "authoring-kit"),
     page_plan: path.join(workspaceDir, "page-plan.json"),
     page_progress: path.join(workspaceDir, "page-progress.json"),
     pages: path.join(workspaceDir, "pages.json"),
@@ -899,29 +908,25 @@ function createDefaultTaskJson(workspaceDir: string, title?: string) {
     status: "initialized",
     task_dir: workspaceDir,
     workspace_dir: workspaceDir,
+    workspace_format: WORKSPACE_FORMAT,
     created_at: now,
     updated_at: now,
     artifacts: {
       task: "task.json",
       setting: "setting.json",
+      requirements: "requirements.json",
       outline: "outline.json",
-      page_plan: "page-plan.json",
       page_progress: "page-progress.json",
-      pages: "pages.json",
+      manifest: "manifest.json",
+      style_guide: "style-guide.md",
+      authoring_kit: "authoring-kit/",
     },
   };
 }
 
 function createDefaultSettingJson() {
   return {
-    audience: "",
-    goal: "",
-    style_notes: "",
-    output_language: "auto",
-    text_density: "balanced",
     page_generation_concurrency: 5,
-    content_review_enabled: false,
-    content_review_failure_limit: 5,
     visual_review_enabled: false,
     visual_review_failure_limit: 2,
     disable_web_research: false,
@@ -952,41 +957,19 @@ function normalizeSettingJson(setting: unknown): Record<string, unknown> {
     setting && typeof setting === "object" && !Array.isArray(setting)
       ? (setting as Record<string, unknown>)
       : {};
-  const nextSetting = { ...existing };
-
-  delete nextSetting.content_source;
-  delete nextSetting.slide_count;
-  delete nextSetting.language;
-
-  if (typeof nextSetting.output_language !== "string" || nextSetting.output_language.trim().length === 0) {
-    nextSetting.output_language = "auto";
-  } else {
-    nextSetting.output_language = nextSetting.output_language.trim();
-  }
-
-  if (
-    nextSetting.visual_tone === "极简 SaaS · 清爽版式 · 柔和中性色" ||
-    nextSetting.visual_tone === "professional"
-  ) {
-    nextSetting.visual_tone = "";
-  }
-
-  nextSetting.content_review_enabled = nextSetting.content_review_enabled === true;
-  nextSetting.visual_review_enabled = nextSetting.visual_review_enabled === true;
-  nextSetting.disable_web_research = nextSetting.disable_web_research === true;
-  nextSetting.disable_image_research = nextSetting.disable_image_research === true;
-  nextSetting.page_generation_concurrency = normalizePageGenerationConcurrency(
-    nextSetting.page_generation_concurrency,
-  );
-  nextSetting.content_review_failure_limit = normalizeReviewFailureLimit(
-    nextSetting.content_review_failure_limit,
-  );
-  nextSetting.visual_review_failure_limit = normalizeReviewFailureLimit(
-    nextSetting.visual_review_failure_limit,
-    2,
-  );
-
-  return nextSetting;
+  return {
+    page_generation_concurrency: normalizePageGenerationConcurrency(
+      existing.page_generation_concurrency,
+    ),
+    visual_review_enabled: existing.visual_review_enabled === true,
+    visual_review_failure_limit: normalizeReviewFailureLimit(
+      existing.visual_review_failure_limit,
+      2,
+    ),
+    disable_web_research: existing.disable_web_research === true,
+    disable_image_research: existing.disable_image_research === true,
+    ...(typeof existing.updated_at === "string" ? { updated_at: existing.updated_at } : {}),
+  };
 }
 
 async function ensureWorkspaceSetting(): Promise<Record<string, unknown>> {
@@ -1276,10 +1259,25 @@ function normalizeOutlineLine(value: unknown, fieldName: string): string {
   return normalized;
 }
 
-function normalizeValidOutlineItem(value: unknown, index: number): AppWorkspaceOutlineItem {
+function normalizeValidOutlineItem(
+  value: unknown,
+  index: number,
+  options: { require_page_id?: boolean } = {},
+): AppWorkspaceOutlineItem {
   if (!isRecord(value)) throw new Error(`outline.items[${index}] must be an object`);
-  assertExactKeys(value, ["title", "core_message", "required_content"], `outline.items[${index}]`);
+  assertExactKeys(
+    value,
+    options.require_page_id
+      ? ["page_id", "title", "core_message", "required_content"]
+      : ["title", "core_message", "required_content"],
+    `outline.items[${index}]`,
+  );
+  const pageId = options.require_page_id ? normalizeString(value.page_id) : "";
+  if (options.require_page_id && !PAGE_ID_PATTERN.test(pageId)) {
+    throw new Error(`outline.items[${index}].page_id must be an opaque page UUID`);
+  }
   return {
+    ...(pageId ? { page_id: pageId } : {}),
     title: normalizeOutlineLine(value.title, `outline.items[${index}].title`),
     core_message: normalizeOutlineLine(value.core_message, `outline.items[${index}].core_message`),
     required_content: normalizeRequiredContentMarkdown(
@@ -1335,7 +1333,17 @@ function normalizeOutlineJson(outline: unknown): AppWorkspaceOutline {
   if (!Array.isArray(outline.items) || outline.items.length === 0) {
     throw new Error("outline.items must contain at least one page");
   }
-  const items = outline.items.map(normalizeValidOutlineItem);
+  const confirmedItemsHavePageIds = outline.status === "confirmed" && outline.items.every(
+    (item) => isRecord(item) && typeof item.page_id === "string" && item.page_id.length > 0,
+  );
+  const items = outline.items.map((item, index) => normalizeValidOutlineItem(
+    item,
+    index,
+    { require_page_id: confirmedItemsHavePageIds },
+  ));
+  if (confirmedItemsHavePageIds && new Set(items.map((item) => item.page_id)).size !== items.length) {
+    throw new Error("confirmed outline page_id values must be unique");
+  }
   const updatedAt = normalizeString(outline.updated_at).trim();
   if (!updatedAt) throw new Error("persisted outline.updated_at must be a non-empty string");
   const confirmedAt = outline.confirmed_at === null ? null : normalizeString(outline.confirmed_at).trim();
@@ -1484,30 +1492,38 @@ function normalizePageProgressItem(value: unknown): AppPageProgressItem | null {
 
   return {
     page_id: pageId,
-    index: typeof record.index === "number" ? record.index : 0,
-    title: normalizeString(record.title) || pageId,
-    status: normalizeString(record.status) || "pending",
+    status: PAGE_PROGRESS_PAGE_STATUSES.has(normalizeString(record.status))
+      ? normalizeString(record.status)
+      : "pending",
     render_attempts: typeof record.render_attempts === "number" ? record.render_attempts : 0,
     visual_review_attempts:
       typeof record.visual_review_attempts === "number" ? record.visual_review_attempts : 0,
-    content_review_attempts:
-      typeof record.content_review_attempts === "number" ? record.content_review_attempts : 0,
     agent_failures: typeof record.agent_failures === "number" ? record.agent_failures : 0,
     agent_infrastructure_failures:
       typeof record.agent_infrastructure_failures === "number"
         ? record.agent_infrastructure_failures
         : 0,
-    slide_path: normalizeString(record.slide_path),
-    data_path: normalizeString(record.data_path),
     last_html_path: normalizeString(record.last_html_path),
     last_screenshot_path: normalizeString(record.last_screenshot_path),
     last_error: normalizeString(record.last_error),
-    content_review: record.content_review ?? null,
     visual_review: record.visual_review ?? null,
-    review: record.review ?? null,
     updated_at: typeof record.updated_at === "string" ? record.updated_at : null,
   };
 }
+
+const PAGE_PROGRESS_PAGE_STATUSES = new Set([
+  "pending",
+  "authoring",
+  "rendering",
+  "render_fixing",
+  "visual_review",
+  "visual_review_fixing",
+  "accepted",
+  "interrupted",
+  "agent_failed",
+  "agent_infrastructure_failed",
+  "render_failed",
+]);
 
 const PAGE_PROGRESS_RECOVERY_RUN_KINDS = new Set([
   "deck-generation",
@@ -1586,7 +1602,6 @@ function normalizeFinalDeckRenderState(value: unknown): AppPageProgress["final_d
     error: normalizeNullableString(record.error),
     output_dir: normalizeNullableString(record.output_dir),
     deck_html_path: normalizeNullableString(record.deck_html_path),
-    pages_path: normalizeNullableString(record.pages_path),
     rendered_at: typeof record.rendered_at === "string" ? record.rendered_at : null,
     updated_at: typeof record.updated_at === "string" ? record.updated_at : null,
   };
@@ -1636,7 +1651,6 @@ function normalizePageProgressJson(value: unknown): AppPageProgress {
     ? record.pages
         .map(normalizePageProgressItem)
         .filter((item): item is AppPageProgressItem => item !== null)
-        .sort((left, right) => left.index - right.index)
     : [];
 
   return {
@@ -1695,7 +1709,6 @@ function createDefaultPageProgressJson(): AppPageProgress {
       error: null,
       output_dir: null,
       deck_html_path: null,
-      pages_path: null,
       rendered_at: null,
       updated_at: null,
     },
@@ -1719,6 +1732,9 @@ function createDefaultTemplateJson() {
 }
 
 function readSelectedTemplateManifestPath(workspace: AppWorkspaceResult): string {
+  if (getPlainRecord(workspace.task).workspace_format === WORKSPACE_FORMAT) {
+    return workspace.files.manifest;
+  }
   const template =
     workspace.template && typeof workspace.template === "object" && !Array.isArray(workspace.template)
       ? (workspace.template as Record<string, unknown>)
@@ -1820,7 +1836,7 @@ function readSelectedTemplateCatalogPath(workspace: AppWorkspaceResult): string 
 
 async function ensureWorkspaceFiles(
   workspaceDir: string,
-  options: CreateAppWorkspaceInput = {},
+  options: CreateAppWorkspaceInput & { require_format?: boolean } = {},
 ): Promise<AppWorkspaceResult> {
   const normalizedWorkspaceDir = normalizeWorkspaceDir(workspaceDir);
   const workspaceName = path.basename(normalizedWorkspaceDir);
@@ -1830,6 +1846,16 @@ async function ensureWorkspaceFiles(
   const files = buildWorkspaceFilePaths(normalizedWorkspaceDir);
   const createdFiles: string[] = [];
 
+  const existingTask = await readJsonFileIfExists(files.task);
+  if (existingTask !== null && options.require_format === true) {
+    const existingTaskRecord = getPlainRecord(existingTask);
+    if (existingTaskRecord.workspace_format !== WORKSPACE_FORMAT) {
+      throw new Error(
+        `Unsupported Workspace format. Expected "${WORKSPACE_FORMAT}"; legacy Workspace migration is not available.`,
+      );
+    }
+  }
+
   const defaults = {
     task: createDefaultTaskJson(normalizedWorkspaceDir, options.title),
     setting: normalizeSettingJson({
@@ -1838,10 +1864,7 @@ async function ensureWorkspaceFiles(
     }),
     requirements: createDefaultPresentationRequirements(),
     outline: createDefaultOutlineJson(),
-    page_plan: createDefaultPagePlanJson(),
     page_progress: createDefaultPageProgressJson(),
-    pages: createDefaultPagesJson(),
-    template: createDefaultTemplateJson(),
   };
 
   for (const [key, defaultValue] of Object.entries(defaults)) {
@@ -1868,8 +1891,21 @@ async function ensureWorkspaceFiles(
 
   const currentOutline = await readJsonFileIfExists(files.outline);
   const normalizedOutline = normalizeOutlineJson(currentOutline);
+  if (
+    getPlainRecord(existingTask).workspace_format === WORKSPACE_FORMAT &&
+    normalizedOutline.status === "confirmed" &&
+    normalizedOutline.items.some((item) => !item.page_id)
+  ) {
+    throw new Error("authoring-kit-v1 Confirmed Outline entries must all own page_id");
+  }
   if (JSON.stringify(currentOutline) !== JSON.stringify(normalizedOutline)) {
     await writeJsonFile(files.outline, normalizedOutline);
+  }
+
+  const currentPageProgress = await readJsonFileIfExists(files.page_progress);
+  const normalizedPageProgress = normalizePageProgressJson(currentPageProgress);
+  if (JSON.stringify(currentPageProgress) !== JSON.stringify(normalizedPageProgress)) {
+    await writeJsonFile(files.page_progress, normalizedPageProgress);
   }
 
   const missingFiles: string[] = [];
@@ -1896,7 +1932,7 @@ async function ensureWorkspaceFiles(
     requirements: normalizedRequirements,
     outline: normalizedOutline,
     page_plan: await readJsonFileIfExists(files.page_plan),
-    page_progress: await readJsonFileIfExists(files.page_progress),
+    page_progress: normalizedPageProgress,
     pages: await readJsonFileIfExists(files.pages),
     template: await readJsonFileIfExists(files.template),
   };
@@ -2005,20 +2041,8 @@ export async function createAppWorkspace(
   const setting = normalizeSettingJson(workspace.setting);
   const defaults = createDefaultSettingJson();
   const createSetting: AppCreateWorkspaceSetting = {
-    output_language:
-      typeof setting.output_language === "string"
-        ? setting.output_language
-        : defaults.output_language,
-    text_density:
-      typeof setting.text_density === "string"
-        ? setting.text_density
-        : defaults.text_density,
     page_generation_concurrency: normalizePageGenerationConcurrency(
       setting.page_generation_concurrency,
-    ),
-    content_review_enabled: setting.content_review_enabled === true,
-    content_review_failure_limit: normalizeReviewFailureLimit(
-      setting.content_review_failure_limit,
     ),
     visual_review_enabled: setting.visual_review_enabled === true,
     visual_review_failure_limit: normalizeReviewFailureLimit(
@@ -2042,7 +2066,7 @@ export async function createAppWorkspace(
 export async function openAppWorkspace(
   input: OpenAppWorkspaceInput,
 ): Promise<AppWorkspaceResult> {
-  return ensureWorkspaceFiles(input.workspace_dir);
+  return ensureWorkspaceFiles(input.workspace_dir, { require_format: true });
 }
 
 export async function updateAppWorkspaceSettings(
@@ -3417,8 +3441,6 @@ export async function updateAppWorkspacePages(
       return existing
         ? {
             ...existing,
-            index: planPage.index,
-            title: planPage.title,
             updated_at: updatedAt,
           }
         : null;
@@ -3568,8 +3590,6 @@ export async function duplicateAppWorkspacePage(
             ? {
                 ...sourceProgress,
                 page_id: copyPagePlanId,
-                index: planPage.index,
-                title: copyTitle,
                 updated_at: updatedAt,
               }
             : null;
@@ -3578,8 +3598,6 @@ export async function duplicateAppWorkspacePage(
         return existing
           ? {
               ...existing,
-              index: planPage.index,
-              title: planPage.title,
             }
           : null;
       })
@@ -3616,6 +3634,7 @@ export async function updateAppWorkspaceRequirements(
   input: UpdateAppWorkspaceRequirementsInput,
 ): Promise<AppWorkspaceResult> {
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const currentRequirements = normalizePresentationRequirements(workspace.requirements);
   const requirements = normalizePresentationRequirements(input.requirements);
   const updatedAt = new Date().toISOString();
   const nextRequirements: AppPresentationRequirements = {
@@ -3623,6 +3642,9 @@ export async function updateAppWorkspaceRequirements(
     updated_at: updatedAt,
     confirmed_at: requirements.status === "confirmed" ? updatedAt : null,
   };
+  if (getSelectedVisualTone(currentRequirements) !== getSelectedVisualTone(nextRequirements)) {
+    await invalidateWorkspaceStyleGuide(workspace);
+  }
   await writeJsonFile(workspace.files.requirements, nextRequirements);
   await touchWorkspaceTask(workspace, updatedAt);
   return ensureWorkspaceFiles(input.workspace_dir);
@@ -4338,10 +4360,36 @@ function buildPersistedOutline(
     version: 3,
     status,
     title,
-    items: outline.items.map(normalizeValidOutlineItem),
+    items: outline.items.map((item, index) => {
+      const normalized = normalizeValidOutlineItem(item, index);
+      return status === "confirmed"
+        ? { ...normalized, page_id: `page-${randomUUID()}` }
+        : normalized;
+    }),
     updated_at: updatedAt,
     confirmed_at: status === "confirmed" ? updatedAt : null,
   };
+}
+
+function outlineContentSignature(outline: AppWorkspaceOutline): string {
+  if (outline.status === "empty") return "";
+  const items = outline.items
+    .map((item) => JSON.stringify([
+      item.title.trim(),
+      item.core_message.trim(),
+      item.required_content.trim(),
+    ]))
+    .sort();
+  return JSON.stringify([outline.title.trim(), items]);
+}
+
+function getSelectedVisualTone(requirements: AppPresentationRequirements): string {
+  const visualTone = requirements.selections.visual_tone;
+  return visualTone ? JSON.stringify([visualTone.label.trim(), visualTone.description.trim()]) : "";
+}
+
+async function invalidateWorkspaceStyleGuide(workspace: AppWorkspaceResult): Promise<void> {
+  await rm(workspace.files.style_guide, { force: true });
 }
 
 async function persistAppWorkspaceOutline(
@@ -4365,6 +4413,10 @@ async function persistAppWorkspaceOutline(
     confirmed_at: updatedAt,
   };
   const currentTask = getPlainRecord(workspace.task);
+  const currentOutline = normalizeOutlineJson(workspace.outline);
+  if (outlineContentSignature(currentOutline) !== outlineContentSignature(nextOutline)) {
+    await invalidateWorkspaceStyleGuide(workspace);
+  }
   await writeJsonFile(workspace.files.outline, nextOutline);
   await writeJsonFile(workspace.files.requirements, nextRequirements);
   await writeJsonFile(workspace.files.task, {
@@ -4384,6 +4436,7 @@ export async function resetAppWorkspaceOutline(
     throw new Error("Confirmed Presentation Requirements are required before resetting an Outline.");
   }
   const updatedAt = new Date().toISOString();
+  await invalidateWorkspaceStyleGuide(workspace);
   await writeJsonFile(workspace.files.outline, createEmptyOutlineJson());
   await touchWorkspaceTask(workspace, updatedAt);
   return ensureWorkspaceFiles(input.workspace_dir);
@@ -4821,29 +4874,31 @@ export async function renderAppWorkspaceDeckHtml(
     screenshot_path: slide.screenshotPath,
     speaker_note: slide.speakerNote,
   }));
-  const pages: AppWorkspacePages = {
-    version: 1,
-    status: "rendered",
-    title: result.title,
-    manifest_path: result.manifestPath,
-    output_dir: result.outputDir,
-    rendered_at: renderedAt,
-    pages: slides.map((slide, index) => ({
-      page_id: slide.slide_id,
-      index,
-      title: slide.title,
-      layout_id: slide.layout_id,
-      html_path: slide.html_path,
-      screenshot_path: slide.screenshot_path,
-      speaker_note: slide.speaker_note,
-    })),
-    source: {
-      kind: "template-manifest",
+  const currentProgress = normalizePageProgressJson(workspace.page_progress);
+  const renderedByPageId = new Map(slides.map((slide) => [slide.slide_id, slide]));
+  const nextProgress: AppPageProgress = {
+    ...currentProgress,
+    final_deck_render: {
+      status: "completed",
+      message: null,
+      error: null,
+      output_dir: result.outputDir,
+      deck_html_path: slides[0]?.html_path ?? null,
+      rendered_at: renderedAt,
+      updated_at: renderedAt,
     },
+    pages: currentProgress.pages.map((page) => {
+      const rendered = renderedByPageId.get(page.page_id);
+      return rendered ? {
+        ...page,
+        last_html_path: rendered.html_path,
+        last_screenshot_path: rendered.screenshot_path,
+        updated_at: renderedAt,
+      } : page;
+    }),
     updated_at: renderedAt,
   };
-
-  await writeJsonFile(workspace.files.pages, pages);
+  await writeJsonFile(workspace.files.page_progress, nextProgress);
   await touchWorkspaceTask(workspace, renderedAt);
 
   return {
@@ -4885,57 +4940,48 @@ export async function getRenderedAppWorkspaceDeckHtml(
   const manifestSlides = Array.isArray(manifestRecord.slides)
     ? manifestRecord.slides.map((slide) => getPlainRecord(slide))
     : [];
-  const pagesRecord = getPlainRecord(await readJsonFileIfExists(workspace.files.pages));
-  const rawPages = Array.isArray(pagesRecord.pages)
-    ? pagesRecord.pages.map((page) => getPlainRecord(page))
-    : [];
-
-  if (pagesRecord.status !== "rendered" || rawPages.length === 0) {
+  const progress = normalizePageProgressJson(workspace.page_progress);
+  if (progress.final_deck_render.status !== "completed" || progress.pages.length === 0) {
     throw new Error("Rendered deck pages are unavailable");
   }
-  if (manifestSlides.length !== rawPages.length) {
+  if (manifestSlides.length !== progress.pages.length) {
     throw new Error("Rendered deck page count does not match the selected template manifest");
   }
 
-  const recordedManifestPath = normalizeString(pagesRecord.manifest_path);
-  if (recordedManifestPath && path.normalize(recordedManifestPath) !== path.normalize(manifestPath)) {
-    throw new Error("Rendered deck manifest path does not match the selected template manifest");
-  }
-
   const slides = await Promise.all(
-    rawPages.map(async (page, index) => {
+    progress.pages.map(async (page, index) => {
       const manifestSlide = manifestSlides[index] ?? {};
-      const pageId = normalizeString(page.page_id);
+      const pageId = page.page_id;
       const manifestPageId = readPageIdFromManifestSlide(manifestSlide);
       if (!pageId || pageId !== manifestPageId) {
         throw new Error(`Rendered deck page ${index + 1} does not match the selected template manifest`);
       }
 
-      const htmlPath = await assertExistingFile(normalizeString(page.html_path), `Rendered deck HTML for ${pageId}`);
+      const htmlPath = await assertExistingFile(page.last_html_path, `Rendered deck HTML for ${pageId}`);
       const screenshotPath = await assertExistingFile(
-        normalizeString(page.screenshot_path),
+        page.last_screenshot_path,
         `Rendered deck screenshot for ${pageId}`,
       );
 
       return {
         slide_id: pageId,
-        layout_id: normalizeString(page.layout_id),
-        title: normalizeString(page.title) || normalizeString(manifestSlide.title) || pageId,
+        layout_id: normalizeString(manifestSlide.layout_id),
+        title: normalizeString(manifestSlide.title) || pageId,
         html_path: htmlPath,
         screenshot_path: screenshotPath,
-        speaker_note: normalizeString(page.speaker_note),
+        speaker_note: normalizeString(manifestSlide.speaker_note),
       };
     }),
   );
 
   return {
     workspace_dir: workspace.workspace_dir,
-    manifest_path: recordedManifestPath || manifestPath,
-    output_dir: normalizeString(pagesRecord.output_dir),
+    manifest_path: manifestPath,
+    output_dir: progress.final_deck_render.output_dir ?? "",
     slides,
     slide_count: slides.length,
-    title: normalizeString(pagesRecord.title) || normalizeString(manifestRecord.title),
-    rendered_at: normalizeString(pagesRecord.rendered_at) || normalizeString(pagesRecord.updated_at),
+    title: normalizeString(manifestRecord.title),
+    rendered_at: progress.final_deck_render.rendered_at ?? progress.updated_at ?? "",
   };
 }
 
@@ -5444,7 +5490,6 @@ function buildInitialPageProgress(pagePlan: AppPagePlan): AppPageProgress {
       error: null,
       output_dir: null,
       deck_html_path: null,
-      pages_path: null,
       rendered_at: null,
       updated_at: now,
     },
@@ -5455,7 +5500,6 @@ function buildInitialPageProgress(pagePlan: AppPagePlan): AppPageProgress {
       status: "pending",
       render_attempts: 0,
       visual_review_attempts: 0,
-      content_review_attempts: 0,
       agent_failures: 0,
       agent_infrastructure_failures: 0,
       slide_path: page.slide_path,
@@ -5463,9 +5507,7 @@ function buildInitialPageProgress(pagePlan: AppPagePlan): AppPageProgress {
       last_html_path: "",
       last_screenshot_path: "",
       last_error: "",
-      content_review: null,
       visual_review: null,
-      review: null,
       updated_at: now,
     })),
     updated_at: now,
@@ -5597,7 +5639,6 @@ export async function prepareAppDeckRefinementPageFiles(
       error: null,
       output_dir: null,
       deck_html_path: null,
-      pages_path: null,
       rendered_at: null,
       updated_at: preparedAt,
     },
@@ -5620,7 +5661,6 @@ export async function prepareAppDeckRefinementPageFiles(
         status: "pending",
         render_attempts: 0,
         visual_review_attempts: 0,
-        content_review_attempts: 0,
         agent_failures: 0,
         agent_infrastructure_failures: 0,
         slide_path: page.slide_path,
@@ -5628,9 +5668,7 @@ export async function prepareAppDeckRefinementPageFiles(
         last_html_path: "",
         last_screenshot_path: "",
         last_error: "",
-        content_review: null,
         visual_review: null,
-        review: null,
         updated_at: preparedAt,
       };
     }),
@@ -5691,6 +5729,106 @@ export async function getAppPageProgress(
   return normalizePageProgressJson(workspace.page_progress);
 }
 
+export async function recordAppWorkspaceStyleGuide(
+  input: RecordAppWorkspaceStyleGuideInput,
+): Promise<RecordAppWorkspaceStyleGuideResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  assertAbsolutePath(input.staging_file_path, "staging_file_path");
+  const expectedSizeBytes = Math.floor(input.expected_size_bytes);
+  if (!Number.isFinite(expectedSizeBytes) || expectedSizeBytes <= 0) {
+    throw new Error('"expected_size_bytes" must be a positive integer');
+  }
+  const bytes = await readFile(input.staging_file_path);
+  if (bytes.length !== expectedSizeBytes) {
+    throw new Error(
+      `Style Guide size mismatch: expected ${expectedSizeBytes} bytes, got ${bytes.length} bytes`,
+    );
+  }
+  if (bytes.toString("utf8").trim().length === 0) {
+    throw new Error("Workspace Style Guide must not be empty");
+  }
+  await writeFile(workspace.files.style_guide, bytes);
+  const updatedAt = new Date().toISOString();
+  await touchWorkspaceTask(workspace, updatedAt);
+  return {
+    workspace_dir: workspace.workspace_dir,
+    style_guide_path: workspace.files.style_guide,
+    size_bytes: bytes.length,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+    updated_at: updatedAt,
+  };
+}
+
+export async function getAppWorkspaceStyleGuideStatus(
+  input: GetAppWorkspaceStyleGuideStatusInput,
+): Promise<GetAppWorkspaceStyleGuideStatusResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  try {
+    const bytes = await readFile(workspace.files.style_guide);
+    return {
+      workspace_dir: workspace.workspace_dir,
+      style_guide_path: workspace.files.style_guide,
+      exists: true,
+      non_empty: bytes.toString("utf8").trim().length > 0,
+      size_bytes: bytes.length,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+    };
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return {
+        workspace_dir: workspace.workspace_dir,
+        style_guide_path: workspace.files.style_guide,
+        exists: false,
+        non_empty: false,
+        size_bytes: 0,
+      };
+    }
+    throw error;
+  }
+}
+
+export async function initializeAppPageProgress(
+  input: InitializeAppPageProgressInput,
+): Promise<AppPageProgress> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const outline = normalizeOutlineJson(workspace.outline);
+  if (outline.status !== "confirmed") {
+    throw new Error("Confirmed Outline is required before initializing Page Progress");
+  }
+  const styleGuide = await readFile(workspace.files.style_guide, "utf8").catch(() => "");
+  if (!styleGuide.trim()) {
+    throw new Error("Workspace Style Guide is required before initializing Page Progress");
+  }
+  for (const item of outline.items) {
+    if (!item.page_id) throw new Error("Confirmed Outline item is missing page_id");
+    if (!(await fileExists(path.join(workspace.workspace_dir, "slides", `${item.page_id}.tsx`)))) {
+      throw new Error(`Page Source is missing for page_id "${item.page_id}"`);
+    }
+  }
+  const updatedAt = new Date().toISOString();
+  const progress: AppPageProgress = {
+    ...createDefaultPageProgressJson(),
+    status: "running",
+    pages: outline.items.map((item) => ({
+      page_id: item.page_id as string,
+      status: "pending",
+      render_attempts: 0,
+      visual_review_attempts: 0,
+      agent_failures: 0,
+      agent_infrastructure_failures: 0,
+      last_html_path: "",
+      last_screenshot_path: "",
+      last_error: "",
+      visual_review: null,
+      updated_at: updatedAt,
+    })),
+    updated_at: updatedAt,
+  };
+  await writeJsonFile(workspace.files.page_progress, progress);
+  await touchWorkspaceTask(workspace, updatedAt);
+  return progress;
+}
+
 export async function recordAppPageProgress(
   input: RecordAppPageProgressInput,
 ): Promise<AppPageProgress> {
@@ -5705,7 +5843,6 @@ export async function recordAppPageProgress(
         ...page,
         ...input.patch,
         page_id: page.page_id,
-        index: page.index,
         updated_at: updatedAt,
       }) as AppPageProgressItem;
     });
@@ -5755,17 +5892,18 @@ export async function renderAppWorkspacePagePreview(
 ): Promise<RenderAppWorkspacePagePreviewResult> {
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
   const manifestPath = readSelectedTemplateManifestPath(workspace);
-  if (!Number.isInteger(input.page_index) || input.page_index < 0) {
-    throw new Error('"page_index" must be a non-negative integer');
-  }
+  const manifest = getPlainRecord(JSON.parse(await readFile(manifestPath, "utf8")) as unknown);
+  const slides = Array.isArray(manifest.slides) ? manifest.slides.map(getPlainRecord) : [];
+  const pageIndex = slides.findIndex((slide) => normalizeString(slide.id) === input.page_id);
+  if (pageIndex < 0) throw new Error(`Unknown page_id "${input.page_id}" in manifest.json`);
 
-  const pageNumber = input.page_index + 1;
+  const pageNumber = pageIndex + 1;
   const renderedAt = new Date().toISOString();
   const htmlOutputDir = path.join(workspace.workspace_dir, "output", "page-preview-html");
   const screenshotOutputDir = path.join(workspace.workspace_dir, "output", "screenshots");
   const localSlide = await readManifestLocalSlideSourcePath({
     manifestPath,
-    pageIndex: input.page_index,
+    pageIndex,
   });
   if (localSlide) {
     await assertLocalTemplateTypecheck({
@@ -5787,7 +5925,7 @@ export async function renderAppWorkspacePagePreview(
     manifest_path: result.manifestPath,
     html_path: result.htmlPath,
     screenshot_path: result.screenshotPath,
-    page_index: input.page_index,
+    page_index: pageIndex,
     page_number: pageNumber,
     slide_id: result.slideId,
     layout_id: result.layoutId,
@@ -5843,6 +5981,11 @@ export type {
   PrepareAppExportModelResult,
   RecordAppPagePlanInput,
   RecordAppPageProgressInput,
+  RecordAppWorkspaceStyleGuideInput,
+  RecordAppWorkspaceStyleGuideResult,
+  GetAppWorkspaceStyleGuideStatusInput,
+  GetAppWorkspaceStyleGuideStatusResult,
+  InitializeAppPageProgressInput,
   RecordAppWorkspaceThemeTokenInput,
   RecordAppWorkspaceThemeTokenResult,
   RecordAppPdfExportInput,

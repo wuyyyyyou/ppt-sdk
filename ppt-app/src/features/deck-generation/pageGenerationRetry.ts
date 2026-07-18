@@ -14,7 +14,7 @@ import {
   failedCompletion,
   preflightAgentToolAccess,
 } from "./deckGenerationCompletion";
-import { pagePlanMatchesOutlineAndTemplate } from "./deckGenerationStartArtifacts";
+import { pagePlanMatchesOutlineAndTemplate } from "./legacyPagePlanCompatibility";
 import {
   recordDeckRecovery,
   recordProgress,
@@ -101,13 +101,10 @@ export async function runPageGenerationRetry(
     status: "pending",
     render_attempts: 0,
     visual_review_attempts: 0,
-    content_review_attempts: 0,
     agent_failures: 0,
     agent_infrastructure_failures: 0,
     last_error: "",
-    content_review: null,
     visual_review: null,
-    review: null,
   });
   const runtime: DeckGenerationRuntime = {
     ...input,
@@ -169,13 +166,14 @@ export async function runPageGenerationRetry(
   });
   const failedPage = progress.pages.find((item) => item.status !== "accepted");
   if (failedPage) {
-    const error = createFailedPageError(failedPage, input.locale);
+    const failedPageIndex = progress.pages.findIndex((item) => item.page_id === failedPage.page_id);
+    const error = createFailedPageError(failedPage, input.locale, failedPageIndex);
     const failedCount = progress.pages.filter((item) => item.status !== "accepted").length;
     const failedProgress = createProgress(
       {
         step: "failed",
         message: failedCount > 1 ? text.failedSummary(failedCount) : error.message,
-        currentPageIndex: failedPage.index,
+        currentPageIndex: failedPageIndex,
         totalPages: pagePlan.pages.length,
       },
       progress,
@@ -192,7 +190,7 @@ export async function runPageGenerationRetry(
 
   return runFinalDeckRender({
     flowInput: input,
-    pagePlan,
+    authoringDeck: pagePlan,
     progress,
   });
 }

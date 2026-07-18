@@ -7,6 +7,7 @@ import {
   fingerprintWorkspacePageSource,
   installWorkspaceAuthoringKit,
   prepareWorkspacePageSources,
+  reconcileWorkspacePageSources,
 } from "../../src/authoring-kit-workspace/index.ts";
 
 async function withWorkspace(fn: (workspaceDir: string) => Promise<void>) {
@@ -166,5 +167,34 @@ test("fingerprints only the requested Page Source", async () => {
     assert.equal(fingerprint.path, path.join(workspaceDir, "slides", `${pageId}.tsx`));
     assert.ok(fingerprint.size_bytes > 0);
 
+  });
+});
+
+test("reconciles only missing pending Page Sources", async () => {
+  await withWorkspace(async (workspaceDir) => {
+    await writeConfirmedOutline(workspaceDir, [{ title: "Pending", outline: "Pending page" }]);
+    const prepared = await prepareWorkspacePageSources({ workspace_dir: workspaceDir });
+    const pageId = prepared.outline.items[0]!.page_id;
+    const sourcePath = path.join(workspaceDir, "slides", `${pageId}.tsx`);
+    await writeFile(path.join(workspaceDir, "page-progress.json"), `${JSON.stringify({
+      version: 1,
+      status: "running",
+      pages: [{ page_id: pageId, status: "pending" }],
+      updated_at: null,
+    }, null, 2)}\n`, "utf8");
+    await rm(sourcePath, { force: true });
+    const repaired = await reconcileWorkspacePageSources({ workspace_dir: workspaceDir });
+    assert.deepEqual(repaired.repaired_page_ids, [pageId]);
+    await rm(sourcePath, { force: true });
+    await writeFile(path.join(workspaceDir, "page-progress.json"), `${JSON.stringify({
+      version: 1,
+      status: "running",
+      pages: [{ page_id: pageId, status: "rendering" }],
+      updated_at: null,
+    }, null, 2)}\n`, "utf8");
+    await assert.rejects(
+      reconcileWorkspacePageSources({ workspace_dir: workspaceDir }),
+      /cannot be resumed/,
+    );
   });
 });
