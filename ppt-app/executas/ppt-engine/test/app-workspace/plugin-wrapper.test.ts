@@ -210,6 +210,16 @@ test("Authoring Kit and Page Source workspace tools are declared and routed", as
   );
 });
 
+test("Workspace Style Guide Host Upload waits for persistence before staging cleanup", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+  const handler = source.match(
+    /async function toolAppCommitWorkspaceStyleGuideHostUpload\(args\) \{[\s\S]*?\n\}/,
+  )?.[0];
+
+  assert.ok(handler, "Missing Workspace Style Guide Host Upload handler");
+  assert.match(handler, /return await recordAppWorkspaceStyleGuide\(\{/);
+});
+
 test("app_get_rendered_deck_html is declared and routed", async () => {
   const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
   const manifest = JSON.parse(

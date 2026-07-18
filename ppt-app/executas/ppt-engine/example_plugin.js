@@ -832,7 +832,7 @@ async function toolAppCommitWorkspaceStyleGuideHostUpload(args) {
       stagingPath,
       expectedSizeBytes: Math.floor(sizeBytes),
     });
-    return recordAppWorkspaceStyleGuide({
+    return await recordAppWorkspaceStyleGuide({
       workspace_dir: workspaceDir,
       staging_file_path: stagingPath,
       expected_size_bytes: Math.floor(sizeBytes),

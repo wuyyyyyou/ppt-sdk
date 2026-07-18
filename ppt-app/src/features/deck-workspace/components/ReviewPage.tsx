@@ -53,7 +53,13 @@ export function ReviewPage(props: ReviewPageProps) {
           {props.deck.map((slide, index) => (
             <article key={`${slide.title}-${index}`} className={`grid-card ${index === props.currentSlide ? "active" : ""}`} onClick={() => props.setCurrentSlide(index)}>
               <span>{formatSlideNumber(index)}</span>
-              {renderedSlides[index]?.screenshot_upload ? <RenderedSlideImage slide={renderedSlides[index]} /> : null}
+              {renderedSlides[index]?.screenshot_upload ? (
+                <div className="grid-card-html-frame">
+                  <RenderedSlideImage slide={renderedSlides[index]} />
+                </div>
+              ) : renderWaiting ? (
+                <PreviewLoadingFrame compact label={props.t.review.rendering} />
+              ) : null}
               <strong>{slide.title}</strong>
             </article>
           ))}
@@ -61,7 +67,11 @@ export function ReviewPage(props: ReviewPageProps) {
       ) : (
         <div className="preview-present-view">
           {selectedRenderedSlide?.screenshot_upload
-            ? <RenderedSlideImage slide={selectedRenderedSlide} loading="eager" />
+            ? (
+              <div className="present-html-frame">
+                <RenderedSlideImage slide={selectedRenderedSlide} loading="eager" />
+              </div>
+            )
             : <PreviewLoadingFrame label={props.t.review.rendering} />}
           <ThumbnailStrip
             deck={props.deck}
@@ -76,6 +86,11 @@ export function ReviewPage(props: ReviewPageProps) {
   );
 }
 
-function PreviewLoadingFrame({ label }: { label: string }) {
-  return <div className="preview-loading-frame" role="status"><LoaderCircle size={28} /><span>{label}</span></div>;
+function PreviewLoadingFrame({ label, compact = false }: { label: string; compact?: boolean }) {
+  return (
+    <div className={`preview-loading-frame ${compact ? "compact" : ""}`} role="status" aria-live="polite">
+      <LoaderCircle size={compact ? 18 : 28} />
+      <span>{label}</span>
+    </div>
+  );
 }

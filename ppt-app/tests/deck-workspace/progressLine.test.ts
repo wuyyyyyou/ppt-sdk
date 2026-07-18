@@ -17,10 +17,10 @@ describe("ProgressLine", () => {
     assert.equal(stageOrder("deck"), 6);
   });
 
-  it("renders the six navigable main stages", () => {
+  it("renders only the five active main stages", () => {
     const html = renderToStaticMarkup(
       createElement(ProgressLine, {
-        stage: "uploaded-source-analysis",
+        stage: "outline",
         t: messages.zh,
         outlineEnabled: true,
         onNavigate: () => undefined,
@@ -29,11 +29,11 @@ describe("ProgressLine", () => {
 
     assert.match(html, /title="需求"/);
     assert.match(html, /title="演示需求"/);
-    assert.match(html, /title="上传资料分析"/);
+    assert.doesNotMatch(html, /title="上传资料分析"/);
     assert.match(html, /title="大纲"/);
     assert.match(html, /title="生成中"/);
     assert.match(html, /title="成稿"/);
-    assert.equal((html.match(/progress-node/g) ?? []).length, 6);
+    assert.equal((html.match(/progress-node/g) ?? []).length, 5);
   });
 
   it("disables outline navigation until presentation requirements are confirmed", () => {

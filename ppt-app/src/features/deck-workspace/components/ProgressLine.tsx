@@ -10,7 +10,7 @@ interface ProgressLineProps {
 }
 
 export function ProgressLine({ stage, t, outlineEnabled, onNavigate }: ProgressLineProps) {
-  const stages = ["brief", "requirements", "uploaded-source-analysis", "outline", "generating", "deck"] as MainStage[];
+  const stages = ["brief", "requirements", "outline", "generating", "deck"] as MainStage[];
   const currentIndex = Math.max(0, stages.indexOf(stage));
   const progress = `${(currentIndex / (stages.length - 1)) * 100}%`;
 

@@ -216,6 +216,7 @@ export interface Messages {
   };
   generating: {
     progressTitle: string;
+    confirmingOutline: string;
     generationComplete: string;
     interruptedTitle: string;
     unresumableTitle: string;
@@ -646,6 +647,7 @@ export const messages: Record<Locale, Messages> = {
     },
     generating: {
       progressTitle: "Generation progress",
+      confirmingOutline: "Confirming the Outline and preparing generation",
       generationComplete: "Generation complete",
       interruptedTitle: "Generation interrupted",
       unresumableTitle: "Unable to resume generation",
@@ -1089,6 +1091,7 @@ export const messages: Record<Locale, Messages> = {
     },
     generating: {
       progressTitle: "生成进度",
+      confirmingOutline: "正在确认大纲并准备生成",
       generationComplete: "生成完成",
       interruptedTitle: "生成中断",
       unresumableTitle: "无法继续生成",

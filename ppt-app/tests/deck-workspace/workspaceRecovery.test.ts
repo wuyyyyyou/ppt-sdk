@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { PageProgress } from "../../src/api/types.ts";
-import { restoreDeckGenerationProgress } from "../../src/features/deck-workspace/workspaceRecovery.ts";
+import {
+  completedDeckIsAvailable,
+  restoreDeckGenerationProgress,
+} from "../../src/features/deck-workspace/workspaceRecovery.ts";
 
 function makeProgress(statuses = ["accepted"]): PageProgress {
   return {
@@ -31,6 +34,23 @@ function makeProgress(statuses = ["accepted"]): PageProgress {
 }
 
 describe("Workspace Recovery", () => {
+  it("recognizes a completed Final Deck Render as immediately available", () => {
+    const progress = makeProgress(["accepted"]);
+    progress.status = "completed";
+    progress.final_deck_render = {
+      status: "completed",
+      message: "Final render completed",
+      error: null,
+      output_dir: "/tmp/rendered",
+      deck_html_path: "/tmp/rendered/deck.html",
+      rendered_at: "2026-06-02T03:47:38.344Z",
+      updated_at: "2026-06-02T03:47:38.344Z",
+    };
+
+    assert.equal(completedDeckIsAvailable(false, progress), true);
+    assert.equal(completedDeckIsAvailable(true, progress), false);
+  });
+
   it("restores completed generation progress for already rendered workspaces", () => {
     const storedProgress = makeProgress();
     storedProgress.research_discovery = {

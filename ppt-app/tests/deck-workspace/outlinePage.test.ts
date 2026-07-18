@@ -10,7 +10,7 @@ import {
 import { normalizeRequiredContentMarkdown } from "../../src/features/outline/model.ts";
 import { messages } from "../../src/i18n/messages.ts";
 
-function renderOutlinePage(dirty: boolean, saving = false) {
+function renderOutlinePage(dirty: boolean, saving = false, loading: "none" | "deck" = "none") {
   return renderToStaticMarkup(createElement(OutlinePage, {
     t: messages.zh,
     title: "演示文稿标题",
@@ -22,7 +22,7 @@ function renderOutlinePage(dirty: boolean, saving = false) {
     dirty,
     saving,
     error: "",
-    loading: "none",
+    loading,
     setTitle: () => undefined,
     updateItem: () => undefined,
     addItem: () => undefined,
@@ -77,6 +77,13 @@ describe("OutlinePage", () => {
 
     assert.match(html, /正在保存草稿\.\.\./);
     assert.doesNotMatch(html, /有未保存的修改/);
+  });
+
+  it("shows immediate feedback while confirming the Outline", () => {
+    const html = renderOutlinePage(false, false, "deck");
+
+    assert.match(html, /spinner small/);
+    assert.match(html, /确认并生成/);
   });
 
   it("parses supported Markdown markers into display bullets", () => {

@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { DeckGenerationProgress } from "../../src/features/deck-generation/index.ts";
-import { buildGenerationViewState } from "../../src/features/deck-workspace/generationViewState.ts";
+import {
+  buildGenerationViewState,
+  navigationBlockedByActiveGeneration,
+} from "../../src/features/deck-workspace/generationViewState.ts";
 
 function makeProgress(
   step: DeckGenerationProgress["step"],
@@ -32,6 +35,14 @@ function makeProgress(
 }
 
 describe("Generation View State", () => {
+  it("blocks navigation only while a generation run is actually active", () => {
+    assert.equal(navigationBlockedByActiveGeneration(null), false);
+    assert.equal(
+      navigationBlockedByActiveGeneration({ kind: "deck-generation", stopping: false }),
+      true,
+    );
+  });
+
   it("shows running only when an active generation run exists", () => {
     const viewState = buildGenerationViewState({
       loading: "none",

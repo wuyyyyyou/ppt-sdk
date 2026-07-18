@@ -9,6 +9,10 @@ export interface ActiveGenerationRun {
   stopping: boolean;
 }
 
+export function navigationBlockedByActiveGeneration(activeRun: ActiveGenerationRun | null) {
+  return activeRun !== null;
+}
+
 export type GenerationViewStatus =
   | "running"
   | "stopping"

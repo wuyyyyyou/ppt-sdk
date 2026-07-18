@@ -83,7 +83,10 @@ import {
   createIdleExportProgress,
   createPptxJobExportProgress,
 } from "../exportProgressDisplay";
-import { restoreDeckGenerationProgress } from "../workspaceRecovery";
+import {
+  completedDeckIsAvailable,
+  restoreDeckGenerationProgress,
+} from "../workspaceRecovery";
 import {
   DEFAULT_PAGE_REVIEW_SETTINGS,
   pageReviewSettingsToWorkspaceSettings,
@@ -125,6 +128,7 @@ import type {
 } from "../types";
 import {
   buildGenerationViewState,
+  navigationBlockedByActiveGeneration,
   type ActiveGenerationRun,
   type ActiveGenerationRunKind,
 } from "../generationViewState";
@@ -841,11 +845,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     throw new Error(locale === "zh" ? "PPTX 导出等待超时" : "Timed out waiting for PPTX export");
   }
 
-  function hasRenderedWorkspacePages(workspace: WorkspaceResult) {
-    const progress = normalizeWorkspacePageProgress(workspace.page_progress);
-    return !isWorkspaceDeckStale(workspace) && progress?.final_deck_render?.status === "completed";
-  }
-
   function workspaceSettingsToState(workspace: WorkspaceResult | null): WorkspaceSettings {
     if (!workspace?.setting || typeof workspace.setting !== "object" || Array.isArray(workspace.setting)) {
       return {};
@@ -1006,6 +1005,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   function applyRenderedDeck(
     result: Awaited<ReturnType<PptBackend["renderDeckHtml"]>>,
     outlineItems?: WorkspaceOutlineItem[],
+    options: { activateDeck?: boolean } = {},
   ) {
     setGenerated(true);
     setDeckTitle(result.title);
@@ -1017,7 +1017,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     );
     if (outlineItems) setOutline(cloneOutlineItems(outlineItems));
     setCurrentSlide(0);
-    setStage("deck");
+    if (options.activateDeck !== false) setStage("deck");
   }
 
   function applyWorkspace(
@@ -1067,6 +1067,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
     const staleDeck = isWorkspaceDeckStale(workspace);
     const workspacePageProgress = normalizeWorkspacePageProgress(workspace.page_progress);
+    const completedDeckAvailable = completedDeckIsAvailable(staleDeck, workspacePageProgress);
     setPageProgress(workspacePageProgress);
     setCreateDeckProgress(
       restoreDeckGenerationProgress({
@@ -1076,10 +1077,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         outline: outlineRecord?.status === "confirmed" ? outlineRecord as WorkspaceOutline : null,
       })
     );
-    if (!staleDeck && workspacePageProgress?.final_deck_render?.status === "completed" && backend) {
+    if (completedDeckAvailable) {
+      setDeck(workspaceOutline.map((item) => ({ title: item.title, subtitle: "" })));
+      setReviewRender({
+        status: "loading",
+        result: null,
+        error: "",
+        renderKey,
+      });
+    }
+    if (completedDeckAvailable && backend) {
       void backend.getRenderedDeckHtml({ workspace_dir: workspace.workspace_dir })
         .then((result) => {
-          applyRenderedDeck(result, workspaceOutline);
+          applyRenderedDeck(result, workspaceOutline, { activateDeck: false });
           setReviewRender({
             status: "ready",
             result,
@@ -1087,9 +1097,16 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
             renderKey: workspaceReviewRenderKey(workspace),
           });
         })
-        .catch(() => undefined);
+        .catch((error) => {
+          setReviewRender({
+            status: "error",
+            result: null,
+            error: error instanceof Error ? error.message : t.review.renderFailed,
+            renderKey,
+          });
+        });
     }
-    setGenerated(false);
+    setGenerated(completedDeckAvailable);
     setCurrentSlide(0);
     if (staleDeck) {
       setStage("outline");
@@ -1097,7 +1114,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (workspaceOutline.length > 0) {
       setOutline(workspaceOutline);
       setOutlineDraft(cloneOutlineItems(workspaceOutline));
-      if (workspacePageProgress && !staleDeck) {
+      if (completedDeckAvailable) {
+        setStage("deck");
+      } else if (workspacePageProgress && !staleDeck) {
         setStage("generating");
       } else {
         setStage("outline");
@@ -1424,7 +1443,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   function navigate(nextPage: PageId) {
-    if (activeGenerationRun || stage === "generating") return;
+    if (navigationBlockedByActiveGeneration(activeGenerationRun)) return;
     if (nextPage !== page && !canLeaveCurrentEditor()) return;
     if (!generated && nextPage !== "main" && nextPage !== "library") {
       showToast(t.toasts.createDeckFirst);
@@ -1502,7 +1521,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   function navigateMain(nextStage: MainStage) {
-    if (activeGenerationRun || stage === "generating") return;
+    if (navigationBlockedByActiveGeneration(activeGenerationRun)) return;
     if (nextStage !== stage && !canLeaveCurrentEditor()) return;
     if (stage === "requirements" && requirementsStatus === "loading" && nextStage !== "requirements") {
       requirementsOperationRef.current += 1;
@@ -1539,7 +1558,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   function goBack() {
-    if (activeGenerationRun || stage === "generating") return;
+    if (navigationBlockedByActiveGeneration(activeGenerationRun)) return;
     if (!canLeaveCurrentEditor()) return;
     setHistory((items) => {
       const next = items.slice(0, -1);
@@ -1874,36 +1893,49 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     let activeRunWorkspaceDir: string | undefined;
     let shouldReconcileActiveRun = false;
+    let outlineConfirmed = false;
     resetGenerationProgress();
     try {
+      const normalized = normalizeValidOutline({
+        title: outlineDraftTitle,
+        items: outlineDraft,
+      });
       const cancelSignal = beginCancellableGeneration();
+      setLoading("deck");
+      beginActiveGenerationRun("deck-generation");
+      setCreateDeckProgress({
+        step: "prepare",
+        message: t.generating.confirmingOutline,
+        currentPageIndex: null,
+        totalPages: normalized.items.length,
+        pages: [],
+      });
+      setStage("generating");
+      setPage("main");
+
       const workspace = await refreshCurrentWorkspaceSnapshot();
-      if (!workspace) return;
+      if (!workspace) {
+        setStage("outline");
+        return;
+      }
       if (!confirmedRequirementsAllowOutline(workspace.requirements)) {
         showToast(t.toasts.confirmRequirementsFirst);
         setPage("main");
         setStage("requirements");
         return;
       }
-      const normalized = normalizeValidOutline({
-        title: outlineDraftTitle,
-        items: outlineDraft,
-      });
       const confirmedWorkspace = await backend.confirmWorkspaceOutline({
         workspace_dir: workspace.workspace_dir,
         outline: normalized,
       });
+      outlineConfirmed = true;
       setDeckTitle(normalized.title);
       setOutline(cloneOutlineItems(normalized.items));
       setOutlineDraft(cloneOutlineItems(normalized.items));
       setOutlineDraftTitle(normalized.title);
       setCurrentWorkspace(confirmedWorkspace);
-      beginActiveGenerationRun("deck-generation");
       activeRunWorkspaceDir = confirmedWorkspace.workspace_dir;
       shouldReconcileActiveRun = true;
-      setLoading("deck");
-      setStage("generating");
-      setPage("main");
 
       const completion = await runDeckGeneration({
         backend,
@@ -1922,6 +1954,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       await applyDeckGenerationCompletion(completion, confirmedWorkspace);
       shouldReconcileActiveRun = false;
     } catch (error) {
+      if (!outlineConfirmed) {
+        setStage("outline");
+        setPage("main");
+      }
       showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
     } finally {
       setLoading("none");
@@ -2644,19 +2680,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         workspace_dir: workspaceDir
       });
       const workspace = await reconcileWorkspaceInterruptedPages(openedWorkspace);
-      const shouldOpenDeck = hasRenderedWorkspacePages(workspace);
       applyWorkspace(workspace, { syncEmptyContextRows: true });
-      if (shouldOpenDeck) {
-        setPage("main");
-        setHistory((items) => (items.at(-1) === "main" ? items : [...items, "main"]));
-        const rendered = await loadDeckHtmlForWorkspace(workspace, "review");
-        if (rendered) {
-          showToast(formatMessage(t.toasts.workspaceOpened, { id: workspace.task_id ?? workspace.workspace_id }));
-        }
-      } else {
-        setPage("main");
-        showToast(formatMessage(t.toasts.workspaceOpened, { id: workspace.task_id ?? workspace.workspace_id }));
-      }
+      setPage("main");
+      setHistory((items) => (items.at(-1) === "main" ? items : [...items, "main"]));
+      showToast(formatMessage(t.toasts.workspaceOpened, { id: workspace.task_id ?? workspace.workspace_id }));
     } catch (error) {
       setWorkspaceError(
         error instanceof Error ? error.message : "Failed to open workspace."

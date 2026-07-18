@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -21,7 +22,37 @@ const loadingReviewRender: DeckReviewRenderState = {
   result: null,
 };
 
-function renderReviewPage(previewMode: PreviewMode) {
+const readyReviewRender: DeckReviewRenderState = {
+  status: "ready",
+  error: "",
+  renderKey: "ready",
+  result: {
+    workspace_dir: "/tmp/workspace",
+    title: "AI Foundations",
+    slide_count: 1,
+    output_dir: "/tmp/workspace/rendered",
+    deck_html_path: "/tmp/workspace/rendered/deck.html",
+    slides: [{
+      page_id: "page-01",
+      index: 0,
+      title: "AI Foundations",
+      html_path: "/tmp/workspace/rendered/page-01.html",
+      screenshot_path: "/tmp/workspace/rendered/page-01.png",
+      screenshot_upload: {
+        transport: "host_upload",
+        r2_key: "preview/page-01.png",
+        url: "https://example.com/page-01.png",
+        mime_type: "image/png",
+        size_bytes: 1024,
+      },
+    }],
+  },
+};
+
+function renderReviewPage(
+  previewMode: PreviewMode,
+  reviewRender: DeckReviewRenderState = loadingReviewRender,
+) {
   return renderToStaticMarkup(
     createElement(ReviewPage, {
       t: messages.zh,
@@ -30,7 +61,7 @@ function renderReviewPage(previewMode: PreviewMode) {
       setCurrentSlide: () => undefined,
       previewMode,
       setPreviewMode: () => undefined,
-      reviewRender: loadingReviewRender,
+      reviewRender,
       renderDeckHtml: async () => undefined,
       onBack: () => undefined,
       updateDeckTitle: () => undefined,
@@ -60,5 +91,38 @@ describe("ReviewPage", () => {
     assert.match(html, /thumb-html-frame/);
     assert.match(html, /slide-preview-loading/);
     assert.doesNotMatch(html, /slide-preview-card large/);
+  });
+
+  it("constrains rendered screenshots inside grid preview frames", () => {
+    const html = renderReviewPage("grid", readyReviewRender);
+
+    assert.match(html, /class="grid-card-html-frame"><img/);
+  });
+
+  it("constrains the selected screenshot inside the present preview frame", () => {
+    const html = renderReviewPage("present", readyReviewRender);
+
+    assert.match(html, /class="present-html-frame"><img/);
+  });
+
+  it("keeps grid, present, and loading preview frames at the slide aspect ratio", async () => {
+    const css = await readFile(
+      new URL("../../src/features/deck-workspace/styles/deck-workspace.css", import.meta.url),
+      "utf8",
+    );
+    function combinedRules(selector: string) {
+      const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return Array.from(css.matchAll(new RegExp(`${escapedSelector} \\{([^}]*)\\}`, "g")))
+        .map((match) => match[1])
+        .join("\n");
+    }
+    const gridRule = combinedRules(".grid-card-html-frame");
+    const presentRule = combinedRules(".present-html-frame");
+    const compactLoadingRule = combinedRules(".preview-loading-frame.compact");
+
+    for (const rule of [gridRule, presentRule, compactLoadingRule]) {
+      assert.match(rule, /aspect-ratio:\s*16\s*\/\s*9/);
+      assert.doesNotMatch(rule, /height:\s*\d+px/);
+    }
   });
 });
