@@ -1,14 +1,12 @@
-import type {
-  DeckRefinementIntentReviewResult,
-  DeckRefinementOutlineOperation,
-  ReviewDeckRefinementIntentInput,
-} from "./types";
 import type { AnnaLlmCompleteInput } from "../runtime/annaRuntime";
+import type {
+  DeckRefinementOutlineOperation,
+  DeckRefinementPlan,
+  PlanDeckRefinementInput,
+} from "./types";
 
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function cleanString(value: unknown): string {
@@ -16,195 +14,141 @@ function cleanString(value: unknown): string {
 }
 
 function cleanStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const item of value) {
-    const text = cleanString(item);
-    const key = text.toLocaleLowerCase();
-    if (!text || seen.has(key)) continue;
-    seen.add(key);
-    result.push(text);
-  }
-  return result;
+  return Array.isArray(value) ? value.map(cleanString).filter(Boolean) : [];
 }
 
-function cleanOperation(value: unknown, index: number): DeckRefinementOutlineOperation {
-  const record = asRecord(value);
-  const op = cleanString(record.op);
-  const pageId = cleanString(record.page_id);
-  const reason = cleanString(record.reason);
-
-  if (op === "keep") {
-    if (!pageId) throw new Error(`operations[${index}].page_id is required for keep.`);
-    return { op, page_id: pageId, reason: reason || "Keep existing Page Generation Unit." };
+function assertOnlyKeys(record: Record<string, unknown>, keys: string[], path: string, errors: string[]) {
+  for (const key of Object.keys(record)) {
+    if (!keys.includes(key)) errors.push(`${path} has unsupported field "${key}"`);
   }
-
-  if (op === "update") {
-    const title = cleanString(record.title);
-    const outline = cleanString(record.outline);
-    if (!pageId || !title || !outline) {
-      throw new Error(`operations[${index}] update requires page_id, title, and outline.`);
-    }
-    return {
-      op,
-      page_id: pageId,
-      title,
-      outline,
-      reason: reason || "Update this Page Generation Unit intent.",
-      additional_research_required: record.additional_research_required === true,
-      additional_web_query_intents: cleanStringArray(record.additional_web_query_intents).slice(0, 3),
-      additional_image_query_intents: cleanStringArray(record.additional_image_query_intents).slice(0, 2),
-      evidence_needs: cleanStringArray(record.evidence_needs).slice(0, 6),
-      visual_needs: cleanStringArray(record.visual_needs).slice(0, 4),
-    };
-  }
-
-  if (op === "add") {
-    const title = cleanString(record.title);
-    const outline = cleanString(record.outline);
-    if (!title || !outline) {
-      throw new Error(`operations[${index}] add requires title and outline.`);
-    }
-    return {
-      op,
-      title,
-      outline,
-      reason: reason || "Add a new Page Generation Unit.",
-      additional_research_required: record.additional_research_required === true,
-      additional_web_query_intents: cleanStringArray(record.additional_web_query_intents).slice(0, 3),
-      additional_image_query_intents: cleanStringArray(record.additional_image_query_intents).slice(0, 2),
-      evidence_needs: cleanStringArray(record.evidence_needs).slice(0, 6),
-      visual_needs: cleanStringArray(record.visual_needs).slice(0, 4),
-    };
-  }
-
-  if (op === "delete") {
-    if (!pageId) throw new Error(`operations[${index}].page_id is required for delete.`);
-    return { op, page_id: pageId, reason: reason || "Delete this Page Generation Unit from active artifacts." };
-  }
-
-  throw new Error(`operations[${index}].op must be keep, update, add, or delete.`);
 }
 
-export function normalizeDeckRefinementIntentReview(
-  value: unknown,
-): DeckRefinementIntentReviewResult {
-  const record = asRecord(value);
-  const route = cleanString(record.route);
-  if (route !== "proceed" && route !== "unsupported" && route !== "no_op") {
-    throw new Error('Deck Refinement Intent Review must return route "proceed", "unsupported", or "no_op".');
+function cleanOperation(value: unknown, index: number, errors: string[]): DeckRefinementOutlineOperation | null {
+  if (!isRecord(value)) {
+    errors.push(`operations[${index}] must be an object`);
+    return null;
   }
-
-  const blockingReason = cleanString(record.blocking_reason);
-  const reason = cleanString(record.reason);
-  if (route === "unsupported") {
-    return {
-      route,
-      blocking_reason: blockingReason || reason || "This Deck Refinement request is unsupported.",
-      output_language_change: { changed: false },
-      theme_change_required: false,
-      theme_change_reason: undefined,
-      operations: [],
-      reason: reason || blockingReason || "Unsupported Deck Refinement request.",
-    };
+  assertOnlyKeys(value, ["op", "page_id", "title", "core_message", "required_content", "reason"], `operations[${index}]`, errors);
+  const op = cleanString(value.op);
+  const pageId = cleanString(value.page_id);
+  const reason = cleanString(value.reason);
+  if (op === "keep" || op === "delete") {
+    if (!pageId) errors.push(`operations[${index}].page_id is required for ${op}`);
+    if (!reason) errors.push(`operations[${index}].reason must be non-empty`);
+    return { op, page_id: pageId, reason } as DeckRefinementOutlineOperation;
   }
-
-  if (route === "no_op") {
-    return {
-      route,
-      blocking_reason: undefined,
-      output_language_change: { changed: false },
-      theme_change_required: false,
-      theme_change_reason: undefined,
-      operations: [],
-      reason: reason || "No Deck Refinement changes are needed.",
-    };
+  if (op === "update" || op === "add") {
+    if (op === "update" && !pageId) errors.push(`operations[${index}].page_id is required for update`);
+    const title = cleanString(value.title);
+    const coreMessage = cleanString(value.core_message);
+    const requiredContent = cleanStringArray(value.required_content);
+    if (!title || /\r|\n/u.test(title)) errors.push(`operations[${index}].title must be one non-empty line`);
+    if (!coreMessage || /\r|\n/u.test(coreMessage)) errors.push(`operations[${index}].core_message must be one non-empty line`);
+    if (requiredContent.length === 0 || requiredContent.some((item) => /\r|\n/u.test(item))) {
+      errors.push(`operations[${index}].required_content must be a non-empty array of single-line strings`);
+    }
+    if (!reason) errors.push(`operations[${index}].reason must be non-empty`);
+    return op === "update"
+      ? { op, page_id: pageId, title, core_message: coreMessage, required_content: requiredContent, reason }
+      : { op, title, core_message: coreMessage, required_content: requiredContent, reason };
   }
+  errors.push(`operations[${index}].op must be keep, update, add, or delete`);
+  return null;
+}
 
-  const outputLanguageRecord = asRecord(record.output_language_change);
-  const outputLanguageChanged = outputLanguageRecord.changed === true;
-  const outputLanguage = cleanString(outputLanguageRecord.output_language);
-  if (outputLanguageChanged && !outputLanguage) {
-    throw new Error("output_language_change.output_language is required when changed is true.");
+export class DeckRefinementPlanningValidationError extends Error {
+  constructor(public readonly errors: string[]) {
+    super(`Invalid Deck Refinement Planning result: ${errors.join("; ")}`);
+    this.name = "DeckRefinementPlanningValidationError";
   }
+}
 
-  const operations = Array.isArray(record.operations)
-    ? record.operations.map(cleanOperation)
-    : [];
-  if (operations.length === 0) {
-    throw new Error("Deck Refinement proceed route requires operation-based outline reconciliation.");
+export function normalizeDeckRefinementPlan(value: unknown, input: Pick<PlanDeckRefinementInput, "outline">): DeckRefinementPlan {
+  const errors: string[] = [];
+  if (!isRecord(value)) throw new DeckRefinementPlanningValidationError(["root must be an object"]);
+  assertOnlyKeys(value, ["route", "title", "output_language_change", "style_guide_change", "operations", "reason"], "root", errors);
+  const route = cleanString(value.route);
+  if (route !== "proceed" && route !== "no_op") errors.push('route must be "proceed" or "no_op"');
+  const title = cleanString(value.title);
+  if (!title) errors.push("title must be non-empty");
+
+  const languageRecord = isRecord(value.output_language_change) ? value.output_language_change : {};
+  assertOnlyKeys(languageRecord, ["changed", "output_language", "reason"], "output_language_change", errors);
+  const languageChanged = languageRecord.changed === true;
+  const outputLanguage = cleanString(languageRecord.output_language);
+  if (languageChanged && !outputLanguage) errors.push("output_language_change.output_language is required when changed is true");
+
+  const styleRecord = isRecord(value.style_guide_change) ? value.style_guide_change : {};
+  assertOnlyKeys(styleRecord, ["action", "reason"], "style_guide_change", errors);
+  const styleAction = cleanString(styleRecord.action);
+  if (styleAction !== "preserve" && styleAction !== "regenerate") errors.push('style_guide_change.action must be "preserve" or "regenerate"');
+  const styleReason = cleanString(styleRecord.reason);
+  if (!styleReason) errors.push("style_guide_change.reason must be non-empty");
+
+  const rawOperations = Array.isArray(value.operations) ? value.operations : [];
+  if (route === "proceed" && rawOperations.length === 0) errors.push("proceed requires at least one operation");
+  if (route === "no_op" && rawOperations.length > 0) errors.push("no_op must return an empty operations array");
+  const operations = rawOperations.map((operation, index) => cleanOperation(operation, index, errors)).filter((operation): operation is DeckRefinementOutlineOperation => Boolean(operation));
+
+  const existingIds = input.outline.items.map((item) => item.page_id).filter((id): id is string => Boolean(id));
+  const existingSet = new Set(existingIds);
+  const seenExisting = new Set<string>();
+  for (const operation of operations) {
+    if (operation.op === "add") continue;
+    if (!existingSet.has(operation.page_id)) errors.push(`operation references unknown page_id "${operation.page_id}"`);
+    if (seenExisting.has(operation.page_id)) errors.push(`page_id "${operation.page_id}" appears more than once`);
+    seenExisting.add(operation.page_id);
   }
-  const themeChangeRequired = record.theme_change_required === true;
-  const themeChangeReason = cleanString(record.theme_change_reason);
-
+  if (route === "proceed") {
+    for (const pageId of existingIds) {
+      if (!seenExisting.has(pageId)) errors.push(`missing operation for existing page_id "${pageId}"`);
+    }
+    if (operations.filter((operation) => operation.op !== "delete").length === 0) errors.push("at least one page must remain after reconciliation");
+  }
+  if (languageChanged && operations.some((operation) => operation.op === "keep")) {
+    errors.push("output language changes require update operations for retained pages");
+  }
+  if (route === "no_op" && (languageChanged || styleAction !== "preserve" || title !== input.outline.title)) {
+    errors.push("no_op cannot change title, output language, or Style Guide");
+  }
+  const reason = cleanString(value.reason);
+  if (!reason) errors.push("reason must be non-empty");
+  if (errors.length > 0) throw new DeckRefinementPlanningValidationError(errors);
   return {
-    route,
-    blocking_reason: blockingReason || undefined,
+    route: route as DeckRefinementPlan["route"],
+    title,
     output_language_change: {
-      changed: outputLanguageChanged,
-      output_language: outputLanguageChanged ? outputLanguage : undefined,
-      reason: cleanString(outputLanguageRecord.reason) || undefined,
+      changed: languageChanged,
+      output_language: languageChanged ? outputLanguage : undefined,
+      reason: cleanString(languageRecord.reason) || undefined,
     },
-    theme_change_required: themeChangeRequired,
-    theme_change_reason: themeChangeRequired
-      ? themeChangeReason || "Whole-deck theme token should be regenerated."
-      : undefined,
+    style_guide_change: { action: styleAction as "preserve" | "regenerate", reason: styleReason },
     operations,
-    reason: reason || "Proceed with Deck Refinement.",
+    reason,
   };
 }
 
-export function buildDeckRefinementIntentReviewLlmRequest(
-  input: ReviewDeckRefinementIntentInput,
-): AnnaLlmCompleteInput {
-  const currentPages = input.pagePlan.pages.map((page) => ({
-    page_id: page.page_id,
-    index: page.index,
-    title: page.title,
-    outline: page.outline,
-    blueprint_id: page.blueprint_id,
-  }));
-  const blueprints = input.planningContext.blueprints.map((blueprint) => ({
-    id: blueprint.id,
-    name: blueprint.name,
-    layout_family: blueprint.layout_family,
-    suitable_for: blueprint.suitable_for,
-    avoid_for: blueprint.avoid_for,
-  }));
-
+export function buildDeckRefinementPlanningRequest(input: PlanDeckRefinementInput): AnnaLlmCompleteInput {
   const expectedShape = {
     route: "proceed",
-    blocking_reason: "",
-    output_language_change: {
-      changed: false,
-      output_language: "",
-      reason: "",
-    },
-    theme_change_required: false,
-    theme_change_reason: "",
+    title: input.outline.title,
+    output_language_change: { changed: false, output_language: "", reason: "" },
+    style_guide_change: { action: "preserve", reason: "" },
     operations: [
-      { op: "keep", page_id: "page-01", reason: "" },
-      { op: "update", page_id: "page-02", title: "", outline: "", reason: "", additional_research_required: false, additional_web_query_intents: [], additional_image_query_intents: [], evidence_needs: [], visual_needs: [] },
-      { op: "add", title: "", outline: "", reason: "", additional_research_required: false, additional_web_query_intents: [], additional_image_query_intents: [], evidence_needs: [], visual_needs: [] },
-      { op: "delete", page_id: "page-03", reason: "" },
+      { op: "keep", page_id: "page-uuid", reason: "" },
+      { op: "update", page_id: "page-uuid", title: "", core_message: "", required_content: [""], reason: "" },
+      { op: "add", title: "", core_message: "", required_content: [""], reason: "" },
+      { op: "delete", page_id: "page-uuid", reason: "" },
     ],
     reason: "",
   };
-  const userInput = {
-    locale: input.locale,
-    deck_refinement_request: input.instruction,
-    workspace_setting_summary: {
-      output_language: input.setting?.output_language,
-    },
-    confirmed_outline_summary: {
-      title: input.outline.title,
-      status: input.outline.status,
-    },
-    current_pages: currentPages,
-    available_blueprints: blueprints,
-  };
-
+  const currentPages = input.outline.items.map((item, index) => ({
+    page_id: item.page_id,
+    index,
+    title: item.title,
+    core_message: item.core_message,
+    required_content: item.required_content,
+  }));
   return {
     messages: [
       {
@@ -212,47 +156,20 @@ export function buildDeckRefinementIntentReviewLlmRequest(
         content: {
           type: "text",
           text: [
-            "You are Deck Refinement Intent Review and operation-based outline reconciliation for an accepted PPT deck.",
-            "Return exactly one JSON object. Do not edit files. Do not include markdown, comments, or code fences.",
-            "",
-            "Route rules:",
-            '- Use route "unsupported" for selected Template/template group changes, unsafe template migrations, or requests that cannot be handled by theme token regeneration or editing existing/new pages.',
-            '- Use route "no_op" when the request does not require output language, outline, research, page, manifest, progress, or render changes.',
-            '- Use route "proceed" when any deck-level artifact or Page Generation Unit should change.',
-            "",
-            "Output language rules:",
-            "- Set output_language_change.changed=true only when the user explicitly asks to change generated content language.",
-            "- Mentions of foreign terms, source language, market names, or translation examples are not enough by themselves.",
-            "- When output_language_change.changed=true, every retained Page Generation Unit will be targeted.",
-            "",
-            "Theme rules:",
-            "- Set theme_change_required=true only for explicit whole-deck visual theme, palette, brand-color, dark/light mode, or visual identity changes.",
-            "- Theme-only Deck Refinement is valid: route must be proceed, operations may all be keep, and theme_change_required must be true.",
-            "- Do not use fixed theme IDs. The system will regenerate workspace/local theme/token.json from the selected Template's theme contract.",
-            "- Do not set theme_change_required for single-slide color tweaks, chart-specific color tweaks, content additions, or vague 'make it better' requests unless they clearly ask for a whole-deck theme change.",
-            "",
-            "Operation rules:",
-            "- operations must be operation-based and keyed by existing page_id for keep, update, and delete.",
-            "- operations must cover every existing page exactly once with keep, update, or delete.",
-            "- Return operations in the final desired deck order. Include add operations at the intended insertion positions.",
-            "- For retained pages use keep or update; do not change page_id, blueprint_id, blueprint_source, slide_path, data_path, or manifest_slide_id.",
-            "- Unchanged pages must use keep and will not be re-authored.",
-            "- Explicit whole-deck audience, goal, narrative, style, tone, or density rewrite requests should use update operations for the affected pages instead of settings/context fields.",
-            "- A plain revised outline array is forbidden.",
-            "- Vague structure-improvement requests must preserve page count; use keep/update only.",
-            "- Add/delete pages only when the user explicitly asks for page-count or page-structure changes.",
-            "- For keep, only page_id and reason are required.",
-            "- For update, provide complete replacement title and outline for that page.",
-            "- For add, provide title and outline. The system will allocate page_id and choose a blueprint only for new pages.",
-            "- For delete, provide the existing page_id.",
-            "",
-            "Research rules:",
-            "- Set per-operation additional_research_required and query intents only for added or changed-intent pages that need external facts, latest data, citations, cases, real visuals, or updated visual assets.",
-            "- Output-language-only changes do not need research by default.",
-            "",
-            "Do not return context_updates, global_change, global_change_reason, workspace settings, local file paths, template paths, or theme_id.",
-            "Expected JSON shape:",
-            JSON.stringify(expectedShape, null, 2),
+            "You are Deck Refinement Planning for an accepted PPT deck.",
+            "Return exactly one JSON object. Do not include markdown, code fences, comments, explanations, or extra text.",
+            "Plan the smallest coherent set of changes needed to satisfy the user's Deck Refinement Request.",
+            "Preserve the current deck title, page count, page order, page intents, output language, and shared visual direction unless the user explicitly requests that specific change.",
+            "The only mutable deck-level requirement is output language. The final slide count is derived from the reconciled operations.",
+            "Return operations in final desired page order. Every existing page must appear exactly once as keep, update, or delete. Add operations may be inserted anywhere.",
+            "Keep and update retain the existing page_id. Add does not include page_id; the system allocates it. Delete references an existing page_id.",
+            "Use update only when the page's Outline Entry or page content must change. Use keep for unchanged pages unless a global output-language or Style Guide change requires all retained pages to be targeted.",
+            "Add, delete, or reorder pages only when the request explicitly asks for page count, structure, sequence, section organization, or narrative-flow changes.",
+            "Set style_guide_change.action to regenerate only for an explicit shared visual-direction change. A page-local visual change uses preserve.",
+            "Set output_language_change.changed only when the user explicitly asks to change the generated presentation language. When it changes, all retained pages must use update operations.",
+            "Do not invent facts, numbers, dates, names, claims, citations, or source-dependent visuals. Use only the provided Workspace material and the user's request.",
+            "Page-level reason fields are concise English instructions for Page Authoring. Outline content must use the current or explicitly requested output language.",
+            `Expected JSON shape: ${JSON.stringify(expectedShape, null, 2)}`,
           ].join("\n"),
         },
       },
@@ -261,9 +178,42 @@ export function buildDeckRefinementIntentReviewLlmRequest(
         content: {
           type: "text",
           text: [
-            "Review this Deck Refinement request using only the provided JSON data.",
-            "Decide the route and operation-based page reconciliation.",
-            JSON.stringify(userInput, null, 2),
+            "Plan this Deck Refinement Request using only the following accepted Workspace context.",
+            `Locale: ${input.locale}`,
+            `Deck Refinement Request: ${input.instruction}`,
+            `Brief: ${input.requirements.source?.brief ?? ""}`,
+            `Confirmed Presentation Requirements: ${JSON.stringify(input.requirements)}`,
+            `Current Confirmed Outline: ${JSON.stringify({ title: input.outline.title, items: currentPages })}`,
+            `Current Workspace Style Guide: ${input.currentStyleGuide || ""}`,
+            "Return one complete plan, not a patch.",
+          ].join("\n"),
+        },
+      },
+    ],
+  };
+}
+
+export function buildDeckRefinementPlanningRepairRequest(
+  previousRequest: AnnaLlmCompleteInput,
+  rawResponse: string,
+  errors: string[],
+): AnnaLlmCompleteInput {
+  return {
+    ...previousRequest,
+    messages: [
+      ...previousRequest.messages,
+      { role: "assistant", content: { type: "text", text: rawResponse } },
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: [
+            "The previous Deck Refinement Planning response failed deterministic validation.",
+            "Return one complete corrected JSON object. Do not return a partial patch.",
+            "Validation errors:",
+            ...errors.map((error) => `- ${error}`),
+            "Preserve all valid decisions from the previous response while correcting every listed error.",
+            "Do not include markdown, code fences, explanations, or extra text.",
           ].join("\n"),
         },
       },

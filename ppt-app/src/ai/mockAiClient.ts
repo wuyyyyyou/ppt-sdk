@@ -13,7 +13,7 @@ import {
 import { validateGeneratedOutline } from "./outlineParser";
 import type {
   AiClient,
-  DeckRefinementIntentReviewResult,
+  DeckRefinementPlan,
   DeckRefinementOutlineOperation,
   GenerateDeckInput,
   GenerateSlidesFromOutlineInput,
@@ -322,27 +322,10 @@ export function createMockAiClient(): AiClient {
       return planned;
     },
 
-    async reviewPageRefinementIntent(input) {
-      await sleep(200);
-      const result = {
-        route: "proceed" as const,
-        outline_change_required: false,
-        additional_research_required: false,
-        additional_web_query_intents: [],
-        additional_image_query_intents: [],
-        evidence_needs: [],
-        visual_needs: [],
-        reason: "Mock current-page refinement can proceed.",
-      };
-      await logMockInteraction(input.logContext, { method: "reviewPageRefinementIntent", input }, result);
-      return result;
-    },
-
-    async reviewDeckRefinementIntent(input) {
+    async planDeckRefinement(input) {
       await sleep(250);
       const lower = input.instruction.toLowerCase();
       const wantsNoOp = /no.?op|不用改|无需|没变化/.test(lower);
-      const wantsTemplate = /template|模板/.test(lower) && /换|change|switch|更换/.test(lower);
       const wantsThemeChange = /theme|palette|brand|color|dark|light|主题|配色|品牌色|深色|浅色|视觉风格/.test(lower);
       const wantsEnglish = /english|英文|英语/.test(lower);
       const wantsChinese = /中文|chinese|汉语/.test(lower);
@@ -351,66 +334,53 @@ export function createMockAiClient(): AiClient {
       const wantsGlobalRewrite = /audience|style|受众|风格|表达|统一/.test(lower);
       const wantsUpdate = /update|rewrite|优化|调整|改/.test(lower);
 
-      const result: DeckRefinementIntentReviewResult = wantsTemplate
-        ? {
-            route: "unsupported" as const,
-            blocking_reason: "Mock: selected Template changes are unsupported in Deck Refinement.",
-            output_language_change: { changed: false },
-            theme_change_required: false,
-            operations: [],
-            reason: "Template migration is outside Deck Refinement.",
-          }
-        : wantsNoOp
+      const result: DeckRefinementPlan = wantsNoOp
           ? {
               route: "no_op" as const,
+              title: input.outline.title,
               output_language_change: { changed: false },
-              theme_change_required: false,
+              style_guide_change: { action: "preserve", reason: "No shared visual change." },
               operations: [],
               reason: "Mock no-op Deck Refinement.",
             }
           : {
               route: "proceed" as const,
+              title: input.outline.title,
               output_language_change: {
                 changed: wantsEnglish || wantsChinese,
                 output_language: wantsEnglish ? "English" : wantsChinese ? "中文" : "",
                 reason: wantsEnglish || wantsChinese ? "Mock explicit output language change." : "",
               },
-              theme_change_required: wantsThemeChange,
-              theme_change_reason: wantsThemeChange ? "Mock explicit whole-deck theme change." : "",
-              operations: input.pagePlan.pages.flatMap((page, index): DeckRefinementOutlineOperation[] => {
-                if (wantsDelete && index === input.pagePlan.pages.length - 1) {
-                  return [{ op: "delete" as const, page_id: page.page_id, reason: "Mock delete last page." }];
+              style_guide_change: {
+                action: wantsThemeChange ? "regenerate" : "preserve",
+                reason: wantsThemeChange ? "Mock explicit shared visual change." : "Preserve current shared direction.",
+              },
+              operations: input.outline.items.flatMap((page, index): DeckRefinementOutlineOperation[] => {
+                if (wantsDelete && index === input.outline.items.length - 1) {
+                  return [{ op: "delete" as const, page_id: page.page_id!, reason: "Mock delete last page." }];
                 }
-                const shouldUpdate = wantsGlobalRewrite || (wantsUpdate && index === Math.min(1, input.pagePlan.pages.length - 1));
+                const shouldUpdate = wantsEnglish || wantsChinese || wantsGlobalRewrite || (wantsUpdate && index === Math.min(1, input.outline.items.length - 1));
                 const base = shouldUpdate
                   ? {
                       op: "update" as const,
-                      page_id: page.page_id,
+                      page_id: page.page_id!,
                       title: page.title.includes("Updated") ? page.title : `${page.title} Updated`,
-                      outline: `${page.outline}\nMock deck-level refinement: ${input.instruction}`,
+                      core_message: `${page.core_message} — ${input.instruction}`,
+                      required_content: page.required_content.split(/\r?\n/).map((item) => item.replace(/^\s*-\s*/, "").trim()).filter(Boolean),
                       reason: wantsGlobalRewrite ? "Mock explicit whole-deck rewrite." : "Mock update page intent.",
-                      additional_research_required: /latest|最新|citation|引用|数据/.test(lower),
-                      additional_web_query_intents: /latest|最新|citation|引用|数据/.test(lower) ? [page.title] : [],
-                      additional_image_query_intents: [],
-                      evidence_needs: [],
-                      visual_needs: [],
                     }
-                  : { op: "keep" as const, page_id: page.page_id, reason: "Mock keep page." };
-                if (wantsAdd && index === input.pagePlan.pages.length - 1) {
+                  : { op: "keep" as const, page_id: page.page_id!, reason: "Mock keep page." };
+                if (wantsAdd && index === input.outline.items.length - 1) {
                   return [
                     base,
                     {
                       op: "add" as const,
                       title: input.locale === "zh" ? "新增补充页" : "Additional Supporting Page",
-                      outline: input.locale === "zh"
+                      core_message: input.locale === "zh"
                         ? "补充整套优化请求中新增的关键信息。"
                         : "Add the key supporting information requested by the deck refinement.",
+                      required_content: [input.instruction],
                       reason: "Mock add page.",
-                      additional_research_required: /latest|最新|citation|引用|数据/.test(lower),
-                      additional_web_query_intents: /latest|最新|citation|引用|数据/.test(lower) ? [input.instruction] : [],
-                      additional_image_query_intents: [],
-                      evidence_needs: [],
-                      visual_needs: [],
                     },
                   ];
                 }
@@ -418,8 +388,17 @@ export function createMockAiClient(): AiClient {
               }),
               reason: "Mock Deck Refinement proceed.",
             };
-      await logMockInteraction(input.logContext, { method: "reviewDeckRefinementIntent", input }, result);
-      return result;
+      await logMockInteraction(input.logContext, { method: "planDeckRefinement", input }, result);
+      return {
+        plan: result,
+        attempts: [{
+          attempt: 1,
+          status: "success" as const,
+          llmRequest: { messages: [] },
+          llmRawResponse: result,
+          validation: { ok: true, errors: [] },
+        }],
+      };
     },
 
     async generateDeck(input: GenerateDeckInput) {

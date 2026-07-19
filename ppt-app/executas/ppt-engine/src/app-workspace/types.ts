@@ -1046,11 +1046,48 @@ export interface AppPageProgressRecoveryState {
   run_kind: AppPageProgressRecoveryRunKind | null;
   step: string | null;
   target_page_ids: string[];
-  page_refinement_request: string | null;
-  page_refinement_requests: Record<string, string>;
-  deck_refinement_review?: unknown | null;
+  refinement_request: string | null;
+  page_refinement_reasons: Record<string, string>;
   error: string | null;
   updated_at: string | null;
+}
+
+export interface PrepareAppPageRefinementInput {
+  workspace_dir: string;
+  page_id: string;
+  refinement_request: string;
+}
+
+export interface PrepareAppPageRefinementResult {
+  workspace_dir: string;
+  page_id: string;
+  progress: AppPageProgress;
+}
+
+export type AppDeckRefinementOperation =
+  | { op: "keep"; page_id: string; reason: string }
+  | { op: "update"; page_id: string; title: string; core_message: string; required_content: string[]; reason: string }
+  | { op: "add"; title: string; core_message: string; required_content: string[]; reason: string }
+  | { op: "delete"; page_id: string; reason: string };
+
+export interface CommitAppDeckRefinementInput {
+  workspace_dir: string;
+  refinement_request: string;
+  title: string;
+  output_language_change: { changed: boolean; output_language?: string };
+  style_guide_action: "preserve" | "regenerate";
+  style_guide_staging_file_path?: string;
+  style_guide_expected_size_bytes?: number;
+  operations: AppDeckRefinementOperation[];
+}
+
+export interface CommitAppDeckRefinementResult {
+  workspace_dir: string;
+  outline: AppWorkspaceOutline;
+  progress: AppPageProgress;
+  target_page_ids: string[];
+  added_page_ids: string[];
+  deleted_page_ids: string[];
 }
 
 export type AppFinalDeckRenderStatus =
@@ -1135,6 +1172,10 @@ export interface GetAppWorkspaceStyleGuideStatusResult {
   non_empty: boolean;
   size_bytes: number;
   sha256?: string;
+}
+
+export interface GetAppWorkspaceStyleGuideResult extends GetAppWorkspaceStyleGuideStatusResult {
+  content: string;
 }
 
 export interface InitializeAppPageProgressInput {

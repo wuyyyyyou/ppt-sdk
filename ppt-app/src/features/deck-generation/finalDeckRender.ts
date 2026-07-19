@@ -162,6 +162,9 @@ export async function runFinalDeckRender(input: {
     status: "completed",
     run_kind: "final-deck-render",
     step: "complete",
+    target_page_ids: [],
+    refinement_request: null,
+    page_refinement_reasons: {},
     error: null,
     final_deck_render: {
       status: "completed",

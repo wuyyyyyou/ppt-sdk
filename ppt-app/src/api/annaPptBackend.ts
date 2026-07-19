@@ -63,6 +63,9 @@ import type {
   WorkspacePageSourceFingerprint,
   CommitWorkspaceStyleGuideResult,
   WorkspaceStyleGuideStatus,
+  WorkspaceStyleGuide,
+  PreparePageRefinementResult,
+  CommitDeckRefinementResult,
 } from "./types";
 import { createSearchAdapter } from "./searchAdapter";
 import { resolvePptBundledToolIds } from "./bundledToolIds";
@@ -257,8 +260,14 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         "app_get_workspace_style_guide_status",
         input,
       ),
+    getWorkspaceStyleGuide: (input) =>
+      invoke<WorkspaceStyleGuide>(toolIds.pptEngine, "app_get_workspace_style_guide", input),
     initializePageProgress: (input) =>
       invoke<PageProgress>(toolIds.pptEngine, "app_initialize_page_progress", input),
+    preparePageRefinement: (input) =>
+      invoke<PreparePageRefinementResult>(toolIds.pptEngine, "app_prepare_page_refinement", input),
+    commitDeckRefinement: (input) =>
+      invoke<CommitDeckRefinementResult>(toolIds.pptEngine, "app_commit_deck_refinement", input),
     listStyleProfiles: () =>
       invoke<ListStyleProfilesResult>(
         toolIds.pptEngine,

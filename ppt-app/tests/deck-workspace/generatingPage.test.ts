@@ -74,19 +74,18 @@ function renderPage(viewState: GenerationViewState, progress: DeckGenerationProg
 }
 
 describe("GeneratingPage controls", () => {
-  it("shows running title and an enabled stop button while active", () => {
+  it("shows running title without exposing the unfinished stop action", () => {
     const html = renderPage(
       makeViewState({ status: "running", canStop: true }),
       makeProgress("page-authoring", "authoring"),
     );
 
     assert.match(html, /生成中/);
-    assert.match(html, />停止</);
-    assert.doesNotMatch(html, /disabled="">停止/);
+    assert.doesNotMatch(html, />停止</);
     assert.doesNotMatch(html, />继续生成</);
   });
 
-  it("shows interrupted title, disabled stop, and resume action when no task is running", () => {
+  it("shows interrupted title and resume action when no task is running", () => {
     const html = renderPage(
       makeViewState({
         status: "interrupted",
@@ -99,7 +98,7 @@ describe("GeneratingPage controls", () => {
     );
 
     assert.match(html, /生成中断/);
-    assert.match(html, /disabled="">停止/);
+    assert.doesNotMatch(html, />停止</);
     assert.match(html, /继续生成/);
     assert.match(html, /generation-major-node interrupted/);
     assert.doesNotMatch(html, /generation-major-node failed/);
@@ -139,7 +138,7 @@ describe("GeneratingPage controls", () => {
     );
 
     assert.match(html, /无法继续生成/);
-    assert.match(html, /disabled="">停止/);
+    assert.doesNotMatch(html, />停止</);
     assert.match(html, />大纲</);
     assert.doesNotMatch(html, />继续生成</);
   });

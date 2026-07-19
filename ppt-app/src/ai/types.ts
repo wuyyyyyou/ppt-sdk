@@ -128,37 +128,7 @@ export interface GeneratePagePlanInput {
   logContext?: AiOperationLogContext;
 }
 
-export type PageRefinementIntentReviewRoute = "proceed" | "unsupported";
-
-export interface PageRefinementIntentReviewResult {
-  route: PageRefinementIntentReviewRoute;
-  blocking_reason?: string;
-  outline_change_required: boolean;
-  target_outline_item?: {
-    title: string;
-    outline: string;
-  };
-  additional_research_required: boolean;
-  additional_web_query_intents: string[];
-  additional_image_query_intents: string[];
-  evidence_needs: string[];
-  visual_needs: string[];
-  reason: string;
-}
-
-export interface ReviewPageRefinementIntentInput {
-  instruction: string;
-  outline: WorkspaceOutline;
-  pagePlan: PagePlan;
-  targetPage: PagePlanItem;
-  planningContext: TemplatePlanningContext;
-  researchRequirement: ResearchRequirement | null;
-  researchEvidence: ResearchEvidenceIndex | null;
-  locale: Locale;
-  logContext?: AiOperationLogContext;
-}
-
-export type DeckRefinementIntentReviewRoute = "proceed" | "unsupported" | "no_op";
+export type DeckRefinementPlanningRoute = "proceed" | "no_op";
 
 export type DeckRefinementOutlineOperation =
   | {
@@ -170,24 +140,16 @@ export type DeckRefinementOutlineOperation =
       op: "update";
       page_id: string;
       title: string;
-      outline: string;
+      core_message: string;
+      required_content: string[];
       reason: string;
-      additional_research_required?: boolean;
-      additional_web_query_intents?: string[];
-      additional_image_query_intents?: string[];
-      evidence_needs?: string[];
-      visual_needs?: string[];
     }
   | {
       op: "add";
       title: string;
-      outline: string;
+      core_message: string;
+      required_content: string[];
       reason: string;
-      additional_research_required?: boolean;
-      additional_web_query_intents?: string[];
-      additional_image_query_intents?: string[];
-      evidence_needs?: string[];
-      visual_needs?: string[];
     }
   | {
       op: "delete";
@@ -195,28 +157,46 @@ export type DeckRefinementOutlineOperation =
       reason: string;
     };
 
-export interface DeckRefinementIntentReviewResult {
-  route: DeckRefinementIntentReviewRoute;
-  blocking_reason?: string;
+export interface DeckRefinementPlan {
+  route: DeckRefinementPlanningRoute;
+  title: string;
   output_language_change: {
     changed: boolean;
     output_language?: string;
     reason?: string;
   };
-  theme_change_required: boolean;
-  theme_change_reason?: string;
+  style_guide_change: {
+    action: "preserve" | "regenerate";
+    reason: string;
+  };
   operations: DeckRefinementOutlineOperation[];
   reason: string;
 }
 
-export interface ReviewDeckRefinementIntentInput {
+export interface PlanDeckRefinementInput {
   instruction: string;
   outline: WorkspaceOutline;
-  pagePlan: PagePlan;
-  planningContext: TemplatePlanningContext;
-  setting?: WorkspaceSettings;
+  requirements: PresentationRequirements;
+  currentStyleGuide: string;
   locale: Locale;
   logContext?: AiOperationLogContext;
+}
+
+export interface DeckRefinementPlanningAttempt {
+  attempt: number;
+  status: "success" | "retry" | "error";
+  llmRequest: AnnaLlmCompleteInput;
+  llmRawResponse?: unknown;
+  validation: {
+    ok: boolean;
+    errors: string[];
+  };
+  error?: { message: string };
+}
+
+export interface DeckRefinementPlanningResult {
+  plan: DeckRefinementPlan;
+  attempts: DeckRefinementPlanningAttempt[];
 }
 
 export interface GenerateAddedPagePlanInput {
@@ -262,8 +242,7 @@ export interface AiClient {
   generateAddedPagePlan(input: GenerateAddedPagePlanInput): Promise<PagePlan>;
   generateResearchDiscoveryDecision(input: GenerateResearchDiscoveryDecisionInput): Promise<ResearchDiscoveryDecision>;
   generateEvidenceAwarePagePlan(input: GenerateEvidenceAwarePagePlanInput): Promise<PagePlan>;
-  reviewPageRefinementIntent(input: ReviewPageRefinementIntentInput): Promise<PageRefinementIntentReviewResult>;
-  reviewDeckRefinementIntent(input: ReviewDeckRefinementIntentInput): Promise<DeckRefinementIntentReviewResult>;
+  planDeckRefinement(input: PlanDeckRefinementInput): Promise<DeckRefinementPlanningResult>;
   generateDeck(input: GenerateDeckInput): Promise<GeneratedDeck>;
   reviseOutline(input: ReviseOutlineInput): Promise<OutlineGenerationResult>;
   generateSlidesFromOutline(

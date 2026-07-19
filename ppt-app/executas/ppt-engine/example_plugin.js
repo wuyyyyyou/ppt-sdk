@@ -68,6 +68,8 @@ import {
   openAppWorkspace,
   patchAppWorkspaceSettings,
   prepareAppDeckRefinementPageFiles,
+  prepareAppPageRefinement,
+  commitAppDeckRefinement,
   prepareAppPageFiles,
   prepareAppExportModel,
   prepareAppWorkspaceDiagnosticBundle,
@@ -77,6 +79,7 @@ import {
   reconcileWorkspacePageSources,
   recordAppWorkspaceStyleGuide,
   getAppWorkspaceStyleGuideStatus,
+  getAppWorkspaceStyleGuide,
   initializeAppPageProgress,
   recordAppPagePlan,
   recordAppPageProgress,
@@ -407,6 +410,14 @@ function readOptionalStringArg(args, parameterName) {
   }
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`"${parameterName}" must be a non-empty string when provided`);
+  }
+  return value;
+}
+
+function readRequiredStringArg(args, parameterName) {
+  const value = args?.[parameterName];
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`Missing required parameter: "${parameterName}"`);
   }
   return value;
 }
@@ -883,6 +894,54 @@ async function toolAppCommitWorkspaceStyleGuideHostUpload(args) {
 async function toolAppGetWorkspaceStyleGuideStatus(args) {
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
   return getAppWorkspaceStyleGuideStatus({ workspace_dir: workspaceDir });
+}
+
+async function toolAppGetWorkspaceStyleGuide(args) {
+  return getAppWorkspaceStyleGuide({ workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir") });
+}
+
+async function toolAppPreparePageRefinement(args) {
+  return prepareAppPageRefinement({
+    workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir"),
+    page_id: readRequiredStringArg(args, "page_id"),
+    refinement_request: readRequiredStringArg(args, "refinement_request"),
+  });
+}
+
+async function toolAppCommitDeckRefinement(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const styleAction = readRequiredStringArg(args, "style_guide_action");
+  let stagingPath;
+  let expectedSizeBytes;
+  if (styleAction === "regenerate") {
+    const uploadArgs = args.style_guide_upload;
+    if (!uploadArgs || typeof uploadArgs !== "object" || Array.isArray(uploadArgs)) {
+      throw new Error('"style_guide_upload" is required when regenerating the Style Guide');
+    }
+    const hostUpload = readHostUploadRefArg(uploadArgs, "host_upload");
+    if (hostUpload.mime_type !== "text/markdown") throw new Error('Replacement Style Guide MIME type must be "text/markdown"');
+    expectedSizeBytes = Number(uploadArgs.size_bytes);
+    if (!Number.isFinite(expectedSizeBytes) || Math.floor(expectedSizeBytes) !== hostUpload.size_bytes) {
+      throw new Error("Replacement Style Guide Host Upload size mismatch");
+    }
+    stagingPath = path.join(STYLE_GUIDE_STAGING_DIR, `${randomUUID()}.md`);
+    await downloadHostUploadToStaging({ hostUpload, stagingPath, expectedSizeBytes: Math.floor(expectedSizeBytes) });
+  }
+  try {
+    return await commitAppDeckRefinement({
+      workspace_dir: workspaceDir,
+      refinement_request: readRequiredStringArg(args, "refinement_request"),
+      title: readRequiredStringArg(args, "title"),
+      output_language_change: args.output_language_change ?? { changed: false },
+      style_guide_action: styleAction,
+      style_guide_staging_file_path: stagingPath,
+      style_guide_expected_size_bytes: expectedSizeBytes,
+      operations: Array.isArray(args.operations) ? args.operations : [],
+    });
+  } finally {
+    if (stagingPath) await unlink(stagingPath).catch(() => undefined);
+  }
 }
 
 async function toolAppInitializePageProgress(args) {
@@ -2477,8 +2536,11 @@ const TOOL_DISPATCH = {
   app_ensure_confirmed_outline_page_ids: toolAppEnsureConfirmedOutlinePageIds,
   app_prepare_workspace_page_sources: toolAppPrepareWorkspacePageSources,
   app_reconcile_workspace_page_sources: toolAppReconcileWorkspacePageSources,
+  app_prepare_page_refinement: toolAppPreparePageRefinement,
+  app_commit_deck_refinement: toolAppCommitDeckRefinement,
   app_commit_workspace_style_guide_host_upload: toolAppCommitWorkspaceStyleGuideHostUpload,
   app_get_workspace_style_guide_status: toolAppGetWorkspaceStyleGuideStatus,
+  app_get_workspace_style_guide: toolAppGetWorkspaceStyleGuide,
   app_initialize_page_progress: toolAppInitializePageProgress,
   app_rebuild_workspace_deck_manifest: toolAppRebuildWorkspaceDeckManifest,
   app_get_workspace_page_source_fingerprint: toolAppGetWorkspacePageSourceFingerprint,

@@ -28,7 +28,7 @@ import {
 import { shouldResumePageGenerationStatus } from "./pageStatusPolicy";
 
 function getActiveGenerationRunKind(input: RunDeckGenerationInput): NonNullable<PageProgress["recovery"]>["run_kind"] {
-  return input.refinementRunKind ?? (input.pageRefinementRequests ? "page-refinement" : "deck-generation");
+  return input.refinementRunKind ?? (input.pageRefinementReasons ? "page-refinement" : "deck-generation");
 }
 
 function getAuthoringPageIds(
@@ -39,7 +39,7 @@ function getAuthoringPageIds(
   return authoringDeck.pages
     .filter((page) => {
       const pageProgress = getProgressPage(progress, page.page_id);
-      return Boolean(input.pageRefinementRequests?.[page.page_id]?.trim()) ||
+      return Boolean(input.pageRefinementReasons?.[page.page_id]?.trim()) ||
         shouldResumePageGenerationStatus(pageProgress?.status ?? "pending");
     })
     .map((page) => page.page_id);
@@ -219,13 +219,11 @@ export async function runDeckGeneration(
       status: "interrupted",
       run_kind: getActiveGenerationRunKind(input),
       step: "interrupted",
-      target_page_ids: input.pageRefinementRequests
-        ? Object.keys(input.pageRefinementRequests)
+      target_page_ids: input.pageRefinementReasons
+        ? Object.keys(input.pageRefinementReasons)
         : authoringDeck.pages.filter((page) => getProgressPage(progress, page.page_id)?.status !== "accepted").map((page) => page.page_id),
-      page_refinement_request: input.pageRefinementRequests
-        ? Object.values(input.pageRefinementRequests)[0] ?? null
-        : null,
-      page_refinement_requests: input.pageRefinementRequests ?? {},
+      refinement_request: input.refinementRequest ?? null,
+      page_refinement_reasons: input.pageRefinementReasons ?? {},
       error: null,
       deck_status: "interrupted",
     });
@@ -258,13 +256,11 @@ export async function runDeckGeneration(
       status: "failed",
       run_kind: getActiveGenerationRunKind(input),
       step: "page-authoring",
-      target_page_ids: input.pageRefinementRequests
-        ? Object.keys(input.pageRefinementRequests)
+      target_page_ids: input.pageRefinementReasons
+        ? Object.keys(input.pageRefinementReasons)
         : [failedPage.page_id],
-      page_refinement_request: input.pageRefinementRequests
-        ? Object.values(input.pageRefinementRequests)[0] ?? null
-        : null,
-      page_refinement_requests: input.pageRefinementRequests ?? {},
+      refinement_request: input.refinementRequest ?? null,
+      page_refinement_reasons: input.pageRefinementReasons ?? {},
       error: error.message,
       deck_status: "failed",
     });

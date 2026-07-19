@@ -1,7 +1,6 @@
 import { AgentRunCancelledError, type AgentPageVisualReviewResult, type AgentStreamEvent } from "../../agent/agentClient";
 import type { AiOperationLogContext } from "../../ai/interactionLog";
 import type { PagePlanItem, PageProgress } from "../../api/types";
-import type { DeckRefinementIntentReviewResult } from "../../ai/types";
 import { buildDeckGenerationSummary, emitRuntime } from "./progressProjection";
 import { updateResearchDiscoveryCurationStream } from "./researchDiscoveryProgress";
 import { ATTEMPT_LIMITS, type DeckGenerationContext, type DeckGenerationRuntime, type DeckGenerationStep, type DeckGenerationStream, type ResearchDiscoveryProgress } from "./types";
@@ -38,9 +37,8 @@ export async function recordDeckRecovery(
     run_kind?: NonNullable<PageProgress["recovery"]>["run_kind"];
     step?: string | null;
     target_page_ids?: string[];
-    page_refinement_request?: string | null;
-    page_refinement_requests?: Record<string, string>;
-    deck_refinement_review?: DeckRefinementIntentReviewResult | null;
+    refinement_request?: string | null;
+    page_refinement_reasons?: Record<string, string>;
     error?: string | null;
     final_deck_render?: Partial<NonNullable<PageProgress["final_deck_render"]>>;
     research_discovery?: ResearchDiscoveryProgress;

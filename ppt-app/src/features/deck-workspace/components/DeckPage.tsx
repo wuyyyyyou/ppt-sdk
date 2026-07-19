@@ -13,6 +13,8 @@ interface DeckPageProps {
   loading: string;
   onRefreshPreview: () => void;
   onPreview: () => void;
+  onRefineSlide: () => void;
+  onRefineDeck: () => void;
   onExport: () => void;
 }
 
@@ -23,14 +25,20 @@ export function DeckPage(props: DeckPageProps) {
   return (
     <section className="page active deck-page">
       <div className="deck-top-actions">
+        <button className="secondary-btn compact" onClick={() => props.onRefineSlide()}>
+          {props.t.controls.refineSlide}
+        </button>
+        <button className="secondary-btn compact" onClick={() => props.onRefineDeck()}>
+          {props.t.controls.refineDeck}
+        </button>
         <button
-          className="secondary-btn compact"
+          className="secondary-btn compact deck-refresh-btn"
           onClick={props.onRefreshPreview}
           disabled={refreshDisabled}
           title={props.t.review.renderAgain}
+          aria-label={props.t.review.renderAgain}
         >
           <RefreshCw size={14} />
-          {props.t.review.renderAgain}
         </button>
       </div>
       <SlidePreviewNavigator

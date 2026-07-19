@@ -16,12 +16,10 @@ import {
   parseResearchDiscoveryDecisionJson,
 } from "./researchDiscoveryPrompt";
 import {
-  buildPageRefinementIntentReviewPrompt,
-  normalizePageRefinementIntentReview,
-} from "./pageRefinementIntentReview";
-import {
-  buildDeckRefinementIntentReviewLlmRequest,
-  normalizeDeckRefinementIntentReview,
+  buildDeckRefinementPlanningRepairRequest,
+  buildDeckRefinementPlanningRequest,
+  DeckRefinementPlanningValidationError,
+  normalizeDeckRefinementPlan,
 } from "./deckRefinementIntentReview";
 import {
   OutlineValidationError,
@@ -42,7 +40,7 @@ import {
 } from "./structuredJson";
 import { CONTENT_GROUNDING_RULES } from "./groundingRules";
 import type { AiOperationLogContext } from "./interactionLog";
-import { buildWorkspaceStyleGuidePrompt } from "./styleGuidePrompt";
+import { buildWorkspaceStyleGuideLlmRequest } from "./styleGuidePrompt";
 import type {
   AiAttemptLog,
   AiClient,
@@ -422,12 +420,7 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
     },
 
     async generateWorkspaceStyleGuide(input) {
-      const request: AnnaLlmCompleteInput = {
-        messages: [{
-          role: "user",
-          content: { type: "text", text: buildWorkspaceStyleGuidePrompt(input) },
-        }],
-      };
+      const request = buildWorkspaceStyleGuideLlmRequest(input);
       let lastError: unknown = null;
       for (let attempt = 1; attempt <= 3; attempt += 1) {
         try {
@@ -567,26 +560,54 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
       return parseEvidenceAwarePagePlanJson(rawText, input.pagePlan, input.targetPageIds);
     },
 
-    async reviewPageRefinementIntent(input) {
-      const result = await completeJson<unknown>(
-        runtime,
-        "page refinement intent review",
-        buildPageRefinementIntentReviewPrompt(input),
-        '{"route":"proceed","blocking_reason":"","outline_change_required":false,"additional_research_required":false,"additional_web_query_intents":[],"additional_image_query_intents":[],"evidence_needs":[],"visual_needs":[],"reason":"..."}',
-        input.logContext,
-      );
-      return normalizePageRefinementIntentReview(result);
-    },
-
-    async reviewDeckRefinementIntent(input) {
-      const result = await completeJsonRequest<unknown>(
-        runtime,
-        "deck refinement intent review",
-        buildDeckRefinementIntentReviewLlmRequest(input),
-        '{"route":"proceed","blocking_reason":"","output_language_change":{"changed":false,"output_language":"","reason":""},"theme_change_required":false,"theme_change_reason":"","operations":[{"op":"keep","page_id":"page-01","reason":""}],"reason":"..."}',
-        input.logContext,
-      );
-      return normalizeDeckRefinementIntentReview(result);
+    async planDeckRefinement(input) {
+      const attempts = [];
+      let request = buildDeckRefinementPlanningRequest(input);
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+          const rawResult = await completeLlm(runtime, request, input.logContext);
+          const rawText = extractCompletionText(rawResult);
+          try {
+            const parsed = parseStructuredJson<unknown>(rawText);
+            const plan = normalizeDeckRefinementPlan(parsed, input);
+            attempts.push({
+              attempt,
+              status: "success" as const,
+              llmRequest: request,
+              llmRawResponse: rawResult,
+              validation: { ok: true, errors: [] },
+            });
+            return { plan, attempts };
+          } catch (error) {
+            const errors = error instanceof DeckRefinementPlanningValidationError
+              ? error.errors
+              : [error instanceof Error ? error.message : String(error)];
+            attempts.push({
+              attempt,
+              status: attempt < 3 ? "retry" as const : "error" as const,
+              llmRequest: request,
+              llmRawResponse: rawResult,
+              validation: { ok: false, errors },
+            });
+            if (attempt < 3) {
+              request = buildDeckRefinementPlanningRepairRequest(request, rawText, errors);
+              continue;
+            }
+            throw new DeckRefinementPlanningValidationError(errors);
+          }
+        } catch (error) {
+          if (error instanceof DeckRefinementPlanningValidationError) throw error;
+          attempts.push({
+            attempt,
+            status: "error" as const,
+            llmRequest: request,
+            validation: { ok: false, errors: [error instanceof Error ? error.message : String(error)] },
+            error: { message: error instanceof Error ? error.message : String(error) },
+          });
+          throw error;
+        }
+      }
+      throw new Error("Deck Refinement Planning failed");
     },
 
     async generateDeck(input) {

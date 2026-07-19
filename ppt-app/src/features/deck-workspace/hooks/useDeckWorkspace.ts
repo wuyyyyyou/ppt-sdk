@@ -88,6 +88,7 @@ import {
   completedDeckIsAvailable,
   restoreDeckGenerationProgress,
 } from "../workspaceRecovery";
+import { resolveRefineSlideIndex } from "../refineNavigation";
 import {
   DEFAULT_PAGE_REVIEW_SETTINGS,
   pageReviewSettingsToWorkspaceSettings,
@@ -1518,13 +1519,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     await loadDeckHtmlForWorkspace(currentWorkspace, "review");
   }
 
-  async function openRefineSlide(index = currentSlide) {
+  async function openRefineSlide(index: unknown = currentSlide) {
     if (!generated) {
       showToast(t.toasts.createDeckFirst);
       return;
     }
 
-    setCurrentSlide(index);
+    const targetIndex = resolveRefineSlideIndex(index, currentSlide, deck.length);
+    setCurrentSlide(targetIndex);
     setRefineScope("slide");
     setPage("refine");
     setHistory((items) =>
@@ -1538,12 +1540,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       reviewRender.status === "ready" &&
       reviewRender.result !== null &&
       reviewRender.renderKey === renderKey &&
-      Boolean(reviewRender.result.slides[index]?.screenshot_upload);
+      Boolean(reviewRender.result.slides[targetIndex]?.screenshot_upload);
     if (hasCurrentSlidePreview) return;
 
     const rendered = await loadDeckHtmlForWorkspace(currentWorkspace, "review");
     if (rendered) {
-      setCurrentSlide(index);
+      setCurrentSlide(targetIndex);
     }
   }
 
@@ -2889,6 +2891,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         backend,
         aiClient,
         agentClient,
+        hostUploadClient,
         aiLogger,
         workspace: refreshedWorkspace,
         confirmedOutline: workspaceOutlineForDownstream(refreshedWorkspace),
@@ -2941,13 +2944,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         backend,
         aiClient,
         agentClient,
+        hostUploadClient,
         aiLogger,
         workspace: refreshedWorkspace,
         confirmedOutline: workspaceOutlineForDownstream(refreshedWorkspace),
         locale,
         instruction: trimmedInstruction,
         scope: "slide",
-        pageIndex: currentSlide,
+        pageId: workspaceOutlineForDownstream(refreshedWorkspace).items[currentSlide]?.page_id,
         onProgress: recordGenerationProgress,
         isCancelled: () => cancelCreateDeckRef.current,
         cancelSignal,
@@ -3174,8 +3178,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       shouldReconcileActiveRun = true;
       setStage("generating");
       setPage("main");
-      beginActiveGenerationRun("deck-generation");
-      const completion = await runDeckGeneration({
+      const recoveryProgress = await backend.getPageProgress({ workspace_dir: refreshedWorkspace.workspace_dir });
+      const recoveryKind = recoveryProgress.recovery?.run_kind;
+      const isRefinementResume = recoveryKind === "page-refinement" || recoveryKind === "deck-refinement";
+      beginActiveGenerationRun(isRefinementResume ? recoveryKind : "deck-generation");
+      const commonInput = {
             backend,
             aiClient,
             agentClient,
@@ -3184,11 +3191,20 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
             workspace: refreshedWorkspace,
             confirmedOutline: workspaceOutlineForDownstream(refreshedWorkspace),
             locale,
-            startMode: "resume",
             onProgress: recordGenerationProgress,
             isCancelled: () => cancelCreateDeckRef.current,
             cancelSignal,
-          });
+          };
+      const completion = isRefinementResume
+        ? await runDeckRefinement({
+            ...commonInput,
+            instruction: recoveryProgress.recovery?.refinement_request ?? "Resume refinement",
+            scope: recoveryKind === "page-refinement" ? "slide" : "deck",
+            pageId: recoveryProgress.recovery?.target_page_ids[0],
+            resumePageIds: recoveryProgress.recovery?.target_page_ids,
+            skipIntentReview: true,
+          })
+        : await runDeckGeneration({ ...commonInput, startMode: "resume" });
       await applyDeckGenerationCompletion(completion, refreshedWorkspace);
       shouldReconcileActiveRun = false;
     } catch (error) {

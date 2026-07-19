@@ -8,6 +8,7 @@ import { OutlinePage } from "../features/deck-workspace/components/OutlinePage";
 import { PanelHeader } from "../features/deck-workspace/components/PanelHeader";
 import { ProgressLine } from "../features/deck-workspace/components/ProgressLine";
 import { ReviewPage } from "../features/deck-workspace/components/ReviewPage";
+import { RefinePage } from "../features/deck-workspace/components/RefinePage";
 import {
   confirmedRequirementsAllowOutline,
   PresentationRequirementsPage,
@@ -19,6 +20,14 @@ import { useI18n } from "../i18n/useI18n";
 export function App() {
   const { locale, setLocale, t } = useI18n();
   const { state, actions } = useDeckWorkspace(t, locale);
+  const refineSlideIndex = state.deck.length > 0
+    ? Math.min(Math.max(state.currentSlide, 0), state.deck.length - 1)
+    : 0;
+  const refineSlide = state.deck[refineSlideIndex] ?? (
+    state.outline[refineSlideIndex]
+      ? { title: state.outline[refineSlideIndex].title, subtitle: "" }
+      : null
+  );
 
   return (
     <main className="anna-stage">
@@ -158,6 +167,8 @@ export function App() {
                 void actions.renderDeckHtml();
               }}
               onPreview={() => actions.navigate("review")}
+              onRefineSlide={actions.openRefineSlide}
+              onRefineDeck={actions.openRefineDeck}
               onExport={() => actions.navigate("export")}
             />
           ) : null}
@@ -192,6 +203,22 @@ export function App() {
               reviewRender={state.reviewRender}
               renderDeckHtml={actions.renderDeckHtml}
               onBack={actions.goBack}
+            />
+          ) : null}
+
+          {state.page === "refine" && refineSlide ? (
+            <RefinePage
+              t={t}
+              deck={state.deck}
+              slide={refineSlide}
+              slideIndex={refineSlideIndex}
+              slideNumber={String(refineSlideIndex + 1)}
+              refineScope={state.refineScope}
+              reviewRender={state.reviewRender}
+              loading={state.loading}
+              onBack={actions.goBack}
+              onRefineDeck={(instruction) => void actions.refineDeck(instruction)}
+              onRefineSlide={(instruction) => void actions.refineSlide(instruction)}
             />
           ) : null}
 

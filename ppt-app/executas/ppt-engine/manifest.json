@@ -109,6 +109,13 @@
       ]
     },
     {
+      "name": "app_get_workspace_style_guide",
+      "description": "Read the current non-empty Workspace Style Guide Markdown for planning and refinement.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true }
+      ]
+    },
+    {
       "name": "app_reconcile_workspace_page_sources",
       "description": "Repair missing pending Page Sources from the Bootstrap and reject missing progressed Page Sources without checking the Authoring Kit directory.",
       "parameters": [
@@ -118,6 +125,28 @@
           "description": "Absolute path to an existing PPT workspace.",
           "required": true
         }
+      ]
+    },
+    {
+      "name": "app_prepare_page_refinement",
+      "description": "Prepare one existing Page Source for Page Refinement without modifying the Confirmed Outline, Workspace Style Guide, or Manifest.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
+        { "name": "page_id", "type": "string", "description": "Stable target page id from the Confirmed Outline.", "required": true },
+        { "name": "refinement_request", "type": "string", "description": "User Page Refinement Request.", "required": true }
+      ]
+    },
+    {
+      "name": "app_commit_deck_refinement",
+      "description": "Commit a prepared Deck Refinement by reconciling the Confirmed Outline, optional replacement Style Guide, Manifest, Page Sources, Page Progress, and recovery state.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
+        { "name": "refinement_request", "type": "string", "description": "User Deck Refinement Request.", "required": true },
+        { "name": "title", "type": "string", "description": "Final Deck title.", "required": true },
+        { "name": "output_language_change", "type": "object", "description": "Explicit output language change decision.", "required": true },
+        { "name": "style_guide_action", "type": "string", "description": "preserve or regenerate.", "required": true },
+        { "name": "operations", "type": "array", "description": "Complete ordered keep/update/add/delete operations.", "required": true },
+        { "name": "style_guide_upload", "type": "object", "description": "Replacement text/markdown Host Upload when style_guide_action is regenerate.", "required": false }
       ]
     },
     {

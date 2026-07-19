@@ -1,7 +1,7 @@
 import type { AgentPageVisualReviewResult } from "../../agent/agentClient";
 import type { RenderWorkspacePagePreviewResult, WorkspaceOutline } from "../../api/types";
 import type { Locale } from "../../i18n/messages";
-import type { AuthoringDeck, AuthoringPage, NoChangeAuthoringRetry, RenderFailureHistoryItem, RenderFailurePhase } from "./types";
+import type { AuthoringDeck, AuthoringPage, NoChangeAuthoringRetry, PageRefinementVisualContext, RenderFailureHistoryItem, RenderFailurePhase } from "./types";
 import {
   createAgentFileToolPathContext,
   describeAgentFileToolPathContext,
@@ -54,6 +54,9 @@ export function buildAuthoringPrompt(input: {
   visualReview?: AgentPageVisualReviewResult | null;
   visualReviewScreenshotPath?: string;
   noChangeRetry?: NoChangeAuthoringRetry | null;
+  refinementRequest?: string;
+  refinementReason?: string;
+  refinementVisualContext?: PageRefinementVisualContext;
 }) {
   const context = createAgentFileToolPathContext({
     workspaceRoot: input.workspaceRoot,
@@ -69,6 +72,14 @@ export function buildAuthoringPrompt(input: {
   const styleGuidePath = `${input.workspaceDir}/style-guide.md`;
   const authoringKitReadmePath = `${input.workspaceDir}/authoring-kit/README.md`;
   const screenshotPath = input.visualReviewScreenshotPath?.trim() ?? "";
+  const baselineScreenshotPath = input.refinementVisualContext?.screenshotPath?.trim() ?? "";
+  const refinementContext = input.refinementRequest?.trim() ? [
+    "这是优化轮次。大纲和艺术指导是最初确定的基线；如果它们与用户本次优化要求冲突，只执行用户本次要求。",
+    `用户本次优化要求: ${input.refinementRequest.trim()}`,
+    `当前页优化原因: ${input.refinementReason?.trim() || "Apply the user's refinement request to this page."}`,
+    baselineScreenshotPath ? toolPath("优化前页面截图（仅作视觉基线，不是事实来源）", baselineScreenshotPath) : "优化前页面截图不可用。",
+    "不得从截图推断或补造事实、数字、名称、日期、引用或来源依赖内容。",
+  ].join("\n") : "";
   const repairContext = input.renderError
     ? [
         "这是渲染修复轮次。优先修复当前错误，不要做无关重构。",
@@ -110,6 +121,7 @@ export function buildAuthoringPrompt(input: {
     "- 用清晰的视觉层级表达当前页唯一核心信息；事实和数字只能来自已读 Workspace 文件，不要自行补造。",
     "",
     "当前轮次：",
+    refinementContext,
     repairContext,
     input.noChangeRetry ? [
       "上一次响应没有改变当前 TSX 的文件指纹。此次必须实际编辑当前 TSX，不能只返回说明。",

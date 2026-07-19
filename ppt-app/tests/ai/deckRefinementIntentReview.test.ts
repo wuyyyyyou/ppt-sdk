@@ -1,128 +1,68 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  buildDeckRefinementIntentReviewLlmRequest,
-  normalizeDeckRefinementIntentReview,
+  buildDeckRefinementPlanningRepairRequest,
+  buildDeckRefinementPlanningRequest,
+  normalizeDeckRefinementPlan,
 } from "../../src/ai/deckRefinementIntentReview.ts";
-import type { PagePlan, TemplatePlanningContext, WorkspaceOutline, WorkspaceSettings } from "../../src/api/types.ts";
+import type { PlanDeckRefinementInput } from "../../src/ai/types.ts";
 
-const outline: WorkspaceOutline = {
-  version: 2,
-  title: "Demo Deck",
-  output_language: "zh",
-  status: "confirmed",
-  items: [
-    { title: "Outline Only Title", outline: "Outline-only wording" },
-  ],
-  source: {
-    prompt: "Build a demo deck",
-    context: [{ id: "theme", value: "digital-indigo" }],
-    setting: { output_language: "zh", theme_id: "digital-indigo" },
+const input: PlanDeckRefinementInput = {
+  instruction: "把第二页改成结论页，整套改为英文",
+  locale: "zh",
+  currentStyleGuide: "# Style\nUse blue.",
+  requirements: {
+    version: 1,
+    status: "confirmed",
+    source: { brief: "季度经营复盘" },
+    candidates: { audience: [], purpose: [], desired_outcome: [], slide_count: [2], output_language: ["中文"], visual_tone: [] },
+    selections: { audience: null, purpose: null, desired_outcome: null, slide_count: 2, output_language: "中文", visual_tone: null },
+    updated_at: null,
+    confirmed_at: null,
   },
-  updated_at: "2026-01-01T00:00:00.000Z",
-};
-
-const pagePlan: PagePlan = {
-  version: 1,
-  status: "prepared",
-  title: "Demo Deck",
-  source: {
-    outline_updated_at: outline.updated_at,
-    template_group: "template",
-    template_manifest_path: "/workspace/template/manifest.json",
-    generated_by: "test",
+  outline: {
+    version: 3,
+    title: "经营复盘",
+    status: "confirmed",
+    items: [
+      { page_id: "page-1", title: "现状", core_message: "收入增长", required_content: "- 收入" },
+      { page_id: "page-2", title: "行动", core_message: "聚焦增长", required_content: "- 行动" },
+    ],
+    updated_at: null,
+    confirmed_at: null,
   },
-  pages: [
-    {
-      page_id: "page-01",
-      index: 0,
-      title: "Plan Page One",
-      outline: "Page-plan wording",
-      blueprint_id: "content-canvas",
-      blueprint_source: "./blueprints/ContentCanvas.tsx",
-      slide_path: "./slides/page-01.tsx",
-      data_path: "./data/page-01.json",
-      manifest_slide_id: "page-01",
-      reason: "Existing page.",
-    },
-  ],
-  updated_at: "2026-01-01T00:00:00.000Z",
 };
 
-const planningContext: TemplatePlanningContext = {
-  template_group: "template",
-  template_group_name: "Template",
-  template_dir: "/workspace/template",
-  manifest_path: "/workspace/template/manifest.json",
-  catalog_path: "/workspace/template/catalog.json",
-  rules: [],
-  blueprints: [
-    {
-      id: "content-canvas",
-      name: "Content Canvas",
-      blueprint_source: "./blueprints/ContentCanvas.tsx",
-      example_slide: "./slides/ContentCanvas.tsx",
-      layout_family: "content-canvas",
-      content_intents: ["analysis"],
-      suitable_for: ["ordinary content page"],
-      avoid_for: ["cover"],
-    },
-  ],
-};
-
-const setting: WorkspaceSettings = {
-  output_language: "zh",
-  theme_id: "digital-indigo",
-  text_density: "balanced",
-};
-
-describe("deck refinement intent review prompt", () => {
-  it("uses system and user messages with trimmed review input", () => {
-    const request = buildDeckRefinementIntentReviewLlmRequest({
-      instruction: "把第一页改成摘要",
-      outline,
-      pagePlan,
-      planningContext,
-      setting,
-      locale: "zh",
-    });
-
+describe("Deck Refinement Planning", () => {
+  it("uses separate English system/user prompts without legacy template or search tasks", () => {
+    const request = buildDeckRefinementPlanningRequest(input);
     assert.equal(request.messages[0]?.role, "system");
     assert.equal(request.messages[1]?.role, "user");
-    const systemPrompt = request.messages[0]?.content.text ?? "";
-    const userPrompt = request.messages[1]?.content.text ?? "";
-
-    assert.match(systemPrompt, /Do not return context_updates/);
-    assert.match(userPrompt, /"page_id": "page-01"/);
-    assert.match(userPrompt, /"output_language": "zh"/);
-    assert.match(userPrompt, /"title": "Plan Page One"/);
-    assert.doesNotMatch(userPrompt, /Outline Only Title/);
-    assert.doesNotMatch(userPrompt, /slide_path/);
-    assert.doesNotMatch(userPrompt, /blueprint_source/);
-    assert.doesNotMatch(userPrompt, /theme_id/);
-    assert.doesNotMatch(userPrompt, /manifest\.json/);
+    const system = request.messages[0]?.content.text ?? "";
+    const user = request.messages[1]?.content.text ?? "";
+    assert.match(system, /Deck Refinement Planning/);
+    assert.match(system, /Return exactly one JSON object/);
+    assert.match(user, /page-1/);
+    assert.match(user, /Current Workspace Style Guide/);
+    assert.doesNotMatch(system, /template|web search|image search|style profile/i);
   });
-});
 
-describe("deck refinement intent review normalization", () => {
-  it("ignores legacy context/global fields instead of preserving them", () => {
-    const result = normalizeDeckRefinementIntentReview({
+  it("validates complete operation coverage and language-wide updates", () => {
+    assert.throws(() => normalizeDeckRefinementPlan({
       route: "proceed",
-      context_updates: {
-        audience: "Executives",
-        theme_id: "digital-indigo",
-      },
-      global_change: true,
-      global_change_reason: "Legacy field should be ignored.",
-      output_language_change: { changed: false },
-      operations: [
-        { op: "keep", page_id: "page-01", reason: "Keep." },
-      ],
-      reason: "Proceed.",
-    });
+      title: "经营复盘",
+      output_language_change: { changed: true, output_language: "English" },
+      style_guide_change: { action: "preserve", reason: "Keep it." },
+      operations: [{ op: "keep", page_id: "page-1", reason: "Keep." }],
+      reason: "Translate.",
+    }, input), /missing operation|require update operations/);
+  });
 
-    assert.equal(result.route, "proceed");
-    assert.equal(Object.prototype.hasOwnProperty.call(result, "context_updates"), false);
-    assert.equal(Object.prototype.hasOwnProperty.call(result, "global_change"), false);
+  it("repair request keeps the invalid response and deterministic errors", () => {
+    const original = buildDeckRefinementPlanningRequest(input);
+    const repaired = buildDeckRefinementPlanningRepairRequest(original, "```json\n{}\n```", ["missing operation"]);
+    assert.equal(repaired.messages.at(-2)?.role, "assistant");
+    assert.match(repaired.messages.at(-1)?.content.text ?? "", /missing operation/);
+    assert.match(repaired.messages.at(-1)?.content.text ?? "", /complete corrected JSON object/);
   });
 });

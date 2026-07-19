@@ -92,8 +92,8 @@ export async function runPageGenerationRetry(
     run_kind: "page-generation-retry",
     step: "page-authoring",
     target_page_ids: [page.page_id],
-    page_refinement_request: null,
-    page_refinement_requests: {},
+    refinement_request: null,
+    page_refinement_reasons: {},
     error: null,
     deck_status: "running",
   });

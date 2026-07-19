@@ -117,8 +117,8 @@ export async function createInitialArtifacts(input: RunDeckGenerationInput) {
     run_kind: "deck-generation",
     step: "authoring-kit",
     target_page_ids: authoringDeck.pages.map((page) => page.page_id),
-    page_refinement_request: null,
-    page_refinement_requests: {},
+    refinement_request: null,
+    page_refinement_reasons: {},
     error: null,
     final_deck_render: {
       status: "idle",

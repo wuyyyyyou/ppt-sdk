@@ -3292,7 +3292,14 @@ details.generation-history-panel > summary::-webkit-details-marker {
 .deck-top-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   margin: -4px 0 8px;
+}
+
+.deck-refresh-btn {
+  width: 30px;
+  min-width: 30px;
+  padding: 0;
 }
 
 .deck-top-actions .slide-ai-actions {

@@ -34,6 +34,7 @@ function renderDeckPage(reviewRender: DeckReviewRenderState = loadingReviewRende
       onRefineSlide: () => undefined,
       onRewriteSlide: () => undefined,
       onChangeSlideLayout: () => undefined,
+      onRefreshPreview: () => undefined,
       onPreview: () => undefined,
       onExport: () => undefined,
     }),
@@ -57,5 +58,14 @@ describe("DeckPage", () => {
     assert.doesNotMatch(html, /AI Deck/);
     assert.doesNotMatch(html, /deck-title-editor/);
     assert.doesNotMatch(html, /aria-label="Deck title"/);
+  });
+
+  it("exposes the current-page and whole-deck refinement entry actions", () => {
+    const html = renderDeckPage();
+    assert.match(html, /deck-top-actions[\s\S]*优化当前页[\s\S]*优化整套/);
+    assert.doesNotMatch(html, /action-bar[\s\S]*优化当前页/);
+    assert.match(html, /aria-label="重新渲染"/);
+    assert.doesNotMatch(html, />重新渲染</);
+    assert.doesNotMatch(html, /复制页面|删除页面|更改布局/);
   });
 });

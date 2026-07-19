@@ -210,6 +210,9 @@ test("Authoring Kit and Page Source workspace tools are declared and routed", as
     ["app_reconcile_workspace_page_sources", "toolAppReconcileWorkspacePageSources"],
     ["app_commit_workspace_style_guide_host_upload", "toolAppCommitWorkspaceStyleGuideHostUpload"],
     ["app_get_workspace_style_guide_status", "toolAppGetWorkspaceStyleGuideStatus"],
+    ["app_get_workspace_style_guide", "toolAppGetWorkspaceStyleGuide"],
+    ["app_prepare_page_refinement", "toolAppPreparePageRefinement"],
+    ["app_commit_deck_refinement", "toolAppCommitDeckRefinement"],
     ["app_initialize_page_progress", "toolAppInitializePageProgress"],
     ["app_rebuild_workspace_deck_manifest", "toolAppRebuildWorkspaceDeckManifest"],
     ["app_get_workspace_page_source_fingerprint", "toolAppGetWorkspacePageSourceFingerprint"],
@@ -223,6 +226,14 @@ test("Authoring Kit and Page Source workspace tools are declared and routed", as
     getToolParameter(manifest, "app_get_workspace_page_source_fingerprint", "page_id").required,
     true,
   );
+});
+
+test("Refinement plugin wrappers define their required string argument parser", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+
+  assert.match(source, /function readRequiredStringArg\(args, parameterName\)/);
+  assert.match(source, /page_id:\s*readRequiredStringArg\(args, "page_id"\)/);
+  assert.match(source, /styleAction = readRequiredStringArg\(args, "style_guide_action"\)/);
 });
 
 test("Workspace Style Guide Host Upload waits for persistence before staging cleanup", async () => {

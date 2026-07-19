@@ -25,7 +25,16 @@ const majorSteps: Array<{
   labelKey: keyof Messages["generating"]["steps"];
   steps: DeckGenerationStep[];
 }> = [
-  { id: "page-plan", labelKey: "pagePlan", steps: ["authoring-kit", "style-guide", "page-sources", "prepare"] },
+  { id: "page-plan", labelKey: "pagePlan", steps: [
+    "authoring-kit",
+    "style-guide",
+    "page-sources",
+    "page-refinement-prepare",
+    "deck-refinement-planning",
+    "deck-refinement-style-guide",
+    "deck-refinement-commit",
+    "prepare",
+  ] },
   {
     id: "pages",
     labelKey: "pages",
@@ -104,9 +113,6 @@ export function GeneratingPage(props: GeneratingPageProps) {
           t={t}
           progress={progress}
           history={history}
-          onCancel={onCancel}
-          showStop={viewState.showStop}
-          canStop={viewState.canStop}
         />
       ) : (
         <div className="generation-progress-panel">
@@ -138,11 +144,8 @@ function GenerationProgressPanel(props: {
   t: Messages;
   progress: DeckGenerationProgress;
   history: GenerationStreamSnapshot[];
-  onCancel: () => void;
-  showStop: boolean;
-  canStop: boolean;
 }) {
-  const { t, progress, history, onCancel, showStop, canStop } = props;
+  const { t, progress, history } = props;
   const realPages = progress.pages.filter((page) => !isDiscoveryPageId(page.page_id));
   const completed = realPages.filter((page) => page.status === "accepted").length;
   const total = realPages.length || progress.totalPages || 0;
@@ -177,11 +180,6 @@ function GenerationProgressPanel(props: {
             </span>
           ) : null}
         </div>
-        {showStop ? (
-          <button className="secondary-btn compact" onClick={onCancel} disabled={!canStop}>
-            {t.controls.stop}
-          </button>
-        ) : null}
       </div>
       {researchDiscoveryGroup ? (
         <ResearchDiscoveryStageGroupView

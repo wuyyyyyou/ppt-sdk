@@ -1159,11 +1159,50 @@ export interface PageProgressRecoveryState {
   run_kind: PageProgressRecoveryRunKind | null;
   step: string | null;
   target_page_ids: string[];
-  page_refinement_request: string | null;
-  page_refinement_requests: Record<string, string>;
-  deck_refinement_review?: unknown | null;
+  refinement_request: string | null;
+  page_refinement_reasons: Record<string, string>;
   error: string | null;
   updated_at: string | null;
+}
+
+export interface PreparePageRefinementInput {
+  workspace_dir: string;
+  page_id: string;
+  refinement_request: string;
+}
+
+export interface PreparePageRefinementResult {
+  workspace_dir: string;
+  page_id: string;
+  progress: PageProgress;
+}
+
+export type CommitDeckRefinementOperation =
+  | { op: "keep"; page_id: string; reason: string }
+  | { op: "update"; page_id: string; title: string; core_message: string; required_content: string[]; reason: string }
+  | { op: "add"; title: string; core_message: string; required_content: string[]; reason: string }
+  | { op: "delete"; page_id: string; reason: string };
+
+export interface CommitDeckRefinementInput {
+  workspace_dir: string;
+  refinement_request: string;
+  title: string;
+  output_language_change: { changed: boolean; output_language?: string };
+  style_guide_action: "preserve" | "regenerate";
+  operations: CommitDeckRefinementOperation[];
+  style_guide_upload?: {
+    size_bytes: number;
+    host_upload: HostUploadRef;
+  };
+}
+
+export interface CommitDeckRefinementResult {
+  workspace_dir: string;
+  outline: WorkspaceOutline;
+  progress: PageProgress;
+  target_page_ids: string[];
+  added_page_ids: string[];
+  deleted_page_ids: string[];
 }
 
 export type FinalDeckRenderStatus =
@@ -1319,6 +1358,10 @@ export interface WorkspaceStyleGuideStatus {
   non_empty: boolean;
   size_bytes: number;
   sha256?: string;
+}
+
+export interface WorkspaceStyleGuide extends WorkspaceStyleGuideStatus {
+  content: string;
 }
 
 export interface RenderWorkspacePagePreviewResult {

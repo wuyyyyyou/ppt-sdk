@@ -50,6 +50,10 @@ export type DeckGenerationStep =
   | "authoring-kit"
   | "style-guide"
   | "page-sources"
+  | "page-refinement-prepare"
+  | "deck-refinement-planning"
+  | "deck-refinement-style-guide"
+  | "deck-refinement-commit"
   | "page-plan"
   | "research-planning"
   | "research-discovery"
@@ -195,7 +199,8 @@ export interface RunDeckGenerationInput {
   onProgress: (progress: DeckGenerationProgress) => void;
   isCancelled: () => boolean;
   cancelSignal?: AbortSignal;
-  pageRefinementRequests?: Record<string, string>;
+  refinementRequest?: string;
+  pageRefinementReasons?: Record<string, string>;
   pageRefinementVisualContexts?: Record<string, PageRefinementVisualContext>;
   refinementRunKind?: "page-refinement" | "deck-refinement";
   selectedStyleProfile?: {
@@ -208,7 +213,7 @@ export interface RunDeckGenerationInput {
 export interface RunDeckRefinementInput extends RunDeckGenerationInput {
   instruction: string;
   scope: "deck" | "slide";
-  pageIndex?: number;
+  pageId?: string;
   resumePageIds?: string[];
   skipIntentReview?: boolean;
 }

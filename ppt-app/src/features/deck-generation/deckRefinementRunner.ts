@@ -1,51 +1,23 @@
 import type { AiOperationLogContext } from "../../ai/interactionLog";
-import type { DeckRefinementIntentReviewResult } from "../../ai/types";
-import type {
-  PagePlan,
-  PageProgress,
-  RenderDeckHtmlResult,
-  WorkspaceResult,
-} from "../../api/types";
-import { generationText } from "./messages";
+import type { DeckRefinementOutlineOperation, DeckRefinementPlan } from "../../ai/types";
+import type { PageProgress, RenderDeckHtmlResult, WorkspaceOutline, WorkspaceResult } from "../../api/types";
 import { createProgress, emit as emitProgress } from "./progressProjection";
-import {
-  ATTEMPT_LIMITS,
-  type DeckGenerationCompletion,
-  type DeckGenerationContext,
-  type DeckGenerationProgress,
-  type DeckGenerationStream,
-  type RunDeckRefinementInput,
-} from "./types";
-import { ensureWorkspaceThemeToken } from "./themeTokenWorkflow";
-import { getAttemptLimits, readWorkspaceSetting } from "./settings";
-import {
-  failedCompletion,
-  preflightAgentToolAccess,
-} from "./deckGenerationCompletion";
-import {
-  persistDeckRefinementArtifacts,
-  prepareDeckRefinementGenerationArtifacts,
-  reconcileDeckRefinement,
-} from "./deckRefinementArtifacts";
-import { legacyOutlineTextToDetail } from "../../data/mockDeck";
-import {
-  recordDeckRecovery,
-  throwIfCancelled,
-} from "./runtimeSupport";
+import { failedCompletion } from "./deckGenerationCompletion";
 import { runDeckGeneration } from "./deckGenerationWorkflow";
+import { authoringDeckFromConfirmedOutline } from "./deckGenerationStartArtifacts";
+import { getAttemptLimits } from "./settings";
+import type { DeckGenerationCompletion, RunDeckRefinementInput } from "./types";
 
-function readRenderedDeckFromWorkspace(workspace: WorkspaceResult): RenderDeckHtmlResult | null {
+function readRenderedDeck(workspace: WorkspaceResult): RenderDeckHtmlResult | null {
   const pages = workspace.pages && typeof workspace.pages === "object" && !Array.isArray(workspace.pages)
     ? workspace.pages as Record<string, unknown>
     : null;
   const rawSlides = Array.isArray(pages?.pages) ? pages.pages : [];
   if (!pages || rawSlides.length === 0) return null;
-  const slides = rawSlides.map((item) => {
-    const slide = item && typeof item === "object" && !Array.isArray(item)
-      ? item as Record<string, unknown>
-      : {};
+  const slides = rawSlides.map((value) => {
+    const slide = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
     return {
-      slide_id: typeof slide.page_id === "string" ? slide.page_id : typeof slide.slide_id === "string" ? slide.slide_id : "",
+      slide_id: typeof slide.page_id === "string" ? slide.page_id : "",
       layout_id: typeof slide.layout_id === "string" ? slide.layout_id : "",
       title: typeof slide.title === "string" ? slide.title : "",
       html_path: typeof slide.html_path === "string" ? slide.html_path : "",
@@ -65,368 +37,205 @@ function readRenderedDeckFromWorkspace(workspace: WorkspaceResult): RenderDeckHt
   };
 }
 
-function emit(
-  input: Pick<DeckGenerationContext, "onProgress"> & Partial<Pick<DeckGenerationContext, "workspace">>,
-  value: Omit<DeckGenerationProgress, "pages">,
-  progress: PageProgress | null,
-  stream?: DeckGenerationStream | null,
-  activeStreams?: Iterable<DeckGenerationStream>,
-) {
-  emitProgress(
-    input,
-    value,
-    progress,
-    stream,
-    activeStreams,
-    input.workspace ? getAttemptLimits({ workspace: input.workspace }) : ATTEMPT_LIMITS,
-  );
+function emit(input: RunDeckRefinementInput, progress: PageProgress | null, step: "deck-refinement-planning" | "deck-refinement-style-guide" | "deck-refinement-commit", message: string) {
+  emitProgress(input, {
+    step,
+    message,
+    currentPageIndex: null,
+    totalPages: input.confirmedOutline.items.length,
+  }, progress, undefined, undefined, getAttemptLimits(input));
 }
 
-function readLlmContextRows(value: unknown): Array<{ id: string; value: string }> {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((item) => {
-    const record = item && typeof item === "object" && !Array.isArray(item)
-      ? item as Record<string, unknown>
-      : {};
-    const id = typeof record.id === "string" ? record.id.trim() : "";
-    const rowValue = typeof record.value === "string" ? record.value.trim() : "";
-    return id ? [{ id, value: rowValue }] : [];
-  });
+function fail(input: RunDeckRefinementInput, progress: PageProgress | null, error: unknown): DeckGenerationCompletion {
+  const message = error instanceof Error ? error.message : String(error);
+  const failedProgress = createProgress({
+    step: "failed",
+    message,
+    currentPageIndex: null,
+    totalPages: input.confirmedOutline.items.length,
+  }, progress, undefined, undefined, getAttemptLimits(input));
+  input.onProgress(failedProgress);
+  return failedCompletion({ progress: failedProgress, error: { type: "page_failed", message } });
 }
 
-export async function runDeckRefinementWorkflow(args: {
-  input: RunDeckRefinementInput;
-  instruction: string;
-  pagePlan: PagePlan;
-  progress: PageProgress;
-}): Promise<DeckGenerationCompletion> {
-  const { input, instruction, pagePlan, progress } = args;
-  const attemptLimits = getAttemptLimits(input);
-  const text = generationText(input.locale);
+function provisionalOutline(current: WorkspaceOutline, plan: DeckRefinementPlan): WorkspaceOutline {
+  const currentById = new Map(current.items.map((item) => [item.page_id, item]));
+  return {
+    ...current,
+    title: plan.title,
+    items: plan.operations.flatMap((operation) => {
+      if (operation.op === "delete") return [];
+      if (operation.op === "keep") {
+        const existing = currentById.get(operation.page_id);
+        return existing ? [existing] : [];
+      }
+      if (operation.op === "update") {
+        return [{
+          page_id: operation.page_id,
+          title: operation.title,
+          core_message: operation.core_message,
+          required_content: operation.required_content.map((item) => `- ${item}`).join("\n"),
+        }];
+      }
+      return [{
+        title: operation.title,
+        core_message: operation.core_message,
+        required_content: operation.required_content.map((item) => `- ${item}`).join("\n"),
+      }];
+    }),
+  };
+}
 
+function refinementReasons(plan: DeckRefinementPlan, targetIds: string[], committedOutline: WorkspaceOutline) {
+  const globalReasons = [
+    plan.output_language_change.changed ? plan.output_language_change.reason || "Apply the new output language to this page." : "",
+    plan.style_guide_change.action === "regenerate" ? plan.style_guide_change.reason : "",
+  ].filter(Boolean);
+  const byExistingId = new Map(plan.operations.flatMap((operation) => operation.op === "add" ? [] : [[
+    operation.page_id,
+    [operation.reason, ...globalReasons].filter(Boolean).join(" "),
+  ] as const]));
+  const addReasons = plan.operations.filter((operation): operation is Extract<DeckRefinementOutlineOperation, { op: "add" }> => operation.op === "add").map((operation) => operation.reason);
+  const addedIds = committedOutline.items.map((item) => item.page_id).filter((id): id is string => typeof id === "string" && !byExistingId.has(id));
+  const addedReasonById = new Map(addedIds.map((id, index) => [id, addReasons[index] ?? plan.reason]));
+  return Object.fromEntries(targetIds.map((id) => [id, byExistingId.get(id) ?? addedReasonById.get(id) ?? plan.reason]));
+}
+
+function refinementVisualContexts(progress: PageProgress, targetIds: string[]) {
+  const targetSet = new Set(targetIds);
+  return Object.fromEntries(progress.pages.filter((page) => targetSet.has(page.page_id)).map((page) => [
+    page.page_id,
+    page.last_screenshot_path?.trim()
+      ? { source: "progress" as const, screenshotPath: page.last_screenshot_path.trim() }
+      : { source: "unavailable" as const, unavailableReason: "No previous successful screenshot is available." },
+  ]));
+}
+
+export async function runDeckRefinementWorkflow(input: RunDeckRefinementInput, instruction: string): Promise<DeckGenerationCompletion> {
+  let progress = await input.backend.getPageProgress({ workspace_dir: input.workspace.workspace_dir });
   if (input.skipIntentReview) {
-    const recoveryRequests = progress.recovery?.page_refinement_requests ?? {};
-    const targetIds = new Set(input.resumePageIds ?? progress.recovery?.target_page_ids ?? []);
-    const pageRefinementRequests = Object.fromEntries(
-      Object.entries(recoveryRequests)
-        .filter(([pageId]) => targetIds.size === 0 || targetIds.has(pageId))
-        .filter(([, request]) => request.trim().length > 0),
-    );
+    const reasons = progress.recovery?.page_refinement_reasons ?? {};
+    const workspace = await input.backend.openWorkspace({ workspace_dir: input.workspace.workspace_dir });
+    const outline = workspace.outline as WorkspaceOutline;
     return runDeckGeneration({
-      backend: input.backend,
-      aiClient: input.aiClient,
-      agentClient: input.agentClient,
-      aiLogger: input.aiLogger,
-      workspace: input.workspace,
-      confirmedOutline: input.confirmedOutline,
-      locale: input.locale,
+      ...input,
+      workspace,
+      confirmedOutline: outline,
       startMode: "resume",
-      onProgress: input.onProgress,
-      isCancelled: input.isCancelled,
-      cancelSignal: input.cancelSignal,
-      pageRefinementRequests,
+      refinementRequest: progress.recovery?.refinement_request ?? instruction,
+      pageRefinementReasons: reasons,
+      pageRefinementVisualContexts: refinementVisualContexts(progress, Object.keys(reasons)),
       refinementRunKind: "deck-refinement",
     });
   }
 
-  emit(
-    input,
-    {
-      step: "page-plan",
-      message: input.locale === "zh" ? "正在理解整套优化需求" : "Reviewing whole-deck refinement request",
-      currentPageIndex: null,
-      totalPages: pagePlan.pages.length,
-    },
-    progress,
-  );
-
-  const planningContext = await input.backend.getTemplatePlanningContext({
-    workspace_dir: input.workspace.workspace_dir,
-  });
-  throwIfCancelled(input);
-  const reviewLogContext: AiOperationLogContext | undefined = input.aiLogger
-    ? {
-        logger: input.aiLogger,
-        workspace_dir: input.workspace.workspace_dir,
-        domain: "page_plan" as const,
-        operation: "deck_refinement_intent_review",
-        operation_id: input.aiLogger.createOperationId("page_plan", "deck_refinement_intent_review"),
-        provider: "anna",
-        runtime_mode: "anna",
-      }
-    : undefined;
-
-  let review: DeckRefinementIntentReviewResult;
   try {
-    review = await input.aiClient.reviewDeckRefinementIntent({
+    emit(input, progress, "deck-refinement-planning", input.locale === "zh" ? "正在规划整套优化" : "Planning deck refinement");
+    const styleGuide = await input.backend.getWorkspaceStyleGuide({ workspace_dir: input.workspace.workspace_dir });
+    const logContext: AiOperationLogContext | undefined = input.aiLogger ? {
+      logger: input.aiLogger,
+      workspace_dir: input.workspace.workspace_dir,
+      domain: "outline",
+      operation: "deck_refinement_planning",
+      operation_id: input.aiLogger.createOperationId("outline", "deck_refinement_planning"),
+      provider: "anna",
+      runtime_mode: "anna",
+    } : undefined;
+    const { plan } = await input.aiClient.planDeckRefinement({
       instruction,
       outline: input.confirmedOutline,
-      pagePlan,
-      planningContext,
-      setting: readWorkspaceSetting(input.workspace),
+      requirements: input.workspace.requirements,
+      currentStyleGuide: styleGuide.content,
       locale: input.locale,
-      logContext: reviewLogContext,
+      logContext,
+    });
+
+    if (plan.route === "no_op") {
+      const rendered = readRenderedDeck(input.workspace);
+      if (!rendered) throw new Error(input.locale === "zh" ? "整套优化无需改动，但现有渲染产物不可用。" : "No changes are needed, but existing rendered artifacts are unavailable.");
+      progress = await input.backend.recordPageProgress({
+        workspace_dir: input.workspace.workspace_dir,
+        patch: {
+          deck_status: "completed",
+          recovery: {
+            status: "completed",
+            run_kind: "deck-refinement",
+            step: "complete",
+            target_page_ids: [],
+            refinement_request: null,
+            page_refinement_reasons: {},
+            error: null,
+          },
+        },
+      });
+      return {
+        status: "completed",
+        result: {
+          outline: input.confirmedOutline,
+          authoringDeck: authoringDeckFromConfirmedOutline(input.confirmedOutline),
+          progress,
+          rendered,
+        },
+      };
+    }
+
+    let styleGuideUpload;
+    if (plan.style_guide_change.action === "regenerate") {
+      emit(input, progress, "deck-refinement-style-guide", input.locale === "zh" ? "正在重新生成艺术指导" : "Regenerating Workspace Style Guide");
+      if (!input.hostUploadClient) throw new Error("Host Upload is required to persist the Workspace Style Guide");
+      const markdown = await input.aiClient.generateWorkspaceStyleGuide({
+        brief: input.workspace.requirements.source?.brief ?? "",
+        requirements: input.workspace.requirements,
+        outline: provisionalOutline(input.confirmedOutline, plan),
+        currentStyleGuide: styleGuide.content,
+        refinementRequest: instruction,
+        refinementReason: plan.style_guide_change.reason,
+        logContext: input.aiLogger ? {
+          logger: input.aiLogger,
+          workspace_dir: input.workspace.workspace_dir,
+          domain: "style_guide",
+          operation: "regenerate_style_guide_for_deck_refinement",
+          operation_id: input.aiLogger.createOperationId("style_guide", "regenerate_style_guide_for_deck_refinement"),
+          provider: "anna",
+          runtime_mode: "anna",
+        } : undefined,
+      });
+      if (!markdown.trim()) throw new Error("Workspace Style Guide generation returned empty Markdown");
+      const file = new File([markdown], "style-guide.md", { type: "text/markdown" });
+      const hostUpload = await input.hostUploadClient.uploadFile(file, {
+        purpose: "user_artifact",
+        filename: "style-guide.md",
+        mimeType: "text/markdown",
+        metadata: { workspace_dir: input.workspace.workspace_dir, artifact: "workspace-style-guide-refinement" },
+      });
+      styleGuideUpload = { size_bytes: hostUpload.size_bytes, host_upload: hostUpload };
+    }
+
+    emit(input, progress, "deck-refinement-commit", input.locale === "zh" ? "正在提交整套优化方案" : "Committing deck refinement");
+    const committed = await input.backend.commitDeckRefinement({
+      workspace_dir: input.workspace.workspace_dir,
+      refinement_request: instruction,
+      title: plan.title,
+      output_language_change: plan.output_language_change,
+      style_guide_action: plan.style_guide_change.action,
+      operations: plan.operations,
+      style_guide_upload: styleGuideUpload,
+    });
+    progress = committed.progress;
+    const workspace = await input.backend.openWorkspace({ workspace_dir: input.workspace.workspace_dir });
+    const outline = committed.outline;
+    const reasons = refinementReasons(plan, committed.target_page_ids, outline);
+    return runDeckGeneration({
+      ...input,
+      workspace,
+      confirmedOutline: outline,
+      startMode: "resume",
+      refinementRequest: instruction,
+      pageRefinementReasons: reasons,
+      pageRefinementVisualContexts: refinementVisualContexts(progress, committed.target_page_ids),
+      refinementRunKind: "deck-refinement",
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const failedProgress = createProgress(
-      {
-        step: "failed",
-        message,
-        currentPageIndex: null,
-        totalPages: pagePlan.pages.length,
-      },
-      progress,
-      undefined,
-      undefined,
-      attemptLimits,
-    );
-    input.onProgress(failedProgress);
-    return failedCompletion({
-      progress: failedProgress,
-      error: { type: "page_failed", message },
-    });
+    return fail(input, progress, error);
   }
-
-  if (review.route === "unsupported") {
-    const message = review.blocking_reason || (
-      input.locale === "zh"
-        ? "整套优化无法处理这个需求。"
-        : "This request cannot be handled as Deck Refinement."
-    );
-    const nextProgress = await recordDeckRecovery(input, {
-      status: "failed",
-      run_kind: "deck-refinement",
-      step: "deck-refinement-context-review",
-      target_page_ids: [],
-      page_refinement_request: instruction,
-      page_refinement_requests: {},
-      deck_refinement_review: review,
-      error: message,
-      deck_status: "failed",
-    });
-    const failedProgress = createProgress(
-      {
-        step: "failed",
-        message,
-        currentPageIndex: null,
-        totalPages: pagePlan.pages.length,
-      },
-      nextProgress,
-      undefined,
-      undefined,
-      attemptLimits,
-    );
-    input.onProgress(failedProgress);
-    return failedCompletion({
-      progress: failedProgress,
-      error: { type: "page_failed", message },
-    });
-  }
-
-  if (review.route === "no_op") {
-    const rendered = readRenderedDeckFromWorkspace(input.workspace);
-    if (!rendered) {
-      const message = input.locale === "zh"
-        ? "整套优化无需改动，但现有渲染产物不可用。"
-        : "Deck Refinement is a no-op, but existing rendered artifacts are unavailable.";
-      const failedProgress = createProgress(
-        {
-          step: "failed",
-          message,
-          currentPageIndex: null,
-          totalPages: pagePlan.pages.length,
-        },
-        progress,
-        undefined,
-        undefined,
-        attemptLimits,
-      );
-      input.onProgress(failedProgress);
-      return failedCompletion({
-        progress: failedProgress,
-        error: { type: "stale_artifacts", message },
-      });
-    }
-    const nextProgress = await recordDeckRecovery(input, {
-      status: "completed",
-      run_kind: "deck-refinement",
-      step: "complete",
-      target_page_ids: [],
-      page_refinement_request: instruction,
-      page_refinement_requests: {},
-      deck_refinement_review: review,
-      error: null,
-      deck_status: "completed",
-    });
-    emit(
-      input,
-      {
-        step: "complete",
-        message: input.locale === "zh" ? "整套优化无需改动" : "Deck Refinement completed with no changes",
-        currentPageIndex: null,
-        totalPages: pagePlan.pages.length,
-      },
-      nextProgress,
-    );
-    return {
-      status: "completed",
-      result: {
-        outline: input.confirmedOutline,
-        authoringDeck: pagePlan,
-        progress: nextProgress,
-        rendered,
-      },
-    };
-  }
-
-  let flowInput = input;
-  if (review.theme_change_required) {
-    emit(
-      input,
-      {
-        step: "page-plan",
-        message: input.locale === "zh" ? "正在重写工作区主题" : "Regenerating workspace theme",
-        currentPageIndex: null,
-        totalPages: pagePlan.pages.length,
-      },
-      progress,
-    );
-    const themeResult = await ensureWorkspaceThemeToken({
-      backend: input.backend,
-      aiClient: input.aiClient,
-      aiLogger: input.aiLogger,
-      workspace: input.workspace,
-      prompt: input.confirmedOutline.source?.prompt ?? "",
-      contextRows: readLlmContextRows(input.confirmedOutline.source?.context),
-      locale: input.locale,
-      runKind: "deck-refinement",
-      refinementRequest: instruction,
-    });
-    if (themeResult.fallbackUsed) {
-      emit(
-        { ...input, workspace: themeResult.workspace },
-        {
-          step: "page-plan",
-          message: input.locale === "zh"
-            ? "主题定制失败，已使用模板默认主题继续精修"
-            : "Theme customization failed. Continuing refinement with the template default theme.",
-          currentPageIndex: null,
-          totalPages: pagePlan.pages.length,
-        },
-        progress,
-      );
-    }
-    flowInput = {
-      ...input,
-      workspace: themeResult.workspace,
-    };
-  }
-
-  const addedOutlineItems = review.operations
-    .filter((operation): operation is Extract<typeof operation, { op: "add" }> => operation.op === "add")
-    .map((operation) => ({
-      ...legacyOutlineTextToDetail(operation.title, operation.outline),
-    }));
-  const addedPagePlan = addedOutlineItems.length > 0
-    ? await flowInput.aiClient.generateAddedPagePlan({
-        outlineItems: addedOutlineItems,
-        baseOutline: flowInput.confirmedOutline,
-        planningContext,
-        locale: flowInput.locale,
-        logContext: flowInput.aiLogger
-          ? {
-              logger: flowInput.aiLogger,
-              workspace_dir: flowInput.workspace.workspace_dir,
-              domain: "page_plan" as const,
-              operation: "deck_refinement_added_page_plan",
-              operation_id: flowInput.aiLogger.createOperationId("page_plan", "deck_refinement_added_page_plan"),
-              provider: "anna",
-              runtime_mode: "anna",
-            }
-          : undefined,
-      })
-    : null;
-  throwIfCancelled(flowInput);
-
-  const now = new Date().toISOString();
-  const reconciliation = reconcileDeckRefinement({
-    instruction,
-    outline: flowInput.confirmedOutline,
-    pagePlan,
-    review,
-    addedPagePlan,
-    now,
-  });
-  if (!reconciliation.renderRequired) {
-    const rendered = readRenderedDeckFromWorkspace(flowInput.workspace);
-    if (!rendered) {
-      const message = input.locale === "zh"
-        ? "整套优化没有产生可执行变更，但现有渲染产物不可用。"
-        : "Deck Refinement produced no runnable changes, but existing rendered artifacts are unavailable.";
-      return failedCompletion({
-        progress: createProgress({
-          step: "failed",
-          message,
-          currentPageIndex: null,
-          totalPages: pagePlan.pages.length,
-        }, progress, undefined, undefined, attemptLimits),
-        error: { type: "stale_artifacts", message },
-      });
-    }
-    return {
-      status: "completed",
-      result: {
-        outline: flowInput.confirmedOutline,
-        authoringDeck: pagePlan,
-        progress,
-        rendered,
-      },
-    };
-  }
-
-  const needsAuthoring = Object.keys(reconciliation.pageRefinementRequests).length > 0;
-  if (needsAuthoring) {
-    const preflightFailure = await preflightAgentToolAccess({
-      agentClient: input.agentClient,
-      locale: flowInput.locale,
-      onProgress: flowInput.onProgress,
-      progress,
-      attemptLimits,
-      totalPages: pagePlan.pages.length,
-      currentPageIndex: null,
-    });
-    if (preflightFailure) return preflightFailure;
-  }
-
-  const persisted = await persistDeckRefinementArtifacts({
-    flowInput,
-    review,
-    reconciliation,
-    now,
-  });
-  await prepareDeckRefinementGenerationArtifacts({
-    flowInput,
-    instruction,
-    pagePlan: persisted.activePagePlan,
-    review,
-    reconciliation,
-    prepareMessage: text.prepare,
-  });
-
-  return runDeckGeneration({
-    backend: flowInput.backend,
-    aiClient: flowInput.aiClient,
-    agentClient: flowInput.agentClient,
-    aiLogger: flowInput.aiLogger,
-    workspace: persisted.activeWorkspace,
-    confirmedOutline: persisted.persistedOutline,
-    locale: flowInput.locale,
-    startMode: "resume",
-    onProgress: flowInput.onProgress,
-    isCancelled: flowInput.isCancelled,
-    cancelSignal: flowInput.cancelSignal,
-    pageRefinementRequests: reconciliation.pageRefinementRequests,
-    refinementRunKind: "deck-refinement",
-  });
 }

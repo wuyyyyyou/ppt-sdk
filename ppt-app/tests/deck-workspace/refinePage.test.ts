@@ -56,7 +56,6 @@ function renderRefinePage(
   options: {
     refineScope?: RefineScope;
     loading?: LoadingKind;
-    workspaceSettingsSaving?: boolean;
   } = {},
 ) {
   return renderToStaticMarkup(
@@ -69,23 +68,10 @@ function renderRefinePage(
       slideNumber: "01",
       reviewRender,
       loading: options.loading ?? "none",
-      researchSearchControlSettings: {
-        disableWebResearch: false,
-        disableImageResearch: false,
-      },
-      workspaceSettingsSaving: options.workspaceSettingsSaving ?? false,
       onBack: () => undefined,
-      setResearchSearchControlSettings: async () => undefined,
       onRefineDeck: () => undefined,
       onRefineSlide: () => undefined,
     }),
-  );
-}
-
-function assertDisabledButtonWithLabel(html: string, label: string) {
-  assert.match(
-    html,
-    new RegExp(`<button(?=[^>]*disabled="")[^>]*>[\\s\\S]*?${label}[\\s\\S]*?</button>`),
   );
 }
 
@@ -106,30 +92,9 @@ describe("RefinePage", () => {
     assert.match(html, /The Future with AI/);
   });
 
-  it("shows persistent research search controls on refinement entry pages", () => {
+  it("does not expose sealed research search controls on refinement entry pages", () => {
     const html = renderRefinePage(idleReviewRender);
-
-    assert.match(html, /禁止网络资料搜索/);
-    assert.match(html, /禁止图片搜索/);
-  });
-
-  it("disables research search controls while deck refinement settings are saving", () => {
-    const html = renderRefinePage(idleReviewRender, {
-      refineScope: "deck",
-      workspaceSettingsSaving: true,
-    });
-
-    assertDisabledButtonWithLabel(html, "禁止网络资料搜索");
-    assertDisabledButtonWithLabel(html, "禁止图片搜索");
-  });
-
-  it("disables research search controls while slide refinement settings are saving", () => {
-    const html = renderRefinePage(idleReviewRender, {
-      refineScope: "slide",
-      workspaceSettingsSaving: true,
-    });
-
-    assertDisabledButtonWithLabel(html, "禁止网络资料搜索");
-    assertDisabledButtonWithLabel(html, "禁止图片搜索");
+    assert.doesNotMatch(html, /禁止网络资料搜索/);
+    assert.doesNotMatch(html, /禁止图片搜索/);
   });
 });

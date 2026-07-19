@@ -120,8 +120,8 @@ test("recordAppPageProgress preserves concurrent updates in one workspace", asyn
           run_kind: "page-refinement",
           step: "page-authoring",
           target_page_ids: ["page-01"],
-          page_refinement_request: "make it clearer",
-          page_refinement_requests: {
+          refinement_request: "make it clearer",
+          page_refinement_reasons: {
             "page-01": "make it clearer",
           },
         },
@@ -159,8 +159,8 @@ test("recordAppPageProgress preserves concurrent updates in one workspace", asyn
         status: string;
         run_kind: string;
         target_page_ids: string[];
-        page_refinement_request: string;
-        page_refinement_requests: Record<string, string>;
+        refinement_request: string;
+        page_refinement_reasons: Record<string, string>;
       };
       final_deck_render: {
         status: string;
@@ -187,8 +187,8 @@ test("recordAppPageProgress preserves concurrent updates in one workspace", asyn
     assert.equal(persisted.recovery.status, "running");
     assert.equal(persisted.recovery.run_kind, "page-refinement");
     assert.deepEqual(persisted.recovery.target_page_ids, ["page-01"]);
-    assert.equal(persisted.recovery.page_refinement_request, "make it clearer");
-    assert.equal(persisted.recovery.page_refinement_requests["page-01"], "make it clearer");
+    assert.equal(persisted.recovery.refinement_request, "make it clearer");
+    assert.equal(persisted.recovery.page_refinement_reasons["page-01"], "make it clearer");
     assert.equal(persisted.final_deck_render.status, "running");
     assert.equal(persisted.final_deck_render.message, "Rendering final deck");
   } finally {

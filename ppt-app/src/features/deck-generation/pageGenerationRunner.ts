@@ -75,7 +75,8 @@ export async function runPageGeneration(
   const attemptLimits = getAttemptLimits(input);
   let progress = input.getProgress();
   const existing = getProgressPage(progress, page.page_id);
-  if (existing?.status === "accepted") {
+  const refinementReason = input.pageRefinementReasons?.[page.page_id]?.trim() ?? "";
+  if (existing?.status === "accepted" && !refinementReason) {
     return { page, reason: "accepted", progress: progress as PageProgress };
   }
 
@@ -106,6 +107,7 @@ export async function runPageGeneration(
       totalPages,
     }, progress);
 
+    const currentProgressPage = getProgressPage(input.getProgress(), page.page_id);
     const prompt = buildAuthoringPrompt({
       workspaceRoot: input.workspace.workspace_root,
       workspaceDir: input.workspace.workspace_dir,
@@ -116,8 +118,11 @@ export async function runPageGeneration(
       renderError,
       renderFailureHistory,
       visualReview,
-      visualReviewScreenshotPath: existing?.last_screenshot_path ?? "",
+      visualReviewScreenshotPath: currentProgressPage?.last_screenshot_path ?? "",
       noChangeRetry,
+      refinementRequest: input.refinementRequest,
+      refinementReason,
+      refinementVisualContext: input.pageRefinementVisualContexts?.[page.page_id],
     });
     const tracker = createAgentRunTracker({
       flowInput: input,
@@ -352,7 +357,7 @@ export async function runPagesConcurrently(
 ): Promise<PageGenerationResult[]> {
   const pages = authoringDeck.pages.filter((page) => {
     const current = getProgressPage(runtime.getProgress(), page.page_id);
-    return shouldResumePageGenerationStatus(current?.status ?? "pending");
+    return Boolean(runtime.pageRefinementReasons?.[page.page_id]?.trim()) || shouldResumePageGenerationStatus(current?.status ?? "pending");
   });
   const results: PageGenerationResult[] = [];
   let nextIndex = 0;

@@ -2,10 +2,8 @@ import { useEffect, useState } from "react";
 import type { Slide } from "../../../data/mockDeck";
 import { formatMessage, type Messages } from "../../../i18n/messages";
 import type { DeckReviewRenderState, LoadingKind, RefineScope } from "../types";
-import type { ResearchSearchControlSettings } from "../researchSearchControl";
 import { PageHeader } from "./PageHeader";
 import { RenderedSlideImage } from "./RenderedSlideImage";
-import { ResearchSearchControlSwitches } from "./ResearchSearchControlSwitches";
 import { RefineSteps } from "./RefineSteps";
 import { SlidePreview } from "./SlidePreview";
 import { SlidePreviewNavigator } from "./SlidePreviewNavigator";
@@ -19,10 +17,7 @@ interface RefinePageProps {
   refineScope: RefineScope;
   reviewRender: DeckReviewRenderState;
   loading: LoadingKind;
-  researchSearchControlSettings: ResearchSearchControlSettings;
-  workspaceSettingsSaving: boolean;
   onBack: () => void;
-  setResearchSearchControlSettings: (settings: ResearchSearchControlSettings) => Promise<void>;
   onRefineDeck: (instruction: string) => void;
   onRefineSlide: (instruction: string) => void;
 }
@@ -37,10 +32,7 @@ export function RefinePage(props: RefinePageProps) {
     refineScope,
     reviewRender,
     loading,
-    researchSearchControlSettings,
-    workspaceSettingsSaving,
     onBack,
-    setResearchSearchControlSettings,
     onRefineDeck,
     onRefineSlide
   } = props;
@@ -92,18 +84,10 @@ export function RefinePage(props: RefinePageProps) {
               />
             </label>
             {loading === "refineDeck" ? <RefineSteps steps={t.refine.deckSteps} /> : null}
-            <ResearchSearchControlSwitches
-              t={t}
-              settings={researchSearchControlSettings}
-              disabled={loading === "refineDeck" || workspaceSettingsSaving}
-              onChange={(settings) => {
-                void setResearchSearchControlSettings(settings);
-              }}
-            />
             <button
               className="primary-btn full"
               onClick={() => onRefineDeck(deckInstruction)}
-              disabled={loading === "refineDeck" || workspaceSettingsSaving || !deckInstruction.trim()}
+              disabled={loading === "refineDeck" || !deckInstruction.trim()}
             >
               {loading === "refineDeck" ? <span className="spinner small" /> : null}
               {t.controls.applyToDeck}
@@ -128,18 +112,10 @@ export function RefinePage(props: RefinePageProps) {
               />
             </label>
             {loading === "refineSlide" ? <RefineSteps steps={t.refine.slideSteps} /> : null}
-            <ResearchSearchControlSwitches
-              t={t}
-              settings={researchSearchControlSettings}
-              disabled={loading === "refineSlide" || workspaceSettingsSaving}
-              onChange={(settings) => {
-                void setResearchSearchControlSettings(settings);
-              }}
-            />
             <button
               className="primary-btn full"
               onClick={() => onRefineSlide(slideInstruction)}
-              disabled={loading === "refineSlide" || workspaceSettingsSaving || !slideInstruction.trim()}
+              disabled={loading === "refineSlide" || !slideInstruction.trim()}
             >
               {loading === "refineSlide" ? <span className="spinner small" /> : null}
               {t.controls.applyToSlide}

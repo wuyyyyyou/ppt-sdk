@@ -102,6 +102,11 @@ import type {
   , CommitWorkspaceStyleGuideHostUploadInput
   , CommitWorkspaceStyleGuideResult
   , WorkspaceStyleGuideStatus
+  , WorkspaceStyleGuide
+  , PreparePageRefinementInput
+  , PreparePageRefinementResult
+  , CommitDeckRefinementInput
+  , CommitDeckRefinementResult
 } from "./types";
 import { createAnnaPptBackend } from "./annaPptBackend";
 import { connectAnnaRuntime } from "../runtime/annaRuntime";
@@ -122,7 +127,10 @@ export interface PptBackend {
   getWorkspacePageSourceFingerprint(input: { workspace_dir: string; page_id: string }): Promise<WorkspacePageSourceFingerprint>;
   commitWorkspaceStyleGuideHostUpload(input: CommitWorkspaceStyleGuideHostUploadInput): Promise<CommitWorkspaceStyleGuideResult>;
   getWorkspaceStyleGuideStatus(input: { workspace_dir: string }): Promise<WorkspaceStyleGuideStatus>;
+  getWorkspaceStyleGuide(input: { workspace_dir: string }): Promise<WorkspaceStyleGuide>;
   initializePageProgress(input: { workspace_dir: string }): Promise<PageProgress>;
+  preparePageRefinement(input: PreparePageRefinementInput): Promise<PreparePageRefinementResult>;
+  commitDeckRefinement(input: CommitDeckRefinementInput): Promise<CommitDeckRefinementResult>;
   commitUploadedSourceHostUpload(input: CommitUploadedSourceHostUploadInput): Promise<CommitUploadedSourceHostUploadResult>;
   listStyleProfiles(): Promise<ListStyleProfilesResult>;
   getStyleProfilePreview(input: { style_profile_id: string }): Promise<GetStyleProfilePreviewResult>;

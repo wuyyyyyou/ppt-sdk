@@ -693,7 +693,7 @@ async function updateDiscoveryProgress(input: {
   setRuntimeResearchDiscoveryProgress(input.runtime, input.update());
   const progress = await recordDeckRecovery(input.runtime, {
     status: "running",
-    run_kind: input.runtime.refinementRunKind ?? (input.runtime.pageRefinementRequests ? "page-refinement" : "deck-generation"),
+    run_kind: input.runtime.refinementRunKind ?? (input.runtime.pageRefinementReasons ? "page-refinement" : "deck-generation"),
     step: input.step,
     target_page_ids: input.pagePlan.pages.map((page) => page.page_id),
     error: null,
@@ -1327,7 +1327,7 @@ export async function runResearchDiscoveryForPagePlan(input: {
   throwIfCancelled(runtime);
   await recordDeckRecovery(runtime, {
     status: "running",
-    run_kind: runtime.refinementRunKind ?? (runtime.pageRefinementRequests ? "page-refinement" : "deck-generation"),
+    run_kind: runtime.refinementRunKind ?? (runtime.pageRefinementReasons ? "page-refinement" : "deck-generation"),
     step: "research-discovery",
     target_page_ids: input.targetPageIds ?? input.pagePlan.pages.map((page) => page.page_id),
     error: null,

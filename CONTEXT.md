@@ -308,49 +308,54 @@ A transient Agent Session infrastructure failure where the platform cannot conti
 **Deck Refinement**:
 A user-requested revision of an accepted Deck as a whole after Deck Generation. It may update deck-level context, output language, Confirmed Outline, page-assigned Research Evidence, and selected Page Generation Units while preserving unaffected accepted pages when safe.
 When the Confirmed Outline changes without changing output language, only Page Generation Units whose outline intent changed are affected unless the request explicitly asks for a global style, language, or narrative rewrite.
+Deck Refinement preserves the Deck title unless the request explicitly changes it. A changed title updates the Workspace and active Confirmed Outline authorities but affects only the Page Generation Units that the reconciliation identifies as needing to express the new title.
+An explicit output-language change updates the Confirmed Presentation Requirements, rewrites the active Confirmed Outline in the new language, and makes every retained Page Generation Unit a refinement target. Merely using foreign terms or examples does not change the Deck output language.
+Deck Refinement does not change the Confirmed Presentation Requirements audience, purpose, desired outcome, or visual tone. Its final page count is synchronized from the reconciled Confirmed Outline rather than decided as a separate requirement update.
+Deck Refinement preserves the current Workspace Style Guide unless the request changes the Deck's shared visual direction. Replacing the Workspace Style Guide makes every retained Page Generation Unit a refinement target, while page-local visual changes leave the shared guide unchanged.
 For retained Page Generation Units, Deck Refinement preserves the existing Page Source; requested layout changes are handled by Page Authoring against that source.
 New Page Generation Units introduced during Deck Refinement are initialized from the engine's Page Source Bootstrap because they do not yet have a Page Source.
 Deleted Page Generation Units are removed from the current Confirmed Outline, progress, manifest, and render artifacts, but their old workspace files may remain as unreferenced artifacts.
-Deck Refinement may run a Research Discovery Loop when the refinement needs additional or updated evidence. The loop uses deck context and a target scope, then updates the affected Page Generation Units' assigned Research Evidence; unaffected pages preserve their assigned Research Evidence when safe.
+Deck Refinement uses the active request and existing Workspace material as its available grounding. It does not invent unsupported facts, numbers, dates, names, claims, or source-dependent visuals when that material is insufficient.
 Target Page Generation Units in Deck Refinement receive both the deck-level request and a page-level refinement reason so page authoring can preserve useful existing work while applying the whole-deck change.
 Deck Refinement outline reconciliation is operation-based so retained Page Generation Units keep their `page_id` identity across keep, update, add, and delete decisions.
-Deck Refinement should add or delete Page Generation Units only when the user explicitly asks for a page-count or page-structure change; vague structure-improvement requests should preserve page count.
+The final operation order owns the resulting page order, so retained Page Generation Units may move without changing identity. Deck Refinement should add, delete, or reorder Page Generation Units only when the request explicitly asks to change page count, structure, sequence, section organization, or narrative flow; ordinary quality or whole-deck improvement requests preserve page count and order.
 _Avoid_: Starting a new Deck Generation when accepted pages can be preserved.
+
+**Deck Refinement Request**:
+The user's active instruction for revising an accepted Deck as a whole. It may explicitly change the Deck title, output language, page structure, page intents, or shared visual direction, while requirement fields other than output language remain unchanged.
+
+**Deck Refinement Planning**:
+The pre-commit decision process that reconciles a Deck Refinement Request into the resulting Deck title, output-language decision, ordered page operations, complete changed or added Outline Entries, shared Style Guide decision, and page-level refinement reasons. It does not author Page Sources and preserves page count and order unless the request explicitly authorizes structural change.
 
 **Deck Refinement Resume**:
 The user action that continues an unfinished Deck Refinement from persisted deck-level decisions and target pages. It does not reinterpret completed context, outline, evidence-assignment, or research-routing decisions as a new request.
-Accepted target pages keep their previous page status until their resumed Deck Refinement run actually starts that page again.
+The committed target Page Generation Units already own their refinement execution states, while the persisted Deck Refinement Request and page-level reasons preserve the authoring intent needed to continue without replanning.
+
+**Deck Refinement Preparation**:
+The visible pre-commit phase of Deck Refinement that derives the complete page reconciliation and, when required, a replacement Workspace Style Guide without changing the accepted Deck's authoritative artifacts. Failure during preparation leaves the accepted Deck unchanged and is retried as a new refinement attempt rather than resumed as partially committed work.
+
+**Deck Refinement Commit**:
+The tool-call-level transition that accepts a prepared Deck Refinement decision as the Workspace's new active generation state, including its reconciled Confirmed Outline, Workspace Style Guide decision, target Page Generation Units, and recovery state. Deck Refinement Resume applies only after this transition has succeeded.
 
 **No-op Deck Refinement**:
 A Deck Refinement whose review and reconciliation steps determine that no workspace artifacts or Page Generation Units need to change. It completes without rerunning page authoring or final deck render.
 
 **Deck Refinement Context Review**:
-The pre-outline judgment step in Deck Refinement that decides whether the request explicitly changes deck-level context rows or output language. Output language should change only when the user explicitly asks to change the generated content language.
-A Deck Refinement that changes output language affects every Page Generation Unit.
-Audience, goal, and Workspace Style Guide changes are whole-deck context changes; content-source and slide-count changes are resolved through later outline, research, and Page Evidence Assignment decisions.
-When output language changes, the active Confirmed Outline and workspace setting should both reflect the new output language.
-Deck Refinement Context Review does not rewrite the original Brief; the Deck Refinement Request is a later instruction with its own audit trail.
+The deck-level portion of Deck Refinement Planning that decides whether the request explicitly changes output language or the shared visual direction. An output-language change updates only that Confirmed Presentation Requirements field and the active Confirmed Outline, while a shared visual-direction change replaces the Workspace Style Guide without rewriting the requirements' Visual Tone; the original Brief and all other confirmed requirement fields remain unchanged.
 
 **Page Refinement**:
-A user-requested revision of one or more accepted Page Generation Units after Deck Generation. It first interprets whether the request can stay within the current Confirmed Outline or must revise the target page outline; a required target-page outline revision becomes the active Confirmed Outline for downstream generation.
-When additional or updated evidence is needed, Page Refinement runs a Research Discovery Loop with the target page scope, then updates the target page-assigned Research Evidence.
+A user-requested revision of one or more accepted Page Generation Units after Deck Generation that re-authors only the target Page Sources without modifying the Confirmed Outline or Workspace Style Guide. The current target Outline Entry and Workspace Style Guide remain the original creation baseline, while the active Page Refinement Request is authoritative wherever it conflicts with either baseline.
 _Avoid_: Deck Generation Resume, Page Visual Review, Visual Review Fix
 
 **Page Refinement Request**:
-The user's active instruction for a Page Refinement during the current run. It may require target-page outline changes or additional evidence, and it is an evidence source only for facts, numbers, dates, names, and claims explicitly stated in the request.
+The user's active instruction for a Page Refinement during the current run. It overrides conflicting target Outline Entry or Workspace Style Guide guidance for the target page without modifying those baseline artifacts; the request and existing Workspace material are the only factual grounding available to the refinement, and the resulting page must not invent unsupported facts, numbers, dates, names, claims, or source-dependent visuals.
 _Avoid_: Visual Review Issue, Rewrite Request
 
 **Page Refinement Resume**:
 The user action that continues an unfinished Page Refinement using the same persisted Page Refinement Request and the same target pages. It preserves non-target accepted pages and does not reinterpret the refinement as a new request.
 
-**Page Refinement Intent Review**:
-The pre-authoring judgment step in Page Refinement that decides whether the request requires a target-page outline revision or additional Research Collection. It produces routing decisions for the refinement run rather than slide content.
-
-**Unsupported Page Refinement Request**:
-A Page Refinement Request that cannot be handled within current-page refinement boundaries, such as changing deck page count, page order, the Workspace Authoring Kit, or other non-target pages. It should stop the refinement run before workspace artifacts are changed.
-
 **Page Refinement Visual Context**:
-The latest available rendered screenshot for a target page during Page Refinement. It guides visual and layout changes, but text, numbers, charts, and claims visible in the screenshot are not grounding evidence unless they are separately present in allowed evidence sources.
+The last successful rendered screenshot preserved for a target page when Page or Deck Refinement resets that page's execution state. It is an optimization-before baseline for visual and layout changes until a new successful render replaces it, but text, numbers, charts, and claims visible in it are not grounding evidence unless separately present in allowed sources.
 
 **Deck Generation Resume**:
 The user action that continues unfinished Deck Generation by completing missing Workspace Style Guide, research, evidence-assignment, or Page Source preparation work, re-running any Page Generation Unit that is not accepted yet, including Interrupted Page Generations, pending pages, infrastructure failures, and Failed Page Generations, or by continuing Final Deck Render when all pages are accepted but final Deck artifacts are not ready. It keeps accepted pages and does not discard the current Deck Generation; an unfinished page keeps its previous current state until its resumed run actually starts.
