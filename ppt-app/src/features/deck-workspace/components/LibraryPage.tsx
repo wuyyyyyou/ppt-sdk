@@ -278,20 +278,6 @@ export function LibraryPage({
           max={PAGE_GENERATION_CONCURRENCY_MAX}
           onChange={(value) => setDraft((next) => ({ ...next, page_generation_concurrency: value }))}
         />
-        <PreferenceSwitch
-          label={locale === "zh" ? "禁用网页搜索（暂时封存）" : "Disable web research (sealed)"}
-          value={draft.disable_web_research === true}
-          editing={editing}
-          t={t}
-          onChange={(value) => setDraft((next) => ({ ...next, disable_web_research: value }))}
-        />
-        <PreferenceSwitch
-          label={locale === "zh" ? "禁用图片搜索（暂时封存）" : "Disable image research (sealed)"}
-          value={draft.disable_image_research === true}
-          editing={editing}
-          t={t}
-          onChange={(value) => setDraft((next) => ({ ...next, disable_image_research: value }))}
-        />
         <PreferenceNumber
           label={t.preferences.visualReviewFailureLimit}
           value={Number(draft.visual_review_failure_limit ?? DEFAULT_VISUAL_REVIEW_FAILURE_LIMIT)}

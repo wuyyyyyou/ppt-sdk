@@ -30,7 +30,7 @@ const workspace: WorkspaceResult = {
 };
 
 describe("LibraryPage", () => {
-  it("does not expose an optional outline review preference", () => {
+  it("does not expose sealed or optional preferences", () => {
     const html = renderToStaticMarkup(createElement(LibraryPage, {
       t: messages.zh,
       locale: "zh",
@@ -49,6 +49,8 @@ describe("LibraryPage", () => {
     }));
 
     assert.doesNotMatch(html, /先审阅大纲/);
+    assert.doesNotMatch(html, /禁用网页搜索|禁用图片搜索/);
+    assert.doesNotMatch(html, /Disable web research|Disable image research/);
   });
 
   it("shows the complete Workspace disclosure and diagnostic bundle action", () => {
