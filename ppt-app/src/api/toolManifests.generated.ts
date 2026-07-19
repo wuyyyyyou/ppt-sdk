@@ -3,13 +3,13 @@
 
 export const PPT_ENGINE_TOOL = {
   handle: "ppt-engine",
-  version: "4.0.6",
+  version: "4.1.0",
   displayName: "ppt-engine",
 } as const;
 
 export const PPT_GENER_TOOL = {
   handle: "ppt-gener",
-  version: "3.1.3",
+  version: "3.1.4",
   displayName: "ppt-gener",
 } as const;
 

@@ -1,6 +1,6 @@
 {
   "display_name": "ppt-engine",
-  "version": "4.0.6",
+  "version": "4.1.0",
   "description": "Anna Executa plugin for Workspace Authoring Kit setup, manifest-based deck HTML generation, and deck HTML to PPTX model conversion.",
   "author": "Anna Developer",
   "host_capabilities": [
