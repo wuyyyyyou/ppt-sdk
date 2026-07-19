@@ -62,10 +62,12 @@ test("export artifact tools publish through APS Files and mint links without Hos
     }
     if (message.method) {
       if (message.method === "host/uploadFile") hostUploadCalls += 1;
-      if (message.method.startsWith("files/")) apsMethods.push(message.method);
+      if (message.method.startsWith("files/")) {
+        apsMethods.push(message.method);
+        assert.equal(message.params?.scope, "tool");
+      }
       let result: Record<string, unknown> = {};
       if (message.method === "files/upload_begin") {
-        assert.equal(message.params?.scope, "app");
         assert.equal(message.params?.content_type, "application/vnd.openxmlformats-officedocument.presentationml.presentation");
         result = {
           put_url: `http://127.0.0.1:${address.port}/put`,

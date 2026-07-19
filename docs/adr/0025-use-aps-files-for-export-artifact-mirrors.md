@@ -2,9 +2,9 @@
 
 ## 决策
 
-Workspace 持有的 PPTX 或 PDF 是权威 Export Artifact（导出产物）。PPT App 通过声明 `aps.files` capability（能力）的 Executa，把每种格式的当前产物发布为一个 `scope: "app"` 的 Export Artifact Mirror（导出产物镜像）。镜像使用固定 APS path 覆盖写入，只在用户准备下载时生成短期 URL，不持久化 URL，也不回退到 Host Upload。
+Workspace 持有的 PPTX 或 PDF 是权威 Export Artifact（导出产物）。PPT App 通过声明 `aps.files` capability（能力）的 Executa，把每种格式的当前产物发布为一个 `scope: "tool"` 的 Export Artifact Mirror（导出产物镜像）。镜像使用固定 APS path 覆盖写入，只在用户准备下载时生成短期 URL，不持久化 URL，也不回退到 Host Upload。`tool` scope 将镜像限制在当前用户与 `ppt-engine` Executa 的私有命名空间内，符合它作为内部下载传输而非用户文件的语义，也与平台为该 Executa 签发的存储 scope 保持一致。
 
-镜像发布失败不会删除本地 Export Artifact，用户可以在不重新生成 PPT 的情况下显式重试。`updated_at` 和源文件 SHA-256 共同判断镜像是否仍对应当前产物；如果上传完成后发现源产物发生变化，本次发布直接失败，不自动重试。`scope: "user"` 保留给未来明确的 My Files Export（导出到“我的文件”）能力，不用于隐式下载传输。
+镜像发布失败不会删除本地 Export Artifact，用户可以在不重新生成 PPT 的情况下显式重试。`updated_at` 和源文件 SHA-256 共同判断镜像是否仍对应当前产物；如果上传完成后发现源产物发生变化，本次发布直接失败，不自动重试。遗留的 `scope: "app"` mirror 记录不再复用，下一次准备下载时会按缺失镜像重新发布到 `tool` scope。`scope: "user"` 保留给未来明确的 My Files Export（导出到“我的文件”）能力，不用于隐式下载传输。
 
 ## 为什么下载需要手动复制 URL
 

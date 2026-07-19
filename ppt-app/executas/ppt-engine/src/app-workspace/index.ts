@@ -5386,7 +5386,7 @@ function normalizeExportArtifactMirror(value: unknown): AppExportArtifactMirror 
   const sizeBytes = Number(record.size_bytes);
   if (
     record.provider !== "aps.files" ||
-    record.scope !== "app" ||
+    record.scope !== "tool" ||
     typeof record.path !== "string" ||
     record.path.length === 0 ||
     typeof record.etag !== "string" ||
@@ -5407,7 +5407,7 @@ function normalizeExportArtifactMirror(value: unknown): AppExportArtifactMirror 
   }
   return {
     provider: "aps.files",
-    scope: "app",
+    scope: "tool",
     path: record.path,
     etag: record.etag,
     size_bytes: Math.floor(sizeBytes),
@@ -5736,7 +5736,7 @@ export async function commitAppExportArtifactMirror(
     }
     if (
       input.mirror.provider !== "aps.files" ||
-      input.mirror.scope !== "app" ||
+      input.mirror.scope !== "tool" ||
       input.mirror.source_updated_at !== input.expected_updated_at ||
       input.mirror.source_sha256.toLowerCase() !== input.expected_sha256.toLowerCase()
     ) {
