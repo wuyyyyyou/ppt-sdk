@@ -1,7 +1,7 @@
 {
   "slug": "ppt-engine",
   "name": "ppt-engine",
-  "version": "4.1.1",
+  "version": "4.1.2",
   "executa_type": "tool",
   "description": "Anna Executa plugin for Workspace Authoring Kit setup, manifest-based deck HTML generation, and deck HTML to PPTX model conversion.",
   "tool_id": "tool-lightvoss-ppt-engine-kqhra9hy",
