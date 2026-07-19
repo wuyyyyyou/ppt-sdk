@@ -339,6 +339,21 @@ export interface Messages {
     lastEditedToday: string;
     lastEditedYesterday: string;
     lastEditedDate: string;
+    diagnosticBundleTitle: string;
+    diagnosticBundleDescription: string;
+    diagnosticBundleSensitiveHint: string;
+    diagnosticBundleNoWorkspace: string;
+    diagnosticBundleGenerate: string;
+    diagnosticBundlePreparing: string;
+    diagnosticBundleRetry: string;
+    diagnosticBundleReady: string;
+    diagnosticBundleExpired: string;
+    diagnosticBundleFailed: string;
+    diagnosticBundleFailedPrefix: string;
+    diagnosticBundleLinkLabel: string;
+    diagnosticBundleCopyLink: string;
+    diagnosticBundleLinkCopied: string;
+    diagnosticBundleCopyHint: string;
   };
   preferences: {
     defaultLanguage: string;
@@ -785,7 +800,22 @@ export const messages: Record<Locale, Messages> = {
       preferences: "Preferences",
       lastEditedToday: "Last edited today",
       lastEditedYesterday: "Last edited yesterday",
-      lastEditedDate: "Last edited {date}"
+      lastEditedDate: "Last edited {date}",
+      diagnosticBundleTitle: "Troubleshooting bundle",
+      diagnosticBundleDescription: "Create a fresh ZIP of the complete current Workspace for troubleshooting. An active task may continue changing while the bundle is collected.",
+      diagnosticBundleSensitiveHint: "Includes logs, uploaded sources, page source files, research records, and generated artifacts.",
+      diagnosticBundleNoWorkspace: "Select a task first",
+      diagnosticBundleGenerate: "Generate troubleshooting download link",
+      diagnosticBundlePreparing: "Packaging and uploading...",
+      diagnosticBundleRetry: "Retry generating download link",
+      diagnosticBundleReady: "Troubleshooting bundle download link is ready.",
+      diagnosticBundleExpired: "The download link has expired. Generate a fresh troubleshooting bundle.",
+      diagnosticBundleFailed: "Failed to generate the troubleshooting bundle.",
+      diagnosticBundleFailedPrefix: "Failed to generate the troubleshooting bundle: ",
+      diagnosticBundleLinkLabel: "Troubleshooting bundle download link",
+      diagnosticBundleCopyLink: "Copy troubleshooting bundle link",
+      diagnosticBundleLinkCopied: "Link copied. Paste it into your browser address bar to download, and do not share it with unrelated people.",
+      diagnosticBundleCopyHint: "Copy the link into a normal browser address bar to download. Do not share it with unrelated people."
     },
     preferences: {
       defaultLanguage: "Default language",
@@ -1237,7 +1267,22 @@ export const messages: Record<Locale, Messages> = {
       preferences: "偏好设置",
       lastEditedToday: "今天编辑",
       lastEditedYesterday: "昨天编辑",
-      lastEditedDate: "{date} 编辑"
+      lastEditedDate: "{date} 编辑",
+      diagnosticBundleTitle: "问题排查包",
+      diagnosticBundleDescription: "将当前任务的完整工作区重新打包为 ZIP，供问题排查使用。任务仍在运行时，打包过程中内容可能继续变化。",
+      diagnosticBundleSensitiveHint: "包含日志、上传资料、页面源码、研究记录和生成产物等完整任务内容。",
+      diagnosticBundleNoWorkspace: "请先选择一个任务",
+      diagnosticBundleGenerate: "生成问题排查包下载链接",
+      diagnosticBundlePreparing: "正在打包并上传，请稍候……",
+      diagnosticBundleRetry: "重试生成下载链接",
+      diagnosticBundleReady: "问题排查包下载链接已准备。",
+      diagnosticBundleExpired: "下载链接已过期，请重新生成问题排查包。",
+      diagnosticBundleFailed: "问题排查包生成失败。",
+      diagnosticBundleFailedPrefix: "问题排查包生成失败：",
+      diagnosticBundleLinkLabel: "问题排查包下载链接",
+      diagnosticBundleCopyLink: "复制问题排查包链接",
+      diagnosticBundleLinkCopied: "链接已复制，请粘贴到浏览器地址栏中下载，并且不要分享给无关人员。",
+      diagnosticBundleCopyHint: "请复制链接并粘贴到普通浏览器地址栏中下载，不要将链接分享给无关人员。"
     },
     preferences: {
       defaultLanguage: "默认语言",

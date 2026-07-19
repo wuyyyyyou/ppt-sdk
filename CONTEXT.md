@@ -374,6 +374,11 @@ _Avoid_: Export Generation
 A user-owned copy of an Export Artifact explicitly saved for reuse outside the PPT App. It is distinct from the app-private Export Artifact Mirror and requires an explicit user action.
 _Avoid_: Export Artifact Mirror
 
+**Workspace Diagnostic Bundle**:
+A temporary downloadable archive containing the contents observed while collecting one Workspace for troubleshooting, including when that Workspace is active; it is not an atomic point-in-time snapshot. Its creation does not change the Workspace, creates no Diagnostic Bundle History, and produces neither an authoritative Workspace artifact nor an Export Artifact or Export Artifact Mirror.
+User-facing Chinese label: 问题排查包
+_Avoid_: Log Bundle, Log Export, Export Artifact, Diagnostic Bundle History
+
 **Task State Semantics**:
 The authoritative state-meaning module for the Task State Machine. It derives effective deck/page state, allowed operations, blockers, recommendations, and page progress synchronization from Workspace artifacts such as the Confirmed Outline, manifest, and Page Progress.
 
@@ -422,3 +427,7 @@ Expert: "No. Keep the Export Artifact and retry only its Export Artifact Mirror.
 Dev: "Does publishing that mirror also save the PPTX to My Files?"
 
 Expert: "No. An Export Artifact Mirror is app-private transport. A My Files Export requires a separate explicit user action."
+
+Dev: "Can the support action be called Log Export if it includes the whole Workspace?"
+
+Expert: "No. Call it a Workspace Diagnostic Bundle so users understand that uploaded sources, authoring files, logs, and generated artifacts may all be included."

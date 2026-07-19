@@ -37,6 +37,8 @@ import type {
   ExportPdfResult,
   ExportArtifactDownloadUrlResult,
   PublishExportArtifactResult,
+  PrepareWorkspaceDiagnosticBundleInput,
+  PrepareWorkspaceDiagnosticBundleResult,
   FinalizeResearchVisualAssetsResult,
   RecordDeckReviewInput,
   RecordPagePlanInput,
@@ -302,6 +304,9 @@ export interface PptBackend {
   getExportArtifactDownloadUrl(
     input: GetExportArtifactDownloadUrlInput
   ): Promise<ExportArtifactDownloadUrlResult>;
+  prepareWorkspaceDiagnosticBundle(
+    input: PrepareWorkspaceDiagnosticBundleInput
+  ): Promise<PrepareWorkspaceDiagnosticBundleResult>;
 }
 
 export async function createPptBackend(): Promise<PptBackend> {

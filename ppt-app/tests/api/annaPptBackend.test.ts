@@ -357,4 +357,28 @@ describe("Anna PPT Backend", () => {
       artifact_type: "pptx",
     });
   });
+
+  it("prepares a Workspace Diagnostic Bundle through one long-running ppt-engine tool call", async () => {
+    setToolIds();
+    const calls: Array<{ method?: unknown; args?: unknown; timeoutMs?: unknown }> = [];
+    const result = {
+      status: "ready" as const,
+      workspace_id: "demo",
+      filename: "demo-workspace-diagnostics.zip",
+      size_bytes: 1024,
+      download_url: "https://storage.example/diagnostic.zip",
+      expires_at: "2026-07-19T12:00:00Z",
+    };
+    const backend = createAnnaPptBackend(createRuntimeWithInvoke(async (input) => {
+      calls.push(input as { method?: unknown; args?: unknown; timeoutMs?: unknown });
+      return { success: true, data: result };
+    }));
+
+    assert.deepEqual(await backend.prepareWorkspaceDiagnosticBundle({
+      workspace_dir: "/tmp/workspaces/demo",
+    }), result);
+    assert.equal(calls[0]?.method, "app_prepare_workspace_diagnostic_bundle");
+    assert.deepEqual(calls[0]?.args, { workspace_dir: "/tmp/workspaces/demo" });
+    assert.equal(calls[0]?.timeoutMs, 600_000);
+  });
 });

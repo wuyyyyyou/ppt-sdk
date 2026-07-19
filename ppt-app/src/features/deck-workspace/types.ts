@@ -56,11 +56,19 @@ export interface ExportArtifact {
   mirrorStatus: "ready" | "missing" | "stale";
 }
 
-export interface ExportDownloadState {
+export interface DownloadLinkState {
   status: "idle" | "preparing" | "ready" | "error";
   message: string;
   href?: string;
   expiresAt?: string | null;
+}
+
+export type ExportDownloadState = DownloadLinkState;
+
+export interface WorkspaceDiagnosticBundleState extends DownloadLinkState {
+  workspaceId?: string;
+  filename?: string;
+  sizeBytes?: number;
 }
 
 export interface ExportProgressState {
@@ -121,6 +129,7 @@ export interface DeckWorkspaceState {
   exportProgress: ExportProgressState;
   exportArtifact: ExportArtifact | null;
   exportDownload: ExportDownloadState;
+  workspaceDiagnosticBundle: WorkspaceDiagnosticBundleState;
   currentStatus: string;
   workspaceScan: ListWorkspacesResult | null;
   currentWorkspace: WorkspaceResult | null;

@@ -1306,3 +1306,18 @@ export interface AppExportArtifactMirrorStatus {
   artifact: AppExportArtifactInfo;
   mirror: AppExportArtifactMirror | null;
 }
+
+export interface PrepareAppWorkspaceDiagnosticBundleInput {
+  workspace_dir: string;
+}
+
+export interface AppWorkspaceDiagnosticBundleSnapshot {
+  workspace_dir: string;
+  workspace_id: string;
+  archive_path: string;
+  filename: string;
+  size_bytes: number;
+  content_type: "application/zip";
+  aps_path: string;
+  created_at: string;
+}

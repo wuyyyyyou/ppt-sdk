@@ -50,6 +50,7 @@
   "dependencies": {
     "@tailwindcss/browser": "4.3.2",
     "ajv": "^8.20.0",
+    "archiver": "^8.0.0",
     "esbuild": "^0.27.4",
     "pptx-svg": "^0.6.4",
     "puppeteer": "24.40.0",
@@ -63,6 +64,7 @@
     "zod": "^4.0.5"
   },
   "devDependencies": {
+    "@types/archiver": "^8.0.0",
     "@types/node": "^20.19.17",
     "@types/react": "^18.3.24",
     "postject": "^1.0.0-alpha.6",

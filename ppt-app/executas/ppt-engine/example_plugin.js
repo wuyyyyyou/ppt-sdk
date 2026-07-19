@@ -70,6 +70,7 @@ import {
   prepareAppDeckRefinementPageFiles,
   prepareAppPageFiles,
   prepareAppExportModel,
+  prepareAppWorkspaceDiagnosticBundle,
   prepareAppUploadedSourceAnalysisWorkspace,
   prepareAppResearchWorkspace,
   prepareWorkspacePageSources,
@@ -271,6 +272,7 @@ const apsFilesClient = new ApsFilesClient({
   writeFrame: (message) => writeStdoutLine(JSON.stringify(message)),
 });
 const exportMirrorPublishQueues = new Map();
+const workspaceDiagnosticBundleQueues = new Map();
 
 async function withExportMirrorPublishQueue(queueKey, operation) {
   const previous = exportMirrorPublishQueues.get(queueKey) ?? Promise.resolve();
@@ -281,6 +283,19 @@ async function withExportMirrorPublishQueue(queueKey, operation) {
   } finally {
     if (exportMirrorPublishQueues.get(queueKey) === current) {
       exportMirrorPublishQueues.delete(queueKey);
+    }
+  }
+}
+
+async function withWorkspaceDiagnosticBundleQueue(workspaceDir, operation) {
+  const previous = workspaceDiagnosticBundleQueues.get(workspaceDir) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  workspaceDiagnosticBundleQueues.set(workspaceDir, current);
+  try {
+    return await current;
+  } finally {
+    if (workspaceDiagnosticBundleQueues.get(workspaceDir) === current) {
+      workspaceDiagnosticBundleQueues.delete(workspaceDir);
     }
   }
 }
@@ -2174,6 +2189,81 @@ async function toolAppGetExportArtifactDownloadUrl(args) {
   };
 }
 
+async function toolAppPrepareWorkspaceDiagnosticBundle(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return withWorkspaceDiagnosticBundleQueue(workspaceDir, async () => {
+    const snapshot = await prepareAppWorkspaceDiagnosticBundle({
+      workspace_dir: workspaceDir,
+    });
+    try {
+      const upload = await apsFilesClient.uploadBegin({
+        path: snapshot.aps_path,
+        sizeBytes: snapshot.size_bytes,
+        contentType: snapshot.content_type,
+        scope: "app",
+        metadata: {
+          workspace_id: snapshot.workspace_id,
+          artifact_type: "workspace_diagnostic_bundle",
+          created_at: snapshot.created_at,
+        },
+      });
+      if (!upload || typeof upload.put_url !== "string" || upload.put_url.length === 0) {
+        throw new Error("files/upload_begin did not return a valid put_url");
+      }
+
+      const contentDisposition = buildAttachmentContentDisposition(snapshot.filename);
+      const putResponse = await fetch(upload.put_url, {
+        method: "PUT",
+        headers: {
+          ...(upload.headers ?? {}),
+          "Content-Length": String(snapshot.size_bytes),
+          "Content-Disposition": contentDisposition,
+        },
+        body: createReadStream(snapshot.archive_path),
+        duplex: "half",
+      });
+      if (!putResponse.ok) {
+        const message = await putResponse.text().catch(() => "");
+        throw new Error(message || `APS Files PUT failed: HTTP ${putResponse.status}`);
+      }
+
+      const putEtag = putResponse.headers.get("etag") ?? undefined;
+      const completed = await apsFilesClient.uploadComplete({
+        path: snapshot.aps_path,
+        etag: putEtag,
+        sizeBytes: snapshot.size_bytes,
+        contentType: snapshot.content_type,
+        scope: "app",
+      });
+      const download = await apsFilesClient.downloadUrl({
+        path: snapshot.aps_path,
+        expiresIn: 600,
+        scope: "app",
+      });
+      if (!download || typeof download.url !== "string" || download.url.length === 0) {
+        throw new Error("files/download_url did not return a valid URL");
+      }
+
+      return {
+        status: "ready",
+        workspace_id: snapshot.workspace_id,
+        filename: snapshot.filename,
+        size_bytes: Number.isFinite(Number(completed?.size_bytes))
+          ? Math.floor(Number(completed.size_bytes))
+          : snapshot.size_bytes,
+        download_url: download.url,
+        expires_at: typeof download.expires_at === "string" ? download.expires_at : null,
+      };
+    } finally {
+      await unlink(snapshot.archive_path).catch(() => undefined);
+    }
+  });
+}
+
 async function toolAppExportPdf(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -2462,6 +2552,7 @@ const TOOL_DISPATCH = {
   app_get_pptx_export_status: toolAppGetPptxExportStatus,
   app_publish_export_artifact: toolAppPublishExportArtifact,
   app_get_export_artifact_download_url: toolAppGetExportArtifactDownloadUrl,
+  app_prepare_workspace_diagnostic_bundle: toolAppPrepareWorkspaceDiagnosticBundle,
   app_prepare_export_model: toolAppPrepareExportModel,
   app_export_pdf: toolAppExportPdf,
   app_record_pptx_export: toolAppRecordPptxExport,

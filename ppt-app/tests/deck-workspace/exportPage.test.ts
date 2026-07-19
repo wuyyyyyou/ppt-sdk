@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { ExportPage } from "../../src/features/deck-workspace/components/ExportPage.tsx";
-import { hasActiveExportDownloadUrl } from "../../src/features/deck-workspace/exportDownloadUrl.ts";
+import { hasActiveDownloadUrl } from "../../src/features/deck-workspace/downloadUrl.ts";
 import type {
   ExportArtifact,
   ExportDownloadState,
@@ -101,14 +101,14 @@ describe("ExportPage", () => {
   });
 
   it("treats expired and malformed URLs as unavailable", () => {
-    assert.equal(hasActiveExportDownloadUrl({
+    assert.equal(hasActiveDownloadUrl({
       status: "ready",
       message: "",
       href: "https://storage.example/expired.pptx",
       expiresAt: "2026-07-18T10:00:00Z",
     }, Date.parse("2026-07-18T10:00:01Z")), false);
 
-    assert.equal(hasActiveExportDownloadUrl({
+    assert.equal(hasActiveDownloadUrl({
       status: "ready",
       message: "",
       href: "https://storage.example/malformed.pptx",
@@ -117,7 +117,7 @@ describe("ExportPage", () => {
   });
 
   it("treats APS expiration timestamps without an offset as UTC", () => {
-    assert.equal(hasActiveExportDownloadUrl({
+    assert.equal(hasActiveDownloadUrl({
       status: "ready",
       message: "",
       href: "https://storage.example/current.pptx",

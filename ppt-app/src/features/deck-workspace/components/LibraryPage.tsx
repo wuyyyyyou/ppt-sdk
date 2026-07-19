@@ -1,4 +1,4 @@
-import { Edit3, Plus } from "lucide-react";
+import { Archive, Download, Edit3, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import type {
   ListWorkspacesResult,
@@ -20,6 +20,9 @@ import {
   REVIEW_FAILURE_LIMIT_MIN,
   type PageReviewSettings,
 } from "../reviewSettings";
+import type { WorkspaceDiagnosticBundleState } from "../types";
+import { useDownloadUrlAvailability } from "../useDownloadUrlAvailability";
+import { CopyableDownloadLink } from "./CopyableDownloadLink";
 import { PageHeader } from "./PageHeader";
 
 interface LibraryPageProps {
@@ -35,6 +38,8 @@ interface LibraryPageProps {
   onCreateWorkspace: () => Promise<void>;
   onSaveSettings: (setting: WorkspaceSettings) => Promise<void>;
   onSaveTitle: (title: string) => Promise<void>;
+  workspaceDiagnosticBundle: WorkspaceDiagnosticBundleState;
+  onPrepareWorkspaceDiagnosticBundle: () => Promise<void>;
 }
 
 function readSettings(workspace: WorkspaceResult | null): WorkspaceSettings {
@@ -103,7 +108,9 @@ export function LibraryPage({
   onOpen,
   onCreateWorkspace,
   onSaveSettings,
-  onSaveTitle
+  onSaveTitle,
+  workspaceDiagnosticBundle,
+  onPrepareWorkspaceDiagnosticBundle
 }: LibraryPageProps) {
   const [editing, setEditing] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -134,6 +141,17 @@ export function LibraryPage({
   }
 
   const tasks = workspaceScan?.tasks ?? workspaceScan?.workspaces ?? [];
+  const diagnosticBundleAvailability = useDownloadUrlAvailability(workspaceDiagnosticBundle);
+  const diagnosticButtonLabel = workspaceDiagnosticBundle.status === "preparing"
+    ? t.library.diagnosticBundlePreparing
+    : workspaceDiagnosticBundle.status === "error"
+      ? t.library.diagnosticBundleRetry
+      : diagnosticBundleAvailability.expired
+        ? t.library.diagnosticBundleRetry
+        : t.library.diagnosticBundleGenerate;
+  const diagnosticStatusMessage = diagnosticBundleAvailability.expired
+    ? t.library.diagnosticBundleExpired
+    : workspaceDiagnosticBundle.message;
 
   return (
     <section className="page active library-page">
@@ -282,6 +300,48 @@ export function LibraryPage({
           max={REVIEW_FAILURE_LIMIT_MAX}
           onChange={(value) => setDraft((next) => ({ ...next, visual_review_failure_limit: value }))}
         />
+      </div>
+
+      <div className="diagnostic-bundle-box">
+        <div className="diagnostic-bundle-header">
+          <div>
+            <strong>{t.library.diagnosticBundleTitle}</strong>
+            <p>{t.library.diagnosticBundleDescription}</p>
+          </div>
+          <Archive size={20} />
+        </div>
+        <div className="diagnostic-bundle-warning">
+          {t.library.diagnosticBundleSensitiveHint}
+        </div>
+        <div className="diagnostic-bundle-action">
+          {currentWorkspace && diagnosticBundleAvailability.active && workspaceDiagnosticBundle.href ? (
+            <CopyableDownloadLink
+              href={workspaceDiagnosticBundle.href}
+              inputLabel={t.library.diagnosticBundleLinkLabel}
+              copyLabel={t.library.diagnosticBundleCopyLink}
+              copiedMessage={t.library.diagnosticBundleLinkCopied}
+              copyHint={t.library.diagnosticBundleCopyHint}
+            />
+          ) : (
+            <button
+              className="diagnostic-bundle-generate-btn"
+              type="button"
+              disabled={!currentWorkspace || loading || workspaceDiagnosticBundle.status === "preparing"}
+              aria-busy={workspaceDiagnosticBundle.status === "preparing"}
+              onClick={() => {
+                void onPrepareWorkspaceDiagnosticBundle();
+              }}
+            >
+              <Download size={15} />
+              <span>{currentWorkspace ? diagnosticButtonLabel : t.library.diagnosticBundleNoWorkspace}</span>
+            </button>
+          )}
+        </div>
+        {diagnosticStatusMessage ? (
+          <div className={`diagnostic-bundle-status ${workspaceDiagnosticBundle.status === "error" ? "error" : ""}`}>
+            {diagnosticStatusMessage}
+          </div>
+        ) : null}
       </div>
     </section>
   );

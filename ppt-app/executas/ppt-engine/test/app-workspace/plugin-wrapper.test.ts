@@ -102,6 +102,21 @@ test("app_patch_workspace_settings is declared and returns settings without a wo
   assert.ok(manifest.tools.some((tool) => tool.name === "app_patch_workspace_settings"));
 });
 
+test("Workspace Diagnostic Bundle tool is declared and routed through the APS plugin wrapper", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+  const manifest = JSON.parse(
+    await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
+  ) as { tools: Array<{ name: string }> };
+
+  assert.match(
+    source,
+    /app_prepare_workspace_diagnostic_bundle:\s*toolAppPrepareWorkspaceDiagnosticBundle/,
+  );
+  assert.ok(
+    manifest.tools.some((tool) => tool.name === "app_prepare_workspace_diagnostic_bundle"),
+  );
+});
+
 test("dedicated Outline lifecycle tools are declared and routed", async () => {
   const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
   const manifest = JSON.parse(

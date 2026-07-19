@@ -1502,3 +1502,16 @@ export type ExportArtifactDownloadUrlResult =
       download_url: null;
       expires_at: null;
     };
+
+export interface PrepareWorkspaceDiagnosticBundleInput {
+  workspace_dir: string;
+}
+
+export interface PrepareWorkspaceDiagnosticBundleResult {
+  status: "ready";
+  workspace_id: string;
+  filename: string;
+  size_bytes: number;
+  download_url: string;
+  expires_at: string | null;
+}

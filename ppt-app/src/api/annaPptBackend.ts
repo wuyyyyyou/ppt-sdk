@@ -59,6 +59,7 @@ import type {
   UpdateWorkspaceSettingsResult,
   WorkspaceAuthoringKitResult,
   PrepareWorkspacePageSourcesResult,
+  PrepareWorkspaceDiagnosticBundleResult,
   WorkspacePageSourceFingerprint,
   CommitWorkspaceStyleGuideResult,
   WorkspaceStyleGuideStatus,
@@ -668,6 +669,13 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
           workspace_dir: input.workspace_dir,
           artifact_type: input.artifact_type,
         }
+      ),
+    prepareWorkspaceDiagnosticBundle: (input) =>
+      invoke<PrepareWorkspaceDiagnosticBundleResult>(
+        toolIds.pptEngine,
+        "app_prepare_workspace_diagnostic_bundle",
+        { workspace_dir: input.workspace_dir },
+        { timeoutMs: PPTX_EXPORT_TIMEOUT_MS }
       )
   };
 }

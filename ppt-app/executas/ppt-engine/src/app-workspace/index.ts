@@ -2,8 +2,10 @@ import os from "node:os";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { createReadStream } from "node:fs";
-import { appendFile, copyFile, mkdir, readdir, readFile, rm, stat, unlink, writeFile } from "node:fs/promises";
+import { createReadStream, createWriteStream } from "node:fs";
+import { appendFile, copyFile, lstat, mkdir, readlink, readdir, readFile, realpath, rm, stat, unlink, writeFile } from "node:fs/promises";
+import { pipeline } from "node:stream/promises";
+import { ZipArchive, type Archiver, type ArchiverError } from "archiver";
 import sharp from "sharp";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import type { ErrorObject } from "ajv";
@@ -125,6 +127,8 @@ import type {
   PrepareAppPageFilesResult,
   PrepareAppExportModelInput,
   PrepareAppExportModelResult,
+  PrepareAppWorkspaceDiagnosticBundleInput,
+  AppWorkspaceDiagnosticBundleSnapshot,
   AppPptxExportJob,
   AppResearchPaths,
   RecordAppPagePlanInput,
@@ -5432,6 +5436,251 @@ function sourceFileChanged(
   after: { size: number; mtimeMs: number },
 ): boolean {
   return before.size !== after.size || before.mtimeMs !== after.mtimeMs;
+}
+
+type DiagnosticBundleEntrySnapshot =
+  | {
+      kind: "file";
+      entry_name: string;
+      absolute_path: string;
+      relative_path: string;
+      size: number;
+      mtime_ms: number;
+      mode: number;
+      ino: number;
+    }
+  | {
+      kind: "symlink";
+      entry_name: string;
+      absolute_path: string;
+      relative_path: string;
+      target: string;
+      mode: number;
+      ino: number;
+    };
+
+function diagnosticBundleEntryName(workspaceId: string, relativePath = ""): string {
+  const suffix = relativePath.split(path.sep).join("/");
+  return suffix ? `${workspaceId}/${suffix}` : `${workspaceId}/`;
+}
+
+async function resolveDiagnosticBundleWorkspace(workspaceDir: string): Promise<{
+  workspace_dir: string;
+  workspace_id: string;
+}> {
+  const normalizedWorkspaceDir = normalizeWorkspaceDir(workspaceDir);
+  const workspaceInfo = await lstat(normalizedWorkspaceDir);
+  if (!workspaceInfo.isDirectory() || workspaceInfo.isSymbolicLink()) {
+    throw new Error('"workspace_dir" must point to a real Workspace directory');
+  }
+
+  const [resolvedRoot, resolvedWorkspaceDir] = await Promise.all([
+    realpath(WORKSPACE_ROOT),
+    realpath(normalizedWorkspaceDir),
+  ]);
+  const relativePath = path.relative(resolvedRoot, resolvedWorkspaceDir);
+  if (
+    relativePath.length === 0 ||
+    relativePath.startsWith("..") ||
+    path.isAbsolute(relativePath) ||
+    path.basename(resolvedWorkspaceDir) !== path.basename(normalizedWorkspaceDir)
+  ) {
+    throw new Error('"workspace_dir" must resolve to its named directory under the default PPT workspace root');
+  }
+
+  return {
+    workspace_dir: resolvedWorkspaceDir,
+    workspace_id: path.basename(resolvedWorkspaceDir),
+  };
+}
+
+async function appendDiagnosticBundleTree(
+  archive: Archiver,
+  workspaceDir: string,
+  workspaceId: string,
+  snapshotsByEntryName: Map<string, DiagnosticBundleEntrySnapshot>,
+): Promise<void> {
+  const rootInfo = await lstat(workspaceDir);
+  archive.append(Buffer.alloc(0), {
+    name: diagnosticBundleEntryName(workspaceId),
+    type: "directory",
+    date: rootInfo.mtime,
+    mode: rootInfo.mode,
+  });
+
+  async function walk(directoryPath: string, relativeDirectory: string): Promise<void> {
+    const entries = await readdir(directoryPath, { withFileTypes: true });
+    entries.sort((left, right) => left.name.localeCompare(right.name));
+
+    for (const entry of entries) {
+      const absolutePath = path.join(directoryPath, entry.name);
+      const relativePath = relativeDirectory
+        ? path.join(relativeDirectory, entry.name)
+        : entry.name;
+      const entryName = diagnosticBundleEntryName(workspaceId, relativePath);
+      const entryInfo = await lstat(absolutePath);
+
+      if (entryInfo.isDirectory()) {
+        archive.append(Buffer.alloc(0), {
+          name: `${entryName}/`,
+          type: "directory",
+          date: entryInfo.mtime,
+          mode: entryInfo.mode,
+        });
+        await walk(absolutePath, relativePath);
+        continue;
+      }
+
+      if (entryInfo.isFile()) {
+        snapshotsByEntryName.set(entryName, {
+          kind: "file",
+          entry_name: entryName,
+          absolute_path: absolutePath,
+          relative_path: relativePath.split(path.sep).join("/"),
+          size: entryInfo.size,
+          mtime_ms: entryInfo.mtimeMs,
+          mode: entryInfo.mode,
+          ino: entryInfo.ino,
+        });
+        archive.file(absolutePath, {
+          name: entryName,
+          date: entryInfo.mtime,
+          mode: entryInfo.mode,
+          stats: entryInfo,
+        });
+        continue;
+      }
+
+      if (entryInfo.isSymbolicLink()) {
+        const target = await readlink(absolutePath);
+        snapshotsByEntryName.set(entryName, {
+          kind: "symlink",
+          entry_name: entryName,
+          absolute_path: absolutePath,
+          relative_path: relativePath.split(path.sep).join("/"),
+          target,
+          mode: entryInfo.mode,
+          ino: entryInfo.ino,
+        });
+        archive.symlink(entryName, target, entryInfo.mode);
+        continue;
+      }
+
+      throw new Error(
+        `Workspace Diagnostic Bundle does not support special file: ${relativePath.split(path.sep).join("/")}`,
+      );
+    }
+  }
+
+  await walk(workspaceDir, "");
+}
+
+async function verifyDiagnosticBundleEntry(
+  snapshot: DiagnosticBundleEntrySnapshot,
+): Promise<void> {
+  let current;
+  try {
+    current = await lstat(snapshot.absolute_path);
+  } catch {
+    throw new Error(
+      `Workspace entry disappeared while the diagnostic bundle was being created: ${snapshot.relative_path}`,
+    );
+  }
+
+  if (snapshot.kind === "file") {
+    if (
+      !current.isFile() ||
+      current.size !== snapshot.size ||
+      current.mtimeMs !== snapshot.mtime_ms ||
+      current.mode !== snapshot.mode ||
+      current.ino !== snapshot.ino
+    ) {
+      throw new Error(
+        `Workspace file changed while the diagnostic bundle was being created: ${snapshot.relative_path}`,
+      );
+    }
+    return;
+  }
+
+  const currentTarget = current.isSymbolicLink()
+    ? await readlink(snapshot.absolute_path)
+    : null;
+  if (
+    !current.isSymbolicLink() ||
+    currentTarget !== snapshot.target ||
+    current.mode !== snapshot.mode ||
+    current.ino !== snapshot.ino
+  ) {
+    throw new Error(
+      `Workspace symbolic link changed while the diagnostic bundle was being created: ${snapshot.relative_path}`,
+    );
+  }
+}
+
+export async function prepareAppWorkspaceDiagnosticBundle(
+  input: PrepareAppWorkspaceDiagnosticBundleInput,
+): Promise<AppWorkspaceDiagnosticBundleSnapshot> {
+  const workspace = await resolveDiagnosticBundleWorkspace(input.workspace_dir);
+  const archiveDir = path.join(os.tmpdir(), "ppt-engine-workspace-diagnostic-bundles");
+  const archivePath = path.join(
+    archiveDir,
+    `${workspace.workspace_id}-${randomUUID()}.zip`,
+  );
+  const filename = `${workspace.workspace_id}-workspace-diagnostics.zip`;
+  await mkdir(archiveDir, { recursive: true });
+
+  const output = createWriteStream(archivePath, { flags: "wx" });
+  const archive = new ZipArchive({ zlib: { level: 6 } });
+  const snapshotsByEntryName = new Map<string, DiagnosticBundleEntrySnapshot>();
+  const verificationChecks: Promise<void>[] = [];
+  let verificationError: unknown = null;
+  archive.on("warning", (error: ArchiverError) => archive.destroy(error));
+  archive.on("entry", (entry) => {
+    const snapshot = snapshotsByEntryName.get(entry.name);
+    if (!snapshot) return;
+    verificationChecks.push(
+      verifyDiagnosticBundleEntry(snapshot).catch((error) => {
+        verificationError ??= error;
+      }),
+    );
+  });
+  const completed = pipeline(archive, output);
+
+  try {
+    await appendDiagnosticBundleTree(
+      archive,
+      workspace.workspace_dir,
+      workspace.workspace_id,
+      snapshotsByEntryName,
+    );
+    await archive.finalize();
+    await completed;
+    await Promise.all(verificationChecks);
+    if (verificationError) {
+      throw verificationError;
+    }
+    const archiveInfo = await stat(archivePath);
+    if (!archiveInfo.isFile() || archiveInfo.size <= 0) {
+      throw new Error("Workspace Diagnostic Bundle archive is empty");
+    }
+
+    return {
+      workspace_dir: workspace.workspace_dir,
+      workspace_id: workspace.workspace_id,
+      archive_path: archivePath,
+      filename,
+      size_bytes: archiveInfo.size,
+      content_type: "application/zip",
+      aps_path: `workspaces/${workspace.workspace_id}/diagnostics/current-workspace.zip`,
+      created_at: new Date().toISOString(),
+    };
+  } catch (error) {
+    archive.abort();
+    output.destroy();
+    await completed.catch(() => undefined);
+    await unlink(archivePath).catch(() => undefined);
+    throw error;
+  }
 }
 
 export async function createAppExportArtifactSnapshot(

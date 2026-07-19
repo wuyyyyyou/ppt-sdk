@@ -7,7 +7,7 @@ import {
   type AiOperationLogContext,
 } from "../../../ai/interactionLog";
 import { createPptBackend, type PptBackend } from "../../../api/pptBackend";
-import { hasActiveExportDownloadUrl } from "../exportDownloadUrl";
+import { hasActiveDownloadUrl } from "../downloadUrl";
 import { connectAnnaRuntime } from "../../../runtime/annaRuntime";
 import {
   createAppHostUploadClient,
@@ -115,6 +115,7 @@ import type {
   ExportProgressState,
   ExportArtifact,
   ExportDownloadState,
+  WorkspaceDiagnosticBundleState,
   GenerationStreamSnapshot,
   LoadingKind,
   MainStage,
@@ -435,6 +436,7 @@ export interface DeckWorkspaceActions {
   renderDeckHtml: () => Promise<void>;
   exportFile: (type: "PPTX" | "PDF") => Promise<void>;
   downloadExportArtifact: () => Promise<void>;
+  prepareWorkspaceDiagnosticBundle: () => Promise<void>;
   returnToOutlineFromGeneration: () => void;
   returnToBriefFromUploadedSourceAnalysis: () => void;
   regenerateDeck: () => Promise<void>;
@@ -519,6 +521,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     status: "idle",
     message: "",
   });
+  const [workspaceDiagnosticBundle, setWorkspaceDiagnosticBundle] =
+    useState<WorkspaceDiagnosticBundleState>({
+      status: "idle",
+      message: "",
+    });
+  const workspaceDiagnosticBundleRequestRef = useRef(0);
   const exportInFlightRef = useRef(false);
   const [backend, setBackend] = useState<PptBackend | null>(null);
   const [hostUploadClient, setHostUploadClient] = useState<AppHostUploadClient | null>(null);
@@ -531,6 +539,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const requirementsOperationRef = useRef(0);
   const [workspaceScan, setWorkspaceScan] = useState<ListWorkspacesResult | null>(null);
   const [currentWorkspace, setCurrentWorkspace] = useState<WorkspaceResult | null>(null);
+  const currentWorkspaceRef = useRef<WorkspaceResult | null>(currentWorkspace);
+  currentWorkspaceRef.current = currentWorkspace;
   const [uploadedSources, setUploadedSources] = useState<UploadedSourceMaterial[]>([]);
   const [currentUploadedSourceAnalysis, setCurrentUploadedSourceAnalysis] =
     useState<UploadedSourceAnalysis | null>(null);
@@ -557,6 +567,15 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   });
   const styleProfileCreationAbortRef = useRef<AbortController | null>(null);
   const aiLogger = useMemo(() => backend ? createAiInteractionLogger(backend) : null, [backend]);
+
+  function invalidateWorkspaceDiagnosticBundle() {
+    workspaceDiagnosticBundleRequestRef.current += 1;
+    setWorkspaceDiagnosticBundle({ status: "idle", message: "" });
+  }
+
+  useEffect(() => {
+    invalidateWorkspaceDiagnosticBundle();
+  }, [currentWorkspace?.workspace_id]);
 
   function getDefaultWorkspaceTitle(date = new Date()) {
     return formatMessage(t.library.defaultWorkspaceTitle, {
@@ -2657,6 +2676,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function showWorkspacePicker() {
     requirementsOperationRef.current += 1;
     resetGenerationUiState();
+    invalidateWorkspaceDiagnosticBundle();
     setCurrentWorkspace(null);
     setPage("main");
     setStage("brief");
@@ -2669,6 +2689,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     requirementsOperationRef.current += 1;
     resetGenerationUiState();
+    invalidateWorkspaceDiagnosticBundle();
     setWorkspaceLoading(true);
     setWorkspaceError("");
     try {
@@ -2693,6 +2714,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (!backend) return;
 
     resetGenerationUiState();
+    invalidateWorkspaceDiagnosticBundle();
     setWorkspaceLoading(true);
     setWorkspaceError("");
     try {
@@ -3332,7 +3354,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (!backend || !currentWorkspace || !exportArtifact || exportDownload.status === "preparing") {
       return;
     }
-    if (hasActiveExportDownloadUrl(exportDownload)) {
+    if (hasActiveDownloadUrl(exportDownload)) {
       return;
     }
     setExportDownload({ status: "preparing", message: t.exportPage.downloadPreparing });
@@ -3367,6 +3389,61 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       console.warn("Failed to download the Export Artifact Mirror", error);
       setExportDownload({ status: "error", message });
       showToast(message);
+    }
+  }
+
+  async function prepareCurrentWorkspaceDiagnosticBundle() {
+    if (!backend || !currentWorkspace) return;
+    const workspaceId = currentWorkspace.workspace_id;
+    const workspaceDir = currentWorkspace.workspace_dir;
+    const requestId = workspaceDiagnosticBundleRequestRef.current + 1;
+    workspaceDiagnosticBundleRequestRef.current = requestId;
+    setWorkspaceDiagnosticBundle({
+      status: "preparing",
+      message: t.library.diagnosticBundlePreparing,
+      workspaceId,
+    });
+
+    try {
+      const result = await backend.prepareWorkspaceDiagnosticBundle({
+        workspace_dir: workspaceDir,
+      });
+      if (
+        workspaceDiagnosticBundleRequestRef.current !== requestId ||
+        currentWorkspaceRef.current?.workspace_id !== workspaceId
+      ) {
+        return;
+      }
+      setWorkspaceDiagnosticBundle({
+        status: "ready",
+        message: t.library.diagnosticBundleReady,
+        workspaceId,
+        filename: result.filename,
+        sizeBytes: result.size_bytes,
+        href: result.download_url,
+        expiresAt: result.expires_at,
+      });
+    } catch (error) {
+      if (
+        workspaceDiagnosticBundleRequestRef.current !== requestId ||
+        currentWorkspaceRef.current?.workspace_id !== workspaceId
+      ) {
+        return;
+      }
+      const detail = error instanceof Error
+        ? error.message
+        : typeof error === "string"
+          ? error
+          : "";
+      const message = detail
+        ? `${t.library.diagnosticBundleFailedPrefix}${detail}`
+        : t.library.diagnosticBundleFailed;
+      console.warn("Failed to prepare the Workspace Diagnostic Bundle", error);
+      setWorkspaceDiagnosticBundle({
+        status: "error",
+        message,
+        workspaceId,
+      });
     }
   }
 
@@ -3621,6 +3698,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     exportProgress,
     exportArtifact,
     exportDownload,
+    workspaceDiagnosticBundle,
     currentStatus,
     workspaceScan,
     currentWorkspace,
@@ -3715,6 +3793,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     renderDeckHtml,
     exportFile,
     downloadExportArtifact: downloadCurrentExportArtifact,
+    prepareWorkspaceDiagnosticBundle: prepareCurrentWorkspaceDiagnosticBundle,
     returnToOutlineFromGeneration,
     returnToBriefFromUploadedSourceAnalysis,
     regenerateDeck,

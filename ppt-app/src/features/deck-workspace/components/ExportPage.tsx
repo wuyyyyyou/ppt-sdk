@@ -1,12 +1,10 @@
-import { Check, ClipboardCopy, Download, File, FileText } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Download, File, FileText } from "lucide-react";
 import type { Messages } from "../../../i18n/messages";
-import {
-  getExportDownloadExpirationMs,
-  hasActiveExportDownloadUrl,
-} from "../exportDownloadUrl";
+import { hasActiveDownloadUrl } from "../downloadUrl";
+import { useDownloadUrlAvailability } from "../useDownloadUrlAvailability";
 import type { ExportArtifact, ExportDownloadState, ExportProgressState } from "../types";
 import type { LoadingKind } from "../types";
+import { CopyableDownloadLink } from "./CopyableDownloadLink";
 import { PageHeader } from "./PageHeader";
 
 interface ExportPageProps {
@@ -27,7 +25,7 @@ function downloadLabel(t: Messages, artifact: ExportArtifact | null) {
 function downloadButtonLabel(t: Messages, artifact: ExportArtifact | null, download: ExportDownloadState) {
   if (download.status === "preparing") return t.exportPage.downloadPreparing;
   if (download.status === "error") return t.exportPage.retryDownloadPreparation;
-  if (hasActiveExportDownloadUrl(download)) return downloadLabel(t, artifact);
+  if (hasActiveDownloadUrl(download)) return downloadLabel(t, artifact);
   return `${t.exportPage.prepareDownload} ${artifact?.type ?? ""}`.trim();
 }
 
@@ -38,9 +36,7 @@ function isDeterminateProgress(progress: ExportProgressState) {
 }
 
 export function ExportPage({ t, progress, artifact, download, loading, onBack, onExport, onDownload }: ExportPageProps) {
-  const downloadLinkRef = useRef<HTMLInputElement>(null);
-  const [downloadClock, setDownloadClock] = useState(() => Date.now());
-  const [downloadLinkCopied, setDownloadLinkCopied] = useState(false);
+  const downloadAvailability = useDownloadUrlAvailability(download);
   const progressClass = [
     "export-progress-track",
     `mode-${progress.mode}`,
@@ -51,43 +47,6 @@ export function ExportPage({ t, progress, artifact, download, loading, onBack, o
     : undefined;
   const ariaValueNow = isDeterminateProgress(progress) ? progress.percent : undefined;
   const downloadDisabled = download.status === "preparing";
-  const downloadUrlReady = hasActiveExportDownloadUrl(download, downloadClock);
-  const expiresAt = download.expiresAt
-    ? getExportDownloadExpirationMs(download.expiresAt)
-    : Number.NaN;
-
-  useEffect(() => {
-    setDownloadClock(Date.now());
-    setDownloadLinkCopied(false);
-  }, [download.href]);
-
-  useEffect(() => {
-    if (!Number.isFinite(expiresAt)) return;
-    const remaining = expiresAt - Date.now();
-    if (remaining <= 0) return;
-    const timeout = globalThis.setTimeout(
-      () => setDownloadClock(Date.now()),
-      remaining + 25,
-    );
-    return () => globalThis.clearTimeout(timeout);
-  }, [expiresAt]);
-
-  async function copyDownloadLink() {
-    const input = downloadLinkRef.current;
-    if (!input || !download.href) return;
-    input.focus();
-    input.select();
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(download.href);
-      } else if (!document.execCommand("copy")) {
-        return;
-      }
-      setDownloadLinkCopied(true);
-    } catch {
-      setDownloadLinkCopied(false);
-    }
-  }
 
   return (
     <section className="page active export-page">
@@ -121,35 +80,14 @@ export function ExportPage({ t, progress, artifact, download, loading, onBack, o
           </div>
         </div>
         <div className="export-download-action-row">
-          {artifact && downloadUrlReady && download.href ? (
-            <div className="export-download-link-control">
-              <div className="export-download-link-row">
-                <input
-                  ref={downloadLinkRef}
-                  className="export-download-link-input"
-                  aria-label={t.exportPage.downloadLinkLabel}
-                  readOnly
-                  value={download.href}
-                  onFocus={(event) => event.currentTarget.select()}
-                />
-                <button
-                  className="export-download-copy-btn"
-                  type="button"
-                  title={t.exportPage.copyDownloadLink}
-                  aria-label={t.exportPage.copyDownloadLink}
-                  onClick={() => {
-                    void copyDownloadLink();
-                  }}
-                >
-                  {downloadLinkCopied ? <Check size={16} /> : <ClipboardCopy size={16} />}
-                </button>
-              </div>
-              <div className="export-download-link-hint">
-                {downloadLinkCopied
-                  ? t.exportPage.downloadLinkCopied
-                  : t.exportPage.downloadCopyHint}
-              </div>
-            </div>
+          {artifact && downloadAvailability.active && download.href ? (
+            <CopyableDownloadLink
+              href={download.href}
+              inputLabel={t.exportPage.downloadLinkLabel}
+              copyLabel={t.exportPage.copyDownloadLink}
+              copiedMessage={t.exportPage.downloadLinkCopied}
+              copyHint={t.exportPage.downloadCopyHint}
+            />
           ) : artifact ? (
             <button
               className="export-download-btn"

@@ -176,6 +176,8 @@ export function App() {
               onCreateWorkspace={actions.createWorkspace}
               onSaveSettings={actions.saveWorkspaceSettings}
               onSaveTitle={actions.saveWorkspaceTitle}
+              workspaceDiagnosticBundle={state.workspaceDiagnosticBundle}
+              onPrepareWorkspaceDiagnosticBundle={actions.prepareWorkspaceDiagnosticBundle}
             />
           ) : null}
 
