@@ -3,40 +3,58 @@ import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import test from "node:test";
+import test, { after } from "node:test";
 
-import {
+const previousHome = process.env.HOME;
+const homeDir = await mkdtemp(path.join(os.tmpdir(), "ppt-engine-export-mirror-home-"));
+process.env.HOME = homeDir;
+const {
   commitAppExportArtifactMirror,
   createAppExportArtifactSnapshot,
   createAppWorkspace,
   getAppExportArtifactMirrorStatus,
   recordAppPptxExport,
-} from "../../src/app-workspace/index.js";
+} = await import("../../src/app-workspace/index.js");
+const isolatedWorkspaceRoot = path.join(homeDir, "anna-workspace", "ppt");
+
+after(async () => {
+  if (previousHome === undefined) delete process.env.HOME;
+  else process.env.HOME = previousHome;
+  await rm(homeDir, { recursive: true, force: true });
+});
+
+function assertWorkspaceIsIsolated(workspaceDir: string) {
+  const relativePath = path.relative(isolatedWorkspaceRoot, workspaceDir);
+  assert.ok(
+    relativePath.length > 0 &&
+      !relativePath.startsWith("..") &&
+      !path.isAbsolute(relativePath),
+    `Expected test Workspace under ${isolatedWorkspaceRoot}, received ${workspaceDir}`,
+  );
+}
 
 test("Export Artifact Mirror uses a snapshot and becomes stale when the source changes", async () => {
-  const previousHome = process.env.HOME;
-  const homeDir = await mkdtemp(path.join(os.tmpdir(), "ppt-engine-export-mirror-home-"));
-  process.env.HOME = homeDir;
+  const created = await createAppWorkspace({ title: "Mirror test" });
+  assertWorkspaceIsIsolated(created.workspace_dir);
+  const outputPath = path.join(created.workspace_dir, "output", "deck.pptx");
+  const bytes = Buffer.from("pptx-v1");
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  await writeFile(outputPath, bytes);
+  await recordAppPptxExport({
+    workspace_dir: created.workspace_dir,
+    pptx_path: outputPath,
+  });
+
+  assert.equal((await getAppExportArtifactMirrorStatus({
+    workspace_dir: created.workspace_dir,
+    artifact_type: "pptx",
+  })).status, "missing");
+
+  const snapshot = await createAppExportArtifactSnapshot({
+    workspace_dir: created.workspace_dir,
+    artifact_type: "pptx",
+  });
   try {
-    const created = await createAppWorkspace({ title: "Mirror test" });
-    const outputPath = path.join(created.workspace_dir, "output", "deck.pptx");
-    const bytes = Buffer.from("pptx-v1");
-    await mkdir(path.dirname(outputPath), { recursive: true });
-    await writeFile(outputPath, bytes);
-    await recordAppPptxExport({
-      workspace_dir: created.workspace_dir,
-      pptx_path: outputPath,
-    });
-
-    assert.equal((await getAppExportArtifactMirrorStatus({
-      workspace_dir: created.workspace_dir,
-      artifact_type: "pptx",
-    })).status, "missing");
-
-    const snapshot = await createAppExportArtifactSnapshot({
-      workspace_dir: created.workspace_dir,
-      artifact_type: "pptx",
-    });
     assert.equal(snapshot.source_sha256, createHash("sha256").update(bytes).digest("hex"));
     assert.equal(snapshot.mirror_path, `workspaces/${created.workspace_id}/exports/current.pptx`);
 
@@ -71,29 +89,23 @@ test("Export Artifact Mirror uses a snapshot and becomes stale when the source c
     });
     assert.equal(stale.status, "stale");
     assert.equal(stale.reason, "source_hash_changed");
-    await unlink(snapshot.snapshot_path);
   } finally {
-    if (previousHome === undefined) delete process.env.HOME;
-    else process.env.HOME = previousHome;
-    await rm(homeDir, { recursive: true, force: true });
+    await unlink(snapshot.snapshot_path).catch(() => undefined);
   }
 });
 
 test("an older snapshot cannot be committed after a newer export is recorded", async () => {
-  const previousHome = process.env.HOME;
-  const homeDir = await mkdtemp(path.join(os.tmpdir(), "ppt-engine-export-conflict-home-"));
-  process.env.HOME = homeDir;
+  const created = await createAppWorkspace({ title: "Mirror conflict" });
+  assertWorkspaceIsIsolated(created.workspace_dir);
+  const outputPath = path.join(created.workspace_dir, "output", "deck.pptx");
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  await writeFile(outputPath, "pptx-v1");
+  await recordAppPptxExport({ workspace_dir: created.workspace_dir, pptx_path: outputPath });
+  const snapshot = await createAppExportArtifactSnapshot({
+    workspace_dir: created.workspace_dir,
+    artifact_type: "pptx",
+  });
   try {
-    const created = await createAppWorkspace({ title: "Mirror conflict" });
-    const outputPath = path.join(created.workspace_dir, "output", "deck.pptx");
-    await mkdir(path.dirname(outputPath), { recursive: true });
-    await writeFile(outputPath, "pptx-v1");
-    await recordAppPptxExport({ workspace_dir: created.workspace_dir, pptx_path: outputPath });
-    const snapshot = await createAppExportArtifactSnapshot({
-      workspace_dir: created.workspace_dir,
-      artifact_type: "pptx",
-    });
-
     await new Promise((resolve) => setTimeout(resolve, 2));
     await writeFile(outputPath, "pptx-v2");
     await recordAppPptxExport({ workspace_dir: created.workspace_dir, pptx_path: outputPath });
@@ -118,28 +130,23 @@ test("an older snapshot cannot be committed after a newer export is recorded", a
       }),
       /Export artifact changed/,
     );
-    await unlink(snapshot.snapshot_path);
   } finally {
-    if (previousHome === undefined) delete process.env.HOME;
-    else process.env.HOME = previousHome;
-    await rm(homeDir, { recursive: true, force: true });
+    await unlink(snapshot.snapshot_path).catch(() => undefined);
   }
 });
 
 test("a legacy mirror without attachment disposition is treated as missing", async () => {
-  const previousHome = process.env.HOME;
-  const homeDir = await mkdtemp(path.join(os.tmpdir(), "ppt-engine-export-legacy-mirror-home-"));
-  process.env.HOME = homeDir;
+  const created = await createAppWorkspace({ title: "Legacy mirror" });
+  assertWorkspaceIsIsolated(created.workspace_dir);
+  const outputPath = path.join(created.workspace_dir, "output", "deck.pptx");
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  await writeFile(outputPath, "pptx-v1");
+  await recordAppPptxExport({ workspace_dir: created.workspace_dir, pptx_path: outputPath });
+  const snapshot = await createAppExportArtifactSnapshot({
+    workspace_dir: created.workspace_dir,
+    artifact_type: "pptx",
+  });
   try {
-    const created = await createAppWorkspace({ title: "Legacy mirror" });
-    const outputPath = path.join(created.workspace_dir, "output", "deck.pptx");
-    await mkdir(path.dirname(outputPath), { recursive: true });
-    await writeFile(outputPath, "pptx-v1");
-    await recordAppPptxExport({ workspace_dir: created.workspace_dir, pptx_path: outputPath });
-    const snapshot = await createAppExportArtifactSnapshot({
-      workspace_dir: created.workspace_dir,
-      artifact_type: "pptx",
-    });
     const taskPath = path.join(created.workspace_dir, "task.json");
     const task = JSON.parse(await readFile(taskPath, "utf8")) as {
       artifacts: { pptx: Record<string, unknown> };
@@ -163,10 +170,7 @@ test("a legacy mirror without attachment disposition is treated as missing", asy
     });
     assert.equal(status.status, "missing");
     assert.equal(status.reason, "mirror_missing");
-    await unlink(snapshot.snapshot_path);
   } finally {
-    if (previousHome === undefined) delete process.env.HOME;
-    else process.env.HOME = previousHome;
-    await rm(homeDir, { recursive: true, force: true });
+    await unlink(snapshot.snapshot_path).catch(() => undefined);
   }
 });
