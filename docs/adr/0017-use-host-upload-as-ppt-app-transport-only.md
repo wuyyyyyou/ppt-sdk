@@ -1,5 +1,7 @@
 # Use Host Upload as PPT App transport only
 
+The Export Artifact Mirror decisions in this ADR are superseded by ADR-0025; its other Host Upload transport decisions remain active.
+
 PPT App uses Host Upload only as the transport for browser-selected files and `ppt-engine` generated artifacts; the local Workspace remains the authoritative store for deck inputs, generated pages, previews, and export artifacts. Host Upload references are short-lived transport objects, so app-facing APIs use structured `*_upload` `HostUploadRef` values and do not preserve legacy `*_url` string fields as a parallel contract.
 
 We intentionally require `negotiate + PUT + confirm` for both frontend browser uploads and backend artifact uploads, even though Host Upload has an inline mode, because this keeps file bytes out of JSON-RPC/stdout and avoids runtime exits from oversized RPC payloads. If Host Upload is unavailable, tools fail with explicit diagnostics instead of falling back to JSON-RPC base64 payloads, `__file_transport`, or local loopback HTTP.

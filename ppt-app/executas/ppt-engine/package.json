@@ -9,6 +9,7 @@
     "manifest.json",
     "dist",
     "example_plugin.js",
+    "aps-files-client.js",
     "host-upload-confirmation.js",
     "build_binary.sh",
     "scripts/binary-release.mjs",

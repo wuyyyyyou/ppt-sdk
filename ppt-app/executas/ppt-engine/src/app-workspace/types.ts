@@ -1260,6 +1260,19 @@ export interface GetAppExportArtifactInput {
   artifact_type: "pptx" | "pdf";
 }
 
+export interface AppExportArtifactMirror {
+  provider: "aps.files";
+  scope: "app";
+  path: string;
+  etag: string;
+  size_bytes: number;
+  content_type: string;
+  content_disposition: string;
+  source_updated_at: string;
+  source_sha256: string;
+  published_at: string;
+}
+
 export interface AppExportArtifactInfo {
   workspace_dir: string;
   workspace_id: string;
@@ -1267,5 +1280,29 @@ export interface AppExportArtifactInfo {
   artifact_type: "pptx" | "pdf";
   path: string;
   filename: string;
-  updated_at: string | null;
+  updated_at: string;
+  mirror: AppExportArtifactMirror | null;
+}
+
+export interface AppExportArtifactSnapshot extends AppExportArtifactInfo {
+  snapshot_path: string;
+  source_sha256: string;
+  size_bytes: number;
+  content_type: string;
+  mirror_path: string;
+}
+
+export interface CommitAppExportArtifactMirrorInput {
+  workspace_dir: string;
+  artifact_type: "pptx" | "pdf";
+  expected_updated_at: string;
+  expected_sha256: string;
+  mirror: AppExportArtifactMirror;
+}
+
+export interface AppExportArtifactMirrorStatus {
+  status: "ready" | "missing" | "stale";
+  reason: "mirror_missing" | "artifact_version_changed" | "source_hash_changed" | null;
+  artifact: AppExportArtifactInfo;
+  mirror: AppExportArtifactMirror | null;
 }

@@ -16,7 +16,7 @@
     "prebuild": "npm run sync:tool-manifests && npm run sync:template-previews",
     "precheck": "npm run sync:tool-manifests",
     "prevalidate": "npm run sync:tool-manifests",
-    "dev": "anna-app dev",
+    "dev": "anna-app dev --storage aps",
     "dev:mock-llm": "anna-app dev --mock-llm fixtures/mock-outline.jsonl",
     "dev:mock-llm:retry": "anna-app dev --mock-llm fixtures/mock-outline-retry.jsonl",
     "build": "vite build --outDir bundle",

@@ -7,6 +7,7 @@ import {
   type AiOperationLogContext,
 } from "../../../ai/interactionLog";
 import { createPptBackend, type PptBackend } from "../../../api/pptBackend";
+import { hasActiveExportDownloadUrl } from "../exportDownloadUrl";
 import { connectAnnaRuntime } from "../../../runtime/annaRuntime";
 import {
   createAppHostUploadClient,
@@ -113,6 +114,7 @@ import type {
   DeckWorkspaceState,
   ExportProgressState,
   ExportArtifact,
+  ExportDownloadState,
   GenerationStreamSnapshot,
   LoadingKind,
   MainStage,
@@ -432,6 +434,7 @@ export interface DeckWorkspaceActions {
   changeCurrentSlideLayout: (mode: "simpler" | "visual" | "comparison" | "process" | "report") => Promise<void>;
   renderDeckHtml: () => Promise<void>;
   exportFile: (type: "PPTX" | "PDF") => Promise<void>;
+  downloadExportArtifact: () => Promise<void>;
   returnToOutlineFromGeneration: () => void;
   returnToBriefFromUploadedSourceAnalysis: () => void;
   regenerateDeck: () => Promise<void>;
@@ -512,7 +515,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     () => createIdleExportProgress(t)
   );
   const [exportArtifact, setExportArtifact] = useState<ExportArtifact | null>(null);
-  const exportRefreshVersionRef = useRef(0);
+  const [exportDownload, setExportDownload] = useState<ExportDownloadState>({
+    status: "idle",
+    message: "",
+  });
   const exportInFlightRef = useRef(false);
   const [backend, setBackend] = useState<PptBackend | null>(null);
   const [hostUploadClient, setHostUploadClient] = useState<AppHostUploadClient | null>(null);
@@ -902,6 +908,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   function setExportArtifactWithProgress(artifact: ExportArtifact | null) {
     setExportArtifact(artifact);
     setExportProgress(createArtifactExportProgress(t, artifact));
+    setExportDownload(artifact
+      ? {
+          status: "idle",
+          message: t.exportPage.downloadNotPrepared,
+        }
+      : { status: "idle", message: "" });
   }
 
   function buildLlmContextRows(
@@ -1037,7 +1049,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setResearchSearchControlSettingsState(workspaceResearchSearchControlSettings(workspace));
     if (!exportInFlightRef.current) {
       setExportArtifactWithProgress(readWorkspaceExportArtifactPath(workspace));
-      void refreshWorkspaceExportArtifact(workspace, exportRefreshVersionRef.current);
     }
     const renderKey = workspaceReviewRenderKey(workspace);
     setReviewRender((current) =>
@@ -1463,9 +1474,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       if (!hasCurrentRender && currentWorkspace) {
         void loadDeckHtmlForWorkspace(currentWorkspace, "review");
       }
-    }
-    if (nextPage === "export" && currentWorkspace) {
-      void refreshWorkspaceExportArtifact(currentWorkspace, exportRefreshVersionRef.current);
     }
   }
 
@@ -2281,8 +2289,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         pptx?: {
           path?: unknown;
           updated_at?: unknown;
+          mirror?: unknown;
         };
-        pdf?: { path?: unknown; updated_at?: unknown };
+        pdf?: { path?: unknown; updated_at?: unknown; mirror?: unknown };
       };
     };
     const pptx = task.artifacts?.pptx;
@@ -2291,12 +2300,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       {
         type: "PPTX" as const,
         path: typeof pptx?.path === "string" ? pptx.path : "",
-        updatedAt: typeof pptx?.updated_at === "string" ? pptx.updated_at : ""
+        updatedAt: typeof pptx?.updated_at === "string" ? pptx.updated_at : "",
+        mirror: pptx?.mirror,
       },
       {
         type: "PDF" as const,
         path: typeof pdf?.path === "string" ? pdf.path : "",
-        updatedAt: typeof pdf?.updated_at === "string" ? pdf.updated_at : ""
+        updatedAt: typeof pdf?.updated_at === "string" ? pdf.updated_at : "",
+        mirror: pdf?.mirror,
       }
     ].filter((item) => item.path);
 
@@ -2311,83 +2322,68 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       return right.updatedAt.localeCompare(left.updatedAt);
     })[0];
 
+    const mirror = latest.mirror && typeof latest.mirror === "object" && !Array.isArray(latest.mirror)
+      ? latest.mirror as {
+          provider?: unknown;
+          scope?: unknown;
+          content_disposition?: unknown;
+          source_updated_at?: unknown;
+        }
+      : null;
+    const mirrorStatus = !mirror ||
+      mirror.provider !== "aps.files" ||
+      mirror.scope !== "app" ||
+      typeof mirror.content_disposition !== "string" ||
+      !/^attachment(?:;|$)/i.test(mirror.content_disposition)
+      ? "missing"
+      : mirror.source_updated_at === latest.updatedAt
+        ? "ready"
+        : "stale";
+
     return {
       type: latest.type,
       path: latest.path,
-      href: ""
+      updatedAt: latest.updatedAt,
+      mirrorStatus,
     };
   }
 
-  function formatExportHostUploadError(error: unknown) {
+  function formatExportDownloadError(error: unknown) {
     const detail = error instanceof Error
       ? error.message
       : typeof error === "string"
         ? error
         : "";
     const fallback = locale === "zh"
-      ? "Host Upload 下载链接生成失败。"
-      : "Failed to create a Host Upload download link.";
+      ? "导出文件下载准备失败。"
+      : "Failed to prepare the export download.";
     if (!detail) return fallback;
     return locale === "zh"
-      ? `Host Upload 下载链接生成失败：${detail}`
-      : `Failed to create a Host Upload download link: ${detail}`;
+      ? `导出文件下载准备失败：${detail}`
+      : `Failed to prepare the export download: ${detail}`;
   }
 
-  async function buildWorkspaceExportArtifact(workspace: WorkspaceResult): Promise<ExportArtifact | null> {
-    const artifact = readWorkspaceExportArtifactPath(workspace);
-    if (!artifact) return null;
-
-    if (!backend) {
-      throw new Error("PptBackend is not available.");
-    }
-
-    const result = await backend.getExportArtifactDownloadUrl({
-      workspace_dir: workspace.workspace_dir,
-      artifact_type: artifact.type.toLowerCase() as "pptx" | "pdf"
-    });
-    if (
-      !result.download_upload ||
-      result.download_upload.transport !== "host_upload" ||
-      typeof result.download_upload.url !== "string" ||
-      result.download_upload.url.length === 0
-    ) {
-      throw new Error("Export artifact response did not include a valid HostUploadRef.");
-    }
-
+  function artifactFromPublishedResult(result: Awaited<ReturnType<PptBackend["publishExportArtifact"]>>): ExportArtifact {
     return {
-      type: result.artifact_type === "pptx" ? "PPTX" : "PDF",
-      path: result.path,
-      href: result.download_upload.url,
-      fileName: result.filename
+      type: result.artifact.artifact_type === "pptx" ? "PPTX" : "PDF",
+      path: result.artifact.path,
+      fileName: result.artifact.filename,
+      updatedAt: result.artifact.updated_at,
+      mirrorStatus: "ready",
     };
   }
 
-  async function refreshWorkspaceExportArtifact(
-    workspace: WorkspaceResult,
-    refreshVersion = exportRefreshVersionRef.current,
-    options: { rethrow?: boolean } = {},
-  ) {
-    try {
-      const artifact = await buildWorkspaceExportArtifact(workspace);
-      if (refreshVersion !== exportRefreshVersionRef.current) {
-        return;
-      }
-      setExportArtifactWithProgress(artifact);
-    } catch (error) {
-      if (refreshVersion !== exportRefreshVersionRef.current) {
-        return;
-      }
-      const artifact = readWorkspaceExportArtifactPath(workspace);
-      const message = formatExportHostUploadError(error);
-      console.warn("Failed to create Host Upload download link", error);
-      setExportArtifact(artifact);
-      setExportProgress((current) =>
-        createExportErrorProgress(message, artifact?.type ?? current.type, current.percent)
-      );
-      if (options.rethrow) {
-        throw new Error(message);
-      }
+  async function publishExportArtifact(workspace: WorkspaceResult, artifact: ExportArtifact): Promise<ExportArtifact> {
+    if (!backend) {
+      throw new Error("PptBackend is not available.");
     }
+    const result = await backend.publishExportArtifact({
+      workspace_dir: workspace.workspace_dir,
+      artifact_type: artifact.type.toLowerCase() as "pptx" | "pdf",
+    });
+    const published = artifactFromPublishedResult(result);
+    setExportArtifact(published);
+    return published;
   }
 
   async function ensureCurrentWorkspace() {
@@ -3231,8 +3227,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     const workspace = await ensureCurrentWorkspace();
     if (!workspace) return;
-    const exportVersion = exportRefreshVersionRef.current + 1;
-    exportRefreshVersionRef.current = exportVersion;
     exportInFlightRef.current = true;
 
     const needsFreshRender =
@@ -3243,6 +3237,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setLoading("export");
     setExportProgress(createExportStartProgress(t, type));
     setExportArtifact(null);
+    setExportDownload({ status: "idle", message: "" });
     try {
       if (needsFreshRender) {
         const rendered = await loadDeckHtmlForWorkspace(workspace, "export");
@@ -3251,6 +3246,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         setExportProgress(createExportStartProgress(t, type));
       }
 
+      let updatedWorkspace: WorkspaceResult;
       if (type === "PPTX") {
         const startedModel = await backend.startPptxExportModel({
           workspace_dir: workspace.workspace_dir
@@ -3285,28 +3281,41 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
         const pptxPath = completed.pptx_path;
         assertPptxExportPath(pptxPath, "pptx_path");
-        const updatedWorkspace = await backend.recordPptxExport({
+        updatedWorkspace = await backend.recordPptxExport({
           workspace_dir: workspace.workspace_dir,
           pptxPath,
           generatorResult: completed.generator_result ?? completed
         });
         applyWorkspace(updatedWorkspace);
-        await refreshWorkspaceExportArtifact(updatedWorkspace, exportVersion, { rethrow: true });
       } else {
         setExportProgress(createExportStartProgress(t, "PDF"));
         const pdfResult = await backend.exportPdf({
           workspace_dir: workspace.workspace_dir
         });
         const pdfPath = pdfResult.pdfPath;
-        const updatedWorkspace = await backend.recordPdfExport({
+        updatedWorkspace = await backend.recordPdfExport({
           workspace_dir: workspace.workspace_dir,
           pdfPath
         });
         applyWorkspace(updatedWorkspace);
-        await refreshWorkspaceExportArtifact(updatedWorkspace, exportVersion, { rethrow: true });
       }
 
-      showToast(type === "PPTX" ? t.toasts.pptxExported : t.toasts.pdfExported);
+      const artifact = readWorkspaceExportArtifactPath(updatedWorkspace);
+      if (!artifact) {
+        throw new Error(`${type} export was recorded without an artifact path.`);
+      }
+      setExportArtifactWithProgress(artifact);
+      setExportDownload({ status: "preparing", message: t.exportPage.downloadPreparing });
+      try {
+        await publishExportArtifact(updatedWorkspace, artifact);
+        setExportDownload({ status: "idle", message: t.exportPage.downloadNotPrepared });
+        showToast(type === "PPTX" ? t.toasts.pptxExported : t.toasts.pdfExported);
+      } catch (error) {
+        const message = formatExportDownloadError(error);
+        console.warn("Failed to publish the Export Artifact Mirror", error);
+        setExportDownload({ status: "error", message });
+        showToast(message);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : t.status.exporting;
       setExportProgress((current) =>
@@ -3316,6 +3325,48 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     } finally {
       exportInFlightRef.current = false;
       setLoading("none");
+    }
+  }
+
+  async function downloadCurrentExportArtifact() {
+    if (!backend || !currentWorkspace || !exportArtifact || exportDownload.status === "preparing") {
+      return;
+    }
+    if (hasActiveExportDownloadUrl(exportDownload)) {
+      return;
+    }
+    setExportDownload({ status: "preparing", message: t.exportPage.downloadPreparing });
+    try {
+      let artifact = exportArtifact;
+      if (artifact.mirrorStatus !== "ready") {
+        artifact = await publishExportArtifact(currentWorkspace, artifact);
+      }
+      const result = await backend.getExportArtifactDownloadUrl({
+        workspace_dir: currentWorkspace.workspace_dir,
+        artifact_type: artifact.type.toLowerCase() as "pptx" | "pdf",
+      });
+      if (result.status !== "ready") {
+        setExportArtifact((current) => current
+          ? { ...current, mirrorStatus: result.status }
+          : current);
+        throw new Error(result.reason);
+      }
+      setExportArtifact({
+        ...artifact,
+        fileName: result.artifact.filename,
+        mirrorStatus: "ready",
+      });
+      setExportDownload({
+        status: "ready",
+        message: t.exportPage.downloadReady,
+        href: result.download_url,
+        expiresAt: result.expires_at,
+      });
+    } catch (error) {
+      const message = formatExportDownloadError(error);
+      console.warn("Failed to download the Export Artifact Mirror", error);
+      setExportDownload({ status: "error", message });
+      showToast(message);
     }
   }
 
@@ -3569,6 +3620,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     generationViewState,
     exportProgress,
     exportArtifact,
+    exportDownload,
     currentStatus,
     workspaceScan,
     currentWorkspace,
@@ -3662,6 +3714,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     changeCurrentSlideLayout,
     renderDeckHtml,
     exportFile,
+    downloadExportArtifact: downloadCurrentExportArtifact,
     returnToOutlineFromGeneration,
     returnToBriefFromUploadedSourceAnalysis,
     regenerateDeck,

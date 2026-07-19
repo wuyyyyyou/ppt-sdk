@@ -51,8 +51,16 @@ export interface DeckReviewRenderState {
 export interface ExportArtifact {
   type: "PPTX" | "PDF";
   path: string;
-  href: string;
   fileName?: string;
+  updatedAt: string;
+  mirrorStatus: "ready" | "missing" | "stale";
+}
+
+export interface ExportDownloadState {
+  status: "idle" | "preparing" | "ready" | "error";
+  message: string;
+  href?: string;
+  expiresAt?: string | null;
 }
 
 export interface ExportProgressState {
@@ -112,6 +120,7 @@ export interface DeckWorkspaceState {
   generationViewState: GenerationViewState;
   exportProgress: ExportProgressState;
   exportArtifact: ExportArtifact | null;
+  exportDownload: ExportDownloadState;
   currentStatus: string;
   workspaceScan: ListWorkspacesResult | null;
   currentWorkspace: WorkspaceResult | null;

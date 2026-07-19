@@ -9,6 +9,7 @@ import path from "node:path";
 import { Readable } from "node:stream";
 
 import { parseHostUploadConfirmation } from "./host-upload-confirmation.js";
+import { ApsFilesClient, ApsFilesError } from "./aps-files-client.js";
 
 import {
   appendAppWorkspaceLog,
@@ -17,7 +18,9 @@ import {
   createAppWorkspace,
   duplicateAppWorkspacePage,
   ensureConfirmedOutlinePageIds,
-  getAppExportArtifact,
+  createAppExportArtifactSnapshot,
+  commitAppExportArtifactMirror,
+  getAppExportArtifactMirrorStatus,
   exportAppPdf,
   forkTemplateGroup,
   getAppWorkspaceDefaults,
@@ -264,6 +267,23 @@ class ExecutaHostUploadClient {
 }
 
 const hostUploadClient = new ExecutaHostUploadClient();
+const apsFilesClient = new ApsFilesClient({
+  writeFrame: (message) => writeStdoutLine(JSON.stringify(message)),
+});
+const exportMirrorPublishQueues = new Map();
+
+async function withExportMirrorPublishQueue(queueKey, operation) {
+  const previous = exportMirrorPublishQueues.get(queueKey) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  exportMirrorPublishQueues.set(queueKey, current);
+  try {
+    return await current;
+  } finally {
+    if (exportMirrorPublishQueues.get(queueKey) === current) {
+      exportMirrorPublishQueues.delete(queueKey);
+    }
+  }
+}
 
 function formatRpcId(id) {
   if (id === null) {
@@ -392,16 +412,6 @@ const STYLE_GUIDE_STAGING_DIR = path.join(
   "style-guide-staging",
 );
 
-function getArtifactContentType(artifactType) {
-  if (artifactType === "pptx") {
-    return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-  }
-  if (artifactType === "pdf") {
-    return "application/pdf";
-  }
-  return "application/octet-stream";
-}
-
 function assertSafeUploadFilename(filename) {
   if (typeof filename !== "string" || filename.trim().length === 0) {
     throw new Error('"filename" must be a non-empty string');
@@ -411,6 +421,19 @@ function assertSafeUploadFilename(filename) {
     throw new Error('"filename" must not contain path separators');
   }
   return trimmed;
+}
+
+function buildAttachmentContentDisposition(filename) {
+  assertSafeUploadFilename(filename);
+  const baseName = path.basename(filename);
+  const fallback = baseName
+    .replace(/[^\x20-\x7e]/g, "_")
+    .replace(/["\\]/g, "_") || "download";
+  const encoded = encodeURIComponent(baseName).replace(
+    /['()*]/g,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
 }
 
 function readHostUploadRefArg(args, parameterName = "host_upload") {
@@ -1997,6 +2020,116 @@ async function toolAppGetPptxExportStatus(args) {
   });
 }
 
+async function toolAppPublishExportArtifact(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const artifactType = args.artifact_type;
+  if (artifactType !== "pptx" && artifactType !== "pdf") {
+    throw new Error('"artifact_type" must be "pptx" or "pdf"');
+  }
+
+  return withExportMirrorPublishQueue(`${workspaceDir}\0${artifactType}`, async () => {
+    const current = await getAppExportArtifactMirrorStatus({
+      workspace_dir: workspaceDir,
+      artifact_type: artifactType,
+    });
+    if (current.status === "ready") {
+      return {
+        status: "ready",
+        artifact: current.artifact,
+        mirror: current.mirror,
+        published: false,
+      };
+    }
+
+    const snapshot = await createAppExportArtifactSnapshot({
+      workspace_dir: workspaceDir,
+      artifact_type: artifactType,
+    });
+    try {
+      const upload = await apsFilesClient.uploadBegin({
+        path: snapshot.mirror_path,
+        sizeBytes: snapshot.size_bytes,
+        contentType: snapshot.content_type,
+        scope: "app",
+        metadata: {
+          workspace_id: snapshot.workspace_id,
+          artifact_type: snapshot.artifact_type,
+          source_updated_at: snapshot.updated_at,
+          source_sha256: snapshot.source_sha256,
+        },
+      });
+      if (!upload || typeof upload.put_url !== "string" || upload.put_url.length === 0) {
+        throw new Error("files/upload_begin did not return a valid put_url");
+      }
+      const contentDisposition = buildAttachmentContentDisposition(snapshot.filename);
+      const putResponse = await fetch(upload.put_url, {
+        method: "PUT",
+        headers: {
+          ...(upload.headers ?? {}),
+          "Content-Length": String(snapshot.size_bytes),
+          "Content-Disposition": contentDisposition,
+        },
+        body: createReadStream(snapshot.snapshot_path),
+        duplex: "half",
+      });
+      if (!putResponse.ok) {
+        const message = await putResponse.text().catch(() => "");
+        throw new Error(message || `APS Files PUT failed: HTTP ${putResponse.status}`);
+      }
+      const putEtag = putResponse.headers.get("etag") ?? undefined;
+      const completed = await apsFilesClient.uploadComplete({
+        path: snapshot.mirror_path,
+        etag: putEtag,
+        sizeBytes: snapshot.size_bytes,
+        contentType: snapshot.content_type,
+        scope: "app",
+      });
+      const mirror = {
+        provider: "aps.files",
+        scope: "app",
+        path: snapshot.mirror_path,
+        etag: typeof completed?.etag === "string" ? completed.etag : putEtag ?? "",
+        size_bytes: Number.isFinite(Number(completed?.size_bytes))
+          ? Math.floor(Number(completed.size_bytes))
+          : snapshot.size_bytes,
+        content_type: snapshot.content_type,
+        content_disposition: contentDisposition,
+        source_updated_at: snapshot.updated_at,
+        source_sha256: snapshot.source_sha256,
+        published_at: new Date().toISOString(),
+      };
+      const committed = await commitAppExportArtifactMirror({
+        workspace_dir: workspaceDir,
+        artifact_type: artifactType,
+        expected_updated_at: snapshot.updated_at,
+        expected_sha256: snapshot.source_sha256,
+        mirror,
+      });
+      return {
+        status: "ready",
+        artifact: {
+          workspace_dir: snapshot.workspace_dir,
+          workspace_id: snapshot.workspace_id,
+          title: snapshot.title,
+          artifact_type: snapshot.artifact_type,
+          path: snapshot.path,
+          filename: snapshot.filename,
+          updated_at: snapshot.updated_at,
+          mirror: committed,
+        },
+        mirror: committed,
+        published: true,
+      };
+    } finally {
+      await unlink(snapshot.snapshot_path).catch(() => undefined);
+    }
+  });
+}
+
 async function toolAppGetExportArtifactDownloadUrl(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -2008,20 +2141,36 @@ async function toolAppGetExportArtifactDownloadUrl(args) {
     throw new Error('"artifact_type" must be "pptx" or "pdf"');
   }
 
-  const artifact = await getAppExportArtifact({
+  const status = await getAppExportArtifactMirrorStatus({
     workspace_dir: workspaceDir,
     artifact_type: artifactType,
   });
-  const downloadUpload = await uploadLocalFileToHost({
-    filePath: artifact.path,
-    filename: artifact.filename,
-    mimeType: getArtifactContentType(artifact.artifact_type),
-    purpose: "user_artifact",
+  if (status.status !== "ready" || !status.mirror) {
+    return {
+      status: status.status,
+      reason: status.reason,
+      artifact: status.artifact,
+      mirror: status.mirror,
+      download_url: null,
+      expires_at: null,
+    };
+  }
+  const download = await apsFilesClient.downloadUrl({
+    path: status.mirror.path,
+    expiresIn: 600,
+    scope: "app",
   });
+  if (!download || typeof download.url !== "string" || download.url.length === 0) {
+    throw new Error("files/download_url did not return a valid URL");
+  }
 
   return {
-    ...artifact,
-    download_upload: downloadUpload,
+    status: "ready",
+    reason: null,
+    artifact: status.artifact,
+    mirror: status.mirror,
+    download_url: download.url,
+    expires_at: typeof download.expires_at === "string" ? download.expires_at : null,
   };
 }
 
@@ -2311,6 +2460,7 @@ const TOOL_DISPATCH = {
   app_render_deck_html: toolAppRenderDeckHtml,
   app_start_pptx_export_model: toolAppStartPptxExportModel,
   app_get_pptx_export_status: toolAppGetPptxExportStatus,
+  app_publish_export_artifact: toolAppPublishExportArtifact,
   app_get_export_artifact_download_url: toolAppGetExportArtifactDownloadUrl,
   app_prepare_export_model: toolAppPrepareExportModel,
   app_export_pdf: toolAppExportPdf,
@@ -2399,7 +2549,7 @@ async function handleInvoke(id, params = {}) {
     const data = await fn(args);
     return makeResponse(id, { success: true, data, tool });
   } catch (error) {
-    if (error instanceof HostUploadError) {
+    if (error instanceof HostUploadError || error instanceof ApsFilesError) {
       return makeResponse(id, undefined, {
         code: error.code,
         message: error.message,
@@ -2441,6 +2591,9 @@ async function handleRequest(request) {
           version: MANIFEST.version,
         },
         client_capabilities: protocolVersion === PROTOCOL_VERSION_V2 ? { upload: {} } : {},
+        capabilities: protocolVersion === PROTOCOL_VERSION_V2
+          ? { storage: { files: true } }
+          : {},
       });
     }
     case "describe": {
@@ -2498,7 +2651,7 @@ rl.on("line", async (line) => {
 
   const { request, parseErrorResponse } = parseRequestLine(trimmed);
   if (!parseErrorResponse && request && typeof request === "object" && !Array.isArray(request) && !("method" in request)) {
-    if (!hostUploadClient.dispatchResponse(request)) {
+    if (!hostUploadClient.dispatchResponse(request) && !apsFilesClient.dispatchResponse(request)) {
       process.stderr.write(`← unmatched-response id=${formatRpcId(request.id)}\n`);
     }
     return;

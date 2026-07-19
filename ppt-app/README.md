@@ -124,8 +124,11 @@ npm run dev:mock-llm
 npm run dev:mock-llm:retry
 ```
 
-`npm run dev` 会执行 `anna-app dev`，由 Anna App harness 发现
+`npm run dev` 会执行 `anna-app dev --storage aps`，由 Anna App harness 连接真实 APS、发现
 `executas/*/executa.json` 并按需启动对应命令。
+
+本地开发默认已经登录 Anna。APS Files 相关 reverse RPC 需要真实 APS；不要移除
+`--storage aps`，也不要为 APS 不可用的环境增加 Host Upload fallback。
 
 `npm run dev:mock-llm` 使用 `fixtures/mock-outline.jsonl` 作为 mock LLM
 响应，适合稳定测试 outline 生成流程。

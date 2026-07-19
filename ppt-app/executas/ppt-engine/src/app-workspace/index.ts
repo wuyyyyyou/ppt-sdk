@@ -2,7 +2,8 @@ import os from "node:os";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { appendFile, copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { appendFile, copyFile, mkdir, readdir, readFile, rm, stat, unlink, writeFile } from "node:fs/promises";
 import sharp from "sharp";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import type { ErrorObject } from "ajv";
@@ -64,7 +65,10 @@ import type {
   AppPageProgressItem,
   ExportAppPdfInput,
   ExportAppPdfResult,
+  AppExportArtifactMirror,
+  AppExportArtifactMirrorStatus,
   AppExportArtifactInfo,
+  AppExportArtifactSnapshot,
   AppWorkspacePages,
   AppWorkspaceTemplateSelection,
   AppTemplatePlanningBlueprint,
@@ -93,6 +97,7 @@ import type {
   GetAppPagePlanInput,
   GetAppPageProgressInput,
   GetAppExportArtifactInput,
+  CommitAppExportArtifactMirrorInput,
   GetAppWorkspaceDefaultsResult,
   GetAppTemplateGroupInput,
   GetAppTemplatePlanningContextInput,
@@ -766,6 +771,24 @@ const pageProgressWriteQueues = new Map<string, Promise<unknown>>();
 const uploadedSourceWriteQueues = new Map<string, Promise<unknown>>();
 const styleProfileWriteQueues = new Map<string, Promise<unknown>>();
 const themeTokenWriteQueues = new Map<string, Promise<unknown>>();
+const exportArtifactWriteQueues = new Map<string, Promise<unknown>>();
+
+async function withExportArtifactWriteQueue<T>(
+  workspaceDir: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const queueKey = path.normalize(workspaceDir);
+  const previous = exportArtifactWriteQueues.get(queueKey) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  exportArtifactWriteQueues.set(queueKey, current);
+  try {
+    return await current;
+  } finally {
+    if (exportArtifactWriteQueues.get(queueKey) === current) {
+      exportArtifactWriteQueues.delete(queueKey);
+    }
+  }
+}
 
 async function withPageProgressWriteQueue<T>(
   workspaceDir: string,
@@ -5099,30 +5122,33 @@ async function recordWorkspaceExport(
   artifactPath: string,
   extra?: Record<string, unknown>,
 ): Promise<AppWorkspaceResult> {
-  const updatedAt = new Date().toISOString();
-  const existing =
-    workspace.task && typeof workspace.task === "object" && !Array.isArray(workspace.task)
-      ? (workspace.task as Record<string, unknown>)
-      : {};
-  const existingArtifacts =
-    existing.artifacts && typeof existing.artifacts === "object" && !Array.isArray(existing.artifacts)
-      ? (existing.artifacts as Record<string, unknown>)
-      : {};
+  return withExportArtifactWriteQueue(workspace.workspace_dir, async () => {
+    const current = await ensureWorkspaceFiles(workspace.workspace_dir);
+    const updatedAt = new Date().toISOString();
+    const existing =
+      current.task && typeof current.task === "object" && !Array.isArray(current.task)
+        ? (current.task as Record<string, unknown>)
+        : {};
+    const existingArtifacts =
+      existing.artifacts && typeof existing.artifacts === "object" && !Array.isArray(existing.artifacts)
+        ? (existing.artifacts as Record<string, unknown>)
+        : {};
 
-  await writeJsonFile(workspace.files.task, {
-    ...existing,
-    updated_at: updatedAt,
-    artifacts: {
-      ...existingArtifacts,
-      [artifactType]: {
-        path: artifactPath,
-        updated_at: updatedAt,
-        ...extra,
+    await writeJsonFile(current.files.task, {
+      ...existing,
+      updated_at: updatedAt,
+      artifacts: {
+        ...existingArtifacts,
+        [artifactType]: {
+          path: artifactPath,
+          updated_at: updatedAt,
+          ...extra,
+        },
       },
-    },
-  });
+    });
 
-  return ensureWorkspaceFiles(workspace.workspace_dir);
+    return ensureWorkspaceFiles(current.workspace_dir);
+  });
 }
 
 export async function prepareAppExportModel(
@@ -5328,6 +5354,9 @@ export async function getAppExportArtifact(
   }
 
   const workspaceTitle = (await getWorkspaceSummary(workspace.workspace_dir)).title;
+  const updatedAt = typeof artifact.updated_at === "string" && artifact.updated_at.length > 0
+    ? artifact.updated_at
+    : artifactStat.mtime.toISOString();
 
   return {
     workspace_dir: workspace.workspace_dir,
@@ -5336,7 +5365,197 @@ export async function getAppExportArtifact(
     artifact_type: artifactType,
     path: artifactPath,
     filename: `${sanitizeFileNameBase(workspaceTitle || workspace.workspace_id)}.${artifactType}`,
-    updated_at: typeof artifact.updated_at === "string" ? artifact.updated_at : null,
+    updated_at: updatedAt,
+    mirror: normalizeExportArtifactMirror(artifact.mirror),
+  };
+}
+
+function normalizeExportArtifactMirror(value: unknown): AppExportArtifactMirror | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const sizeBytes = Number(record.size_bytes);
+  if (
+    record.provider !== "aps.files" ||
+    record.scope !== "app" ||
+    typeof record.path !== "string" ||
+    record.path.length === 0 ||
+    typeof record.etag !== "string" ||
+    !Number.isFinite(sizeBytes) ||
+    sizeBytes < 0 ||
+    typeof record.content_type !== "string" ||
+    record.content_type.length === 0 ||
+    typeof record.content_disposition !== "string" ||
+    !/^attachment(?:;|$)/i.test(record.content_disposition) ||
+    typeof record.source_updated_at !== "string" ||
+    record.source_updated_at.length === 0 ||
+    typeof record.source_sha256 !== "string" ||
+    !/^[a-f0-9]{64}$/i.test(record.source_sha256) ||
+    typeof record.published_at !== "string" ||
+    record.published_at.length === 0
+  ) {
+    return null;
+  }
+  return {
+    provider: "aps.files",
+    scope: "app",
+    path: record.path,
+    etag: record.etag,
+    size_bytes: Math.floor(sizeBytes),
+    content_type: record.content_type,
+    content_disposition: record.content_disposition,
+    source_updated_at: record.source_updated_at,
+    source_sha256: record.source_sha256.toLowerCase(),
+    published_at: record.published_at,
+  };
+}
+
+function exportArtifactContentType(artifactType: "pptx" | "pdf"): string {
+  return artifactType === "pptx"
+    ? "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    : "application/pdf";
+}
+
+async function sha256FileHex(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = createHash("sha256");
+    const stream = createReadStream(filePath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("error", reject);
+    stream.on("end", () => resolve(hash.digest("hex")));
+  });
+}
+
+function sourceFileChanged(
+  before: { size: number; mtimeMs: number },
+  after: { size: number; mtimeMs: number },
+): boolean {
+  return before.size !== after.size || before.mtimeMs !== after.mtimeMs;
+}
+
+export async function createAppExportArtifactSnapshot(
+  input: GetAppExportArtifactInput,
+): Promise<AppExportArtifactSnapshot> {
+  const artifact = await getAppExportArtifact(input);
+  const before = await stat(artifact.path);
+  const snapshotDir = path.join(os.tmpdir(), "ppt-engine-export-snapshots");
+  const snapshotPath = path.join(
+    snapshotDir,
+    `${artifact.workspace_id}-${artifact.artifact_type}-${randomUUID()}.${artifact.artifact_type}`,
+  );
+  await mkdir(snapshotDir, { recursive: true });
+  try {
+    await copyFile(artifact.path, snapshotPath);
+    const after = await stat(artifact.path);
+    if (sourceFileChanged(before, after)) {
+      throw new Error("Export artifact changed while its upload snapshot was being created");
+    }
+    const [sourceSha256, snapshotStat] = await Promise.all([
+      sha256FileHex(snapshotPath),
+      stat(snapshotPath),
+    ]);
+    return {
+      ...artifact,
+      snapshot_path: snapshotPath,
+      source_sha256: sourceSha256,
+      size_bytes: snapshotStat.size,
+      content_type: exportArtifactContentType(artifact.artifact_type),
+      mirror_path: `workspaces/${artifact.workspace_id}/exports/current.${artifact.artifact_type}`,
+    };
+  } catch (error) {
+    await unlink(snapshotPath).catch(() => undefined);
+    throw error;
+  }
+}
+
+export async function commitAppExportArtifactMirror(
+  input: CommitAppExportArtifactMirrorInput,
+): Promise<AppExportArtifactMirror> {
+  return withExportArtifactWriteQueue(input.workspace_dir, async () => {
+    const artifact = await getAppExportArtifact(input);
+    if (artifact.updated_at !== input.expected_updated_at) {
+      throw new Error("Export artifact changed while its APS mirror was being published");
+    }
+    const sourceSha256 = await sha256FileHex(artifact.path);
+    if (sourceSha256 !== input.expected_sha256.toLowerCase()) {
+      throw new Error("Export artifact content changed while its APS mirror was being published");
+    }
+    if (
+      input.mirror.provider !== "aps.files" ||
+      input.mirror.scope !== "app" ||
+      input.mirror.source_updated_at !== input.expected_updated_at ||
+      input.mirror.source_sha256.toLowerCase() !== input.expected_sha256.toLowerCase()
+    ) {
+      throw new Error("Export artifact mirror does not match the expected source version");
+    }
+
+    const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+    const task = workspace.task && typeof workspace.task === "object" && !Array.isArray(workspace.task)
+      ? (workspace.task as Record<string, unknown>)
+      : {};
+    const artifacts = task.artifacts && typeof task.artifacts === "object" && !Array.isArray(task.artifacts)
+      ? (task.artifacts as Record<string, unknown>)
+      : {};
+    const current = artifacts[input.artifact_type] && typeof artifacts[input.artifact_type] === "object" && !Array.isArray(artifacts[input.artifact_type])
+      ? (artifacts[input.artifact_type] as Record<string, unknown>)
+      : {};
+    if (current.updated_at !== input.expected_updated_at) {
+      throw new Error("Export artifact changed before its APS mirror could be recorded");
+    }
+
+    const mirror = normalizeExportArtifactMirror(input.mirror);
+    if (!mirror) {
+      throw new Error("Export artifact mirror is invalid");
+    }
+    await writeJsonFile(workspace.files.task, {
+      ...task,
+      artifacts: {
+        ...artifacts,
+        [input.artifact_type]: {
+          ...current,
+          mirror,
+        },
+      },
+    });
+    return mirror;
+  });
+}
+
+export async function getAppExportArtifactMirrorStatus(
+  input: GetAppExportArtifactInput,
+): Promise<AppExportArtifactMirrorStatus> {
+  const artifact = await getAppExportArtifact(input);
+  if (!artifact.mirror) {
+    return {
+      status: "missing",
+      reason: "mirror_missing",
+      artifact,
+      mirror: null,
+    };
+  }
+  if (artifact.mirror.source_updated_at !== artifact.updated_at) {
+    return {
+      status: "stale",
+      reason: "artifact_version_changed",
+      artifact,
+      mirror: artifact.mirror,
+    };
+  }
+  const sourceSha256 = await sha256FileHex(artifact.path);
+  if (sourceSha256 !== artifact.mirror.source_sha256) {
+    return {
+      status: "stale",
+      reason: "source_hash_changed",
+      artifact,
+      mirror: artifact.mirror,
+    };
+  }
+  return {
+    status: "ready",
+    reason: null,
+    artifact,
+    mirror: artifact.mirror,
   };
 }
 

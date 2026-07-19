@@ -359,6 +359,21 @@ _Avoid_: Regenerate, Restart — those discard accepted pages and start the whol
 **Deck Generation Cancellation**:
 The user action that asks an Active Deck Generation to stop starting new Page Generation Units and to cooperatively stop active page, research, and final-render work. Work already inside an external operation may return after cancellation, but cancelled work must not be promoted into accepted page content, Research Evidence, or final Deck artifacts; after cancellation settles, unfinished deck work is represented as an Interrupted Deck Generation.
 
+**Export Artifact**:
+A final PPTX or PDF produced from a Workspace for the user to download. The Workspace-owned file remains authoritative even when a separate downloadable copy exists.
+
+**Export Artifact Mirror**:
+An app-private downloadable copy of an Export Artifact. A Workspace has at most one current mirror per export format; replacing it does not create Export History. It is transport for the PPT App rather than a user-owned file shared with other apps.
+_Avoid_: User File, My Files Export
+
+**Export Download Preparation**:
+The process that makes an Export Artifact downloadable by creating its current Export Artifact Mirror. Its failure leaves the Export Artifact intact and may be retried without regenerating the export.
+_Avoid_: Export Generation
+
+**My Files Export**:
+A user-owned copy of an Export Artifact explicitly saved for reuse outside the PPT App. It is distinct from the app-private Export Artifact Mirror and requires an explicit user action.
+_Avoid_: Export Artifact Mirror
+
 **Task State Semantics**:
 The authoritative state-meaning module for the Task State Machine. It derives effective deck/page state, allowed operations, blockers, recommendations, and page progress synchronization from Workspace artifacts such as the Confirmed Outline, manifest, and Page Progress.
 
@@ -399,3 +414,11 @@ Expert: "Every Page Authoring Agent reads the same Workspace Style Guide and app
 Dev: "Is the generated Deck HTML another source that Page Authoring can edit?"
 
 Expert: "No. It is a Rendered HTML Snapshot derived from Page Sources after browser rendering; Page Sources remain authoritative and the snapshot is rebuilt when needed."
+
+Dev: "The PPTX was generated, but Export Download Preparation failed. Should we generate the PPTX again?"
+
+Expert: "No. Keep the Export Artifact and retry only its Export Artifact Mirror."
+
+Dev: "Does publishing that mirror also save the PPTX to My Files?"
+
+Expert: "No. An Export Artifact Mirror is app-private transport. A My Files Export requires a separate explicit user action."

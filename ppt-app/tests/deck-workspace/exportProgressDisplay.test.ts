@@ -46,8 +46,9 @@ describe("Export Progress Display", () => {
     const artifact: ExportArtifact = {
       type: "PPTX",
       path: "/tmp/workspaces/demo/output/deck.pptx",
-      href: "blob:download",
       fileName: "deck.pptx",
+      updatedAt: "2026-07-18T10:00:00Z",
+      mirrorStatus: "ready",
     };
 
     assert.deepEqual(createArtifactExportProgress(messages.en, artifact), {

@@ -111,7 +111,7 @@ cd ppt-app && npm run dev:mock-llm
 cd ppt-app && npm run dev:mock-llm:retry
 ```
 
-`npm run dev` 仍然是正式的本地入口，但只在用户明确要求时配合使用。
+`npm run dev` 仍然是正式的本地入口，并固定使用 `anna-app dev --storage aps` 连接真实 APS；只在用户明确要求时配合使用。
 
 `ppt-engine` 里常用命令是：
 

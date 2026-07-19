@@ -40,7 +40,7 @@ Agent 启动插件后会尝试调用 `initialize`：
     "protocolVersion": "2.0",
     "serverInfo": { "name": "my-tool", "version": "0.1.0" },
     "capabilities": {
-      "storage": {}
+      "storage": { "files": true }
     }
   }
 }
@@ -56,18 +56,14 @@ Agent 启动插件后会尝试调用 `initialize`：
 {
   "name": "tool-yourhandle-ppt-engine-abcd1234",
   "version": "1.0.0",
-  "host_capabilities": ["storage.tool", "storage.app"],
+  "host_capabilities": ["aps.files"],
   "tools": []
 }
 ```
 
-可用声明：
+`aps.files` 解锁 `files/*` reverse RPC。对象实际写入 `user`、`app` 还是 `tool` scope，由每次 `files/*` 调用的 `scope` 参数决定，而不是通过不同的 manifest capability 区分。当前协议以 `anna-executa-examples/examples/anna-app-aps-files-demo` 为准；旧 staging 文档中的 `storage.user`、`storage.app`、`storage.tool` 声明不再作为实现依据。
 
-- `storage.tool`：解锁 tool-private APS。
-- `storage.app`：解锁 App scope APS。
-- `storage.user`：解锁 user drive scope APS。
-
-只声明需要的 scope。没有 manifest 声明时，Nexus 会在 gate 层拒绝对应 reverse RPC。
+没有 `aps.files` manifest 声明时，Nexus 会在 gate 层拒绝对应 reverse RPC；调用仍应只请求业务实际需要的 scope。
 
 ### 3. 用户 grant
 
@@ -274,5 +270,6 @@ staging 文档中看到的关键限制：
 - 插件必须是长运行进程，持续读 stdin，不能处理一条请求后退出。
 - stdout 只能写 JSON-RPC frame；日志写 stderr。
 - reverse RPC 与普通 invoke response 共用 stdin/stdout，手写实现时需要单 reader + response dispatch。
+- Files client 不应在本地等待 `initialize` 后再自行 enable；它应直接发送 `files/*` reverse RPC，由 host 根据 manifest capability、storage token 和 scope 做权威校验。`initialize` response 仍声明 `capabilities.storage.files`，但不作为客户端本地开关。
 - 优先使用 SDK 的 APS/storage client；不要在业务函数里自己乱写协议帧。
 - 大文件只返回引用，不返回 bytes。

@@ -1454,13 +1454,51 @@ export interface GetExportArtifactDownloadUrlInput {
   artifact_type: "pptx" | "pdf";
 }
 
-export interface ExportArtifactDownloadUrlResult {
+export interface ExportArtifactMirror {
+  provider: "aps.files";
+  scope: "app";
+  path: string;
+  etag: string;
+  size_bytes: number;
+  content_type: string;
+  content_disposition: string;
+  source_updated_at: string;
+  source_sha256: string;
+  published_at: string;
+}
+
+export interface ExportArtifactInfo {
   workspace_dir: string;
   workspace_id: string;
   title: string;
   artifact_type: "pptx" | "pdf";
   path: string;
   filename: string;
-  updated_at: string | null;
-  download_upload: HostUploadRef;
+  updated_at: string;
+  mirror: ExportArtifactMirror | null;
 }
+
+export interface PublishExportArtifactResult {
+  status: "ready";
+  artifact: ExportArtifactInfo;
+  mirror: ExportArtifactMirror;
+  published: boolean;
+}
+
+export type ExportArtifactDownloadUrlResult =
+  | {
+      status: "ready";
+      reason: null;
+      artifact: ExportArtifactInfo;
+      mirror: ExportArtifactMirror;
+      download_url: string;
+      expires_at: string | null;
+    }
+  | {
+      status: "missing" | "stale";
+      reason: "mirror_missing" | "artifact_version_changed" | "source_hash_changed";
+      artifact: ExportArtifactInfo;
+      mirror: ExportArtifactMirror | null;
+      download_url: null;
+      expires_at: null;
+    };

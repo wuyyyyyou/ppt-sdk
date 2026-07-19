@@ -297,4 +297,64 @@ describe("Anna PPT Backend", () => {
       "app_confirm_workspace_outline",
     ]);
   });
+
+  it("separates Export Artifact Mirror publication from download URL minting", async () => {
+    setToolIds();
+    const calls: Array<{ method?: unknown; args?: unknown }> = [];
+    const mirror = {
+      provider: "aps.files" as const,
+      scope: "app" as const,
+      path: "workspaces/demo/exports/current.pptx",
+      etag: "etag-1",
+      size_bytes: 12,
+      content_type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      source_updated_at: "2026-07-18T10:00:00Z",
+      source_sha256: "a".repeat(64),
+      published_at: "2026-07-18T10:00:01Z",
+    };
+    const artifact = {
+      workspace_dir: "/tmp/workspaces/demo",
+      workspace_id: "demo",
+      title: "Demo",
+      artifact_type: "pptx" as const,
+      path: "/tmp/workspaces/demo/output/deck.pptx",
+      filename: "Demo.pptx",
+      updated_at: mirror.source_updated_at,
+      mirror,
+    };
+    const backend = createAnnaPptBackend(createRuntimeWithInvoke(async (input) => {
+      calls.push(input as { method?: unknown; args?: unknown });
+      return {
+        success: true,
+        data: input.method === "app_publish_export_artifact"
+          ? { status: "ready", artifact, mirror, published: true }
+          : {
+              status: "ready",
+              reason: null,
+              artifact,
+              mirror,
+              download_url: "https://storage.example/current.pptx",
+              expires_at: "soon",
+            },
+      };
+    }));
+
+    await backend.publishExportArtifact({
+      workspace_dir: artifact.workspace_dir,
+      artifact_type: "pptx",
+    });
+    await backend.getExportArtifactDownloadUrl({
+      workspace_dir: artifact.workspace_dir,
+      artifact_type: "pptx",
+    });
+
+    assert.deepEqual(calls.map((call) => call.method), [
+      "app_publish_export_artifact",
+      "app_get_export_artifact_download_url",
+    ]);
+    assert.deepEqual(calls[0]?.args, {
+      workspace_dir: artifact.workspace_dir,
+      artifact_type: "pptx",
+    });
+  });
 });

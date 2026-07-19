@@ -198,9 +198,11 @@ export function App() {
               t={t}
               progress={state.exportProgress}
               artifact={state.exportArtifact}
+              download={state.exportDownload}
               loading={state.loading}
               onBack={actions.goBack}
               onExport={actions.exportFile}
+              onDownload={actions.downloadExportArtifact}
             />
           ) : null}
 

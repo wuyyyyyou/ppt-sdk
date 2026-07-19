@@ -382,6 +382,14 @@ export interface Messages {
     noFile: string;
     download: string;
     downloadPreparing: string;
+    prepareDownload: string;
+    retryDownloadPreparation: string;
+    downloadNotPrepared: string;
+    downloadReady: string;
+    downloadLinkLabel: string;
+    copyDownloadLink: string;
+    downloadLinkCopied: string;
+    downloadCopyHint: string;
     pptxPreparingModel: string;
     pptxModelReady: string;
     pptxGenerating: string;
@@ -829,6 +837,14 @@ export const messages: Record<Locale, Messages> = {
       noFile: "No export file ready",
       download: "Download",
       downloadPreparing: "Preparing download...",
+      prepareDownload: "Prepare download",
+      retryDownloadPreparation: "Retry download preparation",
+      downloadNotPrepared: "Download link is not prepared yet.",
+      downloadReady: "Download link ready.",
+      downloadLinkLabel: "Download link",
+      copyDownloadLink: "Copy download link",
+      downloadLinkCopied: "Download link copied. Paste it into your browser address bar to download.",
+      downloadCopyHint: "Copy the download link manually, then paste it into your browser address bar.",
       pptxPreparingModel: "Preparing PPTX model",
       pptxModelReady: "PPTX model ready",
       pptxGenerating: "Generating PPTX file",
@@ -1271,6 +1287,14 @@ export const messages: Record<Locale, Messages> = {
       noFile: "暂无可下载文件",
       download: "下载",
       downloadPreparing: "准备下载...",
+      prepareDownload: "准备下载",
+      retryDownloadPreparation: "重试准备下载",
+      downloadNotPrepared: "下载链接尚未准备。",
+      downloadReady: "下载链接已准备。",
+      downloadLinkLabel: "下载链接",
+      copyDownloadLink: "复制下载链接",
+      downloadLinkCopied: "下载链接已复制，请粘贴到浏览器地址栏中下载。",
+      downloadCopyHint: "请手动复制下载链接，并粘贴到浏览器地址栏中打开。",
       pptxPreparingModel: "正在准备 PPTX 模型",
       pptxModelReady: "PPTX 模型已准备",
       pptxGenerating: "正在生成 PPTX 文件",

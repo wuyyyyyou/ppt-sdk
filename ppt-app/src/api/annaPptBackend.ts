@@ -4,6 +4,7 @@ import type {
   AppendWorkspaceLogResult,
   ExportPdfInput,
   ExportArtifactDownloadUrlResult,
+  PublishExportArtifactResult,
   ExportPdfResult,
   GeneratePptxInput,
   GeneratePptxResult,
@@ -650,6 +651,15 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         workspace_dir: input.workspace_dir,
         pdf_path: input.pdfPath,
       }),
+    publishExportArtifact: (input) =>
+      invoke<PublishExportArtifactResult>(
+        toolIds.pptEngine,
+        "app_publish_export_artifact",
+        {
+          workspace_dir: input.workspace_dir,
+          artifact_type: input.artifact_type,
+        }
+      ),
     getExportArtifactDownloadUrl: (input) =>
       invoke<ExportArtifactDownloadUrlResult>(
         toolIds.pptEngine,

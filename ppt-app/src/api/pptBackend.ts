@@ -36,6 +36,7 @@ import type {
   ExportPdfInput,
   ExportPdfResult,
   ExportArtifactDownloadUrlResult,
+  PublishExportArtifactResult,
   FinalizeResearchVisualAssetsResult,
   RecordDeckReviewInput,
   RecordPagePlanInput,
@@ -295,6 +296,9 @@ export interface PptBackend {
   exportPdf(input: ExportPdfInput): Promise<ExportPdfResult>;
   recordPptxExport(input: RecordPptxExportInput): Promise<WorkspaceResult>;
   recordPdfExport(input: RecordPdfExportInput): Promise<WorkspaceResult>;
+  publishExportArtifact(
+    input: GetExportArtifactDownloadUrlInput
+  ): Promise<PublishExportArtifactResult>;
   getExportArtifactDownloadUrl(
     input: GetExportArtifactDownloadUrlInput
   ): Promise<ExportArtifactDownloadUrlResult>;

@@ -4,7 +4,8 @@
   "description": "Anna Executa plugin for Workspace Authoring Kit setup, manifest-based deck HTML generation, and deck HTML to PPTX model conversion.",
   "author": "Anna Developer",
   "host_capabilities": [
-    "host.upload"
+    "host.upload",
+    "aps.files"
   ],
   "tools": [
     {
@@ -1410,8 +1411,26 @@
       ]
     },
     {
+      "name": "app_publish_export_artifact",
+      "description": "Publish or reuse the current recorded PPTX or PDF as an app-scoped APS Files Export Artifact Mirror without minting a download URL.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "artifact_type",
+          "type": "string",
+          "description": "Export artifact type. Supports pptx and pdf.",
+          "required": true
+        }
+      ]
+    },
+    {
       "name": "app_get_export_artifact_download_url",
-      "description": "Upload a recorded PPTX or PDF export artifact via Host Upload and return a structured download_upload reference.",
+      "description": "Read the current APS Files Export Artifact Mirror status and mint a short-lived download URL only when the mirror is current.",
       "parameters": [
         {
           "name": "workspace_dir",
