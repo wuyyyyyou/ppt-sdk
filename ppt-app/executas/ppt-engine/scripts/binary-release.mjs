@@ -161,6 +161,29 @@ async function verifyBrowserRuntime(extractDir, platformKey) {
   return { executablePath, metadata };
 }
 
+async function verifyExternalAppRuntime(extractDir, toolManifest) {
+  const appRoot = path.join(extractDir, "lib", "app");
+  await assertDirectory(appRoot, "external app runtime");
+  await assertDirectory(path.join(appRoot, "dist"), "external app dist");
+  await assertDirectory(path.join(appRoot, "node_modules"), "external app node_modules");
+  await assertFile(path.join(appRoot, "example_plugin.js"), "external app entrypoint");
+  await assertFile(path.join(appRoot, "package.json"), "external app package manifest");
+  await assertFile(path.join(appRoot, "manifest.json"), "external app tool manifest");
+  await assertFile(path.join(appRoot, "dist", "index.js"), "external app engine entry");
+
+  const packagedToolManifest = await readJson(path.join(appRoot, "manifest.json"));
+  if (packagedToolManifest.display_name !== toolManifest.display_name) {
+    throw new Error(
+      `External app display_name mismatch: expected ${toolManifest.display_name}, got ${packagedToolManifest.display_name}`,
+    );
+  }
+  if (packagedToolManifest.version !== toolManifest.version) {
+    throw new Error(
+      `External app version mismatch: expected ${toolManifest.version}, got ${packagedToolManifest.version}`,
+    );
+  }
+}
+
 async function readStdin() {
   const chunks = [];
   for await (const chunk of process.stdin) {
@@ -195,6 +218,7 @@ export async function verifyArchiveDirectory({ toolManifest, extractDir, platfor
 
   const binaryFileName = platformKey.startsWith("windows-") ? WINDOWS_BINARY_NAME : BINARY_NAME;
   await assertFile(path.join(extractDir, "bin", binaryFileName), "binary entrypoint");
+  await verifyExternalAppRuntime(extractDir, toolManifest);
   await verifyBrowserRuntime(extractDir, platformKey);
 
   const distributionManifest = await readJson(path.join(extractDir, "manifest.json"));

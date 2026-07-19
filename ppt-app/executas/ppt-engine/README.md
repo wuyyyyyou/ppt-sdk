@@ -76,11 +76,11 @@ npm run build:full
 - 这是当前平台构建。例如在 Apple Silicon macOS 上执行，产出 `darwin-arm64` 分发包。
 - GitHub release workflow 会构建 `darwin-x86_64`、`darwin-arm64`、`windows-x86_64` 和 `linux-x86_64`。`ppt-engine` 暂不发布 `linux-aarch64`，其他 Executa 的平台范围不受影响。
 - `bundle/` 只保留最终 archive 和 sha256，不再保留中间裸二进制。
-- archive 内部包含 `bin/ppt-engine`、`lib/browser/` 下与固定 Puppeteer revision 匹配的完整 Chrome for Testing、`data/` 和顶层 binary distribution `manifest.json`。运行时不要求目标机器预装 Chrome，也不会首次联网下载浏览器。
+- archive 内部包含 bootstrap-only SEA（仅含启动器的 SEA）`bin/ppt-engine`、原样安装的 `lib/app/` 应用运行时、`lib/browser/` 下与固定 Puppeteer revision 匹配的完整 Chrome for Testing、`data/` 和顶层 binary distribution `manifest.json`。运行时不要求目标机器预装 Node.js 或 Chrome，也不会首次联网下载浏览器。
 - `manifest.json` 名称有两层含义：本目录下的 Executa tool manifest 是 `describe` 的来源；archive 顶层 manifest 是 Anna Binary 分发入口配置。
-- 打包脚本的 `--test` 会解压最终 archive，校验 binary distribution manifest 和浏览器资源，在隔离的 SEA v2 缓存中并发启动多个 `describe` 进程，并通过真实 JSON-RPC 调用完成单页 HTML、PNG 和 PPTX Model 冒烟。
+- 打包脚本的 `--test` 会解压最终 archive，校验 binary distribution manifest、`lib/app/` 和浏览器资源，并发启动多个 `describe` 进程，并通过真实 JSON-RPC 调用完成单页 HTML、PNG 和 PPTX Model 冒烟。
 - release workflow 会先生成一次模板预览图 artifact，各平台二进制构建通过 `--reuse-template-previews` 复用这份静态资源；本地直接运行脚本时默认仍会重新生成预览图。
-- 二进制首次运行时会把内嵌的 `dist`、运行时依赖和模板资源解包到版本化共享缓存。每个进程先写独立 staging，校验完成后原子发布，避免并发首次启动破坏正式缓存；浏览器不进入 SEA 缓存。
+- SEA 只提供 Node.js runtime 和最小启动器；启动器通过 `process.execPath` 定位相邻的 `lib/app/example_plugin.js` 并直接加载。应用文件由 Anna Binary 安装过程随 archive 一次解压，不再在首次启动时生成 SEA 二次解包缓存。
 - `linux-x86_64` 的运行基线是 Ubuntu 22.04 兼容的 glibc Linux。Binary 提供 Chrome，但不捆绑 glibc、NSS、GTK、GBM 等系统动态库，也不支持 Alpine/musl 或缺少 Chrome 基础运行库的极简镜像。
 
 ## 主要工具能力

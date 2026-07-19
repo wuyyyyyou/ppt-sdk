@@ -283,7 +283,7 @@ for (const group of groups) {
 console.log(`Verified ${imageCount} template preview image(s) across ${groups.length} group(s).`);
 '
 
-echo "[3/8] Preparing SEA app bundle..."
+echo "[3/8] Preparing external app runtime and SEA bootstrap..."
 PRESENTON_TEMPLATE_ENGINE_SEA_PREP_DIR="$SEA_PREP_DIR" node ./scripts/prepare-sea-bundle.mjs
 
 echo "[4/8] Generating SEA blob..."
@@ -330,6 +330,8 @@ echo "[6/8] Staging Anna Binary distribution package..."
 mkdir -p "$RELEASE_STAGE_DIR/bin" "$RELEASE_STAGE_DIR/lib" "$RELEASE_STAGE_DIR/data"
 cp "$OUTPUT_PATH" "$RELEASE_STAGE_DIR/bin/$OUTPUT_NAME"
 chmod 755 "$RELEASE_STAGE_DIR/bin/$OUTPUT_NAME" || true
+mkdir -p "$RELEASE_STAGE_DIR/lib/app"
+cp -R "$SEA_PREP_DIR/app/." "$RELEASE_STAGE_DIR/lib/app/"
 mkdir -p "$RELEASE_STAGE_DIR/lib/browser"
 cp -R "$BROWSER_RUNTIME_DIR/." "$RELEASE_STAGE_DIR/lib/browser/"
 node ./scripts/binary-release.mjs write-manifest \

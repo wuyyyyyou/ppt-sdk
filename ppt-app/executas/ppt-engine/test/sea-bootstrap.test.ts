@@ -1,171 +1,81 @@
-import { createHash } from "node:crypto";
-import { spawn } from "node:child_process";
-import {
-  mkdir,
-  mkdtemp,
-  readFile,
-  readdir,
-  rm,
-  stat,
-  writeFile,
-} from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
 import assert from "node:assert/strict";
 
 const require = createRequire(import.meta.url);
 const {
-  CACHE_SCHEMA_VERSION,
-  ensureExtractedApp,
-  resolveBundleFilePath,
+  assertExternalAppLayout,
+  importExternalApp,
+  resolveDistributionRoot,
+  resolveExternalAppLayout,
 } = require("../scripts/sea-bootstrap.cjs") as {
-  CACHE_SCHEMA_VERSION: number;
-  ensureExtractedApp: (options: {
-    cacheRoot: string;
-    manifestContent: string;
-    readAssetBuffer: (assetKey: string) => Buffer;
-  }) => { bundleId: string; bundleRoot: string; entryPath: string };
-  resolveBundleFilePath: (bundleRoot: string, relativePath: string) => string;
+  assertExternalAppLayout: (layout: ExternalAppLayout) => ExternalAppLayout;
+  importExternalApp: (binaryPath: string) => Promise<void>;
+  resolveDistributionRoot: (binaryPath: string) => string;
+  resolveExternalAppLayout: (binaryPath: string) => ExternalAppLayout;
 };
 
-const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
-const WORKER_PATH = path.join(TEST_DIR, "fixtures", "sea-cache-worker.cjs");
+type ExternalAppLayout = {
+  distributionRoot: string;
+  appRoot: string;
+  entryPath: string;
+  packageManifestPath: string;
+  toolManifestPath: string;
+};
 
-async function makeFixture() {
-  const root = await mkdtemp(path.join(os.tmpdir(), "ppt-engine-sea-cache-test-"));
-  const cacheRoot = path.join(root, "cache");
-  const assetRoot = path.join(root, "assets");
-  const manifestPath = path.join(root, "manifest.json");
-  const files = [
-    { relativePath: "example_plugin.js", content: "export const marker = 'entry';\n", mode: 0o644 },
-    { relativePath: "package.json", content: "{\"type\":\"module\"}\n", mode: 0o644 },
-    { relativePath: "dist/index.js", content: "export const value = 42;\n", mode: 0o644 },
-  ];
-
-  await mkdir(assetRoot, { recursive: true });
-  for (const file of files) {
-    const assetPath = path.join(assetRoot, file.relativePath);
-    await mkdir(path.dirname(assetPath), { recursive: true });
-    await writeFile(assetPath, file.content, "utf8");
-  }
-
-  const manifest = {
-    entry: "example_plugin.js",
-    files: files.map((file) => ({
-      assetKey: `app/${file.relativePath}`,
-      relativePath: file.relativePath,
-      mode: file.mode,
-      sha256: createHash("sha256").update(file.content).digest("hex"),
-    })),
-  };
-  const manifestContent = `${JSON.stringify(manifest, null, 2)}\n`;
-  await writeFile(manifestPath, manifestContent, "utf8");
-
-  return { root, cacheRoot, assetRoot, manifestPath, manifestContent };
+async function makeDistributionFixture() {
+  const distributionRoot = await mkdtemp(path.join(os.tmpdir(), "ppt-engine-external-app-test-"));
+  const binaryPath = path.join(distributionRoot, "bin", "ppt-engine");
+  const appRoot = path.join(distributionRoot, "lib", "app");
+  await mkdir(path.dirname(binaryPath), { recursive: true });
+  await mkdir(appRoot, { recursive: true });
+  await writeFile(binaryPath, "binary placeholder", "utf8");
+  await writeFile(path.join(appRoot, "package.json"), '{"type":"module"}\n', "utf8");
+  await writeFile(path.join(appRoot, "manifest.json"), '{"display_name":"ppt-engine"}\n', "utf8");
+  await writeFile(
+    path.join(appRoot, "example_plugin.js"),
+    "globalThis.__PPT_ENGINE_EXTERNAL_APP_TEST__ = (globalThis.__PPT_ENGINE_EXTERNAL_APP_TEST__ ?? 0) + 1;\n",
+    "utf8",
+  );
+  return { distributionRoot, binaryPath, appRoot };
 }
 
-function runWorker(input: {
-  cacheRoot: string;
-  manifestPath: string;
-  assetRoot: string;
-}): Promise<{ bundleId: string; bundleRoot: string; entryPath: string }> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [
-      WORKER_PATH,
-      input.cacheRoot,
-      input.manifestPath,
-      input.assetRoot,
-    ], {
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => { stdout += chunk; });
-    child.stderr.on("data", (chunk) => { stderr += chunk; });
-    child.on("error", reject);
-    child.on("close", (code) => {
-      if (code !== 0) {
-        reject(new Error(`SEA cache worker exited with ${code}: ${stderr}`));
-        return;
-      }
-      resolve(JSON.parse(stdout.trim()));
-    });
-  });
-}
+test("SEA bootstrap resolves the external app beside the Binary distribution", async () => {
+  const fixture = await makeDistributionFixture();
+  const layout = resolveExternalAppLayout(fixture.binaryPath);
+  const realDistributionRoot = await realpath(fixture.distributionRoot);
+  const realAppRoot = path.join(realDistributionRoot, "lib", "app");
 
-test("SEA cache schema uses the v2 namespace contract", () => {
-  assert.equal(CACHE_SCHEMA_VERSION, 2);
+  assert.equal(resolveDistributionRoot(fixture.binaryPath), realDistributionRoot);
+  assert.equal(layout.distributionRoot, realDistributionRoot);
+  assert.equal(layout.appRoot, realAppRoot);
+  assert.equal(layout.entryPath, path.join(realAppRoot, "example_plugin.js"));
+  assert.equal(assertExternalAppLayout(layout), layout);
 });
 
-test("SEA cache rejects asset paths that escape the bundle root", () => {
-  assert.throws(
-    () => resolveBundleFilePath("/tmp/bundle", "../outside.js"),
-    /escapes the bundle root/,
+test("SEA bootstrap imports the external ESM app without an extraction cache", async () => {
+  const fixture = await makeDistributionFixture();
+  delete (globalThis as Record<string, unknown>).__PPT_ENGINE_EXTERNAL_APP_TEST__;
+
+  await importExternalApp(fixture.binaryPath);
+
+  assert.equal(
+    (globalThis as Record<string, unknown>).__PPT_ENGINE_EXTERNAL_APP_TEST__,
+    1,
   );
 });
 
-test("SEA cache validates asset checksums before publication", async () => {
-  const fixture = await makeFixture();
-  try {
-    const invalidManifest = JSON.parse(fixture.manifestContent);
-    invalidManifest.files[0].sha256 = "0".repeat(64);
-    assert.throws(
-      () => ensureExtractedApp({
-        cacheRoot: fixture.cacheRoot,
-        manifestContent: `${JSON.stringify(invalidManifest)}\n`,
-        readAssetBuffer(assetKey: string) {
-          return require("node:fs").readFileSync(
-            path.join(fixture.assetRoot, assetKey.replace(/^app\//, "")),
-          );
-        },
-      }),
-      /checksum mismatch/,
-    );
-    const cacheEntries = await readdir(fixture.cacheRoot);
-    assert.deepEqual(cacheEntries, []);
-  } finally {
-    await rm(fixture.root, { recursive: true, force: true });
-  }
-});
+test("SEA bootstrap reports a missing external app entry clearly", async () => {
+  const distributionRoot = await mkdtemp(path.join(os.tmpdir(), "ppt-engine-external-app-missing-"));
+  const binaryPath = path.join(distributionRoot, "bin", "ppt-engine");
+  await mkdir(path.dirname(binaryPath), { recursive: true });
+  await writeFile(binaryPath, "binary placeholder", "utf8");
 
-test("eight processes can publish and reuse one fresh SEA cache concurrently", async () => {
-  const fixture = await makeFixture();
-  try {
-    const results = await Promise.all(Array.from({ length: 8 }, () => runWorker(fixture)));
-    assert.equal(new Set(results.map((result) => result.bundleRoot)).size, 1);
-    assert.equal(new Set(results.map((result) => result.entryPath)).size, 1);
-
-    const bundleRoot = results[0]!.bundleRoot;
-    assert.equal(await readFile(path.join(bundleRoot, ".ready"), "utf8"), results[0]!.bundleId);
-    assert.equal(await readFile(path.join(bundleRoot, "dist", "index.js"), "utf8"), "export const value = 42;\n");
-    assert.ok((await stat(path.join(bundleRoot, "example_plugin.js"))).isFile());
-
-    const cacheEntries = await readdir(fixture.cacheRoot);
-    assert.deepEqual(cacheEntries, [results[0]!.bundleId]);
-  } finally {
-    await rm(fixture.root, { recursive: true, force: true });
-  }
-});
-
-test("an invalid ready cache is quarantined and rebuilt", async () => {
-  const fixture = await makeFixture();
-  try {
-    const first = await runWorker(fixture);
-    await rm(path.join(first.bundleRoot, "example_plugin.js"));
-
-    const repaired = await runWorker(fixture);
-    assert.equal(repaired.bundleRoot, first.bundleRoot);
-    assert.equal(
-      await readFile(path.join(repaired.bundleRoot, "example_plugin.js"), "utf8"),
-      "export const marker = 'entry';\n",
-    );
-    assert.deepEqual(await readdir(fixture.cacheRoot), [first.bundleId]);
-  } finally {
-    await rm(fixture.root, { recursive: true, force: true });
-  }
+  assert.throws(
+    () => assertExternalAppLayout(resolveExternalAppLayout(binaryPath)),
+    /Missing external app entry in the ppt-engine Binary distribution/,
+  );
 });

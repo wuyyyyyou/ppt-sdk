@@ -142,12 +142,15 @@ test("export artifact tools publish through APS Files and mint links without Hos
   }
 });
 
-test("APS Files client is included in package and SEA assets", async () => {
+test("APS Files client is included in the package and external Binary app runtime", async () => {
   const projectDir = fileURLToPath(new URL("..", import.meta.url));
   const packageJson = JSON.parse(await readFile(path.join(projectDir, "package.json"), "utf8")) as {
     files?: string[];
   };
-  const seaScript = await readFile(path.join(projectDir, "scripts", "prepare-sea-bundle.mjs"), "utf8");
+  const binaryAppScript = await readFile(
+    path.join(projectDir, "scripts", "prepare-sea-bundle.mjs"),
+    "utf8",
+  );
   assert.ok(packageJson.files?.includes("aps-files-client.js"));
-  assert.match(seaScript, /"aps-files-client\.js"/);
+  assert.match(binaryAppScript, /"aps-files-client\.js"/);
 });

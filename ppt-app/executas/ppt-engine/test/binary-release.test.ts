@@ -58,6 +58,23 @@ async function writeBrowserRuntime(extractDir: string, platformKey: string) {
   );
 }
 
+async function writeExternalAppRuntime(
+  extractDir: string,
+  toolManifest: { display_name: string; version: string },
+) {
+  const appRoot = path.join(extractDir, "lib", "app");
+  await mkdir(path.join(appRoot, "dist"), { recursive: true });
+  await mkdir(path.join(appRoot, "node_modules"), { recursive: true });
+  await writeFile(path.join(appRoot, "example_plugin.js"), "export {};\n", "utf8");
+  await writeFile(path.join(appRoot, "package.json"), '{"type":"module"}\n', "utf8");
+  await writeFile(path.join(appRoot, "dist", "index.js"), "export {};\n", "utf8");
+  await writeFile(
+    path.join(appRoot, "manifest.json"),
+    `${JSON.stringify({ ...toolManifest, tools: [] }, null, 2)}\n`,
+    "utf8",
+  );
+}
+
 async function runBinaryRelease(args: string[], input?: string) {
   if (input !== undefined) {
     return new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
@@ -154,6 +171,10 @@ test("verify-archive validates structure and top-level manifest", async () => {
   await mkdir(path.join(extractDir, "lib"), { recursive: true });
   await mkdir(path.join(extractDir, "data"), { recursive: true });
   await writeFile(path.join(extractDir, "bin", "ppt-engine"), "", "utf8");
+  await writeExternalAppRuntime(extractDir, {
+    display_name: "ppt-engine",
+    version: "9.8.7",
+  });
   await writeBrowserRuntime(extractDir, "darwin-arm64");
 
   await runBinaryRelease([
@@ -187,6 +208,7 @@ test("verifyArchiveDirectory accepts an empty data directory with a bundled brow
   await mkdir(path.join(extractDir, "lib"), { recursive: true });
   await mkdir(path.join(extractDir, "data"), { recursive: true });
   await writeFile(path.join(extractDir, "bin", "ppt-engine.exe"), "", "utf8");
+  await writeExternalAppRuntime(extractDir, toolManifest);
   await writeBrowserRuntime(extractDir, "windows-x86_64");
   await writeFile(
     path.join(extractDir, "manifest.json"),
@@ -213,6 +235,7 @@ test("verifyArchiveDirectory accepts Linux platform keys", async () => {
   await mkdir(path.join(extractDir, "lib"), { recursive: true });
   await mkdir(path.join(extractDir, "data"), { recursive: true });
   await writeFile(path.join(extractDir, "bin", "ppt-engine"), "", "utf8");
+  await writeExternalAppRuntime(extractDir, toolManifest);
   await writeBrowserRuntime(extractDir, "linux-x86_64");
   await writeFile(
     path.join(extractDir, "manifest.json"),

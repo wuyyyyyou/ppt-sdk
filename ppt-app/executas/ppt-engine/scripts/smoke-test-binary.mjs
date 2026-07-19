@@ -159,7 +159,7 @@ async function main() {
   const fixtureCopy = path.join(workDir, "fixture");
   const renderDir = path.join(workDir, "rendered");
   const modelPath = path.join(workDir, "ppt-model.json");
-  const seaCacheDir = path.join(workDir, "sea-cache-v2");
+  const legacySeaCacheDir = path.join(workDir, "legacy-sea-cache");
 
   await rm(workDir, { recursive: true, force: true });
   await mkdir(workDir, { recursive: true });
@@ -167,11 +167,15 @@ async function main() {
 
   const env = {
     ...process.env,
-    PRESENTON_TEMPLATE_ENGINE_SEA_CACHE_DIR: seaCacheDir,
+    PRESENTON_TEMPLATE_ENGINE_SEA_CACHE_DIR: legacySeaCacheDir,
   };
 
   await verifyBrowserVersion(extractDir);
   await verifyConcurrentDescribe(binaryPath, env);
+  const legacyCacheStat = await stat(legacySeaCacheDir).catch(() => null);
+  if (legacyCacheStat) {
+    throw new Error(`Binary unexpectedly created the legacy SEA extraction cache: ${legacySeaCacheDir}`);
+  }
 
   const renderResponse = await invokeBinary(binaryPath, {
     jsonrpc: "2.0",
