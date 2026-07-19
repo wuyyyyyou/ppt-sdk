@@ -65,7 +65,7 @@ test("Export Artifact Mirror uses a snapshot and becomes stale when the source c
       expected_sha256: snapshot.source_sha256,
       mirror: {
         provider: "aps.files",
-        scope: "tool",
+        scope: "user",
         path: snapshot.mirror_path,
         etag: "etag-1",
         size_bytes: snapshot.size_bytes,
@@ -76,7 +76,7 @@ test("Export Artifact Mirror uses a snapshot and becomes stale when the source c
         published_at: new Date().toISOString(),
       },
     });
-    assert.equal(mirror.scope, "tool");
+    assert.equal(mirror.scope, "user");
     assert.equal((await getAppExportArtifactMirrorStatus({
       workspace_dir: created.workspace_dir,
       artifact_type: "pptx",
@@ -117,7 +117,7 @@ test("an older snapshot cannot be committed after a newer export is recorded", a
         expected_sha256: snapshot.source_sha256,
         mirror: {
           provider: "aps.files",
-          scope: "tool",
+          scope: "user",
           path: snapshot.mirror_path,
           etag: "old-etag",
           size_bytes: snapshot.size_bytes,
@@ -135,7 +135,7 @@ test("an older snapshot cannot be committed after a newer export is recorded", a
   }
 });
 
-test("a legacy app-scoped mirror is treated as missing", async () => {
+test("a legacy tool-scoped mirror is treated as missing", async () => {
   const created = await createAppWorkspace({ title: "Legacy mirror" });
   assertWorkspaceIsIsolated(created.workspace_dir);
   const outputPath = path.join(created.workspace_dir, "output", "deck.pptx");
@@ -153,7 +153,7 @@ test("a legacy app-scoped mirror is treated as missing", async () => {
     };
     task.artifacts.pptx.mirror = {
       provider: "aps.files",
-      scope: "app",
+      scope: "tool",
       path: snapshot.mirror_path,
       etag: "legacy-etag",
       size_bytes: snapshot.size_bytes,

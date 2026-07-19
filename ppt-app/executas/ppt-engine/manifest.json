@@ -1441,7 +1441,7 @@
     },
     {
       "name": "app_publish_export_artifact",
-      "description": "Publish or reuse the current recorded PPTX or PDF as a tool-scoped APS Files Export Artifact Mirror without minting a download URL.",
+      "description": "Publish or reuse the current recorded PPTX or PDF as a user-scoped APS Files Export Artifact Mirror without minting a download URL.",
       "parameters": [
         {
           "name": "workspace_dir",
@@ -1477,7 +1477,7 @@
     },
     {
       "name": "app_prepare_workspace_diagnostic_bundle",
-      "description": "Create a fresh ZIP of the complete current Workspace, overwrite its tool-scoped APS Files diagnostic object, and return a short-lived download URL without persisting a mirror or URL.",
+      "description": "Create a fresh ZIP of the complete current Workspace, overwrite its user-scoped APS Files diagnostic object, and return a short-lived download URL without persisting a mirror or URL.",
       "parameters": [
         {
           "name": "workspace_dir",

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 export const APS_FILES_ERROR_NOT_GRANTED = -32021;
 export const APS_FILES_ERROR_TIMEOUT = -32030;
-export const APS_FILES_PRIVATE_SCOPE = "tool";
+export const APS_FILES_DOWNLOAD_SCOPE = "user";
 
 export class ApsFilesError extends Error {
   constructor(code, message, data) {
@@ -50,7 +50,7 @@ export class ApsFilesClient {
     return true;
   }
 
-  uploadBegin({ path, sizeBytes, contentType, metadata, scope = APS_FILES_PRIVATE_SCOPE }) {
+  uploadBegin({ path, sizeBytes, contentType, metadata, scope = APS_FILES_DOWNLOAD_SCOPE }) {
     return this.call("files/upload_begin", {
       path,
       scope,
@@ -60,7 +60,7 @@ export class ApsFilesClient {
     }, 60_000);
   }
 
-  uploadComplete({ path, etag, sizeBytes, contentType, scope = APS_FILES_PRIVATE_SCOPE }) {
+  uploadComplete({ path, etag, sizeBytes, contentType, scope = APS_FILES_DOWNLOAD_SCOPE }) {
     return this.call("files/upload_complete", {
       path,
       scope,
@@ -70,7 +70,7 @@ export class ApsFilesClient {
     }, 60_000);
   }
 
-  async downloadUrl({ path, expiresIn, scope = APS_FILES_PRIVATE_SCOPE }) {
+  async downloadUrl({ path, expiresIn, scope = APS_FILES_DOWNLOAD_SCOPE }) {
     const result = await this.call("files/download_url", {
       path,
       scope,

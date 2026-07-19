@@ -303,7 +303,7 @@ describe("Anna PPT Backend", () => {
     const calls: Array<{ method?: unknown; args?: unknown }> = [];
     const mirror = {
       provider: "aps.files" as const,
-      scope: "tool" as const,
+      scope: "user" as const,
       path: "workspaces/demo/exports/current.pptx",
       etag: "etag-1",
       size_bytes: 12,

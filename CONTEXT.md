@@ -368,7 +368,7 @@ The user action that asks an Active Deck Generation to stop starting new Page Ge
 A final PPTX or PDF produced from a Workspace for the user to download. The Workspace-owned file remains authoritative even when a separate downloadable copy exists.
 
 **Export Artifact Mirror**:
-A PPT App-internal downloadable copy of an Export Artifact stored in the current user's `ppt-engine` tool-private namespace. A Workspace has at most one current mirror per export format; replacing it does not create Export History. It is transport for the PPT App rather than a user-owned file shared with other apps.
+A PPT App-internal downloadable copy of an Export Artifact stored under an internal path in the user's APS Files namespace. A Workspace has at most one current mirror per export format; replacing it does not create Export History. Its `user` storage scope is a transport constraint and does not by itself make it a My Files Export or create a user-facing file record.
 _Avoid_: User File, My Files Export
 
 **Export Download Preparation**:
@@ -431,7 +431,7 @@ Expert: "No. Keep the Export Artifact and retry only its Export Artifact Mirror.
 
 Dev: "Does publishing that mirror also save the PPTX to My Files?"
 
-Expert: "No. An Export Artifact Mirror is PPT App-internal transport in the `ppt-engine` tool-private namespace. A My Files Export requires a separate explicit user action."
+Expert: "No. An Export Artifact Mirror is PPT App-internal transport under an internal path in the user's APS Files namespace. A My Files Export requires a separate explicit user action and product record."
 
 Dev: "Can the support action be called Log Export if it includes the whole Workspace?"
 

@@ -63,7 +63,7 @@ test("Workspace Diagnostic Bundle uses APS Files without Host Upload and regener
       if (message.method === "host/uploadFile") hostUploadCalls += 1;
       if (message.method.startsWith("files/")) {
         apsMethods.push(message.method);
-        assert.equal(message.params?.scope, "tool");
+        assert.equal(message.params?.scope, "user");
       }
       let result: Record<string, unknown> = {};
       if (message.method === "files/upload_begin") {

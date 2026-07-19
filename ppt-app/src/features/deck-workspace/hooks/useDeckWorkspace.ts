@@ -2353,7 +2353,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       : null;
     const mirrorStatus = !mirror ||
       mirror.provider !== "aps.files" ||
-      mirror.scope !== "tool" ||
+      mirror.scope !== "user" ||
       typeof mirror.content_disposition !== "string" ||
       !/^attachment(?:;|$)/i.test(mirror.content_disposition)
       ? "missing"

@@ -1303,7 +1303,7 @@ export interface GetAppExportArtifactInput {
 
 export interface AppExportArtifactMirror {
   provider: "aps.files";
-  scope: "tool";
+  scope: "user";
   path: string;
   etag: string;
   size_bytes: number;

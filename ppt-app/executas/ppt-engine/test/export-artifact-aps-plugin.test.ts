@@ -64,7 +64,7 @@ test("export artifact tools publish through APS Files and mint links without Hos
       if (message.method === "host/uploadFile") hostUploadCalls += 1;
       if (message.method.startsWith("files/")) {
         apsMethods.push(message.method);
-        assert.equal(message.params?.scope, "tool");
+        assert.equal(message.params?.scope, "user");
       }
       let result: Record<string, unknown> = {};
       if (message.method === "files/upload_begin") {

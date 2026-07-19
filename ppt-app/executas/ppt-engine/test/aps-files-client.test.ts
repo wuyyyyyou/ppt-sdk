@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { ApsFilesClient, ApsFilesError } from "../aps-files-client.js";
 
-test("APS Files client sends tool-scoped upload frames and routes responses", async () => {
+test("APS Files client sends user-scoped upload frames and routes responses", async () => {
   const frames: Array<Record<string, unknown>> = [];
   const client = new ApsFilesClient({
     writeFrame(message: Record<string, unknown>) {
@@ -16,13 +16,13 @@ test("APS Files client sends tool-scoped upload frames and routes responses", as
     path: "workspaces/demo/exports/current.pptx",
     sizeBytes: 12,
     contentType: "application/pptx",
-    scope: "tool",
+    scope: "user",
   });
   assert.equal(frames.length, 1);
   assert.equal(frames[0]?.method, "files/upload_begin");
   assert.deepEqual(frames[0]?.params, {
     path: "workspaces/demo/exports/current.pptx",
-    scope: "tool",
+    scope: "user",
     size_bytes: 12,
     content_type: "application/pptx",
   });
@@ -44,7 +44,7 @@ test("APS Files client sends reverse RPC without requiring a local initialize fl
     contentType: "application/pdf",
   });
   assert.equal(frames[0]?.method, "files/upload_begin");
-  assert.equal((frames[0]?.params as Record<string, unknown>)?.scope, "tool");
+  assert.equal((frames[0]?.params as Record<string, unknown>)?.scope, "user");
   client.dispatchResponse({
     jsonrpc: "2.0",
     id: frames[0]?.id,
@@ -58,10 +58,10 @@ test("APS Files client normalizes get_url and preserves storage errors", async (
   const client = new ApsFilesClient({ writeFrame: (message: Record<string, unknown>) => frames.push(message) });
   client.enable();
 
-  const link = client.downloadUrl({ path: "exports/current.pdf", expiresIn: 600, scope: "tool" });
+  const link = client.downloadUrl({ path: "exports/current.pdf", expiresIn: 600, scope: "user" });
   assert.deepEqual(frames[0]?.params, {
     path: "exports/current.pdf",
-    scope: "tool",
+    scope: "user",
     expires_in: 600,
     ttl_seconds: 600,
   });
@@ -76,7 +76,7 @@ test("APS Files client normalizes get_url and preserves storage errors", async (
     expires_at: "soon",
   });
 
-  const failed = client.uploadComplete({ path: "exports/current.pdf", scope: "tool" });
+  const failed = client.uploadComplete({ path: "exports/current.pdf", scope: "user" });
   client.dispatchResponse({
     jsonrpc: "2.0",
     id: frames[1]?.id,

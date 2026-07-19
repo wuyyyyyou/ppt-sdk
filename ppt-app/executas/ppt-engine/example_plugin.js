@@ -10,7 +10,7 @@ import { Readable } from "node:stream";
 
 import { parseHostUploadConfirmation } from "./host-upload-confirmation.js";
 import {
-  APS_FILES_PRIVATE_SCOPE,
+  APS_FILES_DOWNLOAD_SCOPE,
   ApsFilesClient,
   ApsFilesError,
 } from "./aps-files-client.js";
@@ -2132,7 +2132,7 @@ async function toolAppPublishExportArtifact(args) {
         path: snapshot.mirror_path,
         sizeBytes: snapshot.size_bytes,
         contentType: snapshot.content_type,
-        scope: APS_FILES_PRIVATE_SCOPE,
+        scope: APS_FILES_DOWNLOAD_SCOPE,
         metadata: {
           workspace_id: snapshot.workspace_id,
           artifact_type: snapshot.artifact_type,
@@ -2164,11 +2164,11 @@ async function toolAppPublishExportArtifact(args) {
         etag: putEtag,
         sizeBytes: snapshot.size_bytes,
         contentType: snapshot.content_type,
-        scope: APS_FILES_PRIVATE_SCOPE,
+        scope: APS_FILES_DOWNLOAD_SCOPE,
       });
       const mirror = {
         provider: "aps.files",
-        scope: APS_FILES_PRIVATE_SCOPE,
+        scope: APS_FILES_DOWNLOAD_SCOPE,
         path: snapshot.mirror_path,
         etag: typeof completed?.etag === "string" ? completed.etag : putEtag ?? "",
         size_bytes: Number.isFinite(Number(completed?.size_bytes))
@@ -2236,7 +2236,7 @@ async function toolAppGetExportArtifactDownloadUrl(args) {
   const download = await apsFilesClient.downloadUrl({
     path: status.mirror.path,
     expiresIn: 600,
-    scope: APS_FILES_PRIVATE_SCOPE,
+    scope: APS_FILES_DOWNLOAD_SCOPE,
   });
   if (!download || typeof download.url !== "string" || download.url.length === 0) {
     throw new Error("files/download_url did not return a valid URL");
@@ -2267,7 +2267,7 @@ async function toolAppPrepareWorkspaceDiagnosticBundle(args) {
         path: snapshot.aps_path,
         sizeBytes: snapshot.size_bytes,
         contentType: snapshot.content_type,
-        scope: APS_FILES_PRIVATE_SCOPE,
+        scope: APS_FILES_DOWNLOAD_SCOPE,
         metadata: {
           workspace_id: snapshot.workspace_id,
           artifact_type: "workspace_diagnostic_bundle",
@@ -2300,12 +2300,12 @@ async function toolAppPrepareWorkspaceDiagnosticBundle(args) {
         etag: putEtag,
         sizeBytes: snapshot.size_bytes,
         contentType: snapshot.content_type,
-        scope: APS_FILES_PRIVATE_SCOPE,
+        scope: APS_FILES_DOWNLOAD_SCOPE,
       });
       const download = await apsFilesClient.downloadUrl({
         path: snapshot.aps_path,
         expiresIn: 600,
-        scope: APS_FILES_PRIVATE_SCOPE,
+        scope: APS_FILES_DOWNLOAD_SCOPE,
       });
       if (!download || typeof download.url !== "string" || download.url.length === 0) {
         throw new Error("files/download_url did not return a valid URL");

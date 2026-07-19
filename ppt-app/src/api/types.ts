@@ -1499,7 +1499,7 @@ export interface GetExportArtifactDownloadUrlInput {
 
 export interface ExportArtifactMirror {
   provider: "aps.files";
-  scope: "tool";
+  scope: "user";
   path: string;
   etag: string;
   size_bytes: number;
