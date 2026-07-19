@@ -13,7 +13,10 @@ BUILD_DIR="$SCRIPT_DIR/.build"
 RAW_BINARY_DIR="$BUILD_DIR/binary"
 RELEASE_STAGE_DIR="$BUILD_DIR/release-stage"
 TEST_EXTRACT_DIR="$BUILD_DIR/test-extract"
+BINARY_SMOKE_DIR="$BUILD_DIR/binary-smoke"
 SEA_PREP_DIR="$BUILD_DIR/sea-prep"
+BROWSER_CACHE_DIR="${PRESENTON_BROWSER_BUILD_CACHE_DIR:-$BUILD_DIR/browser-cache}"
+BROWSER_RUNTIME_DIR="$BUILD_DIR/browser-runtime"
 RUN_TEST=false
 REUSE_TEMPLATE_PREVIEWS=false
 
@@ -233,18 +236,26 @@ fi
 ARCHIVE_NAME="${BINARY_NAME}-v${PLUGIN_VERSION}-${PLATFORM_KEY}.${ARCHIVE_EXT}"
 ARCHIVE_PATH="$BUNDLE_DIR/$ARCHIVE_NAME"
 
-rm -rf "$BUNDLE_DIR" "$RAW_BINARY_DIR" "$RELEASE_STAGE_DIR" "$TEST_EXTRACT_DIR"
+rm -rf "$BUNDLE_DIR" "$RAW_BINARY_DIR" "$RELEASE_STAGE_DIR" "$TEST_EXTRACT_DIR" "$BINARY_SMOKE_DIR" "$BROWSER_RUNTIME_DIR"
 mkdir -p "$BUNDLE_DIR" "$RAW_BINARY_DIR"
 
-echo "[1/7] Building dist artifacts and template previews..."
+echo "[1/8] Preparing pinned Chrome for Testing runtime..."
+node ./scripts/prepare-browser-runtime.mjs \
+  --cache-dir "$BROWSER_CACHE_DIR" \
+  --output-dir "$BROWSER_RUNTIME_DIR" \
+  --platform-key "$PLATFORM_KEY"
+BROWSER_EXECUTABLE_RELATIVE_PATH="$(node -e "const fs=require('node:fs'); console.log(JSON.parse(fs.readFileSync(process.argv[1],'utf8')).executable_path)" "$BROWSER_RUNTIME_DIR/runtime.json")"
+BROWSER_EXECUTABLE_PATH="$BROWSER_RUNTIME_DIR/$BROWSER_EXECUTABLE_RELATIVE_PATH"
+
+echo "[2/8] Building dist artifacts and template previews..."
 if [[ "$REUSE_TEMPLATE_PREVIEWS" == "true" ]]; then
   if [[ ! -f "$SCRIPT_DIR/dist/template-previews/index.json" ]]; then
     echo "Template previews are missing. Run npm run build:template-previews or provide dist/template-previews before using --reuse-template-previews." >&2
     exit 1
   fi
-  npm run build
+  PRESENTON_CHROME_EXECUTABLE_PATH="$BROWSER_EXECUTABLE_PATH" npm run build
 else
-  npm run build:full
+  PRESENTON_CHROME_EXECUTABLE_PATH="$BROWSER_EXECUTABLE_PATH" npm run build:full
 fi
 
 node -e '
@@ -272,13 +283,13 @@ for (const group of groups) {
 console.log(`Verified ${imageCount} template preview image(s) across ${groups.length} group(s).`);
 '
 
-echo "[2/7] Preparing SEA app bundle..."
+echo "[3/8] Preparing SEA app bundle..."
 PRESENTON_TEMPLATE_ENGINE_SEA_PREP_DIR="$SEA_PREP_DIR" node ./scripts/prepare-sea-bundle.mjs
 
-echo "[3/7] Generating SEA blob..."
+echo "[4/8] Generating SEA blob..."
 node --experimental-sea-config "$SEA_PREP_DIR/sea-config.json"
 
-echo "[4/7] Injecting blob into Node runtime..."
+echo "[5/8] Injecting blob into Node runtime..."
 node ./scripts/patch-postject.mjs
 if [[ "$PLATFORM" == "windows" ]]; then
   node -e "require('node:fs').copyFileSync(process.execPath, process.argv[1])" "$OUTPUT_PATH"
@@ -315,15 +326,17 @@ if [[ "$PLATFORM" == "darwin" ]]; then
   codesign --force --sign - "$OUTPUT_PATH" >/dev/null 2>&1 || true
 fi
 
-echo "[5/7] Staging Anna Binary distribution package..."
+echo "[6/8] Staging Anna Binary distribution package..."
 mkdir -p "$RELEASE_STAGE_DIR/bin" "$RELEASE_STAGE_DIR/lib" "$RELEASE_STAGE_DIR/data"
 cp "$OUTPUT_PATH" "$RELEASE_STAGE_DIR/bin/$OUTPUT_NAME"
 chmod 755 "$RELEASE_STAGE_DIR/bin/$OUTPUT_NAME" || true
+mkdir -p "$RELEASE_STAGE_DIR/lib/browser"
+cp -R "$BROWSER_RUNTIME_DIR/." "$RELEASE_STAGE_DIR/lib/browser/"
 node ./scripts/binary-release.mjs write-manifest \
   --tool-manifest "$SCRIPT_DIR/manifest.json" \
   --output "$RELEASE_STAGE_DIR/manifest.json"
 
-echo "[6/7] Creating release archive..."
+echo "[7/8] Creating release archive..."
 if [[ "$PLATFORM" == "windows" ]]; then
   compress_zip "$RELEASE_STAGE_DIR" "$ARCHIVE_PATH"
 else
@@ -333,7 +346,7 @@ node ./scripts/binary-release.mjs write-sha256 \
   --file "$ARCHIVE_PATH" \
   --output "$ARCHIVE_PATH.sha256"
 
-echo "[7/7] Validation"
+echo "[8/8] Validation"
 echo "Binary created at: $OUTPUT_PATH"
 ls -lh "$OUTPUT_PATH"
 echo "Release archive created at: $ARCHIVE_PATH"
@@ -359,6 +372,11 @@ if [[ "$RUN_TEST" == "true" ]]; then
   RESULT="$(printf '%s\n' '{"jsonrpc":"2.0","method":"describe","id":1}' | "$TEST_BINARY_PATH" 2>/dev/null)"
   echo "$RESULT" | node ./scripts/binary-release.mjs verify-describe \
     --tool-manifest "$SCRIPT_DIR/manifest.json"
+  node ./scripts/smoke-test-binary.mjs \
+    --binary "$TEST_BINARY_PATH" \
+    --extract-dir "$TEST_EXTRACT_DIR" \
+    --work-dir "$BINARY_SMOKE_DIR" \
+    --fixture-dir "$SCRIPT_DIR/test/fixtures/binary-smoke-deck"
   echo "archive validation passed"
 else
   echo "skip (use --test to validate release archive)"

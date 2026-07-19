@@ -34,6 +34,30 @@ async function writeToolManifest(dir: string) {
   return manifestPath;
 }
 
+async function writeBrowserRuntime(extractDir: string, platformKey: string) {
+  const browserRoot = path.join(extractDir, "lib", "browser");
+  const executableRelativePath = platformKey.startsWith("windows-")
+    ? "chrome-win64/chrome.exe"
+    : "chrome-runtime/chrome";
+  const executablePath = path.join(browserRoot, executableRelativePath);
+  const executableContent = `fake chrome for ${platformKey}\n`;
+  await mkdir(path.dirname(executablePath), { recursive: true });
+  await writeFile(executablePath, executableContent, "utf8");
+  await writeFile(
+    path.join(browserRoot, "runtime.json"),
+    `${JSON.stringify({
+      schema_version: 1,
+      browser: "chrome-for-testing",
+      browser_version: "146.0.7680.153",
+      puppeteer_version: "24.40.0",
+      platform_key: platformKey,
+      executable_path: executableRelativePath,
+      executable_sha256: createHash("sha256").update(executableContent).digest("hex"),
+    }, null, 2)}\n`,
+    "utf8",
+  );
+}
+
 async function runBinaryRelease(args: string[], input?: string) {
   if (input !== undefined) {
     return new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
@@ -130,6 +154,7 @@ test("verify-archive validates structure and top-level manifest", async () => {
   await mkdir(path.join(extractDir, "lib"), { recursive: true });
   await mkdir(path.join(extractDir, "data"), { recursive: true });
   await writeFile(path.join(extractDir, "bin", "ppt-engine"), "", "utf8");
+  await writeBrowserRuntime(extractDir, "darwin-arm64");
 
   await runBinaryRelease([
     "write-manifest",
@@ -150,7 +175,7 @@ test("verify-archive validates structure and top-level manifest", async () => {
   ]);
 });
 
-test("verifyArchiveDirectory accepts empty lib and data directories", async () => {
+test("verifyArchiveDirectory accepts an empty data directory with a bundled browser", async () => {
   const dir = await makeTempDir();
   const extractDir = path.join(dir, "extract");
   const toolManifest = {
@@ -162,6 +187,7 @@ test("verifyArchiveDirectory accepts empty lib and data directories", async () =
   await mkdir(path.join(extractDir, "lib"), { recursive: true });
   await mkdir(path.join(extractDir, "data"), { recursive: true });
   await writeFile(path.join(extractDir, "bin", "ppt-engine.exe"), "", "utf8");
+  await writeBrowserRuntime(extractDir, "windows-x86_64");
   await writeFile(
     path.join(extractDir, "manifest.json"),
     `${JSON.stringify(buildDistributionManifest(toolManifest), null, 2)}\n`,
@@ -187,6 +213,7 @@ test("verifyArchiveDirectory accepts Linux platform keys", async () => {
   await mkdir(path.join(extractDir, "lib"), { recursive: true });
   await mkdir(path.join(extractDir, "data"), { recursive: true });
   await writeFile(path.join(extractDir, "bin", "ppt-engine"), "", "utf8");
+  await writeBrowserRuntime(extractDir, "linux-x86_64");
   await writeFile(
     path.join(extractDir, "manifest.json"),
     `${JSON.stringify(buildDistributionManifest(toolManifest), null, 2)}\n`,
@@ -196,7 +223,7 @@ test("verifyArchiveDirectory accepts Linux platform keys", async () => {
   await verifyArchiveDirectory({
     toolManifest,
     extractDir,
-    platformKey: "linux-aarch64",
+    platformKey: "linux-x86_64",
   });
 });
 

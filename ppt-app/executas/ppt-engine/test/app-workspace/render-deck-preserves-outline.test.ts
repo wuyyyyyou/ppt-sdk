@@ -66,6 +66,7 @@ test("renderAppWorkspaceDeckHtml preserves the confirmed outline artifact", asyn
       status: "confirmed",
       items: [
         {
+          page_id: PAGE_1,
           title: "Original Page",
           core_message: "This outline came from the user's confirmed outline.",
           required_content: "- Preserve the confirmed page content.",
@@ -94,6 +95,33 @@ test("renderAppWorkspaceDeckHtml preserves the confirmed outline artifact", asyn
       ],
     });
     await writePageSource(templateDir, PAGE_1);
+    await writeJson(path.join(workspaceDir, "page-progress.json"), {
+      version: 1,
+      status: "running",
+      final_deck_render: {
+        status: "pending",
+        message: null,
+        error: null,
+        output_dir: null,
+        deck_html_path: null,
+        rendered_at: null,
+        updated_at: "2026-06-02T00:00:00.000Z",
+      },
+      pages: [{
+        page_id: PAGE_1,
+        status: "accepted",
+        render_attempts: 0,
+        visual_review_attempts: 0,
+        agent_failures: 0,
+        agent_infrastructure_failures: 0,
+        last_html_path: null,
+        last_screenshot_path: null,
+        last_error: "",
+        visual_review: null,
+        updated_at: "2026-06-02T00:00:00.000Z",
+      }],
+      updated_at: "2026-06-02T00:00:00.000Z",
+    });
 
     const rendered = await renderAppWorkspaceDeckHtml({
       workspace_dir: workspaceDir,
@@ -119,15 +147,20 @@ test("renderAppWorkspaceDeckHtml preserves the confirmed outline artifact", asyn
     assert.equal(outline.updated_at, "2026-06-02T00:00:00.000Z");
     assert.equal(outline.confirmed_at, "2026-06-02T00:00:00.000Z");
 
-    const pages = await readJson<{
-      title: string;
-      pages: Array<{ title: string; screenshot_path?: string }>;
-    }>(
-      path.join(workspaceDir, "pages.json"),
+    const progress = await readJson<{
+      final_deck_render: { status: string; output_dir: string; deck_html_path: string };
+      pages: Array<{ page_id: string; last_html_path: string; last_screenshot_path: string }>;
+    }>(path.join(workspaceDir, "page-progress.json"));
+    assert.equal(progress.final_deck_render.status, "completed");
+    assert.equal(progress.final_deck_render.output_dir, rendered.output_dir);
+    assert.match(progress.final_deck_render.deck_html_path, /\.html$/);
+    assert.equal(progress.pages[0]?.page_id, PAGE_1);
+    assert.match(progress.pages[0]?.last_html_path ?? "", /\.html$/);
+    assert.match(progress.pages[0]?.last_screenshot_path ?? "", /\.png$/);
+    await assert.rejects(
+      () => readFile(path.join(workspaceDir, "pages.json"), "utf8"),
+      (error: NodeJS.ErrnoException) => error.code === "ENOENT",
     );
-    assert.equal(pages.title, "Rendered Deck");
-    assert.deepEqual(pages.pages.map((page) => page.title), ["Rendered Deck – 1"]);
-    assert.match(pages.pages[0]?.screenshot_path ?? "", /\.png$/);
   } finally {
     if (previousHome === undefined) {
       delete process.env.HOME;

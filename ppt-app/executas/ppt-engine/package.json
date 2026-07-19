@@ -14,8 +14,11 @@
     "build_binary.sh",
     "scripts/binary-release.mjs",
     "scripts/patch-postject.mjs",
+    "scripts/prepare-browser-runtime.mjs",
     "scripts/prepare-sea-bundle.mjs",
-    "scripts/sea-bootstrap.cjs"
+    "scripts/sea-bootstrap.cjs",
+    "scripts/smoke-test-binary.mjs",
+    "test/fixtures/binary-smoke-deck"
   ],
   "exports": {
     ".": {
@@ -41,7 +44,7 @@
     "build:template-previews": "node ./scripts/build-template-previews.mjs",
     "preview:tsx": "node --import tsx/esm ./scripts/preview-page-source.ts",
     "check": "tsc --noEmit",
-    "test:unit": "node --import tsx/esm --test test/**/*.test.ts",
+    "test:unit": "node --import tsx/esm --test test/*.test.ts test/**/*.test.ts",
     "start": "node dist/cli.js",
     "start:plugin": "node example_plugin.js",
     "build:binary": "./build_binary.sh",

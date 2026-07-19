@@ -39,6 +39,7 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       PROJECT_DIR: ppt-app/executas/ppt-engine
+      PUPPETEER_SKIP_CHROME_HEADLESS_SHELL_DOWNLOAD: "true"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -76,8 +77,6 @@ jobs:
         include:
           - runner: ubuntu-22.04
             asset_suffix: linux-x86_64
-          - runner: ubuntu-22.04-arm
-            asset_suffix: linux-aarch64
           - runner: macos-15-intel
             asset_suffix: darwin-x86_64
           - runner: macos-15
@@ -89,6 +88,7 @@ jobs:
         shell: bash
     env:
       PROJECT_DIR: ppt-app/executas/ppt-engine
+      PUPPETEER_SKIP_DOWNLOAD: "true"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

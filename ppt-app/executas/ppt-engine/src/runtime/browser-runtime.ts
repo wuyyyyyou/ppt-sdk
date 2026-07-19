@@ -1,6 +1,8 @@
 import path from "node:path";
 import { access } from "node:fs/promises";
 
+import { resolveBundledBrowserExecutable } from "./bundled-browser-runtime.js";
+
 export interface BrowserRuntimeElementHandleLike {
   evaluate: <T>(pageFunction: (...args: any[]) => T, ...args: any[]) => Promise<T>;
 }
@@ -18,6 +20,7 @@ export interface LaunchManagedBrowserInput {
   purpose: string;
   launchOptions?: Record<string, unknown>;
   dumpio?: boolean;
+  bundledBrowserResolver?: () => Promise<string | null>;
 }
 
 export interface WaitForRenderReadyInput {
@@ -185,6 +188,32 @@ export async function launchManagedBrowser(
     } catch (error) {
       throw new Error(
         `Failed to launch browser for ${input.purpose} using ${configuredExecutable.key}="${configuredExecutable.value}": ${formatErrorMessage(error)}`,
+        { cause: error instanceof Error ? error : undefined },
+      );
+    }
+  }
+
+  let bundledExecutablePath: string | null;
+  try {
+    bundledExecutablePath = await (
+      input.bundledBrowserResolver ?? resolveBundledBrowserExecutable
+    )();
+  } catch (error) {
+    throw new Error(
+      `Could not resolve the bundled browser for ${input.purpose}: ${formatErrorMessage(error)}`,
+      { cause: error instanceof Error ? error : undefined },
+    );
+  }
+
+  if (bundledExecutablePath) {
+    try {
+      return (await puppeteer.launch({
+        ...normalizedLaunchOptions,
+        executablePath: bundledExecutablePath,
+      })) as BrowserRuntimeBrowserLike;
+    } catch (error) {
+      throw new Error(
+        `Failed to launch the bundled browser for ${input.purpose} at "${bundledExecutablePath}": ${formatErrorMessage(error)}`,
         { cause: error instanceof Error ? error : undefined },
       );
     }

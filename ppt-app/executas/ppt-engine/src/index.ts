@@ -61,6 +61,7 @@ import {
   type BuildPageSourcePreviewResult,
 } from "./render/build-page-source-preview.js";
 import { buildDeckHtml, buildStandaloneDeckHtml } from "./render/build-deck.js";
+import { buildBuiltinTemplatePreviewScreenshots } from "./render/build-template-preview-screenshots.js";
 import { renderSlideHtml } from "./render/render-slide.js";
 import type {
   BuildDeckHtmlFromManifestInput,
@@ -303,6 +304,7 @@ export type {
 };
 export {
   buildDeckHtml,
+  buildBuiltinTemplatePreviewScreenshots,
   buildDeckHtmlFromManifest,
   buildDeckHtmlPagesAndScreenshotsFromManifest,
   buildDeckHtmlPagesFromManifest,

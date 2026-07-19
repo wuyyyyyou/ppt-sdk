@@ -12,6 +12,7 @@ export interface WaitForRenderReadinessInput {
   timeoutMs: number;
   quietWindowMs?: number;
   requireTailwind?: boolean;
+  allowFailedImages?: boolean;
 }
 
 type RenderReadinessState = {
@@ -99,6 +100,7 @@ export async function waitForRenderReadiness(
 ): Promise<void> {
   const quietWindowMs = input.quietWindowMs ?? 100;
   const requireTailwind = input.requireTailwind ?? true;
+  const allowFailedImages = input.allowFailedImages ?? false;
   const startedAt = Date.now();
   await page.evaluate(() => {
     const renderWindow = window as typeof window & {
@@ -160,7 +162,7 @@ export async function waitForRenderReadiness(
       lastState.fontsReady &&
       lastState.pendingImages.length === 0 &&
       lastState.pendingRequests.length === 0 &&
-      lastState.failedImages.length === 0 &&
+      (allowFailedImages || lastState.failedImages.length === 0) &&
       lastState.pendingStylesheets.length === 0 &&
       lastState.quietForMs >= quietWindowMs
     ) {

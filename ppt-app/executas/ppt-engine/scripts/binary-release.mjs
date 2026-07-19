@@ -108,6 +108,59 @@ async function assertFile(targetPath, label) {
   }
 }
 
+function resolveInside(rootPath, relativePath, label) {
+  const candidate = path.resolve(rootPath, relativePath);
+  const relative = path.relative(rootPath, candidate);
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error(`${label} escapes its runtime directory: ${relativePath}`);
+  }
+  return candidate;
+}
+
+async function verifyBrowserRuntime(extractDir, platformKey) {
+  const browserRoot = path.join(extractDir, "lib", "browser");
+  const metadataPath = path.join(browserRoot, "runtime.json");
+  await assertFile(metadataPath, "bundled browser runtime metadata");
+  const metadata = await readJson(metadataPath);
+  if (metadata.schema_version !== 1) {
+    throw new Error(`Bundled browser schema mismatch: expected 1, got ${metadata.schema_version}`);
+  }
+  if (metadata.browser !== "chrome-for-testing") {
+    throw new Error(`Bundled browser mismatch: expected chrome-for-testing, got ${metadata.browser}`);
+  }
+  if (metadata.platform_key !== platformKey) {
+    throw new Error(
+      `Bundled browser platform mismatch: expected ${platformKey}, got ${metadata.platform_key}`,
+    );
+  }
+  if (typeof metadata.browser_version !== "string" || metadata.browser_version.length === 0) {
+    throw new Error("Bundled browser metadata is missing browser_version");
+  }
+  if (typeof metadata.puppeteer_version !== "string" || metadata.puppeteer_version.length === 0) {
+    throw new Error("Bundled browser metadata is missing puppeteer_version");
+  }
+  if (typeof metadata.executable_path !== "string" || metadata.executable_path.length === 0) {
+    throw new Error("Bundled browser metadata is missing executable_path");
+  }
+  if (!/^[a-f0-9]{64}$/.test(metadata.executable_sha256 ?? "")) {
+    throw new Error("Bundled browser metadata has invalid executable_sha256");
+  }
+
+  const executablePath = resolveInside(
+    browserRoot,
+    metadata.executable_path,
+    "Bundled browser executable",
+  );
+  await assertFile(executablePath, "bundled Chrome executable");
+  const actualSha256 = createHash("sha256").update(await readFile(executablePath)).digest("hex");
+  if (actualSha256 !== metadata.executable_sha256) {
+    throw new Error(
+      `Bundled Chrome checksum mismatch: expected ${metadata.executable_sha256}, got ${actualSha256}`,
+    );
+  }
+  return { executablePath, metadata };
+}
+
 async function readStdin() {
   const chunks = [];
   for await (const chunk of process.stdin) {
@@ -142,6 +195,7 @@ export async function verifyArchiveDirectory({ toolManifest, extractDir, platfor
 
   const binaryFileName = platformKey.startsWith("windows-") ? WINDOWS_BINARY_NAME : BINARY_NAME;
   await assertFile(path.join(extractDir, "bin", binaryFileName), "binary entrypoint");
+  await verifyBrowserRuntime(extractDir, platformKey);
 
   const distributionManifest = await readJson(path.join(extractDir, "manifest.json"));
   assertDeepEqual(distributionManifest, expectedDistributionManifest, "Binary distribution manifest");

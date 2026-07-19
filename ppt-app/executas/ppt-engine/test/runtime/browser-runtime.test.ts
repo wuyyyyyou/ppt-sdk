@@ -28,6 +28,26 @@ class MockPage {
   }
 }
 
+async function withChromeExecutableEnvCleared<T>(fn: () => Promise<T>): Promise<T> {
+  const keys = [
+    "PRESENTON_CHROME_EXECUTABLE_PATH",
+    "PUPPETEER_EXECUTABLE_PATH",
+    "CHROME_PATH",
+    "GOOGLE_CHROME_BIN",
+  ];
+  const original = new Map(keys.map((key) => [key, process.env[key]]));
+  for (const key of keys) delete process.env[key];
+  try {
+    return await fn();
+  } finally {
+    for (const key of keys) {
+      const value = original.get(key);
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
 test("launchManagedBrowser prefers configured executable path", async () => {
   const original = process.env.PRESENTON_CHROME_EXECUTABLE_PATH;
   process.env.PRESENTON_CHROME_EXECUTABLE_PATH = "/tmp/presenton-chrome";
@@ -81,6 +101,46 @@ test("launchManagedBrowser reports explicit launch failures", async () => {
       return true;
     },
   );
+});
+
+test("launchManagedBrowser uses the bundled browser before system discovery", async () => {
+  const launchCalls: Array<Record<string, unknown>> = [];
+  const puppeteer = {
+    async launch(options: Record<string, unknown>) {
+      launchCalls.push(options);
+      return {
+        newPage: async () => ({}),
+        close: async () => {},
+      };
+    },
+  };
+
+  await withChromeExecutableEnvCleared(() => launchManagedBrowser(puppeteer, {
+    purpose: "test-bundled-browser",
+    bundledBrowserResolver: async () => "/binary/lib/browser/chrome",
+  }));
+
+  assert.equal(launchCalls.length, 1);
+  assert.equal(launchCalls[0]?.executablePath, "/binary/lib/browser/chrome");
+});
+
+test("launchManagedBrowser does not fall back when the bundled browser fails", async () => {
+  let launchCount = 0;
+  const puppeteer = {
+    async launch() {
+      launchCount += 1;
+      throw new Error("bundled launch boom");
+    },
+  };
+
+  await withChromeExecutableEnvCleared(() => assert.rejects(
+    () => launchManagedBrowser(puppeteer, {
+      purpose: "test-bundled-browser",
+      bundledBrowserResolver: async () => "/binary/lib/browser/chrome",
+    }),
+    /Failed to launch the bundled browser/,
+  ));
+  assert.equal(launchCount, 1);
 });
 
 test("waitForRenderReady returns when the wrapper is ready", async () => {

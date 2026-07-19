@@ -37,11 +37,6 @@
             "entrypoint": "ppt-engine",
             "format": "tar.gz"
           },
-          "linux-aarch64": {
-            "path": "bundle/ppt-engine-v{version}-linux-aarch64.tar.gz",
-            "entrypoint": "ppt-engine",
-            "format": "tar.gz"
-          },
           "windows-x86_64": {
             "path": "bundle/ppt-engine-v{version}-windows-x86_64.zip",
             "entrypoint": "ppt-engine.exe",

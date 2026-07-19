@@ -100,6 +100,7 @@ async function waitForSlideRenderReady(
 export async function writeSlideScreenshots(
   slides: Array<{ html: string; outputPath: string; htmlPath?: string }>,
   purpose = "Page Source slide screenshots",
+  options: { requireTailwind?: boolean; allowFailedImages?: boolean } = {},
 ): Promise<void> {
   await withScreenshotRenderQueue(async () => {
     const runtime = await createManagedPage(purpose);
@@ -121,7 +122,11 @@ export async function writeSlideScreenshots(
           });
         }
         const slideElement = await waitForSlideRenderReady(runtime.page);
-        await waitForRenderReadiness(runtime.page, { timeoutMs: 30_000 });
+        await waitForRenderReadiness(runtime.page, {
+          timeoutMs: 30_000,
+          requireTailwind: options.requireTailwind,
+          allowFailedImages: options.allowFailedImages,
+        });
         const screenshot = await slideElement.screenshot({ path: slide.outputPath });
         if (!screenshot) {
           throw new Error(`Failed to write slide screenshot: ${slide.outputPath}`);
