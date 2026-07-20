@@ -9,6 +9,6 @@ export const PPT_ENGINE_TOOL = {
 
 export const ANNA_SEARCH_TOOL = {
   handle: "anna-search",
-  version: "1.0.1",
+  version: "1.0.2",
   displayName: "Anna Search",
 } as const;
