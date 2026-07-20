@@ -7,12 +7,6 @@ export const PPT_ENGINE_TOOL = {
   displayName: "ppt-engine",
 } as const;
 
-export const PPT_GENER_TOOL = {
-  handle: "ppt-gener",
-  version: "3.1.4",
-  displayName: "ppt-gener",
-} as const;
-
 export const ANNA_SEARCH_TOOL = {
   handle: "anna-search",
   version: "1.0.1",

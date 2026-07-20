@@ -65,8 +65,6 @@ interface PromoteRenderContext {
   lockedPageIds: string[];
   deckReviewHtmlPath?: string | null;
   deckReviewReason?: string | null;
-  pptModelPath?: string | null;
-  pptModelReason?: string | null;
   pptxPath?: string | null;
   pptxReason?: string | null;
 }
@@ -358,13 +356,7 @@ function getDeckStageGuidance(context: PromoteRenderContext): string[] {
     case "deck_reviewed":
       return [
         "HTML 已通过用户确认。",
-        "可以把 deck HTML 转换为 PPT 中间模型。",
-        "生成模型后记录工件并推进到 `model_ready`。",
-      ];
-    case "model_ready":
-      return [
-        "PPT 中间模型已经生成。",
-        "可以生成最终 PPTX。",
+        "可以直接从 deck HTML 生成最终 PPTX。",
         "生成后记录 PPTX 工件并推进到 `pptx_ready`。",
       ];
     case "pptx_ready":
@@ -540,15 +532,6 @@ function getRecommendedToolCall(context: PromoteRenderContext): unknown {
           project_dir: projectDir,
           target_deck_state: "deck_review_pending",
           reason: "deck.html 已生成，需要用户审阅确认。",
-        },
-      };
-    case "convert_deck_html_to_model":
-      return {
-        tool: "advance_task_state",
-        arguments: {
-          project_dir: projectDir,
-          target_deck_state: "model_ready",
-          reason: "HTML 审阅已通过，PPT 中间模型已生成。",
         },
       };
     case "generate_pptx":
@@ -991,7 +974,7 @@ function buildTsxExportRuleMarkdown(): string {
     "",
     "## 图表与截图规则",
     "",
-    "- 图形主导模块默认应在外层加 `data-pptx-export=\"screenshot\"`。",
+    "- 图形主导模块应使用 DOM、SVG 或图片表达，并确保资源可被后端浏览器读取。",
     "- 文本主导模块默认不要整块截图。",
     "- 混合型模块只截图纯图形区域，不要把标题、正文、结论一起包进去。",
     "- 截图容器必须有明确宽高、明确背景、边界收敛到单个图表或纯图形模块。",
@@ -2064,19 +2047,18 @@ function buildDeckReviewPendingPromoteMarkdown(context: PromoteRenderContext): s
 function buildDeckReviewedPromoteMarkdown(context: PromoteRenderContext): string {
   const projectDir = context.opened.projectDir;
   const deckHtmlPath = context.deckReviewHtmlPath ?? "<用户已确认通过的 deck.html 路径>";
-  const pptModelPath = path.join(projectDir, "output", "ppt-model.json");
-  const screenshotsDir = path.join(projectDir, "output", "ppt-model-screenshots");
+  const pptxPath = path.join(projectDir, "output", "deck.pptx");
 
   return [
     "# Deck 阶段行动说明：deck_reviewed",
     "",
     "## 当前阶段",
     "",
-    `当前 deck 状态是 \`${context.opened.state.deckState}\`。用户已经确认整套 deck HTML 可以继续生成 PPT 模型。`,
+    `当前 deck 状态是 \`${context.opened.state.deckState}\`。用户已经确认整套 deck HTML 可以继续生成 PPTX。`,
     "",
     "## 本阶段目标",
     "",
-    `使用已确认的 deck HTML 生成 PPT 中间模型：\`${pptModelPath}\`。`,
+    `使用已确认的 deck HTML 直接生成最终 PPTX：\`${pptxPath}\`。`,
     "",
     "## 已确认的 HTML",
     "",
@@ -2091,104 +2073,13 @@ function buildDeckReviewedPromoteMarkdown(context: PromoteRenderContext): string
     "## 下一步行动建议",
     "",
     [
-      `1. 调用 \`convertDeckHtmlToPptxModel\`，输入 HTML 路径使用：\`${deckHtmlPath}\`。`,
-      `2. 将生成的 PPT 模型写入：\`${pptModelPath}\`。`,
-      `3. 如果转换成功，确认返回结果里的 \`output_path\` 是 \`${pptModelPath}\`，并记录 \`slide_count\`。`,
-      "4. 转换失败时先阅读错误信息；不要推进状态，也不要生成 PPTX。",
-      "5. 转换成功后调用 `advance_task_state`，把 deck 状态推进到 `model_ready`，并把生成的 `ppt-model.json` 写入 `related_artifacts`。",
-      "6. 推进成功后调用 `query_task_state`，重新读取最新 promote，进入下一阶段。",
+      "1. 通过当前 PPTX 导出能力从已确认的 deck HTML 生成最终 PPTX。",
+      `2. 将 PPTX 写入：\`${pptxPath}\`。`,
+      "3. 生成失败时先阅读错误信息，不要推进状态。",
+      "4. 成功后把 deck 状态推进到 `pptx_ready`，并记录 PPTX 工件。",
     ].join("\n"),
     "",
     "## 推荐调用的子工具",
-    "",
-    "### 生成 PPT 模型",
-    "",
-    formatJson({
-      tool: "convertDeckHtmlToPptxModel",
-      arguments: {
-        cwd: path.join(projectDir, "output"),
-        html_path: deckHtmlPath,
-        output_path: pptModelPath,
-        name: "deck",
-        screenshots_dir: screenshotsDir,
-      },
-    }),
-    "",
-    "### 推进到 model_ready",
-    "",
-    formatJson({
-      tool: "advance_task_state",
-      arguments: {
-        project_dir: projectDir,
-        target_deck_state: "model_ready",
-        reason: `用户确认 HTML 后已生成 PPT 中间模型：${pptModelPath}`,
-        related_artifacts: [
-          pptModelPath,
-        ],
-      },
-    }),
-    "",
-    "### 查询下一阶段",
-    "",
-    formatJson({
-      tool: "query_task_state",
-      arguments: {
-        project_dir: projectDir,
-        response_mode: "compact",
-      },
-    }),
-  ].join("\n");
-}
-
-function buildModelReadyPromoteMarkdown(context: PromoteRenderContext): string {
-  const projectDir = context.opened.projectDir;
-  const pptModelPath = context.pptModelPath ?? path.join(projectDir, "output", "ppt-model.json");
-  const pptxPath = path.join(projectDir, "output", "deck.pptx");
-
-  return [
-    "# Deck 阶段行动说明：model_ready",
-    "",
-    "## 当前阶段",
-    "",
-    `当前 deck 状态是 \`${context.opened.state.deckState}\`。PPT 中间模型已经生成，可以继续生成最终 PPTX。`,
-    "",
-    "## 本阶段目标",
-    "",
-    `使用 \`${pptModelPath}\` 生成最终 PPTX：\`${pptxPath}\`。`,
-    "",
-    "## 已生成的 PPT 模型",
-    "",
-    `\`${pptModelPath}\``,
-    ...(context.pptModelReason ? [
-      "",
-      "## 模型生成记录",
-      "",
-      context.pptModelReason,
-    ] : []),
-    "",
-    "## 下一步行动建议",
-    "",
-    [
-      `1. 调用 \`generatePptx\`，输入模型路径使用：\`${pptModelPath}\`。`,
-      `2. 将最终 PPTX 写入：\`${pptxPath}\`。`,
-      "3. 如果生成失败，先阅读错误信息并修复模型或生成器输入；不要推进状态。",
-      "4. 如果生成成功，确认返回结果中的 PPTX 路径指向上方输出文件。",
-      "5. 生成成功后调用 `advance_task_state`，把 deck 状态推进到 `pptx_ready`，并把生成的 PPTX 路径写入 `related_artifacts`。",
-      "6. 推进成功后调用 `query_task_state`，重新读取最新 promote，进入下一阶段。",
-    ].join("\n"),
-    "",
-    "## 推荐调用的子工具",
-    "",
-    "### 生成最终 PPTX",
-    "",
-    formatJson({
-      tool: "generatePptx",
-      arguments: {
-        cwd: path.join(projectDir, "output"),
-        model_path: pptModelPath,
-        output_path: pptxPath,
-      },
-    }),
     "",
     "### 推进到 pptx_ready",
     "",
@@ -2197,10 +2088,8 @@ function buildModelReadyPromoteMarkdown(context: PromoteRenderContext): string {
       arguments: {
         project_dir: projectDir,
         target_deck_state: "pptx_ready",
-        reason: `已根据 PPT 中间模型生成最终 PPTX：${pptxPath}`,
-        related_artifacts: [
-          pptxPath,
-        ],
+        reason: `已从用户确认的 HTML 生成最终 PPTX：${pptxPath}`,
+        related_artifacts: [pptxPath],
       },
     }),
     "",
@@ -2257,9 +2146,6 @@ function buildDeckPromoteMarkdown(context: PromoteRenderContext): string {
     return buildDeckReviewedPromoteMarkdown(context);
   }
 
-  if (opened.state.deckState === "model_ready") {
-    return buildModelReadyPromoteMarkdown(context);
-  }
 
   if (opened.state.deckState === "pptx_ready") {
     return buildPptxReadyPromoteMarkdown(context);
@@ -2706,15 +2592,6 @@ function extractFirstHtmlPath(value: string | undefined): string | null {
   return match?.[0] ?? null;
 }
 
-function extractFirstJsonPath(value: string | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-
-  const match = value.match(/(?:\/|\.{1,2}\/|[A-Za-z]:\\)[^\s，。；;"]+\.json/);
-  return match?.[0] ?? null;
-}
-
 function extractFirstPptxPath(value: string | undefined): string | null {
   if (!value) {
     return null;
@@ -2722,31 +2599,6 @@ function extractFirstPptxPath(value: string | undefined): string | null {
 
   const match = value.match(/(?:\/|\.{1,2}\/|[A-Za-z]:\\)[^\s，。；;"]+\.pptx/);
   return match?.[0] ?? null;
-}
-
-async function readLatestPptModelInfo(
-  projectDir: string,
-): Promise<{ modelPath: string | null; reason: string | null }> {
-  const events = await readTaskEvents(projectDir);
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index];
-    if (event.eventType !== "state_advanced" || event.payload.targetDeckState !== "model_ready") {
-      continue;
-    }
-
-    const relatedArtifacts = Array.isArray(event.payload.relatedArtifacts)
-      ? event.payload.relatedArtifacts.filter((item): item is string => typeof item === "string")
-      : [];
-    const modelPathFromArtifacts = relatedArtifacts.find((item) => item.endsWith(".json")) ?? null;
-    const reason = typeof event.payload.reason === "string" ? event.payload.reason : null;
-
-    return {
-      modelPath: modelPathFromArtifacts ?? extractFirstJsonPath(reason ?? undefined),
-      reason,
-    };
-  }
-
-  return { modelPath: null, reason: null };
 }
 
 async function readLatestPptxInfo(
@@ -2826,9 +2678,6 @@ export async function ensureTaskPromoteDocument(
     || opened.state.deckState === "pptx_ready"
     ? await readLatestDeckReviewInfo(projectDir)
     : { htmlPath: null, reason: null };
-  const pptModelInfo = opened.state.deckState === "model_ready"
-    ? await readLatestPptModelInfo(projectDir)
-    : { modelPath: null, reason: null };
   const pptxInfo = opened.state.deckState === "pptx_ready"
     ? await readLatestPptxInfo(projectDir)
     : { pptxPath: null, reason: null };
@@ -2851,8 +2700,6 @@ export async function ensureTaskPromoteDocument(
     lockedPageIds,
     deckReviewHtmlPath: deckReviewInfo.htmlPath,
     deckReviewReason: deckReviewInfo.reason,
-    pptModelPath: pptModelInfo.modelPath,
-    pptModelReason: pptModelInfo.reason,
     pptxPath: pptxInfo.pptxPath,
     pptxReason: pptxInfo.reason,
   };

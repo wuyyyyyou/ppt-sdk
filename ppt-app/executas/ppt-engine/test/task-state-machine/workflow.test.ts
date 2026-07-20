@@ -184,7 +184,7 @@ test("recovery rebuilds progress and returns a queryable safe state", async () =
 
     await invokeTool("advance_task_state", {
       project_dir: projectDir,
-      target_deck_state: "model_ready",
+      target_deck_state: "pptx_ready",
       reason: "测试 escape hatch 可用，但不是推荐动作主线。",
     });
     const escapeHatchQuery = await invokeTool<{
@@ -193,8 +193,8 @@ test("recovery rebuilds progress and returns a queryable safe state", async () =
       project_dir: projectDir,
       response_mode: "compact",
     });
-    assert.equal(escapeHatchQuery.recommendation.deckState, "model_ready");
-    assert.equal(escapeHatchQuery.recommendation.stage, "model_ready");
+    assert.equal(escapeHatchQuery.recommendation.deckState, "pptx_ready");
+    assert.equal(escapeHatchQuery.recommendation.stage, "pptx_ready");
   } finally {
     await rm(projectDir, { recursive: true, force: true });
   }

@@ -4,6 +4,8 @@ __pycache__/
 *.pyc
 *.egg-info/
 node_modules/
+third_party/dom-to-pptx/dist/
+third_party/dom-to-pptx/coverage/
 sea-prep/
 *.blob
 *.spec.bak

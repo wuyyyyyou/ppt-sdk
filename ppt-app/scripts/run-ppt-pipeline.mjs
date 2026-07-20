@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 
 import { spawn } from "node:child_process";
-import { access, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -14,9 +13,7 @@ const PPT_APP_DIR = path.join(WORKSPACE_DIR, "ppt-app");
 const OUTPUT_ROOT = path.join(WORKSPACE_DIR, ".vscode", "pipeline-output");
 const ENGINE_DIR = path.join(PPT_APP_DIR, "executas", "ppt-engine");
 const PREVIEW_SCRIPT = path.join(ENGINE_DIR, "scripts", "preview-page-source.ts");
-const GENERATOR_DIR = path.join(PPT_APP_DIR, "executas", "ppt-gener");
-const GENERATOR_COMMAND = "uv";
-const GENERATOR_ARGS = ["run", "--project", GENERATOR_DIR, "python", "example_plugin.py"];
+const CONVERT_SCRIPT = path.join(ENGINE_DIR, "scripts", "convert-deck-html-to-pptx.ts");
 
 const GENERATE_TIMEOUT_MS = 15 * 60 * 1000;
 const CHECK_TIMEOUT_MS = 30 * 1000;
@@ -36,8 +33,8 @@ function printUsage() {
       "",
       "Commands:",
       "  check-env    Validate the local toolchain needed by the VS Code PPT tasks.",
-      "  generate     Run manifest -> deck html -> model json -> pptx.",
-      "  generate-tsx Run one TSX Page Source -> static html/png -> model json -> pptx.",
+      "  generate     Run manifest -> deck html -> pptx.",
+      "  generate-tsx Run one TSX Page Source -> static html/png -> pptx.",
       "  generate-current  Dispatch the active TSX/JSX or manifest.json to the matching pipeline.",
       "",
       "Options:",
@@ -179,11 +176,8 @@ function buildRunContext({ sourcePath, presentationName, outRoot }) {
     manifestCopyPath: path.join(runDir, "manifest.json"),
     previewOutputDir: path.join(runDir, "preview"),
     engineOutputDir: path.join(runDir, "engine"),
-    modelOutputDir: path.join(runDir, "model"),
-    generatorOutputDir: path.join(runDir, "generator"),
     logsDir: path.join(runDir, "logs"),
-    modelOutputPath: path.join(runDir, "model", `${slug}-model.json`),
-    pptxOutputPath: path.join(runDir, "generator", `${slug}.pptx`),
+    pptxOutputPath: path.join(runDir, "output", `${slug}.pptx`),
     rasterizedOutputDir: path.join(runDir, "pptx-rasterized"),
     summaryPath: path.join(runDir, "run-summary.json"),
   };
@@ -349,7 +343,7 @@ async function invokeRpcStage({
   }
 
   if (response.error) {
-    const hintedMessage = stageName.startsWith("model")
+    const hintedMessage = ["engine", "pptx", "tsx-preview"].some((prefix) => stageName.startsWith(prefix))
       && typeof response.error.message === "string"
       && response.error.message.includes("Failed to launch the browser process")
       ? `${response.error.message.trim()} ${BROWSER_TROUBLESHOOTING_HINT}`
@@ -464,11 +458,6 @@ async function collectEnvironmentIssues() {
       message: "ppt-engine is not built",
       hint: "Run: cd ppt-app/executas/ppt-engine && npm run build",
     },
-    {
-      filePath: path.join(GENERATOR_DIR, "pyproject.toml"),
-      message: "ppt-gener project file is missing",
-      hint: "Expected: ppt-app/executas/ppt-gener/pyproject.toml",
-    },
   ];
 
   for (const check of checks) {
@@ -492,58 +481,6 @@ async function runDescribeChecks() {
     timeoutMs: CHECK_TIMEOUT_MS,
   });
 
-  await invokeRpcStage({
-    stageName: "generator-describe",
-    command: GENERATOR_COMMAND,
-    args: GENERATOR_ARGS,
-    cwd: GENERATOR_DIR,
-    request: describeRequest,
-    timeoutMs: CHECK_TIMEOUT_MS,
-  });
-}
-
-async function runModelBrowserSmokeCheck() {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), "presenton-ppt-pipeline-env-"));
-  const htmlPath = path.join(tempDir, "deck.html");
-  const outputPath = path.join(tempDir, "model.json");
-  const html = [
-    "<!doctype html>",
-    "<html>",
-    "<body>",
-    '  <div id="presentation-slides-wrapper" data-presenton-render-status="ready">',
-    "    <div>",
-    '      <div style="width:1280px;height:720px;background:#ffffff;position:relative;">',
-    '        <h1 style="position:absolute;left:64px;top:64px;font-size:32px;color:#111827;">Env Check</h1>',
-    "      </div>",
-    "    </div>",
-    "  </div>",
-    "</body>",
-    "</html>",
-  ].join("\n");
-
-  try {
-    await writeFile(htmlPath, html, "utf8");
-    const request = createRpcRequest(2, "invoke", {
-      tool: "convertDeckHtmlToPptxModel",
-      arguments: {
-        cwd: tempDir,
-        html_path: htmlPath,
-        output_path: outputPath,
-        name: "env-check",
-      },
-    });
-
-    await invokeRpcStage({
-      stageName: "model-browser-check",
-      command: process.execPath,
-      args: ["example_plugin.js"],
-      cwd: ENGINE_DIR,
-      request,
-      timeoutMs: GENERATE_TIMEOUT_MS,
-    });
-  } finally {
-    await rm(tempDir, { recursive: true, force: true });
-  }
 }
 
 async function checkEnvironment() {
@@ -560,7 +497,6 @@ async function checkEnvironment() {
 
   try {
     await runDescribeChecks();
-    await runModelBrowserSmokeCheck();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write("Environment check failed.\n\n");
@@ -572,8 +508,7 @@ async function checkEnvironment() {
   process.stdout.write("Environment check passed.\n");
   process.stdout.write(`- Node.js: ${process.version}\n`);
   process.stdout.write(`- Engine plugin: ${relativeToWorkspace(ENGINE_DIR)}\n`);
-  process.stdout.write(`- Generator plugin: ${relativeToWorkspace(GENERATOR_DIR)}\n`);
-  process.stdout.write("- Engine HTML-to-model smoke check: passed\n");
+  process.stdout.write("- Engine plugin describe: passed\n");
 }
 
 function optionIsEnabled(value) {
@@ -581,31 +516,16 @@ function optionIsEnabled(value) {
   return !["0", "false", "no", "off"].includes(String(value).trim().toLowerCase());
 }
 
-async function generatePptxFromModel({ modelPath, runContext }) {
-  const generatorRequest = createRpcRequest(3, "invoke", {
-    tool: "generatePptx",
-    arguments: {
-      cwd: runContext.generatorOutputDir,
-      model_path: modelPath,
-      output_path: runContext.pptxOutputPath,
-    },
-  });
-  const generatorStage = await invokeRpcStage({
-    stageName: "generator",
-    command: GENERATOR_COMMAND,
-    args: GENERATOR_ARGS,
-    cwd: GENERATOR_DIR,
-    request: generatorRequest,
+async function generatePptxFromDeckHtml({ htmlPath, runContext }) {
+  const stage = await invokeJsonCommandStage({
+    stageName: "pptx",
+    command: process.execPath,
+    args: ["--import", "tsx/esm", CONVERT_SCRIPT, htmlPath, runContext.pptxOutputPath, runContext.presentationName],
+    cwd: ENGINE_DIR,
     timeoutMs: GENERATE_TIMEOUT_MS,
     logDir: runContext.logsDir,
   });
-
-  const finalPptxPath = generatorStage.response.result?.data?.path;
-  if (typeof finalPptxPath !== "string" || finalPptxPath.length === 0) {
-    throw new Error("Generator stage did not return path");
-  }
-
-  return { finalPptxPath, generatorStage };
+  return { finalPptxPath: stage.response.pptx_path, pptxStage: stage };
 }
 
 async function rasterizeGeneratedPptx({ pptxPath, runContext }) {
@@ -686,15 +606,13 @@ async function generatePipeline(options) {
 
   await Promise.all([
     ensureDirectory(runContext.engineOutputDir),
-    ensureDirectory(runContext.modelOutputDir),
-    ensureDirectory(runContext.generatorOutputDir),
     ensureDirectory(runContext.logsDir),
   ]);
   await writeFile(runContext.manifestCopyPath, manifestText, "utf8");
 
   process.stdout.write(`Manifest: ${relativeToWorkspace(manifestPath)}\n`);
   process.stdout.write(`Run directory: ${relativeToWorkspace(runContext.runDir)}\n`);
-  process.stdout.write(`[1/3] Build deck HTML...\n`);
+  process.stdout.write(`[1/2] Build deck HTML...\n`);
 
   const engineRequest = createRpcRequest(1, "invoke", {
     tool: "buildDeckHtmlFromManifest",
@@ -720,35 +638,9 @@ async function generatePipeline(options) {
     throw new Error("Engine stage did not return deck_output_path");
   }
 
-  process.stdout.write(`[2/3] Convert deck HTML to model JSON...\n`);
-  const modelRequest = createRpcRequest(2, "invoke", {
-    tool: "convertDeckHtmlToPptxModel",
-    arguments: {
-      cwd: runContext.modelOutputDir,
-      html_path: deckOutputPath,
-      output_path: runContext.modelOutputPath,
-      name: runContext.presentationName,
-      screenshots_dir: path.join(runContext.modelOutputDir, "screenshots"),
-    },
-  });
-  const modelStage = await invokeRpcStage({
-    stageName: "model",
-    command: process.execPath,
-    args: ["example_plugin.js"],
-    cwd: ENGINE_DIR,
-    request: modelRequest,
-    timeoutMs: GENERATE_TIMEOUT_MS,
-    logDir: runContext.logsDir,
-  });
-
-  const modelOutputPath = modelStage.response.result?.data?.output_path;
-  if (typeof modelOutputPath !== "string" || modelOutputPath.length === 0) {
-    throw new Error("Model stage did not return output_path");
-  }
-
-  process.stdout.write(`[3/3] Generate PPTX...\n`);
-  const { finalPptxPath, generatorStage } = await generatePptxFromModel({
-    modelPath: modelOutputPath,
+  process.stdout.write(`[2/2] Generate PPTX...\n`);
+  const { finalPptxPath, pptxStage } = await generatePptxFromDeckHtml({
+    htmlPath: deckOutputPath,
     runContext,
   });
   const rasterization = optionIsEnabled(options.rasterize)
@@ -768,17 +660,10 @@ async function generatePipeline(options) {
       slide_count: engineStage.response.result?.data?.slide_count ?? null,
       log_paths: engineStage.logPaths,
     },
-    model: {
-      output_path: modelOutputPath,
-      screenshots_dir: modelStage.response.result?.data?.screenshots_dir ?? null,
-      slide_count: modelStage.response.result?.data?.slide_count ?? null,
-      log_paths: modelStage.logPaths,
-    },
-    generator: {
+    pptx: {
       output_path: finalPptxPath,
-      slide_count: generatorStage.response.result?.data?.slide_count ?? null,
-      presentation_name: generatorStage.response.result?.data?.presentation_name ?? null,
-      log_paths: generatorStage.logPaths,
+      slide_count: pptxStage.response.slide_count ?? null,
+      log_paths: pptxStage.logPaths,
     },
     validation: rasterization
       ? {
@@ -796,7 +681,6 @@ async function generatePipeline(options) {
 
   process.stdout.write("Pipeline completed.\n");
   process.stdout.write(`- Deck HTML: ${relativeToWorkspace(deckOutputPath)}\n`);
-  process.stdout.write(`- Model JSON: ${relativeToWorkspace(modelOutputPath)}\n`);
   process.stdout.write(`- PPTX: ${relativeToWorkspace(finalPptxPath)}\n`);
   if (rasterization) {
     process.stdout.write(
@@ -846,13 +730,12 @@ async function generateTsxPipeline(options) {
 
   await Promise.all([
     ensureDirectory(runContext.previewOutputDir),
-    ensureDirectory(runContext.generatorOutputDir),
     ensureDirectory(runContext.logsDir),
   ]);
 
   process.stdout.write(`Page Source: ${relativeToWorkspace(entryPath)}\n`);
   process.stdout.write(`Run directory: ${relativeToWorkspace(runContext.runDir)}\n`);
-  process.stdout.write(`[1/3] Render Page Source and build PPTX Model...\n`);
+  process.stdout.write(`[1/2] Render Page Source and generate PPTX...\n`);
 
   const previewStage = await invokeJsonCommandStage({
     stageName: "tsx-preview",
@@ -862,7 +745,7 @@ async function generateTsxPipeline(options) {
       "tsx/esm",
       PREVIEW_SCRIPT,
       entryPath,
-      "--model",
+      "--pptx",
       "--json",
       `--name=${derivedName}`,
       `--output=${runContext.previewOutputDir}`,
@@ -872,27 +755,23 @@ async function generateTsxPipeline(options) {
     logDir: runContext.logsDir,
   });
   const preview = previewStage.response;
-  for (const fieldName of ["html_path", "browser_png_path", "model_path"]) {
+  for (const fieldName of ["html_path", "browser_png_path", "pptx_path"]) {
     if (typeof preview[fieldName] !== "string" || preview[fieldName].length === 0) {
       throw new Error(`TSX preview stage did not return ${fieldName}`);
     }
   }
 
-  process.stdout.write(`[2/3] Generate PPTX...\n`);
-  const { finalPptxPath, generatorStage } = await generatePptxFromModel({
-    modelPath: preview.model_path,
-    runContext,
-  });
+  const finalPptxPath = preview.pptx_path;
 
   let rasterization = null;
   if (optionIsEnabled(options.rasterize)) {
-    process.stdout.write(`[3/3] Rasterize generated PPTX for visual verification...\n`);
+    process.stdout.write(`[2/2] Rasterize generated PPTX for visual verification...\n`);
     rasterization = await rasterizeGeneratedPptx({
       pptxPath: finalPptxPath,
       runContext,
     });
   } else {
-    process.stdout.write(`[3/3] PPTX visual verification skipped.\n`);
+    process.stdout.write(`[2/2] PPTX visual verification skipped.\n`);
   }
 
   const summary = {
@@ -905,15 +784,8 @@ async function generateTsxPipeline(options) {
     preview: {
       html_path: preview.html_path ?? null,
       browser_png_path: preview.browser_png_path ?? null,
-      model_path: preview.model_path,
-      model_assets_dir: preview.model_assets_dir ?? null,
+      pptx_path: preview.pptx_path,
       log_paths: previewStage.logPaths,
-    },
-    generator: {
-      output_path: finalPptxPath,
-      slide_count: generatorStage.response.result?.data?.slide_count ?? null,
-      presentation_name: generatorStage.response.result?.data?.presentation_name ?? null,
-      log_paths: generatorStage.logPaths,
     },
     validation: rasterization
       ? {
@@ -931,7 +803,6 @@ async function generateTsxPipeline(options) {
   process.stdout.write("Pipeline completed.\n");
   process.stdout.write(`- Static HTML: ${relativeToWorkspace(preview.html_path)}\n`);
   process.stdout.write(`- Browser PNG: ${relativeToWorkspace(preview.browser_png_path)}\n`);
-  process.stdout.write(`- Model JSON: ${relativeToWorkspace(preview.model_path)}\n`);
   process.stdout.write(`- PPTX: ${relativeToWorkspace(finalPptxPath)}\n`);
   if (rasterization) {
     process.stdout.write(

@@ -200,7 +200,6 @@ const AgingDependency = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
           subtitle={parsed.chartSubtitle}
           tone="comparison"
           padding={22}
-          exportMode="editable"
         >
           <div className="flex h-full min-h-0 flex-col">
             <div className="min-h-0 flex-1">

@@ -9,7 +9,6 @@ type StableInlineRowProps = {
   align?: "start" | "center" | "end";
   className?: string;
   style?: CSSProperties;
-  pptxInlineComposition?: "row" | "icon-text" | "metric";
 };
 
 const alignClassName = {
@@ -27,7 +26,6 @@ const StableInlineRow = ({
   align = "center",
   className,
   style,
-  pptxInlineComposition,
 }: StableInlineRowProps) => {
   const displayClassName = inline ? "inline-flex" : "flex";
   const wrapClassName = wrap ? "flex-wrap" : "whitespace-nowrap";
@@ -42,7 +40,7 @@ const StableInlineRow = ({
       ]
         .filter(Boolean)
         .join(" ")}
-      data-pptx-inline-composition={pptxInlineComposition}
+
       style={{
         height,
         gap,

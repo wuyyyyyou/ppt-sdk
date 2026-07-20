@@ -12,7 +12,7 @@ const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 
 type ParsedArguments = {
   entryPath: string;
-  generatePptxModel: boolean;
+  generatePptx: boolean;
   jsonOutput: boolean;
   name: string | null;
   outputDir: string | null;
@@ -25,14 +25,14 @@ function readOptionValue(argument: string, optionName: string): string | null {
 
 function parseArguments(argv: string[]): ParsedArguments {
   let entryPath: string | null = null;
-  let generatePptxModel = false;
+  let generatePptx = false;
   let jsonOutput = false;
   let name: string | null = null;
   let outputDir: string | null = null;
 
   for (const argument of argv) {
-    if (argument === "--model") {
-      generatePptxModel = true;
+    if (argument === "--pptx") {
+      generatePptx = true;
       continue;
     }
     if (argument === "--json") {
@@ -66,11 +66,11 @@ function parseArguments(argv: string[]): ParsedArguments {
 
   if (!entryPath) {
     throw new Error(
-      "Usage: npm run preview:tsx -- <preview-source> [--model] [--json] [--name=<name>] [--output=<absolute-path>]",
+      "Usage: npm run preview:tsx -- <preview-source> [--pptx] [--json] [--name=<name>] [--output=<absolute-path>]",
     );
   }
 
-  return { entryPath, generatePptxModel, jsonOutput, name, outputDir };
+  return { entryPath, generatePptx, jsonOutput, name, outputDir };
 }
 
 async function main() {
@@ -88,7 +88,7 @@ async function main() {
     entryPath: parsed.entryPath,
     outputDir,
     name,
-    generatePptxModel: parsed.generatePptxModel,
+    generatePptx: parsed.generatePptx,
   });
 
   if (parsed.jsonOutput) {
@@ -98,8 +98,7 @@ async function main() {
       name: result.name,
       html_path: result.htmlPath,
       browser_png_path: result.screenshotPath,
-      model_path: result.modelPath,
-      model_assets_dir: result.modelAssetsDir,
+      pptx_path: result.pptxPath,
     })}\n`);
     return;
   }
@@ -108,10 +107,7 @@ async function main() {
     "Page Source preview generated:",
     `HTML: ${result.htmlPath}`,
     `PNG: ${result.screenshotPath}`,
-    result.modelPath ? `PPTX Model: ${result.modelPath}` : "PPTX Model: not requested",
-    result.modelAssetsDir
-      ? `PPTX assets: ${result.modelAssetsDir}`
-      : "PPTX assets: not requested",
+    result.pptxPath ? `PPTX: ${result.pptxPath}` : "PPTX: not requested",
   ];
   process.stdout.write(`${lines.join("\n")}\n`);
 }

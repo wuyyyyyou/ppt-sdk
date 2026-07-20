@@ -34,18 +34,17 @@ const IconText = ({
     <StableInlineRow
       height={height}
       gap={gap}
-      pptxInlineComposition="icon-text"
       style={{ fontSize }}
     >
       <div
-        data-pptx-inline-role="leading"
+
         className="flex flex-none items-center justify-center"
         style={{ width: iconSize, height: iconSize }}
       >
         {icon}
       </div>
       <div
-        data-pptx-inline-role="label"
+
         className={["flex items-center", noWrap ? "whitespace-nowrap" : "whitespace-normal"].join(" ")}
         style={{
           width: textWidth,

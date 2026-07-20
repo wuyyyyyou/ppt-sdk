@@ -179,6 +179,7 @@ export interface BuildDeckHtmlPagesAndScreenshotsFromManifestSlideOutput {
 
 export interface BuildDeckHtmlPagesAndScreenshotsFromManifestResult {
   outputDir: string;
+  deckHtmlPath: string;
   slides: BuildDeckHtmlPagesAndScreenshotsFromManifestSlideOutput[];
   slideCount: number;
   title: string;

@@ -18,7 +18,6 @@ import {
 import {
   appendAppWorkspaceLog,
   buildDeckHtmlFromManifest,
-  convertDeckHtmlToPptxModel,
   createAppWorkspace,
   duplicateAppWorkspacePage,
   ensureConfirmedOutlinePageIds,
@@ -75,7 +74,6 @@ import {
   prepareAppPageRefinement,
   commitAppDeckRefinement,
   prepareAppPageFiles,
-  prepareAppExportModel,
   prepareAppWorkspaceDiagnosticBundle,
   prepareAppUploadedSourceAnalysisWorkspace,
   prepareAppResearchWorkspace,
@@ -88,7 +86,6 @@ import {
   recordAppPagePlan,
   recordAppPageProgress,
   recordAppPdfExport,
-  recordAppPptxExport,
   recordAppResearchCurationDraft,
   recordAppResearchEvidence,
   recordAppResearchEvidencePage,
@@ -105,7 +102,7 @@ import {
   renderAppWorkspaceDeckHtml,
   renderAppWorkspacePagePreview,
   selectAppWorkspaceTemplate,
-  startAppPptxExportModel,
+  startAppPptxExport,
   invokeTaskStateMachine,
   confirmAppWorkspaceOutline,
   resetAppWorkspaceOutline,
@@ -2065,24 +2062,13 @@ async function toolAppGetRenderedDeckHtml(args) {
   };
 }
 
-async function toolAppPrepareExportModel(args) {
+async function toolAppStartPptxExport(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
   }
 
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  return prepareAppExportModel({
-    workspace_dir: workspaceDir,
-  });
-}
-
-async function toolAppStartPptxExportModel(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  return startAppPptxExportModel({
+  return startAppPptxExport({
     workspace_dir: workspaceDir,
   });
 }
@@ -2338,20 +2324,6 @@ async function toolAppExportPdf(args) {
   });
 }
 
-async function toolAppRecordPptxExport(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const pptxPath = readRequiredAbsolutePathArg(args, "pptx_path");
-  return registerWorkspaceJsonReference(await recordAppPptxExport({
-    workspace_dir: workspaceDir,
-    pptx_path: pptxPath,
-    generator_result: args.generator_result,
-  }));
-}
-
 async function toolAppRecordPdfExport(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -2435,55 +2407,6 @@ async function toolBuildDeckHtmlFromManifest(args) {
     slide_count: result.slideCount,
     title: result.title,
     manifest_path: result.manifestPath,
-  };
-}
-
-async function toolConvertDeckHtmlToPptxModel(args) {
-  if (!args || typeof args !== "object") {
-    throw new Error("Arguments must be an object");
-  }
-
-  readOptionalAbsolutePathArg(args, "cwd");
-  const htmlPath = readRequiredAbsolutePathArg(args, "html_path");
-  const outputPath = readRequiredAbsolutePathArg(args, "output_path");
-  const screenshotsDir = readOptionalAbsolutePathArg(args, "screenshots_dir");
-  const html = await readFile(htmlPath, "utf8");
-  const name =
-    typeof args.name === "string" && args.name.length > 0
-      ? args.name
-      : path.basename(htmlPath, path.extname(htmlPath));
-  const deviceScaleFactor = args.device_scale_factor !== undefined
-    ? Number(args.device_scale_factor)
-    : args.deviceScaleFactor !== undefined
-      ? Number(args.deviceScaleFactor)
-      : undefined;
-  if (
-    deviceScaleFactor !== undefined
-    && (!Number.isFinite(deviceScaleFactor) || deviceScaleFactor <= 0)
-  ) {
-    throw new Error('"device_scale_factor" must be a positive number');
-  }
-
-  const model = await convertDeckHtmlToPptxModel({
-    html,
-    name,
-    viewport: deviceScaleFactor
-      ? { width: 1280, height: 720, deviceScaleFactor }
-      : undefined,
-    settleTimeMs:
-      typeof args.settle_time_ms === "number" ? args.settle_time_ms : undefined,
-    screenshotsDir,
-  });
-
-  await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, `${JSON.stringify(model, null, 2)}\n`, "utf8");
-
-  return {
-    output_path: outputPath,
-    html_path: htmlPath,
-    slide_count: Array.isArray(model.slides) ? model.slides.length : 0,
-    name: model.name ?? name,
-    screenshots_dir: screenshotsDir ?? null,
   };
 }
 
@@ -2614,20 +2537,17 @@ const TOOL_DISPATCH = {
   app_render_workspace_page_preview: toolAppRenderWorkspacePagePreview,
   app_get_rendered_deck_html: toolAppGetRenderedDeckHtml,
   app_render_deck_html: toolAppRenderDeckHtml,
-  app_start_pptx_export_model: toolAppStartPptxExportModel,
+  app_start_pptx_export: toolAppStartPptxExport,
   app_get_pptx_export_status: toolAppGetPptxExportStatus,
   app_publish_export_artifact: toolAppPublishExportArtifact,
   app_get_export_artifact_download_url: toolAppGetExportArtifactDownloadUrl,
   app_prepare_workspace_diagnostic_bundle: toolAppPrepareWorkspaceDiagnosticBundle,
-  app_prepare_export_model: toolAppPrepareExportModel,
   app_export_pdf: toolAppExportPdf,
-  app_record_pptx_export: toolAppRecordPptxExport,
   app_record_pdf_export: toolAppRecordPdfExport,
   listDiscoveredTemplateGroupSummaries: toolListDiscoveredTemplateGroupSummaries,
   getAllDiscoveredTemplateGroups: toolGetAllDiscoveredTemplateGroups,
   getDiscoveredTemplateGroup: toolGetDiscoveredTemplateGroup,
   buildDeckHtmlFromManifest: toolBuildDeckHtmlFromManifest,
-  convertDeckHtmlToPptxModel: toolConvertDeckHtmlToPptxModel,
   forkTemplateGroup: toolForkTemplateGroup,
 };
 

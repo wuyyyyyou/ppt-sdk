@@ -38,18 +38,17 @@ export default function IconText({
       height={height}
       gap={gap}
       className={className}
-      pptxInlineComposition="icon-text"
       style={{ fontSize, color, ...style }}
     >
       <span
-        data-pptx-inline-role="leading"
+
         className="flex flex-none items-center justify-center"
         style={{ width: iconSize, height: iconSize }}
       >
         {icon}
       </span>
       <span
-        data-pptx-inline-role="label"
+
         className={noWrap ? "flex items-center whitespace-nowrap" : "flex items-center whitespace-normal"}
         style={{
           height: noWrap ? height : undefined,

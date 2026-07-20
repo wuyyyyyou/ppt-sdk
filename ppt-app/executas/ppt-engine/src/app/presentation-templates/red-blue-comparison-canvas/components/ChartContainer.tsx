@@ -11,7 +11,6 @@ type ChartContainerProps = {
   meta?: ReactNode;
   tone?: ComparisonTone;
   padding?: number;
-  exportMode?: "editable" | "screenshot";
   className?: string;
 };
 
@@ -22,7 +21,6 @@ const ChartContainer = ({
   meta,
   tone = "comparison",
   padding = 20,
-  exportMode = "editable",
   className,
 }: ChartContainerProps) => {
   const toneValue = redBlueComparisonTheme.tone[tone];
@@ -58,7 +56,7 @@ const ChartContainer = ({
         className="min-h-0 flex-1 overflow-hidden"
         data-chart-like="true"
         data-validation-ignore="true"
-        data-pptx-export={exportMode === "screenshot" ? "screenshot" : undefined}
+
       >
         {children}
       </div>

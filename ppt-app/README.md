@@ -1,7 +1,7 @@
 # PPT App
 
 `ppt-app` 是 Anna App 形态的 PPT 生成工作台。它把前端 SPA、PPT 引擎、
-PPTX 生成器和搜索工具打包在同一个 app 目录下，方便被 Anna App runtime
+PPTX 导出引擎和搜索工具打包在同一个 app 目录下，方便被 Anna App runtime
 加载到 iframe 并通过 bundled Executa 调用本地工具。
 
 ## 项目架构
@@ -17,7 +17,6 @@ ppt-app/
 ├── scripts/               # app 内同步、校验和 pipeline 辅助脚本
 └── executas/
     ├── ppt-engine/        # Node Executa：模板、渲染、工作区、校验、任务状态机
-    ├── ppt-gener/         # Python Executa：把 PPT model 写成最终 .pptx
     └── anna-search/       # Python Executa：搜索和图片抓取工具
 ```
 
@@ -30,7 +29,6 @@ ppt-app/
 
 ```text
 bundled:ppt-engine
-bundled:ppt-gener
 bundled:anna-search
 ```
 
@@ -52,7 +50,8 @@ bundled:anna-search
 
 - Node.js 22+
 - npm
-- uv
+- pnpm 11.15.1（由 Corepack 管理）
+- uv（anna-search）
 - Anna App CLI（通常来自 `@anna-ai/cli`）
 - Chrome 或 Chrome for Testing，用于 `ppt-engine` 生成模板预览截图
 
@@ -71,6 +70,8 @@ anna-app login --host <nexus-url>
 ```bash
 cd ppt-app/executas/ppt-engine
 npm install
+cd ../../../third_party/dom-to-pptx && corepack pnpm install --frozen-lockfile
+cd ../../ppt-app/executas/ppt-engine
 npm run build:full
 ```
 
@@ -88,9 +89,9 @@ npm run build
 `ppt-app` 的 `prebuild` 会同步 tool manifest 和模板预览图，然后由 Vite 输出
 `bundle/`。
 
-### 3. Python Executa 的 uv 环境
+### 3. anna-search 的 uv 环境
 
-`ppt-gener` 和 `anna-search` 不需要像 Node 项目一样手动 `npm install`。
+`anna-search` 不需要像 Node 项目一样手动 `npm install`。
 它们的 `executa.json` 直接使用：
 
 ```bash
@@ -103,10 +104,7 @@ uv run --project . python example_plugin.py
 如果想提前预热依赖缓存，可以手动执行：
 
 ```bash
-cd ppt-app/executas/ppt-gener
-uv sync --project .
-
-cd ../anna-search
+cd ppt-app/executas/anna-search
 uv sync --project .
 ```
 
@@ -148,7 +146,7 @@ npm run ppt:generate-tsx -- \
   --rasterize 1
 ```
 
-流水线生成静态 HTML、浏览器 PNG、PPTX Model、最终 `.pptx`，并可把最终 PPTX
+流水线生成静态 HTML、浏览器 PNG、最终 `.pptx`，并可把最终 PPTX
 重新栅格化为 PNG，方便和浏览器渲染结果对比。产物默认写入仓库根目录的
 `.vscode/pipeline-output/`。
 

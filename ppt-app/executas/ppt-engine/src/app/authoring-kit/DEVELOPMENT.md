@@ -38,15 +38,15 @@ export default function MetricCardPreview() {
 npm run preview:tsx -- src/app/authoring-kit/foundations/SlideCanvas.preview.tsx
 ```
 
-同时生成 PPTX Model：
+同时生成 PPTX：
 
 ```bash
-npm run preview:tsx -- src/app/authoring-kit/foundations/SlideCanvas.preview.tsx --model
+npm run preview:tsx -- src/app/authoring-kit/foundations/SlideCanvas.preview.tsx --pptx
 ```
 
 可用参数：
 
-- `--model`：额外生成单页 PPTX Model JSON 和模型截图资产目录。
+- `--pptx`：额外生成单页 `.pptx`。
 - `--json`：只输出机器可读的单行 JSON，供 `ppt-app` 流水线编排使用。
 - `--name=<name>`：覆盖从入口文件名推导的产物名称。
 - `--output=<absolute-path>`：覆盖默认输出目录，必须使用绝对路径。
@@ -61,23 +61,20 @@ npm run preview:tsx -- src/app/authoring-kit/foundations/SlideCanvas.preview.tsx
 .preview-output/slide-canvas/
 ├── slide-canvas.html
 ├── slide-canvas-browser.png
-├── slide-canvas-ppt-model.json
-└── slide-canvas-ppt-assets/
+├── slide-canvas.pptx
 ```
 
 - HTML 是浏览器渲染后的静态 DOM HTML。
 - `*-browser.png` 是重新打开静态 HTML 后生成的浏览器截图。
-- `*-ppt-model.json` 只在使用 `--model` 时生成。
-- `*-ppt-assets/` 保存 PPTX Model 中截图化元素需要的 PNG，文件名沿用转换器的随机 UUID。
-
-重复运行会覆盖同名 HTML、PNG 和 Model；生成 Model 前只会清理该 Preview 自己的 `*-ppt-assets/`，不会清空整个输出目录。
+- `.pptx` 只在使用 `--pptx` 时生成。
+重复运行会覆盖同名 HTML、PNG 和 PPTX，不会清空整个输出目录。
 
 ## 运行边界
 
 - Preview 使用与正式 Page Source 相同的 React、Recharts、Tailwind、Chrome、渲染就绪和静态化实现。
 - npm 依赖必须属于正式 Page Source 运行时允许的依赖；本地相对 import 必须留在最近 `tsconfig.json` 定义的项目根目录内。
 - `buildPageSourcePreview` 本身只负责构建产物，不执行完整 TypeScript 检查；`preview:tsx` 命令负责先检查再构建，与 ppt-app 的现有编排方式一致。
-- `--model` 只验证到 HTML → PPTX Model，不生成最终 `.pptx`。
+- `--pptx` 通过 vendored dom-to-pptx 直接生成最终 `.pptx`。
 
 ## 最终 PPTX 验证
 
@@ -89,7 +86,7 @@ npm run ppt:generate-tsx -- \
   --rasterize 1
 ```
 
-该命令依次生成静态 HTML、浏览器 PNG、PPTX Model、最终 `.pptx`，并在启用
+该命令依次生成静态 HTML、浏览器 PNG和最终 `.pptx`，并在启用
 `--rasterize` 时把最终 PPTX 重新渲染成 PNG。统一产物和分阶段日志写入仓库根目录的
 `.vscode/pipeline-output/`。
 

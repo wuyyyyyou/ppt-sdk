@@ -8,7 +8,6 @@
 - [`docs/adr/`](docs/adr/)
 - [`ppt-app/README.md`](ppt-app/README.md)
 - [`ppt-app/executas/ppt-engine/README.md`](ppt-app/executas/ppt-engine/README.md)
-- [`ppt-app/executas/ppt-gener/README.md`](ppt-app/executas/ppt-gener/README.md)
 
 如果 `CONTEXT.md` 或 `docs/adr/` 暂时不存在，静默跳过即可。不要同时创建 `context.md` 和 `CONTEXT.md`；在大小写不敏感文件系统上它们会指向同一路径。
 
@@ -19,13 +18,13 @@
 相关子项目都收敛在 `ppt-app/executas/` 下：
 
 - [`ppt-app/executas/ppt-engine/`](ppt-app/executas/ppt-engine/)：Authoring Kit 与 Page Source 工作区能力、模板发现、HTML 渲染、PPTX model 转换和任务状态机。
-- [`ppt-app/executas/ppt-gener/`](ppt-app/executas/ppt-gener/)：把 `PptxPresentationModel` 写成最终 `.pptx`。
+- [`third_party/dom-to-pptx/`](third_party/dom-to-pptx/)：仓库内直接维护的 HTML 到 PPTX 权威源码。
 - [`ppt-app/executas/anna-search/`](ppt-app/executas/anna-search/)：Anna App 内置搜索 Executa。
 
 完整链路仍然是：
 
 ```text
-manifest.json -> deck.html -> ppt-model.json -> .pptx
+manifest.json -> deck.html -> .pptx
 ```
 
 ## 当前代码架构
@@ -45,22 +44,17 @@ manifest.json -> deck.html -> ppt-model.json -> .pptx
 - `src/app/authoring-kit/`：新创作主路径使用的 Foundation Modules、Reference Library 和 Page Source Bootstrap 资源。
 - `src/authoring-kit-workspace/`：Authoring Kit 安装、稳定页面标识、Page Source 初始化和最小 manifest 重建。
 - `src/app-workspace/`：工作区 artifact 读写和聚合。
-- `src/html-to-pptx-model/`：HTML / DOM 到 PPTX model 的抽取与转换。
+- `src/pptx-export/`：在后端受管 Chrome 中加载 vendored dom-to-pptx，并从整体 Deck HTML 生成 `.pptx`。
 - `src/render/`：Deck / slide 渲染与运行时 bundle。
 - `src/task-state-machine/`：任务状态机、恢复、查询与持久化。
 - `src/discovery/`、`src/local-template/`、`src/browser/`、`src/http/`、`src/cli.ts`：发现、本地模板、浏览器渲染、HTTP 和 CLI 入口。
-
-### `ppt-app/executas/ppt-gener`
-
-- `src/presenton_sdk_pptx_generator/`：Python 端的最终 `.pptx` 生成逻辑。
-- `example_plugin.py`：Anna Executa 插件入口。
 
 ## 关键边界
 
 - React 页面组件只调用 `PptBackend`。
 - Anna Runtime / standalone 的差异只放在 adapter 层。
 - 工作区文件读写和 gate 判断放在 `ppt-engine` app-facing tools。
-- `ppt-gener` 保持单一职责，只生成最终 `.pptx`。
+- `ppt-engine` 持有完整的 Deck HTML 到 PPTX 后端导出作业。
 - 前端不能直接读写本地文件系统。
 - 不要把前端的 `tools.invoke` 写成插件内部 JSON-RPC envelope。
 
@@ -73,7 +67,7 @@ manifest.json -> deck.html -> ppt-model.json -> .pptx
 以下位置必须通过 [`ppt-app/scripts/sync-tool-manifests.mjs`](ppt-app/scripts/sync-tool-manifests.mjs)
 保持同步：
 
-- [`ppt-app/manifest.json`](ppt-app/manifest.json) 的 `required_executas[].tool_id`：固定为 `bundled:ppt-engine`、`bundled:ppt-gener`、`bundled:anna-search`
+- [`ppt-app/manifest.json`](ppt-app/manifest.json) 的 `required_executas[].tool_id`：固定为 `bundled:ppt-engine`、`bundled:anna-search`
 - [`ppt-app/manifest.json`](ppt-app/manifest.json) 的 `required_executas[].min_version`：来自各 Executa manifest 的 `version`
 - [`ppt-app/manifest.json`](ppt-app/manifest.json) 的 `ui.host_api.tools`：固定为 `required:bundled:<handle>`
 - [`ppt-app/app.json`](ppt-app/app.json) 的 `bundled_executas`
@@ -88,7 +82,6 @@ manifest.json -> deck.html -> ppt-model.json -> .pptx
 
 ```text
 ppt-engine:  tool-lightvoss-ppt-engine-kqhra9hy
-ppt-gener:   tool-lightvoss-ppt-gener-2r765c57
 anna-search: tool-lightvoss-anna-search-7ym3jyqv
 ```
 
@@ -124,13 +117,6 @@ cd ppt-app/executas/ppt-engine && npm run start
 cd ppt-app/executas/ppt-engine && npm run start:plugin
 ```
 
-`ppt-gener` 里常用命令是：
-
-```bash
-cd ppt-app/executas/ppt-gener && uv sync
-cd ppt-app/executas/ppt-gener && printf '%s\n' '{"jsonrpc":"2.0","method":"describe","id":1}' | uv run --project . python example_plugin.py
-```
-
 ## 构建与验证顺序
 
 如果改动涉及下游产物，优先按这个顺序：
@@ -148,7 +134,7 @@ cd ppt-app/executas/ppt-gener && printf '%s\n' '{"jsonrpc":"2.0","method":"descr
 
 - `ppt-app/executas/ppt-engine/test/**/*.test.ts` 是主要的单测入口，命令是 `npm run test:unit`。
 - `ppt-app` 目前主要靠 `npm run check`、`npm run build` 和 `npm run validate` 做回归。
-- `ppt-app/executas/ppt-gener` 主要靠插件启动和 `build_binary.sh --test` 做冒烟验证。
+- vendored dom-to-pptx 使用定向 Vitest 与 `ppt-engine` build 验证。
 - 新增测试时，优先沿用现有目录和命名：`*.test.ts`。
 
 ## 模板与预览

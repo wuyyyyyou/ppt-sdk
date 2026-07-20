@@ -165,7 +165,7 @@ const EconomySizeGrowth = ({ data }: { data: Partial<z.infer<typeof Schema>> }) 
     >
       {parsed.showDecorations ? <EconomyDecorations /> : null}
       <div className="relative z-10 grid h-full min-h-0 grid-cols-[1.36fr_0.92fr] gap-[34px]">
-        <ChartContainer title={parsed.chartTitle} tone="comparison" padding={24} exportMode="screenshot">
+        <ChartContainer title={parsed.chartTitle} tone="comparison" padding={24}>
           <div className="flex h-full min-h-0 flex-col">
             <div className="min-h-0 flex-1">
               <VerticalComparisonBarChart

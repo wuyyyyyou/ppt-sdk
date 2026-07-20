@@ -22,7 +22,7 @@ const ChartCardShell = ({
   headerMarginBottom = 15,
 }: ChartCardShellProps) => (
   <div
-    data-pptx-export="screenshot"
+
     data-chart-like="true"
     className={`flex h-full flex-col rounded-[8px] border ${className ?? ""}`.trim()}
     style={{

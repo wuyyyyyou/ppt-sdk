@@ -3,7 +3,7 @@ import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createReadStream, createWriteStream } from "node:fs";
-import { appendFile, copyFile, lstat, mkdir, readlink, readdir, readFile, realpath, rm, stat, unlink, writeFile } from "node:fs/promises";
+import { appendFile, copyFile, lstat, mkdir, readlink, readdir, readFile, realpath, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
 import { ZipArchive, type Archiver, type ArchiverError } from "archiver";
 import sharp from "sharp";
@@ -33,7 +33,7 @@ import { validateThemeTokenRecord } from "../render/theme-tokens.js";
 import { resolveLocalModulePath } from "../local-template/loader.js";
 import { assertLocalTemplateTypecheck } from "../local-template/typecheck.js";
 import { launchManagedBrowser } from "../runtime/browser-runtime.js";
-import { convertDeckHtmlToPptxModel } from "../html-to-pptx-model/index.js";
+import { convertDeckHtmlToPptx } from "../pptx-export/dom-to-pptx.js";
 import { rasterizePptxToImages } from "../pptx-rasterization/index.js";
 import { prepareWorkspacePageSources } from "../authoring-kit-workspace/index.js";
 import type {
@@ -130,8 +130,6 @@ import type {
   PrepareAppDeckRefinementPageFilesResult,
   PrepareAppPageFilesInput,
   PrepareAppPageFilesResult,
-  PrepareAppExportModelInput,
-  PrepareAppExportModelResult,
   PrepareAppWorkspaceDiagnosticBundleInput,
   AppWorkspaceDiagnosticBundleSnapshot,
   AppPptxExportJob,
@@ -147,7 +145,6 @@ import type {
   RecordAppWorkspaceThemeTokenInput,
   RecordAppWorkspaceThemeTokenResult,
   RecordAppPdfExportInput,
-  RecordAppPptxExportInput,
   GetAppResearchEvidenceInput,
   GetAppResearchPlanInput,
   GetAppResearchStatusInput,
@@ -180,7 +177,7 @@ import type {
   SelectAppWorkspaceTemplateResult,
   SelectAppWorkspaceStyleProfileInput,
   SelectAppWorkspaceStyleProfileResult,
-  StartAppPptxExportModelInput,
+  StartAppPptxExportInput,
   UpdateAppWorkspacePagesInput,
   ConfirmAppWorkspaceOutlineInput,
   ResetAppWorkspaceOutlineInput,
@@ -228,12 +225,12 @@ const WORKSPACE_LOG_FILE_NAMES = {
   "ai-theme-interactions": "ai-theme-interactions.jsonl",
 } as const;
 const WORKSPACE_LOG_INLINE_PAYLOAD_MAX_BYTES = 64 * 1024;
-const PPTX_EXPORT_STATUS_FILE_NAME = "generate_ppt.json";
+const PPTX_EXPORT_STATUS_FILE_NAME = "pptx-export.json";
 const PPTX_EXPORT_STATUSES: AppPptxExportJob["status"][] = [
   "idle",
-  "preparing_model",
-  "model_ready",
-  "generating_pptx",
+  "queued",
+  "validating",
+  "converting",
   "completed",
   "failed",
 ];
@@ -744,9 +741,13 @@ function buildPptxExportPaths(workspaceDir: string) {
   return {
     outputDir,
     statusPath: path.join(outputDir, PPTX_EXPORT_STATUS_FILE_NAME),
-    modelPath: path.join(outputDir, "ppt-model.json"),
     pptxPath: path.join(outputDir, "deck.pptx"),
   };
+}
+
+function isPathWithin(childPath: string, parentPath: string): boolean {
+  const relative = path.relative(parentPath, childPath);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 async function readJsonFileIfExists(filePath: string): Promise<unknown | null> {
@@ -782,6 +783,8 @@ const uploadedSourceWriteQueues = new Map<string, Promise<unknown>>();
 const styleProfileWriteQueues = new Map<string, Promise<unknown>>();
 const themeTokenWriteQueues = new Map<string, Promise<unknown>>();
 const exportArtifactWriteQueues = new Map<string, Promise<unknown>>();
+let pptxExportQueue = Promise.resolve();
+const activePptxExportJobIds = new Set<string>();
 
 async function withExportArtifactWriteQueue<T>(
   workspaceDir: string,
@@ -865,21 +868,21 @@ function createPptxExportJob(
   const now = new Date().toISOString();
 
   return {
-    version: 1,
+    version: 2,
     job_id: `${path.basename(workspaceDir)}-${Date.now()}`,
-    status: "preparing_model",
-    message: "Preparing PPTX export model.",
+    status: "queued",
+    message: "Waiting to export PPTX.",
     percent: 5,
     workspace_dir: workspaceDir,
     status_path: paths.statusPath,
     output_dir: paths.outputDir,
-    html_path: "",
-    model_path: paths.modelPath,
+    deck_html_path: "",
     pptx_path: paths.pptxPath,
     started_at: now,
     updated_at: now,
     completed_at: null,
     error: null,
+    warning_count: 0,
     ...patch,
   };
 }
@@ -899,7 +902,7 @@ function normalizePptxExportJob(
 
   return createPptxExportJob(workspaceDir, {
     ...existing,
-    version: 1,
+    version: 2,
     job_id: typeof existing.job_id === "string" && existing.job_id.length > 0
       ? existing.job_id
       : `${path.basename(workspaceDir)}-${Date.now()}`,
@@ -909,8 +912,7 @@ function normalizePptxExportJob(
     workspace_dir: workspaceDir,
     status_path: paths.statusPath,
     output_dir: paths.outputDir,
-    html_path: typeof existing.html_path === "string" ? existing.html_path : "",
-    model_path: typeof existing.model_path === "string" ? existing.model_path : paths.modelPath,
+    deck_html_path: typeof existing.deck_html_path === "string" ? existing.deck_html_path : "",
     pptx_path: typeof existing.pptx_path === "string" ? existing.pptx_path : paths.pptxPath,
     started_at: typeof existing.started_at === "string" ? existing.started_at : null,
     updated_at: typeof existing.updated_at === "string" ? existing.updated_at : null,
@@ -919,7 +921,7 @@ function normalizePptxExportJob(
       existing.error && typeof existing.error === "object" && !Array.isArray(existing.error)
         ? existing.error as AppPptxExportJob["error"]
         : null,
-    generator_result: existing.generator_result,
+    warning_count: typeof existing.warning_count === "number" ? existing.warning_count : 0,
   });
 }
 
@@ -4914,7 +4916,7 @@ export async function renderAppWorkspaceDeckHtml(
       message: null,
       error: null,
       output_dir: result.outputDir,
-      deck_html_path: slides[0]?.html_path ?? null,
+      deck_html_path: result.deckHtmlPath,
       rendered_at: renderedAt,
       updated_at: renderedAt,
     },
@@ -4936,6 +4938,7 @@ export async function renderAppWorkspaceDeckHtml(
     workspace_dir: workspace.workspace_dir,
     manifest_path: result.manifestPath,
     output_dir: result.outputDir,
+    deck_html_path: result.deckHtmlPath,
     slides,
     slide_count: result.slideCount,
     title: result.title,
@@ -5009,6 +5012,10 @@ export async function getRenderedAppWorkspaceDeckHtml(
     workspace_dir: workspace.workspace_dir,
     manifest_path: manifestPath,
     output_dir: progress.final_deck_render.output_dir ?? "",
+    deck_html_path: await assertExistingFile(
+      progress.final_deck_render.deck_html_path ?? "",
+      "Rendered Deck HTML",
+    ),
     slides,
     slide_count: slides.length,
     title: normalizeString(manifestRecord.title),
@@ -5159,52 +5166,56 @@ async function recordWorkspaceExport(
   });
 }
 
-export async function prepareAppExportModel(
-  input: PrepareAppExportModelInput,
-): Promise<PrepareAppExportModelResult> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const manifestPath = readSelectedTemplateManifestPath(workspace);
-  const outputDir = path.join(workspace.workspace_dir, "output");
-  const preparedAt = new Date().toISOString();
-  const result = await buildDeckHtmlFromManifest({
-    manifestPath,
-    outputDir,
-    name: `${workspace.workspace_id}-export`,
-  });
-  const model = await convertDeckHtmlToPptxModel({
-    html: result.deckHtml,
-    htmlFilePath: result.deckOutputPath,
-    name: result.title,
-  });
-  const modelPath = path.join(outputDir, "ppt-model.json");
-
-  await mkdir(outputDir, { recursive: true });
-  await writeFile(modelPath, `${JSON.stringify(model, null, 2)}\n`, "utf8");
-  await touchWorkspaceTask(workspace, preparedAt);
-
-  return {
-    workspace_dir: workspace.workspace_dir,
-    manifest_path: manifestPath,
-    html_path: result.deckOutputPath,
-    model_path: modelPath,
-    output_dir: outputDir,
-    prepared_at: preparedAt,
-  };
+async function clearCurrentPptxArtifact(workspace: AppWorkspaceResult, pptxPath: string): Promise<void> {
+  await rm(pptxPath, { force: true });
+  const task = getPlainRecord(workspace.task);
+  const artifacts = getPlainRecord(task.artifacts);
+  delete artifacts.pptx;
+  await writeJsonFile(workspace.files.task, { ...task, artifacts, updated_at: new Date().toISOString() });
 }
 
-async function runPptxExportModelJob(job: AppPptxExportJob): Promise<void> {
+async function runPptxExportJob(job: AppPptxExportJob): Promise<void> {
   try {
-    const prepared = await prepareAppExportModel({
-      workspace_dir: job.workspace_dir,
+    const workspace = await ensureWorkspaceFiles(job.workspace_dir);
+    const progress = normalizePageProgressJson(workspace.page_progress);
+    const deckHtmlPath = progress.final_deck_render.deck_html_path;
+    if (!deckHtmlPath) throw new Error("Final Deck Render has no deck.html. Rebuild the Deck before exporting PPTX.");
+    const normalizedDeckPath = path.normalize(deckHtmlPath);
+    const renderOutputDir = progress.final_deck_render.output_dir;
+    if (!renderOutputDir || !isPathWithin(normalizedDeckPath, path.normalize(renderOutputDir))) {
+      throw new Error("Recorded deck.html is outside the Final Deck Render output directory");
+    }
+
+    await writePptxExportJob({
+      ...job,
+      status: "validating",
+      message: "Validating Deck HTML.",
+      percent: 15,
+      deck_html_path: normalizedDeckPath,
     });
     await writePptxExportJob({
       ...job,
-      status: "model_ready",
-      message: "PPTX model is ready.",
-      percent: 50,
-      html_path: prepared.html_path,
-      model_path: prepared.model_path,
-      output_dir: prepared.output_dir,
+      status: "converting",
+      message: "Generating PPTX.",
+      percent: 30,
+      deck_html_path: normalizedDeckPath,
+    });
+    const summary = await convertDeckHtmlToPptx({
+      htmlPath: normalizedDeckPath,
+      outputPath: job.pptx_path,
+      title: (await getWorkspaceSummary(workspace.workspace_dir)).title,
+      expectedSlideCount: progress.pages.length,
+    });
+    await rename(summary.outputPath, job.pptx_path);
+    await recordWorkspaceExport(await ensureWorkspaceFiles(job.workspace_dir), "pptx", job.pptx_path);
+    await writePptxExportJob({
+      ...job,
+      status: "completed",
+      message: "PPTX export completed.",
+      percent: 100,
+      deck_html_path: normalizedDeckPath,
+      completed_at: new Date().toISOString(),
+      warning_count: summary.warningCount,
       error: null,
     });
   } catch (error) {
@@ -5224,22 +5235,27 @@ async function runPptxExportModelJob(job: AppPptxExportJob): Promise<void> {
   }
 }
 
-export async function startAppPptxExportModel(
-  input: StartAppPptxExportModelInput,
+export async function startAppPptxExport(
+  input: StartAppPptxExportInput,
 ): Promise<AppPptxExportJob> {
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
   const current = await getAppPptxExportStatus({
     workspace_dir: workspace.workspace_dir,
   });
 
-  if (current.status === "preparing_model" || current.status === "generating_pptx") {
+  if (["queued", "validating", "converting"].includes(current.status)) {
     return current;
   }
 
   const job = createPptxExportJob(workspace.workspace_dir);
+  await clearCurrentPptxArtifact(workspace, job.pptx_path);
+  activePptxExportJobIds.add(job.job_id);
   const written = await writePptxExportJob(job);
 
-  void runPptxExportModelJob(written);
+  pptxExportQueue = pptxExportQueue
+    .catch(() => undefined)
+    .then(() => runPptxExportJob(written))
+    .finally(() => activePptxExportJobIds.delete(job.job_id));
 
   return written;
 }
@@ -5261,12 +5277,30 @@ export async function getAppPptxExportStatus(input: {
       updated_at: null,
       status_path: paths.statusPath,
       output_dir: paths.outputDir,
-      model_path: paths.modelPath,
       pptx_path: paths.pptxPath,
     });
   }
 
-  return normalizePptxExportJob(existing, workspaceDir);
+  const normalized = normalizePptxExportJob(existing, workspaceDir);
+  if (
+    ["queued", "validating", "converting"].includes(normalized.status)
+    && !activePptxExportJobIds.has(normalized.job_id)
+  ) {
+    const interrupted = {
+      ...normalized,
+      status: "failed" as const,
+      message: "PPTX export was interrupted because the engine process restarted.",
+      percent: 100,
+      completed_at: new Date().toISOString(),
+      error: {
+        message: "PPTX export was interrupted because the engine process restarted.",
+      },
+    };
+    await writeJsonFile(paths.statusPath, interrupted);
+    await rm(`${paths.pptxPath}.tmp`, { force: true });
+    return interrupted;
+  }
+  return normalized;
 }
 
 export async function exportAppPdf(
@@ -5311,15 +5345,6 @@ export async function exportAppPdf(
     output_dir: outputDir,
     exported_at: exportedAt,
   };
-}
-
-export async function recordAppPptxExport(
-  input: RecordAppPptxExportInput,
-): Promise<AppWorkspaceResult> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  return recordWorkspaceExport(workspace, "pptx", input.pptx_path, {
-    generator_result: input.generator_result ?? null,
-  });
 }
 
 export async function recordAppPdfExport(
@@ -6688,8 +6713,6 @@ export type {
   PatchAppWorkspaceSettingsResult,
   PrepareAppPageFilesInput,
   PrepareAppPageFilesResult,
-  PrepareAppExportModelInput,
-  PrepareAppExportModelResult,
   RecordAppPagePlanInput,
   RecordAppPageProgressInput,
   RecordAppWorkspaceStyleGuideInput,
@@ -6701,7 +6724,6 @@ export type {
   RecordAppWorkspaceThemeTokenInput,
   RecordAppWorkspaceThemeTokenResult,
   RecordAppPdfExportInput,
-  RecordAppPptxExportInput,
   GetAppExportArtifactInput,
   RenderAppWorkspaceDeckHtmlInput,
   RenderAppWorkspaceDeckHtmlResult,

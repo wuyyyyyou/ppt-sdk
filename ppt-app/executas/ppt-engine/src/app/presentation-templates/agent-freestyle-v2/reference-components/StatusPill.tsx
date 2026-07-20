@@ -36,7 +36,7 @@ const StatusPill = ({
   const leadingNode = leadingIcon ?? (
     !leadingIcon && leadingDotColor ? (
       <span
-        data-pptx-inline-role="leading"
+
         className="flex-none rounded-full"
         style={{
           width: Math.max(6, Math.round(fontSize * 0.65)),
@@ -49,7 +49,7 @@ const StatusPill = ({
 
   return (
     <div
-      data-pptx-inline-composition="status-pill"
+
       className={[
         "inline-flex items-center justify-center whitespace-nowrap leading-none",
         className,
@@ -81,7 +81,7 @@ const StatusPill = ({
           textColor={textColor}
         />
       ) : (
-        <span data-pptx-inline-role="label">{label}</span>
+        <span>{label}</span>
       )}
     </div>
   );

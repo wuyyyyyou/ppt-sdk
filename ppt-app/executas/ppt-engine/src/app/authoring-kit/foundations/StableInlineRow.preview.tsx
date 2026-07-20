@@ -17,14 +17,13 @@ export default function StableInlineRowPreview() {
         <StableInlineRow
           height={44}
           gap={14}
-          pptxInlineComposition="icon-text"
           style={{ fontSize: 24, fontWeight: 700, color: "#172033" }}
         >
           <span
-            data-pptx-inline-role="leading"
+
             style={{ width: 18, height: 18, borderRadius: 999, background: "#2563eb" }}
           />
-          <span data-pptx-inline-role="label">稳定的图标与文本单行组合</span>
+          <span>稳定的图标与文本单行组合</span>
         </StableInlineRow>
         <StableInlineRow
           height={38}

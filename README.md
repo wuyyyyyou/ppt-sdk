@@ -5,7 +5,7 @@
 完整链路仍然是：
 
 ```text
-manifest.json -> deck.html -> ppt-model.json -> .pptx
+manifest.json -> deck.html -> .pptx
 ```
 
 ## 项目结构
@@ -19,19 +19,20 @@ ppt-sdk/
     scripts/
     executas/
       ppt-engine/
-      ppt-gener/
       anna-search/
+  third_party/
+    dom-to-pptx/
 ```
 
 ## 组件职责
 
 - `ppt-app/src/`：Anna App 前端工作台。React 页面只通过 `PptBackend` 调用后端能力。
-- `ppt-app/executas/ppt-engine/`：模板发现、模板 fork、Deck HTML 渲染、HTML 到 PPTX model 转换、校验、任务状态机和工作区工具。
-- `ppt-app/executas/ppt-gener/`：把 `PptxPresentationModel` 写成最终 `.pptx`。
+- `ppt-app/executas/ppt-engine/`：模板发现、Deck HTML 渲染、PPTX 导出、校验、任务状态机和工作区工具。
 - `ppt-app/executas/anna-search/`：Anna App bundled search Executa。
+- `third_party/dom-to-pptx/`：仓库内维护的权威 HTML 到 PPTX 源码，不通过 npm 发布。
 - `ppt-app/scripts/`：tool manifest 同步、模板预览同步和 VS Code pipeline 辅助脚本。
 
-Package/project name 暂时保留历史名称，例如 `presenton-template-engine-executa`、`presenton-pptx-generator-executa`、`anna-search-executa`。目录位置以 `ppt-app/executas/*` 为准。
+Package/project name 暂时保留历史名称，例如 `presenton-template-engine-executa`、`anna-search-executa`。目录位置以 `ppt-app/executas/*` 为准。
 
 ## 本地调试
 
@@ -49,8 +50,7 @@ node ppt-app/scripts/run-ppt-pipeline.mjs generate --manifest <manifest.json>
 流水线步骤：
 
 1. `ppt-engine` 生成 Deck HTML。
-2. `ppt-engine` 调用 `convertDeckHtmlToPptxModel` 生成 `*-model.json`。
-3. `ppt-gener` 生成最终 `.pptx`。
+2. `ppt-engine` 在后端受管 Chrome 中加载 vendored `dom-to-pptx`，从整体 Deck HTML 生成 `.pptx`。
 
 输出目录：
 
@@ -60,8 +60,7 @@ node ppt-app/scripts/run-ppt-pipeline.mjs generate --manifest <manifest.json>
     <timestamp>/
       manifest.json
       engine/
-      model/
-      generator/
+      output/
       logs/
       run-summary.json
 ```
@@ -77,10 +76,9 @@ cd ppt-app && npm run build
 cd ppt-app && npm run validate
 ```
 
-Python Executa 使用 `uv`：
+搜索 Executa 使用 `uv`：
 
 ```bash
-cd ppt-app/executas/ppt-gener && uv run --project . python example_plugin.py
 cd ppt-app/executas/anna-search && uv run --project . python example_plugin.py
 ```
 
@@ -92,4 +90,4 @@ cd ppt-app/executas/anna-search && uv run --project . python example_plugin.py
 - [`CONTEXT.md`](./CONTEXT.md)
 - [`ppt-app/README.md`](./ppt-app/README.md)
 - [`ppt-app/executas/ppt-engine/README.md`](./ppt-app/executas/ppt-engine/README.md)
-- [`ppt-app/executas/ppt-gener/README.md`](./ppt-app/executas/ppt-gener/README.md)
+- [`docs/adr/0033-vendor-dom-to-pptx-in-ppt-sdk.md`](./docs/adr/0033-vendor-dom-to-pptx-in-ppt-sdk.md)

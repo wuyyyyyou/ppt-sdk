@@ -13,7 +13,7 @@ const bars = [
 const CoverBarDecoration = () => {
   return (
     <div
-      data-pptx-export="screenshot"
+
       aria-hidden="true"
       className="flex h-[360px] w-[280px] items-end gap-[20px]"
     >

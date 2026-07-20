@@ -39,7 +39,7 @@ export default function BarChartReference({
     return row;
   });
   return (
-    <div data-pptx-export="screenshot" data-chart-like="true" style={{ width, height }}>
+    <div data-chart-like="true" style={{ width, height }}>
       <BarChart width={width} height={height} data={data} margin={{ top: 10, right: 18, bottom: 0, left: 4 }} barGap={8} barCategoryGap="20%">
         <CartesianGrid vertical={false} stroke="#d7dce5" />
         <XAxis dataKey="label" axisLine={{ stroke: "#94a3b8" }} tickLine={false} interval={0} height={32} tick={{ fill: "#475569", fontSize: 12 }} />

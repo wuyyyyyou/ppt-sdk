@@ -18,7 +18,7 @@
 - `CONTEXT.md`
 - `ppt-app/README.md`
 - `ppt-app/executas/ppt-engine/README.md`
-- `ppt-app/executas/ppt-gener/README.md`
+- `docs/adr/0035-ppt-engine-owns-pptx-export-job.md`
 
 ## 注意
 

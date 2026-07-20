@@ -29,7 +29,7 @@ export default function DonutChartReference({
   let offset = 0;
 
   return (
-    <svg data-pptx-export="screenshot" viewBox={`0 0 ${width} ${height}`} width={width} height={height} aria-hidden="true">
+    <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} aria-hidden="true">
       <circle cx={centerX} cy={centerY} r={radius} fill="none" stroke="#e2e8f0" strokeWidth={strokeWidth} />
       {segments.map((segment) => {
         const length = (Math.max(0, segment.value) / total) * circumference;

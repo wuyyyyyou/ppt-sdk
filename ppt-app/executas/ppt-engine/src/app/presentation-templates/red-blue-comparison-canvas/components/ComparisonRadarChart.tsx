@@ -82,7 +82,7 @@ const ComparisonRadarChart = ({
       className="h-full min-h-0 w-full"
       data-chart-like="true"
       data-validation-ignore="true"
-      data-pptx-export="screenshot"
+
     >
       <RadarChart
         width={width}

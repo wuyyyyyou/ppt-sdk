@@ -8,7 +8,6 @@ export interface StableInlineRowProps {
   wrap?: boolean;
   className?: string;
   style?: CSSProperties;
-  pptxInlineComposition?: "row" | "icon-text";
 }
 
 export default function StableInlineRow({
@@ -19,7 +18,6 @@ export default function StableInlineRow({
   wrap = false,
   className,
   style,
-  pptxInlineComposition,
 }: StableInlineRowProps) {
   return (
     <div
@@ -31,7 +29,6 @@ export default function StableInlineRow({
       ]
         .filter(Boolean)
         .join(" ")}
-      data-pptx-inline-composition={pptxInlineComposition}
       style={{ height, gap, ...style }}
     >
       {children}

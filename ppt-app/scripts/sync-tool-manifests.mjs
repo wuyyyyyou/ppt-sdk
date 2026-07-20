@@ -20,18 +20,6 @@ const TOOLS = [
     packageLockBinTarget: "example_plugin.js",
   },
   {
-    key: "pptGener",
-    bundledHandle: "ppt-gener",
-    manifestPath: "ppt-app/executas/ppt-gener/manifest.json",
-    pyprojectPath: "ppt-app/executas/ppt-gener/pyproject.toml",
-    uvLockPath: "ppt-app/executas/ppt-gener/uv.lock",
-    localExecutaPath: "ppt-app/executas/ppt-gener/executa.json",
-    bundledExecutaDir: "ppt-app/executas/ppt-gener",
-    generatedConstName: "PPT_GENER_TOOL",
-    pythonScriptTarget: "presenton_pptx_generator_plugin:main",
-    pythonPackageName: "presenton-pptx-generator-executa",
-  },
-  {
     key: "annaSearch",
     bundledHandle: "anna-search",
     manifestPath: "ppt-app/executas/anna-search/manifest.json",

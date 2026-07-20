@@ -11,7 +11,7 @@ export const TSX_AUTHORING_RULES_SUMMARY = [
   "Do not rely on pseudo-elements for critical content or decoration.",
   "Avoid critical gradients, opacity tricks, text-stroke, text-shadow, and transform-based alignment for important text.",
   "Use explicit widths, heights, nowrap, and text alignment for single-line key text.",
-  "Chart-heavy or graphic-heavy regions may use data-pptx-export=\"screenshot\"; keep surrounding titles and explanations as normal text.",
+  "Use DOM, SVG, or readable images for chart-heavy regions; keep surrounding titles and explanations as normal text.",
   "Use .js suffix for local component imports, for example ../components/Foo.js.",
   "Only edit the current page TSX/data by default; shared components may be changed only with a clear reason.",
 ].join("\n");

@@ -1,8 +1,7 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import type { PptxPresentationModel } from "../html-to-pptx-model/types/pptx-models.js";
-import { convertDeckHtmlToPptxModel } from "../html-to-pptx-model/index.js";
+import { convertDeckHtmlToPptx } from "../pptx-export/dom-to-pptx.js";
 import {
   assertLocalTemplateModule,
   importLocalTemplateModule,
@@ -20,12 +19,13 @@ import {
 } from "./page-source-document.js";
 import { buildPageSourceRuntimeBundle } from "./page-source-runtime-bundle.js";
 import { getTailwindBrowserRuntimeBundle } from "./tailwind-runtime.js";
+import { buildStandaloneDeckHtml } from "./build-deck.js";
 
 export interface BuildPageSourcePreviewInput {
   entryPath: string;
   outputDir: string;
   name?: string | null;
-  generatePptxModel?: boolean | null;
+  generatePptx?: boolean | null;
 }
 
 export interface BuildPageSourcePreviewResult {
@@ -35,9 +35,7 @@ export interface BuildPageSourcePreviewResult {
   html: string;
   htmlPath: string;
   screenshotPath: string;
-  pptxModel: PptxPresentationModel | null;
-  modelPath: string | null;
-  modelAssetsDir: string | null;
+  pptxPath: string | null;
 }
 
 function resolveAbsolutePath(value: string, fieldName: string): string {
@@ -125,22 +123,19 @@ export async function buildPageSourcePreview(
   );
   const html = await readFile(htmlPath, "utf8");
 
-  let pptxModel: PptxPresentationModel | null = null;
-  let modelPath: string | null = null;
-  let modelAssetsDir: string | null = null;
-  if (input.generatePptxModel) {
-    modelPath = path.join(outputDir, `${name}-ppt-model.json`);
-    modelAssetsDir = path.join(outputDir, `${name}-ppt-assets`);
-    await rm(modelAssetsDir, { recursive: true, force: true });
-    await mkdir(modelAssetsDir, { recursive: true });
-    pptxModel = await convertDeckHtmlToPptxModel({
-      html,
-      htmlFilePath: htmlPath,
-      name,
-      slideSelector: ':scope > [data-page-id]',
-      screenshotsDir: modelAssetsDir,
+  let pptxPath: string | null = null;
+  if (input.generatePptx) {
+    const deckHtmlPath = path.join(outputDir, `${name}-deck.html`);
+    await writeFile(deckHtmlPath, buildStandaloneDeckHtml({ title: name, slides: [{ html: runtimeHtml }] }), "utf8");
+    await staticizeHtmlDocuments([{ htmlPath: deckHtmlPath, kind: "deck" }]);
+    pptxPath = path.join(outputDir, `${name}.pptx`);
+    const converted = await convertDeckHtmlToPptx({
+      htmlPath: deckHtmlPath,
+      outputPath: pptxPath,
+      title: name,
+      expectedSlideCount: 1,
     });
-    await writeFile(modelPath, `${JSON.stringify(pptxModel, null, 2)}\n`, "utf8");
+    await rename(converted.outputPath, pptxPath);
   }
 
   return {
@@ -150,8 +145,6 @@ export async function buildPageSourcePreview(
     html,
     htmlPath,
     screenshotPath,
-    pptxModel,
-    modelPath,
-    modelAssetsDir,
+    pptxPath,
   };
 }

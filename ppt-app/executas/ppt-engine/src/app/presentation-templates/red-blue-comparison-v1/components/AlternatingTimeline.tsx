@@ -54,7 +54,7 @@ const AlternatingTimeline = ({
               <div className="flex h-[74px] flex-none items-center justify-center">
                 <div
                   className="flex h-[42px] w-[42px] items-center justify-center"
-                  data-pptx-export="screenshot"
+
                   data-validation-ignore="true"
                 >
                   <div

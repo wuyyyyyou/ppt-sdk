@@ -30,7 +30,6 @@ export interface TaskRecommendedAction {
     | "lock_current_page"
     | "render_full_deck_html"
     | "request_deck_html_approval"
-    | "convert_deck_html_to_model"
     | "generate_pptx"
     | "complete_task"
     | "recover_from_failure";
@@ -368,14 +367,8 @@ export function getDefaultRecommendedAction(
       };
     case "deck_reviewed":
       return {
-        type: "convert_deck_html_to_model",
-        summary: "先阅读 promote/current.md，再将 HTML 转成 PPT 模型。",
-        requiresUserInput: false,
-      };
-    case "model_ready":
-      return {
         type: "generate_pptx",
-        summary: "先阅读 promote/current.md，再生成最终 PPTX。",
+        summary: "先阅读 promote/current.md，再从 deck HTML 生成最终 PPTX。",
         requiresUserInput: false,
       };
     case "pptx_ready":
@@ -530,8 +523,6 @@ export function getExpectedArtifacts(
     case "render_full_deck_html":
     case "request_deck_html_approval":
       return [path.join(input.projectDir, "output", "deck.html")];
-    case "convert_deck_html_to_model":
-      return [path.join(input.projectDir, "output", "ppt-model.json")];
     case "generate_pptx":
       return [path.join(input.projectDir, "output", "deck.pptx")];
     default:

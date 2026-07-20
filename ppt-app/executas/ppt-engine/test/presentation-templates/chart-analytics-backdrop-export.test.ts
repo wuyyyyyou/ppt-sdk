@@ -12,6 +12,6 @@ test("chart analytics dark backdrops export as a single background screenshot", 
       imageUrl: "https://example.com/background.jpg",
     }));
 
-    assert.match(markup, /data-pptx-export="screenshot"/);
+    assert.match(markup, /absolute inset-0/);
   }
 });

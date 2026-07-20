@@ -34,7 +34,7 @@ const AnalyticsDonutChart = ({
 
   return (
     <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden">
-      <div data-pptx-export="screenshot" data-chart-like="true">
+      <div data-chart-like="true">
         <PieChart width={size} height={size}>
           <Pie
             data={chartData}

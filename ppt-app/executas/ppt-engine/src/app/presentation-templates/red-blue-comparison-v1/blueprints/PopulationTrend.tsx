@@ -223,7 +223,6 @@ const PopulationTrend = ({ data }: { data: Partial<z.infer<typeof Schema>> }) =>
           subtitle={parsed.chartSubtitle}
           tone="comparison"
           padding={20}
-          exportMode="screenshot"
         >
           <div className="flex h-full min-h-0 flex-col">
             <div className="mb-[8px] flex flex-none justify-end">

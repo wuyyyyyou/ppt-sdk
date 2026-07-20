@@ -97,8 +97,16 @@ export async function buildDeckHtmlPagesAndScreenshotsFromManifest(
 ): Promise<BuildDeckHtmlPagesAndScreenshotsFromManifestResult> {
   const prepared = await prepareManifestRenderPlan(input);
   const slidesToWrite = prepared.slides;
+  const deckHtmlPath = path.join(prepared.outputDir, `${prepared.deckBaseName}-deck.html`);
+  const deckHtml = buildStandaloneDeckHtml({
+    title: prepared.title,
+    slides: prepared.slides,
+    runtimeBundle: prepared.deckRuntimeBundle,
+    tailwindRuntimeBundle: prepared.tailwindRuntimeBundle,
+  });
 
   await mkdir(prepared.outputDir, { recursive: true });
+  await writeFile(deckHtmlPath, deckHtml, "utf8");
   const screenshotSlides = await Promise.all(
     slidesToWrite.map(async (slide) => {
       const baseFileName = `${String(slide.pageNumber).padStart(2, "0")}-${prepared.deckBaseName}-${sanitizeFileNamePart(
@@ -122,7 +130,10 @@ export async function buildDeckHtmlPagesAndScreenshotsFromManifest(
   );
 
   await staticizeHtmlDocuments(
-    screenshotSlides.map((slide) => ({ htmlPath: slide.htmlPath, kind: "page" })),
+    [
+      { htmlPath: deckHtmlPath, kind: "deck" },
+      ...screenshotSlides.map((slide) => ({ htmlPath: slide.htmlPath, kind: "page" as const })),
+    ],
   );
 
   await writeSlideScreenshots(
@@ -135,6 +146,7 @@ export async function buildDeckHtmlPagesAndScreenshotsFromManifest(
 
   return {
     outputDir: prepared.outputDir,
+    deckHtmlPath,
     slides: screenshotSlides.map((slide) => ({
       slideId: slide.slide.slideId,
       layoutId: slide.slide.layoutId,

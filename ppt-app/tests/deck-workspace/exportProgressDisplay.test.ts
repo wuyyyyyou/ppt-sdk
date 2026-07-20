@@ -12,21 +12,21 @@ import { messages } from "../../src/i18n/messages.ts";
 
 function makePptxJob(overrides: Partial<PptxExportJob>): PptxExportJob {
   return {
-    version: 1,
+    version: 2,
     job_id: "job-1",
-    status: "preparing_model",
-    message: "Preparing PPTX export model.",
+    status: "queued",
+    message: "Queued for PPTX export.",
     percent: 5,
     workspace_dir: "/tmp/workspaces/demo",
-    status_path: "/tmp/workspaces/demo/output/generate_ppt.json",
+    status_path: "/tmp/workspaces/demo/output/pptx-export.json",
     output_dir: "/tmp/workspaces/demo/output",
-    html_path: "",
-    model_path: "/tmp/workspaces/demo/output/ppt-model.json",
+    deck_html_path: "",
     pptx_path: "/tmp/workspaces/demo/output/deck.pptx",
     started_at: null,
     updated_at: null,
     completed_at: null,
     error: null,
+    warning_count: 0,
     ...overrides,
   };
 }
@@ -63,7 +63,7 @@ describe("Export Progress Display", () => {
   it("uses localized PPTX job status text and real percent", () => {
     assert.deepEqual(
       createPptxJobExportProgress(messages.zh, makePptxJob({
-        status: "generating_pptx",
+        status: "converting",
         percent: 75,
       })),
       {

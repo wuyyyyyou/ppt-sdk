@@ -46,7 +46,7 @@ const AnalyticsGroupedBarChart = ({
 
   return (
     <div
-      data-pptx-export="screenshot"
+
       data-chart-like="true"
       className="overflow-hidden"
       style={{ width, height }}

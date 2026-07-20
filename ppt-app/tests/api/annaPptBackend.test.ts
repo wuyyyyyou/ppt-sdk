@@ -15,7 +15,6 @@ function setToolIds() {
     value: {
       __ANNA_TOOL_IDS__: {
         "ppt-engine": "tool-ppt-engine",
-        "ppt-gener": "tool-ppt-gener",
         "anna-search": "tool-anna-search",
       },
     },

@@ -35,7 +35,6 @@ const EntityLegend = ({ items }: EntityLegendProps) => {
         <StableInlineRow
           key={`${item.label}-${index}`}
           height={24}
-          pptxInlineComposition="icon-text"
         >
           <IconText
             icon={

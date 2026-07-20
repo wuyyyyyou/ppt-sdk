@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -228,7 +228,7 @@ import { Line, LineChart } from "recharts";
 export default function Page() {
   return (
     <div style={{ width: "1280px", height: "720px", padding: "80px" }}>
-      <div data-pptx-export="screenshot" data-chart-like="true">
+      <div data-chart-like="true">
         <LineChart width={600} height={320} data={[{ x: "A", y: 10 }, { x: "B", y: 20 }]}>
           <Line type="monotone" dataKey="y" stroke="#2563eb" isAnimationActive={false} />
         </LineChart>
@@ -260,7 +260,7 @@ export default function Page() {
   }
 });
 
-test("buildPageSourcePreview writes static HTML, PNG, and an optional PPTX Model", async () => {
+test("buildPageSourcePreview writes static HTML, PNG, and an optional PPTX", async () => {
   const tempRoot = path.join(process.cwd(), "test", ".tmp");
   await mkdir(tempRoot, { recursive: true });
   const projectRoot = await mkdtemp(path.join(tempRoot, "page-source-preview-"));
@@ -285,7 +285,7 @@ test("buildPageSourcePreview writes static HTML, PNG, and an optional PPTX Model
   return (
     <section
       id="preview-card"
-      data-pptx-export="screenshot"
+
       className="flex items-center bg-blue-500"
       style={{ width: "360px", height: "180px", color: "white" }}
     >
@@ -311,7 +311,7 @@ export default function Preview() {
     const result = await buildPageSourcePreview({
       entryPath,
       outputDir,
-      generatePptxModel: true,
+      generatePptx: true,
     });
 
     assert.equal(result.name, "metric-card");
@@ -326,19 +326,12 @@ export default function Preview() {
     );
     assert.equal(result.htmlPath, path.join(outputDir, "metric-card.html"));
     assert.equal(result.screenshotPath, path.join(outputDir, "metric-card-browser.png"));
-    assert.equal(result.modelPath, path.join(outputDir, "metric-card-ppt-model.json"));
-    assert.equal(result.modelAssetsDir, path.join(outputDir, "metric-card-ppt-assets"));
-    assert.equal(result.pptxModel?.slides.length, 1);
+    assert.equal(result.pptxPath, path.join(outputDir, "metric-card.pptx"));
 
     const png = await readFile(result.screenshotPath);
     assert.deepEqual(Array.from(png.subarray(0, 8)), [137, 80, 78, 71, 13, 10, 26, 10]);
-    assert.ok(result.modelPath);
-    assert.ok(result.modelAssetsDir);
-    await access(result.modelPath);
-    const assetFiles = await readdir(result.modelAssetsDir);
-    assert.ok(assetFiles.some((file) => file.endsWith(".png")));
-    const modelJson = await readFile(result.modelPath, "utf8");
-    assert.match(modelJson, /metric-card-ppt-assets/);
+    assert.ok(result.pptxPath);
+    await access(result.pptxPath);
   } finally {
     await rm(projectRoot, { recursive: true, force: true });
   }

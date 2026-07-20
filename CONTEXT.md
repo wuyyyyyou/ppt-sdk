@@ -243,7 +243,7 @@ _Avoid_: Failed Deck when the issue is an artifact or state blocker rather than 
 A visible part of deck generation, such as creating the Workspace Style Guide, discovering or assigning evidence, preparing Page Sources, authoring a page, rendering, visual review, or final rendering.
 
 **Final Deck Render**:
-The deck-level Generation Step that turns accepted Page Generation Units into final previewable Deck artifacts. It is not owned by any single Page Generation Unit, and Deck Generation is not complete until Final Deck Render has succeeded.
+The deck-level Generation Step that turns accepted Page Generation Units into final previewable page artifacts and one ordered Deck-level Rendered HTML Snapshot. It is not owned by any single Page Generation Unit, and Deck Generation is not complete until Final Deck Render has succeeded.
 
 **Page Generation Unit**:
 One planned page being authored, rendered, and optionally visual-reviewed as an independent part of Deck Generation. It owns exactly one stable Page Source together with that page's content and page-level assets; shared deck structure and Workspace Authoring Kit assets belong outside the unit.
@@ -254,7 +254,7 @@ The Workspace-owned TSX entry point for exactly one Page Generation Unit and the
 _Avoid_: Deck Source, Shared Page Entry, Template Layout, Page Data JSON
 
 **Rendered HTML Snapshot**:
-The Workspace-owned, engine-generated static DOM representation captured after Page Sources have completed browser rendering at the fixed slide viewport. A Page Generation Unit owns one page snapshot, while Final Deck Render produces a separate ordered Deck snapshot from all accepted Page Sources; both are rebuildable derived artifacts rather than authoritative Page Authoring sources, and the Deck snapshot may retain engine-owned viewing behaviour without executing Page Source code to create visible content.
+The Workspace-owned, engine-generated static DOM representation captured after Page Sources have completed browser rendering at the fixed slide viewport. A Page Generation Unit owns one page snapshot, while Final Deck Render produces a separate ordered Deck snapshot in which every accepted page is simultaneously available to whole-Deck consumers; both are rebuildable derived artifacts rather than authoritative Page Authoring sources, and neither carries interactive viewing behaviour.
 User-facing Chinese label: 渲染后 HTML 快照
 _Avoid_: Page Source, Executable React HTML, Runtime HTML
 

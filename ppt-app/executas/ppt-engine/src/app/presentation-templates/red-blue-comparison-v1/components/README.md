@@ -8,7 +8,7 @@
 - 关键标题、说明、数值、标签必须保持真实文本节点。
 - JSON 只承载内容，不承载页面结构决策。
 - 主图表优先使用本目录已有的 Recharts 图表 Module。
-- 图形主导区域优先通过 `ChartContainer exportMode="screenshot"` 或组件自身的 `data-pptx-export="screenshot"` 导出。
+- 图形主导区域使用 DOM、SVG 或普通图片表达，并保证图片资源可由后端浏览器读取。
 - 卡片装饰条使用 `CardAccentRail` 或已内置该原语的卡片 Module，不用 CSS 单边 border 表达强调边。
 - 不新增只服务单页的组件；单页特殊结构直接写在对应 blueprint 或 slide 中。
 - 1280x720 是稳定布局基准；固定格式元素应给出明确宽高或 min/max 约束。

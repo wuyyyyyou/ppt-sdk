@@ -30,6 +30,7 @@ function readRenderedDeck(workspace: WorkspaceResult): RenderDeckHtmlResult | nu
     workspace_dir: workspace.workspace_dir,
     manifest_path: typeof pages.manifest_path === "string" ? pages.manifest_path : "",
     output_dir: typeof pages.output_dir === "string" ? pages.output_dir : "",
+    deck_html_path: typeof pages.deck_html_path === "string" ? pages.deck_html_path : "",
     slides,
     slide_count: slides.length,
     title: typeof pages.title === "string" ? pages.title : "",

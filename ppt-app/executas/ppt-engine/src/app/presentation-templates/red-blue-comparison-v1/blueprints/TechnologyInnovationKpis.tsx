@@ -190,7 +190,6 @@ const TechnologyInnovationKpis = ({ data }: { data: Partial<z.infer<typeof Schem
           subtitle={parsed.chartSubtitle}
           tone="comparison"
           padding={20}
-          exportMode="screenshot"
           meta={
             <div className="flex items-center gap-[12px]">
               {legend.map((item) => {

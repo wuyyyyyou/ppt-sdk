@@ -1,6 +1,5 @@
 export interface ToolIds {
   pptEngine: string;
-  pptGener: string;
 }
 
 export interface HostUploadRef {
@@ -1391,6 +1390,7 @@ export interface RenderDeckHtmlResult {
   workspace_dir: string;
   manifest_path: string;
   output_dir: string;
+  deck_html_path: string;
   slides: Array<{
     slide_id: string;
     layout_id: string;
@@ -1412,26 +1412,16 @@ export interface RecordDeckReviewInput {
   feedback?: string;
 }
 
-export interface PrepareExportModelInput {
-  workspace_dir: string;
-}
-
-export interface PrepareExportModelResult {
-  modelPath: string;
-  htmlPath: string;
-  outputDir: string;
-}
-
 export type PptxExportStatus =
   | "idle"
-  | "preparing_model"
-  | "model_ready"
-  | "generating_pptx"
+  | "queued"
+  | "validating"
+  | "converting"
   | "completed"
   | "failed";
 
 export interface PptxExportJob {
-  version: 1;
+  version: 2;
   job_id: string;
   status: PptxExportStatus;
   message: string;
@@ -1439,8 +1429,7 @@ export interface PptxExportJob {
   workspace_dir: string;
   status_path: string;
   output_dir: string;
-  html_path: string;
-  model_path: string;
+  deck_html_path: string;
   pptx_path: string;
   started_at: string | null;
   updated_at: string | null;
@@ -1449,32 +1438,11 @@ export interface PptxExportJob {
     message: string;
     stack?: string;
   } | null;
-  generator_result?: unknown;
+  warning_count: number;
 }
 
-export interface StartPptxExportModelInput {
+export interface StartPptxExportInput {
   workspace_dir: string;
-}
-
-export interface GeneratePptxInput {
-  modelPath: string;
-  outputPath: string;
-}
-
-export interface GeneratePptxResult {
-  pptxPath: string;
-  summary?: unknown;
-}
-
-export interface StartGeneratePptxInput extends GeneratePptxInput {
-  workspace_dir: string;
-  job_id?: string;
-}
-
-export interface RecordPptxExportInput {
-  workspace_dir: string;
-  pptxPath: string;
-  generatorResult?: unknown;
 }
 
 export interface ExportPdfInput {

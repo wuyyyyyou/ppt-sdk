@@ -8,7 +8,6 @@ type StableInlineRowProps = {
   wrap?: boolean;
   className?: string;
   style?: CSSProperties;
-  pptxInlineComposition?: "row" | "icon-text";
 };
 
 const StableInlineRow = ({
@@ -19,7 +18,6 @@ const StableInlineRow = ({
   wrap = false,
   className,
   style,
-  pptxInlineComposition,
 }: StableInlineRowProps) => (
   <div
     className={[
@@ -28,7 +26,7 @@ const StableInlineRow = ({
       wrap ? "flex-wrap" : "whitespace-nowrap",
       className,
     ].filter(Boolean).join(" ")}
-    data-pptx-inline-composition={pptxInlineComposition}
+
     style={{ height, gap, ...style }}
   >
     {children}

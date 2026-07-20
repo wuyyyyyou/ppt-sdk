@@ -34,7 +34,7 @@ const MetricRing = ({ entity, fallbackColor }: { entity: CircularComparisonEntit
 
   return (
     <div className={`relative flex flex-none items-center justify-center ${sizeClass}`} style={{ opacity: entity.emphasized ? 1 : 0.82 }}>
-      <svg className="h-full w-full" viewBox="0 0 100 100" data-pptx-export="screenshot">
+      <svg className="h-full w-full" viewBox="0 0 100 100">
         <circle cx="50" cy="50" r={radius} fill="transparent" stroke={chartAnalyticsTheme.colors.strokeSoft} strokeWidth="8" />
         <circle
           cx="50"

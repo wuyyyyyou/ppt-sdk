@@ -10,7 +10,6 @@
 
 ```fish
 ./ppt-app/executas/ppt-engine/build_binary.sh --test
-./ppt-app/executas/ppt-gener/build_binary.sh --test
 ```
 
 `ppt-engine` 现在打包成 Anna Binary 分发 archive。`--test` 会自动解压 archive 并调用 `describe` 冒烟；如果要手工执行下面的 Engine 命令，先解压当前平台 archive 并设置 `PPT_ENGINE_BIN`：
@@ -24,18 +23,6 @@ set PPT_ENGINE_BIN /tmp/ppt-engine-binary/bin/ppt-engine
 ```
 
 Windows 平台 archive 是 `.zip`，包内入口是 `bin/ppt-engine.exe`。archive 顶层的 `manifest.json` 是 Anna Binary 分发入口配置；插件 `describe` 返回的 Executa tool manifest 仍来自 engine 包内嵌的 tool manifest。
-
-`ppt-gener` 也打包成 Anna Binary 分发 archive。`--test` 会自动解压 archive 并做协议和真实生成冒烟；如果要手工执行下面的 Generator 命令，先解压当前平台 archive 并设置 `PPT_GENER_BIN`：
-
-```fish
-set generator_archive (ls ./ppt-app/executas/ppt-gener/bundle/ppt-gener-v*-*.tar.gz | head -n 1)
-rm -rf /tmp/ppt-gener-binary
-mkdir -p /tmp/ppt-gener-binary
-tar -C /tmp/ppt-gener-binary -xzf $generator_archive
-set PPT_GENER_BIN /tmp/ppt-gener-binary/bin/ppt-gener
-```
-
-Windows 平台 archive 是 `.zip`，包内入口是 `bin/ppt-gener.exe`。archive 顶层的 `manifest.json` 是 Anna Binary 分发入口配置；`bin/manifest.json` 是插件 `describe` 返回的 Executa tool manifest。
 
 ## 约定
 
@@ -184,33 +171,6 @@ jq -nc \
 | jq
 ```
 
-### Engine: Convert
-
-```fish
-jq -nc \
-  --arg cwd $PWD/.vscode/engine/output \
-  --arg html_path $PWD/.vscode/engine/output/html-model/red-finance-deck.html \
-  --arg output_path $PWD/.vscode/engine/output/model/red-finance-model.json \
-  --arg screenshots_dir $PWD/.vscode/engine/output/model/screenshots \
-  '{
-    jsonrpc: "2.0",
-    method: "invoke",
-    id: 1,
-    params: {
-      tool: "convertDeckHtmlToPptxModel",
-      arguments: {
-        cwd: $cwd,
-        html_path: $html_path,
-        output_path: $output_path,
-        name: "red-finance",
-        screenshots_dir: $screenshots_dir
-      }
-    }
-  }' \
-| $PPT_ENGINE_BIN \
-| jq
-```
-
 ### Engine: Validate
 
 带 rendered 校验：
@@ -322,55 +282,9 @@ jq -nc \
 | jq
 ```
 
-## Generator
+## PPTX 导出
 
-### Generator: Describe
-
-```fish
-jq -nc '{jsonrpc:"2.0",method:"describe",id:1}' \
-| $PPT_GENER_BIN \
-| jq
-```
-
-### Generator: Health
-
-```fish
-jq -nc '{jsonrpc:"2.0",method:"health",id:1}' \
-| $PPT_GENER_BIN \
-| jq
-```
-
-### Generator: Generate PPTX
-
-```fish
-jq -nc \
-  --arg cwd $PWD/.vscode/generator/output \
-  --arg model_path $PWD/.vscode/engine/output/model/red-finance-model.json \
-  --arg output_path $PWD/.vscode/generator/output/red-finance.pptx \
-  '{
-    jsonrpc: "2.0",
-    method: "invoke",
-    id: 1,
-    params: {
-      tool: "generatePptx",
-      arguments: {
-        cwd: $cwd,
-        model_path: $model_path,
-        output_path: $output_path
-      }
-    }
-  }' \
-| $PPT_GENER_BIN \
-| jq
-```
-
-## 整条 3 步链路
-
-如果你想在命令行里手动跑完整链路，可以按这个顺序执行：
-
-1. 先执行 `Engine: Deck Html`
-2. 再执行 `Engine: Convert`
-3. 最后执行 `Generator: Generate PPTX`
+PPTX 不再通过公开的任意 HTML 转换工具或独立 Generator 生成。App 工作区完成 Final Deck Render 后调用 `app_start_pptx_export`，再轮询 `app_get_pptx_export_status`；`ppt-engine` 从已记录的整体 `deck.html` 直接生成 `output/deck.pptx`。
 
 ## 大响应与 `__file_transport`
 

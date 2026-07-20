@@ -37,7 +37,7 @@ export default function RadarChartReference({
   });
 
   return (
-    <div data-pptx-export="screenshot" data-chart-like="true" style={{ width, height }}>
+    <div data-chart-like="true" style={{ width, height }}>
       <RadarChart width={width} height={height} data={data} outerRadius="68%">
         <PolarGrid gridType="polygon" stroke="#cbd5e1" />
         <PolarAngleAxis dataKey="label" tick={{ fill: "#475569", fontSize: 12, fontWeight: 700 }} />

@@ -82,7 +82,7 @@ export function createPptxJobExportProgress(
   }
 
   switch (job.status) {
-    case "preparing_model":
+    case "queued":
       return {
         type: "PPTX",
         mode: "determinate",
@@ -90,7 +90,7 @@ export function createPptxJobExportProgress(
         percent,
         active: true,
       };
-    case "model_ready":
+    case "validating":
       return {
         type: "PPTX",
         mode: "determinate",
@@ -98,7 +98,7 @@ export function createPptxJobExportProgress(
         percent,
         active: true,
       };
-    case "generating_pptx":
+    case "converting":
       return {
         type: "PPTX",
         mode: "determinate",

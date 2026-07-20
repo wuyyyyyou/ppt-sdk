@@ -84,7 +84,7 @@ const StackedCompositionBarChart = ({
     };
 
   return (
-    <div className="h-full min-h-0 w-full" data-pptx-export="screenshot" data-validation-ignore="true">
+    <div className="h-full min-h-0 w-full" data-validation-ignore="true">
       <ResponsiveContainer height={height} width="100%">
         <BarChart
           data={rows}

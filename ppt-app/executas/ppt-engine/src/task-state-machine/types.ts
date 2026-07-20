@@ -10,7 +10,6 @@ export const TASK_STATE_MACHINE_DECK_STATES = [
   "deck_html_ready",
   "deck_review_pending",
   "deck_reviewed",
-  "model_ready",
   "pptx_ready",
   "completed",
   "failed",

@@ -14,7 +14,7 @@ Chrome for Testing 作为 Anna Binary archive 中与 `bin/ppt-engine` 并列的 
 
 Chrome for Testing 不提交到仓库，也不要求运行时下载；Binary 平台构建 job 的 `npm ci` 跳过 Puppeteer 隐式下载，随后使用已安装的 Puppeteer 浏览器工具从官方源显式下载固定 revision，并把下载缓存作为可丢弃的构建加速层。第一版不建设自有浏览器镜像；构建需要网络，最终 Binary 运行必须离线可用。
 
-每个受支持平台的发布门禁必须从最终 archive 启动 Binary：验证外置 `lib/app`、浏览器元数据和版本，并发运行多个插件进程，并通过 JSON-RPC 对仓库内固定、无网络、单页的 Binary smoke fixture 真实调用 `buildDeckHtmlFromManifest` 和 `convertDeckHtmlToPptxModel`。测试应验证静态 Deck HTML、非空且具有正确尺寸和基本像素差异的 PNG，以及单页 PPTX Model；不使用容易受跨平台字体抗锯齿影响的像素级截图快照。
+每个受支持平台的发布门禁必须从最终 archive 启动 Binary：验证外置 `lib/app`、浏览器元数据和版本，并发运行多个插件进程，并通过 JSON-RPC 对仓库内固定、无网络的 Binary smoke fixture 验证静态 Deck HTML 与 PNG。PPTX 转换门禁已由 ADR-0035 和 ADR-0037 改为 `ppt-engine` 内部的整体 Deck HTML 导出作业；不再生成或验证 PPTX Model。
 
 `linux-x86_64` 的支持基线是 Ubuntu 22.04 兼容的 glibc Linux：分发包提供 Chrome for Testing，但不捆绑 glibc、NSS、GTK、GBM 等操作系统动态库，也不支持 Alpine/musl 或缺少 Chrome 基础运行库的极简镜像。Linux 发布门禁必须在该基线环境完成真实渲染，文档应列出必要系统库，并在依赖缺失时提供明确诊断。
 

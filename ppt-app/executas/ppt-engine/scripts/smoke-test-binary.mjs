@@ -158,7 +158,6 @@ async function main() {
   const fixtureDir = requireOption(options, "fixture-dir");
   const fixtureCopy = path.join(workDir, "fixture");
   const renderDir = path.join(workDir, "rendered");
-  const modelPath = path.join(workDir, "ppt-model.json");
   const legacySeaCacheDir = path.join(workDir, "legacy-sea-cache");
 
   await rm(workDir, { recursive: true, force: true });
@@ -171,6 +170,10 @@ async function main() {
   };
 
   await verifyBrowserVersion(extractDir);
+  const domToPptxBundle = path.join(extractDir, "lib", "app", "dist", "vendor", "dom-to-pptx", "dom-to-pptx.bundle.js");
+  if ((await stat(domToPptxBundle)).size <= 0) {
+    throw new Error(`Bundled dom-to-pptx runtime is empty: ${domToPptxBundle}`);
+  }
   await verifyConcurrentDescribe(binaryPath, env);
   const legacyCacheStat = await stat(legacySeaCacheDir).catch(() => null);
   if (legacyCacheStat) {
@@ -203,30 +206,6 @@ async function main() {
   const deckHtml = await readFile(deckHtmlPath, "utf8");
   if (!deckHtml.includes("PPT_ENGINE_BINARY_SMOKE")) {
     throw new Error("Rendered Deck HTML is missing the smoke marker");
-  }
-
-  const convertResponse = await invokeBinary(binaryPath, {
-    jsonrpc: "2.0",
-    method: "invoke",
-    id: 3,
-    params: {
-      tool: "convertDeckHtmlToPptxModel",
-      arguments: {
-        html_path: deckHtmlPath,
-        output_path: modelPath,
-        name: "Binary Browser Smoke",
-      },
-    },
-  }, env);
-  if (convertResponse?.result?.data?.slide_count !== 1) {
-    throw new Error(`Unexpected Binary conversion result: ${JSON.stringify(convertResponse)}`);
-  }
-  const model = JSON.parse(await readFile(modelPath, "utf8"));
-  if (!Array.isArray(model.slides) || model.slides.length !== 1) {
-    throw new Error("Binary smoke PPTX Model must contain exactly one slide");
-  }
-  if (!JSON.stringify(model).includes("PPT_ENGINE_BINARY_SMOKE")) {
-    throw new Error("Binary smoke PPTX Model is missing the smoke marker");
   }
 
   process.stdout.write("Binary browser smoke test passed\n");

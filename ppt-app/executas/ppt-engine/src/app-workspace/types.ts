@@ -1210,6 +1210,7 @@ export interface RenderAppWorkspaceDeckHtmlResult {
   workspace_dir: string;
   manifest_path: string;
   output_dir: string;
+  deck_html_path: string;
   slides: Array<{
     slide_id: string;
     layout_id: string;
@@ -1225,20 +1226,16 @@ export interface RenderAppWorkspaceDeckHtmlResult {
   rendered_at: string;
 }
 
-export interface PrepareAppExportModelInput {
-  workspace_dir: string;
-}
-
 export type AppPptxExportStatus =
   | "idle"
-  | "preparing_model"
-  | "model_ready"
-  | "generating_pptx"
+  | "queued"
+  | "validating"
+  | "converting"
   | "completed"
   | "failed";
 
 export interface AppPptxExportJob {
-  version: 1;
+  version: 2;
   job_id: string;
   status: AppPptxExportStatus;
   message: string;
@@ -1246,8 +1243,7 @@ export interface AppPptxExportJob {
   workspace_dir: string;
   status_path: string;
   output_dir: string;
-  html_path: string;
-  model_path: string;
+  deck_html_path: string;
   pptx_path: string;
   started_at: string | null;
   updated_at: string | null;
@@ -1256,20 +1252,11 @@ export interface AppPptxExportJob {
     message: string;
     stack?: string;
   } | null;
-  generator_result?: unknown;
+  warning_count: number;
 }
 
-export interface StartAppPptxExportModelInput {
+export interface StartAppPptxExportInput {
   workspace_dir: string;
-}
-
-export interface PrepareAppExportModelResult {
-  workspace_dir: string;
-  manifest_path: string;
-  html_path: string;
-  model_path: string;
-  output_dir: string;
-  prepared_at: string;
 }
 
 export interface ExportAppPdfInput {
@@ -1283,12 +1270,6 @@ export interface ExportAppPdfResult {
   pdf_path: string;
   output_dir: string;
   exported_at: string;
-}
-
-export interface RecordAppPptxExportInput {
-  workspace_dir: string;
-  pptx_path: string;
-  generator_result?: unknown;
 }
 
 export interface RecordAppPdfExportInput {

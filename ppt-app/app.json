@@ -17,9 +17,6 @@
     "ppt-engine": {
       "path": "executas/ppt-engine"
     },
-    "ppt-gener": {
-      "path": "executas/ppt-gener"
-    },
     "anna-search": {
       "path": "executas/anna-search"
     }

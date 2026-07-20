@@ -38,18 +38,6 @@ import {
   type ForkTemplateGroupResult,
 } from "./fork/fork-template-group.js";
 import {
-  convertDeckHtmlToPptxModel,
-  convertDeckPageToPptxModel,
-  extractDeckPageToSlideAttributes,
-  convertElementAttributesToPptxSlides,
-  convertSlideElementAttributesToPptxSlideModel,
-  sortElementsForPpt,
-  shouldKeepRootLevelElement,
-  type ConvertDeckHtmlToPptxModelInput,
-  type ConvertDeckPageToPptxModelInput,
-  type OrderedExtractedElement,
-} from "./html-to-pptx-model/index.js";
-import {
   buildDeckHtmlFromManifest,
   buildDeckHtmlPagesAndScreenshotsFromManifest,
   buildDeckHtmlPagesFromManifest,
@@ -290,9 +278,6 @@ export type {
   LocalTemplateCatalog,
   LocalTemplateCatalogSlide,
   LegacyLocalDeckManifestSlideSource,
-  ConvertDeckHtmlToPptxModelInput,
-  ConvertDeckPageToPptxModelInput,
-  OrderedExtractedElement,
   RenderSlideHtmlInput,
   TemplateDiscoverySourceType,
   TemplateRenderThemeInput,
@@ -311,11 +296,6 @@ export {
   buildDeckPageScreenshotFromManifest,
   buildPageSourcePreview,
   buildStandaloneDeckHtml,
-  convertDeckHtmlToPptxModel,
-  convertDeckPageToPptxModel,
-  convertElementAttributesToPptxSlides,
-  convertSlideElementAttributesToPptxSlideModel,
-  extractDeckPageToSlideAttributes,
   forkTemplateGroup,
   getAllDiscoveredTemplateGroups,
   getDiscoveredTemplateGroup,
@@ -327,9 +307,4 @@ export {
   listThemePresets,
   readTemplatePreviewDataUrl,
   renderSlideHtml,
-  shouldKeepRootLevelElement,
-  sortElementsForPpt,
 };
-export * from "./html-to-pptx-model/types/browser.js";
-export * from "./html-to-pptx-model/types/element-attributes.js";
-export * from "./html-to-pptx-model/types/pptx-models.js";

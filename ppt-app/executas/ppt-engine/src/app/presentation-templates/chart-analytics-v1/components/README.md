@@ -30,7 +30,7 @@
 | `ProgressMeter` | 度量原语 | 固定高度进度条 | KPI、成熟度、占比、状态面板 |
 | `StatusBadge` | 状态原语 | 短状态标签 | 风险、趋势、优先级、阶段标签 |
 | `ChartPanelShell` | 图表容器 | 图表标题、副标题、legend 和稳定内容区；legend label 使用显式文本节点便于 PPT 抽取 | Recharts 图表页 |
-| `AnalyticsGroupedBarChart` | 图表组件 | Recharts 分组柱状图，自带 `data-pptx-export="screenshot"` 边界，避免 SVG 内部文字被二次抽取 | 对比指标、采用率、结构占比 |
+| `AnalyticsGroupedBarChart` | 图表组件 | Recharts 分组柱状图，通过 DOM/SVG 直接参与导出 | 对比指标、采用率、结构占比 |
 | `AnalyticsLineChart` | 图表组件 | Recharts 多系列折线图，支持负值区间、0% 基线和截图导出边界 | 趋势对比、历史波动、长周期指标 |
 | `AnalyticsDonutChart` | 图表组件 | Recharts 环形构成图，中心指标固定在图内，自带截图导出边界 | 结构占比、年龄分布、市场份额、组合构成 |
 | `AnalyticsImageShowcasePanel` | 图片展示组件 | 主图片、标题、说明、来源、加载失败占位和 cover/contain 适配 | 图片证据页、截图页、地图/照片/产品图展示页 |
@@ -92,5 +92,5 @@
 - 改跨页共享的颜色、字体、阴影、圆角：改 `theme/tokens.ts`。
 - 改跨页共享的稳定视觉单元：改或新增 `components/*.tsx`，并同步更新本 README。
 - 实现图表页时，优先新增可复用图表容器和 Recharts 图表 Module，不要在 blueprint 中临时手写 Chart.js 或源 HTML 图表结构。
-- Recharts 图表组件必须在组件内部设置截图导出边界，避免 PPTX model 同时包含图表截图和轴标签文本框；图表标题、legend、解释文本应放在截图边界外，保持可编辑。
+- Recharts 图表组件应保持 SVG 和周边 DOM 结构清晰；图表标题、legend、解释文本放在图表容器外层，便于转换器分别处理。
 - 复用阈值：内容页脚、图表壳、跨页卡片、洞察面板、对比卡和时间线面板放在 `components/`；只服务一个源页的装饰、特殊 grid 和字段编排留在对应 blueprint。

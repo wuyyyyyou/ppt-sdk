@@ -3267,17 +3267,16 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (!workspace) return;
     exportInFlightRef.current = true;
 
-    const needsFreshRender =
-      reviewRender.status !== "ready" ||
-      reviewRender.result === null ||
-      reviewRender.renderKey !== workspaceReviewRenderKey(workspace);
-
-    setLoading("export");
+      setLoading("export");
     setExportProgress(createExportStartProgress(t, type));
     setExportArtifact(null);
     setExportDownload({ status: "idle", message: "" });
     try {
-      if (needsFreshRender) {
+      if (type === "PDF" && (
+        reviewRender.status !== "ready" ||
+        reviewRender.result === null ||
+        reviewRender.renderKey !== workspaceReviewRenderKey(workspace)
+      )) {
         const rendered = await loadDeckHtmlForWorkspace(workspace, "export");
         if (!rendered) return;
         setLoading("export");
@@ -3286,28 +3285,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
       let updatedWorkspace: WorkspaceResult;
       if (type === "PPTX") {
-        const startedModel = await backend.startPptxExportModel({
+        const started = await backend.startPptxExport({
           workspace_dir: workspace.workspace_dir
         });
-        setExportProgress(createPptxJobExportProgress(t, startedModel));
-
-        const modelReady = await waitForPptxExportStatus(
-          workspace.workspace_dir,
-          (job) => job.status === "model_ready" || job.status === "failed"
-        );
-        if (modelReady.status === "failed") {
-          throw new Error(getPptxExportErrorMessage(modelReady));
-        }
-        assertPptxExportPath(modelReady.model_path, "model_path");
-        assertPptxExportPath(modelReady.pptx_path, "pptx_path");
-
-        const startedPptx = await backend.startGeneratePptx({
-          workspace_dir: workspace.workspace_dir,
-          job_id: modelReady.job_id,
-          modelPath: modelReady.model_path,
-          outputPath: modelReady.pptx_path
-        });
-        setExportProgress(createPptxJobExportProgress(t, startedPptx));
+        setExportProgress(createPptxJobExportProgress(t, started));
 
         const completed = await waitForPptxExportStatus(
           workspace.workspace_dir,
@@ -3319,10 +3300,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
         const pptxPath = completed.pptx_path;
         assertPptxExportPath(pptxPath, "pptx_path");
-        updatedWorkspace = await backend.recordPptxExport({
+        updatedWorkspace = await backend.openWorkspace({
           workspace_dir: workspace.workspace_dir,
-          pptxPath,
-          generatorResult: completed.generator_result ?? completed
         });
         applyWorkspace(updatedWorkspace);
       } else {

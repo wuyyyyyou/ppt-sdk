@@ -5,8 +5,6 @@ import type {
   CreateWorkspaceInput,
   CreateWorkspaceResult,
   DuplicateWorkspacePageInput,
-  GeneratePptxInput,
-  GeneratePptxResult,
   GetExportArtifactDownloadUrlInput,
   GetWorkspacePageFileFingerprintsInput,
   GetWorkspacePageFileFingerprintsResult,
@@ -16,8 +14,6 @@ import type {
   PagePlan,
   PageProgress,
   OpenWorkspaceInput,
-  PrepareExportModelInput,
-  PrepareExportModelResult,
   PrepareDeckRefinementPageFilesInput,
   PrepareDeckRefinementPageFilesResult,
   PreparePageFilesInput,
@@ -43,7 +39,6 @@ import type {
   RecordDeckReviewInput,
   RecordPagePlanInput,
   RecordPageProgressInput,
-  RecordPptxExportInput,
   RecordPdfExportInput,
   RecordRequirementsInput,
   RecordOutlineInput,
@@ -53,8 +48,7 @@ import type {
   RenderWorkspacePagePreviewResult,
   SelectTemplateInput,
   SelectTemplateResult,
-  StartGeneratePptxInput,
-  StartPptxExportModelInput,
+  StartPptxExportInput,
   WebFetchResult,
   WebSearchResult,
   ImageFetchResult,
@@ -296,15 +290,9 @@ export interface PptBackend {
   getRenderedDeckHtml(input: RenderDeckHtmlInput): Promise<RenderDeckHtmlResult>;
   renderDeckHtml(input: RenderDeckHtmlInput): Promise<RenderDeckHtmlResult>;
   recordDeckReview(input: RecordDeckReviewInput): Promise<ProjectResult>;
-  prepareExportModel(
-    input: PrepareExportModelInput
-  ): Promise<PrepareExportModelResult>;
-  startPptxExportModel(input: StartPptxExportModelInput): Promise<PptxExportJob>;
+  startPptxExport(input: StartPptxExportInput): Promise<PptxExportJob>;
   getPptxExportStatus(input: { workspace_dir: string }): Promise<PptxExportJob>;
-  generatePptx(input: GeneratePptxInput): Promise<GeneratePptxResult>;
-  startGeneratePptx(input: StartGeneratePptxInput): Promise<PptxExportJob>;
   exportPdf(input: ExportPdfInput): Promise<ExportPdfResult>;
-  recordPptxExport(input: RecordPptxExportInput): Promise<WorkspaceResult>;
   recordPdfExport(input: RecordPdfExportInput): Promise<WorkspaceResult>;
   publishExportArtifact(
     input: GetExportArtifactDownloadUrlInput

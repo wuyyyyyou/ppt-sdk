@@ -270,11 +270,7 @@ export async function serializeRenderedPageToStaticHtml(
     document.querySelectorAll('style[type="text/tailwindcss"]')
       .forEach((style) => style.remove());
 
-    for (const script of Array.from(document.scripts)) {
-      const keepViewer = documentKind === "deck" &&
-        script.getAttribute("data-presenton-static-script") === "viewer";
-      if (!keepViewer) script.remove();
-    }
+    for (const script of Array.from(document.scripts)) script.remove();
 
     for (const element of Array.from(document.querySelectorAll<HTMLElement>("*"))) {
       for (const attribute of Array.from(element.attributes)) {

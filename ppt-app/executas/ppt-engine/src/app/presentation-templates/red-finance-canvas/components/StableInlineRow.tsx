@@ -8,7 +8,6 @@ type StableInlineRowProps = {
   wrap?: boolean;
   className?: string;
   style?: CSSProperties;
-  pptxInlineComposition?: "row" | "icon-text";
 };
 
 const StableInlineRow = ({
@@ -19,7 +18,6 @@ const StableInlineRow = ({
   wrap = false,
   className,
   style,
-  pptxInlineComposition,
 }: StableInlineRowProps) => {
   const displayClassName = inline ? "inline-flex" : "flex";
   const wrapClassName = wrap ? "flex-wrap" : "whitespace-nowrap";
@@ -30,7 +28,7 @@ const StableInlineRow = ({
   return (
     <div
       className={mergedClassName}
-      data-pptx-inline-composition={pptxInlineComposition}
+
       style={{
         height,
         gap,

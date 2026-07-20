@@ -819,6 +819,7 @@ function createHarness(options: {
         workspace_dir: workspace.workspace_dir,
         manifest_path: "/tmp/workspaces/demo/template/manifest.json",
         output_dir: "/tmp/workspaces/demo/output",
+        deck_html_path: "/tmp/workspaces/demo/output/demo-deck.html",
         slides: pagePlan.pages.map((page) => ({
           slide_id: page.manifest_slide_id,
           layout_id: page.blueprint_id,
@@ -833,10 +834,19 @@ function createHarness(options: {
       };
     },
     recordDeckReview: async () => ({ projectDir: "", state: {} }),
-    prepareExportModel: async () => ({ modelPath: "", htmlPath: "", outputDir: "" }),
-    generatePptx: async () => ({ pptxPath: "" }),
+    startPptxExport: async () => ({
+      version: 2, job_id: "", status: "idle", message: "", percent: 0,
+      workspace_dir: workspace.workspace_dir, status_path: "", output_dir: "",
+      deck_html_path: "", pptx_path: "", started_at: null, updated_at: null,
+      completed_at: null, error: null, warning_count: 0,
+    }),
+    getPptxExportStatus: async () => ({
+      version: 2, job_id: "", status: "idle", message: "", percent: 0,
+      workspace_dir: workspace.workspace_dir, status_path: "", output_dir: "",
+      deck_html_path: "", pptx_path: "", started_at: null, updated_at: null,
+      completed_at: null, error: null, warning_count: 0,
+    }),
     exportPdf: async () => ({ pdfPath: "", htmlPath: "" }),
-    recordPptxExport: async () => ({ projectDir: "", state: {} }),
     recordPdfExport: async () => ({ projectDir: "", state: {} }),
   };
 
@@ -1211,6 +1221,10 @@ describe("Deck Generation Flow Module", () => {
     assert.match(
       harness.progress.pages[0]?.last_screenshot_path ?? "",
       /\/screenshots\/01-demo-page-preview-page-01-simple\.png$/,
+    );
+    assert.equal(
+      harness.progress.final_deck_render?.deck_html_path,
+      "/tmp/workspaces/demo/output/demo-deck.html",
     );
   });
 

@@ -171,7 +171,8 @@ export async function runFinalDeckRender(input: {
       message: text.deckReady,
       error: null,
       output_dir: rendered.output_dir,
-      deck_html_path: rendered.slides[0]?.html_path ?? null,
+      // Keep the aggregate Deck HTML path; the first slide path is only a page artifact.
+      deck_html_path: rendered.deck_html_path ?? null,
       rendered_at: rendered.rendered_at,
     },
     deck_status: "completed",

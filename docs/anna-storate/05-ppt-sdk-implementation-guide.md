@@ -1,6 +1,6 @@
 # 05. ppt-sdk 落地指南
 
-本文面向本仓库的 PPT 生成链路，说明如何把 Anna 大文件存储能力落到 `ppt-app`、`ppt-engine`、`ppt-gener`。
+本文面向本仓库的 PPT 生成链路，说明如何把 Anna 大文件存储能力落到 `ppt-app` 和 `ppt-engine`。
 
 ## 本仓库边界
 
@@ -9,7 +9,7 @@
 - React 页面组件只调用 `PptBackend`。
 - Anna Runtime / standalone 差异放在 adapter 层。
 - 工作区文件读写和 gate 判断放在 `ppt-engine` app-facing tools。
-- `ppt-gener` 只负责最终 `.pptx` 生成。
+- `ppt-engine` 从 Final Deck Render 的整体静态 HTML 生成最终 `.pptx`。
 - 前端不能直接读写本地文件系统。
 - 大 tool response 应返回 URL / path / artifact id，不返回 bytes。
 
@@ -26,7 +26,6 @@
 | deck manifest | APS KV 或 APS files | 小 manifest 用 KV；大 manifest 用 files |
 | deck HTML | APS files | HTML 可能较大，且可用于 debug |
 | rendered screenshots | APS files | PNG/JPEG，不要内联 |
-| ppt model JSON | APS files | 可能大于 KV 上限 |
 | final `.pptx` | APS files | 用户主要产物 |
 | export PDF | APS files | 用户主要产物 |
 | template preview images | 静态 public 或 APS files | 取决于来源与生命周期 |
@@ -50,7 +49,6 @@ files path：
 
 ```text
 workspaces/{workspace_id}/artifacts/deck.html
-workspaces/{workspace_id}/artifacts/ppt-model.json
 workspaces/{workspace_id}/artifacts/final.pptx
 workspaces/{workspace_id}/artifacts/export.pdf
 workspaces/{workspace_id}/screenshots/page-{page}.png
@@ -79,7 +77,7 @@ workspaces/{workspace_id}/validation/report.json
       "size_bytes": 3481274,
       "etag": "W/\"1-abcd\"",
       "created_at": "2026-06-01T12:00:00Z",
-      "source_step": "generatePptx"
+      "source_step": "app_start_pptx_export"
     }
   ]
 }
@@ -141,7 +139,7 @@ UI 需要下载时：
 
 - 创建 workspace。
 - 写 KV：requirements、outline、page plan、task state、artifact index。
-- 写 files：deck HTML、ppt model、screenshots、validation report。
+- 写 files：deck HTML、PPTX、screenshots、validation report。
 - 对外返回 artifact 引用和 download URL。
 
 建议新增/收敛的 app-facing tool：
@@ -156,21 +154,6 @@ app_list_artifacts
 ```
 
 具体命名应沿用现有工具风格。
-
-### `ppt-gener`
-
-职责：
-
-- 接收 model 引用或本地路径。
-- 生成 `.pptx`。
-- 将结果交给 engine 或直接写 APS files。
-
-长期推荐：
-
-- `ppt-gener` 返回本地临时产物 path 或 bytes stream handle。
-- `ppt-engine` 统一登记 APS artifact index。
-
-如果 `ppt-gener` 自己接入 APS，也必须保证 tool id / storage grant / scope 清晰，不要让两个插件争用同一个 artifact index。
 
 ### `ppt-app`
 
