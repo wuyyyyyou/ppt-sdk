@@ -3,15 +3,19 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+import { resolveCorepackInvocation } from "./corepack-command.mjs";
+
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const engineDir = path.resolve(scriptDir, "..");
 const repoDir = path.resolve(engineDir, "../../..");
 const vendorDir = path.join(repoDir, "third_party", "dom-to-pptx");
 const outputDir = path.join(engineDir, "dist", "vendor", "dom-to-pptx");
 
-const result = spawnSync("corepack", ["pnpm", "build"], {
+const corepackInvocation = resolveCorepackInvocation();
+const result = spawnSync(corepackInvocation.command, corepackInvocation.args, {
   cwd: vendorDir,
   stdio: "inherit",
+  shell: corepackInvocation.shell,
   env: {
     ...process.env,
     PUPPETEER_SKIP_DOWNLOAD: "true",
@@ -20,7 +24,9 @@ const result = spawnSync("corepack", ["pnpm", "build"], {
 });
 
 if (result.error?.code === "ENOENT") {
-  throw new Error("Corepack is required to build third_party/dom-to-pptx. Install Corepack and run `corepack enable`.");
+  throw new Error(
+    "Corepack was not found. Install Corepack and run `corepack enable`.",
+  );
 }
 if (result.status !== 0) {
   throw new Error(
