@@ -52,6 +52,7 @@ function buildConfirmedRequirementsInput(requirements: PresentationRequirements)
       slide_count: requirements.selections.slide_count,
       output_language: requirements.selections.output_language,
       visual_tone: semanticRequirementValue(requirements, "visual_tone"),
+      visual_style_preset: requirements.selections.visual_style_preset ?? null,
     },
   };
 }

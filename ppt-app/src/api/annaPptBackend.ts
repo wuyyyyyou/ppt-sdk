@@ -59,6 +59,7 @@ import type {
   PrepareWorkspaceDiagnosticBundleResult,
   WorkspacePageSourceFingerprint,
   CommitWorkspaceStyleGuideResult,
+  ConfirmWorkspaceRequirementsResult,
   WorkspaceStyleGuideStatus,
   WorkspaceStyleGuide,
   PreparePageRefinementResult,
@@ -223,6 +224,12 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invoke<CommitWorkspaceStyleGuideResult>(
         toolIds.pptEngine,
         "app_commit_workspace_style_guide_host_upload",
+        input,
+      ),
+    confirmWorkspaceRequirements: (input) =>
+      invokeHostUploadJson<ConfirmWorkspaceRequirementsResult>(
+        toolIds.pptEngine,
+        "app_confirm_workspace_requirements",
         input,
       ),
     getWorkspaceStyleGuideStatus: (input) =>

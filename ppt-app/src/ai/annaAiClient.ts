@@ -244,22 +244,25 @@ async function completeJsonRequest<T>(
 async function completePresentationRequirementsWithRetry(
   runtime: AnnaRuntime,
   brief: string,
+  visualStylePreset?: { name: string; description: string } | null,
   logContext?: AiOperationLogContext,
 ) {
-  let request = buildPresentationRequirementsRequest(brief);
+  let request = buildPresentationRequirementsRequest(brief, visualStylePreset);
   let lastErrors: string[] = [];
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     const rawResult = await completeLlm(runtime, request, logContext);
     const rawText = extractCompletionText(rawResult);
     try {
-      return parsePresentationRequirementsCandidates(rawText);
+      return parsePresentationRequirementsCandidates(rawText, {
+        visualStylePresetSelected: Boolean(visualStylePreset),
+      });
     } catch (error) {
       lastErrors = error instanceof PresentationRequirementsValidationError
         ? error.errors
         : [error instanceof Error ? error.message : String(error)];
       if (attempt < 2) {
-        request = buildPresentationRequirementsRepairRequest(request, rawText, lastErrors);
+        request = buildPresentationRequirementsRepairRequest(request, rawText, lastErrors, visualStylePreset);
       }
     }
   }
@@ -406,6 +409,7 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
       return completePresentationRequirementsWithRetry(
         runtime,
         input.brief,
+        input.visualStylePreset,
         input.logContext,
       );
     },

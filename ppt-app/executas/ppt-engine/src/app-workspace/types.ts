@@ -47,6 +47,14 @@ export interface AppPresentationRequirementsSelections {
   slide_count: number | null;
   output_language: string | null;
   visual_tone: AppPresentationRequirementCandidate | null;
+  visual_style_preset: AppVisualStylePresetSelection | null;
+}
+
+export interface AppVisualStylePresetSelection {
+  id: string;
+  version: number;
+  name: string;
+  description: string;
 }
 
 export interface AppPresentationRequirements {
@@ -569,6 +577,19 @@ export interface GetAppWorkspaceRequirementsInput {
 export interface UpdateAppWorkspaceRequirementsInput {
   workspace_dir: string;
   requirements: unknown;
+}
+
+export interface ConfirmAppWorkspaceRequirementsInput {
+  workspace_dir: string;
+  requirements: unknown;
+  style_guide_staging_file_path?: string;
+  style_guide_expected_size_bytes?: number;
+  clear_style_guide?: boolean;
+}
+
+export interface ConfirmAppWorkspaceRequirementsResult {
+  workspace: AppWorkspaceResult;
+  style_guide: RecordAppWorkspaceStyleGuideResult | null;
 }
 
 export interface ResetAppWorkspaceOutlineInput {

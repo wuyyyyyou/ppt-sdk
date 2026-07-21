@@ -138,6 +138,7 @@ export interface Messages {
     unsaved: string;
     recommended: string;
     other: string;
+    templateLocked: string;
     groups: Record<"content" | "specifications" | "visual", string>;
     fields: Record<"audience" | "purpose" | "desired_outcome" | "slide_count" | "output_language" | "visual_tone", string>;
     customPlaceholders: Record<"audience" | "purpose" | "desired_outcome" | "slide_count" | "output_language" | "visual_tone", string>;
@@ -145,6 +146,9 @@ export interface Messages {
   template: {
     title: string;
     helper: string;
+    none: string;
+    noneDescription: string;
+    noneSelected: string;
     loading: string;
     empty: string;
     layouts: string;
@@ -583,11 +587,15 @@ export const messages: Record<Locale, Messages> = {
       other: "Other",
       groups: { content: "Content goals", specifications: "Generation specifications", visual: "Visual direction" },
       fields: { audience: "Audience", purpose: "Purpose", desired_outcome: "Desired outcome", slide_count: "Slide count", output_language: "Language", visual_tone: "Visual tone" },
+      templateLocked: "Locked by the selected style preset. Change it from the Brief page.",
       customPlaceholders: { audience: "Describe another audience", purpose: "Describe another purpose", desired_outcome: "Describe another outcome", slide_count: "Enter a positive integer", output_language: "Enter a language", visual_tone: "Describe another visual tone" },
     },
     template: {
       title: "Choose a style",
       helper: "Pick the visual style Anna should use for this deck.",
+      none: "No preset",
+      noneDescription: "Keep the current visual tone flow and let Anna create the art direction.",
+      noneSelected: "No preset selected",
       loading: "Loading templates...",
       empty: "No templates found.",
       layouts: "layouts",
@@ -1051,11 +1059,15 @@ export const messages: Record<Locale, Messages> = {
       other: "其他",
       groups: { content: "内容目标", specifications: "生成规格", visual: "视觉方向" },
       fields: { audience: "受众", purpose: "用途", desired_outcome: "预期效果", slide_count: "页数", output_language: "语言", visual_tone: "视觉气质" },
+      templateLocked: "已由所选模板锁定。如需更换，请返回需求描述页面。",
       customPlaceholders: { audience: "描述其他受众", purpose: "描述其他用途", desired_outcome: "描述其他预期效果", slide_count: "输入正整数", output_language: "输入具体语言", visual_tone: "描述其他视觉气质" },
     },
     template: {
       title: "选择风格",
       helper: "选择 Anna 生成这份演示时使用的视觉风格。",
+      none: "不使用模板",
+      noneDescription: "保留现有视觉气质流程，由 Anna 生成艺术指导。",
+      noneSelected: "未选择模板",
       loading: "正在加载模板...",
       empty: "没有发现可用模板。",
       layouts: "个版式",

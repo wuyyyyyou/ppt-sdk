@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -177,6 +177,51 @@ test("Presentation Requirements own Workspace recovery and gate Outline Creation
       }),
       /concrete language/,
     );
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    await rm(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("selected Visual Style Preset keeps its Style Guide when the first Outline is saved", async () => {
+  const previousHome = process.env.HOME;
+  const homeDir = await mkdtemp(path.join(os.tmpdir(), "ppt-template-requirements-home-"));
+  process.env.HOME = homeDir;
+
+  const {
+    confirmAppWorkspaceRequirements,
+    createAppWorkspace,
+  } = await import("../../src/app-workspace/index.ts");
+
+  try {
+    const created = await createAppWorkspace({ title: "Template Requirements" });
+    const draft = draftRequirements();
+    const templateRequirements = {
+      ...draft,
+      status: "confirmed" as const,
+      selections: {
+        ...draft.selections,
+        visual_tone: null,
+        visual_style_preset: {
+          id: "placeholder-editorial",
+          version: 1,
+          name: "编辑感留白",
+          description: "浅色背景、深色标题、强调留白和清晰页码层级。",
+        },
+      },
+    };
+    const styleGuide = "# 编辑感留白\n固定模板指导。\n";
+    const stagingPath = path.join(homeDir, "staged-style-guide.md");
+    await writeFile(stagingPath, styleGuide, "utf8");
+    await confirmAppWorkspaceRequirements({
+      workspace_dir: created.workspace_dir,
+      requirements: templateRequirements,
+      style_guide_staging_file_path: stagingPath,
+      style_guide_expected_size_bytes: Buffer.byteLength(styleGuide),
+    });
+
+    assert.equal(await readFile(path.join(created.workspace_dir, "style-guide.md"), "utf8"), styleGuide);
   } finally {
     if (previousHome === undefined) delete process.env.HOME;
     else process.env.HOME = previousHome;

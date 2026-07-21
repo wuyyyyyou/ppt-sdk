@@ -46,6 +46,9 @@ async function ensureWorkspaceStyleGuide(input: RunDeckGenerationInput) {
     workspace_dir: input.workspace.workspace_dir,
   });
   if (status.non_empty) return;
+  if (input.workspace.requirements.selections.visual_style_preset) {
+    throw new Error("Selected Visual Style Preset Style Guide is missing. Return to Presentation Requirements and confirm the template again.");
+  }
   if (!input.hostUploadClient) {
     throw new Error("Host Upload is required to persist the Workspace Style Guide");
   }
@@ -89,7 +92,7 @@ export async function loadResumeArtifacts(input: RunDeckGenerationInput) {
   if (progress.pages.length === 0) {
     emitPreparationStep(input, "authoring-kit", generationText(input.locale).authoringKit);
     await input.backend.installWorkspaceAuthoringKit({ workspace_dir: input.workspace.workspace_dir });
-    if (!styleGuide.non_empty) {
+    if (!styleGuide.non_empty && !input.workspace.requirements.selections.visual_style_preset) {
       emitPreparationStep(input, "style-guide", generationText(input.locale).styleGuide);
       await ensureWorkspaceStyleGuide(input);
     }
@@ -135,7 +138,9 @@ export async function createInitialArtifacts(input: RunDeckGenerationInput) {
   await input.backend.installWorkspaceAuthoringKit({ workspace_dir: input.workspace.workspace_dir });
   throwIfCancelled(input);
 
-  emitPreparationStep(input, "style-guide", text.styleGuide);
+  if (!input.workspace.requirements.selections.visual_style_preset) {
+    emitPreparationStep(input, "style-guide", text.styleGuide);
+  }
   await ensureWorkspaceStyleGuide(input);
   throwIfCancelled(input);
 

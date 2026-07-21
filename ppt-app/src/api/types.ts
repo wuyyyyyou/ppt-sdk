@@ -81,7 +81,24 @@ export interface PresentationRequirementsSelections {
   slide_count: number | null;
   output_language: string | null;
   visual_tone: PresentationRequirementCandidate | null;
+  visual_style_preset?: VisualStylePresetSelection | null;
 }
+
+export interface VisualStylePresetPreview {
+  url: string;
+  alt: string;
+}
+
+export interface VisualStylePreset {
+  id: string;
+  version: number;
+  name: string;
+  description: string;
+  style_guide: string;
+  preview_images: VisualStylePresetPreview[];
+}
+
+export type VisualStylePresetSelection = Omit<VisualStylePreset, "style_guide" | "preview_images">;
 
 export interface PresentationRequirements {
   version: 1;
@@ -1341,6 +1358,19 @@ export interface CommitWorkspaceStyleGuideHostUploadInput {
   workspace_dir: string;
   size_bytes: number;
   host_upload: HostUploadRef;
+}
+
+export interface ConfirmWorkspaceRequirementsInput {
+  workspace_dir: string;
+  requirements: PresentationRequirements;
+  size_bytes?: number;
+  host_upload?: HostUploadRef;
+  clear_style_guide?: boolean;
+}
+
+export interface ConfirmWorkspaceRequirementsResult {
+  workspace: WorkspaceResult;
+  style_guide: CommitWorkspaceStyleGuideResult | null;
 }
 
 export interface CommitWorkspaceStyleGuideResult {

@@ -14,6 +14,7 @@ export function createEmptyRequirementsSelections(): PresentationRequirementsSel
     slide_count: null,
     output_language: null,
     visual_tone: null,
+    visual_style_preset: null,
   };
 }
 
@@ -34,6 +35,7 @@ export function createEmptyPresentationRequirements(): PresentationRequirements 
 export function createRequirementsDraft(
   brief: string,
   candidates: PresentationRequirementsCandidates,
+  visualStylePreset: PresentationRequirementsSelections["visual_style_preset"] = null,
 ): PresentationRequirements {
   return {
     version: 1,
@@ -47,6 +49,7 @@ export function createRequirementsDraft(
       slide_count: candidates.slide_count[0] ?? null,
       output_language: candidates.output_language[0] ?? null,
       visual_tone: candidates.visual_tone[0] ?? null,
+      visual_style_preset: visualStylePreset,
     },
     updated_at: new Date().toISOString(),
     confirmed_at: null,
@@ -65,7 +68,10 @@ export function createManualRequirementsDraft(brief: string): PresentationRequir
 }
 
 export function requirementsAreComplete(requirements: PresentationRequirements) {
-  return Object.values(requirements.selections).every((value) => value !== null) &&
+  const { visual_tone, visual_style_preset, ...otherSelections } = requirements.selections;
+  const normalizedPreset = visual_style_preset ?? null;
+  return Object.values(otherSelections).every((value) => value !== null) &&
+    ((visual_tone !== null) !== (normalizedPreset !== null)) &&
     requirements.selections.output_language?.trim().toLowerCase() !== "auto";
 }
 
@@ -106,11 +112,17 @@ export function projectRequirementsToLegacyInputs(requirements: PresentationRequ
         value: semanticValue(selections.desired_outcome!),
       },
       { id: "slides", label: "Slides", value: String(selections.slide_count) },
-      {
-        id: "visual_tone",
-        label: "Visual tone",
-        value: semanticValue(selections.visual_tone!),
-      },
+      selections.visual_style_preset
+        ? {
+            id: "visual_style_preset",
+            label: "Visual style preset",
+            value: `${selections.visual_style_preset.name}: ${selections.visual_style_preset.description}`,
+          }
+        : {
+            id: "visual_tone",
+            label: "Visual tone",
+            value: semanticValue(selections.visual_tone!),
+          },
     ],
     outputLanguage: selections.output_language!,
   };

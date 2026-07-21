@@ -95,6 +95,8 @@ import type {
   , WorkspacePageSourceFingerprint
   , CommitWorkspaceStyleGuideHostUploadInput
   , CommitWorkspaceStyleGuideResult
+  , ConfirmWorkspaceRequirementsInput
+  , ConfirmWorkspaceRequirementsResult
   , WorkspaceStyleGuideStatus
   , WorkspaceStyleGuide
   , PreparePageRefinementInput
@@ -120,6 +122,7 @@ export interface PptBackend {
   }>;
   getWorkspacePageSourceFingerprint(input: { workspace_dir: string; page_id: string }): Promise<WorkspacePageSourceFingerprint>;
   commitWorkspaceStyleGuideHostUpload(input: CommitWorkspaceStyleGuideHostUploadInput): Promise<CommitWorkspaceStyleGuideResult>;
+  confirmWorkspaceRequirements(input: ConfirmWorkspaceRequirementsInput): Promise<ConfirmWorkspaceRequirementsResult>;
   getWorkspaceStyleGuideStatus(input: { workspace_dir: string }): Promise<WorkspaceStyleGuideStatus>;
   getWorkspaceStyleGuide(input: { workspace_dir: string }): Promise<WorkspaceStyleGuide>;
   initializePageProgress(input: { workspace_dir: string }): Promise<PageProgress>;

@@ -58,6 +58,8 @@ import type {
   AppPresentationRequirements,
   AppPresentationRequirementsCandidates,
   AppPresentationRequirementsSelections,
+  ConfirmAppWorkspaceRequirementsInput,
+  ConfirmAppWorkspaceRequirementsResult,
   AppWorkspaceResult,
   AppWorkspaceSummary,
   AppWorkspaceOutline,
@@ -1086,6 +1088,7 @@ function createDefaultPresentationRequirements(): AppPresentationRequirements {
       slide_count: null,
       output_language: null,
       visual_tone: null,
+      visual_style_preset: null,
     },
     updated_at: null,
     confirmed_at: null,
@@ -1169,7 +1172,11 @@ function parseNullableRequirementCandidate(value: unknown, label: string) {
 
 function parseRequirementsSelections(value: unknown): AppPresentationRequirementsSelections {
   if (!isRecord(value)) throw new Error("requirements.selections must be an object");
-  assertExactKeys(value, PRESENTATION_REQUIREMENTS_FIELDS, "requirements.selections");
+  for (const key of Object.keys(value)) {
+    if (!PRESENTATION_REQUIREMENTS_FIELDS.includes(key as (typeof PRESENTATION_REQUIREMENTS_FIELDS)[number]) && key !== "visual_style_preset") {
+      throw new Error(`requirements.selections contains unexpected field ${key}`);
+    }
+  }
   const slideCount = value.slide_count;
   if (slideCount !== null && (!Number.isInteger(slideCount) || Number(slideCount) <= 0)) {
     throw new Error("requirements.selections.slide_count must be null or a positive integer");
@@ -1182,6 +1189,21 @@ function parseRequirementsSelections(value: unknown): AppPresentationRequirement
   )) {
     throw new Error("requirements.selections.output_language must be null or a concrete language");
   }
+  const presetValue = value.visual_style_preset;
+  const visualStylePreset = presetValue === undefined || presetValue === null
+    ? null
+    : (() => {
+        if (!isRecord(presetValue)) throw new Error("requirements.selections.visual_style_preset must be null or an object");
+        assertExactKeys(presetValue, ["id", "version", "name", "description"], "requirements.selections.visual_style_preset");
+        const id = normalizeString(presetValue.id).trim();
+        const version = presetValue.version;
+        const name = normalizeString(presetValue.name).trim();
+        const description = normalizeString(presetValue.description).trim();
+        if (!id || !Number.isInteger(version) || Number(version) <= 0 || !name || !description) {
+          throw new Error("requirements.selections.visual_style_preset must include a positive version, id, name, and description");
+        }
+        return { id, version: Number(version), name, description };
+      })();
   return {
     audience: parseNullableRequirementCandidate(value.audience, "requirements.selections.audience"),
     purpose: parseNullableRequirementCandidate(value.purpose, "requirements.selections.purpose"),
@@ -1189,6 +1211,7 @@ function parseRequirementsSelections(value: unknown): AppPresentationRequirement
     slide_count: slideCount === null ? null : Number(slideCount),
     output_language: outputLanguage === null ? null : outputLanguage.trim(),
     visual_tone: parseNullableRequirementCandidate(value.visual_tone, "requirements.selections.visual_tone"),
+    visual_style_preset: visualStylePreset,
   };
 }
 
@@ -1219,7 +1242,7 @@ function normalizePresentationRequirements(value: unknown): AppPresentationRequi
 
   if (value.status === "empty") {
     if (source !== null || PRESENTATION_REQUIREMENTS_FIELDS.some((field) => candidates[field].length > 0) ||
-      PRESENTATION_REQUIREMENTS_FIELDS.some((field) => selections[field] !== null)) {
+      PRESENTATION_REQUIREMENTS_FIELDS.some((field) => selections[field] !== null) || selections.visual_style_preset !== null) {
       throw new Error("empty requirements cannot include a source, candidates, or selections");
     }
   } else if (!source) {
@@ -1227,7 +1250,10 @@ function normalizePresentationRequirements(value: unknown): AppPresentationRequi
   }
 
   if (value.status === "confirmed") {
-    const missing = PRESENTATION_REQUIREMENTS_FIELDS.filter((field) => selections[field] === null);
+    const missing: string[] = PRESENTATION_REQUIREMENTS_FIELDS.filter((field) => field !== "visual_tone" || selections.visual_style_preset === null)
+      .filter((field) => selections[field] === null);
+    if (selections.visual_style_preset === null && selections.visual_tone === null) missing.push("visual_tone or visual_style_preset");
+    if (selections.visual_style_preset !== null && selections.visual_tone !== null) missing.push("visual_tone and visual_style_preset are mutually exclusive");
     if (missing.length > 0) {
       throw new Error(`confirmed requirements are missing selections: ${missing.join(", ")}`);
     }
@@ -3676,12 +3702,49 @@ export async function updateAppWorkspaceRequirements(
     updated_at: updatedAt,
     confirmed_at: requirements.status === "confirmed" ? updatedAt : null,
   };
-  if (getSelectedVisualTone(currentRequirements) !== getSelectedVisualTone(nextRequirements)) {
+  if (nextRequirements.status === "confirmed" && getSelectedVisualTone(currentRequirements) !== getSelectedVisualTone(nextRequirements)) {
     await invalidateWorkspaceStyleGuide(workspace);
   }
   await writeJsonFile(workspace.files.requirements, nextRequirements);
   await touchWorkspaceTask(workspace, updatedAt);
   return ensureWorkspaceFiles(input.workspace_dir);
+}
+
+export async function confirmAppWorkspaceRequirements(
+  input: ConfirmAppWorkspaceRequirementsInput,
+): Promise<ConfirmAppWorkspaceRequirementsResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const requirements = normalizePresentationRequirements(input.requirements);
+  if (requirements.status !== "confirmed") {
+    throw new Error("Confirmed Presentation Requirements are required");
+  }
+  const preset = requirements.selections.visual_style_preset;
+  let styleGuide: RecordAppWorkspaceStyleGuideResult | null = null;
+  if (preset) {
+    if (!input.style_guide_staging_file_path) {
+      throw new Error("A template Style Guide staging file is required when a Visual Style Preset is selected");
+    }
+    styleGuide = await recordAppWorkspaceStyleGuide({
+      workspace_dir: workspace.workspace_dir,
+      staging_file_path: input.style_guide_staging_file_path,
+      expected_size_bytes: Math.floor(input.style_guide_expected_size_bytes ?? 0),
+    });
+  } else if (input.clear_style_guide || getSelectedVisualTone(normalizePresentationRequirements(workspace.requirements)) !== getSelectedVisualTone(requirements)) {
+    await invalidateWorkspaceStyleGuide(workspace);
+  }
+
+  const updatedAt = new Date().toISOString();
+  await writeJsonFile(workspace.files.requirements, {
+    ...requirements,
+    updated_at: updatedAt,
+    confirmed_at: updatedAt,
+  });
+  await resetAppWorkspaceOutline({ workspace_dir: workspace.workspace_dir });
+  await touchWorkspaceTask(workspace, updatedAt);
+  return {
+    workspace: await ensureWorkspaceFiles(workspace.workspace_dir),
+    style_guide: styleGuide,
+  };
 }
 
 export async function appendAppWorkspaceLog(
@@ -4419,7 +4482,9 @@ function outlineContentSignature(outline: AppWorkspaceOutline): string {
 
 function getSelectedVisualTone(requirements: AppPresentationRequirements): string {
   const visualTone = requirements.selections.visual_tone;
-  return visualTone ? JSON.stringify([visualTone.label.trim(), visualTone.description.trim()]) : "";
+  const preset = requirements.selections.visual_style_preset;
+  if (preset) return JSON.stringify(["preset", preset.id, preset.version, preset.name, preset.description]);
+  return visualTone ? JSON.stringify(["tone", visualTone.label.trim(), visualTone.description.trim()]) : "";
 }
 
 async function invalidateWorkspaceStyleGuide(workspace: AppWorkspaceResult): Promise<void> {
@@ -4448,7 +4513,9 @@ async function persistAppWorkspaceOutline(
   };
   const currentTask = getPlainRecord(workspace.task);
   const currentOutline = normalizeOutlineJson(workspace.outline);
-  if (outlineContentSignature(currentOutline) !== outlineContentSignature(nextOutline)) {
+  // A selected preset owns a fixed Workspace Style Guide snapshot. Outline edits
+  // only invalidate the LLM-generated guide used by the non-template flow.
+  if (!requirements.selections.visual_style_preset && outlineContentSignature(currentOutline) !== outlineContentSignature(nextOutline)) {
     await invalidateWorkspaceStyleGuide(workspace);
   }
   await writeJsonFile(workspace.files.outline, nextOutline);
@@ -4470,7 +4537,9 @@ export async function resetAppWorkspaceOutline(
     throw new Error("Confirmed Presentation Requirements are required before resetting an Outline.");
   }
   const updatedAt = new Date().toISOString();
-  await invalidateWorkspaceStyleGuide(workspace);
+  if (!requirements.selections.visual_style_preset) {
+    await invalidateWorkspaceStyleGuide(workspace);
+  }
   await writeJsonFile(workspace.files.outline, createEmptyOutlineJson());
   await touchWorkspaceTask(workspace, updatedAt);
   return ensureWorkspaceFiles(input.workspace_dir);

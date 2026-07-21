@@ -124,6 +124,19 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
           <section className="requirements-group" key={group.title}>
             <h2>{t.requirements.groups[group.title]}</h2>
             {group.fields.map((field) => {
+              if (field === "visual_tone" && requirements.selections.visual_style_preset) {
+                const preset = requirements.selections.visual_style_preset;
+                return (
+                  <fieldset className="requirement-field" key="visual-style-preset">
+                    <legend>{t.requirements.fields.visual_tone}</legend>
+                    <div className="requirement-preset-summary">
+                      <strong>{preset.name}</strong>
+                      <span>{preset.description}</span>
+                      <small>{t.requirements.templateLocked}</small>
+                    </div>
+                  </fieldset>
+                );
+              }
               const isSemantic = field !== "slide_count" && field !== "output_language";
               const candidates = requirements.candidates[field];
               const selection = requirements.selections[field];
@@ -183,7 +196,7 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
           <button className="secondary-btn" type="button" disabled={saving || confirming || !dirty} onClick={onSave}>
             <Save size={16} />{t.controls.save}
           </button>
-          <button className="primary-btn" type="button" disabled={saving || confirming || !Object.values(requirements.selections).every(Boolean) || requirements.selections.output_language?.trim().toLowerCase() === "auto"} onClick={onConfirm}>
+          <button className="primary-btn" type="button" disabled={saving || confirming || !((requirements.selections.visual_style_preset || requirements.selections.visual_tone) && Object.entries(requirements.selections).filter(([key]) => key !== "visual_style_preset" && key !== "visual_tone").every(([, value]) => value !== null)) || requirements.selections.output_language?.trim().toLowerCase() === "auto"} onClick={onConfirm}>
             <Check size={16} />{t.requirements.confirm}
           </button>
         </div>

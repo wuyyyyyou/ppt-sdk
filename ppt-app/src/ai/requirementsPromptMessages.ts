@@ -7,7 +7,13 @@ const REQUIREMENTS_JSON_SHAPE = `{
   "visual_tone": [{"label": "...", "description": "..."}]
 }`;
 
-export function buildRequirementsSystemPrompt() {
+export function buildRequirementsSystemPrompt(visualStylePreset?: { name: string; description: string } | null) {
+  const visualField = visualStylePreset
+    ? "- visual direction: fixed by the user-selected Visual Style Preset. Do not return visual_tone or visual_style_preset."
+    : "- visual_tone: the qualitative visual character and intended viewing experience. It may reference a recognizable editorial or cultural style, but must not prescribe exact colors, fonts, templates, or page layouts.";
+  const shape = visualStylePreset
+    ? REQUIREMENTS_JSON_SHAPE.replace('  "visual_tone": [{"label": "...", "description": "..."}]\n', "")
+    : REQUIREMENTS_JSON_SHAPE;
   return [
     "You are a senior presentation strategist.",
     "Your task is to derive a Presentation Requirements Draft solely from the user's Brief.",
@@ -21,7 +27,7 @@ export function buildRequirementsSystemPrompt() {
     "- desired_outcome: what the audience should understand, believe, decide, or do afterward.",
     "- slide_count: the concrete number of slides.",
     "- output_language: the concrete language of the final presentation.",
-    "- visual_tone: the qualitative visual character and intended viewing experience. It may reference a recognizable editorial or cultural style, but must not prescribe exact colors, fonts, templates, or page layouts.",
+    visualField,
     "",
     "Candidate rules:",
     "- Preserve every requirement explicitly stated in the Brief.",
@@ -35,22 +41,23 @@ export function buildRequirementsSystemPrompt() {
     "- Write all candidate labels and descriptions in the language primarily used by the Brief.",
     "",
     "Return one JSON object with this exact shape:",
-    REQUIREMENTS_JSON_SHAPE,
+    shape,
     "Return exact JSON only, with no Markdown, code fences, comments, or extra text.",
   ].join("\n");
 }
 
-export function buildRequirementsUserPrompt(brief: string) {
+export function buildRequirementsUserPrompt(brief: string, visualStylePreset?: { name: string; description: string } | null) {
   return [
     "Create a Presentation Requirements Draft from the Brief below.",
     "",
     "<brief>",
     brief,
     "</brief>",
+    visualStylePreset ? `The user selected Visual Style Preset: ${visualStylePreset.name} — ${visualStylePreset.description}. Do not generate a Visual Tone field.` : "",
   ].join("\n");
 }
 
-export function buildRequirementsRepairPrompt(validationErrors: string[]) {
+export function buildRequirementsRepairPrompt(validationErrors: string[], visualStylePreset?: { name: string; description: string } | null) {
   return [
     "The previous response did not satisfy the Presentation Requirements JSON contract.",
     "",
@@ -62,7 +69,9 @@ export function buildRequirementsRepairPrompt(validationErrors: string[]) {
     "Re-evaluate the previous response against the original Brief and all original instructions.",
     "",
     "Use this exact shape:",
-    REQUIREMENTS_JSON_SHAPE,
+    visualStylePreset
+      ? REQUIREMENTS_JSON_SHAPE.replace('  "visual_tone": [{"label": "...", "description": "..."}]\n', "")
+      : REQUIREMENTS_JSON_SHAPE,
     "Return JSON only.",
   ].join("\n");
 }

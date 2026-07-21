@@ -148,6 +148,7 @@ export async function runDeckRefinementWorkflow(input: RunDeckRefinementInput, i
       requirements: input.workspace.requirements,
       currentStyleGuide: styleGuide.content,
       locale: input.locale,
+      visualStylePresetSelected: Boolean(input.workspace.requirements.selections.visual_style_preset),
       logContext,
     });
 

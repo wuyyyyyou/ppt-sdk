@@ -32,6 +32,7 @@ export function createInitialWorkspaceSnapshot(
         slide_count: null,
         output_language: null,
         visual_tone: null,
+        visual_style_preset: null,
       },
       updated_at: null,
       confirmed_at: null,

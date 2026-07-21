@@ -139,6 +139,7 @@ export interface DeckWorkspaceState {
   workspaceError: string;
   workspaceSettingsSaving: boolean;
   templateGroups: TemplateSummary[];
+  selectedVisualStylePresetId: string | null;
   selectedTemplateGroupId: string | null;
   styleProfiles: StyleProfileIndexEntry[];
   styleProfilePreviews: Record<string, GetStyleProfilePreviewResult | undefined>;

@@ -770,6 +770,42 @@
       ]
     },
     {
+      "name": "app_confirm_workspace_requirements",
+      "description": "Atomically confirm Presentation Requirements, commit or clear the Workspace Style Guide, and reset downstream Outline artifacts.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "requirements",
+          "type": "object",
+          "description": "Complete confirmed Presentation Requirements artifact.",
+          "required": true
+        },
+        {
+          "name": "host_upload",
+          "type": "object",
+          "description": "Host Upload reference for the selected template Style Guide.",
+          "required": false
+        },
+        {
+          "name": "size_bytes",
+          "type": "number",
+          "description": "Uploaded template Style Guide byte size.",
+          "required": false
+        },
+        {
+          "name": "clear_style_guide",
+          "type": "boolean",
+          "description": "Clear the existing Style Guide when no template is selected.",
+          "required": false
+        }
+      ]
+    },
+    {
       "name": "app_get_workspace_outline",
       "description": "Read and normalize outline.json for an existing PPT task workspace.",
       "parameters": [

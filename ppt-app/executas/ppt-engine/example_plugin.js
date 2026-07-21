@@ -108,6 +108,7 @@ import {
   resetAppWorkspaceOutline,
   saveAppWorkspaceOutlineDraft,
   updateAppWorkspaceRequirements,
+  confirmAppWorkspaceRequirements,
   updateAppWorkspacePages,
   updateAppWorkspaceSettings,
   updateAppWorkspaceTitle,
@@ -1576,6 +1577,35 @@ async function toolAppUpdateWorkspaceRequirements(args) {
   }));
 }
 
+async function toolAppConfirmWorkspaceRequirements(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const requirements = args.requirements;
+  if (!requirements || typeof requirements !== "object" || Array.isArray(requirements)) throw new Error('"requirements" must be an object');
+  const preset = requirements.selections?.visual_style_preset;
+  let stagingPath;
+  let expectedSizeBytes;
+  if (preset) {
+    const hostUpload = readHostUploadRefArg(args, "host_upload");
+    if (hostUpload.mime_type !== "text/markdown") throw new Error('Template Style Guide MIME type must be "text/markdown"');
+    expectedSizeBytes = Number(args.size_bytes);
+    if (!Number.isFinite(expectedSizeBytes) || Math.floor(expectedSizeBytes) !== hostUpload.size_bytes) throw new Error("Template Style Guide Host Upload size mismatch");
+    stagingPath = path.join(STYLE_GUIDE_STAGING_DIR, `${randomUUID()}.md`);
+    await downloadHostUploadToStaging({ hostUpload, stagingPath, expectedSizeBytes: Math.floor(expectedSizeBytes) });
+  }
+  try {
+    return registerWorkspaceJsonReference(await confirmAppWorkspaceRequirements({
+      workspace_dir: workspaceDir,
+      requirements,
+      style_guide_staging_file_path: stagingPath,
+      style_guide_expected_size_bytes: expectedSizeBytes,
+      clear_style_guide: Boolean(args.clear_style_guide),
+    }));
+  } finally {
+    if (stagingPath) await unlink(stagingPath).catch(() => undefined);
+  }
+}
+
 async function toolAppUpdateWorkspaceSettings(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -2669,6 +2699,7 @@ const TOOL_DISPATCH = {
   app_append_workspace_log: toolAppAppendWorkspaceLog,
   app_get_workspace_requirements: toolAppGetWorkspaceRequirements,
   app_update_workspace_requirements: toolAppUpdateWorkspaceRequirements,
+  app_confirm_workspace_requirements: toolAppConfirmWorkspaceRequirements,
   app_get_workspace_outline: toolAppGetWorkspaceOutline,
   app_reset_workspace_outline: toolAppResetWorkspaceOutline,
   app_save_workspace_outline_draft: toolAppSaveWorkspaceOutlineDraft,

@@ -63,10 +63,13 @@ export class DeckRefinementPlanningValidationError extends Error {
   }
 }
 
-export function normalizeDeckRefinementPlan(value: unknown, input: Pick<PlanDeckRefinementInput, "outline">): DeckRefinementPlan {
+export function normalizeDeckRefinementPlan(value: unknown, input: Pick<PlanDeckRefinementInput, "outline" | "visualStylePresetSelected">): DeckRefinementPlan {
   const errors: string[] = [];
   if (!isRecord(value)) throw new DeckRefinementPlanningValidationError(["root must be an object"]);
-  assertOnlyKeys(value, ["route", "title", "output_language_change", "style_guide_change", "operations", "reason"], "root", errors);
+  const stylePresetSelected = input.visualStylePresetSelected === true;
+  assertOnlyKeys(value, stylePresetSelected
+    ? ["route", "title", "output_language_change", "operations", "reason"]
+    : ["route", "title", "output_language_change", "style_guide_change", "operations", "reason"], "root", errors);
   const route = cleanString(value.route);
   if (route !== "proceed" && route !== "no_op") errors.push('route must be "proceed" or "no_op"');
   const title = cleanString(value.title);
@@ -78,12 +81,20 @@ export function normalizeDeckRefinementPlan(value: unknown, input: Pick<PlanDeck
   const outputLanguage = cleanString(languageRecord.output_language);
   if (languageChanged && !outputLanguage) errors.push("output_language_change.output_language is required when changed is true");
 
-  const styleRecord = isRecord(value.style_guide_change) ? value.style_guide_change : {};
-  assertOnlyKeys(styleRecord, ["action", "reason"], "style_guide_change", errors);
-  const styleAction = cleanString(styleRecord.action);
-  if (styleAction !== "preserve" && styleAction !== "regenerate") errors.push('style_guide_change.action must be "preserve" or "regenerate"');
-  const styleReason = cleanString(styleRecord.reason);
-  if (!styleReason) errors.push("style_guide_change.reason must be non-empty");
+  let styleAction: "preserve" | "regenerate" = "preserve";
+  let styleReason = "Visual Style Preset Style Guide is immutable.";
+  if (!stylePresetSelected) {
+    const styleRecord = isRecord(value.style_guide_change) ? value.style_guide_change : {};
+    assertOnlyKeys(styleRecord, ["action", "reason"], "style_guide_change", errors);
+    const rawStyleAction = cleanString(styleRecord.action);
+    if (rawStyleAction !== "preserve" && rawStyleAction !== "regenerate") {
+      errors.push('style_guide_change.action must be "preserve" or "regenerate"');
+    } else {
+      styleAction = rawStyleAction;
+    }
+    styleReason = cleanString(styleRecord.reason);
+    if (!styleReason) errors.push("style_guide_change.reason must be non-empty");
+  }
 
   const rawOperations = Array.isArray(value.operations) ? value.operations : [];
   if (route === "proceed" && rawOperations.length === 0) errors.push("proceed requires at least one operation");
@@ -108,7 +119,7 @@ export function normalizeDeckRefinementPlan(value: unknown, input: Pick<PlanDeck
   if (languageChanged && operations.some((operation) => operation.op === "keep")) {
     errors.push("output language changes require update operations for retained pages");
   }
-  if (route === "no_op" && (languageChanged || styleAction !== "preserve" || title !== input.outline.title)) {
+  if (route === "no_op" && (languageChanged || (!stylePresetSelected && styleAction !== "preserve") || title !== input.outline.title)) {
     errors.push("no_op cannot change title, output language, or Style Guide");
   }
   const reason = cleanString(value.reason);
@@ -122,7 +133,7 @@ export function normalizeDeckRefinementPlan(value: unknown, input: Pick<PlanDeck
       output_language: languageChanged ? outputLanguage : undefined,
       reason: cleanString(languageRecord.reason) || undefined,
     },
-    style_guide_change: { action: styleAction as "preserve" | "regenerate", reason: styleReason },
+    style_guide_change: { action: styleAction, reason: styleReason },
     operations,
     reason,
   };
@@ -133,7 +144,7 @@ export function buildDeckRefinementPlanningRequest(input: PlanDeckRefinementInpu
     route: "proceed",
     title: input.outline.title,
     output_language_change: { changed: false, output_language: "", reason: "" },
-    style_guide_change: { action: "preserve", reason: "" },
+    ...(input.visualStylePresetSelected ? {} : { style_guide_change: { action: "preserve", reason: "" } }),
     operations: [
       { op: "keep", page_id: "page-uuid", reason: "" },
       { op: "update", page_id: "page-uuid", title: "", core_message: "", required_content: [""], reason: "" },
@@ -165,7 +176,9 @@ export function buildDeckRefinementPlanningRequest(input: PlanDeckRefinementInpu
             "Keep and update retain the existing page_id. Add does not include page_id; the system allocates it. Delete references an existing page_id.",
             "Use update only when the page's Outline Entry or page content must change. Use keep for unchanged pages unless a global output-language or Style Guide change requires all retained pages to be targeted.",
             "Add, delete, or reorder pages only when the request explicitly asks for page count, structure, sequence, section organization, or narrative-flow changes.",
-            "Set style_guide_change.action to regenerate only for an explicit shared visual-direction change. A page-local visual change uses preserve.",
+            input.visualStylePresetSelected
+              ? "A Visual Style Preset is selected. Do not return style_guide_change. Treat the selected Style Guide as immutable; express shared visual requests through page operations and reasons."
+              : "Set style_guide_change.action to regenerate only for an explicit shared visual-direction change. A page-local visual change uses preserve.",
             "Set output_language_change.changed only when the user explicitly asks to change the generated presentation language. When it changes, all retained pages must use update operations.",
             "Do not invent facts, numbers, dates, names, claims, citations, or source-dependent visuals. Use only the provided Workspace material and the user's request.",
             "Page-level reason fields are concise English instructions for Page Authoring. Outline content must use the current or explicitly requested output language.",

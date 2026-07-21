@@ -1,6 +1,8 @@
-import { AlertTriangle, Check, HelpCircle, Sparkles } from "lucide-react";
+import { AlertTriangle, Check, ChevronLeft, ChevronRight, HelpCircle, Sparkles, X } from "lucide-react";
 import { useState } from "react";
 import type { Messages } from "../../../i18n/messages";
+import type { VisualStylePreset } from "../../../api/types";
+import { VISUAL_STYLE_PRESETS } from "../../templates/visualStylePresets";
 import {
   isStrictReviewModeEnabled,
   type PageReviewSettings,
@@ -16,6 +18,8 @@ export interface BriefPageProps {
   setStrictReviewMode: (enabled: boolean) => Promise<void>;
   workspaceSettingsSaving: boolean;
   generateDeck: () => Promise<void>;
+  selectedVisualStylePresetId: string | null;
+  onSelectVisualStylePreset: (presetId: string | null) => void;
 }
 
 export function BriefPage({
@@ -27,10 +31,13 @@ export function BriefPage({
   setStrictReviewMode,
   workspaceSettingsSaving,
   generateDeck,
+  selectedVisualStylePresetId,
+  onSelectVisualStylePreset,
 }: BriefPageProps) {
   const busy = loading !== "none";
   const strictReviewMode = isStrictReviewModeEnabled(pageReviewSettings);
   const [strictReviewConfirmOpen, setStrictReviewConfirmOpen] = useState(false);
+  const [preview, setPreview] = useState<{ preset: VisualStylePreset; index: number } | null>(null);
 
   function toggleStrictReviewMode() {
     if (strictReviewMode) {
@@ -100,6 +107,97 @@ export function BriefPage({
           </div>
         </div>
       </div>
+
+      <section className="brief-style-presets" aria-labelledby="brief-style-presets-title">
+        <div className="brief-style-presets-heading">
+          <div>
+            <h2 id="brief-style-presets-title">{t.template.title}</h2>
+            <p>{t.template.helper}</p>
+          </div>
+          <span className="brief-style-presets-note">{selectedVisualStylePresetId ? t.template.selected : t.template.noneSelected}</span>
+        </div>
+        <div className="brief-style-preset-grid">
+          <button
+            type="button"
+            className={`brief-style-preset-card brief-style-preset-none-card ${!selectedVisualStylePresetId ? "active" : ""}`}
+            disabled={busy}
+            onClick={() => onSelectVisualStylePreset(null)}
+          >
+            <span className="brief-style-preset-none-mark" aria-hidden="true">
+              <svg viewBox="0 0 640 360" role="presentation">
+                <rect x="80" y="62" width="480" height="236" rx="10" fill="#f8f9fb" stroke="#d8dce5" />
+                <rect x="112" y="96" width="184" height="12" rx="6" fill="#d9dde7" />
+                <rect x="112" y="126" width="276" height="8" rx="4" fill="#e4e7ee" />
+                <rect x="112" y="184" width="124" height="64" rx="8" fill="#eef0f5" />
+                <rect x="252" y="184" width="124" height="64" rx="8" fill="#f1f3f7" />
+                <rect x="392" y="184" width="124" height="64" rx="8" fill="#ebeef4" />
+                <path d="M112 278H516" stroke="#e0e3ea" strokeLinecap="round" />
+                <circle cx="510" cy="112" r="8" fill="#c9ceda" />
+              </svg>
+              {!selectedVisualStylePresetId ? (
+                <span className="brief-style-preset-none-selection"><Check size={15} /></span>
+              ) : null}
+            </span>
+            <strong>{t.template.none}</strong>
+            <small>{t.template.noneDescription}</small>
+          </button>
+          {VISUAL_STYLE_PRESETS.map((preset: VisualStylePreset) => {
+            const selected = selectedVisualStylePresetId === preset.id;
+            return (
+              <button
+                type="button"
+                className={`brief-style-preset-card ${selected ? "active" : ""}`}
+                key={preset.id}
+                disabled={busy}
+                onClick={() => onSelectVisualStylePreset(preset.id)}
+              >
+                <span
+                  className="brief-style-preset-image-wrap"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={t.template.previewTitle}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setPreview({ preset, index: 0 });
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setPreview({ preset, index: 0 });
+                    }
+                  }}
+                >
+                  <img src={preset.preview_images[0]?.url} alt={preset.preview_images[0]?.alt ?? preset.name} />
+                  {selected ? <span className="brief-style-preset-selected"><Check size={14} /></span> : null}
+                </span>
+                <strong>{preset.name}</strong>
+                <small>{preset.description}</small>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {preview ? (
+        <div className="template-preview-modal" role="dialog" aria-modal="true" aria-label={preview.preset.name} onClick={() => setPreview(null)}>
+          <section className="template-preview-modal-card" onClick={(event) => event.stopPropagation()}>
+            <header className="template-preview-modal-header">
+              <div className="template-preview-modal-title"><h2>{preview.preset.name}</h2><span>{preview.preset.description}</span></div>
+              <button type="button" className="template-preview-modal-close" aria-label={t.template.close} onClick={() => setPreview(null)}><X size={17} /></button>
+            </header>
+            <div className="template-preview-modal-stage">
+              <button type="button" className="template-preview-modal-nav" aria-label={t.template.previous} disabled={preview.index === 0} onClick={() => setPreview((current) => current ? { ...current, index: Math.max(0, current.index - 1) } : current)}><ChevronLeft size={18} /></button>
+              <div className="template-preview-modal-frame"><img src={preview.preset.preview_images[preview.index]?.url} alt={preview.preset.preview_images[preview.index]?.alt ?? preview.preset.name} /><span className="template-preview-modal-counter">{preview.index + 1} / {preview.preset.preview_images.length}</span></div>
+              <button type="button" className="template-preview-modal-nav" aria-label={t.template.next} disabled={preview.index >= preview.preset.preview_images.length - 1} onClick={() => setPreview((current) => current ? { ...current, index: Math.min(current.preset.preview_images.length - 1, current.index + 1) } : current)}><ChevronRight size={18} /></button>
+            </div>
+            <footer className="template-preview-modal-footer">
+              <span className="template-preview-modal-layout-name">{t.template.previewTitle}</span>
+              <button type="button" className="template-use-btn" onClick={() => { onSelectVisualStylePreset(preview.preset.id); setPreview(null); }}>{t.controls.useTemplate}</button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
 
       {strictReviewConfirmOpen ? (
         <div

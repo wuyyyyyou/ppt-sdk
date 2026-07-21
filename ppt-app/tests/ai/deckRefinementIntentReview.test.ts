@@ -58,6 +58,56 @@ describe("Deck Refinement Planning", () => {
     }, input), /missing operation|require update operations/);
   });
 
+  it("normalizes template planning without an LLM style_guide_change field", () => {
+    const templateInput: PlanDeckRefinementInput = {
+      ...input,
+      requirements: {
+        ...input.requirements,
+        selections: {
+          ...input.requirements.selections,
+          visual_tone: null,
+          visual_style_preset: {
+            id: "placeholder-editorial",
+            version: 1,
+            name: "编辑感留白",
+            description: "固定视觉指导",
+          },
+        },
+      },
+      visualStylePresetSelected: true,
+    };
+    const rawPlan = {
+      route: "proceed",
+      title: "经营复盘",
+      output_language_change: { changed: false },
+      operations: [
+        { op: "keep", page_id: "page-1", reason: "Keep." },
+        { op: "keep", page_id: "page-2", reason: "Keep." },
+      ],
+      reason: "Proceed.",
+    };
+    const plan = normalizeDeckRefinementPlan(rawPlan, templateInput);
+    assert.deepEqual(plan.style_guide_change, {
+      action: "preserve",
+      reason: "Visual Style Preset Style Guide is immutable.",
+    });
+    const request = buildDeckRefinementPlanningRequest(templateInput);
+    assert.doesNotMatch(request.messages[0]?.content.text ?? "", /"style_guide_change"\s*:/);
+  });
+
+  it("still requires style_guide_change in the non-template flow", () => {
+    assert.throws(() => normalizeDeckRefinementPlan({
+      route: "proceed",
+      title: "经营复盘",
+      output_language_change: { changed: false },
+      operations: [
+        { op: "keep", page_id: "page-1", reason: "Keep." },
+        { op: "keep", page_id: "page-2", reason: "Keep." },
+      ],
+      reason: "Proceed.",
+    }, input), /style_guide_change\.action/);
+  });
+
   it("repair request keeps the invalid response and deterministic errors", () => {
     const original = buildDeckRefinementPlanningRequest(input);
     const repaired = buildDeckRefinementPlanningRepairRequest(original, "```json\n{}\n```", ["missing operation"]);

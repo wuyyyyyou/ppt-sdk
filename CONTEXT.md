@@ -24,10 +24,10 @@ _Avoid_: Confirmed Presentation Requirements
 A selectable proposed value within a Presentation Requirements Draft. Each field has one candidate when the Brief is explicit and two to four materially distinct candidates only when genuine ambiguity remains; semantic candidates pair a concise label with a one-sentence description, while page-count and output-language candidates are simple values.
 
 **Confirmed Presentation Requirements**:
-The complete Presentation Requirements accepted by the user as the primary constraints for downstream creation; page count and output language are always concrete rather than automatically deferred. Any later field change returns them to a draft until the whole set is confirmed again, except that saving a valid Outline synchronizes `slide_count` to the Outline entry count while the requirements remain confirmed; the Brief remains the original source record without overriding a conflicting confirmed field.
+The complete Presentation Requirements accepted by the user as the primary constraints for downstream creation; page count and output language are always concrete rather than automatically deferred. A draft may carry a replaceable Visual Style Preset identity, but only confirmation creates the Workspace's authoritative preset snapshot and style guidance. Any later field change, including changing or clearing a Visual Style Preset, returns them to a draft until the whole set is confirmed again, except that saving a valid Outline synchronizes `slide_count` to the Outline entry count while the requirements remain confirmed; the Brief remains the original source record without overriding a conflicting confirmed field.
 
 **Presentation Requirements Creation**:
-The explicit user-requested process that derives a new Presentation Requirements Draft solely from the current Brief. It may infer missing requirements but never content facts; each resulting draft retains its source Brief, and a successful new creation replaces and persists the current review draft as a whole while a failed attempt leaves it unchanged. Later review edits are persisted only when the user explicitly saves or confirms them.
+The explicit user-requested process that derives a new Presentation Requirements Draft solely from the current Brief and current Visual Style Preset choice. It may infer missing requirements but never content facts; when a preset is selected, the process does not generate or alter Visual Tone, and when no preset is selected, Visual Tone remains an inferred and editable requirement. Changing or clearing the preset requires a new creation before the prior draft may be reviewed again. Each resulting draft retains its source Brief and preset snapshot, and a successful new creation replaces and persists the current review draft as a whole while a failed attempt leaves it unchanged. Later review edits are persisted only when the user explicitly saves or confirms them.
 
 **Presentation Requirements Review**:
 The required user step where every Presentation Requirements field is resolved from generated candidates or manual entry and the whole set is explicitly confirmed by the user; it is never skipped automatically. Default selections remain a draft until this confirmation action occurs. Editing does not auto-save: Save persists a draft, while confirmation saves the complete set as confirmed before downstream work begins.
@@ -44,9 +44,14 @@ User-facing Chinese label: 预期效果
 _Avoid_: Goal
 
 **Visual Tone**:
-The qualitative visual character requested for a Deck; it may use a recognizable editorial or cultural reference and describe visual intensity, headline character, compositional feel, and intended reading experience without fixing exact colors, typography, templates, or page layouts. It is an input to Workspace Style Guide Creation rather than a Style Profile or Workspace Style Guide.
+The qualitative visual character requested for a Deck when no Visual Style Preset is selected; it may use a recognizable editorial or cultural reference and describe visual intensity, headline character, compositional feel, and intended reading experience without fixing exact colors, typography, templates, or page layouts. It is an input to Workspace Style Guide Creation rather than a Style Profile or Workspace Style Guide.
 User-facing Chinese label: 视觉气质
 _Avoid_: Theme, Template, Style Guide
+
+**Visual Style Preset**:
+A selectable, reusable visual direction for a Deck. It has a user-facing name, a concise description, and one complete visual guidance document that may prescribe shared placement and composition tendencies but never an executable page template, fixed content, or code dependency; when selected, its name and description replace the independently editable Visual Tone in Presentation Requirements, while its preview images communicate the choice to the user but are not visual or factual inputs to Page Authoring. A Workspace keeps the confirmed preset snapshot even if the catalog later removes or disables that preset.
+User-facing Chinese label: 模板
+_Avoid_: Template Group, Executable Template, Template Catalog
 
 **Outline**:
 A Workspace-owned presentation title and ordered list of slide-level Outline Entries. It has an `empty`, `draft`, or `confirmed` lifecycle and does not own output language, template selection, or visual theme creation.
@@ -284,7 +289,7 @@ The visible stream for an Active Page Generation. It shows the current page run 
 The user-facing record of what happened within one Page Generation Unit across stages such as authoring, rendering, review, and fixing. It may include live or completed agent output, but it is presented as page work rather than as session history.
 
 **Page Visual Review**:
-The optional, user-enabled Page Generation check that judges whether a rendered page screenshot is visually usable as a PPT page, including layout completeness, readability, overlap, cutoff, blank areas, hierarchy, and fit with the Workspace Style Guide. It does not review factual grounding, output language, or content correctness; after its bounded automatic fix attempts are exhausted, the page is accepted with the unresolved review recorded so the user can inspect the completed Deck instead of being blocked.
+The optional, user-enabled Page Generation check that judges whether a rendered page screenshot is visually usable as a PPT page, including layout completeness, readability, overlap, cutoff, contrast, missing or broken visuals, unintended blank areas, and fit within the canvas. It does not read or judge the Workspace Style Guide or Visual Style Preset, and does not review factual grounding, output language, or content correctness; after its bounded automatic fix attempts are exhausted, the page is accepted with the unresolved review recorded so the user can inspect the completed Deck instead of being blocked.
 _Avoid_: Self Review when referring to the visual-only screenshot check.
 
 **Generation Session History**:
@@ -315,7 +320,7 @@ When the Confirmed Outline changes without changing output language, only Page G
 Deck Refinement preserves the Deck title unless the request explicitly changes it. A changed title updates the Workspace and active Confirmed Outline authorities but affects only the Page Generation Units that the reconciliation identifies as needing to express the new title.
 An explicit output-language change updates the Confirmed Presentation Requirements, rewrites the active Confirmed Outline in the new language, and makes every retained Page Generation Unit a refinement target. Merely using foreign terms or examples does not change the Deck output language.
 Deck Refinement does not change the Confirmed Presentation Requirements audience, purpose, desired outcome, or visual tone. Its final page count is synchronized from the reconciled Confirmed Outline rather than decided as a separate requirement update.
-Deck Refinement preserves the current Workspace Style Guide unless the request changes the Deck's shared visual direction. Replacing the Workspace Style Guide makes every retained Page Generation Unit a refinement target, while page-local visual changes leave the shared guide unchanged.
+Deck Refinement preserves the current Workspace Style Guide unless the request changes the Deck's shared visual direction. In a Workspace with a confirmed Visual Style Preset, the preset's Style Guide is immutable: a shared visual request may override it for targeted Page Generation Units through the active Deck Refinement Request, but never replaces the Workspace Style Guide. Without a confirmed preset, replacing the Workspace Style Guide makes every retained Page Generation Unit a refinement target, while page-local visual changes leave the shared guide unchanged.
 For retained Page Generation Units, Deck Refinement preserves the existing Page Source; requested layout changes are handled by Page Authoring against that source.
 New Page Generation Units introduced during Deck Refinement are initialized from the engine's Page Source Bootstrap because they do not yet have a Page Source.
 Deleted Page Generation Units are removed from the current Confirmed Outline, progress, manifest, and render artifacts, but their old workspace files may remain as unreferenced artifacts.
@@ -329,23 +334,23 @@ _Avoid_: Starting a new Deck Generation when accepted pages can be preserved.
 The user's active instruction for revising an accepted Deck as a whole. It may explicitly change the Deck title, output language, page structure, page intents, or shared visual direction, while requirement fields other than output language remain unchanged.
 
 **Deck Refinement Planning**:
-The pre-commit decision process that reconciles a Deck Refinement Request into the resulting Deck title, output-language decision, ordered page operations, complete changed or added Outline Entries, shared Style Guide decision, and page-level refinement reasons. It does not author Page Sources and preserves page count and order unless the request explicitly authorizes structural change.
+The pre-commit decision process that reconciles a Deck Refinement Request into the resulting Deck title, output-language decision, ordered page operations, complete changed or added Outline Entries, shared Style Guide decision when the Workspace has no Visual Style Preset, and page-level refinement reasons. With a confirmed preset, the planning result keeps the preset Style Guide and still identifies every Page Generation Unit affected by the active request. It does not author Page Sources and preserves page count and order unless the request explicitly authorizes structural change.
 
 **Deck Refinement Resume**:
 The user action that continues an unfinished Deck Refinement from persisted deck-level decisions and target pages. It does not reinterpret completed context, outline, evidence-assignment, or research-routing decisions as a new request.
 The committed target Page Generation Units already own their refinement execution states, while the persisted Deck Refinement Request and page-level reasons preserve the authoring intent needed to continue without replanning.
 
 **Deck Refinement Preparation**:
-The visible pre-commit phase of Deck Refinement that derives the complete page reconciliation and, when required, a replacement Workspace Style Guide without changing the accepted Deck's authoritative artifacts. Failure during preparation leaves the accepted Deck unchanged and is retried as a new refinement attempt rather than resumed as partially committed work.
+The visible pre-commit phase of Deck Refinement that derives the complete page reconciliation and, when allowed, a replacement Workspace Style Guide without changing the accepted Deck's authoritative artifacts. A confirmed Visual Style Preset never allows Style Guide replacement. Failure during preparation leaves the accepted Deck unchanged and is retried as a new refinement attempt rather than resumed as partially committed work.
 
 **Deck Refinement Commit**:
-The tool-call-level transition that accepts a prepared Deck Refinement decision as the Workspace's new active generation state, including its reconciled Confirmed Outline, Workspace Style Guide decision, target Page Generation Units, and recovery state. Deck Refinement Resume applies only after this transition has succeeded.
+The tool-call-level transition that accepts a prepared Deck Refinement decision as the Workspace's new active generation state, including its reconciled Confirmed Outline, any permitted Workspace Style Guide decision, target Page Generation Units, and recovery state. A confirmed Visual Style Preset keeps its Style Guide unchanged. Deck Refinement Resume applies only after this transition has succeeded.
 
 **No-op Deck Refinement**:
 A Deck Refinement whose review and reconciliation steps determine that no workspace artifacts or Page Generation Units need to change. It completes without rerunning page authoring or final deck render.
 
 **Deck Refinement Context Review**:
-The deck-level portion of Deck Refinement Planning that decides whether the request explicitly changes output language or the shared visual direction. An output-language change updates only that Confirmed Presentation Requirements field and the active Confirmed Outline, while a shared visual-direction change replaces the Workspace Style Guide without rewriting the requirements' Visual Tone; the original Brief and all other confirmed requirement fields remain unchanged.
+The deck-level portion of Deck Refinement Planning that decides whether the request explicitly changes output language or the shared visual direction. An output-language change updates only that Confirmed Presentation Requirements field and the active Confirmed Outline. Without a confirmed Visual Style Preset, a shared visual-direction change may replace the Workspace Style Guide; with a confirmed preset, the request instead remains a page-authoring override and leaves the preset Style Guide unchanged. The original Brief and all other confirmed requirement fields remain unchanged.
 
 **Page Refinement**:
 A user-requested revision of one or more accepted Page Generation Units after Deck Generation that re-authors only the target Page Sources without modifying the Confirmed Outline or Workspace Style Guide. The current target Outline Entry and Workspace Style Guide remain the original creation baseline, while the active Page Refinement Request is authoritative wherever it conflicts with either baseline.
@@ -396,6 +401,14 @@ The authoritative state-meaning module for the Task State Machine. It derives ef
 Dev: "The requirements page already selected the first candidate for every field. Can Outline Creation start now?"
 
 Expert: "No. Those selections are still a Presentation Requirements Draft until the user explicitly confirms the whole set; the requirements gate must block Outline Creation before then."
+
+Dev: "The user selected a template on the Brief page. Is that already the Workspace's visual authority?"
+
+Expert: "No. It is a draft Visual Style Preset choice until Presentation Requirements Confirmation. Confirmation records the preset snapshot and its complete Style Guide; the preview images remain UI-only."
+
+Dev: "The user changed the template after the requirements draft was generated. Can they keep reviewing the old draft?"
+
+Expert: "No. The template change requires a new Presentation Requirements Creation. The old draft cannot be confirmed against a different Visual Style Preset."
 
 Dev: "The user edited the Brief after confirming the requirements. Should we mark them stale immediately?"
 

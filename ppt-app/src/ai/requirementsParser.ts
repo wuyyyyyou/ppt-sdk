@@ -104,6 +104,7 @@ function validateSemanticCandidates(
 
 export function parsePresentationRequirementsCandidates(
   text: string,
+  options: { visualStylePresetSelected?: boolean } = {},
 ): PresentationRequirementsCandidates {
   let value: unknown;
   try {
@@ -118,10 +119,11 @@ export function parsePresentationRequirementsCandidates(
   if (!isRecord(value)) {
     throw new PresentationRequirementsValidationError(["The response must be a JSON object."]);
   }
-  validateExactKeys(value, FIELDS, "response", errors);
+  const fields = options.visualStylePresetSelected ? FIELDS.filter((field) => field !== "visual_tone") : FIELDS;
+  validateExactKeys(value, fields, "response", errors);
 
   const semantic = Object.fromEntries(
-    SEMANTIC_FIELDS.map((field) => [
+    SEMANTIC_FIELDS.filter((field) => !options.visualStylePresetSelected || field !== "visual_tone").map((field) => [
       field,
       validateSemanticCandidates(value[field], field, errors),
     ]),
@@ -174,6 +176,6 @@ export function parsePresentationRequirementsCandidates(
     desired_outcome: semantic.desired_outcome,
     slide_count,
     output_language,
-    visual_tone: semantic.visual_tone,
+    visual_tone: semantic.visual_tone ?? [],
   };
 }

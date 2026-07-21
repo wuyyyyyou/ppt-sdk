@@ -1,6 +1,6 @@
 import type { OutlineDetail, Slide } from "../data/mockDeck";
 import type { AnnaLlmCompleteInput } from "../runtime/annaRuntime";
-import type { PresentationRequirements, PresentationRequirementsCandidates, WorkspaceSettings } from "../api/types";
+import type { PresentationRequirements, PresentationRequirementsCandidates, VisualStylePresetSelection, WorkspaceSettings } from "../api/types";
 import type {
   PagePlan,
   PagePlanItem,
@@ -42,6 +42,7 @@ export interface GenerateDeckInput extends DeckBriefInput {
 
 export interface GeneratePresentationRequirementsInput {
   brief: string;
+  visualStylePreset?: VisualStylePresetSelection | null;
   logContext?: AiOperationLogContext;
 }
 
@@ -179,6 +180,7 @@ export interface PlanDeckRefinementInput {
   requirements: PresentationRequirements;
   currentStyleGuide: string;
   locale: Locale;
+  visualStylePresetSelected?: boolean;
   logContext?: AiOperationLogContext;
 }
 

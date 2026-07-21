@@ -152,6 +152,7 @@ import {
   requirementsOwnedRecoveryStage,
   requirementsAreComplete,
 } from "../../requirements";
+import { findVisualStylePreset, toVisualStylePresetSelection } from "../../templates/visualStylePresets";
 
 const DEFAULT_TEMPLATE_GROUP_ID = "red-finance-canvas";
 const AGENT_TOOL_ACCESS_POLICY = resolveAgentToolAccessPolicy(
@@ -380,6 +381,7 @@ export interface DeckWorkspaceActions {
   addStyleRow: () => void;
   generateDeck: () => Promise<void>;
   generatePresentationRequirements: () => Promise<void>;
+  selectVisualStylePreset: (presetId: string | null) => void;
   useManualPresentationRequirements: () => Promise<void>;
   selectPresentationRequirement: <K extends keyof PresentationRequirementsSelections>(
     field: K,
@@ -550,6 +552,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [workspaceError, setWorkspaceError] = useState("");
   const [workspaceSettingsSaving, setWorkspaceSettingsSaving] = useState(false);
   const [templateGroups, setTemplateGroups] = useState<TemplateSummary[]>([]);
+  const [selectedVisualStylePresetId, setSelectedVisualStylePresetId] = useState<string | null>(null);
   const [selectedTemplateGroupId, setSelectedTemplateGroupId] = useState<string | null>(DEFAULT_TEMPLATE_GROUP_ID);
   const [styleProfiles, setStyleProfiles] = useState<StyleProfileIndexEntry[]>([]);
   const [styleProfilePreviews, setStyleProfilePreviews] =
@@ -1058,6 +1061,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   ) {
     setCurrentWorkspace(workspace);
     setPresentationRequirements(workspace.requirements);
+    setSelectedVisualStylePresetId(workspace.requirements.selections.visual_style_preset?.id ?? null);
     setRequirementsStatus(workspace.requirements.status === "empty" ? "idle" : "ready");
     setRequirementsError("");
     setRequirementsDirty(false);
@@ -1629,7 +1633,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     });
   }
 
-  async function generatePresentationRequirements() {
+  async function generatePresentationRequirements(presetIdOverride?: string | null) {
     if (!backend || !aiClient) return;
     const brief = prompt.trim();
     if (!brief) {
@@ -1649,12 +1653,15 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const workspace = await ensureCurrentWorkspace();
       if (!workspace || requirementsOperationRef.current !== operation) return;
       setPrompt(brief);
+      const selectedPreset = findVisualStylePreset(presetIdOverride === undefined ? selectedVisualStylePresetId : presetIdOverride);
       const candidates = await aiClient.generatePresentationRequirements({
         brief,
+        visualStylePreset: toVisualStylePresetSelection(selectedPreset),
         logContext: buildAiLogContext(workspace, "requirements", "generate_requirements"),
       });
       if (requirementsOperationRef.current !== operation) return;
-      const draft = createRequirementsDraft(brief, candidates);
+      const draftCandidates = selectedPreset ? { ...candidates, visual_tone: [] } : candidates;
+      const draft = createRequirementsDraft(brief, draftCandidates, toVisualStylePresetSelection(selectedPreset));
       const updatedWorkspace = await backend.updateWorkspaceRequirements({
         workspace_dir: workspace.workspace_dir,
         requirements: draft,
@@ -1686,11 +1693,32 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
+  function selectVisualStylePreset(presetId: string | null) {
+    const previousId = selectedVisualStylePresetId;
+    if (previousId === presetId) return;
+    const hasExistingRequirements = Boolean(presentationRequirements.source?.brief);
+    if (hasExistingRequirements && typeof window !== "undefined") {
+      const confirmed = window.confirm(
+        locale === "zh"
+          ? "模板已变更，需要重新生成演示需求。是否现在重新生成？"
+          : "The style preset changed. Regenerate presentation requirements now?",
+      );
+      if (!confirmed) return;
+    }
+    setSelectedVisualStylePresetId(presetId);
+    if (hasExistingRequirements) {
+      const brief = presentationRequirements.source?.brief ?? prompt;
+      setPrompt(brief);
+      window.setTimeout(() => void generatePresentationRequirements(presetId), 0);
+    }
+  }
+
   async function useManualPresentationRequirements() {
     const brief = presentationRequirements.source?.brief ?? prompt.trim();
     if (!brief) return;
     requirementsOperationRef.current += 1;
     const draft = createManualRequirementsDraft(brief);
+    draft.selections.visual_style_preset = toVisualStylePresetSelection(findVisualStylePreset(selectedVisualStylePresetId));
     setPresentationRequirements(draft);
     setRequirementsStatus("ready");
     setRequirementsError("");
@@ -1760,14 +1788,27 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     try {
       const workspace = currentWorkspace ?? await ensureCurrentWorkspace();
       if (!workspace) return;
-      const confirmedWorkspace = await backend.updateWorkspaceRequirements({
+      const preset = findVisualStylePreset(confirmed.selections.visual_style_preset?.id);
+      let hostUpload;
+      if (preset) {
+        if (!hostUploadClient) throw new Error("Host Upload is required for a selected Visual Style Preset");
+        const file = new File([preset.style_guide], "style-guide.md", { type: "text/markdown" });
+        hostUpload = await hostUploadClient.uploadFile(file, {
+          purpose: "user_artifact",
+          filename: "style-guide.md",
+          mimeType: "text/markdown",
+          metadata: { workspace_dir: workspace.workspace_dir, artifact: "visual-style-preset-style-guide" },
+        });
+      }
+      const result = await backend.confirmWorkspaceRequirements({
         workspace_dir: workspace.workspace_dir,
         requirements: confirmed,
+        ...(hostUpload ? { size_bytes: hostUpload.size_bytes, host_upload: hostUpload } : {}),
+        clear_style_guide: !preset && Boolean(workspace.requirements.selections.visual_style_preset),
       });
-      const resetWorkspace = await backend.resetWorkspaceOutline({
-        workspace_dir: workspace.workspace_dir,
-      });
+      const resetWorkspace = result.workspace;
       setPresentationRequirements(confirmed);
+      setSelectedVisualStylePresetId(confirmed.selections.visual_style_preset?.id ?? null);
       setCurrentWorkspace(resetWorkspace);
       setRequirementsStatus("ready");
       setRequirementsDirty(false);
@@ -3709,6 +3750,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     workspaceError,
     workspaceSettingsSaving,
     templateGroups,
+    selectedVisualStylePresetId,
     selectedTemplateGroupId,
     styleProfiles,
     styleProfilePreviews,
@@ -3740,6 +3782,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     addStyleRow,
     generateDeck: () => generateDeck(),
     generatePresentationRequirements,
+    selectVisualStylePreset,
     useManualPresentationRequirements,
     selectPresentationRequirement,
     returnToBriefFromRequirements,

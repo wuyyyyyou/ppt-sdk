@@ -6,7 +6,11 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: "bundle",
-    emptyOutDir: true
+    emptyOutDir: true,
+    assetsInlineLimit: (filePath) => {
+      const normalizedPath = filePath.replaceAll("\\", "/");
+      return normalizedPath.includes("/src/features/templates/presets/") ? false : undefined;
+    },
   },
   server: {
     host: "127.0.0.1",

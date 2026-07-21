@@ -94,6 +94,8 @@ export function App() {
               setStrictReviewMode={actions.setStrictReviewMode}
               workspaceSettingsSaving={state.workspaceSettingsSaving}
               generateDeck={actions.generatePresentationRequirements}
+              selectedVisualStylePresetId={state.selectedVisualStylePresetId}
+              onSelectVisualStylePreset={actions.selectVisualStylePreset}
             />
           ) : null}
 
