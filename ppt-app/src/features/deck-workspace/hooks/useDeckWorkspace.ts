@@ -1245,7 +1245,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         nextAgentClient = await createAgentClient(runtime, {
           toolAccessPolicy: AGENT_TOOL_ACCESS_POLICY,
         });
-        const nextHostUploadClient = createAppHostUploadClient(runtime);
+        const nextHostUploadClient = createAppHostUploadClient(runtime, {
+          appendWorkspaceLog: (event) => nextBackend.appendWorkspaceLog({
+            workspace_dir: event.workspace_dir,
+            channel: "storage-transport",
+            entry: event.entry,
+          }),
+        });
         if (cancelled) return;
         setBackend(nextBackend);
         setHostUploadClient(nextHostUploadClient);

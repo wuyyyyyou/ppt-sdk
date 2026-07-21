@@ -295,6 +295,10 @@ _Avoid_: User-facing labels such as "Session History" when the record is really 
 A Workspace-owned diagnostic record of each LLM completion or Agent run used to produce, revise, inspect, or repair deck artifacts. It is for troubleshooting and auditability, separate from user-facing Generation Session History.
 _Avoid_: Session History, Live Page Stream
 
+**Workspace Storage Transfer Log**:
+A Workspace-owned diagnostic record of Host Upload and APS Files transfer activity associated with the Workspace, including transfer lifecycle phases, source operation associations, storage identifiers, and failure responses. It is separate from AI Interaction Logs and does not store file contents; it exists to trace transport and persistence boundaries for troubleshooting.
+_Avoid_: Agent Session Log, Export History, Uploaded Source Material
+
 **Failed Page Generation**:
 A Page Generation Unit that reached a terminal state without becoming accepted after its automatic recovery attempts are exhausted or manual review is required. Deck Generation may still continue other Page Generation Units, but the Deck is not finished until failed pages are retried or otherwise resolved.
 

@@ -478,7 +478,7 @@ test("research curation draft plugin invoke uses scoped draft_id paths", { skip:
   }
 });
 
-test("app_append_workspace_log plugin wrapper accepts theme and style-guide log channels", { skip: pluginInvokeSkip }, async () => {
+test("app_append_workspace_log plugin wrapper accepts theme, style-guide, and storage log channels", { skip: pluginInvokeSkip }, async () => {
   const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-plugin-theme-log-home-"));
   const workspaceDir = path.join(homeDir, "anna-workspace", "ppt", "ppt-20260701-000002");
   const previousHome = process.env.HOME;
@@ -491,6 +491,7 @@ test("app_append_workspace_log plugin wrapper accepts theme and style-guide log 
       "ai-theme-interactions",
       "ai-style-guide",
       "ai-style-guide-interactions",
+      "storage-transport",
     ] as const) {
       const response = await plugin.request("invoke", {
         tool: "app_append_workspace_log",
@@ -516,10 +517,12 @@ test("app_append_workspace_log plugin wrapper accepts theme and style-guide log 
       path.join(workspaceDir, ".log", "ai-style-guide-interactions.jsonl"),
       "utf8",
     );
+    const storageLog = await readFile(path.join(workspaceDir, ".log", "storage-transport.jsonl"), "utf8");
     assert.match(themeLog, /ai-theme\.test/);
     assert.match(themeInteractionLog, /ai-theme-interactions\.test/);
     assert.match(styleGuideLog, /ai-style-guide\.test/);
     assert.match(styleGuideInteractionLog, /ai-style-guide-interactions\.test/);
+    assert.match(storageLog, /storage-transport\.test/);
   } finally {
     await plugin.close();
     if (previousHome === undefined) {

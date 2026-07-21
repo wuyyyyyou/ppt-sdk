@@ -44,6 +44,21 @@ test("workspace AI interaction logs support sidecar payloads", async () => {
 
     const payload = JSON.parse(await readFile(String(ref.path), "utf8")) as { text?: string };
     assert.equal(payload.text, payloadText);
+
+    const storageResult = await appendAppWorkspaceLog({
+      workspace_dir: workspace.workspace_dir,
+      channel: "storage-transport",
+      entry: {
+        event: "storage.transfer.confirm",
+        schema_version: 1,
+        transfer_id: "transfer-1",
+        r2_key: "r2/key",
+      },
+    });
+    assert.equal(path.basename(storageResult.log_file), "storage-transport.jsonl");
+    const storageEntry = await readJsonLine(storageResult.log_file);
+    assert.equal(storageEntry.transfer_id, "transfer-1");
+    assert.equal(storageEntry.r2_key, "r2/key");
   } finally {
     if (previousHome === undefined) {
       delete process.env.HOME;

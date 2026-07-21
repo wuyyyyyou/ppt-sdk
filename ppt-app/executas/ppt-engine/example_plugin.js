@@ -278,6 +278,70 @@ const apsFilesClient = new ApsFilesClient({
 const exportMirrorPublishQueues = new Map();
 const workspaceDiagnosticBundleQueues = new Map();
 
+function redactStorageResponse(value) {
+  if (Array.isArray(value)) return value.map(redactStorageResponse);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).map(([key, child]) => {
+    if (/(authorization|token|signature|signed[_-]?url|put[_-]?url|download[_-]?url)/i.test(key) || key.toLowerCase() === "url") {
+      return [key, "[REDACTED]"];
+    }
+    return [key, redactStorageResponse(child)];
+  }));
+}
+
+function storageErrorRecord(error) {
+  const redactMessage = (message) => String(message).replace(/https?:\/\/\S+/gi, "[REDACTED_URL]");
+  return {
+    name: error?.name || "Error",
+    message: redactMessage(error instanceof Error ? error.message : String(error)),
+    ...(Number.isInteger(error?.code) ? { code: error.code } : {}),
+    ...(error?.data && typeof error.data === "object" ? { data: redactStorageResponse(error.data) } : {}),
+  };
+}
+
+function createStorageTransferLogger(context = {}) {
+  const transferId = `transfer-${randomUUID()}`;
+  const workspaceDir = typeof context.workspaceDir === "string" ? context.workspaceDir : "";
+  const base = {
+    schema_version: 1,
+    transfer_id: transferId,
+    operation_id: context.operationId,
+    source: context.source || "ppt-engine-host-upload",
+    transport: context.transport || "host_upload",
+    filename: context.filename,
+    mime_type: context.mimeType,
+    size_bytes: context.sizeBytes,
+  };
+  return {
+    log(phase, status, extra = {}) {
+      if (!workspaceDir) return;
+      void appendAppWorkspaceLog({
+        workspace_dir: workspaceDir,
+        channel: "storage-transport",
+        entry: {
+          event: status === "failed" ? "storage.transfer.failed" : `storage.transfer.${phase}`,
+          ...base,
+          phase,
+          status,
+          ...extra,
+        },
+      }).catch(() => undefined);
+    },
+  };
+}
+
+function createApsTransferLogger({ workspaceDir, source, filename, mimeType, sizeBytes, path: apsPath, operationId }) {
+  return createStorageTransferLogger({
+    workspaceDir,
+    source,
+    filename,
+    mimeType,
+    sizeBytes,
+    transport: "aps_files",
+    operationId: operationId || apsPath,
+  });
+}
+
 async function withExportMirrorPublishQueue(queueKey, operation) {
   const previous = exportMirrorPublishQueues.get(queueKey) ?? Promise.resolve();
   const current = previous.catch(() => undefined).then(operation);
@@ -541,7 +605,7 @@ async function downloadHostUploadToStaging({ hostUpload, stagingPath, expectedSi
   return receivedBytes;
 }
 
-async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose }) {
+async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose, workspaceDir, operationId, source }) {
   const normalizedPath = path.normalize(filePath);
   const fileStat = await stat(normalizedPath);
   if (!fileStat.isFile()) {
@@ -552,49 +616,66 @@ async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose }) 
     throw new Error(`Host Upload MIME type must be specific for ${safeFilename}`);
   }
   const sizeBytes = fileStat.size;
-  const negotiated = await hostUploadClient.negotiate({
-    filename: safeFilename,
-    mimeType: mimeType.trim(),
-    sizeBytes,
-    purpose: purpose || "user_artifact",
-  });
-  if (!negotiated || typeof negotiated.put_url !== "string" || typeof negotiated.r2_key !== "string") {
-    throw new Error("host/uploadFile negotiate returned an invalid response");
+  const logger = createStorageTransferLogger({ workspaceDir, operationId, source, filename: safeFilename, mimeType: mimeType.trim(), sizeBytes });
+  let currentPhase = "started";
+  logger.log("started", "started", { purpose: purpose || "user_artifact" });
+  try {
+    currentPhase = "negotiate";
+    const negotiated = await hostUploadClient.negotiate({
+      filename: safeFilename,
+      mimeType: mimeType.trim(),
+      sizeBytes,
+      purpose: purpose || "user_artifact",
+    });
+    if (!negotiated || typeof negotiated.put_url !== "string" || typeof negotiated.r2_key !== "string") {
+      throw new Error("host/uploadFile negotiate returned an invalid response");
+    }
+    logger.log("negotiate", "succeeded", { r2_key: negotiated.r2_key, response: redactStorageResponse(negotiated) });
+    currentPhase = "put";
+    const putResponse = await fetch(negotiated.put_url, {
+      method: "PUT",
+      headers: {
+        ...(negotiated.headers ?? {}),
+        "Content-Length": String(sizeBytes),
+      },
+      body: createReadStream(normalizedPath),
+      duplex: "half",
+    });
+    if (!putResponse.ok) {
+      const message = await putResponse.text().catch(() => "");
+      throw new Error(message || `Host Upload PUT failed: HTTP ${putResponse.status}`);
+    }
+    logger.log("put", "succeeded", { http_status: putResponse.status });
+    currentPhase = "confirm";
+    const confirmed = await hostUploadClient.confirm(negotiated.r2_key);
+    logger.log("confirm", "succeeded", { r2_key: negotiated.r2_key, response: redactStorageResponse(confirmed) });
+    const result = parseHostUploadConfirmation({
+      confirmed,
+      negotiated,
+      mimeType: mimeType.trim(),
+      fallbackSizeBytes: sizeBytes,
+      filename: safeFilename,
+    });
+    logger.log("finished", "succeeded", { r2_key: result.r2_key, expires_at: result.expires_at });
+    return result;
+  } catch (error) {
+    logger.log(currentPhase, "failed", { error: storageErrorRecord(error) });
+    throw error;
   }
-  const putResponse = await fetch(negotiated.put_url, {
-    method: "PUT",
-    headers: {
-      ...(negotiated.headers ?? {}),
-      "Content-Length": String(sizeBytes),
-    },
-    body: createReadStream(normalizedPath),
-    duplex: "half",
-  });
-  if (!putResponse.ok) {
-    const message = await putResponse.text().catch(() => "");
-    throw new Error(message || `Host Upload PUT failed: HTTP ${putResponse.status}`);
-  }
-  const confirmed = await hostUploadClient.confirm(negotiated.r2_key);
-  return parseHostUploadConfirmation({
-    confirmed,
-    negotiated,
-    mimeType: mimeType.trim(),
-    fallbackSizeBytes: sizeBytes,
-    filename: safeFilename,
-  });
 }
 
-async function uploadJsonToHost(value, filename) {
+async function uploadJsonToHost(value, filename, context = {}) {
   const body = Buffer.from(`${JSON.stringify(value)}\n`, "utf8");
   return uploadBufferToHost({
     buffer: body,
     filename,
     mimeType: "application/json",
     purpose: "user_artifact",
+    ...context,
   });
 }
 
-async function uploadBufferToHost({ buffer, filename, mimeType, purpose }) {
+async function uploadBufferToHost({ buffer, filename, mimeType, purpose, workspaceDir, operationId, source }) {
   const safeFilename = assertSafeUploadFilename(filename);
   if (!Buffer.isBuffer(buffer) || buffer.byteLength <= 0) {
     throw new Error(`Host Upload buffer must not be empty for ${safeFilename}`);
@@ -602,54 +683,79 @@ async function uploadBufferToHost({ buffer, filename, mimeType, purpose }) {
   if (typeof mimeType !== "string" || mimeType.trim().length === 0 || mimeType === "application/octet-stream") {
     throw new Error(`Host Upload MIME type must be specific for ${safeFilename}`);
   }
-  const negotiated = await hostUploadClient.negotiate({
-    filename: safeFilename,
-    mimeType: mimeType.trim(),
-    sizeBytes: buffer.byteLength,
-    purpose: purpose || "user_artifact",
-  });
-  if (!negotiated || typeof negotiated.put_url !== "string" || typeof negotiated.r2_key !== "string") {
-    throw new Error("host/uploadFile negotiate returned an invalid response");
+  const logger = createStorageTransferLogger({ workspaceDir, operationId, source, filename: safeFilename, mimeType: mimeType.trim(), sizeBytes: buffer.byteLength });
+  let currentPhase = "started";
+  logger.log("started", "started", { purpose: purpose || "user_artifact" });
+  try {
+    currentPhase = "negotiate";
+    const negotiated = await hostUploadClient.negotiate({
+      filename: safeFilename,
+      mimeType: mimeType.trim(),
+      sizeBytes: buffer.byteLength,
+      purpose: purpose || "user_artifact",
+    });
+    if (!negotiated || typeof negotiated.put_url !== "string" || typeof negotiated.r2_key !== "string") {
+      throw new Error("host/uploadFile negotiate returned an invalid response");
+    }
+    logger.log("negotiate", "succeeded", { r2_key: negotiated.r2_key, response: redactStorageResponse(negotiated) });
+    currentPhase = "put";
+    const putResponse = await fetch(negotiated.put_url, {
+      method: "PUT",
+      headers: {
+        ...(negotiated.headers ?? {}),
+        "Content-Length": String(buffer.byteLength),
+      },
+      body: buffer,
+    });
+    if (!putResponse.ok) {
+      const message = await putResponse.text().catch(() => "");
+      throw new Error(message || `Host Upload PUT failed: HTTP ${putResponse.status}`);
+    }
+    logger.log("put", "succeeded", { http_status: putResponse.status });
+    currentPhase = "confirm";
+    const confirmed = await hostUploadClient.confirm(negotiated.r2_key);
+    logger.log("confirm", "succeeded", { r2_key: negotiated.r2_key, response: redactStorageResponse(confirmed) });
+    const result = parseHostUploadConfirmation({
+      confirmed,
+      negotiated,
+      mimeType: mimeType.trim(),
+      fallbackSizeBytes: buffer.byteLength,
+      filename: safeFilename,
+    });
+    logger.log("finished", "succeeded", { r2_key: result.r2_key, expires_at: result.expires_at });
+    return result;
+  } catch (error) {
+    logger.log(currentPhase, "failed", { error: storageErrorRecord(error) });
+    throw error;
   }
-  const putResponse = await fetch(negotiated.put_url, {
-    method: "PUT",
-    headers: {
-      ...(negotiated.headers ?? {}),
-      "Content-Length": String(buffer.byteLength),
-    },
-    body: buffer,
-  });
-  if (!putResponse.ok) {
-    const message = await putResponse.text().catch(() => "");
-    throw new Error(message || `Host Upload PUT failed: HTTP ${putResponse.status}`);
-  }
-  const confirmed = await hostUploadClient.confirm(negotiated.r2_key);
-  return parseHostUploadConfirmation({
-    confirmed,
-    negotiated,
-    mimeType: mimeType.trim(),
-    fallbackSizeBytes: buffer.byteLength,
-    filename: safeFilename,
-  });
 }
 
-async function uploadPreviewImage(imagePath) {
+async function uploadPreviewImage(imagePath, context = {}) {
   return uploadLocalFileToHost({
     filePath: imagePath,
     filename: `${path.basename(imagePath, path.extname(imagePath)) || "slide"}.png`,
     mimeType: "image/png",
+    ...context,
     purpose: "user_artifact",
   });
 }
 
 async function registerJsonReference(value, filename, uploadFieldName) {
+  return registerJsonReferenceWithContext(value, filename, uploadFieldName, {});
+}
+
+async function registerJsonReferenceWithContext(value, filename, uploadFieldName, context) {
   return {
-    [uploadFieldName]: await uploadJsonToHost(value, filename),
+    [uploadFieldName]: await uploadJsonToHost(value, filename, context),
   };
 }
 
-async function registerWorkspaceJsonReference(value) {
-  return registerJsonReference(value, "workspace.json", "workspace_upload");
+async function registerWorkspaceJsonReference(value, workspaceDir) {
+  const resolvedWorkspaceDir = workspaceDir || value?.workspace_dir;
+  return registerJsonReferenceWithContext(value, "workspace.json", "workspace_upload", {
+    workspaceDir: resolvedWorkspaceDir,
+    source: "ppt-engine.workspace-json-reference",
+  });
 }
 
 function parseRequestLine(line) {
@@ -1379,6 +1485,7 @@ async function toolAppAppendWorkspaceLog(args) {
     "ai-research-interactions",
     "ai-theme",
     "ai-theme-interactions",
+    "storage-transport",
   ];
   if (!supportedChannels.includes(channel)) {
     throw new Error(`"channel" must be one of: ${supportedChannels.join(", ")}`);
@@ -2014,7 +2121,10 @@ async function toolAppRenderWorkspacePagePreview(args) {
 
   return {
     ...result,
-    screenshot_upload: await uploadPreviewImage(result.screenshot_path),
+    screenshot_upload: await uploadPreviewImage(result.screenshot_path, {
+      workspaceDir,
+      source: "ppt-engine.page-preview-screenshot",
+    }),
   };
 }
 
@@ -2030,7 +2140,10 @@ async function toolAppRenderDeckHtml(args) {
   const slides = await Promise.all(
     result.slides.map(async (slide) => ({
       ...slide,
-      screenshot_upload: await uploadPreviewImage(slide.screenshot_path),
+      screenshot_upload: await uploadPreviewImage(slide.screenshot_path, {
+        workspaceDir,
+        source: "ppt-engine.deck-screenshot",
+      }),
     })),
   );
 
@@ -2052,7 +2165,10 @@ async function toolAppGetRenderedDeckHtml(args) {
   const slides = await Promise.all(
     result.slides.map(async (slide) => ({
       ...slide,
-      screenshot_upload: await uploadPreviewImage(slide.screenshot_path),
+      screenshot_upload: await uploadPreviewImage(slide.screenshot_path, {
+        workspaceDir,
+        source: "ppt-engine.deck-screenshot",
+      }),
     })),
   );
 
@@ -2113,6 +2229,16 @@ async function toolAppPublishExportArtifact(args) {
       workspace_dir: workspaceDir,
       artifact_type: artifactType,
     });
+    const transferLogger = createApsTransferLogger({
+      workspaceDir,
+      source: "ppt-engine.export-artifact-mirror",
+      filename: snapshot.filename,
+      mimeType: snapshot.content_type,
+      sizeBytes: snapshot.size_bytes,
+      path: snapshot.mirror_path,
+      operationId: `app_publish_export_artifact:${artifactType}`,
+    });
+    transferLogger.log("started", "started", { aps_path: snapshot.mirror_path, artifact_type: artifactType });
     try {
       const upload = await apsFilesClient.uploadBegin({
         path: snapshot.mirror_path,
@@ -2129,6 +2255,7 @@ async function toolAppPublishExportArtifact(args) {
       if (!upload || typeof upload.put_url !== "string" || upload.put_url.length === 0) {
         throw new Error("files/upload_begin did not return a valid put_url");
       }
+      transferLogger.log("negotiate", "succeeded", { response: redactStorageResponse(upload), aps_path: snapshot.mirror_path });
       const contentDisposition = buildAttachmentContentDisposition(snapshot.filename);
       const putResponse = await fetch(upload.put_url, {
         method: "PUT",
@@ -2144,6 +2271,7 @@ async function toolAppPublishExportArtifact(args) {
         const message = await putResponse.text().catch(() => "");
         throw new Error(message || `APS Files PUT failed: HTTP ${putResponse.status}`);
       }
+      transferLogger.log("put", "succeeded", { http_status: putResponse.status, aps_path: snapshot.mirror_path });
       const putEtag = putResponse.headers.get("etag") ?? undefined;
       const completed = await apsFilesClient.uploadComplete({
         path: snapshot.mirror_path,
@@ -2152,6 +2280,7 @@ async function toolAppPublishExportArtifact(args) {
         contentType: snapshot.content_type,
         scope: APS_FILES_DOWNLOAD_SCOPE,
       });
+      transferLogger.log("commit", "succeeded", { response: redactStorageResponse(completed), aps_path: snapshot.mirror_path });
       const mirror = {
         provider: "aps.files",
         scope: APS_FILES_DOWNLOAD_SCOPE,
@@ -2173,6 +2302,7 @@ async function toolAppPublishExportArtifact(args) {
         expected_sha256: snapshot.source_sha256,
         mirror,
       });
+      transferLogger.log("finished", "succeeded", { aps_path: snapshot.mirror_path, etag: committed.etag });
       return {
         status: "ready",
         artifact: {
@@ -2188,6 +2318,9 @@ async function toolAppPublishExportArtifact(args) {
         mirror: committed,
         published: true,
       };
+    } catch (error) {
+      transferLogger.log("unknown", "failed", { aps_path: snapshot.mirror_path, error: storageErrorRecord(error) });
+      throw error;
     } finally {
       await unlink(snapshot.snapshot_path).catch(() => undefined);
     }
@@ -2219,23 +2352,42 @@ async function toolAppGetExportArtifactDownloadUrl(args) {
       expires_at: null,
     };
   }
-  const download = await apsFilesClient.downloadUrl({
+  const transferLogger = createApsTransferLogger({
+    workspaceDir,
+    source: "ppt-engine.export-artifact-download-url",
+    filename: status.artifact.filename,
+    mimeType: status.mirror.content_type,
+    sizeBytes: status.mirror.size_bytes,
     path: status.mirror.path,
-    expiresIn: 600,
-    scope: APS_FILES_DOWNLOAD_SCOPE,
+    operationId: `app_get_export_artifact_download_url:${artifactType}`,
   });
-  if (!download || typeof download.url !== "string" || download.url.length === 0) {
-    throw new Error("files/download_url did not return a valid URL");
+  transferLogger.log("started", "started", { aps_path: status.mirror.path, artifact_type: artifactType });
+  try {
+    const download = await apsFilesClient.downloadUrl({
+      path: status.mirror.path,
+      expiresIn: 600,
+      scope: APS_FILES_DOWNLOAD_SCOPE,
+    });
+    if (!download || typeof download.url !== "string" || download.url.length === 0) {
+      throw new Error("files/download_url did not return a valid URL");
+    }
+    transferLogger.log("download_url", "succeeded", {
+      aps_path: status.mirror.path,
+      response: redactStorageResponse(download),
+    });
+    transferLogger.log("finished", "succeeded", { aps_path: status.mirror.path, expires_at: download.expires_at });
+    return {
+      status: "ready",
+      reason: null,
+      artifact: status.artifact,
+      mirror: status.mirror,
+      download_url: download.url,
+      expires_at: typeof download.expires_at === "string" ? download.expires_at : null,
+    };
+  } catch (error) {
+    transferLogger.log("download_url", "failed", { aps_path: status.mirror.path, error: storageErrorRecord(error) });
+    throw error;
   }
-
-  return {
-    status: "ready",
-    reason: null,
-    artifact: status.artifact,
-    mirror: status.mirror,
-    download_url: download.url,
-    expires_at: typeof download.expires_at === "string" ? download.expires_at : null,
-  };
 }
 
 async function toolAppPrepareWorkspaceDiagnosticBundle(args) {
@@ -2248,6 +2400,16 @@ async function toolAppPrepareWorkspaceDiagnosticBundle(args) {
     const snapshot = await prepareAppWorkspaceDiagnosticBundle({
       workspace_dir: workspaceDir,
     });
+    const transferLogger = createApsTransferLogger({
+      workspaceDir,
+      source: "ppt-engine.workspace-diagnostic-bundle",
+      filename: snapshot.filename,
+      mimeType: snapshot.content_type,
+      sizeBytes: snapshot.size_bytes,
+      path: snapshot.aps_path,
+      operationId: "app_prepare_workspace_diagnostic_bundle",
+    });
+    transferLogger.log("started", "started", { aps_path: snapshot.aps_path });
     try {
       const upload = await apsFilesClient.uploadBegin({
         path: snapshot.aps_path,
@@ -2263,6 +2425,7 @@ async function toolAppPrepareWorkspaceDiagnosticBundle(args) {
       if (!upload || typeof upload.put_url !== "string" || upload.put_url.length === 0) {
         throw new Error("files/upload_begin did not return a valid put_url");
       }
+      transferLogger.log("negotiate", "succeeded", { response: redactStorageResponse(upload), aps_path: snapshot.aps_path });
 
       const contentDisposition = buildAttachmentContentDisposition(snapshot.filename);
       const putResponse = await fetch(upload.put_url, {
@@ -2279,6 +2442,7 @@ async function toolAppPrepareWorkspaceDiagnosticBundle(args) {
         const message = await putResponse.text().catch(() => "");
         throw new Error(message || `APS Files PUT failed: HTTP ${putResponse.status}`);
       }
+      transferLogger.log("put", "succeeded", { http_status: putResponse.status, aps_path: snapshot.aps_path });
 
       const putEtag = putResponse.headers.get("etag") ?? undefined;
       const completed = await apsFilesClient.uploadComplete({
@@ -2288,6 +2452,7 @@ async function toolAppPrepareWorkspaceDiagnosticBundle(args) {
         contentType: snapshot.content_type,
         scope: APS_FILES_DOWNLOAD_SCOPE,
       });
+      transferLogger.log("commit", "succeeded", { response: redactStorageResponse(completed), aps_path: snapshot.aps_path });
       const download = await apsFilesClient.downloadUrl({
         path: snapshot.aps_path,
         expiresIn: 600,
@@ -2296,6 +2461,11 @@ async function toolAppPrepareWorkspaceDiagnosticBundle(args) {
       if (!download || typeof download.url !== "string" || download.url.length === 0) {
         throw new Error("files/download_url did not return a valid URL");
       }
+      transferLogger.log("download_url", "succeeded", {
+        aps_path: snapshot.aps_path,
+        response: redactStorageResponse(download),
+      });
+      transferLogger.log("finished", "succeeded", { aps_path: snapshot.aps_path, expires_at: download.expires_at });
 
       return {
         status: "ready",
@@ -2307,6 +2477,9 @@ async function toolAppPrepareWorkspaceDiagnosticBundle(args) {
         download_url: download.url,
         expires_at: typeof download.expires_at === "string" ? download.expires_at : null,
       };
+    } catch (error) {
+      transferLogger.log("unknown", "failed", { aps_path: snapshot.aps_path, error: storageErrorRecord(error) });
+      throw error;
     } finally {
       await unlink(snapshot.archive_path).catch(() => undefined);
     }

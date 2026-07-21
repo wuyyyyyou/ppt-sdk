@@ -569,7 +569,8 @@ export interface AppendWorkspaceLogInput {
     | "ai-research"
     | "ai-research-interactions"
     | "ai-theme"
-    | "ai-theme-interactions";
+    | "ai-theme-interactions"
+    | "storage-transport";
   entry: Record<string, unknown>;
   payload_keys?: string[];
   inline_payload_max_bytes?: number;

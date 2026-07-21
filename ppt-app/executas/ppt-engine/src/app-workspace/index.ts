@@ -223,6 +223,7 @@ const WORKSPACE_LOG_FILE_NAMES = {
   "ai-research-interactions": "ai-research-interactions.jsonl",
   "ai-theme": "ai-theme.jsonl",
   "ai-theme-interactions": "ai-theme-interactions.jsonl",
+  "storage-transport": "storage-transport.jsonl",
 } as const;
 const WORKSPACE_LOG_INLINE_PAYLOAD_MAX_BYTES = 64 * 1024;
 const PPTX_EXPORT_STATUS_FILE_NAME = "pptx-export.json";
