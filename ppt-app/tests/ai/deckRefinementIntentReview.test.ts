@@ -67,7 +67,7 @@ describe("Deck Refinement Planning", () => {
           ...input.requirements.selections,
           visual_tone: null,
           visual_style_preset: {
-            id: "placeholder-editorial",
+            id: "red-blue-comparative",
             version: 1,
             name: "编辑感留白",
             description: "固定视觉指导",

@@ -204,7 +204,7 @@ test("selected Visual Style Preset keeps its Style Guide when the first Outline 
         ...draft.selections,
         visual_tone: null,
         visual_style_preset: {
-          id: "placeholder-editorial",
+          id: "red-blue-comparative",
           version: 1,
           name: "编辑感留白",
           description: "浅色背景、深色标题、强调留白和清晰页码层级。",
