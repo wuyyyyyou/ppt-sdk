@@ -1,4 +1,8 @@
 import type { VisualStylePreset, VisualStylePresetSelection } from "../../api/types";
+import {
+  VISUAL_STYLE_PRESET_FILTER_FIELDS,
+  type VisualStylePresetFilterField,
+} from "./visualStylePresetFilters";
 
 export const NO_VISUAL_STYLE_PRESET_ID = "none";
 
@@ -7,6 +11,11 @@ interface VisualStylePresetSource {
   version: number;
   name: string;
   description: string;
+  user: string;
+  use_case: string;
+  industry: string;
+  theme: string;
+  color: string;
   style_guide: string;
   preview_images: Array<{ path: string; alt: string }>;
 }
@@ -24,10 +33,11 @@ const previewModules = import.meta.glob("./presets/*/images/*.{png,jpg,jpeg,webp
 
 function assertSource(value: VisualStylePresetSource, configPath: string): void {
   if (!value || typeof value !== "object") throw new Error(`Invalid visual style preset: ${configPath}`);
-  if (!value.id || !Number.isInteger(value.version) || value.version < 1) {
+  if (typeof value.id !== "string" || !value.id || !Number.isInteger(value.version) || value.version < 1) {
     throw new Error(`Invalid visual style preset identity: ${configPath}`);
   }
-  if (!value.name || !value.description || !value.style_guide || !Array.isArray(value.preview_images)) {
+  const stringFields = ["name", "description", "user", "use_case", "industry", "theme", "color", "style_guide"] as const;
+  if (stringFields.some((field) => typeof value[field] !== "string") || !Array.isArray(value.preview_images)) {
     throw new Error(`Incomplete visual style preset: ${configPath}`);
   }
 }
@@ -62,6 +72,13 @@ function loadVisualStylePresets(): VisualStylePreset[] {
 }
 
 export const VISUAL_STYLE_PRESETS = loadVisualStylePresets();
+
+export const VISUAL_STYLE_PRESET_FILTER_OPTIONS = Object.fromEntries(
+  VISUAL_STYLE_PRESET_FILTER_FIELDS.map((field) => [
+    field,
+    [...new Set(VISUAL_STYLE_PRESETS.map((preset) => preset[field]))].sort((left, right) => left.localeCompare(right)),
+  ]),
+) as Record<VisualStylePresetFilterField, string[]>;
 
 export function findVisualStylePreset(id: string | null | undefined): VisualStylePreset | null {
   if (!id || id === NO_VISUAL_STYLE_PRESET_ID) return null;

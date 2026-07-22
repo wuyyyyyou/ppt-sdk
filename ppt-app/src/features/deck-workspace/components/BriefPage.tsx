@@ -2,7 +2,15 @@ import { AlertTriangle, Check, ChevronLeft, ChevronRight, HelpCircle, Sparkles, 
 import { useState } from "react";
 import type { Messages } from "../../../i18n/messages";
 import type { VisualStylePreset } from "../../../api/types";
-import { VISUAL_STYLE_PRESETS } from "../../templates/visualStylePresets";
+import {
+  VISUAL_STYLE_PRESET_FILTER_OPTIONS,
+  VISUAL_STYLE_PRESETS,
+} from "../../templates/visualStylePresets";
+import {
+  matchesVisualStylePresetFilters,
+  VISUAL_STYLE_PRESET_FILTER_FIELDS,
+  type VisualStylePresetFilters,
+} from "../../templates/visualStylePresetFilters";
 import {
   isStrictReviewModeEnabled,
   type PageReviewSettings,
@@ -38,6 +46,14 @@ export function BriefPage({
   const strictReviewMode = isStrictReviewModeEnabled(pageReviewSettings);
   const [strictReviewConfirmOpen, setStrictReviewConfirmOpen] = useState(false);
   const [preview, setPreview] = useState<{ preset: VisualStylePreset; index: number } | null>(null);
+  const [presetFilters, setPresetFilters] = useState<VisualStylePresetFilters>({
+    user: "",
+    use_case: "",
+    industry: "",
+    theme: "",
+    color: "",
+  });
+  const filteredPresets = VISUAL_STYLE_PRESETS.filter((preset) => matchesVisualStylePresetFilters(preset, presetFilters));
 
   function toggleStrictReviewMode() {
     if (strictReviewMode) {
@@ -116,6 +132,23 @@ export function BriefPage({
           </div>
           <span className="brief-style-presets-note">{selectedVisualStylePresetId ? t.template.selected : t.template.noneSelected}</span>
         </div>
+        <div className="brief-style-preset-filters" aria-label={t.template.filtersLabel}>
+          {VISUAL_STYLE_PRESET_FILTER_FIELDS.map((field) => (
+            <label className={`brief-style-preset-filter ${presetFilters[field] ? "active" : ""}`} key={field}>
+              <span>{t.template.filters[field]}</span>
+              <select
+                value={presetFilters[field]}
+                disabled={busy}
+                onChange={(event) => setPresetFilters((current) => ({ ...current, [field]: event.target.value }))}
+              >
+                <option value="">{t.template.all}</option>
+                {VISUAL_STYLE_PRESET_FILTER_OPTIONS[field].map((option) => (
+                  <option value={option} key={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+          ))}
+        </div>
         <div className="brief-style-preset-grid">
           <button
             type="button"
@@ -141,7 +174,7 @@ export function BriefPage({
             <strong>{t.template.none}</strong>
             <small>{t.template.noneDescription}</small>
           </button>
-          {VISUAL_STYLE_PRESETS.map((preset: VisualStylePreset) => {
+          {filteredPresets.map((preset: VisualStylePreset) => {
             const selected = selectedVisualStylePresetId === preset.id;
             return (
               <button
@@ -176,6 +209,9 @@ export function BriefPage({
               </button>
             );
           })}
+          {filteredPresets.length === 0 ? (
+            <p className="brief-style-preset-empty">{t.template.noFilterMatches}</p>
+          ) : null}
         </div>
       </section>
 

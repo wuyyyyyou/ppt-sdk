@@ -94,11 +94,16 @@ export interface VisualStylePreset {
   version: number;
   name: string;
   description: string;
+  user: string;
+  use_case: string;
+  industry: string;
+  theme: string;
+  color: string;
   style_guide: string;
   preview_images: VisualStylePresetPreview[];
 }
 
-export type VisualStylePresetSelection = Omit<VisualStylePreset, "style_guide" | "preview_images">;
+export type VisualStylePresetSelection = Pick<VisualStylePreset, "id" | "version" | "name" | "description">;
 
 export interface PresentationRequirements {
   version: 1;

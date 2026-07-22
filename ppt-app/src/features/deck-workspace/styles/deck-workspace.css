@@ -1631,11 +1631,101 @@ button {
   font-size: 13px;
 }
 
+.brief-style-preset-filters {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid rgba(124, 108, 240, 0.1);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(124, 108, 240, 0.055), rgba(255, 255, 255, 0.5));
+}
+
+.brief-style-preset-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 38px;
+  padding-left: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.03);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.brief-style-preset-filter:hover {
+  border-color: rgba(124, 108, 240, 0.28);
+}
+
+.brief-style-preset-filter:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.brief-style-preset-filter.active {
+  border-color: rgba(124, 108, 240, 0.3);
+  background: rgba(124, 108, 240, 0.08);
+}
+
+.brief-style-preset-filter span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.brief-style-preset-filter.active span {
+  color: var(--accent-hover);
+}
+
+.brief-style-preset-filter select {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 24px 0 2px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-main);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.brief-style-preset-filter select:focus-visible {
+  outline: 0;
+}
+
+.brief-style-preset-filter select:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+@media (max-width: 900px) {
+  .brief-style-preset-filters {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}
+
 .brief-style-preset-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   align-items: stretch;
   gap: 14px;
+}
+
+.brief-style-preset-empty {
+  align-self: center;
+  margin: 0;
+  padding: 18px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
 }
 
 .brief-style-preset-card {

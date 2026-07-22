@@ -8,6 +8,10 @@ PPT App 的“模板”采用新的领域概念 `Visual Style Preset（视觉风
 
 预设源文件和预览图片属于前端静态资源，按 `src/features/templates/presets/<preset-id>/` 目录组织。每个目录包含规定名称的 `preset.json` 和 `images/` 子目录；Vite 构建时自动发现 JSON，并将 JSON 中的相对图片路径解析为构建后的静态 URL。完整 `style_guide` 字符串保存在该 JSON 中，不上传预览图片，也不将预览图片提供给 AI。模板选择在 Brief 页面只形成草稿，用户确认演示需求时才通过现有 Host Upload 提交 Style Guide，并由后端原子地确认需求、提交或清理 Style Guide、重置下游大纲。需求草稿可携带可替换的预设 ID 和版本，但只有确认后才形成 Workspace 权威快照。
 
+每个预设还提供 `user`、`use_case`、`industry`、`theme`、`color` 五个字符串分类字段。Brief 页面从目录数据中派生下拉选项，并以多个条件同时匹配的方式筛选预设。这些字段只属于前端预设目录，不进入 Workspace 的 `visual_style_preset` 快照；已确认快照继续只保存 `id`、`version`、`name`、`description`，避免目录分类调整改变 Workspace 协议。
+
+`ppt-app` 构建前必须独立校验每个 `preset.json` 的必需字段和字段类型，并确认 `preview_images` 中的相对路径仍位于对应预设目录内、指向实际存在且受支持的图片文件。任何协议或图片路径错误都会使构建失败；运行时加载器仍保留防御性检查。
+
 未选择模板时保持现有 Visual Tone 和 LLM Style Guide 生成流程。选择或取消模板会要求重新生成演示需求；用户在 Brief 页面修改模板后不能继续确认旧需求，确认新的需求后才清理旧的下游产物。模板模式下 Deck Refinement 使用独立的 Prompt/Schema，不返回 `style_guide_change`，模板 Style Guide 不可被替换；用户本轮 Refinement Request 仍传给目标页面，并在页面创作时优先于模板指导。Page Visual Review 只检查溢出、截断、可读性、对比度、缺失视觉元素、异常空白和画布边界，不检查模板风格一致性。
 
 ## Considered Options
