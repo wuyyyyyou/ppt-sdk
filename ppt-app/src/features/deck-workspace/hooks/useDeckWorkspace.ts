@@ -18,6 +18,8 @@ import type {
   PageProgress,
   PresentationRequirements,
   PresentationRequirementsSelections,
+  RestorePageSourceVersionResult,
+  SaveManualPageRevisionResult,
   GetStyleProfilePreviewResult,
   PptxExportJob,
   StyleProfileIndexEntry,
@@ -437,6 +439,7 @@ export interface DeckWorkspaceActions {
   rewriteCurrentSlide: () => Promise<void>;
   changeCurrentSlideLayout: (mode: "simpler" | "visual" | "comparison" | "process" | "report") => Promise<void>;
   renderDeckHtml: () => Promise<void>;
+  applyManualPageUpdate: (result: SaveManualPageRevisionResult | RestorePageSourceVersionResult) => void;
   exportFile: (type: "PPTX" | "PDF") => Promise<void>;
   downloadExportArtifact: () => Promise<void>;
   prepareWorkspaceDiagnosticBundle: () => Promise<void>;
@@ -3164,6 +3167,90 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     await renderDeckHtmlForWorkspace(workspace, "review");
   }
 
+  function applyManualPageUpdate(
+    result: SaveManualPageRevisionResult | RestorePageSourceVersionResult,
+  ) {
+    const htmlPath = "manifest" in result
+      ? result.manifest.current_html_path
+      : result.html_path;
+    const screenshotPath = "manifest" in result
+      ? result.manifest.screenshot_path
+      : result.screenshot_path;
+    const manuallyEdited = "manifest" in result;
+    const patchProgress = (current: PageProgress | null): PageProgress | null => {
+      if (!current) return current;
+      const existingFinalRender = current.final_deck_render;
+      return {
+        ...current,
+        final_deck_render: result.final_deck_render_updated
+          ? {
+              status: "completed",
+              message: null,
+              error: null,
+              output_dir: existingFinalRender?.output_dir ?? null,
+              deck_html_path: result.deck_html_path,
+              rendered_at: result.rendered_at,
+              updated_at: result.page_progress_updated_at,
+            }
+          : {
+              status: "idle",
+              message: "Manual page saved; Final Deck Render requires a rebuild.",
+              error: null,
+              output_dir: null,
+              deck_html_path: null,
+              rendered_at: null,
+              updated_at: result.page_progress_updated_at,
+            },
+        pages: current.pages.map((page) => page.page_id === result.page_id ? {
+          ...page,
+          last_html_path: htmlPath,
+          last_screenshot_path: screenshotPath,
+          updated_at: result.page_progress_updated_at,
+        } : page),
+        updated_at: result.page_progress_updated_at,
+      };
+    };
+    const nextPageProgress = patchProgress(pageProgress);
+    setPageProgress(nextPageProgress);
+    setReviewRender((current) => ({
+      ...current,
+      result: current.result ? {
+        ...current.result,
+        deck_html_path: result.deck_html_path ?? current.result.deck_html_path,
+        rendered_at: result.rendered_at ?? current.result.rendered_at,
+        slides: current.result.slides.map((slide) => slide.slide_id === result.page_id ? {
+          ...slide,
+          html_path: htmlPath,
+          screenshot_path: screenshotPath,
+          screenshot_upload: result.screenshot_upload,
+          manually_edited: manuallyEdited,
+        } : slide),
+      } : null,
+    }));
+    if (currentWorkspace && nextPageProgress) {
+      const task = currentWorkspace.task && typeof currentWorkspace.task === "object" && !Array.isArray(currentWorkspace.task)
+        ? currentWorkspace.task as Record<string, unknown>
+        : {};
+      const artifacts = task.artifacts && typeof task.artifacts === "object" && !Array.isArray(task.artifacts)
+        ? { ...task.artifacts as Record<string, unknown> }
+        : {};
+      delete artifacts.pptx;
+      delete artifacts.pdf;
+      const nextWorkspace: WorkspaceResult = {
+        ...currentWorkspace,
+        task: { ...task, artifacts, updated_at: result.page_progress_updated_at },
+        page_progress: nextPageProgress,
+      };
+      setCurrentWorkspace(nextWorkspace);
+      setReviewRender((current) => ({
+        ...current,
+        renderKey: workspaceReviewRenderKey(nextWorkspace),
+      }));
+    }
+    setExportArtifactWithProgress(null);
+    setExportDownload({ status: "idle", message: "" });
+  }
+
   function returnToOutlineFromGeneration() {
     setGenerationUnresumable(false);
     if (outline.length === 0) {
@@ -3835,6 +3922,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     rewriteCurrentSlide,
     changeCurrentSlideLayout,
     renderDeckHtml,
+    applyManualPageUpdate,
     exportFile,
     downloadExportArtifact: downloadCurrentExportArtifact,
     prepareWorkspaceDiagnosticBundle: prepareCurrentWorkspaceDiagnosticBundle,

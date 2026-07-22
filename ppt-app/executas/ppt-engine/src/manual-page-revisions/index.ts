@@ -7,6 +7,7 @@ import sharp from "sharp";
 export const MANUAL_HTML_MAX_BYTES = 64 * 1024 * 1024;
 export const AGENT_HTML_MAX_BYTES = 2 * 1024 * 1024;
 const revisionPublishQueues = new Map<string, Promise<unknown>>();
+const deckPublishQueues = new Map<string, Promise<unknown>>();
 
 export interface ManualPageRevisionManifest {
   version: 1;
@@ -264,6 +265,33 @@ async function writeAtomic(filePath: string, value: string | Buffer): Promise<vo
   const temporaryPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
   await writeFile(temporaryPath, value);
   await rename(temporaryPath, filePath);
+}
+
+export async function publishManualPageIntoDeck(input: {
+  deckHtmlPath: string;
+  pageHtmlPath: string;
+  pageIndex: number;
+}): Promise<void> {
+  const deckHtmlPath = path.resolve(input.deckHtmlPath);
+  const previous = deckPublishQueues.get(deckHtmlPath) ?? Promise.resolve();
+  const run = previous.catch(() => undefined).then(async () => {
+    const [deckHtml, pageHtml] = await Promise.all([
+      readFile(deckHtmlPath, "utf8"),
+      readFile(path.resolve(input.pageHtmlPath), "utf8"),
+    ]);
+    const replacementShell = extractSlideShell(pageHtml).shell;
+    await writeAtomic(
+      deckHtmlPath,
+      replaceSlideShellAtIndex(deckHtml, input.pageIndex, replacementShell),
+    );
+  });
+  const tail = run.catch(() => undefined);
+  deckPublishQueues.set(deckHtmlPath, tail);
+  try {
+    await run;
+  } finally {
+    if (deckPublishQueues.get(deckHtmlPath) === tail) deckPublishQueues.delete(deckHtmlPath);
+  }
 }
 
 export async function publishManualPageRevision(input: {

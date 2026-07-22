@@ -1213,7 +1213,11 @@ export interface SaveAppManualPageRevisionResult {
   workspace_dir: string;
   page_id: string;
   manifest: AppManualPageRevisionManifest;
-  final_deck_render_invalidated: true;
+  final_deck_render_updated: boolean;
+  final_deck_render_requires_rebuild: boolean;
+  deck_html_path: string | null;
+  rendered_at: string | null;
+  page_progress_updated_at: string;
 }
 
 export interface RestoreAppPageSourceVersionInput {
@@ -1227,6 +1231,11 @@ export interface RestoreAppPageSourceVersionResult {
   restored: true;
   html_path: string;
   screenshot_path: string;
+  final_deck_render_updated: boolean;
+  final_deck_render_requires_rebuild: boolean;
+  deck_html_path: string | null;
+  rendered_at: string | null;
+  page_progress_updated_at: string;
 }
 
 export interface RecordAppWorkspaceStyleGuideInput {

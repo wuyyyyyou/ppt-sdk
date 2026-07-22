@@ -47,9 +47,10 @@ export function App() {
         workspaceDir={state.currentWorkspace.workspace_dir}
         pages={manualEditorPages}
         initialPageIndex={state.currentSlide}
-        onExit={async () => {
+        onPageUpdated={actions.applyManualPageUpdate}
+        onExit={async (requiresDeckRender) => {
           setManualEditorOpen(false);
-          await actions.renderDeckHtml();
+          if (requiresDeckRender) await actions.renderDeckHtml();
         }}
       />
     );

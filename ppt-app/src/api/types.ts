@@ -1455,7 +1455,11 @@ export interface SaveManualPageRevisionResult {
   page_id: string;
   manifest: ManualPageRevisionManifest;
   screenshot_upload: HostUploadRef;
-  final_deck_render_invalidated: true;
+  final_deck_render_updated: boolean;
+  final_deck_render_requires_rebuild: boolean;
+  deck_html_path: string | null;
+  rendered_at: string | null;
+  page_progress_updated_at: string;
 }
 
 export interface RestorePageSourceVersionResult {
@@ -1466,6 +1470,11 @@ export interface RestorePageSourceVersionResult {
   screenshot_path: string;
   html_upload: HostUploadRef;
   screenshot_upload: HostUploadRef;
+  final_deck_render_updated: boolean;
+  final_deck_render_requires_rebuild: boolean;
+  deck_html_path: string | null;
+  rendered_at: string | null;
+  page_progress_updated_at: string;
 }
 
 export interface RecordOutlineInput {

@@ -31,6 +31,7 @@ import {
   embedWorkspaceLocalImageResources,
   extractSlideShell,
   manualPageRevisionPaths,
+  publishManualPageIntoDeck,
   publishManualPageRevision,
   readManualPageRevision,
   removeAllManualPageRevisions,
@@ -40,10 +41,6 @@ import {
   replaceSinglePageSlideShell,
   sanitizeManualPageHtml,
 } from "../manual-page-revisions/index.js";
-import type {
-  LegacyDeckManifestInput,
-  LegacyDeckManifestSlideInput,
-} from "../render/types.js";
 import { validateThemeTokenRecord } from "../render/theme-tokens.js";
 import { resolveLocalModulePath } from "../local-template/loader.js";
 import { assertLocalTemplateTypecheck } from "../local-template/typecheck.js";
@@ -807,6 +804,7 @@ const uploadedSourceWriteQueues = new Map<string, Promise<unknown>>();
 const styleProfileWriteQueues = new Map<string, Promise<unknown>>();
 const themeTokenWriteQueues = new Map<string, Promise<unknown>>();
 const exportArtifactWriteQueues = new Map<string, Promise<unknown>>();
+const manualFinalDeckWriteQueues = new Map<string, Promise<unknown>>();
 let pptxExportQueue = Promise.resolve();
 const activePptxExportJobIds = new Set<string>();
 
@@ -823,6 +821,24 @@ async function withExportArtifactWriteQueue<T>(
   } finally {
     if (exportArtifactWriteQueues.get(queueKey) === current) {
       exportArtifactWriteQueues.delete(queueKey);
+    }
+  }
+}
+
+async function withManualFinalDeckWriteQueue<T>(
+  workspaceDir: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const queueKey = path.normalize(workspaceDir);
+  const previous = manualFinalDeckWriteQueues.get(queueKey) ?? Promise.resolve();
+  const run = previous.catch(() => undefined).then(operation);
+  const tail = run.catch(() => undefined);
+  manualFinalDeckWriteQueues.set(queueKey, tail);
+  try {
+    return await run;
+  } finally {
+    if (manualFinalDeckWriteQueues.get(queueKey) === tail) {
+      manualFinalDeckWriteQueues.delete(queueKey);
     }
   }
 }
@@ -1852,24 +1868,30 @@ async function readManifestLocalSlideSourcePath(input: {
     throw new Error("Selected template manifest root must be a JSON object");
   }
 
-  const manifest = rawValue as unknown as LegacyDeckManifestInput;
-  const slide = manifest.slides?.[input.pageIndex] as LegacyDeckManifestSlideInput | undefined;
-  if (!slide) {
+  const slides = Array.isArray(rawValue.slides) ? rawValue.slides : [];
+  const slide = slides[input.pageIndex];
+  if (!isRecord(slide)) {
     throw new Error(`Manifest does not contain page index ${input.pageIndex}`);
   }
 
-  if (slide.source?.type !== "local") {
+  const source = slide.source;
+  const sourcePath = typeof source === "string"
+    ? source
+    : isRecord(source) && source.type === "local" && typeof source.path === "string"
+      ? source.path
+      : null;
+  if (!sourcePath) {
     return null;
   }
 
   const absolutePath = await resolveLocalModulePath(
-    slide.source.path,
+    sourcePath,
     manifestDir,
-    `Slide "${slide.id}"`,
+    `Slide "${normalizeString(slide.id)}"`,
   );
   return {
     absolutePath,
-    slideId: slide.id,
+    slideId: normalizeString(slide.id),
   };
 }
 
@@ -5056,6 +5078,103 @@ export async function getAppPageEditContext(
   };
 }
 
+interface CommitManualPageToFinalDeckResult {
+  final_deck_render_updated: boolean;
+  final_deck_render_requires_rebuild: boolean;
+  deck_html_path: string | null;
+  rendered_at: string | null;
+  page_progress_updated_at: string;
+}
+
+async function commitManualPageToFinalDeck(input: {
+  workspace_dir: string;
+  page_id: string;
+  page_index: number;
+  html_path: string;
+  screenshot_path: string;
+  updated_at: string;
+}): Promise<CommitManualPageToFinalDeckResult> {
+  return withManualFinalDeckWriteQueue(input.workspace_dir, async () => {
+    const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+    const progress = normalizePageProgressJson(workspace.page_progress);
+    const currentFinalRender = progress.final_deck_render;
+    let finalDeckRenderUpdated = false;
+    let incrementalError: string | null = null;
+
+    if (
+      currentFinalRender.status === "completed" &&
+      currentFinalRender.deck_html_path &&
+      currentFinalRender.output_dir &&
+      isPathWithin(
+        path.normalize(currentFinalRender.deck_html_path),
+        path.normalize(currentFinalRender.output_dir),
+      )
+    ) {
+      try {
+        await publishManualPageIntoDeck({
+          deckHtmlPath: currentFinalRender.deck_html_path,
+          pageHtmlPath: input.html_path,
+          pageIndex: input.page_index,
+        });
+        finalDeckRenderUpdated = true;
+      } catch (error) {
+        incrementalError = error instanceof Error ? error.message : String(error);
+      }
+    } else {
+      incrementalError = "No completed Final Deck Render is available for incremental publication.";
+    }
+
+    const nextFinalRender = finalDeckRenderUpdated
+      ? {
+          ...currentFinalRender,
+          status: "completed" as const,
+          message: null,
+          error: null,
+          rendered_at: input.updated_at,
+          updated_at: input.updated_at,
+        }
+      : {
+          status: "idle" as const,
+          message: "Manual page saved; Final Deck Render requires a rebuild.",
+          error: incrementalError,
+          output_dir: null,
+          deck_html_path: null,
+          rendered_at: null,
+          updated_at: input.updated_at,
+        };
+    const nextProgress: AppPageProgress = {
+      ...progress,
+      final_deck_render: nextFinalRender,
+      pages: progress.pages.map((page) => page.page_id === input.page_id ? {
+        ...page,
+        last_html_path: input.html_path,
+        last_screenshot_path: input.screenshot_path,
+        updated_at: input.updated_at,
+      } : page),
+      updated_at: input.updated_at,
+    };
+    await writeJsonFile(workspace.files.page_progress, nextProgress);
+
+    const task = getPlainRecord(workspace.task);
+    const artifacts = getPlainRecord(task.artifacts);
+    delete artifacts.pptx;
+    delete artifacts.pdf;
+    await writeJsonFile(workspace.files.task, {
+      ...task,
+      artifacts,
+      updated_at: input.updated_at,
+    });
+
+    return {
+      final_deck_render_updated: finalDeckRenderUpdated,
+      final_deck_render_requires_rebuild: !finalDeckRenderUpdated,
+      deck_html_path: finalDeckRenderUpdated ? nextFinalRender.deck_html_path : null,
+      rendered_at: finalDeckRenderUpdated ? input.updated_at : null,
+      page_progress_updated_at: input.updated_at,
+    };
+  });
+}
+
 export async function saveAppManualPageRevision(
   input: SaveAppManualPageRevisionInput,
 ): Promise<SaveAppManualPageRevisionResult> {
@@ -5120,33 +5239,19 @@ export async function saveAppManualPageRevision(
       screenshotPath: pendingScreenshot,
       sourceBytes,
     });
-    const updatedAt = manifest.updated_at;
-    const progress = normalizePageProgressJson(workspace.page_progress);
-    await writeJsonFile(workspace.files.page_progress, {
-      ...progress,
-      final_deck_render: {
-        status: "idle",
-        message: null,
-        error: null,
-        output_dir: null,
-        deck_html_path: null,
-        rendered_at: null,
-        updated_at: updatedAt,
-      },
-      pages: progress.pages.map((page) => page.page_id === input.page_id ? {
-        ...page,
-        last_html_path: manifest.current_html_path,
-        last_screenshot_path: manifest.screenshot_path,
-        updated_at: updatedAt,
-      } : page),
-      updated_at: updatedAt,
-    } satisfies AppPageProgress);
-    await touchWorkspaceTask(workspace, updatedAt);
+    const finalDeck = await commitManualPageToFinalDeck({
+      workspace_dir: workspace.workspace_dir,
+      page_id: input.page_id,
+      page_index: context.page_index,
+      html_path: manifest.current_html_path,
+      screenshot_path: manifest.screenshot_path,
+      updated_at: manifest.updated_at,
+    });
     return {
       workspace_dir: workspace.workspace_dir,
       page_id: input.page_id,
       manifest,
-      final_deck_render_invalidated: true,
+      ...finalDeck,
     };
   } finally {
     await rm(pendingHtml, { force: true }).catch(() => undefined);
@@ -5163,34 +5268,21 @@ export async function restoreAppPageSourceVersion(
     workspace_dir: workspace.workspace_dir,
     page_id: input.page_id,
   });
-  const updatedAt = new Date().toISOString();
-  const progress = normalizePageProgressJson(workspace.page_progress);
-  await writeJsonFile(workspace.files.page_progress, {
-    ...progress,
-    final_deck_render: {
-      status: "idle",
-      message: null,
-      error: null,
-      output_dir: null,
-      deck_html_path: null,
-      rendered_at: null,
-      updated_at: updatedAt,
-    },
-    pages: progress.pages.map((page) => page.page_id === input.page_id ? {
-      ...page,
-      last_html_path: preview.html_path,
-      last_screenshot_path: preview.screenshot_path,
-      updated_at: updatedAt,
-    } : page),
-    updated_at: updatedAt,
-  } satisfies AppPageProgress);
-  await touchWorkspaceTask(workspace, updatedAt);
+  const finalDeck = await commitManualPageToFinalDeck({
+    workspace_dir: workspace.workspace_dir,
+    page_id: input.page_id,
+    page_index: preview.page_index,
+    html_path: preview.html_path,
+    screenshot_path: preview.screenshot_path,
+    updated_at: preview.rendered_at,
+  });
   return {
     workspace_dir: workspace.workspace_dir,
     page_id: input.page_id,
     restored: true,
     html_path: preview.html_path,
     screenshot_path: preview.screenshot_path,
+    ...finalDeck,
   };
 }
 

@@ -522,15 +522,38 @@
   background: var(--manual-danger);
 }
 
-.manual-editor-loading,
+.manual-editor-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--manual-muted);
+  font-size: 13px;
+  font-weight: 550;
+  transform: translate(-50%, -50%);
+}
+
+.manual-editor-loading svg {
+  color: var(--manual-accent);
+  animation: manual-editor-loading-spin 0.85s linear infinite;
+}
+
+@keyframes manual-editor-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .manual-editor-error {
   position: absolute;
-  top: 16px;
   left: 50%;
   z-index: 45;
   padding: 8px 12px;
   border-radius: 9px;
-  color: var(--manual-text);
   background: rgba(255, 255, 255, 0.96);
   box-shadow: var(--manual-shadow);
   font-size: 12px;

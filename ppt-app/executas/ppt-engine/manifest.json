@@ -1480,7 +1480,7 @@
     },
     {
       "name": "app_save_manual_page_revision",
-      "description": "Validate and persist the latest self-contained manual HTML revision for one page.",
+      "description": "Validate and persist the latest self-contained manual HTML revision, then incrementally publish it into the completed Deck when possible.",
       "parameters": [
         { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
         { "name": "page_id", "type": "string", "description": "Stable page id from the Confirmed Outline.", "required": true },
@@ -1491,7 +1491,7 @@
     },
     {
       "name": "app_restore_page_source_version",
-      "description": "Delete one Manual Page Revision and rerender the current Page Source as the page version.",
+      "description": "Delete one Manual Page Revision, rerender that Page Source page, and incrementally publish it into the completed Deck when possible.",
       "parameters": [
         { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
         { "name": "page_id", "type": "string", "description": "Stable page id from the Confirmed Outline.", "required": true }

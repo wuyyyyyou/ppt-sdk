@@ -8,6 +8,7 @@ import {
   embedWorkspaceLocalImageResources,
   extractSlideShell,
   manualPageRevisionPaths,
+  publishManualPageIntoDeck,
   publishManualPageRevision,
   readManualPageRevision,
   replaceSinglePageSlideShell,
@@ -66,6 +67,53 @@ test("keeps replacement speaker notes when the manual shell already carries them
   const result = replaceSlideShellAtIndex(deck, 0, replacement);
   assert.match(result, /manual note/);
   assert.doesNotMatch(result, /old note/);
+});
+
+test("publishes concurrent manual pages into one deck without losing either update", async () => {
+  const workspaceDir = await mkdtemp(path.join(os.tmpdir(), "manual-deck-publish-"));
+  try {
+    const deckPath = path.join(workspaceDir, "deck.html");
+    const firstPagePath = path.join(workspaceDir, "first.html");
+    const secondPagePath = path.join(workspaceDir, "second.html");
+    await writeFile(
+      deckPath,
+      '<div id="presentation-slides-wrapper"><div data-presenton-slide-shell="true"><p>old one</p></div><div data-presenton-slide-shell="true"><p>old two</p></div></div>',
+    );
+    await writeFile(firstPagePath, ensureSinglePageSlideShell(pageHtml("<p>new one</p>")));
+    await writeFile(secondPagePath, ensureSinglePageSlideShell(pageHtml("<p>new two</p>")));
+
+    await Promise.all([
+      publishManualPageIntoDeck({ deckHtmlPath: deckPath, pageHtmlPath: firstPagePath, pageIndex: 0 }),
+      publishManualPageIntoDeck({ deckHtmlPath: deckPath, pageHtmlPath: secondPagePath, pageIndex: 1 }),
+    ]);
+
+    const deck = await readFile(deckPath, "utf8");
+    assert.match(deck, />new one</);
+    assert.match(deck, />new two</);
+    assert.doesNotMatch(deck, />old one</);
+    assert.doesNotMatch(deck, />old two</);
+  } finally {
+    await rm(workspaceDir, { recursive: true, force: true });
+  }
+});
+
+test("does not publish a manual page when the requested Deck shell is missing", async () => {
+  const workspaceDir = await mkdtemp(path.join(os.tmpdir(), "manual-deck-missing-shell-"));
+  try {
+    const deckPath = path.join(workspaceDir, "deck.html");
+    const pagePath = path.join(workspaceDir, "page.html");
+    const originalDeck = '<div id="presentation-slides-wrapper"><div data-presenton-slide-shell="true"><p>one</p></div></div>';
+    await writeFile(deckPath, originalDeck);
+    await writeFile(pagePath, ensureSinglePageSlideShell(pageHtml("<p>changed</p>")));
+
+    await assert.rejects(
+      () => publishManualPageIntoDeck({ deckHtmlPath: deckPath, pageHtmlPath: pagePath, pageIndex: 1 }),
+      /missing slide shell 2/i,
+    );
+    assert.equal(await readFile(deckPath, "utf8"), originalDeck);
+  } finally {
+    await rm(workspaceDir, { recursive: true, force: true });
+  }
 });
 
 test("sanitizes active content and extracts image data URLs for Agent HTML", async () => {

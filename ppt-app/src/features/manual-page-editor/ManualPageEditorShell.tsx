@@ -14,6 +14,7 @@ import {
   ImagePlus,
   Italic,
   Layers,
+  LoaderCircle,
   MoreHorizontal,
   PaintBucket,
   PanelLeftClose,
@@ -34,7 +35,11 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { createPptBackend, type PptBackend } from "../../api/pptBackend";
-import type { GetPageEditContextResult } from "../../api/types";
+import type {
+  GetPageEditContextResult,
+  RestorePageSourceVersionResult,
+  SaveManualPageRevisionResult,
+} from "../../api/types";
 import { createAppHostUploadClient, type AppHostUploadClient } from "../../runtime/appHostUploadClient";
 import { connectAnnaRuntime } from "../../runtime/annaRuntime";
 import "./manual-page-editor.css";
@@ -61,7 +66,8 @@ interface Props {
   workspaceDir: string;
   pages: ManualPageEditorPage[];
   initialPageIndex: number;
-  onExit: () => Promise<void> | void;
+  onPageUpdated: (result: SaveManualPageRevisionResult | RestorePageSourceVersionResult) => void;
+  onExit: (requiresDeckRender: boolean) => Promise<void> | void;
 }
 
 type SaveStatus = "saved" | "unsaved" | "saving" | "conflict" | "error";
@@ -166,6 +172,12 @@ export function ManualPageEditorShell(props: Props) {
   const moveBeforeRef = useRef<string | null>(null);
   const selectionRangeRef = useRef<Range | null>(null);
   const iframeCleanupRef = useRef<(() => void) | null>(null);
+  const deckRenderRequiredRef = useRef(false);
+
+  const recordDeckRenderRequirement = useCallback((required: boolean) => {
+    if (!required) return;
+    deckRenderRequiredRef.current = true;
+  }, []);
 
   const page = props.pages[pageIndex];
   const dirty = saveStatus === "unsaved" || saveStatus === "error" || saveStatus === "conflict";
@@ -299,6 +311,8 @@ export function ManualPageEditorShell(props: Props) {
       setHistory([]);
       setFuture([]);
       setSaveStatus("saved");
+      recordDeckRenderRequirement(result.final_deck_render_requires_rebuild);
+      props.onPageUpdated(result);
       return true;
     } catch (value) {
       const message = value instanceof Error ? value.message : String(value);
@@ -306,20 +320,22 @@ export function ManualPageEditorShell(props: Props) {
       setSaveStatus(/revision conflict/i.test(message) ? "conflict" : "error");
       return false;
     }
-  }, [backend, context, currentHtml, page, props.workspaceDir, uploadClient]);
+  }, [backend, context, currentHtml, page, props.onPageUpdated, props.workspaceDir, recordDeckRenderRequirement, uploadClient]);
 
   const restore = useCallback(async () => {
     if (!backend || !page) return;
     setLoading(true);
     try {
-      await backend.restorePageSourceVersion({ workspace_dir: props.workspaceDir, page_id: page.pageId });
+      const result = await backend.restorePageSourceVersion({ workspace_dir: props.workspaceDir, page_id: page.pageId });
+      recordDeckRenderRequirement(result.final_deck_render_requires_rebuild);
+      props.onPageUpdated(result);
       await loadPage(pageIndex);
     } catch (value) {
       setError(value instanceof Error ? value.message : String(value));
     } finally {
       setLoading(false);
     }
-  }, [backend, loadPage, page, pageIndex, props.workspaceDir]);
+  }, [backend, loadPage, page, pageIndex, props.onPageUpdated, props.workspaceDir, recordDeckRenderRequirement]);
 
   const requestSwitch = (index: number) => {
     if (index === pageIndex) return;
@@ -327,7 +343,7 @@ export function ManualPageEditorShell(props: Props) {
     else void loadPage(index);
   };
 
-  const requestExit = () => dirty ? setConfirm({ kind: "exit" }) : void props.onExit();
+  const requestExit = () => dirty ? setConfirm({ kind: "exit" }) : void props.onExit(deckRenderRequiredRef.current);
 
   const resolveConfirm = async (action: "save" | "discard" | "cancel" | "restore") => {
     const request = confirm;
@@ -340,7 +356,7 @@ export function ManualPageEditorShell(props: Props) {
     if (action === "save" && !(await save())) return;
     setConfirm(null);
     if (request.kind === "switch" && request.target !== undefined) await loadPage(request.target);
-    if (request.kind === "exit") await props.onExit();
+    if (request.kind === "exit") await props.onExit(deckRenderRequiredRef.current);
   };
 
   const selectParent = () => {
@@ -692,7 +708,12 @@ export function ManualPageEditorShell(props: Props) {
       <main ref={canvasAreaRef} className="manual-editor-canvas-area">
           {toolbar}
         <div className="manual-editor-canvas-scroll">
-          {loading ? <div className="manual-editor-loading">正在加载页面…</div> : null}
+          {loading ? (
+            <div className="manual-editor-loading" role="status" aria-live="polite">
+              <LoaderCircle size={30} aria-hidden="true" />
+              <span>正在加载页面…</span>
+            </div>
+          ) : null}
           {error ? <div className="manual-editor-error">{error}{saveStatus === "conflict" ? <button onClick={() => void loadPage(pageIndex)}>加载后端最新版本</button> : null}</div> : null}
           {!loading && html ? (
             <div className="manual-editor-stage" style={{ width: 1280 * scale, height: 720 * scale }}>

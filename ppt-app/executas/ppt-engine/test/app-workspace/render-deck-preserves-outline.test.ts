@@ -241,3 +241,63 @@ test("renderAppWorkspacePagePreview includes stable slide id in preview filename
     await rm(homeDir, { recursive: true, force: true });
   }
 });
+
+test("renderAppWorkspacePagePreview typechecks canonical string slide sources before rendering", async () => {
+  const previousHome = process.env.HOME;
+  const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-page-preview-typecheck-home-"));
+  process.env.HOME = homeDir;
+
+  const { renderAppWorkspacePagePreview } = await import(`../../src/app-workspace/index.ts?typecheck=${Date.now()}`);
+  const workspaceDir = createWorkspaceDir(homeDir);
+  const manifestPath = path.join(workspaceDir, "manifest.json");
+  const sourcePath = path.join(workspaceDir, "slides", `${PAGE_1}.tsx`);
+
+  try {
+    await mkdir(path.dirname(sourcePath), { recursive: true });
+    await writeJson(path.join(workspaceDir, "task.json"), {
+      title: "Page preview typecheck fixture",
+      workspace_format: "authoring-kit-v1",
+      updated_at: "2026-07-22T00:00:00.000Z",
+    });
+    await writeJson(path.join(workspaceDir, "setting.json"), {});
+    await writeJson(manifestPath, {
+      title: "Preview Typecheck Deck",
+      slides: [{
+        id: PAGE_1,
+        source: `./slides/${PAGE_1}.tsx`,
+      }],
+    });
+    await writeFile(
+      sourcePath,
+      [
+        'import React from "react";',
+        "",
+        "export default function Page() {",
+        "  return <main>{space}</main>;",
+        "}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    await assert.rejects(
+      () => renderAppWorkspacePagePreview({
+        workspace_dir: workspaceDir,
+        page_id: PAGE_1,
+      }),
+      (error) => {
+        assert.ok(error instanceof Error);
+        assert.match(error.message, /Pre-render TypeScript check failed/);
+        assert.match(error.message, /Cannot find name 'space'/);
+        return true;
+      },
+    );
+  } finally {
+    if (previousHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = previousHome;
+    }
+    await rm(homeDir, { recursive: true, force: true });
+  }
+});
