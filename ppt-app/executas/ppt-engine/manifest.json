@@ -1471,6 +1471,33 @@
       ]
     },
     {
+      "name": "app_get_page_edit_context",
+      "description": "Prepare one page for direct static HTML editing and return its HTML and screenshot through Host Upload.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
+        { "name": "page_id", "type": "string", "description": "Stable page id from the Confirmed Outline.", "required": true }
+      ]
+    },
+    {
+      "name": "app_save_manual_page_revision",
+      "description": "Validate and persist the latest self-contained manual HTML revision for one page.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
+        { "name": "page_id", "type": "string", "description": "Stable page id from the Confirmed Outline.", "required": true },
+        { "name": "base_revision", "type": "number", "description": "Revision loaded by the editor for optimistic concurrency.", "required": true },
+        { "name": "size_bytes", "type": "number", "description": "Expected uploaded HTML size in bytes.", "required": true },
+        { "name": "host_upload", "type": "object", "description": "text/plain HostUploadRef containing the submitted HTML page document as UTF-8 text.", "required": true }
+      ]
+    },
+    {
+      "name": "app_restore_page_source_version",
+      "description": "Delete one Manual Page Revision and rerender the current Page Source as the page version.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
+        { "name": "page_id", "type": "string", "description": "Stable page id from the Confirmed Outline.", "required": true }
+      ]
+    },
+    {
       "name": "app_get_rendered_deck_html",
       "description": "Read existing rendered workspace deck HTML and screenshots, upload screenshot previews via Host Upload, and fail if any rendered artifact is missing.",
       "parameters": [

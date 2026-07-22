@@ -1,4 +1,4 @@
-import { AlertTriangle, LayoutGrid, LoaderCircle, Maximize2, RefreshCw } from "lucide-react";
+import { AlertTriangle, Edit3, LayoutGrid, LoaderCircle, Maximize2, RefreshCw } from "lucide-react";
 import type { Slide } from "../../../data/mockDeck";
 import type { Messages } from "../../../i18n/messages";
 import type { DeckReviewRenderState, PreviewMode } from "../types";
@@ -17,6 +17,7 @@ interface ReviewPageProps {
   reviewRender: DeckReviewRenderState;
   renderDeckHtml: () => Promise<void>;
   onBack: () => void;
+  onEdit: () => void;
 }
 
 export function ReviewPage(props: ReviewPageProps) {
@@ -31,9 +32,12 @@ export function ReviewPage(props: ReviewPageProps) {
         onBack={props.onBack}
         t={props.t}
         actions={
-          <button className="icon-action-btn" onClick={() => void props.renderDeckHtml()} disabled={renderWaiting} title={props.t.review.renderAgain}>
-            <RefreshCw size={14} />
-          </button>
+          <>
+            <button className="icon-action-btn" onClick={props.onEdit} title="编辑 PPT"><Edit3 size={14} /></button>
+            <button className="icon-action-btn" onClick={() => void props.renderDeckHtml()} disabled={renderWaiting} title={props.t.review.renderAgain}>
+              <RefreshCw size={14} />
+            </button>
+          </>
         }
       />
       <div className="mode-toggle">

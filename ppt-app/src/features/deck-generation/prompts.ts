@@ -1,5 +1,6 @@
 import type { AgentPageVisualReviewResult } from "../../agent/agentClient";
 import type { RenderWorkspacePagePreviewResult, WorkspaceOutline } from "../../api/types";
+import type { ManualPageRevisionManifest } from "../../api/types";
 import type { Locale } from "../../i18n/messages";
 import type { AuthoringDeck, AuthoringPage, NoChangeAuthoringRetry, PageRefinementVisualContext, RenderFailureHistoryItem, RenderFailurePhase } from "./types";
 import {
@@ -57,6 +58,7 @@ export function buildAuthoringPrompt(input: {
   refinementRequest?: string;
   refinementReason?: string;
   refinementVisualContext?: PageRefinementVisualContext;
+  manualRevision?: ManualPageRevisionManifest | null;
 }) {
   const context = createAgentFileToolPathContext({
     workspaceRoot: input.workspaceRoot,
@@ -73,6 +75,7 @@ export function buildAuthoringPrompt(input: {
   const authoringKitReadmePath = `${input.workspaceDir}/authoring-kit/README.md`;
   const screenshotPath = input.visualReviewScreenshotPath?.trim() ?? "";
   const baselineScreenshotPath = input.refinementVisualContext?.screenshotPath?.trim() ?? "";
+  const manualRevision = input.manualRevision;
   const refinementContext = input.refinementRequest?.trim() ? [
     "这是优化轮次。大纲和艺术指导是最初确定的基线；如果它们与用户本次优化要求冲突，只执行用户本次要求。",
     `用户本次优化要求: ${input.refinementRequest.trim()}`,
@@ -103,13 +106,27 @@ export function buildAuthoringPrompt(input: {
     describeAgentFileToolPathContext(context),
     "",
     "开始写代码前，必须严格按以下顺序完整读取文件：",
-    `1. ${toolPath("当前页面 TSX", pageSourcePath)}`,
-    `2. ${toolPath("演示需求", requirementsPath)}`,
-    `3. ${toolPath("已确认大纲", outlinePath)}`,
-    `4. ${toolPath("艺术指导", styleGuidePath)}`,
-    `5. ${toolPath("Authoring Kit 总说明", authoringKitReadmePath)}`,
-    "6. 根据总说明判断当前页相关的 foundations / references 分类，并完整读取相关分类 README。",
-    "7. 如果认为任何 Foundation Module（基础模块）或 Reference Implementation（参考实现）适合使用或参考，必须先完整读取对应组件的 TSX 文件，再开始写当前页面。不能只看文件名、README 摘要或局部代码。",
+    ...(manualRevision ? [
+      `1. ${toolPath("人工页面修订 manifest", `${input.workspaceDir}/manual-edits/${input.page.page_id}/manifest.json`)}`,
+      `2. ${toolPath("用户最新人工 HTML", manualRevision.agent_html_path)}`,
+      `3. ${toolPath("用户最新人工页面截图（仅作视觉参考）", manualRevision.screenshot_path)}`,
+      `4. ${toolPath("当前旧 TSX（需要修改的源码）", pageSourcePath)}`,
+      `5. ${toolPath("演示需求", requirementsPath)}`,
+      `6. ${toolPath("已确认大纲", outlinePath)}`,
+      `7. ${toolPath("艺术指导", styleGuidePath)}`,
+      `8. ${toolPath("Authoring Kit 总说明", authoringKitReadmePath)}`,
+      "9. 根据总说明判断当前页相关的 foundations / references 分类，并完整读取相关分类 README。",
+      "10. 如果认为任何 Foundation Module（基础模块）或 Reference Implementation（参考实现）适合使用或参考，必须先完整读取对应组件的 TSX 文件，再开始写当前页面。不能只看文件名、README 摘要或局部代码。",
+      "人工页面修订是用户最新内容与视觉结构，旧 TSX 只是需要修复的源码。除非本次优化要求明确冲突，不得回退人工文字、数字、新增对象或恢复 data-ppt-editor-deleted=\"true\" 的对象；data-ppt-editor-placeholder=\"true\" 仅是布局占位，不得写入新 TSX。",
+    ] : [
+      `1. ${toolPath("当前页面 TSX", pageSourcePath)}`,
+      `2. ${toolPath("演示需求", requirementsPath)}`,
+      `3. ${toolPath("已确认大纲", outlinePath)}`,
+      `4. ${toolPath("艺术指导", styleGuidePath)}`,
+      `5. ${toolPath("Authoring Kit 总说明", authoringKitReadmePath)}`,
+      "6. 根据总说明判断当前页相关的 foundations / references 分类，并完整读取相关分类 README。",
+      "7. 如果认为任何 Foundation Module（基础模块）或 Reference Implementation（参考实现）适合使用或参考，必须先完整读取对应组件的 TSX 文件，再开始写当前页面。不能只看文件名、README 摘要或局部代码。",
+    ]),
     "",
     "页面要求：",
     `- page_id: ${input.page.page_id}`,

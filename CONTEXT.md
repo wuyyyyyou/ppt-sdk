@@ -248,15 +248,20 @@ _Avoid_: Failed Deck when the issue is an artifact or state blocker rather than 
 A visible part of deck generation, such as creating the Workspace Style Guide, discovering or assigning evidence, preparing Page Sources, authoring a page, rendering, visual review, or final rendering.
 
 **Final Deck Render**:
-The deck-level Generation Step that turns accepted Page Generation Units into final previewable page artifacts and one ordered Deck-level Rendered HTML Snapshot. It is not owned by any single Page Generation Unit, and Deck Generation is not complete until Final Deck Render has succeeded.
+The deck-level Generation Step that turns the current accepted version of every Page Generation Unit into final previewable page artifacts and one ordered Deck-level Rendered HTML Snapshot. A current Manual Page Revision participates in place of that page's Page Source render; Final Deck Render is not owned by any single Page Generation Unit, and Deck Generation is not complete until it has succeeded.
 
 **Page Generation Unit**:
-One planned page being authored, rendered, and optionally visual-reviewed as an independent part of Deck Generation. It owns exactly one stable Page Source together with that page's content and page-level assets; shared deck structure and Workspace Authoring Kit assets belong outside the unit.
+One planned page being authored, rendered, optionally manually revised, and optionally visual-reviewed as an independent part of Deck Generation. It owns exactly one stable Page Source, at most one current Manual Page Revision, and that page's content and page-level assets; shared deck structure and Workspace Authoring Kit assets belong outside the unit.
 Its stable identity is the Confirmed Outline entry's `page_id`; the identity is never reused, while page index is ordering rather than identity.
 
 **Page Source**:
-The Workspace-owned TSX entry point for exactly one Page Generation Unit and the sole authoritative render source for that page's visible content and composition. The Confirmed Outline provides intent and Research Evidence provides factual grounding without acting as separate render data; Page Authoring modifies only the current Page Source and its page-owned assets.
+The Workspace-owned TSX entry point and authoritative authoring source for exactly one Page Generation Unit. Its accepted render is the current page unless a Manual Page Revision supersedes it; the Confirmed Outline provides intent and Research Evidence provides factual grounding without acting as separate render data.
 _Avoid_: Deck Source, Shared Page Entry, Template Layout, Page Data JSON
+
+**Manual Page Revision**:
+A Workspace-owned, user-confirmed content and visual revision of exactly one Page Generation Unit created after its Page Source has rendered. While present it is that page's current version, and its explicitly saved text and numbers are user-provided content; it remains current until the user restores the Page Source version, a full Deck Generation replaces the page identity, or accepted Page Authoring supersedes it.
+User-facing Chinese label: 人工页面修订
+_Avoid_: HTML Override, Edited Snapshot, Manual Draft
 
 **Rendered HTML Snapshot**:
 The Workspace-owned, engine-generated static DOM representation captured after Page Sources have completed browser rendering at the fixed slide viewport. A Page Generation Unit owns one page snapshot, while Final Deck Render produces a separate ordered Deck snapshot in which every accepted page is simultaneously available to whole-Deck consumers; both are rebuildable derived artifacts rather than authoritative Page Authoring sources, and neither carries interactive viewing behaviour.

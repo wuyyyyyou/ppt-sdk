@@ -100,7 +100,7 @@ async function waitForSlideRenderReady(
 export async function writeSlideScreenshots(
   slides: Array<{ html: string; outputPath: string; htmlPath?: string }>,
   purpose = "Page Source slide screenshots",
-  options: { requireTailwind?: boolean; allowFailedImages?: boolean } = {},
+  options: { requireTailwind?: boolean; allowFailedImages?: boolean; validateManualSlideShell?: boolean } = {},
 ): Promise<void> {
   await withScreenshotRenderQueue(async () => {
     const runtime = await createManagedPage(purpose);
@@ -127,6 +127,34 @@ export async function writeSlideScreenshots(
           requireTailwind: options.requireTailwind,
           allowFailedImages: options.allowFailedImages,
         });
+        if (options.validateManualSlideShell) {
+          await runtime.page.evaluate(() => {
+            const shells = Array.from(document.querySelectorAll<HTMLElement>('[data-presenton-slide-shell="true"]'));
+            if (shells.length !== 1) throw new Error(`Manual page must contain exactly one slide shell; found ${shells.length}`);
+            const shell = shells[0]!;
+            const rect = shell.getBoundingClientRect();
+            const style = getComputedStyle(shell);
+            if (Math.round(rect.width) !== 1280 || Math.round(rect.height) !== 720) {
+              throw new Error(`Manual page slide shell must measure 1280x720; measured ${rect.width}x${rect.height}`);
+            }
+            if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) {
+              throw new Error("Manual page slide shell must be visible");
+            }
+            const fontFamilies = new Set<string>();
+            for (const element of [shell, ...Array.from(shell.querySelectorAll<HTMLElement>("*"))]) {
+              const computed = getComputedStyle(element);
+              if (computed.display !== "none" && computed.visibility !== "hidden" && element.textContent?.trim()) {
+                const family = computed.fontFamily.split(",")[0]?.trim().replace(/^['"]|['"]$/g, "");
+                if (family) fontFamilies.add(family);
+              }
+            }
+            for (const family of fontFamilies) {
+              if (document.fonts && !document.fonts.check(`16px "${family}"`)) {
+                throw new Error(`Manual page font failed to load: ${family}`);
+              }
+            }
+          });
+        }
         const screenshot = await slideElement.screenshot({ path: slide.outputPath });
         if (!screenshot) {
           throw new Error(`Failed to write slide screenshot: ${slide.outputPath}`);

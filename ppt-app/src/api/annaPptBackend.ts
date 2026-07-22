@@ -7,6 +7,9 @@ import type {
   PublishExportArtifactResult,
   ExportPdfResult,
   GetWorkspacePageFileFingerprintsResult,
+  GetPageEditContextResult,
+  SaveManualPageRevisionResult,
+  RestorePageSourceVersionResult,
   ImageFetchResult,
   ImageSearchResult,
   PagePlan,
@@ -571,6 +574,12 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         "app_render_workspace_page_preview",
         input
       ),
+    getPageEditContext: (input) =>
+      invoke<GetPageEditContextResult>(toolIds.pptEngine, "app_get_page_edit_context", input),
+    saveManualPageRevision: (input) =>
+      invoke<SaveManualPageRevisionResult>(toolIds.pptEngine, "app_save_manual_page_revision", input),
+    restorePageSourceVersion: (input) =>
+      invoke<RestorePageSourceVersionResult>(toolIds.pptEngine, "app_restore_page_source_version", input),
     getRenderedDeckHtml: (input) =>
       invoke<RenderDeckHtmlResult>(
         toolIds.pptEngine,

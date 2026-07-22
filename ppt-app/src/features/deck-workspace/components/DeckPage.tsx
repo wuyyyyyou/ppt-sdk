@@ -1,4 +1,4 @@
-import { RefreshCw } from "lucide-react";
+import { Edit3, RefreshCw } from "lucide-react";
 import type { Slide } from "../../../data/mockDeck";
 import type { Messages } from "../../../i18n/messages";
 import type { DeckReviewRenderState } from "../types";
@@ -16,6 +16,7 @@ interface DeckPageProps {
   onRefineSlide: () => void;
   onRefineDeck: () => void;
   onExport: () => void;
+  onEdit: () => void;
 }
 
 export type SlideLayoutMode = "simpler" | "visual" | "comparison" | "process" | "report";
@@ -49,6 +50,7 @@ export function DeckPage(props: DeckPageProps) {
         reviewRender={props.reviewRender}
       />
       <div className="action-bar">
+        <button className="secondary-btn" onClick={props.onEdit}><Edit3 size={14} />编辑 PPT</button>
         <button className="secondary-btn" onClick={props.onPreview}>{props.t.controls.preview}</button>
         <button className="secondary-btn" onClick={props.onExport}>{props.t.controls.export}</button>
       </div>

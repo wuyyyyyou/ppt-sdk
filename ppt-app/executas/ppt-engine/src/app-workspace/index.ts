@@ -25,6 +25,21 @@ import {
   buildDeckHtmlPagesAndScreenshotsFromManifest,
   buildDeckPageScreenshotFromManifest,
 } from "../render/build-deck-from-manifest.js";
+import { writeSlideScreenshots } from "../render/browser-artifacts.js";
+import {
+  ensureSinglePageSlideShell,
+  embedWorkspaceLocalImageResources,
+  extractSlideShell,
+  manualPageRevisionPaths,
+  publishManualPageRevision,
+  readManualPageRevision,
+  removeAllManualPageRevisions,
+  removeManualPageRevision,
+  removePageOwnedManualArtifacts,
+  replaceSlideShellAtIndex,
+  replaceSinglePageSlideShell,
+  sanitizeManualPageHtml,
+} from "../manual-page-revisions/index.js";
 import type {
   LegacyDeckManifestInput,
   LegacyDeckManifestSlideInput,
@@ -101,6 +116,12 @@ import type {
   GetAppUploadedSourceAnalysisInput,
   GetAppPagePlanInput,
   GetAppPageProgressInput,
+  GetAppPageEditContextInput,
+  GetAppPageEditContextResult,
+  SaveAppManualPageRevisionInput,
+  SaveAppManualPageRevisionResult,
+  RestoreAppPageSourceVersionInput,
+  RestoreAppPageSourceVersionResult,
   PrepareAppPageRefinementInput,
   PrepareAppPageRefinementResult,
   CommitAppDeckRefinementInput,
@@ -4957,6 +4978,222 @@ export async function selectAppWorkspaceTemplate(
   };
 }
 
+async function invalidateFinalDeckRender(
+  workspace: Awaited<ReturnType<typeof ensureWorkspaceFiles>>,
+  updatedAt = new Date().toISOString(),
+): Promise<void> {
+  const progress = normalizePageProgressJson(workspace.page_progress);
+  await writeJsonFile(workspace.files.page_progress, {
+    ...progress,
+    final_deck_render: {
+      status: "idle",
+      message: null,
+      error: null,
+      output_dir: null,
+      deck_html_path: null,
+      rendered_at: null,
+      updated_at: updatedAt,
+    },
+    updated_at: updatedAt,
+  } satisfies AppPageProgress);
+}
+
+export async function getAppPageEditContext(
+  input: GetAppPageEditContextInput,
+): Promise<GetAppPageEditContextResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const outline = normalizeOutlineJson(workspace.outline);
+  const pageIndex = outline.items.findIndex((item) => item.page_id === input.page_id);
+  if (pageIndex < 0) throw new Error(`Unknown page_id "${input.page_id}"`);
+  const existing = await readManualPageRevision(workspace.workspace_dir, input.page_id);
+  if (existing) {
+    return {
+      workspace_dir: workspace.workspace_dir,
+      page_id: input.page_id,
+      title: outline.items[pageIndex]?.title ?? input.page_id,
+      page_index: pageIndex,
+      revision: existing.revision,
+      manually_edited: true,
+      html_path: existing.current_html_path,
+      screenshot_path: existing.screenshot_path,
+      manifest: existing,
+    };
+  }
+
+  const progressPage = normalizePageProgressJson(workspace.page_progress).pages
+    .find((item) => item.page_id === input.page_id);
+  let htmlPath = progressPage?.last_html_path ?? "";
+  let screenshotPath = progressPage?.last_screenshot_path ?? "";
+  const existingArtifactsAvailable = htmlPath && screenshotPath &&
+    await stat(htmlPath).then((value) => value.isFile()).catch(() => false) &&
+    await stat(screenshotPath).then((value) => value.isFile()).catch(() => false);
+  if (!existingArtifactsAvailable) {
+    const preview = await renderAppWorkspacePagePreview({
+      workspace_dir: workspace.workspace_dir,
+      page_id: input.page_id,
+    });
+    htmlPath = preview.html_path;
+    screenshotPath = preview.screenshot_path;
+  }
+  const html = await embedWorkspaceLocalImageResources(
+    workspace.workspace_dir,
+    ensureSinglePageSlideShell(await readFile(htmlPath, "utf8")),
+  );
+  const contextDir = path.join(workspace.workspace_dir, "output", "manual-editor-context");
+  await mkdir(contextDir, { recursive: true });
+  const contextHtmlPath = path.join(contextDir, `${input.page_id}.html`);
+  await writeFile(contextHtmlPath, html, "utf8");
+  return {
+    workspace_dir: workspace.workspace_dir,
+    page_id: input.page_id,
+    title: outline.items[pageIndex]?.title ?? input.page_id,
+    page_index: pageIndex,
+    revision: 0,
+    manually_edited: false,
+    html_path: contextHtmlPath,
+    screenshot_path: screenshotPath,
+    manifest: null,
+  };
+}
+
+export async function saveAppManualPageRevision(
+  input: SaveAppManualPageRevisionInput,
+): Promise<SaveAppManualPageRevisionResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  assertAbsolutePath(input.staging_file_path, "staging_file_path");
+  const submitted = await readFile(input.staging_file_path);
+  if (submitted.length !== Math.floor(input.expected_size_bytes)) {
+    throw new Error(`Manual HTML size mismatch: expected ${input.expected_size_bytes}, got ${submitted.length}`);
+  }
+  const context = await getAppPageEditContext({
+    workspace_dir: workspace.workspace_dir,
+    page_id: input.page_id,
+  });
+  if (context.revision !== input.base_revision) {
+    throw new Error(`Manual Page Revision conflict: expected ${context.revision}, received ${input.base_revision}`);
+  }
+  const baseDocument = await readFile(
+    context.manifest?.current_html_path ?? context.html_path,
+    "utf8",
+  );
+  const submittedSanitized = await sanitizeManualPageHtml(
+    workspace.workspace_dir,
+    input.page_id,
+    submitted.toString("utf8"),
+  );
+  const submittedShell = extractSlideShell(submittedSanitized.currentHtml).shell
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, "")
+    .replace(/<(?:link|meta|base)\b[^>]*>/gi, "");
+  const restrictedDocument = replaceSinglePageSlideShell(
+    ensureSinglePageSlideShell(baseDocument),
+    submittedShell,
+  );
+  const { currentHtml, agentHtml } = await sanitizeManualPageHtml(
+    workspace.workspace_dir,
+    input.page_id,
+    restrictedDocument,
+  );
+  const pendingDir = path.join(workspace.workspace_dir, "manual-edits", ".pending");
+  await mkdir(pendingDir, { recursive: true });
+  const pendingHtml = path.join(pendingDir, `${input.page_id}-${Date.now()}.html`);
+  const pendingScreenshot = path.join(pendingDir, `${input.page_id}-${Date.now()}.png`);
+  await writeFile(pendingHtml, currentHtml, "utf8");
+  try {
+    await writeSlideScreenshots(
+      [{ html: currentHtml, htmlPath: pendingHtml, outputPath: pendingScreenshot }],
+      "Manual Page Revision validation",
+      { requireTailwind: false, validateManualSlideShell: true },
+    );
+    const sourcePath = path.join(workspace.workspace_dir, "slides", `${input.page_id}.tsx`);
+    const sourceBytes = await readFile(sourcePath);
+    const baseHtml = await readFile(
+      context.manifest?.base_html_path ?? context.html_path,
+      "utf8",
+    );
+    const manifest = await publishManualPageRevision({
+      workspaceDir: workspace.workspace_dir,
+      pageId: input.page_id,
+      baseRevision: input.base_revision,
+      baseHtml,
+      currentHtml,
+      agentHtml,
+      screenshotPath: pendingScreenshot,
+      sourceBytes,
+    });
+    const updatedAt = manifest.updated_at;
+    const progress = normalizePageProgressJson(workspace.page_progress);
+    await writeJsonFile(workspace.files.page_progress, {
+      ...progress,
+      final_deck_render: {
+        status: "idle",
+        message: null,
+        error: null,
+        output_dir: null,
+        deck_html_path: null,
+        rendered_at: null,
+        updated_at: updatedAt,
+      },
+      pages: progress.pages.map((page) => page.page_id === input.page_id ? {
+        ...page,
+        last_html_path: manifest.current_html_path,
+        last_screenshot_path: manifest.screenshot_path,
+        updated_at: updatedAt,
+      } : page),
+      updated_at: updatedAt,
+    } satisfies AppPageProgress);
+    await touchWorkspaceTask(workspace, updatedAt);
+    return {
+      workspace_dir: workspace.workspace_dir,
+      page_id: input.page_id,
+      manifest,
+      final_deck_render_invalidated: true,
+    };
+  } finally {
+    await rm(pendingHtml, { force: true }).catch(() => undefined);
+    await rm(pendingScreenshot, { force: true }).catch(() => undefined);
+  }
+}
+
+export async function restoreAppPageSourceVersion(
+  input: RestoreAppPageSourceVersionInput,
+): Promise<RestoreAppPageSourceVersionResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  await removeManualPageRevision(workspace.workspace_dir, input.page_id);
+  const preview = await renderAppWorkspacePagePreview({
+    workspace_dir: workspace.workspace_dir,
+    page_id: input.page_id,
+  });
+  const updatedAt = new Date().toISOString();
+  const progress = normalizePageProgressJson(workspace.page_progress);
+  await writeJsonFile(workspace.files.page_progress, {
+    ...progress,
+    final_deck_render: {
+      status: "idle",
+      message: null,
+      error: null,
+      output_dir: null,
+      deck_html_path: null,
+      rendered_at: null,
+      updated_at: updatedAt,
+    },
+    pages: progress.pages.map((page) => page.page_id === input.page_id ? {
+      ...page,
+      last_html_path: preview.html_path,
+      last_screenshot_path: preview.screenshot_path,
+      updated_at: updatedAt,
+    } : page),
+    updated_at: updatedAt,
+  } satisfies AppPageProgress);
+  await touchWorkspaceTask(workspace, updatedAt);
+  return {
+    workspace_dir: workspace.workspace_dir,
+    page_id: input.page_id,
+    restored: true,
+    html_path: preview.html_path,
+    screenshot_path: preview.screenshot_path,
+  };
+}
+
 export async function renderAppWorkspaceDeckHtml(
   input: RenderAppWorkspaceDeckHtmlInput,
 ): Promise<RenderAppWorkspaceDeckHtmlResult> {
@@ -4969,14 +5206,28 @@ export async function renderAppWorkspaceDeckHtml(
     outputDir,
     name: `${workspace.workspace_id}-review`,
   });
-  const slides = result.slides.map((slide) => ({
-    slide_id: slide.slideId,
-    layout_id: slide.layoutId,
-    title: slide.title,
-    html_path: slide.htmlPath,
-    screenshot_path: slide.screenshotPath,
-    speaker_note: slide.speakerNote,
-  }));
+  let deckHtml = await readFile(result.deckHtmlPath, "utf8");
+  const slides: RenderAppWorkspaceDeckHtmlResult["slides"] = [];
+  for (const [index, slide] of result.slides.entries()) {
+    const revision = await readManualPageRevision(workspace.workspace_dir, slide.slideId);
+    if (revision) {
+      const manualHtml = await readFile(revision.current_html_path, "utf8");
+      const shell = extractSlideShell(manualHtml).shell;
+      deckHtml = replaceSlideShellAtIndex(deckHtml, index, shell);
+      await copyFile(revision.current_html_path, slide.htmlPath);
+      await copyFile(revision.screenshot_path, slide.screenshotPath);
+    }
+    slides.push({
+      slide_id: slide.slideId,
+      layout_id: slide.layoutId,
+      title: slide.title,
+      html_path: slide.htmlPath,
+      screenshot_path: slide.screenshotPath,
+      speaker_note: slide.speakerNote,
+      manually_edited: Boolean(revision),
+    });
+  }
+  await writeFile(result.deckHtmlPath, deckHtml, "utf8");
   const currentProgress = normalizePageProgressJson(workspace.page_progress);
   const renderedByPageId = new Map(slides.map((slide) => [slide.slide_id, slide]));
   const nextProgress: AppPageProgress = {
@@ -5074,6 +5325,7 @@ export async function getRenderedAppWorkspaceDeckHtml(
         html_path: htmlPath,
         screenshot_path: screenshotPath,
         speaker_note: normalizeString(manifestSlide.speaker_note),
+        manually_edited: Boolean(await readManualPageRevision(workspace.workspace_dir, pageId)),
       };
     }),
   );
@@ -6506,6 +6758,9 @@ export async function commitAppDeckRefinement(
     }
     throw error;
   }
+  for (const pageId of deletedPageIds) {
+    await removePageOwnedManualArtifacts(workspace.workspace_dir, pageId);
+  }
   return {
     workspace_dir: workspace.workspace_dir,
     outline: nextOutline,
@@ -6593,6 +6848,7 @@ export async function initializeAppPageProgress(
   input: InitializeAppPageProgressInput,
 ): Promise<AppPageProgress> {
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  await removeAllManualPageRevisions(workspace.workspace_dir);
   const outline = normalizeOutlineJson(workspace.outline);
   if (outline.status !== "confirmed") {
     throw new Error("Confirmed Outline is required before initializing Page Progress");
@@ -6684,6 +6940,9 @@ export async function recordAppPageProgress(
     };
 
     await writeJsonFile(workspace.files.page_progress, nextProgress);
+    if (pageId && normalizeString(input.patch.status) === "accepted") {
+      await removeManualPageRevision(workspace.workspace_dir, pageId);
+    }
     await touchWorkspaceTask(workspace, updatedAt);
     return nextProgress;
   });
@@ -6767,6 +7026,12 @@ export type {
   DuplicateAppWorkspacePageInput,
   GetAppPagePlanInput,
   GetAppPageProgressInput,
+  GetAppPageEditContextInput,
+  GetAppPageEditContextResult,
+  SaveAppManualPageRevisionInput,
+  SaveAppManualPageRevisionResult,
+  RestoreAppPageSourceVersionInput,
+  RestoreAppPageSourceVersionResult,
   PrepareAppPageRefinementInput,
   PrepareAppPageRefinementResult,
   CommitAppDeckRefinementInput,

@@ -8,6 +8,8 @@ import type {
   GetExportArtifactDownloadUrlInput,
   GetWorkspacePageFileFingerprintsInput,
   GetWorkspacePageFileFingerprintsResult,
+  GetPageEditContextInput,
+  GetPageEditContextResult,
   GetWorkspaceOutlineInput,
   ListWorkspacesResult,
   ListTemplatesResult,
@@ -46,6 +48,9 @@ import type {
   RenderDeckHtmlResult,
   RenderWorkspacePagePreviewInput,
   RenderWorkspacePagePreviewResult,
+  SaveManualPageRevisionInput,
+  SaveManualPageRevisionResult,
+  RestorePageSourceVersionResult,
   SelectTemplateInput,
   SelectTemplateResult,
   StartPptxExportInput,
@@ -289,6 +294,9 @@ export interface PptBackend {
   renderWorkspacePagePreview(
     input: RenderWorkspacePagePreviewInput
   ): Promise<RenderWorkspacePagePreviewResult>;
+  getPageEditContext(input: GetPageEditContextInput): Promise<GetPageEditContextResult>;
+  saveManualPageRevision(input: SaveManualPageRevisionInput): Promise<SaveManualPageRevisionResult>;
+  restorePageSourceVersion(input: GetPageEditContextInput): Promise<RestorePageSourceVersionResult>;
   recordOutline(input: RecordOutlineInput): Promise<ProjectResult>;
   getRenderedDeckHtml(input: RenderDeckHtmlInput): Promise<RenderDeckHtmlResult>;
   renderDeckHtml(input: RenderDeckHtmlInput): Promise<RenderDeckHtmlResult>;

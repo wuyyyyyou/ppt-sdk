@@ -94,6 +94,12 @@ export async function runPageGeneration(
   }] : [];
   let noChangeRetry: NoChangeAuthoringRetry | null = null;
   let noChangeRetryCount = 0;
+  const manualRevision = input.refinementRequest?.trim()
+    ? await input.backend.getPageEditContext({
+      workspace_dir: input.workspace.workspace_dir,
+      page_id: page.page_id,
+    }).then((context) => context.manifest).catch(() => null)
+    : null;
 
   while (!input.isCancelled()) {
     progress = await recordProgress(input, page, {
@@ -123,6 +129,7 @@ export async function runPageGeneration(
       refinementRequest: input.refinementRequest,
       refinementReason,
       refinementVisualContext: input.pageRefinementVisualContexts?.[page.page_id],
+      manualRevision,
     });
     const tracker = createAgentRunTracker({
       flowInput: input,

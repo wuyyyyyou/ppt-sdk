@@ -297,6 +297,47 @@ describe("Anna PPT Backend", () => {
     ]);
   });
 
+  it("routes manual page editing through the dedicated ppt-engine tools", async () => {
+    setToolIds();
+    const calls: Array<{ method?: unknown; args?: unknown }> = [];
+    const backend = createAnnaPptBackend(createRuntimeWithInvoke(async (input) => {
+      calls.push(input as { method?: unknown; args?: unknown });
+      return { success: true, data: {} };
+    }));
+    const hostUpload: HostUploadRef = {
+      transport: "host_upload",
+      r2_key: "uploads/page-01.html",
+      url: "https://upload.example/page-01.html",
+      mime_type: "text/plain",
+      size_bytes: 256,
+      filename: "page-01.html",
+      mode: "negotiate+confirm",
+    };
+
+    await backend.getPageEditContext({ workspace_dir: "/tmp/workspaces/demo", page_id: "page-01" });
+    await backend.saveManualPageRevision({
+      workspace_dir: "/tmp/workspaces/demo",
+      page_id: "page-01",
+      base_revision: 2,
+      size_bytes: 256,
+      host_upload: hostUpload,
+    });
+    await backend.restorePageSourceVersion({ workspace_dir: "/tmp/workspaces/demo", page_id: "page-01" });
+
+    assert.deepEqual(calls.map((call) => call.method), [
+      "app_get_page_edit_context",
+      "app_save_manual_page_revision",
+      "app_restore_page_source_version",
+    ]);
+    assert.deepEqual(calls[1]?.args, {
+      workspace_dir: "/tmp/workspaces/demo",
+      page_id: "page-01",
+      base_revision: 2,
+      size_bytes: 256,
+      host_upload: hostUpload,
+    });
+  });
+
   it("separates Export Artifact Mirror publication from download URL minting", async () => {
     setToolIds();
     const calls: Array<{ method?: unknown; args?: unknown }> = [];

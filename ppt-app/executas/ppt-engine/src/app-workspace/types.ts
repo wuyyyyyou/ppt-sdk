@@ -1169,6 +1169,66 @@ export interface RenderAppWorkspacePagePreviewResult {
   rendered_at: string;
 }
 
+export interface AppManualPageRevisionManifest {
+  version: 1;
+  page_id: string;
+  revision: number;
+  manually_edited: true;
+  base_source_sha256: string;
+  base_html_sha256: string;
+  current_html_sha256: string;
+  base_html_path: string;
+  current_html_path: string;
+  agent_html_path: string;
+  screenshot_path: string;
+  updated_at: string;
+}
+
+export interface GetAppPageEditContextInput {
+  workspace_dir: string;
+  page_id: string;
+}
+
+export interface GetAppPageEditContextResult {
+  workspace_dir: string;
+  page_id: string;
+  title: string;
+  page_index: number;
+  revision: number;
+  manually_edited: boolean;
+  html_path: string;
+  screenshot_path: string;
+  manifest: AppManualPageRevisionManifest | null;
+}
+
+export interface SaveAppManualPageRevisionInput {
+  workspace_dir: string;
+  page_id: string;
+  base_revision: number;
+  staging_file_path: string;
+  expected_size_bytes: number;
+}
+
+export interface SaveAppManualPageRevisionResult {
+  workspace_dir: string;
+  page_id: string;
+  manifest: AppManualPageRevisionManifest;
+  final_deck_render_invalidated: true;
+}
+
+export interface RestoreAppPageSourceVersionInput {
+  workspace_dir: string;
+  page_id: string;
+}
+
+export interface RestoreAppPageSourceVersionResult {
+  workspace_dir: string;
+  page_id: string;
+  restored: true;
+  html_path: string;
+  screenshot_path: string;
+}
+
 export interface RecordAppWorkspaceStyleGuideInput {
   workspace_dir: string;
   staging_file_path: string;
@@ -1242,6 +1302,7 @@ export interface RenderAppWorkspaceDeckHtmlResult {
     screenshot_url?: string;
     preview_url?: string;
     speaker_note: string;
+    manually_edited?: boolean;
   }>;
   slide_count: number;
   title: string;

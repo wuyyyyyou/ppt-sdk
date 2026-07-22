@@ -1408,6 +1408,66 @@ export interface RenderWorkspacePagePreviewResult {
   rendered_at: string;
 }
 
+export interface ManualPageRevisionManifest {
+  version: 1;
+  page_id: string;
+  revision: number;
+  manually_edited: true;
+  base_source_sha256: string;
+  base_html_sha256: string;
+  current_html_sha256: string;
+  base_html_path: string;
+  current_html_path: string;
+  agent_html_path: string;
+  screenshot_path: string;
+  updated_at: string;
+}
+
+export interface GetPageEditContextInput {
+  workspace_dir: string;
+  page_id: string;
+}
+
+export interface GetPageEditContextResult {
+  workspace_dir: string;
+  page_id: string;
+  title: string;
+  page_index: number;
+  revision: number;
+  manually_edited: boolean;
+  html_path: string;
+  screenshot_path: string;
+  html_upload: HostUploadRef;
+  screenshot_upload: HostUploadRef;
+  manifest: ManualPageRevisionManifest | null;
+}
+
+export interface SaveManualPageRevisionInput {
+  workspace_dir: string;
+  page_id: string;
+  base_revision: number;
+  size_bytes: number;
+  host_upload: HostUploadRef;
+}
+
+export interface SaveManualPageRevisionResult {
+  workspace_dir: string;
+  page_id: string;
+  manifest: ManualPageRevisionManifest;
+  screenshot_upload: HostUploadRef;
+  final_deck_render_invalidated: true;
+}
+
+export interface RestorePageSourceVersionResult {
+  workspace_dir: string;
+  page_id: string;
+  restored: true;
+  html_path: string;
+  screenshot_path: string;
+  html_upload: HostUploadRef;
+  screenshot_upload: HostUploadRef;
+}
+
 export interface RecordOutlineInput {
   projectDir: string;
   outline: unknown;
@@ -1430,6 +1490,7 @@ export interface RenderDeckHtmlResult {
     screenshot_path?: string;
     screenshot_upload?: HostUploadRef;
     speaker_note: string;
+    manually_edited?: boolean;
   }>;
   slide_count: number;
   title: string;

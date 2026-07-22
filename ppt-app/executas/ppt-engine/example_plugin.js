@@ -34,6 +34,7 @@ import {
   getAppWorkspacePageFileFingerprints,
   getAppPagePlan,
   getAppPageProgress,
+  getAppPageEditContext,
   getAppPptxExportStatus,
   getRenderedAppWorkspaceDeckHtml,
   fingerprintWorkspacePageSource,
@@ -101,6 +102,8 @@ import {
   rasterizePptxToImages,
   renderAppWorkspaceDeckHtml,
   renderAppWorkspacePagePreview,
+  saveAppManualPageRevision,
+  restoreAppPageSourceVersion,
   selectAppWorkspaceTemplate,
   startAppPptxExport,
   invokeTaskStateMachine,
@@ -502,6 +505,11 @@ const STYLE_GUIDE_STAGING_DIR = path.join(
   os.tmpdir(),
   "presenton-template-engine-executa",
   "style-guide-staging",
+);
+const MANUAL_PAGE_STAGING_DIR = path.join(
+  os.tmpdir(),
+  "presenton-template-engine-executa",
+  "manual-page-staging",
 );
 
 function assertSafeUploadFilename(filename) {
@@ -2158,6 +2166,93 @@ async function toolAppRenderWorkspacePagePreview(args) {
   };
 }
 
+async function toolAppGetPageEditContext(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const pageId = typeof args.page_id === "string" ? args.page_id.trim() : "";
+  if (!pageId) throw new Error('"page_id" must be a non-empty string');
+  const result = await getAppPageEditContext({ workspace_dir: workspaceDir, page_id: pageId });
+  return {
+    ...result,
+    html_upload: await uploadLocalFileToHost({
+      filePath: result.html_path,
+      filename: `${pageId}.html`,
+      mimeType: "text/plain",
+      purpose: "user_artifact",
+      workspaceDir,
+      source: "ppt-engine.manual-page-edit-context",
+    }),
+    screenshot_upload: await uploadPreviewImage(result.screenshot_path, {
+      workspaceDir,
+      source: "ppt-engine.manual-page-edit-context-screenshot",
+    }),
+  };
+}
+
+async function toolAppSaveManualPageRevision(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const pageId = typeof args.page_id === "string" ? args.page_id.trim() : "";
+  if (!pageId) throw new Error('"page_id" must be a non-empty string');
+  const baseRevision = Number(args.base_revision);
+  if (!Number.isInteger(baseRevision) || baseRevision < 0) throw new Error('"base_revision" must be a non-negative integer');
+  const expectedSizeBytes = Number(args.size_bytes);
+  if (!Number.isInteger(expectedSizeBytes) || expectedSizeBytes <= 0 || expectedSizeBytes > 64 * 1024 * 1024) {
+    throw new Error('"size_bytes" must be between 1 and 67108864');
+  }
+  const hostUpload = readHostUploadRefArg(args, "host_upload");
+  if (hostUpload.mime_type !== "text/plain") throw new Error('"host_upload.mime_type" must be "text/plain"');
+  const stagingPath = path.join(MANUAL_PAGE_STAGING_DIR, `${pageId}-${randomUUID()}.html`);
+  try {
+    await downloadHostUploadToStaging({ hostUpload, stagingPath, expectedSizeBytes });
+    const result = await saveAppManualPageRevision({
+      workspace_dir: workspaceDir,
+      page_id: pageId,
+      base_revision: baseRevision,
+      staging_file_path: stagingPath,
+      expected_size_bytes: expectedSizeBytes,
+    });
+    return {
+      ...result,
+      screenshot_upload: await uploadPreviewImage(result.manifest.screenshot_path, {
+        workspaceDir,
+        source: "ppt-engine.manual-page-revision-screenshot",
+      }),
+    };
+  } finally {
+    await unlink(stagingPath).catch(() => undefined);
+  }
+}
+
+async function toolAppRestorePageSourceVersion(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const pageId = typeof args.page_id === "string" ? args.page_id.trim() : "";
+  if (!pageId) throw new Error('"page_id" must be a non-empty string');
+  const result = await restoreAppPageSourceVersion({ workspace_dir: workspaceDir, page_id: pageId });
+  return {
+    ...result,
+    html_upload: await uploadLocalFileToHost({
+      filePath: result.html_path,
+      filename: `${pageId}.html`,
+      mimeType: "text/plain",
+      purpose: "user_artifact",
+      workspaceDir,
+      source: "ppt-engine.restored-page-source-html",
+    }),
+    screenshot_upload: await uploadPreviewImage(result.screenshot_path, {
+      workspaceDir,
+      source: "ppt-engine.restored-page-source-screenshot",
+    }),
+  };
+}
+
 async function toolAppRenderDeckHtml(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -2739,6 +2834,9 @@ const TOOL_DISPATCH = {
   app_get_research_status: toolAppGetResearchStatus,
   app_record_page_progress: toolAppRecordPageProgress,
   app_render_workspace_page_preview: toolAppRenderWorkspacePagePreview,
+  app_get_page_edit_context: toolAppGetPageEditContext,
+  app_save_manual_page_revision: toolAppSaveManualPageRevision,
+  app_restore_page_source_version: toolAppRestorePageSourceVersion,
   app_get_rendered_deck_html: toolAppGetRenderedDeckHtml,
   app_render_deck_html: toolAppRenderDeckHtml,
   app_start_pptx_export: toolAppStartPptxExport,

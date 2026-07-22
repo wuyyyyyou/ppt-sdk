@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { PanelTop } from "lucide-react";
 import { BriefPage } from "../features/deck-workspace/components/BriefPage";
 import { DeckPage } from "../features/deck-workspace/components/DeckPage";
@@ -16,10 +17,21 @@ import {
 import { WorkspaceDialog } from "../features/deck-workspace/components/WorkspaceDialog";
 import { useDeckWorkspace } from "../features/deck-workspace/hooks/useDeckWorkspace";
 import { useI18n } from "../i18n/useI18n";
+import { ManualPageEditorShell } from "../features/manual-page-editor/ManualPageEditorShell";
 
 export function App() {
   const { locale, setLocale, t } = useI18n();
   const { state, actions } = useDeckWorkspace(t, locale);
+  const [manualEditorOpen, setManualEditorOpen] = useState(false);
+  const manualEditorPages = useMemo(() => {
+    const rendered = state.reviewRender.result?.slides ?? [];
+    const progressPages = state.pageProgress?.pages ?? [];
+    return progressPages.map((item, index) => ({
+      pageId: item.page_id,
+      title: state.deck[index]?.title ?? state.outline[index]?.title ?? item.page_id,
+      screenshotUrl: rendered[index]?.screenshot_upload?.url,
+    }));
+  }, [state.deck, state.outline, state.pageProgress, state.reviewRender.result]);
   const refineSlideIndex = state.deck.length > 0
     ? Math.min(Math.max(state.currentSlide, 0), state.deck.length - 1)
     : 0;
@@ -28,6 +40,20 @@ export function App() {
       ? { title: state.outline[refineSlideIndex].title, subtitle: "" }
       : null
   );
+
+  if (manualEditorOpen && state.currentWorkspace?.workspace_dir && manualEditorPages.length > 0) {
+    return (
+      <ManualPageEditorShell
+        workspaceDir={state.currentWorkspace.workspace_dir}
+        pages={manualEditorPages}
+        initialPageIndex={state.currentSlide}
+        onExit={async () => {
+          setManualEditorOpen(false);
+          await actions.renderDeckHtml();
+        }}
+      />
+    );
+  }
 
   return (
     <main className="anna-stage">
@@ -172,6 +198,7 @@ export function App() {
               onRefineSlide={actions.openRefineSlide}
               onRefineDeck={actions.openRefineDeck}
               onExport={() => actions.navigate("export")}
+              onEdit={() => setManualEditorOpen(true)}
             />
           ) : null}
 
@@ -205,6 +232,7 @@ export function App() {
               reviewRender={state.reviewRender}
               renderDeckHtml={actions.renderDeckHtml}
               onBack={actions.goBack}
+              onEdit={() => setManualEditorOpen(true)}
             />
           ) : null}
 
