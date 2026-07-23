@@ -448,6 +448,7 @@ export interface DeckWorkspaceActions {
   exportFile: (type: "PPTX" | "PDF") => Promise<void>;
   downloadExportArtifact: () => Promise<void>;
   prepareWorkspaceDiagnosticBundle: () => Promise<void>;
+  resetWorkspaceDiagnosticBundle: () => void;
   returnToOutlineFromGeneration: () => void;
   returnToBriefFromUploadedSourceAnalysis: () => void;
   regenerateDeck: () => Promise<void>;
@@ -4232,6 +4233,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     exportFile,
     downloadExportArtifact: downloadCurrentExportArtifact,
     prepareWorkspaceDiagnosticBundle: prepareCurrentWorkspaceDiagnosticBundle,
+    resetWorkspaceDiagnosticBundle: invalidateWorkspaceDiagnosticBundle,
     returnToOutlineFromGeneration,
     returnToBriefFromUploadedSourceAnalysis,
     regenerateDeck,

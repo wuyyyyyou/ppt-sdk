@@ -354,6 +354,7 @@ export interface Messages {
     diagnosticBundleNoWorkspace: string;
     diagnosticBundleGenerate: string;
     diagnosticBundlePreparing: string;
+    diagnosticBundleRefresh: string;
     diagnosticBundleRetry: string;
     diagnosticBundleReady: string;
     diagnosticBundleExpired: string;
@@ -825,6 +826,7 @@ export const messages: Record<Locale, Messages> = {
       diagnosticBundleNoWorkspace: "Select a task first",
       diagnosticBundleGenerate: "Generate troubleshooting download link",
       diagnosticBundlePreparing: "Packaging and uploading...",
+      diagnosticBundleRefresh: "Regenerate troubleshooting bundle",
       diagnosticBundleRetry: "Retry generating download link",
       diagnosticBundleReady: "Troubleshooting bundle download link is ready.",
       diagnosticBundleExpired: "The download link has expired. Generate a fresh troubleshooting bundle.",
@@ -1301,6 +1303,7 @@ export const messages: Record<Locale, Messages> = {
       diagnosticBundleNoWorkspace: "请先选择一个任务",
       diagnosticBundleGenerate: "生成问题排查包下载链接",
       diagnosticBundlePreparing: "正在打包并上传，请稍候……",
+      diagnosticBundleRefresh: "重新生成问题排查包",
       diagnosticBundleRetry: "重试生成下载链接",
       diagnosticBundleReady: "问题排查包下载链接已准备。",
       diagnosticBundleExpired: "下载链接已过期，请重新生成问题排查包。",

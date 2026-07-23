@@ -12,6 +12,7 @@ import {
   cleanupGenerationRun,
   commitGenerationRun,
   findGenerationRunForWorkspace,
+  listGenerationRunsForWorkspace,
   prepareGenerationRun,
   recoverGenerationRunForWorkspace,
   type AppGenerationRunKind,
@@ -6177,12 +6178,12 @@ export async function prepareAppWorkspaceDiagnosticBundle(
       workspace.workspace_id,
       snapshotsByEntryName,
     );
-    const generationRun = await findGenerationRunForWorkspace(WORKSPACE_ROOT, workspace.workspace_id);
-    if (generationRun && generationRun.state !== "abandoned") {
+    const generationRuns = await listGenerationRunsForWorkspace(WORKSPACE_ROOT, workspace.workspace_id);
+    for (const generationRun of generationRuns) {
       await appendDiagnosticBundleTree(
         archive,
         path.dirname(path.dirname(generationRun.shadow_workspace_dir)),
-        "generation-run",
+        `generation-runs/${generationRun.run_id}`,
         snapshotsByEntryName,
       );
     }

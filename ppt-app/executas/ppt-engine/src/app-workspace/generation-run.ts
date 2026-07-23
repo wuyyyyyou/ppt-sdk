@@ -196,18 +196,31 @@ export async function cleanupGenerationRun(workspaceRoot: string, runId: string)
 }
 
 export async function findGenerationRunForWorkspace(workspaceRoot: string, workspaceId: string): Promise<AppGenerationRunTransaction | null> {
+  const runs = await listGenerationRunsForWorkspace(workspaceRoot, workspaceId);
+  return runs.find((transaction) =>
+    transaction.state === "preparing" ||
+    transaction.state === "active" ||
+    transaction.state === "committing" ||
+    transaction.state === "abandoned"
+  ) ?? null;
+}
+
+export async function listGenerationRunsForWorkspace(
+  workspaceRoot: string,
+  workspaceId: string,
+): Promise<AppGenerationRunTransaction[]> {
   const root = path.join(workspaceRoot, ".generation-runs");
   let entries;
-  try { entries = await readdir(root, { withFileTypes: true }); } catch { return null; }
+  try { entries = await readdir(root, { withFileTypes: true }); } catch { return []; }
   const runs: AppGenerationRunTransaction[] = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     try {
       const transaction = await readGenerationRun(workspaceRoot, entry.name);
-      if (transaction.workspace_id === workspaceId && (transaction.state === "preparing" || transaction.state === "active" || transaction.state === "committing" || transaction.state === "abandoned")) runs.push(transaction);
+      if (transaction.workspace_id === workspaceId) runs.push(transaction);
     } catch { /* ignore invalid cleanup residue */ }
   }
-  return runs.sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0] ?? null;
+  return runs.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 }
 
 export async function recoverGenerationRunForWorkspace(workspaceRoot: string, workspaceId: string): Promise<AppGenerationRunTransaction | null> {

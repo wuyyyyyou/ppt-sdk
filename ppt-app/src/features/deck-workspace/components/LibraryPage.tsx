@@ -1,4 +1,4 @@
-import { Archive, Download, Edit3, Plus } from "lucide-react";
+import { Archive, Download, Edit3, Plus, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import type {
   ListWorkspacesResult,
@@ -40,6 +40,7 @@ interface LibraryPageProps {
   onSaveTitle: (title: string) => Promise<void>;
   workspaceDiagnosticBundle: WorkspaceDiagnosticBundleState;
   onPrepareWorkspaceDiagnosticBundle: () => Promise<void>;
+  onResetWorkspaceDiagnosticBundle: () => void;
 }
 
 function readSettings(workspace: WorkspaceResult | null): WorkspaceSettings {
@@ -110,7 +111,8 @@ export function LibraryPage({
   onSaveSettings,
   onSaveTitle,
   workspaceDiagnosticBundle,
-  onPrepareWorkspaceDiagnosticBundle
+  onPrepareWorkspaceDiagnosticBundle,
+  onResetWorkspaceDiagnosticBundle
 }: LibraryPageProps) {
   const [editing, setEditing] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -294,7 +296,19 @@ export function LibraryPage({
             <strong>{t.library.diagnosticBundleTitle}</strong>
             <p>{t.library.diagnosticBundleDescription}</p>
           </div>
-          <Archive size={20} />
+          {workspaceDiagnosticBundle.href ? (
+            <button
+              className="diagnostic-bundle-refresh-btn"
+              type="button"
+              aria-label={t.library.diagnosticBundleRefresh}
+              title={t.library.diagnosticBundleRefresh}
+              onClick={onResetWorkspaceDiagnosticBundle}
+            >
+              <RefreshCw size={20} />
+            </button>
+          ) : (
+            <Archive size={20} />
+          )}
         </div>
         <div className="diagnostic-bundle-warning">
           {t.library.diagnosticBundleSensitiveHint}

@@ -225,6 +225,7 @@ export function App() {
               onSaveTitle={actions.saveWorkspaceTitle}
               workspaceDiagnosticBundle={state.workspaceDiagnosticBundle}
               onPrepareWorkspaceDiagnosticBundle={actions.prepareWorkspaceDiagnosticBundle}
+              onResetWorkspaceDiagnosticBundle={actions.resetWorkspaceDiagnosticBundle}
             />
           ) : null}
 

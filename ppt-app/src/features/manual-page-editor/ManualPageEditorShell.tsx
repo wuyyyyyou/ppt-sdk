@@ -42,6 +42,12 @@ import type {
 } from "../../api/types";
 import { createAppHostUploadClient, type AppHostUploadClient } from "../../runtime/appHostUploadClient";
 import { connectAnnaRuntime } from "../../runtime/annaRuntime";
+import {
+  MOVEABLE_EDITOR_CLASS,
+  canvasDistance,
+  exceedsDragThreshold,
+  isMoveableEditorTarget,
+} from "./manualPageEditorInteractions";
 import "./manual-page-editor.css";
 
 const FONT_FAMILIES = [
@@ -169,10 +175,23 @@ export function ManualPageEditorShell(props: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const textEditBeforeRef = useRef<string | null>(null);
-  const moveBeforeRef = useRef<string | null>(null);
   const selectionRangeRef = useRef<Range | null>(null);
   const iframeCleanupRef = useRef<(() => void) | null>(null);
   const deckRenderRequiredRef = useRef(false);
+  const dragGestureRef = useRef<{
+    before: string;
+    startLeft: number;
+    startTop: number;
+    moved: boolean;
+  } | null>(null);
+  const resizeGestureRef = useRef<{
+    before: string;
+    startLeft: number;
+    startTop: number;
+    startWidth: number;
+    startHeight: number;
+    moved: boolean;
+  } | null>(null);
 
   const recordDeckRenderRequirement = useCallback((required: boolean) => {
     if (!required) return;
@@ -497,10 +516,12 @@ export function ManualPageEditorShell(props: Props) {
     if (!shell) { setError("页面缺少可编辑 slide shell。"); return; }
     const pointerDown = (event: PointerEvent) => {
       if (editableTarget(event.target)) return;
+      if (isMoveableEditorTarget(event.target)) return;
       const target = selectionTarget(event.target, shell);
       setSelected(target);
     };
     const doubleClick = (event: MouseEvent) => {
+      if (isMoveableEditorTarget(event.target)) return;
       const target = selectionTarget(event.target, shell);
       if (!target || !target.textContent?.trim() || /^(IMG|SVG|CANVAS|TABLE)$/.test(target.tagName)) return;
       textEditBeforeRef.current = serializeDocument(doc);
@@ -729,23 +750,75 @@ export function ManualPageEditorShell(props: Props) {
           ) : null}
           {iframeDocument && selected ? createPortal(
             <Moveable
+              className={MOVEABLE_EDITOR_CLASS}
               target={selected}
               draggable
               resizable
               keepRatio={selected.tagName === "IMG"}
               edge
               throttleDrag={1}
-              onDragStart={() => { moveBeforeRef.current = serializeDocument(iframeDocument); promoteToAbsolute(selected); }}
-              onDrag={(event) => { event.target.style.left = `${event.left}px`; event.target.style.top = `${event.top}px`; }}
-              onDragEnd={() => { if (moveBeforeRef.current) markMutation(moveBeforeRef.current); moveBeforeRef.current = null; }}
-              onResizeStart={() => { moveBeforeRef.current = serializeDocument(iframeDocument); promoteToAbsolute(selected); }}
-              onResize={(event) => {
-                event.target.style.width = `${Math.max(16, event.width)}px`;
-                event.target.style.height = `${Math.max(16, event.height)}px`;
-                event.target.style.left = `${event.drag.left}px`;
-                event.target.style.top = `${event.drag.top}px`;
+              onDragStart={() => {
+                dragGestureRef.current = {
+                  before: serializeDocument(iframeDocument),
+                  startLeft: 0,
+                  startTop: 0,
+                  moved: false,
+                };
               }}
-              onResizeEnd={() => { if (moveBeforeRef.current) markMutation(moveBeforeRef.current); moveBeforeRef.current = null; }}
+              onDrag={(event) => {
+                const gesture = dragGestureRef.current;
+                if (!gesture || !exceedsDragThreshold(event.dist, scale)) return;
+                if (!gesture.moved) {
+                  promoteToAbsolute(event.target as HTMLElement);
+                  gesture.startLeft = Number.parseFloat(event.target.style.left || "0") || 0;
+                  gesture.startTop = Number.parseFloat(event.target.style.top || "0") || 0;
+                  gesture.moved = true;
+                }
+                const [dx, dy] = canvasDistance(event.dist, scale);
+                event.target.style.left = `${gesture.startLeft + dx}px`;
+                event.target.style.top = `${gesture.startTop + dy}px`;
+              }}
+              onDragEnd={() => {
+                const gesture = dragGestureRef.current;
+                if (gesture?.moved) markMutation(gesture.before);
+                dragGestureRef.current = null;
+              }}
+              onResizeStart={() => {
+                resizeGestureRef.current = {
+                  before: serializeDocument(iframeDocument),
+                  startLeft: 0,
+                  startTop: 0,
+                  startWidth: 0,
+                  startHeight: 0,
+                  moved: false,
+                };
+              }}
+              onResize={(event) => {
+                const gesture = resizeGestureRef.current;
+                if (!gesture) return;
+                const resizeDistance: [number, number] = [event.dist[0], event.dist[1]];
+                const dragDistance: [number, number] = [event.drag.dist[0], event.drag.dist[1]];
+                if (!exceedsDragThreshold(resizeDistance, scale) && !exceedsDragThreshold(dragDistance, scale)) return;
+                if (!gesture.moved) {
+                  promoteToAbsolute(event.target as HTMLElement);
+                  gesture.startLeft = Number.parseFloat(event.target.style.left || "0") || 0;
+                  gesture.startTop = Number.parseFloat(event.target.style.top || "0") || 0;
+                  gesture.startWidth = event.target.getBoundingClientRect().width;
+                  gesture.startHeight = event.target.getBoundingClientRect().height;
+                  gesture.moved = true;
+                }
+                const [dw, dh] = canvasDistance(resizeDistance, scale);
+                const [dx, dy] = canvasDistance(dragDistance, scale);
+                event.target.style.width = `${Math.max(16, gesture.startWidth + dw)}px`;
+                event.target.style.height = `${Math.max(16, gesture.startHeight + dh)}px`;
+                event.target.style.left = `${gesture.startLeft + dx}px`;
+                event.target.style.top = `${gesture.startTop + dy}px`;
+              }}
+              onResizeEnd={() => {
+                const gesture = resizeGestureRef.current;
+                if (gesture?.moved) markMutation(gesture.before);
+                resizeGestureRef.current = null;
+              }}
             />,
             iframeDocument.body,
           ) : null}

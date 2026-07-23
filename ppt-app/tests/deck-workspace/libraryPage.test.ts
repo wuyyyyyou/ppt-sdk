@@ -46,6 +46,7 @@ describe("LibraryPage", () => {
       onSaveTitle: async () => undefined,
       workspaceDiagnosticBundle: { status: "idle", message: "" },
       onPrepareWorkspaceDiagnosticBundle: async () => undefined,
+      onResetWorkspaceDiagnosticBundle: () => undefined,
     }));
 
     assert.doesNotMatch(html, /先审阅大纲/);
@@ -69,6 +70,7 @@ describe("LibraryPage", () => {
       onSaveTitle: async () => undefined,
       workspaceDiagnosticBundle: { status: "idle", message: "" },
       onPrepareWorkspaceDiagnosticBundle: async () => undefined,
+      onResetWorkspaceDiagnosticBundle: () => undefined,
     }));
 
     assert.match(html, /问题排查包/);
@@ -98,10 +100,41 @@ describe("LibraryPage", () => {
         expiresAt: new Date(Date.now() + 60_000).toISOString(),
       },
       onPrepareWorkspaceDiagnosticBundle: async () => undefined,
+      onResetWorkspaceDiagnosticBundle: () => undefined,
     }));
 
     assert.match(html, /https:\/\/storage\.example\/diagnostic\.zip/);
     assert.match(html, /复制问题排查包链接/);
     assert.match(html, /不要将链接分享给无关人员/);
+    assert.match(html, /aria-label="重新生成问题排查包"/);
+  });
+
+  it("localizes the diagnostic bundle refresh action in English", () => {
+    const html = renderToStaticMarkup(createElement(LibraryPage, {
+      t: messages.en,
+      locale: "en",
+      workspaceScan: null,
+      currentWorkspace: workspace,
+      loading: false,
+      savingSettings: false,
+      pageReviewSettings: DEFAULT_PAGE_REVIEW_SETTINGS,
+      onBack: () => undefined,
+      onOpen: async () => undefined,
+      onCreateWorkspace: async () => undefined,
+      onSaveSettings: async () => undefined,
+      onSaveTitle: async () => undefined,
+      workspaceDiagnosticBundle: {
+        status: "ready",
+        message: "Troubleshooting bundle download link is ready.",
+        href: "https://storage.example/diagnostic.zip",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+      onPrepareWorkspaceDiagnosticBundle: async () => undefined,
+      onResetWorkspaceDiagnosticBundle: () => undefined,
+    }));
+
+    assert.match(html, /aria-label="Regenerate troubleshooting bundle"/);
+    assert.match(html, /title="Regenerate troubleshooting bundle"/);
+    assert.doesNotMatch(html, /重新生成问题排查包/);
   });
 });

@@ -55,22 +55,46 @@ test("abandonment leaves the official Workspace unchanged", async () => {
   await api.cleanupAppGenerationRun({ run_id: transaction.run_id });
 });
 
-test("Workspace Diagnostic Bundle includes the current generation transaction and shadow", async () => {
+test("Workspace Diagnostic Bundle includes every on-disk generation run, including abandoned runs", async () => {
   const created = await api.createAppWorkspace({ title: "Shadow diagnostics" });
-  const transaction = await api.beginAppGenerationRun({
+  const abandonedTransaction = await api.beginAppGenerationRun({
     workspace_dir: created.workspace_dir,
     run_kind: "deck-generation",
   });
-  await api.prepareAppGenerationRun({ run_id: transaction.run_id });
-  await writeFile(path.join(transaction.shadow_workspace_dir, "shadow-only.txt"), "shadow diagnostic", "utf8");
+  await api.prepareAppGenerationRun({ run_id: abandonedTransaction.run_id });
+  await writeFile(path.join(abandonedTransaction.shadow_workspace_dir, "abandoned-only.txt"), "abandoned diagnostic", "utf8");
+  await api.abandonAppGenerationRun({ run_id: abandonedTransaction.run_id });
+
+  const activeTransaction = await api.beginAppGenerationRun({
+    workspace_dir: created.workspace_dir,
+    run_kind: "page-refinement",
+  });
+  await api.prepareAppGenerationRun({ run_id: activeTransaction.run_id });
+  await writeFile(path.join(activeTransaction.shadow_workspace_dir, "active-only.txt"), "active diagnostic", "utf8");
+
+  const otherWorkspace = await api.createAppWorkspace({ title: "Other workspace" });
+  const otherTransaction = await api.beginAppGenerationRun({
+    workspace_dir: otherWorkspace.workspace_dir,
+    run_kind: "deck-generation",
+  });
+  await api.prepareAppGenerationRun({ run_id: otherTransaction.run_id });
+  await writeFile(path.join(otherTransaction.shadow_workspace_dir, "other-only.txt"), "other diagnostic", "utf8");
+
   const bundle = await api.prepareAppWorkspaceDiagnosticBundle({ workspace_dir: created.workspace_dir });
   try {
     const bytes = await readFile(bundle.archive_path);
-    assert.equal(bytes.includes(Buffer.from("generation-run/transaction.json")), true);
-    assert.equal(bytes.includes(Buffer.from(`generation-run/shadow/${created.workspace_id}/shadow-only.txt`)), true);
+    assert.equal(bytes.includes(Buffer.from(`generation-runs/${abandonedTransaction.run_id}/transaction.json`)), true);
+    assert.equal(bytes.includes(Buffer.from(`generation-runs/${abandonedTransaction.run_id}/shadow/${created.workspace_id}/abandoned-only.txt`)), true);
+    assert.equal(bytes.includes(Buffer.from(`generation-runs/${activeTransaction.run_id}/transaction.json`)), true);
+    assert.equal(bytes.includes(Buffer.from(`generation-runs/${activeTransaction.run_id}/shadow/${created.workspace_id}/active-only.txt`)), true);
+    assert.equal(bytes.includes(Buffer.from(`generation-runs/${otherTransaction.run_id}/transaction.json`)), false);
+    assert.equal(bytes.includes(Buffer.from(`generation-runs/${otherTransaction.run_id}/shadow/${otherWorkspace.workspace_id}/other-only.txt`)), false);
   } finally {
     await unlink(bundle.archive_path).catch(() => undefined);
-    await api.abandonAppGenerationRun({ run_id: transaction.run_id });
-    await api.cleanupAppGenerationRun({ run_id: transaction.run_id });
+    await api.cleanupAppGenerationRun({ run_id: abandonedTransaction.run_id });
+    await api.abandonAppGenerationRun({ run_id: activeTransaction.run_id });
+    await api.cleanupAppGenerationRun({ run_id: activeTransaction.run_id });
+    await api.abandonAppGenerationRun({ run_id: otherTransaction.run_id });
+    await api.cleanupAppGenerationRun({ run_id: otherTransaction.run_id });
   }
 });
