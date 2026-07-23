@@ -193,6 +193,9 @@
         {
           "name": "operations",
           "type": "array",
+          "items": {
+            "type": "object"
+          },
           "description": "Complete ordered keep/update/add/delete operations.",
           "required": true
         },
@@ -728,6 +731,9 @@
         {
           "name": "payload_keys",
           "type": "array",
+          "items": {
+            "type": "string"
+          },
           "description": "Optional entry keys that may be moved to sidecar payload files when they exceed the inline payload threshold.",
           "required": false
         },
@@ -878,6 +884,9 @@
         {
           "name": "pages",
           "type": "array",
+          "items": {
+            "type": "object"
+          },
           "description": "Ordered list of remaining pages. Each entry must include page_id and may include title.",
           "required": true
         }
@@ -1099,6 +1108,9 @@
         {
           "name": "new_page_ids",
           "type": "array",
+          "items": {
+            "type": "string"
+          },
           "description": "Page ids that were newly added and should be initialized from their selected blueprint.",
           "required": false
         }
@@ -1249,12 +1261,18 @@
         {
           "name": "visual_assets",
           "type": "array",
+          "items": {
+            "type": "object"
+          },
           "description": "Visual Research Curation Draft assets selected from local raw image material.",
           "required": true
         },
         {
           "name": "raw_image_index_paths",
           "type": "array",
+          "items": {
+            "type": "string"
+          },
           "description": "Optional raw image index paths for audit metadata lookup.",
           "required": false
         }
@@ -1585,35 +1603,35 @@
       "name": "app_begin_generation_run",
       "description": "Create a preparing shadow-Workspace transaction and return its stable run id.",
       "parameters": [
-        { "name": "workspace_dir", "type": "string", "required": true },
-        { "name": "run_kind", "type": "string", "required": true },
-        { "name": "origin_page_id", "type": "string", "required": false }
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to the existing PPT workspace.", "required": true },
+        { "name": "run_kind", "type": "string", "description": "Generation run kind: deck-generation, page-refinement, or deck-refinement.", "required": true },
+        { "name": "origin_page_id", "type": "string", "description": "Optional page id that originated the generation run.", "required": false }
       ]
     },
     {
       "name": "app_prepare_generation_run",
       "description": "Create and activate the complete shadow Workspace for a preparing generation run.",
-      "parameters": [{ "name": "run_id", "type": "string", "required": true }]
+      "parameters": [{ "name": "run_id", "type": "string", "description": "Stable id of the preparing generation run.", "required": true }]
     },
     {
       "name": "app_abandon_generation_run",
       "description": "Atomically abandon a preparing or active generation run.",
-      "parameters": [{ "name": "run_id", "type": "string", "required": true }]
+      "parameters": [{ "name": "run_id", "type": "string", "description": "Stable id of the generation run to abandon.", "required": true }]
     },
     {
       "name": "app_commit_generation_run",
       "description": "Atomically publish an active shadow Workspace as the official Workspace.",
-      "parameters": [{ "name": "run_id", "type": "string", "required": true }]
+      "parameters": [{ "name": "run_id", "type": "string", "description": "Stable id of the active generation run to commit.", "required": true }]
     },
     {
       "name": "app_cleanup_generation_run",
       "description": "Best-effort cleanup for a committed or abandoned generation run.",
-      "parameters": [{ "name": "run_id", "type": "string", "required": true }]
+      "parameters": [{ "name": "run_id", "type": "string", "description": "Stable id of the committed or abandoned generation run to clean up.", "required": true }]
     },
     {
       "name": "app_get_workspace_generation_run",
       "description": "Return the current preparing, active, or committing generation transaction for a Workspace.",
-      "parameters": [{ "name": "workspace_dir", "type": "string", "required": true }]
+      "parameters": [{ "name": "workspace_dir", "type": "string", "description": "Absolute path to the existing PPT workspace.", "required": true }]
     },
     {
       "name": "app_prepare_workspace_diagnostic_bundle",
@@ -2116,6 +2134,9 @@
         {
           "name": "pages",
           "type": "array",
+          "items": {
+            "type": "object"
+          },
           "required": true,
           "description": "Pages to revise. Each item accepts page_id, summary, and review_notes."
         }
