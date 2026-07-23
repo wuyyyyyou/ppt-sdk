@@ -1214,7 +1214,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   function applyCreatedWorkspace(
     result: Awaited<ReturnType<PptBackend["createWorkspace"]>>,
+    options: { preserveWorkflowState?: boolean } = {},
   ): WorkspaceResult {
+    const preserveWorkflowState = options.preserveWorkflowState === true;
     const workspace = createInitialWorkspaceSnapshot(result);
     setCurrentWorkspace(workspace);
     setUploadedSources([]);
@@ -1231,11 +1233,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       error: "",
       renderKey: createWorkspaceReviewRenderKey(workspace),
     });
-    setPrompt("");
+    if (!preserveWorkflowState) setPrompt("");
     setContextRows([]);
-    setPresentationRequirements(workspace.requirements);
-    setRequirementsStatus("idle");
-    setRequirementsError("");
+    if (!preserveWorkflowState) {
+      setPresentationRequirements(workspace.requirements);
+      setRequirementsStatus("idle");
+      setRequirementsError("");
+    }
     setRequirementsSaving(false);
     setRequirementsDirty(false);
     setRequirementsHasSavedDraft(false);
@@ -1253,7 +1257,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setGenerationHistory([]);
     setActiveGenerationRun(null);
     setSelectedTemplateGroupId(DEFAULT_TEMPLATE_GROUP_ID);
-    setStage("brief");
+    if (!preserveWorkflowState) setStage("brief");
     resetGenerationUiState();
 
     return workspace;
@@ -1793,7 +1797,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setLoading("requirements");
 
     try {
-      const workspace = await ensureCurrentWorkspace();
+      const workspace = await ensureCurrentWorkspace({ preserveWorkflowState: true });
       if (!workspace || requirementsOperationRef.current !== operation) return;
       setPrompt(brief);
       const selectedPreset = findVisualStylePreset(presetIdOverride === undefined ? selectedVisualStylePresetId : presetIdOverride);
@@ -2686,14 +2690,16 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return published;
   }
 
-  async function ensureCurrentWorkspace() {
+  async function ensureCurrentWorkspace(
+    options: { preserveWorkflowState?: boolean } = {},
+  ) {
     if (!backend) return null;
     if (currentWorkspace) return currentWorkspace;
 
     const created = await backend.createWorkspace({
       title: getDefaultWorkspaceTitle()
     });
-    const workspace = applyCreatedWorkspace(created);
+    const workspace = applyCreatedWorkspace(created, options);
     setWorkspaceScan(await backend.listWorkspaces());
     return workspace;
   }

@@ -9,7 +9,10 @@ export default defineConfig({
     emptyOutDir: true,
     assetsInlineLimit: (filePath) => {
       const normalizedPath = filePath.replaceAll("\\", "/");
-      return normalizedPath.includes("/src/features/templates/presets/") ? false : undefined;
+      return normalizedPath.includes("/src/features/templates/presets/") ||
+        normalizedPath.endsWith("/src/features/deck-workspace/assets/default-project-cover.svg")
+        ? false
+        : undefined;
     },
   },
   server: {

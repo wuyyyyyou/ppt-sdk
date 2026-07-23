@@ -38,6 +38,7 @@ describe("MyWorkPage", () => {
     assert.match(html, /新建演示文稿/);
     assert.match(html, /https:\/\/example\.test\/cover\.png/);
     assert.match(html, /default-project-cover\.svg/);
+    assert.doesNotMatch(html, /src="\/default-project-cover\.svg"/);
   });
 
   it("renders skeletons while waiting for backend summaries", () => {

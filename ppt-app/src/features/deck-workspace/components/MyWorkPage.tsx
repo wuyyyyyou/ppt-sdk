@@ -17,7 +17,10 @@ interface MyWorkPageProps {
   onDelete: (workspaceDir: string) => Promise<void>;
 }
 
-const DEFAULT_COVER = "/default-project-cover.svg";
+const DEFAULT_COVER = new URL(
+  "../assets/default-project-cover.svg",
+  import.meta.url,
+).href;
 
 function formatUpdatedAt(value: string, locale: Locale) {
   const date = new Date(value);
