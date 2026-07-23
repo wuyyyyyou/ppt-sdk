@@ -12,7 +12,7 @@
     {
       "tool_id": "bundled:anna-search",
       "version": "latest",
-      "min_version": "1.0.6"
+      "min_version": "1.0.7"
     }
   ],
   "optional_executas": [],
