@@ -2,6 +2,7 @@ import type { OutlineDetail, Slide } from "../../data/mockDeck";
 import type {
   ListWorkspacesResult,
   PageProgress,
+  PptEngineRuntimeInfo,
   GetStyleProfileResult,
   GetStyleProfilePreviewResult,
   StyleProfileIndexEntry,
@@ -150,6 +151,8 @@ export interface DeckWorkspaceState {
   workspaceLoading: boolean;
   workspaceError: string;
   workspaceSettingsSaving: boolean;
+  runtimeInfo: PptEngineRuntimeInfo | null;
+  runtimeInfoError: string;
   templateGroups: TemplateSummary[];
   selectedVisualStylePresetId: string | null;
   selectedTemplateGroupId: string | null;

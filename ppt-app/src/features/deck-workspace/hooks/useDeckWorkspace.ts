@@ -18,6 +18,7 @@ import type {
   PageProgress,
   PresentationRequirements,
   PresentationRequirementsSelections,
+  PptEngineRuntimeInfo,
   RestorePageSourceVersionResult,
   SaveManualPageRevisionResult,
   GetStyleProfilePreviewResult,
@@ -33,8 +34,8 @@ import type {
   WorkspacePageItem,
   WorkspacePages,
   WorkspaceStyleProfileSelection,
-  WorkspaceSettings
-  , GenerationRunTransaction
+  WorkspaceSettings,
+  GenerationRunTransaction
 } from "../../../api/types";
 import {
   createLocalProjectDeck,
@@ -574,6 +575,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [workspaceLoading, setWorkspaceLoading] = useState(true);
   const [workspaceError, setWorkspaceError] = useState("");
   const [workspaceSettingsSaving, setWorkspaceSettingsSaving] = useState(false);
+  const [runtimeInfo, setRuntimeInfo] = useState<PptEngineRuntimeInfo | null>(null);
+  const [runtimeInfoError, setRuntimeInfoError] = useState("");
   const [templateGroups, setTemplateGroups] = useState<TemplateSummary[]>([]);
   const [selectedVisualStylePresetId, setSelectedVisualStylePresetId] = useState<string | null>(null);
   const [selectedTemplateGroupId, setSelectedTemplateGroupId] = useState<string | null>(DEFAULT_TEMPLATE_GROUP_ID);
@@ -1289,6 +1292,17 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         setHostUploadClient(nextHostUploadClient);
         setAiClient(nextAiClient);
         setAgentClient(nextAgentClient);
+        void nextBackend.getRuntimeInfo().then((result) => {
+          if (!cancelled) {
+            setRuntimeInfo(result);
+            setRuntimeInfoError("");
+          }
+        }).catch((error) => {
+          if (!cancelled) {
+            setRuntimeInfo(null);
+            setRuntimeInfoError(error instanceof Error ? error.message : "Failed to read runtime version.");
+          }
+        });
         const scan = await nextBackend.listWorkspaces();
         if (cancelled) return;
         setWorkspaceScan(scan);
@@ -4241,6 +4255,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     workspaceLoading,
     workspaceError,
     workspaceSettingsSaving,
+    runtimeInfo,
+    runtimeInfoError,
     templateGroups,
     selectedVisualStylePresetId,
     selectedTemplateGroupId,

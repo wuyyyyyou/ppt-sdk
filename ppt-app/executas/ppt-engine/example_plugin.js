@@ -163,6 +163,12 @@ function readToolManifest() {
 
 const MANIFEST = readToolManifest();
 
+function toolAppGetRuntimeInfo() {
+  return {
+    ppt_engine_version: MANIFEST.version,
+  };
+}
+
 function makeResponse(id, result, error) {
   const response = { jsonrpc: "2.0", id };
   if (error !== undefined) {
@@ -2811,6 +2817,7 @@ async function toolForkTemplateGroup(args) {
 }
 
 const TOOL_DISPATCH = {
+  app_get_runtime_info: toolAppGetRuntimeInfo,
   app_begin_generation_run: toolAppBeginGenerationRun,
   app_prepare_generation_run: toolAppPrepareGenerationRun,
   app_abandon_generation_run: toolAppAbandonGenerationRun,

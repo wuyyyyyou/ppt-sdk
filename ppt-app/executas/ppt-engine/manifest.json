@@ -9,6 +9,11 @@
   ],
   "tools": [
     {
+      "name": "app_get_runtime_info",
+      "description": "Return lightweight identity information from the currently running ppt-engine process.",
+      "parameters": []
+    },
+    {
       "name": "app_list_workspaces",
       "description": "Scan the default PPT task workspace root and return existing ppt-YYYYMMDD-HHmmss workspaces.",
       "parameters": []

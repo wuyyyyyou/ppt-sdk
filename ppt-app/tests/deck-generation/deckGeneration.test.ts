@@ -408,6 +408,7 @@ function createHarness(options: {
   }
 
   const backend: PptBackend = {
+    getRuntimeInfo: async () => ({ ppt_engine_version: "test" }),
     listWorkspaces: async () => ({ workspace_root: "", has_workspaces: false, latest_workspace: null, workspaces: [] }),
     getWorkspaceDefaults: async () => ({ workspace_root: workspace.workspace_root, setting: {} }),
     createWorkspace: async () => createdWorkspace,

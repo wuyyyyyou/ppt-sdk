@@ -16,6 +16,7 @@ import type {
   ListTemplatesResult,
   PagePlan,
   PageProgress,
+  PptEngineRuntimeInfo,
   OpenWorkspaceInput,
   PatchWorkspaceDefaultsInput,
   PrepareDeckRefinementPageFilesInput,
@@ -120,6 +121,7 @@ import { connectAnnaRuntime } from "../runtime/annaRuntime";
 import { detectRuntimeMode } from "../runtime/runtimeMode";
 
 export interface PptBackend {
+  getRuntimeInfo(): Promise<PptEngineRuntimeInfo>;
   beginGenerationRun(input: { workspace_dir: string; run_kind: GenerationRunKind; origin_page_id?: string | null }): Promise<GenerationRunTransaction>;
   prepareGenerationRun(input: { run_id: string }): Promise<PrepareGenerationRunResult>;
   abandonGenerationRun(input: { run_id: string }): Promise<GenerationRunTransaction>;

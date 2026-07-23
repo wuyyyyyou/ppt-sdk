@@ -14,6 +14,7 @@ type JsonRpcResponse = {
   result?: {
     success?: boolean;
     data?: Record<string, unknown>;
+    version?: string;
     tools?: Array<{ name: string; parameters?: Array<{ name: string; required?: boolean }> }>;
   };
   error?: { message?: string };
@@ -81,6 +82,24 @@ async function startPluginProcess(): Promise<PluginProcess> {
   child.stderr.resume();
   return new PluginProcess(child);
 }
+
+test("app_get_runtime_info returns the same version as describe", async () => {
+  const plugin = await startPluginProcess();
+
+  try {
+    const describe = await plugin.request("describe");
+    const runtimeInfo = await plugin.request("invoke", {
+      tool: "app_get_runtime_info",
+      arguments: {},
+    });
+
+    assert.ok(!describe.error, describe.error?.message);
+    assert.ok(!runtimeInfo.error, runtimeInfo.error?.message);
+    assert.equal(runtimeInfo.result?.data?.ppt_engine_version, describe.result?.version);
+  } finally {
+    await plugin.close();
+  }
+});
 
 test("app_update_workspace_settings plugin wrapper forwards persist_as_default", async () => {
   const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");

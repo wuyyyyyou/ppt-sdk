@@ -566,6 +566,10 @@ export interface WorkspaceDefaultsResult {
   setting: WorkspaceSettings;
 }
 
+export interface PptEngineRuntimeInfo {
+  ppt_engine_version: string;
+}
+
 export interface PatchWorkspaceDefaultsInput {
   setting: WorkspaceSettings;
 }

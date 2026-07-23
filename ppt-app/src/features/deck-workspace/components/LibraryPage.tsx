@@ -1,6 +1,7 @@
 import { Archive, Download, Edit3, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { WorkspaceResult, WorkspaceSettings } from "../../../api/types";
+import appManifest from "../../../../app.json";
+import type { PptEngineRuntimeInfo, WorkspaceResult, WorkspaceSettings } from "../../../api/types";
 import type { Messages } from "../../../i18n/messages";
 import {
   PAGE_GENERATION_CONCURRENCY_MAX,
@@ -27,6 +28,8 @@ interface LibraryPageProps {
   loading: boolean;
   savingSettings: boolean;
   pageReviewSettings: PageReviewSettings;
+  runtimeInfo: PptEngineRuntimeInfo | null;
+  runtimeInfoError: string;
   onBack: () => void;
   onSaveSettings: (setting: WorkspaceSettings) => Promise<void>;
   onSaveTitle: (title: string) => Promise<void>;
@@ -52,6 +55,8 @@ export function LibraryPage({
   loading,
   savingSettings,
   pageReviewSettings,
+  runtimeInfo,
+  runtimeInfoError,
   onBack,
   onSaveSettings,
   onSaveTitle,
@@ -129,6 +134,13 @@ export function LibraryPage({
         <PreferenceSwitch label={t.preferences.visualReviewEnabled} value={draft.visual_review_enabled === true} editing={editing} t={t} onChange={(value) => setDraft((next) => ({ ...next, visual_review_enabled: value }))} />
         <PreferenceNumber label={t.preferences.pageGenerationConcurrency} value={Number(draft.page_generation_concurrency)} editing={editing} min={PAGE_GENERATION_CONCURRENCY_MIN} max={PAGE_GENERATION_CONCURRENCY_MAX} onChange={(value) => setDraft((next) => ({ ...next, page_generation_concurrency: value }))} />
         <PreferenceNumber label={t.preferences.visualReviewFailureLimit} value={Number(draft.visual_review_failure_limit ?? DEFAULT_VISUAL_REVIEW_FAILURE_LIMIT)} editing={editing} min={REVIEW_FAILURE_LIMIT_MIN} max={REVIEW_FAILURE_LIMIT_MAX} onChange={(value) => setDraft((next) => ({ ...next, visual_review_failure_limit: value }))} />
+      </div>
+
+      <div className="runtime-info-box">
+        <div className="runtime-info-header"><strong>{t.library.runtimeInfoTitle}</strong></div>
+        <div className="pref-row"><span>{t.library.annaDeckVersion}</span><strong>{appManifest.version}</strong></div>
+        <div className="pref-row"><span>{t.library.pptEngineVersion}</span><strong>{runtimeInfo?.ppt_engine_version ?? "—"}</strong></div>
+        {runtimeInfoError ? <div className="runtime-info-error" title={runtimeInfoError}>{t.library.runtimeInfoUnavailable}</div> : null}
       </div>
 
       {currentWorkspace ? (

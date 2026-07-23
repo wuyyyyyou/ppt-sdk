@@ -235,6 +235,8 @@ export function App() {
               loading={state.workspaceLoading}
               savingSettings={state.workspaceSettingsSaving}
               pageReviewSettings={state.pageReviewSettings}
+              runtimeInfo={state.runtimeInfo}
+              runtimeInfoError={state.runtimeInfoError}
               onBack={actions.goBack}
               onSaveSettings={actions.saveWorkspaceSettings}
               onSaveTitle={actions.saveWorkspaceTitle}

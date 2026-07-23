@@ -135,6 +135,30 @@ async function verifyConcurrentDescribe(binaryPath, env) {
   }
 }
 
+async function verifyRuntimeInfo(binaryPath, env) {
+  const describeResponse = await invokeBinary(binaryPath, {
+    jsonrpc: "2.0",
+    method: "describe",
+    id: 9,
+  }, env);
+  const runtimeInfoResponse = await invokeBinary(binaryPath, {
+    jsonrpc: "2.0",
+    method: "invoke",
+    id: 10,
+    params: {
+      tool: "app_get_runtime_info",
+      arguments: {},
+    },
+  }, env);
+  const describedVersion = describeResponse?.result?.version;
+  const runtimeVersion = runtimeInfoResponse?.result?.data?.ppt_engine_version;
+  if (!describedVersion || runtimeVersion !== describedVersion) {
+    throw new Error(
+      `Binary runtime version mismatch: describe=${JSON.stringify(describedVersion)}, runtime=${JSON.stringify(runtimeVersion)}`,
+    );
+  }
+}
+
 async function verifyRenderedPng(pngPath) {
   const fileStat = await stat(pngPath);
   if (fileStat.size <= 0) throw new Error(`Rendered PNG is empty: ${pngPath}`);
@@ -175,6 +199,7 @@ async function main() {
     throw new Error(`Bundled dom-to-pptx runtime is empty: ${domToPptxBundle}`);
   }
   await verifyConcurrentDescribe(binaryPath, env);
+  await verifyRuntimeInfo(binaryPath, env);
   const legacyCacheStat = await stat(legacySeaCacheDir).catch(() => null);
   if (legacyCacheStat) {
     throw new Error(`Binary unexpectedly created the legacy SEA extraction cache: ${legacySeaCacheDir}`);

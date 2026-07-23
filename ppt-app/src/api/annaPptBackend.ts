@@ -20,6 +20,7 @@ import type {
   PreparePageFilesResult,
   ProjectResult,
   PptxExportJob,
+  PptEngineRuntimeInfo,
   ResearchCurationDraftFingerprint,
   ResearchEvidenceIndex,
   RecordResearchEvidenceResult,
@@ -196,6 +197,8 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
   });
 
   return {
+    getRuntimeInfo: () =>
+      invoke<PptEngineRuntimeInfo>(toolIds.pptEngine, "app_get_runtime_info", {}),
     beginGenerationRun: (input) =>
       invoke<GenerationRunTransaction>(toolIds.pptEngine, "app_begin_generation_run", input),
     prepareGenerationRun: (input) =>

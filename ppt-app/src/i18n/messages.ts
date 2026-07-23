@@ -346,6 +346,10 @@ export interface Messages {
     createWorkspace: string;
     defaultWorkspaceTitle: string;
     preferences: string;
+    runtimeInfoTitle: string;
+    annaDeckVersion: string;
+    pptEngineVersion: string;
+    runtimeInfoUnavailable: string;
     lastEditedToday: string;
     lastEditedYesterday: string;
     lastEditedDate: string;
@@ -839,6 +843,10 @@ export const messages: Record<Locale, Messages> = {
       createWorkspace: "New task",
       defaultWorkspaceTitle: "New Task-{date}",
       preferences: "Preferences",
+      runtimeInfoTitle: "Runtime information",
+      annaDeckVersion: "Anna Deck version",
+      pptEngineVersion: "ppt-engine version",
+      runtimeInfoUnavailable: "The runtime version is temporarily unavailable.",
       lastEditedToday: "Last edited today",
       lastEditedYesterday: "Last edited yesterday",
       lastEditedDate: "Last edited {date}",
@@ -1337,6 +1345,10 @@ export const messages: Record<Locale, Messages> = {
       createWorkspace: "新建任务",
       defaultWorkspaceTitle: "新建任务-{date}",
       preferences: "偏好设置",
+      runtimeInfoTitle: "运行信息",
+      annaDeckVersion: "Anna Deck 版本",
+      pptEngineVersion: "ppt-engine 版本",
+      runtimeInfoUnavailable: "暂时无法获取运行版本。",
       lastEditedToday: "今天编辑",
       lastEditedYesterday: "昨天编辑",
       lastEditedDate: "{date} 编辑",

@@ -86,6 +86,21 @@ function createJsonUploadRef(filename: string): HostUploadRef {
 }
 
 describe("Anna PPT Backend", () => {
+  it("reads runtime information from the running ppt-engine tool", async () => {
+    setToolIds();
+    const runtime = createRuntimeWithInvoke(async (input) => {
+      assert.deepEqual(input, {
+        tool_id: "tool-ppt-engine",
+        method: "app_get_runtime_info",
+        args: {},
+      });
+      return { success: true, data: { ppt_engine_version: "4.2.4" } };
+    });
+
+    const backend = createAnnaPptBackend(runtime);
+    assert.deepEqual(await backend.getRuntimeInfo(), { ppt_engine_version: "4.2.4" });
+  });
+
   it("returns bounded create workspace results inline", async () => {
     setToolIds();
     const created: CreateWorkspaceResult = {
