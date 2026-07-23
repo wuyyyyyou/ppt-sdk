@@ -1,6 +1,6 @@
 {
   "name": "presenton-template-engine-executa",
-  "version": "4.2.2",
+  "version": "4.2.3",
   "description": "Presenton template engine vendored into an Anna Executa plugin",
   "private": true,
   "type": "module",

@@ -1,7 +1,7 @@
 {
   "slug": "anna-search",
   "name": "Anna Search",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "executa_type": "tool",
   "description": "Search the web through pluggable search providers. The initial provider is ddgs.",
   "tool_id": "tool-lightvoss-anna-search-7ym3jyqv",
