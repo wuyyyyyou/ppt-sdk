@@ -25,6 +25,7 @@ import {
   getAppWorkspaceGenerationRun,
   buildDeckHtmlFromManifest,
   createAppWorkspace,
+  deleteAppWorkspace,
   duplicateAppWorkspacePage,
   ensureConfirmedOutlinePageIds,
   createAppExportArtifactSnapshot,
@@ -77,6 +78,7 @@ import {
   listDiscoveredTemplateGroupSummaries,
   openAppWorkspace,
   patchAppWorkspaceSettings,
+  patchAppWorkspaceDefaults,
   prepareAppDeckRefinementPageFiles,
   prepareAppPageRefinement,
   commitAppDeckRefinement,
@@ -938,6 +940,16 @@ async function toolAppGetWorkspaceDefaults() {
   return getAppWorkspaceDefaults();
 }
 
+async function toolAppPatchWorkspaceDefaults(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  if (!args.setting || typeof args.setting !== "object" || Array.isArray(args.setting)) {
+    throw new Error('"setting" must be an object');
+  }
+  return patchAppWorkspaceDefaults({ setting: args.setting });
+}
+
 async function toolAppCreateWorkspace(args) {
   if (args !== undefined && (!args || typeof args !== "object" || Array.isArray(args))) {
     throw new Error("Arguments must be an object");
@@ -1704,6 +1716,14 @@ async function toolAppUpdateWorkspaceTitle(args) {
     workspace_dir: workspaceDir,
     title: args.title,
   }));
+}
+
+async function toolAppDeleteWorkspace(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return deleteAppWorkspace({ workspace_dir: workspaceDir });
 }
 
 async function toolAppListTemplateGroups() {
@@ -2798,6 +2818,7 @@ const TOOL_DISPATCH = {
   app_cleanup_generation_run: toolAppCleanupGenerationRun,
   app_get_workspace_generation_run: toolAppGetWorkspaceGenerationRun,
   app_list_workspaces: toolAppListWorkspaces,
+  app_patch_workspace_defaults: toolAppPatchWorkspaceDefaults,
   app_get_workspace_defaults: toolAppGetWorkspaceDefaults,
   app_create_workspace: toolAppCreateWorkspace,
   app_open_workspace: toolAppOpenWorkspace,
@@ -2848,6 +2869,7 @@ const TOOL_DISPATCH = {
   app_update_workspace_settings: toolAppUpdateWorkspaceSettings,
   app_patch_workspace_settings: toolAppPatchWorkspaceSettings,
   app_update_workspace_title: toolAppUpdateWorkspaceTitle,
+  app_delete_workspace: toolAppDeleteWorkspace,
   app_list_template_groups: toolAppListTemplateGroups,
   app_get_template_group: toolAppGetTemplateGroup,
   app_get_template_preview: toolAppGetTemplatePreview,

@@ -49,6 +49,7 @@ export interface WorkspaceSummary {
   status: string;
   created_at: string;
   updated_at: string;
+  has_deck_html: boolean;
 }
 
 export interface WorkspaceFiles {
@@ -565,9 +566,19 @@ export interface WorkspaceDefaultsResult {
   setting: WorkspaceSettings;
 }
 
+export interface PatchWorkspaceDefaultsInput {
+  setting: WorkspaceSettings;
+}
+
 export interface UpdateWorkspaceTitleInput {
   workspace_dir: string;
   title: string;
+}
+
+export interface DeleteWorkspaceResult {
+  deleted: true;
+  workspace_id: string;
+  workspace_dir: string;
 }
 
 export interface UpdateWorkspacePagesInput {

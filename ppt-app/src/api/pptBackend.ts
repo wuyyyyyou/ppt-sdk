@@ -5,6 +5,7 @@ import type {
   CreateWorkspaceInput,
   CreateWorkspaceResult,
   DuplicateWorkspacePageInput,
+  DeleteWorkspaceResult,
   GetExportArtifactDownloadUrlInput,
   GetWorkspacePageFileFingerprintsInput,
   GetWorkspacePageFileFingerprintsResult,
@@ -16,6 +17,7 @@ import type {
   PagePlan,
   PageProgress,
   OpenWorkspaceInput,
+  PatchWorkspaceDefaultsInput,
   PrepareDeckRefinementPageFilesInput,
   PrepareDeckRefinementPageFilesResult,
   PreparePageFilesInput,
@@ -126,6 +128,7 @@ export interface PptBackend {
   getWorkspaceGenerationRun(input: { workspace_dir: string }): Promise<GenerationRunTransaction | null>;
   listWorkspaces(): Promise<ListWorkspacesResult>;
   getWorkspaceDefaults(): Promise<WorkspaceDefaultsResult>;
+  patchWorkspaceDefaults(input: PatchWorkspaceDefaultsInput): Promise<WorkspaceDefaultsResult>;
   createWorkspace(input: CreateWorkspaceInput): Promise<CreateWorkspaceResult>;
   openWorkspace(input: OpenWorkspaceInput): Promise<WorkspaceResult>;
   installWorkspaceAuthoringKit(input: { workspace_dir: string }): Promise<WorkspaceAuthoringKitResult>;
@@ -196,6 +199,7 @@ export interface PptBackend {
   updateWorkspacePages(input: UpdateWorkspacePagesInput): Promise<WorkspaceResult>;
   duplicateWorkspacePage(input: DuplicateWorkspacePageInput): Promise<WorkspaceResult>;
   updateWorkspaceTitle(input: UpdateWorkspaceTitleInput): Promise<WorkspaceResult>;
+  deleteWorkspace(input: { workspace_dir: string }): Promise<DeleteWorkspaceResult>;
   createProject(input: CreateProjectInput): Promise<ProjectResult>;
   getProject(input: { projectDir: string }): Promise<ProjectResult>;
   recordRequirements(input: RecordRequirementsInput): Promise<ProjectResult>;

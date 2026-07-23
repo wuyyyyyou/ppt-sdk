@@ -35,6 +35,8 @@ import type {
   WorkspaceThemeValidationResult,
   RecordWorkspaceThemeTokenResult,
   WorkspaceDefaultsResult,
+  PatchWorkspaceDefaultsInput,
+  DeleteWorkspaceResult,
   WorkspaceResult,
   ClearWorkspaceStyleProfileResult,
   CommitUploadedSourceHostUploadResult,
@@ -210,6 +212,8 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invoke<ListWorkspacesResult>(toolIds.pptEngine, "app_list_workspaces", {}),
     getWorkspaceDefaults: () =>
       invoke<WorkspaceDefaultsResult>(toolIds.pptEngine, "app_get_workspace_defaults", {}),
+    patchWorkspaceDefaults: (input: PatchWorkspaceDefaultsInput) =>
+      invoke<WorkspaceDefaultsResult>(toolIds.pptEngine, "app_patch_workspace_defaults", input),
     createWorkspace: (input) =>
       invoke<CreateWorkspaceResult>(toolIds.pptEngine, "app_create_workspace", input),
     openWorkspace: (input) =>
@@ -440,6 +444,8 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invokeWorkspaceResult("app_duplicate_workspace_page", input),
     updateWorkspaceTitle: (input) =>
       invokeWorkspaceResult("app_update_workspace_title", input),
+    deleteWorkspace: (input) =>
+      invoke<DeleteWorkspaceResult>(toolIds.pptEngine, "app_delete_workspace", input),
     createProject: (input) =>
       invoke<ProjectResult>(toolIds.pptEngine, "app_create_project", input),
     getProject: (input) =>

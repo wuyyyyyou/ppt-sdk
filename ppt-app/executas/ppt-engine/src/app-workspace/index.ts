@@ -105,6 +105,7 @@ import type {
   AppTemplatePlanningContext,
   CreateAppWorkspaceInput,
   CreateAppWorkspaceResult,
+  DeleteAppWorkspaceInput,
   DuplicateAppWorkspacePageInput,
   ListAppUploadedSourcesInput,
   ListAppUploadedSourcesResult,
@@ -232,10 +233,10 @@ const WORKSPACE_FORMAT = "authoring-kit-v1";
 const LEGACY_TASK_ROOT = path.join(WORKSPACE_ROOT, "tasks");
 const WORKSPACE_SETTING_PATH = path.join(WORKSPACE_ROOT, "setting.json");
 const WORKSPACE_DIR_PATTERN = /^ppt-\d{8}-\d{6}$/;
+const DEFAULT_WORKSPACE_TITLE_PATTERN = /^(?:新建工作区|新建任务|New Workspace|New Task)-\d{4}-\d{2}-\d{2}$/;
 const PAGE_ID_PATTERN = /^page-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const WORKSPACE_FILE_NAMES = [
   "task.json",
-  "setting.json",
   "requirements.json",
   "outline.json",
   "page-progress.json",
@@ -1001,7 +1002,6 @@ function createDefaultTaskJson(workspaceDir: string, title?: string) {
     updated_at: now,
     artifacts: {
       task: "task.json",
-      setting: "setting.json",
       requirements: "requirements.json",
       outline: "outline.json",
       page_progress: "page-progress.json",
@@ -1974,10 +1974,6 @@ async function ensureWorkspaceFiles(
 
   const defaults = {
     task: createDefaultTaskJson(normalizedWorkspaceDir, options.title),
-    setting: normalizeSettingJson({
-      ...createDefaultSettingJson(),
-      ...workspaceSettingDefaults,
-    }),
     requirements: createDefaultPresentationRequirements(),
     outline: createDefaultOutlineJson(),
     page_progress: createDefaultPageProgressJson(),
@@ -1991,15 +1987,7 @@ async function ensureWorkspaceFiles(
     }
   }
 
-  const currentTaskSetting = await readJsonFileIfExists(files.setting);
-  const currentTaskSettingRecord =
-    currentTaskSetting && typeof currentTaskSetting === "object" && !Array.isArray(currentTaskSetting)
-      ? (currentTaskSetting as Record<string, unknown>)
-      : {};
-  const normalizedTaskSetting = normalizeSettingJson(currentTaskSettingRecord);
-  if (JSON.stringify(currentTaskSetting) !== JSON.stringify(normalizedTaskSetting)) {
-    await writeJsonFile(files.setting, normalizedTaskSetting);
-  }
+  const normalizedTaskSetting = normalizeSettingJson(workspaceSettingDefaults);
 
   const normalizedRequirements = normalizePresentationRequirements(
     await readJsonFileIfExists(files.requirements),
@@ -2074,6 +2062,15 @@ async function getWorkspaceSummary(workspaceDir: string): Promise<AppWorkspaceSu
     task && typeof task === "object" && !Array.isArray(task)
       ? (task as Record<string, unknown>)
       : {};
+  const progress = normalizePageProgressJson(
+    await readJsonFileIfExists(path.join(workspaceDir, "page-progress.json")),
+  );
+  const deckHtmlPath = progress.final_deck_render.deck_html_path;
+  const hasDeckHtml =
+    progress.final_deck_render.status === "completed" &&
+    typeof deckHtmlPath === "string" &&
+    deckHtmlPath.length > 0 &&
+    await fileExists(deckHtmlPath);
 
   return {
     workspace_id: workspaceName,
@@ -2096,6 +2093,7 @@ async function getWorkspaceSummary(workspaceDir: string): Promise<AppWorkspaceSu
       typeof taskRecord.created_at === "string"
         ? taskRecord.created_at
         : info.birthtime.toISOString(),
+    has_deck_html: hasDeckHtml,
   };
 }
 
@@ -2180,7 +2178,7 @@ export async function listAppWorkspaces(): Promise<ListAppWorkspacesResult> {
   }
 
   const workspaces = await Promise.all([...workspaceDirs].map(getWorkspaceSummary));
-  workspaces.sort((left, right) => right.workspace_id.localeCompare(left.workspace_id));
+  workspaces.sort((left, right) => right.updated_at.localeCompare(left.updated_at));
 
   return {
     workspace_root: WORKSPACE_ROOT,
@@ -2255,23 +2253,20 @@ export async function patchAppWorkspaceSettings(
   input: UpdateAppWorkspaceSettingsInput,
 ): Promise<PatchAppWorkspaceSettingsResult> {
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const existing = normalizeSettingJson(await readJsonFileIfExists(workspace.files.setting));
-  const nextSetting = {
-    ...normalizeSettingJson({
-      ...existing,
-      ...input.setting,
-    }),
-    updated_at: new Date().toISOString(),
-  };
-
-  await writeJsonFile(workspace.files.setting, nextSetting);
-  if (input.persist_as_default === true) {
-    await updateGlobalWorkspaceDefaults(input.setting);
-  }
+  const nextSetting = await updateGlobalWorkspaceDefaults(input.setting);
   return {
     workspace_dir: workspace.workspace_dir,
     setting: nextSetting,
-    persisted_as_default: input.persist_as_default === true,
+    persisted_as_default: true,
+  };
+}
+
+export async function patchAppWorkspaceDefaults(input: {
+  setting: Record<string, unknown>;
+}): Promise<GetAppWorkspaceDefaultsResult> {
+  return {
+    workspace_root: WORKSPACE_ROOT,
+    setting: await updateGlobalWorkspaceDefaults(input.setting),
   };
 }
 
@@ -2298,6 +2293,23 @@ export async function updateAppWorkspaceTitle(
 
   await writeJsonFile(workspace.files.task, nextTask);
   return ensureWorkspaceFiles(input.workspace_dir);
+}
+
+export async function deleteAppWorkspace(
+  input: DeleteAppWorkspaceInput,
+): Promise<{ deleted: true; workspace_id: string; workspace_dir: string }> {
+  const workspaceDir = normalizeWorkspaceDir(input.workspace_dir);
+  await openAppWorkspace({ workspace_dir: workspaceDir });
+  const activeRun = await findGenerationRunForWorkspace(WORKSPACE_ROOT, path.basename(workspaceDir));
+  if (activeRun && ["preparing", "active", "committing"].includes(activeRun.state)) {
+    throw new Error("An active generation run must be stopped before deleting this workspace.");
+  }
+  await rm(workspaceDir, { recursive: true, force: false });
+  return {
+    deleted: true,
+    workspace_id: path.basename(workspaceDir),
+    workspace_dir: workspaceDir,
+  };
 }
 
 export async function uploadAppUploadedSource(
@@ -4605,6 +4617,14 @@ function outlineContentSignature(outline: AppWorkspaceOutline): string {
   return JSON.stringify([outline.title.trim(), items]);
 }
 
+function shouldAutoSyncWorkspaceTitle(currentTask: Record<string, unknown>, currentOutline: AppWorkspaceOutline, nextTitle: string) {
+  const currentTitle = typeof currentTask.title === "string" ? currentTask.title.trim() : "";
+  const previousOutlineTitle = currentOutline.status === "empty" ? "" : currentOutline.title.trim();
+  if (!currentTitle || currentTitle === nextTitle) return false;
+  if (DEFAULT_WORKSPACE_TITLE_PATTERN.test(currentTitle)) return true;
+  return Boolean(previousOutlineTitle && currentTitle === previousOutlineTitle);
+}
+
 function getSelectedVisualTone(requirements: AppPresentationRequirements): string {
   const visualTone = requirements.selections.visual_tone;
   const preset = requirements.selections.visual_style_preset;
@@ -4647,7 +4667,9 @@ async function persistAppWorkspaceOutline(
   await writeJsonFile(workspace.files.requirements, nextRequirements);
   await writeJsonFile(workspace.files.task, {
     ...currentTask,
-    title: nextOutline.title,
+    ...(shouldAutoSyncWorkspaceTitle(currentTask, currentOutline, nextOutline.title)
+      ? { title: nextOutline.title }
+      : {}),
     updated_at: updatedAt,
   });
   return ensureWorkspaceFiles(input.workspace_dir);
@@ -6927,7 +6949,12 @@ export async function commitAppDeckRefinement(
   try {
     await writeJsonFile(workspace.files.outline, nextOutline);
     await writeJsonFile(workspace.files.requirements, nextRequirements);
-    await writeJsonFile(workspace.files.task, { ...getPlainRecord(workspace.task), title, updated_at: updatedAt });
+    const currentTask = getPlainRecord(workspace.task);
+    await writeJsonFile(workspace.files.task, {
+      ...currentTask,
+      ...(shouldAutoSyncWorkspaceTitle(currentTask, currentOutline, title) ? { title } : {}),
+      updated_at: updatedAt,
+    });
     if (replacementStyleGuide) await writeFile(workspace.files.style_guide, replacementStyleGuide);
     await prepareWorkspacePageSources({ workspace_dir: workspace.workspace_dir });
     await writeJsonFile(workspace.files.page_progress, nextProgress);

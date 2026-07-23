@@ -7,6 +7,7 @@ export interface AppWorkspaceSummary {
   status: string;
   created_at: string;
   updated_at: string;
+  has_deck_html: boolean;
 }
 
 export interface AppWorkspaceFiles {
@@ -564,6 +565,10 @@ export interface GetAppWorkspaceDefaultsResult {
 export interface UpdateAppWorkspaceTitleInput {
   workspace_dir: string;
   title: string;
+}
+
+export interface DeleteAppWorkspaceInput {
+  workspace_dir: string;
 }
 
 export interface GetAppWorkspaceOutlineInput {

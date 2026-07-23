@@ -8,7 +8,7 @@ async function readJson(filePath: string) {
   return JSON.parse(await readFile(filePath, "utf8")) as Record<string, unknown>;
 }
 
-test("authoring-kit-v1 Workspace settings persist only the five generation controls", async () => {
+test("authoring-kit-v1 settings persist globally and workspace setting files are ignored", async () => {
   const previousHome = process.env.HOME;
   const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-workspace-settings-home-"));
   process.env.HOME = homeDir;
@@ -54,9 +54,7 @@ test("authoring-kit-v1 Workspace settings persist only the five generation contr
     assert.equal(patched.setting.disable_web_research, true);
     assert.equal(patched.setting.disable_image_research, false);
 
-    const workspaceSetting = await readJson(path.join(created.workspace_dir, "setting.json"));
-    assert.equal("output_language" in workspaceSetting, false);
-    assert.equal("content_review_enabled" in workspaceSetting, false);
+    await assert.rejects(readFile(path.join(created.workspace_dir, "setting.json")));
     const defaults = await getAppWorkspaceDefaults();
     assert.deepEqual(defaults.setting, await readJson(path.join(homeDir, "anna-workspace", "ppt", "setting.json")));
 
@@ -66,9 +64,18 @@ test("authoring-kit-v1 Workspace settings persist only the five generation contr
     assert.equal(inherited.setting.visual_review_failure_limit, 1);
     assert.equal(inherited.setting.disable_web_research, true);
     assert.equal(inherited.setting.disable_image_research, false);
+
+    await writeJson(path.join(inherited.workspace_dir, "setting.json"), { page_generation_concurrency: 1 });
+    const reopened = await import("../../src/app-workspace/index.ts").then((api) => api.openAppWorkspace({ workspace_dir: inherited.workspace_dir }));
+    assert.equal(reopened.setting.page_generation_concurrency, 10);
   } finally {
     if (previousHome === undefined) delete process.env.HOME;
     else process.env.HOME = previousHome;
     await rm(homeDir, { recursive: true, force: true });
   }
 });
+
+async function writeJson(filePath: string, value: unknown) {
+  const { writeFile } = await import("node:fs/promises");
+  await writeFile(filePath, JSON.stringify(value), "utf8");
+}

@@ -417,6 +417,8 @@ export interface DeckWorkspaceActions {
   openWorkspace: (workspaceDir: string) => Promise<void>;
   scanWorkspaces: () => Promise<void>;
   showWorkspacePicker: () => Promise<void>;
+  startNewPresentation: () => Promise<void>;
+  refreshMyWork: () => Promise<void>;
   useLatestWorkspace: () => Promise<void>;
   createWorkspace: () => Promise<void>;
   uploadUploadedSource: (file: File) => Promise<void>;
@@ -436,6 +438,8 @@ export interface DeckWorkspaceActions {
   clearStyleProfile: () => Promise<void>;
   saveWorkspaceSettings: (setting: WorkspaceSettings) => Promise<void>;
   saveWorkspaceTitle: (title: string) => Promise<void>;
+  renameWorkspace: (workspaceDir: string, title: string) => Promise<void>;
+  deleteWorkspace: (workspaceDir: string) => Promise<void>;
   selectTemplate: (groupId: string) => Promise<void>;
   openRefineDeck: () => Promise<void>;
   openRefineSlide: (index?: number) => Promise<void>;
@@ -467,6 +471,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [pageReviewSettings, setPageReviewSettings] = useState<PageReviewSettings>(
     DEFAULT_PAGE_REVIEW_SETTINGS
   );
+  const [globalSettings, setGlobalSettings] = useState<WorkspaceSettings>({});
   const [researchSearchControlSettings, setResearchSearchControlSettingsState] =
     useState<ResearchSearchControlSettings>(DEFAULT_RESEARCH_SEARCH_CONTROL_SETTINGS);
   const [contextRows, setContextRows] = useState<ContextRow[]>([]);
@@ -558,6 +563,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const forceUploadedSourceAnalysisRefreshRef = useRef(false);
   const requirementsOperationRef = useRef(0);
   const [workspaceScan, setWorkspaceScan] = useState<ListWorkspacesResult | null>(null);
+  const [workspaceCovers, setWorkspaceCovers] = useState<Record<string, string | undefined>>({});
   const [currentWorkspace, setCurrentWorkspace] = useState<WorkspaceResult | null>(null);
   const currentWorkspaceRef = useRef<WorkspaceResult | null>(currentWorkspace);
   currentWorkspaceRef.current = currentWorkspace;
@@ -930,6 +936,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   function applyWorkspaceSetting(setting: WorkspaceSettings) {
+    setGlobalSettings(setting);
     setCurrentWorkspace((workspace) => workspace ? { ...workspace, setting } : workspace);
     setPageReviewSettings(readPageReviewSettings(setting));
     setResearchSearchControlSettingsState(readResearchSearchControlSettings(setting));
@@ -1285,6 +1292,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         if (cancelled) return;
         setPageReviewSettings(readPageReviewSettings(defaults.setting));
         setResearchSearchControlSettingsState(readResearchSearchControlSettings(defaults.setting));
+        setGlobalSettings(defaults.setting);
       } catch (error) {
         if (!cancelled) {
           setWorkspaceError(
@@ -1618,7 +1626,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function navigate(nextPage: PageId) {
     if (navigationBlockedByActiveGeneration(activeGenerationRun)) return;
     if (nextPage !== page && !await canLeaveCurrentEditor()) return;
-    if (!generated && nextPage !== "main" && nextPage !== "library") {
+    if (!generated && nextPage !== "main" && nextPage !== "my-work" && nextPage !== "settings") {
       showToast(t.toasts.createDeckFirst);
       return;
     }
@@ -1627,6 +1635,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setHistory((items) =>
       items.at(-1) === nextPage ? items : [...items, nextPage]
     );
+    if (nextPage === "my-work") {
+      await refreshMyWork();
+    }
     if (nextPage === "review") {
       const renderKey = currentWorkspace ? workspaceReviewRenderKey(currentWorkspace) : "";
       const hasCurrentRender =
@@ -2936,6 +2947,32 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
+  async function refreshMyWork() {
+    if (!backend) return;
+    setWorkspaceLoading(true);
+    setWorkspaceError("");
+    try {
+      const scan = await backend.listWorkspaces();
+      setWorkspaceScan(scan);
+      const completed = (scan.tasks ?? scan.workspaces ?? []).filter((item) => item.has_deck_html);
+      const coverEntries = await Promise.all(completed.map(async (item) => {
+        try {
+          const rendered = await backend.getRenderedDeckHtml({
+            workspace_dir: item.task_dir ?? item.workspace_dir,
+          });
+          return [item.workspace_id, rendered.slides[0]?.screenshot_upload?.url] as const;
+        } catch {
+          return [item.workspace_id, undefined] as const;
+        }
+      }));
+      setWorkspaceCovers(Object.fromEntries(coverEntries));
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : "Failed to load projects.");
+    } finally {
+      setWorkspaceLoading(false);
+    }
+  }
+
   async function useLatestWorkspace() {
     const latestTask = workspaceScan?.latest_task ?? workspaceScan?.latest_workspace;
     if (!backend || !latestTask) return;
@@ -2951,6 +2988,37 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setPage("main");
     setStage("brief");
     setHistory((items) => (items.at(-1) === "main" ? items : [...items, "main"]));
+    await scanWorkspaces();
+  }
+
+  async function startNewPresentation() {
+    requirementsOperationRef.current += 1;
+    resetGenerationUiState();
+    invalidateWorkspaceDiagnosticBundle();
+    setCurrentWorkspace(null);
+    setPrompt("");
+    setPresentationRequirements(createEmptyPresentationRequirements());
+    setRequirementsStatus("idle");
+    setRequirementsError("");
+    setRequirementsDirty(false);
+    setRequirementsHasSavedDraft(false);
+    setSelectedVisualStylePresetId(null);
+    setDeckTitle(t.deck.title);
+    setDeck([]);
+    setOutline([]);
+    setOutlineDraft([]);
+    setOutlineDraftTitle(t.deck.title);
+    setOutlineError("");
+    setOutlineFeedback("");
+    setGenerated(false);
+    setCurrentSlide(0);
+    setPageProgress(null);
+    setCreateDeckProgress(null);
+    setGenerationHistory([]);
+    setActiveGenerationRun(null);
+    setStage("brief");
+    setPage("main");
+    setHistory(["main"]);
     await scanWorkspaces();
   }
 
@@ -3043,16 +3111,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function saveWorkspaceSettings(setting: WorkspaceSettings) {
-    if (!backend || !currentWorkspace) return;
+    if (!backend) return;
 
     setWorkspaceSettingsSaving(true);
     setWorkspaceError("");
     try {
-      const result = await backend.updateWorkspaceSettings({
-        workspace_dir: currentWorkspace.workspace_dir,
-        persist_as_default: true,
-        setting
-      });
+      const result = await backend.patchWorkspaceDefaults({ setting });
       applyWorkspaceSetting(result.setting);
       showToast(t.status.settingsSaved);
     } catch (error) {
@@ -3070,17 +3134,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setWorkspaceSettingsSaving(true);
     setWorkspaceError("");
     try {
-      const workspace = await ensureCurrentWorkspace();
-      if (!workspace) return;
-      const setting = workspaceSettingsToState(workspace);
-      const currentReviewSettings = readPageReviewSettings(setting);
       const nextReviewSettings: PageReviewSettings = {
-        ...currentReviewSettings,
+        ...pageReviewSettings,
         visualReviewEnabled: enabled,
       };
-      const result = await backend.updateWorkspaceSettings({
-        workspace_dir: workspace.workspace_dir,
-        persist_as_default: true,
+      const result = await backend.patchWorkspaceDefaults({
         setting: pageReviewSettingsToWorkspaceSettings(nextReviewSettings),
       });
       applyWorkspaceSetting(result.setting);
@@ -3097,15 +3155,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function setResearchSearchControlSettings(settings: ResearchSearchControlSettings) {
     if (!backend) return;
 
+    const previousSettings = researchSearchControlSettings;
     setWorkspaceSettingsSaving(true);
     setWorkspaceError("");
     setResearchSearchControlSettingsState(settings);
     try {
-      const workspace = await ensureCurrentWorkspace();
-      if (!workspace) return;
-      const result = await backend.updateWorkspaceSettings({
-        workspace_dir: workspace.workspace_dir,
-        persist_as_default: true,
+      const result = await backend.patchWorkspaceDefaults({
         setting: researchSearchControlSettingsToWorkspaceSettings(settings),
       });
       applyWorkspaceSetting(result.setting);
@@ -3114,9 +3169,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       setWorkspaceError(
         error instanceof Error ? error.message : "Failed to save settings."
       );
-      setResearchSearchControlSettingsState(
-        workspaceResearchSearchControlSettings(currentWorkspace)
-      );
+      setResearchSearchControlSettingsState(previousSettings);
     } finally {
       setWorkspaceSettingsSaving(false);
     }
@@ -3145,6 +3198,45 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       );
     } finally {
       setWorkspaceSettingsSaving(false);
+    }
+  }
+
+  async function renameWorkspace(workspaceDir: string, title: string) {
+    if (!backend) return;
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) return;
+    setWorkspaceLoading(true);
+    setWorkspaceError("");
+    try {
+      const workspace = await backend.updateWorkspaceTitle({ workspace_dir: workspaceDir, title: trimmedTitle });
+      if (currentWorkspaceRef.current?.workspace_dir === workspaceDir) {
+        applyWorkspace(workspace);
+        setDeckTitle(trimmedTitle);
+      }
+      await refreshMyWork();
+      showToast(t.status.settingsSaved);
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : "Failed to rename project.");
+    } finally {
+      setWorkspaceLoading(false);
+    }
+  }
+
+  async function deleteWorkspace(workspaceDir: string) {
+    if (!backend) return;
+    setWorkspaceLoading(true);
+    setWorkspaceError("");
+    try {
+      await backend.deleteWorkspace({ workspace_dir: workspaceDir });
+      if (currentWorkspaceRef.current?.workspace_dir === workspaceDir) {
+        await startNewPresentation();
+      } else {
+        await refreshMyWork();
+      }
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : "Failed to delete project.");
+    } finally {
+      setWorkspaceLoading(false);
     }
   }
 
@@ -4099,6 +4191,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     toast,
     prompt,
     pageReviewSettings,
+    globalSettings,
     researchSearchControlSettings,
     contextRows,
     presentationRequirements,
@@ -4135,6 +4228,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     workspaceDiagnosticBundle,
     currentStatus,
     workspaceScan,
+    workspaceCovers,
     currentWorkspace,
     uploadedSources,
     uploadedSourceAnalysisState,
@@ -4202,6 +4296,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     openWorkspace,
     scanWorkspaces,
     showWorkspacePicker,
+    startNewPresentation,
+    refreshMyWork,
     useLatestWorkspace,
     createWorkspace,
     uploadUploadedSource,
@@ -4221,6 +4317,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     clearStyleProfile,
     saveWorkspaceSettings,
     saveWorkspaceTitle,
+    renameWorkspace,
+    deleteWorkspace,
     selectTemplate,
     openRefineDeck,
     openRefineSlide,

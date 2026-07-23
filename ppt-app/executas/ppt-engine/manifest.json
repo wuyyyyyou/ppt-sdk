@@ -15,8 +15,20 @@
     },
     {
       "name": "app_get_workspace_defaults",
-      "description": "Read global PPT workspace defaults used by newly created workspaces without creating a workspace.",
+      "description": "Read the global PPT settings used by every workspace without creating a workspace.",
       "parameters": []
+    },
+    {
+      "name": "app_patch_workspace_defaults",
+      "description": "Patch the global PPT settings used by every existing and future workspace.",
+      "parameters": [
+        {
+          "name": "setting",
+          "type": "object",
+          "description": "Partial settings object to merge into the global setting.json.",
+          "required": true
+        }
+      ]
     },
     {
       "name": "app_create_workspace",
@@ -660,7 +672,7 @@
     },
     {
       "name": "app_update_workspace_settings",
-      "description": "Update the PPT workspace-level setting.json and return the refreshed task workspace.",
+      "description": "Compatibility wrapper that updates global PPT settings and returns the refreshed task workspace.",
       "parameters": [
         {
           "name": "workspace_dir",
@@ -671,20 +683,20 @@
         {
           "name": "setting",
           "type": "object",
-          "description": "Partial settings object to merge into the workspace-level setting.json.",
+          "description": "Partial settings object to merge into the global setting.json.",
           "required": true
         },
         {
           "name": "persist_as_default",
           "type": "boolean",
-          "description": "When true, also merge these settings into the global PPT defaults used by newly created workspaces.",
+          "description": "Deprecated compatibility flag. Global settings are always updated.",
           "required": false
         }
       ]
     },
     {
       "name": "app_patch_workspace_settings",
-      "description": "Patch the PPT workspace-level setting.json and return only the normalized settings result.",
+      "description": "Compatibility wrapper that patches global PPT settings and returns the normalized settings result.",
       "parameters": [
         {
           "name": "workspace_dir",
@@ -695,13 +707,13 @@
         {
           "name": "setting",
           "type": "object",
-          "description": "Partial settings object to merge into the workspace-level setting.json.",
+          "description": "Partial settings object to merge into the global setting.json.",
           "required": true
         },
         {
           "name": "persist_as_default",
           "type": "boolean",
-          "description": "When true, also merge these settings into the global PPT defaults used by newly created workspaces.",
+          "description": "Deprecated compatibility flag. Global settings are always updated.",
           "required": false
         }
       ]
@@ -930,6 +942,18 @@
           "name": "title",
           "type": "string",
           "description": "New workspace title.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_delete_workspace",
+      "description": "Permanently delete an existing PPT task workspace after rejecting active generation runs.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
           "required": true
         }
       ]

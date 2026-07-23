@@ -1,4 +1,4 @@
-import { BookOpen, PanelTop } from "lucide-react";
+import { PanelTop, Settings } from "lucide-react";
 import type { Locale, Messages } from "../../../i18n/messages";
 
 interface PanelHeaderProps {
@@ -42,7 +42,7 @@ export function PanelHeader(props: PanelHeaderProps) {
           title={t.controls.library}
           disabled={navigationDisabled}
         >
-          <BookOpen size={14} />
+          <Settings size={14} />
           {t.controls.library}
         </button>
         <div className="lang-switch" aria-label="Language">

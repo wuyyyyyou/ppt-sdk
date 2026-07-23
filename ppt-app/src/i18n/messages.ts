@@ -366,6 +366,26 @@ export interface Messages {
     diagnosticBundleLinkCopied: string;
     diagnosticBundleCopyHint: string;
   };
+  myWork: {
+    title: string;
+    home: string;
+    presentations: string;
+    inProgress: string;
+    newPresentation: string;
+    emptyPresentations: string;
+    emptyInProgress: string;
+    loading: string;
+    loadFailed: string;
+    retry: string;
+    menu: string;
+    rename: string;
+    renameTitle: string;
+    renamePlaceholder: string;
+    delete: string;
+    deleteTitle: string;
+    deleteBody: string;
+    deleteConfirm: string;
+  };
   preferences: {
     defaultLanguage: string;
     textDensity: string;
@@ -448,7 +468,7 @@ export const messages: Record<Locale, Messages> = {
     appName: "AnnaDeck",
     languageName: "English",
     controls: {
-      library: "Library",
+      library: "Settings",
       minimize: "Minimize",
       close: "Close",
       back: "Back",
@@ -810,7 +830,7 @@ export const messages: Record<Locale, Messages> = {
       slideCounter: "{current} / {total}"
     },
     library: {
-      title: "Local decks",
+      title: "Settings",
       workspace: "Workspace",
       workspacePath: "Anna Workspace / PPT",
       currentWorkspace: "Current task",
@@ -838,6 +858,26 @@ export const messages: Record<Locale, Messages> = {
       diagnosticBundleCopyLink: "Copy troubleshooting bundle link",
       diagnosticBundleLinkCopied: "Link copied. Paste it into your browser address bar to download, and do not share it with unrelated people.",
       diagnosticBundleCopyHint: "Copy the link into a normal browser address bar to download. Do not share it with unrelated people."
+    },
+    myWork: {
+      title: "My Work",
+      home: "Home",
+      presentations: "Presentations",
+      inProgress: "In Progress",
+      newPresentation: "New Presentation",
+      emptyPresentations: "No generated presentations yet.",
+      emptyInProgress: "No unfinished projects.",
+      loading: "Loading projects...",
+      loadFailed: "Failed to load projects.",
+      retry: "Retry",
+      menu: "Project actions",
+      rename: "Rename",
+      renameTitle: "Rename project",
+      renamePlaceholder: "Project name",
+      delete: "Delete",
+      deleteTitle: "Delete project?",
+      deleteBody: "This permanently deletes “{title}” and all of its files. This action cannot be undone.",
+      deleteConfirm: "Delete permanently"
     },
     preferences: {
       defaultLanguage: "Default language",
@@ -927,7 +967,7 @@ export const messages: Record<Locale, Messages> = {
     appName: "AnnaDeck",
     languageName: "中文",
     controls: {
-      library: "资料库",
+      library: "设置",
       minimize: "最小化",
       close: "关闭",
       back: "返回",
@@ -1288,7 +1328,7 @@ export const messages: Record<Locale, Messages> = {
       slideCounter: "{current} / {total}"
     },
     library: {
-      title: "本地演示文稿",
+      title: "设置",
       workspace: "工作区",
       workspacePath: "Anna 工作区 / PPT",
       currentWorkspace: "当前任务",
@@ -1316,6 +1356,26 @@ export const messages: Record<Locale, Messages> = {
       diagnosticBundleCopyLink: "复制问题排查包链接",
       diagnosticBundleLinkCopied: "链接已复制，请粘贴到浏览器地址栏中下载，并且不要分享给无关人员。",
       diagnosticBundleCopyHint: "请复制链接并粘贴到普通浏览器地址栏中下载，不要将链接分享给无关人员。"
+    },
+    myWork: {
+      title: "我的作品",
+      home: "首页",
+      presentations: "演示文稿",
+      inProgress: "未完成项目",
+      newPresentation: "新建演示文稿",
+      emptyPresentations: "还没有已生成的演示文稿。",
+      emptyInProgress: "没有未完成项目。",
+      loading: "正在加载项目……",
+      loadFailed: "项目加载失败。",
+      retry: "重试",
+      menu: "项目操作",
+      rename: "重命名",
+      renameTitle: "重命名项目",
+      renamePlaceholder: "项目名称",
+      delete: "删除",
+      deleteTitle: "删除项目？",
+      deleteBody: "将永久删除“{title}”及其中的全部文件，此操作无法撤销。",
+      deleteConfirm: "永久删除"
     },
     preferences: {
       defaultLanguage: "默认语言",

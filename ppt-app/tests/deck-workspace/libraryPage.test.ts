@@ -33,15 +33,12 @@ describe("LibraryPage", () => {
   it("does not expose sealed or optional preferences", () => {
     const html = renderToStaticMarkup(createElement(LibraryPage, {
       t: messages.zh,
-      locale: "zh",
-      workspaceScan: null,
+      settings: {},
       currentWorkspace: workspace,
       loading: false,
       savingSettings: false,
       pageReviewSettings: DEFAULT_PAGE_REVIEW_SETTINGS,
       onBack: () => undefined,
-      onOpen: async () => undefined,
-      onCreateWorkspace: async () => undefined,
       onSaveSettings: async () => undefined,
       onSaveTitle: async () => undefined,
       workspaceDiagnosticBundle: { status: "idle", message: "" },
@@ -52,20 +49,40 @@ describe("LibraryPage", () => {
     assert.doesNotMatch(html, /先审阅大纲/);
     assert.doesNotMatch(html, /禁用网页搜索|禁用图片搜索/);
     assert.doesNotMatch(html, /Disable web research|Disable image research/);
+    assert.doesNotMatch(html, /新建任务|打开/);
+  });
+
+  it("shows global preferences without a current workspace", () => {
+    const html = renderToStaticMarkup(createElement(LibraryPage, {
+      t: messages.zh,
+      settings: { page_generation_concurrency: 7 },
+      currentWorkspace: null,
+      loading: false,
+      savingSettings: false,
+      pageReviewSettings: DEFAULT_PAGE_REVIEW_SETTINGS,
+      onBack: () => undefined,
+      onSaveSettings: async () => undefined,
+      onSaveTitle: async () => undefined,
+      workspaceDiagnosticBundle: { status: "idle", message: "" },
+      onPrepareWorkspaceDiagnosticBundle: async () => undefined,
+      onResetWorkspaceDiagnosticBundle: () => undefined,
+    }));
+
+    assert.match(html, /设置/);
+    assert.match(html, /页面生成并发数/);
+    assert.match(html, />7</);
+    assert.doesNotMatch(html, /当前任务|问题排查包/);
   });
 
   it("shows the complete Workspace disclosure and diagnostic bundle action", () => {
     const html = renderToStaticMarkup(createElement(LibraryPage, {
       t: messages.zh,
-      locale: "zh",
-      workspaceScan: null,
+      settings: {},
       currentWorkspace: workspace,
       loading: false,
       savingSettings: false,
       pageReviewSettings: DEFAULT_PAGE_REVIEW_SETTINGS,
       onBack: () => undefined,
-      onOpen: async () => undefined,
-      onCreateWorkspace: async () => undefined,
       onSaveSettings: async () => undefined,
       onSaveTitle: async () => undefined,
       workspaceDiagnosticBundle: { status: "idle", message: "" },
@@ -82,15 +99,12 @@ describe("LibraryPage", () => {
   it("shows a copyable URL when the diagnostic bundle is ready", () => {
     const html = renderToStaticMarkup(createElement(LibraryPage, {
       t: messages.zh,
-      locale: "zh",
-      workspaceScan: null,
+      settings: {},
       currentWorkspace: workspace,
       loading: false,
       savingSettings: false,
       pageReviewSettings: DEFAULT_PAGE_REVIEW_SETTINGS,
       onBack: () => undefined,
-      onOpen: async () => undefined,
-      onCreateWorkspace: async () => undefined,
       onSaveSettings: async () => undefined,
       onSaveTitle: async () => undefined,
       workspaceDiagnosticBundle: {
@@ -112,15 +126,12 @@ describe("LibraryPage", () => {
   it("localizes the diagnostic bundle refresh action in English", () => {
     const html = renderToStaticMarkup(createElement(LibraryPage, {
       t: messages.en,
-      locale: "en",
-      workspaceScan: null,
+      settings: {},
       currentWorkspace: workspace,
       loading: false,
       savingSettings: false,
       pageReviewSettings: DEFAULT_PAGE_REVIEW_SETTINGS,
       onBack: () => undefined,
-      onOpen: async () => undefined,
-      onCreateWorkspace: async () => undefined,
       onSaveSettings: async () => undefined,
       onSaveTitle: async () => undefined,
       workspaceDiagnosticBundle: {

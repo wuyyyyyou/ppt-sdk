@@ -6,6 +6,7 @@ import { ExportPage } from "../features/deck-workspace/components/ExportPage";
 import { GeneratingPage } from "../features/deck-workspace/components/GeneratingPage";
 import { StoppingGenerationOverlay } from "../features/deck-workspace/components/StoppingGenerationOverlay";
 import { LibraryPage } from "../features/deck-workspace/components/LibraryPage";
+import { MyWorkPage } from "../features/deck-workspace/components/MyWorkPage";
 import { OutlinePage } from "../features/deck-workspace/components/OutlinePage";
 import { PanelHeader } from "../features/deck-workspace/components/PanelHeader";
 import { ProgressLine } from "../features/deck-workspace/components/ProgressLine";
@@ -15,7 +16,6 @@ import {
   confirmedRequirementsAllowOutline,
   PresentationRequirementsPage,
 } from "../features/requirements";
-import { WorkspaceDialog } from "../features/deck-workspace/components/WorkspaceDialog";
 import { ConfirmationDialog } from "../features/deck-workspace/components/ConfirmationDialog";
 import { useDeckWorkspace } from "../features/deck-workspace/hooks/useDeckWorkspace";
 import { useI18n } from "../i18n/useI18n";
@@ -42,6 +42,7 @@ export function App() {
       ? { title: state.outline[refineSlideIndex].title, subtitle: "" }
       : null
   );
+  const showEntrySidebar = (state.page === "main" && state.stage === "brief") || state.page === "my-work";
 
   if (manualEditorOpen && state.currentWorkspace?.workspace_dir && manualEditorPages.length > 0) {
     return (
@@ -91,37 +92,33 @@ export function App() {
           <StoppingGenerationOverlay t={t} />
         ) : null}
 
-        <WorkspaceDialog
-            locale={locale}
-            scan={state.workspaceScan}
-            task={state.currentWorkspace}
-            loading={state.workspaceLoading}
-            error={state.workspaceError}
-            onUseLatest={actions.useLatestWorkspace}
-            onCreate={actions.createWorkspace}
-            onOpen={actions.openWorkspace}
-        />
-
         <PanelHeader
           t={t}
           locale={locale}
           setLocale={setLocale}
           status={state.currentStatus}
-          onLibrary={() => actions.navigate("library")}
+          onLibrary={() => actions.navigate("settings")}
           navigationDisabled={state.stage === "generating" && state.generationViewState.isActive}
-          onHome={() => void actions.showWorkspacePicker()}
+          onHome={() => void actions.startNewPresentation()}
         />
+        <div className={`entry-layout ${showEntrySidebar ? "with-sidebar" : ""}`}>
+          {showEntrySidebar ? (
+            <aside className="entry-sidebar" aria-label={t.appName}>
+              <button type="button" className={state.page === "main" ? "active" : ""} onClick={() => void actions.startNewPresentation()}>{t.myWork.home}</button>
+              <button type="button" className={state.page === "my-work" ? "active" : ""} onClick={() => void actions.navigate("my-work")}>{t.myWork.title}</button>
+            </aside>
+          ) : null}
+          <div className="entry-main">
+          {state.page === "main" ? (
+            <ProgressLine
+              stage={state.stage}
+              t={t}
+              outlineEnabled={confirmedRequirementsAllowOutline(state.currentWorkspace?.requirements)}
+              onNavigate={actions.navigateMain}
+            />
+          ) : null}
 
-        {state.page === "main" ? (
-          <ProgressLine
-            stage={state.stage}
-            t={t}
-            outlineEnabled={confirmedRequirementsAllowOutline(state.currentWorkspace?.requirements)}
-            onNavigate={actions.navigateMain}
-          />
-        ) : null}
-
-        <div className="view-container">
+          <div className="view-container">
           {state.page === "main" && state.stage === "brief" ? (
             <BriefPage
               t={t}
@@ -214,18 +211,31 @@ export function App() {
             />
           ) : null}
 
-          {state.page === "library" ? (
-            <LibraryPage
+          {state.page === "my-work" ? (
+            <MyWorkPage
               t={t}
               locale={locale}
               workspaceScan={state.workspaceScan}
+              workspaceCovers={state.workspaceCovers}
+              loading={state.workspaceLoading}
+              error={state.workspaceError}
+              onRetry={actions.refreshMyWork}
+              onOpen={actions.openWorkspace}
+              onNew={actions.startNewPresentation}
+              onRename={actions.renameWorkspace}
+              onDelete={actions.deleteWorkspace}
+            />
+          ) : null}
+
+          {state.page === "settings" ? (
+            <LibraryPage
+              t={t}
+              settings={state.globalSettings}
               currentWorkspace={state.currentWorkspace}
               loading={state.workspaceLoading}
               savingSettings={state.workspaceSettingsSaving}
               pageReviewSettings={state.pageReviewSettings}
               onBack={actions.goBack}
-              onOpen={actions.openWorkspace}
-              onCreateWorkspace={actions.createWorkspace}
               onSaveSettings={actions.saveWorkspaceSettings}
               onSaveTitle={actions.saveWorkspaceTitle}
               workspaceDiagnosticBundle={state.workspaceDiagnosticBundle}
@@ -278,6 +288,8 @@ export function App() {
             />
           ) : null}
 
+          </div>
+          </div>
         </div>
       </section>
     </main>

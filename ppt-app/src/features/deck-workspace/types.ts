@@ -22,7 +22,7 @@ import type { PageReviewSettings } from "./reviewSettings";
 import type { ResearchSearchControlSettings } from "./researchSearchControl";
 
 export type MainStage = "brief" | "requirements" | "uploaded-source-analysis" | "outline" | "generating" | "deck";
-export type PageId = "main" | "library" | "review" | "refine" | "export" | "style-profile-creation";
+export type PageId = "main" | "my-work" | "settings" | "review" | "refine" | "export" | "style-profile-creation";
 export type PanelMode = "visible" | "minimized" | "closed";
 export type RefineScope = "deck" | "slide";
 export type PreviewMode = "grid" | "organize" | "present";
@@ -106,6 +106,7 @@ export interface DeckWorkspaceState {
   toast: string;
   prompt: string;
   pageReviewSettings: PageReviewSettings;
+  globalSettings: WorkspaceSettings;
   researchSearchControlSettings: ResearchSearchControlSettings;
   contextRows: ContextRow[];
   presentationRequirements: PresentationRequirements;
@@ -142,6 +143,7 @@ export interface DeckWorkspaceState {
   workspaceDiagnosticBundle: WorkspaceDiagnosticBundleState;
   currentStatus: string;
   workspaceScan: ListWorkspacesResult | null;
+  workspaceCovers: Record<string, string | undefined>;
   currentWorkspace: WorkspaceResult | null;
   uploadedSources: UploadedSourceMaterial[];
   uploadedSourceAnalysisState: UploadedSourceAnalysisViewState;

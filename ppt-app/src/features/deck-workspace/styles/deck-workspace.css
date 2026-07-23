@@ -342,6 +342,49 @@ button {
   user-select: none;
 }
 
+.entry-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.entry-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.entry-sidebar {
+  display: flex;
+  width: 196px;
+  flex: 0 0 196px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 22px 14px;
+  border-right: 1px solid var(--line);
+  background: rgba(247, 247, 251, 0.76);
+}
+
+.entry-sidebar button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 10px;
+  padding: 0 14px;
+  color: var(--text-muted);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 650;
+  text-align: left;
+}
+
+.entry-sidebar button:hover,
+.entry-sidebar button.active {
+  color: var(--accent-hover);
+  background: var(--accent-light);
+}
+
 .header-left,
 .header-controls,
 .page-header-left,
@@ -4142,6 +4185,290 @@ details.generation-history-panel > summary::-webkit-details-marker {
   align-items: center;
   gap: 6px;
   margin-top: 8px;
+}
+
+.view-container > .my-work-page {
+  width: min(100%, 1120px);
+}
+
+.my-work-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
+.my-work-header .eyebrow {
+  margin: 0 0 6px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.my-work-header h1,
+.my-work-section h2 {
+  margin: 0;
+}
+
+.my-work-header h1 {
+  font-size: 28px;
+}
+
+.my-work-section {
+  margin-bottom: 34px;
+}
+
+.my-work-section-heading {
+  margin-bottom: 14px;
+}
+
+.my-work-section h2 {
+  font-size: 17px;
+}
+
+.my-work-grid,
+.my-work-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.my-work-card,
+.my-work-new-card {
+  position: relative;
+  min-height: 218px;
+  overflow: visible;
+  border: 1px solid rgba(17, 24, 39, 0.09);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 10px 24px rgba(25, 25, 45, 0.04);
+}
+
+.my-work-card-main {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 218px;
+  overflow: hidden;
+  border: 0;
+  border-radius: inherit;
+  padding: 12px;
+  flex-direction: column;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+}
+
+.my-work-card-main img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #f0eeff;
+}
+
+.my-work-card-copy {
+  display: flex;
+  gap: 5px;
+  padding: 13px 3px 3px;
+  flex-direction: column;
+}
+
+.my-work-card-copy strong {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-work-card-copy small,
+.my-work-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.my-work-card-menu-trigger {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  display: grid;
+  width: 30px;
+  height: 28px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 8px;
+  place-items: center;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.my-work-card-menu {
+  position: absolute;
+  z-index: 6;
+  right: 14px;
+  bottom: -54px;
+  display: flex;
+  min-width: 116px;
+  padding: 6px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 10px;
+  flex-direction: column;
+  background: #fff;
+  box-shadow: 0 14px 32px rgba(17, 24, 39, 0.14);
+}
+
+.my-work-card-menu button {
+  border: 0;
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: transparent;
+  text-align: left;
+}
+
+.my-work-card-menu button:hover {
+  background: rgba(124, 108, 240, 0.09);
+}
+
+.my-work-new-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-style: dashed;
+  color: var(--text-muted);
+  flex-direction: column;
+}
+
+.my-work-new-card:hover {
+  border-color: rgba(124, 108, 240, 0.42);
+  color: var(--accent-hover);
+  background: rgba(124, 108, 240, 0.05);
+}
+
+.my-work-empty {
+  margin: 14px 0 0;
+}
+
+.my-work-loading {
+  display: grid;
+  gap: 36px;
+}
+
+.my-work-section-skeleton > span,
+.my-work-skeleton-grid i {
+  display: block;
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(17, 24, 39, 0.05), rgba(255, 255, 255, 0.72), rgba(17, 24, 39, 0.05));
+  background-size: 220% 100%;
+  animation: myWorkSkeleton 1.3s linear infinite;
+}
+
+.my-work-section-skeleton > span {
+  width: 140px;
+  height: 20px;
+  margin-bottom: 14px;
+}
+
+.my-work-skeleton-grid i {
+  height: 218px;
+}
+
+@keyframes myWorkSkeleton {
+  to { background-position: -220% 0; }
+}
+
+.my-work-error {
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  color: var(--text-muted);
+}
+
+.my-work-modal-backdrop {
+  position: fixed;
+  z-index: 60;
+  inset: 0;
+  display: grid;
+  padding: 20px;
+  place-items: center;
+  background: rgba(20, 20, 34, 0.34);
+  backdrop-filter: blur(8px);
+}
+
+.my-work-modal {
+  position: relative;
+  width: min(100%, 430px);
+  padding: 26px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(17, 24, 39, 0.22);
+}
+
+.my-work-modal h2 {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+
+.my-work-modal p {
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.my-work-modal input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  border-radius: 10px;
+  padding: 0 12px;
+  outline: none;
+}
+
+.my-work-modal input:focus {
+  border-color: rgba(124, 108, 240, 0.55);
+  box-shadow: 0 0 0 3px rgba(124, 108, 240, 0.1);
+}
+
+.my-work-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  place-items: center;
+  background: rgba(17, 24, 39, 0.05);
+}
+
+.my-work-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.danger-btn {
+  min-height: 38px;
+  border: 0;
+  border-radius: 10px;
+  padding: 0 15px;
+  color: #fff;
+  background: #c73b3b;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .entry-sidebar { width: 160px; flex-basis: 160px; }
+  .my-work-grid, .my-work-skeleton-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .entry-layout.with-sidebar { flex-direction: column; }
+  .entry-sidebar { width: 100%; flex: 0 0 auto; padding: 10px 14px; border-right: 0; border-bottom: 1px solid var(--line); flex-direction: row; }
+  .entry-sidebar button { flex: 1; text-align: center; }
+  .my-work-grid, .my-work-skeleton-grid { grid-template-columns: 1fr; }
 }
 
 .preferences-box {
