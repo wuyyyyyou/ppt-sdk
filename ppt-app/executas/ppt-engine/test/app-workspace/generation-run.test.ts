@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test, { after } from "node:test";
@@ -53,6 +53,24 @@ test("abandonment leaves the official Workspace unchanged", async () => {
   assert.equal(abandoned.state, "abandoned");
   assert.equal(await readFile(markerPath, "utf8"), "official");
   await api.cleanupAppGenerationRun({ run_id: transaction.run_id });
+});
+
+test("recovery removes an orphan shadow run recreated after transaction cleanup", async () => {
+  const created = await api.createAppWorkspace({ title: "Orphan shadow cleanup" });
+  const transaction = await api.beginAppGenerationRun({
+    workspace_dir: created.workspace_dir,
+    run_kind: "page-refinement",
+  });
+  await api.prepareAppGenerationRun({ run_id: transaction.run_id });
+  await api.abandonAppGenerationRun({ run_id: transaction.run_id });
+  await api.cleanupAppGenerationRun({ run_id: transaction.run_id });
+
+  const lateFile = path.join(transaction.shadow_workspace_dir, "slides", "late.tsx");
+  await mkdir(path.dirname(lateFile), { recursive: true });
+  await writeFile(lateFile, "export default null;", "utf8");
+
+  await api.getAppWorkspaceGenerationRun({ workspace_dir: created.workspace_dir });
+  await assert.rejects(access(lateFile), { code: "ENOENT" });
 });
 
 test("Workspace Diagnostic Bundle includes every on-disk generation run, including abandoned runs", async () => {

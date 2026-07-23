@@ -4,6 +4,7 @@ import { BriefPage } from "../features/deck-workspace/components/BriefPage";
 import { DeckPage } from "../features/deck-workspace/components/DeckPage";
 import { ExportPage } from "../features/deck-workspace/components/ExportPage";
 import { GeneratingPage } from "../features/deck-workspace/components/GeneratingPage";
+import { StoppingGenerationOverlay } from "../features/deck-workspace/components/StoppingGenerationOverlay";
 import { LibraryPage } from "../features/deck-workspace/components/LibraryPage";
 import { OutlinePage } from "../features/deck-workspace/components/OutlinePage";
 import { PanelHeader } from "../features/deck-workspace/components/PanelHeader";
@@ -85,6 +86,10 @@ export function App() {
           request={state.confirmationDialog}
           onResolve={actions.resolveConfirmation}
         />
+
+        {state.stage === "generating" && state.generationViewState.isStopping ? (
+          <StoppingGenerationOverlay t={t} />
+        ) : null}
 
         <WorkspaceDialog
             locale={locale}

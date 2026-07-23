@@ -40,6 +40,19 @@ function transactionPath(workspaceRoot: string, runId: string) {
   return path.join(runRoot(workspaceRoot, runId), "transaction.json");
 }
 
+function isNotFoundError(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "ENOENT",
+  );
+}
+
+async function cleanupOrphanGenerationRun(workspaceRoot: string, runId: string): Promise<void> {
+  await rm(runRoot(workspaceRoot, runId), { recursive: true, force: true }).catch(() => undefined);
+}
+
 async function atomicWriteJson(filePath: string, value: unknown) {
   await mkdir(path.dirname(filePath), { recursive: true });
   const temporaryPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
@@ -218,7 +231,10 @@ export async function listGenerationRunsForWorkspace(
     try {
       const transaction = await readGenerationRun(workspaceRoot, entry.name);
       if (transaction.workspace_id === workspaceId) runs.push(transaction);
-    } catch { /* ignore invalid cleanup residue */ }
+    } catch (error) {
+      if (isNotFoundError(error)) await cleanupOrphanGenerationRun(workspaceRoot, entry.name);
+      // Invalid transaction records remain available for diagnostics.
+    }
   }
   return runs.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 }
@@ -231,7 +247,12 @@ export async function recoverGenerationRunForWorkspace(workspaceRoot: string, wo
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     let transaction: AppGenerationRunTransaction;
-    try { transaction = await readGenerationRun(workspaceRoot, entry.name); } catch { continue; }
+    try {
+      transaction = await readGenerationRun(workspaceRoot, entry.name);
+    } catch (error) {
+      if (isNotFoundError(error)) await cleanupOrphanGenerationRun(workspaceRoot, entry.name);
+      continue;
+    }
     if (transaction.workspace_id !== workspaceId) continue;
     if (transaction.state === "active") {
       active.push(transaction);
