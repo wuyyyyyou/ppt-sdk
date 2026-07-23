@@ -3114,12 +3114,12 @@ describe("Deck Generation Flow Module", () => {
     assert.ok(harness.authoringPrompts.some((prompt) =>
       prompt.includes("You are a local file-editing Agent generating one PPT slide") &&
       prompt.includes("Deck-level Research Evidence index") &&
-      prompt.includes("Agent file-tool path: workspaces/demo/research/evidence-index.json")
+      prompt.includes("Agent file-tool absolute path: /tmp/workspaces/demo/research/evidence-index.json")
     ));
     assert.ok(harness.authoringPrompts.some((prompt) =>
       prompt.includes("You are a local file-editing Agent generating one PPT slide") &&
       prompt.includes("Current-page Research Evidence") &&
-      prompt.includes("Agent file-tool path: workspaces/demo/research/evidence/pages/page-01.md")
+      prompt.includes("Agent file-tool absolute path: /tmp/workspaces/demo/research/evidence/pages/page-01.md")
     ));
     const pageAuthoringPrompt = harness.authoringPrompts.find((prompt) =>
       prompt.includes("You are a local file-editing Agent generating one PPT slide") &&
@@ -3263,7 +3263,7 @@ describe("Deck Generation Flow Module", () => {
     assert.match(visualCurationPrompt, /Agent file-tool paths are only for fs_\* tool calls and upload_local_file/);
     assert.match(visualCurationPrompt, /copy the exact file_path value from the selected raw image index result/);
     assert.match(visualCurationPrompt, /Do not write Agent file-tool paths into visual_assets file_path or original_raw_path/);
-    assert.match(visualCurationPrompt, /do not write PPT-task-relative paths such as ppt\/<workspace>\/research\/raw\/images/);
+    assert.match(visualCurationPrompt, /Do not write Agent file-tool absolute paths into visual_assets file_path or original_raw_path/);
   });
 
   it("retries web research curation no-write failures with full fresh-session prompts and falls back to a gap", async () => {
@@ -3309,8 +3309,8 @@ describe("Deck Generation Flow Module", () => {
     assert.ok(webPromptIndexes.every(({ prompt }) =>
       prompt.includes("Raw web index paths to read:") &&
       prompt.includes("Web draft JSON path to write:") &&
-      prompt.includes("Agent file-tool path:") &&
-      /workspaces\/demo\/research\/evidence\/drafts\/discovery-deck-web-1-[a-z0-9]+-[a-z0-9]+-web\.json/.test(prompt) &&
+      prompt.includes("Agent file-tool absolute path:") &&
+      /\/tmp\/workspaces\/demo\/research\/evidence\/drafts\/discovery-deck-web-1-[a-z0-9]+-[a-z0-9]+-web\.json/.test(prompt) &&
       !prompt.includes("workspaces/demo/research/evidence/drafts/discovery-web-1-web.json")
     ));
     const webCurationRunIds = webPromptIndexes.map(({ prompt }) =>
@@ -3378,8 +3378,8 @@ describe("Deck Generation Flow Module", () => {
     assert.ok(visualPromptIndexes.every(({ prompt }) =>
       prompt.includes("Raw image index paths to read:") &&
       prompt.includes("Visual draft JSON path to write:") &&
-      prompt.includes("Agent file-tool path:") &&
-      /workspaces\/demo\/research\/evidence\/drafts\/discovery-deck-visual-1-[a-z0-9]+-[a-z0-9]+-visual\.json/.test(prompt) &&
+      prompt.includes("Agent file-tool absolute path:") &&
+      /\/tmp\/workspaces\/demo\/research\/evidence\/drafts\/discovery-deck-visual-1-[a-z0-9]+-[a-z0-9]+-visual\.json/.test(prompt) &&
       !prompt.includes("workspaces/demo/research/evidence/drafts/discovery-visual-1-visual.json")
     ));
     const visualCurationRunIds = visualPromptIndexes.map(({ prompt }) =>
