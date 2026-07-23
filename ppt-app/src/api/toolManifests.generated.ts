@@ -3,12 +3,12 @@
 
 export const PPT_ENGINE_TOOL = {
   handle: "ppt-engine",
-  version: "4.2.1",
+  version: "4.2.2",
   displayName: "ppt-engine",
 } as const;
 
 export const ANNA_SEARCH_TOOL = {
   handle: "anna-search",
-  version: "1.0.3",
+  version: "1.0.4",
   displayName: "Anna Search",
 } as const;

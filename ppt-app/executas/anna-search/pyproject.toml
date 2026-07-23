@@ -1,6 +1,6 @@
 [project]
 name = "anna-search-executa"
-version = "1.0.3"
+version = "1.0.4"
 description = "Anna Executa web search tool backed by pluggable providers."
 readme = "README.md"
 requires-python = ">=3.11"
