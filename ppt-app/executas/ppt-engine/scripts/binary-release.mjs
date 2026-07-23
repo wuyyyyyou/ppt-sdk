@@ -3,6 +3,8 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { validateToolManifest } from "./tool-manifest-validation.mjs";
+
 const BINARY_NAME = "ppt-engine";
 const WINDOWS_BINARY_NAME = `${BINARY_NAME}.exe`;
 
@@ -53,16 +55,7 @@ async function readJson(filePath) {
 
 async function readToolManifest(filePath) {
   const manifest = await readJson(filePath);
-  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
-    throw new Error("Tool manifest must be a JSON object");
-  }
-  if (typeof manifest.display_name !== "string" || manifest.display_name.length === 0) {
-    throw new Error("Tool manifest must include a non-empty display_name");
-  }
-  if (typeof manifest.version !== "string" || manifest.version.length === 0) {
-    throw new Error("Tool manifest must include a non-empty version");
-  }
-  return manifest;
+  return validateToolManifest(manifest, filePath);
 }
 
 export function buildDistributionManifest(toolManifest) {
@@ -172,6 +165,7 @@ async function verifyExternalAppRuntime(extractDir, toolManifest) {
   await assertFile(path.join(appRoot, "dist", "index.js"), "external app engine entry");
 
   const packagedToolManifest = await readJson(path.join(appRoot, "manifest.json"));
+  validateToolManifest(packagedToolManifest, "External app tool manifest");
   if (packagedToolManifest.display_name !== toolManifest.display_name) {
     throw new Error(
       `External app display_name mismatch: expected ${toolManifest.display_name}, got ${packagedToolManifest.display_name}`,
@@ -245,6 +239,7 @@ async function verifyDescribe(options) {
   if (!result || typeof result !== "object") {
     throw new Error("Describe response must include a result object");
   }
+  validateToolManifest(result, "Describe result");
   if (result.display_name !== toolManifest.display_name) {
     throw new Error(`Describe display_name mismatch: expected ${toolManifest.display_name}, got ${result.display_name}`);
   }

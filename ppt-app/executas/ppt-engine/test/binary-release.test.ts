@@ -264,6 +264,33 @@ test("verify-describe validates Executa tool identity", async () => {
     result: {
       display_name: "ppt-engine",
       version: "9.8.7",
+      tools: [],
     },
   })}\n`);
+});
+
+test("verify-describe rejects parameters without descriptions", async () => {
+  const dir = await makeTempDir();
+  const toolManifestPath = await writeToolManifest(dir);
+
+  await assert.rejects(
+    runBinaryRelease([
+      "verify-describe",
+      "--tool-manifest",
+      toolManifestPath,
+    ], `${JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      result: {
+        display_name: "ppt-engine",
+        version: "9.8.7",
+        tools: [{
+          name: "broken_tool",
+          description: "Broken tool.",
+          parameters: [{ name: "workspace_dir", type: "string" }],
+        }],
+      },
+    })}\n`),
+    /Describe result\.tools\[0\]\.parameters\[0\]\.description: must be a non-empty string/,
+  );
 });
