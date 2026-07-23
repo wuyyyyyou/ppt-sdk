@@ -14,6 +14,32 @@ export interface HostUploadRef {
   mode?: "negotiate+confirm";
 }
 
+export type GenerationRunKind = "deck-generation" | "page-refinement" | "deck-refinement";
+export type GenerationRunState = "preparing" | "active" | "committing" | "committed" | "abandoned";
+export interface GenerationRunTransaction {
+  schema_version: 1;
+  run_id: string;
+  workspace_id: string;
+  run_kind: GenerationRunKind;
+  state: GenerationRunState;
+  official_workspace_dir: string;
+  shadow_workspace_dir: string;
+  previous_workspace_dir: string;
+  origin_page_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PrepareGenerationRunResult {
+  transaction: GenerationRunTransaction;
+  workspace: WorkspaceResult | null;
+}
+
+export interface CommitGenerationRunResult {
+  transaction: GenerationRunTransaction;
+  workspace: WorkspaceResult;
+}
+
 export interface WorkspaceSummary {
   workspace_id: string;
   task_id?: string;

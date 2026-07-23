@@ -108,12 +108,22 @@ import type {
   , PreparePageRefinementResult
   , CommitDeckRefinementInput
   , CommitDeckRefinementResult
+  , GenerationRunKind
+  , GenerationRunTransaction
+  , PrepareGenerationRunResult
+  , CommitGenerationRunResult
 } from "./types";
 import { createAnnaPptBackend } from "./annaPptBackend";
 import { connectAnnaRuntime } from "../runtime/annaRuntime";
 import { detectRuntimeMode } from "../runtime/runtimeMode";
 
 export interface PptBackend {
+  beginGenerationRun(input: { workspace_dir: string; run_kind: GenerationRunKind; origin_page_id?: string | null }): Promise<GenerationRunTransaction>;
+  prepareGenerationRun(input: { run_id: string }): Promise<PrepareGenerationRunResult>;
+  abandonGenerationRun(input: { run_id: string }): Promise<GenerationRunTransaction>;
+  commitGenerationRun(input: { run_id: string }): Promise<CommitGenerationRunResult>;
+  cleanupGenerationRun(input: { run_id: string }): Promise<{ cleaned: true }>;
+  getWorkspaceGenerationRun(input: { workspace_dir: string }): Promise<GenerationRunTransaction | null>;
   listWorkspaces(): Promise<ListWorkspacesResult>;
   getWorkspaceDefaults(): Promise<WorkspaceDefaultsResult>;
   createWorkspace(input: CreateWorkspaceInput): Promise<CreateWorkspaceResult>;

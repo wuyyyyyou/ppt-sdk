@@ -85,7 +85,7 @@ The process that automatically starts after Presentation Requirements Confirmati
 A natural-language instruction used to revise the currently displayed Outline Draft, including unsaved manual edits. A successful revision must be complete and valid, may add, remove, merge, split, or reorder entries, and is saved automatically; failure preserves the displayed Outline unchanged.
 
 **Outline Confirmation**:
-The explicit user action that saves the currently displayed Outline, validates every entry, assigns a new opaque `page_id` to every entry, marks the Outline confirmed, and then automatically starts the downstream workflow. If an existing Deck is present, confirmation replaces its current generation state and page identities rather than maintaining parallel Deck versions.
+The explicit user action that first preserves the currently displayed content as the current Outline Draft, then validates every entry, assigns a new opaque `page_id` to every entry, marks the run's Outline confirmed, and automatically starts the downstream workflow. If that first Deck Generation is abandoned, the confirmation does not become current and the preserved Outline Draft remains; otherwise, when an existing Deck is present, successful Generation Commit replaces its current generation state and page identities rather than maintaining parallel Deck versions.
 
 **Authoring Kit**:
 The released page-authoring foundation used to initialize Deck Generation work. It provides a stable Page Source Bootstrap together with reusable foundations and reference guidance, but it is not a selectable visual style and does not determine a Deck's final visual identity.
@@ -169,7 +169,7 @@ _Avoid_: Disable evidence, disable uploaded sources
 The decision that more external material is needed because the deck or a refinement target depends on real-world facts, current information, source-backed data, or external visual assets that are not already available in Research Evidence.
 
 **Research Evidence Gap**:
-A case where Research Discovery, Research Curation, or Page Evidence Assignment cannot produce enough Research Evidence for a requested deck or page intent. It does not block Page Generation and does not make completed research work partially failed; unsupported concrete details must be omitted, generalized, or marked as TBD / 待补充. Reaching a Research Discovery iteration limit may produce a Research Evidence Gap. User cancellation or interruption during research is unfinished work, not a Research Evidence Gap.
+A case where Research Discovery, Research Curation, or Page Evidence Assignment cannot produce enough Research Evidence for a requested deck or page intent. It does not block Page Generation and does not make completed research work partially failed; unsupported concrete details must be omitted, generalized, or marked as TBD / 待补充. Reaching a Research Discovery iteration limit may produce a Research Evidence Gap. Generation Abandonment or interruption during research is unfinished work, not a Research Evidence Gap.
 
 **Page Evidence Assignment**:
 The deck-level step after Research Discovery that assigns relevant facts, derived insights, and visual assets to Page Generation Units and directly materializes page-assigned Research Evidence before Page Authoring. It does not create a Page Plan, choose page composition, modify the Confirmed Outline, or make Raw Research Material or full Uploaded Source Analysis a Page Authoring grounding source.
@@ -230,18 +230,18 @@ A deck that was generated from an earlier Confirmed Outline, Workspace Authoring
 The process that turns a confirmed outline into presentation pages; it does not include outline creation from a brief.
 
 **Deck Generation Public Facade**:
-The stable app-facing entry boundary for Deck Generation, Deck Generation Resume, and future refinement workflows. It exposes the workflow capabilities without owning their internal workflow decisions.
+The stable app-facing entry boundary for Deck Generation, Deck Generation Resume, Generation Abandonment, and future refinement workflows. It exposes the workflow capabilities without owning their internal workflow decisions.
 _Avoid_: Workflow implementation, orchestration module
 
 **Active Deck Generation**:
-A deck generation process that is currently running; the confirmed outline is not open to edits during this period.
+A deck generation process that is currently running; the official Workspace's presentation content is frozen during this period and is replaced only by successful Generation Commit.
 
 **Interrupted Deck Generation**:
-A Deck Generation that is neither running nor finished, with the Workspace Style Guide, research, evidence assignment, or Page Source preparation not yet ready, one or more Page Generation Units not yet accepted, or final Deck artifacts not yet ready, and no page actively authoring. It can be resumed to finish the unfinished work while keeping accepted pages.
-_Avoid_: Cancelled Deck — cancellation is the user action that leads here, not the resulting state.
+A Deck Generation that is neither running nor finished, with the Workspace Style Guide, research, evidence assignment, or Page Source preparation not yet ready, one or more Page Generation Units not yet accepted, or final Deck artifacts not yet ready, and no page actively authoring. It can be resumed as the same run while keeping accepted pages, and the Workspace state that preceded the run remains current until Generation Commit succeeds.
+_Avoid_: Abandoned Generation — Generation Abandonment permanently discards its run rather than creating resumable work.
 
 **Unresumable Deck Generation**:
-A Deck Generation that is not running and cannot be safely resumed because authoritative Workspace artifacts are missing, stale, invalid, or inconsistent with the Confirmed Outline and persisted generation state.
+A Deck Generation that cannot be safely resumed because the authoritative pre-run Workspace artifacts are missing, stale, invalid, or inconsistent with the run state. The run ends without replacing the pre-run Workspace, and the user must correct or recreate its authoritative inputs before starting a new run.
 _Avoid_: Failed Deck when the issue is an artifact or state blocker rather than a Page Generation failure.
 
 **Generation Step**:
@@ -269,7 +269,7 @@ User-facing Chinese label: 渲染后 HTML 快照
 _Avoid_: Page Source, Executable React HTML, Runtime HTML
 
 **Render Readiness**:
-The condition in which all tracked dependencies affecting visible content have settled and the rendered DOM and layout are stable enough to capture. A Rendered HTML Snapshot may be published only after this condition is reached; timeout or cancellation leaves rendering unfinished and produces no partial snapshot.
+The condition in which all tracked dependencies affecting visible content have settled and the rendered DOM and layout are stable enough to capture. A Rendered HTML Snapshot may be published only after this condition is reached; timeout, interruption, or Generation Abandonment leaves rendering unfinished and produces no partial snapshot.
 User-facing Chinese label: 渲染就绪
 _Avoid_: Fixed Settle Time, Best-effort Ready
 
@@ -278,7 +278,7 @@ The engine-owned, rebuildable rendering index that maps the current Confirmed Ou
 _Avoid_: Page Plan, Page Source of Truth, Agent-authored Manifest
 
 **Active Page Generation**:
-A Page Generation Unit that has started and has not yet reached an accepted, failed, or cancelled terminal state. Its live stream may be shown while it is active.
+A Page Generation Unit that has started and has not yet reached an accepted, failed, or interrupted terminal state. Its live stream may be shown while it is active.
 
 **Deck Generation Progress**:
 The aggregate progress of an Active Deck Generation across all Page Generation Units. It describes counts and overall state rather than naming one current page.
@@ -298,11 +298,11 @@ The optional, user-enabled Page Generation check that judges whether a rendered 
 _Avoid_: Self Review when referring to the visual-only screenshot check.
 
 **Generation Session History**:
-The collapsed-by-default record of completed agent runs from Deck Generation. It is historical context, not the primary place for Live Page Streams.
+The collapsed-by-default record of completed agent runs from Deck Generation. It is historical context, not the primary place for Live Page Streams, and abandoned runs remain diagnostic-only rather than appearing as resumable or completed generation history.
 _Avoid_: User-facing labels such as "Session History" when the record is really page generation work.
 
 **AI Interaction Log**:
-A Workspace-owned diagnostic record of each LLM completion or Agent run used to produce, revise, inspect, or repair deck artifacts. It is for troubleshooting and auditability, separate from user-facing Generation Session History.
+A Workspace-owned diagnostic record of each LLM completion or Agent run used to produce, revise, inspect, or repair deck artifacts, including runs later abandoned by the user. It is for troubleshooting and auditability, separate from user-facing Generation Session History.
 _Avoid_: Session History, Live Page Stream
 
 **Workspace Storage Transfer Log**:
@@ -310,11 +310,11 @@ A Workspace-owned diagnostic record of Host Upload and APS Files transfer activi
 _Avoid_: Agent Session Log, Export History, Uploaded Source Material
 
 **Failed Page Generation**:
-A Page Generation Unit that reached a terminal state without becoming accepted after its automatic recovery attempts are exhausted or manual review is required. Deck Generation may still continue other Page Generation Units, but the Deck is not finished until failed pages are retried or otherwise resolved.
+A Page Generation Unit that reached a terminal state without becoming accepted after its automatic recovery attempts are exhausted or manual review is required. Its run and accepted pages remain available for retry while the pre-run Workspace stays current; only Generation Abandonment discards them, and Generation Commit cannot begin until every failed page is resolved.
 
 **Interrupted Page Generation**:
-A Page Generation Unit that was Active but whose run is no longer owned by any process, because the user stopped Deck Generation or the app exited before the unit reached an accepted or failed verdict, including interruption during Research Collection or Research Curation. It is unfinished in intent but terminal in fact: no run is advancing it, so it must be explicitly resumed or retried. It is defined by ownership, not by cause, so a user stop and an app exit produce the same state.
-_Avoid_: Stopped Page, Cancelled Page — cancellation is a deck-level user action, not a page state. Distinguish from Failed Page Generation, which exhausted recovery or needs review.
+A Page Generation Unit that was Active but whose run is no longer owned by any process because the app exited or lost the run before the unit reached an accepted or failed verdict, including interruption during Research Collection or Research Curation. It is unfinished in intent but terminal in fact: no run is advancing it, so it must be explicitly resumed or retried.
+_Avoid_: Abandoned Page — Generation Abandonment discards the whole run rather than leaving resumable page state. Distinguish from Failed Page Generation, which exhausted recovery or needs review.
 
 **Agent Session Cache Miss**:
 A transient Agent Session infrastructure failure where the platform cannot continue an Agent run because the app session authorization is unavailable. It is treated as infrastructure failure, not as a Page Generation content or render failure.
@@ -346,7 +346,7 @@ The user action that continues an unfinished Deck Refinement from persisted deck
 The committed target Page Generation Units already own their refinement execution states, while the persisted Deck Refinement Request and page-level reasons preserve the authoring intent needed to continue without replanning.
 
 **Deck Refinement Preparation**:
-The visible pre-commit phase of Deck Refinement that derives the complete page reconciliation and, when allowed, a replacement Workspace Style Guide without changing the accepted Deck's authoritative artifacts. A confirmed Visual Style Preset never allows Style Guide replacement. Failure during preparation leaves the accepted Deck unchanged and is retried as a new refinement attempt rather than resumed as partially committed work.
+The visible pre-commit phase of Deck Refinement that derives the complete page reconciliation and, when allowed, a replacement Workspace Style Guide without changing the accepted Deck's authoritative artifacts. A confirmed Visual Style Preset never allows Style Guide replacement; a recoverable preparation failure keeps the same run available to retry the failed stage, while invalid authoritative inputs make the run unresumable.
 
 **Deck Refinement Commit**:
 The tool-call-level transition that accepts a prepared Deck Refinement decision as the Workspace's new active generation state, including its reconciled Confirmed Outline, any permitted Workspace Style Guide decision, target Page Generation Units, and recovery state. A confirmed Visual Style Preset keeps its Style Guide unchanged. Deck Refinement Resume applies only after this transition has succeeded.
@@ -372,11 +372,17 @@ The user action that continues an unfinished Page Refinement using the same pers
 The last successful rendered screenshot preserved for a target page when Page or Deck Refinement resets that page's execution state. It is an optimization-before baseline for visual and layout changes until a new successful render replaces it, but text, numbers, charts, and claims visible in it are not grounding evidence unless separately present in allowed sources.
 
 **Deck Generation Resume**:
-The user action that continues unfinished Deck Generation by completing missing Workspace Style Guide, research, evidence-assignment, or Page Source preparation work, re-running any Page Generation Unit that is not accepted yet, including Interrupted Page Generations, pending pages, infrastructure failures, and Failed Page Generations, or by continuing Final Deck Render when all pages are accepted but final Deck artifacts are not ready. It keeps accepted pages and does not discard the current Deck Generation; an unfinished page keeps its previous current state until its resumed run actually starts.
+The user action that continues the same unfinished Deck Generation by completing missing Workspace Style Guide, research, evidence-assignment, or Page Source preparation work, re-running any Page Generation Unit that is not accepted yet, including Interrupted Page Generations, pending pages, infrastructure failures, and Failed Page Generations, or by continuing Final Deck Render when all pages are accepted but final Deck artifacts are not ready. It keeps accepted pages from that run without replacing the pre-run current Workspace until Generation Commit succeeds; an unfinished page keeps its previous state until its resumed work actually starts.
 _Avoid_: Regenerate, Restart — those discard accepted pages and start the whole Deck over.
 
-**Deck Generation Cancellation**:
-The user action that asks an Active Deck Generation to stop starting new Page Generation Units and to cooperatively stop active page, research, and final-render work. Work already inside an external operation may return after cancellation, but cancelled work must not be promoted into accepted page content, Research Evidence, or final Deck artifacts; after cancellation settles, unfinished deck work is represented as an Interrupted Deck Generation.
+**Generation Abandonment**:
+The explicit user-confirmed action available throughout an active Deck Generation, Page Refinement, or Deck Refinement before its final commit; it permanently discards that run and returns to the Workspace state that preceded it. An abandoned run cannot be resumed or prevent a new run from starting, and any work that finishes afterward cannot become current Workspace content or final Deck artifacts.
+User-facing Chinese label: 停止
+_Avoid_: Cancellation, Pause, Interrupted Generation
+
+**Generation Commit**:
+The final transition that makes a fully prepared Deck Generation, Page Refinement, or Deck Refinement result current in its Workspace. Generation Abandonment may win before this transition begins and is unavailable while the commit is running; if the commit fails, the result never becomes current and the Workspace returns to its pre-run state after the user acknowledges the failure.
+_Avoid_: Page Acceptance, Final Deck Render
 
 **Export Artifact**:
 A final PPTX or PDF produced from a Workspace for the user to download. The Workspace-owned file remains authoritative even when a separate downloadable copy exists.
@@ -394,7 +400,7 @@ A user-owned copy of an Export Artifact explicitly saved for reuse outside the P
 _Avoid_: Export Artifact Mirror
 
 **Workspace Diagnostic Bundle**:
-A temporary downloadable archive containing the contents observed while collecting one Workspace for troubleshooting, including when that Workspace is active; it is not an atomic point-in-time snapshot. Its creation does not change the Workspace, creates no Diagnostic Bundle History, and produces neither an authoritative Workspace artifact nor an Export Artifact or Export Artifact Mirror.
+A temporary downloadable archive containing the contents observed while collecting one official Workspace for troubleshooting and, when present, its current foreground or interrupted generation transaction and complete shadow Workspace. It may be collected while generation is active, is not an atomic point-in-time snapshot, changes no Workspace, creates no Diagnostic Bundle History, and produces neither an authoritative Workspace artifact nor an Export Artifact or Export Artifact Mirror.
 User-facing Chinese label: 问题排查包
 _Avoid_: Log Bundle, Log Export, Export Artifact, Diagnostic Bundle History
 

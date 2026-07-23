@@ -68,6 +68,7 @@ export interface AgentClient {
   checkToolAccess(): Promise<void>;
   runAuthoringPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentRunSummary>;
   runPageVisualReviewPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentPageVisualReviewResult>;
+  cancelActiveRuns(): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -82,6 +83,7 @@ export interface AgentRunOptions {
   signal?: AbortSignal;
   isCancelled?: () => boolean;
   logContext?: AiOperationLogContext;
+  drainOnCancel?: boolean;
 }
 
 export interface AgentClientOptions {
@@ -403,12 +405,23 @@ async function collectRunText(
   let output = "";
   const events: AgentStreamEvent[] = [];
 
-  const stream = guardStreamLiveness(session.run({ content }), {
+  const rawStream = session.run({ content });
+  const sessionRecord = session as unknown as Record<string, unknown>;
+  const streamRecord = rawStream as unknown as Record<string, unknown>;
+  const initialRunId = typeof streamRecord.run_id === "string"
+    ? streamRecord.run_id
+    : typeof streamRecord.runId === "string" ? streamRecord.runId : null;
+  if (initialRunId) sessionRecord.__activeRunId = initialRunId;
+  const stream = guardStreamLiveness(rawStream, {
     idleMs: clientOptions.streamIdleTimeoutMs ?? AGENT_STREAM_IDLE_TIMEOUT_MS,
-    signal: options?.signal,
-    isCancelled: options?.isCancelled,
+    signal: options?.drainOnCancel ? undefined : options?.signal,
+    isCancelled: options?.drainOnCancel ? undefined : options?.isCancelled,
   });
   for await (const frame of stream) {
+    const frameRunId = typeof frame.run_id === "string"
+      ? frame.run_id
+      : typeof frame.runId === "string" ? frame.runId : null;
+    if (frameRunId) sessionRecord.__activeRunId = frameRunId;
     if (frame.event === "complete") {
       break;
     }
@@ -429,7 +442,6 @@ async function collectRunText(
       }
     }
   }
-
   return { text: output, events };
 }
 
@@ -558,12 +570,14 @@ export async function createAgentClient(
   runtime: AnnaRuntime,
   clientOptions: AgentClientOptions = {},
 ): Promise<AgentClient> {
+  const activeSessions = new Set<AnnaAgentSession>();
   const wait = clientOptions.wait ?? defaultWait;
   const toolAccessPolicy =
     clientOptions.toolAccessPolicy ?? DEFAULT_AGENT_TOOL_ACCESS_POLICY;
   async function createSession() {
     try {
       const session = await runtime.agent.session({ submode: "auto" });
+      activeSessions.add(session);
       if (toolAccessPolicy !== "off") {
         const toolAccessWarning = getAgentToolAccessWarning(session);
         if (toolAccessWarning) {
@@ -586,6 +600,7 @@ export async function createAgentClient(
   }
 
   async function deleteSession(session: AnnaAgentSession | null) {
+    if (session) activeSessions.delete(session);
     await session?.delete().catch(() => undefined);
   }
 
@@ -915,6 +930,24 @@ export async function createAgentClient(
             collected.sessionCacheMissRetries + repaired.sessionCacheMissRetries,
         };
       }
+    },
+
+    async cancelActiveRuns() {
+      await Promise.all([...activeSessions].map(async (session) => {
+        const sessionRecord = session as unknown as Record<string, unknown>;
+        const runId = typeof sessionRecord.__activeRunId === "string"
+          ? sessionRecord.__activeRunId
+          : typeof sessionRecord.run_id === "string"
+            ? sessionRecord.run_id
+            : typeof sessionRecord.runId === "string" ? sessionRecord.runId : null;
+        if (!runId || typeof session.cancel !== "function") {
+          console.warn("Agent Session cancellation is unavailable for an active run.");
+          return;
+        }
+        await session.cancel(runId).catch((error) => {
+          console.warn("Failed to cancel Agent Session run", error);
+        });
+      }));
     },
 
     async close() {

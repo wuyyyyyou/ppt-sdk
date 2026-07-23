@@ -40,7 +40,7 @@ export async function runPageRefinement(input: RunDeckRefinementInput, instructi
       message: input.locale === "zh" ? "正在准备当前页优化" : "Preparing current-page refinement",
       currentPageIndex: page.index,
       totalPages: authoringDeck.pages.length,
-    }, await input.backend.getPageProgress({ workspace_dir: input.workspace.workspace_dir }), undefined, undefined, attemptLimits));
+    }, null, undefined, undefined, attemptLimits));
     const prepared = await input.backend.preparePageRefinement({
       workspace_dir: input.workspace.workspace_dir,
       page_id: page.page_id,

@@ -6,7 +6,11 @@ export type ActiveGenerationRunKind = "deck-generation" | "page-refinement" | "d
 
 export interface ActiveGenerationRun {
   kind: ActiveGenerationRunKind;
+  runId: string;
+  officialWorkspaceDir: string;
+  shadowWorkspaceDir: string;
   stopping: boolean;
+  committing: boolean;
 }
 
 export function navigationBlockedByActiveGeneration(activeRun: ActiveGenerationRun | null) {
@@ -14,6 +18,7 @@ export function navigationBlockedByActiveGeneration(activeRun: ActiveGenerationR
 }
 
 export type GenerationViewStatus =
+  | "preparing"
   | "running"
   | "stopping"
   | "interrupted"
@@ -38,8 +43,10 @@ export interface BuildGenerationViewStateInput {
   loading: LoadingKind;
   progress: DeckGenerationProgress | null;
   activeRun: ActiveGenerationRun | null;
+  preparing?: boolean;
   unresumable?: boolean;
   resumeAllowed?: boolean;
+  hasAbandonableRun?: boolean;
 }
 
 function hasUnfinishedPages(progress: DeckGenerationProgress | null) {
@@ -79,12 +86,28 @@ export function buildGenerationViewState(
     };
   }
 
+  if (input.preparing) {
+    return {
+      status: "preparing",
+      isActive,
+      isStopping: false,
+      canStop: isActive && activeRun?.committing !== true,
+      canResume: false,
+      canBackToOutline: false,
+      showStop: isActive,
+      showResume: false,
+      showBackToOutline: false,
+      hasUnfinishedPages: unfinishedPages,
+      resumeAction: "generation",
+    };
+  }
+
   if (isActive) {
     return {
       status: "running",
       isActive: true,
       isStopping: false,
-      canStop: true,
+      canStop: activeRun?.committing !== true,
       canResume: false,
       canBackToOutline: false,
       showStop: true,
@@ -100,7 +123,7 @@ export function buildGenerationViewState(
       status: "unresumable",
       isActive: false,
       isStopping: false,
-      canStop: false,
+      canStop: input.hasAbandonableRun === true,
       canResume: false,
       canBackToOutline: true,
       showStop: true,
@@ -139,7 +162,7 @@ export function buildGenerationViewState(
       status: "interrupted",
       isActive: false,
       isStopping: false,
-      canStop: false,
+      canStop: input.hasAbandonableRun === true,
       canResume: resumeAllowed,
       canBackToOutline: false,
       showStop: true,
@@ -157,7 +180,7 @@ export function buildGenerationViewState(
     status: "interrupted",
     isActive: false,
     isStopping: false,
-    canStop: false,
+    canStop: input.hasAbandonableRun === true,
     canResume: resumeAllowed,
     canBackToOutline: false,
     showStop: true,

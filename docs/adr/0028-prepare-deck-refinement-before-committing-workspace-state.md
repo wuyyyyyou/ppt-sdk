@@ -4,6 +4,8 @@ status: accepted
 
 # Prepare Deck Refinement before committing Workspace state
 
+> ADR-0041 supersedes this ADR's decisions that Deck Refinement Commit changes the official Workspace before Page Authoring and that post-commit refinement recovery proceeds only forward in that official Workspace. Its preparation, planning, validation, page reconciliation, and refinement-intent decisions remain in effect inside the per-run shadow Workspace.
+
 Deck Refinement enters the visible generation experience immediately after submission, but its page reconciliation and replacement Workspace Style Guide are prepared before any accepted Workspace authority is changed. Only a fully prepared result is committed as the new active generation state; planning or Style Guide failure leaves the existing Outline, Style Guide, Page Sources, progress, and rendered Deck intact.
 
 **Consequences**
@@ -14,7 +16,7 @@ Deck Refinement enters the visible generation experience immediately after submi
 - Reconciled Deck titles and Outline Entry content use the current confirmed output language, or the explicit new output language when the refinement changes it, regardless of the language used to submit the request. Internal planning and page-level reason fields may remain English for consistent downstream prompting and diagnostics.
 - Planning `update` and `add` operations use the same structured Outline Entry contract as Outline Creation: one-line `title`, one-line `core_message`, and a non-empty array of single-line `required_content` strings. Validation converts the array into the Workspace Markdown representation only after the complete planning result passes.
 - Planning and replacement Style Guide generation can be retried without recovering or rolling back a partially modified Deck.
-- Preparation failure offers a full retry from Deck Refinement Planning or a return to the unchanged accepted Deck; it is not presented as Resume. A planning-level `no_op` returns to the Deck as a successful no-change result rather than a failure.
+- Recoverable preparation failure keeps the same shadow run and offers a retry from the failed preparation stage or Generation Abandonment; invalid authoritative inputs end the unresumable run without changing the accepted Deck. A planning-level `no_op` returns to the Deck as a successful no-change result rather than a failure.
 - The Deck Refinement Commit is the boundary after which interruption is persisted and continued through Deck Refinement Resume.
 - Commit reconciles the Confirmed Outline, Workspace Style Guide decision, Manifest, Page Progress, added Page Source Bootstraps, removed active pages, target-page recovery information, and invalidated final render as one active generation transition.
 - Commit prevalidates every artifact, prepares temporary files, replaces official files only after preparation succeeds, and rolls back ordinary tool-call failures. It does not introduce a transaction journal or promise crash-atomic multi-file replacement if the engine process is forcibly terminated between filesystem operations.

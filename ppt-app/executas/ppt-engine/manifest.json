@@ -1582,6 +1582,40 @@
       ]
     },
     {
+      "name": "app_begin_generation_run",
+      "description": "Create a preparing shadow-Workspace transaction and return its stable run id.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "required": true },
+        { "name": "run_kind", "type": "string", "required": true },
+        { "name": "origin_page_id", "type": "string", "required": false }
+      ]
+    },
+    {
+      "name": "app_prepare_generation_run",
+      "description": "Create and activate the complete shadow Workspace for a preparing generation run.",
+      "parameters": [{ "name": "run_id", "type": "string", "required": true }]
+    },
+    {
+      "name": "app_abandon_generation_run",
+      "description": "Atomically abandon a preparing or active generation run.",
+      "parameters": [{ "name": "run_id", "type": "string", "required": true }]
+    },
+    {
+      "name": "app_commit_generation_run",
+      "description": "Atomically publish an active shadow Workspace as the official Workspace.",
+      "parameters": [{ "name": "run_id", "type": "string", "required": true }]
+    },
+    {
+      "name": "app_cleanup_generation_run",
+      "description": "Best-effort cleanup for a committed or abandoned generation run.",
+      "parameters": [{ "name": "run_id", "type": "string", "required": true }]
+    },
+    {
+      "name": "app_get_workspace_generation_run",
+      "description": "Return the current preparing, active, or committing generation transaction for a Workspace.",
+      "parameters": [{ "name": "workspace_dir", "type": "string", "required": true }]
+    },
+    {
       "name": "app_prepare_workspace_diagnostic_bundle",
       "description": "Create a fresh ZIP of the complete current Workspace, overwrite its user-scoped APS Files diagnostic object, and return a short-lived download URL without persisting a mirror or URL.",
       "parameters": [

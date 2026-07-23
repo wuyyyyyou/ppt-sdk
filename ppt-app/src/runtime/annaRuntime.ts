@@ -35,6 +35,7 @@ export interface AnnaAgentSession {
   inherit_host_tools?: boolean;
   run(input: { content: string }): AsyncIterable<AnnaAgentRunFrame>;
   history?(): Promise<unknown>;
+  cancel?(runId: string): Promise<unknown>;
   delete(): Promise<unknown>;
 }
 

@@ -34,6 +34,7 @@ import type {
   WorkspacePages,
   WorkspaceStyleProfileSelection,
   WorkspaceSettings
+  , GenerationRunTransaction
 } from "../../../api/types";
 import {
   createLocalProjectDeck,
@@ -113,6 +114,7 @@ import { createWorkspaceReviewRenderKey } from "../workspaceReviewRenderKey";
 import { createInitialWorkspaceSnapshot } from "../createdWorkspace";
 import type {
   ContextRow,
+  ConfirmationDialogRequest,
   DeckReviewRenderState,
   DeckWorkspaceState,
   ExportProgressState,
@@ -138,6 +140,7 @@ import {
   type ActiveGenerationRun,
   type ActiveGenerationRunKind,
 } from "../generationViewState";
+import { createOperationScopedProgressHandler } from "../generationProgressGuard";
 import { isSelectableTemplateGroup } from "../templateSelectionPolicy";
 import {
   applyUploadedSourceAnalysisWorkflowEvent,
@@ -163,6 +166,7 @@ const AGENT_TOOL_ACCESS_POLICY = resolveAgentToolAccessPolicy(
 );
 const PPTX_EXPORT_POLL_INTERVAL_MS = 1500;
 const PPTX_EXPORT_POLL_TIMEOUT_MS = 15 * 60 * 1000;
+const AGENT_CANCELLATION_WAIT_MS = 3_000;
 
 function padDatePart(value: number) {
   return String(value).padStart(2, "0");
@@ -373,23 +377,24 @@ export interface DeckWorkspaceActions {
   setPreviewMode: (mode: PreviewMode) => void;
   setRefineScope: (scope: RefineScope) => void;
   showToast: (message: string) => void;
-  cancelGenerateDeck: () => void;
-  navigate: (page: PageId) => void;
-  navigateMain: (stage: MainStage) => void;
-  goBack: () => void;
+  cancelGenerateDeck: () => Promise<void>;
+  navigate: (page: PageId) => Promise<void>;
+  navigateMain: (stage: MainStage) => Promise<void>;
+  goBack: () => Promise<void>;
+  resolveConfirmation: (confirmed: boolean) => void;
   addContextRow: (row: ContextRow) => void;
   updateContextRow: (id: string, value: string) => void;
   removeContextRow: (id: string) => void;
   addStyleRow: () => void;
   generateDeck: () => Promise<void>;
   generatePresentationRequirements: () => Promise<void>;
-  selectVisualStylePreset: (presetId: string | null) => void;
+  selectVisualStylePreset: (presetId: string | null) => Promise<void>;
   useManualPresentationRequirements: () => Promise<void>;
   selectPresentationRequirement: <K extends keyof PresentationRequirementsSelections>(
     field: K,
     value: PresentationRequirementsSelections[K],
   ) => void;
-  returnToBriefFromRequirements: () => void;
+  returnToBriefFromRequirements: () => Promise<void>;
   savePresentationRequirements: () => Promise<void>;
   confirmPresentationRequirements: () => Promise<void>;
   createDeckFromOutline: () => Promise<void>;
@@ -515,8 +520,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [pageProgress, setPageProgress] = useState<PageProgress | null>(null);
   const [refineScope, setRefineScope] = useState<RefineScope>("deck");
   const [loading, setLoading] = useState<LoadingKind>("none");
+  const [confirmationDialog, setConfirmationDialog] =
+    useState<ConfirmationDialogRequest | null>(null);
   const [activeGenerationRun, setActiveGenerationRun] =
     useState<ActiveGenerationRun | null>(null);
+  const [generationPreparing, setGenerationPreparing] = useState(false);
+  const [generationTransaction, setGenerationTransaction] =
+    useState<GenerationRunTransaction | null>(null);
   const [generationUnresumable, setGenerationUnresumable] = useState(false);
   const [generationResumeAllowed, setGenerationResumeAllowed] = useState(true);
   const [exportProgress, setExportProgress] = useState<ExportProgressState>(
@@ -540,6 +550,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [agentClient, setAgentClient] = useState<AgentClient | null>(null);
   const cancelCreateDeckRef = useRef(false);
   const cancelCreateDeckAbortRef = useRef<AbortController | null>(null);
+  const generationOperationRef = useRef(0);
+  const generationSignalOperationsRef = useRef(new WeakMap<AbortSignal, number>());
+  const confirmationResolverRef = useRef<((confirmed: boolean) => void) | null>(null);
   const pendingUploadedSourceAnalysisActionRef = useRef<(() => Promise<void>) | null>(null);
   const forceUploadedSourceAnalysisRefreshRef = useRef(false);
   const requirementsOperationRef = useRef(0);
@@ -1309,7 +1322,16 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     resetGenerationUiState();
   }
 
+  function generationProgressHandler(signal: AbortSignal) {
+    return createOperationScopedProgressHandler(
+      signal,
+      ownsGenerationOperation,
+      recordGenerationProgress,
+    );
+  }
+
   function resetGenerationUiState() {
+    setGenerationPreparing(false);
     setGenerationUnresumable(false);
     setGenerationResumeAllowed(true);
   }
@@ -1319,13 +1341,87 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     cancelCreateDeckAbortRef.current?.abort();
     const controller = new AbortController();
     cancelCreateDeckAbortRef.current = controller;
+    const operationId = generationOperationRef.current + 1;
+    generationOperationRef.current = operationId;
+    generationSignalOperationsRef.current.set(controller.signal, operationId);
     return controller.signal;
   }
 
-  function beginActiveGenerationRun(kind: ActiveGenerationRunKind) {
+  function ownsGenerationOperation(signal: AbortSignal) {
+    return generationSignalOperationsRef.current.get(signal) === generationOperationRef.current;
+  }
+
+  function beginActiveGenerationRun(kind: ActiveGenerationRunKind, transaction: GenerationRunTransaction) {
     setGenerationUnresumable(false);
     setGenerationResumeAllowed(kind === "deck-generation");
-    setActiveGenerationRun({ kind, stopping: false });
+    setActiveGenerationRun({
+      kind,
+      runId: transaction.run_id,
+      officialWorkspaceDir: transaction.official_workspace_dir,
+      shadowWorkspaceDir: transaction.shadow_workspace_dir,
+      stopping: false,
+      committing: false,
+    });
+    setGenerationTransaction(transaction);
+  }
+
+  async function prepareShadowGenerationRun(
+    workspace: WorkspaceResult,
+    kind: ActiveGenerationRunKind,
+    originPageId?: string | null,
+    onStarted?: (transaction: GenerationRunTransaction) => void,
+  ) {
+    if (!backend) throw new Error("PptBackend is not available.");
+    const transaction = await backend.beginGenerationRun({
+      workspace_dir: workspace.workspace_dir,
+      run_kind: kind,
+      origin_page_id: originPageId,
+    });
+    onStarted?.(transaction);
+    beginActiveGenerationRun(kind, transaction);
+    let prepared;
+    try {
+      prepared = await backend.prepareGenerationRun({ run_id: transaction.run_id });
+    } catch (error) {
+      await backend.abandonGenerationRun({ run_id: transaction.run_id }).catch(() => undefined);
+      void backend.cleanupGenerationRun({ run_id: transaction.run_id }).catch((cleanupError) =>
+        console.warn("Failed to clean incomplete shadow Workspace", cleanupError)
+      );
+      setGenerationTransaction(null);
+      throw error;
+    }
+    if (prepared.transaction.state === "abandoned" || !prepared.workspace) {
+      throw new Error("本次生成已停止。");
+    }
+    setGenerationPreparing(false);
+    return { transaction: prepared.transaction, workspace: prepared.workspace };
+  }
+
+  function rebaseCompletion<T>(value: T, from: string, to: string): T {
+    return JSON.parse(JSON.stringify(value).split(from).join(to)) as T;
+  }
+
+  async function commitShadowGenerationRun(transaction: GenerationRunTransaction) {
+    if (!backend) throw new Error("PptBackend is not available.");
+    setGenerationTransaction({ ...transaction, state: "committing" });
+    setActiveGenerationRun((current) => current ? { ...current, committing: true } : current);
+    try {
+      return await backend.commitGenerationRun({ run_id: transaction.run_id });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await requestConfirmation({
+        title: locale === "zh" ? "生成结果提交失败" : "Failed to commit generation result",
+        body: locale === "zh"
+          ? `${message}\n\n系统已恢复生成前版本。`
+          : `${message}\n\nThe version from before generation has been restored.`,
+        confirmLabel: locale === "zh" ? "知道了" : "Got it",
+        tone: "warning",
+      });
+      const official = await backend.openWorkspace({ workspace_dir: transaction.official_workspace_dir });
+      applyWorkspace(official, { preserveCurrentSlide: true });
+      setGenerationTransaction(null);
+      throw error;
+    }
   }
 
   async function finishActiveGenerationRun(options: {
@@ -1356,10 +1452,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         loading,
         progress: createDeckProgress,
         activeRun: activeGenerationRun,
+        preparing: generationPreparing,
         unresumable: generationUnresumable,
         resumeAllowed: generationResumeAllowed,
+        hasAbandonableRun: generationTransaction?.state === "preparing" || generationTransaction?.state === "active",
       }),
-    [activeGenerationRun, createDeckProgress, generationResumeAllowed, generationUnresumable, loading],
+    [activeGenerationRun, createDeckProgress, generationPreparing, generationResumeAllowed, generationTransaction, generationUnresumable, loading],
   );
 
   const currentStatus = useMemo(() => {
@@ -1370,6 +1468,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
     if (loading === "uploadedSourceAnalysis") return t.status.analyzingUploadedSource;
     if (loading === "outline") return t.status.creatingOutline;
+    if (generationViewState.status === "preparing") {
+      return t.generating.preparingTitle;
+    }
     if (generationViewState.status === "running") {
       return t.status.creatingDeck;
     }
@@ -1476,19 +1577,46 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     window.setTimeout(() => setToast(""), 2400);
   }
 
-  function canLeaveCurrentEditor() {
-    const dirty = (stage === "requirements" && requirementsDirty) || (stage === "outline" && outlineDirty);
-    if (!dirty) return true;
-    return window.confirm(
-      locale === "zh"
-        ? "当前页面有未保存修改，确定不保存并离开吗？"
-        : "This page has unsaved changes. Leave without saving?",
-    );
+  function resolveConfirmation(confirmed: boolean) {
+    const resolve = confirmationResolverRef.current;
+    confirmationResolverRef.current = null;
+    setConfirmationDialog(null);
+    resolve?.(confirmed);
   }
 
-  function navigate(nextPage: PageId) {
+  function requestConfirmation(request: Omit<ConfirmationDialogRequest, "closeLabel">) {
+    confirmationResolverRef.current?.(false);
+    return new Promise<boolean>((resolve) => {
+      confirmationResolverRef.current = resolve;
+      setConfirmationDialog({
+        ...request,
+        closeLabel: locale === "zh" ? "关闭" : "Close",
+      });
+    });
+  }
+
+  useEffect(() => () => {
+    confirmationResolverRef.current?.(false);
+    confirmationResolverRef.current = null;
+  }, []);
+
+  async function canLeaveCurrentEditor() {
+    const dirty = (stage === "requirements" && requirementsDirty) || (stage === "outline" && outlineDirty);
+    if (!dirty) return true;
+    return requestConfirmation({
+      title: locale === "zh" ? "放弃未保存的修改？" : "Discard unsaved changes?",
+      body: locale === "zh"
+        ? "当前页面有未保存修改。离开后，这些修改将不会保留。"
+        : "This page has unsaved changes. They will not be kept after you leave.",
+      cancelLabel: locale === "zh" ? "继续编辑" : "Keep editing",
+      confirmLabel: locale === "zh" ? "放弃修改" : "Discard changes",
+      tone: "danger",
+    });
+  }
+
+  async function navigate(nextPage: PageId) {
     if (navigationBlockedByActiveGeneration(activeGenerationRun)) return;
-    if (nextPage !== page && !canLeaveCurrentEditor()) return;
+    if (nextPage !== page && !await canLeaveCurrentEditor()) return;
     if (!generated && nextPage !== "main" && nextPage !== "library") {
       showToast(t.toasts.createDeckFirst);
       return;
@@ -1562,9 +1690,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
-  function navigateMain(nextStage: MainStage) {
+  async function navigateMain(nextStage: MainStage) {
     if (navigationBlockedByActiveGeneration(activeGenerationRun)) return;
-    if (nextStage !== stage && !canLeaveCurrentEditor()) return;
+    if (nextStage !== stage && !await canLeaveCurrentEditor()) return;
     if (stage === "requirements" && requirementsStatus === "loading" && nextStage !== "requirements") {
       requirementsOperationRef.current += 1;
       setLoading("none");
@@ -1599,9 +1727,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setHistory((items) => (items.at(-1) === "main" ? items : [...items, "main"]));
   }
 
-  function goBack() {
+  async function goBack() {
     if (navigationBlockedByActiveGeneration(activeGenerationRun)) return;
-    if (!canLeaveCurrentEditor()) return;
+    if (!await canLeaveCurrentEditor()) return;
     setHistory((items) => {
       const next = items.slice(0, -1);
       const previous = next.at(-1) ?? "main";
@@ -1696,16 +1824,20 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
-  function selectVisualStylePreset(presetId: string | null) {
+  async function selectVisualStylePreset(presetId: string | null) {
     const previousId = selectedVisualStylePresetId;
     if (previousId === presetId) return;
     const hasExistingRequirements = Boolean(presentationRequirements.source?.brief);
     if (hasExistingRequirements && typeof window !== "undefined") {
-      const confirmed = window.confirm(
-        locale === "zh"
+      const confirmed = await requestConfirmation({
+        title: locale === "zh" ? "需要重新生成演示需求" : "Presentation requirements need to be regenerated",
+        body: locale === "zh"
           ? "模板已变更，需要重新生成演示需求。是否现在重新生成？"
           : "The style preset changed. Regenerate presentation requirements now?",
-      );
+        cancelLabel: locale === "zh" ? "暂不生成" : "Not now",
+        confirmLabel: locale === "zh" ? "重新生成" : "Regenerate",
+        tone: "warning",
+      });
       if (!confirmed) return;
     }
     setSelectedVisualStylePresetId(presetId);
@@ -1746,8 +1878,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     });
   }
 
-  function returnToBriefFromRequirements() {
-    if (requirementsDirty && !canLeaveCurrentEditor()) return;
+  async function returnToBriefFromRequirements() {
+    if (requirementsDirty && !await canLeaveCurrentEditor()) return;
     requirementsOperationRef.current += 1;
     setLoading("none");
     setPage("main");
@@ -1944,21 +2076,77 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     await createOutlineFromConfirmedRequirements();
   }
 
-  function cancelGenerateDeck() {
+  async function cancelGenerateDeck() {
+    const targetRun = activeGenerationRun ?? (generationTransaction ? {
+      kind: generationTransaction.run_kind,
+      runId: generationTransaction.run_id,
+      officialWorkspaceDir: generationTransaction.official_workspace_dir,
+      shadowWorkspaceDir: generationTransaction.shadow_workspace_dir,
+      stopping: false,
+      committing: false,
+    } : null);
+    if (!backend || !targetRun) return;
+    const isGeneration = targetRun.kind === "deck-generation";
+    const confirmed = await requestConfirmation({
+      title: isGeneration
+        ? (locale === "zh" ? "停止生成？" : "Stop generation?")
+        : (locale === "zh" ? "停止优化？" : "Stop refinement?"),
+      body: isGeneration
+        ? (locale === "zh"
+            ? "停止后，本次生成的所有内容都不会保留，并返回生成前的大纲。"
+            : "All content from this run will be discarded, and the Outline from before generation will be restored.")
+        : (locale === "zh"
+            ? "停止后，本次优化的所有内容都不会保留，并恢复优化前的演示文稿。"
+            : "All changes from this refinement will be discarded, and the presentation from before refinement will be restored."),
+      cancelLabel: isGeneration
+        ? (locale === "zh" ? "继续生成" : "Continue generation")
+        : (locale === "zh" ? "继续优化" : "Continue refinement"),
+      confirmLabel: locale === "zh" ? "停止并放弃" : "Stop and discard",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    // Invalidate the old operation before any awaited backend work. The agent may
+    // still emit a final progress frame while the run is being abandoned.
+    generationOperationRef.current += 1;
     cancelCreateDeckRef.current = true;
     cancelCreateDeckAbortRef.current?.abort();
-    setActiveGenerationRun((current) =>
-      current ? { ...current, stopping: true } : current
-    );
-    setCreateDeckProgress((current) =>
-      current
-        ? {
-            ...current,
-            step: "cancelled",
-            message: t.generating.cancelling,
-          }
-        : current
-    );
+    setActiveGenerationRun((current) => current ? { ...current, stopping: true } : current);
+    try {
+      await backend.abandonGenerationRun({ run_id: targetRun.runId });
+      if (agentClient) {
+        let cancellationTimedOut = false;
+        let cancellationTimeoutId: number | undefined;
+        await Promise.race([
+          agentClient.cancelActiveRuns().catch((error) => {
+            console.warn("Failed to cancel active Agent Session runs", error);
+          }),
+          new Promise<void>((resolve) => {
+            cancellationTimeoutId = window.setTimeout(() => {
+              cancellationTimedOut = true;
+              resolve();
+            }, AGENT_CANCELLATION_WAIT_MS);
+          }),
+        ]);
+        if (cancellationTimeoutId !== undefined) {
+          window.clearTimeout(cancellationTimeoutId);
+        }
+        if (cancellationTimedOut) {
+          console.warn("Timed out waiting for active Agent Session cancellation");
+        }
+      }
+      const official = await backend.openWorkspace({ workspace_dir: targetRun.officialWorkspaceDir });
+      applyWorkspace(official);
+      setGenerationPreparing(false);
+      setActiveGenerationRun(null);
+      setGenerationTransaction(null);
+      setLoading("none");
+      setPage("main");
+      setStage(isGeneration ? "outline" : "deck");
+      showToast(isGeneration ? "已停止，本次生成未保留。" : "已停止，本次优化未保留。");
+    } catch (error) {
+      setActiveGenerationRun((current) => current ? { ...current, stopping: false } : current);
+      showToast(error instanceof Error ? error.message : "停止失败，请重试。");
+    }
   }
 
   async function createDeckFromOutline() {
@@ -1973,15 +2161,15 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     let activeRunWorkspaceDir: string | undefined;
     let shouldReconcileActiveRun = false;
     let outlineConfirmed = false;
+    let generationRun: GenerationRunTransaction | null = null;
+    const cancelSignal = beginCancellableGeneration();
     resetGenerationProgress();
     try {
       const normalized = normalizeValidOutline({
         title: outlineDraftTitle,
         items: outlineDraft,
       });
-      const cancelSignal = beginCancellableGeneration();
       setLoading("deck");
-      beginActiveGenerationRun("deck-generation");
       setCreateDeckProgress({
         step: "prepare",
         message: t.generating.confirmingOutline,
@@ -1989,6 +2177,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         totalPages: normalized.items.length,
         pages: [],
       });
+      setGenerationPreparing(true);
       setStage("generating");
       setPage("main");
 
@@ -2003,8 +2192,15 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         setStage("requirements");
         return;
       }
-      const confirmedWorkspace = await backend.confirmWorkspaceOutline({
+      const draftWorkspace = await backend.saveWorkspaceOutlineDraft({
         workspace_dir: workspace.workspace_dir,
+        outline: normalized,
+      });
+      setCurrentWorkspace(draftWorkspace);
+      const shadowRun = await prepareShadowGenerationRun(draftWorkspace, "deck-generation", null, (transaction) => { generationRun = transaction; });
+      generationRun = shadowRun.transaction;
+      const confirmedWorkspace = await backend.confirmWorkspaceOutline({
+        workspace_dir: shadowRun.workspace.workspace_dir,
         outline: normalized,
       });
       outlineConfirmed = true;
@@ -2012,7 +2208,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       setOutline(cloneOutlineItems(normalized.items));
       setOutlineDraft(cloneOutlineItems(normalized.items));
       setOutlineDraftTitle(normalized.title);
-      setCurrentWorkspace(confirmedWorkspace);
       activeRunWorkspaceDir = confirmedWorkspace.workspace_dir;
       shouldReconcileActiveRun = true;
 
@@ -2026,24 +2221,46 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         confirmedOutline: workspaceOutlineForDownstream(confirmedWorkspace),
         locale,
         startMode: "new",
-        onProgress: recordGenerationProgress,
+        onProgress: generationProgressHandler(cancelSignal),
         isCancelled: () => cancelCreateDeckRef.current,
         cancelSignal,
       });
-      await applyDeckGenerationCompletion(completion, confirmedWorkspace);
+      if (!ownsGenerationOperation(cancelSignal)) return;
+      if (completion.status === "completed") {
+        const committed = await commitShadowGenerationRun(generationRun);
+        setGenerationTransaction(null);
+        const rebasedCompletion = rebaseCompletion(
+          completion,
+          generationRun.shadow_workspace_dir,
+          generationRun.official_workspace_dir,
+        );
+        await applyDeckGenerationCompletion(rebasedCompletion, committed.workspace);
+      } else if (!cancelCreateDeckRef.current) {
+        await applyDeckGenerationCompletion(completion, confirmedWorkspace);
+      }
       shouldReconcileActiveRun = false;
     } catch (error) {
+      if (!ownsGenerationOperation(cancelSignal)) return;
+      setGenerationPreparing(false);
       if (!outlineConfirmed) {
         setStage("outline");
         setPage("main");
       }
       showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
     } finally {
-      setLoading("none");
-      await finishActiveGenerationRun({
-        workspaceDir: activeRunWorkspaceDir,
-        reconcileInterrupted: shouldReconcileActiveRun,
-      });
+      if (ownsGenerationOperation(cancelSignal)) {
+        setGenerationPreparing(false);
+        setLoading("none");
+        await finishActiveGenerationRun({
+          workspaceDir: activeRunWorkspaceDir,
+          reconcileInterrupted: shouldReconcileActiveRun && !generationRun,
+        });
+      }
+      if (generationRun) {
+        void backend.cleanupGenerationRun({ run_id: generationRun.run_id }).catch((error) =>
+          console.warn("Failed to clean generation run", error)
+        );
+      }
     }
   }
 
@@ -2750,6 +2967,17 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       });
       const workspace = await reconcileWorkspaceInterruptedPages(openedWorkspace);
       applyWorkspace(workspace, { syncEmptyContextRows: true });
+      const transaction = await backend.getWorkspaceGenerationRun({ workspace_dir: workspace.workspace_dir });
+      if (transaction?.state === "active" || transaction?.state === "preparing") {
+        setGenerationTransaction(transaction);
+        if (transaction.state === "active") {
+          const shadowWorkspace = await backend.openWorkspace({ workspace_dir: transaction.shadow_workspace_dir });
+          applyWorkspace(shadowWorkspace, { preserveCurrentSlide: true });
+          setCurrentWorkspace(workspace);
+        }
+        setStage("generating");
+        setPage("main");
+      }
       setPage("main");
       setHistory((items) => (items.at(-1) === "main" ? items : [...items, "main"]));
       showToast(formatMessage(t.toasts.workspaceOpened, { id: workspace.task_id ?? workspace.workspace_id }));
@@ -2926,14 +3154,16 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     let activeRunWorkspaceDir: string | undefined;
     let shouldReconcileActiveRun = false;
+    let generationRun: GenerationRunTransaction | null = null;
     const cancelSignal = beginCancellableGeneration();
     setLoading("refineDeck");
     resetGenerationProgress();
     try {
       const refreshedWorkspace = await refreshCurrentWorkspaceSnapshot();
       if (!refreshedWorkspace) return;
-      beginActiveGenerationRun("deck-refinement");
-      activeRunWorkspaceDir = refreshedWorkspace.workspace_dir;
+      const shadowRun = await prepareShadowGenerationRun(refreshedWorkspace, "deck-refinement", workspaceOutlineForDownstream(refreshedWorkspace).items[currentSlide]?.page_id, (transaction) => { generationRun = transaction; });
+      generationRun = shadowRun.transaction;
+      activeRunWorkspaceDir = shadowRun.workspace.workspace_dir;
       shouldReconcileActiveRun = true;
       setStage("generating");
       setPage("main");
@@ -2943,30 +3173,45 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         agentClient,
         hostUploadClient,
         aiLogger,
-        workspace: refreshedWorkspace,
-        confirmedOutline: workspaceOutlineForDownstream(refreshedWorkspace),
+        workspace: shadowRun.workspace,
+        confirmedOutline: workspaceOutlineForDownstream(shadowRun.workspace),
         locale,
         instruction: trimmedInstruction,
         scope: "deck",
-        onProgress: recordGenerationProgress,
+        onProgress: generationProgressHandler(cancelSignal),
         isCancelled: () => cancelCreateDeckRef.current,
         cancelSignal,
       });
-      await applyDeckGenerationCompletion(completion, refreshedWorkspace, {
-        resumeAllowedOnRecoverableStop: true,
-      });
+      if (!ownsGenerationOperation(cancelSignal)) return;
+      if (completion.status === "completed" && completion.noChange) {
+        await backend.abandonGenerationRun({ run_id: generationRun.run_id });
+        setGenerationTransaction(null);
+        const official = await backend.openWorkspace({ workspace_dir: generationRun.official_workspace_dir });
+        applyWorkspace(official, { preserveCurrentSlide: true });
+        showToast("当前内容无需优化。");
+      } else if (completion.status === "completed") {
+        const committed = await commitShadowGenerationRun(generationRun);
+        setGenerationTransaction(null);
+        await applyDeckGenerationCompletion(rebaseCompletion(completion, generationRun.shadow_workspace_dir, generationRun.official_workspace_dir), committed.workspace);
+      } else if (!cancelCreateDeckRef.current) {
+        await applyDeckGenerationCompletion(completion, shadowRun.workspace, { resumeAllowedOnRecoverableStop: true });
+      }
       shouldReconcileActiveRun = false;
       if (completion.status === "completed") {
         showToast(t.status.deckRefined);
       }
     } catch (error) {
+      if (!ownsGenerationOperation(cancelSignal)) return;
       showToast(error instanceof Error ? error.message : t.status.refiningDeck);
     } finally {
-      setLoading("none");
-      await finishActiveGenerationRun({
-        workspaceDir: activeRunWorkspaceDir,
-        reconcileInterrupted: shouldReconcileActiveRun,
-      });
+      if (ownsGenerationOperation(cancelSignal)) {
+        setLoading("none");
+        await finishActiveGenerationRun({
+          workspaceDir: activeRunWorkspaceDir,
+          reconcileInterrupted: shouldReconcileActiveRun && !generationRun,
+        });
+      }
+      if (generationRun) void backend.cleanupGenerationRun({ run_id: generationRun.run_id }).catch((error) => console.warn("Failed to clean generation run", error));
     }
   }
 
@@ -2979,14 +3224,17 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     let activeRunWorkspaceDir: string | undefined;
     let shouldReconcileActiveRun = false;
+    let generationRun: GenerationRunTransaction | null = null;
     const cancelSignal = beginCancellableGeneration();
     setLoading("refineSlide");
     resetGenerationProgress();
     try {
       const refreshedWorkspace = await refreshCurrentWorkspaceSnapshot();
       if (!refreshedWorkspace) return;
-      beginActiveGenerationRun("page-refinement");
-      activeRunWorkspaceDir = refreshedWorkspace.workspace_dir;
+      const originPageId = workspaceOutlineForDownstream(refreshedWorkspace).items[currentSlide]?.page_id;
+      const shadowRun = await prepareShadowGenerationRun(refreshedWorkspace, "page-refinement", originPageId, (transaction) => { generationRun = transaction; });
+      generationRun = shadowRun.transaction;
+      activeRunWorkspaceDir = shadowRun.workspace.workspace_dir;
       shouldReconcileActiveRun = true;
       setStage("generating");
       setPage("main");
@@ -2996,32 +3244,41 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         agentClient,
         hostUploadClient,
         aiLogger,
-        workspace: refreshedWorkspace,
-        confirmedOutline: workspaceOutlineForDownstream(refreshedWorkspace),
+        workspace: shadowRun.workspace,
+        confirmedOutline: workspaceOutlineForDownstream(shadowRun.workspace),
         locale,
         instruction: trimmedInstruction,
         scope: "slide",
-        pageId: workspaceOutlineForDownstream(refreshedWorkspace).items[currentSlide]?.page_id,
-        onProgress: recordGenerationProgress,
+        pageId: originPageId,
+        onProgress: generationProgressHandler(cancelSignal),
         isCancelled: () => cancelCreateDeckRef.current,
         cancelSignal,
       });
-      await applyDeckGenerationCompletion(completion, refreshedWorkspace, {
-        resumeAllowedOnRecoverableStop: true,
-      });
+      if (!ownsGenerationOperation(cancelSignal)) return;
+      if (completion.status === "completed") {
+        const committed = await commitShadowGenerationRun(generationRun);
+        setGenerationTransaction(null);
+        await applyDeckGenerationCompletion(rebaseCompletion(completion, generationRun.shadow_workspace_dir, generationRun.official_workspace_dir), committed.workspace);
+      } else if (!cancelCreateDeckRef.current) {
+        await applyDeckGenerationCompletion(completion, shadowRun.workspace, { resumeAllowedOnRecoverableStop: true });
+      }
       shouldReconcileActiveRun = false;
       setCurrentSlide(currentSlide);
       if (completion.status === "completed") {
         showToast(t.status.slideRefined);
       }
     } catch (error) {
+      if (!ownsGenerationOperation(cancelSignal)) return;
       showToast(error instanceof Error ? error.message : t.status.refiningSlide);
     } finally {
-      setLoading("none");
-      await finishActiveGenerationRun({
-        workspaceDir: activeRunWorkspaceDir,
-        reconcileInterrupted: shouldReconcileActiveRun,
-      });
+      if (ownsGenerationOperation(cancelSignal)) {
+        setLoading("none");
+        await finishActiveGenerationRun({
+          workspaceDir: activeRunWorkspaceDir,
+          reconcileInterrupted: shouldReconcileActiveRun && !generationRun,
+        });
+      }
+      if (generationRun) void backend.cleanupGenerationRun({ run_id: generationRun.run_id }).catch((error) => console.warn("Failed to clean generation run", error));
     }
   }
 
@@ -3301,13 +3558,17 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     let activeRunWorkspaceDir: string | undefined;
     let shouldReconcileActiveRun = false;
+    let generationRun: GenerationRunTransaction | null = null;
     const cancelSignal = beginCancellableGeneration();
     setLoading("deckFromOutline");
     try {
       const workspace = await refreshCurrentWorkspaceSnapshot();
       if (!workspace) return;
-      const refreshedWorkspace = await reconcileWorkspaceInterruptedPages(workspace);
-      applyWorkspace(refreshedWorkspace);
+      generationRun = await backend.getWorkspaceGenerationRun({ workspace_dir: workspace.workspace_dir });
+      const runWorkspace = generationRun
+        ? await backend.openWorkspace({ workspace_dir: generationRun.shadow_workspace_dir })
+        : workspace;
+      const refreshedWorkspace = await reconcileWorkspaceInterruptedPages(runWorkspace);
       activeRunWorkspaceDir = refreshedWorkspace.workspace_dir;
       shouldReconcileActiveRun = true;
       setStage("generating");
@@ -3315,7 +3576,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const recoveryProgress = await backend.getPageProgress({ workspace_dir: refreshedWorkspace.workspace_dir });
       const recoveryKind = recoveryProgress.recovery?.run_kind;
       const isRefinementResume = recoveryKind === "page-refinement" || recoveryKind === "deck-refinement";
-      beginActiveGenerationRun(isRefinementResume ? recoveryKind : "deck-generation");
+      if (generationRun) beginActiveGenerationRun(isRefinementResume ? recoveryKind : "deck-generation", generationRun);
       const commonInput = {
             backend,
             aiClient,
@@ -3325,7 +3586,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
             workspace: refreshedWorkspace,
             confirmedOutline: workspaceOutlineForDownstream(refreshedWorkspace),
             locale,
-            onProgress: recordGenerationProgress,
+            onProgress: generationProgressHandler(cancelSignal),
             isCancelled: () => cancelCreateDeckRef.current,
             cancelSignal,
           };
@@ -3339,16 +3600,27 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
             skipIntentReview: true,
           })
         : await runDeckGeneration({ ...commonInput, startMode: "resume" });
-      await applyDeckGenerationCompletion(completion, refreshedWorkspace);
+      if (!ownsGenerationOperation(cancelSignal)) return;
+      if (completion.status === "completed" && generationRun) {
+        const committed = await commitShadowGenerationRun(generationRun);
+        setGenerationTransaction(null);
+        await applyDeckGenerationCompletion(rebaseCompletion(completion, generationRun.shadow_workspace_dir, generationRun.official_workspace_dir), committed.workspace);
+      } else {
+        await applyDeckGenerationCompletion(completion, refreshedWorkspace);
+      }
       shouldReconcileActiveRun = false;
     } catch (error) {
+      if (!ownsGenerationOperation(cancelSignal)) return;
       showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
     } finally {
-      setLoading("none");
-      await finishActiveGenerationRun({
-        workspaceDir: activeRunWorkspaceDir,
-        reconcileInterrupted: shouldReconcileActiveRun,
-      });
+      if (ownsGenerationOperation(cancelSignal)) {
+        setLoading("none");
+        await finishActiveGenerationRun({
+          workspaceDir: activeRunWorkspaceDir,
+          reconcileInterrupted: shouldReconcileActiveRun && !generationRun,
+        });
+      }
+      if (generationRun) void backend.cleanupGenerationRun({ run_id: generationRun.run_id }).catch((error) => console.warn("Failed to clean generation run", error));
     }
   }
 
@@ -3358,12 +3630,17 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     let activeRunWorkspaceDir: string | undefined;
     let shouldReconcileActiveRun = false;
+    let generationRun: GenerationRunTransaction | null = null;
     const cancelSignal = beginCancellableGeneration();
     setLoading("deckFromOutline");
     try {
-      const refreshedWorkspace = await refreshCurrentWorkspaceSnapshot();
-      if (!refreshedWorkspace) return;
-      beginActiveGenerationRun("deck-generation");
+      const officialWorkspace = await refreshCurrentWorkspaceSnapshot();
+      if (!officialWorkspace) return;
+      generationRun = await backend.getWorkspaceGenerationRun({ workspace_dir: officialWorkspace.workspace_dir });
+      const refreshedWorkspace = generationRun
+        ? await backend.openWorkspace({ workspace_dir: generationRun.shadow_workspace_dir })
+        : officialWorkspace;
+      if (generationRun) beginActiveGenerationRun(generationRun.run_kind, generationRun);
       activeRunWorkspaceDir = refreshedWorkspace.workspace_dir;
       shouldReconcileActiveRun = true;
       setStage("generating");
@@ -3377,20 +3654,31 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         confirmedOutline: workspaceOutlineForDownstream(refreshedWorkspace),
         locale,
         pageId,
-        onProgress: recordGenerationProgress,
+        onProgress: generationProgressHandler(cancelSignal),
         isCancelled: () => cancelCreateDeckRef.current,
         cancelSignal,
       });
-      await applyDeckGenerationCompletion(completion, refreshedWorkspace);
+      if (!ownsGenerationOperation(cancelSignal)) return;
+      if (completion.status === "completed" && generationRun) {
+        const committed = await commitShadowGenerationRun(generationRun);
+        setGenerationTransaction(null);
+        await applyDeckGenerationCompletion(rebaseCompletion(completion, generationRun.shadow_workspace_dir, generationRun.official_workspace_dir), committed.workspace);
+      } else {
+        await applyDeckGenerationCompletion(completion, refreshedWorkspace);
+      }
       shouldReconcileActiveRun = false;
     } catch (error) {
+      if (!ownsGenerationOperation(cancelSignal)) return;
       showToast(error instanceof Error ? error.message : t.toasts.createDeckFirst);
     } finally {
-      setLoading("none");
-      await finishActiveGenerationRun({
-        workspaceDir: activeRunWorkspaceDir,
-        reconcileInterrupted: shouldReconcileActiveRun,
-      });
+      if (ownsGenerationOperation(cancelSignal)) {
+        setLoading("none");
+        await finishActiveGenerationRun({
+          workspaceDir: activeRunWorkspaceDir,
+          reconcileInterrupted: shouldReconcileActiveRun && !generationRun,
+        });
+      }
+      if (generationRun) void backend.cleanupGenerationRun({ run_id: generationRun.run_id }).catch((error) => console.warn("Failed to clean generation run", error));
     }
   }
 
@@ -3753,7 +4041,15 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function selectStyleProfile(styleProfileId: string) {
     if (!backend || !currentWorkspace) return;
     if (hasDownstreamArtifacts(currentWorkspace)) {
-      const ok = window.confirm("更换风格画像后，当前成稿会标记为需要重新生成。是否继续？");
+      const ok = await requestConfirmation({
+        title: locale === "zh" ? "更换风格画像？" : "Change the style profile?",
+        body: locale === "zh"
+          ? "更换风格画像后，当前成稿会标记为需要重新生成。是否继续？"
+          : "Changing the style profile will mark the current deck for regeneration. Continue?",
+        cancelLabel: locale === "zh" ? "取消" : "Cancel",
+        confirmLabel: locale === "zh" ? "继续更换" : "Continue",
+        tone: "warning",
+      });
       if (!ok) return;
     }
     try {
@@ -3772,7 +4068,15 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function clearStyleProfile() {
     if (!backend || !currentWorkspace || !selectedStyleProfile) return;
     if (hasDownstreamArtifacts(currentWorkspace)) {
-      const ok = window.confirm("清除风格画像后，当前成稿会标记为需要重新生成。是否继续？");
+      const ok = await requestConfirmation({
+        title: locale === "zh" ? "清除风格画像？" : "Clear the style profile?",
+        body: locale === "zh"
+          ? "清除风格画像后，当前成稿会标记为需要重新生成。是否继续？"
+          : "Clearing the style profile will mark the current deck for regeneration. Continue?",
+        cancelLabel: locale === "zh" ? "取消" : "Cancel",
+        confirmLabel: locale === "zh" ? "继续清除" : "Continue",
+        tone: "warning",
+      });
       if (!ok) return;
     }
     try {
@@ -3846,6 +4150,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     styleProfileLibraryError,
     styleProfileCreation,
     styleProfileDetail,
+    confirmationDialog,
   };
 
   const actions: DeckWorkspaceActions = {
@@ -3859,6 +4164,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setPreviewMode,
     setRefineScope,
     showToast,
+    resolveConfirmation,
     cancelGenerateDeck,
     navigate,
     navigateMain,

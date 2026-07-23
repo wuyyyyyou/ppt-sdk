@@ -66,6 +66,20 @@ describe("Generation View State", () => {
     assert.equal(viewState.canStop, false);
   });
 
+  it("shows preparing while generation startup has begun without a durable run", () => {
+    const viewState = buildGenerationViewState({
+      loading: "deck",
+      progress: makeProgress("prepare", []),
+      activeRun: null,
+      preparing: true,
+    });
+
+    assert.equal(viewState.status, "preparing");
+    assert.equal(viewState.isActive, false);
+    assert.equal(viewState.showStop, false);
+    assert.equal(viewState.showResume, false);
+  });
+
   it("shows stopping while an active run is being cancelled", () => {
     const viewState = buildGenerationViewState({
       loading: "deck",
@@ -88,6 +102,18 @@ describe("Generation View State", () => {
     assert.equal(viewState.status, "interrupted");
     assert.equal(viewState.canStop, false);
     assert.equal(viewState.canResume, true);
+  });
+
+  it("allows an interrupted shadow run to be abandoned", () => {
+    const viewState = buildGenerationViewState({
+      loading: "none",
+      progress: makeProgress("failed", ["render_failed"]),
+      activeRun: null,
+      hasAbandonableRun: true,
+    });
+    assert.equal(viewState.status, "interrupted");
+    assert.equal(viewState.canStop, true);
+    assert.equal(viewState.showStop, true);
   });
 
   it("shows interrupted for failed pages that can be resumed", () => {

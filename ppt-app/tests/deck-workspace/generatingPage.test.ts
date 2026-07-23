@@ -74,6 +74,23 @@ function renderPage(viewState: GenerationViewState, progress: DeckGenerationProg
 }
 
 describe("GeneratingPage controls", () => {
+  it("shows preparing instead of interrupted before the generation run is active", () => {
+    const html = renderPage(
+      makeViewState({
+        status: "preparing",
+        isActive: false,
+        canStop: false,
+        showStop: false,
+      }),
+      makeProgress("prepare", "pending"),
+    );
+
+    assert.match(html, /生成准备中/);
+    assert.doesNotMatch(html, /生成中断/);
+    assert.doesNotMatch(html, />继续生成</);
+    assert.doesNotMatch(html, />停止</);
+  });
+
   it("shows running title without exposing the unfinished stop action", () => {
     const html = renderPage(
       makeViewState({ status: "running", canStop: true }),

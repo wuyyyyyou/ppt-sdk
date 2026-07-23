@@ -6,6 +6,18 @@ import { createReadStream, createWriteStream } from "node:fs";
 import { appendFile, copyFile, lstat, mkdir, readlink, readdir, readFile, realpath, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
 import { ZipArchive, type Archiver, type ArchiverError } from "archiver";
+import {
+  abandonGenerationRun,
+  beginGenerationRun,
+  cleanupGenerationRun,
+  commitGenerationRun,
+  findGenerationRunForWorkspace,
+  prepareGenerationRun,
+  recoverGenerationRunForWorkspace,
+  type AppGenerationRunKind,
+  type AppGenerationRunTransaction,
+  withGenerationWorkspaceLock,
+} from "./generation-run.js";
 import sharp from "sharp";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import type { ErrorObject } from "ajv";
@@ -2090,6 +2102,65 @@ export function getDefaultAppWorkspaceRoot(): string {
   return WORKSPACE_ROOT;
 }
 
+export async function beginAppGenerationRun(input: {
+  workspace_dir: string;
+  run_kind: AppGenerationRunKind;
+  origin_page_id?: string | null;
+}): Promise<AppGenerationRunTransaction> {
+  const workspace = await openAppWorkspace({ workspace_dir: input.workspace_dir });
+  return beginGenerationRun({
+    workspace_root: WORKSPACE_ROOT,
+    official_workspace_dir: workspace.workspace_dir,
+    workspace_id: workspace.workspace_id,
+    run_kind: input.run_kind,
+    origin_page_id: input.origin_page_id,
+  });
+}
+
+export async function prepareAppGenerationRun(input: { run_id: string }): Promise<{
+  transaction: AppGenerationRunTransaction;
+  workspace: AppWorkspaceResult | null;
+}> {
+  const transaction = await prepareGenerationRun(WORKSPACE_ROOT, input.run_id);
+  return {
+    transaction,
+    workspace: transaction.state === "active"
+      ? await openAppWorkspace({ workspace_dir: transaction.shadow_workspace_dir })
+      : null,
+  };
+}
+
+export async function abandonAppGenerationRun(input: { run_id: string }): Promise<AppGenerationRunTransaction> {
+  return abandonGenerationRun(WORKSPACE_ROOT, input.run_id);
+}
+
+export async function commitAppGenerationRun(input: { run_id: string }): Promise<{
+  transaction: AppGenerationRunTransaction;
+  workspace: AppWorkspaceResult;
+}> {
+  const current = await readGenerationRunForCommit(input.run_id);
+  const transaction = await withGenerationWorkspaceLock(
+    current.official_workspace_dir,
+    () => commitGenerationRun(WORKSPACE_ROOT, input.run_id),
+  );
+  return { transaction, workspace: await openAppWorkspace({ workspace_dir: transaction.official_workspace_dir }) };
+}
+
+async function readGenerationRunForCommit(runId: string) {
+  const transactionFile = path.join(WORKSPACE_ROOT, ".generation-runs", runId, "transaction.json");
+  return JSON.parse(await readFile(transactionFile, "utf8")) as AppGenerationRunTransaction;
+}
+
+export async function cleanupAppGenerationRun(input: { run_id: string }): Promise<{ cleaned: true }> {
+  await cleanupGenerationRun(WORKSPACE_ROOT, input.run_id);
+  return { cleaned: true };
+}
+
+export async function getAppWorkspaceGenerationRun(input: { workspace_dir: string }): Promise<AppGenerationRunTransaction | null> {
+  const workspaceDir = normalizeWorkspaceDir(input.workspace_dir);
+  return recoverGenerationRunForWorkspace(WORKSPACE_ROOT, path.basename(workspaceDir));
+}
+
 export async function listAppWorkspaces(): Promise<ListAppWorkspacesResult> {
   await mkdir(WORKSPACE_ROOT, { recursive: true });
   const roots = [WORKSPACE_ROOT, LEGACY_TASK_ROOT];
@@ -3793,7 +3864,15 @@ export async function confirmAppWorkspaceRequirements(
 export async function appendAppWorkspaceLog(
   input: AppendAppWorkspaceLogInput,
 ): Promise<AppendAppWorkspaceLogResult> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const requestedWorkspaceDir = normalizeWorkspaceDir(input.workspace_dir);
+  const generationRun = await findGenerationRunForWorkspace(
+    WORKSPACE_ROOT,
+    path.basename(requestedWorkspaceDir),
+  );
+  const logWorkspaceDir = generationRun?.shadow_workspace_dir === requestedWorkspaceDir
+    ? generationRun.official_workspace_dir
+    : requestedWorkspaceDir;
+  const workspace = await ensureWorkspaceFiles(logWorkspaceDir);
   const logFileName = WORKSPACE_LOG_FILE_NAMES[input.channel];
   if (!logFileName) {
     throw new Error('"channel" must be a supported workspace log channel');
@@ -3810,40 +3889,42 @@ export async function appendAppWorkspaceLog(
     : [];
   const inlinePayloadMaxBytes = readInlinePayloadMaxBytes(input.inline_payload_max_bytes);
 
-  await mkdir(logDir, { recursive: true });
-  for (const key of payloadKeys) {
-    if (!Object.prototype.hasOwnProperty.call(entry, key)) continue;
-    const value = entry[key as keyof typeof entry];
-    const serialized = `${JSON.stringify(value, null, 2)}\n`;
-    const size = Buffer.byteLength(serialized, "utf8");
-    if (size <= inlinePayloadMaxBytes) continue;
+  return withGenerationWorkspaceLock(workspace.workspace_dir, async () => {
+    await mkdir(logDir, { recursive: true });
+    for (const key of payloadKeys) {
+      if (!Object.prototype.hasOwnProperty.call(entry, key)) continue;
+      const value = entry[key as keyof typeof entry];
+      const serialized = `${JSON.stringify(value, null, 2)}\n`;
+      const size = Buffer.byteLength(serialized, "utf8");
+      if (size <= inlinePayloadMaxBytes) continue;
 
-    const sha256 = sha256Hex(serialized);
-    const payloadDir = path.join(logDir, "payloads", input.channel);
-    const payloadFileName = [
-      entry.timestamp.replace(/[:.]/g, "-"),
-      sanitizePayloadKey(key),
-      sha256.slice(0, 16),
-    ].join("-");
-    const payloadFile = path.join(payloadDir, `${payloadFileName}.json`);
+      const sha256 = sha256Hex(serialized);
+      const payloadDir = path.join(logDir, "payloads", input.channel);
+      const payloadFileName = [
+        entry.timestamp.replace(/[:.]/g, "-"),
+        sanitizePayloadKey(key),
+        sha256.slice(0, 16),
+      ].join("-");
+      const payloadFile = path.join(payloadDir, `${payloadFileName}.json`);
 
-    await mkdir(payloadDir, { recursive: true });
-    await writeFile(payloadFile, serialized, "utf8");
-    entry[key as keyof typeof entry] = {
-      __workspace_log_payload: true,
-      path: payloadFile,
-      relative_path: path.relative(workspace.workspace_dir, payloadFile),
-      size,
-      sha256,
-    } as never;
-  }
-  await appendFile(logFile, `${JSON.stringify(entry)}\n`, "utf8");
+      await mkdir(payloadDir, { recursive: true });
+      await writeFile(payloadFile, serialized, "utf8");
+      entry[key as keyof typeof entry] = {
+        __workspace_log_payload: true,
+        path: payloadFile,
+        relative_path: path.relative(workspace.workspace_dir, payloadFile),
+        size,
+        sha256,
+      } as never;
+    }
+    await appendFile(logFile, `${JSON.stringify(entry)}\n`, "utf8");
 
-  return {
-    workspace_dir: workspace.workspace_dir,
-    log_file: logFile,
-    appended: true,
-  };
+    return {
+      workspace_dir: workspace.workspace_dir,
+      log_file: logFile,
+      appended: true,
+    };
+  });
 }
 
 function createDefaultResearchPlanJson(workspace: AppWorkspaceResult) {
@@ -6096,6 +6177,15 @@ export async function prepareAppWorkspaceDiagnosticBundle(
       workspace.workspace_id,
       snapshotsByEntryName,
     );
+    const generationRun = await findGenerationRunForWorkspace(WORKSPACE_ROOT, workspace.workspace_id);
+    if (generationRun && generationRun.state !== "abandoned") {
+      await appendDiagnosticBundleTree(
+        archive,
+        path.dirname(path.dirname(generationRun.shadow_workspace_dir)),
+        "generation-run",
+        snapshotsByEntryName,
+      );
+    }
     await archive.finalize();
     await completed;
     await Promise.all(verificationChecks);

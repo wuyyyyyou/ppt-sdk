@@ -1,5 +1,7 @@
 # page-progress 拥有 Deck Generation 恢复状态
 
+> ADR-0041 取代了本文关于“用户取消会把活动页面转为可恢复 `interrupted` 状态”的决定。进程异常退出仍使用 `interrupted` 恢复语义，但用户主动“停止并放弃”会废弃整个影子运行；Page Progress 继续拥有未放弃运行内部的恢复状态。
+
 Deck Generation 的恢复判断需要同时覆盖单页前的规划/准备、未完成 Page Generation Unit、Page Refinement Resume，以及所有页面 accepted 后的 Final Deck Render。决定由 `page-progress.json` 的顶层 deck-level 状态拥有这些恢复元数据，而不是新增独立恢复文件；这样恢复入口只需要围绕一个进度 artifact 做 gate 判断。
 
 新的 Authoring Kit 主路径同样用顶层 recovery 记录 `authoring-kit`、`style-guide`、`prepare-page-sources`、`page-authoring` 和 `final-render` 等步骤。`style-guide.md` 的存在且非空才是艺术指导就绪事实；recovery 只记录运行位置和错误摘要，详细 LLM 尝试属于独立的 `style-guide` AI Interaction Log，不新增艺术指导状态文件。

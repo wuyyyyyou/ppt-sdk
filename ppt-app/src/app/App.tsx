@@ -15,6 +15,7 @@ import {
   PresentationRequirementsPage,
 } from "../features/requirements";
 import { WorkspaceDialog } from "../features/deck-workspace/components/WorkspaceDialog";
+import { ConfirmationDialog } from "../features/deck-workspace/components/ConfirmationDialog";
 import { useDeckWorkspace } from "../features/deck-workspace/hooks/useDeckWorkspace";
 import { useI18n } from "../i18n/useI18n";
 import { ManualPageEditorShell } from "../features/manual-page-editor/ManualPageEditorShell";
@@ -79,6 +80,11 @@ export function App() {
 
       <section className={`deck-panel ${state.panelMode === "visible" ? "visible" : ""}`}>
         <div className={`toast ${state.toast ? "visible" : ""}`}>{state.toast}</div>
+
+        <ConfirmationDialog
+          request={state.confirmationDialog}
+          onResolve={actions.resolveConfirmation}
+        />
 
         <WorkspaceDialog
             locale={locale}

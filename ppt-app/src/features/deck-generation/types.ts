@@ -172,7 +172,7 @@ export interface DeckGenerationError {
 }
 
 export type DeckGenerationCompletion =
-  | { status: "completed"; result: DeckGenerationResult }
+  | { status: "completed"; result: DeckGenerationResult; noChange?: boolean }
   | { status: "cancelled"; progress: DeckGenerationProgress | null }
   | {
       status: "failed";

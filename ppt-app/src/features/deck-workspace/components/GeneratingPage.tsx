@@ -92,7 +92,7 @@ export function GeneratingPage(props: GeneratingPageProps) {
       <div className="page-header compact">
         <div>
           <div className="page-title">{pageTitle}</div>
-          <p><ThinkingStatusText text={progressMessage} active={viewState.status === "running"} /></p>
+          <p><ThinkingStatusText text={progressMessage} active={viewState.status === "preparing" || viewState.status === "running"} /></p>
         </div>
       </div>
 
@@ -128,11 +128,22 @@ export function GeneratingPage(props: GeneratingPageProps) {
               ? t.controls.resumeRefinement
               : t.controls.resumeGeneration}
           </button>
+          {viewState.showStop ? (
+            <button className="secondary-btn" onClick={onCancel} disabled={!viewState.canStop}>
+              {t.controls.stop}
+            </button>
+          ) : null}
         </div>
       ) : viewState.showBackToOutline ? (
         <div className="generation-recovery-actions">
           <button className="secondary-btn" onClick={onBackToOutline} disabled={!canBackToOutline}>
             {t.stages.outline}
+          </button>
+        </div>
+      ) : viewState.showStop ? (
+        <div className="generation-recovery-actions">
+          <button className="secondary-btn" onClick={onCancel} disabled={!viewState.canStop}>
+            {t.controls.stop}
           </button>
         </div>
       ) : null}
@@ -444,6 +455,8 @@ function PageStageRecordView(props: {
 
 function generationPageTitle(t: Messages, status: GenerationViewState["status"]) {
   switch (status) {
+    case "preparing":
+      return t.generating.preparingTitle;
     case "running":
       return t.stages.generating;
     case "stopping":

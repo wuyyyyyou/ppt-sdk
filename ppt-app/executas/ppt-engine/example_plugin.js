@@ -17,6 +17,12 @@ import {
 
 import {
   appendAppWorkspaceLog,
+  beginAppGenerationRun,
+  prepareAppGenerationRun,
+  abandonAppGenerationRun,
+  commitAppGenerationRun,
+  cleanupAppGenerationRun,
+  getAppWorkspaceGenerationRun,
   buildDeckHtmlFromManifest,
   createAppWorkspace,
   duplicateAppWorkspacePage,
@@ -2611,6 +2617,38 @@ async function toolAppPrepareWorkspaceDiagnosticBundle(args) {
   });
 }
 
+async function toolAppBeginGenerationRun(args) {
+  return beginAppGenerationRun({
+    workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir"),
+    run_kind: args.run_kind,
+    origin_page_id: typeof args.origin_page_id === "string" ? args.origin_page_id : null,
+  });
+}
+
+async function toolAppPrepareGenerationRun(args) {
+  if (typeof args.run_id !== "string" || !args.run_id) throw new Error('Missing required parameter: "run_id"');
+  return prepareAppGenerationRun({ run_id: args.run_id });
+}
+
+async function toolAppAbandonGenerationRun(args) {
+  if (typeof args.run_id !== "string" || !args.run_id) throw new Error('Missing required parameter: "run_id"');
+  return abandonAppGenerationRun({ run_id: args.run_id });
+}
+
+async function toolAppCommitGenerationRun(args) {
+  if (typeof args.run_id !== "string" || !args.run_id) throw new Error('Missing required parameter: "run_id"');
+  return commitAppGenerationRun({ run_id: args.run_id });
+}
+
+async function toolAppCleanupGenerationRun(args) {
+  if (typeof args.run_id !== "string" || !args.run_id) throw new Error('Missing required parameter: "run_id"');
+  return cleanupAppGenerationRun({ run_id: args.run_id });
+}
+
+async function toolAppGetWorkspaceGenerationRun(args) {
+  return getAppWorkspaceGenerationRun({ workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir") });
+}
+
 async function toolAppExportPdf(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -2753,6 +2791,12 @@ async function toolForkTemplateGroup(args) {
 }
 
 const TOOL_DISPATCH = {
+  app_begin_generation_run: toolAppBeginGenerationRun,
+  app_prepare_generation_run: toolAppPrepareGenerationRun,
+  app_abandon_generation_run: toolAppAbandonGenerationRun,
+  app_commit_generation_run: toolAppCommitGenerationRun,
+  app_cleanup_generation_run: toolAppCleanupGenerationRun,
+  app_get_workspace_generation_run: toolAppGetWorkspaceGenerationRun,
   app_list_workspaces: toolAppListWorkspaces,
   app_get_workspace_defaults: toolAppGetWorkspaceDefaults,
   app_create_workspace: toolAppCreateWorkspace,

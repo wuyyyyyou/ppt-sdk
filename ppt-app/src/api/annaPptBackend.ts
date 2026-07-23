@@ -67,6 +67,9 @@ import type {
   WorkspaceStyleGuide,
   PreparePageRefinementResult,
   CommitDeckRefinementResult,
+  GenerationRunTransaction,
+  PrepareGenerationRunResult,
+  CommitGenerationRunResult,
 } from "./types";
 import { createSearchAdapter } from "./searchAdapter";
 import { resolvePptBundledToolIds } from "./bundledToolIds";
@@ -191,6 +194,18 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
   });
 
   return {
+    beginGenerationRun: (input) =>
+      invoke<GenerationRunTransaction>(toolIds.pptEngine, "app_begin_generation_run", input),
+    prepareGenerationRun: (input) =>
+      invoke<PrepareGenerationRunResult>(toolIds.pptEngine, "app_prepare_generation_run", input, { timeoutMs: PPTX_EXPORT_TIMEOUT_MS }),
+    abandonGenerationRun: (input) =>
+      invoke<GenerationRunTransaction>(toolIds.pptEngine, "app_abandon_generation_run", input),
+    commitGenerationRun: (input) =>
+      invoke<CommitGenerationRunResult>(toolIds.pptEngine, "app_commit_generation_run", input, { timeoutMs: PPTX_EXPORT_TIMEOUT_MS }),
+    cleanupGenerationRun: (input) =>
+      invoke<{ cleaned: true }>(toolIds.pptEngine, "app_cleanup_generation_run", input),
+    getWorkspaceGenerationRun: (input) =>
+      invoke<GenerationRunTransaction | null>(toolIds.pptEngine, "app_get_workspace_generation_run", input),
     listWorkspaces: () =>
       invoke<ListWorkspacesResult>(toolIds.pptEngine, "app_list_workspaces", {}),
     getWorkspaceDefaults: () =>

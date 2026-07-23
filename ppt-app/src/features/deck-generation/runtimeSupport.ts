@@ -303,5 +303,6 @@ export function buildAgentRunOptions(
     signal: input.cancelSignal,
     isCancelled: input.isCancelled,
     logContext,
+    drainOnCancel: true,
   };
 }

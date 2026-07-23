@@ -131,7 +131,10 @@ export async function runDeckRefinementWorkflow(input: RunDeckRefinementInput, i
   }
 
   try {
-    emit(input, progress, "deck-refinement-planning", input.locale === "zh" ? "正在规划整套优化" : "Planning deck refinement");
+    // Do not project the previous completed deck progress while the refinement
+    // plan is still being prepared. The durable progress is retained for
+    // planning and visual context, but it is not current UI progress.
+    emit(input, null, "deck-refinement-planning", input.locale === "zh" ? "正在规划整套优化" : "Planning deck refinement");
     const styleGuide = await input.backend.getWorkspaceStyleGuide({ workspace_dir: input.workspace.workspace_dir });
     const logContext: AiOperationLogContext | undefined = input.aiLogger ? {
       logger: input.aiLogger,
@@ -172,6 +175,7 @@ export async function runDeckRefinementWorkflow(input: RunDeckRefinementInput, i
       });
       return {
         status: "completed",
+        noChange: true,
         result: {
           outline: input.confirmedOutline,
           authoringDeck: authoringDeckFromConfirmedOutline(input.confirmedOutline),
@@ -183,7 +187,7 @@ export async function runDeckRefinementWorkflow(input: RunDeckRefinementInput, i
 
     let styleGuideUpload;
     if (plan.style_guide_change.action === "regenerate") {
-      emit(input, progress, "deck-refinement-style-guide", input.locale === "zh" ? "正在重新生成艺术指导" : "Regenerating Workspace Style Guide");
+      emit(input, null, "deck-refinement-style-guide", input.locale === "zh" ? "正在重新生成艺术指导" : "Regenerating Workspace Style Guide");
       if (!input.hostUploadClient) throw new Error("Host Upload is required to persist the Workspace Style Guide");
       const markdown = await input.aiClient.generateWorkspaceStyleGuide({
         brief: input.workspace.requirements.source?.brief ?? "",
@@ -213,7 +217,7 @@ export async function runDeckRefinementWorkflow(input: RunDeckRefinementInput, i
       styleGuideUpload = { size_bytes: hostUpload.size_bytes, host_upload: hostUpload };
     }
 
-    emit(input, progress, "deck-refinement-commit", input.locale === "zh" ? "正在提交整套优化方案" : "Committing deck refinement");
+    emit(input, null, "deck-refinement-commit", input.locale === "zh" ? "正在提交整套优化方案" : "Committing deck refinement");
     const committed = await input.backend.commitDeckRefinement({
       workspace_dir: input.workspace.workspace_dir,
       refinement_request: instruction,

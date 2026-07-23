@@ -65,6 +65,16 @@ export interface DownloadLinkState {
 
 export type ExportDownloadState = DownloadLinkState;
 
+export interface ConfirmationDialogRequest {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  closeLabel: string;
+  tone: "default" | "warning" | "danger";
+  dismissible?: boolean;
+}
+
 export interface WorkspaceDiagnosticBundleState extends DownloadLinkState {
   workspaceId?: string;
   filename?: string;
@@ -148,6 +158,7 @@ export interface DeckWorkspaceState {
   styleProfileLibraryError: string;
   styleProfileCreation: StyleProfileCreationViewState;
   styleProfileDetail: StyleProfileDetailState;
+  confirmationDialog: ConfirmationDialogRequest | null;
 }
 
 export type { WorkspaceSettings };
