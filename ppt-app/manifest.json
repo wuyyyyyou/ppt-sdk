@@ -6,13 +6,13 @@
   "required_executas": [
     {
       "tool_id": "bundled:ppt-engine",
-      "min_version": "4.2.3",
+      "min_version": "4.2.4",
       "version": "latest"
     },
     {
       "tool_id": "bundled:anna-search",
       "version": "latest",
-      "min_version": "1.0.5"
+      "min_version": "1.0.6"
     }
   ],
   "optional_executas": [],
