@@ -1,0 +1,17 @@
+{
+  "name": "anna-app-web-search-demo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Pure frontend Anna App demo for host-managed web and image search APIs.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "predev": "npm run build",
+    "dev": "anna-app dev",
+    "validate": "anna-app validate --strict",
+    "check": "node --check src/app.js"
+  },
+  "devDependencies": {
+    "@anna-ai/cli": "latest"
+  }
+}

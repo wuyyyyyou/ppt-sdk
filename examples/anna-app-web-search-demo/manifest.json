@@ -1,0 +1,44 @@
+{
+  "schema": 2,
+  "permissions": [],
+  "required_executas": [],
+  "optional_executas": [],
+  "system_prompt_addendum": "The user has the Web and Image Search Demo open. It directly exercises Anna's host-managed web.search, web.fetch, web.image_search and web.image_fetch APIs from the iframe without an Executa.",
+  "tags": ["demo", "developer-tools", "web", "search", "image-search", "aps"],
+  "ui": {
+    "bundle": {
+      "format": "static-spa",
+      "entry": "index.html",
+      "external_origins": []
+    },
+    "views": [
+      {
+        "name": "main",
+        "title": "Web 与图片搜索 Demo",
+        "default": true,
+        "entry": "index.html",
+        "min_size": { "w": 760, "h": 640 },
+        "default_size": { "w": 1180, "h": 820 },
+        "max_size": { "w": 1600, "h": 1200 },
+        "resizable": true,
+        "movable": true,
+        "single_instance": true
+      }
+    ],
+    "host_api": {
+      "web": ["search", "fetch", "image_search", "image_fetch"],
+      "window": ["set_title"]
+    },
+    "csp_overrides": {
+      "script-src": ["'self'"],
+      "style-src": ["'self'"],
+      "connect-src": ["'self'", "https:"],
+      "img-src": ["'self'", "https:", "data:", "blob:"],
+      "font-src": ["'self'", "data:"]
+    },
+    "state_merge": "last_writer_wins"
+  },
+  "dev": {
+    "user_id": 1
+  }
+}

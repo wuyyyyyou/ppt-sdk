@@ -1,0 +1,11 @@
+{
+  "slug": "web-search-demo",
+  "name": "Web 与图片搜索 Demo",
+  "version": "0.1.0",
+  "tagline": "测试 Anna 官方 Web 搜索、网页抓取、图片搜索和图片下载接口。",
+  "description": "一个不依赖 Executa 的纯前端 Anna App，用于观察 host-managed web API 的搜索质量、正文提取、图片结果、APS 工件、耗时、缓存和 CU 消耗。",
+  "category": "developer-tools",
+  "homepage_url": "https://staging.anna.partners/developers/reference/host-api-web.md",
+  "support_url": "https://staging.anna.partners/developers/reference/host-api-web.md",
+  "pricing_model": "free"
+}
