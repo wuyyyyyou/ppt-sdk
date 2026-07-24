@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.uv/
+uv.lock
+bundle/anna-tool-ids.js
+.anna/
+.DS_Store

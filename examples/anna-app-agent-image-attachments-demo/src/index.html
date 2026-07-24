@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agent Image Attachments Demo</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <p class="eyebrow">PROTOTYPE / 集成验证原型</p>
+      <h1>Agent 图片附件演示</h1>
+      <p class="subhead">
+        Agent Image Attachments Demo — 本地图片经 Host Upload 生成短时 URL，随后通过
+        <code>session.run({ attachments })</code> 直接交给视觉模型。
+      </p>
+    </header>
+
+    <main>
+      <section class="panel">
+        <div class="section-title">
+          <span class="step">1</span>
+          <div>
+            <h2>上传本地图片 / Upload local images</h2>
+            <p>每行一个绝对路径，最多 6 张。Executa 必须能读取这些路径。</p>
+          </div>
+        </div>
+
+        <label for="paths-input">本地图片路径 / Absolute image paths</label>
+        <textarea id="paths-input" rows="6" spellcheck="false" placeholder="/Users/you/Pictures/slide-1.png&#10;/Users/you/Pictures/slide-2.jpg"></textarea>
+
+        <div class="actions">
+          <button id="upload-btn">上传图片 / Upload images</button>
+          <button id="reset-uploads-btn" class="secondary">清空上传 / Clear</button>
+          <span id="upload-status" class="status">尚未上传 / Not uploaded</span>
+        </div>
+
+        <div id="upload-list" class="upload-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <span class="step">2</span>
+          <div>
+            <h2>运行多模态 Session / Run multimodal Session</h2>
+            <p>图片只在当前 run 中可见；每次测试都会创建并删除一个临时 Session。</p>
+          </div>
+        </div>
+
+        <label for="prompt-input">提示词 / Prompt</label>
+        <textarea id="prompt-input" rows="5">请逐张分析这些图片。先说明每张图片的主要内容，再比较它们的视觉风格、版式和可能存在的问题。请明确引用“图片 1”“图片 2”等编号。</textarea>
+
+        <div class="field-grid">
+          <div>
+            <label for="model-hint-input">模型提示 / Model hint（可选 / optional）</label>
+            <input id="model-hint-input" type="text" placeholder="gemini / gpt-4o / claude" spellcheck="false" />
+          </div>
+          <div>
+            <label for="detail-select">图片细节 / Image detail</label>
+            <select id="detail-select">
+              <option value="high" selected>high（高细节）</option>
+              <option value="auto">auto（自动）</option>
+              <option value="low">low（低细节）</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="run-btn" disabled>运行 Session / Run Session</button>
+          <button id="cancel-btn" class="secondary" disabled>取消 / Cancel</button>
+          <span id="run-status" class="status">等待图片 / Waiting for images</span>
+        </div>
+
+        <div class="response-wrap">
+          <h3>模型回答 / Model response</h3>
+          <pre id="response-output">（暂无回答 / No response yet）</pre>
+        </div>
+      </section>
+
+      <section class="panel log-panel">
+        <div class="log-heading">
+          <div>
+            <h2>运行日志 / Session log</h2>
+            <p>记录上传结果、Session 生命周期和所有流式返回帧，仅保存在当前页面内存中。</p>
+          </div>
+          <button id="clear-log-btn" class="secondary compact">清空日志 / Clear log</button>
+        </div>
+        <pre id="log-output"></pre>
+      </section>
+    </main>
+
+    <script src="anna-tool-ids.js" defer></script>
+    <script src="app.js" type="module"></script>
+  </body>
+</html>

@@ -1,0 +1,51 @@
+{
+  "schema": 2,
+  "permissions": [
+    "tools.invoke"
+  ],
+  "required_executas": [
+    {
+      "tool_id": "bundled:agent-image-upload",
+      "min_version": "0.1.0",
+      "version": "latest"
+    }
+  ],
+  "optional_executas": [],
+  "system_prompt_addendum": "The user has the Agent Image Attachments Demo open. It uploads local image paths through a bundled Executa using Host Upload, then passes the returned short-lived URLs to agent.session.run attachments so a vision-capable model can inspect the images directly. You do not need to summon any windows.",
+  "tags": ["demo", "agent", "session", "multimodal", "vision", "images", "attachments", "host-upload"],
+  "ui": {
+    "bundle": {
+      "format": "static-spa",
+      "entry": "index.html",
+      "external_origins": []
+    },
+    "views": [
+      {
+        "name": "main",
+        "title": "Agent Image Attachments Demo",
+        "default": true,
+        "entry": "index.html",
+        "min_size": { "w": 520, "h": 640 },
+        "default_size": { "w": 760, "h": 860 },
+        "resizable": true,
+        "movable": true,
+        "single_instance": true
+      }
+    ],
+    "host_api": {
+      "tools": ["required:bundled:agent-image-upload"],
+      "agent": {
+        "session": { "auto": true },
+        "tools": []
+      },
+      "window": ["set_title"]
+    },
+    "csp_overrides": {
+      "script-src": ["'self'"]
+    },
+    "state_merge": "last_writer_wins"
+  },
+  "dev": {
+    "user_id": 1
+  }
+}

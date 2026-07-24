@@ -1,0 +1,15 @@
+{
+  "name": "anna-app-agent-image-attachments-demo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Prototype Anna App: upload local image paths through Host Upload, then send the returned URLs to agent.session.run attachments.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "predev": "npm run build",
+    "dev": "anna-app dev",
+    "validate": "anna-app validate"
+  },
+  "devDependencies": {
+    "@anna-ai/cli": "^0.1.22"
+  }
+}

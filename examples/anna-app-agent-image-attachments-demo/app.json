@@ -1,0 +1,14 @@
+{
+  "slug": "agent-image-attachments-demo",
+  "name": "Agent Image Attachments Demo",
+  "version": "0.1.0",
+  "tagline": "Upload local image paths and inspect them through native agent.session attachments.",
+  "description": "A throwaway integration prototype for native Agent Session image inputs. Enter up to six absolute local image paths. A bundled Python Executa reads those files and persists them with host/uploadFile using purpose=image_input. The app receives short-lived HTTPS URLs and passes them directly to agent.session.run({content, attachments}). The streamed session frames and model response are rendered as an in-memory log. This intentionally avoids upload_local_file and analyze_image so the test isolates native multimodal input.",
+  "category": "developer-tools",
+  "pricing_model": "free",
+  "bundled_executas": {
+    "agent-image-upload": {
+      "path": "./executas/agent-image-upload-python"
+    }
+  }
+}

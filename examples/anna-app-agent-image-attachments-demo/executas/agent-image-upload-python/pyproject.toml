@@ -1,0 +1,19 @@
+[project]
+name = "tool-test-agent-image-upload-12345678"
+version = "0.1.0"
+description = "Prototype Executa: upload local image paths through Host Upload for agent session attachments."
+requires-python = ">=3.10"
+authors = [{ name = "Anna Developer" }]
+license = { text = "MIT" }
+dependencies = []
+
+[project.scripts]
+"tool-test-agent-image-upload-12345678" = "agent_image_upload_plugin:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+only-include = ["agent_image_upload_plugin.py", "host_upload_client.py"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

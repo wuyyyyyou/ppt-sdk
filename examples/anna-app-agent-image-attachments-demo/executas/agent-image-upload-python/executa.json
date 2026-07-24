@@ -1,0 +1,20 @@
+{
+  "slug": "agent-image-upload",
+  "name": "Agent Image Upload",
+  "version": "0.1.0",
+  "executa_type": "tool",
+  "description": "Reads up to six local image paths and persists them with host/uploadFile for native Agent Session attachments.",
+  "tool_id": "tool-test-agent-image-upload-12345678",
+  "type": "python",
+  "enabled": true,
+  "distribution": {
+    "active": "local",
+    "profiles": {
+      "local": {
+        "type": "local",
+        "supports_protocol": true,
+        "capabilities": ["host.upload"]
+      }
+    }
+  }
+}
