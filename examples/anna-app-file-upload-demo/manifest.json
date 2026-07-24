@@ -12,7 +12,7 @@
     }
   ],
   "optional_executas": [],
-  "system_prompt_addendum": "The user has the Host Upload Demo app open. It demonstrates the host/uploadFile reverse-RPC (inline / negotiate / confirm) via the bundled file-upload-via-executa Executa. The Executa generates a local scratch file (make_sample) and persists it to short-lived host storage (host_upload_path) — bytes go plugin→R2 directly, never through tools.invoke. Objects are transient (~30 min TTL) and not enumerable; the deliverable is the returned short-lived download URL.",
+  "system_prompt_addendum": "The user has the Host Upload Demo app open. It demonstrates the host/uploadFile reverse-RPC (inline / negotiate / confirm) via the bundled file-upload-via-executa Executa. The Executa generates a local scratch file (make_sample) and persists it to short-lived host storage (host_upload_path) — bytes go plugin→R2 directly, never through tools.invoke. The UI also contains a concurrent invoke race reproducer with downloadable browser and Executa phase logs. Objects are transient (~30 min TTL) and not enumerable; the deliverable is the returned short-lived download URL.",
   "tags": ["demo", "storage", "files", "upload", "host-upload", "executa"],
   "ui": {
     "bundle": {

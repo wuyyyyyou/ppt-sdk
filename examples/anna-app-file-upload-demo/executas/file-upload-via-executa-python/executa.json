@@ -1,7 +1,7 @@
 {
   "slug": "file-upload-via-executa",
   "name": "Host Upload via Executa",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "executa_type": "tool",
   "description": "Demonstrates the host/uploadFile reverse-RPC (inline / negotiate / confirm) by generating a local scratch file and persisting it to short-lived host storage — bytes go plugin→R2 directly, never through tools.invoke. Backed by the host.upload capability.",
 
@@ -15,12 +15,12 @@
       "local": {
         "type": "local",
         "supports_protocol": true,
-        "capabilities": ["make_sample", "host_upload_path"]
+        "capabilities": ["make_sample", "host_upload_path", "get_diagnostic_log"]
       },
       "binary": {
         "type": "binary",
         "supports_protocol": true,
-        "capabilities": ["make_sample", "host_upload_path"],
+        "capabilities": ["make_sample", "host_upload_path", "get_diagnostic_log"],
         "binary_artifacts": {
           "darwin-x86_64": {
             "path": "bundle/file-upload-v{version}-darwin-x86_64.tar.gz",

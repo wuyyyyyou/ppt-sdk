@@ -1,9 +1,14 @@
 {
   "name": "anna-app-file-upload-demo",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.4",
   "description": "Anna App that demonstrates the host/uploadFile reverse-RPC (inline / negotiate / confirm) via a bundled Executa that sources bytes locally and streams them straight to R2.",
   "scripts": {
+    "build": "node scripts/build.mjs",
+    "predev": "npm run build",
+    "predev:mock": "npm run build",
+    "predev:off": "npm run build",
+    "test:startup": "python3 tests/test_startup.py",
     "dev": "anna-app dev",
     "dev:mock": "anna-app dev --mock-llm fixtures/happy-path.jsonl",
     "dev:off": "anna-app dev --no-llm",

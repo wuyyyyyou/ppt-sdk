@@ -50,7 +50,8 @@ lifetime.
 | Tool               | Does                                                                                     | Returns                                                       |
 | ------------------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `make_sample`      | Write a scratch file of `size_bytes` bytes to the local filesystem.                     | `{ ok, path, filename, size_bytes }`                         |
-| `host_upload_path` | Read a **local file path** and persist it via `host/uploadFile` (auto inline/negotiate). | `{ ok, mode, filename, size_bytes, mime_type, download_url, r2_key, expires_at }` |
+| `host_upload_path` | Read a **local file path** and persist it via `host/uploadFile` (auto/forced inline/forced negotiate). | `{ ok, mode, filename, size_bytes, mime_type, download_url, r2_key, expires_at }` |
+| `get_diagnostic_log` | Return one byte-bounded page of Executa-side phase logs for a diagnostic run. | `{ ok, run_id, cursor, next_cursor, done, total_events, events }` |
 
 `make_sample` exists only so the UI can conjure preset-size payloads that
 straddle the thresholds without committing large binaries to the repo. A real
@@ -114,6 +115,33 @@ The harness opens the bundle in a Chromium iframe:
 Each result shows the size + chosen mode and, on success, the short-lived
 `open ↗` link. Host Upload objects are transient and **never** listed — the
 returned link is the only deliverable.
+
+## 并发竞态复现
+
+页面新增了“并发 invoke 竞态复现”区域，用于排查多个独立 `tools.invoke`
+同时执行 `host/uploadFile` 时，`r2_key` 是否会在 `confirm` 阶段被错误归属。
+
+- 测试文件固定为 256 KiB，并强制使用 `negotiate → PUT → confirm`，与
+  `ppt-engine` 上传页面截图的路径一致。
+- 可配置并发数、总调用数、confirm 前固定延迟和随机抖动。
+- 建议先用并发数 1 建立基线，再使用 4 或 8 进行对比。
+- 浏览器记录调用调度、耗时和最终错误；Executa 单独记录
+  negotiate、PUT、confirm 的阶段事件。
+- 测试完成后可从浏览器下载合并后的 JSONL。下载 URL、签名和 token 会被
+  脱敏，`run_id`、`call_id`、父级 invoke ID 和 `r2_key` 会保留用于关联。
+- Executa 日志按约 24 KiB 的字节预算分页返回，浏览器自动逐页拉取并合并，
+  避免单行 JSON-RPC 响应超过 Anna Runtime 默认的 64 KiB stdout 限制。
+
+复现真实平台问题必须使用已登录账号运行 `pnpm dev`。`pnpm dev:mock`
+不会发出真实 reverse RPC，因此只能检查界面，不能验证并发归属问题。
+
+Executa 是自包含的，不依赖仓库外的 Python SDK 路径。可以先运行下面的
+启动回归测试，确认 Anna Dev 使用的真实 `uv run` 命令能够完成 `describe`
+和 `make_sample`：
+
+```bash
+pnpm test:startup
+```
 
 > **No browser CORS is involved.** Unlike a browser-side `PUT`, the `negotiate`
 > `PUT` happens inside the Executa subprocess, so the R2 bucket does not need

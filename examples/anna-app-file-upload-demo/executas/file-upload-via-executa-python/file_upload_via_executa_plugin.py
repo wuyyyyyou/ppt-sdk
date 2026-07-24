@@ -49,25 +49,22 @@ above the per-file cap is rejected with ``UPLOAD_TOO_LARGE`` (-32204)
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import json
 import os
+import random
 import sys
 import tempfile
 import threading
+import time
 import urllib.request
+import uuid
+from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
-# Fallback for fresh checkouts: locate the in-repo SDK when not pip-installed.
-try:
-    import executa_sdk  # noqa: F401
-except ModuleNotFoundError:
-    _SDK_PATH = Path(__file__).resolve().parents[4] / "sdk" / "python"
-    if _SDK_PATH.is_dir():
-        sys.path.insert(0, str(_SDK_PATH))
-
-from executa_sdk import (  # noqa: E402
+from host_upload_client import (
     PROTOCOL_VERSION_V2,
     HostUploadClient,
     UploadError,
@@ -82,12 +79,20 @@ _INLINE_CAP_BYTES = 8 * 1024 * 1024
 # a deterministic per-size filename means repeated clicks overwrite rather
 # than accumulate.
 _SAMPLE_DIR = Path(tempfile.gettempdir()) / "anna-host-upload-demo"
+_TRACE_DIR = Path(tempfile.gettempdir()) / "anna-host-upload-demo-traces"
+_TRACE_LOCK = threading.Lock()
+_DIAGNOSTIC_PAGE_DEFAULT_BYTES = 24 * 1024
+_DIAGNOSTIC_PAGE_MAX_BYTES = 32 * 1024
+_TRACE_CONTEXT: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
+    "host_upload_trace_context", default=None
+)
+_RPC_TRACE_CONTEXTS: dict[str, dict] = {}
 
 # ─── Manifest ─────────────────────────────────────────────────────────
 
 MANIFEST = {
     "display_name": "Host Upload via Executa",
-    "version": "0.2.3",
+    "version": "0.2.4",
     "description": (
         "Demonstrates the host/uploadFile reverse-RPC (inline / negotiate / "
         "confirm) by reading a local file and persisting it to short-lived "
@@ -165,6 +170,68 @@ MANIFEST = {
                     "default": "user_artifact",
                     "enum": ["image_input", "image_reference", "user_artifact"],
                 },
+                {
+                    "name": "mode",
+                    "type": "string",
+                    "description": "Upload mode: auto, inline, or negotiate.",
+                    "required": False,
+                    "default": "auto",
+                    "enum": ["auto", "inline", "negotiate"],
+                },
+                {
+                    "name": "run_id",
+                    "type": "string",
+                    "description": "Diagnostic run correlation id.",
+                    "required": False,
+                    "default": "",
+                },
+                {
+                    "name": "call_id",
+                    "type": "string",
+                    "description": "Diagnostic call correlation id.",
+                    "required": False,
+                    "default": "",
+                },
+                {
+                    "name": "delay_before_confirm_ms",
+                    "type": "integer",
+                    "description": "Fixed delay after PUT and before confirm, used to amplify interleaving.",
+                    "required": False,
+                    "default": 0,
+                },
+                {
+                    "name": "jitter_ms",
+                    "type": "integer",
+                    "description": "Random additional delay before confirm.",
+                    "required": False,
+                    "default": 0,
+                },
+            ],
+        },
+        {
+            "name": "get_diagnostic_log",
+            "description": "Return structured Executa-side Host Upload trace events for one diagnostic run.",
+            "parameters": [
+                {
+                    "name": "run_id",
+                    "type": "string",
+                    "description": "Diagnostic run id returned by the browser stress test.",
+                    "required": True,
+                },
+                {
+                    "name": "cursor",
+                    "type": "integer",
+                    "description": "Zero-based event cursor; defaults to the first event.",
+                    "required": False,
+                    "default": 0,
+                },
+                {
+                    "name": "max_bytes",
+                    "type": "integer",
+                    "description": "Maximum serialized event bytes per page; capped at 32 KiB.",
+                    "required": False,
+                    "default": _DIAGNOSTIC_PAGE_DEFAULT_BYTES,
+                },
             ],
         },
     ],
@@ -177,6 +244,19 @@ _stdout_lock = threading.Lock()
 
 
 def _write_frame(msg: dict) -> None:
+    context = _TRACE_CONTEXT.get()
+    if context and msg.get("method") == "host/uploadFile":
+        reverse_rpc_id = str(msg.get("id", ""))
+        with _TRACE_LOCK:
+            _RPC_TRACE_CONTEXTS[reverse_rpc_id] = context
+        _trace_event(
+            **context,
+            phase="reverse-rpc",
+            status="sent",
+            reverse_rpc_id=reverse_rpc_id,
+            reverse_rpc_mode=(msg.get("params") or {}).get("mode"),
+            r2_key=(msg.get("params") or {}).get("r2_key"),
+        )
     payload = json.dumps(msg, ensure_ascii=False)
     with _stdout_lock:
         sys.stdout.write(payload + "\n")
@@ -185,6 +265,167 @@ def _write_frame(msg: dict) -> None:
 
 _host_upload = HostUploadClient(write_frame=_write_frame)
 _route_response = make_response_router(_host_upload)
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def _safe_trace_id(value: str, fallback: str) -> str:
+    cleaned = "".join(ch for ch in (value or "") if ch.isalnum() or ch in "-_")
+    return cleaned[:120] or fallback
+
+
+def _trace_path(run_id: str) -> Path:
+    return _TRACE_DIR / f"{_safe_trace_id(run_id, 'unscoped')}.jsonl"
+
+
+def _trace_event(
+    *,
+    run_id: str,
+    call_id: str,
+    invoke_id: Any,
+    phase: str,
+    status: str,
+    **extra: Any,
+) -> dict:
+    event = {
+        "timestamp": _utc_now(),
+        "monotonic_ns": time.monotonic_ns(),
+        "event": f"executa.upload.{phase}",
+        "run_id": run_id,
+        "call_id": call_id,
+        "invoke_id": invoke_id,
+        "thread": threading.current_thread().name,
+        "phase": phase,
+        "status": status,
+        **extra,
+    }
+    _TRACE_DIR.mkdir(parents=True, exist_ok=True)
+    line = json.dumps(event, ensure_ascii=False, separators=(",", ":"))
+    with _TRACE_LOCK:
+        with open(_trace_path(run_id), "a", encoding="utf-8") as trace_file:
+            trace_file.write(line + "\n")
+    print(f"[host-upload-trace] {line}", file=sys.stderr)
+    return event
+
+
+def _redact_storage_value(value: Any) -> Any:
+    if isinstance(value, list):
+        return [_redact_storage_value(child) for child in value]
+    if not isinstance(value, dict):
+        return value
+    redacted = {}
+    for key, child in value.items():
+        normalized = str(key).lower().replace("-", "_")
+        if normalized in {"url", "put_url", "download_url", "authorization", "token", "signature"} or "signed_url" in normalized:
+            redacted[key] = "[REDACTED]"
+        else:
+            redacted[key] = _redact_storage_value(child)
+    return redacted
+
+
+def _error_record(error: BaseException) -> dict:
+    record = {
+        "name": type(error).__name__,
+        "message": str(error),
+    }
+    if isinstance(error, UploadError):
+        record["code"] = error.code
+        record["data"] = _redact_storage_value(error.data)
+    return record
+
+
+def _trace_reverse_rpc_response(message: dict) -> None:
+    reverse_rpc_id = str(message.get("id", ""))
+    with _TRACE_LOCK:
+        context = _RPC_TRACE_CONTEXTS.pop(reverse_rpc_id, None)
+    if not context:
+        return
+    error = message.get("error")
+    result = message.get("result") or {}
+    _trace_event(
+        **context,
+        phase="reverse-rpc",
+        status="failed" if error else "succeeded",
+        reverse_rpc_id=reverse_rpc_id,
+        r2_key=result.get("r2_key") if isinstance(result, dict) else None,
+        error=_redact_storage_value(error),
+    )
+
+
+async def _get_diagnostic_log(
+    run_id: str,
+    cursor: int = 0,
+    max_bytes: int = _DIAGNOSTIC_PAGE_DEFAULT_BYTES,
+) -> dict:
+    safe_run_id = _safe_trace_id(run_id, "")
+    if not safe_run_id:
+        raise ValueError("run_id must not be empty")
+    try:
+        page_cursor = int(cursor)
+        requested_max_bytes = int(max_bytes)
+    except (TypeError, ValueError) as error:
+        raise ValueError("cursor and max_bytes must be integers") from error
+    if page_cursor < 0:
+        raise ValueError("cursor must be >= 0")
+    if requested_max_bytes <= 0:
+        raise ValueError("max_bytes must be > 0")
+    page_max_bytes = min(requested_max_bytes, _DIAGNOSTIC_PAGE_MAX_BYTES)
+    trace_path = _trace_path(safe_run_id)
+    if not trace_path.is_file():
+        return {
+            "ok": True,
+            "run_id": safe_run_id,
+            "cursor": page_cursor,
+            "next_cursor": page_cursor,
+            "done": True,
+            "total_events": 0,
+            "page_bytes": 0,
+            "max_bytes": page_max_bytes,
+            "events": [],
+        }
+    all_events = []
+    with open(trace_path, "r", encoding="utf-8") as trace_file:
+        for line in trace_file:
+            line = line.strip()
+            if line:
+                all_events.append(json.loads(line))
+    total_events = len(all_events)
+    if page_cursor > total_events:
+        raise ValueError(
+            f"cursor {page_cursor} exceeds diagnostic event count {total_events}"
+        )
+
+    events = []
+    page_bytes = 0
+    next_cursor = page_cursor
+    for event in all_events[page_cursor:]:
+        event_bytes = len(
+            json.dumps(event, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        )
+        if event_bytes > _DIAGNOSTIC_PAGE_MAX_BYTES:
+            raise ValueError(
+                "one diagnostic event exceeds the 32 KiB safe response budget"
+            )
+        separator_bytes = 1 if events else 0
+        if events and page_bytes + separator_bytes + event_bytes > page_max_bytes:
+            break
+        events.append(event)
+        page_bytes += separator_bytes + event_bytes
+        next_cursor += 1
+
+    return {
+        "ok": True,
+        "run_id": safe_run_id,
+        "cursor": page_cursor,
+        "next_cursor": next_cursor,
+        "done": next_cursor >= total_events,
+        "total_events": total_events,
+        "page_bytes": page_bytes,
+        "max_bytes": page_max_bytes,
+        "events": events,
+    }
 
 
 # ─── Tool implementations ─────────────────────────────────────────────
@@ -217,7 +458,16 @@ async def _make_sample(size_bytes: int, filename: str) -> dict:
 
 
 async def _host_upload_path(
-    path: str, filename: str, mime_type: str, purpose: str
+    path: str,
+    filename: str,
+    mime_type: str,
+    purpose: str,
+    mode: str = "auto",
+    run_id: str = "",
+    call_id: str = "",
+    delay_before_confirm_ms: int = 0,
+    jitter_ms: int = 0,
+    invoke_id: Any = None,
 ) -> dict:
     """Persist a local file via host/uploadFile.
 
@@ -235,45 +485,180 @@ async def _host_upload_path(
     name = (filename or "").strip() or p.name
     mime = mime_type or "application/octet-stream"
     purpose = purpose or "user_artifact"
+    selected_mode = (mode or "auto").strip().lower()
+    if selected_mode not in {"auto", "inline", "negotiate"}:
+        raise ValueError("mode must be auto, inline, or negotiate")
+    delay_ms = max(0, int(delay_before_confirm_ms or 0))
+    random_jitter_ms = max(0, int(jitter_ms or 0))
+    trace_run_id = _safe_trace_id(run_id, f"manual-{uuid.uuid4().hex[:12]}")
+    trace_call_id = _safe_trace_id(call_id, f"call-{uuid.uuid4().hex[:12]}")
+    trace_context = {
+        "run_id": trace_run_id,
+        "call_id": trace_call_id,
+        "invoke_id": invoke_id,
+    }
+    trace_token = _TRACE_CONTEXT.set(trace_context)
+    current_phase = "started"
 
-    if size <= _INLINE_CAP_BYTES:
-        # Mode 1 — inline: base64 round-trip, simplest path. Bytes ride the
-        # reverse-RPC request, so this is only sane for small payloads.
-        res = await _host_upload.upload_inline(
-            filename=name,
-            mime_type=mime,
-            content=p.read_bytes(),
-            purpose=purpose,
+    _trace_event(
+        run_id=trace_run_id,
+        call_id=trace_call_id,
+        invoke_id=invoke_id,
+        phase="started",
+        status="started",
+        filename=name,
+        size_bytes=size,
+        requested_mode=selected_mode,
+    )
+
+    try:
+        use_inline = selected_mode == "inline" or (
+            selected_mode == "auto" and size <= _INLINE_CAP_BYTES
         )
-        mode = "inline"
-    else:
-        # Mode 2 — negotiate + PUT + confirm: the host signs an R2 PUT URL,
-        # the plugin streams the file straight to R2 (NOT through stdio),
-        # then confirm registers the object. This is the large-file path.
-        info = await _host_upload.negotiate(
-            filename=name,
-            mime_type=mime,
-            size_bytes=size,
-            purpose=purpose,
-        )
-        headers = dict(info.get("headers") or {})
-        # urllib only sets Content-Length automatically for bytes bodies;
-        # for a streamed file object we must set it ourselves.
-        headers["Content-Length"] = str(size)
-        with open(p, "rb") as f:
-            req = urllib.request.Request(
-                info["put_url"], data=f, method="PUT", headers=headers
+        if use_inline:
+            current_phase = "inline"
+            _trace_event(
+                run_id=trace_run_id,
+                call_id=trace_call_id,
+                invoke_id=invoke_id,
+                phase="inline",
+                status="started",
             )
-            with urllib.request.urlopen(req, timeout=300) as resp:  # noqa: S310 - presigned URL
-                put_status = resp.status
-        if put_status not in (200, 201):
-            raise RuntimeError(f"host upload PUT failed: HTTP {put_status}")
-        res = await _host_upload.confirm(r2_key=info["r2_key"])
-        mode = "negotiate+confirm"
+            res = await _host_upload.upload_inline(
+                filename=name,
+                mime_type=mime,
+                content=p.read_bytes(),
+                purpose=purpose,
+            )
+            actual_mode = "inline"
+            _trace_event(
+                run_id=trace_run_id,
+                call_id=trace_call_id,
+                invoke_id=invoke_id,
+                phase="inline",
+                status="succeeded",
+                r2_key=res.get("r2_key"),
+            )
+        else:
+            current_phase = "negotiate"
+            _trace_event(
+                run_id=trace_run_id,
+                call_id=trace_call_id,
+                invoke_id=invoke_id,
+                phase="negotiate",
+                status="started",
+            )
+            info = await _host_upload.negotiate(
+                filename=name,
+                mime_type=mime,
+                size_bytes=size,
+                purpose=purpose,
+                metadata={
+                    "diagnostic_run_id": trace_run_id,
+                    "diagnostic_call_id": trace_call_id,
+                    "parent_invoke_id": str(invoke_id),
+                },
+            )
+            negotiated_key = info["r2_key"]
+            _trace_event(
+                run_id=trace_run_id,
+                call_id=trace_call_id,
+                invoke_id=invoke_id,
+                phase="negotiate",
+                status="succeeded",
+                r2_key=negotiated_key,
+            )
+            headers = dict(info.get("headers") or {})
+            headers["Content-Length"] = str(size)
+            current_phase = "put"
+            _trace_event(
+                run_id=trace_run_id,
+                call_id=trace_call_id,
+                invoke_id=invoke_id,
+                phase="put",
+                status="started",
+                r2_key=negotiated_key,
+            )
+            with open(p, "rb") as f:
+                req = urllib.request.Request(
+                    info["put_url"], data=f, method="PUT", headers=headers
+                )
+                with urllib.request.urlopen(req, timeout=300) as resp:  # noqa: S310 - presigned URL
+                    put_status = resp.status
+            if put_status not in (200, 201):
+                raise RuntimeError(f"host upload PUT failed: HTTP {put_status}")
+            _trace_event(
+                run_id=trace_run_id,
+                call_id=trace_call_id,
+                invoke_id=invoke_id,
+                phase="put",
+                status="succeeded",
+                r2_key=negotiated_key,
+                http_status=put_status,
+            )
+            applied_delay_ms = delay_ms + (
+                random.randint(0, random_jitter_ms) if random_jitter_ms else 0
+            )
+            if applied_delay_ms:
+                current_phase = "before-confirm-delay"
+                _trace_event(
+                    run_id=trace_run_id,
+                    call_id=trace_call_id,
+                    invoke_id=invoke_id,
+                    phase="before-confirm-delay",
+                    status="started",
+                    r2_key=negotiated_key,
+                    delay_ms=applied_delay_ms,
+                )
+                await asyncio.sleep(applied_delay_ms / 1000)
+            current_phase = "confirm"
+            _trace_event(
+                run_id=trace_run_id,
+                call_id=trace_call_id,
+                invoke_id=invoke_id,
+                phase="confirm",
+                status="started",
+                r2_key=negotiated_key,
+            )
+            res = await _host_upload.confirm(r2_key=negotiated_key)
+            _trace_event(
+                run_id=trace_run_id,
+                call_id=trace_call_id,
+                invoke_id=invoke_id,
+                phase="confirm",
+                status="succeeded",
+                r2_key=negotiated_key,
+                confirmed_r2_key=res.get("r2_key"),
+            )
+            actual_mode = "negotiate+confirm"
 
-    return {
+        _trace_event(
+            run_id=trace_run_id,
+            call_id=trace_call_id,
+            invoke_id=invoke_id,
+            phase="finished",
+            status="succeeded",
+            r2_key=res.get("r2_key"),
+            mode=actual_mode,
+        )
+    except Exception as error:
+        _trace_event(
+            run_id=trace_run_id,
+            call_id=trace_call_id,
+            invoke_id=invoke_id,
+            phase="failed",
+            status="failed",
+            failed_phase=current_phase,
+            error=_error_record(error),
+        )
+        _TRACE_CONTEXT.reset(trace_token)
+        raise
+
+    result = {
         "ok": True,
-        "mode": mode,
+        "mode": actual_mode,
+        "run_id": trace_run_id,
+        "call_id": trace_call_id,
         "filename": name,
         "size_bytes": res.get("size_bytes", size),
         "mime_type": mime,
@@ -285,6 +670,8 @@ async def _host_upload_path(
         # response-shape differences.
         "host_upload_raw_result": res,
     }
+    _TRACE_CONTEXT.reset(trace_token)
+    return result
 
 
 # ─── JSON-RPC dispatch ────────────────────────────────────────────────
@@ -317,6 +704,18 @@ def _handle_invoke(req_id: Any, params: dict) -> None:
             str(args.get("filename", "")),
             str(args.get("mime_type", "application/octet-stream")),
             str(args.get("purpose", "user_artifact")),
+            str(args.get("mode", "auto")),
+            str(args.get("run_id", "")),
+            str(args.get("call_id", "")),
+            args.get("delay_before_confirm_ms", 0),
+            args.get("jitter_ms", 0),
+            req_id,
+        )
+    elif tool == "get_diagnostic_log":
+        coro = _get_diagnostic_log(
+            str(args.get("run_id", "")),
+            args.get("cursor", 0),
+            args.get("max_bytes", _DIAGNOSTIC_PAGE_DEFAULT_BYTES),
         )
     else:
         _err(req_id, -32601, f"Unknown tool: {tool}")
@@ -371,6 +770,7 @@ def _handle_message(line: str) -> None:
         return
     # Reverse-RPC replies from the host resolve our pending upload futures.
     if "method" not in msg:
+        _trace_reverse_rpc_response(msg)
         if not _route_response(msg):
             print(f"⚠️  unmatched response id={msg.get('id')!r}", file=sys.stderr)
         return
@@ -397,7 +797,7 @@ def _handle_message(line: str) -> None:
 
 def main() -> None:
     print("🔌 host-upload-via-executa plugin started", file=sys.stderr)
-    pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="invoke")
+    pool = ThreadPoolExecutor(max_workers=16, thread_name_prefix="invoke")
     try:
         for raw in sys.stdin:
             line = raw.strip()
