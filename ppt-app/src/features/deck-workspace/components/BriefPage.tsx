@@ -7,7 +7,7 @@ import {
   VISUAL_STYLE_PRESETS,
 } from "../../templates/visualStylePresets";
 import {
-  matchesVisualStylePresetFilters,
+  filterVisualStylePresets,
   VISUAL_STYLE_PRESET_FILTER_FIELDS,
   type VisualStylePresetFilters,
 } from "../../templates/visualStylePresetFilters";
@@ -28,6 +28,80 @@ export interface BriefPageProps {
   generateDeck: () => Promise<void>;
   selectedVisualStylePresetId: string | null;
   onSelectVisualStylePreset: (presetId: string | null) => void;
+}
+
+interface VisualStylePresetCardImageProps {
+  preset: VisualStylePreset;
+  selected: boolean;
+  previewLabel: string;
+  onOpen: () => void;
+}
+
+function VisualStylePresetCardImage({
+  preset,
+  selected,
+  previewLabel,
+  onOpen,
+}: VisualStylePresetCardImageProps) {
+  const [imageStatus, setImageStatus] = useState<"loading" | "ready" | "error">("loading");
+  const previewImage = preset.preview_images[0];
+
+  function revealImage(image: HTMLImageElement) {
+    void image.decode()
+      .catch(() => undefined)
+      .finally(() => setImageStatus("ready"));
+  }
+
+  function openPreview() {
+    onOpen();
+  }
+
+  return (
+    <span
+      className="brief-style-preset-image-wrap"
+      data-image-status={imageStatus}
+      role="button"
+      tabIndex={0}
+      aria-label={previewLabel}
+      onClick={(event) => {
+        event.stopPropagation();
+        openPreview();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          event.stopPropagation();
+          openPreview();
+        }
+      }}
+    >
+      <span className="brief-style-preset-image-placeholder" aria-hidden="true">
+        <span className="brief-style-preset-placeholder-mark">CONSULTING</span>
+        <span className="brief-style-preset-placeholder-title" />
+        <span className="brief-style-preset-placeholder-copy" />
+        <span className="brief-style-preset-placeholder-panels">
+          <i />
+          <i />
+          <i />
+        </span>
+      </span>
+      {previewImage ? (
+        <img
+          src={previewImage.url}
+          alt={previewImage.alt ?? preset.name}
+          width={1600}
+          height={900}
+          loading="lazy"
+          decoding="async"
+          fetchPriority="low"
+          draggable={false}
+          onLoad={(event) => revealImage(event.currentTarget)}
+          onError={() => setImageStatus("error")}
+        />
+      ) : null}
+      {selected ? <span className="brief-style-preset-selected"><Check size={14} /></span> : null}
+    </span>
+  );
 }
 
 export function BriefPage({
@@ -53,7 +127,7 @@ export function BriefPage({
     theme: "",
     color: "",
   });
-  const filteredPresets = VISUAL_STYLE_PRESETS.filter((preset) => matchesVisualStylePresetFilters(preset, presetFilters));
+  const filteredPresets = filterVisualStylePresets(VISUAL_STYLE_PRESETS, presetFilters);
 
   function toggleStrictReviewMode() {
     if (strictReviewMode) {
@@ -179,33 +253,18 @@ export function BriefPage({
             return (
               <button
                 type="button"
-                className={`brief-style-preset-card ${selected ? "active" : ""}`}
+                className={`brief-style-preset-card brief-style-preset-image-card ${selected ? "active" : ""}`}
                 key={preset.id}
+                aria-label={preset.name}
                 disabled={busy}
                 onClick={() => onSelectVisualStylePreset(preset.id)}
               >
-                <span
-                  className="brief-style-preset-image-wrap"
-                  role="button"
-                  tabIndex={0}
-                  aria-label={t.template.previewTitle}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setPreview({ preset, index: 0 });
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setPreview({ preset, index: 0 });
-                    }
-                  }}
-                >
-                  <img src={preset.preview_images[0]?.url} alt={preset.preview_images[0]?.alt ?? preset.name} />
-                  {selected ? <span className="brief-style-preset-selected"><Check size={14} /></span> : null}
-                </span>
-                <strong>{preset.name}</strong>
-                <small>{preset.description}</small>
+                <VisualStylePresetCardImage
+                  preset={preset}
+                  selected={selected}
+                  previewLabel={t.template.previewTitle}
+                  onOpen={() => setPreview({ preset, index: 0 })}
+                />
               </button>
             );
           })}

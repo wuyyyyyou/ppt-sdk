@@ -116,17 +116,35 @@ export interface VisualStylePresetPreview {
   alt: string;
 }
 
+export type VisualStylePresetTheme = "dark" | "light";
+
+export type VisualStylePresetColor =
+  | "black"
+  | "white"
+  | "gray"
+  | "red"
+  | "orange"
+  | "yellow"
+  | "green"
+  | "cyan"
+  | "blue"
+  | "purple"
+  | "pink"
+  | "brown"
+  | "beige";
+
 export interface VisualStylePreset {
   id: string;
   version: number;
-  score: number;
+  ppt_number: number;
+  score?: number;
+  theme: VisualStylePresetTheme;
+  color: VisualStylePresetColor[];
   name: string;
   description: string;
   user: string;
   use_case: string;
   industry: string;
-  theme: string;
-  color: string;
   style_guide: string;
   preview_images: VisualStylePresetPreview[];
 }
