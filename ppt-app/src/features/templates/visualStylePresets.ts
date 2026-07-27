@@ -9,6 +9,7 @@ export const NO_VISUAL_STYLE_PRESET_ID = "none";
 interface VisualStylePresetSource {
   id: string;
   version: number;
+  score: number;
   name: string;
   description: string;
   user: string;
@@ -35,6 +36,9 @@ function assertSource(value: VisualStylePresetSource, configPath: string): void 
   if (!value || typeof value !== "object") throw new Error(`Invalid visual style preset: ${configPath}`);
   if (typeof value.id !== "string" || !value.id || !Number.isInteger(value.version) || value.version < 1) {
     throw new Error(`Invalid visual style preset identity: ${configPath}`);
+  }
+  if (typeof value.score !== "number") {
+    throw new Error(`Invalid visual style preset score: ${configPath}`);
   }
   const stringFields = ["name", "description", "user", "use_case", "industry", "theme", "color", "style_guide"] as const;
   if (stringFields.some((field) => typeof value[field] !== "string") || !Array.isArray(value.preview_images)) {
@@ -68,7 +72,8 @@ function loadVisualStylePresets(): VisualStylePreset[] {
 
       if (preview_images.length === 0) throw new Error(`Visual style preset has no previews: ${source.id}`);
       return { ...source, preview_images };
-    });
+    })
+    .sort((left, right) => right.score - left.score || left.id.localeCompare(right.id));
 }
 
 export const VISUAL_STYLE_PRESETS = loadVisualStylePresets();

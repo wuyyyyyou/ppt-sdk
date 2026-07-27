@@ -9,6 +9,7 @@ import { validateVisualStylePresets } from "../../scripts/validate-visual-style-
 const validPreset = {
   id: "test-preset",
   version: 1,
+  score: 0,
   name: "Test preset",
   description: "Test description",
   user: "Industry Professionals",
@@ -35,6 +36,12 @@ describe("visual style preset build validation", () => {
     assert.equal(result.presetCount, 3);
   });
 
+  it("accepts a negative decimal score", async () => {
+    const root = await createPresetRoot({ ...validPreset, score: -1.5 });
+    const result = await validateVisualStylePresets(root);
+    assert.equal(result.presetCount, 1);
+  });
+
   it("rejects a missing metadata field", async () => {
     const { theme: _theme, ...preset } = validPreset;
     const root = await createPresetRoot(preset);
@@ -44,6 +51,17 @@ describe("visual style preset build validation", () => {
   it("rejects a metadata field with the wrong type", async () => {
     const root = await createPresetRoot({ ...validPreset, color: ["blue"] });
     await assert.rejects(() => validateVisualStylePresets(root), /field "color" must be string/);
+  });
+
+  it("rejects a missing score", async () => {
+    const { score: _score, ...preset } = validPreset;
+    const root = await createPresetRoot(preset);
+    await assert.rejects(() => validateVisualStylePresets(root), /missing required field "score"/);
+  });
+
+  it("rejects a non-number score", async () => {
+    const root = await createPresetRoot({ ...validPreset, score: "0" });
+    await assert.rejects(() => validateVisualStylePresets(root), /field "score" must be number/);
   });
 
   it("rejects a missing preview image", async () => {

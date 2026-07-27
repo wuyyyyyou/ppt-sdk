@@ -8,6 +8,7 @@ const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 const REQUIRED_FIELD_TYPES = {
   id: "string",
   version: "number",
+  score: "number",
   name: "string",
   description: "string",
   user: "string",

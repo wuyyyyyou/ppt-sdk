@@ -119,6 +119,7 @@ export interface VisualStylePresetPreview {
 export interface VisualStylePreset {
   id: string;
   version: number;
+  score: number;
   name: string;
   description: string;
   user: string;
