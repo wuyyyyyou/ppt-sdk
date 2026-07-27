@@ -127,6 +127,8 @@ export function App() {
               loading={state.loading}
               pageReviewSettings={state.pageReviewSettings}
               setStrictReviewMode={actions.setStrictReviewMode}
+              researchSearchControlSettings={state.researchSearchControlSettings}
+              setResearchSearchControlSettings={actions.setResearchSearchControlSettings}
               workspaceSettingsSaving={state.workspaceSettingsSaving}
               generateDeck={actions.generatePresentationRequirements}
               selectedVisualStylePresetId={state.selectedVisualStylePresetId}

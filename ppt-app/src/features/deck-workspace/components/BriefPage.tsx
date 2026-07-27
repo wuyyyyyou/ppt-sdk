@@ -15,7 +15,9 @@ import {
   isStrictReviewModeEnabled,
   type PageReviewSettings,
 } from "../reviewSettings";
+import type { ResearchSearchControlSettings } from "../researchSearchControl";
 import type { LoadingKind } from "../types";
+import { ResearchSearchControlSwitches } from "./ResearchSearchControlSwitches";
 
 export interface BriefPageProps {
   t: Messages;
@@ -24,6 +26,8 @@ export interface BriefPageProps {
   loading: LoadingKind;
   pageReviewSettings: PageReviewSettings;
   setStrictReviewMode: (enabled: boolean) => Promise<void>;
+  researchSearchControlSettings: ResearchSearchControlSettings;
+  setResearchSearchControlSettings: (settings: ResearchSearchControlSettings) => Promise<void>;
   workspaceSettingsSaving: boolean;
   generateDeck: () => Promise<void>;
   selectedVisualStylePresetId: string | null;
@@ -111,6 +115,8 @@ export function BriefPage({
   loading,
   pageReviewSettings,
   setStrictReviewMode,
+  researchSearchControlSettings,
+  setResearchSearchControlSettings,
   workspaceSettingsSaving,
   generateDeck,
   selectedVisualStylePresetId,
@@ -196,6 +202,12 @@ export function BriefPage({
             </span>
           </div>
         </div>
+        <ResearchSearchControlSwitches
+          t={t}
+          settings={researchSearchControlSettings}
+          disabled={busy || workspaceSettingsSaving}
+          onChange={(settings) => void setResearchSearchControlSettings(settings)}
+        />
       </div>
 
       <section className="brief-style-presets" aria-labelledby="brief-style-presets-title">

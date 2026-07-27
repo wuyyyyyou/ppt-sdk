@@ -13,6 +13,7 @@ import {
   RESEARCH_IMAGE_SESSION_CONCURRENCY_MIN,
   readResearchImageSessionConcurrency,
 } from "../researchImageSessionConcurrency";
+import { readResearchSearchControlSettings } from "../researchSearchControl";
 import {
   DEFAULT_VISUAL_REVIEW_FAILURE_LIMIT,
   pageReviewSettingsToWorkspaceSettings,
@@ -44,6 +45,7 @@ interface LibraryPageProps {
 }
 
 function toEditableSettings(settings: WorkspaceSettings, pageReviewSettings: PageReviewSettings) {
+  const researchSearchControls = readResearchSearchControlSettings(settings);
   return {
     ...settings,
     ...pageReviewSettingsToWorkspaceSettings(pageReviewSettings),
@@ -51,6 +53,8 @@ function toEditableSettings(settings: WorkspaceSettings, pageReviewSettings: Pag
     research_image_session_concurrency: readResearchImageSessionConcurrency(settings),
     visual_review_enabled: pageReviewSettings.visualReviewEnabled,
     visual_review_failure_limit: pageReviewSettings.visualReviewFailureLimit,
+    disable_web_research: researchSearchControls.disableWebResearch,
+    disable_image_research: researchSearchControls.disableImageResearch,
   };
 }
 
@@ -138,6 +142,8 @@ export function LibraryPage({
           ) : <button className="secondary-btn compact" onClick={() => setEditing(true)} disabled={savingSettings}><Edit3 size={12} />{t.controls.edit}</button>}
         </div>
         <PreferenceSwitch label={t.preferences.visualReviewEnabled} value={draft.visual_review_enabled === true} editing={editing} t={t} onChange={(value) => setDraft((next) => ({ ...next, visual_review_enabled: value }))} />
+        <PreferenceSwitch label={t.preferences.disableWebResearch} value={draft.disable_web_research === true} editing={editing} t={t} onChange={(value) => setDraft((next) => ({ ...next, disable_web_research: value }))} />
+        <PreferenceSwitch label={t.preferences.disableImageResearch} value={draft.disable_image_research === true} editing={editing} t={t} onChange={(value) => setDraft((next) => ({ ...next, disable_image_research: value }))} />
         <PreferenceNumber label={t.preferences.pageGenerationConcurrency} value={Number(draft.page_generation_concurrency)} editing={editing} min={PAGE_GENERATION_CONCURRENCY_MIN} max={PAGE_GENERATION_CONCURRENCY_MAX} onChange={(value) => setDraft((next) => ({ ...next, page_generation_concurrency: value }))} />
         <PreferenceNumber label={t.preferences.researchImageSessionConcurrency} value={Number(draft.research_image_session_concurrency)} editing={editing} min={RESEARCH_IMAGE_SESSION_CONCURRENCY_MIN} max={RESEARCH_IMAGE_SESSION_CONCURRENCY_MAX} onChange={(value) => setDraft((next) => ({ ...next, research_image_session_concurrency: value }))} />
         <PreferenceNumber label={t.preferences.visualReviewFailureLimit} value={Number(draft.visual_review_failure_limit ?? DEFAULT_VISUAL_REVIEW_FAILURE_LIMIT)} editing={editing} min={REVIEW_FAILURE_LIMIT_MIN} max={REVIEW_FAILURE_LIMIT_MAX} onChange={(value) => setDraft((next) => ({ ...next, visual_review_failure_limit: value }))} />

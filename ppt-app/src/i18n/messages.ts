@@ -396,6 +396,8 @@ export interface Messages {
     researchImageSessionConcurrency: string;
     visualReviewEnabled: string;
     visualReviewFailureLimit: string;
+    disableWebResearch: string;
+    disableImageResearch: string;
     enabled: string;
     disabled: string;
   };
@@ -898,6 +900,8 @@ export const messages: Record<Locale, Messages> = {
       researchImageSessionConcurrency: "Image research Session concurrency",
       visualReviewEnabled: "Visual check",
       visualReviewFailureLimit: "Visual check failure limit",
+      disableWebResearch: "Disable web research",
+      disableImageResearch: "Disable image search",
       enabled: "On",
       disabled: "Off"
     },
@@ -1405,6 +1409,8 @@ export const messages: Record<Locale, Messages> = {
       researchImageSessionConcurrency: "图片研究 Session 并发数",
       visualReviewEnabled: "视觉检查",
       visualReviewFailureLimit: "视觉检查失败次数上限",
+      disableWebResearch: "禁止网络资料搜索",
+      disableImageResearch: "禁止图片搜索",
       enabled: "开启",
       disabled: "关闭"
     },
