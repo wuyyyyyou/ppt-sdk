@@ -598,6 +598,12 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         "app_render_workspace_page_preview",
         input
       ),
+    uploadCurrentPageScreenshot: (input) =>
+      invoke<HostUploadRef>(
+        toolIds.pptEngine,
+        "app_upload_current_page_screenshot",
+        input,
+      ),
     getPageEditContext: (input) =>
       invoke<GetPageEditContextResult>(toolIds.pptEngine, "app_get_page_edit_context", input),
     saveManualPageRevision: (input) =>

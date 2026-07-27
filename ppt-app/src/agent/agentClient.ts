@@ -1,4 +1,8 @@
-import type { AnnaAgentSession, AnnaRuntime } from "../runtime/annaRuntime";
+import type {
+  AnnaAgentImageAttachment,
+  AnnaAgentSession,
+  AnnaRuntime,
+} from "../runtime/annaRuntime";
 import {
   AGENT_TOOLS_UNAVAILABLE_MESSAGE,
   getAgentToolAccessWarning,
@@ -53,6 +57,7 @@ export interface AgentRunSummary {
 export interface AgentPageVisualReviewResult {
   pass: boolean;
   score: number;
+  image_description: string;
   issues: Array<{
     severity?: string;
     area?: string;
@@ -79,6 +84,7 @@ export type AgentStreamEvent =
   | { type: "complete"; usage?: unknown };
 
 export interface AgentRunOptions {
+  attachments?: AnnaAgentImageAttachment[];
   onStreamEvent?: (event: AgentStreamEvent) => void;
   signal?: AbortSignal;
   isCancelled?: () => boolean;
@@ -223,9 +229,18 @@ function normalizePageVisualReview(value: unknown): AgentPageVisualReviewResult 
     ? (value as Partial<AgentPageVisualReviewResult>)
     : {};
 
+  const imageDescription = typeof record.image_description === "string"
+    ? record.image_description.trim()
+    : "";
+  const normalizedImageDescription = imageDescription || "IMAGE_UNAVAILABLE";
+  const imageUnavailable = normalizedImageDescription.toUpperCase() === "IMAGE_UNAVAILABLE";
+
   return {
-    pass: record.pass === true,
-    score: typeof record.score === "number" ? record.score : 0,
+    pass: imageUnavailable ? false : record.pass === true,
+    score: imageUnavailable
+      ? 0
+      : typeof record.score === "number" ? record.score : 0,
+    image_description: normalizedImageDescription,
     issues: Array.isArray(record.issues)
       ? record.issues
           .filter((item): item is AgentPageVisualReviewResult["issues"][number] =>
@@ -237,8 +252,9 @@ function normalizePageVisualReview(value: unknown): AgentPageVisualReviewResult 
       : [],
     revision_request:
       typeof record.revision_request === "string" ? record.revision_request : "",
-    confidence:
-      record.confidence === "high" || record.confidence === "low"
+    confidence: imageUnavailable
+      ? "low"
+      : record.confidence === "high" || record.confidence === "low"
         ? record.confidence
         : "medium",
   };
@@ -405,7 +421,10 @@ async function collectRunText(
   let output = "";
   const events: AgentStreamEvent[] = [];
 
-  const rawStream = session.run({ content });
+  const rawStream = session.run({
+    content,
+    ...(options?.attachments?.length ? { attachments: options.attachments } : {}),
+  });
   const sessionRecord = session as unknown as Record<string, unknown>;
   const streamRecord = rawStream as unknown as Record<string, unknown>;
   const initialRunId = typeof streamRecord.run_id === "string"
@@ -450,7 +469,7 @@ function isActiveSessionLimitMessage(message: string) {
 }
 
 function isInfrastructureMessage(message: string) {
-  return /APP_NOT_GRANTED|invalid app_session_token|session\.mint|agent\.session|transport|HTTP 401|HTTP 429/i.test(message);
+  return /APP_NOT_GRANTED|APP_MODEL_NOT_VISION_CAPABLE|invalid app_session_token|session\.mint|agent\.session|transport|HTTP 401|HTTP 429/i.test(message);
 }
 
 function toErrorMessage(error: unknown) {
@@ -754,7 +773,7 @@ export async function createAgentClient(
       }
       if (
         error instanceof AgentRunStreamError &&
-        (error.expired || error.code === "http" || isInfrastructureMessage(error.message))
+        (error.expired || error.code === "http" || error.code === "APP_MODEL_NOT_VISION_CAPABLE" || isInfrastructureMessage(error.message))
       ) {
         throw toAgentInfrastructureError(error, "Agent session failed.");
       }
@@ -881,7 +900,7 @@ export async function createAgentClient(
         }
         if (
           error instanceof AgentRunStreamError &&
-          (error.expired || error.code === "http" || isInfrastructureMessage(error.message))
+          (error.expired || error.code === "http" || error.code === "APP_MODEL_NOT_VISION_CAPABLE" || isInfrastructureMessage(error.message))
         ) {
           throw toAgentInfrastructureError(error, "Agent session failed.");
         }
@@ -920,10 +939,12 @@ export async function createAgentClient(
       } catch (error) {
         const repairPrompt = buildStructuredJsonRepairPrompt(
           collected.text,
-          '{"pass":true,"score":8,"issues":[],"revision_request":"","confidence":"medium"}',
+          '{"pass":false,"score":0,"image_description":"IMAGE_UNAVAILABLE","issues":[],"revision_request":"","confidence":"low"}',
           error instanceof Error ? error.message : String(error)
         );
-        const repaired = await collectWithSessionRetry(repairPrompt, options);
+        const repaired = await collectWithSessionRetry(repairPrompt, options
+          ? { ...options, attachments: undefined }
+          : undefined);
         return {
           ...normalizePageVisualReview(parseJsonObject(repaired.text, "page visual review")),
           session_cache_miss_retries:

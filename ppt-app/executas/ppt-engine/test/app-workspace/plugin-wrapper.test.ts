@@ -355,6 +355,19 @@ test("app_get_research_evidence returns a JSON result reference", async () => {
   );
 });
 
+test("page preview rendering and current screenshot upload are separate tools", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+  const manifest = JSON.parse(
+    await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
+  ) as { tools: Array<{ name: string }> };
+
+  assert.match(source, /app_render_workspace_page_preview:\s*toolAppRenderWorkspacePagePreview/);
+  assert.match(source, /app_upload_current_page_screenshot:\s*toolAppUploadCurrentPageScreenshot/);
+  assert.ok(manifest.tools.some((tool) => tool.name === "app_upload_current_page_screenshot"));
+  assert.match(source, /for \(let attempt = 1; attempt <= 3; attempt \+= 1\)/);
+  assert.match(source, /getAppPageProgress\(\{ workspace_dir: workspaceDir \}\)/);
+});
+
 test("workspace theme token tools are declared and routed", async () => {
   const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
   const manifest = JSON.parse(

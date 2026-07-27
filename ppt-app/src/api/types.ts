@@ -1464,13 +1464,19 @@ export interface RenderWorkspacePagePreviewResult {
   manifest_path: string;
   html_path: string;
   screenshot_path: string;
-  screenshot_upload: HostUploadRef;
+  /** @deprecated Rendering no longer uploads; kept optional for compatibility with older callers. */
+  screenshot_upload?: HostUploadRef;
   page_index: number;
   page_number: number;
   slide_id: string;
   layout_id: string;
   title: string;
   rendered_at: string;
+}
+
+export interface UploadCurrentPageScreenshotInput {
+  workspace_dir: string;
+  page_id: string;
 }
 
 export interface ManualPageRevisionManifest {

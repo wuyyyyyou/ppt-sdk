@@ -11,6 +11,7 @@ import type {
   GetWorkspacePageFileFingerprintsResult,
   GetPageEditContextInput,
   GetPageEditContextResult,
+  HostUploadRef,
   GetWorkspaceOutlineInput,
   ListWorkspacesResult,
   ListTemplatesResult,
@@ -51,6 +52,7 @@ import type {
   RenderDeckHtmlResult,
   RenderWorkspacePagePreviewInput,
   RenderWorkspacePagePreviewResult,
+  UploadCurrentPageScreenshotInput,
   SaveManualPageRevisionInput,
   SaveManualPageRevisionResult,
   RestorePageSourceVersionResult,
@@ -310,6 +312,7 @@ export interface PptBackend {
   renderWorkspacePagePreview(
     input: RenderWorkspacePagePreviewInput
   ): Promise<RenderWorkspacePagePreviewResult>;
+  uploadCurrentPageScreenshot(input: UploadCurrentPageScreenshotInput): Promise<HostUploadRef>;
   getPageEditContext(input: GetPageEditContextInput): Promise<GetPageEditContextResult>;
   saveManualPageRevision(input: SaveManualPageRevisionInput): Promise<SaveManualPageRevisionResult>;
   restorePageSourceVersion(input: GetPageEditContextInput): Promise<RestorePageSourceVersionResult>;

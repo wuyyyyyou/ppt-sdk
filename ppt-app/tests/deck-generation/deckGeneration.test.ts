@@ -291,7 +291,6 @@ function createPreview(pageIndex: number, page?: PagePlanItem): RenderWorkspaceP
     manifest_path: "/tmp/workspaces/demo/template/manifest.json",
     html_path: `/tmp/workspaces/demo/output/page-preview-html/${baseName}.html`,
     screenshot_path: `/tmp/workspaces/demo/output/screenshots/${baseName}.png`,
-    screenshot_upload: createPngUploadRef(`${baseName}.png`),
     page_index: pageIndex,
     page_number: pageNumber,
     slide_id: slideId,
@@ -317,7 +316,12 @@ function createHarness(options: {
   renderErrorMessage?: string;
   deckRenderError?: Error;
   deckIntentReviews?: DeckRefinementIntentReviewResult[];
-  visualReviews?: Array<{ pass: boolean; score: number; revision_request?: string }>;
+  visualReviews?: Array<{
+    pass: boolean;
+    score: number;
+    image_description?: string;
+    revision_request?: string;
+  }>;
   contentReviews?: Array<{
     pass: boolean;
     score: number;
@@ -810,6 +814,27 @@ function createHarness(options: {
       }
       return createPreview(input.page_index, pagePlan.pages[input.page_index]);
     },
+    uploadCurrentPageScreenshot: async (input) => createPngUploadRef(`${input.page_id}.png`),
+    getPageEditContext: async (input) => {
+      const pageIndex = pagePlan.pages.findIndex((item) => item.page_id === input.page_id);
+      const pageProgress = progress.pages.find((item) => item.page_id === input.page_id);
+      return {
+        workspace_dir: input.workspace_dir,
+        page_id: input.page_id,
+        title: pagePlan.pages[pageIndex]?.title ?? input.page_id,
+        page_index: pageIndex,
+        revision: 0,
+        manually_edited: false,
+        html_path: pageProgress?.last_html_path ?? `${input.workspace_dir}/output/${input.page_id}.html`,
+        screenshot_path: pageProgress?.last_screenshot_path ?? `${input.workspace_dir}/output/${input.page_id}.png`,
+        html_upload: {
+          ...createPngUploadRef(`${input.page_id}.html`),
+          mime_type: "text/plain",
+        },
+        screenshot_upload: createPngUploadRef(`${input.page_id}.png`),
+        manifest: null,
+      };
+    },
     recordOutline: async () => ({ projectDir: "", state: {} }),
     renderDeckHtml: async () => {
       deckRenderCalls += 1;
@@ -1077,6 +1102,7 @@ function createHarness(options: {
       return {
         pass: next.pass,
         score: next.score,
+        image_description: next.image_description ?? "A readable slide layout with its main regions visible.",
         issues: next.pass ? [] : [{ problem: "layout issue" }],
         revision_request: next.revision_request ?? "",
         confidence: "medium",
@@ -2062,11 +2088,9 @@ describe("Deck Generation Flow Module", () => {
     assert.equal(completion.status, "completed");
     assert.equal(harness.renderCalls, 1);
     const prompt = harness.authoringPrompts[0] ?? "";
-    assert.match(prompt, /Page Refinement Visual Context/);
-    assert.match(prompt, /\/tmp\/workspaces\/demo\/output\/current-page\.png/);
-    assert.match(prompt, /upload_local_file/);
-    assert.match(prompt, /analyze_image/);
-    assert.match(prompt, /not factual grounding evidence/);
+    assert.match(prompt, /优化前页面截图已作为当前 Session 的原生图片附件提供/);
+    assert.doesNotMatch(prompt, /upload_local_file|analyze_image/);
+    assert.match(prompt, /不是事实来源/);
 
     const fallbackHarness = createHarness({
       pagePlan,

@@ -639,10 +639,12 @@ async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose, wo
     throw new Error(`Host Upload MIME type must be specific for ${safeFilename}`);
   }
   const sizeBytes = fileStat.size;
-  const logger = createStorageTransferLogger({ workspaceDir, operationId, source, filename: safeFilename, mimeType: mimeType.trim(), sizeBytes });
-  let currentPhase = "started";
-  logger.log("started", "started", { purpose: purpose || "user_artifact" });
-  try {
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const logger = createStorageTransferLogger({ workspaceDir, operationId, source, filename: safeFilename, mimeType: mimeType.trim(), sizeBytes });
+    let currentPhase = "started";
+    logger.log("started", "started", { purpose: purpose || "user_artifact", attempt, max_attempts: 3 });
+    try {
     currentPhase = "negotiate";
     const negotiated = await hostUploadClient.negotiate({
       filename: safeFilename,
@@ -680,11 +682,22 @@ async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose, wo
       filename: safeFilename,
     });
     logger.log("finished", "succeeded", { r2_key: result.r2_key, expires_at: result.expires_at });
-    return result;
-  } catch (error) {
-    logger.log(currentPhase, "failed", { error: storageErrorRecord(error) });
-    throw error;
+      return result;
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      const deterministic = /permission|forbidden|unauthori[sz]ed|quota|file too large|payload too large|mime|purpose|invalid (?:argument|parameter)|unsupported/i.test(message);
+      const retryable = !deterministic && attempt < 3;
+      logger.log(currentPhase, "failed", {
+        error: storageErrorRecord(error),
+        attempt,
+        max_attempts: 3,
+        retryable,
+      });
+      if (!retryable) throw error;
+    }
   }
+  throw lastError;
 }
 
 async function uploadJsonToHost(value, filename, context = {}) {
@@ -2184,18 +2197,38 @@ async function toolAppRenderWorkspacePagePreview(args) {
     throw new Error('"page_id" must be a non-empty string');
   }
 
-  const result = await renderAppWorkspacePagePreview({
+  return renderAppWorkspacePagePreview({
     workspace_dir: workspaceDir,
     page_id: pageId,
   });
+}
 
-  return {
-    ...result,
-    screenshot_upload: await uploadPreviewImage(result.screenshot_path, {
-      workspaceDir,
-      source: "ppt-engine.page-preview-screenshot",
-    }),
-  };
+async function toolAppUploadCurrentPageScreenshot(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const pageId = typeof args.page_id === "string" ? args.page_id.trim() : "";
+  if (!pageId) throw new Error('"page_id" must be a non-empty string');
+
+  const progress = await getAppPageProgress({ workspace_dir: workspaceDir });
+  const pageProgress = progress.pages.find((item) => item.page_id === pageId);
+  if (!pageProgress) throw new Error(`Unknown page_id "${pageId}" in page-progress.json`);
+  const screenshotPath = pageProgress.last_screenshot_path;
+  if (!screenshotPath) throw new Error(`Page "${pageId}" does not have a current screenshot`);
+  const normalizedWorkspaceDir = path.resolve(workspaceDir);
+  const normalizedScreenshotPath = path.resolve(screenshotPath);
+  const relativePath = path.relative(normalizedWorkspaceDir, normalizedScreenshotPath);
+  if (!relativePath || relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    throw new Error(`Page "${pageId}" screenshot is outside its Workspace`);
+  }
+  if (path.extname(normalizedScreenshotPath).toLowerCase() !== ".png") {
+    throw new Error(`Page "${pageId}" screenshot must be a PNG file`);
+  }
+  return uploadPreviewImage(normalizedScreenshotPath, {
+    workspaceDir: normalizedWorkspaceDir,
+    source: "ppt-engine.current-page-screenshot",
+  });
 }
 
 async function toolAppGetPageEditContext(args) {
@@ -2907,6 +2940,7 @@ const TOOL_DISPATCH = {
   app_get_research_status: toolAppGetResearchStatus,
   app_record_page_progress: toolAppRecordPageProgress,
   app_render_workspace_page_preview: toolAppRenderWorkspacePagePreview,
+  app_upload_current_page_screenshot: toolAppUploadCurrentPageScreenshot,
   app_get_page_edit_context: toolAppGetPageEditContext,
   app_save_manual_page_revision: toolAppSaveManualPageRevision,
   app_restore_page_source_version: toolAppRestorePageSourceVersion,

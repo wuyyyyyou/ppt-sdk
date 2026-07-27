@@ -27,13 +27,23 @@ export interface AnnaAgentRunFrame {
   [key: string]: unknown;
 }
 
+export interface AnnaAgentImageAttachment {
+  type: string;
+  url: string;
+  filename?: string;
+  detail: "auto";
+}
+
 export interface AnnaAgentSession {
   appSessionUuid?: string;
   expires_in?: number;
   expiresIn?: number;
   granted_tools?: string[];
   inherit_host_tools?: boolean;
-  run(input: { content: string }): AsyncIterable<AnnaAgentRunFrame>;
+  run(input: {
+    content: string;
+    attachments?: AnnaAgentImageAttachment[];
+  }): AsyncIterable<AnnaAgentRunFrame>;
   history?(): Promise<unknown>;
   cancel?(runId: string): Promise<unknown>;
   delete(): Promise<unknown>;
