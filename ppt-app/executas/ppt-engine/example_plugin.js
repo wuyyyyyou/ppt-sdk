@@ -51,12 +51,6 @@ import {
   getAppUploadedSourceAnalysis,
   getAppUploadedSourceAnalysisDraft,
   getAppUploadedSourceAnalysisDraftFingerprint,
-  getAppResearchCurationDraft,
-  getAppResearchCurationDraftFingerprint,
-  getAppResearchEvidence,
-  getAppResearchPlan,
-  getAppResearchStatus,
-  finalizeAppResearchVisualAssets,
   getAllDiscoveredTemplateGroups,
   getAppWorkspaceOutline,
   getAppWorkspaceRequirements,
@@ -85,7 +79,6 @@ import {
   prepareAppPageFiles,
   prepareAppWorkspaceDiagnosticBundle,
   prepareAppUploadedSourceAnalysisWorkspace,
-  prepareAppResearchWorkspace,
   prepareAppSharedResearchWorkspace,
   getAppSharedResearchContext,
   recordAppSharedResearchProgress,
@@ -101,13 +94,6 @@ import {
   recordAppPagePlan,
   recordAppPageProgress,
   recordAppPdfExport,
-  recordAppResearchCurationDraft,
-  recordAppResearchEvidence,
-  recordAppResearchEvidencePage,
-  recordAppResearchEvidencePageMarkdown,
-  recordAppResearchPlan,
-  recordAppResearchStatus,
-  recordAppResearchStatusPage,
   recordAppWorkspaceThemeToken,
   rebuildWorkspaceDeckManifest,
   removeAppUploadedSource,
@@ -1942,15 +1928,6 @@ async function toolAppGetPageProgress(args) {
   return getAppPageProgress({ workspace_dir: workspaceDir });
 }
 
-async function toolAppPrepareResearchWorkspace(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  return prepareAppResearchWorkspace({ workspace_dir: workspaceDir });
-}
-
 async function toolAppPrepareSharedResearchWorkspace(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
   return prepareAppSharedResearchWorkspace({
@@ -2013,228 +1990,6 @@ async function toolAppImportSharedResearchImageHostUpload(args) {
   } finally {
     await unlink(stagingPath).catch(() => undefined);
   }
-}
-
-async function toolAppRecordResearchPlan(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const researchPlan = args.research_plan;
-  if (!researchPlan || typeof researchPlan !== "object" || Array.isArray(researchPlan)) {
-    throw new Error('"research_plan" must be an object');
-  }
-  return recordAppResearchPlan({ workspace_dir: workspaceDir, research_plan: researchPlan });
-}
-
-async function toolAppGetResearchPlan(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  return getAppResearchPlan({ workspace_dir: workspaceDir });
-}
-
-async function toolAppRecordResearchEvidence(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const evidence = args.evidence;
-  if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) {
-    throw new Error('"evidence" must be an object');
-  }
-  return recordAppResearchEvidence({ workspace_dir: workspaceDir, evidence });
-}
-
-async function toolAppRecordResearchEvidencePage(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const pageEvidence = args.page_evidence;
-  if (!pageEvidence || typeof pageEvidence !== "object" || Array.isArray(pageEvidence)) {
-    throw new Error('"page_evidence" must be an object');
-  }
-  return recordAppResearchEvidencePage({
-    workspace_dir: workspaceDir,
-    page_evidence: pageEvidence,
-  });
-}
-
-async function toolAppGetResearchEvidence(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  return registerJsonReference(
-    await getAppResearchEvidence({ workspace_dir: workspaceDir }),
-    "research-evidence.json",
-    "result_upload",
-  );
-}
-
-async function toolAppFinalizeResearchVisualAssets(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const pageId = args.page_id;
-  if (typeof pageId !== "string" || pageId.length === 0) {
-    throw new Error('"page_id" must be a non-empty string');
-  }
-  const visualAssets = args.visual_assets;
-  if (!Array.isArray(visualAssets)) {
-    throw new Error('"visual_assets" must be an array');
-  }
-  const rawImageIndexPaths = Array.isArray(args.raw_image_index_paths)
-    ? args.raw_image_index_paths.filter((item) => typeof item === "string")
-    : undefined;
-  return finalizeAppResearchVisualAssets({
-    workspace_dir: workspaceDir,
-    page_id: pageId,
-    visual_assets: visualAssets,
-    raw_image_index_paths: rawImageIndexPaths,
-  });
-}
-
-async function toolAppRecordResearchCurationDraft(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const pageId = args.page_id;
-  const draftType = args.draft_type;
-  const draftId = readOptionalStringArg(args, "draft_id");
-  const draft = args.draft;
-  if (typeof pageId !== "string" || pageId.length === 0) {
-    throw new Error('"page_id" must be a non-empty string');
-  }
-  if (draftType !== "web" && draftType !== "visual") {
-    throw new Error('"draft_type" must be either "web" or "visual"');
-  }
-  if (!draft || typeof draft !== "object" || Array.isArray(draft)) {
-    throw new Error('"draft" must be an object');
-  }
-  return recordAppResearchCurationDraft({
-    workspace_dir: workspaceDir,
-    page_id: pageId,
-    draft_type: draftType,
-    draft_id: draftId,
-    draft,
-  });
-}
-
-async function toolAppGetResearchCurationDraft(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const pageId = args.page_id;
-  const draftType = args.draft_type;
-  const draftId = readOptionalStringArg(args, "draft_id");
-  if (typeof pageId !== "string" || pageId.length === 0) {
-    throw new Error('"page_id" must be a non-empty string');
-  }
-  if (draftType !== "web" && draftType !== "visual") {
-    throw new Error('"draft_type" must be either "web" or "visual"');
-  }
-  return getAppResearchCurationDraft({
-    workspace_dir: workspaceDir,
-    page_id: pageId,
-    draft_type: draftType,
-    draft_id: draftId,
-  });
-}
-
-async function toolAppGetResearchCurationDraftFingerprint(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const pageId = args.page_id;
-  const draftType = args.draft_type;
-  const draftId = readOptionalStringArg(args, "draft_id");
-  if (typeof pageId !== "string" || pageId.length === 0) {
-    throw new Error('"page_id" must be a non-empty string');
-  }
-  if (draftType !== "web" && draftType !== "visual") {
-    throw new Error('"draft_type" must be either "web" or "visual"');
-  }
-  return getAppResearchCurationDraftFingerprint({
-    workspace_dir: workspaceDir,
-    page_id: pageId,
-    draft_type: draftType,
-    draft_id: draftId,
-  });
-}
-
-async function toolAppRecordResearchEvidencePageMarkdown(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const pageId = args.page_id;
-  const markdown = args.markdown;
-  if (typeof pageId !== "string" || pageId.length === 0) {
-    throw new Error('"page_id" must be a non-empty string');
-  }
-  if (typeof markdown !== "string") {
-    throw new Error('"markdown" must be a string');
-  }
-  return recordAppResearchEvidencePageMarkdown({
-    workspace_dir: workspaceDir,
-    page_id: pageId,
-    markdown,
-  });
-}
-
-async function toolAppRecordResearchStatus(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const status = args.status;
-  if (!status || typeof status !== "object" || Array.isArray(status)) {
-    throw new Error('"status" must be an object');
-  }
-  return recordAppResearchStatus({ workspace_dir: workspaceDir, status });
-}
-
-async function toolAppRecordResearchStatusPage(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const pageStatus = args.page_status;
-  if (!pageStatus || typeof pageStatus !== "object" || Array.isArray(pageStatus)) {
-    throw new Error('"page_status" must be an object');
-  }
-  return recordAppResearchStatusPage({
-    workspace_dir: workspaceDir,
-    page_status: pageStatus,
-  });
-}
-
-async function toolAppGetResearchStatus(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  return getAppResearchStatus({ workspace_dir: workspaceDir });
 }
 
 async function toolAppRecordPageProgress(args) {
@@ -2999,26 +2754,12 @@ const TOOL_DISPATCH = {
   app_prepare_deck_refinement_page_files: toolAppPrepareDeckRefinementPageFiles,
   app_get_workspace_page_file_fingerprints: toolAppGetWorkspacePageFileFingerprints,
   app_get_page_progress: toolAppGetPageProgress,
-  app_prepare_research_workspace: toolAppPrepareResearchWorkspace,
   app_prepare_shared_research_workspace: toolAppPrepareSharedResearchWorkspace,
   app_get_shared_research_context: toolAppGetSharedResearchContext,
   app_record_shared_research_progress: toolAppRecordSharedResearchProgress,
   app_append_web_research_batch: toolAppAppendWebResearchBatch,
   app_append_image_research_batch: toolAppAppendImageResearchBatch,
   app_import_shared_research_image_host_upload: toolAppImportSharedResearchImageHostUpload,
-  app_record_research_plan: toolAppRecordResearchPlan,
-  app_get_research_plan: toolAppGetResearchPlan,
-  app_record_research_evidence: toolAppRecordResearchEvidence,
-  app_record_research_evidence_page: toolAppRecordResearchEvidencePage,
-  app_get_research_evidence: toolAppGetResearchEvidence,
-  app_finalize_research_visual_assets: toolAppFinalizeResearchVisualAssets,
-  app_record_research_curation_draft: toolAppRecordResearchCurationDraft,
-  app_get_research_curation_draft: toolAppGetResearchCurationDraft,
-  app_get_research_curation_draft_fingerprint: toolAppGetResearchCurationDraftFingerprint,
-  app_record_research_evidence_page_markdown: toolAppRecordResearchEvidencePageMarkdown,
-  app_record_research_status: toolAppRecordResearchStatus,
-  app_record_research_status_page: toolAppRecordResearchStatusPage,
-  app_get_research_status: toolAppGetResearchStatus,
   app_record_page_progress: toolAppRecordPageProgress,
   app_render_workspace_page_preview: toolAppRenderWorkspacePagePreview,
   app_upload_current_page_screenshot: toolAppUploadCurrentPageScreenshot,

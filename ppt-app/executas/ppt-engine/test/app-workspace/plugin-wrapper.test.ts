@@ -186,6 +186,7 @@ test(
       assert.equal(response.result?.data?.workspace_dir, workspaceDir);
       assert.deepEqual(response.result?.data?.setting, {
         page_generation_concurrency: 5,
+        research_image_session_concurrency: 5,
         visual_review_enabled: true,
         visual_review_failure_limit: 2,
         disable_web_research: false,
@@ -339,20 +340,32 @@ test("style profile app tools are declared and routed", async () => {
   );
 });
 
-test("app_get_research_evidence returns a JSON result reference", async () => {
+test("legacy research tools are no longer declared or routed", async () => {
   const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
   const manifest = JSON.parse(
     await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
-  ) as { tools: Array<{ name: string; description?: string }> };
+  ) as { tools: Array<{ name: string }> };
 
-  assert.match(source, /app_get_research_evidence:\s*toolAppGetResearchEvidence/);
-  assert.match(source, /registerJsonReference\(\s*await getAppResearchEvidence/);
-  assert.match(source, /"research-evidence\.json"/);
-  assert.match(source, /"result_upload"/);
-  assert.match(
-    manifest.tools.find((tool) => tool.name === "app_get_research_evidence")?.description ?? "",
-    /result_upload/,
-  );
+  const legacyToolNames = [
+    "app_prepare_research_workspace",
+    "app_record_research_plan",
+    "app_get_research_plan",
+    "app_append_research_evidence",
+    "app_get_research_evidence",
+    "app_record_page_evidence_assignment",
+    "app_get_page_evidence_assignment",
+    "app_finalize_research_visual_assets",
+    "app_record_research_curation_draft",
+    "app_get_research_curation_draft",
+    "app_get_research_curation_draft_fingerprint",
+    "app_record_research_status",
+    "app_get_research_status",
+  ];
+
+  for (const toolName of legacyToolNames) {
+    assert.equal(manifest.tools.some((tool) => tool.name === toolName), false, toolName);
+    assert.equal(source.includes(`${toolName}:`), false, toolName);
+  }
 });
 
 test("page preview rendering and current screenshot upload are separate tools", async () => {
@@ -396,119 +409,12 @@ test("workspace theme token tools are declared and routed", async () => {
   );
 });
 
-test("research curation draft tools declare optional draft_id", async () => {
-  const manifest = JSON.parse(
-    await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
-  ) as { tools: Array<{ name: string; parameters?: Array<{ name: string; required?: boolean }> }> };
-
-  for (const toolName of [
-    "app_record_research_curation_draft",
-    "app_get_research_curation_draft",
-    "app_get_research_curation_draft_fingerprint",
-  ]) {
-    const parameter = getToolParameter(manifest, toolName, "draft_id");
-    assert.equal(parameter.required, false);
-  }
-});
-
-test("research curation draft plugin wrapper forwards draft_id", async () => {
-  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
-
-  assert.match(source, /const draftId = readOptionalStringArg\(args, "draft_id"\)/);
-  assert.match(source, /draft_id:\s*draftId/);
-});
-
 let pluginInvokeSkip: string | false = false;
 try {
-  const distIndex = await readFile(new URL("../../dist/index.js", import.meta.url), "utf8");
-  if (!distIndex.includes("draft_id")) {
-    pluginInvokeSkip = "requires a built dist/index.js with draft_id support";
-  }
+  await readFile(new URL("../../dist/index.js", import.meta.url), "utf8");
 } catch {
   pluginInvokeSkip = "requires a built dist/index.js";
 }
-
-test("research curation draft plugin invoke uses scoped draft_id paths", { skip: pluginInvokeSkip }, async () => {
-  const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-plugin-draft-home-"));
-  const workspaceDir = path.join(homeDir, "anna-workspace", "ppt", "ppt-20260701-000001");
-  const previousHome = process.env.HOME;
-  process.env.HOME = homeDir;
-  const plugin = await startPluginProcess();
-
-  try {
-    const describe = await plugin.request("describe");
-    assert.ok(!describe.error, describe.error?.message);
-    const tools = describe.result?.tools ?? [];
-    const manifest = { tools };
-    assert.equal(getToolParameter(manifest, "app_record_research_curation_draft", "draft_id").required, false);
-
-    const draftId = "discovery-page-06-web-1-test-run";
-    const record = await plugin.request("invoke", {
-      tool: "app_record_research_curation_draft",
-      arguments: {
-        workspace_dir: workspaceDir,
-        page_id: "page-01",
-        draft_type: "web",
-        draft_id: draftId,
-        draft: {
-          version: 1,
-          status: "curated",
-          facts: [{ id: "fact-1", claim: "Scoped claim", source_type: "web_source" }],
-          derived_insights: [],
-          gaps: [],
-          rejected_material: [],
-        },
-      },
-    });
-    assert.ok(!record.error, record.error?.message);
-    assert.equal(path.basename(String(record.result?.data?.draft_path)), `${draftId}-web.json`);
-
-    const read = await plugin.request("invoke", {
-      tool: "app_get_research_curation_draft",
-      arguments: {
-        workspace_dir: workspaceDir,
-        page_id: "page-01",
-        draft_type: "web",
-        draft_id: draftId,
-      },
-    });
-    assert.ok(!read.error, read.error?.message);
-    assert.equal(path.basename(String(read.result?.data?.draft_path)), `${draftId}-web.json`);
-
-    const fingerprint = await plugin.request("invoke", {
-      tool: "app_get_research_curation_draft_fingerprint",
-      arguments: {
-        workspace_dir: workspaceDir,
-        page_id: "page-01",
-        draft_type: "web",
-        draft_id: draftId,
-      },
-    });
-    assert.ok(!fingerprint.error, fingerprint.error?.message);
-    assert.equal(fingerprint.result?.data?.draft_id, draftId);
-    assert.equal(path.basename(String(fingerprint.result?.data?.draft_path)), `${draftId}-web.json`);
-
-    const legacy = await plugin.request("invoke", {
-      tool: "app_get_research_curation_draft_fingerprint",
-      arguments: {
-        workspace_dir: workspaceDir,
-        page_id: "page-01",
-        draft_type: "web",
-      },
-    });
-    assert.ok(!legacy.error, legacy.error?.message);
-    assert.equal(legacy.result?.data?.exists, false);
-    assert.equal(path.basename(String(legacy.result?.data?.draft_path)), "page-01-web.json");
-  } finally {
-    await plugin.close();
-    if (previousHome === undefined) {
-      delete process.env.HOME;
-    } else {
-      process.env.HOME = previousHome;
-    }
-    await rm(homeDir, { recursive: true, force: true });
-  }
-});
 
 test("app_append_workspace_log plugin wrapper accepts theme, style-guide, and storage log channels", { skip: pluginInvokeSkip }, async () => {
   const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-plugin-theme-log-home-"));

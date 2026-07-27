@@ -22,9 +22,6 @@ export interface AppWorkspaceFiles {
   page_progress: string;
   pages: string;
   template: string;
-  research_plan: string;
-  research_evidence: string;
-  research_status: string;
 }
 
 export interface AppPresentationRequirementCandidate {
@@ -657,16 +654,8 @@ export interface AppendAppWorkspaceLogResult {
 
 export interface AppResearchPaths {
   root_dir: string;
-  raw_dir: string;
-  raw_web_dir: string;
-  raw_images_dir: string;
   evidence_dir: string;
-  evidence_pages_dir: string;
   evidence_images_dir: string;
-  evidence_drafts_dir: string;
-  research_plan_path: string;
-  evidence_index_path: string;
-  status_path: string;
   web_summary_path: string;
   image_catalog_path: string;
   images_dir: string;
@@ -720,146 +709,6 @@ export interface ImportAppSharedResearchImageResult {
   sha256: string;
   mime_type: string;
   bytes_size: number;
-}
-
-export interface PrepareAppResearchWorkspaceInput {
-  workspace_dir: string;
-}
-
-export interface PrepareAppResearchWorkspaceResult extends AppResearchPaths {
-  workspace_dir: string;
-  prepared_at: string;
-}
-
-export interface RecordAppResearchPlanInput {
-  workspace_dir: string;
-  research_plan: unknown;
-}
-
-export interface GetAppResearchPlanInput {
-  workspace_dir: string;
-}
-
-export interface RecordAppResearchEvidenceInput {
-  workspace_dir: string;
-  evidence: unknown;
-}
-
-export interface RecordAppResearchEvidenceResult {
-  workspace_dir: string;
-  status: string;
-  evidence_index_path: string;
-  page_count: number;
-  updated_at: string;
-}
-
-export interface RecordAppResearchEvidencePageInput {
-  workspace_dir: string;
-  page_evidence: unknown;
-}
-
-export interface RecordAppResearchEvidencePageResult {
-  workspace_dir: string;
-  page_id: string;
-  status: string;
-  evidence_index_path: string;
-  page_count: number;
-  updated_at: string;
-}
-
-export interface GetAppResearchEvidenceInput {
-  workspace_dir: string;
-}
-
-export interface AppVisualResearchEvidence {
-  id: string;
-  file_path: string;
-  original_raw_path?: string;
-  image_url?: string;
-  page_url?: string;
-  sha256?: string;
-  reason: string;
-  visual_summary: string;
-}
-
-export interface AppResearchRejectedMaterial {
-  source?: string;
-  reason: string;
-}
-
-export interface FinalizeAppResearchVisualAssetsInput {
-  workspace_dir: string;
-  page_id: string;
-  visual_assets: AppVisualResearchEvidence[];
-  raw_image_index_paths?: string[];
-}
-
-export interface FinalizeAppResearchVisualAssetsResult {
-  workspace_dir: string;
-  page_id: string;
-  visual_assets: AppVisualResearchEvidence[];
-  gaps: string[];
-  rejected_material: AppResearchRejectedMaterial[];
-}
-
-export interface RecordAppResearchCurationDraftInput {
-  workspace_dir: string;
-  page_id: string;
-  draft_type: "web" | "visual";
-  draft_id?: string;
-  draft: unknown;
-}
-
-export interface GetAppResearchCurationDraftInput {
-  workspace_dir: string;
-  page_id: string;
-  draft_type: "web" | "visual";
-  draft_id?: string;
-}
-
-export interface GetAppResearchCurationDraftFingerprintInput {
-  workspace_dir: string;
-  page_id: string;
-  draft_type: "web" | "visual";
-  draft_id?: string;
-}
-
-export interface AppResearchCurationDraftFingerprint {
-  workspace_dir: string;
-  page_id: string;
-  draft_type: "web" | "visual";
-  draft_id?: string;
-  draft_path: string;
-  exists: boolean;
-  sha256?: string;
-  size_bytes?: number;
-}
-
-export interface RecordAppResearchEvidencePageMarkdownInput {
-  workspace_dir: string;
-  page_id: string;
-  markdown: string;
-}
-
-export interface RecordAppResearchEvidencePageMarkdownResult {
-  workspace_dir: string;
-  page_id: string;
-  markdown_path: string;
-  updated_at: string;
-}
-
-export interface RecordAppResearchStatusInput {
-  workspace_dir: string;
-  status: unknown;
-}
-
-export interface RecordAppResearchStatusPageInput {
-  workspace_dir: string;
-  page_status: unknown;
-}
-
-export interface GetAppResearchStatusInput {
-  workspace_dir: string;
 }
 
 export interface AppTemplatePreviewRef {

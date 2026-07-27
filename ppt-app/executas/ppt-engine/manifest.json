@@ -1185,343 +1185,124 @@
       "name": "app_prepare_shared_research_workspace",
       "description": "Initialize the shared web summary, image catalog, image directory, and resumable web/image research progress for a workspace.",
       "parameters": [
-        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
-        { "name": "reset_progress", "type": "boolean", "description": "Reset only the resumable research checkpoint for a new generation or refinement run.", "required": false }
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing PPT workspace.",
+          "required": true
+        },
+        {
+          "name": "reset_progress",
+          "type": "boolean",
+          "description": "Reset only the resumable research checkpoint for a new generation or refinement run.",
+          "required": false
+        }
       ]
     },
     {
       "name": "app_get_shared_research_context",
       "description": "Read the complete shared web summary, image catalog, and current research checkpoint.",
       "parameters": [
-        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true }
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing PPT workspace.",
+          "required": true
+        }
       ]
     },
     {
       "name": "app_record_shared_research_progress",
       "description": "Atomically replace the resumable web/image research checkpoint.",
       "parameters": [
-        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
-        { "name": "progress", "type": "object", "description": "Complete research checkpoint JSON object.", "required": true }
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing PPT workspace.",
+          "required": true
+        },
+        {
+          "name": "progress",
+          "type": "object",
+          "description": "Complete research checkpoint JSON object.",
+          "required": true
+        }
       ]
     },
     {
       "name": "app_append_web_research_batch",
       "description": "Idempotently append one complete Markdown batch to research/evidence/web-summary.md.",
       "parameters": [
-        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
-        { "name": "markdown", "type": "string", "description": "Complete Research Batch Markdown block prepared by the App.", "required": true }
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing PPT workspace.",
+          "required": true
+        },
+        {
+          "name": "markdown",
+          "type": "string",
+          "description": "Complete Research Batch Markdown block prepared by the App.",
+          "required": true
+        }
       ]
     },
     {
       "name": "app_append_image_research_batch",
       "description": "Idempotently append one complete batch object to research/evidence/image-catalog.json.",
       "parameters": [
-        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
-        { "name": "batch", "type": "object", "description": "Complete image research batch prepared by the App.", "required": true }
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing PPT workspace.",
+          "required": true
+        },
+        {
+          "name": "batch",
+          "type": "object",
+          "description": "Complete image research batch prepared by the App.",
+          "required": true
+        }
       ]
     },
     {
       "name": "app_import_shared_research_image_host_upload",
       "description": "Validate and import one selected research image Host Upload into the shadow Workspace evidence image directory.",
       "parameters": [
-        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
-        { "name": "candidate_id", "type": "string", "description": "Stable image candidate identifier.", "required": true },
-        { "name": "mime_type", "type": "string", "description": "Host-validated image MIME type.", "required": true },
-        { "name": "size_bytes", "type": "number", "description": "Expected image byte size.", "required": true },
-        { "name": "sha256", "type": "string", "description": "Expected image SHA-256 from anna.web.image_fetch.", "required": false },
-        { "name": "host_upload", "type": "object", "description": "Image HostUploadRef returned by the Anna App Host Upload API.", "required": true }
-      ]
-    },
-    {
-      "name": "app_prepare_research_workspace",
-      "description": "Prepare workspace research directories and initialize research plan, evidence, and status artifacts.",
-      "parameters": [
         {
           "name": "workspace_dir",
           "type": "string",
-          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          "required": true
-        }
-      ]
-    },
-    {
-      "name": "app_record_research_plan",
-      "description": "Write the deck-level Research Plan artifact for a workspace.",
-      "parameters": [
-        {
-          "name": "workspace_dir",
-          "type": "string",
-          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "description": "Absolute path to an existing PPT workspace.",
           "required": true
         },
         {
-          "name": "research_plan",
-          "type": "object",
-          "description": "Research Plan artifact.",
-          "required": true
-        }
-      ]
-    },
-    {
-      "name": "app_get_research_plan",
-      "description": "Read the deck-level Research Plan artifact for a workspace.",
-      "parameters": [
-        {
-          "name": "workspace_dir",
+          "name": "candidate_id",
           "type": "string",
-          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          "required": true
-        }
-      ]
-    },
-    {
-      "name": "app_record_research_evidence",
-      "description": "Write the Research Evidence index artifact for a workspace and return a compact write summary.",
-      "parameters": [
-        {
-          "name": "workspace_dir",
-          "type": "string",
-          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "description": "Stable image candidate identifier.",
           "required": true
         },
         {
-          "name": "evidence",
-          "type": "object",
-          "description": "Research Evidence index artifact.",
-          "required": true
-        }
-      ]
-    },
-    {
-      "name": "app_record_research_evidence_page",
-      "description": "Upsert one page-level Research Evidence record into the workspace Research Evidence index and return a compact write summary.",
-      "parameters": [
-        {
-          "name": "workspace_dir",
+          "name": "mime_type",
           "type": "string",
-          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "description": "Host-validated image MIME type.",
           "required": true
         },
         {
-          "name": "page_evidence",
-          "type": "object",
-          "description": "One page-level Research Evidence record with page_id.",
-          "required": true
-        }
-      ]
-    },
-    {
-      "name": "app_get_research_evidence",
-      "description": "Read the Research Evidence index artifact for a workspace. Large results may be returned by result_upload.",
-      "parameters": [
-        {
-          "name": "workspace_dir",
-          "type": "string",
-          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          "required": true
-        }
-      ]
-    },
-    {
-      "name": "app_finalize_research_visual_assets",
-      "description": "Copy selected raw research image assets into research/evidence/images and return canonical Visual Research Evidence records with gaps and rejected material.",
-      "parameters": [
-        {
-          "name": "workspace_dir",
-          "type": "string",
-          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "name": "size_bytes",
+          "type": "number",
+          "description": "Expected image byte size.",
           "required": true
         },
         {
-          "name": "page_id",
+          "name": "sha256",
           "type": "string",
-          "description": "Page id that owns the selected visual assets.",
-          "required": true
-        },
-        {
-          "name": "visual_assets",
-          "type": "array",
-          "items": {
-            "type": "object"
-          },
-          "description": "Visual Research Curation Draft assets selected from local raw image material.",
-          "required": true
-        },
-        {
-          "name": "raw_image_index_paths",
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Optional raw image index paths for audit metadata lookup.",
-          "required": false
-        }
-      ]
-    },
-    {
-      "name": "app_record_research_curation_draft",
-      "description": "Write a page-level Web or Visual Research Curation Draft artifact for a workspace.",
-      "parameters": [
-        {
-          "name": "workspace_dir",
-          "type": "string",
-          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          "required": true
-        },
-        {
-          "name": "page_id",
-          "type": "string",
-          "description": "Page Generation Unit id, for example page-01.",
-          "required": true
-        },
-        {
-          "name": "draft_type",
-          "type": "string",
-          "description": "Draft type: web or visual.",
-          "required": true
-        },
-        {
-          "name": "draft_id",
-          "type": "string",
-          "description": "Optional unique draft artifact id. When omitted, the legacy page-level draft path is used.",
+          "description": "Expected image SHA-256 from anna.web.image_fetch.",
           "required": false
         },
         {
-          "name": "draft",
+          "name": "host_upload",
           "type": "object",
-          "description": "Research Curation Draft artifact.",
-          "required": true
-        }
-      ]
-    },
-    {
-      "name": "app_get_research_curation_draft",
-      "description": "Read a page-level Web or Visual Research Curation Draft artifact for a workspace.",
-      "parameters": [
-        {
-          "name": "workspace_dir",
-          "type": "string",
-          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          "required": true
-        },
-        {
-          "name": "page_id",
-          "type": "string",
-          "description": "Page Generation Unit id, for example page-01.",
-          "required": true
-        },
-        {
-          "name": "draft_type",
-          "type": "string",
-          "description": "Draft type: web or visual.",
-          "required": true
-        },
-        {
-          "name": "draft_id",
-          "type": "string",
-          "description": "Optional unique draft artifact id. When omitted, the legacy page-level draft path is used.",
-          "required": false
-        }
-      ]
-    },
-    {
-      "name": "app_get_research_curation_draft_fingerprint",
-      "description": "Return the existence and SHA-256 fingerprint for a page-level Web or Visual Research Curation Draft artifact.",
-      "parameters": [
-        {
-          "name": "workspace_dir",
-          "type": "string",
-          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          "required": true
-        },
-        {
-          "name": "page_id",
-          "type": "string",
-          "description": "Page Generation Unit id, for example page-01.",
-          "required": true
-        },
-        {
-          "name": "draft_type",
-          "type": "string",
-          "description": "Draft type: web or visual.",
-          "required": true
-        },
-        {
-          "name": "draft_id",
-          "type": "string",
-          "description": "Optional unique draft artifact id. When omitted, the legacy page-level draft path is used.",
-          "required": false
-        }
-      ]
-    },
-    {
-      "name": "app_record_research_evidence_page_markdown",
-      "description": "Write the current-page Research Evidence markdown summary for a workspace.",
-      "parameters": [
-        {
-          "name": "workspace_dir",
-          "type": "string",
-          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          "required": true
-        },
-        {
-          "name": "page_id",
-          "type": "string",
-          "description": "Page Generation Unit id, for example page-01.",
-          "required": true
-        },
-        {
-          "name": "markdown",
-          "type": "string",
-          "description": "Markdown content to write.",
-          "required": true
-        }
-      ]
-    },
-    {
-      "name": "app_record_research_status",
-      "description": "Write the Research Collection and Research Curation status artifact for a workspace.",
-      "parameters": [
-        {
-          "name": "workspace_dir",
-          "type": "string",
-          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          "required": true
-        },
-        {
-          "name": "status",
-          "type": "object",
-          "description": "Research status artifact.",
-          "required": true
-        }
-      ]
-    },
-    {
-      "name": "app_record_research_status_page",
-      "description": "Upsert one page-level Research Status record and recompute the workspace Research Status aggregate.",
-      "parameters": [
-        {
-          "name": "workspace_dir",
-          "type": "string",
-          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
-          "required": true
-        },
-        {
-          "name": "page_status",
-          "type": "object",
-          "description": "One page-level Research Status record with page_id.",
-          "required": true
-        }
-      ]
-    },
-    {
-      "name": "app_get_research_status",
-      "description": "Read the Research Collection and Research Curation status artifact for a workspace.",
-      "parameters": [
-        {
-          "name": "workspace_dir",
-          "type": "string",
-          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "description": "Image HostUploadRef returned by the Anna App Host Upload API.",
           "required": true
         }
       ]
@@ -1590,27 +1371,72 @@
       "name": "app_get_page_edit_context",
       "description": "Prepare one page for direct static HTML editing and return its HTML and screenshot through Host Upload.",
       "parameters": [
-        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
-        { "name": "page_id", "type": "string", "description": "Stable page id from the Confirmed Outline.", "required": true }
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing PPT workspace.",
+          "required": true
+        },
+        {
+          "name": "page_id",
+          "type": "string",
+          "description": "Stable page id from the Confirmed Outline.",
+          "required": true
+        }
       ]
     },
     {
       "name": "app_save_manual_page_revision",
       "description": "Validate and persist the latest self-contained manual HTML revision, then incrementally publish it into the completed Deck when possible.",
       "parameters": [
-        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
-        { "name": "page_id", "type": "string", "description": "Stable page id from the Confirmed Outline.", "required": true },
-        { "name": "base_revision", "type": "number", "description": "Revision loaded by the editor for optimistic concurrency.", "required": true },
-        { "name": "size_bytes", "type": "number", "description": "Expected uploaded HTML size in bytes.", "required": true },
-        { "name": "host_upload", "type": "object", "description": "text/plain HostUploadRef containing the submitted HTML page document as UTF-8 text.", "required": true }
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing PPT workspace.",
+          "required": true
+        },
+        {
+          "name": "page_id",
+          "type": "string",
+          "description": "Stable page id from the Confirmed Outline.",
+          "required": true
+        },
+        {
+          "name": "base_revision",
+          "type": "number",
+          "description": "Revision loaded by the editor for optimistic concurrency.",
+          "required": true
+        },
+        {
+          "name": "size_bytes",
+          "type": "number",
+          "description": "Expected uploaded HTML size in bytes.",
+          "required": true
+        },
+        {
+          "name": "host_upload",
+          "type": "object",
+          "description": "text/plain HostUploadRef containing the submitted HTML page document as UTF-8 text.",
+          "required": true
+        }
       ]
     },
     {
       "name": "app_restore_page_source_version",
       "description": "Delete one Manual Page Revision, rerender that Page Source page, and incrementally publish it into the completed Deck when possible.",
       "parameters": [
-        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
-        { "name": "page_id", "type": "string", "description": "Stable page id from the Confirmed Outline.", "required": true }
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing PPT workspace.",
+          "required": true
+        },
+        {
+          "name": "page_id",
+          "type": "string",
+          "description": "Stable page id from the Confirmed Outline.",
+          "required": true
+        }
       ]
     },
     {
@@ -1701,35 +1527,85 @@
       "name": "app_begin_generation_run",
       "description": "Create a preparing shadow-Workspace transaction and return its stable run id.",
       "parameters": [
-        { "name": "workspace_dir", "type": "string", "description": "Absolute path to the existing PPT workspace.", "required": true },
-        { "name": "run_kind", "type": "string", "description": "Generation run kind: deck-generation, page-refinement, or deck-refinement.", "required": true },
-        { "name": "origin_page_id", "type": "string", "description": "Optional page id that originated the generation run.", "required": false }
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to the existing PPT workspace.",
+          "required": true
+        },
+        {
+          "name": "run_kind",
+          "type": "string",
+          "description": "Generation run kind: deck-generation, page-refinement, or deck-refinement.",
+          "required": true
+        },
+        {
+          "name": "origin_page_id",
+          "type": "string",
+          "description": "Optional page id that originated the generation run.",
+          "required": false
+        }
       ]
     },
     {
       "name": "app_prepare_generation_run",
       "description": "Create and activate the complete shadow Workspace for a preparing generation run.",
-      "parameters": [{ "name": "run_id", "type": "string", "description": "Stable id of the preparing generation run.", "required": true }]
+      "parameters": [
+        {
+          "name": "run_id",
+          "type": "string",
+          "description": "Stable id of the preparing generation run.",
+          "required": true
+        }
+      ]
     },
     {
       "name": "app_abandon_generation_run",
       "description": "Atomically abandon a preparing or active generation run.",
-      "parameters": [{ "name": "run_id", "type": "string", "description": "Stable id of the generation run to abandon.", "required": true }]
+      "parameters": [
+        {
+          "name": "run_id",
+          "type": "string",
+          "description": "Stable id of the generation run to abandon.",
+          "required": true
+        }
+      ]
     },
     {
       "name": "app_commit_generation_run",
       "description": "Atomically publish an active shadow Workspace as the official Workspace.",
-      "parameters": [{ "name": "run_id", "type": "string", "description": "Stable id of the active generation run to commit.", "required": true }]
+      "parameters": [
+        {
+          "name": "run_id",
+          "type": "string",
+          "description": "Stable id of the active generation run to commit.",
+          "required": true
+        }
+      ]
     },
     {
       "name": "app_cleanup_generation_run",
       "description": "Best-effort cleanup for a committed or abandoned generation run.",
-      "parameters": [{ "name": "run_id", "type": "string", "description": "Stable id of the committed or abandoned generation run to clean up.", "required": true }]
+      "parameters": [
+        {
+          "name": "run_id",
+          "type": "string",
+          "description": "Stable id of the committed or abandoned generation run to clean up.",
+          "required": true
+        }
+      ]
     },
     {
       "name": "app_get_workspace_generation_run",
       "description": "Return the current preparing, active, or committing generation transaction for a Workspace.",
-      "parameters": [{ "name": "workspace_dir", "type": "string", "description": "Absolute path to the existing PPT workspace.", "required": true }]
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to the existing PPT workspace.",
+          "required": true
+        }
+      ]
     },
     {
       "name": "app_prepare_workspace_diagnostic_bundle",

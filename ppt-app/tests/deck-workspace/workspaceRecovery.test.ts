@@ -65,11 +65,8 @@ describe("Workspace Recovery", () => {
       records: [
         { phase: "web-decision", state: "completed", rationale: "No additional web facts needed." },
         { phase: "web-collection", state: "completed", activities: ["无需网页搜索，已跳过搜索与抓取。"] },
-        { phase: "web-curation", state: "completed", activities: ["无需筛选网页事实证据。"] },
         { phase: "visual-decision", state: "completed" },
         { phase: "visual-collection", state: "completed" },
-        { phase: "visual-curation", state: "completed" },
-        { phase: "evidence-page-planning", state: "completed" },
       ],
     };
     const progress = restoreDeckGenerationProgress({
@@ -81,7 +78,7 @@ describe("Workspace Recovery", () => {
     assert.equal(progress?.step, "complete");
     assert.equal(progress?.totalPages, 1);
     assert.equal(progress?.pages[0]?.status, "accepted");
-    assert.equal(progress?.researchDiscovery?.records.length, 7);
+    assert.equal(progress?.researchDiscovery?.records.length, 4);
     assert.equal(progress?.researchDiscovery?.records.find((record) => record.phase === "web-collection")?.activities?.[0], "无需网页搜索，已跳过搜索与抓取。");
   });
 

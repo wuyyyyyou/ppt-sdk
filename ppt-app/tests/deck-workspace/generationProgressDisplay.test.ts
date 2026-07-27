@@ -34,10 +34,10 @@ describe("Generation Progress Display", () => {
     assert.equal(
       getGenerationProgressDisplayMessage(messages.zh, {
         ...completeProgress,
-        step: "research-curation",
+        step: "research-collection",
         message: "0/1 页已通过",
         researchDiscovery: {
-          status: "active",
+          status: "running",
           summary: {
             facts: 0,
             derivedInsights: 0,
@@ -48,15 +48,12 @@ describe("Generation Progress Display", () => {
           records: [
             { phase: "web-decision", state: "completed" },
             { phase: "web-collection", state: "completed" },
-            { phase: "web-curation", state: "completed" },
             { phase: "visual-decision", state: "completed" },
-            { phase: "visual-collection", state: "completed" },
-            { phase: "visual-curation", state: "active" },
-            { phase: "evidence-page-planning", state: "pending" },
+            { phase: "visual-collection", state: "running" },
           ],
         },
       }),
-      "筛选图片素材",
+      "搜索并筛选图片素材",
     );
   });
 
@@ -67,7 +64,7 @@ describe("Generation Progress Display", () => {
         step: "research-discovery",
         message: "0/1 页通过",
       }),
-      "判断网页资料需求",
+      "判断是否需要网页资料",
     );
     assert.equal(
       getGenerationProgressDisplayMessage(messages.en, {
@@ -75,7 +72,7 @@ describe("Generation Progress Display", () => {
         step: "research-collection",
         message: "0/1 accepted",
       }),
-      "Search and fetch web sources",
+      "Search and organize web research",
     );
   });
 
