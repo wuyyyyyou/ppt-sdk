@@ -346,6 +346,7 @@ button {
   display: flex;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .entry-main {
@@ -354,6 +355,7 @@ button {
   min-width: 0;
   min-height: 0;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .entry-sidebar {
@@ -580,9 +582,12 @@ button {
 
 .view-container {
   position: relative;
-  flex: 1;
+  flex: 1 1 0;
+  height: 0;
   min-height: 0;
   overflow-y: auto;
+  overflow-anchor: none;
+  scroll-behavior: auto;
   padding: 36px 54px 44px;
 }
 
@@ -1799,6 +1804,10 @@ button {
   opacity: 0.65;
 }
 
+.brief-style-preset-image-card {
+  padding-bottom: 0;
+}
+
 .brief-style-preset-card strong,
 .brief-style-preset-card small {
   margin: 0 12px;
@@ -1823,11 +1832,82 @@ button {
   background: #eef0f5;
 }
 
+.brief-style-preset-image-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-content: center;
+  gap: 8px;
+  padding: 18px;
+  background: #e5e7eb;
+  color: #6b7280;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+
+.brief-style-preset-placeholder-mark {
+  grid-column: 1 / -1;
+  width: max-content;
+  padding: 3px 6px;
+  border: 1px solid #9ca3af;
+  border-radius: 3px;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.brief-style-preset-placeholder-title,
+.brief-style-preset-placeholder-copy {
+  grid-column: 1 / -1;
+  display: block;
+  height: 9px;
+  border-radius: 999px;
+  background: #9ca3af;
+}
+
+.brief-style-preset-placeholder-title {
+  width: 64%;
+}
+
+.brief-style-preset-placeholder-copy {
+  width: 88%;
+  height: 5px;
+  background: #c1c6ce;
+}
+
+.brief-style-preset-placeholder-panels {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+
+.brief-style-preset-placeholder-panels i {
+  display: block;
+  height: 34px;
+  border: 1px solid #c1c6ce;
+  border-radius: 4px;
+  background: #d4d7dc;
+}
+
 .brief-style-preset-image-wrap img {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
+  opacity: 0;
   object-fit: cover;
+  transition: opacity 0.18s ease;
+}
+
+.brief-style-preset-image-wrap[data-image-status="ready"] img {
+  opacity: 1;
+}
+
+.brief-style-preset-image-wrap[data-image-status="ready"] .brief-style-preset-image-placeholder {
+  opacity: 0;
 }
 
 .brief-style-preset-selected {

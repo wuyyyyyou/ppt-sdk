@@ -16,6 +16,7 @@ from typing import Any, TextIO
 from urllib.parse import urlparse
 
 from anna_search_executa.providers import (
+
     DdgsSearchProvider,
     ImageFetchProvider,
     ImageSearchProvider,
