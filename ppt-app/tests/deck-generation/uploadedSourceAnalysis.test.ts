@@ -16,7 +16,6 @@ import {
   validateUploadedSourceVisualAnalysisDraft,
 } from "../../src/features/deck-generation/uploadedSourceAnalysis.ts";
 import { ensureFreshUploadedSourceAnalysis } from "../../src/features/deck-generation/uploadedSourceAnalysisWorkflow.ts";
-import { runResearchDiscoveryForPagePlan } from "../../src/features/deck-generation/researchDiscoveryWorkflow.ts";
 
 const uploadedSourceIndex: UploadedSourceIndex = {
   workspace_dir: "/tmp/workspace",
@@ -564,6 +563,7 @@ describe("Uploaded Source Analysis workflow gates", () => {
   });
 });
 
+/* Legacy iterative research-discovery coverage was removed with that workflow.
 describe("Uploaded Source Analysis research discovery freshness", () => {
   it("does not use stale uploaded-source analysis when active uploads are empty", async () => {
     const outline = {
@@ -741,3 +741,4 @@ describe("Uploaded Source Analysis research discovery freshness", () => {
     assert.ok(recordedPageEvidence?.gaps.some((gap) => gap.includes("Missing assigned Uploaded Source fact id: old-fact")));
   });
 });
+*/

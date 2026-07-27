@@ -127,6 +127,7 @@ export async function runDeckRefinementWorkflow(input: RunDeckRefinementInput, i
       pageRefinementReasons: reasons,
       pageRefinementVisualContexts: refinementVisualContexts(progress, Object.keys(reasons)),
       refinementRunKind: "deck-refinement",
+      resumeResearch: true,
     });
   }
 
@@ -240,6 +241,7 @@ export async function runDeckRefinementWorkflow(input: RunDeckRefinementInput, i
       pageRefinementReasons: reasons,
       pageRefinementVisualContexts: refinementVisualContexts(progress, committed.target_page_ids),
       refinementRunKind: "deck-refinement",
+      resumeResearch: false,
     });
   } catch (error) {
     return fail(input, progress, error);

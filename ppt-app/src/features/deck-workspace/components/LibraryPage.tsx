@@ -9,6 +9,11 @@ import {
   readPageGenerationConcurrency,
 } from "../generationConcurrency";
 import {
+  RESEARCH_IMAGE_SESSION_CONCURRENCY_MAX,
+  RESEARCH_IMAGE_SESSION_CONCURRENCY_MIN,
+  readResearchImageSessionConcurrency,
+} from "../researchImageSessionConcurrency";
+import {
   DEFAULT_VISUAL_REVIEW_FAILURE_LIMIT,
   pageReviewSettingsToWorkspaceSettings,
   readPageReviewSettings,
@@ -43,6 +48,7 @@ function toEditableSettings(settings: WorkspaceSettings, pageReviewSettings: Pag
     ...settings,
     ...pageReviewSettingsToWorkspaceSettings(pageReviewSettings),
     page_generation_concurrency: readPageGenerationConcurrency(settings),
+    research_image_session_concurrency: readResearchImageSessionConcurrency(settings),
     visual_review_enabled: pageReviewSettings.visualReviewEnabled,
     visual_review_failure_limit: pageReviewSettings.visualReviewFailureLimit,
   };
@@ -133,6 +139,7 @@ export function LibraryPage({
         </div>
         <PreferenceSwitch label={t.preferences.visualReviewEnabled} value={draft.visual_review_enabled === true} editing={editing} t={t} onChange={(value) => setDraft((next) => ({ ...next, visual_review_enabled: value }))} />
         <PreferenceNumber label={t.preferences.pageGenerationConcurrency} value={Number(draft.page_generation_concurrency)} editing={editing} min={PAGE_GENERATION_CONCURRENCY_MIN} max={PAGE_GENERATION_CONCURRENCY_MAX} onChange={(value) => setDraft((next) => ({ ...next, page_generation_concurrency: value }))} />
+        <PreferenceNumber label={t.preferences.researchImageSessionConcurrency} value={Number(draft.research_image_session_concurrency)} editing={editing} min={RESEARCH_IMAGE_SESSION_CONCURRENCY_MIN} max={RESEARCH_IMAGE_SESSION_CONCURRENCY_MAX} onChange={(value) => setDraft((next) => ({ ...next, research_image_session_concurrency: value }))} />
         <PreferenceNumber label={t.preferences.visualReviewFailureLimit} value={Number(draft.visual_review_failure_limit ?? DEFAULT_VISUAL_REVIEW_FAILURE_LIMIT)} editing={editing} min={REVIEW_FAILURE_LIMIT_MIN} max={REVIEW_FAILURE_LIMIT_MAX} onChange={(value) => setDraft((next) => ({ ...next, visual_review_failure_limit: value }))} />
       </div>
 

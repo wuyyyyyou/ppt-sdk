@@ -23,14 +23,6 @@ import type {
 } from "./types";
 import type { AiOperationLogContext } from "./interactionLog";
 
-function pageLooksResearchSensitive(text: string) {
-  return /data|market|case|latest|trend|数据|市场|案例|最新|趋势|排名|规模|202\d|current|recent/i.test(text);
-}
-
-function pageLooksVisualSensitive(text: string) {
-  return /image|photo|visual|product|logo|图片|照片|视觉|产品|标志|screenshot|map|person|place/i.test(text);
-}
-
 async function logMockInteraction(
   logContext: AiOperationLogContext | undefined,
   request: unknown,
@@ -261,65 +253,6 @@ export function createMockAiClient(): AiClient {
       };
       await logMockInteraction(input.logContext, { method: "generateAddedPagePlan", input }, plan);
       return plan;
-    },
-
-    async generateResearchDiscoveryDecision(input) {
-      await sleep(80);
-      const targetIds = new Set(input.targetPageIds ?? input.pagePlan.pages.map((page) => page.page_id));
-      const scopedPages = input.pagePlan.pages.filter((page) => targetIds.has(page.page_id));
-      const existingQueries = new Set(
-        input.discoveryPool.iterations.flatMap((iteration) =>
-          iteration.query_summaries
-            .filter((summary) => summary.kind === input.phase)
-            .map((summary) => summary.query.toLowerCase()),
-        ),
-      );
-      const queries = scopedPages
-        .filter((page) => input.phase === "web"
-          ? pageLooksResearchSensitive(`${page.title} ${page.outline}`)
-          : pageLooksVisualSensitive(`${page.title} ${page.outline}`))
-        .map((page) => input.phase === "web" ? page.title : `${page.title} visual reference`)
-        .filter((query) => !existingQueries.has(query.toLowerCase()))
-        .slice(0, 4);
-      const decision = {
-        action: queries.length > 0 && input.iteration <= input.iterationLimit ? "search" as const : "stop" as const,
-        phase: input.phase,
-        queries,
-        rationale: queries.length > 0 ? "Mock detected research-sensitive target pages." : "Mock found no additional search needs.",
-        evidence_needs: input.phase === "web" && queries.length > 0 ? ["Source-backed facts for target pages."] : [],
-        visual_needs: input.phase === "visual" && queries.length > 0 ? ["Relevant non-template visual assets for target pages."] : [],
-        gaps: [],
-      };
-      await logMockInteraction(input.logContext, { method: "generateResearchDiscoveryDecision", input }, decision);
-      return decision;
-    },
-
-    async generateEvidenceAwarePagePlan(input) {
-      await sleep(120);
-      const targetIds = new Set(input.targetPageIds ?? input.pagePlan.pages.map((page) => page.page_id));
-      const factIds = input.discoveryPool.facts.map((fact) => fact.id);
-      const insightIds = input.discoveryPool.derived_insights.map((insight) => insight.id);
-      const visualIds = input.discoveryPool.visual_assets.map((asset) => asset.id);
-      const planned = {
-        ...input.pagePlan,
-        pages: input.pagePlan.pages.map((page) => targetIds.has(page.page_id)
-          ? {
-              ...page,
-              content_plan: {
-                main_message: page.outline || page.title,
-                content_points: [page.outline || page.title],
-                evidence_fact_ids: factIds.slice(0, 4),
-                derived_insight_ids: insightIds.slice(0, 3),
-                visual_asset_ids: visualIds.slice(0, 2),
-                gaps: input.discoveryPool.gaps.slice(0, 3),
-                authoring_notes: ["Use only assigned Research Evidence; generalize unsupported details."],
-              },
-            }
-          : page),
-        updated_at: new Date().toISOString(),
-      };
-      await logMockInteraction(input.logContext, { method: "generateEvidenceAwarePagePlan", input }, planned);
-      return planned;
     },
 
     async planDeckRefinement(input) {

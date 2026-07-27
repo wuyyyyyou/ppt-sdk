@@ -1,6 +1,6 @@
 {
   "display_name": "ppt-engine",
-  "version": "4.2.4",
+  "version": "4.3.0",
   "description": "Anna Executa plugin for Workspace Authoring Kit setup, manifest-based deck HTML generation, and backend PPTX export.",
   "author": "Anna Developer",
   "host_capabilities": [
@@ -1179,6 +1179,57 @@
           "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
           "required": true
         }
+      ]
+    },
+    {
+      "name": "app_prepare_shared_research_workspace",
+      "description": "Initialize the shared web summary, image catalog, image directory, and resumable web/image research progress for a workspace.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
+        { "name": "reset_progress", "type": "boolean", "description": "Reset only the resumable research checkpoint for a new generation or refinement run.", "required": false }
+      ]
+    },
+    {
+      "name": "app_get_shared_research_context",
+      "description": "Read the complete shared web summary, image catalog, and current research checkpoint.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true }
+      ]
+    },
+    {
+      "name": "app_record_shared_research_progress",
+      "description": "Atomically replace the resumable web/image research checkpoint.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
+        { "name": "progress", "type": "object", "description": "Complete research checkpoint JSON object.", "required": true }
+      ]
+    },
+    {
+      "name": "app_append_web_research_batch",
+      "description": "Idempotently append one complete Markdown batch to research/evidence/web-summary.md.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
+        { "name": "markdown", "type": "string", "description": "Complete Research Batch Markdown block prepared by the App.", "required": true }
+      ]
+    },
+    {
+      "name": "app_append_image_research_batch",
+      "description": "Idempotently append one complete batch object to research/evidence/image-catalog.json.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
+        { "name": "batch", "type": "object", "description": "Complete image research batch prepared by the App.", "required": true }
+      ]
+    },
+    {
+      "name": "app_import_shared_research_image_host_upload",
+      "description": "Validate and import one selected research image Host Upload into the shadow Workspace evidence image directory.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
+        { "name": "candidate_id", "type": "string", "description": "Stable image candidate identifier.", "required": true },
+        { "name": "mime_type", "type": "string", "description": "Host-validated image MIME type.", "required": true },
+        { "name": "size_bytes", "type": "number", "description": "Expected image byte size.", "required": true },
+        { "name": "sha256", "type": "string", "description": "Expected image SHA-256 from anna.web.image_fetch.", "required": false },
+        { "name": "host_upload", "type": "object", "description": "Image HostUploadRef returned by the Anna App Host Upload API.", "required": true }
       ]
     },
     {

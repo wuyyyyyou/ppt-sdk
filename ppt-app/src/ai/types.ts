@@ -4,10 +4,6 @@ import type { PresentationRequirements, PresentationRequirementsCandidates, Visu
 import type {
   PagePlan,
   PagePlanItem,
-  ResearchDiscoveryDecision,
-  ResearchDiscoveryEvidencePool,
-  ResearchEvidenceIndex,
-  ResearchRequirement,
   TemplatePlanningContext,
   WorkspaceThemeContext,
   WorkspaceOutlineItem,
@@ -209,30 +205,6 @@ export interface GenerateAddedPagePlanInput {
   logContext?: AiOperationLogContext;
 }
 
-export interface GenerateResearchDiscoveryDecisionInput {
-  outline: WorkspaceOutline;
-  pagePlan: PagePlan;
-  phase: "web" | "visual";
-  iteration: number;
-  iterationLimit: number;
-  targetPageIds?: string[];
-  discoveryPool: ResearchDiscoveryEvidencePool;
-  uploadedSourceAnalysisContext?: unknown;
-  researchStatus?: unknown;
-  locale: Locale;
-  logContext?: AiOperationLogContext;
-}
-
-export interface GenerateEvidenceAwarePagePlanInput {
-  outline: WorkspaceOutline;
-  pagePlan: PagePlan;
-  discoveryPool: ResearchDiscoveryEvidencePool;
-  uploadedSourceAnalysisContext?: unknown;
-  targetPageIds?: string[];
-  locale: Locale;
-  logContext?: AiOperationLogContext;
-}
-
 export interface AiClient {
   generatePresentationRequirements(
     input: GeneratePresentationRequirementsInput
@@ -242,8 +214,6 @@ export interface AiClient {
   generateThemeToken(input: GenerateThemeTokenInput): Promise<unknown>;
   generatePagePlan(input: GeneratePagePlanInput): Promise<PagePlan>;
   generateAddedPagePlan(input: GenerateAddedPagePlanInput): Promise<PagePlan>;
-  generateResearchDiscoveryDecision(input: GenerateResearchDiscoveryDecisionInput): Promise<ResearchDiscoveryDecision>;
-  generateEvidenceAwarePagePlan(input: GenerateEvidenceAwarePagePlanInput): Promise<PagePlan>;
   planDeckRefinement(input: PlanDeckRefinementInput): Promise<DeckRefinementPlanningResult>;
   generateDeck(input: GenerateDeckInput): Promise<GeneratedDeck>;
   reviseOutline(input: ReviseOutlineInput): Promise<OutlineGenerationResult>;

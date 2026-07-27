@@ -246,6 +246,7 @@ export interface Messages {
       title: string;
       empty: string;
       warning: string;
+      statuses: Record<"waiting" | "running" | "completed" | "skipped" | "warning", string>;
       queries: string;
       sources: string;
       visualAssets: string;
@@ -262,11 +263,8 @@ export interface Messages {
       phases: Record<
         | "web-decision"
         | "web-collection"
-        | "web-curation"
         | "visual-decision"
-        | "visual-collection"
-        | "visual-curation"
-        | "evidence-page-planning",
+        | "visual-collection",
         string
       >;
     };
@@ -395,6 +393,7 @@ export interface Messages {
     textDensity: string;
     visualTone: string;
     pageGenerationConcurrency: string;
+    researchImageSessionConcurrency: string;
     visualReviewEnabled: string;
     visualReviewFailureLimit: string;
     enabled: string;
@@ -735,6 +734,13 @@ export const messages: Record<Locale, Messages> = {
         title: "Facts collection",
         empty: "No details for this step yet.",
         warning: "Partial",
+        statuses: {
+          waiting: "Waiting",
+          running: "Running",
+          completed: "Completed",
+          skipped: "Skipped",
+          warning: "Completed with gaps"
+        },
         queries: "Queries",
         sources: "Sources",
         visualAssets: "Selected visual assets",
@@ -760,13 +766,10 @@ export const messages: Record<Locale, Messages> = {
           rejectedMaterial: "Rejected"
         },
         phases: {
-          "web-decision": "Judge web evidence needs",
-          "web-collection": "Search and fetch web sources",
-          "web-curation": "Curate factual evidence",
-          "visual-decision": "Judge image asset needs",
-          "visual-collection": "Search and download image assets",
-          "visual-curation": "Curate image assets",
-          "evidence-page-planning": "Evidence-aware page planning"
+          "web-decision": "Decide whether web research is needed",
+          "web-collection": "Search and organize web research",
+          "visual-decision": "Decide whether image research is needed",
+          "visual-collection": "Search and select image material"
         }
       },
       currentSessionStream: "Current session stream",
@@ -892,6 +895,7 @@ export const messages: Record<Locale, Messages> = {
       textDensity: "Text density",
       visualTone: "Visual tone",
       pageGenerationConcurrency: "Page generation concurrency",
+      researchImageSessionConcurrency: "Image research Session concurrency",
       visualReviewEnabled: "Visual check",
       visualReviewFailureLimit: "Visual check failure limit",
       enabled: "On",
@@ -1237,6 +1241,13 @@ export const messages: Record<Locale, Messages> = {
         title: "事实收集",
         empty: "这个步骤暂无详细输出。",
         warning: "部分完成",
+        statuses: {
+          waiting: "等待中",
+          running: "进行中",
+          completed: "已完成",
+          skipped: "已跳过",
+          warning: "有缺口"
+        },
         queries: "查询",
         sources: "来源",
         visualAssets: "入选图片素材",
@@ -1262,13 +1273,10 @@ export const messages: Record<Locale, Messages> = {
           rejectedMaterial: "拒绝"
         },
         phases: {
-          "web-decision": "判断网页资料需求",
-          "web-collection": "搜索并抓取网页资料",
-          "web-curation": "筛选事实证据",
-          "visual-decision": "判断图片素材需求",
-          "visual-collection": "搜索并下载图片素材",
-          "visual-curation": "筛选图片素材",
-          "evidence-page-planning": "证据感知页面规划"
+          "web-decision": "判断是否需要网页资料",
+          "web-collection": "搜索并整理网页资料",
+          "visual-decision": "判断是否需要图片素材",
+          "visual-collection": "搜索并筛选图片素材"
         }
       },
       currentSessionStream: "当前会话流",
@@ -1394,6 +1402,7 @@ export const messages: Record<Locale, Messages> = {
       textDensity: "文字密度",
       visualTone: "视觉语气",
       pageGenerationConcurrency: "页面生成并发数",
+      researchImageSessionConcurrency: "图片研究 Session 并发数",
       visualReviewEnabled: "视觉检查",
       visualReviewFailureLimit: "视觉检查失败次数上限",
       enabled: "开启",

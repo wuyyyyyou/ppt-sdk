@@ -22,6 +22,8 @@ import type {
 import type { PptBackend } from "../../api/pptBackend";
 import type { Locale } from "../../i18n/messages";
 import type { AppHostUploadClient } from "../../runtime/appHostUploadClient";
+import type { ResearchAiClient } from "../../ai/researchAiClient";
+import type { ResearchWebClient } from "../../api/researchWebClient";
 
 export const ATTEMPT_LIMITS = {
   render: 10,
@@ -190,6 +192,8 @@ export interface RunDeckGenerationInput {
   backend: PptBackend;
   aiClient: AiClient;
   agentClient: AgentClient;
+  researchAiClient: ResearchAiClient;
+  researchWebClient: ResearchWebClient;
   hostUploadClient?: AppHostUploadClient | null;
   aiLogger?: AiInteractionLogger | null;
   workspace: WorkspaceResult;
@@ -203,6 +207,7 @@ export interface RunDeckGenerationInput {
   pageRefinementReasons?: Record<string, string>;
   pageRefinementVisualContexts?: Record<string, PageRefinementVisualContext>;
   refinementRunKind?: "page-refinement" | "deck-refinement";
+  resumeResearch?: boolean;
   selectedStyleProfile?: {
     displayName?: string;
     profilePath: string;

@@ -24,24 +24,17 @@ import type {
   PrepareDeckRefinementPageFilesResult,
   PreparePageFilesInput,
   PreparePageFilesResult,
-  PrepareResearchWorkspaceResult,
+  SharedResearchContextResult,
+  SharedResearchImageBatch,
+  ImportSharedResearchImageResult,
   ProjectResult,
   PptxExportJob,
-  ResearchEvidenceIndex,
-  ResearchCurationDraftFingerprint,
-  RecordResearchEvidenceResult,
-  RecordResearchEvidencePageResult,
-  VisualResearchCurationDraft,
-  ResearchPlan,
-  ResearchStatus,
-  WebResearchCurationDraft,
   ExportPdfInput,
   ExportPdfResult,
   ExportArtifactDownloadUrlResult,
   PublishExportArtifactResult,
   PrepareWorkspaceDiagnosticBundleInput,
   PrepareWorkspaceDiagnosticBundleResult,
-  FinalizeResearchVisualAssetsResult,
   RecordDeckReviewInput,
   RecordPagePlanInput,
   RecordPageProgressInput,
@@ -59,10 +52,6 @@ import type {
   SelectTemplateInput,
   SelectTemplateResult,
   StartPptxExportInput,
-  WebFetchResult,
-  WebSearchResult,
-  ImageFetchResult,
-  ImageSearchResult,
   TemplatePlanningContext,
   WorkspaceThemeContext,
   WorkspaceThemeValidationResult,
@@ -222,91 +211,19 @@ export interface PptBackend {
   getWorkspacePageFileFingerprints(
     input: GetWorkspacePageFileFingerprintsInput
   ): Promise<GetWorkspacePageFileFingerprintsResult>;
-  getResearchCurationDraftFingerprint(input: {
+  prepareSharedResearchWorkspace(input: { workspace_dir: string; reset_progress?: boolean }): Promise<SharedResearchContextResult>;
+  getSharedResearchContext(input: { workspace_dir: string }): Promise<SharedResearchContextResult>;
+  recordSharedResearchProgress(input: { workspace_dir: string; progress: Record<string, unknown> }): Promise<Record<string, unknown>>;
+  appendWebResearchBatch(input: { workspace_dir: string; markdown: string }): Promise<{ workspace_dir: string; web_summary_path: string; appended: boolean }>;
+  appendImageResearchBatch(input: { workspace_dir: string; batch: SharedResearchImageBatch }): Promise<{ workspace_dir: string; image_catalog_path: string; appended: boolean }>;
+  importSharedResearchImageHostUpload(input: {
     workspace_dir: string;
-    page_id: string;
-    draft_type: "web" | "visual";
-    draft_id?: string;
-  }): Promise<ResearchCurationDraftFingerprint>;
-  prepareResearchWorkspace(input: { workspace_dir: string }): Promise<PrepareResearchWorkspaceResult>;
-  recordResearchPlan(input: { workspace_dir: string; research_plan: ResearchPlan }): Promise<ResearchPlan>;
-  getResearchPlan(input: { workspace_dir: string }): Promise<ResearchPlan>;
-  recordResearchEvidence(input: { workspace_dir: string; evidence: ResearchEvidenceIndex }): Promise<RecordResearchEvidenceResult>;
-  recordResearchEvidencePage(input: {
-    workspace_dir: string;
-    page_evidence: Omit<ResearchEvidenceIndex["pages"][number], "updated_at"> & {
-      updated_at?: string;
-    };
-  }): Promise<RecordResearchEvidencePageResult>;
-  getResearchEvidence(input: { workspace_dir: string }): Promise<ResearchEvidenceIndex>;
-  finalizeResearchVisualAssets(input: {
-    workspace_dir: string;
-    page_id: string;
-    visual_assets: VisualResearchCurationDraft["visual_assets"];
-    raw_image_index_paths?: string[];
-  }): Promise<FinalizeResearchVisualAssetsResult>;
-  recordResearchCurationDraft(input: {
-    workspace_dir: string;
-    page_id: string;
-    draft_type: "web";
-    draft_id?: string;
-    draft: WebResearchCurationDraft;
-  } | {
-    workspace_dir: string;
-    page_id: string;
-    draft_type: "visual";
-    draft_id?: string;
-    draft: VisualResearchCurationDraft;
-  }): Promise<WebResearchCurationDraft | VisualResearchCurationDraft>;
-  getResearchCurationDraft(input: {
-    workspace_dir: string;
-    page_id: string;
-    draft_type: "web" | "visual";
-    draft_id?: string;
-  }): Promise<WebResearchCurationDraft | VisualResearchCurationDraft | Record<string, unknown>>;
-  recordResearchEvidencePageMarkdown(input: {
-    workspace_dir: string;
-    page_id: string;
-    markdown: string;
-  }): Promise<{
-    workspace_dir: string;
-    page_id: string;
-    markdown_path: string;
-    updated_at: string;
-  }>;
-  recordResearchStatus(input: { workspace_dir: string; status: ResearchStatus }): Promise<ResearchStatus>;
-  recordResearchStatusPage(input: {
-    workspace_dir: string;
-    page_status: ResearchStatus["pages"][number];
-  }): Promise<ResearchStatus>;
-  getResearchStatus(input: { workspace_dir: string }): Promise<ResearchStatus>;
-  webSearch(input: {
-    query: string;
-    max_results?: number;
-    safesearch?: "off" | "moderate" | "strict";
-    timelimit?: "d" | "w" | "m" | "y";
-  }): Promise<WebSearchResult>;
-  webFetch(input: {
-    urls: string[];
-    output_dir?: string;
-    format?: "text_markdown" | "text_plain" | "text_rich";
-    max_chars?: number;
-  }): Promise<WebFetchResult>;
-  imageSearch(input: {
-    query: string;
-    max_results?: number;
-    safesearch?: "off" | "moderate" | "strict";
-    timelimit?: "d" | "w" | "m" | "y";
-    size?: string;
-    color?: string;
-    type_image?: string;
-    layout?: string;
-  }): Promise<ImageSearchResult>;
-  imageFetch(input: {
-    urls: string[];
-    output_dir?: string;
-    max_bytes?: number;
-  }): Promise<ImageFetchResult>;
+    candidate_id: string;
+    mime_type: string;
+    size_bytes: number;
+    sha256?: string;
+    host_upload: HostUploadRef;
+  }): Promise<ImportSharedResearchImageResult>;
   getPageProgress(input: { workspace_dir: string }): Promise<PageProgress>;
   recordPageProgress(input: RecordPageProgressInput): Promise<PageProgress>;
   renderWorkspacePagePreview(

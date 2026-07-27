@@ -10,12 +10,6 @@ import {
   parsePagePlanJson,
 } from "./pagePlanPrompt";
 import {
-  buildEvidenceAwarePagePlanLlmRequest,
-  buildResearchDiscoveryDecisionLlmRequest,
-  parseEvidenceAwarePagePlanJson,
-  parseResearchDiscoveryDecisionJson,
-} from "./researchDiscoveryPrompt";
-import {
   buildDeckRefinementPlanningRepairRequest,
   buildDeckRefinementPlanningRequest,
   DeckRefinementPlanningValidationError,
@@ -548,20 +542,6 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
       }
 
       throw new Error("Anna LLM returned invalid added-page plan JSON.");
-    },
-
-    async generateResearchDiscoveryDecision(input) {
-      const request = buildResearchDiscoveryDecisionLlmRequest(input);
-      const rawResult = await completeLlm(runtime, request, input.logContext);
-      const rawText = extractCompletionText(rawResult);
-      return parseResearchDiscoveryDecisionJson(rawText, input.phase);
-    },
-
-    async generateEvidenceAwarePagePlan(input) {
-      const request = buildEvidenceAwarePagePlanLlmRequest(input);
-      const rawResult = await completeLlm(runtime, request, input.logContext);
-      const rawText = extractCompletionText(rawResult);
-      return parseEvidenceAwarePagePlanJson(rawText, input.pagePlan, input.targetPageIds);
     },
 
     async planDeckRefinement(input) {

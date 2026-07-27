@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createAgentClient, type AgentClient } from "../../../agent/agentClient";
 import { resolveAgentToolAccessPolicy } from "../../../agent/agentToolAccessPolicy";
 import { createAiClient, type AiAttemptLog, type AiClient, type LlmContextRow } from "../../../ai/aiClient";
+import { createResearchAiClient, type ResearchAiClient } from "../../../ai/researchAiClient";
 import {
   createAiInteractionLogger,
   type AiOperationLogContext,
 } from "../../../ai/interactionLog";
 import { createPptBackend, type PptBackend } from "../../../api/pptBackend";
+import { createResearchWebClient, type ResearchWebClient } from "../../../api/researchWebClient";
 import { hasActiveDownloadUrl } from "../downloadUrl";
 import { connectAnnaRuntime } from "../../../runtime/annaRuntime";
 import {
@@ -554,6 +556,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [backend, setBackend] = useState<PptBackend | null>(null);
   const [hostUploadClient, setHostUploadClient] = useState<AppHostUploadClient | null>(null);
   const [aiClient, setAiClient] = useState<AiClient | null>(null);
+  const [researchAiClient, setResearchAiClient] = useState<ResearchAiClient | null>(null);
+  const [researchWebClient, setResearchWebClient] = useState<ResearchWebClient | null>(null);
   const [agentClient, setAgentClient] = useState<AgentClient | null>(null);
   const cancelCreateDeckRef = useRef(false);
   const cancelCreateDeckAbortRef = useRef<AbortController | null>(null);
@@ -1287,10 +1291,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
             entry: event.entry,
           }),
         });
+        const nextResearchAiClient = createResearchAiClient(runtime);
+        const nextResearchWebClient = createResearchWebClient(runtime);
         if (cancelled) return;
         setBackend(nextBackend);
         setHostUploadClient(nextHostUploadClient);
         setAiClient(nextAiClient);
+        setResearchAiClient(nextResearchAiClient);
+        setResearchWebClient(nextResearchWebClient);
         setAgentClient(nextAgentClient);
         void nextBackend.getRuntimeInfo().then((result) => {
           if (!cancelled) {
@@ -2180,7 +2188,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function createDeckFromOutline() {
-    if (!backend || !aiClient || !hostUploadClient) return;
+    if (!backend || !aiClient || !researchAiClient || !researchWebClient || !hostUploadClient) return;
     if (!agentClient) {
       if (uploadedSources.length > 0) {
         showToast(t.errors.uploadedSourceAnalysisUnavailable);
@@ -2244,6 +2252,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const completion = await runDeckGeneration({
         backend,
         aiClient,
+        researchAiClient,
+        researchWebClient,
         agentClient,
         hostUploadClient,
         aiLogger,
@@ -3261,7 +3271,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function refineDeck(instruction: string) {
-    if (!backend || !aiClient || !agentClient) return;
+    if (!backend || !aiClient || !researchAiClient || !researchWebClient || !agentClient || !hostUploadClient) return;
     const trimmedInstruction = instruction.trim();
     if (!trimmedInstruction) return;
 
@@ -3283,6 +3293,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const completion = await runDeckRefinement({
         backend,
         aiClient,
+        researchAiClient,
+        researchWebClient,
         agentClient,
         hostUploadClient,
         aiLogger,
@@ -3329,7 +3341,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function refineSlide(instruction: string) {
-    if (!backend || !aiClient || !agentClient) return;
+    if (!backend || !aiClient || !researchAiClient || !researchWebClient || !agentClient || !hostUploadClient) return;
     const trimmedInstruction = instruction.trim();
     if (!trimmedInstruction) return;
     const slide = deck[currentSlide];
@@ -3354,6 +3366,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const completion = await runDeckRefinement({
         backend,
         aiClient,
+        researchAiClient,
+        researchWebClient,
         agentClient,
         hostUploadClient,
         aiLogger,
@@ -3666,7 +3680,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function resumeDeckGeneration() {
-    if (!backend || !aiClient || !agentClient || !hostUploadClient) return;
+    if (!backend || !aiClient || !researchAiClient || !researchWebClient || !agentClient || !hostUploadClient) return;
     if (loading === "deck" || loading === "deckFromOutline") return;
 
     let activeRunWorkspaceDir: string | undefined;
@@ -3693,6 +3707,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const commonInput = {
             backend,
             aiClient,
+            researchAiClient,
+            researchWebClient,
             agentClient,
             hostUploadClient,
             aiLogger,
@@ -3712,7 +3728,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
             resumePageIds: recoveryProgress.recovery?.target_page_ids,
             skipIntentReview: true,
           })
-        : await runDeckGeneration({ ...commonInput, startMode: "resume" });
+        : await runDeckGeneration({ ...commonInput, startMode: "resume", resumeResearch: true });
       if (!ownsGenerationOperation(cancelSignal)) return;
       if (completion.status === "completed" && generationRun) {
         const committed = await commitShadowGenerationRun(generationRun);
@@ -3738,7 +3754,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function retryPageGeneration(pageId: string) {
-    if (!backend || !aiClient || !agentClient) return;
+    if (!backend || !aiClient || !researchAiClient || !researchWebClient || !agentClient || !hostUploadClient) return;
     if (loading === "deck" || loading === "deckFromOutline") return;
 
     let activeRunWorkspaceDir: string | undefined;
@@ -3761,7 +3777,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const completion = await runPageGenerationRetry({
         backend,
         aiClient,
+        researchAiClient,
+        researchWebClient,
         agentClient,
+        hostUploadClient,
         aiLogger,
         workspace: refreshedWorkspace,
         confirmedOutline: workspaceOutlineForDownstream(refreshedWorkspace),
@@ -3770,6 +3789,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         onProgress: generationProgressHandler(cancelSignal),
         isCancelled: () => cancelCreateDeckRef.current,
         cancelSignal,
+        resumeResearch: true,
       });
       if (!ownsGenerationOperation(cancelSignal)) return;
       if (completion.status === "completed" && generationRun) {

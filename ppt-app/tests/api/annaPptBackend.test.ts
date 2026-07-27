@@ -15,7 +15,6 @@ function setToolIds() {
     value: {
       __ANNA_TOOL_IDS__: {
         "ppt-engine": "tool-ppt-engine",
-        "anna-search": "tool-anna-search",
       },
     },
   });
@@ -189,43 +188,6 @@ describe("Anna PPT Backend", () => {
       assert.equal(result.setting.visual_review_enabled, true);
       assert.equal(result.persisted_as_default, true);
       assert.equal(fetchMock.mock.callCount(), 0);
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
-  });
-
-  it("fetches Host Upload JSON references for research evidence results", async () => {
-    setToolIds();
-    const evidence = {
-      version: 1,
-      status: "curated",
-      pages: [{ page_id: "page-01", status: "curated" }],
-      shared: { facts: [], visual_assets: [], gaps: [] },
-      updated_at: "2026-07-07T00:00:00.000Z",
-    };
-    const originalFetch = globalThis.fetch;
-    const fetchMock = mock.fn(async () =>
-      new Response(JSON.stringify(evidence), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })
-    );
-    globalThis.fetch = fetchMock as typeof fetch;
-
-    try {
-      const backend = createAnnaPptBackend(createRuntime({
-        success: true,
-        data: {
-          result_upload: createJsonUploadRef("research-evidence.json"),
-        },
-      }));
-
-      const result = await backend.getResearchEvidence({ workspace_dir: "/tmp/workspaces/demo" });
-
-      assert.equal(result.status, "curated");
-      assert.equal(result.pages[0]?.page_id, "page-01");
-      assert.equal(fetchMock.mock.callCount(), 1);
-      assert.equal(fetchMock.mock.calls[0].arguments[0], "https://upload.example/research-evidence.json");
     } finally {
       globalThis.fetch = originalFetch;
     }

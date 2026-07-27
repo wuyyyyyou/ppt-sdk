@@ -1,6 +1,7 @@
 import type { WorkspaceResult } from "../../api/types";
 import { readPageGenerationConcurrency } from "../deck-workspace/generationConcurrency";
 import { readResearchSearchControlSettings } from "../deck-workspace/researchSearchControl";
+import { readResearchImageSessionConcurrency } from "../deck-workspace/researchImageSessionConcurrency";
 import { readPageReviewSettings } from "../deck-workspace/reviewSettings";
 import { ATTEMPT_LIMITS } from "./types";
 
@@ -28,4 +29,8 @@ export function getPageGenerationConcurrency(input: { workspace: WorkspaceResult
 
 export function getResearchSearchControlSettings(input: { workspace: WorkspaceResult }) {
   return readResearchSearchControlSettings(readWorkspaceSetting(input.workspace));
+}
+
+export function getResearchImageSessionConcurrency(input: { workspace: WorkspaceResult }) {
+  return readResearchImageSessionConcurrency(readWorkspaceSetting(input.workspace));
 }

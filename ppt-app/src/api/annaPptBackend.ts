@@ -10,8 +10,6 @@ import type {
   GetPageEditContextResult,
   SaveManualPageRevisionResult,
   RestorePageSourceVersionResult,
-  ImageFetchResult,
-  ImageSearchResult,
   PagePlan,
   PageProgress,
   TemplateSummary,
@@ -21,12 +19,6 @@ import type {
   ProjectResult,
   PptxExportJob,
   PptEngineRuntimeInfo,
-  ResearchCurationDraftFingerprint,
-  ResearchEvidenceIndex,
-  RecordResearchEvidenceResult,
-  RecordResearchEvidencePageResult,
-  ResearchPlan,
-  ResearchStatus,
   RenderDeckHtmlResult,
   RenderWorkspacePagePreviewResult,
   RecordPdfExportInput,
@@ -73,8 +65,10 @@ import type {
   GenerationRunTransaction,
   PrepareGenerationRunResult,
   CommitGenerationRunResult,
+  SharedResearchContextResult,
+  SharedResearchImageBatch,
+  ImportSharedResearchImageResult,
 } from "./types";
-import { createSearchAdapter } from "./searchAdapter";
 import { resolvePptBundledToolIds } from "./bundledToolIds";
 
 const PPTX_EXPORT_TIMEOUT_MS = 600_000;
@@ -191,11 +185,6 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
     args: object,
     options?: { timeoutMs?: number }
   ) => invokeHostUploadJson<WorkspaceResult>(toolIds.pptEngine, method, args, options);
-  const searchAdapter = createSearchAdapter({
-    runtime,
-    toolId: toolIds.annaSearch,
-  });
-
   return {
     getRuntimeInfo: () =>
       invoke<PptEngineRuntimeInfo>(toolIds.pptEngine, "app_get_runtime_info", {}),
@@ -520,70 +509,18 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         "app_get_workspace_page_file_fingerprints",
         input,
       ),
-    prepareResearchWorkspace: (input) =>
-      invoke(toolIds.pptEngine, "app_prepare_research_workspace", input),
-    recordResearchPlan: (input) =>
-      invoke<ResearchPlan>(toolIds.pptEngine, "app_record_research_plan", input),
-    getResearchPlan: (input) =>
-      invoke<ResearchPlan>(toolIds.pptEngine, "app_get_research_plan", input),
-    recordResearchEvidence: (input) =>
-      invoke<RecordResearchEvidenceResult>(
-        toolIds.pptEngine,
-        "app_record_research_evidence",
-        input
-      ),
-    recordResearchEvidencePage: (input) =>
-      invoke<RecordResearchEvidencePageResult>(
-        toolIds.pptEngine,
-        "app_record_research_evidence_page",
-        input
-      ),
-    getResearchEvidence: (input) =>
-      invokeHostUploadJson<ResearchEvidenceIndex>(
-        toolIds.pptEngine,
-        "app_get_research_evidence",
-        input
-      ),
-    finalizeResearchVisualAssets: (input) =>
-      invoke(
-        toolIds.pptEngine,
-        "app_finalize_research_visual_assets",
-        input
-      ),
-    recordResearchCurationDraft: (input) =>
-      invoke(
-        toolIds.pptEngine,
-        "app_record_research_curation_draft",
-        input
-      ),
-    getResearchCurationDraft: (input) =>
-      invoke(
-        toolIds.pptEngine,
-        "app_get_research_curation_draft",
-        input
-      ),
-    getResearchCurationDraftFingerprint: (input) =>
-      invoke<ResearchCurationDraftFingerprint>(
-        toolIds.pptEngine,
-        "app_get_research_curation_draft_fingerprint",
-        input
-      ),
-    recordResearchEvidencePageMarkdown: (input) =>
-      invoke(
-        toolIds.pptEngine,
-        "app_record_research_evidence_page_markdown",
-        input
-      ),
-    recordResearchStatus: (input) =>
-      invoke<ResearchStatus>(toolIds.pptEngine, "app_record_research_status", input),
-    recordResearchStatusPage: (input) =>
-      invoke<ResearchStatus>(toolIds.pptEngine, "app_record_research_status_page", input),
-    getResearchStatus: (input) =>
-      invoke<ResearchStatus>(toolIds.pptEngine, "app_get_research_status", input),
-    webSearch: searchAdapter.webSearch,
-    webFetch: searchAdapter.webFetch,
-    imageSearch: searchAdapter.imageSearch,
-    imageFetch: searchAdapter.imageFetch,
+    prepareSharedResearchWorkspace: (input) =>
+      invoke<SharedResearchContextResult>(toolIds.pptEngine, "app_prepare_shared_research_workspace", input),
+    getSharedResearchContext: (input) =>
+      invoke<SharedResearchContextResult>(toolIds.pptEngine, "app_get_shared_research_context", input),
+    recordSharedResearchProgress: (input) =>
+      invoke<Record<string, unknown>>(toolIds.pptEngine, "app_record_shared_research_progress", input),
+    appendWebResearchBatch: (input) =>
+      invoke<{ workspace_dir: string; web_summary_path: string; appended: boolean }>(toolIds.pptEngine, "app_append_web_research_batch", input),
+    appendImageResearchBatch: (input: { workspace_dir: string; batch: SharedResearchImageBatch }) =>
+      invoke<{ workspace_dir: string; image_catalog_path: string; appended: boolean }>(toolIds.pptEngine, "app_append_image_research_batch", input),
+    importSharedResearchImageHostUpload: (input) =>
+      invoke<ImportSharedResearchImageResult>(toolIds.pptEngine, "app_import_shared_research_image_host_upload", input),
     getPageProgress: (input) =>
       invoke<PageProgress>(toolIds.pptEngine, "app_get_page_progress", input),
     recordPageProgress: (input) =>

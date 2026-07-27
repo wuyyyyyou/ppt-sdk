@@ -519,4 +519,48 @@ describe("AgentClient cache miss retry", () => {
     );
     assert.equal(harness.sessionDeletes, 1);
   });
+
+  it("repairs malformed image JSON in the same Session without resending attachments", async () => {
+    let sessionCreations = 0;
+    let runCount = 0;
+    const runInputs: Array<{ content: string; attachments?: unknown[] }> = [];
+    const runtime: AnnaRuntime = {
+      tools: { invoke: async () => ({}) },
+      llm: { complete: async () => ({}) },
+      agent: {
+        session: async () => {
+          sessionCreations += 1;
+          return {
+            run: (input: { content: string; attachments?: unknown[] }) => {
+              runCount += 1;
+              runInputs.push(input);
+              const text = runCount === 1
+                ? "not json"
+                : "```json\n{\"candidates\":[{\"candidate_id\":\"image-1\",\"use_in_ppt\":true,\"description\":\"A room\",\"reason\":\"Relevant\"}]}\n```";
+              return (async function* () {
+                yield { event: "message", text };
+                yield { event: "complete" };
+              })();
+            },
+            delete: async () => undefined,
+          } as AnnaAgentSession;
+        },
+      },
+    };
+    const client = await createAgentClient(runtime);
+    const result = await client.runImageResearchPrompt("select images", {
+      attachments: [{ type: "image/jpeg", url: "https://example.com/image.jpg", filename: "image-1", detail: "auto" }],
+    });
+
+    assert.equal(sessionCreations, 1);
+    assert.equal(runCount, 2);
+    assert.equal(runInputs[0]?.attachments?.length, 1);
+    assert.equal(runInputs[1]?.attachments, undefined);
+    assert.deepEqual(result.candidates, [{
+      candidate_id: "image-1",
+      use_in_ppt: true,
+      description: "A room",
+      reason: "Relevant",
+    }]);
+  });
 });

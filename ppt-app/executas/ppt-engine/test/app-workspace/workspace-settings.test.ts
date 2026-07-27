@@ -21,6 +21,7 @@ test("authoring-kit-v1 settings persist globally and workspace setting files are
     const created = await createAppWorkspace({ title: "Settings" });
     assert.deepEqual(created.setting, {
       page_generation_concurrency: 5,
+      research_image_session_concurrency: 5,
       visual_review_enabled: false,
       visual_review_failure_limit: 2,
       disable_web_research: false,
@@ -32,6 +33,7 @@ test("authoring-kit-v1 settings persist globally and workspace setting files are
       persist_as_default: true,
       setting: {
         page_generation_concurrency: 99,
+        research_image_session_concurrency: 99,
         visual_review_enabled: true,
         visual_review_failure_limit: -1,
         disable_web_research: true,
@@ -44,11 +46,13 @@ test("authoring-kit-v1 settings persist globally and workspace setting files are
       "disable_image_research",
       "disable_web_research",
       "page_generation_concurrency",
+      "research_image_session_concurrency",
       "updated_at",
       "visual_review_enabled",
       "visual_review_failure_limit",
     ]);
     assert.equal(patched.setting.page_generation_concurrency, 10);
+    assert.equal(patched.setting.research_image_session_concurrency, 10);
     assert.equal(patched.setting.visual_review_enabled, true);
     assert.equal(patched.setting.visual_review_failure_limit, 1);
     assert.equal(patched.setting.disable_web_research, true);
@@ -60,6 +64,7 @@ test("authoring-kit-v1 settings persist globally and workspace setting files are
 
     const inherited = await createAppWorkspace({ title: "Inherited" });
     assert.equal(inherited.setting.page_generation_concurrency, 10);
+    assert.equal(inherited.setting.research_image_session_concurrency, 10);
     assert.equal(inherited.setting.visual_review_enabled, true);
     assert.equal(inherited.setting.visual_review_failure_limit, 1);
     assert.equal(inherited.setting.disable_web_research, true);

@@ -126,6 +126,7 @@ export interface AppWorkspaceSettings {
   visual_tone?: string;
   theme_id?: string;
   page_generation_concurrency?: number;
+  research_image_session_concurrency?: number;
   visual_review_enabled?: boolean;
   visual_review_failure_limit?: number;
   disable_web_research?: boolean;
@@ -136,6 +137,7 @@ export interface AppWorkspaceSettings {
 
 export interface AppCreateWorkspaceSetting {
   page_generation_concurrency: number;
+  research_image_session_concurrency: number;
   visual_review_enabled: boolean;
   visual_review_failure_limit: number;
   disable_web_research: boolean;
@@ -665,6 +667,59 @@ export interface AppResearchPaths {
   research_plan_path: string;
   evidence_index_path: string;
   status_path: string;
+  web_summary_path: string;
+  image_catalog_path: string;
+  images_dir: string;
+  progress_path: string;
+}
+
+export interface PrepareAppSharedResearchWorkspaceInput {
+  workspace_dir: string;
+  reset_progress?: boolean;
+}
+
+export interface AppSharedResearchContextResult {
+  workspace_dir: string;
+  web_summary_path: string;
+  image_catalog_path: string;
+  images_dir: string;
+  progress_path: string;
+  web_summary: string;
+  image_catalog: Record<string, unknown>;
+  progress: Record<string, unknown>;
+}
+
+export interface RecordAppSharedResearchProgressInput {
+  workspace_dir: string;
+  progress: unknown;
+}
+
+export interface AppendAppWebResearchBatchInput {
+  workspace_dir: string;
+  markdown: string;
+}
+
+export interface AppendAppImageResearchBatchInput {
+  workspace_dir: string;
+  batch: unknown;
+}
+
+export interface ImportAppSharedResearchImageInput {
+  workspace_dir: string;
+  candidate_id: string;
+  staging_file_path: string;
+  expected_size_bytes: number;
+  expected_sha256?: string;
+  mime_type: string;
+}
+
+export interface ImportAppSharedResearchImageResult {
+  workspace_dir: string;
+  candidate_id: string;
+  file_path: string;
+  sha256: string;
+  mime_type: string;
+  bytes_size: number;
 }
 
 export interface PrepareAppResearchWorkspaceInput {

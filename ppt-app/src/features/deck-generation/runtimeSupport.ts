@@ -2,21 +2,7 @@ import { AgentRunCancelledError, type AgentPageVisualReviewResult, type AgentStr
 import type { AiOperationLogContext } from "../../ai/interactionLog";
 import type { PagePlanItem, PageProgress } from "../../api/types";
 import { buildDeckGenerationSummary, emitRuntime } from "./progressProjection";
-import { updateResearchDiscoveryCurationStream } from "./researchDiscoveryProgress";
 import { ATTEMPT_LIMITS, type DeckGenerationContext, type DeckGenerationRuntime, type DeckGenerationStep, type DeckGenerationStream, type ResearchDiscoveryProgress } from "./types";
-
-function isResearchAgentKind(kind: string) {
-  return kind === "research-curation"
-    || kind === "web-research-curation"
-    || kind === "visual-research-curation";
-}
-
-function isDeckLevelResearchDiscoveryStream(stream: DeckGenerationStream) {
-  return stream.page_id.startsWith("discovery-") && (
-    stream.kind === "web-research-curation" ||
-    stream.kind === "visual-research-curation"
-  );
-}
 
 export async function recordProgress(
   input: Pick<DeckGenerationContext, "backend" | "workspace">,
@@ -119,11 +105,10 @@ export function createAgentRunTracker(input: {
   attemptLimits?: typeof ATTEMPT_LIMITS;
 }) {
   const startedAt = new Date().toISOString();
-  const isResearchOperation = isResearchAgentKind(input.kind);
   const operationId = input.logContext?.operation_id ?? input.operationId ?? (
     input.flowInput.aiLogger
       ? input.flowInput.aiLogger.createOperationId(
-          isResearchOperation ? "research" : "page_agent",
+          "page_agent",
           input.kind,
         )
       : `${input.page.page_id}-${input.kind}-${Date.now().toString(36)}`
@@ -132,7 +117,7 @@ export function createAgentRunTracker(input: {
     ? input.logContext ?? {
         logger: input.flowInput.aiLogger,
         workspace_dir: input.flowInput.workspace.workspace_dir,
-        domain: (isResearchOperation ? "research" : "page_agent") as AiOperationLogContext["domain"],
+        domain: "page_agent",
         operation: input.kind,
         operation_id: operationId,
         page_id: input.page.page_id,
@@ -221,9 +206,7 @@ export function createAgentRunTracker(input: {
     async flush(status: "completed" | "error", extra: Record<string, unknown>) {
       const endedAt = new Date().toISOString();
       const baseEntry = {
-        event: isResearchOperation
-          ? "ai.research.curation.operation.finished"
-          : "ai.page_agent.operation.finished",
+        event: "ai.page_agent.operation.finished",
         schema_version: 1,
         operation_id: operationId,
         interaction_ids: logContext?.interaction_ids ?? [],
@@ -240,7 +223,7 @@ export function createAgentRunTracker(input: {
       try {
         await input.flowInput.backend.appendWorkspaceLog({
           workspace_dir: input.flowInput.workspace.workspace_dir,
-          channel: isResearchOperation ? "ai-research" : "ai-page-agent",
+          channel: "ai-page-agent",
           entry: baseEntry,
         });
         await flushStreamBatch(true);
@@ -249,14 +232,6 @@ export function createAgentRunTracker(input: {
       } finally {
         stream.status = status;
         stream.updated_at = endedAt;
-        if (isDeckLevelResearchDiscoveryStream(stream)) {
-          input.flowInput.researchDiscoveryProgress = updateResearchDiscoveryCurationStream(
-            input.flowInput.researchDiscoveryProgress,
-            stream.kind === "web-research-curation" ? "web" : "visual",
-            stream,
-            endedAt,
-          );
-        }
         emitStream();
         input.flowInput.activeStreams.delete(operationId);
         emitRuntime(

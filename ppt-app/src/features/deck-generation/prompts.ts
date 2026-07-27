@@ -73,6 +73,9 @@ export function buildAuthoringPrompt(input: {
   const outlinePath = `${input.workspaceDir}/outline.json`;
   const styleGuidePath = `${input.workspaceDir}/style-guide.md`;
   const authoringKitReadmePath = `${input.workspaceDir}/authoring-kit/README.md`;
+  const webResearchSummaryPath = `${input.workspaceDir}/research/evidence/web-summary.md`;
+  const imageCatalogPath = `${input.workspaceDir}/research/evidence/image-catalog.json`;
+  const shouldReadResearch = input.attemptKind === "initial" || input.attemptKind === "page-refinement";
   const manualRevision = input.manualRevision;
   const refinementContext = input.refinementRequest?.trim() ? [
     "这是优化轮次。大纲和艺术指导是最初确定的基线；如果它们与用户本次优化要求冲突，只执行用户本次要求。",
@@ -131,6 +134,14 @@ export function buildAuthoringPrompt(input: {
       "6. 根据总说明判断当前页相关的 foundations / references 分类，并完整读取相关分类 README。",
       "7. 如果认为任何 Foundation Module（基础模块）或 Reference Implementation（参考实现）适合使用或参考，必须先完整读取对应组件的 TSX 文件，再开始写当前页面。不能只看文件名、README 摘要或局部代码。",
     ]),
+    ...(shouldReadResearch ? [
+      "",
+      "开始创作前还必须完整读取以下共享研究资料：",
+      `- ${toolPath("Web 研究总结", webResearchSummaryPath)}`,
+      `- ${toolPath("图片素材目录", imageCatalogPath)}`,
+      "Web 研究总结是允许使用的事实依据；不要使用搜索原始结果、URL 列表或研究进度文件补充事实。",
+      "图片目录中只有 use_in_ppt=true 且存在本地 file_path 的候选可以用于页面。不得直接使用远程 image_url 或 thumbnail_url。",
+    ] : []),
     "",
     "页面要求：",
     `- page_id: ${input.page.page_id}`,

@@ -1,3 +1,7 @@
+---
+status: superseded by ADR-0043
+---
+
 # Replace Research Planning with iterative Research Discovery
 
 Deck Generation will retire the one-shot, per-page `Research Plan` decision model and use deck-level iterative Research Discovery instead. Research Discovery runs web discovery before visual discovery, uses LLM JSON decisions to choose whether and what to search next, uses Agent sessions only for curation, stores curated material in a Research Discovery Evidence Pool, and then updates the Page Plan with evidence-aware `content_plan` references before code deterministically materializes page-assigned Research Evidence. This trades implementation simplicity for a closed research loop that can discover missing facts and image needs from already curated material while keeping Page Authoring grounded only in assigned Research Evidence.

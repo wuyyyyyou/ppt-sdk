@@ -86,6 +86,12 @@ import {
   prepareAppWorkspaceDiagnosticBundle,
   prepareAppUploadedSourceAnalysisWorkspace,
   prepareAppResearchWorkspace,
+  prepareAppSharedResearchWorkspace,
+  getAppSharedResearchContext,
+  recordAppSharedResearchProgress,
+  appendAppWebResearchBatch,
+  appendAppImageResearchBatch,
+  importAppSharedResearchImage,
   prepareWorkspacePageSources,
   reconcileWorkspacePageSources,
   recordAppWorkspaceStyleGuide,
@@ -524,6 +530,11 @@ const MANUAL_PAGE_STAGING_DIR = path.join(
   os.tmpdir(),
   "presenton-template-engine-executa",
   "manual-page-staging",
+);
+const RESEARCH_IMAGE_STAGING_DIR = path.join(
+  os.tmpdir(),
+  "presenton-template-engine-executa",
+  "research-image-staging",
 );
 
 function assertSafeUploadFilename(filename) {
@@ -1940,6 +1951,70 @@ async function toolAppPrepareResearchWorkspace(args) {
   return prepareAppResearchWorkspace({ workspace_dir: workspaceDir });
 }
 
+async function toolAppPrepareSharedResearchWorkspace(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  return prepareAppSharedResearchWorkspace({
+    workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir"),
+    reset_progress: args.reset_progress === true,
+  });
+}
+
+async function toolAppGetSharedResearchContext(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  return getAppSharedResearchContext({ workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir") });
+}
+
+async function toolAppRecordSharedResearchProgress(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  if (!args.progress || typeof args.progress !== "object" || Array.isArray(args.progress)) throw new Error('"progress" must be an object');
+  return recordAppSharedResearchProgress({
+    workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir"),
+    progress: args.progress,
+  });
+}
+
+async function toolAppAppendWebResearchBatch(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  return appendAppWebResearchBatch({
+    workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir"),
+    markdown: readRequiredStringArg(args, "markdown"),
+  });
+}
+
+async function toolAppAppendImageResearchBatch(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  if (!args.batch || typeof args.batch !== "object" || Array.isArray(args.batch)) throw new Error('"batch" must be an object');
+  return appendAppImageResearchBatch({
+    workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir"),
+    batch: args.batch,
+  });
+}
+
+async function toolAppImportSharedResearchImageHostUpload(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const candidateId = readRequiredStringArg(args, "candidate_id");
+  const hostUpload = readHostUploadRefArg(args, "host_upload");
+  const sizeBytes = Number(args.size_bytes);
+  if (!Number.isFinite(sizeBytes) || Math.floor(sizeBytes) !== hostUpload.size_bytes) throw new Error("Research image Host Upload size mismatch");
+  const mimeType = readRequiredStringArg(args, "mime_type");
+  if (mimeType !== hostUpload.mime_type) throw new Error("Research image Host Upload MIME type mismatch");
+  const stagingPath = path.join(RESEARCH_IMAGE_STAGING_DIR, `${randomUUID()}.upload`);
+  try {
+    await downloadHostUploadToStaging({ hostUpload, stagingPath, expectedSizeBytes: Math.floor(sizeBytes) });
+    return importAppSharedResearchImage({
+      workspace_dir: workspaceDir,
+      candidate_id: candidateId,
+      staging_file_path: stagingPath,
+      expected_size_bytes: Math.floor(sizeBytes),
+      expected_sha256: typeof args.sha256 === "string" ? args.sha256 : undefined,
+      mime_type: mimeType,
+    });
+  } finally {
+    await unlink(stagingPath).catch(() => undefined);
+  }
+}
+
 async function toolAppRecordResearchPlan(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -2925,6 +3000,12 @@ const TOOL_DISPATCH = {
   app_get_workspace_page_file_fingerprints: toolAppGetWorkspacePageFileFingerprints,
   app_get_page_progress: toolAppGetPageProgress,
   app_prepare_research_workspace: toolAppPrepareResearchWorkspace,
+  app_prepare_shared_research_workspace: toolAppPrepareSharedResearchWorkspace,
+  app_get_shared_research_context: toolAppGetSharedResearchContext,
+  app_record_shared_research_progress: toolAppRecordSharedResearchProgress,
+  app_append_web_research_batch: toolAppAppendWebResearchBatch,
+  app_append_image_research_batch: toolAppAppendImageResearchBatch,
+  app_import_shared_research_image_host_upload: toolAppImportSharedResearchImageHostUpload,
   app_record_research_plan: toolAppRecordResearchPlan,
   app_get_research_plan: toolAppGetResearchPlan,
   app_record_research_evidence: toolAppRecordResearchEvidence,

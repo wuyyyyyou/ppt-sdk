@@ -1,2 +1,0 @@
-"""Anna Search Executa package."""
-

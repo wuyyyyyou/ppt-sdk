@@ -69,10 +69,21 @@ export interface AgentPageVisualReviewResult {
   session_cache_miss_retries?: number;
 }
 
+export interface AgentImageResearchDecision {
+  candidates: Array<{
+    candidate_id: string;
+    use_in_ppt: boolean;
+    description: string;
+    reason: string;
+  }>;
+  session_cache_miss_retries?: number;
+}
+
 export interface AgentClient {
   checkToolAccess(): Promise<void>;
   runAuthoringPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentRunSummary>;
   runPageVisualReviewPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentPageVisualReviewResult>;
+  runImageResearchPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentImageResearchDecision>;
   cancelActiveRuns(): Promise<void>;
   close(): Promise<void>;
 }
@@ -258,6 +269,19 @@ function normalizePageVisualReview(value: unknown): AgentPageVisualReviewResult 
         ? record.confidence
         : "medium",
   };
+}
+
+function normalizeImageResearchDecision(value: unknown): AgentImageResearchDecision {
+  const record = isRecord(value) ? value : {};
+  const candidates = Array.isArray(record.candidates)
+    ? record.candidates.filter(isRecord).map((candidate) => ({
+        candidate_id: readString(candidate.candidate_id).trim(),
+        use_in_ppt: candidate.use_in_ppt === true,
+        description: readString(candidate.description).trim() || "No image description was returned.",
+        reason: readString(candidate.reason).trim() || "No selection reason was returned.",
+      })).filter((candidate) => candidate.candidate_id.length > 0)
+    : [];
+  return { candidates };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -914,6 +938,46 @@ export async function createAgentClient(
     }
   }
 
+  async function collectImageResearchWithSameSessionRepair(
+    prompt: string,
+    runOptions: AgentRunOptions | undefined,
+  ): Promise<AgentImageResearchDecision> {
+    const sessionMeta = await createSession();
+    const sessionCacheMissRetryState: AgentSessionCacheMissRetryState = { retries: 0, totalWaitMs: 0 };
+    const sessionState = {
+      sessionRetries: 0,
+      streamIdleRetries: 0,
+      sessionCacheMissRetryState,
+    };
+    try {
+      const collected = await runPromptWithSession(sessionMeta, prompt, runOptions, sessionState);
+      try {
+        return {
+          ...normalizeImageResearchDecision(parseJsonObject(collected.text, "image research")),
+          session_cache_miss_retries: sessionCacheMissRetryState.retries,
+        };
+      } catch (error) {
+        const repairPrompt = buildStructuredJsonRepairPrompt(
+          collected.text,
+          '{"candidates":[{"candidate_id":"image-id","use_in_ppt":false,"description":"short description","reason":"short reason"}]}',
+          error instanceof Error ? error.message : String(error),
+        );
+        const repaired = await runPromptWithSession(
+          sessionMeta,
+          repairPrompt,
+          runOptions ? { ...runOptions, attachments: undefined } : undefined,
+          sessionState,
+        );
+        return {
+          ...normalizeImageResearchDecision(parseJsonObject(repaired.text, "image research")),
+          session_cache_miss_retries: sessionCacheMissRetryState.retries,
+        };
+      }
+    } finally {
+      await deleteSession(sessionMeta.session);
+    }
+  }
+
   return {
     async checkToolAccess() {
       const sessionMeta = await createSession();
@@ -951,6 +1015,10 @@ export async function createAgentClient(
             collected.sessionCacheMissRetries + repaired.sessionCacheMissRetries,
         };
       }
+    },
+
+    runImageResearchPrompt(prompt, options) {
+      return collectImageResearchWithSameSessionRepair(prompt, options);
     },
 
     async cancelActiveRuns() {

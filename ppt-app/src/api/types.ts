@@ -459,6 +459,7 @@ export interface WorkspaceSettings {
   /** Legacy isolated setting; not persisted by authoring-kit-v1 Workspaces. */
   text_density?: string;
   page_generation_concurrency?: number;
+  research_image_session_concurrency?: number;
   visual_review_enabled?: boolean;
   visual_review_failure_limit?: number;
   disable_web_research?: boolean;
@@ -471,6 +472,7 @@ export type CreatedWorkspaceSetting = Required<
   Pick<
     WorkspaceSettings,
     | "page_generation_concurrency"
+    | "research_image_session_concurrency"
     | "visual_review_enabled"
     | "visual_review_failure_limit"
     | "disable_web_research"
@@ -1208,6 +1210,76 @@ export interface ImageFetchResult {
   count: number;
 }
 
+export type SharedResearchStageState = "waiting" | "running" | "completed" | "skipped" | "warning";
+
+export interface SharedResearchImageCandidate {
+  candidate_id: string;
+  query: string;
+  image_url: string;
+  thumbnail_url?: string | null;
+  source_url: string;
+  title?: string | null;
+  width?: number | null;
+  height?: number | null;
+  use_in_ppt: boolean;
+  description: string;
+  reason: string;
+  file_path?: string;
+  download_status: "pending" | "imported" | "failed";
+  sha256?: string;
+  mime_type?: string;
+  bytes_size?: number;
+  aps_path?: string;
+  final_url?: string;
+  error?: string;
+}
+
+export interface SharedResearchImageBatch {
+  title: string;
+  status: SharedResearchStageState;
+  queries: Array<{
+    query: string;
+    status: SharedResearchStageState;
+    candidate_count: number;
+    message?: string;
+  }>;
+  candidates: SharedResearchImageCandidate[];
+  gaps: string[];
+  statistics?: {
+    queries: number;
+    candidates: number;
+    selected: number;
+    imported: number;
+    failed: number;
+    gaps: number;
+  };
+}
+
+export interface SharedResearchImageCatalog {
+  schema_version: 1;
+  batches: SharedResearchImageBatch[];
+}
+
+export interface SharedResearchContextResult {
+  workspace_dir: string;
+  web_summary_path: string;
+  image_catalog_path: string;
+  images_dir: string;
+  progress_path: string;
+  web_summary: string;
+  image_catalog: SharedResearchImageCatalog;
+  progress: Record<string, unknown>;
+}
+
+export interface ImportSharedResearchImageResult {
+  workspace_dir: string;
+  candidate_id: string;
+  file_path: string;
+  sha256: string;
+  mime_type: string;
+  bytes_size: number;
+}
+
 export interface PageProgressItem {
   page_id: string;
   status: string;
@@ -1307,18 +1379,15 @@ export interface FinalDeckRenderState {
 export type ResearchDiscoveryProgressPhase =
   | "web-decision"
   | "web-collection"
-  | "web-curation"
   | "visual-decision"
-  | "visual-collection"
-  | "visual-curation"
-  | "evidence-page-planning";
+  | "visual-collection";
 
 export type ResearchDiscoveryProgressState =
-  | "pending"
-  | "active"
+  | "waiting"
+  | "running"
   | "completed"
   | "warning"
-  | "failed";
+  | "skipped";
 
 export interface ResearchDiscoveryProgressSource {
   title?: string;

@@ -150,29 +150,25 @@ User-facing Chinese label: 创建风格画像
 _Avoid_: Deck Generation, Uploaded Source Analysis
 
 **Research Discovery**:
-The deck-level iterative process that decides what external material is still needed, collects candidate web and image material, curates it into Research Evidence, and stops when enough useful evidence has been collected or the iteration limit is reached. It happens before Page Generation Units are authored. When Uploaded Source Analysis exists, Research Discovery treats it as prior source context and should search only for unresolved gaps, required current external facts, public benchmarks, or additional visual assets. Web material is discovered before visual material so image needs can be informed by curated facts and insights; visual material does not become factual evidence by itself. Interrupted Research Discovery work is not complete discovery work and must not be promoted into the Research Discovery Evidence Pool.
+The deck-level process that independently decides whether web material and visual material are needed, collects the required candidates, and curates them into Shared Research Evidence before Page Generation Units are authored. Web material is discovered before visual material when both are required so image needs can be informed by curated facts and insights; visual material does not become factual evidence by itself.
 User-facing Chinese label: 事实收集
 _Avoid_: Research Planning
 
-**Research Discovery Evidence Pool**:
-The deck-level curated evidence pool produced during Research Discovery before evidence is assigned to Page Generation Units. It supports further Research Discovery decisions and Page Evidence Assignment, but it is not by itself an allowed grounding source for Page Authoring.
-_Avoid_: Shared Research Evidence, Page Research Evidence
-
-**Research Collection Ledger**:
-A Workspace-owned record of which web and image query intents have already been collected during Research Discovery or later refinement research. It is used to avoid repeating completed query intents while preserving existing Research Evidence; interrupted research work must not make a query intent count as completed collection.
-
 **Research Search Control**:
-A Workspace-level or run-level user preference that disables new web or visual external search and fetch during Research Discovery. It does not disable reuse of existing Research Evidence, Page Evidence Assignment, Uploaded Source Material, or Uploaded Source Analysis.
+A Workspace-level or run-level user preference that disables new web or visual external search and fetch during Research Discovery. It does not disable reuse of existing Shared Research Evidence, Uploaded Source Material, or Uploaded Source Analysis.
 _Avoid_: Disable evidence, disable uploaded sources
 
 **Research Requirement**:
-The decision that more external material is needed because the deck or a refinement target depends on real-world facts, current information, source-backed data, or external visual assets that are not already available in Research Evidence.
+The decision that more external material is needed because the deck or a refinement target depends on material not already available in Shared Research Evidence. Web Research Requirement and Visual Research Requirement are evaluated independently.
+
+**Web Research Requirement**:
+The decision that source-backed web material is needed for real-world facts, current information, public data, citations, named cases, or conflict investigation.
+
+**Visual Research Requirement**:
+The decision that external visual assets are needed for the Deck or refinement target. It is independent of Web Research Requirement, although curated web material may inform later visual searches.
 
 **Research Evidence Gap**:
-A case where Research Discovery, Research Curation, or Page Evidence Assignment cannot produce enough Research Evidence for a requested deck or page intent. It does not block Page Generation and does not make completed research work partially failed; unsupported concrete details must be omitted, generalized, or marked as TBD / 待补充. Reaching a Research Discovery iteration limit may produce a Research Evidence Gap. Generation Abandonment or interruption during research is unfinished work, not a Research Evidence Gap.
-
-**Page Evidence Assignment**:
-The deck-level step after Research Discovery that assigns relevant facts, derived insights, and visual assets to Page Generation Units and directly materializes page-assigned Research Evidence before Page Authoring. It does not create a Page Plan, choose page composition, modify the Confirmed Outline, or make Raw Research Material or full Uploaded Source Analysis a Page Authoring grounding source.
+A case where Research Discovery or Research Curation cannot produce enough Shared Research Evidence for a requested deck or page intent. The gap is recorded in the current Shared Research Evidence so Page Authoring knows which details cannot be asserted; it does not block Page Generation, and unsupported concrete details must be omitted, generalized, or marked as TBD / 待补充. Technical failure details belong in the Research Log. Generation Abandonment or interruption during research is unfinished work, not a Research Evidence Gap.
 
 **Raw Research Material**:
 External material collected by search, fetch, or image lookup before cleanup or selection. It is not grounding evidence until promoted into Research Evidence.
@@ -184,7 +180,7 @@ User-facing Chinese label: 上传资料
 User-facing English label: Source material
 
 **Uploaded Source Analysis**:
-A deck-level analysis result produced from Uploaded Source Material before Outline Creation or Deck Generation uses the uploaded material. It captures selected factual content, visual asset understanding, source-use constraints, gaps, and rejected or unusable material. Uploaded Source Analysis may inform Outline Creation and later evidence assignment, but it is not the same artifact as the Research Discovery Evidence Pool. It combines the continuation decisions from the factual and visual analysis drafts into the overall decision about whether Outline Creation may continue. When the Uploaded Source Material set or file content changes, existing Uploaded Source Analysis becomes stale, and any Outline Draft or Confirmed Outline that depended on it must be regenerated or reconfirmed before downstream generation uses the changed material.
+A deck-level analysis result produced from Uploaded Source Material before Outline Creation or Deck Generation uses the uploaded material. It captures selected factual content, visual asset understanding, source-use constraints, gaps, and rejected or unusable material. Uploaded Source Analysis remains separate from Shared Research Evidence. It combines the continuation decisions from the factual and visual analysis drafts into the overall decision about whether Outline Creation may continue. When the Uploaded Source Material set or file content changes, existing Uploaded Source Analysis becomes stale, and any Outline Draft or Confirmed Outline that depended on it must be regenerated or reconfirmed before downstream generation uses the changed material.
 
 **Uploaded Source Analysis Continuation Decision**:
 A structured decision inside a valid Uploaded Source Analysis result that states whether downstream Outline Creation may continue when some Uploaded Source Material could not be fully parsed or understood. The decision is valid only after the analysis draft itself has been written and passed deterministic validation. Agent session failure, missing or invalid analysis drafts, or missing continuation decisions are analysis failures, not continuable uploaded-source gaps.
@@ -193,32 +189,31 @@ A structured decision inside a valid Uploaded Source Analysis result that states
 An intermediate analysis result that selects factual claims, tables, metrics, source excerpts, gaps, and rejected material from Uploaded Source Material. It owns the continuation decision for factual uploaded-source analysis. It must not select visual assets for page use.
 
 **Uploaded Source Visual Analysis Draft**:
-An intermediate analysis result that interprets images, screenshots, charts, diagrams, and other visual material found in Uploaded Source Material, including suitability for PPT use and user-provided use constraints. It owns the continuation decision for visual uploaded-source analysis. Uploaded images and embedded visuals are not page-usable Visual Research Evidence until selected through Uploaded Source Visual Analysis and later assigned to a page. It must not promote visual text or chart content as factual evidence unless that content is separately captured by factual analysis.
+An intermediate analysis result that interprets images, screenshots, charts, diagrams, and other visual material found in Uploaded Source Material, including suitability for PPT use and user-provided use constraints. It owns the continuation decision for visual uploaded-source analysis. Uploaded images and embedded visuals are not usable Visual Research Evidence until selected through Uploaded Source Visual Analysis and promoted into Shared Research Evidence. It must not promote visual text or chart content as factual evidence unless that content is separately captured by factual analysis.
 
 **Research Curation**:
-The step that turns Raw Research Material into Research Evidence by selecting relevant facts, sources, and visual assets for a Page Generation Unit.
-
-**Research Curation Draft**:
-An intermediate curation result selected from Raw Research Material before it is promoted into a Research Discovery Evidence Pool or page-assigned Research Evidence. Drafts from interrupted research work are not valid inputs for Research Evidence until the research stage is completed again.
-
-**Web Research Curation Draft**:
-A Research Curation Draft that contains candidate factual evidence, source judgments, derived insights, rejected material, and gaps from web material.
-
-**Visual Research Curation Draft**:
-A Research Curation Draft that contains candidate visual assets, visual judgments, rejected material, and gaps from image material.
+The step that turns Raw Research Material into Shared Research Evidence by selecting relevant facts, derived insights, visual assets, and gaps for the Deck.
 
 **Research Log**:
-A Workspace-owned diagnostic record of Research Discovery, Research Collection, Research Curation, and Page Evidence Assignment activity. It is separate from Page Generation Stage Records and is used for troubleshooting evidence decisions.
+A Workspace-owned diagnostic record of Research Discovery, Research Collection, and Research Curation activity. It is separate from Page Generation Stage Records and is used for troubleshooting evidence decisions.
 
 **Research Evidence**:
-Curated facts, sources, and visual assets selected from Raw Research Material for use in Page Generation. Page-assigned Research Evidence is materialized for one Page Generation Unit from the Research Discovery Evidence Pool and evidence-assignment decisions. It is an allowed grounding source for generated page content.
+Curated facts, derived insights, visual assets, and gaps selected from Raw Research Material for use in Page Generation. Shared Research Evidence is the deck-level authoritative grounding source for generated page content; raw material is never a substitute for it.
 _Avoid_: Raw search results, raw crawl output
 
 **Visual Research Evidence**:
-A curated visual asset selected for a Page Generation Unit because it fits the page intent and is visually usable. Text, charts, or claims visible inside the asset are not grounded facts unless separately captured as Research Evidence.
+A curated visual asset selected for the Deck because it is visually usable and has a documented source. Text, charts, or claims visible inside the asset are not grounded facts unless separately captured as Research Evidence.
+
+**Visual Research Candidate**:
+An image returned by external visual search and inspected for possible Deck use. A candidate is not Visual Research Evidence until it is selected as usable; rejected candidates remain diagnostic material and cannot be used for Page Authoring.
 
 **Shared Research Evidence**:
-Curated deck-level material that can support multiple Page Generation Units without belonging exclusively to one page.
+Curated deck-level facts, derived insights, visual assets, and gaps that can support multiple Page Generation Units. It is composed of an ordered history of Research Batches and is the authoritative research grounding source available to page authoring, while external URLs and raw collection records remain diagnostic material rather than Page Authoring context.
+
+**Research Batch**:
+One ordered addition to Shared Research Evidence produced during initial Deck Generation or a later Deck or Page Refinement. A batch records curated evidence or an explicit skipped or gap outcome. Its heading may describe the generation or refinement that produced it for human readability, but it does not define page-level applicability and Page Authoring does not filter research by a structured target-page scope. Newer information takes precedence when it conflicts with older information, while older batches remain part of the evidence history.
+User-facing Chinese label: 研究批次
+_Avoid_: Research Update, Page Evidence Assignment
 
 **Deck**:
 The finished presentation content before export.
@@ -320,7 +315,7 @@ _Avoid_: Abandoned Page — Generation Abandonment discards the whole run rather
 A transient Agent Session infrastructure failure where the platform cannot continue an Agent run because the app session authorization is unavailable. It is treated as infrastructure failure, not as a Page Generation content or render failure.
 
 **Deck Refinement**:
-A user-requested revision of an accepted Deck as a whole after Deck Generation. It may update deck-level context, output language, Confirmed Outline, page-assigned Research Evidence, and selected Page Generation Units while preserving unaffected accepted pages when safe.
+A user-requested revision of an accepted Deck as a whole after Deck Generation. It may update deck-level context, output language, Confirmed Outline, Shared Research Evidence, and selected Page Generation Units while preserving unaffected accepted pages when safe.
 When the Confirmed Outline changes without changing output language, only Page Generation Units whose outline intent changed are affected unless the request explicitly asks for a global style, language, or narrative rewrite.
 Deck Refinement preserves the Deck title unless the request explicitly changes it. A changed title updates the Workspace and active Confirmed Outline authorities but affects only the Page Generation Units that the reconciliation identifies as needing to express the new title.
 An explicit output-language change updates the Confirmed Presentation Requirements, rewrites the active Confirmed Outline in the new language, and makes every retained Page Generation Unit a refinement target. Merely using foreign terms or examples does not change the Deck output language.
@@ -342,7 +337,7 @@ The user's active instruction for revising an accepted Deck as a whole. It may e
 The pre-commit decision process that reconciles a Deck Refinement Request into the resulting Deck title, output-language decision, ordered page operations, complete changed or added Outline Entries, shared Style Guide decision when the Workspace has no Visual Style Preset, and page-level refinement reasons. With a confirmed preset, the planning result keeps the preset Style Guide and still identifies every Page Generation Unit affected by the active request. It does not author Page Sources and preserves page count and order unless the request explicitly authorizes structural change.
 
 **Deck Refinement Resume**:
-The user action that continues an unfinished Deck Refinement from persisted deck-level decisions and target pages. It does not reinterpret completed context, outline, evidence-assignment, or research-routing decisions as a new request.
+The user action that continues an unfinished Deck Refinement from persisted deck-level decisions and target pages. It does not reinterpret completed context, outline, Shared Research Evidence, or research-routing decisions as a new request.
 The committed target Page Generation Units already own their refinement execution states, while the persisted Deck Refinement Request and page-level reasons preserve the authoring intent needed to continue without replanning.
 
 **Deck Refinement Preparation**:
@@ -372,7 +367,7 @@ The user action that continues an unfinished Page Refinement using the same pers
 The last successful rendered screenshot preserved for a retained target page when Page or Deck Refinement resets that page's execution state. It is required visual input for initial Page Authoring, no-change/session retries, and render-fix attempts until a new successful render replaces it; once a new render exists, Page Visual Review and visual-review-fix use that latest rendered screenshot instead. Text, numbers, charts, and claims visible in any screenshot are not grounding evidence unless separately present in allowed sources. A newly added Page Generation Unit has no Page Refinement Visual Context, and a non-target page does not receive one.
 
 **Deck Generation Resume**:
-The user action that continues the same unfinished Deck Generation by completing missing Workspace Style Guide, research, evidence-assignment, or Page Source preparation work, re-running any Page Generation Unit that is not accepted yet, including Interrupted Page Generations, pending pages, infrastructure failures, and Failed Page Generations, or by continuing Final Deck Render when all pages are accepted but final Deck artifacts are not ready. It keeps accepted pages from that run without replacing the pre-run current Workspace until Generation Commit succeeds; an unfinished page keeps its previous state until its resumed work actually starts.
+The user action that continues the same unfinished Deck Generation by completing missing Workspace Style Guide, research, or Page Source preparation work, re-running any Page Generation Unit that is not accepted yet, including Interrupted Page Generations, pending pages, infrastructure failures, and Failed Page Generations, or by continuing Final Deck Render when all pages are accepted but final Deck artifacts are not ready. It keeps accepted pages from that run without replacing the pre-run current Workspace until Generation Commit succeeds; an unfinished page keeps its previous state until its resumed work actually starts.
 _Avoid_: Regenerate, Restart — those discard accepted pages and start the whole Deck over.
 
 **Generation Abandonment**:

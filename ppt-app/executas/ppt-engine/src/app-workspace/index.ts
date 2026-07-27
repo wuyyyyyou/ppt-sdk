@@ -168,6 +168,13 @@ import type {
   AppWorkspaceDiagnosticBundleSnapshot,
   AppPptxExportJob,
   AppResearchPaths,
+  AppSharedResearchContextResult,
+  AppendAppImageResearchBatchInput,
+  AppendAppWebResearchBatchInput,
+  ImportAppSharedResearchImageInput,
+  ImportAppSharedResearchImageResult,
+  PrepareAppSharedResearchWorkspaceInput,
+  RecordAppSharedResearchProgressInput,
   RecordAppPagePlanInput,
   RecordAppPageProgressInput,
   RecordAppWorkspaceStyleGuideInput,
@@ -584,6 +591,10 @@ function buildResearchPaths(workspaceDir: string): AppResearchPaths {
     evidence_pages_dir: path.join(evidenceDir, "pages"),
     evidence_images_dir: path.join(evidenceDir, "images"),
     evidence_drafts_dir: path.join(evidenceDir, "drafts"),
+    web_summary_path: path.join(evidenceDir, "web-summary.md"),
+    image_catalog_path: path.join(evidenceDir, "image-catalog.json"),
+    images_dir: path.join(evidenceDir, "images"),
+    progress_path: path.join(rootDir, "web-image-search-progress.json"),
     research_plan_path: path.join(rootDir, "research-plan.json"),
     evidence_index_path: path.join(rootDir, "evidence-index.json"),
     status_path: path.join(rootDir, "research-status.json"),
@@ -813,6 +824,21 @@ async function writeJsonFile(filePath: string, data: unknown): Promise<void> {
   await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
 }
 
+async function atomicWriteTextFile(filePath: string, content: string): Promise<void> {
+  await mkdir(path.dirname(filePath), { recursive: true });
+  const temporaryPath = path.join(path.dirname(filePath), `.${path.basename(filePath)}.${randomUUID()}.tmp`);
+  try {
+    await writeFile(temporaryPath, content, "utf8");
+    await rename(temporaryPath, filePath);
+  } finally {
+    await unlink(temporaryPath).catch(() => undefined);
+  }
+}
+
+async function atomicWriteJsonFile(filePath: string, data: unknown): Promise<void> {
+  await atomicWriteTextFile(filePath, `${JSON.stringify(data, null, 2)}\n`);
+}
+
 const pageProgressWriteQueues = new Map<string, Promise<unknown>>();
 const uploadedSourceWriteQueues = new Map<string, Promise<unknown>>();
 const styleProfileWriteQueues = new Map<string, Promise<unknown>>();
@@ -1015,6 +1041,7 @@ function createDefaultTaskJson(workspaceDir: string, title?: string) {
 function createDefaultSettingJson() {
   return {
     page_generation_concurrency: 5,
+    research_image_session_concurrency: 5,
     visual_review_enabled: false,
     visual_review_failure_limit: 2,
     disable_web_research: false,
@@ -1040,6 +1067,10 @@ function normalizePageGenerationConcurrency(value: unknown): number {
   return Math.max(1, Math.min(10, Math.floor(numericValue)));
 }
 
+function normalizeResearchImageSessionConcurrency(value: unknown): number {
+  return normalizePageGenerationConcurrency(value);
+}
+
 function normalizeSettingJson(setting: unknown): Record<string, unknown> {
   const existing =
     setting && typeof setting === "object" && !Array.isArray(setting)
@@ -1048,6 +1079,9 @@ function normalizeSettingJson(setting: unknown): Record<string, unknown> {
   return {
     page_generation_concurrency: normalizePageGenerationConcurrency(
       existing.page_generation_concurrency,
+    ),
+    research_image_session_concurrency: normalizeResearchImageSessionConcurrency(
+      existing.research_image_session_concurrency,
     ),
     visual_review_enabled: existing.visual_review_enabled === true,
     visual_review_failure_limit: normalizeReviewFailureLimit(
@@ -1721,19 +1755,16 @@ function normalizeFinalDeckRenderState(value: unknown): AppPageProgress["final_d
 const RESEARCH_DISCOVERY_PHASES = new Set([
   "web-decision",
   "web-collection",
-  "web-curation",
   "visual-decision",
   "visual-collection",
-  "visual-curation",
-  "evidence-page-planning",
 ]);
 
 const RESEARCH_DISCOVERY_STATES = new Set([
-  "pending",
-  "active",
+  "waiting",
+  "running",
   "completed",
   "warning",
-  "failed",
+  "skipped",
 ]);
 
 function normalizeResearchDiscoveryProgress(value: unknown): AppPageProgress["research_discovery"] {
@@ -2216,6 +2247,9 @@ export async function createAppWorkspace(
   const createSetting: AppCreateWorkspaceSetting = {
     page_generation_concurrency: normalizePageGenerationConcurrency(
       setting.page_generation_concurrency,
+    ),
+    research_image_session_concurrency: normalizeResearchImageSessionConcurrency(
+      setting.research_image_session_concurrency,
     ),
     visual_review_enabled: setting.visual_review_enabled === true,
     visual_review_failure_limit: normalizeReviewFailureLimit(
@@ -3995,6 +4029,180 @@ async function ensureResearchDirectories(workspaceDir: string): Promise<AppResea
     mkdir(paths.evidence_drafts_dir, { recursive: true }),
   ]);
   return paths;
+}
+
+function createDefaultSharedResearchProgress() {
+  return {
+    schema_version: 1,
+    status: "waiting",
+    stages: {
+      web_decision: "waiting",
+      web_research: "waiting",
+      image_decision: "waiting",
+      image_research: "waiting",
+    },
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function createDefaultImageCatalog() {
+  return { schema_version: 1, batches: [] };
+}
+
+function normalizeImageCatalog(value: unknown): Record<string, unknown> {
+  const record = getPlainRecord(value);
+  if (Object.keys(record).length === 0) return createDefaultImageCatalog();
+  if (record.schema_version !== 1 || !Array.isArray(record.batches)) {
+    throw new Error("Invalid research/evidence/image-catalog.json");
+  }
+  return { schema_version: 1, batches: record.batches };
+}
+
+async function ensureSharedResearchFiles(workspaceDir: string, resetProgress: boolean): Promise<AppResearchPaths> {
+  const paths = await ensureResearchDirectories(workspaceDir);
+  await mkdir(paths.images_dir, { recursive: true });
+  if (!(await fileExists(paths.web_summary_path))) {
+    await atomicWriteTextFile(paths.web_summary_path, "# Web Research Summary\n");
+  }
+  if (!(await fileExists(paths.image_catalog_path))) {
+    await atomicWriteJsonFile(paths.image_catalog_path, createDefaultImageCatalog());
+  }
+  if (resetProgress || !(await fileExists(paths.progress_path))) {
+    await atomicWriteJsonFile(paths.progress_path, createDefaultSharedResearchProgress());
+  }
+  return paths;
+}
+
+export async function getAppSharedResearchContext(
+  input: { workspace_dir: string },
+): Promise<AppSharedResearchContextResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureSharedResearchFiles(workspace.workspace_dir, false);
+  return {
+    workspace_dir: workspace.workspace_dir,
+    web_summary_path: paths.web_summary_path,
+    image_catalog_path: paths.image_catalog_path,
+    images_dir: paths.images_dir,
+    progress_path: paths.progress_path,
+    web_summary: await readFile(paths.web_summary_path, "utf8"),
+    image_catalog: normalizeImageCatalog(await readJsonFileIfExists(paths.image_catalog_path)),
+    progress: getPlainRecord(await readJsonFileIfExists(paths.progress_path)),
+  };
+}
+
+export async function prepareAppSharedResearchWorkspace(
+  input: PrepareAppSharedResearchWorkspaceInput,
+): Promise<AppSharedResearchContextResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  await ensureSharedResearchFiles(workspace.workspace_dir, input.reset_progress === true);
+  return getAppSharedResearchContext({ workspace_dir: workspace.workspace_dir });
+}
+
+export async function recordAppSharedResearchProgress(
+  input: RecordAppSharedResearchProgressInput,
+): Promise<Record<string, unknown>> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureSharedResearchFiles(workspace.workspace_dir, false);
+  const progress = {
+    ...getPlainRecord(input.progress),
+    schema_version: 1,
+    updated_at: new Date().toISOString(),
+  };
+  await atomicWriteJsonFile(paths.progress_path, progress);
+  return progress;
+}
+
+export async function appendAppWebResearchBatch(
+  input: AppendAppWebResearchBatchInput,
+): Promise<{ workspace_dir: string; web_summary_path: string; appended: boolean }> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureSharedResearchFiles(workspace.workspace_dir, false);
+  const block = input.markdown.trim();
+  if (!block) throw new Error('"markdown" must be non-empty');
+  const current = await readFile(paths.web_summary_path, "utf8");
+  if (current.trimEnd().endsWith(block)) {
+    return { workspace_dir: workspace.workspace_dir, web_summary_path: paths.web_summary_path, appended: false };
+  }
+  await atomicWriteTextFile(paths.web_summary_path, `${current.trimEnd()}\n\n${block}\n`);
+  return { workspace_dir: workspace.workspace_dir, web_summary_path: paths.web_summary_path, appended: true };
+}
+
+export async function appendAppImageResearchBatch(
+  input: AppendAppImageResearchBatchInput,
+): Promise<{ workspace_dir: string; image_catalog_path: string; appended: boolean }> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureSharedResearchFiles(workspace.workspace_dir, false);
+  const catalog = normalizeImageCatalog(await readJsonFileIfExists(paths.image_catalog_path));
+  const batches = Array.isArray(catalog.batches) ? catalog.batches : [];
+  const batch = getPlainRecord(input.batch);
+  if (!normalizeString(batch.title) || !Array.isArray(batch.candidates)) {
+    throw new Error('"batch" must contain title and candidates');
+  }
+  const last = batches.at(-1);
+  if (last !== undefined && JSON.stringify(last) === JSON.stringify(batch)) {
+    return { workspace_dir: workspace.workspace_dir, image_catalog_path: paths.image_catalog_path, appended: false };
+  }
+  await atomicWriteJsonFile(paths.image_catalog_path, {
+    schema_version: 1,
+    batches: [...batches, batch],
+  });
+  return { workspace_dir: workspace.workspace_dir, image_catalog_path: paths.image_catalog_path, appended: true };
+}
+
+const SHARED_RESEARCH_IMAGE_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+};
+
+export async function importAppSharedResearchImage(
+  input: ImportAppSharedResearchImageInput,
+): Promise<ImportAppSharedResearchImageResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureSharedResearchFiles(workspace.workspace_dir, false);
+  assertAbsolutePath(input.staging_file_path, "staging_file_path");
+  const extension = SHARED_RESEARCH_IMAGE_EXTENSIONS[input.mime_type];
+  if (!extension) throw new Error(`Unsupported research image MIME type: ${input.mime_type}`);
+  const bytes = await readFile(input.staging_file_path);
+  if (bytes.length !== Math.floor(input.expected_size_bytes)) {
+    throw new Error(`Research image size mismatch: expected ${Math.floor(input.expected_size_bytes)}, got ${bytes.length}`);
+  }
+  const sha256 = sha256BufferHex(bytes);
+  if (input.expected_sha256 && input.expected_sha256 !== sha256) {
+    throw new Error("Research image SHA-256 mismatch");
+  }
+  await sharp(bytes).metadata();
+  const candidateId = sanitizeFileNamePart(input.candidate_id, "image");
+  const destinationPath = path.join(paths.images_dir, `${candidateId}${extension}`);
+  if (await fileExists(destinationPath)) {
+    const existing = await readFile(destinationPath);
+    if (sha256BufferHex(existing) === sha256) {
+      return {
+        workspace_dir: workspace.workspace_dir,
+        candidate_id: input.candidate_id,
+        file_path: path.relative(workspace.workspace_dir, destinationPath).split(path.sep).join("/"),
+        sha256,
+        mime_type: input.mime_type,
+        bytes_size: bytes.length,
+      };
+    }
+  }
+  const temporaryPath = path.join(paths.images_dir, `.${candidateId}.${randomUUID()}.tmp`);
+  try {
+    await writeFile(temporaryPath, bytes);
+    await rename(temporaryPath, destinationPath);
+  } finally {
+    await unlink(temporaryPath).catch(() => undefined);
+  }
+  return {
+    workspace_dir: workspace.workspace_dir,
+    candidate_id: input.candidate_id,
+    file_path: path.relative(workspace.workspace_dir, destinationPath).split(path.sep).join("/"),
+    sha256,
+    mime_type: input.mime_type,
+    bytes_size: bytes.length,
+  };
 }
 
 export async function prepareAppResearchWorkspace(

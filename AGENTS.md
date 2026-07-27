@@ -19,7 +19,7 @@
 
 - [`ppt-app/executas/ppt-engine/`](ppt-app/executas/ppt-engine/)：Authoring Kit 与 Page Source 工作区能力、模板发现、HTML 渲染、PPTX model 转换和任务状态机。
 - [`third_party/dom-to-pptx/`](third_party/dom-to-pptx/)：仓库内直接维护的 HTML 到 PPTX 权威源码。
-- [`ppt-app/executas/anna-search/`](ppt-app/executas/anna-search/)：Anna App 内置搜索 Executa。
+- Web 和图片研究由 Anna Host 官方 Web API 提供，不再使用本地搜索 Executa。
 
 完整链路仍然是：
 
@@ -67,7 +67,7 @@ manifest.json -> deck.html -> .pptx
 以下位置必须通过 [`ppt-app/scripts/sync-tool-manifests.mjs`](ppt-app/scripts/sync-tool-manifests.mjs)
 保持同步：
 
-- [`ppt-app/manifest.json`](ppt-app/manifest.json) 的 `required_executas[].tool_id`：固定为 `bundled:ppt-engine`、`bundled:anna-search`
+- [`ppt-app/manifest.json`](ppt-app/manifest.json) 的 `required_executas[].tool_id`：固定为 `bundled:ppt-engine`
 - [`ppt-app/manifest.json`](ppt-app/manifest.json) 的 `required_executas[].min_version`：来自各 Executa manifest 的 `version`
 - [`ppt-app/manifest.json`](ppt-app/manifest.json) 的 `ui.host_api.tools`：固定为 `required:bundled:<handle>`
 - [`ppt-app/app.json`](ppt-app/app.json) 的 `bundled_executas`
@@ -82,7 +82,6 @@ manifest.json -> deck.html -> .pptx
 
 ```text
 ppt-engine:  tool-lightvoss-ppt-engine-kqhra9hy
-anna-search: tool-lightvoss-anna-search-7ym3jyqv
 ```
 
 ## 开发与运行
