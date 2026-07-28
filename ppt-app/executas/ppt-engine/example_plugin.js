@@ -1979,7 +1979,7 @@ async function toolAppImportSharedResearchImageHostUpload(args) {
   const stagingPath = path.join(RESEARCH_IMAGE_STAGING_DIR, `${randomUUID()}.upload`);
   try {
     await downloadHostUploadToStaging({ hostUpload, stagingPath, expectedSizeBytes: Math.floor(sizeBytes) });
-    return importAppSharedResearchImage({
+    return await importAppSharedResearchImage({
       workspace_dir: workspaceDir,
       candidate_id: candidateId,
       staging_file_path: stagingPath,

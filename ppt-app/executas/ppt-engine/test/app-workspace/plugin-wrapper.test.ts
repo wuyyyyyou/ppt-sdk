@@ -266,6 +266,16 @@ test("Workspace Style Guide Host Upload waits for persistence before staging cle
   assert.match(handler, /return await recordAppWorkspaceStyleGuide\(\{/);
 });
 
+test("Shared Research Image Host Upload waits for import before staging cleanup", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+  const handler = source.match(
+    /async function toolAppImportSharedResearchImageHostUpload\(args\) \{[\s\S]*?\n\}/,
+  )?.[0];
+
+  assert.ok(handler, "Missing Shared Research Image Host Upload handler");
+  assert.match(handler, /return await importAppSharedResearchImage\(\{/);
+});
+
 test("app_get_rendered_deck_html is declared and routed", async () => {
   const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
   const manifest = JSON.parse(
