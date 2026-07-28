@@ -27,6 +27,8 @@ export function ThumbnailStrip({
           <button
             key={`${slide.title}-${index}`}
             className={`thumb ${index === currentSlide ? "active" : ""}`}
+            type="button"
+            aria-current={index === currentSlide ? "true" : undefined}
             onClick={() => setCurrentSlide(index)}
           >
           {renderedSlide?.screenshot_upload ? (

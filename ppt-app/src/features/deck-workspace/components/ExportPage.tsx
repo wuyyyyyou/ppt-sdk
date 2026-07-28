@@ -53,20 +53,36 @@ export function ExportPage({ t, progress, artifact, download, loading, onBack, o
       <PageHeader title={t.exportPage.title} onBack={onBack} t={t} />
       <div className="export-grid">
         <button className="export-card" onClick={() => onExport("PPTX")} disabled={loading === "export"}>
-          <FileText size={32} />
+          <FileText size={32} aria-hidden="true" />
           <strong>{t.controls.pptx}</strong>
           <span>{t.exportPage.pptxDescription}</span>
         </button>
         <button className="export-card" onClick={() => onExport("PDF")} disabled={loading === "export"}>
-          <File size={32} />
+          <File size={32} aria-hidden="true" />
           <strong>{t.controls.pdf}</strong>
           <span>{t.exportPage.pdfDescription}</span>
         </button>
       </div>
       <div className={`export-progress-panel ${progress.mode === "error" ? "error" : ""}`}>
-        <div className={`export-progress-message ${progress.active ? "breathing" : ""}`}>
+        <div
+          className={`export-progress-message ${progress.active ? "breathing" : ""}`}
+          role="status"
+          aria-live="polite"
+        >
           {progress.message}
         </div>
+        {progress.mode === "error" && progress.type ? (
+          <div className="export-retry-row">
+            <button
+              className="secondary-btn compact"
+              type="button"
+              disabled={loading === "export"}
+              onClick={() => onExport(progress.type as "PPTX" | "PDF")}
+            >
+              {t.exportPage.retryExport}
+            </button>
+          </div>
+        ) : null}
         <div className="export-progress-row">
           <div
             className={progressClass}
@@ -98,18 +114,18 @@ export function ExportPage({ t, progress, artifact, download, loading, onBack, o
                 void onDownload();
               }}
             >
-              <Download size={16} />
+              <Download size={16} aria-hidden="true" />
               <span>{downloadButtonLabel(t, artifact, download)}</span>
             </button>
           ) : (
             <button className="export-download-btn" type="button" disabled>
-              <Download size={16} />
+              <Download size={16} aria-hidden="true" />
               <span>{downloadLabel(t, artifact)}</span>
             </button>
           )}
         </div>
         {download.message ? (
-          <div className={`export-download-status ${download.status === "error" ? "error" : ""}`}>
+          <div className={`export-download-status ${download.status === "error" ? "error" : ""}`} role="status" aria-live="polite">
             {download.message}
           </div>
         ) : null}

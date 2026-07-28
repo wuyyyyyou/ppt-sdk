@@ -114,11 +114,16 @@ export function buildPageGenerationStageRecords(input: {
         statusRecord.stageKey === "rendering" ||
         statusRecord.stageKey === "accepted" ||
         statusRecord.stageKey === "pending";
-      const stages = sortStageRecords([
-        ...snapshotRecords,
-        ...activeRecords,
-        ...(shouldIncludeStatusRecord ? [statusRecord] : []),
-      ]);
+      const pageHasFinallyFailed = isGenuinelyFailedPageGenerationStatus(page.status);
+      const stages = hideRecoveredFailures(
+        t,
+        sortStageRecords([
+          ...snapshotRecords,
+          ...activeRecords,
+          ...(shouldIncludeStatusRecord ? [statusRecord] : []),
+        ]),
+        pageHasFinallyFailed,
+      );
 
       return {
         pageId: page.page_id,
@@ -127,10 +132,39 @@ export function buildPageGenerationStageRecords(input: {
         pageStatus: page.status,
         pageStatusLabel: t.generating.stageRecords.pageStatuses[pageStatusLabelKey(page.status)],
         state: pageStatusState(page.status),
-        lastError: page.last_error,
+        // GEN-005: a retried attempt is not the user's problem, so the error is
+        // only surfaced once the page itself has finally failed.
+        lastError: pageHasFinallyFailed ? page.last_error : undefined,
         stages,
       };
     });
+}
+
+/**
+ * GEN-005: an internal failure that the run is still retrying, or already
+ * recovered from, must not read as a red step. Only a page whose final status
+ * is genuinely failed keeps its failure records.
+ */
+function hideRecoveredFailures(
+  t: Messages,
+  stages: PageGenerationStageRecord[],
+  pageHasFinallyFailed: boolean,
+): PageGenerationStageRecord[] {
+  if (pageHasFinallyFailed) return stages;
+
+  const visible = stages
+    .filter((stage) => stage.state !== "failed")
+    .map((stage) => (stage.lastError ? { ...stage, lastError: undefined } : stage));
+  if (visible.length > 0) return visible;
+
+  // Every record for this page is a retried attempt; keep the page on the
+  // timeline as still in progress rather than dropping it entirely.
+  return stages.map((stage) => ({
+    ...stage,
+    state: "pending" as const,
+    statusLabel: stateLabel(t, "pending"),
+    lastError: undefined,
+  }));
 }
 
 function groupBy<T>(items: T[], keyFor: (item: T) => string | undefined) {

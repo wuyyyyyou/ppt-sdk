@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { VisualStylePreset } from "../../src/api/types.ts";
-import { matchesVisualStylePresetFilters } from "../../src/features/templates/visualStylePresetFilters.ts";
+import {
+  buildVisualStylePresetFilterOptions,
+  createEmptyVisualStylePresetFilters,
+  matchesVisualStylePresetFilters,
+} from "../../src/features/templates/visualStylePresetFilters.ts";
 
 const preset = {
   id: "test",
@@ -37,5 +41,21 @@ describe("visual style preset filters", () => {
       theme: "Futuristic & Technology",
       color: "",
     }), false);
+  });
+
+  it("starts with every field cleared so the all option is selected", () => {
+    const filters = createEmptyVisualStylePresetFilters();
+
+    assert.deepEqual(filters, { user: "", use_case: "", industry: "", theme: "", color: "" });
+    assert.equal(matchesVisualStylePresetFilters(preset, filters), true);
+  });
+
+  it("derives deduplicated sorted options from the given presets", () => {
+    const other = { ...preset, id: "other", color: "Amber", user: "Industry Professionals" };
+
+    const options = buildVisualStylePresetFilterOptions([preset, other]);
+
+    assert.deepEqual(options.color, ["Amber", "Navy Blue"]);
+    assert.deepEqual(options.user, ["Industry Professionals"]);
   });
 });

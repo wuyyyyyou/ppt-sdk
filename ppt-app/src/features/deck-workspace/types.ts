@@ -19,6 +19,7 @@ import type {
   DeckGenerationStreamSnapshot
 } from "../deck-generation";
 import type { ActiveGenerationRun, GenerationViewState } from "./generationViewState";
+import type { WorkspaceCovers } from "./workspaceCovers";
 import type { PageReviewSettings } from "./reviewSettings";
 import type { ResearchSearchControlSettings } from "./researchSearchControl";
 
@@ -113,6 +114,7 @@ export interface DeckWorkspaceState {
   presentationRequirements: PresentationRequirements;
   requirementsStatus: "idle" | "loading" | "ready" | "error";
   requirementsError: string;
+  requirementsErrorDetail: string;
   requirementsSaving: boolean;
   requirementsConfirming: boolean;
   requirementsDirty: boolean;
@@ -125,6 +127,7 @@ export interface DeckWorkspaceState {
   outlineDirty: boolean;
   outlineSaving: boolean;
   outlineError: string;
+  outlineErrorDetail: string;
   generated: boolean;
   currentSlide: number;
   outlineFeedback: string;
@@ -144,12 +147,16 @@ export interface DeckWorkspaceState {
   workspaceDiagnosticBundle: WorkspaceDiagnosticBundleState;
   currentStatus: string;
   workspaceScan: ListWorkspacesResult | null;
-  workspaceCovers: Record<string, string | undefined>;
+  workspaceCovers: WorkspaceCovers;
+  openingWorkspaceDir: string | null;
+  /** WORK-005: the freshly created copy, so My Works can point the user at it. */
+  highlightedWorkspaceId: string | null;
   currentWorkspace: WorkspaceResult | null;
   uploadedSources: UploadedSourceMaterial[];
   uploadedSourceAnalysisState: UploadedSourceAnalysisViewState;
   workspaceLoading: boolean;
   workspaceError: string;
+  workspaceErrorDetail: string;
   workspaceSettingsSaving: boolean;
   runtimeInfo: PptEngineRuntimeInfo | null;
   runtimeInfoError: string;

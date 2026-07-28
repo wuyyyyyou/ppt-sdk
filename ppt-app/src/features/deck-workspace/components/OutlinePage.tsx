@@ -20,6 +20,7 @@ import type { OutlineDetail } from "../../../data/mockDeck";
 import type { Messages } from "../../../i18n/messages";
 import type { LoadingKind } from "../types";
 import { formatSlideNumber } from "../utils";
+import { ErrorNotice } from "./ErrorNotice";
 
 interface OutlinePageProps {
   t: Messages;
@@ -28,6 +29,7 @@ interface OutlinePageProps {
   dirty: boolean;
   saving: boolean;
   error: string;
+  errorDetail?: string;
   loading: LoadingKind;
   setTitle: (value: string) => void;
   updateItem: (index: number, patch: Partial<OutlineDetail>) => void;
@@ -83,6 +85,7 @@ export function OutlinePage(props: OutlinePageProps) {
     dirty,
     saving,
     error,
+    errorDetail,
     loading,
     setTitle,
     updateItem,
@@ -118,15 +121,15 @@ export function OutlinePage(props: OutlinePageProps) {
 
   if (error && outline.length === 0) {
     return (
-      <section className="page active requirements-page requirements-error" role="alert">
+      <section className="page active requirements-page requirements-error">
         <h1>{t.outline.errorTitle}</h1>
-        <p>{error}</p>
+        <ErrorNotice t={t} tone="block" summary={error} detail={errorDetail} />
         <div className="requirements-error-actions">
-          <button className="primary-btn" type="button" onClick={() => void retry()}>
-            <RefreshCw size={16} />{t.outline.retry}
+          <button className="primary-btn" type="button" onClick={() => void retry()} disabled={loading === "outline"}>
+            <RefreshCw size={16} aria-hidden="true" />{t.outline.retry}
           </button>
           <button className="secondary-btn" type="button" onClick={backToRequirements}>
-            <ArrowLeft size={16} />{t.outline.backToRequirements}
+            <ArrowLeft size={16} aria-hidden="true" />{t.outline.backToRequirements}
           </button>
         </div>
       </section>

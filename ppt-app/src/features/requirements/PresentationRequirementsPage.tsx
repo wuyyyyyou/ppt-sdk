@@ -6,6 +6,7 @@ import type {
   PresentationRequirementsSelections,
 } from "../../api/types";
 import type { Messages } from "../../i18n/messages";
+import { ErrorNotice } from "../deck-workspace/components/ErrorNotice";
 
 type SemanticField = "audience" | "purpose" | "desired_outcome" | "visual_tone";
 type SimpleField = "slide_count" | "output_language";
@@ -16,6 +17,7 @@ export interface PresentationRequirementsPageProps {
   requirements: PresentationRequirements;
   status: "idle" | "loading" | "ready" | "error";
   error: string;
+  errorDetail?: string;
   saving: boolean;
   confirming: boolean;
   dirty: boolean;
@@ -45,7 +47,7 @@ function semanticMatches(
 }
 
 export function PresentationRequirementsPage(props: PresentationRequirementsPageProps) {
-  const { t, brief, requirements, status, error, saving, confirming, dirty, hasSavedDraft, onSelect, onRetry, onManual, onBack, onSave, onConfirm } = props;
+  const { t, brief, requirements, status, error, errorDetail, saving, confirming, dirty, hasSavedDraft, onSelect, onRetry, onManual, onBack, onSave, onConfirm } = props;
   const [customValues, setCustomValues] = useState<Record<string, string>>(() => {
     const values: Record<string, string> = {};
     for (const field of ["audience", "purpose", "desired_outcome", "visual_tone"] as const) {
@@ -92,13 +94,23 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
 
   if (status === "error") {
     return (
-      <section className="page active requirements-page requirements-error" role="alert">
+      <section className="page active requirements-page requirements-error">
         <h1>{t.requirements.errorTitle}</h1>
-        <p>{error || t.requirements.errorBody}</p>
+        <ErrorNotice
+          t={t}
+          tone="block"
+          summary={error || t.requirements.errorBody}
+          detail={errorDetail}
+        />
         <div className="requirements-error-actions">
-          <button className="primary-btn" type="button" onClick={onRetry}><RefreshCw size={16} />{t.requirements.retry}</button>
-          <button className="secondary-btn" type="button" onClick={onManual}>{t.requirements.manual}</button>
-          <button className="text-btn" type="button" onClick={onBack}>{t.requirements.back}</button>
+          <button className="primary-btn" type="button" onClick={onRetry} disabled={saving || confirming}>
+            <RefreshCw size={16} aria-hidden="true" />
+            {t.requirements.retry}
+          </button>
+          <button className="secondary-btn" type="button" onClick={onManual} disabled={saving || confirming}>
+            {t.requirements.manual}
+          </button>
+          <button className="secondary-btn" type="button" onClick={onBack}>{t.requirements.back}</button>
         </div>
       </section>
     );

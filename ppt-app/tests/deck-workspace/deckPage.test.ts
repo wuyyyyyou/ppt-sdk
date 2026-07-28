@@ -32,11 +32,10 @@ function renderDeckPage(reviewRender: DeckReviewRenderState = loadingReviewRende
       loading: "none",
       onRefineDeck: () => undefined,
       onRefineSlide: () => undefined,
-      onRewriteSlide: () => undefined,
-      onChangeSlideLayout: () => undefined,
-      onRefreshPreview: () => undefined,
       onPreview: () => undefined,
+      onBack: () => undefined,
       onExport: () => undefined,
+      onEdit: () => undefined,
     }),
   );
 }
@@ -64,8 +63,63 @@ describe("DeckPage", () => {
     const html = renderDeckPage();
     assert.match(html, /deck-top-actions[\s\S]*优化当前页[\s\S]*优化整套/);
     assert.doesNotMatch(html, /action-bar[\s\S]*优化当前页/);
-    assert.match(html, /aria-label="重新渲染"/);
-    assert.doesNotMatch(html, />重新渲染</);
     assert.doesNotMatch(html, /复制页面|删除页面|更改布局/);
+  });
+
+  it("opens the top actions row with a back entry", () => {
+    const html = renderDeckPage();
+
+    assert.match(html, /deck-top-actions"><button class="secondary-btn deck-back-btn"/);
+    assert.match(html, new RegExp(`deck-back-btn[\\s\\S]*${messages.zh.controls.back}`));
+  });
+
+  it("drops the unlabelled preview refresh button from the top actions", () => {
+    const html = renderDeckPage();
+
+    assert.doesNotMatch(html, /deck-refresh-btn/);
+    assert.doesNotMatch(html, /重新渲染/);
+  });
+
+  it("labels the manual editor entry from the locale bundle", () => {
+    const zh = renderDeckPage();
+    const en = renderToStaticMarkup(
+      createElement(DeckPage, {
+        t: messages.en,
+        deck,
+        currentSlide: 0,
+        setCurrentSlide: () => undefined,
+        reviewRender: loadingReviewRender,
+        loading: "none",
+        onRefineDeck: () => undefined,
+        onRefineSlide: () => undefined,
+        onPreview: () => undefined,
+        onBack: () => undefined,
+        onExport: () => undefined,
+        onEdit: () => undefined,
+      }),
+    );
+
+    assert.match(zh, new RegExp(`aria-label="${messages.zh.controls.edit}"`));
+    assert.match(en, new RegExp(`aria-label="${messages.en.controls.edit}"`));
+    assert.doesNotMatch(zh, /编辑 PPT/);
+    assert.doesNotMatch(en, /Edit deck/);
+  });
+
+  it("gives every action-bar entry a leading icon", () => {
+    const html = renderDeckPage();
+    const bar = html.slice(html.indexOf(`class="action-bar"`));
+
+    for (const icon of ["lucide-pen-line", "lucide-eye", "lucide-download"]) {
+      assert.match(bar, new RegExp(icon), icon);
+    }
+    assert.match(bar, new RegExp(`lucide-eye[\\s\\S]*${messages.zh.controls.preview}`));
+    assert.match(bar, new RegExp(`lucide-download[\\s\\S]*${messages.zh.controls.export}`));
+  });
+
+  it("gives the slide navigation arrows localized accessible names", () => {
+    const html = renderDeckPage();
+
+    assert.match(html, /class="nav-arrow"[^>]*aria-label="上一页"/);
+    assert.match(html, /class="nav-arrow"[^>]*aria-label="下一页"/);
   });
 });

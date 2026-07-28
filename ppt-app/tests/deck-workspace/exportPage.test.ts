@@ -100,6 +100,55 @@ describe("ExportPage", () => {
     assert.doesNotMatch(html, /anna-workspace/);
   });
 
+  it("offers a retry entry when the export itself failed", () => {
+    const html = renderToStaticMarkup(
+      createElement(ExportPage, {
+        t: messages.zh,
+        progress: {
+          type: "PPTX",
+          mode: "error",
+          message: messages.zh.exportPage.exportFailedSummary,
+          percent: 40,
+          active: false,
+        },
+        artifact: null,
+        download: { status: "idle", message: "" },
+        loading: "none",
+        onBack: () => undefined,
+        onExport: () => undefined,
+        onDownload: async () => undefined,
+      }),
+    );
+
+    assert.match(html, /export-retry-row/);
+    assert.match(html, /重新导出/);
+    assert.match(html, /导出未能完成。/);
+    assert.doesNotMatch(html, /JSON-RPC/);
+  });
+
+  it("keeps the retry entry hidden while an export is still running", () => {
+    const html = renderToStaticMarkup(
+      createElement(ExportPage, {
+        t: messages.zh,
+        progress: {
+          type: "PPTX",
+          mode: "determinate",
+          message: messages.zh.exportPage.pptxGenerating,
+          percent: 40,
+          active: true,
+        },
+        artifact: null,
+        download: { status: "idle", message: "" },
+        loading: "export",
+        onBack: () => undefined,
+        onExport: () => undefined,
+        onDownload: async () => undefined,
+      }),
+    );
+
+    assert.doesNotMatch(html, /export-retry-row/);
+  });
+
   it("treats expired and malformed URLs as unavailable", () => {
     assert.equal(hasActiveDownloadUrl({
       status: "ready",

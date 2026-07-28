@@ -46,14 +46,13 @@ function makeViewState(patch: Partial<GenerationViewState>): GenerationViewState
     status: "running",
     isActive: true,
     isStopping: false,
-    canStop: true,
     canResume: false,
     canBackToOutline: false,
-    showStop: true,
     showResume: false,
     showBackToOutline: false,
     hasUnfinishedPages: false,
     resumeAction: "generation",
+    runIntent: "generation",
     ...patch,
   };
 }
@@ -65,7 +64,7 @@ function renderPage(viewState: GenerationViewState, progress: DeckGenerationProg
       viewState,
       progress,
       history: [],
-      onCancel: () => undefined,
+      onBack: () => undefined,
       onBackToOutline: () => undefined,
       onResume: async () => undefined,
       canBackToOutline: true,
@@ -79,8 +78,6 @@ describe("GeneratingPage controls", () => {
       makeViewState({
         status: "preparing",
         isActive: false,
-        canStop: false,
-        showStop: false,
       }),
       makeProgress("prepare", "pending"),
     );
@@ -91,15 +88,55 @@ describe("GeneratingPage controls", () => {
     assert.doesNotMatch(html, />停止</);
   });
 
-  it("shows running title without exposing the unfinished stop action", () => {
+  it("keeps a back entry at the bottom of the stage through every generation status", () => {
+    const running = renderPage(
+      makeViewState({ status: "running" }),
+      makeProgress("page-authoring", "authoring"),
+    );
+    const complete = renderPage(
+      makeViewState({ status: "complete", isActive: false }),
+      makeProgress("complete", "passed"),
+    );
+
+    for (const html of [running, complete]) {
+      assert.match(html, /generation-page-footer"><button class="secondary-btn" type="button">/);
+      assert.doesNotMatch(html, /page-header-left"><button/);
+    }
+  });
+
+  it("locks the back entry while the run can no longer be abandoned", () => {
     const html = renderPage(
-      makeViewState({ status: "running", canStop: true }),
+      makeViewState({ status: "stopping", isStopping: true, navigationLocked: true }),
       makeProgress("page-authoring", "authoring"),
     );
 
-    assert.match(html, /生成中/);
-    assert.doesNotMatch(html, />停止</);
-    assert.doesNotMatch(html, />继续生成</);
+    assert.match(html, /generation-page-footer"><button class="secondary-btn" type="button" disabled=""/);
+  });
+
+  it("never offers a stop entry on the page", () => {
+    for (const status of ["running", "stopping", "interrupted", "unresumable"] as const) {
+      const html = renderPage(
+        makeViewState({
+          status,
+          isActive: status === "running" || status === "stopping",
+          isStopping: status === "stopping",
+        }),
+        makeProgress("page-authoring", "authoring"),
+      );
+
+      assert.doesNotMatch(html, /<button[^>]*>[^<]*停止/);
+      assert.doesNotMatch(html, /aria-busy/);
+    }
+  });
+
+  it("labels back as returning to the last version while refining", () => {
+    const html = renderPage(
+      makeViewState({ status: "running", runIntent: "refinement" }),
+      makeProgress("page-authoring", "authoring"),
+    );
+
+    assert.match(html, /generation-page-footer"><button class="secondary-btn" type="button">[\s\S]*?返回上一版/);
+    assert.doesNotMatch(html, />返回</);
   });
 
   it("shows interrupted title and resume action when no task is running", () => {
@@ -107,7 +144,6 @@ describe("GeneratingPage controls", () => {
       makeViewState({
         status: "interrupted",
         isActive: false,
-        canStop: false,
         canResume: true,
         showResume: true,
       }),
@@ -128,7 +164,6 @@ describe("GeneratingPage controls", () => {
       makeViewState({
         status: "interrupted",
         isActive: false,
-        canStop: false,
         canResume: true,
         showResume: true,
         resumeAction: "refinement",
@@ -145,7 +180,6 @@ describe("GeneratingPage controls", () => {
       makeViewState({
         status: "unresumable",
         isActive: false,
-        canStop: false,
         canResume: false,
         canBackToOutline: true,
         showResume: false,
@@ -160,18 +194,18 @@ describe("GeneratingPage controls", () => {
     assert.doesNotMatch(html, />继续生成</);
   });
 
-  it("keeps research planning in the page planning major step", () => {
+  it("keeps research planning inside the authoring setup major step", () => {
     const html = renderPage(
       makeViewState({ status: "running" }),
       makeProgress("research-planning", "pending"),
     );
 
-    assert.match(html, /<button class="generation-major-node active">[\s\S]*?<span>页面规划<\/span><\/button>/);
-    assert.match(html, /<button class="generation-major-node pending">[\s\S]*?<span>事实收集<\/span><\/button>/);
-    assert.match(html, /<button class="generation-major-node pending">[\s\S]*?<span>逐页生成<\/span><\/button>/);
+    assert.match(html, /<li class="generation-major-node active" aria-current="step">[\s\S]*?<span>创作准备<\/span><\/li>/);
+    assert.match(html, /<li class="generation-major-node pending">[\s\S]*?<span>逐页生成<\/span><\/li>/);
+    assert.match(html, /<li class="generation-major-node pending">[\s\S]*?<span>最终预览<\/span><\/li>/);
   });
 
-  it("shows Research Discovery as its own major step after file preparation", () => {
+  it("shows Research Discovery detail while the timeline stays on authoring setup", () => {
     const html = renderPage(
       makeViewState({ status: "running" }),
       {
@@ -202,33 +236,31 @@ describe("GeneratingPage controls", () => {
       },
     );
 
-    assert.match(html, /<button class="generation-major-node done">[\s\S]*?<span>页面规划<\/span><\/button>/);
-    assert.match(html, /<button class="generation-major-node done">[\s\S]*?<span>准备文件<\/span><\/button>/);
-    assert.match(html, /<button class="generation-major-node active">[\s\S]*?<span>事实收集<\/span><\/button>/);
+    assert.match(html, /<li class="generation-major-node active" aria-current="step">[\s\S]*?<span>创作准备<\/span><\/li>/);
     assert.match(html, /事实收集/);
     assert.match(html, /判断网页资料需求/);
     assert.match(html, /Need current facts before authoring/);
   });
 
-  it("orders major timeline as planning, preparation, discovery, page generation, final preview", () => {
+  it("orders the major timeline as authoring setup, page generation, final preview", () => {
     const html = renderPage(
       makeViewState({ status: "running" }),
       makeProgress("research-discovery", "pending"),
     );
-    const labels = [...html.matchAll(/<span>(页面规划|准备文件|事实收集|逐页生成|最终预览)<\/span>/g)]
+    const labels = [...html.matchAll(/<span>(创作准备|逐页生成|最终预览)<\/span>/g)]
       .map((match) => match[1]);
 
-    assert.deepEqual(labels, ["页面规划", "准备文件", "事实收集", "逐页生成", "最终预览"]);
+    assert.deepEqual(labels, ["创作准备", "逐页生成", "最终预览"]);
   });
 
   it("marks every major step done after generation is complete", () => {
     const html = renderPage(
-      makeViewState({ status: "complete", isActive: false, showStop: false }),
+      makeViewState({ status: "complete", isActive: false }),
       makeProgress("complete", "accepted"),
     );
 
-    assert.match(html, /<button class="generation-major-node done">[\s\S]*?<span>最终预览<\/span><\/button>/);
-    assert.doesNotMatch(html, /<button class="generation-major-node active">[\s\S]*?<span>最终预览<\/span><\/button>/);
+    assert.match(html, /<li class="generation-major-node done">[\s\S]*?<span>最终预览<\/span><\/li>/);
+    assert.doesNotMatch(html, /<li class="generation-major-node active"[\s\S]*?<span>最终预览<\/span><\/li>/);
     assert.doesNotMatch(html, /generation-running-icon/);
   });
 
@@ -338,8 +370,8 @@ describe("GeneratingPage controls", () => {
       },
     );
 
-    assert.match(html, /1\/2 页通过/);
-    assert.doesNotMatch(html, /2\/3 页通过/);
+    assert.match(html, /1\/2 页已通过/);
+    assert.doesNotMatch(html, /2\/3 页已通过/);
     assert.doesNotMatch(html, /Deck-level discovery/);
   });
 
@@ -468,6 +500,44 @@ describe("GeneratingPage controls", () => {
     assert.doesNotMatch(html, /\/tmp\/evidence\/image-1\.png/);
     assert.doesNotMatch(html, /https:\/\/example\.com\/source-page/);
     assert.doesNotMatch(html, /Factory line photo/);
+  });
+
+  it("does not render a page preview grid", () => {
+    const html = renderPage(
+      makeViewState({ status: "running" }),
+      {
+        ...makeProgress("page-authoring", "authoring"),
+        totalPages: 2,
+        pages: [
+          { ...makeProgress("page-authoring", "accepted").pages[0], page_id: "page-1", index: 0, title: "开场" },
+          { ...makeProgress("page-authoring", "authoring").pages[0], page_id: "page-2", index: 1, title: "现状" },
+        ],
+      },
+    );
+
+    assert.doesNotMatch(html, /generation-page-preview/);
+    assert.doesNotMatch(html, /暂时无法显示预览/);
+  });
+
+  it("does not surface a failure the run is still recovering from", () => {
+    const html = renderPage(
+      makeViewState({ status: "running" }),
+      makeProgress("page-render", "render_fixing"),
+    );
+
+    assert.doesNotMatch(html, /needs another pass/);
+    assert.doesNotMatch(html, /generation-page-error/);
+    assert.doesNotMatch(html, /generation-stage-record failed/);
+  });
+
+  it("keeps the failure visible once the page itself has finally failed", () => {
+    const html = renderPage(
+      makeViewState({ status: "interrupted", isActive: false }),
+      makeProgress("failed", "render_failed"),
+    );
+
+    assert.match(html, /generation-page-error/);
+    assert.match(html, /generation-status-badge failed/);
   });
 
   it("renders Research Discovery above page records without a fake slide", () => {

@@ -75,6 +75,13 @@ function renderReviewPage(
 }
 
 describe("ReviewPage", () => {
+  it("labels its header actions from the locale bundle", () => {
+    const html = renderReviewPage("grid");
+
+    assert.match(html, new RegExp(`aria-label="${messages.zh.controls.edit}"`));
+    assert.match(html, /aria-label="重新渲染"/);
+  });
+
   it("hides template subtitles and shows loading previews in grid mode", () => {
     const html = renderReviewPage("grid");
 

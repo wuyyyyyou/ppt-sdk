@@ -11,9 +11,11 @@ import {
   beginGenerationRun,
   cleanupGenerationRun,
   commitGenerationRun,
+  copyTree,
   findGenerationRunForWorkspace,
   listGenerationRunsForWorkspace,
   prepareGenerationRun,
+  rebaseTextTree,
   recoverGenerationRunForWorkspace,
   type AppGenerationRunKind,
   type AppGenerationRunTransaction,
@@ -106,7 +108,9 @@ import type {
   CreateAppWorkspaceInput,
   CreateAppWorkspaceResult,
   DeleteAppWorkspaceInput,
+  DuplicateAppWorkspaceInput,
   DuplicateAppWorkspacePageInput,
+  DuplicateAppWorkspaceResult,
   ListAppUploadedSourcesInput,
   ListAppUploadedSourcesResult,
   ListAppStyleProfilesResult,
@@ -146,6 +150,8 @@ import type {
   GetAppWorkspaceThemeContextInput,
   GetAppWorkspaceOutlineInput,
   GetAppWorkspaceRequirementsInput,
+  GetAppWorkspaceCoverInput,
+  GetAppWorkspaceCoverResult,
   GetAppWorkspacePageFileFingerprintsInput,
   GetAppWorkspacePageFileFingerprintsResult,
   ListAppTemplateGroupsResult,
@@ -2293,6 +2299,82 @@ export async function updateAppWorkspaceTitle(
 
   await writeJsonFile(workspace.files.task, nextTask);
   return ensureWorkspaceFiles(input.workspace_dir);
+}
+
+/**
+ * WORK-005: creates an independent Workspace from an existing one. The copy
+ * keeps everything the source owns, including export artifacts, logs and an
+ * interrupted generation, but never shares mutable files with it: the copied
+ * tree is rebased onto the new directory and given a fresh Workspace identity.
+ */
+export async function duplicateAppWorkspace(
+  input: DuplicateAppWorkspaceInput,
+): Promise<DuplicateAppWorkspaceResult> {
+  const sourceDir = normalizeWorkspaceDir(input.workspace_dir);
+  const source = await openAppWorkspace({ workspace_dir: sourceDir });
+  const sourceId = path.basename(sourceDir);
+
+  return withGenerationWorkspaceLock(sourceDir, async () => {
+    const activeRun = await findGenerationRunForWorkspace(WORKSPACE_ROOT, sourceId);
+    if (activeRun && ["preparing", "active", "committing"].includes(activeRun.state)) {
+      throw new Error("An active generation run must be stopped before duplicating this workspace.");
+    }
+
+    const createdAt = new Date();
+    let workspaceId = formatWorkspaceId(createdAt);
+    let workspaceDir = path.join(WORKSPACE_ROOT, workspaceId);
+    let attempt = 0;
+    while (await fileExists(workspaceDir)) {
+      attempt += 1;
+      workspaceId = formatWorkspaceId(new Date(createdAt.getTime() + attempt * 1000));
+      workspaceDir = path.join(WORKSPACE_ROOT, workspaceId);
+    }
+
+    const sourceTask = getPlainRecord(await readJsonFileIfExists(source.files.task));
+    const sourceTitle =
+      typeof sourceTask.title === "string" && sourceTask.title.trim().length > 0
+        ? sourceTask.title.trim()
+        : sourceId;
+    const title =
+      typeof input.title === "string" && input.title.trim().length > 0
+        ? input.title.trim()
+        : `${sourceTitle} (Copy)`;
+
+    try {
+      await copyTree(sourceDir, workspaceDir);
+      await rebaseTextTree(workspaceDir, sourceDir, workspaceDir);
+
+      const now = new Date().toISOString();
+      const copiedTask = getPlainRecord(
+        await readJsonFileIfExists(path.join(workspaceDir, "task.json")),
+      );
+      await writeJsonFile(path.join(workspaceDir, "task.json"), {
+        ...copiedTask,
+        id: workspaceId,
+        task_id: workspaceId,
+        title,
+        task_dir: workspaceDir,
+        workspace_dir: workspaceDir,
+        duplicated_from: sourceId,
+        created_at: now,
+        updated_at: now,
+      });
+    } catch (error) {
+      await rm(workspaceDir, { recursive: true, force: true }).catch(() => undefined);
+      throw error;
+    }
+
+    const workspace = await ensureWorkspaceFiles(workspaceDir, { require_format: true });
+    return {
+      version: 1,
+      workspace_root: workspace.workspace_root,
+      source_workspace_id: sourceId,
+      source_workspace_dir: sourceDir,
+      workspace_id: workspace.workspace_id,
+      workspace_dir: workspace.workspace_dir,
+      title,
+    } satisfies DuplicateAppWorkspaceResult;
+  });
 }
 
 export async function deleteAppWorkspace(
@@ -5482,6 +5564,82 @@ async function assertExistingFile(filePath: string, label: string): Promise<stri
   return normalizedPath;
 }
 
+/** Wide enough for a My Works card on a 2x display, small enough to stay a few tens of KB. */
+const WORKSPACE_COVER_WIDTH = 640;
+const WORKSPACE_COVER_QUALITY = 78;
+
+/**
+ * My Works needs one small image per Workspace, not the whole rendered deck.
+ * Going through `getRenderedAppWorkspaceDeckHtml` made cover latency scale with
+ * deck length, because its caller uploads every slide screenshot. This reads
+ * only the first page and derives a card-sized thumbnail from it.
+ */
+export async function getAppWorkspaceCover(
+  input: GetAppWorkspaceCoverInput,
+): Promise<GetAppWorkspaceCoverResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const progress = normalizePageProgressJson(workspace.page_progress);
+  const firstPage = progress.pages[0];
+  if (!firstPage) {
+    throw new Error("Workspace cover is unavailable: the deck has no rendered pages");
+  }
+
+  const sourcePath = await assertExistingFile(
+    firstPage.last_screenshot_path,
+    "Workspace cover screenshot",
+  );
+  const sourceStat = await stat(sourcePath);
+  // Keyed by the bytes it was derived from, so a re-render lands on a new name
+  // instead of serving a stale thumbnail.
+  const fingerprint = createHash("sha256")
+    .update(`${sourcePath}|${sourceStat.size}|${Math.trunc(sourceStat.mtimeMs)}|${WORKSPACE_COVER_WIDTH}`)
+    .digest("hex")
+    .slice(0, 16);
+  const coverDir = path.join(workspace.workspace_dir, "output", "covers");
+  const coverPath = path.join(coverDir, `cover-${fingerprint}.webp`);
+
+  const existing = await stat(coverPath).catch(() => null);
+  if (!existing?.isFile()) {
+    await mkdir(coverDir, { recursive: true });
+    const pendingPath = `${coverPath}.${randomUUID()}.tmp`;
+    try {
+      await sharp(sourcePath)
+        .resize({ width: WORKSPACE_COVER_WIDTH, withoutEnlargement: true })
+        .webp({ quality: WORKSPACE_COVER_QUALITY })
+        .toFile(pendingPath);
+      await rename(pendingPath, coverPath);
+    } catch (error) {
+      await rm(pendingPath, { force: true }).catch(() => undefined);
+      throw error;
+    }
+    await removeSupersededWorkspaceCovers(coverDir, path.basename(coverPath));
+  }
+
+  const coverStat = await stat(coverPath);
+  const dimensions = await readImageDimensions(coverPath);
+
+  return {
+    version: 1,
+    workspace_dir: workspace.workspace_dir,
+    page_id: firstPage.page_id ?? "",
+    source_path: sourcePath,
+    cover_path: coverPath,
+    width: dimensions.width,
+    height: dimensions.height,
+    size_bytes: coverStat.size,
+    generated_at: new Date(coverStat.mtimeMs).toISOString(),
+  };
+}
+
+async function removeSupersededWorkspaceCovers(coverDir: string, keepFilename: string): Promise<void> {
+  const entries = await readdir(coverDir).catch(() => [] as string[]);
+  await Promise.all(
+    entries
+      .filter((entry) => entry !== keepFilename && entry.startsWith("cover-"))
+      .map((entry) => rm(path.join(coverDir, entry), { force: true }).catch(() => undefined)),
+  );
+}
+
 export async function getRenderedAppWorkspaceDeckHtml(
   input: RenderAppWorkspaceDeckHtmlInput,
 ): Promise<RenderAppWorkspaceDeckHtmlResult> {
@@ -7252,6 +7410,8 @@ export type {
   GetAppWorkspaceThemeContextInput,
   GetAppWorkspaceOutlineInput,
   GetAppWorkspaceRequirementsInput,
+  GetAppWorkspaceCoverInput,
+  GetAppWorkspaceCoverResult,
   ListAppTemplateGroupsResult,
   ListAppWorkspacesResult,
   OpenAppWorkspaceInput,

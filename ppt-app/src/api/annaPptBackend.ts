@@ -8,6 +8,7 @@ import type {
   ExportPdfResult,
   GetWorkspacePageFileFingerprintsResult,
   GetPageEditContextResult,
+  GetWorkspaceCoverResult,
   SaveManualPageRevisionResult,
   RestorePageSourceVersionResult,
   ImageFetchResult,
@@ -38,6 +39,7 @@ import type {
   WorkspaceDefaultsResult,
   PatchWorkspaceDefaultsInput,
   DeleteWorkspaceResult,
+  DuplicateWorkspaceResult,
   WorkspaceResult,
   ClearWorkspaceStyleProfileResult,
   CommitUploadedSourceHostUploadResult,
@@ -102,9 +104,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function readHostUploadJsonReferenceUrl(value: unknown): string {
+function readHostUploadJsonReference(value: unknown): HostUploadRef | null {
   if (!isRecord(value)) {
-    return "";
+    return null;
   }
 
   const upload = isRecord(value.workspace_upload)
@@ -113,7 +115,7 @@ function readHostUploadJsonReferenceUrl(value: unknown): string {
       ? value.result_upload
       : null;
   if (!upload) {
-    return "";
+    return null;
   }
   if (upload.transport !== "host_upload") {
     throw new Error("Tool JSON reference upload transport must be host_upload.");
@@ -121,21 +123,49 @@ function readHostUploadJsonReferenceUrl(value: unknown): string {
   if (upload.mime_type !== "application/json") {
     throw new Error("Tool JSON reference upload MIME type must be application/json.");
   }
-  return typeof upload.url === "string" && upload.url.length > 0 ? upload.url : "";
+  if (typeof upload.r2_key !== "string" || upload.r2_key.length === 0) {
+    throw new Error("Tool JSON reference upload r2_key must be non-empty.");
+  }
+  if (typeof upload.url !== "string" || upload.url.length === 0) {
+    throw new Error("Tool JSON reference upload URL must be non-empty.");
+  }
+  if (typeof upload.size_bytes !== "number" || upload.size_bytes <= 0) {
+    throw new Error("Tool JSON reference upload size_bytes must be positive.");
+  }
+
+  return upload as unknown as HostUploadRef;
 }
 
-async function resolveHostUploadJsonReference<T>(value: T | HostUploadJsonReference): Promise<T> {
-  const url = readHostUploadJsonReferenceUrl(value);
-  if (!url) {
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function resolveHostUploadJsonReference<T>(
+  value: T | HostUploadJsonReference,
+  resolveOnServer: (upload: HostUploadRef) => Promise<T>,
+): Promise<T> {
+  const upload = readHostUploadJsonReference(value);
+  if (!upload) {
     return value as T;
   }
 
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch tool JSON Host Upload reference: HTTP ${response.status}`);
+  try {
+    const response = await fetch(upload.url, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    return (await response.json()) as T;
+  } catch (browserError) {
+    try {
+      return await resolveOnServer(upload);
+    } catch (serverError) {
+      throw new Error(
+        "Failed to resolve tool JSON Host Upload reference. " +
+        `Browser download failed: ${errorMessage(browserError)}. ` +
+        `ppt-engine fallback failed: ${errorMessage(serverError)}.`,
+      );
+    }
   }
-
-  return (await response.json()) as T;
 }
 
 function readString(record: Record<string, unknown>, ...keys: string[]): string {
@@ -183,7 +213,13 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
     options?: { timeoutMs?: number }
   ): Promise<T> {
     return resolveHostUploadJsonReference<T>(
-      await invoke<T | HostUploadJsonReference>(toolId, method, args, options)
+      await invoke<T | HostUploadJsonReference>(toolId, method, args, options),
+      (hostUpload) => invoke<T>(
+        toolId,
+        "app_resolve_host_upload_json_reference",
+        { host_upload: hostUpload },
+        options,
+      ),
     );
   }
   const invokeWorkspaceResult = (
@@ -449,6 +485,8 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invokeWorkspaceResult("app_update_workspace_title", input),
     deleteWorkspace: (input) =>
       invoke<DeleteWorkspaceResult>(toolIds.pptEngine, "app_delete_workspace", input),
+    duplicateWorkspace: (input) =>
+      invoke<DuplicateWorkspaceResult>(toolIds.pptEngine, "app_duplicate_workspace", input),
     createProject: (input) =>
       invoke<ProjectResult>(toolIds.pptEngine, "app_create_project", input),
     getProject: (input) =>
@@ -608,6 +646,12 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invoke<RenderDeckHtmlResult>(
         toolIds.pptEngine,
         "app_get_rendered_deck_html",
+        input
+      ),
+    getWorkspaceCover: (input) =>
+      invoke<GetWorkspaceCoverResult>(
+        toolIds.pptEngine,
+        "app_get_workspace_cover",
         input
       ),
     recordOutline: (input) =>

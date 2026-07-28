@@ -1,6 +1,6 @@
 {
   "display_name": "ppt-engine",
-  "version": "4.2.4",
+  "version": "4.4.0",
   "description": "Anna Executa plugin for Workspace Authoring Kit setup, manifest-based deck HTML generation, and backend PPTX export.",
   "author": "Anna Developer",
   "host_capabilities": [
@@ -12,6 +12,18 @@
       "name": "app_get_runtime_info",
       "description": "Return lightweight identity information from the currently running ppt-engine process.",
       "parameters": []
+    },
+    {
+      "name": "app_resolve_host_upload_json_reference",
+      "description": "Resolve a bounded application/json Host Upload reference inside ppt-engine when browser CORS prevents a direct download.",
+      "parameters": [
+        {
+          "name": "host_upload",
+          "type": "object",
+          "description": "application/json HostUploadRef returned by ppt-engine.",
+          "required": true
+        }
+      ]
     },
     {
       "name": "app_list_workspaces",
@@ -952,6 +964,24 @@
       ]
     },
     {
+      "name": "app_duplicate_workspace",
+      "description": "Create an independent copy of an existing PPT task workspace, including export artifacts, logs and interrupted generation state.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "description": "Optional title for the duplicated workspace. Defaults to the source title with a copy suffix.",
+          "required": false
+        }
+      ]
+    },
+    {
       "name": "app_delete_workspace",
       "description": "Permanently delete an existing PPT task workspace after rejecting active generation runs.",
       "parameters": [
@@ -1547,6 +1577,18 @@
     {
       "name": "app_get_rendered_deck_html",
       "description": "Read existing rendered workspace deck HTML and screenshots, upload screenshot previews via Host Upload, and fail if any rendered artifact is missing.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_workspace_cover",
+      "description": "Derive a card-sized cover thumbnail from the first rendered page of a workspace and return a single Host Upload reference for it.",
       "parameters": [
         {
           "name": "workspace_dir",
