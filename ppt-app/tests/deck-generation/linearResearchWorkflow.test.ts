@@ -154,11 +154,13 @@ describe("Linear Shared Research workflow", () => {
           ok: true,
           content: "Market evidence.",
         }] }),
-        imageSearch: async ({ query }: { query: string }) => ({ results: [{
-          image_url: `https://image.test/${encodeURIComponent(query)}.png`,
-          source_url: "https://source.test",
-          mime_type: "image/png",
-        }] }),
+        imageSearch: async ({ query }: { query: string }) => ({
+          results: Array.from({ length: query === "first image" ? 6 : 1 }, (_, index) => ({
+            image_url: `https://image.test/${encodeURIComponent(query)}-${index}.png`,
+            source_url: "https://source.test",
+            mime_type: "image/png",
+          })),
+        }),
         imageFetch: async () => {
           firstDownloadStarted.resolve();
           return {
@@ -175,12 +177,18 @@ describe("Linear Shared Research workflow", () => {
       agentClient: {
         runImageResearchPrompt: async (prompt: string, options: { logContext?: { operation?: string } }) => {
           assert.equal(options.logContext?.operation, "image_candidate_analysis");
-          const candidateId = prompt.match(/"candidate_id": "([^"]+)"/)?.[1] ?? "";
-          if (prompt.includes("Image query: second image")) {
+          if (prompt.includes("Image queries: second image")) {
             secondSessionEntered.resolve();
             await releaseSecondSession.promise;
           }
-          return { candidates: [{ candidate_id: candidateId, use_in_ppt: true, description: "Usable", reason: "Relevant" }] };
+          return {
+            candidates: [...prompt.matchAll(/"candidate_id": "([^"]+)"/g)].map((match, index) => ({
+              candidate_id: match[1] ?? "",
+              use_in_ppt: index === 0,
+              description: "Usable",
+              reason: "Relevant",
+            })),
+          };
         },
       },
     });
@@ -205,6 +213,208 @@ describe("Linear Shared Research workflow", () => {
       "web_research_summary",
       "image_research_decision",
     ]);
+  });
+
+  it("deduplicates normalized image URLs across queries before image analysis", async () => {
+    let analysisRuns = 0;
+    let analyzedAttachmentCount = 0;
+    const { runtime, context, imageBatches } = createRuntime({
+      researchAiClient: {
+        decideWebResearch: async () => ({ needs_search: false, queries: [] }),
+        selectWebFetchResults: async () => [],
+        summarizeWebResearch: async () => "Summary",
+        decideImageResearch: async () => ({ needs_search: true, queries: ["first", "second"] }),
+      },
+      researchWebClient: {
+        search: async () => ({ results: [] }),
+        fetch: async () => ({ pages: [] }),
+        imageSearch: async ({ query }: { query: string }) => ({ results: [{
+          image_url: query === "first"
+            ? "HTTPS://IMAGE.TEST:443/messi.jpg?UTM_SOURCE=first&width=1200#hero"
+            : "https://image.test/messi.jpg?width=1200&utm_id=second",
+          source_url: `https://source.test/${query}`,
+          mime_type: "image/jpeg",
+        }] }),
+        imageFetch: async () => ({
+          path: "aps/image",
+          get_url: "https://download.test/image",
+          mime_type: "image/jpeg",
+          bytes_size: 3,
+          sha256: "sha256",
+          source_url: "https://source.test",
+          final_url: "https://image.test/messi.jpg",
+        }),
+      },
+      agentClient: {
+        runImageResearchPrompt: async (prompt: string, options: { attachments?: unknown[] }) => {
+          analysisRuns += 1;
+          analyzedAttachmentCount += options.attachments?.length ?? 0;
+          const candidateId = prompt.match(/"candidate_id": "([^"]+)"/)?.[1] ?? "";
+          return { candidates: [{ candidate_id: candidateId, use_in_ppt: false, description: "Messi", reason: "Relevant" }] };
+        },
+      },
+    });
+
+    await runLinearSharedResearch(runtime, { resume: false });
+
+    assert.equal(analysisRuns, 1);
+    assert.equal(analyzedAttachmentCount, 1);
+    assert.equal(imageBatches[0]?.candidates.length, 1);
+    assert.deepEqual(imageBatches[0]?.candidates[0]?.matched_queries, ["first", "second"]);
+    const progress = context.progress as {
+      schema_version?: number;
+      image?: { deduplication?: { statistics?: Record<string, number>; groups?: Array<{ occurrence_ids?: string[] }> } };
+    };
+    assert.equal(progress.schema_version, 2);
+    assert.equal(progress.image?.deduplication?.statistics?.raw_occurrences, 2);
+    assert.equal(progress.image?.deduplication?.statistics?.unique_urls, 1);
+    assert.equal(progress.image?.deduplication?.statistics?.duplicate_occurrences, 1);
+    assert.deepEqual(progress.image?.deduplication?.groups?.[0]?.occurrence_ids, ["image-q1-r1", "image-q2-r1"]);
+  });
+
+  it("reuses one imported file when distinct image URLs have the same content hash", async () => {
+    let uploadCount = 0;
+    let backendImportCount = 0;
+    const { runtime, context, imageBatches } = createRuntime({
+      researchAiClient: {
+        decideWebResearch: async () => ({ needs_search: false, queries: [] }),
+        selectWebFetchResults: async () => [],
+        summarizeWebResearch: async () => "Summary",
+        decideImageResearch: async () => ({ needs_search: true, queries: ["images"] }),
+      },
+      researchWebClient: {
+        search: async () => ({ results: [] }),
+        fetch: async () => ({ pages: [] }),
+        imageSearch: async () => ({ results: [
+          { image_url: "https://image.test/a.jpg", source_url: "https://source.test/a", mime_type: "image/jpeg" },
+          { image_url: "https://image.test/b.jpg", source_url: "https://source.test/b", mime_type: "image/jpeg" },
+        ] }),
+        imageFetch: async ({ url }: { url: string }) => ({
+          path: `aps/${url.endsWith("a.jpg") ? "a" : "b"}`,
+          get_url: "https://download.test/shared-image",
+          mime_type: "image/jpeg",
+          bytes_size: 3,
+          sha256: "same-content-sha256",
+          source_url: url,
+          final_url: url,
+        }),
+      },
+      agentClient: {
+        runImageResearchPrompt: async (prompt: string) => ({
+          candidates: [...prompt.matchAll(/"candidate_id": "([^"]+)"/g)].map((match) => ({
+            candidate_id: match[1] ?? "",
+            use_in_ppt: true,
+            description: "Messi",
+            reason: "Relevant",
+          })),
+        }),
+      },
+      hostUploadClient: {
+        uploadFile: async () => {
+          uploadCount += 1;
+          return { transport: "host_upload", r2_key: "key", url: "https://upload.test/image", mime_type: "image/jpeg", size_bytes: 3 };
+        },
+      },
+    });
+    const runtimeRecord = runtime as unknown as { backend: Record<string, unknown> };
+    const originalBackend = runtimeRecord.backend;
+    runtimeRecord.backend = {
+      ...originalBackend,
+      importSharedResearchImageHostUpload: async ({ candidate_id }: { candidate_id: string }) => {
+        backendImportCount += 1;
+        return {
+          workspace_dir: "/tmp/workspace",
+          candidate_id,
+          file_path: `/tmp/workspace/research/evidence/images/${candidate_id}.jpg`,
+          sha256: "same-content-sha256",
+          mime_type: "image/jpeg",
+          bytes_size: 3,
+        };
+      },
+    };
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(new Blob(["img"], { type: "image/jpeg" }), { status: 200 });
+    try {
+      await runLinearSharedResearch(runtime, { resume: false });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    assert.equal(uploadCount, 1);
+    assert.equal(backendImportCount, 1);
+    assert.equal(imageBatches[0]?.candidates.filter((candidate) => candidate.download_status === "imported").length, 2);
+    assert.equal(imageBatches[0]?.statistics?.unique_content_imported, 1);
+    const duplicate = imageBatches[0]?.candidates.find((candidate) => candidate.content_duplicate_of);
+    assert.ok(duplicate?.content_duplicate_of);
+    const progress = context.progress as { image?: { content_deduplication?: { statistics?: Record<string, number> } } };
+    assert.equal(progress.image?.content_deduplication?.statistics?.imported_candidates, 2);
+    assert.equal(progress.image?.content_deduplication?.statistics?.unique_content, 1);
+  });
+
+  it("resumes from completed image checkpoints without repeating analysis or upload", async () => {
+    let analysisRuns = 0;
+    let uploadCount = 0;
+    const { runtime, context, imageBatches } = createRuntime({
+      researchAiClient: {
+        decideWebResearch: async () => ({ needs_search: false, queries: [] }),
+        selectWebFetchResults: async () => [],
+        summarizeWebResearch: async () => "Summary",
+        decideImageResearch: async () => ({ needs_search: true, queries: ["resume image"] }),
+      },
+      researchWebClient: {
+        search: async () => ({ results: [] }),
+        fetch: async () => ({ pages: [] }),
+        imageSearch: async () => ({ results: [{
+          image_url: "https://image.test/resume.jpg",
+          source_url: "https://source.test/resume",
+          mime_type: "image/jpeg",
+        }] }),
+        imageFetch: async () => ({
+          path: "aps/resume",
+          get_url: "https://download.test/resume-image",
+          mime_type: "image/jpeg",
+          bytes_size: 3,
+          sha256: "resume-image-sha256",
+          source_url: "https://source.test/resume",
+          final_url: "https://image.test/resume.jpg",
+        }),
+      },
+      agentClient: {
+        runImageResearchPrompt: async (prompt: string) => {
+          analysisRuns += 1;
+          const candidateId = prompt.match(/"candidate_id": "([^"]+)"/)?.[1] ?? "";
+          return { candidates: [{ candidate_id: candidateId, use_in_ppt: true, description: "Usable", reason: "Relevant" }] };
+        },
+      },
+      hostUploadClient: {
+        uploadFile: async () => {
+          uploadCount += 1;
+          return { transport: "host_upload", r2_key: "key", url: "https://upload.test/resume-image", mime_type: "image/jpeg", size_bytes: 3 };
+        },
+      },
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(new Blob(["img"], { type: "image/jpeg" }), { status: 200 });
+    try {
+      await runLinearSharedResearch(runtime, { resume: false });
+      assert.equal(analysisRuns, 1);
+      assert.equal(uploadCount, 1);
+
+      const progress = context.progress as { image?: { written?: boolean } };
+      if (!progress.image) throw new Error("Expected persisted image checkpoint");
+      progress.image.written = false;
+      imageBatches.length = 0;
+      context.image_catalog.batches.length = 0;
+
+      await runLinearSharedResearch(runtime, { resume: true });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    assert.equal(analysisRuns, 1);
+    assert.equal(uploadCount, 1);
+    assert.equal(imageBatches.length, 1);
+    assert.equal(imageBatches[0]?.candidates[0]?.download_status, "imported");
   });
 
   it("keeps raw technical errors out of formal research batches", async () => {

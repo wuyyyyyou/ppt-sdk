@@ -889,6 +889,10 @@ export type SharedResearchStageState = "waiting" | "running" | "completed" | "sk
 export interface SharedResearchImageCandidate {
   candidate_id: string;
   query: string;
+  dedup_key?: string;
+  representative_occurrence_id?: string;
+  matched_occurrence_ids?: string[];
+  matched_queries?: string[];
   image_url: string;
   thumbnail_url?: string | null;
   source_url: string;
@@ -898,6 +902,7 @@ export interface SharedResearchImageCandidate {
   use_in_ppt: boolean;
   description: string;
   reason: string;
+  analysis_status?: "pending" | "running" | "completed" | "failed";
   file_path?: string;
   download_status: "pending" | "imported" | "failed";
   sha256?: string;
@@ -905,6 +910,7 @@ export interface SharedResearchImageCandidate {
   bytes_size?: number;
   aps_path?: string;
   final_url?: string;
+  content_duplicate_of?: string;
   error?: string;
 }
 
@@ -922,8 +928,12 @@ export interface SharedResearchImageBatch {
   statistics?: {
     queries: number;
     candidates: number;
+    raw_candidates?: number;
+    unique_url_candidates?: number;
+    duplicate_url_occurrences?: number;
     selected: number;
     imported: number;
+    unique_content_imported?: number;
     failed: number;
     gaps: number;
   };

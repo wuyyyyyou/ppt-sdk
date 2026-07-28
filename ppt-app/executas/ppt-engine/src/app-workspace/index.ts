@@ -3786,13 +3786,17 @@ async function ensureResearchDirectories(workspaceDir: string): Promise<AppResea
 
 function createDefaultSharedResearchProgress() {
   return {
-    schema_version: 1,
+    schema_version: 2,
     status: "waiting",
     stages: {
       web_decision: "waiting",
       web_research: "waiting",
       image_decision: "waiting",
       image_research: "waiting",
+      image_search: "waiting",
+      image_deduplication: "waiting",
+      image_analysis: "waiting",
+      image_import: "waiting",
     },
     updated_at: new Date().toISOString(),
   };
@@ -3858,7 +3862,7 @@ export async function recordAppSharedResearchProgress(
   const paths = await ensureSharedResearchFiles(workspace.workspace_dir, false);
   const progress = {
     ...getPlainRecord(input.progress),
-    schema_version: 1,
+    schema_version: 2,
     updated_at: new Date().toISOString(),
   };
   await atomicWriteJsonFile(paths.progress_path, progress);

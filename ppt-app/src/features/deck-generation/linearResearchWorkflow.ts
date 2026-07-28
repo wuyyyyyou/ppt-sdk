@@ -16,17 +16,53 @@ import { getAttemptLimits, getResearchImageSessionConcurrency, getResearchSearch
 import { throwIfCancelled } from "./runtimeSupport";
 import type { DeckGenerationRuntime } from "./types";
 
-type StageKey = "web_decision" | "web_research" | "image_decision" | "image_research";
+type StageKey =
+  | "web_decision"
+  | "web_research"
+  | "image_decision"
+  | "image_research"
+  | "image_search"
+  | "image_deduplication"
+  | "image_analysis"
+  | "image_import";
+
+type ImageWorkState = "waiting" | "running" | "completed" | "warning";
+
+interface ImageSearchOccurrence extends ResearchImageSearchResult {
+  occurrence_id: string;
+  query: string;
+  query_index: number;
+  result_index: number;
+}
+
+interface ImageDeduplicationGroup {
+  dedup_key: string;
+  candidate_id: string;
+  representative_occurrence_id: string;
+  occurrence_ids: string[];
+  matched_query_indexes: number[];
+}
+
+interface ImageAnalysisBatchCheckpoint {
+  batch_id: string;
+  candidate_ids: string[];
+  status: "pending" | "running" | "completed" | "failed";
+  attempt: number;
+  interaction_ids: string[];
+  started_at?: string;
+  completed_at?: string;
+  error?: string;
+}
 
 interface QueryCheckpoint<T> {
   query: string;
-  status: "completed" | "warning";
+  status: "running" | "completed" | "warning";
   result?: T;
   error?: string;
 }
 
 interface LinearResearchCheckpoint {
-  schema_version: 1;
+  schema_version: 2;
   status: SharedResearchStageState;
   stages: Record<StageKey, SharedResearchStageState>;
   web?: {
@@ -41,8 +77,45 @@ interface LinearResearchCheckpoint {
   };
   image?: {
     decision?: { needs_search: boolean; queries: string[]; rationale?: string };
-    searches?: Array<QueryCheckpoint<SharedResearchImageCandidate[]>>;
-    analyzed_query_indexes?: number[];
+    searches?: Array<QueryCheckpoint<ImageSearchOccurrence[]>>;
+    search_status?: ImageWorkState;
+    deduplication?: {
+      status: ImageWorkState;
+      strategy: {
+        version: 1;
+        key: "normalized_image_url";
+        remove_fragment: true;
+        remove_default_port: true;
+        sort_query_parameters: true;
+        removed_tracking_parameters: string[];
+      };
+      statistics: {
+        raw_occurrences: number;
+        unique_urls: number;
+        duplicate_occurrences: number;
+        duplicate_groups: number;
+      };
+      groups: ImageDeduplicationGroup[];
+      completed_at?: string;
+    };
+    candidates?: SharedResearchImageCandidate[];
+    analysis_status?: ImageWorkState;
+    analysis_batches?: ImageAnalysisBatchCheckpoint[];
+    import_status?: ImageWorkState;
+    content_deduplication?: {
+      status: ImageWorkState;
+      statistics: {
+        imported_candidates: number;
+        unique_content: number;
+        duplicate_content_candidates: number;
+      };
+      groups: Array<{
+        sha256: string;
+        representative_candidate_id: string;
+        candidate_ids: string[];
+      }>;
+      completed_at?: string;
+    };
     gaps?: string[];
     diagnostic_errors?: string[];
     prepared_batch?: SharedResearchImageBatch;
@@ -51,10 +124,20 @@ interface LinearResearchCheckpoint {
   updated_at?: string;
 }
 
-const STAGE_ORDER: StageKey[] = ["web_decision", "web_research", "image_decision", "image_research"];
+const STAGE_ORDER: StageKey[] = [
+  "web_decision",
+  "web_research",
+  "image_decision",
+  "image_research",
+  "image_search",
+  "image_deduplication",
+  "image_analysis",
+  "image_import",
+];
 
 function readCheckpoint(value: Record<string, unknown>): LinearResearchCheckpoint {
-  const stagesRecord = value.stages && typeof value.stages === "object" && !Array.isArray(value.stages)
+  const compatible = value.schema_version === 2;
+  const stagesRecord = compatible && value.stages && typeof value.stages === "object" && !Array.isArray(value.stages)
     ? value.stages as Record<string, unknown>
     : {};
   const state = (key: StageKey): SharedResearchStageState => {
@@ -64,13 +147,87 @@ function readCheckpoint(value: Record<string, unknown>): LinearResearchCheckpoin
       : "waiting";
   };
   return {
-    schema_version: 1,
-    status: value.status === "running" || value.status === "completed" || value.status === "skipped" || value.status === "warning"
+    schema_version: 2,
+    status: compatible && (value.status === "running" || value.status === "completed" || value.status === "skipped" || value.status === "warning")
       ? value.status
       : "waiting",
     stages: Object.fromEntries(STAGE_ORDER.map((key) => [key, state(key)])) as Record<StageKey, SharedResearchStageState>,
-    ...(value.web && typeof value.web === "object" && !Array.isArray(value.web) ? { web: value.web as LinearResearchCheckpoint["web"] } : {}),
-    ...(value.image && typeof value.image === "object" && !Array.isArray(value.image) ? { image: value.image as LinearResearchCheckpoint["image"] } : {}),
+    ...(compatible && value.web && typeof value.web === "object" && !Array.isArray(value.web) ? { web: value.web as LinearResearchCheckpoint["web"] } : {}),
+    ...(compatible && value.image && typeof value.image === "object" && !Array.isArray(value.image) ? { image: value.image as LinearResearchCheckpoint["image"] } : {}),
+  };
+}
+
+const IMAGE_ANALYSIS_BATCH_SIZE = 6;
+const IMAGE_IMPORT_CONCURRENCY = 2;
+const IMAGE_DEDUP_TRACKING_PARAMETERS = [
+  "utm_*",
+  "fbclid",
+  "gclid",
+];
+
+function isImageDedupTrackingParameter(parameter: string) {
+  const normalized = parameter.toLowerCase();
+  return normalized.startsWith("utm_") || normalized === "fbclid" || normalized === "gclid";
+}
+
+function stableShortHash(value: string) {
+  let hash = 0xcbf29ce484222325n;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= BigInt(value.charCodeAt(index));
+    hash = BigInt.asUintN(64, hash * 0x100000001b3n);
+  }
+  return hash.toString(16).padStart(16, "0");
+}
+
+export function normalizeImageUrlForDedup(rawUrl: string) {
+  const trimmed = rawUrl.trim();
+  try {
+    const url = new URL(trimmed);
+    url.protocol = url.protocol.toLowerCase();
+    url.hostname = url.hostname.toLowerCase();
+    url.hash = "";
+    if ((url.protocol === "https:" && url.port === "443") || (url.protocol === "http:" && url.port === "80")) {
+      url.port = "";
+    }
+    const sorted = [...url.searchParams.entries()]
+      .filter(([key]) => !isImageDedupTrackingParameter(key))
+      .sort(([leftKey, leftValue], [rightKey, rightValue]) => {
+        const keyOrder = leftKey.localeCompare(rightKey);
+        return keyOrder !== 0 ? keyOrder : leftValue.localeCompare(rightValue);
+      });
+    url.search = "";
+    for (const [key, value] of sorted) url.searchParams.append(key, value);
+    return url.toString();
+  } catch {
+    return trimmed;
+  }
+}
+
+function createImageCandidateId(dedupKey: string) {
+  return `image-${stableShortHash(dedupKey)}`;
+}
+
+function chunkItems<T>(items: T[], size: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) chunks.push(items.slice(index, index + size));
+  return chunks;
+}
+
+function createConcurrencyLimiter(concurrency: number) {
+  let active = 0;
+  const queue: Array<() => void> = [];
+  const release = () => {
+    active -= 1;
+    queue.shift()?.();
+  };
+  return async function limit<T>(task: () => Promise<T>): Promise<T> {
+    if (active >= concurrency) await new Promise<void>((resolve) => queue.push(resolve));
+    active += 1;
+    try {
+      return await task();
+    } finally {
+      release();
+    }
   };
 }
 
@@ -100,6 +257,10 @@ function stageMessage(runtime: DeckGenerationRuntime, stage: StageKey) {
     web_research: zh ? "正在搜索并整理网页资料" : "Searching and organizing web research",
     image_decision: zh ? "正在判断是否需要图片素材" : "Deciding whether image research is needed",
     image_research: zh ? "正在搜索并筛选图片素材" : "Searching and selecting image material",
+    image_search: zh ? "正在搜索图片候选" : "Searching for image candidates",
+    image_deduplication: zh ? "正在合并重复图片" : "Deduplicating image candidates",
+    image_analysis: zh ? "正在判断图片可用性" : "Assessing image candidates",
+    image_import: zh ? "正在保存可用图片" : "Saving selected images",
   };
   return messages[stage];
 }
@@ -242,7 +403,7 @@ function inferAttachmentType(candidate: ResearchImageSearchResult) {
   return "image/jpeg";
 }
 
-function buildImagePrompt(runtime: DeckGenerationRuntime, styleGuide: string, query: string, candidates: SharedResearchImageCandidate[]) {
+function buildImagePrompt(runtime: DeckGenerationRuntime, styleGuide: string, candidates: SharedResearchImageCandidate[]) {
   const targetPageIds = Object.keys(runtime.pageRefinementReasons ?? {});
   const targetPages = runtime.confirmedOutline.items.filter((item) => item.page_id && targetPageIds.includes(item.page_id));
   return [
@@ -255,8 +416,12 @@ function buildImagePrompt(runtime: DeckGenerationRuntime, styleGuide: string, qu
     `Confirmed Outline: ${JSON.stringify(runtime.confirmedOutline, null, 2)}`,
     `Workspace Style Guide: ${styleGuide}`,
     `Current target pages: ${targetPages.length > 0 ? JSON.stringify(targetPages, null, 2) : "deck-level scope"}`,
-    `Image query: ${query}`,
-    `Candidate mapping: ${JSON.stringify(candidates.map((candidate, index) => ({ candidate_id: candidate.candidate_id, attachment_index: index + 1 })), null, 2)}`,
+    `Image queries: ${[...new Set(candidates.flatMap((candidate) => candidate.matched_queries ?? [candidate.query]))].join("; ")}`,
+    `Candidate mapping: ${JSON.stringify(candidates.map((candidate, index) => ({
+      candidate_id: candidate.candidate_id,
+      attachment_index: index + 1,
+      matched_queries: candidate.matched_queries ?? [candidate.query],
+    })), null, 2)}`,
     '{"candidates":[{"candidate_id":"...","use_in_ppt":true,"description":"...","reason":"..."}]}',
   ].join("\n\n");
 }
@@ -276,29 +441,55 @@ async function mapWithConcurrency<T, R>(items: T[], concurrency: number, worker:
   return results;
 }
 
-async function importSelectedImage(runtime: DeckGenerationRuntime, candidate: SharedResearchImageCandidate) {
+interface ImportedResearchImageAsset {
+  candidate_id: string;
+  file_path: string;
+  sha256: string;
+  mime_type: string;
+  bytes_size: number;
+}
+
+async function importSelectedImage(
+  runtime: DeckGenerationRuntime,
+  candidate: SharedResearchImageCandidate,
+  importsBySha256: Map<string, Promise<ImportedResearchImageAsset>>,
+) {
   if (!runtime.hostUploadClient) throw new Error("Host Upload is required to import research images");
   const fetched = await runtime.researchWebClient.imageFetch({ url: candidate.image_url, max_bytes: 20 * 1024 * 1024, purpose: "ppt-research" });
-  const response = await fetch(fetched.get_url);
-  if (!response.ok) throw new Error(`Failed to read fetched APS image: HTTP ${response.status}`);
-  const blob = await response.blob();
-  const mimeType = fetched.mime_type || blob.type;
-  const extension = mimeType === "image/png" ? ".png" : mimeType === "image/webp" ? ".webp" : mimeType === "image/gif" ? ".gif" : ".jpg";
-  const file = new File([blob], `${candidate.candidate_id}${extension}`, { type: mimeType });
-  const hostUpload = await runtime.hostUploadClient.uploadFile(file, {
-    purpose: "image_reference",
-    filename: file.name,
-    mimeType,
-    metadata: { workspace_dir: runtime.workspace.workspace_dir, source: "research_image_fetch" },
-  });
-  const imported = await runtime.backend.importSharedResearchImageHostUpload({
-    workspace_dir: runtime.workspace.workspace_dir,
-    candidate_id: candidate.candidate_id,
-    mime_type: mimeType,
-    size_bytes: hostUpload.size_bytes,
-    sha256: fetched.sha256,
-    host_upload: hostUpload,
-  });
+  let importPromise = importsBySha256.get(fetched.sha256);
+  const reusedExistingContent = Boolean(importPromise);
+  if (!importPromise) {
+    importPromise = (async () => {
+      const response = await fetch(fetched.get_url);
+      if (!response.ok) throw new Error(`Failed to read fetched APS image: HTTP ${response.status}`);
+      const blob = await response.blob();
+      const mimeType = fetched.mime_type || blob.type;
+      const extension = mimeType === "image/png" ? ".png" : mimeType === "image/webp" ? ".webp" : mimeType === "image/gif" ? ".gif" : ".jpg";
+      const file = new File([blob], `${candidate.candidate_id}${extension}`, { type: mimeType });
+      const hostUpload = await runtime.hostUploadClient!.uploadFile(file, {
+        purpose: "image_reference",
+        filename: file.name,
+        mimeType,
+        metadata: { workspace_dir: runtime.workspace.workspace_dir, source: "research_image_fetch" },
+      });
+      return runtime.backend.importSharedResearchImageHostUpload({
+        workspace_dir: runtime.workspace.workspace_dir,
+        candidate_id: candidate.candidate_id,
+        mime_type: mimeType,
+        size_bytes: hostUpload.size_bytes,
+        sha256: fetched.sha256,
+        host_upload: hostUpload,
+      });
+    })();
+    importsBySha256.set(fetched.sha256, importPromise);
+  }
+  let imported: ImportedResearchImageAsset;
+  try {
+    imported = await importPromise;
+  } catch (error) {
+    if (importsBySha256.get(fetched.sha256) === importPromise) importsBySha256.delete(fetched.sha256);
+    throw error;
+  }
   Object.assign(candidate, {
     file_path: imported.file_path,
     download_status: "imported" as const,
@@ -307,6 +498,7 @@ async function importSelectedImage(runtime: DeckGenerationRuntime, candidate: Sh
     bytes_size: imported.bytes_size,
     aps_path: fetched.path,
     final_url: fetched.final_url,
+    ...(reusedExistingContent && imported.candidate_id !== candidate.candidate_id ? { content_duplicate_of: imported.candidate_id } : {}),
   });
 }
 
@@ -494,125 +686,303 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
     const decision = checkpoint.image.decision ?? { needs_search: false, queries: [] };
     const queries: SharedResearchImageBatch["queries"] = [];
     const gaps: string[] = [...(checkpoint.image.gaps ?? [])];
-    let candidates: SharedResearchImageCandidate[] = [];
+    let candidates: SharedResearchImageCandidate[] = checkpoint.image.candidates ?? [];
     if (decision.needs_search && decision.queries.length > 0) {
+      checkpoint.stages.image_search = "running";
+      checkpoint.image.search_status = checkpoint.image.search_status === "completed" ? "completed" : "running";
       checkpoint.image.searches ??= [];
-      const existingQueries = new Set(checkpoint.image.searches.map((item) => item.query));
-      await Promise.all(decision.queries.filter((query) => !existingQueries.has(query)).map(async (query) => {
+      const previousSearches = checkpoint.image.searches;
+      const searchesByQuery: Array<QueryCheckpoint<ImageSearchOccurrence[]>> = decision.queries.map((query, queryIndex) => {
+        const previous = previousSearches[queryIndex];
+        return previous?.query === query ? previous : { query, status: "running" };
+      });
+      checkpoint.image.searches = searchesByQuery;
+      await persist();
+      await Promise.all(decision.queries.map(async (query, queryIndex) => {
+        const existing = searchesByQuery[queryIndex];
+        if (existing && existing.status !== "running") return;
         try {
           const response = await runtime.researchWebClient.imageSearch({ query, max_results: 6, min_width: 800, min_height: 600, aspect: "any" });
-          const batchCandidates = response.results.slice(0, 6).map((item) => ({
-            candidate_id: `image-${crypto.randomUUID()}`,
+          const results: ImageSearchOccurrence[] = response.results.slice(0, 6).map((item, resultIndex) => ({
+            occurrence_id: `image-q${queryIndex + 1}-r${resultIndex + 1}`,
             query,
-            image_url: item.image_url,
-            thumbnail_url: item.thumbnail_url,
-            source_url: item.source_url,
-            title: item.title,
-            width: item.width,
-            height: item.height,
-            ...(item.mime_type ? { mime_type: item.mime_type } : {}),
-            use_in_ppt: false,
-            description: "Not returned by image analysis.",
-            reason: "Not returned by image analysis; defaulted to use_in_ppt: false.",
-            download_status: "pending" as const,
+            query_index: queryIndex,
+            result_index: resultIndex,
+            ...item,
           }));
-          checkpoint.image!.searches!.push({ query, status: batchCandidates.length > 0 ? "completed" : "warning", result: batchCandidates, ...(batchCandidates.length === 0 ? { error: "No image results" } : {}) });
+          searchesByQuery[queryIndex] = { query, status: results.length > 0 ? "completed" : "warning", result: results, ...(results.length === 0 ? { error: "No image results" } : {}) };
         } catch (error) {
-          checkpoint.image!.searches!.push({ query, status: "warning", error: errorMessage(error) });
           checkpoint.image!.diagnostic_errors = appendUnique(checkpoint.image!.diagnostic_errors, `${query}: ${errorMessage(error)}`);
           await logResearchError(runtime, "image-search", error, { query });
+          searchesByQuery[queryIndex] = { query, status: "warning", error: errorMessage(error) };
         }
+        checkpoint.image!.searches = searchesByQuery;
         await persist();
       }));
-      checkpoint.image.analyzed_query_indexes ??= [];
-      const downloadTasks: Promise<void>[] = [];
-      await mapWithConcurrency(checkpoint.image.searches, getResearchImageSessionConcurrency(runtime), async (search, searchIndex) => {
-        if (!search.result?.length) return;
-        if (!checkpoint.image!.analyzed_query_indexes!.includes(searchIndex)) {
-          const attachments: AnnaAgentImageAttachment[] = search.result.map((candidate) => ({
+      checkpoint.image.search_status = "completed";
+      checkpoint.stages.image_search = checkpoint.image.searches.some((search) => search.status === "warning") ? "warning" : "completed";
+      await persist();
+
+      if (!checkpoint.image.deduplication || checkpoint.image.deduplication.status !== "completed") {
+        checkpoint.stages.image_deduplication = "running";
+        checkpoint.image.deduplication = {
+          status: "running",
+          strategy: {
+            version: 1,
+            key: "normalized_image_url",
+            remove_fragment: true,
+            remove_default_port: true,
+            sort_query_parameters: true,
+            removed_tracking_parameters: [...IMAGE_DEDUP_TRACKING_PARAMETERS],
+          },
+          statistics: { raw_occurrences: 0, unique_urls: 0, duplicate_occurrences: 0, duplicate_groups: 0 },
+          groups: [],
+        };
+        const groupsByKey = new Map<string, ImageDeduplicationGroup>();
+        const candidatesByKey = new Map<string, SharedResearchImageCandidate>();
+        for (const search of checkpoint.image.searches) {
+          for (const occurrence of search.result ?? []) {
+            const dedupKey = normalizeImageUrlForDedup(occurrence.image_url);
+            const persistedDedupKey = `urlhash:${stableShortHash(dedupKey)}`;
+            let group = groupsByKey.get(dedupKey);
+            let candidate = candidatesByKey.get(dedupKey);
+            if (!group || !candidate) {
+              candidate = {
+                candidate_id: createImageCandidateId(dedupKey),
+                query: occurrence.query,
+                dedup_key: persistedDedupKey,
+                representative_occurrence_id: occurrence.occurrence_id,
+                matched_occurrence_ids: [occurrence.occurrence_id],
+                matched_queries: [occurrence.query],
+                image_url: occurrence.image_url,
+                thumbnail_url: occurrence.thumbnail_url,
+                source_url: occurrence.source_url,
+                title: occurrence.title,
+                width: occurrence.width,
+                height: occurrence.height,
+                ...(occurrence.mime_type ? { mime_type: occurrence.mime_type } : {}),
+                use_in_ppt: false,
+                description: "Not returned by image analysis.",
+                reason: "Not returned by image analysis; defaulted to use_in_ppt: false.",
+                analysis_status: "pending",
+                download_status: "pending",
+              };
+              candidatesByKey.set(dedupKey, candidate);
+              group = { dedup_key: persistedDedupKey, candidate_id: candidate.candidate_id, representative_occurrence_id: occurrence.occurrence_id, occurrence_ids: [occurrence.occurrence_id], matched_query_indexes: [occurrence.query_index] };
+              groupsByKey.set(dedupKey, group);
+            } else {
+              group.occurrence_ids.push(occurrence.occurrence_id);
+              if (!group.matched_query_indexes.includes(occurrence.query_index)) group.matched_query_indexes.push(occurrence.query_index);
+              candidate.matched_occurrence_ids = [...(candidate.matched_occurrence_ids ?? []), occurrence.occurrence_id];
+              candidate.matched_queries = [...new Set([...(candidate.matched_queries ?? []), occurrence.query])];
+            }
+          }
+        }
+        const allGroups = [...groupsByKey.values()];
+        const rawOccurrences = checkpoint.image.searches.reduce((sum, search) => sum + (search.result?.length ?? 0), 0);
+        checkpoint.image.deduplication = {
+          ...checkpoint.image.deduplication,
+          status: "completed",
+          statistics: {
+            raw_occurrences: rawOccurrences,
+            unique_urls: allGroups.length,
+            duplicate_occurrences: rawOccurrences - allGroups.length,
+            duplicate_groups: allGroups.filter((group) => group.occurrence_ids.length > 1).length,
+          },
+          groups: allGroups,
+          completed_at: new Date().toISOString(),
+        };
+        checkpoint.image.candidates = [...candidatesByKey.values()];
+        candidates = checkpoint.image.candidates;
+        checkpoint.stages.image_deduplication = "completed";
+        await persist();
+      } else {
+        candidates = checkpoint.image.candidates ?? [];
+        checkpoint.stages.image_deduplication = "completed";
+      }
+
+      checkpoint.image.analysis_batches ??= chunkItems(candidates, IMAGE_ANALYSIS_BATCH_SIZE).map((batch, index) => ({
+        batch_id: `image-analysis-batch-${index + 1}`,
+        candidate_ids: batch.map((candidate) => candidate.candidate_id),
+        status: "pending",
+        attempt: 0,
+        interaction_ids: [],
+      }));
+      checkpoint.image.analysis_status = "running";
+      checkpoint.stages.image_analysis = "running";
+      checkpoint.image.import_status = "running";
+      checkpoint.stages.image_import = "running";
+      const importLimiter = createConcurrencyLimiter(IMAGE_IMPORT_CONCURRENCY);
+      const importsBySha256 = new Map<string, Promise<ImportedResearchImageAsset>>();
+      for (const candidate of candidates) {
+        if (candidate.download_status !== "imported" || !candidate.sha256 || !candidate.file_path || !candidate.mime_type || !candidate.bytes_size) continue;
+        importsBySha256.set(candidate.sha256, Promise.resolve({
+          candidate_id: candidate.content_duplicate_of ?? candidate.candidate_id,
+          file_path: candidate.file_path,
+          sha256: candidate.sha256,
+          mime_type: candidate.mime_type,
+          bytes_size: candidate.bytes_size,
+        }));
+      }
+      const scheduledImportIds = new Set<string>();
+      const importTasks: Promise<void>[] = [];
+      const scheduleImport = (candidate: SharedResearchImageCandidate) => {
+        if (!candidate.use_in_ppt || candidate.download_status !== "pending" || scheduledImportIds.has(candidate.candidate_id)) return;
+        scheduledImportIds.add(candidate.candidate_id);
+        importTasks.push(importLimiter(async () => {
+          try {
+            await importSelectedImage(runtime, candidate, importsBySha256);
+          } catch (error) {
+            candidate.download_status = "failed";
+            candidate.error = errorMessage(error);
+            checkpoint.image!.gaps = appendUnique(
+              checkpoint.image!.gaps,
+              runtime.locale === "zh" ? `候选图片 ${candidate.candidate_id} 未能保存为本地素材。` : `Image candidate ${candidate.candidate_id} could not be saved as a local asset.`,
+            );
+            checkpoint.image!.diagnostic_errors = appendUnique(checkpoint.image!.diagnostic_errors, `${candidate.candidate_id}: ${candidate.error}`);
+            await logResearchError(runtime, "image-import", error, { candidate_id: candidate.candidate_id });
+          }
+          await persist();
+        }));
+      };
+      candidates.forEach((candidate) => {
+        if (candidate.analysis_status === "completed") scheduleImport(candidate);
+      });
+      await mapWithConcurrency(checkpoint.image.analysis_batches, getResearchImageSessionConcurrency(runtime), async (batch) => {
+        if (batch.status === "completed") return;
+        batch.status = "running";
+        batch.attempt += 1;
+        batch.started_at = new Date().toISOString();
+        const batchCandidates = candidates.filter((candidate) => batch.candidate_ids.includes(candidate.candidate_id));
+        batchCandidates.forEach((candidate) => { candidate.analysis_status = "running"; });
+        await persist();
+        const logContext = researchLogContext(runtime, "image_candidate_analysis", batchCandidates.flatMap((candidate) => candidate.matched_queries ?? [candidate.query]).join("; "));
+        try {
+          const attachments: AnnaAgentImageAttachment[] = batchCandidates.map((candidate) => ({
             type: inferAttachmentType({ image_url: candidate.image_url, source_url: candidate.source_url, mime_type: candidate.mime_type }),
             url: candidate.image_url || candidate.thumbnail_url || "",
             filename: candidate.candidate_id,
             detail: "auto",
           }));
-          try {
-            const analysis = await runtime.agentClient.runImageResearchPrompt(buildImagePrompt(runtime, styleGuide.content, search.query, search.result), {
-              attachments,
-              signal: runtime.cancelSignal,
-              isCancelled: runtime.isCancelled,
-              logContext: researchLogContext(runtime, "image_candidate_analysis", search.query),
-            });
-            const byId = new Map(analysis.candidates.map((item) => [item.candidate_id, item]));
-            for (const candidate of search.result) {
-              const decision = byId.get(candidate.candidate_id);
-              if (!decision) continue;
-              Object.assign(candidate, decision);
-            }
-          } catch (error) {
-            if (isAgentRunCancelledError(error) || runtime.isCancelled()) throw error;
-            checkpoint.image!.gaps = appendUnique(
-              checkpoint.image!.gaps,
-              runtime.locale === "zh" ? `图片搜索词“${search.query}”的候选未能完成视觉判断。` : `Image candidates for query “${search.query}” could not be visually assessed.`,
-            );
-            checkpoint.image!.diagnostic_errors = appendUnique(checkpoint.image!.diagnostic_errors, `${search.query}: ${errorMessage(error)}`);
-            await logResearchError(runtime, "image-analysis", error, { query: search.query });
+          const analysis = await runtime.agentClient.runImageResearchPrompt(buildImagePrompt(runtime, styleGuide.content, batchCandidates), {
+            attachments,
+            signal: runtime.cancelSignal,
+            isCancelled: runtime.isCancelled,
+            logContext,
+          });
+          batch.interaction_ids = [...(logContext?.interaction_ids ?? [])];
+          const expectedIds = new Set(batchCandidates.map((candidate) => candidate.candidate_id));
+          const returnedIds = analysis.candidates.map((item) => item.candidate_id);
+          const duplicateIds = returnedIds.filter((candidateId, index) => returnedIds.indexOf(candidateId) !== index);
+          const unknownIds = returnedIds.filter((candidateId) => !expectedIds.has(candidateId));
+          const missingIds = [...expectedIds].filter((candidateId) => !returnedIds.includes(candidateId));
+          if (duplicateIds.length > 0 || unknownIds.length > 0 || missingIds.length > 0) {
+            throw new Error(`Invalid image analysis candidate mapping: duplicate=${duplicateIds.join(",") || "none"}; unknown=${unknownIds.join(",") || "none"}; missing=${missingIds.join(",") || "none"}`);
           }
-          checkpoint.image!.analyzed_query_indexes!.push(searchIndex);
-          await persist();
+          const byId = new Map(analysis.candidates.map((item) => [item.candidate_id, item]));
+          for (const candidate of batchCandidates) {
+            const decision = byId.get(candidate.candidate_id);
+            if (!decision) continue;
+            Object.assign(candidate, decision, { analysis_status: "completed" as const });
+          }
+          batch.status = "completed";
+          batch.completed_at = new Date().toISOString();
+          batchCandidates.forEach(scheduleImport);
+        } catch (error) {
+          batch.interaction_ids = [...new Set([...(batch.interaction_ids ?? []), ...(logContext?.interaction_ids ?? [])])];
+          if (isAgentRunCancelledError(error) || runtime.isCancelled()) throw error;
+          batch.status = "failed";
+          batch.error = errorMessage(error);
+          batch.completed_at = new Date().toISOString();
+          for (const candidate of batchCandidates) {
+            candidate.analysis_status = "failed";
+            candidate.use_in_ppt = false;
+          }
+          const matchedQueries = [...new Set(batchCandidates.flatMap((candidate) => candidate.matched_queries ?? [candidate.query]))];
+          for (const query of matchedQueries) {
+            checkpoint.image!.gaps = appendUnique(checkpoint.image!.gaps, runtime.locale === "zh"
+              ? `图片搜索词“${query}”的候选未能完成视觉判断。`
+              : `Image candidates for query “${query}” could not be visually assessed.`);
+          }
+          checkpoint.image!.diagnostic_errors = appendUnique(checkpoint.image!.diagnostic_errors, `${batch.batch_id}: ${errorMessage(error)}`);
+          await logResearchError(runtime, "image-analysis", error, { batch_id: batch.batch_id, candidate_ids: batch.candidate_ids });
         }
-        for (const candidate of search.result.filter((item) => item.use_in_ppt && item.download_status === "pending")) {
-          const downloadTask = (async () => {
-            try {
-              await importSelectedImage(runtime, candidate);
-            } catch (error) {
-              candidate.download_status = "failed";
-              candidate.error = errorMessage(error);
-              checkpoint.image!.gaps = appendUnique(
-                checkpoint.image!.gaps,
-                runtime.locale === "zh" ? `候选图片 ${candidate.candidate_id} 未能保存为本地素材。` : `Image candidate ${candidate.candidate_id} could not be saved as a local asset.`,
-              );
-              checkpoint.image!.diagnostic_errors = appendUnique(checkpoint.image!.diagnostic_errors, `${candidate.candidate_id}: ${candidate.error}`);
-              await logResearchError(runtime, "image-import", error, { candidate_id: candidate.candidate_id });
-            }
-            await persist();
-          })();
-          downloadTask.catch(() => undefined);
-          downloadTasks.push(downloadTask);
-        }
+        await persist();
       });
+      checkpoint.image.analysis_status = checkpoint.image.analysis_batches.every((batch) => batch.status === "completed") ? "completed" : "warning";
+      checkpoint.stages.image_analysis = checkpoint.image.analysis_status;
+      candidates.forEach(scheduleImport);
+      await Promise.all(importTasks);
+      checkpoint.image.import_status = candidates.some((candidate) => candidate.download_status === "failed") ? "warning" : "completed";
+      checkpoint.stages.image_import = checkpoint.image.import_status;
+      const contentGroupsBySha = new Map<string, { sha256: string; representative_candidate_id: string; candidate_ids: string[] }>();
+      for (const candidate of candidates.filter((item) => item.download_status === "imported" && item.sha256)) {
+        const sha256 = candidate.sha256 as string;
+        const existing = contentGroupsBySha.get(sha256);
+        if (existing) existing.candidate_ids.push(candidate.candidate_id);
+        else contentGroupsBySha.set(sha256, {
+          sha256,
+          representative_candidate_id: candidate.content_duplicate_of ?? candidate.candidate_id,
+          candidate_ids: [candidate.candidate_id],
+        });
+      }
+      const contentGroups = [...contentGroupsBySha.values()];
+      const importedCandidates = contentGroups.reduce((total, group) => total + group.candidate_ids.length, 0);
+      checkpoint.image.content_deduplication = {
+        status: "completed",
+        statistics: {
+          imported_candidates: importedCandidates,
+          unique_content: contentGroups.length,
+          duplicate_content_candidates: importedCandidates - contentGroups.length,
+        },
+        groups: contentGroups,
+        completed_at: new Date().toISOString(),
+      };
+      await persist();
       throwIfCancelled(runtime);
-      await Promise.all(downloadTasks);
-      throwIfCancelled(runtime);
-      candidates = checkpoint.image.searches.flatMap((item) => item.result ?? []).map((candidate) => {
-        const { error: _diagnosticError, ...formalCandidate } = candidate;
-        return formalCandidate;
-      });
       gaps.push(...(checkpoint.image.gaps ?? []));
       for (const search of checkpoint.image.searches) {
         queries.push({
           query: search.query,
           status: search.status === "completed" ? "completed" : "warning",
-          candidate_count: search.result?.length ?? 0,
+          candidate_count: new Set((search.result ?? []).map((occurrence) => normalizeImageUrlForDedup(occurrence.image_url))).size,
           ...(search.error ? { message: runtime.locale === "zh" ? "未获得可用图片候选。" : "No usable image candidates were returned." } : {}),
         });
         if (search.error) gaps.push(runtime.locale === "zh" ? `图片搜索词“${search.query}”未获得可用候选。` : `No usable image candidates were collected for query “${search.query}”.`);
       }
     } else if (decision.needs_search) {
       gaps.push("Image research was requested, but no usable query was returned.");
+      checkpoint.stages.image_search = "warning";
+      checkpoint.stages.image_deduplication = "skipped";
+      checkpoint.stages.image_analysis = "skipped";
+      checkpoint.stages.image_import = "skipped";
+    } else {
+      checkpoint.stages.image_search = "skipped";
+      checkpoint.stages.image_deduplication = "skipped";
+      checkpoint.stages.image_analysis = "skipped";
+      checkpoint.stages.image_import = "skipped";
     }
     const status: SharedResearchStageState = !decision.needs_search ? "skipped" : gaps.length > 0 || candidates.length === 0 ? "warning" : "completed";
     const uniqueGaps = [...new Set(gaps)];
+    const formalCandidates = candidates.map((candidate) => {
+      const { error: _diagnosticError, ...formalCandidate } = candidate;
+      return formalCandidate;
+    });
     checkpoint.image.prepared_batch = {
       title: batchTitle(runtime),
       status,
       queries,
-      candidates,
+      candidates: formalCandidates,
       gaps: uniqueGaps,
       statistics: {
         queries: queries.length,
         candidates: candidates.length,
+        raw_candidates: checkpoint.image.deduplication?.statistics.raw_occurrences ?? candidates.length,
+        unique_url_candidates: candidates.length,
+        duplicate_url_occurrences: checkpoint.image.deduplication?.statistics.duplicate_occurrences ?? 0,
         selected: candidates.filter((candidate) => candidate.use_in_ppt).length,
         imported: candidates.filter((candidate) => candidate.download_status === "imported").length,
+        unique_content_imported: checkpoint.image.content_deduplication?.statistics.unique_content ?? 0,
         failed: candidates.filter((candidate) => candidate.download_status === "failed").length,
         gaps: uniqueGaps.length,
       },
