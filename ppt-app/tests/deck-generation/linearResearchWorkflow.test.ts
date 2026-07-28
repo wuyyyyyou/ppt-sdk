@@ -299,7 +299,8 @@ describe("Linear Shared Research workflow", () => {
   it("reuses one imported file when distinct image URLs have the same content hash", async () => {
     let uploadCount = 0;
     let backendImportCount = 0;
-    const { runtime, context, imageBatches } = createRuntime({
+    let hostUploadMetadata: Record<string, unknown> | undefined;
+    const { runtime, context, imageBatches, logs } = createRuntime({
       researchAiClient: {
         decideWebResearch: async () => ({ needs_search: false, queries: [] }),
         selectWebFetchResults: async () => [],
@@ -313,15 +314,21 @@ describe("Linear Shared Research workflow", () => {
           { image_url: "https://image.test/a.jpg", source_url: "https://source.test/a", mime_type: "image/jpeg" },
           { image_url: "https://image.test/b.jpg", source_url: "https://source.test/b", mime_type: "image/jpeg" },
         ] }),
-        imageFetch: async ({ url }: { url: string }) => ({
-          path: `aps/${url.endsWith("a.jpg") ? "a" : "b"}`,
-          get_url: "https://download.test/shared-image",
-          mime_type: "image/jpeg",
-          bytes_size: 3,
-          sha256: "same-content-sha256",
-          source_url: url,
-          final_url: url,
-        }),
+        imageFetch: async (
+          { url }: { url: string },
+          callContext: { interaction_id?: string },
+        ) => {
+          callContext.interaction_id = `image-fetch-${url.endsWith("a.jpg") ? "a" : "b"}`;
+          return {
+            path: `aps/${url.endsWith("a.jpg") ? "a" : "b"}`,
+            get_url: "https://download.test/shared-image",
+            mime_type: "image/jpeg",
+            bytes_size: 3,
+            sha256: "same-content-sha256",
+            source_url: url,
+            final_url: url,
+          };
+        },
       },
       agentClient: {
         runImageResearchPrompt: async (prompt: string) => ({
@@ -334,8 +341,9 @@ describe("Linear Shared Research workflow", () => {
         }),
       },
       hostUploadClient: {
-        uploadFile: async () => {
+        uploadFile: async (_file: File, input: { metadata?: Record<string, unknown> }) => {
           uploadCount += 1;
+          hostUploadMetadata = input.metadata;
           return { transport: "host_upload", r2_key: "key", url: "https://upload.test/image", mime_type: "image/jpeg", size_bytes: 3 };
         },
       },
@@ -373,6 +381,11 @@ describe("Linear Shared Research workflow", () => {
     const progress = context.progress as { image?: { content_deduplication?: { statistics?: Record<string, number> } } };
     assert.equal(progress.image?.content_deduplication?.statistics?.imported_candidates, 2);
     assert.equal(progress.image?.content_deduplication?.statistics?.unique_content, 1);
+    const apsEvents = logs.filter((entry) => entry.transport === "aps_files");
+    assert.deepEqual(apsEvents.map((entry) => entry.event), ["storage.transfer.started", "storage.transfer.finished"]);
+    assert.equal(apsEvents[0]?.operation_id, hostUploadMetadata?.operation_id);
+    assert.equal(apsEvents[0]?.parent_interaction_id, hostUploadMetadata?.parent_interaction_id);
+    assert.match(String(apsEvents[0]?.parent_interaction_id), /^image-fetch-/);
   });
 
   it("resumes from completed image checkpoints without repeating analysis or upload", async () => {

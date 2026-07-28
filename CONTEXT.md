@@ -195,7 +195,7 @@ An intermediate analysis result that interprets images, screenshots, charts, dia
 The step that turns Raw Research Material into Shared Research Evidence by selecting relevant facts, derived insights, visual assets, and gaps for the Deck.
 
 **Research Log**:
-A Workspace-owned diagnostic record of Research Discovery, Research Collection, and Research Curation activity. It is separate from Page Generation Stage Records and is used for troubleshooting evidence decisions.
+A Workspace-owned diagnostic record of Research Discovery, Research Collection, and Research Curation activity, including external research API interactions and technical failures. It is separate from AI Interaction Logs, Workspace Storage Transfer Logs, and Page Generation Stage Records; their correlation identifiers connect related AI decisions, external collection, and asset transfers without merging their ownership boundaries.
 
 **Research Evidence**:
 Curated facts, derived insights, visual assets, and gaps selected from Raw Research Material for use in Page Generation. Shared Research Evidence is the deck-level authoritative grounding source for generated page content; raw material is never a substitute for it.
@@ -459,3 +459,7 @@ Expert: "No. An Export Artifact Mirror is PPT App-internal transport under an in
 Dev: "Can the support action be called Log Export if it includes the whole Workspace?"
 
 Expert: "No. Call it a Workspace Diagnostic Bundle so users understand that uploaded sources, authoring files, logs, and generated artifacts may all be included."
+
+Dev: "Anna image fetch succeeded, but the image never reached the Workspace. Is the Research Log enough to locate the failure?"
+
+Expert: "No. The Research Log shows the external API interaction; use its correlation identifiers with the Workspace Storage Transfer Log to distinguish the later APS download and Host Upload stages."

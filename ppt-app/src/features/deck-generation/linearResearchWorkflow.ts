@@ -10,7 +10,13 @@ import type {
 } from "../../api/types";
 import type { ResearchSearchResultForSelection } from "../../ai/researchAiClient";
 import type { AiOperationLogContext } from "../../ai/interactionLog";
-import type { ResearchImageSearchResult, ResearchWebFetchPage } from "../../api/researchWebClient";
+import {
+  createResearchWebOperationId,
+  type ResearchImageFetchResponse,
+  type ResearchImageSearchResult,
+  type ResearchWebCallContext,
+  type ResearchWebFetchPage,
+} from "../../api/researchWebClient";
 import { emitRuntime } from "./progressProjection";
 import { getAttemptLimits, getResearchImageSessionConcurrency, getResearchSearchControlSettings } from "./settings";
 import { throwIfCancelled } from "./runtimeSupport";
@@ -449,20 +455,118 @@ interface ImportedResearchImageAsset {
   bytes_size: number;
 }
 
+function researchWebCallContext(runtime: DeckGenerationRuntime, operationId: string): ResearchWebCallContext {
+  return {
+    workspace_dir: runtime.workspace.workspace_dir,
+    operation_id: operationId,
+  };
+}
+
+function storageTransferId() {
+  return `transfer-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2, 14)}`;
+}
+
+function storageErrorRecord(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const record = error && typeof error === "object" && !Array.isArray(error)
+    ? error as Record<string, unknown>
+    : {};
+  return {
+    ...(error instanceof Error ? { name: error.name } : {}),
+    message: message.replace(/https?:\/\/\S+/gi, "[REDACTED_URL]"),
+    ...(record.code !== undefined ? { code: record.code } : {}),
+  };
+}
+
+async function downloadResearchApsImage(
+  runtime: DeckGenerationRuntime,
+  fetched: ResearchImageFetchResponse,
+  candidateId: string,
+  operationId: string,
+  parentInteractionId: string | undefined,
+) {
+  const transferId = storageTransferId();
+  const base = {
+    schema_version: 1,
+    transfer_id: transferId,
+    operation_id: operationId,
+    parent_interaction_id: parentInteractionId,
+    source: "research_image_fetch",
+    transport: "aps_files",
+    candidate_id: candidateId,
+    aps_path: fetched.path,
+  };
+  const log = async (entry: Record<string, unknown>) => {
+    try {
+      await runtime.backend.appendWorkspaceLog({
+        workspace_dir: runtime.workspace.workspace_dir,
+        channel: "storage-transport",
+        entry,
+      });
+    } catch (error) {
+      console.warn("[research-image-aps-log] Failed to append storage transfer log", {
+        operation_id: operationId,
+        parent_interaction_id: parentInteractionId,
+        transfer_id: transferId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+  await log({
+    event: "storage.transfer.started",
+    ...base,
+    phase: "started",
+    status: "started",
+  });
+  try {
+    const response = await fetch(fetched.get_url);
+    if (!response.ok) throw new Error(`Failed to read fetched APS image: HTTP ${response.status}`);
+    const blob = await response.blob();
+    await log({
+      event: "storage.transfer.finished",
+      ...base,
+      phase: "finished",
+      status: "succeeded",
+      http_status: response.status,
+      mime_type: fetched.mime_type || blob.type,
+      size_bytes: blob.size,
+    });
+    return blob;
+  } catch (error) {
+    await log({
+      event: "storage.transfer.failed",
+      ...base,
+      phase: "download",
+      status: "failed",
+      error: storageErrorRecord(error),
+    });
+    throw error;
+  }
+}
+
 async function importSelectedImage(
   runtime: DeckGenerationRuntime,
   candidate: SharedResearchImageCandidate,
   importsBySha256: Map<string, Promise<ImportedResearchImageAsset>>,
+  researchWebOperationId: string,
 ) {
   if (!runtime.hostUploadClient) throw new Error("Host Upload is required to import research images");
-  const fetched = await runtime.researchWebClient.imageFetch({ url: candidate.image_url, max_bytes: 20 * 1024 * 1024, purpose: "ppt-research" });
+  const imageFetchContext = researchWebCallContext(runtime, researchWebOperationId);
+  const fetched = await runtime.researchWebClient.imageFetch(
+    { url: candidate.image_url, max_bytes: 20 * 1024 * 1024, purpose: "ppt-research" },
+    imageFetchContext,
+  );
   let importPromise = importsBySha256.get(fetched.sha256);
   const reusedExistingContent = Boolean(importPromise);
   if (!importPromise) {
     importPromise = (async () => {
-      const response = await fetch(fetched.get_url);
-      if (!response.ok) throw new Error(`Failed to read fetched APS image: HTTP ${response.status}`);
-      const blob = await response.blob();
+      const blob = await downloadResearchApsImage(
+        runtime,
+        fetched,
+        candidate.candidate_id,
+        researchWebOperationId,
+        imageFetchContext.interaction_id,
+      );
       const mimeType = fetched.mime_type || blob.type;
       const extension = mimeType === "image/png" ? ".png" : mimeType === "image/webp" ? ".webp" : mimeType === "image/gif" ? ".gif" : ".jpg";
       const file = new File([blob], `${candidate.candidate_id}${extension}`, { type: mimeType });
@@ -470,7 +574,12 @@ async function importSelectedImage(
         purpose: "image_reference",
         filename: file.name,
         mimeType,
-        metadata: { workspace_dir: runtime.workspace.workspace_dir, source: "research_image_fetch" },
+        metadata: {
+          workspace_dir: runtime.workspace.workspace_dir,
+          source: "research_image_fetch",
+          operation_id: researchWebOperationId,
+          parent_interaction_id: imageFetchContext.interaction_id,
+        },
       });
       return runtime.backend.importSharedResearchImageHostUpload({
         workspace_dir: runtime.workspace.workspace_dir,
@@ -503,6 +612,7 @@ async function importSelectedImage(
 }
 
 export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, input: { resume: boolean }) {
+  const researchWebOperationId = createResearchWebOperationId();
   let context = await runtime.backend.prepareSharedResearchWorkspace({
     workspace_dir: runtime.workspace.workspace_dir,
     reset_progress: !input.resume,
@@ -565,7 +675,10 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
       const existingQueries = new Set(checkpoint.web.searches.map((item) => item.query));
       await Promise.all(decision.queries.filter((query) => !existingQueries.has(query)).map(async (query) => {
         try {
-          const response = await runtime.researchWebClient.search({ query, max_results: 6 });
+          const response = await runtime.researchWebClient.search(
+            { query, max_results: 6 },
+            researchWebCallContext(runtime, researchWebOperationId),
+          );
           const queryIndex = decision.queries.indexOf(query);
           const results = response.results.map((result, resultIndex) => ({ ...result, result_id: `web-q${queryIndex + 1}-r${resultIndex + 1}` }));
           checkpoint.web!.searches!.push({ query, status: results.length > 0 ? "completed" : "warning", result: results, ...(results.length === 0 ? { error: "No results" } : {}) });
@@ -603,7 +716,10 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
           const urls = dedupeExactUrls(checkpoint.web.fetch_result_ids, allResults);
           if (urls.length > 0) {
             try {
-              const fetched = await runtime.researchWebClient.fetch({ urls, max_chars: 8000 });
+              const fetched = await runtime.researchWebClient.fetch(
+                { urls, max_chars: 8000 },
+                researchWebCallContext(runtime, researchWebOperationId),
+              );
               checkpoint.web.fetched_pages = fetched.pages;
               const failedPages = fetched.pages.filter((page) => !page.ok);
               if (failedPages.length > 0) {
@@ -702,7 +818,10 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
         const existing = searchesByQuery[queryIndex];
         if (existing && existing.status !== "running") return;
         try {
-          const response = await runtime.researchWebClient.imageSearch({ query, max_results: 6, min_width: 800, min_height: 600, aspect: "any" });
+          const response = await runtime.researchWebClient.imageSearch(
+            { query, max_results: 6, min_width: 800, min_height: 600, aspect: "any" },
+            researchWebCallContext(runtime, researchWebOperationId),
+          );
           const results: ImageSearchOccurrence[] = response.results.slice(0, 6).map((item, resultIndex) => ({
             occurrence_id: `image-q${queryIndex + 1}-r${resultIndex + 1}`,
             query,
@@ -831,7 +950,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
         scheduledImportIds.add(candidate.candidate_id);
         importTasks.push(importLimiter(async () => {
           try {
-            await importSelectedImage(runtime, candidate, importsBySha256);
+            await importSelectedImage(runtime, candidate, importsBySha256, researchWebOperationId);
           } catch (error) {
             candidate.download_status = "failed";
             candidate.error = errorMessage(error);

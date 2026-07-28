@@ -10,6 +10,7 @@ PPT Workspace 需要排查 Host Upload、R2 对象确认和 APS Files 发布之�
 - 前端 App Host Upload 通过 `app_append_workspace_log` 写入；已经持有 Workspace 路径的 engine/Executa 后端直接使用同一套 Workspace append 逻辑写入。
 - `upload_local_file` 的普通工具活动继续归属于 Agent session 日志，不在 storage 日志中重复记录；本决策不修改 Agent session 日志协议。
 - Page Visual Review、Page Refinement 和 visual-review-fix 使用原生 Session 图片附件时，底层截图 Host Upload 继续沿用现有 Storage Transfer Log 的事件、字段、阶段和 URL 脱敏颗粒度，不新增独立的附件日志协议，也不在 AI Interaction Log 中重复保存上传传输明细。每次自动重试作为一次新的完整传输尝试，仍按相同的 `started`、`negotiate`、`put`、`confirm`、`finished` 或 `failed` 阶段记录。
+- `anna.web.image_fetch` 返回 APS 图片引用后，App 对 `get_url` 的下载作为独立的 APS 读取传输写入 Storage Transfer Log，后续 Host Upload 继续沿用既有传输日志。APS 下载和 Host Upload 分别拥有自己的 `transfer_id`，共享本次研究尝试的 `operation_id`，并通过 `parent_interaction_id` 指向对应的 Anna Web API interaction，以便区分图片抓取、APS 下载和工作区导入前上传分别在哪个边界失败；该关联不把图片字节写入日志，也不改变既有 Storage Transfer Log 的 URL 脱敏规则。
 - 日志写入采用 best-effort。日志写入失败不得改变上传、渲染、APS 发布或生成主流程的结果。
 - 保存完整原始响应以避免遗漏未知诊断字段，但写入 Workspace 前对已知 bearer URL、签名和 token 字段做确定性脱敏。完整保留 `r2_key`、`invoke_id`、`operation_id`、`interaction_id` 等关联标识；不保存文件内容。
 - 新日志属于 Workspace 内容，会随 Workspace Diagnostic Bundle 一并收集；旧 Workspace 不迁移。

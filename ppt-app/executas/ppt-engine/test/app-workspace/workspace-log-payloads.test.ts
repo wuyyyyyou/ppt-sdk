@@ -9,7 +9,7 @@ async function readJsonLine(filePath: string): Promise<Record<string, unknown>> 
   return JSON.parse(line) as Record<string, unknown>;
 }
 
-test("workspace AI interaction logs support sidecar payloads", async () => {
+test("workspace interaction logs support sidecar payloads", async () => {
   const previousHome = process.env.HOME;
   const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-workspace-log-home-"));
   process.env.HOME = homeDir;
@@ -44,6 +44,27 @@ test("workspace AI interaction logs support sidecar payloads", async () => {
 
     const payload = JSON.parse(await readFile(String(ref.path), "utf8")) as { text?: string };
     assert.equal(payload.text, payloadText);
+
+    const researchWebResult = await appendAppWorkspaceLog({
+      workspace_dir: workspace.workspace_dir,
+      channel: "research-web-interactions",
+      entry: {
+        event: "research.web.interaction.finished",
+        schema_version: 1,
+        status: "succeeded",
+        raw_response: {
+          get_url: "https://download.example.test/image?signature=original",
+          content: payloadText,
+        },
+      },
+      payload_keys: ["raw_response"],
+      inline_payload_max_bytes: 32,
+    });
+    assert.equal(path.basename(researchWebResult.log_file), "research-web-interactions.jsonl");
+    const researchWebEntry = await readJsonLine(researchWebResult.log_file);
+    const researchWebRef = researchWebEntry.raw_response as Record<string, unknown>;
+    const researchWebPayload = JSON.parse(await readFile(String(researchWebRef.path), "utf8")) as { get_url?: string };
+    assert.equal(researchWebPayload.get_url, "https://download.example.test/image?signature=original");
 
     const storageResult = await appendAppWorkspaceLog({
       workspace_dir: workspace.workspace_dir,

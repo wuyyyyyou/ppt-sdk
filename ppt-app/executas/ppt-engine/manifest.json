@@ -736,7 +736,7 @@
         {
           "name": "channel",
           "type": "string",
-          "description": "Workspace log channel. Supports AI domain channels including ai-theme-interactions, plus storage-transport.",
+          "description": "Workspace log channel. Supports AI domain channels, research-web-interactions, and storage-transport.",
           "required": true
         },
         {

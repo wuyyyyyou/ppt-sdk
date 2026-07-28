@@ -243,6 +243,7 @@ const WORKSPACE_LOG_FILE_NAMES = {
   "ai-page-agent-stream": "ai-page-agent-stream.jsonl",
   "ai-research": "ai-research.jsonl",
   "ai-research-interactions": "ai-research-interactions.jsonl",
+  "research-web-interactions": "research-web-interactions.jsonl",
   "ai-theme": "ai-theme.jsonl",
   "ai-theme-interactions": "ai-theme-interactions.jsonl",
   "storage-transport": "storage-transport.jsonl",

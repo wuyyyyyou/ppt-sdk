@@ -1292,7 +1292,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           }),
         });
         const nextResearchAiClient = createResearchAiClient(runtime);
-        const nextResearchWebClient = createResearchWebClient(runtime);
+        const nextResearchWebClient = createResearchWebClient(runtime, {
+          appendWorkspaceLog: (input) => nextBackend.appendWorkspaceLog(input),
+        });
         if (cancelled) return;
         setBackend(nextBackend);
         setHostUploadClient(nextHostUploadClient);

@@ -110,6 +110,7 @@ describe("AppHostUploadClient", () => {
         workspace_dir: "/tmp/workspace",
         operation_id: "operation-1",
         interaction_id: "interaction-1",
+        parent_interaction_id: "parent-interaction-1",
       },
     });
 
@@ -125,5 +126,6 @@ describe("AppHostUploadClient", () => {
     assert.equal((events[1].entry.response as Record<string, unknown>).put_url, "[REDACTED]");
     assert.equal(events[1].entry.operation_id, "operation-1");
     assert.equal(events[1].entry.interaction_id, "interaction-1");
+    assert.equal(events[1].entry.parent_interaction_id, "parent-interaction-1");
   });
 });

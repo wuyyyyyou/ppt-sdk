@@ -652,6 +652,7 @@ export interface AppendWorkspaceLogInput {
     | "ai-page-agent-stream"
     | "ai-research"
     | "ai-research-interactions"
+    | "research-web-interactions"
     | "ai-theme"
     | "ai-theme-interactions"
     | "storage-transport";
