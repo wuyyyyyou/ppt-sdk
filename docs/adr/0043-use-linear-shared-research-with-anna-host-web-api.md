@@ -12,7 +12,7 @@ PPT App 重新启用 Web 和图片研究时，不再恢复基于 `anna-search` E
 
 正式研究工件固定为 append-only（只追加）的 `research/evidence/web-summary.md`、按批次数组追加的 `research/evidence/image-catalog.json`，以及只保存最终可用图片的 `research/evidence/images/`。App 负责组装和写入最终工件；LLM 和图片 Session 不直接重写完整文件。图片目录保留全部候选及其视觉判断，但 Page Authoring 只能使用 `use_in_ppt: true` 且已通过 `image_fetch` 和 `ppt-engine` 导入影子 Workspace、具有本地 `file_path` 的图片。研究批次是共享历史，不声明 `run_kind`、`target_page_ids` 或页面适用范围；页面 Agent 自行判断相关性，新信息与旧信息冲突时以较新的相关内容为准。最终 Web 总结不强制事实 ID、来源 ID、URL 列表或逐条引用，原始响应、URL 和技术错误只属于 Research Log（研究日志）与研究进度诊断。
 
-研究在每次生成或优化的影子 Workspace 中运行，并用单一的 `research/web-image-search-progress.json` 原子覆盖记录线性阶段、query、抓取、图片 Session、下载和最终写入检查点。它不建立研究专用 `run_id`、批次 ID 或 `.runs/<run_id>/` 层级；影子 Workspace 已提供运行隔离。恢复只继续未完成步骤，最终写入前把待追加内容保存到进度文件，并通过与正式文件末尾的完全匹配避免中断窗口造成重复追加。停止并放弃时研究结果随整个影子 Workspace 丢弃；图片目录中的 `file_path` 始终保存 Workspace 相对路径，因此成功 Generation Commit 修改 Workspace 根目录后不需要重写图片目录。
+研究在每次生成或优化的影子 Workspace 中运行，并用单一的 `research/web-image-search-progress.json` 原子覆盖记录线性阶段、query、抓取、图片 Session、下载和最终写入检查点。它不建立研究专用 `run_id`、批次 ID 或 `.runs/<run_id>/` 层级；影子 Workspace 已提供运行隔离。恢复只继续未完成步骤，最终写入前把待追加内容保存到进度文件，并通过与正式文件末尾的完全匹配避免中断窗口造成重复追加。停止并放弃时研究结果随整个影子 Workspace 丢弃；图片目录中的 `file_path` 始终保存当前 Workspace 内已导入图片的绝对路径，Page Authoring 必须原样用于 TSX 图片引用。Shadow Preparation 和 Generation Commit 通过既有的全量文本路径 rebase 分别在正式与影子 Workspace 根路径之间重写该字段及其下游 TSX 引用。
 
 Web 与图片搜索开关只禁止对应方向的新增外部搜索，不禁止另一方向，也不禁止复用已有 Shared Research Evidence。判断不需要搜索时仍写入 `skipped` 批次；权限、限流、供应商、单页抓取、图片下载或导入失败记录为 gap 或 warning，但不阻塞 Page Authoring。除完全无法解析结构化 JSON 时允许一次格式修复外，App 不为官方 Web API 增加自动重试，也不恢复旧的迭代查询。图片 Session 并发使用独立的全局设置，默认 5、范围 1～10；该设置不限制搜索、抓取、图片下载或工作区导入。Uploaded Source Analysis 本轮继续封存，不进入新研究输入或研究工件，未来重构时另行决策。
 

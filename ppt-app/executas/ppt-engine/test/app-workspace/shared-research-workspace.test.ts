@@ -5,7 +5,7 @@ import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-test("shared research artifacts append batches and keep image paths workspace-relative", async () => {
+test("shared research artifacts append batches and keep absolute imported image paths", async () => {
   const previousHome = process.env.HOME;
   const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-shared-research-"));
   process.env.HOME = homeDir;
@@ -53,8 +53,9 @@ test("shared research artifacts append batches and keep image paths workspace-re
       expected_size_bytes: imageBytes.length,
       expected_sha256: sha256,
     });
-    assert.equal(imported.file_path, "research/evidence/images/candidate-1.png");
-    assert.equal((await stat(path.join(workspace.workspace_dir, imported.file_path))).isFile(), true);
+    assert.equal(imported.file_path, path.join(workspace.workspace_dir, "research/evidence/images/candidate-1.png"));
+    assert.equal(path.isAbsolute(imported.file_path), true);
+    assert.equal((await stat(imported.file_path)).isFile(), true);
 
     const batch = {
       title: "Initial generation",

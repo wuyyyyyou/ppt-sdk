@@ -30,12 +30,28 @@ test("generation run publishes a self-contained shadow Workspace atomically", as
   const shadowMarker = path.join(transaction.shadow_workspace_dir, "marker.json");
   assert.equal((await readFile(shadowMarker, "utf8")).includes(transaction.shadow_workspace_dir), true);
   await writeFile(shadowMarker, JSON.stringify({ root: transaction.shadow_workspace_dir, value: "new" }), "utf8");
+  const shadowCatalog = path.join(transaction.shadow_workspace_dir, "research", "evidence", "image-catalog.json");
+  const shadowSlide = path.join(transaction.shadow_workspace_dir, "slides", "page-1.tsx");
+  const shadowImage = path.join(transaction.shadow_workspace_dir, "research", "evidence", "images", "image-1.png");
+  await mkdir(path.dirname(shadowCatalog), { recursive: true });
+  await mkdir(path.dirname(shadowSlide), { recursive: true });
+  await writeFile(shadowCatalog, JSON.stringify({ file_path: shadowImage }), "utf8");
+  await writeFile(shadowSlide, `export const imagePath = ${JSON.stringify(shadowImage)};`, "utf8");
 
   const committed = await api.commitAppGenerationRun({ run_id: transaction.run_id });
   assert.equal(committed.transaction.state, "committed");
   const published = JSON.parse(await readFile(markerPath, "utf8")) as { root: string; value: string };
   assert.equal(published.root, created.workspace_dir);
   assert.equal(published.value, "new");
+  const officialImage = path.join(created.workspace_dir, "research", "evidence", "images", "image-1.png");
+  assert.deepEqual(
+    JSON.parse(await readFile(path.join(created.workspace_dir, "research", "evidence", "image-catalog.json"), "utf8")),
+    { file_path: officialImage },
+  );
+  assert.equal(
+    await readFile(path.join(created.workspace_dir, "slides", "page-1.tsx"), "utf8"),
+    `export const imagePath = ${JSON.stringify(officialImage)};`,
+  );
   await api.cleanupAppGenerationRun({ run_id: transaction.run_id });
 });
 

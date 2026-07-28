@@ -57,6 +57,10 @@ describe("Agent file-tool path prompt blocks", () => {
     assert.match(prompt, /Agent file-tool absolute path: \/tmp\/anna-workspace\/ppt\/ppt-20260630-152620\/outline\.json/);
     assert.match(prompt, /Agent file-tool absolute path: \/tmp\/anna-workspace\/ppt\/ppt-20260630-152620\/style-guide\.md/);
     assert.match(prompt, /Agent file-tool absolute path: \/tmp\/anna-workspace\/ppt\/ppt-20260630-152620\/authoring-kit\/README\.md/);
+    assert.match(prompt, /file_path 是当前 Workspace 中已导入图片的绝对路径/);
+    assert.match(prompt, /必须原样使用该 file_path/);
+    assert.match(prompt, /不得改成相对路径、添加 \.\/ 或 \.\.\//);
+    assert.match(prompt, /不得使用远程 image_url 或 thumbnail_url/);
     assert.doesNotMatch(prompt, /Agent file-tool root:/);
     assert.doesNotMatch(prompt, /Agent file-tool path: ppt\//);
     assert.doesNotMatch(prompt, /Canonical absolute path/);
@@ -78,5 +82,23 @@ describe("Agent file-tool path prompt blocks", () => {
     assert.doesNotMatch(prompt, /Screenshot path:/);
     assert.doesNotMatch(prompt, /Rendered HTML path:/);
     assert.doesNotMatch(prompt, /upload_local_file|analyze_image/);
+  });
+
+  it("keeps the absolute local-image contract in every page authoring round", () => {
+    for (const attemptKind of ["initial", "page-refinement", "render-fix", "visual-review-fix"] as const) {
+      const prompt = buildAuthoringPrompt({
+        workspaceRoot,
+        workspaceDir,
+        page,
+        authoringDeck,
+        outline,
+        attemptKind,
+        ...(attemptKind === "render-fix" ? { renderError: "Render failed" } : {}),
+      });
+
+      assert.match(prompt, /file_path 是当前 Workspace 中已导入图片的绝对路径/);
+      assert.match(prompt, /必须原样使用该 file_path/);
+      assert.match(prompt, /不得改成相对路径、添加 \.\/ 或 \.\.\//);
+    }
   });
 });

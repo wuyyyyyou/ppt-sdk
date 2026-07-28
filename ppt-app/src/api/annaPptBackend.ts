@@ -71,7 +71,7 @@ import type {
 } from "./types";
 import { resolvePptBundledToolIds } from "./bundledToolIds";
 
-const PPTX_EXPORT_TIMEOUT_MS = 600_000;
+const LONG_RUNNING_TOOL_TIMEOUT_MS = 600_000;
 
 interface HostUploadJsonReference {
   workspace_upload?: HostUploadRef;
@@ -191,11 +191,11 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
     beginGenerationRun: (input) =>
       invoke<GenerationRunTransaction>(toolIds.pptEngine, "app_begin_generation_run", input),
     prepareGenerationRun: (input) =>
-      invoke<PrepareGenerationRunResult>(toolIds.pptEngine, "app_prepare_generation_run", input, { timeoutMs: PPTX_EXPORT_TIMEOUT_MS }),
+      invoke<PrepareGenerationRunResult>(toolIds.pptEngine, "app_prepare_generation_run", input, { timeoutMs: LONG_RUNNING_TOOL_TIMEOUT_MS }),
     abandonGenerationRun: (input) =>
       invoke<GenerationRunTransaction>(toolIds.pptEngine, "app_abandon_generation_run", input),
     commitGenerationRun: (input) =>
-      invoke<CommitGenerationRunResult>(toolIds.pptEngine, "app_commit_generation_run", input, { timeoutMs: PPTX_EXPORT_TIMEOUT_MS }),
+      invoke<CommitGenerationRunResult>(toolIds.pptEngine, "app_commit_generation_run", input, { timeoutMs: LONG_RUNNING_TOOL_TIMEOUT_MS }),
     cleanupGenerationRun: (input) =>
       invoke<{ cleaned: true }>(toolIds.pptEngine, "app_cleanup_generation_run", input),
     getWorkspaceGenerationRun: (input) =>
@@ -533,7 +533,8 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invoke<RenderWorkspacePagePreviewResult>(
         toolIds.pptEngine,
         "app_render_workspace_page_preview",
-        input
+        input,
+        { timeoutMs: LONG_RUNNING_TOOL_TIMEOUT_MS },
       ),
     uploadCurrentPageScreenshot: (input) =>
       invoke<HostUploadRef>(
@@ -559,7 +560,8 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invoke<RenderDeckHtmlResult>(
         toolIds.pptEngine,
         "app_render_deck_html",
-        input
+        input,
+        { timeoutMs: LONG_RUNNING_TOOL_TIMEOUT_MS },
       ),
     recordDeckReview: (input) =>
       invoke<ProjectResult>(
@@ -611,7 +613,7 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         toolIds.pptEngine,
         "app_prepare_workspace_diagnostic_bundle",
         { workspace_dir: input.workspace_dir },
-        { timeoutMs: PPTX_EXPORT_TIMEOUT_MS }
+        { timeoutMs: LONG_RUNNING_TOOL_TIMEOUT_MS }
       )
   };
 }

@@ -49,7 +49,7 @@ function createRuntime(overrides: Record<string, unknown> = {}) {
     importSharedResearchImageHostUpload: async ({ candidate_id }: { candidate_id: string }) => ({
       workspace_dir: context.workspace_dir,
       candidate_id,
-      file_path: `research/evidence/images/${candidate_id}.png`,
+      file_path: `/tmp/workspace/research/evidence/images/${candidate_id}.png`,
       sha256: "sha256",
       mime_type: "image/png",
       bytes_size: 3,

@@ -23,6 +23,7 @@ const ANNA_RUNTIME_SDK_URLS = [
 ];
 const SESSION_STORAGE_KEY = "test-session-app.saved-session-ids.v1";
 const SETTINGS_STORAGE_KEY = "test-session-app.settings.v1";
+const SESSION_CREATE_INPUT = { submode: "auto" };
 
 const els = Object.fromEntries(
   [
@@ -426,10 +427,10 @@ async function connectAnna() {
 
 async function createSession() {
   if (!canUseSession()) return;
-  const entry = beginOperation("session", "session.create", { submode: "auto" });
+  const entry = beginOperation("session", "session.create", SESSION_CREATE_INPUT);
   addLog("ok", "session.create", "开始创建 raw agent session", entry.record.record_id);
   try {
-    const raw = await anna.agent.session.create({ submode: "auto" });
+    const raw = await anna.agent.session.create(SESSION_CREATE_INPUT);
     appendRecordEvent(entry, "session.create.response_received");
     const normalized = normalizeCreateResult(raw);
     if (!normalized.app_session_uuid) throw new Error("session.create 结果缺少 app_session_uuid");
@@ -572,7 +573,13 @@ async function runSessionById(id, source) {
     return;
   }
   saveSettings();
-  const entry = beginOperation("session", "session.run", { app_session_uuid: id, source, content });
+  const runInput = {
+    app_session_uuid: id,
+    source,
+    content,
+    allowed_tools: ["fs_read_file"],
+  };
+  const entry = beginOperation("session", "session.run", runInput);
   entry.record.stream_id = "";
   entry.record.run_id = "";
   entry.record.stream_frames = [];
@@ -587,7 +594,11 @@ async function runSessionById(id, source) {
   const collector = createRawSessionRunCollector(entry);
   try {
     collector.start(anna);
-    const runResult = await anna.agent.session.run({ app_session_uuid: id, content });
+    const runResult = await anna.agent.session.run({
+      app_session_uuid: id,
+      content,
+      allowed_tools: ["fs_read_file"],
+    });
     entry.record.metrics.run_rpc_ms = elapsedMs(entry.startedPerf);
     entry.record.response = { rpc_response: toSerializable(runResult) };
     appendRecordEvent(entry, "session.run.rpc_response", { duration_ms: entry.record.metrics.run_rpc_ms });

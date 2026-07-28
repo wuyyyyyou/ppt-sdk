@@ -3934,7 +3934,7 @@ export async function importAppSharedResearchImage(
       return {
         workspace_dir: workspace.workspace_dir,
         candidate_id: input.candidate_id,
-        file_path: path.relative(workspace.workspace_dir, destinationPath).split(path.sep).join("/"),
+        file_path: destinationPath,
         sha256,
         mime_type: input.mime_type,
         bytes_size: bytes.length,
@@ -3951,7 +3951,7 @@ export async function importAppSharedResearchImage(
   return {
     workspace_dir: workspace.workspace_dir,
     candidate_id: input.candidate_id,
-    file_path: path.relative(workspace.workspace_dir, destinationPath).split(path.sep).join("/"),
+    file_path: destinationPath,
     sha256,
     mime_type: input.mime_type,
     bytes_size: bytes.length,

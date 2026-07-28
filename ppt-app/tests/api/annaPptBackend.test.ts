@@ -398,4 +398,21 @@ describe("Anna PPT Backend", () => {
     assert.deepEqual(calls[0]?.args, { workspace_dir: "/tmp/workspaces/demo" });
     assert.equal(calls[0]?.timeoutMs, 600_000);
   });
+
+  it("uses long-running timeouts for page preview and deck rendering", async () => {
+    setToolIds();
+    const calls: Array<{ method?: unknown; timeoutMs?: unknown }> = [];
+    const backend = createAnnaPptBackend(createRuntimeWithInvoke(async (input) => {
+      calls.push(input as { method?: unknown; timeoutMs?: unknown });
+      return { success: true, data: {} };
+    }));
+
+    await backend.renderWorkspacePagePreview({ workspace_dir: "/tmp/workspaces/demo", page_id: "page-1" });
+    await backend.renderDeckHtml({ workspace_dir: "/tmp/workspaces/demo" });
+
+    assert.deepEqual(calls.map((call) => [call.method, call.timeoutMs]), [
+      ["app_render_workspace_page_preview", 600_000],
+      ["app_render_deck_html", 600_000],
+    ]);
+  });
 });
