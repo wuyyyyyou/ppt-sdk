@@ -3803,16 +3803,97 @@ function createDefaultSharedResearchProgress() {
 }
 
 function createDefaultImageCatalog() {
-  return { schema_version: 1, batches: [] };
+  return { schema_version: 2, assets: [] };
+}
+
+function compactImageCatalogAsset(value: unknown): Record<string, unknown> | null {
+  const candidate = getPlainRecord(value);
+  if (
+    candidate.use_in_ppt !== true
+    || candidate.download_status !== "imported"
+    || !normalizeString(candidate.candidate_id)
+    || !normalizeString(candidate.file_path)
+    || !normalizeString(candidate.sha256)
+    || !normalizeString(candidate.mime_type)
+    || typeof candidate.bytes_size !== "number"
+    || !Number.isFinite(candidate.bytes_size)
+    || candidate.bytes_size <= 0
+  ) return null;
+  const query = normalizeString(candidate.query);
+  const matchedQueries = normalizeStringArray(candidate.matched_queries);
+  return {
+    asset_id: normalizeString(candidate.candidate_id),
+    file_path: normalizeString(candidate.file_path),
+    sha256: normalizeString(candidate.sha256),
+    mime_type: normalizeString(candidate.mime_type),
+    bytes_size: candidate.bytes_size,
+    ...(typeof candidate.width === "number" && Number.isFinite(candidate.width) && candidate.width > 0 ? { width: candidate.width } : {}),
+    ...(typeof candidate.height === "number" && Number.isFinite(candidate.height) && candidate.height > 0 ? { height: candidate.height } : {}),
+    description: normalizeString(candidate.description),
+    reason: normalizeString(candidate.reason),
+    matched_queries: matchedQueries.length > 0 ? matchedQueries : query ? [query] : [],
+    source_url: normalizeString(candidate.source_url),
+  };
+}
+
+function normalizeImageCatalogAsset(value: unknown): Record<string, unknown> | null {
+  const asset = getPlainRecord(value);
+  if (
+    !normalizeString(asset.asset_id)
+    || !normalizeString(asset.file_path)
+    || !normalizeString(asset.sha256)
+    || !normalizeString(asset.mime_type)
+    || typeof asset.bytes_size !== "number"
+    || !Number.isFinite(asset.bytes_size)
+    || asset.bytes_size <= 0
+  ) return null;
+  return {
+    asset_id: normalizeString(asset.asset_id),
+    file_path: normalizeString(asset.file_path),
+    sha256: normalizeString(asset.sha256),
+    mime_type: normalizeString(asset.mime_type),
+    bytes_size: asset.bytes_size,
+    ...(typeof asset.width === "number" && Number.isFinite(asset.width) && asset.width > 0 ? { width: asset.width } : {}),
+    ...(typeof asset.height === "number" && Number.isFinite(asset.height) && asset.height > 0 ? { height: asset.height } : {}),
+    description: normalizeString(asset.description),
+    reason: normalizeString(asset.reason),
+    matched_queries: normalizeStringArray(asset.matched_queries),
+    source_url: normalizeString(asset.source_url),
+  };
+}
+
+function deduplicateImageCatalogAssets(assets: Record<string, unknown>[]) {
+  const bySha256 = new Map<string, Record<string, unknown>>();
+  for (const asset of assets) {
+    const sha256 = normalizeString(asset.sha256);
+    const previous = bySha256.get(sha256);
+    if (!previous) {
+      bySha256.set(sha256, asset);
+      continue;
+    }
+    bySha256.set(sha256, {
+      ...previous,
+      ...asset,
+      asset_id: previous.asset_id,
+      matched_queries: [...new Set([
+        ...normalizeStringArray(previous.matched_queries),
+        ...normalizeStringArray(asset.matched_queries),
+      ])],
+    });
+  }
+  return [...bySha256.values()];
 }
 
 function normalizeImageCatalog(value: unknown): Record<string, unknown> {
   const record = getPlainRecord(value);
   if (Object.keys(record).length === 0) return createDefaultImageCatalog();
-  if (record.schema_version !== 1 || !Array.isArray(record.batches)) {
-    throw new Error("Invalid research/evidence/image-catalog.json");
+  if (record.schema_version === 2 && Array.isArray(record.assets)) {
+    return {
+      schema_version: 2,
+      assets: deduplicateImageCatalogAssets(record.assets.map(normalizeImageCatalogAsset).filter((asset): asset is Record<string, unknown> => asset !== null)),
+    };
   }
-  return { schema_version: 1, batches: record.batches };
+  throw new Error("Invalid research/evidence/image-catalog.json");
 }
 
 async function ensureSharedResearchFiles(workspaceDir: string, resetProgress: boolean): Promise<AppResearchPaths> {
@@ -3823,6 +3904,12 @@ async function ensureSharedResearchFiles(workspaceDir: string, resetProgress: bo
   }
   if (!(await fileExists(paths.image_catalog_path))) {
     await atomicWriteJsonFile(paths.image_catalog_path, createDefaultImageCatalog());
+  } else {
+    const currentCatalog = await readJsonFileIfExists(paths.image_catalog_path);
+    const normalizedCatalog = normalizeImageCatalog(currentCatalog);
+    if (JSON.stringify(currentCatalog) !== JSON.stringify(normalizedCatalog)) {
+      await atomicWriteJsonFile(paths.image_catalog_path, normalizedCatalog);
+    }
   }
   if (resetProgress || !(await fileExists(paths.progress_path))) {
     await atomicWriteJsonFile(paths.progress_path, createDefaultSharedResearchProgress());
@@ -3890,18 +3977,21 @@ export async function appendAppImageResearchBatch(
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
   const paths = await ensureSharedResearchFiles(workspace.workspace_dir, false);
   const catalog = normalizeImageCatalog(await readJsonFileIfExists(paths.image_catalog_path));
-  const batches = Array.isArray(catalog.batches) ? catalog.batches : [];
+  const assets = Array.isArray(catalog.assets) ? catalog.assets.map(getPlainRecord) : [];
   const batch = getPlainRecord(input.batch);
   if (!normalizeString(batch.title) || !Array.isArray(batch.candidates)) {
     throw new Error('"batch" must contain title and candidates');
   }
-  const last = batches.at(-1);
-  if (last !== undefined && JSON.stringify(last) === JSON.stringify(batch)) {
+  const nextAssets = deduplicateImageCatalogAssets([
+    ...assets,
+    ...batch.candidates.map(compactImageCatalogAsset).filter((asset): asset is Record<string, unknown> => asset !== null),
+  ]);
+  if (JSON.stringify(assets) === JSON.stringify(nextAssets)) {
     return { workspace_dir: workspace.workspace_dir, image_catalog_path: paths.image_catalog_path, appended: false };
   }
   await atomicWriteJsonFile(paths.image_catalog_path, {
-    schema_version: 1,
-    batches: [...batches, batch],
+    schema_version: 2,
+    assets: nextAssets,
   });
   return { workspace_dir: workspace.workspace_dir, image_catalog_path: paths.image_catalog_path, appended: true };
 }

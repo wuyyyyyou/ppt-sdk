@@ -1,6 +1,6 @@
 {
   "display_name": "ppt-engine",
-  "version": "4.3.4",
+  "version": "4.3.5",
   "description": "Anna Executa plugin for Workspace Authoring Kit setup, manifest-based deck HTML generation, and backend PPTX export.",
   "author": "Anna Developer",
   "host_capabilities": [
@@ -1249,7 +1249,7 @@
     },
     {
       "name": "app_append_image_research_batch",
-      "description": "Idempotently append one complete batch object to research/evidence/image-catalog.json.",
+      "description": "Idempotently merge reusable imported assets from one completed image research batch into research/evidence/image-catalog.json.",
       "parameters": [
         {
           "name": "workspace_dir",

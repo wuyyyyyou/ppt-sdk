@@ -939,9 +939,23 @@ export interface SharedResearchImageBatch {
   };
 }
 
+export interface SharedResearchImageAsset {
+  asset_id: string;
+  file_path: string;
+  sha256: string;
+  mime_type: string;
+  bytes_size: number;
+  width?: number;
+  height?: number;
+  description: string;
+  reason: string;
+  matched_queries: string[];
+  source_url: string;
+}
+
 export interface SharedResearchImageCatalog {
-  schema_version: 1;
-  batches: SharedResearchImageBatch[];
+  schema_version: 2;
+  assets: SharedResearchImageAsset[];
 }
 
 export interface SharedResearchContextResult {

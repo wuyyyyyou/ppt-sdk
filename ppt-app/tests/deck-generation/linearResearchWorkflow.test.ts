@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { AiInteractionLogger } from "../../src/ai/interactionLog.ts";
-import type { SharedResearchContextResult, SharedResearchImageBatch } from "../../src/api/types.ts";
+import type { SharedResearchContextResult, SharedResearchImageAsset, SharedResearchImageBatch } from "../../src/api/types.ts";
 import { runLinearSharedResearch } from "../../src/features/deck-generation/linearResearchWorkflow.ts";
 import type { DeckGenerationRuntime } from "../../src/features/deck-generation/types.ts";
 
@@ -20,7 +20,7 @@ function createRuntime(overrides: Record<string, unknown> = {}) {
     images_dir: "/tmp/workspace/research/evidence/images",
     progress_path: "/tmp/workspace/research/web-image-search-progress.json",
     web_summary: "# Web Research Summary\n",
-    image_catalog: { schema_version: 1, batches: [] },
+    image_catalog: { schema_version: 2, assets: [] },
     progress: {},
   };
   const webBatches: string[] = [];
@@ -43,7 +43,31 @@ function createRuntime(overrides: Record<string, unknown> = {}) {
     },
     appendImageResearchBatch: async ({ batch }: { batch: SharedResearchImageBatch }) => {
       imageBatches.push(structuredClone(batch));
-      context.image_catalog.batches.push(structuredClone(batch));
+      const assets = batch.candidates.filter((candidate) => (
+        candidate.use_in_ppt
+        && candidate.download_status === "imported"
+        && candidate.file_path
+        && candidate.sha256
+        && candidate.mime_type
+        && candidate.bytes_size
+      )).map((candidate): SharedResearchImageAsset => ({
+        asset_id: candidate.candidate_id,
+        file_path: candidate.file_path as string,
+        sha256: candidate.sha256 as string,
+        mime_type: candidate.mime_type as string,
+        bytes_size: candidate.bytes_size as number,
+        ...(typeof candidate.width === "number" ? { width: candidate.width } : {}),
+        ...(typeof candidate.height === "number" ? { height: candidate.height } : {}),
+        description: candidate.description,
+        reason: candidate.reason,
+        matched_queries: candidate.matched_queries ?? [candidate.query],
+        source_url: candidate.source_url,
+      }));
+      for (const asset of assets) {
+        if (!context.image_catalog.assets.some((existing) => existing.sha256 === asset.sha256)) {
+          context.image_catalog.assets.push(structuredClone(asset));
+        }
+      }
       return { workspace_dir: context.workspace_dir, image_catalog_path: context.image_catalog_path, appended: true };
     },
     importSharedResearchImageHostUpload: async ({ candidate_id }: { candidate_id: string }) => ({
@@ -404,7 +428,7 @@ describe("Linear Shared Research workflow", () => {
       if (!progress.image) throw new Error("Expected persisted image checkpoint");
       progress.image.written = false;
       imageBatches.length = 0;
-      context.image_catalog.batches.length = 0;
+      context.image_catalog.assets.length = 0;
 
       await runLinearSharedResearch(runtime, { resume: true });
     } finally {

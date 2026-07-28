@@ -150,7 +150,7 @@ function normalizeDecision(value: unknown): ResearchNeedDecision {
   };
 }
 
-function commonContext(input: ResearchDecisionContext) {
+function commonContext(input: ResearchDecisionContext, options: { includeImageCatalog?: boolean } = {}) {
   return [
     `Output locale: ${input.locale}`,
     `User brief:\n${input.brief || "(empty)"}`,
@@ -158,8 +158,10 @@ function commonContext(input: ResearchDecisionContext) {
     `Confirmed Outline:\n${JSON.stringify(input.outline, null, 2)}`,
     `Workspace Style Guide:\n${input.styleGuide}`,
     `Complete existing web-summary.md:\n${input.webSummary || "(empty)"}`,
-    `Complete existing image-catalog.json:\n${JSON.stringify(input.imageCatalog, null, 2)}`,
-  ].join("\n\n");
+    options.includeImageCatalog
+      ? `Reusable local image assets from image-catalog.json:\n${JSON.stringify(input.imageCatalog, null, 2)}`
+      : "",
+  ].filter(Boolean).join("\n\n");
 }
 
 export function createResearchAiClient(runtime: AnnaRuntime): ResearchAiClient {
@@ -227,7 +229,7 @@ export function createResearchAiClient(runtime: AnnaRuntime): ResearchAiClient {
         "If needed, return up to 6 image search queries. Every query must be English, preferably 1-4 words, at most 6 words and 60 characters. Use keywords, not sentences or questions.",
         "Return exactly one JSON object. needs_search must be boolean. queries must be an array of strings.",
         '{"needs_search":true,"queries":["short english query"],"rationale":"short reason"}',
-        commonContext(input),
+        commonContext(input, { includeImageCatalog: true }),
       ].join("\n\n"), '{"needs_search":true,"queries":["short english query"],"rationale":"short reason"}', input.logContext);
       return normalizeDecision(result);
     },
