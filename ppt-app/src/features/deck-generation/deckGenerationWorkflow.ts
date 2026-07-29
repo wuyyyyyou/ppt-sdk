@@ -27,6 +27,7 @@ import {
 } from "./runtimeSupport";
 import { shouldResumePageGenerationStatus } from "./pageStatusPolicy";
 import { runLinearSharedResearch } from "./linearResearchWorkflow";
+import { beginPerformanceSpan } from "../../performance/performanceRecorder";
 
 function getActiveGenerationRunKind(input: RunDeckGenerationInput): NonNullable<PageProgress["recovery"]>["run_kind"] {
   return input.refinementRunKind ?? (input.pageRefinementReasons ? "page-refinement" : "deck-generation");
@@ -171,10 +172,17 @@ export async function runDeckGeneration(
     },
   };
 
+  const researchSpan = beginPerformanceSpan({
+    operationName: "research.run",
+    workspaceId: input.workspace.workspace_id,
+    attributes: { layer: "workflow" },
+  });
   try {
     await runLinearSharedResearch(runtime, { resume: input.resumeResearch === true });
+    researchSpan?.finish("ok");
     progress = runtime.getProgress() ?? progress;
   } catch (error) {
+    researchSpan?.finish(isAgentRunCancelledError(error) || input.isCancelled() ? "interrupted" : "error");
     if (isAgentRunCancelledError(error) || input.isCancelled()) {
       const cancelledProgress = createProgress(
         {

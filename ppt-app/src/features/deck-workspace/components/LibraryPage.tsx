@@ -52,6 +52,7 @@ interface LibraryPageProps {
   onFinalizePerformanceRun: () => Promise<void>;
   onAbandonPerformanceRun: () => Promise<void>;
   onViewPerformanceReport: (run: PerformanceRunSummary) => Promise<void>;
+  onRegeneratePerformanceReport: (run: PerformanceRunSummary) => Promise<void>;
   onDeletePerformanceRun: (run: PerformanceRunSummary) => Promise<void>;
 }
 
@@ -91,6 +92,7 @@ export function LibraryPage({
   onFinalizePerformanceRun,
   onAbandonPerformanceRun,
   onViewPerformanceReport,
+  onRegeneratePerformanceReport,
   onDeletePerformanceRun,
 }: LibraryPageProps) {
   const [editing, setEditing] = useState(false);
@@ -184,6 +186,7 @@ export function LibraryPage({
         onFinish={onFinalizePerformanceRun}
         onAbandon={onAbandonPerformanceRun}
         onViewReport={onViewPerformanceReport}
+        onRegenerateReport={onRegeneratePerformanceReport}
         onDelete={onDeletePerformanceRun}
       />
 

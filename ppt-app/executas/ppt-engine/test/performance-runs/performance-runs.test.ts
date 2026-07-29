@@ -11,6 +11,7 @@ import {
   getActivePerformanceRun,
   getPerformanceReportPath,
   listPerformanceRuns,
+  regeneratePerformanceReport,
   startPerformanceRun,
   type PerformanceEvent,
 } from "../../src/performance-runs/index.ts";
@@ -44,6 +45,19 @@ test("Performance Run persists append-only events and generates a report", async
       events: [
         event({ event_type: "span.started", sequence_number: 1 }),
         event({ event_type: "span.finished", sequence_number: 2, duration_ms: 42.5, status: "ok" }),
+        event({ event_type: "button.interaction", sequence_number: 3, span_id: undefined, operation_name: "button.interaction", interaction_delay_ms: 3.2, feedback_delay_ms: 18.5, attributes: { button_id: "brief.create-deck" } }),
+        event({ event_type: "span.finished", sequence_number: 4, span_id: "span-requirements", operation_name: "requirements.create", duration_ms: 1_250, status: "ok" }),
+        event({ event_type: "span.finished", sequence_number: 5, span_id: "span-generation", operation_name: "generation.run", duration_ms: 9_500, status: "ok" }),
+        event({ event_type: "span.finished", sequence_number: 6, span_id: "span-research", operation_name: "research.run", duration_ms: 2_400, status: "ok" }),
+        event({ event_type: "span.finished", sequence_number: 7, span_id: "span-page", operation_name: "page.generation", duration_ms: 4_800, status: "ok", attributes: { page_id: "page-01", page_index: 0 } }),
+        event({ event_type: "span.finished", sequence_number: 8, span_id: "span-authoring", operation_name: "page.authoring", duration_ms: 3_100, status: "ok", attributes: { page_id: "page-01", page_index: 0 } }),
+        event({ event_type: "span.finished", sequence_number: 9, span_id: "span-research", operation_name: "research.run", duration_ms: 3_500, status: "ok" }),
+        event({ event_type: "span.finished", sequence_number: 10, span_id: "span-web-decision", operation_name: "research.web.decision", duration_ms: 500, status: "ok" }),
+        event({ event_type: "span.finished", sequence_number: 11, span_id: "span-web-search-1", operation_name: "web.search", recorded_at: "2026-07-29T08:00:01.000Z", duration_ms: 1_000, status: "ok" }),
+        event({ event_type: "span.finished", sequence_number: 12, span_id: "span-web-search-2", operation_name: "web.search", recorded_at: "2026-07-29T08:00:01.000Z", duration_ms: 1_000, status: "ok" }),
+        event({ event_type: "span.finished", sequence_number: 13, span_id: "span-image-analysis", operation_name: "research.image.analysis", duration_ms: 1_600, status: "ok" }),
+        event({ event_type: "span.finished", sequence_number: 14, span_id: "span-render-fix", operation_name: "page.render_fix", duration_ms: 900, status: "ok", attributes: { page_id: "page-01", page_index: 0 } }),
+        event({ event_type: "span.finished", sequence_number: 15, span_id: "span-visual-review", operation_name: "page.visual_review", duration_ms: 700, status: "ok", attributes: { page_id: "page-01", page_index: 0 } }),
       ],
     });
     const result = await finalizePerformanceRun({ root_dir: rootDir, run_id: run.run_id, locale: "zh" });
@@ -56,9 +70,33 @@ test("Performance Run persists append-only events and generates a report", async
     const html = await readFile(report.report_path, "utf8");
     assert.match(html, /PPT 性能测试报告/);
     assert.match(html, /workspace\.create/);
+    assert.match(html, /耗时前 10 按钮/);
+    assert.match(html, /创建 PPT/);
+    assert.match(html, /PPT 创建流程/);
+    assert.match(html, /演示需求创建/);
+    assert.match(html, /生成过程分解/);
+    assert.match(html, /研究过程/);
+    assert.match(html, /Web 搜索调用/);
+    assert.match(html, /图片 Session 判断/);
+    assert.match(html, /墙钟耗时/);
+    assert.match(html, /Web 搜索调用<\/strong><code>web\.search<\/code><\/td><td>2<\/td><td>1\.00s<\/td><td>2\.00s/);
+    assert.match(html, /页面生成明细/);
+    assert.match(html, /第 1 页/);
+    assert.match(html, /渲染修复/);
+    assert.match(html, /视觉检查/);
+    assert.match(html, /技术诊断数据/);
+    const eventsPath = path.join(rootDir, run.run_id, "events.jsonl");
+    const eventsBeforeRegeneration = await readFile(eventsPath, "utf8");
+    const endedAt = result.run.ended_at;
+    const regenerated = await regeneratePerformanceReport({ root_dir: rootDir, run_id: run.run_id, locale: "en" });
+    assert.equal(regenerated.status, "completed");
+    assert.equal(regenerated.report_locale, "en");
+    assert.equal(regenerated.ended_at, endedAt);
+    assert.equal(await readFile(eventsPath, "utf8"), eventsBeforeRegeneration);
+    assert.match(await readFile(report.report_path, "utf8"), /PPT Performance Report/);
     const listed = await listPerformanceRuns(rootDir);
     assert.equal(listed.runs.length, 1);
-    assert.equal(listed.runs[0]?.event_count, 2);
+    assert.equal(listed.runs[0]?.event_count, 15);
 
     assert.deepEqual(await deletePerformanceRun({ root_dir: rootDir, run_id: run.run_id }), {
       deleted: true,

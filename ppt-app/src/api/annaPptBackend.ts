@@ -205,6 +205,7 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
     "app_start_performance_run",
     "app_append_performance_events",
     "app_finalize_performance_run",
+    "app_regenerate_performance_report",
     "app_abandon_performance_run",
     "app_delete_performance_run",
     "app_prepare_performance_report",
@@ -319,6 +320,8 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       if (result.run.status === "completed") setActivePerformanceRun(null);
       return result;
     },
+    regeneratePerformanceReport: (input) =>
+      invoke<PerformanceRunSummary>(toolIds.pptEngine, "app_regenerate_performance_report", input),
     abandonPerformanceRun: async (input) => {
       await flushPerformanceEvents({ throwOnError: true });
       const result = await invoke<PerformanceRunSummary>(toolIds.pptEngine, "app_abandon_performance_run", input);

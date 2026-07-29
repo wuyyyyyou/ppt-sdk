@@ -278,6 +278,7 @@ export function App() {
               onFinalizePerformanceRun={actions.finalizePerformanceRun}
               onAbandonPerformanceRun={actions.abandonPerformanceRun}
               onViewPerformanceReport={actions.openPerformanceReport}
+              onRegeneratePerformanceReport={actions.regeneratePerformanceReport}
               onDeletePerformanceRun={actions.deletePerformanceRun}
             />
           ) : null}

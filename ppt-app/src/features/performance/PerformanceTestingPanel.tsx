@@ -12,6 +12,7 @@ interface PerformanceTestingPanelProps {
   onFinish: () => Promise<void>;
   onAbandon: () => Promise<void>;
   onViewReport: (run: PerformanceRunSummary) => Promise<void>;
+  onRegenerateReport: (run: PerformanceRunSummary) => Promise<void>;
   onDelete: (run: PerformanceRunSummary) => Promise<void>;
 }
 
@@ -22,7 +23,7 @@ function runStatus(run: PerformanceRunSummary, t: Messages) {
   return t.performance.finalizationFailed;
 }
 
-export function PerformanceTestingPanel({ t, locale, state, onRefresh, onStart, onFinish, onAbandon, onViewReport, onDelete }: PerformanceTestingPanelProps) {
+export function PerformanceTestingPanel({ t, locale, state, onRefresh, onStart, onFinish, onAbandon, onViewReport, onRegenerateReport, onDelete }: PerformanceTestingPanelProps) {
   if (!state.enabled) return null;
   return (
     <div className="performance-testing-box" data-performance-control="true">
@@ -55,6 +56,7 @@ export function PerformanceTestingPanel({ t, locale, state, onRefresh, onStart, 
                 <div className="performance-run-row" key={run.run_id}>
                   <div className="performance-run-main"><strong>{run.run_id}</strong><span>{runStatus(run, t)} · {new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "medium" }).format(new Date(run.started_at))} · {run.event_count} {t.performance.events}</span></div>
                   <div className="performance-run-actions">
+                    {run.status === "completed" ? <button type="button" className="icon-btn" data-performance-exclude="true" aria-label={t.performance.regenerateReport} title={t.performance.regenerateReport} disabled={state.busy} onClick={() => void onRegenerateReport(run)}><RefreshCw size={16} /></button> : null}
                     {run.report_available ? <button type="button" className="icon-btn" data-performance-exclude="true" aria-label={t.performance.viewReport} title={t.performance.viewReport} disabled={state.busy} onClick={() => void onViewReport(run)}><FileText size={16} /></button> : null}
                     {(run.status === "completed" || run.status === "abandoned") ? <button type="button" className="icon-btn danger" data-performance-exclude="true" aria-label={t.performance.deleteRun} title={t.performance.deleteRun} disabled={state.busy} onClick={() => void onDelete(run)}><Trash2 size={16} /></button> : null}
                   </div>

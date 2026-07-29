@@ -5,6 +5,7 @@ import { emit } from "./progressProjection";
 import type { AuthoringDeck, RunDeckGenerationInput } from "./types";
 import { getAttemptLimits } from "./settings";
 import { recordDeckRecovery, throwIfCancelled } from "./runtimeSupport";
+import { beginPerformanceSpan } from "../../performance/performanceRecorder";
 
 export function authoringDeckFromConfirmedOutline(outline: WorkspaceOutline): AuthoringDeck {
   if (outline.status !== "confirmed" || outline.items.some((item) => !item.page_id)) {
@@ -52,33 +53,44 @@ async function ensureWorkspaceStyleGuide(input: RunDeckGenerationInput) {
   if (!input.hostUploadClient) {
     throw new Error("Host Upload is required to persist the Workspace Style Guide");
   }
-  const requirements = input.workspace.requirements;
-  const markdown = await input.aiClient.generateWorkspaceStyleGuide({
-    brief: requirements.source?.brief ?? "",
-    requirements,
-    outline: input.confirmedOutline,
-    logContext: input.aiLogger ? {
-      logger: input.aiLogger,
+  const performanceSpan = beginPerformanceSpan({
+    operationName: "style_guide.create",
+    workspaceId: input.workspace.workspace_id,
+    attributes: { layer: "workflow" },
+  });
+  try {
+    const requirements = input.workspace.requirements;
+    const markdown = await input.aiClient.generateWorkspaceStyleGuide({
+      brief: requirements.source?.brief ?? "",
+      requirements,
+      outline: input.confirmedOutline,
+      logContext: input.aiLogger ? {
+        logger: input.aiLogger,
+        workspace_dir: input.workspace.workspace_dir,
+        domain: "style_guide",
+        operation: "generate_style_guide",
+        operation_id: input.aiLogger.createOperationId("style_guide", "generate_style_guide"),
+        provider: "anna",
+        runtime_mode: "anna",
+      } : undefined,
+    });
+    const file = new File([markdown], "style-guide.md", { type: "text/markdown" });
+    const hostUpload = await input.hostUploadClient.uploadFile(file, {
+      purpose: "user_artifact",
+      filename: "style-guide.md",
+      mimeType: "text/markdown",
+      metadata: { workspace_dir: input.workspace.workspace_dir, artifact: "workspace-style-guide" },
+    });
+    await input.backend.commitWorkspaceStyleGuideHostUpload({
       workspace_dir: input.workspace.workspace_dir,
-      domain: "style_guide",
-      operation: "generate_style_guide",
-      operation_id: input.aiLogger.createOperationId("style_guide", "generate_style_guide"),
-      provider: "anna",
-      runtime_mode: "anna",
-    } : undefined,
-  });
-  const file = new File([markdown], "style-guide.md", { type: "text/markdown" });
-  const hostUpload = await input.hostUploadClient.uploadFile(file, {
-    purpose: "user_artifact",
-    filename: "style-guide.md",
-    mimeType: "text/markdown",
-    metadata: { workspace_dir: input.workspace.workspace_dir, artifact: "workspace-style-guide" },
-  });
-  await input.backend.commitWorkspaceStyleGuideHostUpload({
-    workspace_dir: input.workspace.workspace_dir,
-    size_bytes: hostUpload.size_bytes,
-    host_upload: hostUpload,
-  });
+      size_bytes: hostUpload.size_bytes,
+      host_upload: hostUpload,
+    });
+    performanceSpan?.finish("ok");
+  } catch (error) {
+    performanceSpan?.finish("error");
+    throw error;
+  }
 }
 
 export async function loadResumeArtifacts(input: RunDeckGenerationInput) {

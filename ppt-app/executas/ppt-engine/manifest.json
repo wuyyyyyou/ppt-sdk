@@ -45,6 +45,14 @@
       ]
     },
     {
+      "name": "app_regenerate_performance_report",
+      "description": "Regenerate a completed Performance Run report from its authoritative events.jsonl file.",
+      "parameters": [
+        { "name": "run_id", "type": "string", "required": true, "description": "Completed Performance Run id." },
+        { "name": "locale", "type": "string", "required": true, "description": "Report locale: en or zh." }
+      ]
+    },
+    {
       "name": "app_abandon_performance_run",
       "description": "Abandon the active Performance Run without generating a report.",
       "parameters": [

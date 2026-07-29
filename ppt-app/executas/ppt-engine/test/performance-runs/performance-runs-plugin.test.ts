@@ -68,6 +68,9 @@ test("plugin exposes and runs the Performance Run lifecycle", { timeout: 10_000 
     });
     const finalized = await invoke("app_finalize_performance_run", { run_id: runId, locale: "en" });
     assert.equal((finalized.run as Record<string, unknown>)?.status, "completed");
+    const regenerated = await invoke("app_regenerate_performance_report", { run_id: runId, locale: "zh" });
+    assert.equal(regenerated.status, "completed");
+    assert.equal(regenerated.report_locale, "zh");
     const listed = await invoke("app_list_performance_runs", {});
     assert.equal(Array.isArray(listed.runs) ? listed.runs.length : 0, 1);
   } finally {

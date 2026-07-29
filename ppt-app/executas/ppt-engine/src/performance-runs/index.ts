@@ -130,6 +130,13 @@ async function atomicWriteJson(filePath: string, value: unknown) {
   await rename(temporaryPath, filePath);
 }
 
+async function atomicWriteText(filePath: string, value: string) {
+  await mkdir(path.dirname(filePath), { recursive: true });
+  const temporaryPath = `${filePath}.${randomUUID()}.tmp`;
+  await writeFile(temporaryPath, value, "utf8");
+  await rename(temporaryPath, filePath);
+}
+
 async function readJson<T>(filePath: string): Promise<T> {
   return JSON.parse(await readFile(filePath, "utf8")) as T;
 }
@@ -473,48 +480,241 @@ function percentile(values: number[], fraction: number) {
   return ordered[Math.min(ordered.length - 1, Math.ceil(ordered.length * fraction) - 1)];
 }
 
-function formatMs(value: number) {
-  return `${value.toFixed(value >= 100 ? 0 : 1)} ms`;
+function formatDuration(value: number) {
+  if (value >= 60_000) return `${Math.floor(value / 60_000)}m ${((value % 60_000) / 1_000).toFixed(1)}s`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(value >= 10_000 ? 1 : 2)}s`;
+  return `${value.toFixed(value >= 100 ? 0 : 1)}ms`;
+}
+
+interface PerformanceMetric {
+  name: string;
+  events: PerformanceEvent[];
+  durations: number[];
+  total: number;
+  wall_clock: number;
+  average: number;
+  p95: number;
+  max: number;
+  errors: number;
+  interrupted: number;
+}
+
+function mergedWallClockDuration(events: PerformanceEvent[]) {
+  const intervals = events.map((event) => {
+    const end = Date.parse(event.recorded_at);
+    const duration = event.duration_ms ?? 0;
+    return { start: end - duration, end };
+  }).filter((interval) => Number.isFinite(interval.start) && Number.isFinite(interval.end))
+    .sort((left, right) => left.start - right.start);
+  if (intervals.length === 0) return 0;
+  let total = 0;
+  let start = intervals[0].start;
+  let end = intervals[0].end;
+  for (const interval of intervals.slice(1)) {
+    if (interval.start <= end) {
+      end = Math.max(end, interval.end);
+      continue;
+    }
+    total += end - start;
+    start = interval.start;
+    end = interval.end;
+  }
+  return total + end - start;
+}
+
+function metric(name: string, events: PerformanceEvent[]): PerformanceMetric | null {
+  const measured = events.filter((event) => typeof event.duration_ms === "number");
+  if (measured.length === 0) return null;
+  const durations = measured.map((event) => event.duration_ms ?? 0);
+  const total = durations.reduce((sum, duration) => sum + duration, 0);
+  return {
+    name,
+    events: measured,
+    durations,
+    total,
+    wall_clock: mergedWallClockDuration(measured),
+    average: total / durations.length,
+    p95: percentile(durations, 0.95),
+    max: Math.max(...durations),
+    errors: measured.filter((event) => event.status === "error").length,
+    interrupted: measured.filter((event) => event.status === "interrupted").length,
+  };
+}
+
+function preferredOperationMetric(finished: PerformanceEvent[], name: string) {
+  for (const candidate of [name, `${name}.roundtrip`, `${name}.backend`]) {
+    const result = metric(name, finished.filter((event) => event.operation_name === candidate));
+    if (result) return result;
+  }
+  return null;
+}
+
+function operationLabel(name: string, zh: boolean) {
+  const labels: Record<string, [string, string]> = {
+    "requirements.create": ["演示需求创建", "Requirements creation"],
+    "outline.create": ["大纲创建", "Outline creation"],
+    "outline.rewrite": ["大纲重写", "Outline rewrite"],
+    "generation.run": ["整套生成", "Deck generation"],
+    "authoring_kit.install": ["安装 Authoring Kit", "Install Authoring Kit"],
+    "style_guide.create": ["创建艺术指导", "Create style guide"],
+    "page_sources.prepare": ["准备页面源码", "Prepare page sources"],
+    "research.run": ["研究", "Research"],
+    "research.web.decision": ["判断是否需要 Web 资料", "Decide whether web research is needed"],
+    "research.web.search": ["Web 搜索阶段", "Web search stage"],
+    "web.search": ["Web 搜索调用", "Web search calls"],
+    "research.web.fetch_selection": ["判断需要读取的网页", "Select pages to fetch"],
+    "research.web.fetch": ["Web 正文抓取阶段", "Web fetch stage"],
+    "web.fetch": ["Web 抓取调用", "Web fetch calls"],
+    "research.web.synthesis": ["Web 信息整理", "Web information synthesis"],
+    "research.web.publish": ["发布 Web 研究结果", "Publish web research"],
+    "research.image.decision": ["判断是否需要图片", "Decide whether images are needed"],
+    "research.image.search": ["图片搜索阶段", "Image search stage"],
+    "image.search": ["图片搜索调用", "Image search calls"],
+    "research.image.analysis": ["图片 Session 判断", "Image session assessment"],
+    "image.fetch": ["获取图片下载地址", "Resolve image downloads"],
+    "research.image.download": ["下载图片", "Download images"],
+    "research.image.import": ["上传并导入图片", "Upload and import images"],
+    "research.image.publish": ["发布图片研究结果", "Publish image research"],
+    "page.generation": ["页面生成", "Page generation"],
+    "page.research": ["页面研究", "Page research"],
+    "page.authoring": ["页面创作", "Page authoring"],
+    "page.render": ["页面渲染", "Page render"],
+    "page.render_fix": ["渲染修复", "Render fix"],
+    "page.visual_review": ["视觉检查", "Visual review"],
+    "page.visual_review_fix": ["视觉修复", "Visual review fix"],
+    "final_deck_render": ["最终 Deck 渲染", "Final deck render"],
+    "generation.commit": ["提交生成结果", "Commit generation"],
+    "ai.interaction": ["AI 调用", "AI interaction"],
+    "agent.session": ["Agent 会话", "Agent session"],
+    "host_upload": ["Host Upload", "Host Upload"],
+  };
+  return labels[name]?.[zh ? 0 : 1] ?? name;
+}
+
+function buttonLabel(buttonId: string, zh: boolean) {
+  const labels: Record<string, [string, string]> = {
+    "brief.create-deck": ["创建 PPT", "Create deck"],
+    "requirements.create.retry": ["重试创建演示需求", "Retry requirements creation"],
+    "requirements.save": ["保存演示需求", "Save requirements"],
+    "requirements.confirm": ["确认演示需求", "Confirm requirements"],
+    "outline.create.retry": ["重试创建大纲", "Retry outline creation"],
+    "outline.rewrite": ["重写大纲", "Rewrite outline"],
+    "outline.save": ["保存大纲", "Save outline"],
+    "outline.confirm": ["确认大纲", "Confirm outline"],
+    "generation.resume": ["继续生成", "Resume generation"],
+    "deck.refine-page": ["修改当前页", "Refine page"],
+    "deck.refine-deck": ["修改整套 PPT", "Refine deck"],
+    "deck.preview": ["预览 PPT", "Preview deck"],
+    "deck.export": ["打开导出", "Open export"],
+    "export.pptx.start": ["导出 PPTX", "Export PPTX"],
+    "export.pdf.start": ["导出 PDF", "Export PDF"],
+    "workspace.create": ["新建工作区", "Create workspace"],
+    "workspace.open-latest": ["打开最近工作区", "Open latest workspace"],
+    "my-work.workspace.open": ["打开 PPT", "Open presentation"],
+    "my-work.new-presentation": ["新建 PPT", "New presentation"],
+    "settings.preferences.save": ["保存设置", "Save settings"],
+  };
+  if (labels[buttonId]) return labels[buttonId][zh ? 0 : 1];
+  return buttonId.split(".").map((part) => part.replaceAll("-", " ")).join(" / ");
 }
 
 function createReportHtml(run: PerformanceRunRecord, parsed: ParsedEvents, locale: "en" | "zh") {
   const zh = locale === "zh";
   const finished = parsed.events.filter((event) => event.event_type === "span.finished" && typeof event.duration_ms === "number");
-  const groups = new Map<string, PerformanceEvent[]>();
-  for (const event of finished) {
-    const name = event.operation_name || "unknown";
-    groups.set(name, [...(groups.get(name) ?? []), event]);
-  }
-  const metricRows = Array.from(groups.entries()).map(([name, events]) => {
-    const durations = events.map((event) => event.duration_ms ?? 0);
-    return `<tr><td>${escapeHtml(name)}</td><td>${events.length}</td><td>${formatMs(durations.reduce((a, b) => a + b, 0) / durations.length)}</td><td>${formatMs(percentile(durations, 0.5))}</td><td>${formatMs(percentile(durations, 0.95))}</td><td>${formatMs(Math.max(...durations))}</td><td>${events.filter((event) => event.status === "error").length}</td></tr>`;
-  }).join("");
+  const integrity = run.data_integrity === "complete" && parsed.corruptLineCount === 0 && !hasEventIntegrityIssue(parsed.events) ? "complete" : "degraded";
+  const runDuration = run.ended_at ? Math.max(0, Date.parse(run.ended_at) - Date.parse(run.started_at)) : 0;
+  const failures = finished.filter((event) => event.status === "error" || event.status === "interrupted");
+
   const buttonGroups = new Map<string, PerformanceEvent[]>();
   for (const event of parsed.events.filter((item) => item.event_type === "button.interaction")) {
     const buttonId = String(event.attributes?.button_id ?? "unknown");
     buttonGroups.set(buttonId, [...(buttonGroups.get(buttonId) ?? []), event]);
   }
-  const buttonRows = Array.from(buttonGroups.entries()).map(([buttonId, events]) => {
+  const buttonMetrics = Array.from(buttonGroups.entries()).map(([buttonId, events]) => {
     const interaction = events.map((event) => event.interaction_delay_ms ?? 0);
     const feedback = events.map((event) => event.feedback_delay_ms ?? 0);
-    return `<tr><td>${escapeHtml(buttonId)}</td><td>${events.length}</td><td>${formatMs(interaction.reduce((a, b) => a + b, 0) / interaction.length)}</td><td>${formatMs(percentile(interaction, 0.95))}</td><td>${formatMs(feedback.reduce((a, b) => a + b, 0) / feedback.length)}</td><td>${formatMs(percentile(feedback, 0.95))}</td></tr>`;
-  }).join("");
-  const detailEvents = parsed.events.slice(0, MAX_REPORT_DETAIL_ROWS);
-  const detailRows = detailEvents.map((event) => `<tr><td>${escapeHtml(event.recorded_at)}</td><td>${escapeHtml(event.event_type)}</td><td>${escapeHtml(event.operation_name ?? event.attributes?.button_id ?? "")}</td><td>${event.duration_ms === undefined ? "—" : formatMs(event.duration_ms)}</td><td>${escapeHtml(event.status ?? "")}</td></tr>`).join("");
-  const omitted = Math.max(0, parsed.events.length - detailEvents.length);
-  const integrity = run.data_integrity === "complete" && parsed.corruptLineCount === 0 && !hasEventIntegrityIssue(parsed.events) ? "complete" : "degraded";
+    return {
+      buttonId,
+      count: events.length,
+      interactionAverage: interaction.reduce((sum, value) => sum + value, 0) / interaction.length,
+      feedbackAverage: feedback.reduce((sum, value) => sum + value, 0) / feedback.length,
+      feedbackP95: percentile(feedback, 0.95),
+      feedbackMax: Math.max(...feedback),
+    };
+  }).sort((left, right) => right.feedbackP95 - left.feedbackP95);
+  const topButtons = buttonMetrics.slice(0, 10);
+  const topButtonRows = topButtons.map((item, index) => `<tr><td class="rank">${index + 1}</td><td><strong>${escapeHtml(buttonLabel(item.buttonId, zh))}</strong><code>${escapeHtml(item.buttonId)}</code></td><td>${item.count}</td><td>${formatDuration(item.interactionAverage)}</td><td>${formatDuration(item.feedbackAverage)}</td><td>${formatDuration(item.feedbackP95)}</td><td>${formatDuration(item.feedbackMax)}</td></tr>`).join("");
+
+  const primaryStages = ["requirements.create", "outline.create", "outline.rewrite", "generation.run"];
+  const primaryMetrics = primaryStages.map((name) => ({ name, value: preferredOperationMetric(finished, name) }));
+  const maxPrimaryDuration = Math.max(1, ...primaryMetrics.map((item) => item.value?.wall_clock ?? 0));
+  const stageRows = primaryMetrics.map(({ name, value }) => `<div class="stage-row"><div class="stage-name"><strong>${escapeHtml(operationLabel(name, zh))}</strong><code>${name}</code></div><div class="stage-track"><i style="width:${value ? Math.max(2, value.wall_clock / maxPrimaryDuration * 100) : 0}%"></i></div><div class="stage-value">${value ? `<strong>${formatDuration(value.wall_clock)}</strong><span>${value.events.length}${zh ? " 次" : " runs"}${value.errors + value.interrupted ? ` · ${value.errors + value.interrupted} ${zh ? "异常" : "issues"}` : ""}</span>` : `<span>${zh ? "未记录" : "Not recorded"}</span>`}</div></div>`).join("");
+
+  const pageGroups = new Map<string, PerformanceEvent[]>();
+  for (const event of finished) {
+    const pageId = event.attributes?.page_id;
+    if (typeof pageId !== "string" || !pageId) continue;
+    pageGroups.set(pageId, [...(pageGroups.get(pageId) ?? []), event]);
+  }
+  const pageRows = Array.from(pageGroups.entries()).map(([pageId, events]) => {
+    const pageIndex = Math.min(...events.map((event) => Number(event.attributes?.page_index ?? Number.MAX_SAFE_INTEGER)));
+    const stageFor = (...names: string[]) => {
+      const matching = events.filter((event) => names.includes(event.operation_name ?? ""));
+      return { duration: matching.reduce((sum, event) => sum + (event.duration_ms ?? 0), 0), count: matching.length };
+    };
+    const total = stageFor("page.generation");
+    const issues = events.filter((event) => event.status === "error" || event.status === "interrupted").length;
+    return { pageId, pageIndex, total, authoring: stageFor("page.authoring"), render: stageFor("page.render"), renderFix: stageFor("page.render_fix"), review: stageFor("page.visual_review"), reviewFix: stageFor("page.visual_review_fix"), issues };
+  }).sort((left, right) => left.pageIndex - right.pageIndex);
+  const stageCell = (stage: { duration: number; count: number }) => stage.count > 0
+    ? `${formatDuration(stage.duration)}<small>${stage.count}${zh ? " 次" : " runs"}</small>`
+    : "—";
+  const pageDetailRows = pageRows.map((item) => `<tr><td><strong>${zh ? `第 ${item.pageIndex + 1} 页` : `Page ${item.pageIndex + 1}`}</strong><code>${escapeHtml(item.pageId)}</code></td><td>${stageCell(item.total)}</td><td>${stageCell(item.authoring)}</td><td>${stageCell(item.render)}</td><td>${stageCell(item.renderFix)}</td><td>${stageCell(item.review)}</td><td>${stageCell(item.reviewFix)}</td><td>${item.issues}</td></tr>`).join("");
+
+  const operationGroups = new Map<string, PerformanceEvent[]>();
+  for (const event of finished) {
+    const name = event.operation_name || "unknown";
+    operationGroups.set(name, [...(operationGroups.get(name) ?? []), event]);
+  }
+  const operationMetrics = Array.from(operationGroups.entries()).map(([name, events]) => metric(name, events)).filter((item): item is PerformanceMetric => item !== null);
+  const slowOperations = operationMetrics.filter((item) => !item.name.endsWith(".backend") && !item.name.endsWith(".roundtrip") && !item.name.startsWith("tool.")).sort((left, right) => right.max - left.max).slice(0, 10);
+  const slowRows = slowOperations.map((item, index) => `<tr><td class="rank">${index + 1}</td><td><strong>${escapeHtml(operationLabel(item.name, zh))}</strong><code>${escapeHtml(item.name)}</code></td><td>${item.events.length}</td><td>${formatDuration(item.average)}</td><td>${formatDuration(item.p95)}</td><td>${formatDuration(item.max)}</td><td>${item.errors + item.interrupted}</td></tr>`).join("");
+
+  const diagnosticRows = operationMetrics.sort((left, right) => right.max - left.max).map((item) => `<tr><td><code>${escapeHtml(item.name)}</code></td><td>${item.events.length}</td><td>${formatDuration(item.average)}</td><td>${formatDuration(item.p95)}</td><td>${formatDuration(item.max)}</td><td>${item.errors + item.interrupted}</td></tr>`).join("");
+  const issueEvents = parsed.events.filter((event) => event.event_type === "data.loss" || event.status === "error" || event.status === "interrupted").slice(0, MAX_REPORT_DETAIL_ROWS);
+  const issueRows = issueEvents.map((event) => `<tr><td>${escapeHtml(event.recorded_at)}</td><td>${escapeHtml(event.event_type)}</td><td><code>${escapeHtml(event.operation_name ?? event.attributes?.button_id ?? "")}</code></td><td>${event.duration_ms === undefined ? "—" : formatDuration(event.duration_ms)}</td><td>${escapeHtml(event.status ?? event.attributes?.reason ?? "")}</td></tr>`).join("");
+
   const labels = zh ? {
-    title: "PPT 性能测试报告", overview: "运行概览", started: "开始时间", ended: "结束时间", status: "运行状态",
-    integrity: "数据完整性", events: "有效事件", corrupt: "损坏行", metrics: "操作指标", operation: "操作",
-    count: "次数", average: "平均", max: "最大", errors: "错误", details: "事件明细", time: "时间", type: "类型", buttons: "按钮交互指标", button: "按钮", interaction: "交互延迟", feedback: "反馈延迟",
-    duration: "耗时", omitted: `另有 ${omitted} 条原始事件未复制到报告，请查看 events.jsonl。`, noMetrics: "没有可聚合的已完成操作。",
+    title: "PPT 性能测试报告", subtitle: "面向测试人员的业务流程耗时与交互反馈摘要", overview: "运行摘要", total: "测试总时长", generation: "整套生成耗时", clicks: "按钮点击", slowestButton: "最慢按钮反馈", issues: "异常操作", integrity: "数据完整性", slowButtons: "耗时前 10 按钮", buttonNote: "按钮耗时表示浏览器收到点击后到下一帧反馈的 UI 延迟，不代表后台任务完成时间。", rank: "排名", button: "按钮名称", count: "次数", interaction: "平均交互", feedbackAverage: "平均反馈", feedbackP95: "反馈 P95", maximum: "最大", workflow: "PPT 创建流程", workflowNote: "业务阶段显示系统处理时间，不包含测试人员阅读、编辑和确认时的停留时间。", generationBreakdown: "生成过程分解", generationNote: "墙钟耗时合并了并行区间，表示实际等待；累计耗时表示全部调用工作量。父子阶段可能相互包含，不能直接相加。", preparation: "生成准备", research: "研究过程", pages: "逐页生成", completion: "生成收尾", pageBreakdown: "页面生成明细", page: "页面", authoring: "创作", render: "渲染", renderFix: "渲染修复", visualReview: "视觉检查", visualReviewFix: "视觉修复", stage: "阶段", wallClock: "墙钟耗时", totalWork: "累计耗时", average: "平均", errors: "异常", slowOperations: "最慢业务操作", diagnostics: "技术诊断数据", diagnosticsNote: "用于开发排查的底层 Tool、backend 和 roundtrip 指标。", issueDetails: "错误、中断与数据丢失", noData: "本次运行没有相应数据。", events: "个事件", started: "开始", ended: "结束",
   } : {
-    title: "PPT Performance Report", overview: "Run overview", started: "Started", ended: "Ended", status: "Run status",
-    integrity: "Data integrity", events: "Valid events", corrupt: "Corrupt lines", metrics: "Operation metrics", operation: "Operation",
-    count: "Count", average: "Average", max: "Max", errors: "Errors", details: "Event details", time: "Time", type: "Type", buttons: "Button interaction metrics", button: "Button", interaction: "Interaction delay", feedback: "Feedback delay",
-    duration: "Duration", omitted: `${omitted} additional raw events are omitted from this report. See events.jsonl.`, noMetrics: "No completed operations were available for aggregation.",
+    title: "PPT Performance Report", subtitle: "Business workflow timing and interaction feedback for testers", overview: "Run summary", total: "Run duration", generation: "Deck generation", clicks: "Button clicks", slowestButton: "Slowest button feedback", issues: "Operation issues", integrity: "Data integrity", slowButtons: "Top 10 slowest buttons", buttonNote: "Button timing measures browser UI feedback from click receipt to the next frame. It is not backend task completion time.", rank: "Rank", button: "Button", count: "Count", interaction: "Avg interaction", feedbackAverage: "Avg feedback", feedbackP95: "Feedback P95", maximum: "Max", workflow: "PPT creation workflow", workflowNote: "Business stages show system processing time and exclude time spent by the tester reading, editing, or confirming.", generationBreakdown: "Generation breakdown", generationNote: "Wall-clock time merges overlapping intervals and represents actual waiting time. Cumulative time represents total work. Parent and child stages may overlap and must not be added together.", preparation: "Generation preparation", research: "Research", pages: "Page generation", completion: "Generation completion", pageBreakdown: "Page generation details", page: "Page", authoring: "Authoring", render: "Render", renderFix: "Render fixes", visualReview: "Visual review", visualReviewFix: "Visual fixes", stage: "Stage", wallClock: "Wall clock", totalWork: "Cumulative", average: "Average", errors: "Issues", slowOperations: "Slowest business operations", diagnostics: "Technical diagnostics", diagnosticsNote: "Low-level Tool, backend, and roundtrip metrics for engineering diagnosis.", issueDetails: "Errors, interruptions, and data loss", noData: "No corresponding data was recorded in this run.", events: "events", started: "Started", ended: "Ended",
   };
-  return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:"><title>${labels.title}</title><style>body{margin:0;background:#f5f6f8;color:#1d2433;font:14px/1.5 system-ui,sans-serif}main{max-width:1180px;margin:auto;padding:28px}h1{font-size:24px;margin:0 0 20px}h2{font-size:16px;margin:28px 0 10px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:#d9dee8;border:1px solid #d9dee8}.item{background:#fff;padding:12px}.item span{display:block;color:#687083;font-size:12px}.item strong{display:block;margin-top:4px}.degraded{color:#b42318}table{width:100%;border-collapse:collapse;background:#fff;font-size:12px}th,td{text-align:left;padding:9px 10px;border:1px solid #e1e5ec}th{background:#f0f2f6}p.note{color:#687083;font-size:12px}</style></head><body><main><h1>${labels.title}</h1><section><h2>${labels.overview}</h2><div class="grid"><div class="item"><span>Run ID</span><strong>${escapeHtml(run.run_id)}</strong></div><div class="item"><span>${labels.started}</span><strong>${escapeHtml(run.started_at)}</strong></div><div class="item"><span>${labels.ended}</span><strong>${escapeHtml(run.ended_at)}</strong></div><div class="item"><span>${labels.status}</span><strong>${escapeHtml(run.status)}</strong></div><div class="item"><span>${labels.integrity}</span><strong class="${integrity}">${integrity}</strong></div><div class="item"><span>${labels.events}</span><strong>${parsed.events.length}</strong></div><div class="item"><span>${labels.corrupt}</span><strong>${parsed.corruptLineCount}</strong></div></div></section><section><h2>${labels.metrics}</h2>${metricRows ? `<table><thead><tr><th>${labels.operation}</th><th>${labels.count}</th><th>${labels.average}</th><th>P50</th><th>P95</th><th>${labels.max}</th><th>${labels.errors}</th></tr></thead><tbody>${metricRows}</tbody></table>` : `<p>${labels.noMetrics}</p>`}</section><section><h2>${labels.buttons}</h2>${buttonRows ? `<table><thead><tr><th>${labels.button}</th><th>${labels.count}</th><th>${labels.interaction} ${labels.average}</th><th>${labels.interaction} P95</th><th>${labels.feedback} ${labels.average}</th><th>${labels.feedback} P95</th></tr></thead><tbody>${buttonRows}</tbody></table>` : `<p>${labels.noMetrics}</p>`}</section><section><h2>${labels.details}</h2><table><thead><tr><th>${labels.time}</th><th>${labels.type}</th><th>${labels.operation}</th><th>${labels.duration}</th><th>${labels.status}</th></tr></thead><tbody>${detailRows}</tbody></table>${omitted ? `<p class="note">${labels.omitted}</p>` : ""}</section></main></body></html>`;
+  const generationGroups = [
+    { title: labels.preparation, stages: ["authoring_kit.install", "style_guide.create", "page_sources.prepare"] },
+    { title: labels.research, stages: ["research.run", "research.web.decision", "research.web.search", "web.search", "research.web.fetch_selection", "research.web.fetch", "web.fetch", "research.web.synthesis", "research.web.publish", "research.image.decision", "research.image.search", "image.search", "research.image.analysis", "image.fetch", "research.image.download", "research.image.import", "research.image.publish"] },
+    { title: labels.pages, stages: ["page.generation", "page.authoring", "page.render", "page.render_fix", "page.visual_review", "page.visual_review_fix"] },
+    { title: labels.completion, stages: ["final_deck_render", "generation.commit"] },
+  ];
+  const generationGroupHtml = generationGroups.map((group) => {
+    const rows = group.stages
+      .map((name) => preferredOperationMetric(finished, name))
+      .filter((item): item is PerformanceMetric => item !== null)
+      .map((item) => `<tr><td><strong>${escapeHtml(operationLabel(item.name, zh))}</strong><code>${item.name}</code></td><td>${item.events.length}</td><td>${formatDuration(item.wall_clock)}</td><td>${formatDuration(item.total)}</td><td>${formatDuration(item.average)}</td><td>${formatDuration(item.p95)}</td><td>${formatDuration(item.max)}</td><td>${item.errors + item.interrupted}</td></tr>`)
+      .join("");
+    return `<div class="generation-group"><h3>${escapeHtml(group.title)}</h3>${rows ? `<div class="table-wrap"><table><thead><tr><th>${labels.stage}</th><th>${labels.count}</th><th>${labels.wallClock}</th><th>${labels.totalWork}</th><th>${labels.average}</th><th>P95</th><th>${labels.maximum}</th><th>${labels.errors}</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty">${labels.noData}</div>`}</div>`;
+  }).join("");
+  const generationMetric = preferredOperationMetric(finished, "generation.run");
+  const slowestButton = topButtons[0];
+  const summaryItems = [
+    [labels.total, formatDuration(runDuration)],
+    [labels.generation, generationMetric ? formatDuration(generationMetric.wall_clock) : "—"],
+    [labels.clicks, String(parsed.events.filter((event) => event.event_type === "button.interaction").length)],
+    [labels.slowestButton, slowestButton ? formatDuration(slowestButton.feedbackP95) : "—"],
+    [labels.issues, String(failures.length)],
+    [zh ? "事件文件完整性" : "Event file integrity", integrity],
+  ].map(([label, value]) => `<div class="summary-item"><span>${label}</span><strong class="${value === "degraded" ? "danger" : ""}">${escapeHtml(value)}</strong></div>`).join("");
+
+  return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:"><title>${labels.title}</title><style>:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#202737;font:14px/1.5 system-ui,-apple-system,sans-serif}main{max-width:1180px;margin:auto;padding:32px 24px 56px}header.report-header{padding:0 0 24px;border-bottom:1px solid #dce1e8}h1{font-size:28px;line-height:1.2;margin:0}header p{margin:7px 0 0;color:#657084}header small{display:block;margin-top:15px;color:#7b8495}h2{font-size:19px;margin:32px 0 6px}h3{font-size:14px;margin:20px 0 8px}.generation-group:first-of-type h3{margin-top:14px}section>p.note{margin:0 0 14px;color:#687386;font-size:13px}.summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid #dce1e8;background:#dce1e8;gap:1px}.summary-item{background:#fff;padding:16px 18px;min-height:82px}.summary-item span{display:block;color:#687386;font-size:12px}.summary-item strong{display:block;margin-top:7px;font-size:21px}.danger{color:#b42318}table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #dce1e8;font-size:13px}th,td{text-align:left;padding:11px 12px;border-bottom:1px solid #e3e7ed;vertical-align:middle}th{background:#edf0f4;color:#4f5b6d;font-size:12px}tbody tr:last-child td{border-bottom:0}td.rank{width:52px;color:#7b8495}td strong{display:block;font-weight:600}td small{display:block;margin-top:2px;color:#778195;font-size:11px}code{display:block;margin-top:2px;color:#778195;font:11px/1.35 ui-monospace,SFMono-Regular,monospace;overflow-wrap:anywhere}.stage-list{background:#fff;border:1px solid #dce1e8}.stage-row{display:grid;grid-template-columns:minmax(180px,1.2fr) minmax(180px,2fr) minmax(115px,.7fr);gap:18px;align-items:center;padding:15px 18px;border-bottom:1px solid #e3e7ed}.stage-row:last-child{border-bottom:0}.stage-name strong,.stage-value strong,.stage-value span{display:block}.stage-track{height:8px;background:#e8ebf0;overflow:hidden}.stage-track i{display:block;height:100%;background:#267a5b}.stage-value{text-align:right}.stage-value span{color:#778195;font-size:11px}.empty{padding:18px;background:#fff;border:1px solid #dce1e8;color:#778195}details{margin-top:16px;border:1px solid #dce1e8;background:#fff}summary{cursor:pointer;padding:14px 16px;font-weight:600}details .details-body{padding:0 16px 16px;overflow:auto}.table-wrap{overflow:auto;border:1px solid #dce1e8}.table-wrap table{border:0;min-width:860px}@media(max-width:720px){main{padding:22px 14px 40px}.summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stage-row{grid-template-columns:1fr}.stage-value{text-align:left}h1{font-size:24px}}@media(max-width:430px){.summary-grid{grid-template-columns:1fr}}</style></head><body><main><header class="report-header"><h1>${labels.title}</h1><p>${labels.subtitle}</p><small>Run ID: ${escapeHtml(run.run_id)} · ${labels.started}: ${escapeHtml(run.started_at)} · ${labels.ended}: ${escapeHtml(run.ended_at)} · ${parsed.events.length} ${labels.events}</small></header><section><h2>${labels.overview}</h2><div class="summary-grid">${summaryItems}</div></section><section><h2>${labels.slowButtons}</h2><p class="note">${labels.buttonNote}</p>${topButtonRows ? `<div class="table-wrap"><table><thead><tr><th>${labels.rank}</th><th>${labels.button}</th><th>${labels.count}</th><th>${labels.interaction}</th><th>${labels.feedbackAverage}</th><th>${labels.feedbackP95}</th><th>${labels.maximum}</th></tr></thead><tbody>${topButtonRows}</tbody></table></div>` : `<div class="empty">${labels.noData}</div>`}</section><section><h2>${labels.workflow}</h2><p class="note">${labels.workflowNote}</p><div class="stage-list">${stageRows}</div></section><section><h2>${labels.generationBreakdown}</h2><p class="note">${labels.generationNote}</p>${generationGroupHtml}</section><section><h2>${labels.pageBreakdown}</h2>${pageDetailRows ? `<div class="table-wrap"><table><thead><tr><th>${labels.page}</th><th>${labels.total}</th><th>${labels.authoring}</th><th>${labels.render}</th><th>${labels.renderFix}</th><th>${labels.visualReview}</th><th>${labels.visualReviewFix}</th><th>${labels.errors}</th></tr></thead><tbody>${pageDetailRows}</tbody></table></div>` : `<div class="empty">${labels.noData}</div>`}</section><section><h2>${labels.slowOperations}</h2>${slowRows ? `<div class="table-wrap"><table><thead><tr><th>${labels.rank}</th><th>${labels.stage}</th><th>${labels.count}</th><th>${labels.average}</th><th>P95</th><th>${labels.maximum}</th><th>${labels.errors}</th></tr></thead><tbody>${slowRows}</tbody></table></div>` : `<div class="empty">${labels.noData}</div>`}</section><section><h2>${labels.diagnostics}</h2><p class="note">${labels.diagnosticsNote}</p><details><summary>${labels.diagnostics}</summary><div class="details-body"><div class="table-wrap"><table><thead><tr><th>${labels.stage}</th><th>${labels.count}</th><th>${labels.average}</th><th>P95</th><th>${labels.maximum}</th><th>${labels.errors}</th></tr></thead><tbody>${diagnosticRows}</tbody></table></div></div></details><details><summary>${labels.issueDetails} (${issueEvents.length})</summary><div class="details-body">${issueRows ? `<div class="table-wrap"><table><thead><tr><th>${zh ? "时间" : "Time"}</th><th>${zh ? "类型" : "Type"}</th><th>${labels.stage}</th><th>${zh ? "耗时" : "Duration"}</th><th>${zh ? "状态" : "Status"}</th></tr></thead><tbody>${issueRows}</tbody></table></div>` : `<div class="empty">${labels.noData}</div>`}</div></details></section></main></body></html>`;
 }
 
 export async function finalizePerformanceRun(input: {
@@ -562,7 +762,7 @@ export async function finalizePerformanceRun(input: {
     run = { ...run, status: "completed", report_status: "generated", ended_at: isoNow(), updated_at: isoNow() };
     const html = createReportHtml(run, parsed, input.locale);
     if (Buffer.byteLength(html) > MAX_REPORT_BYTES) throw new Error(`Performance report exceeds ${MAX_REPORT_BYTES} bytes`);
-    await writeFile(paths.report_path, html, "utf8");
+    await atomicWriteText(paths.report_path, html);
     await atomicWriteJson(paths.run_path, run);
     await rm(paths.active_run_path, { force: true });
     return { run: await toSummary(run, rootDir), requires_force: false, active_span_count: active.size };
@@ -570,6 +770,50 @@ export async function finalizePerformanceRun(input: {
     run = {
       ...run,
       status: "finalization_failed",
+      report_status: "failed",
+      report_error: error instanceof Error ? error.message : String(error),
+      updated_at: isoNow(),
+    };
+    await atomicWriteJson(paths.run_path, run);
+    throw error;
+  }
+}
+
+export async function regeneratePerformanceReport(input: {
+  run_id: string;
+  locale: "en" | "zh";
+  root_dir?: string;
+}): Promise<PerformanceRunSummary> {
+  const rootDir = input.root_dir ?? DEFAULT_ROOT;
+  const paths = getPerformanceRunPaths(input.run_id, rootDir);
+  let run = await readRun(input.run_id, rootDir);
+  if (run.status !== "completed") {
+    throw new Error(`Performance Run ${run.run_id} cannot regenerate a report from ${run.status}`);
+  }
+  try {
+    const parsed = await parseEvents(paths.events_path);
+    const dataIntegrity = parsed.corruptLineCount > 0 || hasEventIntegrityIssue(parsed.events)
+      ? "degraded"
+      : "complete";
+    run = {
+      ...run,
+      data_integrity: dataIntegrity,
+      report_locale: input.locale,
+      report_status: "generated",
+      report_error: null,
+      updated_at: isoNow(),
+    };
+    const html = createReportHtml(run, parsed, input.locale);
+    if (Buffer.byteLength(html) > MAX_REPORT_BYTES) {
+      throw new Error(`Performance report exceeds ${MAX_REPORT_BYTES} bytes`);
+    }
+    await atomicWriteText(paths.report_path, html);
+    await atomicWriteJson(paths.run_path, run);
+    return toSummary(run, rootDir);
+  } catch (error) {
+    run = {
+      ...run,
+      report_locale: input.locale,
       report_status: "failed",
       report_error: error instanceof Error ? error.message : String(error),
       updated_at: isoNow(),

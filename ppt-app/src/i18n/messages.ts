@@ -421,6 +421,7 @@ export interface Messages {
     history: string;
     empty: string;
     viewReport: string;
+    regenerateReport: string;
     deleteRun: string;
     refresh: string;
     events: string;
@@ -434,6 +435,7 @@ export interface Messages {
     reportLoading: string;
     started: string;
     reportGenerated: string;
+    reportRegenerated: string;
     activeOperationsTitle: string;
     activeOperationsBody: string;
     keepRecording: string;
@@ -449,6 +451,7 @@ export interface Messages {
     abandonFailed: string;
     deleteFailed: string;
     reportFailed: string;
+    regenerateFailed: string;
   };
   myWork: {
     title: string;
@@ -1037,6 +1040,7 @@ export const messages: Record<Locale, Messages> = {
       history: "Run history",
       empty: "No Performance Runs yet.",
       viewReport: "View report",
+      regenerateReport: "Regenerate report",
       deleteRun: "Delete run",
       refresh: "Refresh runs",
       events: "events",
@@ -1050,6 +1054,7 @@ export const messages: Record<Locale, Messages> = {
       reportLoading: "Loading report...",
       started: "Performance recording started.",
       reportGenerated: "Performance report generated.",
+      reportRegenerated: "Performance report regenerated.",
       activeOperationsTitle: "Operations are still active",
       activeOperationsBody: "{count} operations are unfinished. Force finish marks their measurements as interrupted but does not stop product tasks.",
       keepRecording: "Keep recording",
@@ -1064,7 +1069,8 @@ export const messages: Record<Locale, Messages> = {
       finalizeFailed: "Failed to finalize Performance Run.",
       abandonFailed: "Failed to abandon Performance Run.",
       deleteFailed: "Failed to delete Performance Run.",
-      reportFailed: "Failed to open Performance Report."
+      reportFailed: "Failed to open Performance Report.",
+      regenerateFailed: "Failed to regenerate Performance Report."
     },
     myWork: {
       title: "My Works",
@@ -1653,6 +1659,7 @@ export const messages: Record<Locale, Messages> = {
       history: "历史记录",
       empty: "暂无性能测试记录。",
       viewReport: "查看报告",
+      regenerateReport: "重新生成报告",
       deleteRun: "删除记录",
       refresh: "刷新记录",
       events: "条事件",
@@ -1666,6 +1673,7 @@ export const messages: Record<Locale, Messages> = {
       reportLoading: "正在加载报告……",
       started: "性能记录已开始。",
       reportGenerated: "性能报告已生成。",
+      reportRegenerated: "性能报告已重新生成。",
       activeOperationsTitle: "仍有操作正在记录",
       activeOperationsBody: "仍有 {count} 个操作未完成。强制结束会将这些测量标记为中断，但不会停止正在执行的产品任务。",
       keepRecording: "继续记录",
@@ -1680,7 +1688,8 @@ export const messages: Record<Locale, Messages> = {
       finalizeFailed: "性能记录结束失败。",
       abandonFailed: "放弃性能记录失败。",
       deleteFailed: "删除性能记录失败。",
-      reportFailed: "打开性能报告失败。"
+      reportFailed: "打开性能报告失败。",
+      regenerateFailed: "重新生成性能报告失败。"
     },
     myWork: {
       title: "我的作品",

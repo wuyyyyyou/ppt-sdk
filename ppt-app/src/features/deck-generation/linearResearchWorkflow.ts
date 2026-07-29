@@ -22,6 +22,7 @@ import { emitRuntime } from "./progressProjection";
 import { getAttemptLimits, getResearchImageSessionConcurrency, getResearchSearchControlSettings } from "./settings";
 import { throwIfCancelled } from "./runtimeSupport";
 import type { DeckGenerationRuntime } from "./types";
+import { beginPerformanceSpan } from "../../performance/performanceRecorder";
 
 type StageKey =
   | "web_decision"
@@ -34,6 +35,28 @@ type StageKey =
   | "image_import";
 
 type ImageWorkState = "waiting" | "running" | "completed" | "warning";
+
+async function measureResearchOperation<T>(
+  runtime: DeckGenerationRuntime,
+  operationName: string,
+  task: () => Promise<T>,
+  attributes: Record<string, string | number | boolean | null> = {},
+  layer = "workflow",
+): Promise<T> {
+  const span = beginPerformanceSpan({
+    operationName,
+    workspaceId: runtime.workspace.workspace_id,
+    attributes: { layer, ...attributes },
+  });
+  try {
+    const result = await task();
+    span?.finish("ok");
+    return result;
+  } catch (error) {
+    span?.finish(isAgentRunCancelledError(error) || runtime.isCancelled() ? "interrupted" : "error");
+    throw error;
+  }
+}
 
 interface ImageSearchOccurrence extends ResearchImageSearchResult {
   occurrence_id: string;
@@ -718,35 +741,43 @@ async function importSelectedImage(
   const reusedExistingContent = Boolean(importPromise);
   if (!importPromise) {
     importPromise = (async () => {
-      const blob = await downloadResearchApsImage(
+      const blob = await measureResearchOperation(
         runtime,
-        fetched,
-        candidate.candidate_id,
-        researchWebOperationId,
-        imageFetchContext.interaction_id,
+        "research.image.download",
+        () => downloadResearchApsImage(
+          runtime,
+          fetched,
+          candidate.candidate_id,
+          researchWebOperationId,
+          imageFetchContext.interaction_id,
+        ),
+        { candidate_id: candidate.candidate_id, size_bytes: fetched.bytes_size },
+        "research-image-transfer",
       );
       const mimeType = fetched.mime_type || blob.type;
       const extension = mimeType === "image/png" ? ".png" : mimeType === "image/webp" ? ".webp" : mimeType === "image/gif" ? ".gif" : ".jpg";
       const file = new File([blob], `${candidate.candidate_id}${extension}`, { type: mimeType });
-      const hostUpload = await runtime.hostUploadClient!.uploadFile(file, {
-        purpose: "image_reference",
-        filename: file.name,
-        mimeType,
-        metadata: {
+      return measureResearchOperation(runtime, "research.image.import", async () => {
+        const hostUpload = await runtime.hostUploadClient!.uploadFile(file, {
+          purpose: "image_reference",
+          filename: file.name,
+          mimeType,
+          metadata: {
+            workspace_dir: runtime.workspace.workspace_dir,
+            source: "research_image_fetch",
+            operation_id: researchWebOperationId,
+            parent_interaction_id: imageFetchContext.interaction_id,
+          },
+        });
+        return runtime.backend.importSharedResearchImageHostUpload({
           workspace_dir: runtime.workspace.workspace_dir,
-          source: "research_image_fetch",
-          operation_id: researchWebOperationId,
-          parent_interaction_id: imageFetchContext.interaction_id,
-        },
-      });
-      return runtime.backend.importSharedResearchImageHostUpload({
-        workspace_dir: runtime.workspace.workspace_dir,
-        candidate_id: candidate.candidate_id,
-        mime_type: mimeType,
-        size_bytes: hostUpload.size_bytes,
-        sha256: fetched.sha256,
-        host_upload: hostUpload,
-      });
+          candidate_id: candidate.candidate_id,
+          mime_type: mimeType,
+          size_bytes: hostUpload.size_bytes,
+          sha256: fetched.sha256,
+          host_upload: hostUpload,
+        });
+      }, { candidate_id: candidate.candidate_id, size_bytes: file.size }, "research-image-transfer");
     })();
     importsBySha256.set(fetched.sha256, importPromise);
   }
@@ -800,9 +831,14 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
     await setStage(runtime, checkpoint, "web_decision", "running", persist);
     try {
       checkpoint.web ??= {};
-      checkpoint.web.decision = controls.disableWebResearch
-        ? { needs_search: false, queries: [], rationale: "Web research is disabled by the user setting." }
-        : await runtime.researchAiClient.decideWebResearch(decisionContext("web_research_decision"));
+      checkpoint.web.decision = await measureResearchOperation(
+        runtime,
+        "research.web.decision",
+        () => controls.disableWebResearch
+          ? Promise.resolve({ needs_search: false, queries: [], rationale: "Web research is disabled by the user setting." })
+          : runtime.researchAiClient.decideWebResearch(decisionContext("web_research_decision")),
+        { disabled: controls.disableWebResearch },
+      );
       await setStage(runtime, checkpoint, "web_decision", checkpoint.web.decision.needs_search ? "completed" : "skipped", persist);
     } catch (error) {
       checkpoint.web = {
@@ -838,22 +874,23 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
       checkpoint.web ??= {};
       checkpoint.web.searches ??= [];
       const existingQueries = new Set(checkpoint.web.searches.map((item) => item.query));
-      await Promise.all(decision.queries.filter((query) => !existingQueries.has(query)).map(async (query) => {
-        try {
-          const response = await runtime.researchWebClient.search(
-            { query, max_results: 6 },
-            researchWebCallContext(runtime, researchWebOperationId),
-          );
-          const queryIndex = decision.queries.indexOf(query);
-          const results = response.results.map((result, resultIndex) => ({ ...result, result_id: `web-q${queryIndex + 1}-r${resultIndex + 1}` }));
-          checkpoint.web!.searches!.push({ query, status: results.length > 0 ? "completed" : "warning", result: results, ...(results.length === 0 ? { error: "No results" } : {}) });
-        } catch (error) {
-          checkpoint.web!.searches!.push({ query, status: "warning", error: errorMessage(error) });
-          checkpoint.web!.diagnostic_errors = appendUnique(checkpoint.web!.diagnostic_errors, `${query}: ${errorMessage(error)}`);
-          await logResearchError(runtime, "web-search", error, { query });
-        }
-        await persist();
-      }));
+      const pendingQueries = decision.queries.filter((query) => !existingQueries.has(query));
+      await measureResearchOperation(runtime, "research.web.search", () => Promise.all(pendingQueries.map(async (query) => {
+          try {
+            const response = await runtime.researchWebClient.search(
+              { query, max_results: 6 },
+              researchWebCallContext(runtime, researchWebOperationId),
+            );
+            const queryIndex = decision.queries.indexOf(query);
+            const results = response.results.map((result, resultIndex) => ({ ...result, result_id: `web-q${queryIndex + 1}-r${resultIndex + 1}` }));
+            checkpoint.web!.searches!.push({ query, status: results.length > 0 ? "completed" : "warning", result: results, ...(results.length === 0 ? { error: "No results" } : {}) });
+          } catch (error) {
+            checkpoint.web!.searches!.push({ query, status: "warning", error: errorMessage(error) });
+            checkpoint.web!.diagnostic_errors = appendUnique(checkpoint.web!.diagnostic_errors, `${query}: ${errorMessage(error)}`);
+            await logResearchError(runtime, "web-search", error, { query });
+          }
+          await persist();
+        })).then(() => undefined), { query_count: pendingQueries.length });
       const allResults = checkpoint.web.searches.flatMap((item) => item.result ?? []);
       const gaps = checkpoint.web.searches.flatMap((item) => item.error
         ? [runtime.locale === "zh" ? `搜索词“${item.query}”未获得可用结果。` : `No usable result was collected for query “${item.query}”.`]
@@ -866,7 +903,12 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
       } else {
         if (!checkpoint.web.fetch_result_ids) {
           try {
-            const selected = await runtime.researchAiClient.selectWebFetchResults({ ...decisionContext("web_fetch_selection"), results: allResults });
+            const selected = await measureResearchOperation(
+              runtime,
+              "research.web.fetch_selection",
+              () => runtime.researchAiClient.selectWebFetchResults({ ...decisionContext("web_fetch_selection"), results: allResults }),
+              { result_count: allResults.length },
+            );
             const knownIds = new Set(allResults.map((item) => item.result_id));
             checkpoint.web.fetch_result_ids = [...new Set(selected.filter((id) => knownIds.has(id)))].slice(0, 10);
           } catch (error) {
@@ -881,14 +923,17 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
           const urls = dedupeExactUrls(checkpoint.web.fetch_result_ids, allResults);
           if (urls.length > 0) {
             try {
-              const fetchedPages: ResearchWebFetchPage[] = [];
-              for (const url of urls) {
-                const fetched = await runtime.researchWebClient.fetch(
-                  { urls: [url], max_chars: 8000 },
-                  researchWebCallContext(runtime, researchWebOperationId),
-                );
-                fetchedPages.push(...fetched.pages);
-              }
+              const fetchedPages = await measureResearchOperation(runtime, "research.web.fetch", async () => {
+                const pages: ResearchWebFetchPage[] = [];
+                for (const url of urls) {
+                  const fetched = await runtime.researchWebClient.fetch(
+                    { urls: [url], max_chars: 8000 },
+                    researchWebCallContext(runtime, researchWebOperationId),
+                  );
+                  pages.push(...fetched.pages);
+                }
+                return pages;
+              }, { url_count: urls.length });
               checkpoint.web.fetched_pages = fetchedPages;
               const failedPages = fetchedPages.filter((page) => !page.ok);
               if (failedPages.length > 0) {
@@ -910,12 +955,19 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
         }
         if (!checkpoint.web.prepared_batch) {
           try {
-            const summary = await runtime.researchAiClient.summarizeWebResearch({
-              ...decisionContext("web_research_summary"),
-              searchResults: allResults,
-              fetchedPages: checkpoint.web.fetched_pages.filter((page) => page.ok),
-              gaps: checkpoint.web.gaps ?? [],
-            });
+            const fetchedPages = checkpoint.web.fetched_pages.filter((page) => page.ok);
+            const webGaps = checkpoint.web.gaps ?? [];
+            const summary = await measureResearchOperation(
+              runtime,
+              "research.web.synthesis",
+              () => runtime.researchAiClient.summarizeWebResearch({
+                ...decisionContext("web_research_summary"),
+                searchResults: allResults,
+                fetchedPages,
+                gaps: webGaps,
+              }),
+              { result_count: allResults.length, page_count: fetchedPages.length },
+            );
             checkpoint.web.prepared_batch = buildWebBatch(runtime.locale, title, (checkpoint.web.gaps?.length ?? 0) > 0 ? "warning" : "completed", summary);
           } catch (error) {
             gaps.push(runtime.locale === "zh" ? "本轮网页资料未能整理为可用研究总结。" : "Web material could not be organized into a usable research summary for this run.");
@@ -934,7 +986,11 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
       checkpoint.web.prepared_batch = `${checkpoint.web.prepared_batch ?? ""}\n\n${webStatisticsMarkdown(runtime, checkpoint.web)}`.trim();
     }
     await persist();
-    await runtime.backend.publishPreparedWebResearchBatch({ workspace_dir: runtime.workspace.workspace_dir });
+    await measureResearchOperation(
+      runtime,
+      "research.web.publish",
+      () => runtime.backend.publishPreparedWebResearchBatch({ workspace_dir: runtime.workspace.workspace_dir }).then(() => undefined),
+    );
     checkpoint.web.written = true;
     persistedCheckpoint.web ??= {};
     persistedCheckpoint.web.written = true;
@@ -947,9 +1003,14 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
     await setStage(runtime, checkpoint, "image_decision", "running", persist);
     try {
       checkpoint.image ??= {};
-      checkpoint.image.decision = controls.disableImageResearch
-        ? { needs_search: false, queries: [], rationale: "Image research is disabled by the user setting." }
-        : await runtime.researchAiClient.decideImageResearch(decisionContext("image_research_decision"));
+      checkpoint.image.decision = await measureResearchOperation(
+        runtime,
+        "research.image.decision",
+        () => controls.disableImageResearch
+          ? Promise.resolve({ needs_search: false, queries: [], rationale: "Image research is disabled by the user setting." })
+          : runtime.researchAiClient.decideImageResearch(decisionContext("image_research_decision")),
+        { disabled: controls.disableImageResearch },
+      );
       await setStage(runtime, checkpoint, "image_decision", checkpoint.image.decision.needs_search ? "completed" : "skipped", persist);
     } catch (error) {
       checkpoint.image = {
@@ -985,30 +1046,30 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
       });
       checkpoint.image.searches = searchesByQuery;
       await persist();
-      await Promise.all(decision.queries.map(async (query, queryIndex) => {
-        const existing = searchesByQuery[queryIndex];
-        if (existing && existing.status !== "running") return;
-        try {
-          const response = await runtime.researchWebClient.imageSearch(
-            { query, max_results: 6, min_width: 800, min_height: 600, aspect: "any" },
-            researchWebCallContext(runtime, researchWebOperationId),
-          );
-          const results: ImageSearchOccurrence[] = response.results.slice(0, 6).map((item, resultIndex) => ({
-            occurrence_id: `image-q${queryIndex + 1}-r${resultIndex + 1}`,
-            query,
-            query_index: queryIndex,
-            result_index: resultIndex,
-            ...item,
-          }));
-          searchesByQuery[queryIndex] = { query, status: results.length > 0 ? "completed" : "warning", result: results, ...(results.length === 0 ? { error: "No image results" } : {}) };
-        } catch (error) {
-          checkpoint.image!.diagnostic_errors = appendUnique(checkpoint.image!.diagnostic_errors, `${query}: ${errorMessage(error)}`);
-          await logResearchError(runtime, "image-search", error, { query });
-          searchesByQuery[queryIndex] = { query, status: "warning", error: errorMessage(error) };
-        }
-        checkpoint.image!.searches = searchesByQuery;
-        await persist();
-      }));
+      await measureResearchOperation(runtime, "research.image.search", () => Promise.all(decision.queries.map(async (query, queryIndex) => {
+          const existing = searchesByQuery[queryIndex];
+          if (existing && existing.status !== "running") return;
+          try {
+            const response = await runtime.researchWebClient.imageSearch(
+              { query, max_results: 6, min_width: 800, min_height: 600, aspect: "any" },
+              researchWebCallContext(runtime, researchWebOperationId),
+            );
+            const results: ImageSearchOccurrence[] = response.results.slice(0, 6).map((item, resultIndex) => ({
+              occurrence_id: `image-q${queryIndex + 1}-r${resultIndex + 1}`,
+              query,
+              query_index: queryIndex,
+              result_index: resultIndex,
+              ...item,
+            }));
+            searchesByQuery[queryIndex] = { query, status: results.length > 0 ? "completed" : "warning", result: results, ...(results.length === 0 ? { error: "No image results" } : {}) };
+          } catch (error) {
+            checkpoint.image!.diagnostic_errors = appendUnique(checkpoint.image!.diagnostic_errors, `${query}: ${errorMessage(error)}`);
+            await logResearchError(runtime, "image-search", error, { query });
+            searchesByQuery[queryIndex] = { query, status: "warning", error: errorMessage(error) };
+          }
+          checkpoint.image!.searches = searchesByQuery;
+          await persist();
+        })).then(() => undefined), { query_count: decision.queries.length });
       checkpoint.image.search_status = "completed";
       checkpoint.stages.image_search = checkpoint.image.searches.some((search) => search.status === "warning") ? "warning" : "completed";
       await persist();
@@ -1140,7 +1201,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
       candidates.forEach((candidate) => {
         if (candidate.analysis_status === "completed") scheduleImport(candidate);
       });
-      await mapWithConcurrency(checkpoint.image.analysis_batches, getResearchImageSessionConcurrency(runtime), async (batch) => {
+      await measureResearchOperation(runtime, "research.image.analysis", () => mapWithConcurrency(checkpoint.image!.analysis_batches!, getResearchImageSessionConcurrency(runtime), async (batch) => {
         if (batch.status === "completed") return;
         batch.status = "running";
         batch.attempt += 1;
@@ -1200,7 +1261,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
           await logResearchError(runtime, "image-analysis", error, { batch_id: batch.batch_id, candidate_ids: batch.candidate_ids });
         }
         await persist();
-      });
+      }), { batch_count: checkpoint.image.analysis_batches.length });
       checkpoint.image.analysis_status = checkpoint.image.analysis_batches.every((batch) => batch.status === "completed") ? "completed" : "warning";
       checkpoint.stages.image_analysis = checkpoint.image.analysis_status;
       candidates.forEach(scheduleImport);
@@ -1280,7 +1341,11 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
       },
     };
     await persist();
-    await runtime.backend.publishPreparedImageResearchBatch({ workspace_dir: runtime.workspace.workspace_dir });
+    await measureResearchOperation(
+      runtime,
+      "research.image.publish",
+      () => runtime.backend.publishPreparedImageResearchBatch({ workspace_dir: runtime.workspace.workspace_dir }).then(() => undefined),
+    );
     checkpoint.image.written = true;
     persistedCheckpoint.image ??= {};
     persistedCheckpoint.image.written = true;

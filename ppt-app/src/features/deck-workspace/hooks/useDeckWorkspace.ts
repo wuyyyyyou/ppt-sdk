@@ -427,6 +427,7 @@ export interface DeckWorkspaceActions {
   abandonPerformanceRun: () => Promise<void>;
   deletePerformanceRun: (run: PerformanceRunSummary) => Promise<void>;
   openPerformanceReport: (run: PerformanceRunSummary) => Promise<void>;
+  regeneratePerformanceReport: (run: PerformanceRunSummary) => Promise<void>;
   addContextRow: (row: ContextRow) => void;
   updateContextRow: (id: string, value: string) => void;
   removeContextRow: (id: string) => void;
@@ -1630,7 +1631,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setGenerationTransaction({ ...transaction, state: "committing" });
     setActiveGenerationRun((current) => current ? { ...current, committing: true } : current);
     try {
-      return await backend.commitGenerationRun({ run_id: transaction.run_id });
+      const operationName = transaction.run_kind === "deck-generation"
+        ? "generation.commit"
+        : "deck_refinement.commit";
+      return await measurePerformanceOperation(
+        operationName,
+        transaction.shadow_workspace_dir,
+        () => backend.commitGenerationRun({ run_id: transaction.run_id }),
+      );
     } catch (error) {
       const { summary } = summarizeUserFacingError(t, error, t.generating.commitFailed.body);
       await requestConfirmation({
@@ -2075,17 +2083,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       if (!workspace || requirementsOperationRef.current !== operation) return;
       setPrompt(brief);
       const selectedPreset = findVisualStylePreset(presetIdOverride === undefined ? selectedVisualStylePresetId : presetIdOverride);
-      const candidates = await aiClient.generatePresentationRequirements({
-        brief,
-        visualStylePreset: toVisualStylePresetSelection(selectedPreset),
-        logContext: buildAiLogContext(workspace, "requirements", "generate_requirements"),
-      });
-      if (requirementsOperationRef.current !== operation) return;
-      const draftCandidates = selectedPreset ? { ...candidates, visual_tone: [] } : candidates;
-      const draft = createRequirementsDraft(brief, draftCandidates, toVisualStylePresetSelection(selectedPreset));
-      const updatedWorkspace = await backend.updateWorkspaceRequirements({
-        workspace_dir: workspace.workspace_dir,
-        requirements: draft,
+      const { candidates, updatedWorkspace } = await measurePerformanceOperation("requirements.create", workspace.workspace_dir, async () => {
+        const generatedCandidates = await aiClient.generatePresentationRequirements({
+          brief,
+          visualStylePreset: toVisualStylePresetSelection(selectedPreset),
+          logContext: buildAiLogContext(workspace, "requirements", "generate_requirements"),
+        });
+        const draftCandidates = selectedPreset ? { ...generatedCandidates, visual_tone: [] } : generatedCandidates;
+        const draft = createRequirementsDraft(brief, draftCandidates, toVisualStylePresetSelection(selectedPreset));
+        const persistedWorkspace = await backend.updateWorkspaceRequirements({
+          workspace_dir: workspace.workspace_dir,
+          requirements: draft,
+        });
+        return { candidates: generatedCandidates, updatedWorkspace: persistedWorkspace };
       });
       if (requirementsOperationRef.current !== operation) return;
       setPresentationRequirements(updatedWorkspace.requirements);
@@ -2334,23 +2344,27 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       if (workspace.requirements.status !== "confirmed") {
         throw new Error("请先确认演示需求，再创建大纲。");
       }
+      const activeWorkspace = workspace;
       setStage("outline");
       setLoading("outline");
-      const outlineLogContext = buildAiLogContext(workspace, "outline", "generate_outline");
-      const result = await aiClient.generateOutline({
-        requirements: workspace.requirements,
-        logContext: outlineLogContext,
+      const outlineLogContext = buildAiLogContext(activeWorkspace, "outline", "generate_outline");
+      const { result, normalized, updatedWorkspace } = await measurePerformanceOperation("outline.create", activeWorkspace.workspace_dir, async () => {
+        const generated = await aiClient.generateOutline({
+          requirements: activeWorkspace.requirements,
+          logContext: outlineLogContext,
+        });
+        const nextOutline = normalizeValidOutline({
+          title: generated.outline.title,
+          items: generated.outline.items,
+        });
+        const persistedWorkspace = await backend.saveWorkspaceOutlineDraft({
+          workspace_dir: activeWorkspace.workspace_dir,
+          outline: nextOutline,
+        });
+        return { result: generated, normalized: nextOutline, updatedWorkspace: persistedWorkspace };
       });
       if (outlineOperationRef.current !== operation) return;
       await appendOutlineAiAttemptLogs(workspace, result.attempts, outlineLogContext);
-      const normalized = normalizeValidOutline({
-        title: result.outline.title,
-        items: result.outline.items,
-      });
-      const updatedWorkspace = await backend.saveWorkspaceOutlineDraft({
-        workspace_dir: workspace.workspace_dir,
-        outline: normalized,
-      });
       // The user may have walked away while the Outline was being written, and
       // landing here would drag them back onto a stage they left.
       if (outlineOperationRef.current !== operation) return;
@@ -2605,25 +2619,29 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       if (workspace.requirements.status !== "confirmed") {
         throw new Error("请先确认演示需求，再改写大纲。");
       }
+      const activeWorkspace = workspace;
       setLoading("outline");
-      const outlineLogContext = buildAiLogContext(workspace, "outline", "revise_outline");
-      const result = await aiClient.reviseOutline({
-        title: outlineDraftTitle,
-        outline: outlineDraft,
-        feedback: outlineFeedback,
-        requirements: workspace.requirements,
-        logContext: outlineLogContext,
+      const outlineLogContext = buildAiLogContext(activeWorkspace, "outline", "revise_outline");
+      const { result, normalized, updatedWorkspace } = await measurePerformanceOperation("outline.rewrite", activeWorkspace.workspace_dir, async () => {
+        const revised = await aiClient.reviseOutline({
+          title: outlineDraftTitle,
+          outline: outlineDraft,
+          feedback: outlineFeedback,
+          requirements: activeWorkspace.requirements,
+          logContext: outlineLogContext,
+        });
+        const nextOutline = normalizeValidOutline({
+          title: revised.outline.title,
+          items: revised.outline.items,
+        });
+        const persistedWorkspace = await backend.saveWorkspaceOutlineDraft({
+          workspace_dir: activeWorkspace.workspace_dir,
+          outline: nextOutline,
+        });
+        return { result: revised, normalized: nextOutline, updatedWorkspace: persistedWorkspace };
       });
       if (outlineOperationRef.current !== operation) return;
       await appendOutlineAiAttemptLogs(workspace, result.attempts, outlineLogContext);
-      const normalized = normalizeValidOutline({
-        title: result.outline.title,
-        items: result.outline.items,
-      });
-      const updatedWorkspace = await backend.saveWorkspaceOutlineDraft({
-        workspace_dir: workspace.workspace_dir,
-        outline: normalized,
-      });
       if (outlineOperationRef.current !== operation) return;
       setCurrentWorkspace(updatedWorkspace);
       setDeckTitle(normalized.title);
@@ -4795,6 +4813,28 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
+  async function regeneratePerformanceReport(run: PerformanceRunSummary) {
+    if (!backend || performanceTesting.busy || run.status !== "completed") return;
+    setPerformanceTesting((current) => ({ ...current, busy: true, error: "" }));
+    try {
+      const regenerated = await backend.regeneratePerformanceReport({ run_id: run.run_id, locale });
+      setPerformanceTesting((current) => ({
+        ...current,
+        busy: false,
+        runs: current.runs.map((item) => item.run_id === regenerated.run_id ? regenerated : item),
+      }));
+      showToast(t.performance.reportRegenerated);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t.performance.regenerateFailed;
+      try {
+        const latest = await backend.listPerformanceRuns();
+        setPerformanceTesting((current) => ({ ...current, busy: false, error: message, activeRun: latest.active_run, runs: latest.runs }));
+      } catch {
+        setPerformanceTesting((current) => ({ ...current, busy: false, error: message }));
+      }
+    }
+  }
+
   const state: DeckWorkspaceState = {
     panelMode,
     page,
@@ -4885,6 +4925,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     abandonPerformanceRun,
     deletePerformanceRun,
     openPerformanceReport,
+    regeneratePerformanceReport,
     cancelGenerateDeck,
     navigate,
     navigateFromHeader,

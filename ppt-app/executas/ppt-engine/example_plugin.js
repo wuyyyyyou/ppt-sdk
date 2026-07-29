@@ -133,6 +133,7 @@ import {
   getActivePerformanceRun,
   getPerformanceReportPath,
   listPerformanceRuns,
+  regeneratePerformanceReport,
   startPerformanceRun,
 } from "./dist/index.js";
 
@@ -320,6 +321,13 @@ async function toolAppFinalizePerformanceRun(args) {
     run_id: args?.run_id,
     locale: args?.locale === "zh" ? "zh" : "en",
     force: args?.force === true,
+  });
+}
+
+async function toolAppRegeneratePerformanceReport(args) {
+  return regeneratePerformanceReport({
+    run_id: args?.run_id,
+    locale: args?.locale === "zh" ? "zh" : "en",
   });
 }
 
@@ -3009,6 +3017,7 @@ const TOOL_DISPATCH = {
   app_start_performance_run: toolAppStartPerformanceRun,
   app_append_performance_events: toolAppAppendPerformanceEvents,
   app_finalize_performance_run: toolAppFinalizePerformanceRun,
+  app_regenerate_performance_report: toolAppRegeneratePerformanceReport,
   app_abandon_performance_run: toolAppAbandonPerformanceRun,
   app_delete_performance_run: toolAppDeletePerformanceRun,
   app_prepare_performance_report: toolAppPreparePerformanceReport,

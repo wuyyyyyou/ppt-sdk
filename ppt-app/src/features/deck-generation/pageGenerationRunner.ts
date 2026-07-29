@@ -37,6 +37,7 @@ import {
   type RenderFailureHistoryItem,
   type RenderFailurePhase,
 } from "./types";
+import { beginPerformanceSpan } from "../../performance/performanceRecorder";
 
 function emitRuntime(
   input: DeckGenerationRuntime,
@@ -76,10 +77,29 @@ async function getTargetPageFingerprint(input: DeckGenerationRuntime, page: Auth
   });
 }
 
-export async function runPageGeneration(
+function beginPageStageSpan(
+  input: DeckGenerationRuntime,
+  page: AuthoringPage,
+  operationName: string,
+  parentSpanId?: string,
+) {
+  return beginPerformanceSpan({
+    operationName,
+    parentSpanId,
+    workspaceId: input.workspace.workspace_id,
+    attributes: {
+      layer: "page-stage",
+      page_id: page.page_id,
+      page_index: page.index,
+    },
+  });
+}
+
+async function runPageGenerationInternal(
   input: DeckGenerationRuntime,
   authoringDeck: AuthoringDeck,
   page: AuthoringPage,
+  performanceParentSpanId?: string,
 ): Promise<PageGenerationResult> {
   const text = generationText(input.locale);
   const totalPages = authoringDeck.pages.length;
@@ -237,6 +257,12 @@ export async function runPageGeneration(
       kind: renderError ? "render-fix" : visualReview ? "visual-review-fix" : "authoring",
       attemptLimits,
     });
+    const authoringOperation = renderError
+      ? "page.render_fix"
+      : visualReview
+        ? "page.visual_review_fix"
+        : "page.authoring";
+    const authoringSpan = beginPageStageSpan(input, page, authoringOperation, performanceParentSpanId);
 
     try {
       const before = await getTargetPageFingerprint(input, page).catch((error) => {
@@ -269,6 +295,7 @@ export async function runPageGeneration(
         target_tsx_fingerprint: { before, after },
         target_tsx_changed: changed,
       });
+      authoringSpan?.finish("ok");
       if (!changed) {
         const exhausted = noChangeRetryCount >= LOCAL_GATE_REPAIR_LIMIT;
         const message = targetPageNoChangeMessage(input.locale, page);
@@ -293,6 +320,7 @@ export async function runPageGeneration(
       renderError = "";
       visualReview = null;
     } catch (error) {
+      authoringSpan?.finish(isAgentRunCancelledError(error) ? "interrupted" : "error");
       if (isAgentRunCancelledError(error)) {
         await tracker.flush("error", { cancelled: true });
         return { page, reason: "cancelled", progress: input.getProgress() ?? progress as PageProgress };
@@ -339,6 +367,7 @@ export async function runPageGeneration(
 
     let preview: RenderWorkspacePagePreviewResult;
     let latestAttachment: HostUploadRef | null = null;
+    const renderSpan = beginPageStageSpan(input, page, "page.render", performanceParentSpanId);
     try {
       progress = await recordProgress(input, page, { status: "rendering", last_error: "" });
       input.setProgress(progress);
@@ -352,6 +381,7 @@ export async function runPageGeneration(
         workspace_dir: input.workspace.workspace_dir,
         page_id: page.page_id,
       });
+      renderSpan?.finish("ok");
       progress = await recordProgress(input, page, {
         status: reviewSettings.visualReviewEnabled ? "visual_review" : "accepted",
         last_html_path: preview.html_path,
@@ -382,6 +412,7 @@ export async function runPageGeneration(
         }
       }
     } catch (error) {
+      renderSpan?.finish("error");
       renderAttempts += 1;
       renderError = error instanceof Error ? error.message : String(error);
       renderFailureHistory.push({
@@ -424,6 +455,7 @@ export async function runPageGeneration(
       kind: "page-visual-review",
       attemptLimits,
     });
+    const visualReviewSpan = beginPageStageSpan(input, page, "page.visual_review", performanceParentSpanId);
     try {
       visualReview = await input.agentClient.runPageVisualReviewPrompt(
         reviewPrompt,
@@ -438,7 +470,9 @@ export async function runPageGeneration(
         },
       );
       await reviewTracker.flush("completed", { parsed_review: true, review: visualReview });
+      visualReviewSpan?.finish("ok");
     } catch (error) {
+      visualReviewSpan?.finish(isAgentRunCancelledError(error) ? "interrupted" : "error");
       if (isAgentRunCancelledError(error)) {
         await reviewTracker.flush("error", { cancelled: true });
         return { page, reason: "cancelled", progress };
@@ -499,6 +533,37 @@ export async function runPageGeneration(
     ? createFailedPageError(failedPage, input.locale, page.index)
     : { type: "page_failed" as const, message: `Page ${page.index + 1} failed`, page_id: page.page_id, page_index: page.index, page_status: "failed" };
   return { page, reason: "page_failed", progress, error };
+}
+
+export async function runPageGeneration(
+  input: DeckGenerationRuntime,
+  authoringDeck: AuthoringDeck,
+  page: AuthoringPage,
+): Promise<PageGenerationResult> {
+  const pageSpan = beginPerformanceSpan({
+    operationName: "page.generation",
+    workspaceId: input.workspace.workspace_id,
+    attributes: {
+      layer: "page-workflow",
+      page_id: page.page_id,
+      page_index: page.index,
+    },
+  });
+  try {
+    const result = await runPageGenerationInternal(input, authoringDeck, page, pageSpan?.spanId);
+    pageSpan?.finish(
+      result.reason === "accepted"
+        ? "ok"
+        : result.reason === "cancelled"
+          ? "interrupted"
+          : "error",
+      { result: result.reason },
+    );
+    return result;
+  } catch (error) {
+    pageSpan?.finish(isAgentRunCancelledError(error) || input.isCancelled() ? "interrupted" : "error");
+    throw error;
+  }
 }
 
 export async function runPagesConcurrently(
