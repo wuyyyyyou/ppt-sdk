@@ -1,4 +1,5 @@
 import type { AnnaRuntime } from "../runtime/annaRuntime";
+import { createAppHostUploadClient } from "../runtime/appHostUploadClient";
 import type { PptBackend } from "./pptBackend";
 import type {
   AppendWorkspaceLogResult,
@@ -75,6 +76,7 @@ import type {
 import { resolvePptBundledToolIds } from "./bundledToolIds";
 
 const LONG_RUNNING_TOOL_TIMEOUT_MS = 600_000;
+const WORKSPACE_LOG_INLINE_INVOKE_MAX_BYTES = 48 * 1024;
 
 interface HostUploadJsonReference {
   workspace_upload?: HostUploadRef;
@@ -186,6 +188,7 @@ function normalizeExportPdfResult(value: unknown): ExportPdfResult {
 
 export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
   const toolIds = resolvePptBundledToolIds();
+  const hostUploadClient = createAppHostUploadClient(runtime);
   async function invoke<T>(
     toolId: string,
     method: string,
@@ -435,12 +438,41 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         "app_get_uploaded_source_analysis",
         input
       ),
-    appendWorkspaceLog: (input) =>
-      invoke<AppendWorkspaceLogResult>(
+    appendWorkspaceLog: async (input) => {
+      const inlineSizeBytes = new TextEncoder().encode(JSON.stringify(input)).byteLength;
+      if (inlineSizeBytes <= WORKSPACE_LOG_INLINE_INVOKE_MAX_BYTES) {
+        return invoke<AppendWorkspaceLogResult>(
+          toolIds.pptEngine,
+          "app_append_workspace_log",
+          input,
+        );
+      }
+
+      const entryJson = JSON.stringify(input.entry);
+      const entryUpload = await hostUploadClient.uploadFile(
+        new File([entryJson], "workspace-log-entry.json", { type: "application/json" }),
+        {
+          purpose: "user_artifact",
+          metadata: {
+            workspace_dir: input.workspace_dir,
+            source: "ppt-app.workspace-log-entry",
+          },
+        },
+      );
+      return invoke<AppendWorkspaceLogResult>(
         toolIds.pptEngine,
         "app_append_workspace_log",
-        input
-      ),
+        {
+          workspace_dir: input.workspace_dir,
+          channel: input.channel,
+          entry_upload: entryUpload,
+          ...(input.payload_keys ? { payload_keys: input.payload_keys } : {}),
+          ...(input.inline_payload_max_bytes === undefined
+            ? {}
+            : { inline_payload_max_bytes: input.inline_payload_max_bytes }),
+        },
+      );
+    },
     getWorkspaceRequirements: (input) =>
       invoke<PresentationRequirements>(
         toolIds.pptEngine,

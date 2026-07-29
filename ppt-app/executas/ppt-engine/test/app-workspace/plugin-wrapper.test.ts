@@ -556,3 +556,18 @@ test("app_append_workspace_log plugin wrapper accepts research web, theme, style
     await rm(homeDir, { recursive: true, force: true });
   }
 });
+
+test("app_append_workspace_log declares mutually exclusive inline and Host Upload entries", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+  const manifest = JSON.parse(
+    await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
+  ) as { tools: Array<{ name: string; parameters?: Array<{ name: string; required?: boolean }> }> };
+
+  assert.equal(getToolParameter(manifest, "app_append_workspace_log", "entry").required, false);
+  assert.equal(getToolParameter(manifest, "app_append_workspace_log", "entry_upload").required, false);
+  assert.match(source, /Exactly one of \"entry\" or \"entry_upload\" must be provided/);
+  assert.match(
+    source,
+    /toolAppResolveHostUploadJsonReference\(\{ host_upload: args\.entry_upload \}\)/,
+  );
+});

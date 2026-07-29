@@ -881,12 +881,16 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
           const urls = dedupeExactUrls(checkpoint.web.fetch_result_ids, allResults);
           if (urls.length > 0) {
             try {
-              const fetched = await runtime.researchWebClient.fetch(
-                { urls, max_chars: 8000 },
-                researchWebCallContext(runtime, researchWebOperationId),
-              );
-              checkpoint.web.fetched_pages = fetched.pages;
-              const failedPages = fetched.pages.filter((page) => !page.ok);
+              const fetchedPages: ResearchWebFetchPage[] = [];
+              for (const url of urls) {
+                const fetched = await runtime.researchWebClient.fetch(
+                  { urls: [url], max_chars: 8000 },
+                  researchWebCallContext(runtime, researchWebOperationId),
+                );
+                fetchedPages.push(...fetched.pages);
+              }
+              checkpoint.web.fetched_pages = fetchedPages;
+              const failedPages = fetchedPages.filter((page) => !page.ok);
               if (failedPages.length > 0) {
                 gaps.push(runtime.locale === "zh" ? `${failedPages.length} 个选中网页未能读取正文。` : `${failedPages.length} selected web page(s) could not be read.`);
                 checkpoint.web.diagnostic_errors = appendUnique(

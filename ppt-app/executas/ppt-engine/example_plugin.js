@@ -1633,9 +1633,16 @@ async function toolAppAppendWorkspaceLog(args) {
     throw new Error(`"channel" must be one of: ${supportedChannels.join(", ")}`);
   }
 
-  const entry = args.entry;
+  const hasInlineEntry = args.entry !== undefined;
+  const hasEntryUpload = args.entry_upload !== undefined;
+  if (hasInlineEntry === hasEntryUpload) {
+    throw new Error('Exactly one of "entry" or "entry_upload" must be provided');
+  }
+  const entry = hasEntryUpload
+    ? await toolAppResolveHostUploadJsonReference({ host_upload: args.entry_upload })
+    : args.entry;
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-    throw new Error('"entry" must be an object');
+    throw new Error('Workspace log entry must be a JSON object');
   }
   const payloadKeys = Array.isArray(args.payload_keys)
     ? args.payload_keys.filter((key) => typeof key === "string" && key.length > 0)

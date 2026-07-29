@@ -754,8 +754,14 @@
         {
           "name": "entry",
           "type": "object",
-          "description": "JSON-serializable log entry to append.",
-          "required": true
+          "description": "JSON-serializable log entry to append. Exactly one of entry or entry_upload is required.",
+          "required": false
+        },
+        {
+          "name": "entry_upload",
+          "type": "object",
+          "description": "application/json HostUploadRef containing the log entry. Exactly one of entry or entry_upload is required.",
+          "required": false
         },
         {
           "name": "payload_keys",

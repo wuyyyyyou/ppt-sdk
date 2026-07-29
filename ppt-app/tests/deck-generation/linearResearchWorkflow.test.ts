@@ -214,6 +214,62 @@ function createRuntime(overrides: Record<string, unknown> = {}) {
 }
 
 describe("Linear Shared Research workflow", () => {
+  it("fetches selected web pages one URL at a time in order", async () => {
+    const urls = [
+      "https://source.test/first",
+      "https://source.test/second",
+      "https://source.test/third",
+    ];
+    const fetchCalls: Array<{ urls: string[]; max_chars?: number }> = [];
+    let activeFetches = 0;
+    let maxActiveFetches = 0;
+    const { runtime } = createRuntime({
+      researchAiClient: {
+        decideWebResearch: async () => ({ needs_search: true, queries: ["market evidence"] }),
+        selectWebFetchResults: async (input: { results: Array<{ result_id: string }> }) => (
+          input.results.map((result) => result.result_id)
+        ),
+        summarizeWebResearch: async () => "Market evidence summary.",
+        decideImageResearch: async () => ({ needs_search: false, queries: [] }),
+      },
+      researchWebClient: {
+        search: async () => ({
+          results: urls.map((url, index) => ({
+            title: `Source ${index + 1}`,
+            url,
+            snippet: `Evidence ${index + 1}`,
+            site: "source.test",
+          })),
+        }),
+        fetch: async (input: { urls: string[]; max_chars?: number }) => {
+          fetchCalls.push(structuredClone(input));
+          activeFetches += 1;
+          maxActiveFetches = Math.max(maxActiveFetches, activeFetches);
+          await new Promise<void>((resolve) => setImmediate(resolve));
+          activeFetches -= 1;
+          return {
+            pages: input.urls.map((url) => ({ url, ok: true, content: `Content for ${url}` })),
+          };
+        },
+        imageSearch: async () => ({ results: [] }),
+        imageFetch: async () => ({
+          path: "aps/image",
+          get_url: "https://download.test/image",
+          mime_type: "image/png",
+          bytes_size: 3,
+          sha256: "sha256",
+          source_url: "https://source.test",
+          final_url: "https://image.test",
+        }),
+      },
+    });
+
+    await runLinearSharedResearch(runtime, { resume: false });
+
+    assert.deepEqual(fetchCalls, urls.map((url) => ({ urls: [url], max_chars: 8000 })));
+    assert.equal(maxActiveFetches, 1);
+  });
+
   it("splits a five-query image checkpoint into patches below 32 KiB", () => {
     const operations: SharedResearchProgressOperation[] = Array.from({ length: 5 }, (_, queryIndex) => ({
       op: "upsert_image_search" as const,

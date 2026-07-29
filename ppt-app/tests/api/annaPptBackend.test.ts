@@ -85,6 +85,101 @@ function createJsonUploadRef(filename: string): HostUploadRef {
 }
 
 describe("Anna PPT Backend", () => {
+  it("keeps small workspace log entries inline", async () => {
+    setToolIds();
+    const calls: AnnaToolInvokeInput[] = [];
+    const backend = createAnnaPptBackend(createRuntimeWithInvoke(async (input) => {
+      calls.push(input);
+      return {
+        success: true,
+        data: { workspace_dir: "/tmp/workspaces/demo", log_file: "demo.jsonl", appended: true },
+      };
+    }));
+    const input = {
+      workspace_dir: "/tmp/workspaces/demo",
+      channel: "ai-research-interactions" as const,
+      entry: { event: "ai.research.interaction.started", request: { text: "small" } },
+      payload_keys: ["request"],
+    };
+
+    await backend.appendWorkspaceLog(input);
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0]?.method, "app_append_workspace_log");
+    assert.deepEqual(calls[0]?.args, input);
+  });
+
+  it("uploads large workspace log entries before invoking ppt-engine", async () => {
+    setToolIds();
+    const calls: AnnaToolInvokeInput[] = [];
+    const uploadedBodies: string[] = [];
+    let negotiatedSize = 0;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      uploadedBodies.push(await new Response(init?.body).text());
+      return new Response("", { status: 200 });
+    }) as typeof fetch;
+    const runtime = createRuntimeWithInvoke(async (input) => {
+      calls.push(input);
+      return {
+        success: true,
+        data: { workspace_dir: "/tmp/workspaces/demo", log_file: "demo.jsonl", appended: true },
+      };
+    });
+    runtime.upload = {
+      negotiate: async (input) => {
+        negotiatedSize = input.size_bytes;
+        return {
+          put_url: "https://upload.example/put",
+          headers: { "content-type": input.mime_type },
+          r2_key: "workspace-logs/entry.json",
+        };
+      },
+      confirm: async ({ r2_key }) => ({
+        download_url: "https://upload.example/get",
+        r2_key,
+        size_bytes: negotiatedSize,
+      }),
+    };
+    const entry = {
+      event: "ai.research.interaction.started",
+      request: { text: "研究".repeat(20_000) },
+    };
+
+    try {
+      await createAnnaPptBackend(runtime).appendWorkspaceLog({
+        workspace_dir: "/tmp/workspaces/demo",
+        channel: "ai-research-interactions",
+        entry,
+        payload_keys: ["request"],
+        inline_payload_max_bytes: 1024,
+      });
+
+      assert.deepEqual(uploadedBodies, [JSON.stringify(entry)]);
+      assert.equal(negotiatedSize, new TextEncoder().encode(JSON.stringify(entry)).byteLength);
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0]?.method, "app_append_workspace_log");
+      const args = calls[0]?.args as Record<string, unknown>;
+      assert.equal(args.entry, undefined);
+      assert.deepEqual(args.payload_keys, ["request"]);
+      assert.equal(args.inline_payload_max_bytes, 1024);
+      assert.deepEqual(args.entry_upload, {
+        transport: "host_upload",
+        r2_key: "workspace-logs/entry.json",
+        url: "https://upload.example/get",
+        mime_type: "application/json",
+        size_bytes: negotiatedSize,
+        filename: "workspace-log-entry.json",
+        expires_at: undefined,
+        expires_in: undefined,
+        mode: "negotiate+confirm",
+      });
+      assert.ok(new TextEncoder().encode(JSON.stringify(calls[0])).byteLength < 48 * 1024);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("reads runtime information from the running ppt-engine tool", async () => {
     setToolIds();
     const runtime = createRuntimeWithInvoke(async (input) => {
