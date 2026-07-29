@@ -1242,8 +1242,8 @@
       ]
     },
     {
-      "name": "app_record_shared_research_progress",
-      "description": "Atomically replace the resumable web/image research checkpoint.",
+      "name": "app_patch_shared_research_progress",
+      "description": "Atomically apply one bounded batch of domain operations to the resumable web/image research checkpoint.",
       "parameters": [
         {
           "name": "workspace_dir",
@@ -1252,9 +1252,36 @@
           "required": true
         },
         {
-          "name": "progress",
-          "type": "object",
-          "description": "Complete research checkpoint JSON object.",
+          "name": "operations",
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "description": "Ordered, strictly validated shared-research domain operations. Serialized tool arguments must not exceed 32 KiB.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_publish_prepared_web_research_batch",
+      "description": "Idempotently publish the prepared Web Research Batch from the checkpoint and then mark it written.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing PPT workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_publish_prepared_image_research_batch",
+      "description": "Idempotently publish the prepared Image Research Batch from the checkpoint and then mark it written.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing PPT workspace.",
           "required": true
         }
       ]

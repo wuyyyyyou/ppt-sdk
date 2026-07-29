@@ -10,13 +10,13 @@ test("shared research artifacts retain only reusable imported image assets", asy
   const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-shared-research-"));
   process.env.HOME = homeDir;
   const {
-    appendAppImageResearchBatch,
-    appendAppWebResearchBatch,
     createAppWorkspace,
     getAppSharedResearchContext,
     importAppSharedResearchImage,
+    patchAppSharedResearchProgress,
     prepareAppSharedResearchWorkspace,
-    recordAppSharedResearchProgress,
+    publishPreparedAppImageResearchBatch,
+    publishPreparedAppWebResearchBatch,
   } = await import("../../src/app-workspace/index.ts");
 
   try {
@@ -29,14 +29,16 @@ test("shared research artifacts retain only reusable imported image assets", asy
     assert.deepEqual(prepared.image_catalog, { schema_version: 2, assets: [] });
 
     const markdown = "## Research batch: Initial generation\n\nStatus: completed\n\nUseful summary.";
-    assert.equal((await appendAppWebResearchBatch({ workspace_dir: workspace.workspace_dir, markdown })).appended, true);
-    assert.equal((await appendAppWebResearchBatch({ workspace_dir: workspace.workspace_dir, markdown })).appended, false);
-
-    const progress = await recordAppSharedResearchProgress({
+    await patchAppSharedResearchProgress({
       workspace_dir: workspace.workspace_dir,
-      progress: { status: "running", stages: { web_decision: "completed" } },
+      operations: [
+        { op: "set_stage", stage: "web_decision", state: "running" },
+        { op: "set_web_prepared_batch", markdown },
+      ],
     });
-    assert.equal(progress.status, "running");
+    assert.equal((await publishPreparedAppWebResearchBatch({ workspace_dir: workspace.workspace_dir })).published, true);
+    assert.equal((await publishPreparedAppWebResearchBatch({ workspace_dir: workspace.workspace_dir })).already_published, true);
+    assert.equal((await getAppSharedResearchContext({ workspace_dir: workspace.workspace_dir })).progress.status, "running");
 
     const imageBytes = Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z3i8AAAAASUVORK5CYII=",
@@ -95,21 +97,49 @@ test("shared research artifacts retain only reusable imported image assets", asy
       }],
       gaps: [],
     };
-    assert.equal((await appendAppImageResearchBatch({ workspace_dir: workspace.workspace_dir, batch })).appended, true);
-    assert.equal((await appendAppImageResearchBatch({ workspace_dir: workspace.workspace_dir, batch })).appended, false);
-    assert.equal((await appendAppImageResearchBatch({
+    await patchAppSharedResearchProgress({
       workspace_dir: workspace.workspace_dir,
-      batch: {
-        ...batch,
-        title: "Refinement",
-        candidates: [{
+      operations: batch.candidates.map((candidate) => ({
+        op: "upsert_image_candidate" as const,
+        candidate_id: candidate.candidate_id,
+        candidate,
+      })),
+    });
+    await patchAppSharedResearchProgress({
+      workspace_dir: workspace.workspace_dir,
+      operations: [{
+        op: "finalize_image_research",
+        title: batch.title,
+        status: batch.status,
+        queries: batch.queries,
+        gaps: batch.gaps,
+        statistics: {},
+      }],
+    });
+    assert.equal((await publishPreparedAppImageResearchBatch({ workspace_dir: workspace.workspace_dir })).published, true);
+    assert.equal((await publishPreparedAppImageResearchBatch({ workspace_dir: workspace.workspace_dir })).already_published, true);
+
+    await patchAppSharedResearchProgress({
+      workspace_dir: workspace.workspace_dir,
+      operations: [{
+        op: "upsert_image_candidate",
+        candidate_id: "candidate-same-content",
+        candidate: {
           ...batch.candidates[0],
           candidate_id: "candidate-same-content",
           query: "office interior",
           matched_queries: ["office interior"],
-        }],
-      },
-    })).appended, true);
+        },
+      }, {
+        op: "finalize_image_research",
+        title: "Refinement",
+        status: batch.status,
+        queries: batch.queries,
+        gaps: [],
+        statistics: {},
+      }],
+    });
+    assert.equal((await publishPreparedAppImageResearchBatch({ workspace_dir: workspace.workspace_dir })).published, true);
 
     const context = await getAppSharedResearchContext({ workspace_dir: workspace.workspace_dir });
     assert.deepEqual(context.image_catalog, {

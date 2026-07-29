@@ -68,7 +68,8 @@ import type {
   PrepareGenerationRunResult,
   CommitGenerationRunResult,
   SharedResearchContextResult,
-  SharedResearchImageBatch,
+  PatchSharedResearchProgressResult,
+  PublishSharedResearchBatchResult,
   ImportSharedResearchImageResult,
 } from "./types";
 import { resolvePptBundledToolIds } from "./bundledToolIds";
@@ -548,15 +549,15 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         input,
       ),
     prepareSharedResearchWorkspace: (input) =>
-      invoke<SharedResearchContextResult>(toolIds.pptEngine, "app_prepare_shared_research_workspace", input),
+      invokeHostUploadJson<SharedResearchContextResult>(toolIds.pptEngine, "app_prepare_shared_research_workspace", input),
     getSharedResearchContext: (input) =>
-      invoke<SharedResearchContextResult>(toolIds.pptEngine, "app_get_shared_research_context", input),
-    recordSharedResearchProgress: (input) =>
-      invoke<Record<string, unknown>>(toolIds.pptEngine, "app_record_shared_research_progress", input),
-    appendWebResearchBatch: (input) =>
-      invoke<{ workspace_dir: string; web_summary_path: string; appended: boolean }>(toolIds.pptEngine, "app_append_web_research_batch", input),
-    appendImageResearchBatch: (input: { workspace_dir: string; batch: SharedResearchImageBatch }) =>
-      invoke<{ workspace_dir: string; image_catalog_path: string; appended: boolean }>(toolIds.pptEngine, "app_append_image_research_batch", input),
+      invokeHostUploadJson<SharedResearchContextResult>(toolIds.pptEngine, "app_get_shared_research_context", input),
+    patchSharedResearchProgress: (input) =>
+      invoke<PatchSharedResearchProgressResult>(toolIds.pptEngine, "app_patch_shared_research_progress", input),
+    publishPreparedWebResearchBatch: (input) =>
+      invoke<PublishSharedResearchBatchResult>(toolIds.pptEngine, "app_publish_prepared_web_research_batch", input),
+    publishPreparedImageResearchBatch: (input) =>
+      invoke<PublishSharedResearchBatchResult>(toolIds.pptEngine, "app_publish_prepared_image_research_batch", input),
     importSharedResearchImageHostUpload: (input) =>
       invoke<ImportSharedResearchImageResult>(toolIds.pptEngine, "app_import_shared_research_image_host_upload", input),
     getPageProgress: (input) =>

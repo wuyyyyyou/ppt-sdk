@@ -29,7 +29,9 @@ import type {
   PreparePageFilesInput,
   PreparePageFilesResult,
   SharedResearchContextResult,
-  SharedResearchImageBatch,
+  SharedResearchProgressOperation,
+  PatchSharedResearchProgressResult,
+  PublishSharedResearchBatchResult,
   ImportSharedResearchImageResult,
   ProjectResult,
   PptxExportJob,
@@ -218,9 +220,9 @@ export interface PptBackend {
   ): Promise<GetWorkspacePageFileFingerprintsResult>;
   prepareSharedResearchWorkspace(input: { workspace_dir: string; reset_progress?: boolean }): Promise<SharedResearchContextResult>;
   getSharedResearchContext(input: { workspace_dir: string }): Promise<SharedResearchContextResult>;
-  recordSharedResearchProgress(input: { workspace_dir: string; progress: Record<string, unknown> }): Promise<Record<string, unknown>>;
-  appendWebResearchBatch(input: { workspace_dir: string; markdown: string }): Promise<{ workspace_dir: string; web_summary_path: string; appended: boolean }>;
-  appendImageResearchBatch(input: { workspace_dir: string; batch: SharedResearchImageBatch }): Promise<{ workspace_dir: string; image_catalog_path: string; appended: boolean }>;
+  patchSharedResearchProgress(input: { workspace_dir: string; operations: SharedResearchProgressOperation[] }): Promise<PatchSharedResearchProgressResult>;
+  publishPreparedWebResearchBatch(input: { workspace_dir: string }): Promise<PublishSharedResearchBatchResult>;
+  publishPreparedImageResearchBatch(input: { workspace_dir: string }): Promise<PublishSharedResearchBatchResult>;
   importSharedResearchImageHostUpload(input: {
     workspace_dir: string;
     candidate_id: string;

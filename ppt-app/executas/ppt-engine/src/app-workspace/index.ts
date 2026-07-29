@@ -179,8 +179,10 @@ import type {
   AppendAppWebResearchBatchInput,
   ImportAppSharedResearchImageInput,
   ImportAppSharedResearchImageResult,
+  PatchAppSharedResearchProgressInput,
+  PatchAppSharedResearchProgressResult,
   PrepareAppSharedResearchWorkspaceInput,
-  RecordAppSharedResearchProgressInput,
+  PublishAppSharedResearchBatchResult,
   RecordAppPagePlanInput,
   RecordAppPageProgressInput,
   RecordAppWorkspaceStyleGuideInput,
@@ -221,6 +223,10 @@ import type {
   PublishAppStyleProfileInput,
   PublishAppStyleProfileResult,
 } from "./types.js";
+import {
+  applySharedResearchProgressOperations,
+  createDefaultSharedResearchProgress,
+} from "./shared-research-progress.js";
 
 const WORKSPACE_ROOT = path.join(os.homedir(), "anna-workspace", "ppt");
 const WORKSPACE_FORMAT = "authoring-kit-v1";
@@ -656,6 +662,7 @@ const styleProfileWriteQueues = new Map<string, Promise<unknown>>();
 const themeTokenWriteQueues = new Map<string, Promise<unknown>>();
 const exportArtifactWriteQueues = new Map<string, Promise<unknown>>();
 const manualFinalDeckWriteQueues = new Map<string, Promise<unknown>>();
+const sharedResearchWriteQueues = new Map<string, Promise<unknown>>();
 let pptxExportQueue = Promise.resolve();
 const activePptxExportJobIds = new Set<string>();
 
@@ -673,6 +680,18 @@ async function withExportArtifactWriteQueue<T>(
     if (exportArtifactWriteQueues.get(queueKey) === current) {
       exportArtifactWriteQueues.delete(queueKey);
     }
+  }
+}
+
+async function withSharedResearchWriteQueue<T>(workspaceDir: string, operation: () => Promise<T>): Promise<T> {
+  const queueKey = path.normalize(workspaceDir);
+  const previous = sharedResearchWriteQueues.get(queueKey) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  sharedResearchWriteQueues.set(queueKey, current);
+  try {
+    return await current;
+  } finally {
+    if (sharedResearchWriteQueues.get(queueKey) === current) sharedResearchWriteQueues.delete(queueKey);
   }
 }
 
@@ -3869,24 +3888,6 @@ async function ensureResearchDirectories(workspaceDir: string): Promise<AppResea
   return paths;
 }
 
-function createDefaultSharedResearchProgress() {
-  return {
-    schema_version: 2,
-    status: "waiting",
-    stages: {
-      web_decision: "waiting",
-      web_research: "waiting",
-      image_decision: "waiting",
-      image_research: "waiting",
-      image_search: "waiting",
-      image_deduplication: "waiting",
-      image_analysis: "waiting",
-      image_import: "waiting",
-    },
-    updated_at: new Date().toISOString(),
-  };
-}
-
 function createDefaultImageCatalog() {
   return { schema_version: 2, assets: [] };
 }
@@ -4027,18 +4028,96 @@ export async function prepareAppSharedResearchWorkspace(
   return getAppSharedResearchContext({ workspace_dir: workspace.workspace_dir });
 }
 
-export async function recordAppSharedResearchProgress(
-  input: RecordAppSharedResearchProgressInput,
-): Promise<Record<string, unknown>> {
+export async function patchAppSharedResearchProgress(
+  input: PatchAppSharedResearchProgressInput,
+): Promise<PatchAppSharedResearchProgressResult> {
+  const serializedBytes = Buffer.byteLength(JSON.stringify(input), "utf8");
+  if (serializedBytes > 32 * 1024) throw new Error(`Shared research patch is ${serializedBytes} bytes; maximum is ${32 * 1024}`);
+  if (!Array.isArray(input.operations) || input.operations.length === 0) throw new Error('"operations" must be a non-empty array');
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
   const paths = await ensureSharedResearchFiles(workspace.workspace_dir, false);
-  const progress = {
-    ...getPlainRecord(input.progress),
-    schema_version: 2,
+  return withSharedResearchWriteQueue(workspace.workspace_dir, async () => {
+    const current = getPlainRecord(await readJsonFileIfExists(paths.progress_path));
+    const result = applySharedResearchProgressOperations(current, input.operations);
+    if (result.updated) await atomicWriteJsonFile(paths.progress_path, result.progress);
+    return {
+      workspace_dir: workspace.workspace_dir,
+      progress_path: paths.progress_path,
+      updated: result.updated,
+      revision: result.revision,
+      updated_at: result.updated_at,
+    };
+  });
+}
+
+async function markPreparedResearchPublished(
+  workspaceDir: string,
+  kind: "web" | "image",
+): Promise<{ progress: Record<string, unknown>; revision: number }> {
+  const paths = await ensureSharedResearchFiles(workspaceDir, false);
+  const current = getPlainRecord(await readJsonFileIfExists(paths.progress_path));
+  const section = getPlainRecord(current[kind]);
+  if (!section.prepared_batch) throw new Error(`Prepared ${kind} research batch is not ready`);
+  if (section.written === true) return { progress: current, revision: typeof current.revision === "number" ? current.revision : 0 };
+  const next = {
+    ...current,
+    [kind]: { ...section, written: true },
+    revision: (typeof current.revision === "number" ? current.revision : 0) + 1,
     updated_at: new Date().toISOString(),
   };
-  await atomicWriteJsonFile(paths.progress_path, progress);
-  return progress;
+  await atomicWriteJsonFile(paths.progress_path, next);
+  return { progress: next, revision: Number(next.revision) };
+}
+
+export async function publishPreparedAppWebResearchBatch(
+  input: { workspace_dir: string },
+): Promise<PublishAppSharedResearchBatchResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  return withSharedResearchWriteQueue(workspace.workspace_dir, async () => {
+    const paths = await ensureSharedResearchFiles(workspace.workspace_dir, false);
+    const currentProgress = getPlainRecord(await readJsonFileIfExists(paths.progress_path));
+    const block = normalizeString(getPlainRecord(currentProgress.web).prepared_batch).trim();
+    if (!block) throw new Error("Prepared web research batch is not ready");
+    const current = await readFile(paths.web_summary_path, "utf8");
+    const alreadyPublished = current.trimEnd().endsWith(block);
+    if (!alreadyPublished) await atomicWriteTextFile(paths.web_summary_path, `${current.trimEnd()}\n\n${block}\n`);
+    const marked = await markPreparedResearchPublished(workspace.workspace_dir, "web");
+    return {
+      workspace_dir: workspace.workspace_dir,
+      artifact_path: paths.web_summary_path,
+      published: !alreadyPublished,
+      already_published: alreadyPublished,
+      revision: marked.revision,
+    };
+  });
+}
+
+export async function publishPreparedAppImageResearchBatch(
+  input: { workspace_dir: string },
+): Promise<PublishAppSharedResearchBatchResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  return withSharedResearchWriteQueue(workspace.workspace_dir, async () => {
+    const paths = await ensureSharedResearchFiles(workspace.workspace_dir, false);
+    const currentProgress = getPlainRecord(await readJsonFileIfExists(paths.progress_path));
+    const batch = getPlainRecord(getPlainRecord(currentProgress.image).prepared_batch);
+    if (!normalizeString(batch.title) || !Array.isArray(batch.candidates)) throw new Error("Prepared image research batch is not ready");
+    const catalog = normalizeImageCatalog(await readJsonFileIfExists(paths.image_catalog_path));
+    const assets = Array.isArray(catalog.assets) ? catalog.assets.map(getPlainRecord) : [];
+    const nextAssets = deduplicateImageCatalogAssets([
+      ...assets,
+      ...batch.candidates.map(compactImageCatalogAsset).filter((asset): asset is Record<string, unknown> => asset !== null),
+    ]);
+    const alreadyPublished = JSON.stringify(assets) === JSON.stringify(nextAssets);
+    if (!alreadyPublished) await atomicWriteJsonFile(paths.image_catalog_path, { schema_version: 2, assets: nextAssets });
+    const marked = await markPreparedResearchPublished(workspace.workspace_dir, "image");
+    return {
+      workspace_dir: workspace.workspace_dir,
+      artifact_path: paths.image_catalog_path,
+      published: !alreadyPublished,
+      already_published: alreadyPublished,
+      revision: marked.revision,
+    };
+  });
 }
 
 export async function appendAppWebResearchBatch(

@@ -89,7 +89,9 @@ import {
   prepareAppUploadedSourceAnalysisWorkspace,
   prepareAppSharedResearchWorkspace,
   getAppSharedResearchContext,
-  recordAppSharedResearchProgress,
+  patchAppSharedResearchProgress,
+  publishPreparedAppWebResearchBatch,
+  publishPreparedAppImageResearchBatch,
   appendAppWebResearchBatch,
   appendAppImageResearchBatch,
   importAppSharedResearchImage,
@@ -157,6 +159,7 @@ const UPLOAD_ERR_NOT_GRANTED = -32201;
 const UPLOAD_ERR_TIMEOUT = -32208;
 const UPLOAD_ERR_NOT_NEGOTIATED = -32210;
 const MAX_HOST_UPLOAD_JSON_REFERENCE_BYTES = 512 * 1024;
+const SHARED_RESEARCH_CONTEXT_INLINE_MAX_BYTES = 48 * 1024;
 
 function readToolManifest() {
   return JSON.parse(readFileSync(new URL("./manifest.json", import.meta.url), "utf8"));
@@ -875,6 +878,14 @@ async function registerWorkspaceJsonReference(value, workspaceDir) {
   return registerJsonReferenceWithContext(value, "workspace.json", "workspace_upload", {
     workspaceDir: resolvedWorkspaceDir,
     source: "ppt-engine.workspace-json-reference",
+  });
+}
+
+async function maybeRegisterSharedResearchContextReference(value) {
+  if (Buffer.byteLength(JSON.stringify(value), "utf8") <= SHARED_RESEARCH_CONTEXT_INLINE_MAX_BYTES) return value;
+  return registerJsonReferenceWithContext(value, "shared-research-context.json", "result_upload", {
+    workspaceDir: value?.workspace_dir,
+    source: "ppt-engine.shared-research-context",
   });
 }
 
@@ -2033,24 +2044,36 @@ async function toolAppGetPageProgress(args) {
 
 async function toolAppPrepareSharedResearchWorkspace(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
-  return prepareAppSharedResearchWorkspace({
+  return maybeRegisterSharedResearchContextReference(await prepareAppSharedResearchWorkspace({
     workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir"),
     reset_progress: args.reset_progress === true,
-  });
+  }));
 }
 
 async function toolAppGetSharedResearchContext(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
-  return getAppSharedResearchContext({ workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir") });
+  return maybeRegisterSharedResearchContextReference(await getAppSharedResearchContext({ workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir") }));
 }
 
-async function toolAppRecordSharedResearchProgress(args) {
+async function toolAppPatchSharedResearchProgress(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
-  if (!args.progress || typeof args.progress !== "object" || Array.isArray(args.progress)) throw new Error('"progress" must be an object');
-  return recordAppSharedResearchProgress({
+  if (!Array.isArray(args.operations) || args.operations.some((operation) => !operation || typeof operation !== "object" || Array.isArray(operation))) {
+    throw new Error('"operations" must be an array of objects');
+  }
+  return patchAppSharedResearchProgress({
     workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir"),
-    progress: args.progress,
+    operations: args.operations,
   });
+}
+
+async function toolAppPublishPreparedWebResearchBatch(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  return publishPreparedAppWebResearchBatch({ workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir") });
+}
+
+async function toolAppPublishPreparedImageResearchBatch(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  return publishPreparedAppImageResearchBatch({ workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir") });
 }
 
 async function toolAppAppendWebResearchBatch(args) {
@@ -2877,7 +2900,9 @@ const TOOL_DISPATCH = {
   app_get_page_progress: toolAppGetPageProgress,
   app_prepare_shared_research_workspace: toolAppPrepareSharedResearchWorkspace,
   app_get_shared_research_context: toolAppGetSharedResearchContext,
-  app_record_shared_research_progress: toolAppRecordSharedResearchProgress,
+  app_patch_shared_research_progress: toolAppPatchSharedResearchProgress,
+  app_publish_prepared_web_research_batch: toolAppPublishPreparedWebResearchBatch,
+  app_publish_prepared_image_research_batch: toolAppPublishPreparedImageResearchBatch,
   app_append_web_research_batch: toolAppAppendWebResearchBatch,
   app_append_image_research_batch: toolAppAppendImageResearchBatch,
   app_import_shared_research_image_host_upload: toolAppImportSharedResearchImageHostUpload,

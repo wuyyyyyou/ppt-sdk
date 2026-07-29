@@ -2,8 +2,16 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { AiInteractionLogger } from "../../src/ai/interactionLog.ts";
-import type { SharedResearchContextResult, SharedResearchImageAsset, SharedResearchImageBatch } from "../../src/api/types.ts";
-import { runLinearSharedResearch } from "../../src/features/deck-generation/linearResearchWorkflow.ts";
+import type {
+  SharedResearchContextResult,
+  SharedResearchImageAsset,
+  SharedResearchImageBatch,
+  SharedResearchProgressOperation,
+} from "../../src/api/types.ts";
+import {
+  chunkSharedResearchProgressOperations,
+  runLinearSharedResearch,
+} from "../../src/features/deck-generation/linearResearchWorkflow.ts";
 import type { DeckGenerationRuntime } from "../../src/features/deck-generation/types.ts";
 
 function deferred<T = void>() {
@@ -27,21 +35,88 @@ function createRuntime(overrides: Record<string, unknown> = {}) {
   const imageBatches: SharedResearchImageBatch[] = [];
   const logs: Array<Record<string, unknown>> = [];
   const pageProgress = { pages: [] };
+  const asRecord = (value: unknown) => value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  const upsert = (items: unknown, key: string, value: Record<string, unknown>) => {
+    const current = Array.isArray(items) ? items.map(asRecord) : [];
+    const index = current.findIndex((item) => item[key] === value[key]);
+    if (index >= 0) current[index] = structuredClone(value);
+    else current.push(structuredClone(value));
+    return current;
+  };
+  const applyPatch = (operations: SharedResearchProgressOperation[]) => {
+    const progress = context.progress;
+    progress.schema_version ??= 2;
+    progress.status ??= "waiting";
+    progress.stages ??= {};
+    for (const operation of operations) {
+      const web = asRecord(progress.web);
+      const image = asRecord(progress.image);
+      if (operation.op === "set_stage") {
+        asRecord(progress.stages)[operation.stage] = operation.state;
+        if (operation.state === "running" && progress.status === "waiting") progress.status = "running";
+      } else if (operation.op === "set_web_decision") progress.web = { ...web, decision: structuredClone(operation.decision) };
+      else if (operation.op === "upsert_web_search") progress.web = { ...web, searches: upsert(web.searches, "query", { ...operation.search, query: operation.query }) };
+      else if (operation.op === "set_web_fetch_result_ids") progress.web = { ...web, fetch_result_ids: [...operation.result_ids] };
+      else if (operation.op === "upsert_web_fetched_page") progress.web = { ...web, fetched_pages: upsert(web.fetched_pages, "url", { ...operation.page, url: operation.url }) };
+      else if (operation.op === "set_web_prepared_batch") progress.web = { ...web, prepared_batch: operation.markdown, written: false };
+      else if (operation.op === "set_web_diagnostics") progress.web = { ...web, gaps: [...operation.gaps], diagnostic_errors: [...operation.diagnostic_errors] };
+      else if (operation.op === "set_image_decision") progress.image = { ...image, decision: structuredClone(operation.decision) };
+      else if (operation.op === "upsert_image_search") progress.image = { ...image, searches: upsert(image.searches, "query", { ...operation.search, query: operation.query }) };
+      else if (operation.op === "set_image_work_status") progress.image = { ...image, [operation.field]: operation.state };
+      else if (operation.op === "upsert_image_deduplication_entry") {
+        const deduplication = asRecord(image.deduplication);
+        progress.image = {
+          ...image,
+          deduplication: { ...deduplication, groups: upsert(deduplication.groups, "candidate_id", { ...operation.group, candidate_id: operation.candidate_id }) },
+          candidates: upsert(image.candidates, "candidate_id", { ...operation.candidate, candidate_id: operation.candidate_id }),
+        };
+      } else if (operation.op === "set_image_deduplication_summary") {
+        progress.image = { ...image, deduplication: { ...asRecord(image.deduplication), status: "completed", strategy: operation.strategy, statistics: operation.statistics } };
+      } else if (operation.op === "upsert_image_analysis_batch") {
+        let candidates = image.candidates;
+        for (const candidate of operation.candidates) candidates = upsert(candidates, "candidate_id", { ...candidate.candidate, candidate_id: candidate.candidate_id });
+        progress.image = { ...image, analysis_batches: upsert(image.analysis_batches, "batch_id", { ...operation.batch, batch_id: operation.batch_id }), candidates };
+      }
+      else if (operation.op === "upsert_image_candidate") progress.image = { ...image, candidates: upsert(image.candidates, "candidate_id", { ...operation.candidate, candidate_id: operation.candidate_id }) };
+      else if (operation.op === "set_image_diagnostics") progress.image = { ...image, gaps: [...operation.gaps], diagnostic_errors: [...operation.diagnostic_errors] };
+      else if (operation.op === "set_image_content_deduplication") progress.image = { ...image, content_deduplication: structuredClone(operation.value) };
+      else if (operation.op === "finalize_image_research") {
+        progress.image = {
+          ...image,
+          prepared_batch: {
+            title: operation.title,
+            status: operation.status,
+            queries: structuredClone(operation.queries),
+            candidates: structuredClone(Array.isArray(image.candidates) ? image.candidates : []),
+            gaps: [...operation.gaps],
+            statistics: structuredClone(operation.statistics),
+          },
+          written: false,
+        };
+      } else if (operation.op === "finalize_shared_research") progress.status = "completed";
+    }
+  };
   const backend = {
     prepareSharedResearchWorkspace: async () => context,
     getSharedResearchContext: async () => context,
     getWorkspaceStyleGuide: async () => ({ content: "Use documentary photography." }),
-    recordSharedResearchProgress: async ({ progress }: { progress: Record<string, unknown> }) => {
-      context.progress = structuredClone(progress);
-      return progress;
+    patchSharedResearchProgress: async ({ operations }: { operations: SharedResearchProgressOperation[] }) => {
+      applyPatch(operations);
+      return { workspace_dir: context.workspace_dir, progress_path: context.progress_path, updated: true, revision: 1, updated_at: new Date().toISOString() };
     },
     recordPageProgress: async () => pageProgress,
-    appendWebResearchBatch: async ({ markdown }: { markdown: string }) => {
+    publishPreparedWebResearchBatch: async () => {
+      const web = asRecord(context.progress.web);
+      const markdown = String(web.prepared_batch ?? "");
       webBatches.push(markdown);
       context.web_summary = `${context.web_summary.trimEnd()}\n\n${markdown}\n`;
-      return { workspace_dir: context.workspace_dir, web_summary_path: context.web_summary_path, appended: true };
+      context.progress.web = { ...web, written: true };
+      return { workspace_dir: context.workspace_dir, artifact_path: context.web_summary_path, published: true, already_published: false, revision: 1 };
     },
-    appendImageResearchBatch: async ({ batch }: { batch: SharedResearchImageBatch }) => {
+    publishPreparedImageResearchBatch: async () => {
+      const batch = asRecord(asRecord(context.progress.image).prepared_batch) as unknown as SharedResearchImageBatch;
       imageBatches.push(structuredClone(batch));
       const assets = batch.candidates.filter((candidate) => (
         candidate.use_in_ppt
@@ -68,7 +143,8 @@ function createRuntime(overrides: Record<string, unknown> = {}) {
           context.image_catalog.assets.push(structuredClone(asset));
         }
       }
-      return { workspace_dir: context.workspace_dir, image_catalog_path: context.image_catalog_path, appended: true };
+      context.progress.image = { ...asRecord(context.progress.image), written: true };
+      return { workspace_dir: context.workspace_dir, artifact_path: context.image_catalog_path, published: true, already_published: false, revision: 1 };
     },
     importSharedResearchImageHostUpload: async ({ candidate_id }: { candidate_id: string }) => ({
       workspace_dir: context.workspace_dir,
@@ -138,6 +214,31 @@ function createRuntime(overrides: Record<string, unknown> = {}) {
 }
 
 describe("Linear Shared Research workflow", () => {
+  it("splits a five-query image checkpoint into patches below 32 KiB", () => {
+    const operations: SharedResearchProgressOperation[] = Array.from({ length: 5 }, (_, queryIndex) => ({
+      op: "upsert_image_search" as const,
+      query: `query-${queryIndex + 1}`,
+      search: {
+        query: `query-${queryIndex + 1}`,
+        status: "completed",
+        result: Array.from({ length: 6 }, (_, resultIndex) => ({
+          occurrence_id: `image-q${queryIndex + 1}-r${resultIndex + 1}`,
+          image_url: `https://images.test/${queryIndex + 1}/${resultIndex + 1}.jpg`,
+          source_url: `https://source.test/${queryIndex + 1}/${resultIndex + 1}`,
+          title: `Candidate ${queryIndex + 1}-${resultIndex + 1}`,
+          description: "x".repeat(1200),
+        })),
+      },
+    }));
+    const batches = chunkSharedResearchProgressOperations("/tmp/workspace", operations);
+    assert.ok(batches.length > 1);
+    assert.equal(batches.flat().length, operations.length);
+    for (const batch of batches) {
+      const bytes = new TextEncoder().encode(JSON.stringify({ workspace_dir: "/tmp/workspace", operations: batch })).byteLength;
+      assert.ok(bytes <= 32 * 1024, `patch was ${bytes} bytes`);
+    }
+  });
+
   it("starts selected-image downloads as soon as each image Session finishes", async () => {
     const secondSessionEntered = deferred();
     const releaseSecondSession = deferred();

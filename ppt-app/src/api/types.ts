@@ -985,6 +985,52 @@ export interface SharedResearchContextResult {
   progress: Record<string, unknown>;
 }
 
+export type SharedResearchStage =
+  | "web_decision"
+  | "web_research"
+  | "image_decision"
+  | "image_research"
+  | "image_search"
+  | "image_deduplication"
+  | "image_analysis"
+  | "image_import";
+
+export type SharedResearchProgressOperation =
+  | { op: "set_stage"; stage: SharedResearchStage; state: SharedResearchStageState }
+  | { op: "set_web_decision"; decision: Record<string, unknown> }
+  | { op: "upsert_web_search"; query: string; search: Record<string, unknown> }
+  | { op: "set_web_fetch_result_ids"; result_ids: string[] }
+  | { op: "upsert_web_fetched_page"; url: string; page: Record<string, unknown> }
+  | { op: "set_web_prepared_batch"; markdown: string }
+  | { op: "set_web_diagnostics"; gaps: string[]; diagnostic_errors: string[] }
+  | { op: "set_image_decision"; decision: Record<string, unknown> }
+  | { op: "upsert_image_search"; query: string; search: Record<string, unknown> }
+  | { op: "set_image_work_status"; field: "search_status" | "analysis_status" | "import_status"; state: "waiting" | "running" | "completed" | "warning" }
+  | { op: "upsert_image_deduplication_entry"; candidate_id: string; group: Record<string, unknown>; candidate: Record<string, unknown> }
+  | { op: "set_image_deduplication_summary"; strategy: Record<string, unknown>; statistics: Record<string, unknown> }
+  | { op: "upsert_image_analysis_batch"; batch_id: string; batch: Record<string, unknown>; candidates: Array<{ candidate_id: string; candidate: Record<string, unknown> }> }
+  | { op: "upsert_image_candidate"; candidate_id: string; candidate: Record<string, unknown> }
+  | { op: "set_image_diagnostics"; gaps: string[]; diagnostic_errors: string[] }
+  | { op: "set_image_content_deduplication"; value: Record<string, unknown> }
+  | { op: "finalize_image_research"; title: string; status: SharedResearchStageState; queries: Array<Record<string, unknown>>; gaps: string[]; statistics: Record<string, unknown> }
+  | { op: "finalize_shared_research" };
+
+export interface PatchSharedResearchProgressResult {
+  workspace_dir: string;
+  progress_path: string;
+  updated: boolean;
+  revision: number;
+  updated_at: string;
+}
+
+export interface PublishSharedResearchBatchResult {
+  workspace_dir: string;
+  artifact_path: string;
+  published: boolean;
+  already_published: boolean;
+  revision: number;
+}
+
 export interface ImportSharedResearchImageResult {
   workspace_dir: string;
   candidate_id: string;

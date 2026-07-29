@@ -6,6 +6,7 @@ import type {
   SharedResearchContextResult,
   SharedResearchImageBatch,
   SharedResearchImageCandidate,
+  SharedResearchProgressOperation,
   SharedResearchStageState,
 } from "../../api/types";
 import type { ResearchSearchResultForSelection } from "../../ai/researchAiClient";
@@ -271,12 +272,169 @@ function stageMessage(runtime: DeckGenerationRuntime, stage: StageKey) {
   return messages[stage];
 }
 
-async function setStage(runtime: DeckGenerationRuntime, checkpoint: LinearResearchCheckpoint, stage: StageKey, state: SharedResearchStageState) {
+function sameValue(left: unknown, right: unknown) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function plainRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function changedByKey(
+  previous: unknown,
+  next: unknown,
+  key: string,
+) {
+  const previousByKey = new Map((Array.isArray(previous) ? previous : []).map((item) => {
+    const record = plainRecord(item);
+    return [String(record[key] ?? ""), record] as const;
+  }));
+  return (Array.isArray(next) ? next : []).map(plainRecord).filter((item) => {
+    const identity = String(item[key] ?? "");
+    return identity && !sameValue(previousByKey.get(identity), item);
+  });
+}
+
+export function chunkSharedResearchProgressOperations(
+  workspaceDir: string,
+  operations: SharedResearchProgressOperation[],
+  maxBytes = 32 * 1024,
+) {
+  const batches: SharedResearchProgressOperation[][] = [];
+  let current: SharedResearchProgressOperation[] = [];
+  for (const operation of operations) {
+    const candidate = [...current, operation];
+    const bytes = new TextEncoder().encode(JSON.stringify({ workspace_dir: workspaceDir, operations: candidate })).byteLength;
+    if (bytes <= maxBytes) {
+      current = candidate;
+      continue;
+    }
+    if (current.length === 0) throw new Error(`Single shared research progress operation exceeds ${maxBytes} bytes`);
+    batches.push(current);
+    current = [operation];
+    const singleBytes = new TextEncoder().encode(JSON.stringify({ workspace_dir: workspaceDir, operations: current })).byteLength;
+    if (singleBytes > maxBytes) throw new Error(`Single shared research progress operation exceeds ${maxBytes} bytes`);
+  }
+  if (current.length > 0) batches.push(current);
+  return batches;
+}
+
+function buildSharedResearchProgressOperations(
+  previous: LinearResearchCheckpoint,
+  next: LinearResearchCheckpoint,
+): SharedResearchProgressOperation[] {
+  const operations: SharedResearchProgressOperation[] = [];
+  const previousWeb = previous.web ?? {};
+  const nextWeb = next.web ?? {};
+  const previousImage = previous.image ?? {};
+  const nextImage = next.image ?? {};
+
+  if (!sameValue(previousWeb.decision, nextWeb.decision) && nextWeb.decision) {
+    operations.push({ op: "set_web_decision", decision: structuredClone(nextWeb.decision) as unknown as Record<string, unknown> });
+  }
+  for (const search of changedByKey(previousWeb.searches, nextWeb.searches, "query")) {
+    operations.push({ op: "upsert_web_search", query: String(search.query), search });
+  }
+  if (!sameValue(previousWeb.fetch_result_ids, nextWeb.fetch_result_ids) && nextWeb.fetch_result_ids) {
+    operations.push({ op: "set_web_fetch_result_ids", result_ids: [...nextWeb.fetch_result_ids] });
+  }
+  for (const page of changedByKey(previousWeb.fetched_pages, nextWeb.fetched_pages, "url")) {
+    operations.push({ op: "upsert_web_fetched_page", url: String(page.url), page });
+  }
+  if (!sameValue(previousWeb.prepared_batch, nextWeb.prepared_batch) && nextWeb.prepared_batch) {
+    operations.push({ op: "set_web_prepared_batch", markdown: nextWeb.prepared_batch });
+  }
+  if (!sameValue(previousWeb.gaps, nextWeb.gaps) || !sameValue(previousWeb.diagnostic_errors, nextWeb.diagnostic_errors)) {
+    operations.push({ op: "set_web_diagnostics", gaps: [...(nextWeb.gaps ?? [])], diagnostic_errors: [...(nextWeb.diagnostic_errors ?? [])] });
+  }
+
+  if (!sameValue(previousImage.decision, nextImage.decision) && nextImage.decision) {
+    operations.push({ op: "set_image_decision", decision: structuredClone(nextImage.decision) as unknown as Record<string, unknown> });
+  }
+  for (const search of changedByKey(previousImage.searches, nextImage.searches, "query")) {
+    operations.push({ op: "upsert_image_search", query: String(search.query), search });
+  }
+  for (const field of ["search_status", "analysis_status", "import_status"] as const) {
+    const value = nextImage[field];
+    if (value && value !== previousImage[field]) operations.push({ op: "set_image_work_status", field, state: value });
+  }
+
+  const previousCandidates = new Map((previousImage.candidates ?? []).map((candidate) => [candidate.candidate_id, candidate]));
+  const analysisCandidateIds = new Set<string>();
+  if (nextImage.deduplication && !sameValue(previousImage.deduplication, nextImage.deduplication)) {
+    for (const group of nextImage.deduplication.groups ?? []) {
+      const candidate = (nextImage.candidates ?? []).find((item) => item.candidate_id === group.candidate_id);
+      const previousGroup = previousImage.deduplication?.groups?.find((item) => item.candidate_id === group.candidate_id);
+      if (candidate && (!sameValue(previousGroup, group) || !previousCandidates.has(candidate.candidate_id))) {
+        operations.push({
+          op: "upsert_image_deduplication_entry",
+          candidate_id: candidate.candidate_id,
+          group: structuredClone(group) as unknown as Record<string, unknown>,
+          candidate: structuredClone(candidate) as unknown as Record<string, unknown>,
+        });
+      }
+    }
+    if (nextImage.deduplication.status === "completed") {
+      operations.push({
+        op: "set_image_deduplication_summary",
+        strategy: structuredClone(nextImage.deduplication.strategy) as unknown as Record<string, unknown>,
+        statistics: structuredClone(nextImage.deduplication.statistics) as unknown as Record<string, unknown>,
+      });
+    }
+  }
+  for (const batch of changedByKey(previousImage.analysis_batches, nextImage.analysis_batches, "batch_id")) {
+    const candidateIds = new Set(Array.isArray(batch.candidate_ids) ? batch.candidate_ids.map(String) : []);
+    const candidates = (nextImage.candidates ?? [])
+      .filter((candidate) => candidateIds.has(candidate.candidate_id))
+      .filter((candidate) => !sameValue(previousCandidates.get(candidate.candidate_id), candidate))
+      .map((candidate) => ({ candidate_id: candidate.candidate_id, candidate: structuredClone(candidate) as unknown as Record<string, unknown> }));
+    for (const candidate of candidates) analysisCandidateIds.add(candidate.candidate_id);
+    operations.push({ op: "upsert_image_analysis_batch", batch_id: String(batch.batch_id), batch, candidates });
+  }
+  for (const candidate of nextImage.candidates ?? []) {
+    const previousCandidate = previousCandidates.get(candidate.candidate_id);
+    if (previousCandidate && !sameValue(previousCandidate, candidate) && !analysisCandidateIds.has(candidate.candidate_id)) {
+      operations.push({ op: "upsert_image_candidate", candidate_id: candidate.candidate_id, candidate: structuredClone(candidate) as unknown as Record<string, unknown> });
+    }
+  }
+  if (!sameValue(previousImage.gaps, nextImage.gaps) || !sameValue(previousImage.diagnostic_errors, nextImage.diagnostic_errors)) {
+    operations.push({ op: "set_image_diagnostics", gaps: [...(nextImage.gaps ?? [])], diagnostic_errors: [...(nextImage.diagnostic_errors ?? [])] });
+  }
+  if (!sameValue(previousImage.content_deduplication, nextImage.content_deduplication) && nextImage.content_deduplication) {
+    operations.push({ op: "set_image_content_deduplication", value: structuredClone(nextImage.content_deduplication) as unknown as Record<string, unknown> });
+  }
+  if (!sameValue(previousImage.prepared_batch, nextImage.prepared_batch) && nextImage.prepared_batch) {
+    operations.push({
+      op: "finalize_image_research",
+      title: nextImage.prepared_batch.title,
+      status: nextImage.prepared_batch.status,
+      queries: structuredClone(nextImage.prepared_batch.queries) as unknown as Array<Record<string, unknown>>,
+      gaps: [...nextImage.prepared_batch.gaps],
+      statistics: structuredClone(nextImage.prepared_batch.statistics ?? {}) as unknown as Record<string, unknown>,
+    });
+  }
+
+  for (const stage of STAGE_ORDER) {
+    if (previous.stages[stage] !== next.stages[stage]) operations.push({ op: "set_stage", stage, state: next.stages[stage] });
+  }
+  if (previous.status !== next.status && next.status !== "running" && next.status !== "waiting") {
+    operations.push({ op: "finalize_shared_research" });
+  }
+  return operations;
+}
+
+async function setStage(
+  runtime: DeckGenerationRuntime,
+  checkpoint: LinearResearchCheckpoint,
+  stage: StageKey,
+  state: SharedResearchStageState,
+  persist: () => Promise<void>,
+) {
   checkpoint.status = state === "running" ? "running" : checkpoint.status;
   checkpoint.stages[stage] = state;
   runtime.researchDiscoveryProgress = uiProgress(checkpoint);
   await Promise.all([
-    runtime.backend.recordSharedResearchProgress({ workspace_dir: runtime.workspace.workspace_dir, progress: checkpoint as unknown as Record<string, unknown> }),
+    persist(),
     runtime.backend.recordPageProgress({
       workspace_dir: runtime.workspace.workspace_dir,
       patch: { research_discovery: runtime.researchDiscoveryProgress },
@@ -623,22 +781,29 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
     ...researchContext(runtime, context, operation ? researchLogContext(runtime, operation) : undefined),
     styleGuide: styleGuide.content,
   });
+  let persistedCheckpoint = structuredClone(checkpoint);
   let persistQueue = Promise.resolve();
   const persist = () => {
-    const snapshot = structuredClone(checkpoint) as unknown as Record<string, unknown>;
-    persistQueue = persistQueue.then(() => runtime.backend.recordSharedResearchProgress({ workspace_dir: runtime.workspace.workspace_dir, progress: snapshot })).then(() => undefined);
+    const snapshot = structuredClone(checkpoint);
+    persistQueue = persistQueue.then(async () => {
+      const operations = buildSharedResearchProgressOperations(persistedCheckpoint, snapshot);
+      for (const batch of chunkSharedResearchProgressOperations(runtime.workspace.workspace_dir, operations)) {
+        await runtime.backend.patchSharedResearchProgress({ workspace_dir: runtime.workspace.workspace_dir, operations: batch });
+      }
+      persistedCheckpoint = structuredClone(snapshot);
+    });
     return persistQueue;
   };
   const controls = getResearchSearchControlSettings(runtime);
 
   if (checkpoint.stages.web_decision === "waiting" || checkpoint.stages.web_decision === "running") {
-    await setStage(runtime, checkpoint, "web_decision", "running");
+    await setStage(runtime, checkpoint, "web_decision", "running", persist);
     try {
       checkpoint.web ??= {};
       checkpoint.web.decision = controls.disableWebResearch
         ? { needs_search: false, queries: [], rationale: "Web research is disabled by the user setting." }
         : await runtime.researchAiClient.decideWebResearch(decisionContext("web_research_decision"));
-      await setStage(runtime, checkpoint, "web_decision", checkpoint.web.decision.needs_search ? "completed" : "skipped");
+      await setStage(runtime, checkpoint, "web_decision", checkpoint.web.decision.needs_search ? "completed" : "skipped", persist);
     } catch (error) {
       checkpoint.web = {
         decision: {
@@ -650,13 +815,13 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
         diagnostic_errors: [errorMessage(error)],
       };
       await logResearchError(runtime, "web-decision", error);
-      await setStage(runtime, checkpoint, "web_decision", "warning");
+      await setStage(runtime, checkpoint, "web_decision", "warning", persist);
     }
   }
   throwIfCancelled(runtime);
 
   if (!checkpoint.web?.written) {
-    await setStage(runtime, checkpoint, "web_research", "running");
+    await setStage(runtime, checkpoint, "web_research", "running", persist);
     const decision = checkpoint.web?.decision ?? { needs_search: false, queries: [] };
     const title = batchTitle(runtime);
     if (!decision.needs_search) {
@@ -765,21 +930,23 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
       checkpoint.web.prepared_batch = `${checkpoint.web.prepared_batch ?? ""}\n\n${webStatisticsMarkdown(runtime, checkpoint.web)}`.trim();
     }
     await persist();
-    await runtime.backend.appendWebResearchBatch({ workspace_dir: runtime.workspace.workspace_dir, markdown: checkpoint.web.prepared_batch ?? "" });
+    await runtime.backend.publishPreparedWebResearchBatch({ workspace_dir: runtime.workspace.workspace_dir });
     checkpoint.web.written = true;
-    await setStage(runtime, checkpoint, "web_research", checkpoint.web.gaps?.length ? "warning" : decision.needs_search ? "completed" : "skipped");
+    persistedCheckpoint.web ??= {};
+    persistedCheckpoint.web.written = true;
+    await setStage(runtime, checkpoint, "web_research", checkpoint.web.gaps?.length ? "warning" : decision.needs_search ? "completed" : "skipped", persist);
   }
   context = await runtime.backend.getSharedResearchContext({ workspace_dir: runtime.workspace.workspace_dir });
   throwIfCancelled(runtime);
 
   if (checkpoint.stages.image_decision === "waiting" || checkpoint.stages.image_decision === "running") {
-    await setStage(runtime, checkpoint, "image_decision", "running");
+    await setStage(runtime, checkpoint, "image_decision", "running", persist);
     try {
       checkpoint.image ??= {};
       checkpoint.image.decision = controls.disableImageResearch
         ? { needs_search: false, queries: [], rationale: "Image research is disabled by the user setting." }
         : await runtime.researchAiClient.decideImageResearch(decisionContext("image_research_decision"));
-      await setStage(runtime, checkpoint, "image_decision", checkpoint.image.decision.needs_search ? "completed" : "skipped");
+      await setStage(runtime, checkpoint, "image_decision", checkpoint.image.decision.needs_search ? "completed" : "skipped", persist);
     } catch (error) {
       checkpoint.image = {
         decision: {
@@ -791,13 +958,13 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
         diagnostic_errors: [errorMessage(error)],
       };
       await logResearchError(runtime, "image-decision", error);
-      await setStage(runtime, checkpoint, "image_decision", "warning");
+      await setStage(runtime, checkpoint, "image_decision", "warning", persist);
     }
   }
   throwIfCancelled(runtime);
 
   if (!checkpoint.image?.written) {
-    await setStage(runtime, checkpoint, "image_research", "running");
+    await setStage(runtime, checkpoint, "image_research", "running", persist);
     checkpoint.image ??= {};
     const decision = checkpoint.image.decision ?? { needs_search: false, queries: [] };
     const queries: SharedResearchImageBatch["queries"] = [];
@@ -857,6 +1024,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
           statistics: { raw_occurrences: 0, unique_urls: 0, duplicate_occurrences: 0, duplicate_groups: 0 },
           groups: [],
         };
+        await persist();
         const groupsByKey = new Map<string, ImageDeduplicationGroup>();
         const candidatesByKey = new Map<string, SharedResearchImageCandidate>();
         for (const search of checkpoint.image.searches) {
@@ -931,6 +1099,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
       checkpoint.stages.image_analysis = "running";
       checkpoint.image.import_status = "running";
       checkpoint.stages.image_import = "running";
+      await persist();
       const importLimiter = createConcurrencyLimiter(IMAGE_IMPORT_CONCURRENCY);
       const importsBySha256 = new Map<string, Promise<ImportedResearchImageAsset>>();
       for (const candidate of candidates) {
@@ -1107,8 +1276,10 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
       },
     };
     await persist();
-    await runtime.backend.appendImageResearchBatch({ workspace_dir: runtime.workspace.workspace_dir, batch: checkpoint.image.prepared_batch });
+    await runtime.backend.publishPreparedImageResearchBatch({ workspace_dir: runtime.workspace.workspace_dir });
     checkpoint.image.written = true;
+    persistedCheckpoint.image ??= {};
+    persistedCheckpoint.image.written = true;
     const stageStates = Object.values(checkpoint.stages);
     const noNewResearch = checkpoint.web?.decision?.needs_search !== true && checkpoint.image?.decision?.needs_search !== true;
     checkpoint.status = status === "warning" || stageStates.includes("warning")
@@ -1116,6 +1287,6 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
       : noNewResearch
         ? "skipped"
         : "completed";
-    await setStage(runtime, checkpoint, "image_research", status);
+    await setStage(runtime, checkpoint, "image_research", status, persist);
   }
 }
