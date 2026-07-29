@@ -11,6 +11,7 @@
     "example_plugin.js",
     "aps-files-client.js",
     "host-upload-confirmation.js",
+    "host-upload-cache.js",
     "build_binary.sh",
     "scripts/binary-release.mjs",
     "scripts/tool-manifest-validation.mjs",

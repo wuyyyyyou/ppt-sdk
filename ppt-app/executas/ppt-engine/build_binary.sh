@@ -371,7 +371,7 @@ if [[ "$RUN_TEST" == "true" ]]; then
 
   TEST_BINARY_PATH="$TEST_EXTRACT_DIR/bin/$OUTPUT_NAME"
   chmod +x "$TEST_BINARY_PATH" || true
-  RESULT="$(printf '%s\n' '{"jsonrpc":"2.0","method":"describe","id":1}' | "$TEST_BINARY_PATH" 2>/dev/null)"
+  RESULT="$(printf '%s\n' '{"jsonrpc":"2.0","method":"describe","id":1}' | "$TEST_BINARY_PATH")"
   echo "$RESULT" | node ./scripts/binary-release.mjs verify-describe \
     --tool-manifest "$SCRIPT_DIR/manifest.json"
   node ./scripts/smoke-test-binary.mjs \

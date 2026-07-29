@@ -142,15 +142,30 @@ test("export artifact tools publish through APS Files and mint links without Hos
   }
 });
 
-test("APS Files client is included in the package and external Binary app runtime", async () => {
+test("plugin-relative modules are included in the package and external Binary app runtime", async () => {
   const projectDir = fileURLToPath(new URL("..", import.meta.url));
   const packageJson = JSON.parse(await readFile(path.join(projectDir, "package.json"), "utf8")) as {
     files?: string[];
   };
+  const pluginSource = await readFile(path.join(projectDir, "example_plugin.js"), "utf8");
   const binaryAppScript = await readFile(
     path.join(projectDir, "scripts", "prepare-sea-bundle.mjs"),
     "utf8",
   );
-  assert.ok(packageJson.files?.includes("aps-files-client.js"));
-  assert.match(binaryAppScript, /"aps-files-client\.js"/);
+  const relativeImports = [...pluginSource.matchAll(/from\s+["']\.\/([^"']+)["']/g)]
+    .map((match) => match[1]);
+
+  assert.ok(relativeImports.length > 0);
+  for (const relativeImport of relativeImports) {
+    const topLevelPath = relativeImport.split("/")[0];
+    const packagedCandidates = [relativeImport, topLevelPath];
+    assert.ok(
+      packagedCandidates.some((candidate) => packageJson.files?.includes(candidate)),
+      `${relativeImport} must be included in package.json files`,
+    );
+    assert.ok(
+      packagedCandidates.some((candidate) => binaryAppScript.includes(JSON.stringify(candidate))),
+      `${relativeImport} must be included in the external Binary app runtime`,
+    );
+  }
 });
