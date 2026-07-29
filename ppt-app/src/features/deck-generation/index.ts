@@ -22,6 +22,7 @@ export type {
   DeckGenerationCompletion,
   DeckGenerationError,
   DeckGenerationProgress,
+  DeckGenerationProgressMessageKey,
   DeckGenerationProgressPage,
   DeckGenerationResult,
   DeckGenerationStartMode,

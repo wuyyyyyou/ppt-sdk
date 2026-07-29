@@ -4,14 +4,18 @@ import type {
   CreateProjectInput,
   CreateWorkspaceInput,
   CreateWorkspaceResult,
-  DuplicateWorkspacePageInput,
   DeleteWorkspaceResult,
+  DuplicateWorkspaceInput,
+  DuplicateWorkspacePageInput,
+  DuplicateWorkspaceResult,
   GetExportArtifactDownloadUrlInput,
   GetWorkspacePageFileFingerprintsInput,
   GetWorkspacePageFileFingerprintsResult,
   GetPageEditContextInput,
   GetPageEditContextResult,
   HostUploadRef,
+  GetWorkspaceCoverInput,
+  GetWorkspaceCoverResult,
   GetWorkspaceOutlineInput,
   ListWorkspacesResult,
   ListTemplatesResult,
@@ -193,6 +197,7 @@ export interface PptBackend {
   duplicateWorkspacePage(input: DuplicateWorkspacePageInput): Promise<WorkspaceResult>;
   updateWorkspaceTitle(input: UpdateWorkspaceTitleInput): Promise<WorkspaceResult>;
   deleteWorkspace(input: { workspace_dir: string }): Promise<DeleteWorkspaceResult>;
+  duplicateWorkspace(input: DuplicateWorkspaceInput): Promise<DuplicateWorkspaceResult>;
   createProject(input: CreateProjectInput): Promise<ProjectResult>;
   getProject(input: { projectDir: string }): Promise<ProjectResult>;
   recordRequirements(input: RecordRequirementsInput): Promise<ProjectResult>;
@@ -235,6 +240,7 @@ export interface PptBackend {
   restorePageSourceVersion(input: GetPageEditContextInput): Promise<RestorePageSourceVersionResult>;
   recordOutline(input: RecordOutlineInput): Promise<ProjectResult>;
   getRenderedDeckHtml(input: RenderDeckHtmlInput): Promise<RenderDeckHtmlResult>;
+  getWorkspaceCover(input: GetWorkspaceCoverInput): Promise<GetWorkspaceCoverResult>;
   renderDeckHtml(input: RenderDeckHtmlInput): Promise<RenderDeckHtmlResult>;
   recordDeckReview(input: RecordDeckReviewInput): Promise<ProjectResult>;
   startPptxExport(input: StartPptxExportInput): Promise<PptxExportJob>;

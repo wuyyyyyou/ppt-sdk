@@ -33,24 +33,45 @@ export function ReviewPage(props: ReviewPageProps) {
         t={props.t}
         actions={
           <>
-            <button className="icon-action-btn" onClick={props.onEdit} title="编辑 PPT"><Edit3 size={14} /></button>
-            <button className="icon-action-btn" onClick={() => void props.renderDeckHtml()} disabled={renderWaiting} title={props.t.review.renderAgain}>
-              <RefreshCw size={14} />
+            <button
+              className="icon-action-btn"
+              onClick={props.onEdit}
+              title={props.t.controls.edit}
+              aria-label={props.t.controls.edit}
+            >
+              <Edit3 size={14} aria-hidden="true" />
+            </button>
+            <button
+              className="icon-action-btn"
+              onClick={() => void props.renderDeckHtml()}
+              disabled={renderWaiting}
+              title={props.t.review.renderAgain}
+              aria-label={props.t.review.renderAgain}
+            >
+              <RefreshCw size={14} aria-hidden="true" />
             </button>
           </>
         }
       />
       <div className="mode-toggle">
-        <button className={mode === "grid" ? "active" : ""} onClick={() => props.setPreviewMode("grid")}>
-          <LayoutGrid size={14} />{props.t.review.grid}
+        <button
+          className={mode === "grid" ? "active" : ""}
+          aria-pressed={mode === "grid"}
+          onClick={() => props.setPreviewMode("grid")}
+        >
+          <LayoutGrid size={14} aria-hidden="true" />{props.t.review.grid}
         </button>
-        <button className={mode === "present" ? "active" : ""} onClick={() => props.setPreviewMode("present")}>
-          <Maximize2 size={14} />{props.t.review.present}
+        <button
+          className={mode === "present" ? "active" : ""}
+          aria-pressed={mode === "present"}
+          onClick={() => props.setPreviewMode("present")}
+        >
+          <Maximize2 size={14} aria-hidden="true" />{props.t.review.present}
         </button>
       </div>
       {props.reviewRender.status === "loading" ? <PreviewLoadingFrame label={props.t.review.rendering} /> : null}
       {props.reviewRender.status === "error" ? (
-        <div className="deck-html-review-error"><AlertTriangle size={18} /><pre>{props.reviewRender.error}</pre></div>
+        <div className="deck-html-review-error"><AlertTriangle size={18} aria-hidden="true" /><pre>{props.reviewRender.error}</pre></div>
       ) : null}
       {mode === "grid" ? (
         <div className="preview-grid-view">

@@ -1,12 +1,17 @@
-import { AlertCircle, CheckCircle2, ChevronDown, Circle, LoaderCircle, Play, Sparkles } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, Circle, LoaderCircle, Play, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Messages } from "../../../i18n/messages";
 import type { DeckGenerationProgress, DeckGenerationStep } from "../../deck-generation";
 import { buildPageGenerationStageRecords, type PageGenerationStageRecord, type PageGenerationStageRecordGroup } from "../generationStageRecords";
-import { buildResearchDiscoveryStageRecords, isDiscoveryPageId, type ResearchDiscoveryStageRecord, type ResearchDiscoveryStageGroup } from "../researchDiscoveryStageRecords";
-import { getGenerationProgressDisplayMessage } from "../generationProgressDisplay";
+import { buildResearchDiscoveryStageRecords, type ResearchDiscoveryStageRecord, type ResearchDiscoveryStageGroup } from "../researchDiscoveryStageRecords";
+import {
+  buildGenerationPageSummary,
+  formatGenerationPageSummary,
+  getGenerationProgressDisplayMessage,
+} from "../generationProgressDisplay";
 import type { GenerationStreamSnapshot } from "../types";
 import type { GenerationViewState } from "../generationViewState";
+import { summarizeUserFacingError } from "../userFacingError";
 import { ThinkingStatusText } from "./BriefPage";
 
 interface GeneratingPageProps {
@@ -14,7 +19,7 @@ interface GeneratingPageProps {
   viewState: GenerationViewState;
   progress: DeckGenerationProgress | null;
   history: GenerationStreamSnapshot[];
-  onCancel: () => void;
+  onBack: () => void;
   onBackToOutline: () => void;
   onResume: () => Promise<void>;
   canBackToOutline: boolean;
@@ -82,31 +87,43 @@ function stepState(
 }
 
 export function GeneratingPage(props: GeneratingPageProps) {
-  const { t, viewState, progress, history, onCancel, onBackToOutline, onResume, canBackToOutline } = props;
+  const { t, viewState, progress, history, onBack, onBackToOutline, onResume, canBackToOutline } = props;
   const activeIndex = majorStepIndex(progress?.step ?? null);
   const progressMessage = getGenerationProgressDisplayMessage(t, progress);
   const pageTitle = generationPageTitle(t, viewState.status);
+  const backLabel = viewState.runIntent === "refinement"
+    ? t.controls.backToLastVersion
+    : t.controls.back;
 
   return (
     <section className="page active generating-page">
       <div className="page-header compact">
-        <div>
-          <div className="page-title">{pageTitle}</div>
-          <p><ThinkingStatusText text={progressMessage} active={viewState.status === "preparing" || viewState.status === "running"} /></p>
+        <div className="page-header-left">
+          <div>
+            <div className="page-title">{pageTitle}</div>
+            <p><ThinkingStatusText text={progressMessage} active={viewState.status === "preparing" || viewState.status === "running"} /></p>
+          </div>
         </div>
       </div>
 
-      <div className="generation-major-timeline">
+      {/* The timeline reports state, so it is a list rather than a row of
+          buttons that would take focus without doing anything. */}
+      <ol className="generation-major-timeline" aria-label={t.generating.progressTitle}>
         {majorSteps.map((step, index) => {
           const state = stepState(index, activeIndex, progress, viewState.status);
+          const label = t.generating.steps[step.labelKey];
           return (
-            <button key={step.id} className={`generation-major-node ${state}`}>
-              {state === "done" ? <CheckCircle2 size={15} /> : state === "failed" || state === "interrupted" ? <AlertCircle size={15} /> : state === "active" ? <LoaderCircle className="generation-running-icon" size={15} /> : <Circle size={15} />}
-              <span>{t.generating.steps[step.labelKey]}</span>
-            </button>
+            <li
+              key={step.id}
+              className={`generation-major-node ${state}`}
+              aria-current={state === "active" ? "step" : undefined}
+            >
+              {state === "done" ? <CheckCircle2 size={15} aria-hidden="true" /> : state === "failed" || state === "interrupted" ? <AlertCircle size={15} aria-hidden="true" /> : state === "active" ? <LoaderCircle className="generation-running-icon" size={15} aria-hidden="true" /> : <Circle size={15} aria-hidden="true" />}
+              <span>{label}</span>
+            </li>
           );
         })}
-      </div>
+      </ol>
 
       {progress ? (
         <GenerationProgressPanel
@@ -120,33 +137,32 @@ export function GeneratingPage(props: GeneratingPageProps) {
         </div>
       )}
 
-      {viewState.showResume ? (
-        <div className="generation-recovery-actions">
-          <button className="primary-btn" onClick={() => void onResume()} disabled={!viewState.canResume}>
-            <Play size={14} />
-            {viewState.resumeAction === "refinement"
-              ? t.controls.resumeRefinement
-              : t.controls.resumeGeneration}
-          </button>
-          {viewState.showStop ? (
-            <button className="secondary-btn" onClick={onCancel} disabled={!viewState.canStop}>
-              {t.controls.stop}
-            </button>
-          ) : null}
-        </div>
-      ) : viewState.showBackToOutline ? (
-        <div className="generation-recovery-actions">
-          <button className="secondary-btn" onClick={onBackToOutline} disabled={!canBackToOutline}>
-            {t.stages.outline}
-          </button>
-        </div>
-      ) : viewState.showStop ? (
-        <div className="generation-recovery-actions">
-          <button className="secondary-btn" onClick={onCancel} disabled={!viewState.canStop}>
-            {t.controls.stop}
-          </button>
-        </div>
-      ) : null}
+      {/* Back sits at the bottom of the stage, next to the recovery entries it
+          belongs with. Available for the whole stage, not just the recovery
+          states: a run in flight routes through the abandonment confirmation
+          instead of taking the entry away. */}
+      <div className="generation-page-footer">
+        <button className="secondary-btn" type="button" onClick={onBack} disabled={viewState.navigationLocked}>
+          <ArrowLeft size={16} aria-hidden="true" />{backLabel}
+        </button>
+        {viewState.showResume || viewState.showBackToOutline ? (
+          <div className="generation-recovery-actions">
+            {viewState.showResume ? (
+              <button className="primary-btn" onClick={() => void onResume()} disabled={!viewState.canResume}>
+                <Play size={14} aria-hidden="true" />
+                {viewState.resumeAction === "refinement"
+                  ? t.controls.resumeRefinement
+                  : t.controls.resumeGeneration}
+              </button>
+            ) : null}
+            {viewState.showBackToOutline ? (
+              <button className="secondary-btn" onClick={onBackToOutline} disabled={!canBackToOutline}>
+                {t.stages.outline}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -157,10 +173,8 @@ function GenerationProgressPanel(props: {
   history: GenerationStreamSnapshot[];
 }) {
   const { t, progress, history } = props;
-  const realPages = progress.pages.filter((page) => !isDiscoveryPageId(page.page_id));
-  const completed = realPages.filter((page) => page.status === "accepted").length;
-  const total = realPages.length || progress.totalPages || 0;
-  const showPageAcceptedSummary = isPageGenerationStep(progress.step) && total > 0;
+  const pageSummary = buildGenerationPageSummary(progress);
+  const showPageAcceptedSummary = isPageGenerationStep(progress.step) && pageSummary !== null;
   const progressMessage = getGenerationProgressDisplayMessage(t, progress);
   const stageGroups = useMemo(
     () => buildPageGenerationStageRecords({ t, progress, history }),
@@ -183,11 +197,12 @@ function GenerationProgressPanel(props: {
           {running ? (
             <span className="generation-stay-hint">{t.generating.stayOnPageHint}</span>
           ) : null}
-          {showPageAcceptedSummary ? (
-            <span className="generation-pages-passed">
-              {t.generating.pagesPassed
-                .replace("{completed}", String(completed))
-                .replace("{total}", String(total))}
+          {showPageAcceptedSummary && pageSummary ? (
+            <span className="generation-pages-passed" role="status" aria-live="polite">
+              <span className="visually-hidden">{t.generating.pageSummary.label}</span>
+              {formatGenerationPageSummary(t, pageSummary).map((part, index) => (
+                <span key={`${index}-${part}`} className="generation-page-summary-part">{part}</span>
+              ))}
             </span>
           ) : null}
         </div>
@@ -374,7 +389,9 @@ function PageStageRecordGroupView(props: {
         </div>
         <span className={`generation-status-badge ${badgeState}`}>{group.pageStatusLabel}</span>
       </div>
-      {group.lastError ? <p className="generation-page-error">{group.lastError}</p> : null}
+      {group.lastError ? (
+        <p className="generation-page-error">{summarizeUserFacingError(t, group.lastError).summary}</p>
+      ) : null}
       <div className="generation-page-stage-list">
         {group.stages.map((stage) => (
           <PageStageRecordView

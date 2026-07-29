@@ -570,6 +570,21 @@ export interface DeleteAppWorkspaceInput {
   workspace_dir: string;
 }
 
+export interface DuplicateAppWorkspaceInput {
+  workspace_dir: string;
+  title?: string;
+}
+
+export interface DuplicateAppWorkspaceResult {
+  version: 1;
+  workspace_root: string;
+  source_workspace_id: string;
+  source_workspace_dir: string;
+  workspace_id: string;
+  workspace_dir: string;
+  title: string;
+}
+
 export interface GetAppWorkspaceOutlineInput {
   workspace_dir: string;
 }
@@ -791,6 +806,22 @@ export interface SelectAppWorkspaceTemplateResult {
 
 export interface RenderAppWorkspaceDeckHtmlInput {
   workspace_dir: string;
+}
+
+export interface GetAppWorkspaceCoverInput {
+  workspace_dir: string;
+}
+
+export interface GetAppWorkspaceCoverResult {
+  version: 1;
+  workspace_dir: string;
+  page_id: string;
+  source_path: string;
+  cover_path: string;
+  width: number | null;
+  height: number | null;
+  size_bytes: number;
+  generated_at: string;
 }
 
 export interface AppTemplatePlanningBlueprint {

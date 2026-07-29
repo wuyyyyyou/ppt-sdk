@@ -121,6 +121,58 @@ test("app_patch_workspace_settings is declared and returns settings without a wo
   assert.ok(manifest.tools.some((tool) => tool.name === "app_patch_workspace_settings"));
 });
 
+test("app_duplicate_workspace is declared and routed to the Workspace duplication API", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+  const manifest = JSON.parse(
+    await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
+  ) as { tools: Array<{ name: string; parameters?: Array<{ name: string; required?: boolean }> }> };
+
+  assert.match(source, /app_duplicate_workspace:\s*toolAppDuplicateWorkspace/);
+  assert.match(source, /return duplicateAppWorkspace\(\{/);
+
+  const tool = manifest.tools.find((item) => item.name === "app_duplicate_workspace");
+  assert.ok(tool);
+  assert.equal(tool.parameters?.find((item) => item.name === "workspace_dir")?.required, true);
+  assert.equal(tool.parameters?.find((item) => item.name === "title")?.required, false);
+});
+
+test("app_get_workspace_cover uploads one thumbnail instead of every slide screenshot", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+  const manifest = JSON.parse(
+    await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
+  ) as { tools: Array<{ name: string; parameters?: Array<{ name: string; required?: boolean }> }> };
+
+  assert.match(source, /app_get_workspace_cover:\s*toolAppGetWorkspaceCover/);
+
+  const wrapper = source.slice(
+    source.indexOf("async function toolAppGetWorkspaceCover("),
+    source.indexOf("async function toolAppStartPptxExport("),
+  );
+  assert.ok(wrapper.length > 0, "toolAppGetWorkspaceCover must be defined");
+  assert.match(wrapper, /getAppWorkspaceCover\(\{/);
+  assert.equal(
+    wrapper.match(/uploadPreviewImage\(/g)?.length,
+    1,
+    "the cover wrapper must upload exactly one image",
+  );
+
+  const tool = manifest.tools.find((item) => item.name === "app_get_workspace_cover");
+  assert.ok(tool);
+  assert.equal(tool.parameters?.find((item) => item.name === "workspace_dir")?.required, true);
+});
+
+test("preview image uploads reuse confirmed references while they stay valid", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+
+  const uploadPreviewImage = source.slice(
+    source.indexOf("async function uploadPreviewImage("),
+    source.indexOf("async function registerJsonReference("),
+  );
+  assert.match(uploadPreviewImage, /reuseWhileValid:\s*true/);
+  assert.match(source, /readCachedHostUpload\(hostUploadCache, cacheKey\)/);
+  assert.match(source, /storeHostUpload\(hostUploadCache, cacheKey, result\)/);
+});
+
 test("Workspace Diagnostic Bundle tool is declared and routed through the APS plugin wrapper", async () => {
   const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
   const manifest = JSON.parse(
@@ -389,6 +441,26 @@ test("page preview rendering and current screenshot upload are separate tools", 
   assert.ok(manifest.tools.some((tool) => tool.name === "app_upload_current_page_screenshot"));
   assert.match(source, /for \(let attempt = 1; attempt <= 3; attempt \+= 1\)/);
   assert.match(source, /getAppPageProgress\(\{ workspace_dir: workspaceDir \}\)/);
+});
+
+test("Host Upload JSON references declare a bounded server-side CORS fallback", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+  const manifest = JSON.parse(
+    await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
+  ) as { tools: Array<{ name: string; description?: string; parameters?: Array<{ name: string; required?: boolean }> }> };
+
+  assert.match(
+    source,
+    /app_resolve_host_upload_json_reference:\s*toolAppResolveHostUploadJsonReference/,
+  );
+  assert.match(source, /MAX_HOST_UPLOAD_JSON_REFERENCE_BYTES\s*=\s*512\s*\*\s*1024/);
+
+  const tool = manifest.tools.find(
+    (candidate) => candidate.name === "app_resolve_host_upload_json_reference",
+  );
+  assert.ok(tool);
+  assert.match(tool.description ?? "", /browser CORS/);
+  assert.equal(tool.parameters?.find((parameter) => parameter.name === "host_upload")?.required, true);
 });
 
 test("workspace theme token tools are declared and routed", async () => {

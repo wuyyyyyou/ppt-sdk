@@ -7,7 +7,7 @@ import type {
   HostUploadRef,
   WorkspaceResult,
 } from "../../src/api/types.ts";
-import type { AnnaRuntime } from "../../src/runtime/annaRuntime.ts";
+import type { AnnaRuntime, AnnaToolInvokeInput } from "../../src/runtime/annaRuntime.ts";
 
 function setToolIds() {
   Object.defineProperty(globalThis, "window", {
@@ -158,6 +158,49 @@ describe("Anna PPT Backend", () => {
       assert.equal(result.workspace_id, "from-http");
       assert.equal(fetchMock.mock.callCount(), 1);
       assert.equal(fetchMock.mock.calls[0].arguments[0], "https://upload.example/workspace.json");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("falls back to ppt-engine when browser CORS blocks a Host Upload JSON reference", async () => {
+    setToolIds();
+    const workspace = createWorkspace({ workspace_id: "from-server-fallback" });
+    const upload = createJsonUploadRef("workspace.json");
+    const calls: AnnaToolInvokeInput[] = [];
+    const originalFetch = globalThis.fetch;
+    const fetchMock = mock.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    try {
+      const backend = createAnnaPptBackend(createRuntimeWithInvoke(async (input) => {
+        calls.push(input);
+        if (input.method === "app_open_workspace") {
+          return {
+            success: true,
+            data: { workspace_upload: upload },
+          };
+        }
+        if (input.method === "app_resolve_host_upload_json_reference") {
+          return {
+            success: true,
+            data: workspace,
+          };
+        }
+        throw new Error(`Unexpected tool call: ${input.method}`);
+      }));
+
+      const result = await backend.openWorkspace({ workspace_dir: "/tmp/workspaces/demo" });
+
+      assert.equal(result.workspace_id, "from-server-fallback");
+      assert.equal(fetchMock.mock.callCount(), 1);
+      assert.deepEqual(calls.map((call) => call.method), [
+        "app_open_workspace",
+        "app_resolve_host_upload_json_reference",
+      ]);
+      assert.deepEqual(calls[1]?.args, { host_upload: upload });
     } finally {
       globalThis.fetch = originalFetch;
     }

@@ -13,10 +13,6 @@ export interface ActiveGenerationRun {
   committing: boolean;
 }
 
-export function navigationBlockedByActiveGeneration(activeRun: ActiveGenerationRun | null) {
-  return activeRun !== null;
-}
-
 export type GenerationViewStatus =
   | "preparing"
   | "running"
@@ -29,14 +25,24 @@ export interface GenerationViewState {
   status: GenerationViewStatus;
   isActive: boolean;
   isStopping: boolean;
-  canStop: boolean;
   canResume: boolean;
   canBackToOutline: boolean;
-  showStop: boolean;
   showResume: boolean;
   showBackToOutline: boolean;
   hasUnfinishedPages: boolean;
   resumeAction: "generation" | "refinement";
+  /**
+   * Whether the page is showing a deck generation or an AI refinement, which
+   * decides how Back is labelled: abandoning a refinement returns to the last
+   * saved version rather than one stage back.
+   */
+  runIntent: "generation" | "refinement";
+  /**
+   * GEN-003: top-level navigation stays available during a run and asks for
+   * confirmation instead. Only Generation Commit and an in-flight stop take the
+   * entries away, because neither can be abandoned safely.
+   */
+  navigationLocked: boolean;
 }
 
 export interface BuildGenerationViewStateInput {
@@ -46,7 +52,6 @@ export interface BuildGenerationViewStateInput {
   preparing?: boolean;
   unresumable?: boolean;
   resumeAllowed?: boolean;
-  hasAbandonableRun?: boolean;
 }
 
 function hasUnfinishedPages(progress: DeckGenerationProgress | null) {
@@ -61,28 +66,39 @@ function isProgressComplete(progress: DeckGenerationProgress | null) {
   return progress?.step === "complete" && !hasUnfinishedPages(progress);
 }
 
+function recoveryAction(progress: DeckGenerationProgress | null): "generation" | "refinement" {
+  return progress?.recoveryRunKind === "page-refinement" ||
+    progress?.recoveryRunKind === "deck-refinement"
+    ? "refinement"
+    : "generation";
+}
+
 export function buildGenerationViewState(
   input: BuildGenerationViewStateInput,
 ): GenerationViewState {
   const activeRun = input.activeRun;
   const isActive = Boolean(activeRun);
   const isStopping = activeRun?.stopping === true;
+  const isCommitting = activeRun?.committing === true;
   const unfinishedPages = hasUnfinishedPages(input.progress);
   const resumeAllowed = input.resumeAllowed !== false;
+  const runIntent: "generation" | "refinement" = activeRun
+    ? (activeRun.kind === "deck-generation" ? "generation" : "refinement")
+    : recoveryAction(input.progress);
 
   if (isStopping) {
     return {
       status: "stopping",
       isActive: true,
       isStopping: true,
-      canStop: false,
       canResume: false,
       canBackToOutline: false,
-      showStop: true,
       showResume: false,
       showBackToOutline: false,
       hasUnfinishedPages: unfinishedPages,
       resumeAction: "generation",
+      runIntent,
+      navigationLocked: true,
     };
   }
 
@@ -91,14 +107,14 @@ export function buildGenerationViewState(
       status: "preparing",
       isActive,
       isStopping: false,
-      canStop: isActive && activeRun?.committing !== true,
       canResume: false,
       canBackToOutline: false,
-      showStop: isActive,
       showResume: false,
       showBackToOutline: false,
       hasUnfinishedPages: unfinishedPages,
       resumeAction: "generation",
+      runIntent,
+      navigationLocked: isCommitting,
     };
   }
 
@@ -107,14 +123,14 @@ export function buildGenerationViewState(
       status: "running",
       isActive: true,
       isStopping: false,
-      canStop: activeRun?.committing !== true,
       canResume: false,
       canBackToOutline: false,
-      showStop: true,
       showResume: false,
       showBackToOutline: false,
       hasUnfinishedPages: unfinishedPages,
       resumeAction: "generation",
+      runIntent,
+      navigationLocked: isCommitting,
     };
   }
 
@@ -123,14 +139,14 @@ export function buildGenerationViewState(
       status: "unresumable",
       isActive: false,
       isStopping: false,
-      canStop: input.hasAbandonableRun === true,
       canResume: false,
       canBackToOutline: true,
-      showStop: true,
       showResume: false,
       showBackToOutline: true,
       hasUnfinishedPages: unfinishedPages,
       resumeAction: "generation",
+      runIntent,
+      navigationLocked: false,
     };
   }
 
@@ -139,14 +155,14 @@ export function buildGenerationViewState(
       status: "complete",
       isActive: false,
       isStopping: false,
-      canStop: false,
       canResume: false,
       canBackToOutline: false,
-      showStop: false,
       showResume: false,
       showBackToOutline: false,
       hasUnfinishedPages: false,
       resumeAction: "generation",
+      runIntent,
+      navigationLocked: false,
     };
   }
 
@@ -162,17 +178,14 @@ export function buildGenerationViewState(
       status: "interrupted",
       isActive: false,
       isStopping: false,
-      canStop: input.hasAbandonableRun === true,
       canResume: resumeAllowed,
       canBackToOutline: false,
-      showStop: true,
       showResume: resumeAllowed,
       showBackToOutline: false,
       hasUnfinishedPages: unfinishedPages,
-      resumeAction: input.progress?.recoveryRunKind === "page-refinement" ||
-        input.progress?.recoveryRunKind === "deck-refinement"
-        ? "refinement"
-        : "generation",
+      resumeAction: recoveryAction(input.progress),
+      runIntent,
+      navigationLocked: false,
     };
   }
 
@@ -180,16 +193,13 @@ export function buildGenerationViewState(
     status: "interrupted",
     isActive: false,
     isStopping: false,
-    canStop: input.hasAbandonableRun === true,
     canResume: resumeAllowed,
     canBackToOutline: false,
-    showStop: true,
     showResume: resumeAllowed,
     showBackToOutline: false,
     hasUnfinishedPages: unfinishedPages,
-    resumeAction: input.progress?.recoveryRunKind === "page-refinement" ||
-      input.progress?.recoveryRunKind === "deck-refinement"
-      ? "refinement"
-      : "generation",
+    resumeAction: recoveryAction(input.progress),
+    runIntent,
+    navigationLocked: false,
   };
 }

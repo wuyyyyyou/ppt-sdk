@@ -76,6 +76,19 @@ describe("Generation Progress Display", () => {
     );
   });
 
+  it("re-resolves app-owned captions when the locale changes mid-run", () => {
+    const confirming: DeckGenerationProgress = {
+      ...completeProgress,
+      step: "outline-confirmation",
+      message: "正在确认大纲…",
+      messageKey: "confirmingOutline",
+    };
+
+    assert.equal(getGenerationProgressDisplayMessage(messages.zh, confirming), messages.zh.generating.confirmingOutline);
+    assert.equal(getGenerationProgressDisplayMessage(messages.en, confirming), messages.en.generating.confirmingOutline);
+    assert.doesNotMatch(getGenerationProgressDisplayMessage(messages.en, confirming), /[\u4e00-\u9fa5]/);
+  });
+
   it("keeps page accepted summaries during page generation", () => {
     assert.equal(
       getGenerationProgressDisplayMessage(messages.zh, {

@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
-import { PanelTop } from "lucide-react";
+import { Presentation } from "lucide-react";
 import { BriefPage } from "../features/deck-workspace/components/BriefPage";
 import { DeckPage } from "../features/deck-workspace/components/DeckPage";
+import { EntrySidebar } from "../features/deck-workspace/components/EntrySidebar";
+import { EntryTopControls } from "../features/deck-workspace/components/EntryTopControls";
 import { ExportPage } from "../features/deck-workspace/components/ExportPage";
 import { GeneratingPage } from "../features/deck-workspace/components/GeneratingPage";
 import { StoppingGenerationOverlay } from "../features/deck-workspace/components/StoppingGenerationOverlay";
@@ -18,6 +20,7 @@ import {
 } from "../features/requirements";
 import { ConfirmationDialog } from "../features/deck-workspace/components/ConfirmationDialog";
 import { useDeckWorkspace } from "../features/deck-workspace/hooks/useDeckWorkspace";
+import { VISUAL_STYLE_PRESETS } from "../features/templates/visualStylePresets";
 import { useI18n } from "../i18n/useI18n";
 import { ManualPageEditorShell } from "../features/manual-page-editor/ManualPageEditorShell";
 
@@ -25,6 +28,7 @@ export function App() {
   const { locale, setLocale, t } = useI18n();
   const { state, actions } = useDeckWorkspace(t, locale);
   const [manualEditorOpen, setManualEditorOpen] = useState(false);
+  const [entrySidebarCollapsed, setEntrySidebarCollapsed] = useState(false);
   const manualEditorPages = useMemo(() => {
     const rendered = state.reviewRender.result?.slides ?? [];
     const progressPages = state.pageProgress?.pages ?? [];
@@ -66,14 +70,14 @@ export function App() {
         onClick={() => actions.setPanelMode("visible")}
         aria-label={t.appName}
       >
-        <PanelTop size={24} />
+        <Presentation size={24} aria-hidden="true" />
       </button>
 
       <button
         className={`minimized-pill ${state.panelMode === "minimized" ? "visible" : ""}`}
         onClick={() => actions.setPanelMode("visible")}
       >
-        <PanelTop size={20} />
+        <Presentation size={20} aria-hidden="true" />
         <span>
           {t.appName}
           {state.currentStatus ? <small> · {state.currentStatus}</small> : null}
@@ -92,23 +96,37 @@ export function App() {
           <StoppingGenerationOverlay t={t} />
         ) : null}
 
-        <PanelHeader
-          t={t}
-          locale={locale}
-          setLocale={setLocale}
-          status={state.currentStatus}
-          onLibrary={() => actions.navigate("settings")}
-          navigationDisabled={state.stage === "generating" && state.generationViewState.isActive}
-          onHome={() => void actions.startNewPresentation()}
-        />
+        {showEntrySidebar ? null : (
+          <PanelHeader
+            t={t}
+            locale={locale}
+            setLocale={setLocale}
+            status={state.currentStatus}
+            onLibrary={() => void actions.navigateFromHeader("settings")}
+            navigationDisabled={state.stage === "generating" && state.generationViewState.navigationLocked}
+            onHome={() => void actions.goHomeFromHeader()}
+          />
+        )}
         <div className={`entry-layout ${showEntrySidebar ? "with-sidebar" : ""}`}>
           {showEntrySidebar ? (
-            <aside className="entry-sidebar" aria-label={t.appName}>
-              <button type="button" className={state.page === "main" ? "active" : ""} onClick={() => void actions.startNewPresentation()}>{t.myWork.home}</button>
-              <button type="button" className={state.page === "my-work" ? "active" : ""} onClick={() => void actions.navigate("my-work")}>{t.myWork.title}</button>
-            </aside>
+            <EntrySidebar
+              t={t}
+              page={state.page}
+              collapsed={entrySidebarCollapsed}
+              onToggleCollapsed={() => setEntrySidebarCollapsed((collapsed) => !collapsed)}
+              onHome={() => void actions.goHomeFromHeader()}
+              onMyWork={() => void actions.navigateFromHeader("my-work")}
+            />
           ) : null}
           <div className="entry-main">
+          {showEntrySidebar ? (
+            <EntryTopControls
+              t={t}
+              locale={locale}
+              setLocale={setLocale}
+              onSettings={() => void actions.navigateFromHeader("settings")}
+            />
+          ) : null}
           {state.page === "main" ? (
             <ProgressLine
               stage={state.stage}
@@ -131,6 +149,7 @@ export function App() {
               setResearchSearchControlSettings={actions.setResearchSearchControlSettings}
               workspaceSettingsSaving={state.workspaceSettingsSaving}
               generateDeck={actions.generatePresentationRequirements}
+              visualStylePresets={VISUAL_STYLE_PRESETS}
               selectedVisualStylePresetId={state.selectedVisualStylePresetId}
               onSelectVisualStylePreset={actions.selectVisualStylePreset}
             />
@@ -143,6 +162,7 @@ export function App() {
               requirements={state.presentationRequirements}
               status={state.requirementsStatus}
               error={state.requirementsError}
+              errorDetail={state.requirementsErrorDetail}
               saving={state.requirementsSaving}
               confirming={state.requirementsConfirming}
               dirty={state.requirementsDirty}
@@ -164,6 +184,7 @@ export function App() {
               dirty={state.outlineDirty}
               saving={state.outlineSaving}
               error={state.outlineError}
+              errorDetail={state.outlineErrorDetail}
               setTitle={actions.setOutlineDraftTitle}
               updateItem={actions.updateOutlineDraftItem}
               addItem={actions.addOutlineDraftItem}
@@ -187,7 +208,7 @@ export function App() {
               viewState={state.generationViewState}
               progress={state.createDeckProgress}
               history={state.generationHistory}
-              onCancel={actions.cancelGenerateDeck}
+              onBack={() => void actions.backFromGeneration()}
               onBackToOutline={actions.returnToOutlineFromGeneration}
               onResume={actions.resumeDeckGeneration}
               canBackToOutline={state.outline.length > 0}
@@ -202,10 +223,8 @@ export function App() {
               setCurrentSlide={actions.setCurrentSlide}
               reviewRender={state.reviewRender}
               loading={state.loading}
-              onRefreshPreview={() => {
-                void actions.renderDeckHtml();
-              }}
               onPreview={() => actions.navigate("review")}
+              onBack={() => void actions.backFromDeck()}
               onRefineSlide={actions.openRefineSlide}
               onRefineDeck={actions.openRefineDeck}
               onExport={() => actions.navigate("export")}
@@ -220,12 +239,16 @@ export function App() {
               workspaceScan={state.workspaceScan}
               workspaceCovers={state.workspaceCovers}
               loading={state.workspaceLoading}
+              openingWorkspaceDir={state.openingWorkspaceDir}
+              highlightedWorkspaceId={state.highlightedWorkspaceId}
               error={state.workspaceError}
+              errorDetail={state.workspaceErrorDetail}
               onRetry={actions.refreshMyWork}
               onOpen={actions.openWorkspace}
               onNew={actions.startNewPresentation}
               onRename={actions.renameWorkspace}
               onDelete={actions.deleteWorkspace}
+              onDuplicate={actions.duplicateWorkspace}
             />
           ) : null}
 

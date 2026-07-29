@@ -606,6 +606,21 @@ export interface DeleteWorkspaceResult {
   workspace_dir: string;
 }
 
+export interface DuplicateWorkspaceInput {
+  workspace_dir: string;
+  title?: string;
+}
+
+export interface DuplicateWorkspaceResult {
+  version: 1;
+  workspace_root: string;
+  source_workspace_id: string;
+  source_workspace_dir: string;
+  workspace_id: string;
+  workspace_dir: string;
+  title: string;
+}
+
 export interface UpdateWorkspacePagesInput {
   workspace_dir: string;
   pages: Array<{
@@ -1344,6 +1359,23 @@ export interface RenderDeckHtmlResult {
   title: string;
   rendered_at: string;
   diagnostics?: unknown;
+}
+
+export interface GetWorkspaceCoverInput {
+  workspace_dir: string;
+}
+
+export interface GetWorkspaceCoverResult {
+  version: 1;
+  workspace_dir: string;
+  page_id: string;
+  source_path: string;
+  cover_path: string;
+  width: number | null;
+  height: number | null;
+  size_bytes: number;
+  generated_at: string;
+  cover_upload: HostUploadRef;
 }
 
 export interface RecordDeckReviewInput {

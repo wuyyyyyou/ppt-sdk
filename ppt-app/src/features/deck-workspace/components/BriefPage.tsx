@@ -1,12 +1,10 @@
-import { AlertTriangle, Check, ChevronLeft, ChevronRight, HelpCircle, Sparkles, X } from "lucide-react";
-import { useState } from "react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, HelpCircle, ImageOff, Maximize2, Sparkles, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import type { Messages } from "../../../i18n/messages";
 import type { VisualStylePreset } from "../../../api/types";
 import {
-  VISUAL_STYLE_PRESET_FILTER_OPTIONS,
-  VISUAL_STYLE_PRESETS,
-} from "../../templates/visualStylePresets";
-import {
+  buildVisualStylePresetFilterOptions,
+  createEmptyVisualStylePresetFilters,
   filterVisualStylePresets,
   VISUAL_STYLE_PRESET_FILTER_FIELDS,
   type VisualStylePresetFilters,
@@ -18,6 +16,7 @@ import {
 import type { ResearchSearchControlSettings } from "../researchSearchControl";
 import type { LoadingKind } from "../types";
 import { ResearchSearchControlSwitches } from "./ResearchSearchControlSwitches";
+import { ConfirmationDialog } from "./ConfirmationDialog";
 
 export interface BriefPageProps {
   t: Messages;
@@ -30,82 +29,9 @@ export interface BriefPageProps {
   setResearchSearchControlSettings: (settings: ResearchSearchControlSettings) => Promise<void>;
   workspaceSettingsSaving: boolean;
   generateDeck: () => Promise<void>;
+  visualStylePresets: readonly VisualStylePreset[];
   selectedVisualStylePresetId: string | null;
   onSelectVisualStylePreset: (presetId: string | null) => void;
-}
-
-interface VisualStylePresetCardImageProps {
-  preset: VisualStylePreset;
-  selected: boolean;
-  previewLabel: string;
-  onOpen: () => void;
-}
-
-function VisualStylePresetCardImage({
-  preset,
-  selected,
-  previewLabel,
-  onOpen,
-}: VisualStylePresetCardImageProps) {
-  const [imageStatus, setImageStatus] = useState<"loading" | "ready" | "error">("loading");
-  const previewImage = preset.preview_images[0];
-
-  function revealImage(image: HTMLImageElement) {
-    void image.decode()
-      .catch(() => undefined)
-      .finally(() => setImageStatus("ready"));
-  }
-
-  function openPreview() {
-    onOpen();
-  }
-
-  return (
-    <span
-      className="brief-style-preset-image-wrap"
-      data-image-status={imageStatus}
-      role="button"
-      tabIndex={0}
-      aria-label={previewLabel}
-      onClick={(event) => {
-        event.stopPropagation();
-        openPreview();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          event.stopPropagation();
-          openPreview();
-        }
-      }}
-    >
-      <span className="brief-style-preset-image-placeholder" aria-hidden="true">
-        <span className="brief-style-preset-placeholder-mark">CONSULTING</span>
-        <span className="brief-style-preset-placeholder-title" />
-        <span className="brief-style-preset-placeholder-copy" />
-        <span className="brief-style-preset-placeholder-panels">
-          <i />
-          <i />
-          <i />
-        </span>
-      </span>
-      {previewImage ? (
-        <img
-          src={previewImage.url}
-          alt={previewImage.alt ?? preset.name}
-          width={1600}
-          height={900}
-          loading="lazy"
-          decoding="async"
-          fetchPriority="low"
-          draggable={false}
-          onLoad={(event) => revealImage(event.currentTarget)}
-          onError={() => setImageStatus("error")}
-        />
-      ) : null}
-      {selected ? <span className="brief-style-preset-selected"><Check size={14} /></span> : null}
-    </span>
-  );
 }
 
 export function BriefPage({
@@ -119,21 +45,30 @@ export function BriefPage({
   setResearchSearchControlSettings,
   workspaceSettingsSaving,
   generateDeck,
+  visualStylePresets,
   selectedVisualStylePresetId,
   onSelectVisualStylePreset,
 }: BriefPageProps) {
   const busy = loading !== "none";
   const strictReviewMode = isStrictReviewModeEnabled(pageReviewSettings);
   const [strictReviewConfirmOpen, setStrictReviewConfirmOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [preview, setPreview] = useState<{ preset: VisualStylePreset; index: number } | null>(null);
-  const [presetFilters, setPresetFilters] = useState<VisualStylePresetFilters>({
-    user: "",
-    use_case: "",
-    industry: "",
-    theme: "",
-    color: "",
-  });
-  const filteredPresets = filterVisualStylePresets(VISUAL_STYLE_PRESETS, presetFilters);
+  const [brokenPreviewIds, setBrokenPreviewIds] = useState<string[]>([]);
+  const [presetFilters, setPresetFilters] = useState<VisualStylePresetFilters>(
+    createEmptyVisualStylePresetFilters,
+  );
+  const filterOptions = useMemo(
+    () => buildVisualStylePresetFilterOptions(visualStylePresets),
+    [visualStylePresets],
+  );
+  const filteredPresets = useMemo(
+    () => filterVisualStylePresets(visualStylePresets, presetFilters),
+    [presetFilters, visualStylePresets],
+  );
+  // A local guard so the very first click already locks the composer, before the
+  // Workspace or requirements request has had a chance to move `loading`.
+  const submitBlocked = busy || submitting || workspaceSettingsSaving;
 
   function toggleStrictReviewMode() {
     if (strictReviewMode) {
@@ -144,9 +79,19 @@ export function BriefPage({
     setStrictReviewConfirmOpen(true);
   }
 
-  function confirmStrictReviewMode() {
+  function resolveStrictReviewConfirmation(confirmed: boolean) {
     setStrictReviewConfirmOpen(false);
-    void setStrictReviewMode(true);
+    if (confirmed) void setStrictReviewMode(true);
+  }
+
+  async function submitBrief() {
+    if (submitBlocked || !prompt.trim()) return;
+    setSubmitting(true);
+    try {
+      await generateDeck();
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -163,51 +108,53 @@ export function BriefPage({
           disabled={busy}
         />
         <div className="prompt-inline-actions">
+          <div className="prompt-inline-options">
+            <div className="checkbox-row-with-help">
+              <button
+                type="button"
+                className={`checkbox-row ${strictReviewMode ? "active" : ""}`}
+                onClick={toggleStrictReviewMode}
+                aria-checked={strictReviewMode}
+                role="switch"
+                disabled={submitBlocked}
+              >
+                <span className="checkbox-custom" aria-hidden="true">
+                  {strictReviewMode ? <Check size={11} strokeWidth={3} /> : null}
+                </span>
+                <span>{t.brief.strictReviewMode}</span>
+              </button>
+              <span
+                className="help-tooltip"
+                tabIndex={0}
+                role="note"
+                aria-label={t.brief.strictReviewModeHelp}
+              >
+                <HelpCircle size={15} aria-hidden="true" />
+                <span className="help-tooltip-content">
+                  {t.brief.strictReviewModeHelp}
+                </span>
+              </span>
+            </div>
+            <ResearchSearchControlSwitches
+              t={t}
+              settings={researchSearchControlSettings}
+              disabled={submitBlocked}
+              onChange={(settings) => void setResearchSearchControlSettings(settings)}
+            />
+          </div>
           <button
             className="inline-create-btn"
-            disabled={busy || workspaceSettingsSaving || !prompt.trim()}
-            onClick={() => void generateDeck()}
+            type="button"
+            disabled={submitBlocked || !prompt.trim()}
+            aria-busy={submitting || busy}
+            onClick={() => void submitBrief()}
           >
-            {busy ? <span className="spinner small" /> : <Sparkles size={14} />}
+            {submitting || busy
+              ? <span className="spinner small" aria-hidden="true" />
+              : <Sparkles size={14} aria-hidden="true" />}
             {t.controls.createDeck}
           </button>
         </div>
-      </div>
-
-      <div className="brief-toggle-columns">
-        <div className="brief-toggle-column">
-          <div className="checkbox-row-with-help">
-            <button
-              type="button"
-              className={`checkbox-row ${strictReviewMode ? "active" : ""}`}
-              onClick={toggleStrictReviewMode}
-              aria-checked={strictReviewMode}
-              role="switch"
-              disabled={busy || workspaceSettingsSaving}
-            >
-              <span className="checkbox-custom">
-                {strictReviewMode ? <Check size={11} strokeWidth={3} /> : null}
-              </span>
-              <span>{t.brief.strictReviewMode}</span>
-            </button>
-            <span
-              className="help-tooltip"
-              tabIndex={0}
-              aria-label={t.brief.strictReviewModeHelp}
-            >
-              <HelpCircle size={15} />
-              <span className="help-tooltip-content">
-                {t.brief.strictReviewModeHelp}
-              </span>
-            </span>
-          </div>
-        </div>
-        <ResearchSearchControlSwitches
-          t={t}
-          settings={researchSearchControlSettings}
-          disabled={busy || workspaceSettingsSaving}
-          onChange={(settings) => void setResearchSearchControlSettings(settings)}
-        />
       </div>
 
       <section className="brief-style-presets" aria-labelledby="brief-style-presets-title">
@@ -218,28 +165,34 @@ export function BriefPage({
           </div>
           <span className="brief-style-presets-note">{selectedVisualStylePresetId ? t.template.selected : t.template.noneSelected}</span>
         </div>
-        <div className="brief-style-preset-filters" aria-label={t.template.filtersLabel}>
+        <div className="brief-style-preset-filters" role="group" aria-label={t.template.filtersLabel}>
           {VISUAL_STYLE_PRESET_FILTER_FIELDS.map((field) => (
             <label className={`brief-style-preset-filter ${presetFilters[field] ? "active" : ""}`} key={field}>
               <span>{t.template.filters[field]}</span>
               <select
                 value={presetFilters[field]}
                 disabled={busy}
+                title={presetFilters[field] || t.template.all}
                 onChange={(event) => setPresetFilters((current) => ({ ...current, [field]: event.target.value }))}
               >
                 <option value="">{t.template.all}</option>
-                {VISUAL_STYLE_PRESET_FILTER_OPTIONS[field].map((option) => (
+                {filterOptions[field].map((option) => (
                   <option value={option} key={option}>{option}</option>
                 ))}
               </select>
+              <ChevronDown className="brief-style-preset-filter-chevron" size={14} aria-hidden="true" />
             </label>
           ))}
         </div>
         <div className="brief-style-preset-grid">
+          {/* The "no preset" card keeps its visible label: HOME-004 only covers
+              ordinary Visual Style Preset cards, and its final form is still an
+              open product question. */}
           <button
             type="button"
             className={`brief-style-preset-card brief-style-preset-none-card ${!selectedVisualStylePresetId ? "active" : ""}`}
             disabled={busy}
+            aria-pressed={!selectedVisualStylePresetId}
             onClick={() => onSelectVisualStylePreset(null)}
           >
             <span className="brief-style-preset-none-mark" aria-hidden="true">
@@ -247,9 +200,13 @@ export function BriefPage({
                 <rect x="80" y="62" width="480" height="236" rx="10" fill="#f8f9fb" stroke="#d8dce5" />
                 <rect x="112" y="96" width="184" height="12" rx="6" fill="#d9dde7" />
                 <rect x="112" y="126" width="276" height="8" rx="4" fill="#e4e7ee" />
-                <rect x="112" y="184" width="124" height="64" rx="8" fill="#eef0f5" />
-                <rect x="252" y="184" width="124" height="64" rx="8" fill="#f1f3f7" />
-                <rect x="392" y="184" width="124" height="64" rx="8" fill="#ebeef4" />
+                {/* The card title sits over this band, so the blocks stay fainter
+                    than the rest of the illustration. */}
+                <g className="brief-style-preset-none-blocks">
+                  <rect x="112" y="184" width="124" height="64" rx="8" fill="#eef0f5" />
+                  <rect x="252" y="184" width="124" height="64" rx="8" fill="#f1f3f7" />
+                  <rect x="392" y="184" width="124" height="64" rx="8" fill="#ebeef4" />
+                </g>
                 <path d="M112 278H516" stroke="#e0e3ea" strokeLinecap="round" />
                 <circle cx="510" cy="112" r="8" fill="#c9ceda" />
               </svg>
@@ -257,27 +214,57 @@ export function BriefPage({
                 <span className="brief-style-preset-none-selection"><Check size={15} /></span>
               ) : null}
             </span>
-            <strong>{t.template.none}</strong>
-            <small>{t.template.noneDescription}</small>
+            <span className="brief-style-preset-none-copy">
+              <strong>{t.template.none}</strong>
+            </span>
           </button>
           {filteredPresets.map((preset: VisualStylePreset) => {
             const selected = selectedVisualStylePresetId === preset.id;
+            const cover = preset.preview_images[0];
+            const coverBroken = brokenPreviewIds.includes(preset.id);
             return (
-              <button
-                type="button"
-                className={`brief-style-preset-card brief-style-preset-image-card ${selected ? "active" : ""}`}
+              <article
+                className={`brief-style-preset-card ${selected ? "active" : ""}`}
                 key={preset.id}
-                aria-label={preset.name}
-                disabled={busy}
-                onClick={() => onSelectVisualStylePreset(preset.id)}
               >
-                <VisualStylePresetCardImage
-                  preset={preset}
-                  selected={selected}
-                  previewLabel={t.template.previewTitle}
-                  onOpen={() => setPreview({ preset, index: 0 })}
-                />
-              </button>
+                <span className="brief-style-preset-image-wrap">
+                  {coverBroken || !cover ? (
+                    <span className="brief-style-preset-image-fallback" aria-hidden="true">
+                      <ImageOff size={20} />
+                    </span>
+                  ) : (
+                    <img
+                      src={cover.url}
+                      alt=""
+                      loading="lazy"
+                      onError={() => setBrokenPreviewIds((current) =>
+                        current.includes(preset.id) ? current : [...current, preset.id])}
+                    />
+                  )}
+                </span>
+                <button
+                  type="button"
+                  className="brief-style-preset-select"
+                  disabled={busy}
+                  aria-pressed={selected}
+                  onClick={() => onSelectVisualStylePreset(preset.id)}
+                >
+                  <span className="brief-style-preset-accessible-name">{preset.name}</span>
+                </button>
+                <button
+                  type="button"
+                  className="brief-style-preset-preview-btn"
+                  disabled={busy}
+                  title={`${t.template.previewTitle} · ${preset.name}`}
+                  aria-label={`${t.template.previewTitle} · ${preset.name}`}
+                  onClick={() => setPreview({ preset, index: 0 })}
+                >
+                  <Maximize2 size={14} aria-hidden="true" />
+                </button>
+                {selected ? (
+                  <span className="brief-style-preset-selected" aria-hidden="true"><Check size={14} /></span>
+                ) : null}
+              </article>
             );
           })}
           {filteredPresets.length === 0 ? (
@@ -306,46 +293,17 @@ export function BriefPage({
         </div>
       ) : null}
 
-      {strictReviewConfirmOpen ? (
-        <div
-          className="strict-review-confirm-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="strict-review-confirm-title"
-          onClick={() => setStrictReviewConfirmOpen(false)}
-        >
-          <section
-            className="strict-review-confirm-card"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="strict-review-confirm-icon">
-              <AlertTriangle size={22} />
-            </div>
-            <div className="strict-review-confirm-copy">
-              <h2 id="strict-review-confirm-title">
-                {t.brief.strictReviewConfirmTitle}
-              </h2>
-              <p>{t.brief.strictReviewConfirmBody}</p>
-            </div>
-            <footer className="strict-review-confirm-actions">
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={() => setStrictReviewConfirmOpen(false)}
-              >
-                {t.controls.cancel}
-              </button>
-              <button
-                type="button"
-                className="primary-btn"
-                onClick={confirmStrictReviewMode}
-              >
-                {t.brief.strictReviewConfirmAction}
-              </button>
-            </footer>
-          </section>
-        </div>
-      ) : null}
+      <ConfirmationDialog
+        request={strictReviewConfirmOpen ? {
+          title: t.brief.strictReviewConfirmTitle,
+          body: t.brief.strictReviewConfirmBody,
+          confirmLabel: t.brief.strictReviewConfirmAction,
+          cancelLabel: t.controls.cancel,
+          closeLabel: t.controls.close,
+          tone: "warning",
+        } : null}
+        onResolve={resolveStrictReviewConfirmation}
+      />
     </section>
   );
 }

@@ -1,5 +1,15 @@
-import type { Messages } from "../../i18n/messages";
-import type { DeckGenerationProgress, DeckGenerationStep, ResearchDiscoveryProgressPhase } from "../deck-generation";
+import { formatMessage, type Messages } from "../../i18n/messages";
+import type {
+  DeckGenerationProgress,
+  DeckGenerationProgressMessageKey,
+  DeckGenerationStep,
+  ResearchDiscoveryProgressPhase,
+} from "../deck-generation";
+import {
+  isActivePageGenerationStatus,
+  isGenuinelyFailedPageGenerationStatus,
+} from "../deck-generation/pageStatusPolicy";
+import { isDiscoveryPageId } from "./researchDiscoveryStageRecords";
 
 export function getGenerationProgressDisplayMessage(
   t: Messages,
@@ -7,10 +17,73 @@ export function getGenerationProgressDisplayMessage(
 ): string {
   if (!progress) return t.status.creatingDeck;
   if (progress.step === "complete") return t.generating.generationComplete;
+  // App-owned captions win over the stored string so switching locale mid-run
+  // immediately re-resolves them.
+  if (progress.messageKey) return appOwnedMessage(t, progress.messageKey);
   if (isResearchDiscoveryStep(progress.step) && isPageAcceptedSummary(progress.message)) {
     return activeResearchDiscoveryLabel(t, progress) ?? t.generating.steps.researchDiscovery;
   }
   return progress.message;
+}
+
+function appOwnedMessage(t: Messages, key: DeckGenerationProgressMessageKey): string {
+  const messages: Record<DeckGenerationProgressMessageKey, string> = {
+    confirmingOutline: t.generating.confirmingOutline,
+  };
+  return messages[key];
+}
+
+/**
+ * STAB-002: the page-level counts a user needs to understand where a run stands.
+ * Internal paths, task_dir, run ids and RPC envelopes are deliberately absent.
+ */
+export interface GenerationPageSummary {
+  accepted: number;
+  failed: number;
+  running: number;
+  pending: number;
+  total: number;
+}
+
+export function buildGenerationPageSummary(
+  progress: DeckGenerationProgress | null,
+): GenerationPageSummary | null {
+  const pages = (progress?.pages ?? []).filter((page) => !isDiscoveryPageId(page.page_id));
+  const total = pages.length || progress?.totalPages || 0;
+  if (total === 0) return null;
+
+  const accepted = pages.filter((page) => page.status === "accepted").length;
+  const failed = pages.filter((page) => isGenuinelyFailedPageGenerationStatus(page.status)).length;
+  const running = pages.filter((page) => isActivePageGenerationStatus(page.status)).length;
+
+  return {
+    accepted,
+    failed,
+    running,
+    pending: Math.max(0, total - accepted - failed - running),
+    total,
+  };
+}
+
+/** Formatted, locale-owned segments. Never assembled by string concatenation. */
+export function formatGenerationPageSummary(
+  t: Messages,
+  summary: GenerationPageSummary,
+): string[] {
+  const parts = [formatMessage(t.generating.pageSummary.accepted, {
+    accepted: summary.accepted,
+    total: summary.total,
+  })];
+  if (summary.running > 0) {
+    parts.push(formatMessage(t.generating.pageSummary.running, { count: summary.running }));
+  }
+  if (summary.pending > 0) {
+    parts.push(formatMessage(t.generating.pageSummary.pending, { count: summary.pending }));
+  }
+  if (summary.failed > 0) {
+    parts.push(formatMessage(t.generating.pageSummary.failed, { count: summary.failed }));
+  }
+  return parts;
 }
 
 function isResearchDiscoveryStep(step: DeckGenerationStep) {

@@ -2,10 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { DeckGenerationProgress } from "../../src/features/deck-generation/index.ts";
-import {
-  buildGenerationViewState,
-  navigationBlockedByActiveGeneration,
-} from "../../src/features/deck-workspace/generationViewState.ts";
+import { buildGenerationViewState } from "../../src/features/deck-workspace/generationViewState.ts";
 
 function makeProgress(
   step: DeckGenerationProgress["step"],
@@ -35,14 +32,6 @@ function makeProgress(
 }
 
 describe("Generation View State", () => {
-  it("blocks navigation only while a generation run is actually active", () => {
-    assert.equal(navigationBlockedByActiveGeneration(null), false);
-    assert.equal(
-      navigationBlockedByActiveGeneration({ kind: "deck-generation", stopping: false }),
-      true,
-    );
-  });
-
   it("shows running only when an active generation run exists", () => {
     const viewState = buildGenerationViewState({
       loading: "none",
@@ -51,7 +40,7 @@ describe("Generation View State", () => {
     });
 
     assert.equal(viewState.status, "running");
-    assert.equal(viewState.canStop, true);
+    assert.equal(viewState.runIntent, "generation");
     assert.equal(viewState.showResume, false);
   });
 
@@ -63,7 +52,6 @@ describe("Generation View State", () => {
     });
 
     assert.equal(viewState.status, "interrupted");
-    assert.equal(viewState.canStop, false);
   });
 
   it("shows preparing while generation startup has begun without a durable run", () => {
@@ -76,7 +64,6 @@ describe("Generation View State", () => {
 
     assert.equal(viewState.status, "preparing");
     assert.equal(viewState.isActive, false);
-    assert.equal(viewState.showStop, false);
     assert.equal(viewState.showResume, false);
   });
 
@@ -88,7 +75,6 @@ describe("Generation View State", () => {
     });
 
     assert.equal(viewState.status, "stopping");
-    assert.equal(viewState.canStop, false);
     assert.equal(viewState.canResume, false);
   });
 
@@ -100,20 +86,18 @@ describe("Generation View State", () => {
     });
 
     assert.equal(viewState.status, "interrupted");
-    assert.equal(viewState.canStop, false);
     assert.equal(viewState.canResume, true);
   });
 
-  it("allows an interrupted shadow run to be abandoned", () => {
+  it("reports a refinement run intent so Back can offer the last version", () => {
     const viewState = buildGenerationViewState({
-      loading: "none",
-      progress: makeProgress("failed", ["render_failed"]),
-      activeRun: null,
-      hasAbandonableRun: true,
+      loading: "refineSlide",
+      progress: makeProgress("page-authoring", ["authoring"]),
+      activeRun: { kind: "page-refinement", stopping: false },
     });
-    assert.equal(viewState.status, "interrupted");
-    assert.equal(viewState.canStop, true);
-    assert.equal(viewState.showStop, true);
+
+    assert.equal(viewState.status, "running");
+    assert.equal(viewState.runIntent, "refinement");
   });
 
   it("shows interrupted for failed pages that can be resumed", () => {
@@ -189,7 +173,7 @@ describe("Generation View State", () => {
     });
 
     assert.equal(viewState.status, "complete");
-    assert.equal(viewState.showStop, false);
+    assert.equal(viewState.showResume, false);
     assert.equal(viewState.canResume, false);
   });
 });

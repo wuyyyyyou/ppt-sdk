@@ -4,9 +4,8 @@ import type {
   VisualStylePresetTheme,
 } from "../../api/types";
 import {
+  buildVisualStylePresetFilterOptions,
   sortVisualStylePresetsByScore,
-  VISUAL_STYLE_PRESET_FILTER_FIELDS,
-  type VisualStylePresetFilterField,
 } from "./visualStylePresetFilters";
 export { toVisualStylePresetSelection } from "./visualStylePresetSelection";
 
@@ -125,19 +124,8 @@ function loadVisualStylePresets(): VisualStylePreset[] {
 
 export const VISUAL_STYLE_PRESETS = loadVisualStylePresets();
 
-export const VISUAL_STYLE_PRESET_FILTER_OPTIONS = Object.fromEntries(
-  VISUAL_STYLE_PRESET_FILTER_FIELDS.map((field) => [
-    field,
-    [
-      ...new Set(
-        VISUAL_STYLE_PRESETS.flatMap((preset) => {
-          const value = preset[field];
-          return Array.isArray(value) ? value : [value];
-        }),
-      ),
-    ].sort((left, right) => left.localeCompare(right)),
-  ]),
-) as Record<VisualStylePresetFilterField, string[]>;
+export const VISUAL_STYLE_PRESET_FILTER_OPTIONS =
+  buildVisualStylePresetFilterOptions(VISUAL_STYLE_PRESETS);
 
 export function findVisualStylePreset(id: string | null | undefined): VisualStylePreset | null {
   if (!id || id === NO_VISUAL_STYLE_PRESET_ID) return null;

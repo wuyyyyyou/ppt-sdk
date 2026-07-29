@@ -42,10 +42,12 @@ export function SlidePreviewNavigator(props: SlidePreviewNavigatorProps) {
       <div className="preview-controls">
         <button
           className="nav-arrow"
+          type="button"
+          aria-label={t.deck.previousSlide}
           disabled={selectedIndex === 0}
           onClick={() => setCurrentSlide(Math.max(0, selectedIndex - 1))}
         >
-          <ChevronLeft size={16} />
+          <ChevronLeft size={16} aria-hidden="true" />
         </button>
         <div className="slide-counter">
           {formatMessage(t.deck.slideCounter, {
@@ -55,10 +57,12 @@ export function SlidePreviewNavigator(props: SlidePreviewNavigatorProps) {
         </div>
         <button
           className="nav-arrow"
+          type="button"
+          aria-label={t.deck.nextSlide}
           disabled={selectedIndex === maxSlideIndex}
           onClick={() => setCurrentSlide(Math.min(maxSlideIndex, selectedIndex + 1))}
         >
-          <ChevronRight size={16} />
+          <ChevronRight size={16} aria-hidden="true" />
         </button>
       </div>
 

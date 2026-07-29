@@ -5,9 +5,12 @@ export interface Messages {
   languageName: string;
   controls: {
     library: string;
+    collapseSidebar: string;
+    expandSidebar: string;
     minimize: string;
     close: string;
     back: string;
+    backToLastVersion: string;
     open: string;
     edit: string;
     cancel: string;
@@ -147,7 +150,6 @@ export interface Messages {
     title: string;
     helper: string;
     none: string;
-    noneDescription: string;
     noneSelected: string;
     loading: string;
     empty: string;
@@ -234,6 +236,42 @@ export interface Messages {
     stayOnPageHint: string;
     pagesPassed: string;
     pageLabel: string;
+    pageSummary: {
+      label: string;
+      accepted: string;
+      running: string;
+      pending: string;
+      failed: string;
+      total: string;
+    };
+    abandon: {
+      generationTitle: string;
+      refinementTitle: string;
+      generationBody: string;
+      refinementBody: string;
+      generationCancel: string;
+      refinementCancel: string;
+      confirm: string;
+      generationStopped: string;
+      refinementStopped: string;
+      failed: string;
+      home: {
+        generationTitle: string;
+        refinementTitle: string;
+        generationBody: string;
+        refinementBody: string;
+        preparationTitle: string;
+        preparationBody: string;
+        preparationCancel: string;
+        confirm: string;
+      };
+    };
+    commitFailed: {
+      title: string;
+      body: string;
+      restored: string;
+      confirm: string;
+    };
     steps: {
       outline: string;
       pagePlan: string;
@@ -333,6 +371,8 @@ export interface Messages {
     title: string;
     subtitle: string;
     slideCounter: string;
+    previousSlide: string;
+    nextSlide: string;
   };
   library: {
     title: string;
@@ -387,6 +427,16 @@ export interface Messages {
     deleteTitle: string;
     deleteBody: string;
     deleteConfirm: string;
+    coverLoading: string;
+    coverUnavailable: string;
+    opening: string;
+    openFailed: string;
+    openRetry: string;
+    duplicate: string;
+    duplicateTitle: string;
+    duplicating: string;
+    duplicateFailed: string;
+    duplicated: string;
   };
   preferences: {
     defaultLanguage: string;
@@ -446,6 +496,12 @@ export interface Messages {
     pptxGenerating: string;
     pptxFailed: string;
     pdfGenerating: string;
+    pptxQueued: string;
+    checkingStatus: string;
+    resumedJob: string;
+    exportFailedSummary: string;
+    retryExport: string;
+    pptxTimedOut: string;
   };
   toasts: {
     localFolder: string;
@@ -459,12 +515,21 @@ export interface Messages {
     createDeckFirst: string;
     workspaceOpened: string;
     workspaceCreated: string;
+    workspaceDuplicated: string;
     pptxExported: string;
     pdfExported: string;
   };
   errors: {
     uploadedSourceAnalysisUnavailable: string;
     uploadedSourceAnalysisBlocked: string;
+    summaryTimeout: string;
+    summaryTransport: string;
+    summaryNotFound: string;
+    summaryNetwork: string;
+    summaryUnknown: string;
+    showDetails: string;
+    hideDetails: string;
+    detailsLabel: string;
   };
 }
 
@@ -474,9 +539,12 @@ export const messages: Record<Locale, Messages> = {
     languageName: "English",
     controls: {
       library: "Settings",
+      collapseSidebar: "Collapse sidebar",
+      expandSidebar: "Expand sidebar",
       minimize: "Minimize",
       close: "Close",
       back: "Back",
+      backToLastVersion: "Back to last version",
       open: "Open",
       edit: "Edit",
       cancel: "Cancel",
@@ -626,7 +694,6 @@ export const messages: Record<Locale, Messages> = {
       title: "Choose a style",
       helper: "Pick the visual style Anna should use for this deck.",
       none: "No preset",
-      noneDescription: "Keep the current visual tone flow and let Anna create the art direction.",
       noneSelected: "No preset selected",
       loading: "Loading templates...",
       empty: "No templates found.",
@@ -724,6 +791,47 @@ export const messages: Record<Locale, Messages> = {
       stayOnPageHint: "Please do not leave this page.",
       pagesPassed: "{completed}/{total} pages passed",
       pageLabel: "Page {page}",
+      abandon: {
+        generationTitle: "Stop generation?",
+        refinementTitle: "Stop refinement?",
+        generationBody:
+          "All content from this run will be discarded, and the Outline from before generation will be restored.",
+        refinementBody:
+          "All changes from this refinement will be discarded, and the presentation from before refinement will be restored.",
+        generationCancel: "Continue generation",
+        refinementCancel: "Continue refinement",
+        confirm: "Stop and discard",
+        generationStopped: "Stopped. This run was not kept.",
+        refinementStopped: "Stopped. This refinement was not kept.",
+        failed: "Could not stop the run. Please try again.",
+        home: {
+          generationTitle: "Leave and discard this run?",
+          refinementTitle: "Leave and discard this refinement?",
+          generationBody:
+            "Generation is still running. Leaving discards this run and restores the Outline from before it started, then takes you to My Works.",
+          refinementBody:
+            "Refinement is still running. Leaving discards these changes and restores the presentation from before it started, then takes you to My Works.",
+          preparationTitle: "Leave and discard this step?",
+          preparationBody:
+            "Anna is still working on this step. Leaving discards the result, and the step has to be run again.",
+          preparationCancel: "Keep waiting",
+          confirm: "Discard and leave"
+        }
+      },
+      pageSummary: {
+        label: "Page progress",
+        accepted: "{accepted}/{total} passed",
+        failed: "{count} failed",
+        running: "{count} in progress",
+        pending: "{count} waiting",
+        total: "{count} pages in total"
+      },
+      commitFailed: {
+        title: "Could not save this run",
+        body: "The generated presentation could not be saved.",
+        restored: "Your previous presentation is unchanged.",
+        confirm: "Got it"
+      },
       steps: {
         outline: "Outline",
         pagePlan: "Authoring setup",
@@ -836,7 +944,9 @@ export const messages: Record<Locale, Messages> = {
     deck: {
       title: "AI Agent Workflows",
       subtitle: "Local project data",
-      slideCounter: "{current} / {total}"
+      slideCounter: "{current} / {total}",
+      previousSlide: "Previous page",
+      nextSlide: "Next page"
     },
     library: {
       title: "Settings",
@@ -873,7 +983,7 @@ export const messages: Record<Locale, Messages> = {
       diagnosticBundleCopyHint: "Copy the link into a normal browser address bar to download. Do not share it with unrelated people."
     },
     myWork: {
-      title: "My Work",
+      title: "My Works",
       home: "Home",
       presentations: "Presentations",
       inProgress: "In Progress",
@@ -890,7 +1000,17 @@ export const messages: Record<Locale, Messages> = {
       delete: "Delete",
       deleteTitle: "Delete project?",
       deleteBody: "This permanently deletes “{title}” and all of its files. This action cannot be undone.",
-      deleteConfirm: "Delete permanently"
+      deleteConfirm: "Delete permanently",
+      coverLoading: "Loading cover",
+      coverUnavailable: "Cover unavailable",
+      opening: "Opening...",
+      openFailed: "This project could not be opened.",
+      openRetry: "Try opening again",
+      duplicate: "Duplicate",
+      duplicateTitle: "{title} (Copy)",
+      duplicating: "Duplicating...",
+      duplicateFailed: "This project could not be duplicated.",
+      duplicated: "Project duplicated"
     },
     preferences: {
       defaultLanguage: "Default language",
@@ -957,7 +1077,13 @@ export const messages: Record<Locale, Messages> = {
       pptxModelReady: "PPTX model ready",
       pptxGenerating: "Generating PPTX file",
       pptxFailed: "PPTX export failed",
-      pdfGenerating: "Generating PDF file"
+      pdfGenerating: "Generating PDF file",
+      pptxQueued: "PPTX export queued",
+      checkingStatus: "Checking export status...",
+      resumedJob: "Reconnected to the export already running for this deck.",
+      exportFailedSummary: "The export could not be completed.",
+      retryExport: "Try exporting again",
+      pptxTimedOut: "Timed out waiting for the PPTX export."
     },
     toasts: {
       localFolder: "Opening local folder...",
@@ -971,12 +1097,21 @@ export const messages: Record<Locale, Messages> = {
       createDeckFirst: "Create the deck first",
       workspaceOpened: "Opened task {id}",
       workspaceCreated: "Created task {id}",
+      workspaceDuplicated: "Duplicated task {id}",
       pptxExported: "PPTX exported",
       pdfExported: "PDF exported"
     },
     errors: {
       uploadedSourceAnalysisUnavailable: "Source material analysis is unavailable because the agent session is not ready.",
-      uploadedSourceAnalysisBlocked: "Source material analysis blocked outline creation"
+      uploadedSourceAnalysisBlocked: "Source material analysis blocked outline creation",
+      summaryTimeout: "This is taking longer than expected and the request timed out.",
+      summaryTransport: "The file could not be transferred between Anna and this app.",
+      summaryNotFound: "The requested content is no longer available.",
+      summaryNetwork: "Anna could not be reached. Check your connection and try again.",
+      summaryUnknown: "Something went wrong. Please try again.",
+      showDetails: "Show technical details",
+      hideDetails: "Hide technical details",
+      detailsLabel: "Technical details"
     }
   },
   zh: {
@@ -984,9 +1119,12 @@ export const messages: Record<Locale, Messages> = {
     languageName: "中文",
     controls: {
       library: "设置",
+      collapseSidebar: "收起侧边栏",
+      expandSidebar: "展开侧边栏",
       minimize: "最小化",
       close: "关闭",
       back: "返回",
+      backToLastVersion: "返回上一版",
       open: "打开",
       edit: "编辑",
       cancel: "取消",
@@ -1136,7 +1274,6 @@ export const messages: Record<Locale, Messages> = {
       title: "选择风格",
       helper: "选择 Anna 生成这份演示时使用的视觉风格。",
       none: "不使用模板",
-      noneDescription: "保留现有视觉气质流程，由 Anna 生成艺术指导。",
       noneSelected: "未选择模板",
       loading: "正在加载模板...",
       empty: "没有发现可用模板。",
@@ -1233,6 +1370,42 @@ export const messages: Record<Locale, Messages> = {
       stayOnPageHint: "请勿离开此页面",
       pagesPassed: "{completed}/{total} 页通过",
       pageLabel: "第 {page} 页",
+      abandon: {
+        generationTitle: "停止生成？",
+        refinementTitle: "停止优化？",
+        generationBody: "停止后，本次生成的所有内容都不会保留，并返回生成前的大纲。",
+        refinementBody: "停止后，本次优化的所有内容都不会保留，并恢复优化前的演示文稿。",
+        generationCancel: "继续生成",
+        refinementCancel: "继续优化",
+        confirm: "停止并放弃",
+        generationStopped: "已停止，本次生成未保留。",
+        refinementStopped: "已停止，本次优化未保留。",
+        failed: "停止失败，请重试。",
+        home: {
+          generationTitle: "离开会放弃这次生成？",
+          refinementTitle: "离开会放弃这次优化？",
+          generationBody: "生成还没完成。离开后本次生成的内容都不会保留，会恢复到生成前的大纲，并回到「我的作品」。",
+          refinementBody: "优化还没完成。离开后本次优化的内容都不会保留，会恢复到优化前的演示文稿，并回到「我的作品」。",
+          preparationTitle: "离开会放弃这一步？",
+          preparationBody: "Anna 还在处理这一步。离开后这次的结果不会保留，需要重新跑一次。",
+          preparationCancel: "继续等待",
+          confirm: "放弃并离开"
+        }
+      },
+      pageSummary: {
+        label: "页面进度",
+        accepted: "{accepted}/{total} 页已通过",
+        failed: "{count} 页失败",
+        running: "{count} 页进行中",
+        pending: "{count} 页等待中",
+        total: "共 {count} 页"
+      },
+      commitFailed: {
+        title: "本次生成未能保存",
+        body: "生成好的演示文稿没能保存成功。",
+        restored: "你之前的演示文稿没有被改动。",
+        confirm: "知道了"
+      },
       steps: {
         outline: "大纲",
         pagePlan: "创作准备",
@@ -1345,7 +1518,9 @@ export const messages: Record<Locale, Messages> = {
     deck: {
       title: "AI Agent 工作流",
       subtitle: "本地项目数据",
-      slideCounter: "{current} / {total}"
+      slideCounter: "{current} / {total}",
+      previousSlide: "上一页",
+      nextSlide: "下一页"
     },
     library: {
       title: "设置",
@@ -1399,7 +1574,17 @@ export const messages: Record<Locale, Messages> = {
       delete: "删除",
       deleteTitle: "删除项目？",
       deleteBody: "将永久删除“{title}”及其中的全部文件，此操作无法撤销。",
-      deleteConfirm: "永久删除"
+      deleteConfirm: "永久删除",
+      coverLoading: "封面加载中",
+      coverUnavailable: "暂无封面",
+      opening: "正在打开……",
+      openFailed: "这个项目暂时无法打开。",
+      openRetry: "重新打开",
+      duplicate: "创建副本",
+      duplicateTitle: "{title} 副本",
+      duplicating: "正在复制……",
+      duplicateFailed: "这个项目暂时无法复制。",
+      duplicated: "已复制项目"
     },
     preferences: {
       defaultLanguage: "默认语言",
@@ -1464,7 +1649,13 @@ export const messages: Record<Locale, Messages> = {
       pptxModelReady: "PPTX 模型已准备",
       pptxGenerating: "正在生成 PPTX 文件",
       pptxFailed: "PPTX 导出失败",
-      pdfGenerating: "正在生成 PDF 文件"
+      pdfGenerating: "正在生成 PDF 文件",
+      pptxQueued: "PPTX 导出已排队",
+      checkingStatus: "正在查询导出状态……",
+      resumedJob: "已重新连接到这份演示文稿正在进行的导出任务。",
+      exportFailedSummary: "导出未能完成。",
+      retryExport: "重新导出",
+      pptxTimedOut: "PPTX 导出等待超时。"
     },
     toasts: {
       localFolder: "正在打开本地文件夹...",
@@ -1478,12 +1669,21 @@ export const messages: Record<Locale, Messages> = {
       createDeckFirst: "请先创建演示文稿",
       workspaceOpened: "已打开任务 {id}",
       workspaceCreated: "已创建任务 {id}",
+      workspaceDuplicated: "已复制任务 {id}",
       pptxExported: "PPTX 已导出",
       pdfExported: "PDF 已导出"
     },
     errors: {
       uploadedSourceAnalysisUnavailable: "Agent 会话尚未就绪，无法分析上传资料。",
-      uploadedSourceAnalysisBlocked: "上传资料分析阻止了大纲创建"
+      uploadedSourceAnalysisBlocked: "上传资料分析阻止了大纲创建",
+      summaryTimeout: "这次请求等待超时，处理时间比预期更长。",
+      summaryTransport: "文件在 Anna 和本应用之间传输失败。",
+      summaryNotFound: "需要的内容已经不存在。",
+      summaryNetwork: "无法连接 Anna，请检查网络后重试。",
+      summaryUnknown: "出了点问题，请重试。",
+      showDetails: "查看技术详情",
+      hideDetails: "收起技术详情",
+      detailsLabel: "技术详情"
     }
   }
 };

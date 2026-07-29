@@ -111,15 +111,19 @@ export async function beginGenerationRun(input: {
   return transaction;
 }
 
-async function copyTree(source: string, destination: string): Promise<void> {
+/**
+ * Whole-Workspace copy shared by shadow runs and user-visible duplication.
+ * Reflink first so a copy stays cheap on filesystems that support it.
+ */
+export async function copyTree(source: string, destination: string): Promise<void> {
   const info = await lstat(source);
   if (info.isDirectory()) {
     await mkdir(destination, { recursive: true });
     for (const entry of await readdir(source)) await copyTree(path.join(source, entry), path.join(destination, entry));
     return;
   }
-  if (info.isSymbolicLink()) throw new Error(`Shadow Workspace cannot copy symbolic link: ${source}`);
-  if (!info.isFile()) throw new Error(`Shadow Workspace cannot copy special file: ${source}`);
+  if (info.isSymbolicLink()) throw new Error(`Workspace copy cannot include symbolic link: ${source}`);
+  if (!info.isFile()) throw new Error(`Workspace copy cannot include special file: ${source}`);
   await mkdir(path.dirname(destination), { recursive: true });
   try {
     await copyFile(source, destination, fsConstants.COPYFILE_FICLONE);
@@ -128,7 +132,8 @@ async function copyTree(source: string, destination: string): Promise<void> {
   }
 }
 
-async function rebaseTextTree(root: string, from: string, to: string): Promise<void> {
+/** Rewrites absolute Workspace paths recorded inside copied text artifacts. */
+export async function rebaseTextTree(root: string, from: string, to: string): Promise<void> {
   for (const entry of await readdir(root, { withFileTypes: true })) {
     const entryPath = path.join(root, entry.name);
     if (entry.isDirectory()) {

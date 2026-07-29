@@ -113,9 +113,17 @@ export type {
   ResearchDiscoveryProgressVisualAsset,
 };
 
+/**
+ * App-owned progress captions. Unlike `message`, which carries Agent or backend
+ * text verbatim, these are resolved from the active locale on every render so a
+ * mid-run language switch cannot leave stale copy on screen.
+ */
+export type DeckGenerationProgressMessageKey = "confirmingOutline";
+
 export interface DeckGenerationProgress {
   step: DeckGenerationStep;
   message: string;
+  messageKey?: DeckGenerationProgressMessageKey;
   currentPageIndex: number | null;
   totalPages: number;
   pages: DeckGenerationProgressPage[];

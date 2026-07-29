@@ -35,3 +35,22 @@ export function filterVisualStylePresets(
     presets.filter((preset) => matchesVisualStylePresetFilters(preset, filters)),
   );
 }
+
+export function createEmptyVisualStylePresetFilters(): VisualStylePresetFilters {
+  return { user: "", use_case: "", industry: "", theme: "", color: "" };
+}
+
+export function buildVisualStylePresetFilterOptions(
+  presets: readonly VisualStylePreset[],
+): Record<VisualStylePresetFilterField, string[]> {
+  return Object.fromEntries(
+    VISUAL_STYLE_PRESET_FILTER_FIELDS.map((field) => [
+      field,
+      [...new Set(presets.flatMap((preset) => {
+        const value = preset[field];
+        return Array.isArray(value) ? value : [value];
+      }).filter(Boolean))]
+        .sort((left, right) => left.localeCompare(right)),
+    ]),
+  ) as Record<VisualStylePresetFilterField, string[]>;
+}

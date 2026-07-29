@@ -71,6 +71,15 @@ export function createExportErrorProgress(
   };
 }
 
+/**
+ * EXPORT-001: a queued or in-flight job is resumed instead of started again, so
+ * re-entering the export page never launches a second conversion.
+ */
+export function isPptxExportJobRunning(job: PptxExportJob | null | undefined): boolean {
+  if (!job) return false;
+  return job.status === "queued" || job.status === "validating" || job.status === "converting";
+}
+
 export function createPptxJobExportProgress(
   t: Messages,
   job: PptxExportJob,

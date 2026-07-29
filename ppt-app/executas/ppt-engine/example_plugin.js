@@ -10,6 +10,12 @@ import { Readable } from "node:stream";
 
 import { parseHostUploadConfirmation } from "./host-upload-confirmation.js";
 import {
+  createHostUploadCache,
+  hostUploadCacheKey,
+  readCachedHostUpload,
+  storeHostUpload,
+} from "./host-upload-cache.js";
+import {
   APS_FILES_DOWNLOAD_SCOPE,
   ApsFilesClient,
   ApsFilesError,
@@ -26,6 +32,7 @@ import {
   buildDeckHtmlFromManifest,
   createAppWorkspace,
   deleteAppWorkspace,
+  duplicateAppWorkspace,
   duplicateAppWorkspacePage,
   ensureConfirmedOutlinePageIds,
   createAppExportArtifactSnapshot,
@@ -43,6 +50,7 @@ import {
   getAppPageProgress,
   getAppPageEditContext,
   getAppPptxExportStatus,
+  getAppWorkspaceCover,
   getRenderedAppWorkspaceDeckHtml,
   fingerprintWorkspacePageSource,
   installWorkspaceAuthoringKit,
@@ -148,6 +156,7 @@ const HOST_UPLOAD_METHOD = "host/uploadFile";
 const UPLOAD_ERR_NOT_GRANTED = -32201;
 const UPLOAD_ERR_TIMEOUT = -32208;
 const UPLOAD_ERR_NOT_NEGOTIATED = -32210;
+const MAX_HOST_UPLOAD_JSON_REFERENCE_BYTES = 512 * 1024;
 
 function readToolManifest() {
   return JSON.parse(readFileSync(new URL("./manifest.json", import.meta.url), "utf8"));
@@ -159,6 +168,53 @@ function toolAppGetRuntimeInfo() {
   return {
     ppt_engine_version: MANIFEST.version,
   };
+}
+
+async function toolAppResolveHostUploadJsonReference(args) {
+  const hostUpload = readHostUploadRefArg(args, "host_upload");
+  if (hostUpload.mime_type !== "application/json") {
+    throw new Error('Host Upload JSON reference MIME type must be "application/json"');
+  }
+  if (hostUpload.size_bytes > MAX_HOST_UPLOAD_JSON_REFERENCE_BYTES) {
+    throw new Error(
+      `Host Upload JSON reference is ${hostUpload.size_bytes} bytes; ` +
+      `server-side CORS fallback is limited to ${MAX_HOST_UPLOAD_JSON_REFERENCE_BYTES} bytes.`,
+    );
+  }
+
+  const response = await fetch(hostUpload.url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Host Upload JSON reference download failed: HTTP ${response.status}`);
+  }
+  if (!response.body) {
+    throw new Error("Host Upload JSON reference download returned an empty response body.");
+  }
+
+  const chunks = [];
+  let receivedBytes = 0;
+  for await (const chunk of Readable.fromWeb(response.body)) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    receivedBytes += buffer.byteLength;
+    if (
+      receivedBytes > hostUpload.size_bytes
+      || receivedBytes > MAX_HOST_UPLOAD_JSON_REFERENCE_BYTES
+    ) {
+      throw new Error(
+        `Host Upload JSON reference size mismatch: expected ${hostUpload.size_bytes} bytes, ` +
+        `got more than ${hostUpload.size_bytes} bytes.`,
+      );
+    }
+    chunks.push(buffer);
+  }
+
+  if (receivedBytes !== hostUpload.size_bytes) {
+    throw new Error(
+      `Host Upload JSON reference size mismatch: expected ${hostUpload.size_bytes} bytes, ` +
+      `got ${receivedBytes} bytes.`,
+    );
+  }
+
+  return JSON.parse(Buffer.concat(chunks, receivedBytes).toString("utf8"));
 }
 
 function makeResponse(id, result, error) {
@@ -282,6 +338,7 @@ class ExecutaHostUploadClient {
 }
 
 const hostUploadClient = new ExecutaHostUploadClient();
+const hostUploadCache = createHostUploadCache();
 const apsFilesClient = new ApsFilesClient({
   writeFrame: (message) => writeStdoutLine(JSON.stringify(message)),
 });
@@ -625,11 +682,25 @@ async function downloadHostUploadToStaging({ hostUpload, stagingPath, expectedSi
   return receivedBytes;
 }
 
-async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose, workspaceDir, operationId, source }) {
+async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose, workspaceDir, operationId, source, reuseWhileValid }) {
   const normalizedPath = path.normalize(filePath);
   const fileStat = await stat(normalizedPath);
   if (!fileStat.isFile()) {
     throw new Error(`Host Upload source path is not a file: ${normalizedPath}`);
+  }
+  const cacheKey = reuseWhileValid
+    ? hostUploadCacheKey({
+        filePath: normalizedPath,
+        sizeBytes: fileStat.size,
+        mtimeMs: fileStat.mtimeMs,
+        mimeType,
+        purpose: purpose || "user_artifact",
+      })
+    : null;
+  if (cacheKey) {
+    // Not a transfer, so it stays out of the storage transfer log by design.
+    const cached = readCachedHostUpload(hostUploadCache, cacheKey);
+    if (cached) return cached;
   }
   const safeFilename = assertSafeUploadFilename(filename || path.basename(normalizedPath));
   if (typeof mimeType !== "string" || mimeType.trim().length === 0 || mimeType === "application/octet-stream") {
@@ -679,6 +750,7 @@ async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose, wo
       filename: safeFilename,
     });
     logger.log("finished", "succeeded", { r2_key: result.r2_key, expires_at: result.expires_at });
+      if (cacheKey) storeHostUpload(hostUploadCache, cacheKey, result);
       return result;
     } catch (error) {
       lastError = error;
@@ -763,11 +835,26 @@ async function uploadBufferToHost({ buffer, filename, mimeType, purpose, workspa
   }
 }
 
+const PREVIEW_IMAGE_MIME_TYPES = {
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+};
+
 async function uploadPreviewImage(imagePath, context = {}) {
+  const extension = path.extname(imagePath).toLowerCase();
+  const mimeType = PREVIEW_IMAGE_MIME_TYPES[extension];
+  if (!mimeType) {
+    throw new Error(`Host Upload preview image type is not supported: ${imagePath}`);
+  }
   return uploadLocalFileToHost({
     filePath: imagePath,
-    filename: `${path.basename(imagePath, path.extname(imagePath)) || "slide"}.png`,
-    mimeType: "image/png",
+    filename: `${path.basename(imagePath, extension) || "slide"}${extension}`,
+    mimeType,
+    // Rendered previews are immutable for a given mtime, so repeat views can
+    // reuse the confirmed reference instead of re-uploading the same bytes.
+    reuseWhileValid: true,
     ...context,
     purpose: "user_artifact",
   });
@@ -1735,6 +1822,21 @@ async function toolAppUpdateWorkspaceTitle(args) {
   }));
 }
 
+async function toolAppDuplicateWorkspace(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  if (args.title !== undefined && typeof args.title !== "string") {
+    throw new Error('"title" must be a string');
+  }
+
+  return duplicateAppWorkspace({
+    workspace_dir: workspaceDir,
+    title: typeof args.title === "string" ? args.title : undefined,
+  });
+}
+
 async function toolAppDeleteWorkspace(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -2196,6 +2298,22 @@ async function toolAppGetRenderedDeckHtml(args) {
   return {
     ...result,
     slides,
+  };
+}
+
+async function toolAppGetWorkspaceCover(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const cover = await getAppWorkspaceCover({ workspace_dir: workspaceDir });
+  return {
+    ...cover,
+    cover_upload: await uploadPreviewImage(cover.cover_path, {
+      workspaceDir,
+      source: "ppt-engine.workspace-cover",
+    }),
   };
 }
 
@@ -2682,6 +2800,7 @@ async function toolForkTemplateGroup(args) {
 
 const TOOL_DISPATCH = {
   app_get_runtime_info: toolAppGetRuntimeInfo,
+  app_resolve_host_upload_json_reference: toolAppResolveHostUploadJsonReference,
   app_begin_generation_run: toolAppBeginGenerationRun,
   app_prepare_generation_run: toolAppPrepareGenerationRun,
   app_abandon_generation_run: toolAppAbandonGenerationRun,
@@ -2740,6 +2859,7 @@ const TOOL_DISPATCH = {
   app_update_workspace_settings: toolAppUpdateWorkspaceSettings,
   app_patch_workspace_settings: toolAppPatchWorkspaceSettings,
   app_update_workspace_title: toolAppUpdateWorkspaceTitle,
+  app_duplicate_workspace: toolAppDuplicateWorkspace,
   app_delete_workspace: toolAppDeleteWorkspace,
   app_list_template_groups: toolAppListTemplateGroups,
   app_get_template_group: toolAppGetTemplateGroup,
@@ -2768,6 +2888,7 @@ const TOOL_DISPATCH = {
   app_save_manual_page_revision: toolAppSaveManualPageRevision,
   app_restore_page_source_version: toolAppRestorePageSourceVersion,
   app_get_rendered_deck_html: toolAppGetRenderedDeckHtml,
+  app_get_workspace_cover: toolAppGetWorkspaceCover,
   app_render_deck_html: toolAppRenderDeckHtml,
   app_start_pptx_export: toolAppStartPptxExport,
   app_get_pptx_export_status: toolAppGetPptxExportStatus,

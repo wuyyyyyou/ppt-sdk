@@ -6,6 +6,7 @@ import {
   createArtifactExportProgress,
   createIdleExportProgress,
   createPptxJobExportProgress,
+  isPptxExportJobRunning,
 } from "../../src/features/deck-workspace/exportProgressDisplay.ts";
 import type { ExportArtifact } from "../../src/features/deck-workspace/types.ts";
 import { messages } from "../../src/i18n/messages.ts";
@@ -91,5 +92,19 @@ describe("Export Progress Display", () => {
         active: false,
       },
     );
+  });
+
+  it("treats queued and in-flight jobs as resumable so a rerender never starts a second export", () => {
+    for (const status of ["queued", "validating", "converting"] as const) {
+      assert.equal(isPptxExportJobRunning(makePptxJob({ status })), true, status);
+    }
+  });
+
+  it("allows a new export once the previous job settled or never existed", () => {
+    for (const status of ["idle", "completed", "failed"] as const) {
+      assert.equal(isPptxExportJobRunning(makePptxJob({ status })), false, status);
+    }
+    assert.equal(isPptxExportJobRunning(null), false);
+    assert.equal(isPptxExportJobRunning(undefined), false);
   });
 });

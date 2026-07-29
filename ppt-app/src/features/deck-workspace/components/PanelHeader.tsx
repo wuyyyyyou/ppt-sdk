@@ -1,4 +1,5 @@
-import { PanelTop, Settings } from "lucide-react";
+import { Home, Settings } from "lucide-react";
+import { LocaleSwitch } from "./LocaleSwitch";
 import type { Locale, Messages } from "../../../i18n/messages";
 
 interface PanelHeaderProps {
@@ -24,17 +25,19 @@ export function PanelHeader(props: PanelHeaderProps) {
 
   return (
     <header className="panel-header">
-      <button
-        className="header-left header-home-btn"
-        type="button"
-        onClick={onHome}
-        title={t.appName}
-        disabled={navigationDisabled}
-      >
-        <PanelTop size={18} />
-        <div className="app-title">{t.appName}</div>
+      <div className="header-left">
+        <button
+          className="header-home-btn"
+          type="button"
+          onClick={onHome}
+          title={t.myWork.home}
+          aria-label={t.myWork.home}
+          disabled={navigationDisabled}
+        >
+          <Home size={18} aria-hidden="true" />
+        </button>
         {status ? <div className="status-pill">{status}</div> : null}
-      </button>
+      </div>
       <div className="header-controls">
         <button
           className="control-btn text"
@@ -42,17 +45,10 @@ export function PanelHeader(props: PanelHeaderProps) {
           title={t.controls.library}
           disabled={navigationDisabled}
         >
-          <Settings size={14} />
+          <Settings size={14} aria-hidden="true" />
           {t.controls.library}
         </button>
-        <div className="lang-switch" aria-label="Language">
-          <button className={locale === "en" ? "active" : ""} onClick={() => setLocale("en")}>
-            EN
-          </button>
-          <button className={locale === "zh" ? "active" : ""} onClick={() => setLocale("zh")}>
-            中
-          </button>
-        </div>
+        <LocaleSwitch locale={locale} setLocale={setLocale} />
       </div>
     </header>
   );
