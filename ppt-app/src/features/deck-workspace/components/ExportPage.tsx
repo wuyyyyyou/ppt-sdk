@@ -1,6 +1,5 @@
 import { Download, File, FileText } from "lucide-react";
 import type { Messages } from "../../../i18n/messages";
-import { hasActiveDownloadUrl } from "../downloadUrl";
 import { useDownloadUrlAvailability } from "../useDownloadUrlAvailability";
 import type { ExportArtifact, ExportDownloadState, ExportProgressState } from "../types";
 import type { LoadingKind } from "../types";
@@ -24,9 +23,8 @@ function downloadLabel(t: Messages, artifact: ExportArtifact | null) {
 
 function downloadButtonLabel(t: Messages, artifact: ExportArtifact | null, download: ExportDownloadState) {
   if (download.status === "preparing") return t.exportPage.downloadPreparing;
-  if (download.status === "error") return t.exportPage.retryDownloadPreparation;
-  if (hasActiveDownloadUrl(download)) return downloadLabel(t, artifact);
-  return `${t.exportPage.prepareDownload} ${artifact?.type ?? ""}`.trim();
+  if (download.status === "error") return t.exportPage.retryDownload;
+  return downloadLabel(t, artifact);
 }
 
 function isDeterminateProgress(progress: ExportProgressState) {
@@ -96,33 +94,29 @@ export function ExportPage({ t, progress, artifact, download, loading, onBack, o
           </div>
         </div>
         <div className="export-download-action-row">
+          <button
+            className="export-download-btn"
+            type="button"
+            disabled={!artifact || downloadDisabled}
+            aria-busy={download.status === "preparing"}
+            onClick={() => {
+              void onDownload();
+            }}
+          >
+            <Download size={16} aria-hidden="true" />
+            <span>{artifact ? downloadButtonLabel(t, artifact, download) : downloadLabel(t, artifact)}</span>
+          </button>
+          {/* ADR-0025: the host iframe may still refuse to start the transfer, so
+              the signed URL stays reachable as a manual fallback. */}
           {artifact && downloadAvailability.active && download.href ? (
             <CopyableDownloadLink
               href={download.href}
               inputLabel={t.exportPage.downloadLinkLabel}
               copyLabel={t.exportPage.copyDownloadLink}
               copiedMessage={t.exportPage.downloadLinkCopied}
-              copyHint={t.exportPage.downloadCopyHint}
+              copyHint={t.exportPage.downloadFallbackHint}
             />
-          ) : artifact ? (
-            <button
-              className="export-download-btn"
-              type="button"
-              disabled={downloadDisabled}
-              aria-busy={download.status === "preparing"}
-              onClick={() => {
-                void onDownload();
-              }}
-            >
-              <Download size={16} aria-hidden="true" />
-              <span>{downloadButtonLabel(t, artifact, download)}</span>
-            </button>
-          ) : (
-            <button className="export-download-btn" type="button" disabled>
-              <Download size={16} aria-hidden="true" />
-              <span>{downloadLabel(t, artifact)}</span>
-            </button>
-          )}
+          ) : null}
         </div>
         {download.message ? (
           <div className={`export-download-status ${download.status === "error" ? "error" : ""}`} role="status" aria-live="polite">

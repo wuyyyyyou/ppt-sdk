@@ -5,6 +5,8 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
+  AlignVerticalJustifyStart,
+  AlignVerticalSpaceAround,
   ArrowDown,
   ArrowDownToLine,
   ArrowLeft,
@@ -19,12 +21,10 @@ import {
   PaintBucket,
   PanelLeftClose,
   PanelLeftOpen,
-  Pilcrow,
   Redo2,
   RotateCcw,
   Save,
   Shapes,
-  SlidersHorizontal,
   Square,
   Strikethrough,
   Trash2,
@@ -42,12 +42,16 @@ import type {
 } from "../../api/types";
 import { createAppHostUploadClient, type AppHostUploadClient } from "../../runtime/appHostUploadClient";
 import { connectAnnaRuntime } from "../../runtime/annaRuntime";
+import { formatMessage, type Messages } from "../../i18n/messages";
 import {
   MOVEABLE_EDITOR_CLASS,
   canvasDistance,
   exceedsDragThreshold,
   isMoveableEditorTarget,
+  isSelectableBox,
 } from "./manualPageEditorInteractions";
+import { measureLocalScale, promoteToAbsolute } from "./manualPageEditorPromotion";
+import { explicitZIndex, planStackingChange, type ArrangeAction } from "./manualPageEditorStacking";
 import "./manual-page-editor.css";
 
 const FONT_FAMILIES = [
@@ -69,6 +73,7 @@ export interface ManualPageEditorPage {
 }
 
 interface Props {
+  t: Messages;
   workspaceDir: string;
   pages: ManualPageEditorPage[];
   initialPageIndex: number;
@@ -77,7 +82,7 @@ interface Props {
 }
 
 type SaveStatus = "saved" | "unsaved" | "saving" | "conflict" | "error";
-type ToolbarPopover = "paragraph" | "fill" | "border" | "opacity" | "more" | null;
+type ToolbarPopover = "fill" | "border" | "more" | null;
 
 function editableTarget(target: EventTarget | null): target is HTMLElement {
   const element = target && typeof (target as HTMLElement).closest === "function" ? target as HTMLElement : null;
@@ -86,22 +91,47 @@ function editableTarget(target: EventTarget | null): target is HTMLElement {
 
 function selectionTarget(target: EventTarget | null, shell: HTMLElement): HTMLElement | null {
   let element = target && typeof (target as HTMLElement).closest === "function" ? target as HTMLElement : null;
-  const inlineTags = new Set(["SPAN", "STRONG", "EM", "B", "I", "U", "S", "BR", "SMALL"]);
   while (element && element !== shell) {
     const style = element.ownerDocument.defaultView?.getComputedStyle(element);
     const rect = element.getBoundingClientRect();
-    if (
-      !element.dataset.pptEditorPlaceholder && !element.dataset.pptEditorDeleted &&
-      style?.display !== "none" && style?.visibility !== "hidden" && rect.width > 0 && rect.height > 0 &&
-      !inlineTags.has(element.tagName)
-    ) return element;
+    if (isSelectableBox({
+      tagName: element.tagName,
+      display: style?.display ?? "block",
+      visibility: style?.visibility ?? "visible",
+      width: rect.width,
+      height: rect.height,
+      isEditorArtifact: Boolean(element.dataset.pptEditorPlaceholder || element.dataset.pptEditorDeleted),
+    })) return element;
     element = element.parentElement;
   }
   return null;
 }
 
+interface OutlineBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+function outlineBox(element: HTMLElement): OutlineBox {
+  const rect = element.getBoundingClientRect();
+  const view = element.ownerDocument.defaultView;
+  return {
+    left: rect.left + (view?.scrollX ?? 0),
+    top: rect.top + (view?.scrollY ?? 0),
+    width: rect.width,
+    height: rect.height,
+  };
+}
+
 function serializeDocument(doc: Document): string {
-  return `<!doctype html>\n${doc.documentElement.outerHTML}`;
+  const root = doc.documentElement.cloneNode(true) as HTMLElement;
+  // Moveable draws its control box into the iframe body, and this serialization
+  // feeds both the saved revision and the undo snapshots, so the handles would
+  // otherwise be baked into the page and its screenshot.
+  for (const node of Array.from(root.querySelectorAll(`.${MOVEABLE_EDITOR_CLASS}`))) node.remove();
+  return `<!doctype html>\n${root.outerHTML}`;
 }
 
 function makeId(): string {
@@ -121,37 +151,9 @@ function colorInputValue(value: string | undefined, fallback: string): string {
   return `#${rgb.slice(1, 4).map((part) => Math.max(0, Math.min(255, Number(part))).toString(16).padStart(2, "0")).join("")}`;
 }
 
-function promoteToAbsolute(element: HTMLElement): void {
-  const style = element.ownerDocument.defaultView?.getComputedStyle(element);
-  if (style?.position === "absolute") return;
-  const parent = element.parentElement;
-  if (!parent) return;
-  const rect = element.getBoundingClientRect();
-  const parentRect = parent.getBoundingClientRect();
-  const placeholder = element.ownerDocument.createElement("div");
-  placeholder.dataset.pptEditorPlaceholder = "true";
-  placeholder.setAttribute("aria-hidden", "true");
-  placeholder.style.width = `${rect.width}px`;
-  placeholder.style.height = `${rect.height}px`;
-  placeholder.style.visibility = "hidden";
-  placeholder.style.pointerEvents = "none";
-  placeholder.style.flex = style?.flex ?? "0 0 auto";
-  if (style?.gridArea) placeholder.style.gridArea = style.gridArea;
-  parent.insertBefore(placeholder, element);
-  if (style?.position === "static" && element.ownerDocument.defaultView?.getComputedStyle(parent).position === "static") {
-    parent.style.position = "relative";
-  }
-  Object.assign(element.style, {
-    position: "absolute",
-    left: `${rect.left - parentRect.left + parent.scrollLeft}px`,
-    top: `${rect.top - parentRect.top + parent.scrollTop}px`,
-    width: `${rect.width}px`,
-    height: `${rect.height}px`,
-    margin: "0",
-  });
-}
-
 export function ManualPageEditorShell(props: Props) {
+  const t = props.t.manualEditor;
+  const controls = props.t.controls;
   const [backend, setBackend] = useState<PptBackend | null>(null);
   const [uploadClient, setUploadClient] = useState<AppHostUploadClient | null>(null);
   const [pageIndex, setPageIndex] = useState(Math.min(props.initialPageIndex, Math.max(0, props.pages.length - 1)));
@@ -161,6 +163,7 @@ export function ManualPageEditorShell(props: Props) {
   const [error, setError] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [selected, setSelected] = useState<HTMLElement | null>(null);
+  const [hoverBox, setHoverBox] = useState<OutlineBox | null>(null);
   const [iframeDocument, setIframeDocument] = useState<Document | null>(null);
   const [zoom, setZoom] = useState<"fit" | number>("fit");
   const [fitScale, setFitScale] = useState(0.75);
@@ -176,12 +179,15 @@ export function ManualPageEditorShell(props: Props) {
   const toolbarRef = useRef<HTMLDivElement>(null);
   const textEditBeforeRef = useRef<string | null>(null);
   const selectionRangeRef = useRef<Range | null>(null);
+  const hoveredRef = useRef<HTMLElement | null>(null);
+  const selectedRef = useRef<HTMLElement | null>(null);
   const iframeCleanupRef = useRef<(() => void) | null>(null);
   const deckRenderRequiredRef = useRef(false);
   const dragGestureRef = useRef<{
     before: string;
     startLeft: number;
     startTop: number;
+    localScale: { x: number; y: number };
     moved: boolean;
   } | null>(null);
   const resizeGestureRef = useRef<{
@@ -190,8 +196,15 @@ export function ManualPageEditorShell(props: Props) {
     startTop: number;
     startWidth: number;
     startHeight: number;
+    localScale: { x: number; y: number };
     moved: boolean;
   } | null>(null);
+
+  /** Drops the cached hover so the next pointer move measures the new layout. */
+  const forgetHover = useCallback(() => {
+    hoveredRef.current = null;
+    setHoverBox(null);
+  }, []);
 
   const recordDeckRenderRequirement = useCallback((required: boolean) => {
     if (!required) return;
@@ -223,7 +236,9 @@ export function ManualPageEditorShell(props: Props) {
     try {
       const nextContext = await backend.getPageEditContext({ workspace_dir: props.workspaceDir, page_id: target.pageId });
       const response = await fetch(nextContext.html_upload.url, { cache: "no-store" });
-      if (!response.ok) throw new Error(`加载页面 HTML 失败：HTTP ${response.status}`);
+      if (!response.ok) {
+        throw new Error(formatMessage(t.loadFailed, { status: response.status }));
+      }
       setContext(nextContext);
       setHtml(await response.text());
       setPageIndex(index);
@@ -235,11 +250,20 @@ export function ManualPageEditorShell(props: Props) {
     } finally {
       setLoading(false);
     }
-  }, [backend, props.pages, props.workspaceDir]);
+  }, [backend, props.pages, props.workspaceDir, t]);
 
   useEffect(() => { if (backend) void loadPage(pageIndex); }, [backend]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => iframeCleanupRef.current?.(), []);
+
+  // The iframe listeners are registered once per page load, so they read the
+  // current selection through a ref instead of a stale closure.
+  useEffect(() => {
+    selectedRef.current = selected;
+    // Moveable already frames the selection; two outlines on one element read as
+    // a rendering glitch.
+    if (hoveredRef.current === selected) setHoverBox(null);
+  }, [selected]);
 
   useEffect(() => {
     if (!toolbarPopover) return;
@@ -298,7 +322,7 @@ export function ManualPageEditorShell(props: Props) {
     const value = currentHtml();
     const file = new File([value], `${page.pageId}.html`, { type: "text/plain" });
     if (file.size > 64 * 1024 * 1024) {
-      setError("当前页面 HTML 超过 64 MiB，无法保存。");
+      setError(t.tooLarge);
       setSaveStatus("error");
       return false;
     }
@@ -339,7 +363,7 @@ export function ManualPageEditorShell(props: Props) {
       setSaveStatus(/revision conflict/i.test(message) ? "conflict" : "error");
       return false;
     }
-  }, [backend, context, currentHtml, page, props.onPageUpdated, props.workspaceDir, recordDeckRenderRequirement, uploadClient]);
+  }, [backend, context, currentHtml, page, props.onPageUpdated, props.workspaceDir, recordDeckRenderRequirement, t, uploadClient]);
 
   const restore = useCallback(async () => {
     if (!backend || !page) return;
@@ -409,22 +433,24 @@ export function ManualPageEditorShell(props: Props) {
     patchSelected((element) => { (element.style as unknown as Record<string, string>)[property as string] = value; });
   };
 
-  const arrange = (action: "front" | "forward" | "backward" | "back") => {
+  const arrange = (action: ArrangeAction) => {
     if (!selected?.parentElement) return;
+    const view = selected.ownerDocument.defaultView;
     const siblings = Array.from(selected.parentElement.children)
       .filter((item): item is HTMLElement => "style" in item && !((item as HTMLElement).dataset.pptEditorPlaceholder) && !((item as HTMLElement).dataset.pptEditorDeleted));
-    const ordered = siblings.map((item, index) => ({ item, z: Number.parseInt(item.ownerDocument.defaultView?.getComputedStyle(item).zIndex || String(index), 10) || index }))
-      .sort((left, right) => left.z - right.z);
-    const current = ordered.findIndex((item) => item.item === selected);
-    if (current < 0) return;
-    const target = action === "front" ? ordered.length - 1
-      : action === "back" ? 0
-        : action === "forward" ? Math.min(ordered.length - 1, current + 1)
-          : Math.max(0, current - 1);
-    const [entry] = ordered.splice(current, 1);
-    ordered.splice(target, 0, entry!);
+    const target = siblings.indexOf(selected);
+    if (target < 0) return;
+    const updates = planStackingChange(
+      siblings.map((item) => ({ zIndex: explicitZIndex(view?.getComputedStyle(item).zIndex) })),
+      target,
+      action,
+    );
+    if (updates.length === 0) return;
     markMutation();
-    ordered.forEach(({ item }, index) => { item.style.zIndex = String(index + 1); });
+    for (const update of updates) {
+      const item = siblings[update.index];
+      if (item) item.style.zIndex = String(update.zIndex);
+    }
   };
 
   const addElement = (kind: "text" | "shape") => {
@@ -438,7 +464,7 @@ export function ManualPageEditorShell(props: Props) {
     element.style.zIndex = "999";
     if (kind === "text") {
       Object.assign(element.style, { left: "430px", top: "328px", width: "420px", height: "64px", fontSize: "24px", fontFamily: "Arial", color: "#111827", overflow: "hidden" });
-      element.textContent = "双击输入文字";
+      element.textContent = t.newTextPlaceholder;
     } else {
       Object.assign(element.style, { left: "500px", top: "290px", width: "280px", height: "140px", background: "#ddd6fe", borderRadius: "16px" });
     }
@@ -448,7 +474,7 @@ export function ManualPageEditorShell(props: Props) {
 
   const handleImage = async (file: File) => {
     if (!/image\/(png|jpeg|webp)/.test(file.type) || file.size > 20 * 1024 * 1024) {
-      setError("仅支持不超过 20 MiB 的 PNG、JPEG、WebP 图片。");
+      setError(t.imageRejected);
       return;
     }
     const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -513,7 +539,7 @@ export function ManualPageEditorShell(props: Props) {
     iframeCleanupRef.current?.();
     setIframeDocument(doc);
     const shell = doc.querySelector<HTMLElement>('[data-presenton-slide-shell="true"]');
-    if (!shell) { setError("页面缺少可编辑 slide shell。"); return; }
+    if (!shell) { setError(t.missingShell); return; }
     const pointerDown = (event: PointerEvent) => {
       if (editableTarget(event.target)) return;
       if (isMoveableEditorTarget(event.target)) return;
@@ -546,17 +572,33 @@ export function ManualPageEditorShell(props: Props) {
       const range = doc.getSelection()?.rangeCount ? doc.getSelection()!.getRangeAt(0) : null;
       selectionRangeRef.current = range && shell.contains(range.commonAncestorContainer) ? range.cloneRange() : null;
     };
+    // A click lands on a leaf over text and on a container over padding, so the
+    // pointer previews what it is about to grab.
+    const pointerMove = (event: PointerEvent) => {
+      if (dragGestureRef.current || resizeGestureRef.current) return;
+      if (isMoveableEditorTarget(event.target)) return;
+      const target = selectionTarget(event.target, shell);
+      if (target === hoveredRef.current) return;
+      hoveredRef.current = target;
+      setHoverBox(target && target !== selectedRef.current ? outlineBox(target) : null);
+    };
+    const pointerLeave = () => forgetHover();
     doc.addEventListener("pointerdown", pointerDown);
+    doc.addEventListener("pointermove", pointerMove);
+    doc.addEventListener("pointerleave", pointerLeave);
     doc.addEventListener("dblclick", doubleClick);
     doc.addEventListener("focusout", focusOut);
     doc.addEventListener("paste", paste);
     doc.addEventListener("selectionchange", selectionChange);
     iframeCleanupRef.current = () => {
       doc.removeEventListener("pointerdown", pointerDown);
+      doc.removeEventListener("pointermove", pointerMove);
+      doc.removeEventListener("pointerleave", pointerLeave);
       doc.removeEventListener("dblclick", doubleClick);
       doc.removeEventListener("focusout", focusOut);
       doc.removeEventListener("paste", paste);
       doc.removeEventListener("selectionchange", selectionChange);
+      forgetHover();
       selectionRangeRef.current = null;
     };
   };
@@ -585,60 +627,61 @@ export function ManualPageEditorShell(props: Props) {
   const fillColor = colorInputValue(selectedStyle?.backgroundColor, "#ffffff");
   const borderColor = colorInputValue(selectedStyle?.borderColor, "#111827");
   const borderWidth = Math.round(Number.parseFloat(selectedStyle?.borderWidth ?? "0"));
-  const opacity = Math.round(Number(selectedStyle?.opacity ?? 1) * 100);
   const saveStatusLabel = saveStatus === "saved"
-    ? "已保存"
+    ? t.saveStatus.saved
     : saveStatus === "saving"
-      ? "保存中…"
+      ? t.saveStatus.saving
       : saveStatus === "conflict"
-        ? "保存冲突"
+        ? t.saveStatus.conflict
         : saveStatus === "error"
-          ? "保存失败"
-          : "未保存";
+          ? t.saveStatus.failed
+          : t.saveStatus.unsaved;
   const togglePopover = (popover: Exclude<ToolbarPopover, null>) => {
     setToolbarPopover((current) => current === popover ? null : popover);
   };
 
   const toolbar = (
     <div ref={toolbarRef} className="manual-editor-toolbar" role="toolbar">
-      <button className="manual-editor-btn icon" onClick={undo} disabled={!history.length} title="撤销（Ctrl/Cmd+Z）"><Undo2 size={16} /></button>
-      <button className="manual-editor-btn icon" onClick={redo} disabled={!future.length} title="重做（Ctrl/Cmd+Shift+Z）"><Redo2 size={16} /></button>
+      <button className="manual-editor-btn icon" onClick={undo} disabled={!history.length} title={t.undo}><Undo2 size={16} /></button>
+      <button className="manual-editor-btn icon" onClick={redo} disabled={!future.length} title={t.redo}><Redo2 size={16} /></button>
       <span className="manual-toolbar-divider" />
       {!selected ? (
         <>
-          <button className="manual-editor-btn icon" onClick={() => addElement("text")} title="新增文本"><Type size={16} /></button>
-          <button className="manual-editor-btn icon" onClick={() => addElement("shape")} title="新增形状"><Shapes size={16} /></button>
-          <button className="manual-editor-btn icon" onClick={() => { setImageMode("add"); fileInputRef.current?.click(); }} title="新增图片"><ImagePlus size={16} /></button>
+          <button className="manual-editor-btn icon" onClick={() => addElement("text")} title={t.addText}><Type size={16} /></button>
+          <button className="manual-editor-btn icon" onClick={() => addElement("shape")} title={t.addShape}><Shapes size={16} /></button>
+          <button className="manual-editor-btn icon" onClick={() => { setImageMode("add"); fileInputRef.current?.click(); }} title={t.addImage}><ImagePlus size={16} /></button>
         </>
       ) : null}
 
       {selectedHasText ? (
         <>
-          <select className="manual-toolbar-select font-family" title="字体" value={selectedFont || "Arial"} onChange={(event) => applyTextStyle("fontFamily", event.target.value)}>
+          <select className="manual-toolbar-select font-family" title={t.fontFamily} value={selectedFont || "Arial"} onChange={(event) => applyTextStyle("fontFamily", event.target.value)}>
             {fontOptions.map((font) => <option key={font}>{font}</option>)}
           </select>
-          <select className="manual-toolbar-select font-size" title="字号" value={currentFontSize} onChange={(event) => applyTextStyle("fontSize", `${event.target.value}px`)}>
+          <select className="manual-toolbar-select font-size" title={t.fontSize} value={currentFontSize} onChange={(event) => applyTextStyle("fontSize", `${event.target.value}px`)}>
             {fontSizeOptions.map((size) => <option key={size}>{size}</option>)}
           </select>
           <span className="manual-toolbar-divider" />
-          <button className={`manual-editor-btn icon ${Number.parseInt(selectedStyle?.fontWeight ?? "400", 10) >= 600 ? "active" : ""}`} title="加粗" onClick={() => applyTextStyle("fontWeight", Number.parseInt(selectedStyle?.fontWeight ?? "400", 10) >= 600 ? "400" : "700")}><Bold size={15} /></button>
-          <button className={`manual-editor-btn icon ${selectedStyle?.fontStyle === "italic" ? "active" : ""}`} title="斜体" onClick={() => applyTextStyle("fontStyle", selectedStyle?.fontStyle === "italic" ? "normal" : "italic")}><Italic size={15} /></button>
-          <button className={`manual-editor-btn icon ${selectedStyle?.textDecorationLine.includes("underline") ? "active" : ""}`} title="下划线" onClick={() => applyTextStyle("textDecoration", selectedStyle?.textDecorationLine.includes("underline") ? "none" : "underline")}><Underline size={15} /></button>
-          <button className={`manual-editor-btn icon ${selectedStyle?.textDecorationLine.includes("line-through") ? "active" : ""}`} title="删除线" onClick={() => applyTextStyle("textDecoration", selectedStyle?.textDecorationLine.includes("line-through") ? "none" : "line-through")}><Strikethrough size={15} /></button>
+          <button className={`manual-editor-btn icon ${Number.parseInt(selectedStyle?.fontWeight ?? "400", 10) >= 600 ? "active" : ""}`} title={t.bold} onClick={() => applyTextStyle("fontWeight", Number.parseInt(selectedStyle?.fontWeight ?? "400", 10) >= 600 ? "400" : "700")}><Bold size={15} /></button>
+          <button className={`manual-editor-btn icon ${selectedStyle?.fontStyle === "italic" ? "active" : ""}`} title={t.italic} onClick={() => applyTextStyle("fontStyle", selectedStyle?.fontStyle === "italic" ? "normal" : "italic")}><Italic size={15} /></button>
+          <button className={`manual-editor-btn icon ${selectedStyle?.textDecorationLine.includes("underline") ? "active" : ""}`} title={t.underline} onClick={() => applyTextStyle("textDecoration", selectedStyle?.textDecorationLine.includes("underline") ? "none" : "underline")}><Underline size={15} /></button>
+          <button className={`manual-editor-btn icon ${selectedStyle?.textDecorationLine.includes("line-through") ? "active" : ""}`} title={t.strikethrough} onClick={() => applyTextStyle("textDecoration", selectedStyle?.textDecorationLine.includes("line-through") ? "none" : "line-through")}><Strikethrough size={15} /></button>
           <span className="manual-toolbar-divider" />
-          <button className={`manual-editor-btn icon ${selectedStyle?.textAlign === "left" || selectedStyle?.textAlign === "start" ? "active" : ""}`} title="左对齐" onClick={() => patchSelected((element) => { element.style.textAlign = "left"; })}><AlignLeft size={15} /></button>
-          <button className={`manual-editor-btn icon ${selectedStyle?.textAlign === "center" ? "active" : ""}`} title="居中" onClick={() => patchSelected((element) => { element.style.textAlign = "center"; })}><AlignCenter size={15} /></button>
-          <button className={`manual-editor-btn icon ${selectedStyle?.textAlign === "right" || selectedStyle?.textAlign === "end" ? "active" : ""}`} title="右对齐" onClick={() => patchSelected((element) => { element.style.textAlign = "right"; })}><AlignRight size={15} /></button>
-          <div className="manual-toolbar-popover-anchor">
-            <button className={`manual-editor-btn icon ${toolbarPopover === "paragraph" ? "active" : ""}`} title="段落设置" onClick={() => togglePopover("paragraph")}><Pilcrow size={15} /></button>
-            {toolbarPopover === "paragraph" ? (
-              <div className="manual-toolbar-popover paragraph">
-                <label><span>行高</span><select value={selected?.style.lineHeight || "1.2"} onChange={(event) => patchSelected((element) => { element.style.lineHeight = event.target.value; })}>{[1, 1.15, 1.25, 1.5, 1.75, 2, 2.5, 3].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
-                <label><span>段后间距</span><select value={Number.parseInt(selectedStyle?.marginBottom ?? "0", 10) || 0} onChange={(event) => patchSelected((element) => { element.style.marginBottom = `${event.target.value}px`; })}>{[0, 2, 4, 8, 12, 16, 24, 32].map((value) => <option key={value} value={value}>{value}px</option>)}</select></label>
-              </div>
-            ) : null}
-          </div>
-          <label className="manual-toolbar-color" title="文字颜色">
+          <button className={`manual-editor-btn icon ${selectedStyle?.textAlign === "left" || selectedStyle?.textAlign === "start" ? "active" : ""}`} title={t.alignLeft} onClick={() => patchSelected((element) => { element.style.textAlign = "left"; })}><AlignLeft size={15} /></button>
+          <button className={`manual-editor-btn icon ${selectedStyle?.textAlign === "center" ? "active" : ""}`} title={t.alignCenter} onClick={() => patchSelected((element) => { element.style.textAlign = "center"; })}><AlignCenter size={15} /></button>
+          <button className={`manual-editor-btn icon ${selectedStyle?.textAlign === "right" || selectedStyle?.textAlign === "end" ? "active" : ""}`} title={t.alignRight} onClick={() => patchSelected((element) => { element.style.textAlign = "right"; })}><AlignRight size={15} /></button>
+          {/* Line height and space after are one click each, so they sit on the
+              toolbar instead of behind a paragraph popover. */}
+          <label className="manual-toolbar-field" title={t.lineHeight}>
+            <AlignVerticalSpaceAround size={15} aria-hidden="true" />
+            <select className="manual-toolbar-select line-height" aria-label={t.lineHeight} value={selected?.style.lineHeight || "1.2"} onChange={(event) => patchSelected((element) => { element.style.lineHeight = event.target.value; })}>{[1, 1.15, 1.25, 1.5, 1.75, 2, 2.5, 3].map((value) => <option key={value} value={value}>{value}</option>)}</select>
+          </label>
+          <label className="manual-toolbar-field" title={t.spaceAfter}>
+            <AlignVerticalJustifyStart size={15} aria-hidden="true" />
+            <select className="manual-toolbar-select space-after" aria-label={t.spaceAfter} value={Number.parseInt(selectedStyle?.marginBottom ?? "0", 10) || 0} onChange={(event) => patchSelected((element) => { element.style.marginBottom = `${event.target.value}px`; })}>{[0, 2, 4, 8, 12, 16, 24, 32].map((value) => <option key={value} value={value}>{value}px</option>)}</select>
+          </label>
+          <span className="manual-toolbar-divider" />
+          <label className="manual-toolbar-color" title={t.textColor}>
             <span className="manual-text-color-sample" style={{ borderBottomColor: textColor }}>A</span>
             <input type="color" value={textColor} onChange={(event) => applyTextStyle("color", event.target.value)} />
           </label>
@@ -647,9 +690,9 @@ export function ManualPageEditorShell(props: Props) {
 
       {selectedIsImage ? (
         <>
-          <button className="manual-editor-btn text" onClick={() => { setImageMode("replace"); fileInputRef.current?.click(); }}><ImagePlus size={15} />替换图片</button>
-          <select className="manual-toolbar-select image-fit" title="图片适应方式" value={selectedStyle?.objectFit ?? "contain"} onChange={(event) => patchSelected((element) => { element.style.objectFit = event.target.value; })}>
-            <option value="cover">填满并裁切</option><option value="contain">完整显示</option><option value="fill">拉伸填满</option>
+          <button className="manual-editor-btn text" onClick={() => { setImageMode("replace"); fileInputRef.current?.click(); }}><ImagePlus size={15} />{t.replaceImage}</button>
+          <select className="manual-toolbar-select image-fit" title={t.imageFit} value={selectedStyle?.objectFit ?? "contain"} onChange={(event) => patchSelected((element) => { element.style.objectFit = event.target.value; })}>
+            <option value="cover">{t.imageFitCover}</option><option value="contain">{t.imageFitContain}</option><option value="fill">{t.imageFitFill}</option>
           </select>
         </>
       ) : null}
@@ -657,49 +700,42 @@ export function ManualPageEditorShell(props: Props) {
       {selected && !selectedIsImage ? (
         <>
           <div className="manual-toolbar-popover-anchor">
-            <button className={`manual-editor-btn text ${toolbarPopover === "fill" ? "active" : ""}`} title="填充" onClick={() => togglePopover("fill")}><PaintBucket size={15} /><span className="manual-color-dot" style={{ background: fillColor }} />填充</button>
+            <button className={`manual-editor-btn icon ${toolbarPopover === "fill" ? "active" : ""}`} title={t.fill} onClick={() => togglePopover("fill")}><span className="manual-color-swatch" style={{ borderBottomColor: fillColor }}><PaintBucket size={15} /></span></button>
             {toolbarPopover === "fill" ? (
               <div className="manual-toolbar-popover compact align-right">
-                <label className="manual-color-field"><span>填充颜色</span><input type="color" value={fillColor} onChange={(event) => patchSelected((element) => { element.style.backgroundColor = event.target.value; })} /></label>
-                <button className="manual-popover-action" onClick={() => { patchSelected((element) => { element.style.background = "transparent"; }); setToolbarPopover(null); }}>无填充</button>
+                <label className="manual-color-field"><span>{t.fillColor}</span><input type="color" value={fillColor} onChange={(event) => patchSelected((element) => { element.style.backgroundColor = event.target.value; })} /></label>
+                <button className="manual-popover-action" onClick={() => { patchSelected((element) => { element.style.background = "transparent"; }); setToolbarPopover(null); }}>{t.noFill}</button>
               </div>
             ) : null}
           </div>
           <div className="manual-toolbar-popover-anchor">
-            <button className={`manual-editor-btn text ${toolbarPopover === "border" ? "active" : ""}`} title="边框" onClick={() => togglePopover("border")}><Square size={15} style={{ color: borderColor }} />边框</button>
+            <button className={`manual-editor-btn icon ${toolbarPopover === "border" ? "active" : ""}`} title={t.border} onClick={() => togglePopover("border")}><span className="manual-color-swatch" style={{ borderBottomColor: borderColor }}><Square size={15} /></span></button>
             {toolbarPopover === "border" ? (
               <div className="manual-toolbar-popover compact align-right">
-                <label className="manual-color-field"><span>边框颜色</span><input type="color" value={borderColor} onChange={(event) => patchSelected((element) => { element.style.borderColor = event.target.value; element.style.borderStyle = "solid"; })} /></label>
-                <label><span>边框宽度</span><select value={borderWidth} onChange={(event) => patchSelected((element) => { element.style.borderWidth = `${event.target.value}px`; element.style.borderStyle = Number(event.target.value) > 0 ? "solid" : "none"; })}>{[0, 1, 2, 3, 4, 6, 8].map((value) => <option key={value} value={value}>{value}px</option>)}</select></label>
+                <label className="manual-color-field"><span>{t.borderColor}</span><input type="color" value={borderColor} onChange={(event) => patchSelected((element) => { element.style.borderColor = event.target.value; element.style.borderStyle = "solid"; })} /></label>
+                <label><span>{t.borderWidth}</span><select value={borderWidth} onChange={(event) => patchSelected((element) => { element.style.borderWidth = `${event.target.value}px`; element.style.borderStyle = Number(event.target.value) > 0 ? "solid" : "none"; })}>{[0, 1, 2, 3, 4, 6, 8].map((value) => <option key={value} value={value}>{value}px</option>)}</select></label>
               </div>
             ) : null}
           </div>
+          <span className="manual-toolbar-divider" />
         </>
       ) : null}
 
       {selected ? (
-        <>
-          <div className="manual-toolbar-popover-anchor">
-            <button className={`manual-editor-btn text ${toolbarPopover === "opacity" ? "active" : ""}`} title="透明度" onClick={() => togglePopover("opacity")}><SlidersHorizontal size={15} />{opacity}%</button>
-            {toolbarPopover === "opacity" ? (
-              <div className="manual-toolbar-popover opacity align-right"><label><span>透明度</span><input type="range" min="0" max="100" value={opacity} onChange={(event) => patchSelected((element) => { element.style.opacity = String(Number(event.target.value) / 100); })} /><strong>{opacity}%</strong></label></div>
-            ) : null}
-          </div>
-          <button className="manual-editor-btn icon danger" title="删除（Delete）" onClick={() => { patchSelected((element) => { element.style.visibility = "hidden"; element.dataset.pptEditorDeleted = "true"; }); setSelected(null); }}><Trash2 size={15} /></button>
-        </>
+        <button className="manual-editor-btn icon danger" title={t.deleteElement} onClick={() => { patchSelected((element) => { element.style.visibility = "hidden"; element.dataset.pptEditorDeleted = "true"; }); setSelected(null); }}><Trash2 size={15} /></button>
       ) : null}
 
       <div className="manual-toolbar-popover-anchor manual-toolbar-more">
-        <button className={`manual-editor-btn icon ${toolbarPopover === "more" ? "active" : ""}`} title="更多" onClick={() => togglePopover("more")}><MoreHorizontal size={16} /></button>
+        <button className={`manual-editor-btn icon ${toolbarPopover === "more" ? "active" : ""}`} title={t.more} onClick={() => togglePopover("more")}><MoreHorizontal size={16} /></button>
         {toolbarPopover === "more" ? (
           <div className="manual-toolbar-menu align-right">
-            {selected ? <button disabled={!canSelectParent} onClick={selectParent}><Layers size={14} />选择父级</button> : null}
-            {selected ? <span className="manual-toolbar-menu-label">图层</span> : null}
-            {selected ? <button onClick={() => { arrange("front"); setToolbarPopover(null); }}><ArrowUpToLine size={14} />置于顶层</button> : null}
-            {selected ? <button onClick={() => { arrange("forward"); setToolbarPopover(null); }}><ArrowUp size={14} />上移一层</button> : null}
-            {selected ? <button onClick={() => { arrange("backward"); setToolbarPopover(null); }}><ArrowDown size={14} />下移一层</button> : null}
-            {selected ? <button onClick={() => { arrange("back"); setToolbarPopover(null); }}><ArrowDownToLine size={14} />置于底层</button> : null}
-            <button disabled={!context?.manually_edited} onClick={() => { setToolbarPopover(null); setConfirm({ kind: "restore" }); }}><RotateCcw size={14} />恢复 AI 版本</button>
+            {selected ? <button disabled={!canSelectParent} onClick={selectParent}><Layers size={14} />{t.selectParent}</button> : null}
+            {selected ? <span className="manual-toolbar-menu-label">{t.layers}</span> : null}
+            {selected ? <button onClick={() => { arrange("front"); setToolbarPopover(null); }}><ArrowUpToLine size={14} />{t.bringToFront}</button> : null}
+            {selected ? <button onClick={() => { arrange("forward"); setToolbarPopover(null); }}><ArrowUp size={14} />{t.bringForward}</button> : null}
+            {selected ? <button onClick={() => { arrange("backward"); setToolbarPopover(null); }}><ArrowDown size={14} />{t.sendBackward}</button> : null}
+            {selected ? <button onClick={() => { arrange("back"); setToolbarPopover(null); }}><ArrowDownToLine size={14} />{t.sendToBack}</button> : null}
+            <button disabled={!context?.manually_edited} onClick={() => { setToolbarPopover(null); setConfirm({ kind: "restore" }); }}><RotateCcw size={14} />{t.restoreAiVersion}</button>
           </div>
         ) : null}
       </div>
@@ -710,9 +746,9 @@ export function ManualPageEditorShell(props: Props) {
     <section className="manual-page-editor">
       <aside className={`manual-editor-filmstrip ${filmstripCollapsed ? "collapsed" : ""}`}>
         <div className="manual-filmstrip-header">
-          <button className="manual-editor-btn icon" onClick={requestExit} title="返回"><ArrowLeft size={17} /></button>
-          {!filmstripCollapsed ? <strong>编辑 PPT</strong> : null}
-          <button className="manual-editor-btn icon" onClick={() => setFilmstripCollapsed((value) => !value)} title={filmstripCollapsed ? "展开页面列表" : "收起页面列表"}>{filmstripCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}</button>
+          <button className="manual-editor-btn icon" onClick={requestExit} title={controls.back}><ArrowLeft size={17} /></button>
+          {!filmstripCollapsed ? <strong>{t.title}</strong> : null}
+          <button className="manual-editor-btn icon" onClick={() => setFilmstripCollapsed((value) => !value)} title={filmstripCollapsed ? t.expandPages : t.collapsePages}>{filmstripCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}</button>
         </div>
         {!filmstripCollapsed ? (
           <div className="manual-filmstrip-scroll">
@@ -732,20 +768,31 @@ export function ManualPageEditorShell(props: Props) {
           {loading ? (
             <div className="manual-editor-loading" role="status" aria-live="polite">
               <LoaderCircle size={30} aria-hidden="true" />
-              <span>正在加载页面…</span>
+              <span>{t.loading}</span>
             </div>
           ) : null}
-          {error ? <div className="manual-editor-error">{error}{saveStatus === "conflict" ? <button onClick={() => void loadPage(pageIndex)}>加载后端最新版本</button> : null}</div> : null}
+          {error ? <div className="manual-editor-error">{error}{saveStatus === "conflict" ? <button onClick={() => void loadPage(pageIndex)}>{t.reloadLatest}</button> : null}</div> : null}
           {!loading && html ? (
             <div className="manual-editor-stage" style={{ width: 1280 * scale, height: 720 * scale }}>
               <iframe
                 ref={iframeRef}
-                title={page?.title ?? "PPT page editor"}
+                title={page?.title ?? t.title}
                 sandbox="allow-same-origin"
                 srcDoc={html}
                 onLoad={onIframeLoad}
                 style={{ width: 1280, height: 720, transform: `scale(${scale})`, transformOrigin: "top left" }}
               />
+              {hoverBox ? (
+                <div
+                  className="manual-editor-hover-outline"
+                  style={{
+                    left: hoverBox.left * scale,
+                    top: hoverBox.top * scale,
+                    width: hoverBox.width * scale,
+                    height: hoverBox.height * scale,
+                  }}
+                />
+              ) : null}
             </div>
           ) : null}
           {iframeDocument && selected ? createPortal(
@@ -758,10 +805,12 @@ export function ManualPageEditorShell(props: Props) {
               edge
               throttleDrag={1}
               onDragStart={() => {
+                forgetHover();
                 dragGestureRef.current = {
                   before: serializeDocument(iframeDocument),
                   startLeft: 0,
                   startTop: 0,
+                  localScale: { x: 1, y: 1 },
                   moved: false,
                 };
               }}
@@ -772,24 +821,28 @@ export function ManualPageEditorShell(props: Props) {
                   promoteToAbsolute(event.target as HTMLElement);
                   gesture.startLeft = Number.parseFloat(event.target.style.left || "0") || 0;
                   gesture.startTop = Number.parseFloat(event.target.style.top || "0") || 0;
+                  gesture.localScale = measureLocalScale(event.target as HTMLElement);
                   gesture.moved = true;
                 }
                 const [dx, dy] = canvasDistance(event.dist, scale);
-                event.target.style.left = `${gesture.startLeft + dx}px`;
-                event.target.style.top = `${gesture.startTop + dy}px`;
+                event.target.style.left = `${gesture.startLeft + dx / gesture.localScale.x}px`;
+                event.target.style.top = `${gesture.startTop + dy / gesture.localScale.y}px`;
               }}
               onDragEnd={() => {
                 const gesture = dragGestureRef.current;
                 if (gesture?.moved) markMutation(gesture.before);
                 dragGestureRef.current = null;
+                forgetHover();
               }}
               onResizeStart={() => {
+                forgetHover();
                 resizeGestureRef.current = {
                   before: serializeDocument(iframeDocument),
                   startLeft: 0,
                   startTop: 0,
                   startWidth: 0,
                   startHeight: 0,
+                  localScale: { x: 1, y: 1 },
                   moved: false,
                 };
               }}
@@ -803,47 +856,52 @@ export function ManualPageEditorShell(props: Props) {
                   promoteToAbsolute(event.target as HTMLElement);
                   gesture.startLeft = Number.parseFloat(event.target.style.left || "0") || 0;
                   gesture.startTop = Number.parseFloat(event.target.style.top || "0") || 0;
-                  gesture.startWidth = event.target.getBoundingClientRect().width;
-                  gesture.startHeight = event.target.getBoundingClientRect().height;
+                  // Layout size, so an element with its own transform does not
+                  // resize from its painted bounding box.
+                  const box = event.target as HTMLElement;
+                  gesture.startWidth = box.offsetWidth || box.getBoundingClientRect().width;
+                  gesture.startHeight = box.offsetHeight || box.getBoundingClientRect().height;
+                  gesture.localScale = measureLocalScale(event.target as HTMLElement);
                   gesture.moved = true;
                 }
                 const [dw, dh] = canvasDistance(resizeDistance, scale);
                 const [dx, dy] = canvasDistance(dragDistance, scale);
-                event.target.style.width = `${Math.max(16, gesture.startWidth + dw)}px`;
-                event.target.style.height = `${Math.max(16, gesture.startHeight + dh)}px`;
-                event.target.style.left = `${gesture.startLeft + dx}px`;
-                event.target.style.top = `${gesture.startTop + dy}px`;
+                event.target.style.width = `${Math.max(16, gesture.startWidth + dw / gesture.localScale.x)}px`;
+                event.target.style.height = `${Math.max(16, gesture.startHeight + dh / gesture.localScale.y)}px`;
+                event.target.style.left = `${gesture.startLeft + dx / gesture.localScale.x}px`;
+                event.target.style.top = `${gesture.startTop + dy / gesture.localScale.y}px`;
               }}
               onResizeEnd={() => {
                 const gesture = resizeGestureRef.current;
                 if (gesture?.moved) markMutation(gesture.before);
                 resizeGestureRef.current = null;
+                forgetHover();
               }}
             />,
             iframeDocument.body,
           ) : null}
         </div>
-          <div className="manual-editor-status-bar">
-            <div className="manual-editor-zoom-control">
-              <button className={`manual-editor-btn ghost ${zoom === "fit" ? "active" : ""}`} onClick={() => setZoom("fit")}>适应窗口</button>
-              <button className="manual-editor-btn icon ghost" onClick={() => setZoom(Math.max(0.25, scale - 0.1))} title="缩小"><ZoomOut size={15} /></button>
-              <span>{Math.round(scale * 100)}%</span>
-              <button className="manual-editor-btn icon ghost" onClick={() => setZoom(Math.min(2, scale + 0.1))} title="放大"><ZoomIn size={15} /></button>
-            </div>
-            <div className={`manual-save-status ${saveStatus}`}><span className="manual-save-dot" />{saveStatusLabel}</div>
-            <button className="manual-editor-btn primary" onClick={() => void save()} disabled={saveStatus === "saving" || saveStatus === "saved"}><Save size={15} />保存</button>
+        <div className="manual-editor-status-bar">
+          <div className="manual-editor-zoom-control">
+            <button className={`manual-editor-btn ghost ${zoom === "fit" ? "active" : ""}`} onClick={() => setZoom("fit")}>{t.fitWindow}</button>
+            <button className="manual-editor-btn icon ghost" onClick={() => setZoom(Math.max(0.25, scale - 0.1))} title={t.zoomOut}><ZoomOut size={15} /></button>
+            <span>{Math.round(scale * 100)}%</span>
+            <button className="manual-editor-btn icon ghost" onClick={() => setZoom(Math.min(2, scale + 0.1))} title={t.zoomIn}><ZoomIn size={15} /></button>
           </div>
+          <div className={`manual-save-status ${saveStatus}`}><span className="manual-save-dot" />{saveStatusLabel}</div>
+          <button className="manual-editor-btn primary" onClick={() => void save()} disabled={saveStatus === "saving" || saveStatus === "saved"}><Save size={15} />{controls.save}</button>
+        </div>
       </main>
       <input ref={fileInputRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleImage(file); event.currentTarget.value = ""; }} />
       {confirm ? (
         <div className="manual-editor-confirm-backdrop">
           <div className="manual-editor-confirm">
-            <strong>{confirm.kind === "restore" ? "恢复 AI 生成版本" : "当前页面有未保存修改"}</strong>
-            <p>{confirm.kind === "restore" ? "当前人工修改将被删除，并重新渲染现有 TSX。" : "请选择保存、放弃修改或继续编辑。"}</p>
+            <strong>{confirm.kind === "restore" ? t.restoreConfirm.title : t.unsavedConfirm.title}</strong>
+            <p>{confirm.kind === "restore" ? t.restoreConfirm.body : t.unsavedConfirm.body}</p>
             {confirm.kind === "restore" ? (
-              <div><button onClick={() => void resolveConfirm("cancel")}>取消</button><button className="primary" onClick={() => void resolveConfirm("restore")}>确认恢复</button></div>
+              <div><button onClick={() => void resolveConfirm("cancel")}>{controls.cancel}</button><button className="primary" onClick={() => void resolveConfirm("restore")}>{t.restoreConfirm.confirm}</button></div>
             ) : (
-              <div><button onClick={() => void resolveConfirm("cancel")}>继续编辑</button><button onClick={() => void resolveConfirm("discard")}>放弃</button><button className="primary" onClick={() => void resolveConfirm("save")}>保存</button></div>
+              <div><button onClick={() => void resolveConfirm("cancel")}>{t.unsavedConfirm.keepEditing}</button><button onClick={() => void resolveConfirm("discard")}>{t.unsavedConfirm.discard}</button><button className="primary" onClick={() => void resolveConfirm("save")}>{controls.save}</button></div>
             )}
           </div>
         </div>

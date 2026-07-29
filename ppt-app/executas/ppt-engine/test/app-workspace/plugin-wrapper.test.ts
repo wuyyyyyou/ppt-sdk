@@ -146,7 +146,7 @@ test("app_get_workspace_cover uploads one thumbnail instead of every slide scree
 
   const wrapper = source.slice(
     source.indexOf("async function toolAppGetWorkspaceCover("),
-    source.indexOf("async function toolAppStartPptxExport("),
+    source.indexOf("async function toolAppGetWorkspacePageImage("),
   );
   assert.ok(wrapper.length > 0, "toolAppGetWorkspaceCover must be defined");
   assert.match(wrapper, /getAppWorkspaceCover\(\{/);
@@ -159,6 +159,34 @@ test("app_get_workspace_cover uploads one thumbnail instead of every slide scree
   const tool = manifest.tools.find((item) => item.name === "app_get_workspace_cover");
   assert.ok(tool);
   assert.equal(tool.parameters?.find((item) => item.name === "workspace_dir")?.required, true);
+});
+
+test("app_get_workspace_page_image uploads one image for the requested page", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+  const manifest = JSON.parse(
+    await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
+  ) as { tools: Array<{ name: string; parameters?: Array<{ name: string; required?: boolean }> }> };
+
+  assert.match(source, /app_get_workspace_page_image:\s*toolAppGetWorkspacePageImage/);
+
+  const wrapper = source.slice(
+    source.indexOf("async function toolAppGetWorkspacePageImage("),
+    source.indexOf("async function toolAppStartPptxExport("),
+  );
+  assert.ok(wrapper.length > 0, "toolAppGetWorkspacePageImage must be defined");
+  assert.match(wrapper, /getAppWorkspacePageImage\(\{/);
+  assert.match(wrapper, /page_id: pageId/);
+  assert.equal(
+    wrapper.match(/uploadPreviewImage\(/g)?.length,
+    1,
+    "the page image wrapper must upload exactly one image",
+  );
+
+  const tool = manifest.tools.find((item) => item.name === "app_get_workspace_page_image");
+  assert.ok(tool);
+  assert.equal(tool.parameters?.find((item) => item.name === "workspace_dir")?.required, true);
+  assert.equal(tool.parameters?.find((item) => item.name === "page_id")?.required, true);
+  assert.equal(tool.parameters?.find((item) => item.name === "width")?.required, false);
 });
 
 test("preview image uploads reuse confirmed references while they stay valid", async () => {

@@ -34,7 +34,7 @@ interface LibraryPageProps {
   onSaveSettings: (setting: WorkspaceSettings) => Promise<void>;
   onSaveTitle: (title: string) => Promise<void>;
   workspaceDiagnosticBundle: WorkspaceDiagnosticBundleState;
-  onPrepareWorkspaceDiagnosticBundle: () => Promise<void>;
+  onDownloadWorkspaceDiagnosticBundle: () => Promise<void>;
   onResetWorkspaceDiagnosticBundle: () => void;
 }
 
@@ -61,7 +61,7 @@ export function LibraryPage({
   onSaveSettings,
   onSaveTitle,
   workspaceDiagnosticBundle,
-  onPrepareWorkspaceDiagnosticBundle,
+  onDownloadWorkspaceDiagnosticBundle,
   onResetWorkspaceDiagnosticBundle,
 }: LibraryPageProps) {
   const [editing, setEditing] = useState(false);
@@ -93,9 +93,7 @@ export function LibraryPage({
     ? t.library.diagnosticBundlePreparing
     : workspaceDiagnosticBundle.status === "error"
       ? t.library.diagnosticBundleRetry
-      : diagnosticBundleAvailability.expired
-        ? t.library.diagnosticBundleRetry
-        : t.library.diagnosticBundleGenerate;
+      : t.library.diagnosticBundleDownload;
   const diagnosticStatusMessage = diagnosticBundleAvailability.expired
     ? t.library.diagnosticBundleExpired
     : workspaceDiagnosticBundle.message;
@@ -148,7 +146,10 @@ export function LibraryPage({
           <div className="diagnostic-bundle-header"><div><strong>{t.library.diagnosticBundleTitle}</strong><p>{t.library.diagnosticBundleDescription}</p></div>{workspaceDiagnosticBundle.href ? <button className="diagnostic-bundle-refresh-btn" type="button" aria-label={t.library.diagnosticBundleRefresh} title={t.library.diagnosticBundleRefresh} onClick={onResetWorkspaceDiagnosticBundle}><RefreshCw size={20} /></button> : <Archive size={20} />}</div>
           <div className="diagnostic-bundle-warning">{t.library.diagnosticBundleSensitiveHint}</div>
           <div className="diagnostic-bundle-action">
-            {diagnosticBundleAvailability.active && workspaceDiagnosticBundle.href ? <CopyableDownloadLink href={workspaceDiagnosticBundle.href} inputLabel={t.library.diagnosticBundleLinkLabel} copyLabel={t.library.diagnosticBundleCopyLink} copiedMessage={t.library.diagnosticBundleLinkCopied} copyHint={t.library.diagnosticBundleCopyHint} /> : <button className="diagnostic-bundle-generate-btn" type="button" disabled={loading || workspaceDiagnosticBundle.status === "preparing"} aria-busy={workspaceDiagnosticBundle.status === "preparing"} onClick={() => void onPrepareWorkspaceDiagnosticBundle()}><Download size={15} /><span>{diagnosticButtonLabel}</span></button>}
+            <button className="diagnostic-bundle-generate-btn" type="button" disabled={loading || workspaceDiagnosticBundle.status === "preparing"} aria-busy={workspaceDiagnosticBundle.status === "preparing"} onClick={() => void onDownloadWorkspaceDiagnosticBundle()}><Download size={15} /><span>{diagnosticButtonLabel}</span></button>
+            {/* ADR-0025: the host iframe may still refuse to start the transfer,
+                so the signed URL stays reachable as a manual fallback. */}
+            {diagnosticBundleAvailability.active && workspaceDiagnosticBundle.href ? <CopyableDownloadLink href={workspaceDiagnosticBundle.href} inputLabel={t.library.diagnosticBundleLinkLabel} copyLabel={t.library.diagnosticBundleCopyLink} copiedMessage={t.library.diagnosticBundleLinkCopied} copyHint={t.library.diagnosticBundleDownloadFallbackHint} /> : null}
           </div>
           {diagnosticStatusMessage ? <div className={`diagnostic-bundle-status ${workspaceDiagnosticBundle.status === "error" ? "error" : ""}`}>{diagnosticStatusMessage}</div> : null}
         </div>

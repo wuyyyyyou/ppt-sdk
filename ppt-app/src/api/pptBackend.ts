@@ -15,6 +15,8 @@ import type {
   GetPageEditContextResult,
   GetWorkspaceCoverInput,
   GetWorkspaceCoverResult,
+  GetWorkspacePageImageInput,
+  GetWorkspacePageImageResult,
   GetWorkspaceOutlineInput,
   ListWorkspacesResult,
   ListTemplatesResult,
@@ -321,6 +323,7 @@ export interface PptBackend {
   recordOutline(input: RecordOutlineInput): Promise<ProjectResult>;
   getRenderedDeckHtml(input: RenderDeckHtmlInput): Promise<RenderDeckHtmlResult>;
   getWorkspaceCover(input: GetWorkspaceCoverInput): Promise<GetWorkspaceCoverResult>;
+  getWorkspacePageImage(input: GetWorkspacePageImageInput): Promise<GetWorkspacePageImageResult>;
   renderDeckHtml(input: RenderDeckHtmlInput): Promise<RenderDeckHtmlResult>;
   recordDeckReview(input: RecordDeckReviewInput): Promise<ProjectResult>;
   startPptxExport(input: StartPptxExportInput): Promise<PptxExportJob>;

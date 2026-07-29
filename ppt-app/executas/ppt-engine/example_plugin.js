@@ -51,6 +51,7 @@ import {
   getAppPageEditContext,
   getAppPptxExportStatus,
   getAppWorkspaceCover,
+  getAppWorkspacePageImage,
   getRenderedAppWorkspaceDeckHtml,
   fingerprintWorkspacePageSource,
   installWorkspaceAuthoringKit,
@@ -2453,6 +2454,35 @@ async function toolAppGetWorkspaceCover(args) {
   };
 }
 
+async function toolAppGetWorkspacePageImage(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const pageId = readRequiredStringArg(args, "page_id");
+  let width;
+  if (args.width !== undefined && args.width !== null) {
+    if (typeof args.width !== "number" || !Number.isFinite(args.width) || args.width <= 0) {
+      throw new Error('"width" must be a positive number');
+    }
+    width = args.width;
+  }
+
+  const image = await getAppWorkspacePageImage({
+    workspace_dir: workspaceDir,
+    page_id: pageId,
+    ...(width === undefined ? {} : { width }),
+  });
+  return {
+    ...image,
+    image_upload: await uploadPreviewImage(image.image_path, {
+      workspaceDir,
+      source: "ppt-engine.workspace-page-image",
+    }),
+  };
+}
+
 async function toolAppStartPptxExport(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
@@ -2742,15 +2772,26 @@ async function toolAppPrepareWorkspaceDiagnosticBundle(args) {
       });
       transferLogger.log("finished", "succeeded", { aps_path: snapshot.aps_path, expires_at: download.expires_at });
 
+      const sizeBytes = Number.isFinite(Number(completed?.size_bytes))
+        ? Math.floor(Number(completed.size_bytes))
+        : snapshot.size_bytes;
       return {
         status: "ready",
         workspace_id: snapshot.workspace_id,
         filename: snapshot.filename,
-        size_bytes: Number.isFinite(Number(completed?.size_bytes))
-          ? Math.floor(Number(completed.size_bytes))
-          : snapshot.size_bytes,
+        size_bytes: sizeBytes,
         download_url: download.url,
         expires_at: typeof download.expires_at === "string" ? download.expires_at : null,
+        // ADR-0025: the Host can save this object itself, which keeps the signed
+        // URL out of the App unless the fallback route is needed.
+        mirror: {
+          provider: "aps.files",
+          scope: APS_FILES_DOWNLOAD_SCOPE,
+          path: snapshot.aps_path,
+          content_type: snapshot.content_type,
+          content_disposition: contentDisposition,
+          size_bytes: sizeBytes,
+        },
       };
     } catch (error) {
       transferLogger.log("unknown", "failed", { aps_path: snapshot.aps_path, error: storageErrorRecord(error) });
@@ -3032,6 +3073,7 @@ const TOOL_DISPATCH = {
   app_restore_page_source_version: toolAppRestorePageSourceVersion,
   app_get_rendered_deck_html: toolAppGetRenderedDeckHtml,
   app_get_workspace_cover: toolAppGetWorkspaceCover,
+  app_get_workspace_page_image: toolAppGetWorkspacePageImage,
   app_render_deck_html: toolAppRenderDeckHtml,
   app_start_pptx_export: toolAppStartPptxExport,
   app_get_pptx_export_status: toolAppGetPptxExportStatus,

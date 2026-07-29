@@ -1586,6 +1586,27 @@ export interface GetWorkspaceCoverResult {
   cover_upload: HostUploadRef;
 }
 
+export interface GetWorkspacePageImageInput {
+  workspace_dir: string;
+  page_id: string;
+  width?: number;
+}
+
+export interface GetWorkspacePageImageResult {
+  version: 1;
+  workspace_dir: string;
+  page_id: string;
+  page_index: number;
+  page_status: string;
+  source_path: string;
+  image_path: string;
+  width: number | null;
+  height: number | null;
+  size_bytes: number;
+  generated_at: string;
+  image_upload: HostUploadRef;
+}
+
 export interface RecordDeckReviewInput {
   projectDir: string;
   approved: boolean;
@@ -1705,4 +1726,13 @@ export interface PrepareWorkspaceDiagnosticBundleResult {
   size_bytes: number;
   download_url: string;
   expires_at: string | null;
+  /** Object reference the Host can download directly; absent on older engines. */
+  mirror?: {
+    provider?: string;
+    scope?: string;
+    path?: string;
+    content_type?: string;
+    content_disposition?: string;
+    size_bytes?: number;
+  };
 }

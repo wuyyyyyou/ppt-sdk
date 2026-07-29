@@ -152,6 +152,8 @@ import type {
   GetAppWorkspaceRequirementsInput,
   GetAppWorkspaceCoverInput,
   GetAppWorkspaceCoverResult,
+  GetAppWorkspacePageImageInput,
+  GetAppWorkspacePageImageResult,
   GetAppWorkspacePageFileFingerprintsInput,
   GetAppWorkspacePageFileFingerprintsResult,
   ListAppTemplateGroupsResult,
@@ -5566,7 +5568,66 @@ async function assertExistingFile(filePath: string, label: string): Promise<stri
 
 /** Wide enough for a My Works card on a 2x display, small enough to stay a few tens of KB. */
 const WORKSPACE_COVER_WIDTH = 640;
-const WORKSPACE_COVER_QUALITY = 78;
+/** Big enough to read a slide at full canvas width; thumbnails reuse the same file. */
+const WORKSPACE_PAGE_IMAGE_WIDTH = 1280;
+const WORKSPACE_PAGE_IMAGE_MAX_WIDTH = 1920;
+const DERIVED_IMAGE_QUALITY = 78;
+
+interface DerivedImage {
+  path: string;
+  width: number | null;
+  height: number | null;
+  size_bytes: number;
+  generated_at: string;
+}
+
+/**
+ * Page screenshots are full-size PNGs, which are far too heavy to hand to the
+ * browser once per page. This derives a WebP of the requested width next to the
+ * Workspace and reuses it while the source bytes stay the same.
+ */
+async function deriveWorkspaceImage(input: {
+  sourcePath: string;
+  outputDir: string;
+  prefix: string;
+  width: number;
+}): Promise<DerivedImage> {
+  const sourceStat = await stat(input.sourcePath);
+  // Keyed by the bytes it was derived from, so a re-render lands on a new name
+  // instead of serving a stale thumbnail.
+  const fingerprint = createHash("sha256")
+    .update(`${input.sourcePath}|${sourceStat.size}|${Math.trunc(sourceStat.mtimeMs)}|${input.width}`)
+    .digest("hex")
+    .slice(0, 16);
+  const targetPath = path.join(input.outputDir, `${input.prefix}-${fingerprint}.webp`);
+
+  const existing = await stat(targetPath).catch(() => null);
+  if (!existing?.isFile()) {
+    await mkdir(input.outputDir, { recursive: true });
+    const pendingPath = `${targetPath}.${randomUUID()}.tmp`;
+    try {
+      await sharp(input.sourcePath)
+        .resize({ width: input.width, withoutEnlargement: true })
+        .webp({ quality: DERIVED_IMAGE_QUALITY })
+        .toFile(pendingPath);
+      await rename(pendingPath, targetPath);
+    } catch (error) {
+      await rm(pendingPath, { force: true }).catch(() => undefined);
+      throw error;
+    }
+    await removeSupersededDerivedImages(input.outputDir, `${input.prefix}-`, path.basename(targetPath));
+  }
+
+  const targetStat = await stat(targetPath);
+  const dimensions = await readImageDimensions(targetPath);
+  return {
+    path: targetPath,
+    width: dimensions.width,
+    height: dimensions.height,
+    size_bytes: targetStat.size,
+    generated_at: new Date(targetStat.mtimeMs).toISOString(),
+  };
+}
 
 /**
  * My Works needs one small image per Workspace, not the whole rendered deck.
@@ -5588,55 +5649,97 @@ export async function getAppWorkspaceCover(
     firstPage.last_screenshot_path,
     "Workspace cover screenshot",
   );
-  const sourceStat = await stat(sourcePath);
-  // Keyed by the bytes it was derived from, so a re-render lands on a new name
-  // instead of serving a stale thumbnail.
-  const fingerprint = createHash("sha256")
-    .update(`${sourcePath}|${sourceStat.size}|${Math.trunc(sourceStat.mtimeMs)}|${WORKSPACE_COVER_WIDTH}`)
-    .digest("hex")
-    .slice(0, 16);
-  const coverDir = path.join(workspace.workspace_dir, "output", "covers");
-  const coverPath = path.join(coverDir, `cover-${fingerprint}.webp`);
-
-  const existing = await stat(coverPath).catch(() => null);
-  if (!existing?.isFile()) {
-    await mkdir(coverDir, { recursive: true });
-    const pendingPath = `${coverPath}.${randomUUID()}.tmp`;
-    try {
-      await sharp(sourcePath)
-        .resize({ width: WORKSPACE_COVER_WIDTH, withoutEnlargement: true })
-        .webp({ quality: WORKSPACE_COVER_QUALITY })
-        .toFile(pendingPath);
-      await rename(pendingPath, coverPath);
-    } catch (error) {
-      await rm(pendingPath, { force: true }).catch(() => undefined);
-      throw error;
-    }
-    await removeSupersededWorkspaceCovers(coverDir, path.basename(coverPath));
-  }
-
-  const coverStat = await stat(coverPath);
-  const dimensions = await readImageDimensions(coverPath);
+  const cover = await deriveWorkspaceImage({
+    sourcePath,
+    outputDir: path.join(workspace.workspace_dir, "output", "covers"),
+    prefix: "cover",
+    width: WORKSPACE_COVER_WIDTH,
+  });
 
   return {
     version: 1,
     workspace_dir: workspace.workspace_dir,
     page_id: firstPage.page_id ?? "",
     source_path: sourcePath,
-    cover_path: coverPath,
-    width: dimensions.width,
-    height: dimensions.height,
-    size_bytes: coverStat.size,
-    generated_at: new Date(coverStat.mtimeMs).toISOString(),
+    cover_path: cover.path,
+    width: cover.width,
+    height: cover.height,
+    size_bytes: cover.size_bytes,
+    generated_at: cover.generated_at,
   };
 }
 
-async function removeSupersededWorkspaceCovers(coverDir: string, keepFilename: string): Promise<void> {
-  const entries = await readdir(coverDir).catch(() => [] as string[]);
+/**
+ * The generation page shows each page as soon as it passes, so it needs one page
+ * at a time from whichever Workspace the run writes to — during a run that is
+ * the Shadow Workspace, which has no rendered deck yet. Going through the deck
+ * render would therefore be both unavailable and far too expensive.
+ */
+export async function getAppWorkspacePageImage(
+  input: GetAppWorkspacePageImageInput,
+): Promise<GetAppWorkspacePageImageResult> {
+  const pageId = normalizeString(input.page_id);
+  if (!pageId) {
+    throw new Error('"page_id" must be a non-empty string');
+  }
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const progress = normalizePageProgressJson(workspace.page_progress);
+  const pageIndex = progress.pages.findIndex((page) => page.page_id === pageId);
+  if (pageIndex < 0) {
+    throw new Error(`Unknown page_id "${pageId}" in page-progress.json`);
+  }
+
+  const page = progress.pages[pageIndex];
+  const sourcePath = await assertExistingFile(
+    page.last_screenshot_path,
+    `Page image screenshot for "${pageId}"`,
+  );
+  const image = await deriveWorkspaceImage({
+    sourcePath,
+    outputDir: path.join(workspace.workspace_dir, "output", "page-previews"),
+    prefix: `page-${derivedImageSlug(pageId)}`,
+    width: readPageImageWidth(input.width),
+  });
+
+  return {
+    version: 1,
+    workspace_dir: workspace.workspace_dir,
+    page_id: pageId,
+    page_index: pageIndex,
+    page_status: page.status,
+    source_path: sourcePath,
+    image_path: image.path,
+    width: image.width,
+    height: image.height,
+    size_bytes: image.size_bytes,
+    generated_at: image.generated_at,
+  };
+}
+
+function readPageImageWidth(value: number | undefined): number {
+  if (value === undefined) return WORKSPACE_PAGE_IMAGE_WIDTH;
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error('"width" must be a positive number');
+  }
+  return Math.min(Math.trunc(value), WORKSPACE_PAGE_IMAGE_MAX_WIDTH);
+}
+
+/** Page ids come from the outline, so they cannot be trusted as path segments. */
+function derivedImageSlug(value: string): string {
+  const slug = value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || createHash("sha256").update(value).digest("hex").slice(0, 12);
+}
+
+async function removeSupersededDerivedImages(
+  outputDir: string,
+  prefix: string,
+  keepFilename: string,
+): Promise<void> {
+  const entries = await readdir(outputDir).catch(() => [] as string[]);
   await Promise.all(
     entries
-      .filter((entry) => entry !== keepFilename && entry.startsWith("cover-"))
-      .map((entry) => rm(path.join(coverDir, entry), { force: true }).catch(() => undefined)),
+      .filter((entry) => entry !== keepFilename && entry.startsWith(prefix))
+      .map((entry) => rm(path.join(outputDir, entry), { force: true }).catch(() => undefined)),
   );
 }
 
@@ -7412,6 +7515,8 @@ export type {
   GetAppWorkspaceRequirementsInput,
   GetAppWorkspaceCoverInput,
   GetAppWorkspaceCoverResult,
+  GetAppWorkspacePageImageInput,
+  GetAppWorkspacePageImageResult,
   ListAppTemplateGroupsResult,
   ListAppWorkspacesResult,
   OpenAppWorkspaceInput,

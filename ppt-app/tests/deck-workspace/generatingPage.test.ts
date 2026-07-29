@@ -8,6 +8,7 @@ import { messages } from "../../src/i18n/messages.ts";
 import type { DeckGenerationProgress } from "../../src/features/deck-generation/index.ts";
 import { GeneratingPage } from "../../src/features/deck-workspace/components/GeneratingPage.tsx";
 import type { GenerationViewState } from "../../src/features/deck-workspace/generationViewState.ts";
+import type { GenerationPagePreviews } from "../../src/features/deck-workspace/generationPagePreviews.ts";
 
 const t = messages.zh as Messages;
 
@@ -57,13 +58,20 @@ function makeViewState(patch: Partial<GenerationViewState>): GenerationViewState
   };
 }
 
-function renderPage(viewState: GenerationViewState, progress: DeckGenerationProgress) {
+function renderPage(
+  viewState: GenerationViewState,
+  progress: DeckGenerationProgress,
+  pagePreviews: GenerationPagePreviews = {},
+) {
   return renderToStaticMarkup(
     createElement(GeneratingPage, {
       t,
       viewState,
       progress,
       history: [],
+      pagePreviews,
+      pinnedPreviewPageId: null,
+      onSelectPreviewPage: () => undefined,
       onBack: () => undefined,
       onBackToOutline: () => undefined,
       onResume: async () => undefined,
@@ -502,7 +510,7 @@ describe("GeneratingPage controls", () => {
     assert.doesNotMatch(html, /Factory line photo/);
   });
 
-  it("does not render a page preview grid", () => {
+  it("puts the run log beside the rendered page preview", () => {
     const html = renderPage(
       makeViewState({ status: "running" }),
       {
@@ -513,10 +521,27 @@ describe("GeneratingPage controls", () => {
           { ...makeProgress("page-authoring", "authoring").pages[0], page_id: "page-2", index: 1, title: "现状" },
         ],
       },
+      {
+        "page-1": {
+          pageId: "page-1",
+          pageIndex: 0,
+          title: "开场",
+          screenshotPath: "/tmp/one.png",
+          status: "ready",
+          url: "https://example.test/one.webp",
+        },
+      },
     );
 
-    assert.doesNotMatch(html, /generation-page-preview/);
-    assert.doesNotMatch(html, /暂时无法显示预览/);
+    assert.match(
+      html,
+      /generation-stage-split"><div class="generation-stage-progress-column">[\s\S]*generation-progress-panel/,
+    );
+    assert.match(
+      html,
+      /generation-stage-preview-column"><section class="generation-preview-panel"/,
+    );
+    assert.match(html, /<img src="https:\/\/example\.test\/one\.webp"/);
   });
 
   it("does not surface a failure the run is still recovering from", () => {

@@ -62,6 +62,14 @@ export interface AnnaUploadConfirmResult {
   expires_in?: number;
 }
 
+export interface AnnaFilesDownloadInput {
+  path: string;
+  scope?: string | null;
+  /** Save-as name; the Host bakes it into the attachment disposition. */
+  filename?: string | null;
+  ttl_seconds?: number;
+}
+
 export interface AnnaRuntime {
   call?<T = unknown>(
     ns: string,
@@ -84,6 +92,12 @@ export interface AnnaRuntime {
   upload?: {
     negotiate(input: AnnaUploadNegotiateInput): Promise<AnnaUploadNegotiateResult>;
     confirm(input: { r2_key: string }): Promise<AnnaUploadConfirmResult>;
+  };
+  // The SDK builds `files` as a proxy, so every method is present as a function
+  // whether or not the Host implements it. Availability has to come from the
+  // call itself, not from a typeof check.
+  files?: {
+    download(input: AnnaFilesDownloadInput): Promise<unknown>;
   };
 }
 

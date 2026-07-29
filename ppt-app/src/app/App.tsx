@@ -51,6 +51,7 @@ export function App() {
   if (manualEditorOpen && state.currentWorkspace?.workspace_dir && manualEditorPages.length > 0) {
     return (
       <ManualPageEditorShell
+        t={t}
         workspaceDir={state.currentWorkspace.workspace_dir}
         pages={manualEditorPages}
         initialPageIndex={state.currentSlide}
@@ -206,6 +207,9 @@ export function App() {
               viewState={state.generationViewState}
               progress={state.createDeckProgress}
               history={state.generationHistory}
+              pagePreviews={state.generationPagePreviews}
+              pinnedPreviewPageId={state.pinnedGenerationPreviewPageId}
+              onSelectPreviewPage={actions.selectGenerationPreviewPage}
               onBack={() => void actions.backFromGeneration()}
               onBackToOutline={actions.returnToOutlineFromGeneration}
               onResume={actions.resumeDeckGeneration}
@@ -264,7 +268,7 @@ export function App() {
               onSaveSettings={actions.saveWorkspaceSettings}
               onSaveTitle={actions.saveWorkspaceTitle}
               workspaceDiagnosticBundle={state.workspaceDiagnosticBundle}
-              onPrepareWorkspaceDiagnosticBundle={actions.prepareWorkspaceDiagnosticBundle}
+              onDownloadWorkspaceDiagnosticBundle={actions.downloadWorkspaceDiagnosticBundle}
               onResetWorkspaceDiagnosticBundle={actions.resetWorkspaceDiagnosticBundle}
             />
           ) : null}

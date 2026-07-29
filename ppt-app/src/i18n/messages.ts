@@ -280,6 +280,18 @@ export interface Messages {
       pages: string;
       finalRender: string;
     };
+    preview: {
+      title: string;
+      waiting: string;
+      thumbnails: string;
+      loading: string;
+      failed: string;
+      untitledPage: string;
+      selectPage: string;
+      latest: string;
+      followingLatest: string;
+      backToLatest: string;
+    };
     researchDiscovery: {
       title: string;
       empty: string;
@@ -397,7 +409,10 @@ export interface Messages {
     diagnosticBundleDescription: string;
     diagnosticBundleSensitiveHint: string;
     diagnosticBundleNoWorkspace: string;
-    diagnosticBundleGenerate: string;
+    diagnosticBundleDownload: string;
+    diagnosticBundleDownloadStarted: string;
+    diagnosticBundleDownloadStartedWithLink: string;
+    diagnosticBundleDownloadFallbackHint: string;
     diagnosticBundlePreparing: string;
     diagnosticBundleRefresh: string;
     diagnosticBundleRetry: string;
@@ -408,7 +423,6 @@ export interface Messages {
     diagnosticBundleLinkLabel: string;
     diagnosticBundleCopyLink: string;
     diagnosticBundleLinkCopied: string;
-    diagnosticBundleCopyHint: string;
   };
   myWork: {
     title: string;
@@ -473,6 +487,76 @@ export interface Messages {
     deckSteps: string[];
     slideSteps: string[];
   };
+  manualEditor: {
+    title: string;
+    loading: string;
+    loadFailed: string;
+    tooLarge: string;
+    imageRejected: string;
+    missingShell: string;
+    reloadLatest: string;
+    newTextPlaceholder: string;
+    expandPages: string;
+    collapsePages: string;
+    saveStatus: {
+      saved: string;
+      saving: string;
+      conflict: string;
+      failed: string;
+      unsaved: string;
+    };
+    undo: string;
+    redo: string;
+    addText: string;
+    addShape: string;
+    addImage: string;
+    fontFamily: string;
+    fontSize: string;
+    bold: string;
+    italic: string;
+    underline: string;
+    strikethrough: string;
+    alignLeft: string;
+    alignCenter: string;
+    alignRight: string;
+    lineHeight: string;
+    spaceAfter: string;
+    textColor: string;
+    replaceImage: string;
+    imageFit: string;
+    imageFitCover: string;
+    imageFitContain: string;
+    imageFitFill: string;
+    fill: string;
+    fillColor: string;
+    noFill: string;
+    border: string;
+    borderColor: string;
+    borderWidth: string;
+    deleteElement: string;
+    more: string;
+    selectParent: string;
+    layers: string;
+    bringToFront: string;
+    bringForward: string;
+    sendBackward: string;
+    sendToBack: string;
+    restoreAiVersion: string;
+    fitWindow: string;
+    zoomOut: string;
+    zoomIn: string;
+    restoreConfirm: {
+      title: string;
+      body: string;
+      confirm: string;
+    };
+    unsavedConfirm: {
+      title: string;
+      body: string;
+      keepEditing: string;
+      discard: string;
+    };
+  };
   exportPage: {
     title: string;
     pptxDescription: string;
@@ -482,14 +566,15 @@ export interface Messages {
     noFile: string;
     download: string;
     downloadPreparing: string;
-    prepareDownload: string;
-    retryDownloadPreparation: string;
+    retryDownload: string;
     downloadNotPrepared: string;
     downloadReady: string;
+    downloadStarted: string;
+    downloadStartedWithLink: string;
     downloadLinkLabel: string;
     copyDownloadLink: string;
     downloadLinkCopied: string;
-    downloadCopyHint: string;
+    downloadFallbackHint: string;
     pptxPreparingModel: string;
     pptxModelReady: string;
     pptxGenerating: string;
@@ -839,6 +924,18 @@ export const messages: Record<Locale, Messages> = {
         pages: "Pages",
         finalRender: "Final preview"
       },
+      preview: {
+        title: "Page preview",
+        waiting: "Each page shows up here as soon as it renders.",
+        thumbnails: "Rendered pages",
+        loading: "Preparing preview\u2026",
+        failed: "Preview is unavailable for now.",
+        untitledPage: "Untitled page",
+        selectPage: "Show page {page}",
+        latest: "Latest",
+        followingLatest: "Following the newest page",
+        backToLatest: "Follow the newest page"
+      },
       researchDiscovery: {
         title: "Facts collection",
         empty: "No details for this step yet.",
@@ -964,7 +1061,12 @@ export const messages: Record<Locale, Messages> = {
       diagnosticBundleDescription: "Create a fresh ZIP of the complete current Workspace for troubleshooting. An active task may continue changing while the bundle is collected.",
       diagnosticBundleSensitiveHint: "Includes logs, uploaded sources, page source files, research records, and generated artifacts.",
       diagnosticBundleNoWorkspace: "Select a task first",
-      diagnosticBundleGenerate: "Generate troubleshooting download link",
+      diagnosticBundleDownload: "Download troubleshooting bundle",
+      diagnosticBundleDownloadStarted: "Download started. Check your browser downloads.",
+      diagnosticBundleDownloadStartedWithLink:
+        "Download started. If your browser blocked it, copy the link below instead.",
+      diagnosticBundleDownloadFallbackHint:
+        "If the download did not start, copy the link into a normal browser address bar. Do not share it with unrelated people.",
       diagnosticBundlePreparing: "Packaging and uploading...",
       diagnosticBundleRefresh: "Regenerate troubleshooting bundle",
       diagnosticBundleRetry: "Retry generating download link",
@@ -974,8 +1076,7 @@ export const messages: Record<Locale, Messages> = {
       diagnosticBundleFailedPrefix: "Failed to generate the troubleshooting bundle: ",
       diagnosticBundleLinkLabel: "Troubleshooting bundle download link",
       diagnosticBundleCopyLink: "Copy troubleshooting bundle link",
-      diagnosticBundleLinkCopied: "Link copied. Paste it into your browser address bar to download, and do not share it with unrelated people.",
-      diagnosticBundleCopyHint: "Copy the link into a normal browser address bar to download. Do not share it with unrelated people."
+      diagnosticBundleLinkCopied: "Link copied. Paste it into your browser address bar to download, and do not share it with unrelated people."
     },
     myWork: {
       title: "My Works",
@@ -1048,6 +1149,76 @@ export const messages: Record<Locale, Messages> = {
       ],
       slideSteps: ["Rewriting selected slide", "Updating slide visual"]
     },
+    manualEditor: {
+      title: "Edit deck",
+      loading: "Loading page...",
+      loadFailed: "Could not load the page HTML: HTTP {status}",
+      tooLarge: "This page is larger than 64 MiB and cannot be saved.",
+      imageRejected: "Only PNG, JPEG or WebP images up to 20 MiB are supported.",
+      missingShell: "This page has no editable slide shell.",
+      reloadLatest: "Load the latest saved version",
+      newTextPlaceholder: "Double-click to edit",
+      expandPages: "Expand page list",
+      collapsePages: "Collapse page list",
+      saveStatus: {
+        saved: "Saved",
+        saving: "Saving...",
+        conflict: "Save conflict",
+        failed: "Save failed",
+        unsaved: "Unsaved"
+      },
+      undo: "Undo (Ctrl/Cmd+Z)",
+      redo: "Redo (Ctrl/Cmd+Shift+Z)",
+      addText: "Add text",
+      addShape: "Add shape",
+      addImage: "Add image",
+      fontFamily: "Font",
+      fontSize: "Font size",
+      bold: "Bold",
+      italic: "Italic",
+      underline: "Underline",
+      strikethrough: "Strikethrough",
+      alignLeft: "Align left",
+      alignCenter: "Center",
+      alignRight: "Align right",
+      lineHeight: "Line height",
+      spaceAfter: "Space after",
+      textColor: "Text color",
+      replaceImage: "Replace image",
+      imageFit: "Image fit",
+      imageFitCover: "Fill and crop",
+      imageFitContain: "Show whole image",
+      imageFitFill: "Stretch to fill",
+      fill: "Fill",
+      fillColor: "Fill color",
+      noFill: "No fill",
+      border: "Border",
+      borderColor: "Border color",
+      borderWidth: "Border width",
+      deleteElement: "Delete (Del)",
+      more: "More",
+      selectParent: "Select parent",
+      layers: "Layer",
+      bringToFront: "Bring to front",
+      bringForward: "Bring forward",
+      sendBackward: "Send backward",
+      sendToBack: "Send to back",
+      restoreAiVersion: "Restore AI version",
+      fitWindow: "Fit to window",
+      zoomOut: "Zoom out",
+      zoomIn: "Zoom in",
+      restoreConfirm: {
+        title: "Restore the AI version",
+        body: "Your manual edits will be dropped and the current TSX will be rendered again.",
+        confirm: "Restore"
+      },
+      unsavedConfirm: {
+        title: "This page has unsaved changes",
+        body: "Save them, discard them, or keep editing.",
+        keepEditing: "Keep editing",
+        discard: "Discard"
+      }
+    },
     exportPage: {
       title: "Export",
       pptxDescription: "Editable PowerPoint file",
@@ -1057,14 +1228,15 @@ export const messages: Record<Locale, Messages> = {
       noFile: "No export file ready",
       download: "Download",
       downloadPreparing: "Preparing download...",
-      prepareDownload: "Prepare download",
-      retryDownloadPreparation: "Retry download preparation",
-      downloadNotPrepared: "Download link is not prepared yet.",
+      retryDownload: "Retry download",
+      downloadNotPrepared: "Ready to download.",
       downloadReady: "Download link ready.",
+      downloadStarted: "The download has started.",
+      downloadStartedWithLink: "Download requested. If your browser did not save the file, use the link below.",
       downloadLinkLabel: "Download link",
       copyDownloadLink: "Copy download link",
       downloadLinkCopied: "Download link copied. Paste it into your browser address bar to download.",
-      downloadCopyHint: "Copy the download link manually, then paste it into your browser address bar.",
+      downloadFallbackHint: "Copy the link, then paste it into your browser address bar.",
       pptxPreparingModel: "Preparing PPTX model",
       pptxModelReady: "PPTX model ready",
       pptxGenerating: "Generating PPTX file",
@@ -1406,6 +1578,18 @@ export const messages: Record<Locale, Messages> = {
         pages: "逐页生成",
         finalRender: "最终预览"
       },
+      preview: {
+        title: "页面预览",
+        waiting: "每生成好一页，就会在这里显示整页预览。",
+        thumbnails: "已生成的页面",
+        loading: "正在准备预览\u2026",
+        failed: "预览暂时不可用。",
+        untitledPage: "未命名页面",
+        selectPage: "查看第 {page} 页",
+        latest: "最新",
+        followingLatest: "正在跟随最新一页",
+        backToLatest: "跟随最新一页"
+      },
       researchDiscovery: {
         title: "事实收集",
         empty: "这个步骤暂无详细输出。",
@@ -1531,7 +1715,10 @@ export const messages: Record<Locale, Messages> = {
       diagnosticBundleDescription: "将当前任务的完整工作区重新打包为 ZIP，供问题排查使用。任务仍在运行时，打包过程中内容可能继续变化。",
       diagnosticBundleSensitiveHint: "包含日志、上传资料、页面源码、研究记录和生成产物等完整任务内容。",
       diagnosticBundleNoWorkspace: "请先选择一个任务",
-      diagnosticBundleGenerate: "生成问题排查包下载链接",
+      diagnosticBundleDownload: "下载问题排查包",
+      diagnosticBundleDownloadStarted: "已开始下载，请在浏览器下载列表中查看。",
+      diagnosticBundleDownloadStartedWithLink: "已开始下载。如果浏览器拦截了，可以复制下面的链接。",
+      diagnosticBundleDownloadFallbackHint: "如果没有自动开始下载，请复制链接并粘贴到普通浏览器地址栏中下载，不要将链接分享给无关人员。",
       diagnosticBundlePreparing: "正在打包并上传，请稍候……",
       diagnosticBundleRefresh: "重新生成问题排查包",
       diagnosticBundleRetry: "重试生成下载链接",
@@ -1541,8 +1728,7 @@ export const messages: Record<Locale, Messages> = {
       diagnosticBundleFailedPrefix: "问题排查包生成失败：",
       diagnosticBundleLinkLabel: "问题排查包下载链接",
       diagnosticBundleCopyLink: "复制问题排查包链接",
-      diagnosticBundleLinkCopied: "链接已复制，请粘贴到浏览器地址栏中下载，并且不要分享给无关人员。",
-      diagnosticBundleCopyHint: "请复制链接并粘贴到普通浏览器地址栏中下载，不要将链接分享给无关人员。"
+      diagnosticBundleLinkCopied: "链接已复制，请粘贴到浏览器地址栏中下载，并且不要分享给无关人员。"
     },
     myWork: {
       title: "我的作品",
@@ -1613,6 +1799,76 @@ export const messages: Record<Locale, Messages> = {
       ],
       slideSteps: ["重写选中页面", "更新页面视觉"]
     },
+    manualEditor: {
+      title: "编辑 PPT",
+      loading: "正在加载页面…",
+      loadFailed: "加载页面 HTML 失败：HTTP {status}",
+      tooLarge: "当前页面 HTML 超过 64 MiB，无法保存。",
+      imageRejected: "仅支持不超过 20 MiB 的 PNG、JPEG、WebP 图片。",
+      missingShell: "页面缺少可编辑 slide shell。",
+      reloadLatest: "加载后端最新版本",
+      newTextPlaceholder: "双击输入文字",
+      expandPages: "展开页面列表",
+      collapsePages: "收起页面列表",
+      saveStatus: {
+        saved: "已保存",
+        saving: "保存中…",
+        conflict: "保存冲突",
+        failed: "保存失败",
+        unsaved: "未保存"
+      },
+      undo: "撤销（Ctrl/Cmd+Z）",
+      redo: "重做（Ctrl/Cmd+Shift+Z）",
+      addText: "新增文本",
+      addShape: "新增形状",
+      addImage: "新增图片",
+      fontFamily: "字体",
+      fontSize: "字号",
+      bold: "加粗",
+      italic: "斜体",
+      underline: "下划线",
+      strikethrough: "删除线",
+      alignLeft: "左对齐",
+      alignCenter: "居中",
+      alignRight: "右对齐",
+      lineHeight: "行高",
+      spaceAfter: "段后间距",
+      textColor: "文字颜色",
+      replaceImage: "替换图片",
+      imageFit: "图片适应方式",
+      imageFitCover: "填满并裁切",
+      imageFitContain: "完整显示",
+      imageFitFill: "拉伸填满",
+      fill: "填充",
+      fillColor: "填充颜色",
+      noFill: "无填充",
+      border: "边框",
+      borderColor: "边框颜色",
+      borderWidth: "边框宽度",
+      deleteElement: "删除（Delete）",
+      more: "更多",
+      selectParent: "选择父级",
+      layers: "图层",
+      bringToFront: "置于顶层",
+      bringForward: "上移一层",
+      sendBackward: "下移一层",
+      sendToBack: "置于底层",
+      restoreAiVersion: "恢复 AI 版本",
+      fitWindow: "适应窗口",
+      zoomOut: "缩小",
+      zoomIn: "放大",
+      restoreConfirm: {
+        title: "恢复 AI 生成版本",
+        body: "当前人工修改将被删除，并重新渲染现有 TSX。",
+        confirm: "确认恢复"
+      },
+      unsavedConfirm: {
+        title: "当前页面有未保存修改",
+        body: "请选择保存、放弃修改或继续编辑。",
+        keepEditing: "继续编辑",
+        discard: "放弃"
+      }
+    },
     exportPage: {
       title: "导出",
       pptxDescription: "可编辑 PowerPoint 文件",
@@ -1622,14 +1878,15 @@ export const messages: Record<Locale, Messages> = {
       noFile: "暂无可下载文件",
       download: "下载",
       downloadPreparing: "准备下载...",
-      prepareDownload: "准备下载",
-      retryDownloadPreparation: "重试准备下载",
-      downloadNotPrepared: "下载链接尚未准备。",
+      retryDownload: "重试下载",
+      downloadNotPrepared: "可以下载了。",
       downloadReady: "下载链接已准备。",
+      downloadStarted: "已开始下载。",
+      downloadStartedWithLink: "已开始下载。如果浏览器没有保存文件，请用下方链接。",
       downloadLinkLabel: "下载链接",
       copyDownloadLink: "复制下载链接",
       downloadLinkCopied: "下载链接已复制，请粘贴到浏览器地址栏中下载。",
-      downloadCopyHint: "请手动复制下载链接，并粘贴到浏览器地址栏中打开。",
+      downloadFallbackHint: "复制链接后粘贴到浏览器地址栏打开。",
       pptxPreparingModel: "正在准备 PPTX 模型",
       pptxModelReady: "PPTX 模型已准备",
       pptxGenerating: "正在生成 PPTX 文件",
