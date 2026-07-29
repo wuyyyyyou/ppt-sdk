@@ -24,6 +24,7 @@ export function EntrySidebar(props: EntrySidebarProps) {
       {/* The toggle leads the row so its icon lines up with the nav icons below. */}
       <div className="entry-sidebar-brand">
         <button
+          data-performance-id="navigation.new-presentation"
           type="button"
           className="entry-sidebar-toggle"
           onClick={onToggleCollapsed}
@@ -41,6 +42,7 @@ export function EntrySidebar(props: EntrySidebarProps) {
       </div>
       <nav className="entry-sidebar-nav" aria-label={t.myWork.home}>
         <button
+          data-performance-id="navigation.my-work"
           type="button"
           className={page === "main" ? "active" : ""}
           aria-current={page === "main" ? "page" : undefined}
@@ -52,6 +54,7 @@ export function EntrySidebar(props: EntrySidebarProps) {
           {collapsed ? null : t.myWork.home}
         </button>
         <button
+          data-performance-id="navigation.collapse"
           type="button"
           className={page === "my-work" ? "active" : ""}
           aria-current={page === "my-work" ? "page" : undefined}

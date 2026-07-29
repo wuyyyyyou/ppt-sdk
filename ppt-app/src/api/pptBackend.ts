@@ -112,6 +112,11 @@ import type {
   , GenerationRunTransaction
   , PrepareGenerationRunResult
   , CommitGenerationRunResult
+  , PerformanceEvent
+  , PerformanceRunSummary
+  , ListPerformanceRunsResult
+  , FinalizePerformanceRunResult
+  , PreparePerformanceReportResult
 } from "./types";
 import { createAnnaPptBackend } from "./annaPptBackend";
 import { connectAnnaRuntime } from "../runtime/annaRuntime";
@@ -119,6 +124,13 @@ import { detectRuntimeMode } from "../runtime/runtimeMode";
 
 export interface PptBackend {
   getRuntimeInfo(): Promise<PptEngineRuntimeInfo>;
+  listPerformanceRuns(): Promise<ListPerformanceRunsResult>;
+  startPerformanceRun(input: { app_version: string; environment?: Record<string, string | number | boolean | null>; initial_settings?: Record<string, unknown> }): Promise<PerformanceRunSummary>;
+  appendPerformanceEvents(input: { run_id: string; events: PerformanceEvent[] }): Promise<{ appended: number; run: PerformanceRunSummary }>;
+  finalizePerformanceRun(input: { run_id: string; locale: "en" | "zh"; force?: boolean }): Promise<FinalizePerformanceRunResult>;
+  abandonPerformanceRun(input: { run_id: string }): Promise<PerformanceRunSummary>;
+  deletePerformanceRun(input: { run_id: string }): Promise<{ deleted: true; run_id: string }>;
+  preparePerformanceReport(input: { run_id: string }): Promise<PreparePerformanceReportResult>;
   beginGenerationRun(input: { workspace_dir: string; run_kind: GenerationRunKind; origin_page_id?: string | null }): Promise<GenerationRunTransaction>;
   prepareGenerationRun(input: { run_id: string }): Promise<PrepareGenerationRunResult>;
   abandonGenerationRun(input: { run_id: string }): Promise<GenerationRunTransaction>;

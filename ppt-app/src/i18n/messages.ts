@@ -408,6 +408,48 @@ export interface Messages {
     diagnosticBundleLinkCopied: string;
     diagnosticBundleCopyHint: string;
   };
+  performance: {
+    title: string;
+    description: string;
+    unavailable: string;
+    loading: string;
+    active: string;
+    inactive: string;
+    start: string;
+    finish: string;
+    abandon: string;
+    history: string;
+    empty: string;
+    viewReport: string;
+    deleteRun: string;
+    refresh: string;
+    events: string;
+    integrity: string;
+    startedAt: string;
+    completed: string;
+    abandoned: string;
+    finalizationFailed: string;
+    recording: string;
+    reportTitle: string;
+    reportLoading: string;
+    started: string;
+    reportGenerated: string;
+    activeOperationsTitle: string;
+    activeOperationsBody: string;
+    keepRecording: string;
+    forceFinish: string;
+    abandonTitle: string;
+    abandonBody: string;
+    abandonConfirm: string;
+    deleteTitle: string;
+    deleteBody: string;
+    deleteConfirm: string;
+    startFailed: string;
+    finalizeFailed: string;
+    abandonFailed: string;
+    deleteFailed: string;
+    reportFailed: string;
+  };
   myWork: {
     title: string;
     home: string;
@@ -982,6 +1024,48 @@ export const messages: Record<Locale, Messages> = {
       diagnosticBundleLinkCopied: "Link copied. Paste it into your browser address bar to download, and do not share it with unrelated people.",
       diagnosticBundleCopyHint: "Copy the link into a normal browser address bar to download. Do not share it with unrelated people."
     },
+    performance: {
+      title: "Performance Testing",
+      description: "Record internal button interactions, backend round trips, and workflow timings. Data stays in the global PPT performance-runs directory.",
+      unavailable: "This ppt-engine does not support Performance Testing.",
+      loading: "Loading Performance Runs...",
+      active: "Recording",
+      inactive: "Not recording",
+      start: "Start recording",
+      finish: "Finish and generate report",
+      abandon: "Abandon recording",
+      history: "Run history",
+      empty: "No Performance Runs yet.",
+      viewReport: "View report",
+      deleteRun: "Delete run",
+      refresh: "Refresh runs",
+      events: "events",
+      integrity: "Data integrity",
+      startedAt: "Started",
+      completed: "Completed",
+      abandoned: "Abandoned",
+      finalizationFailed: "Report generation failed",
+      recording: "Recording",
+      reportTitle: "Performance Report",
+      reportLoading: "Loading report...",
+      started: "Performance recording started.",
+      reportGenerated: "Performance report generated.",
+      activeOperationsTitle: "Operations are still active",
+      activeOperationsBody: "{count} operations are unfinished. Force finish marks their measurements as interrupted but does not stop product tasks.",
+      keepRecording: "Keep recording",
+      forceFinish: "Force finish",
+      abandonTitle: "Abandon this Performance Run?",
+      abandonBody: "Raw events are retained, but no report will be generated.",
+      abandonConfirm: "Abandon run",
+      deleteTitle: "Delete Performance Run?",
+      deleteBody: "This permanently deletes raw events and the report for {runId}.",
+      deleteConfirm: "Delete permanently",
+      startFailed: "Failed to start Performance Run.",
+      finalizeFailed: "Failed to finalize Performance Run.",
+      abandonFailed: "Failed to abandon Performance Run.",
+      deleteFailed: "Failed to delete Performance Run.",
+      reportFailed: "Failed to open Performance Report."
+    },
     myWork: {
       title: "My Works",
       home: "Home",
@@ -1555,6 +1639,48 @@ export const messages: Record<Locale, Messages> = {
       diagnosticBundleCopyLink: "复制问题排查包链接",
       diagnosticBundleLinkCopied: "链接已复制，请粘贴到浏览器地址栏中下载，并且不要分享给无关人员。",
       diagnosticBundleCopyHint: "请复制链接并粘贴到普通浏览器地址栏中下载，不要将链接分享给无关人员。"
+    },
+    performance: {
+      title: "性能测试",
+      description: "记录内部测试中的按钮交互、后端往返和工作流耗时。数据保存在 PPT 全局 performance-runs 目录中。",
+      unavailable: "当前 ppt-engine 不支持性能测试。",
+      loading: "正在加载性能测试记录……",
+      active: "正在记录",
+      inactive: "未开始记录",
+      start: "开始记录",
+      finish: "结束并生成报告",
+      abandon: "放弃本次记录",
+      history: "历史记录",
+      empty: "暂无性能测试记录。",
+      viewReport: "查看报告",
+      deleteRun: "删除记录",
+      refresh: "刷新记录",
+      events: "条事件",
+      integrity: "数据完整性",
+      startedAt: "开始时间",
+      completed: "已完成",
+      abandoned: "已放弃",
+      finalizationFailed: "报告生成失败",
+      recording: "记录中",
+      reportTitle: "性能测试报告",
+      reportLoading: "正在加载报告……",
+      started: "性能记录已开始。",
+      reportGenerated: "性能报告已生成。",
+      activeOperationsTitle: "仍有操作正在记录",
+      activeOperationsBody: "仍有 {count} 个操作未完成。强制结束会将这些测量标记为中断，但不会停止正在执行的产品任务。",
+      keepRecording: "继续记录",
+      forceFinish: "强制结束",
+      abandonTitle: "放弃本次性能记录？",
+      abandonBody: "本次原始事件会保留，但不会生成报告。",
+      abandonConfirm: "放弃记录",
+      deleteTitle: "删除性能记录？",
+      deleteBody: "将永久删除 {runId} 的原始事件和报告。",
+      deleteConfirm: "永久删除",
+      startFailed: "性能记录启动失败。",
+      finalizeFailed: "性能记录结束失败。",
+      abandonFailed: "放弃性能记录失败。",
+      deleteFailed: "删除性能记录失败。",
+      reportFailed: "打开性能报告失败。"
     },
     myWork: {
       title: "我的作品",

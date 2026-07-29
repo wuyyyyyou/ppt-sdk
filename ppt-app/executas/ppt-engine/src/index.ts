@@ -87,6 +87,7 @@ import {
   type TemplatePreviewIndex,
 } from "./template-previews/index.js";
 export * from "./app-workspace/index.js";
+export * from "./performance-runs/index.js";
 export * from "./pptx-rasterization/index.js";
 export * from "./task-state-machine/index.js";
 

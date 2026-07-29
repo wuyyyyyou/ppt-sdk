@@ -14,6 +14,58 @@
       "parameters": []
     },
     {
+      "name": "app_list_performance_runs",
+      "description": "List the active and historical internal Performance Runs from the global PPT root.",
+      "parameters": []
+    },
+    {
+      "name": "app_start_performance_run",
+      "description": "Start the single global internal Performance Run without requiring a title.",
+      "parameters": [
+        { "name": "app_version", "type": "string", "required": false, "description": "PPT App version snapshot." },
+        { "name": "environment", "type": "object", "required": false, "description": "Bounded initial runtime environment snapshot." },
+        { "name": "initial_settings", "type": "object", "required": false, "description": "Bounded initial PPT settings snapshot." }
+      ]
+    },
+    {
+      "name": "app_append_performance_events",
+      "description": "Append a bounded batch of performance events to the active run's authoritative JSONL file.",
+      "parameters": [
+        { "name": "run_id", "type": "string", "required": true, "description": "Active Performance Run id." },
+        { "name": "events", "type": "array", "items": { "type": "object" }, "required": true, "description": "One to 200 bounded performance events." }
+      ]
+    },
+    {
+      "name": "app_finalize_performance_run",
+      "description": "Finalize an active Performance Run and generate its local static HTML report.",
+      "parameters": [
+        { "name": "run_id", "type": "string", "required": true, "description": "Active Performance Run id." },
+        { "name": "locale", "type": "string", "required": true, "description": "Report locale: en or zh." },
+        { "name": "force", "type": "boolean", "required": false, "description": "Interrupt unfinished measurements and continue finalization." }
+      ]
+    },
+    {
+      "name": "app_abandon_performance_run",
+      "description": "Abandon the active Performance Run without generating a report.",
+      "parameters": [
+        { "name": "run_id", "type": "string", "required": true, "description": "Active Performance Run id." }
+      ]
+    },
+    {
+      "name": "app_delete_performance_run",
+      "description": "Delete one completed or abandoned historical Performance Run.",
+      "parameters": [
+        { "name": "run_id", "type": "string", "required": true, "description": "Terminal Performance Run id." }
+      ]
+    },
+    {
+      "name": "app_prepare_performance_report",
+      "description": "Upload a generated local Performance Report through Host Upload as text/plain.",
+      "parameters": [
+        { "name": "run_id", "type": "string", "required": true, "description": "Completed Performance Run id." }
+      ]
+    },
+    {
       "name": "app_resolve_host_upload_json_reference",
       "description": "Resolve a bounded application/json Host Upload reference inside ppt-engine when browser CORS prevents a direct download.",
       "parameters": [

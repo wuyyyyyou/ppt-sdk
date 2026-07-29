@@ -27,6 +27,7 @@ export function ErrorNotice({ t, summary, detail, tone = "inline", actions }: Er
         {detail ? (
           <>
             <button
+              data-performance-id="error.details.toggle"
               type="button"
               className="error-notice-toggle"
               aria-expanded={expanded}

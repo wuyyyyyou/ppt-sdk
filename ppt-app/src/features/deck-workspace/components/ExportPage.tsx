@@ -52,12 +52,12 @@ export function ExportPage({ t, progress, artifact, download, loading, onBack, o
     <section className="page active export-page">
       <PageHeader title={t.exportPage.title} onBack={onBack} t={t} />
       <div className="export-grid">
-        <button className="export-card" onClick={() => onExport("PPTX")} disabled={loading === "export"}>
+        <button data-performance-id="export.pptx.start" className="export-card" onClick={() => onExport("PPTX")} disabled={loading === "export"}>
           <FileText size={32} aria-hidden="true" />
           <strong>{t.controls.pptx}</strong>
           <span>{t.exportPage.pptxDescription}</span>
         </button>
-        <button className="export-card" onClick={() => onExport("PDF")} disabled={loading === "export"}>
+        <button data-performance-id="export.pdf.start" className="export-card" onClick={() => onExport("PDF")} disabled={loading === "export"}>
           <File size={32} aria-hidden="true" />
           <strong>{t.controls.pdf}</strong>
           <span>{t.exportPage.pdfDescription}</span>
@@ -74,6 +74,7 @@ export function ExportPage({ t, progress, artifact, download, loading, onBack, o
         {progress.mode === "error" && progress.type ? (
           <div className="export-retry-row">
             <button
+              data-performance-id="export.retry"
               className="secondary-btn compact"
               type="button"
               disabled={loading === "export"}
@@ -106,6 +107,7 @@ export function ExportPage({ t, progress, artifact, download, loading, onBack, o
             />
           ) : artifact ? (
             <button
+              data-performance-id="export.download.prepare"
               className="export-download-btn"
               type="button"
               disabled={downloadDisabled}
@@ -118,7 +120,7 @@ export function ExportPage({ t, progress, artifact, download, loading, onBack, o
               <span>{downloadButtonLabel(t, artifact, download)}</span>
             </button>
           ) : (
-            <button className="export-download-btn" type="button" disabled>
+            <button data-performance-id="export.download.unavailable" className="export-download-btn" type="button" disabled>
               <Download size={16} aria-hidden="true" />
               <span>{downloadLabel(t, artifact)}</span>
             </button>

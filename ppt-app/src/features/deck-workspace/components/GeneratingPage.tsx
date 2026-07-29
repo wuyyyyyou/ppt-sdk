@@ -142,13 +142,13 @@ export function GeneratingPage(props: GeneratingPageProps) {
           states: a run in flight routes through the abandonment confirmation
           instead of taking the entry away. */}
       <div className="generation-page-footer">
-        <button className="secondary-btn" type="button" onClick={onBack} disabled={viewState.navigationLocked}>
+        <button data-performance-id="generation.back" className="secondary-btn" type="button" onClick={onBack} disabled={viewState.navigationLocked}>
           <ArrowLeft size={16} aria-hidden="true" />{backLabel}
         </button>
         {viewState.showResume || viewState.showBackToOutline ? (
           <div className="generation-recovery-actions">
             {viewState.showResume ? (
-              <button className="primary-btn" onClick={() => void onResume()} disabled={!viewState.canResume}>
+              <button data-performance-id="generation.resume" className="primary-btn" onClick={() => void onResume()} disabled={!viewState.canResume}>
                 <Play size={14} aria-hidden="true" />
                 {viewState.resumeAction === "refinement"
                   ? t.controls.resumeRefinement
@@ -156,7 +156,7 @@ export function GeneratingPage(props: GeneratingPageProps) {
               </button>
             ) : null}
             {viewState.showBackToOutline ? (
-              <button className="secondary-btn" onClick={onBackToOutline} disabled={!canBackToOutline}>
+              <button data-performance-id="generation.back-to-outline" className="secondary-btn" onClick={onBackToOutline} disabled={!canBackToOutline}>
                 {t.stages.outline}
               </button>
             ) : null}
@@ -288,6 +288,7 @@ function ResearchDiscoveryStageRecordView(props: {
   return (
     <article className={`generation-stage-record research-discovery-record ${record.state}`}>
       <button
+        data-performance-id="generation.research-stage.toggle"
         className="generation-stage-summary"
         type="button"
         onClick={onToggle}
@@ -426,6 +427,7 @@ function PageStageRecordView(props: {
   return (
     <article className={`generation-stage-record ${stage.state}`}>
       <button
+        data-performance-id="generation.page-stage.toggle"
         className="generation-stage-summary"
         type="button"
         onClick={onToggle}

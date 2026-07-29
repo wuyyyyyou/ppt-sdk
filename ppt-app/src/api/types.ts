@@ -589,6 +589,71 @@ export interface WorkspaceDefaultsResult {
 
 export interface PptEngineRuntimeInfo {
   ppt_engine_version: string;
+  performance_testing?: {
+    supported: boolean;
+    schema_version: number;
+  };
+}
+
+export type PerformanceRunStatus = "recording" | "finalizing" | "completed" | "finalization_failed" | "abandoned";
+export interface PerformanceContext {
+  run_id: string;
+  trace_id: string;
+  span_id: string;
+  parent_span_id?: string;
+  operation_name?: string;
+  workspace_id?: string;
+}
+export interface PerformanceEvent {
+  schema_version: 1;
+  event_id: string;
+  event_type: "span.started" | "span.finished" | "button.interaction" | "data.loss";
+  recorded_at: string;
+  producer_id: string;
+  sequence_number: number;
+  trace_id?: string;
+  span_id?: string;
+  parent_span_id?: string;
+  operation_name?: string;
+  workspace_id?: string;
+  duration_ms?: number;
+  interaction_delay_ms?: number;
+  feedback_delay_ms?: number;
+  status?: "ok" | "error" | "interrupted";
+  attributes?: Record<string, string | number | boolean | null>;
+}
+export interface PerformanceRunSummary {
+  schema_version: 1;
+  run_id: string;
+  status: PerformanceRunStatus;
+  data_integrity: "complete" | "degraded";
+  started_at: string;
+  updated_at: string;
+  ended_at: string | null;
+  report_locale: "en" | "zh" | null;
+  report_status: "not_generated" | "generated" | "failed";
+  report_error: string | null;
+  app_version: string;
+  environment: Record<string, string | number | boolean | null>;
+  initial_settings: Record<string, unknown>;
+  event_count: number;
+  dropped_event_count: number;
+  run_dir: string;
+  report_available: boolean;
+}
+export interface ListPerformanceRunsResult {
+  root_dir: string;
+  active_run: PerformanceRunSummary | null;
+  runs: PerformanceRunSummary[];
+}
+export interface FinalizePerformanceRunResult {
+  run: PerformanceRunSummary;
+  requires_force: boolean;
+  active_span_count: number;
+}
+export interface PreparePerformanceReportResult {
+  run: PerformanceRunSummary;
+  report_upload: HostUploadRef;
 }
 
 export interface PatchWorkspaceDefaultsInput {

@@ -2,6 +2,7 @@ import type { WorkspaceOutline } from "../api/types";
 import type { ResearchWebFetchPage, ResearchWebSearchResult } from "../api/researchWebClient";
 import type { Locale } from "../i18n/messages";
 import type { AnnaLlmCompleteInput, AnnaRuntime } from "../runtime/annaRuntime";
+import { beginPerformanceSpan } from "../performance/performanceRecorder";
 import type { AiOperationLogContext } from "./interactionLog";
 import { buildStructuredJsonRepairPrompt, parseStructuredJson } from "./structuredJson";
 
@@ -70,6 +71,11 @@ async function complete(
   const handle = logContext?.logger
     ? await logContext.logger.startInteraction(logContext, { request })
     : null;
+  const performanceSpan = beginPerformanceSpan({
+    operationName: "ai.interaction",
+    workspaceId: logContext?.workspace_dir.split(/[\\/]/).filter(Boolean).at(-1),
+    attributes: { layer: "anna-research-llm" },
+  });
   try {
     const result = typeof runtime.call === "function"
       ? await runtime.call("llm", "complete", request, { timeoutMs: 600_000 })
@@ -82,8 +88,10 @@ async function complete(
         output: text,
       });
     }
+    performanceSpan?.finish("ok");
     return text;
   } catch (error) {
+    performanceSpan?.finish("error");
     if (handle) await logContext?.logger?.finishInteraction(handle, { status: "failed", error });
     throw error;
   }

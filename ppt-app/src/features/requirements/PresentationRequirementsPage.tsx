@@ -103,14 +103,14 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
           detail={errorDetail}
         />
         <div className="requirements-error-actions">
-          <button className="primary-btn" type="button" onClick={onRetry} disabled={saving || confirming}>
+          <button data-performance-id="requirements.create.retry" className="primary-btn" type="button" onClick={onRetry} disabled={saving || confirming}>
             <RefreshCw size={16} aria-hidden="true" />
             {t.requirements.retry}
           </button>
-          <button className="secondary-btn" type="button" onClick={onManual} disabled={saving || confirming}>
+          <button data-performance-id="requirements.create-manually" className="secondary-btn" type="button" onClick={onManual} disabled={saving || confirming}>
             {t.requirements.manual}
           </button>
-          <button className="secondary-btn" type="button" onClick={onBack}>{t.requirements.back}</button>
+          <button data-performance-id="requirements.back" className="secondary-btn" type="button" onClick={onBack}>{t.requirements.back}</button>
         </div>
       </section>
     );
@@ -168,6 +168,7 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
                       const description = isSemantic ? (candidate as PresentationRequirementCandidate).description : "";
                       return (
                         <button
+                          data-performance-id={`requirements.${field}.select-candidate`}
                           type="button"
                           className={`requirement-option ${selected ? "selected" : ""}`}
                           onClick={() => onSelect(field as never, candidate as never)}
@@ -202,13 +203,13 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
       </div>
 
       <footer className="requirements-footer">
-        <button className="secondary-btn" type="button" onClick={onBack}><ArrowLeft size={16} />{t.requirements.back}</button>
+        <button data-performance-id="requirements.back" className="secondary-btn" type="button" onClick={onBack}><ArrowLeft size={16} />{t.requirements.back}</button>
         <span>{confirming ? t.requirements.confirming : saving ? t.requirements.saving : dirty ? t.requirements.unsaved : hasSavedDraft ? t.requirements.saved : ""}</span>
         <div className="requirements-footer-actions">
-          <button className="secondary-btn" type="button" disabled={saving || confirming || !dirty} onClick={onSave}>
+          <button data-performance-id="requirements.save" className="secondary-btn" type="button" disabled={saving || confirming || !dirty} onClick={onSave}>
             <Save size={16} />{t.controls.save}
           </button>
-          <button className="primary-btn" type="button" disabled={saving || confirming || !((requirements.selections.visual_style_preset || requirements.selections.visual_tone) && Object.entries(requirements.selections).filter(([key]) => key !== "visual_style_preset" && key !== "visual_tone").every(([, value]) => value !== null)) || requirements.selections.output_language?.trim().toLowerCase() === "auto"} onClick={onConfirm}>
+          <button data-performance-id="requirements.confirm" className="primary-btn" type="button" disabled={saving || confirming || !((requirements.selections.visual_style_preset || requirements.selections.visual_tone) && Object.entries(requirements.selections).filter(([key]) => key !== "visual_style_preset" && key !== "visual_tone").every(([, value]) => value !== null)) || requirements.selections.output_language?.trim().toLowerCase() === "auto"} onClick={onConfirm}>
             <Check size={16} />{t.requirements.confirm}
           </button>
         </div>

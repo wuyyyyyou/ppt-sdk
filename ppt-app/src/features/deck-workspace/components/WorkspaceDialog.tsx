@@ -90,11 +90,12 @@ export function WorkspaceDialog({
             <div className="task-state">{text.loading}</div>
           ) : (
             <div className="task-launch-grid">
-              <button className="task-launch-card" onClick={onCreate} disabled={loading}>
+              <button data-performance-id="workspace.create" className="task-launch-card" onClick={onCreate} disabled={loading}>
                 <FolderPlus size={22} />
                 <strong>{text.create}</strong>
               </button>
               <button
+                data-performance-id="workspace.picker.open"
                 className="task-launch-card"
                 onClick={() => setOpenPicker(true)}
                 disabled={loading || tasks.length === 0}
@@ -112,13 +113,13 @@ export function WorkspaceDialog({
           <div className="task-recent-header">
             <span>{text.recent}</span>
             {latest ? (
-              <button onClick={onUseLatest} disabled={loading}>
+              <button data-performance-id="workspace.open-latest" onClick={onUseLatest} disabled={loading}>
                 {text.useLatest}
               </button>
             ) : null}
           </div>
           {latest ? (
-            <button className="task-recent-row" onClick={onUseLatest} disabled={loading}>
+            <button data-performance-id="workspace.open-latest" className="task-recent-row" onClick={onUseLatest} disabled={loading}>
               <strong>{latest.title || formatTaskName(latest.task_id ?? latest.workspace_id)}</strong>
               <span>{latest.task_dir ?? latest.workspace_dir}</span>
             </button>
@@ -132,7 +133,7 @@ export function WorkspaceDialog({
             <section className="task-picker">
               <div className="task-picker-header">
                 <strong>{text.open}</strong>
-                <button aria-label={text.close} onClick={() => setOpenPicker(false)}>
+                <button data-performance-id="workspace.picker.close" aria-label={text.close} onClick={() => setOpenPicker(false)}>
                   <X size={16} />
                 </button>
               </div>
@@ -141,6 +142,7 @@ export function WorkspaceDialog({
                   const taskDir = item.task_dir ?? item.workspace_dir;
                   return (
                     <button
+                      data-performance-id="workspace.picker.select"
                       key={taskDir}
                       onClick={() => {
                         setOpenPicker(false);

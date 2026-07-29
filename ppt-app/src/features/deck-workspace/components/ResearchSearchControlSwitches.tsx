@@ -15,6 +15,7 @@ export function ResearchSearchControlSwitches(props: ResearchSearchControlSwitch
   return (
     <div className="research-search-control-options">
       <button
+        data-performance-id="research.web-search.toggle"
         type="button"
         className={`checkbox-row ${settings.disableWebResearch ? "active" : ""}`}
         onClick={() => onChange({
@@ -31,6 +32,7 @@ export function ResearchSearchControlSwitches(props: ResearchSearchControlSwitch
         <span>{t.controls.disableWebResearch}</span>
       </button>
       <button
+        data-performance-id="research.image-search.toggle"
         type="button"
         className={`checkbox-row ${settings.disableImageResearch ? "active" : ""}`}
         onClick={() => onChange({

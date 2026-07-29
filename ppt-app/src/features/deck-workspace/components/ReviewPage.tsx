@@ -34,6 +34,7 @@ export function ReviewPage(props: ReviewPageProps) {
         actions={
           <>
             <button
+              data-performance-id="review.manual-edit"
               className="icon-action-btn"
               onClick={props.onEdit}
               title={props.t.controls.edit}
@@ -42,6 +43,7 @@ export function ReviewPage(props: ReviewPageProps) {
               <Edit3 size={14} aria-hidden="true" />
             </button>
             <button
+              data-performance-id="review.render-again"
               className="icon-action-btn"
               onClick={() => void props.renderDeckHtml()}
               disabled={renderWaiting}
@@ -55,6 +57,7 @@ export function ReviewPage(props: ReviewPageProps) {
       />
       <div className="mode-toggle">
         <button
+          data-performance-id="review.mode.grid"
           className={mode === "grid" ? "active" : ""}
           aria-pressed={mode === "grid"}
           onClick={() => props.setPreviewMode("grid")}
@@ -62,6 +65,7 @@ export function ReviewPage(props: ReviewPageProps) {
           <LayoutGrid size={14} aria-hidden="true" />{props.t.review.grid}
         </button>
         <button
+          data-performance-id="review.mode.present"
           className={mode === "present" ? "active" : ""}
           aria-pressed={mode === "present"}
           onClick={() => props.setPreviewMode("present")}

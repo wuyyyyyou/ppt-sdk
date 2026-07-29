@@ -16,7 +16,7 @@ interface EntryTopControlsProps {
 export function EntryTopControls({ t, locale, setLocale, onSettings }: EntryTopControlsProps) {
   return (
     <div className="entry-topbar">
-      <button type="button" className="control-btn text" onClick={onSettings} title={t.controls.library}>
+      <button data-performance-id="navigation.settings" type="button" className="control-btn text" onClick={onSettings} title={t.controls.library}>
         <Settings size={14} aria-hidden="true" />
         {t.controls.library}
       </button>

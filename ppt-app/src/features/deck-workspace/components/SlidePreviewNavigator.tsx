@@ -41,6 +41,7 @@ export function SlidePreviewNavigator(props: SlidePreviewNavigatorProps) {
 
       <div className="preview-controls">
         <button
+          data-performance-id="deck.slide.previous"
           className="nav-arrow"
           type="button"
           aria-label={t.deck.previousSlide}
@@ -56,6 +57,7 @@ export function SlidePreviewNavigator(props: SlidePreviewNavigatorProps) {
           })}
         </div>
         <button
+          data-performance-id="deck.slide.next"
           className="nav-arrow"
           type="button"
           aria-label={t.deck.nextSlide}

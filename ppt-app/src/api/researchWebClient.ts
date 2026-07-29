@@ -1,5 +1,6 @@
 import type { AnnaRuntime } from "../runtime/annaRuntime";
 import type { AppendWorkspaceLogInput } from "./types";
+import { beginPerformanceSpan } from "../performance/performanceRecorder";
 
 export interface ResearchWebSearchResult {
   title: string;
@@ -414,9 +415,16 @@ export function createResearchWebClient(runtime: AnnaRuntime, options: ResearchW
     }, ["input", "runtime_request", "runtime_options"]);
 
     let rawResponse: unknown;
+    const performanceSpan = beginPerformanceSpan({
+      operationName: input.method === "image_search" ? "image.search" : input.method === "image_fetch" ? "image.fetch" : `web.${input.method}`,
+      workspaceId: input.context.workspace_dir.split(/[\\/]/).filter(Boolean).at(-1),
+      attributes: { layer: "anna-web" },
+    });
     try {
       rawResponse = await input.call();
+      performanceSpan?.finish("ok");
     } catch (error) {
+      performanceSpan?.finish("error");
       const endedAt = new Date().toISOString();
       const errorSnapshot = snapshotForLog(error, "$.error");
       await appendLog(input.context, {

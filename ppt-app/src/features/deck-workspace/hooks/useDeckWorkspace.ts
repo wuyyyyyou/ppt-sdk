@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import appManifest from "../../../../app.json";
 import { createAgentClient, type AgentClient } from "../../../agent/agentClient";
 import { resolveAgentToolAccessPolicy } from "../../../agent/agentToolAccessPolicy";
 import { createAiClient, type AiAttemptLog, type AiClient, type LlmContextRow } from "../../../ai/aiClient";
@@ -37,7 +38,8 @@ import type {
   WorkspacePages,
   WorkspaceStyleProfileSelection,
   WorkspaceSettings,
-  GenerationRunTransaction
+  GenerationRunTransaction,
+  PerformanceRunSummary,
 } from "../../../api/types";
 import {
   createLocalProjectDeck,
@@ -174,6 +176,7 @@ import {
   requirementsAreComplete,
 } from "../../requirements";
 import { findVisualStylePreset, toVisualStylePresetSelection } from "../../templates/visualStylePresets";
+import { beginPerformanceSpan, installPerformanceButtonCollector } from "../../../performance/performanceRecorder";
 
 const DEFAULT_TEMPLATE_GROUP_ID = "red-finance-canvas";
 const AGENT_TOOL_ACCESS_POLICY = resolveAgentToolAccessPolicy(
@@ -184,6 +187,23 @@ const PPTX_EXPORT_POLL_INTERVAL_MS = 1500;
 const PPTX_EXPORT_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 const PPTX_EXPORT_STATUS_ERROR_LIMIT = 5;
 const AGENT_CANCELLATION_WAIT_MS = 3_000;
+const PERFORMANCE_TESTING_ENABLED = import.meta.env.VITE_PERFORMANCE_TESTING_ENABLED === "true";
+
+async function measurePerformanceOperation<T>(operationName: string, workspaceDir: string, task: () => Promise<T>): Promise<T> {
+  const span = beginPerformanceSpan({
+    operationName,
+    workspaceId: workspaceDir.split(/[\\/]/).filter(Boolean).at(-1),
+    attributes: { layer: "workflow" },
+  });
+  try {
+    const result = await task();
+    span?.finish("ok");
+    return result;
+  } catch (error) {
+    span?.finish("error");
+    throw error;
+  }
+}
 
 function padDatePart(value: number) {
   return String(value).padStart(2, "0");
@@ -401,6 +421,12 @@ export interface DeckWorkspaceActions {
   navigateMain: (stage: MainStage) => Promise<void>;
   goBack: () => Promise<void>;
   resolveConfirmation: (confirmed: boolean) => void;
+  refreshPerformanceRuns: () => Promise<void>;
+  startPerformanceRun: () => Promise<void>;
+  finalizePerformanceRun: () => Promise<void>;
+  abandonPerformanceRun: () => Promise<void>;
+  deletePerformanceRun: (run: PerformanceRunSummary) => Promise<void>;
+  openPerformanceReport: (run: PerformanceRunSummary) => Promise<void>;
   addContextRow: (row: ContextRow) => void;
   updateContextRow: (id: string, value: string) => void;
   removeContextRow: (id: string) => void;
@@ -572,6 +598,17 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       status: "idle",
       message: "",
     });
+  const [performanceTesting, setPerformanceTesting] = useState<DeckWorkspaceState["performanceTesting"]>({
+    enabled: PERFORMANCE_TESTING_ENABLED,
+    supported: false,
+    loading: PERFORMANCE_TESTING_ENABLED,
+    busy: false,
+    error: "",
+    activeRun: null,
+    runs: [],
+    reportHtml: "",
+    reportRunId: null,
+  });
   const workspaceDiagnosticBundleRequestRef = useRef(0);
   const exportInFlightRef = useRef(false);
   const [backend, setBackend] = useState<PptBackend | null>(null);
@@ -631,6 +668,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   });
   const styleProfileCreationAbortRef = useRef<AbortController | null>(null);
   const aiLogger = useMemo(() => backend ? createAiInteractionLogger(backend) : null, [backend]);
+
+  useEffect(() => {
+    if (!PERFORMANCE_TESTING_ENABLED) return;
+    return installPerformanceButtonCollector();
+  }, []);
 
   function invalidateWorkspaceDiagnosticBundle() {
     workspaceDiagnosticBundleRequestRef.current += 1;
@@ -1406,6 +1448,29 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         setResearchAiClient(nextResearchAiClient);
         setResearchWebClient(nextResearchWebClient);
         setAgentClient(nextAgentClient);
+        if (PERFORMANCE_TESTING_ENABLED) {
+          void nextBackend.listPerformanceRuns().then((result) => {
+            if (!cancelled) {
+              setPerformanceTesting((current) => ({
+                ...current,
+                supported: true,
+                loading: false,
+                error: "",
+                activeRun: result.active_run,
+                runs: result.runs,
+              }));
+            }
+          }).catch((error) => {
+            if (!cancelled) {
+              setPerformanceTesting((current) => ({
+                ...current,
+                supported: false,
+                loading: false,
+                error: error instanceof Error ? error.message : t.performance.unavailable,
+              }));
+            }
+          });
+        }
         void nextBackend.getRuntimeInfo().then((result) => {
           if (!cancelled) {
             setRuntimeInfo(result);
@@ -1782,7 +1847,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function navigate(nextPage: PageId) {
     if (isGenerationInFlight()) return;
     if (nextPage !== page && !await canLeaveCurrentEditor()) return;
-    if (!generated && nextPage !== "main" && nextPage !== "my-work" && nextPage !== "settings") {
+    if (!generated && nextPage !== "main" && nextPage !== "my-work" && nextPage !== "settings" && nextPage !== "performance-report") {
       showToast(t.toasts.createDeckFirst);
       return;
     }
@@ -2472,7 +2537,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       activeRunWorkspaceDir = confirmedWorkspace.workspace_dir;
       shouldReconcileActiveRun = true;
 
-      const completion = await runDeckGeneration({
+      const completion = await measurePerformanceOperation("generation.run", confirmedWorkspace.workspace_dir, () => runDeckGeneration({
         backend,
         aiClient,
         researchAiClient,
@@ -2487,7 +2552,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         onProgress: generationProgressHandler(cancelSignal),
         isCancelled: () => cancelCreateDeckRef.current,
         cancelSignal,
-      });
+      }));
       if (!ownsGenerationOperation(cancelSignal)) return;
       if (completion.status === "completed") {
         const committed = await commitShadowGenerationRun(generationRun);
@@ -3633,7 +3698,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       shouldReconcileActiveRun = true;
       setStage("generating");
       setPage("main");
-      const completion = await runDeckRefinement({
+      const completion = await measurePerformanceOperation("deck_refinement.run", shadowRun.workspace.workspace_dir, () => runDeckRefinement({
         backend,
         aiClient,
         researchAiClient,
@@ -3649,7 +3714,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         onProgress: generationProgressHandler(cancelSignal),
         isCancelled: () => cancelCreateDeckRef.current,
         cancelSignal,
-      });
+      }));
       if (!ownsGenerationOperation(cancelSignal)) return;
       if (completion.status === "completed" && completion.noChange) {
         await backend.abandonGenerationRun({ run_id: generationRun.run_id });
@@ -3706,7 +3771,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       shouldReconcileActiveRun = true;
       setStage("generating");
       setPage("main");
-      const completion = await runDeckRefinement({
+      const completion = await measurePerformanceOperation("page_refinement.run", shadowRun.workspace.workspace_dir, () => runDeckRefinement({
         backend,
         aiClient,
         researchAiClient,
@@ -3723,7 +3788,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         onProgress: generationProgressHandler(cancelSignal),
         isCancelled: () => cancelCreateDeckRef.current,
         cancelSignal,
-      });
+      }));
       if (!ownsGenerationOperation(cancelSignal)) return;
       if (completion.status === "completed") {
         const committed = await commitShadowGenerationRun(generationRun);
@@ -4088,8 +4153,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
             isCancelled: () => cancelCreateDeckRef.current,
             cancelSignal,
           };
-      const completion = isRefinementResume
-        ? await runDeckRefinement({
+      const completion = await measurePerformanceOperation(
+        isRefinementResume ? (recoveryKind === "page-refinement" ? "page_refinement.run" : "deck_refinement.run") : "generation.run",
+        refreshedWorkspace.workspace_dir,
+        () => isRefinementResume
+        ? runDeckRefinement({
             ...commonInput,
             instruction: recoveryProgress.recovery?.refinement_request ?? "Resume refinement",
             scope: recoveryKind === "page-refinement" ? "slide" : "deck",
@@ -4097,7 +4165,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
             resumePageIds: recoveryProgress.recovery?.target_page_ids,
             skipIntentReview: true,
           })
-        : await runDeckGeneration({ ...commonInput, startMode: "resume", resumeResearch: true });
+        : runDeckGeneration({ ...commonInput, startMode: "resume", resumeResearch: true }),
+      );
       if (!ownsGenerationOperation(cancelSignal)) return;
       if (completion.status === "completed" && generationRun) {
         const committed = await commitShadowGenerationRun(generationRun);
@@ -4143,7 +4212,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       shouldReconcileActiveRun = true;
       setStage("generating");
       setPage("main");
-      const completion = await runPageGenerationRetry({
+      const completion = await measurePerformanceOperation("page.generation", refreshedWorkspace.workspace_dir, () => runPageGenerationRetry({
         backend,
         aiClient,
         researchAiClient,
@@ -4159,7 +4228,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         isCancelled: () => cancelCreateDeckRef.current,
         cancelSignal,
         resumeResearch: true,
-      });
+      }));
       if (!ownsGenerationOperation(cancelSignal)) return;
       if (completion.status === "completed" && generationRun) {
         const committed = await commitShadowGenerationRun(generationRun);
@@ -4595,6 +4664,137 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
+  async function refreshPerformanceRuns() {
+    if (!backend || !PERFORMANCE_TESTING_ENABLED) return;
+    setPerformanceTesting((current) => ({ ...current, loading: true, error: "" }));
+    try {
+      const result = await backend.listPerformanceRuns();
+      setPerformanceTesting((current) => ({
+        ...current,
+        supported: true,
+        loading: false,
+        activeRun: result.active_run,
+        runs: result.runs,
+      }));
+    } catch (error) {
+      setPerformanceTesting((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : t.performance.unavailable }));
+    }
+  }
+
+  async function startPerformanceRun() {
+    if (!backend || performanceTesting.busy || performanceTesting.activeRun) return;
+    setPerformanceTesting((current) => ({ ...current, busy: true, error: "" }));
+    try {
+      const run = await backend.startPerformanceRun({
+        app_version: appManifest.version,
+        environment: {
+          locale,
+          viewport_width: window.innerWidth,
+          viewport_height: window.innerHeight,
+          device_pixel_ratio: window.devicePixelRatio,
+          online: navigator.onLine,
+        },
+        initial_settings: globalSettings,
+      });
+      setPerformanceTesting((current) => ({ ...current, busy: false, activeRun: run, runs: [run, ...current.runs.filter((item) => item.run_id !== run.run_id)] }));
+      showToast(t.performance.started);
+    } catch (error) {
+      setPerformanceTesting((current) => ({ ...current, busy: false, error: error instanceof Error ? error.message : t.performance.startFailed }));
+    }
+  }
+
+  async function finalizePerformanceRun() {
+    if (!backend || performanceTesting.busy || !performanceTesting.activeRun) return;
+    const runId = performanceTesting.activeRun.run_id;
+    setPerformanceTesting((current) => ({ ...current, busy: true, error: "" }));
+    try {
+      let result = await backend.finalizePerformanceRun({ run_id: runId, locale });
+      if (result.requires_force) {
+        setPerformanceTesting((current) => ({ ...current, busy: false }));
+        const force = await requestConfirmation({
+          title: t.performance.activeOperationsTitle,
+          body: formatMessage(t.performance.activeOperationsBody, { count: result.active_span_count }),
+          cancelLabel: t.performance.keepRecording,
+          confirmLabel: t.performance.forceFinish,
+          tone: "warning",
+        });
+        if (!force) return;
+        setPerformanceTesting((current) => ({ ...current, busy: true }));
+        result = await backend.finalizePerformanceRun({ run_id: runId, locale, force: true });
+      }
+      setPerformanceTesting((current) => ({
+        ...current,
+        busy: false,
+        activeRun: null,
+        runs: [result.run, ...current.runs.filter((item) => item.run_id !== result.run.run_id)],
+      }));
+      showToast(t.performance.reportGenerated);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t.performance.finalizeFailed;
+      try {
+        const latest = await backend.listPerformanceRuns();
+        setPerformanceTesting((current) => ({ ...current, busy: false, error: message, activeRun: latest.active_run, runs: latest.runs }));
+      } catch {
+        setPerformanceTesting((current) => ({ ...current, busy: false, error: message }));
+      }
+    }
+  }
+
+  async function abandonPerformanceRun() {
+    if (!backend || performanceTesting.busy || !performanceTesting.activeRun) return;
+    const confirmed = await requestConfirmation({
+      title: t.performance.abandonTitle,
+      body: t.performance.abandonBody,
+      cancelLabel: t.controls.cancel,
+      confirmLabel: t.performance.abandonConfirm,
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    setPerformanceTesting((current) => ({ ...current, busy: true, error: "" }));
+    try {
+      const run = await backend.abandonPerformanceRun({ run_id: performanceTesting.activeRun.run_id });
+      setPerformanceTesting((current) => ({ ...current, busy: false, activeRun: null, runs: [run, ...current.runs.filter((item) => item.run_id !== run.run_id)] }));
+    } catch (error) {
+      setPerformanceTesting((current) => ({ ...current, busy: false, error: error instanceof Error ? error.message : t.performance.abandonFailed }));
+    }
+  }
+
+  async function deletePerformanceRun(run: PerformanceRunSummary) {
+    if (!backend || performanceTesting.busy) return;
+    const confirmed = await requestConfirmation({
+      title: t.performance.deleteTitle,
+      body: formatMessage(t.performance.deleteBody, { runId: run.run_id }),
+      cancelLabel: t.controls.cancel,
+      confirmLabel: t.performance.deleteConfirm,
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    setPerformanceTesting((current) => ({ ...current, busy: true, error: "" }));
+    try {
+      await backend.deletePerformanceRun({ run_id: run.run_id });
+      setPerformanceTesting((current) => ({ ...current, busy: false, runs: current.runs.filter((item) => item.run_id !== run.run_id) }));
+    } catch (error) {
+      setPerformanceTesting((current) => ({ ...current, busy: false, error: error instanceof Error ? error.message : t.performance.deleteFailed }));
+    }
+  }
+
+  async function openPerformanceReport(run: PerformanceRunSummary) {
+    if (!backend || performanceTesting.busy || !run.report_available) return;
+    setPerformanceTesting((current) => ({ ...current, busy: true, error: "" }));
+    try {
+      const result = await backend.preparePerformanceReport({ run_id: run.run_id });
+      if (result.report_upload.mime_type !== "text/plain") throw new Error(`${t.performance.reportFailed} MIME: ${result.report_upload.mime_type}`);
+      const response = await fetch(result.report_upload.url, { cache: "no-store" });
+      if (!response.ok) throw new Error(`${t.performance.reportFailed} HTTP ${response.status}`);
+      const html = await response.text();
+      setPerformanceTesting((current) => ({ ...current, busy: false, reportHtml: html, reportRunId: run.run_id }));
+      setPage("performance-report");
+      setHistory((items) => [...items, "performance-report"]);
+    } catch (error) {
+      setPerformanceTesting((current) => ({ ...current, busy: false, error: error instanceof Error ? error.message : t.performance.reportFailed }));
+    }
+  }
+
   const state: DeckWorkspaceState = {
     panelMode,
     page,
@@ -4639,6 +4839,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     exportArtifact,
     exportDownload,
     workspaceDiagnosticBundle,
+    performanceTesting,
     currentStatus,
     workspaceScan,
     workspaceCovers,
@@ -4678,6 +4879,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setRefineScope,
     showToast,
     resolveConfirmation,
+    refreshPerformanceRuns,
+    startPerformanceRun,
+    finalizePerformanceRun,
+    abandonPerformanceRun,
+    deletePerformanceRun,
+    openPerformanceReport,
     cancelGenerateDeck,
     navigate,
     navigateFromHeader,

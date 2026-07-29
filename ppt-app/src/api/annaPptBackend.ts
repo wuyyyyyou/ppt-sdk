@@ -72,8 +72,19 @@ import type {
   PatchSharedResearchProgressResult,
   PublishSharedResearchBatchResult,
   ImportSharedResearchImageResult,
+  FinalizePerformanceRunResult,
+  ListPerformanceRunsResult,
+  PerformanceRunSummary,
+  PreparePerformanceReportResult,
 } from "./types";
 import { resolvePptBundledToolIds } from "./bundledToolIds";
+import {
+  beginPerformanceSpan,
+  configurePerformanceEventSink,
+  flushPerformanceEvents,
+  getActivePerformanceRunId,
+  setActivePerformanceRun,
+} from "../performance/performanceRecorder";
 
 const LONG_RUNNING_TOOL_TIMEOUT_MS = 600_000;
 const WORKSPACE_LOG_INLINE_INVOKE_MAX_BYTES = 48 * 1024;
@@ -189,20 +200,82 @@ function normalizeExportPdfResult(value: unknown): ExportPdfResult {
 export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
   const toolIds = resolvePptBundledToolIds();
   const hostUploadClient = createAppHostUploadClient(runtime);
+  const performanceControlMethods = new Set([
+    "app_list_performance_runs",
+    "app_start_performance_run",
+    "app_append_performance_events",
+    "app_finalize_performance_run",
+    "app_abandon_performance_run",
+    "app_delete_performance_run",
+    "app_prepare_performance_report",
+  ]);
+  const performanceOperationNames: Record<string, string> = {
+    app_get_runtime_info: "app.initialize",
+    app_list_workspaces: "workspace.list",
+    app_create_workspace: "workspace.create",
+    app_open_workspace: "workspace.open",
+    app_duplicate_workspace: "workspace.duplicate",
+    app_delete_workspace: "workspace.delete",
+    app_patch_workspace_settings: "workspace.settings.save",
+    app_commit_uploaded_source_host_upload: "uploaded_source.upload",
+    app_prepare_uploaded_source_analysis_workspace: "uploaded_source.analysis",
+    app_update_workspace_requirements: "requirements.save",
+    app_confirm_workspace_requirements: "requirements.confirm",
+    app_save_workspace_outline_draft: "outline.save",
+    app_confirm_workspace_outline: "outline.confirm",
+    app_install_workspace_authoring_kit: "authoring_kit.install",
+    app_prepare_workspace_page_sources: "page_sources.prepare",
+    app_render_workspace_page_preview: "page.render",
+    app_render_deck_html: "final_deck_render",
+    app_prepare_page_refinement: "page_refinement.run",
+    app_commit_deck_refinement: "deck_refinement.commit",
+    app_get_page_edit_context: "manual_page.load",
+    app_save_manual_page_revision: "manual_page.save",
+    app_restore_page_source_version: "manual_page.restore",
+    app_start_pptx_export: "pptx_export.run",
+    app_get_pptx_export_status: "pptx_export.status",
+    app_export_pdf: "pdf_export.run",
+    app_publish_export_artifact: "export_download.prepare",
+    app_get_export_artifact_download_url: "export_download.prepare",
+  };
+  async function invokeRaw<T>(toolId: string, method: string, args: object, options?: { timeoutMs?: number }) {
+    const input = options?.timeoutMs === undefined
+      ? { tool_id: toolId, method, args }
+      : { tool_id: toolId, method, args, timeoutMs: options.timeoutMs };
+    return unwrapToolResult<T>(await runtime.tools.invoke(input, options));
+  }
+  configurePerformanceEventSink((runId, events) => invokeRaw(
+    toolIds.pptEngine,
+    "app_append_performance_events",
+    { run_id: runId, events },
+  ).then(() => undefined));
   async function invoke<T>(
     toolId: string,
     method: string,
     args: object,
     options?: { timeoutMs?: number }
   ): Promise<T> {
-    const input =
-      options?.timeoutMs === undefined
-        ? { tool_id: toolId, method, args }
-        : { tool_id: toolId, method, args, timeoutMs: options.timeoutMs };
-
-    return unwrapToolResult<T>(
-      await runtime.tools.invoke(input, options)
-    );
+    if (performanceControlMethods.has(method) || !getActivePerformanceRunId()) {
+      return invokeRaw<T>(toolId, method, args, options);
+    }
+    const operationName = performanceOperationNames[method] ?? `tool.${method.replace(/^app_/, "")}`;
+    const workspaceId = isRecord(args) && typeof args.workspace_dir === "string"
+      ? args.workspace_dir.split(/[\\/]/).filter(Boolean).at(-1)
+      : undefined;
+    const span = beginPerformanceSpan({
+      operationName: `${operationName}.roundtrip`,
+      workspaceId,
+      attributes: { layer: "ppt-backend", tool: method },
+    });
+    const performanceContext = span?.childContext(`${operationName}.backend`);
+    try {
+      const result = await invokeRaw<T>(toolId, method, performanceContext ? { ...args, performance_context: performanceContext } : args, options);
+      span?.finish("ok");
+      return result;
+    } catch (error) {
+      span?.finish("error");
+      throw error;
+    }
   }
   async function invokeHostUploadJson<T>(
     toolId: string,
@@ -228,6 +301,34 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
   return {
     getRuntimeInfo: () =>
       invoke<PptEngineRuntimeInfo>(toolIds.pptEngine, "app_get_runtime_info", {}),
+    listPerformanceRuns: async () => {
+      const result = await invoke<ListPerformanceRunsResult>(toolIds.pptEngine, "app_list_performance_runs", {});
+      setActivePerformanceRun(result.active_run?.run_id ?? null);
+      return result;
+    },
+    startPerformanceRun: async (input) => {
+      const result = await invoke<PerformanceRunSummary>(toolIds.pptEngine, "app_start_performance_run", input);
+      setActivePerformanceRun(result.run_id);
+      return result;
+    },
+    appendPerformanceEvents: (input) =>
+      invoke(toolIds.pptEngine, "app_append_performance_events", input),
+    finalizePerformanceRun: async (input) => {
+      await flushPerformanceEvents({ throwOnError: true });
+      const result = await invoke<FinalizePerformanceRunResult>(toolIds.pptEngine, "app_finalize_performance_run", input);
+      if (result.run.status === "completed") setActivePerformanceRun(null);
+      return result;
+    },
+    abandonPerformanceRun: async (input) => {
+      await flushPerformanceEvents({ throwOnError: true });
+      const result = await invoke<PerformanceRunSummary>(toolIds.pptEngine, "app_abandon_performance_run", input);
+      setActivePerformanceRun(null);
+      return result;
+    },
+    deletePerformanceRun: (input) =>
+      invoke(toolIds.pptEngine, "app_delete_performance_run", input),
+    preparePerformanceReport: (input) =>
+      invoke<PreparePerformanceReportResult>(toolIds.pptEngine, "app_prepare_performance_report", input),
     beginGenerationRun: (input) =>
       invoke<GenerationRunTransaction>(toolIds.pptEngine, "app_begin_generation_run", input),
     prepareGenerationRun: (input) =>

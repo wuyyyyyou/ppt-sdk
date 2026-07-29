@@ -3,6 +3,7 @@ import type {
   AnnaAgentSession,
   AnnaRuntime,
 } from "../runtime/annaRuntime";
+import { beginPerformanceSpan } from "../performance/performanceRecorder";
 import {
   AGENT_TOOLS_UNAVAILABLE_MESSAGE,
   getAgentToolAccessWarning,
@@ -618,6 +619,7 @@ export async function createAgentClient(
   const toolAccessPolicy =
     clientOptions.toolAccessPolicy ?? DEFAULT_AGENT_TOOL_ACCESS_POLICY;
   async function createSession() {
+    const performanceSpan = beginPerformanceSpan({ operationName: "agent.session", attributes: { phase: "create" } });
     try {
       const session = await runtime.agent.session({ submode: "auto" });
       activeSessions.add(session);
@@ -632,12 +634,14 @@ export async function createAgentClient(
           }
         }
       }
+      performanceSpan?.finish("ok");
       return {
         session,
         createdAtMs: Date.now(),
         expiresInSeconds: readSessionExpiresInSeconds(session),
       };
     } catch (error) {
+      performanceSpan?.finish("error");
       throw toAgentInfrastructureError(error, "Failed to create Agent session.");
     }
   }
@@ -673,6 +677,16 @@ export async function createAgentClient(
           },
         })
       : null;
+    const performanceSpan = beginPerformanceSpan({
+      operationName: "agent.session.attempt",
+      workspaceId: runOptions?.logContext?.workspace_dir.split(/[\\/]/).filter(Boolean).at(-1),
+      attributes: {
+        phase: "run",
+        session_retry: sessionState.sessionRetries,
+        stream_idle_retry: sessionState.streamIdleRetries,
+        cache_miss_retry: sessionState.sessionCacheMissRetryState.retries,
+      },
+    });
     try {
       const collected = await withTimeout(
         collectRunText(
@@ -704,8 +718,10 @@ export async function createAgentClient(
           message: `Agent session recovered after ${sessionState.sessionCacheMissRetryState.retries - cacheMissRetriesAtRunStart} retries`,
         });
       }
+      performanceSpan?.finish("ok");
       return collected;
     } catch (error) {
+      performanceSpan?.finish("error");
       if (interactionHandle) {
         await runOptions?.logContext?.logger?.finishInteraction(interactionHandle, {
           status: isStreamCancelledError(error) ? "cancelled" : "failed",

@@ -111,6 +111,7 @@ export function BriefPage({
           <div className="prompt-inline-options">
             <div className="checkbox-row-with-help">
               <button
+                data-performance-id="brief.strict-review.toggle"
                 type="button"
                 className={`checkbox-row ${strictReviewMode ? "active" : ""}`}
                 onClick={toggleStrictReviewMode}
@@ -143,6 +144,7 @@ export function BriefPage({
             />
           </div>
           <button
+            data-performance-id="brief.create-deck"
             className="inline-create-btn"
             type="button"
             disabled={submitBlocked || !prompt.trim()}
@@ -189,6 +191,7 @@ export function BriefPage({
               ordinary Visual Style Preset cards, and its final form is still an
               open product question. */}
           <button
+            data-performance-id="brief.visual-style.clear"
             type="button"
             className={`brief-style-preset-card brief-style-preset-none-card ${!selectedVisualStylePresetId ? "active" : ""}`}
             disabled={busy}
@@ -243,6 +246,7 @@ export function BriefPage({
                   )}
                 </span>
                 <button
+                  data-performance-id="brief.visual-style.select"
                   type="button"
                   className="brief-style-preset-select"
                   disabled={busy}
@@ -252,6 +256,7 @@ export function BriefPage({
                   <span className="brief-style-preset-accessible-name">{preset.name}</span>
                 </button>
                 <button
+                  data-performance-id="brief.visual-style.preview"
                   type="button"
                   className="brief-style-preset-preview-btn"
                   disabled={busy}
@@ -278,16 +283,16 @@ export function BriefPage({
           <section className="template-preview-modal-card" onClick={(event) => event.stopPropagation()}>
             <header className="template-preview-modal-header">
               <div className="template-preview-modal-title"><h2>{preview.preset.name}</h2><span>{preview.preset.description}</span></div>
-              <button type="button" className="template-preview-modal-close" aria-label={t.template.close} onClick={() => setPreview(null)}><X size={17} /></button>
+              <button data-performance-id="brief.visual-style.preview.close" type="button" className="template-preview-modal-close" aria-label={t.template.close} onClick={() => setPreview(null)}><X size={17} /></button>
             </header>
             <div className="template-preview-modal-stage">
-              <button type="button" className="template-preview-modal-nav" aria-label={t.template.previous} disabled={preview.index === 0} onClick={() => setPreview((current) => current ? { ...current, index: Math.max(0, current.index - 1) } : current)}><ChevronLeft size={18} /></button>
+              <button data-performance-id="brief.visual-style.preview.previous" type="button" className="template-preview-modal-nav" aria-label={t.template.previous} disabled={preview.index === 0} onClick={() => setPreview((current) => current ? { ...current, index: Math.max(0, current.index - 1) } : current)}><ChevronLeft size={18} /></button>
               <div className="template-preview-modal-frame"><img src={preview.preset.preview_images[preview.index]?.url} alt={preview.preset.preview_images[preview.index]?.alt ?? preview.preset.name} /><span className="template-preview-modal-counter">{preview.index + 1} / {preview.preset.preview_images.length}</span></div>
-              <button type="button" className="template-preview-modal-nav" aria-label={t.template.next} disabled={preview.index >= preview.preset.preview_images.length - 1} onClick={() => setPreview((current) => current ? { ...current, index: Math.min(current.preset.preview_images.length - 1, current.index + 1) } : current)}><ChevronRight size={18} /></button>
+              <button data-performance-id="brief.visual-style.preview.next" type="button" className="template-preview-modal-nav" aria-label={t.template.next} disabled={preview.index >= preview.preset.preview_images.length - 1} onClick={() => setPreview((current) => current ? { ...current, index: Math.min(current.preset.preview_images.length - 1, current.index + 1) } : current)}><ChevronRight size={18} /></button>
             </div>
             <footer className="template-preview-modal-footer">
               <span className="template-preview-modal-layout-name">{t.template.previewTitle}</span>
-              <button type="button" className="template-use-btn" onClick={() => { onSelectVisualStylePreset(preview.preset.id); setPreview(null); }}>{t.controls.useTemplate}</button>
+              <button data-performance-id="brief.visual-style.preview.use" type="button" className="template-use-btn" onClick={() => { onSelectVisualStylePreset(preview.preset.id); setPreview(null); }}>{t.controls.useTemplate}</button>
             </footer>
           </section>
         </div>

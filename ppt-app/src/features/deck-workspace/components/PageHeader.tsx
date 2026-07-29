@@ -13,7 +13,7 @@ export function PageHeader({ title, onBack, t, actions }: PageHeaderProps) {
   return (
     <div className="page-header">
       <div className="page-header-left">
-        <button className="back-btn" onClick={onBack}>
+        <button data-performance-id="navigation.back" className="back-btn" onClick={onBack}>
           <ArrowLeft size={14} />
           {t.controls.back}
         </button>

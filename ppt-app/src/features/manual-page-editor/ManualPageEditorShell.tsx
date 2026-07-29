@@ -601,14 +601,14 @@ export function ManualPageEditorShell(props: Props) {
 
   const toolbar = (
     <div ref={toolbarRef} className="manual-editor-toolbar" role="toolbar">
-      <button className="manual-editor-btn icon" onClick={undo} disabled={!history.length} title="撤销（Ctrl/Cmd+Z）"><Undo2 size={16} /></button>
-      <button className="manual-editor-btn icon" onClick={redo} disabled={!future.length} title="重做（Ctrl/Cmd+Shift+Z）"><Redo2 size={16} /></button>
+      <button data-performance-id="manual-editor.undo" className="manual-editor-btn icon" onClick={undo} disabled={!history.length} title="撤销（Ctrl/Cmd+Z）"><Undo2 size={16} /></button>
+      <button data-performance-id="manual-editor.redo" className="manual-editor-btn icon" onClick={redo} disabled={!future.length} title="重做（Ctrl/Cmd+Shift+Z）"><Redo2 size={16} /></button>
       <span className="manual-toolbar-divider" />
       {!selected ? (
         <>
-          <button className="manual-editor-btn icon" onClick={() => addElement("text")} title="新增文本"><Type size={16} /></button>
-          <button className="manual-editor-btn icon" onClick={() => addElement("shape")} title="新增形状"><Shapes size={16} /></button>
-          <button className="manual-editor-btn icon" onClick={() => { setImageMode("add"); fileInputRef.current?.click(); }} title="新增图片"><ImagePlus size={16} /></button>
+          <button data-performance-id="manual-editor.element.add-text" className="manual-editor-btn icon" onClick={() => addElement("text")} title="新增文本"><Type size={16} /></button>
+          <button data-performance-id="manual-editor.element.add-shape" className="manual-editor-btn icon" onClick={() => addElement("shape")} title="新增形状"><Shapes size={16} /></button>
+          <button data-performance-id="manual-editor.element.add-image" className="manual-editor-btn icon" onClick={() => { setImageMode("add"); fileInputRef.current?.click(); }} title="新增图片"><ImagePlus size={16} /></button>
         </>
       ) : null}
 
@@ -621,16 +621,16 @@ export function ManualPageEditorShell(props: Props) {
             {fontSizeOptions.map((size) => <option key={size}>{size}</option>)}
           </select>
           <span className="manual-toolbar-divider" />
-          <button className={`manual-editor-btn icon ${Number.parseInt(selectedStyle?.fontWeight ?? "400", 10) >= 600 ? "active" : ""}`} title="加粗" onClick={() => applyTextStyle("fontWeight", Number.parseInt(selectedStyle?.fontWeight ?? "400", 10) >= 600 ? "400" : "700")}><Bold size={15} /></button>
-          <button className={`manual-editor-btn icon ${selectedStyle?.fontStyle === "italic" ? "active" : ""}`} title="斜体" onClick={() => applyTextStyle("fontStyle", selectedStyle?.fontStyle === "italic" ? "normal" : "italic")}><Italic size={15} /></button>
-          <button className={`manual-editor-btn icon ${selectedStyle?.textDecorationLine.includes("underline") ? "active" : ""}`} title="下划线" onClick={() => applyTextStyle("textDecoration", selectedStyle?.textDecorationLine.includes("underline") ? "none" : "underline")}><Underline size={15} /></button>
-          <button className={`manual-editor-btn icon ${selectedStyle?.textDecorationLine.includes("line-through") ? "active" : ""}`} title="删除线" onClick={() => applyTextStyle("textDecoration", selectedStyle?.textDecorationLine.includes("line-through") ? "none" : "line-through")}><Strikethrough size={15} /></button>
+          <button data-performance-id="manual-editor.text.bold" className={`manual-editor-btn icon ${Number.parseInt(selectedStyle?.fontWeight ?? "400", 10) >= 600 ? "active" : ""}`} title="加粗" onClick={() => applyTextStyle("fontWeight", Number.parseInt(selectedStyle?.fontWeight ?? "400", 10) >= 600 ? "400" : "700")}><Bold size={15} /></button>
+          <button data-performance-id="manual-editor.text.italic" className={`manual-editor-btn icon ${selectedStyle?.fontStyle === "italic" ? "active" : ""}`} title="斜体" onClick={() => applyTextStyle("fontStyle", selectedStyle?.fontStyle === "italic" ? "normal" : "italic")}><Italic size={15} /></button>
+          <button data-performance-id="manual-editor.text.underline" className={`manual-editor-btn icon ${selectedStyle?.textDecorationLine.includes("underline") ? "active" : ""}`} title="下划线" onClick={() => applyTextStyle("textDecoration", selectedStyle?.textDecorationLine.includes("underline") ? "none" : "underline")}><Underline size={15} /></button>
+          <button data-performance-id="manual-editor.text.strikethrough" className={`manual-editor-btn icon ${selectedStyle?.textDecorationLine.includes("line-through") ? "active" : ""}`} title="删除线" onClick={() => applyTextStyle("textDecoration", selectedStyle?.textDecorationLine.includes("line-through") ? "none" : "line-through")}><Strikethrough size={15} /></button>
           <span className="manual-toolbar-divider" />
-          <button className={`manual-editor-btn icon ${selectedStyle?.textAlign === "left" || selectedStyle?.textAlign === "start" ? "active" : ""}`} title="左对齐" onClick={() => patchSelected((element) => { element.style.textAlign = "left"; })}><AlignLeft size={15} /></button>
-          <button className={`manual-editor-btn icon ${selectedStyle?.textAlign === "center" ? "active" : ""}`} title="居中" onClick={() => patchSelected((element) => { element.style.textAlign = "center"; })}><AlignCenter size={15} /></button>
-          <button className={`manual-editor-btn icon ${selectedStyle?.textAlign === "right" || selectedStyle?.textAlign === "end" ? "active" : ""}`} title="右对齐" onClick={() => patchSelected((element) => { element.style.textAlign = "right"; })}><AlignRight size={15} /></button>
+          <button data-performance-id="manual-editor.text.align-left" className={`manual-editor-btn icon ${selectedStyle?.textAlign === "left" || selectedStyle?.textAlign === "start" ? "active" : ""}`} title="左对齐" onClick={() => patchSelected((element) => { element.style.textAlign = "left"; })}><AlignLeft size={15} /></button>
+          <button data-performance-id="manual-editor.text.align-center" className={`manual-editor-btn icon ${selectedStyle?.textAlign === "center" ? "active" : ""}`} title="居中" onClick={() => patchSelected((element) => { element.style.textAlign = "center"; })}><AlignCenter size={15} /></button>
+          <button data-performance-id="manual-editor.text.align-right" className={`manual-editor-btn icon ${selectedStyle?.textAlign === "right" || selectedStyle?.textAlign === "end" ? "active" : ""}`} title="右对齐" onClick={() => patchSelected((element) => { element.style.textAlign = "right"; })}><AlignRight size={15} /></button>
           <div className="manual-toolbar-popover-anchor">
-            <button className={`manual-editor-btn icon ${toolbarPopover === "paragraph" ? "active" : ""}`} title="段落设置" onClick={() => togglePopover("paragraph")}><Pilcrow size={15} /></button>
+            <button data-performance-id="manual-editor.paragraph.toggle" className={`manual-editor-btn icon ${toolbarPopover === "paragraph" ? "active" : ""}`} title="段落设置" onClick={() => togglePopover("paragraph")}><Pilcrow size={15} /></button>
             {toolbarPopover === "paragraph" ? (
               <div className="manual-toolbar-popover paragraph">
                 <label><span>行高</span><select value={selected?.style.lineHeight || "1.2"} onChange={(event) => patchSelected((element) => { element.style.lineHeight = event.target.value; })}>{[1, 1.15, 1.25, 1.5, 1.75, 2, 2.5, 3].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
@@ -647,7 +647,7 @@ export function ManualPageEditorShell(props: Props) {
 
       {selectedIsImage ? (
         <>
-          <button className="manual-editor-btn text" onClick={() => { setImageMode("replace"); fileInputRef.current?.click(); }}><ImagePlus size={15} />替换图片</button>
+          <button data-performance-id="manual-editor.image.replace" className="manual-editor-btn text" onClick={() => { setImageMode("replace"); fileInputRef.current?.click(); }}><ImagePlus size={15} />替换图片</button>
           <select className="manual-toolbar-select image-fit" title="图片适应方式" value={selectedStyle?.objectFit ?? "contain"} onChange={(event) => patchSelected((element) => { element.style.objectFit = event.target.value; })}>
             <option value="cover">填满并裁切</option><option value="contain">完整显示</option><option value="fill">拉伸填满</option>
           </select>
@@ -657,16 +657,16 @@ export function ManualPageEditorShell(props: Props) {
       {selected && !selectedIsImage ? (
         <>
           <div className="manual-toolbar-popover-anchor">
-            <button className={`manual-editor-btn text ${toolbarPopover === "fill" ? "active" : ""}`} title="填充" onClick={() => togglePopover("fill")}><PaintBucket size={15} /><span className="manual-color-dot" style={{ background: fillColor }} />填充</button>
+            <button data-performance-id="manual-editor.fill.toggle" className={`manual-editor-btn text ${toolbarPopover === "fill" ? "active" : ""}`} title="填充" onClick={() => togglePopover("fill")}><PaintBucket size={15} /><span className="manual-color-dot" style={{ background: fillColor }} />填充</button>
             {toolbarPopover === "fill" ? (
               <div className="manual-toolbar-popover compact align-right">
                 <label className="manual-color-field"><span>填充颜色</span><input type="color" value={fillColor} onChange={(event) => patchSelected((element) => { element.style.backgroundColor = event.target.value; })} /></label>
-                <button className="manual-popover-action" onClick={() => { patchSelected((element) => { element.style.background = "transparent"; }); setToolbarPopover(null); }}>无填充</button>
+                <button data-performance-id="manual-editor.fill.clear" className="manual-popover-action" onClick={() => { patchSelected((element) => { element.style.background = "transparent"; }); setToolbarPopover(null); }}>无填充</button>
               </div>
             ) : null}
           </div>
           <div className="manual-toolbar-popover-anchor">
-            <button className={`manual-editor-btn text ${toolbarPopover === "border" ? "active" : ""}`} title="边框" onClick={() => togglePopover("border")}><Square size={15} style={{ color: borderColor }} />边框</button>
+            <button data-performance-id="manual-editor.border.toggle" className={`manual-editor-btn text ${toolbarPopover === "border" ? "active" : ""}`} title="边框" onClick={() => togglePopover("border")}><Square size={15} style={{ color: borderColor }} />边框</button>
             {toolbarPopover === "border" ? (
               <div className="manual-toolbar-popover compact align-right">
                 <label className="manual-color-field"><span>边框颜色</span><input type="color" value={borderColor} onChange={(event) => patchSelected((element) => { element.style.borderColor = event.target.value; element.style.borderStyle = "solid"; })} /></label>
@@ -680,26 +680,26 @@ export function ManualPageEditorShell(props: Props) {
       {selected ? (
         <>
           <div className="manual-toolbar-popover-anchor">
-            <button className={`manual-editor-btn text ${toolbarPopover === "opacity" ? "active" : ""}`} title="透明度" onClick={() => togglePopover("opacity")}><SlidersHorizontal size={15} />{opacity}%</button>
+            <button data-performance-id="manual-editor.opacity.toggle" className={`manual-editor-btn text ${toolbarPopover === "opacity" ? "active" : ""}`} title="透明度" onClick={() => togglePopover("opacity")}><SlidersHorizontal size={15} />{opacity}%</button>
             {toolbarPopover === "opacity" ? (
               <div className="manual-toolbar-popover opacity align-right"><label><span>透明度</span><input type="range" min="0" max="100" value={opacity} onChange={(event) => patchSelected((element) => { element.style.opacity = String(Number(event.target.value) / 100); })} /><strong>{opacity}%</strong></label></div>
             ) : null}
           </div>
-          <button className="manual-editor-btn icon danger" title="删除（Delete）" onClick={() => { patchSelected((element) => { element.style.visibility = "hidden"; element.dataset.pptEditorDeleted = "true"; }); setSelected(null); }}><Trash2 size={15} /></button>
+          <button data-performance-id="manual-editor.element.delete" className="manual-editor-btn icon danger" title="删除（Delete）" onClick={() => { patchSelected((element) => { element.style.visibility = "hidden"; element.dataset.pptEditorDeleted = "true"; }); setSelected(null); }}><Trash2 size={15} /></button>
         </>
       ) : null}
 
       <div className="manual-toolbar-popover-anchor manual-toolbar-more">
-        <button className={`manual-editor-btn icon ${toolbarPopover === "more" ? "active" : ""}`} title="更多" onClick={() => togglePopover("more")}><MoreHorizontal size={16} /></button>
+        <button data-performance-id="manual-editor.more.toggle" className={`manual-editor-btn icon ${toolbarPopover === "more" ? "active" : ""}`} title="更多" onClick={() => togglePopover("more")}><MoreHorizontal size={16} /></button>
         {toolbarPopover === "more" ? (
           <div className="manual-toolbar-menu align-right">
-            {selected ? <button disabled={!canSelectParent} onClick={selectParent}><Layers size={14} />选择父级</button> : null}
+            {selected ? <button data-performance-id="manual-editor.selection.select-parent" disabled={!canSelectParent} onClick={selectParent}><Layers size={14} />选择父级</button> : null}
             {selected ? <span className="manual-toolbar-menu-label">图层</span> : null}
-            {selected ? <button onClick={() => { arrange("front"); setToolbarPopover(null); }}><ArrowUpToLine size={14} />置于顶层</button> : null}
-            {selected ? <button onClick={() => { arrange("forward"); setToolbarPopover(null); }}><ArrowUp size={14} />上移一层</button> : null}
-            {selected ? <button onClick={() => { arrange("backward"); setToolbarPopover(null); }}><ArrowDown size={14} />下移一层</button> : null}
-            {selected ? <button onClick={() => { arrange("back"); setToolbarPopover(null); }}><ArrowDownToLine size={14} />置于底层</button> : null}
-            <button disabled={!context?.manually_edited} onClick={() => { setToolbarPopover(null); setConfirm({ kind: "restore" }); }}><RotateCcw size={14} />恢复 AI 版本</button>
+            {selected ? <button data-performance-id="manual-editor.layer.to-front" onClick={() => { arrange("front"); setToolbarPopover(null); }}><ArrowUpToLine size={14} />置于顶层</button> : null}
+            {selected ? <button data-performance-id="manual-editor.layer.forward" onClick={() => { arrange("forward"); setToolbarPopover(null); }}><ArrowUp size={14} />上移一层</button> : null}
+            {selected ? <button data-performance-id="manual-editor.layer.backward" onClick={() => { arrange("backward"); setToolbarPopover(null); }}><ArrowDown size={14} />下移一层</button> : null}
+            {selected ? <button data-performance-id="manual-editor.layer.to-back" onClick={() => { arrange("back"); setToolbarPopover(null); }}><ArrowDownToLine size={14} />置于底层</button> : null}
+            <button data-performance-id="manual-editor.restore.request" disabled={!context?.manually_edited} onClick={() => { setToolbarPopover(null); setConfirm({ kind: "restore" }); }}><RotateCcw size={14} />恢复 AI 版本</button>
           </div>
         ) : null}
       </div>
@@ -710,14 +710,14 @@ export function ManualPageEditorShell(props: Props) {
     <section className="manual-page-editor">
       <aside className={`manual-editor-filmstrip ${filmstripCollapsed ? "collapsed" : ""}`}>
         <div className="manual-filmstrip-header">
-          <button className="manual-editor-btn icon" onClick={requestExit} title="返回"><ArrowLeft size={17} /></button>
+          <button data-performance-id="manual-editor.exit.request" className="manual-editor-btn icon" onClick={requestExit} title="返回"><ArrowLeft size={17} /></button>
           {!filmstripCollapsed ? <strong>编辑 PPT</strong> : null}
-          <button className="manual-editor-btn icon" onClick={() => setFilmstripCollapsed((value) => !value)} title={filmstripCollapsed ? "展开页面列表" : "收起页面列表"}>{filmstripCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}</button>
+          <button data-performance-id="manual-editor.filmstrip.toggle" className="manual-editor-btn icon" onClick={() => setFilmstripCollapsed((value) => !value)} title={filmstripCollapsed ? "展开页面列表" : "收起页面列表"}>{filmstripCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}</button>
         </div>
         {!filmstripCollapsed ? (
           <div className="manual-filmstrip-scroll">
             {props.pages.map((item, index) => (
-              <button key={item.pageId} className={`manual-filmstrip-item ${index === pageIndex ? "active" : ""}`} onClick={() => requestSwitch(index)}>
+              <button data-performance-id="manual-editor.page.select" key={item.pageId} className={`manual-filmstrip-item ${index === pageIndex ? "active" : ""}`} onClick={() => requestSwitch(index)}>
                 <span className="manual-filmstrip-index">{index + 1}</span>
                 {item.screenshotUrl ? <img src={item.screenshotUrl} alt="" /> : <div className="manual-thumb-placeholder" />}
                 <small>{item.title}</small>
@@ -735,7 +735,7 @@ export function ManualPageEditorShell(props: Props) {
               <span>正在加载页面…</span>
             </div>
           ) : null}
-          {error ? <div className="manual-editor-error">{error}{saveStatus === "conflict" ? <button onClick={() => void loadPage(pageIndex)}>加载后端最新版本</button> : null}</div> : null}
+          {error ? <div className="manual-editor-error">{error}{saveStatus === "conflict" ? <button data-performance-id="manual-editor.conflict.reload" onClick={() => void loadPage(pageIndex)}>加载后端最新版本</button> : null}</div> : null}
           {!loading && html ? (
             <div className="manual-editor-stage" style={{ width: 1280 * scale, height: 720 * scale }}>
               <iframe
@@ -825,13 +825,13 @@ export function ManualPageEditorShell(props: Props) {
         </div>
           <div className="manual-editor-status-bar">
             <div className="manual-editor-zoom-control">
-              <button className={`manual-editor-btn ghost ${zoom === "fit" ? "active" : ""}`} onClick={() => setZoom("fit")}>适应窗口</button>
-              <button className="manual-editor-btn icon ghost" onClick={() => setZoom(Math.max(0.25, scale - 0.1))} title="缩小"><ZoomOut size={15} /></button>
+              <button data-performance-id="manual-editor.zoom.fit" className={`manual-editor-btn ghost ${zoom === "fit" ? "active" : ""}`} onClick={() => setZoom("fit")}>适应窗口</button>
+              <button data-performance-id="manual-editor.zoom.out" className="manual-editor-btn icon ghost" onClick={() => setZoom(Math.max(0.25, scale - 0.1))} title="缩小"><ZoomOut size={15} /></button>
               <span>{Math.round(scale * 100)}%</span>
-              <button className="manual-editor-btn icon ghost" onClick={() => setZoom(Math.min(2, scale + 0.1))} title="放大"><ZoomIn size={15} /></button>
+              <button data-performance-id="manual-editor.zoom.in" className="manual-editor-btn icon ghost" onClick={() => setZoom(Math.min(2, scale + 0.1))} title="放大"><ZoomIn size={15} /></button>
             </div>
             <div className={`manual-save-status ${saveStatus}`}><span className="manual-save-dot" />{saveStatusLabel}</div>
-            <button className="manual-editor-btn primary" onClick={() => void save()} disabled={saveStatus === "saving" || saveStatus === "saved"}><Save size={15} />保存</button>
+            <button data-performance-id="manual-editor.save" className="manual-editor-btn primary" onClick={() => void save()} disabled={saveStatus === "saving" || saveStatus === "saved"}><Save size={15} />保存</button>
           </div>
       </main>
       <input ref={fileInputRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleImage(file); event.currentTarget.value = ""; }} />
@@ -841,9 +841,9 @@ export function ManualPageEditorShell(props: Props) {
             <strong>{confirm.kind === "restore" ? "恢复 AI 生成版本" : "当前页面有未保存修改"}</strong>
             <p>{confirm.kind === "restore" ? "当前人工修改将被删除，并重新渲染现有 TSX。" : "请选择保存、放弃修改或继续编辑。"}</p>
             {confirm.kind === "restore" ? (
-              <div><button onClick={() => void resolveConfirm("cancel")}>取消</button><button className="primary" onClick={() => void resolveConfirm("restore")}>确认恢复</button></div>
+              <div><button data-performance-id="manual-editor.confirm.cancel" onClick={() => void resolveConfirm("cancel")}>取消</button><button data-performance-id="manual-editor.restore.confirm" className="primary" onClick={() => void resolveConfirm("restore")}>确认恢复</button></div>
             ) : (
-              <div><button onClick={() => void resolveConfirm("cancel")}>继续编辑</button><button onClick={() => void resolveConfirm("discard")}>放弃</button><button className="primary" onClick={() => void resolveConfirm("save")}>保存</button></div>
+              <div><button data-performance-id="manual-editor.exit.cancel" onClick={() => void resolveConfirm("cancel")}>继续编辑</button><button data-performance-id="manual-editor.exit.discard" onClick={() => void resolveConfirm("discard")}>放弃</button><button data-performance-id="manual-editor.exit.save" className="primary" onClick={() => void resolveConfirm("save")}>保存</button></div>
             )}
           </div>
         </div>

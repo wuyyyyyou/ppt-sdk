@@ -75,7 +75,7 @@ export function StyleProfileCreationPage(props: {
   return (
     <section className="page active style-profile-page">
       <header className="style-profile-page-header">
-        <button className="secondary-btn" onClick={onBack} disabled={running}>
+        <button data-performance-id="style-profile.back" className="secondary-btn" onClick={onBack} disabled={running}>
           <ArrowLeft size={15} />
           返回任务选择
         </button>
@@ -99,6 +99,7 @@ export function StyleProfileCreationPage(props: {
           <div className="style-profile-upload-field">
             <span>上传参考资料（PPTX / 图片）</span>
             <button
+              data-performance-id="style-profile.source-files.select"
               className="upload-btn"
               disabled={running}
               onClick={() => fileInputRef.current?.click()}
@@ -132,29 +133,30 @@ export function StyleProfileCreationPage(props: {
 
         <div className="style-profile-actions">
           {creation.status === "running" ? (
-            <button className="secondary-btn" onClick={onStop}>
+            <button data-performance-id="style-profile.creation.stop" className="secondary-btn" onClick={onStop}>
               <Square size={14} />
               停止
             </button>
           ) : null}
           {creation.status === "completed" ? (
             <>
-              <button className="primary-btn" onClick={onReset}>
+              <button data-performance-id="style-profile.creation.reset" className="primary-btn" onClick={onReset}>
                 <Sparkles size={14} />
                 继续创建
               </button>
-              <button className="secondary-btn" onClick={onBack}>返回任务选择</button>
+              <button data-performance-id="style-profile.back" className="secondary-btn" onClick={onBack}>返回任务选择</button>
             </>
           ) : creation.canRetryAnalysis ? (
             <>
-              <button className="primary-btn" onClick={onRetry}>
+              <button data-performance-id="style-profile.creation.retry" className="primary-btn" onClick={onRetry}>
                 <RotateCcw size={14} />
                 重试分析
               </button>
-              <button className="secondary-btn" onClick={onReset}>重新开始</button>
+              <button data-performance-id="style-profile.creation.reset" className="secondary-btn" onClick={onReset}>重新开始</button>
             </>
           ) : (
             <button
+              data-performance-id="style-profile.creation.start"
               className="primary-btn"
               disabled={running || creation.files.length === 0 || creation.displayName.trim().length === 0}
               onClick={() => void onStart()}
@@ -219,7 +221,7 @@ export function StyleProfileBriefSelection(props: {
           <p>选择一个可复用的视觉风格指导，写入当前 PPT 任务。</p>
         </div>
         {selectedStyleProfile ? (
-          <button className="secondary-btn" onClick={() => void onClear()}>
+          <button data-performance-id="style-profile.selection.clear" className="secondary-btn" onClick={() => void onClear()}>
             <X size={14} />
             清除选择
           </button>
@@ -275,7 +277,7 @@ function StyleProfileLibrary(props: StyleProfileLibraryProps) {
           <div className="section-label">已有风格画像</div>
           <p>{profiles.length > 0 ? "点击卡片查看参考图片和 profile.md 原文。" : "暂无风格画像。上传 PPTX 或图片创建第一个风格画像。"}</p>
         </div>
-        <button className="secondary-btn" onClick={() => void onRefresh()} disabled={loading}>
+        <button data-performance-id="style-profile.library.refresh" className="secondary-btn" onClick={() => void onRefresh()} disabled={loading}>
           {loading ? <span className="spinner small" /> : <RotateCcw size={14} />}
           重试
         </button>
@@ -313,6 +315,7 @@ function StyleProfileCard(props: {
   return (
     <article className={`template-card ${selected ? "active" : ""}`}>
       <button
+        data-performance-id="style-profile.detail.open"
         type="button"
         className="template-preview template-preview-button"
         onClick={() => void onOpenDetail()}
@@ -346,7 +349,7 @@ function StyleProfileCard(props: {
           {profile.reference_count} 张参考图 · {profile.source_file_count} 个来源
         </p>
         {selectable ? (
-          <button className="template-use-btn" disabled={selected} onClick={() => void onSelect?.()}>
+          <button data-performance-id="style-profile.select" className="template-use-btn" disabled={selected} onClick={() => void onSelect?.()}>
             {selected ? <CheckCircle2 size={14} /> : <Sparkles size={14} />}
             {selected ? "已使用" : "使用画像"}
           </button>
@@ -406,7 +409,7 @@ function StyleProfileDetailModal(props: {
           <div className="template-preview-modal-title">
             <h2>{profile?.display_name ?? "风格画像详情"}</h2>
           </div>
-          <button className="template-preview-modal-close" aria-label="关闭" onClick={onClose}>
+          <button data-performance-id="style-profile.detail.close" className="template-preview-modal-close" aria-label="关闭" onClick={onClose}>
             <X size={18} />
           </button>
         </header>

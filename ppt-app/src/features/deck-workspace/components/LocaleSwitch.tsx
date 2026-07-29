@@ -8,10 +8,10 @@ interface LocaleSwitchProps {
 export function LocaleSwitch({ locale, setLocale }: LocaleSwitchProps) {
   return (
     <div className="lang-switch" aria-label="Language">
-      <button className={locale === "en" ? "active" : ""} onClick={() => setLocale("en")}>
+      <button data-performance-id="locale.select-english" className={locale === "en" ? "active" : ""} onClick={() => setLocale("en")}>
         EN
       </button>
-      <button className={locale === "zh" ? "active" : ""} onClick={() => setLocale("zh")}>
+      <button data-performance-id="locale.select-chinese" className={locale === "zh" ? "active" : ""} onClick={() => setLocale("zh")}>
         中
       </button>
     </div>

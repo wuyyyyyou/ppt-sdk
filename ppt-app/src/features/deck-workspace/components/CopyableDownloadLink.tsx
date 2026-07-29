@@ -52,6 +52,7 @@ export function CopyableDownloadLink({
           onFocus={(event) => event.currentTarget.select()}
         />
         <button
+          data-performance-id="download-link.copy"
           className="download-link-copy-btn"
           type="button"
           title={copyLabel}

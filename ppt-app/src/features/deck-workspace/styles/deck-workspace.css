@@ -3221,6 +3221,7 @@ article.brief-style-preset-card {
 .preferences-box,
 .diagnostic-bundle-box,
 .runtime-info-box,
+.performance-testing-box,
 .workspace-row {
   border: 1px solid rgba(17, 24, 39, 0.05);
   border-radius: 14px;
@@ -5127,6 +5128,137 @@ details.generation-history-panel > summary::-webkit-details-marker {
   gap: 2px;
   margin-top: 16px;
   padding: 14px;
+}
+
+.performance-testing-box {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px;
+}
+
+.performance-testing-header,
+.performance-run-status,
+.performance-history-header,
+.performance-run-row,
+.performance-testing-actions,
+.performance-run-actions {
+  display: flex;
+  align-items: center;
+}
+
+.performance-testing-header,
+.performance-history-header,
+.performance-run-row {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.performance-testing-header > div,
+.performance-run-main {
+  min-width: 0;
+}
+
+.performance-testing-header strong,
+.performance-history-header strong {
+  font-size: 13px;
+}
+
+.performance-testing-header p {
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.performance-run-status {
+  gap: 10px;
+  border-left: 3px solid #a4aab7;
+  padding: 9px 10px;
+  background: rgba(17, 24, 39, 0.035);
+}
+
+.performance-run-status.recording {
+  border-left-color: #15803d;
+  background: rgba(21, 128, 61, 0.07);
+}
+
+.performance-run-status > div,
+.performance-run-main {
+  display: grid;
+  gap: 2px;
+}
+
+.performance-run-status span,
+.performance-run-main span,
+.performance-history-header span,
+.performance-testing-message {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.performance-testing-actions,
+.performance-run-actions {
+  gap: 8px;
+}
+
+.performance-history-header {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.performance-run-list {
+  display: grid;
+  border-top: 1px solid var(--line);
+}
+
+.performance-run-row {
+  min-height: 54px;
+  border-bottom: 1px solid var(--line);
+  padding: 7px 0;
+}
+
+.performance-run-main strong {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.performance-testing-message.error {
+  color: #b42318;
+}
+
+.icon-btn.danger {
+  color: #b42318;
+}
+
+.performance-report-page {
+  min-height: 0;
+}
+
+.performance-report-frame {
+  width: 100%;
+  min-height: 620px;
+  height: calc(100vh - 150px);
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+@media (max-width: 640px) {
+  .performance-testing-actions,
+  .performance-run-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .performance-testing-actions > button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .performance-run-actions {
+    justify-content: flex-end;
+  }
 }
 
 .runtime-info-header {

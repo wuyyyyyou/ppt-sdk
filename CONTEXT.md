@@ -304,6 +304,60 @@ _Avoid_: Session History, Live Page Stream
 A Workspace-owned diagnostic record of Host Upload and APS Files transfer activity associated with the Workspace, including transfer lifecycle phases, source operation associations, storage identifiers, and failure responses. It is separate from AI Interaction Logs and does not store file contents; it exists to trace transport and persistence boundaries for troubleshooting.
 _Avoid_: Agent Session Log, Export History, Uploaded Source Material
 
+**Performance Testing**:
+An internal, explicitly enabled testing capability that measures user-perceived interactions and authoritative workflow stages before release using performance metadata rather than business content or raw diagnostic payloads. It is separate from Workspace diagnostics and does not collect ordinary users' production activity.
+User-facing Chinese label: 性能测试
+_Avoid_: Production Telemetry, Product Analytics, Workspace Diagnostics
+
+**Performance Run**:
+A bounded recording session within Performance Testing that captures the tester's actual product operations and may involve zero, one, or multiple Workspaces. It begins and ends explicitly, remains active across an app or engine interruption until a tester resolves it, is the source record for its performance report, and at most one may be active within a PPT global workspace root.
+User-facing Chinese label: 性能测试运行
+_Avoid_: Workspace, Generation Run, User Session
+
+**Performance Run Finalization**:
+The retryable process that stops a Performance Run from accepting new observations and derives its performance report from the captured source record. When explicitly forced, it marks unfinished Performance Operations as interrupted without stopping the measured product work; its own failure is a failure of the testing capability rather than a verdict on any measured product operation.
+User-facing Chinese label: 结束并生成报告
+
+**Abandoned Performance Run**:
+A Performance Run explicitly ended by a tester without producing a valid performance report. Its captured observations remain diagnostic material rather than becoming a completed test result.
+User-facing Chinese label: 已放弃的性能测试运行
+_Avoid_: Deleted Performance Run, Failed Product Operation
+
+**Button Interaction**:
+A measured activation of a PPT App-owned button with a stable testing identity, from the tester's action through the browser's next presentation of that interaction. It describes interaction responsiveness rather than completion of asynchronous business work; key asynchronous buttons may additionally measure their explicit feedback state, and controls inside generated content or embedded page output are excluded.
+User-facing Chinese label: 按钮交互
+_Avoid_: Button Task, Business Operation, Click Handler Duration
+
+**Performance Operation**:
+A measured product operation with an explicit lifecycle and outcome, potentially spanning frontend, backend, and workflow stages. A key asynchronous Button Interaction may start one, while purely local controls do not require one.
+User-facing Chinese label: 性能操作
+_Avoid_: Button Interaction, Diagnostic Log Entry
+
+**Performance Attempt**:
+One actual automatic attempt within a parent Performance Operation, including its own lifecycle and outcome. Automatic retries create additional attempts under the same operation, while a tester's explicit retry begins a new Performance Trace.
+User-facing Chinese label: 性能尝试
+_Avoid_: Performance Operation, User Retry, Hidden Recovered Failure
+
+**Performance Trace**:
+The causally connected record of one tester intent or system-initiated flow within a Performance Run, composed of related Performance Operations across product boundaries. A Performance Run contains many Performance Traces, while existing diagnostic operation and interaction identifiers remain linked evidence rather than being redefined by the trace.
+User-facing Chinese label: 性能链路
+_Avoid_: Performance Run, AI Interaction Log, User Session
+
+**Performance Report**:
+A derived presentation of the performance measurements captured by one completed Performance Run, organized by stable interactions, operations, and workflow stages. It reports observed metrics without assigning a product score or turning measured business failures into a verdict on the report itself.
+User-facing Chinese label: 性能报告
+_Avoid_: Performance Score, Test Verdict, Diagnostic Bundle
+
+**Performance Data Integrity**:
+The completeness assessment of a Performance Run's captured measurements, based on known event loss, corruption, or producer sequence gaps. It is independent of the run's lifecycle, report generation outcome, and the success or failure of measured product operations.
+User-facing Chinese label: 性能数据完整性
+_Avoid_: Performance Run Status, Product Operation Status
+
+**Performance Run History**:
+The retained collection of terminal Performance Runs available for later inspection or report regeneration. It is not automatically expired; testers explicitly remove runs they no longer need.
+User-facing Chinese label: 性能测试历史
+_Avoid_: Workspace History, Generation Session History, Automatic Retention
+
 **Failed Page Generation**:
 A Page Generation Unit that reached a terminal state without becoming accepted after its automatic recovery attempts are exhausted or manual review is required. Its run and accepted pages remain available for retry while the pre-run Workspace stays current; only Generation Abandonment discards them, and Generation Commit cannot begin until every failed page is resolved.
 
@@ -463,3 +517,15 @@ Expert: "No. Call it a Workspace Diagnostic Bundle so users understand that uplo
 Dev: "Anna image fetch succeeded, but the image never reached the Workspace. Is the Research Log enough to locate the failure?"
 
 Expert: "No. The Research Log shows the external API interaction; use its correlation identifiers with the Workspace Storage Transfer Log to distinguish the later APS download and Host Upload stages."
+
+Dev: "Should creating a Workspace automatically create a Performance Run?"
+
+Expert: "No. A Performance Run belongs to an explicitly started internal test recording, which may include creating, opening, or never using a Workspace at all."
+
+Dev: "The tester confirmed an Outline and that started a full Deck Generation. Are those separate Performance Runs?"
+
+Expert: "No. They belong to one Performance Run and one causal Performance Trace, with confirmation and downstream generation represented as related Performance Operations."
+
+Dev: "One telemetry batch could not be delivered, but the PPT finished and the report was generated. Did the Performance Run fail?"
+
+Expert: "No. The report may complete while Performance Data Integrity is degraded; the measured PPT result and the testing data's completeness are separate facts."

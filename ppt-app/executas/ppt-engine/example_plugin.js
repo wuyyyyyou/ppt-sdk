@@ -126,6 +126,14 @@ import {
   updateAppWorkspaceSettings,
   updateAppWorkspaceTitle,
   validateAppWorkspaceThemeToken,
+  abandonPerformanceRun,
+  appendPerformanceEvents,
+  deletePerformanceRun,
+  finalizePerformanceRun,
+  getActivePerformanceRun,
+  getPerformanceReportPath,
+  listPerformanceRuns,
+  startPerformanceRun,
 } from "./dist/index.js";
 
 const TASK_STATE_MACHINE_TOOL_NAMES = [
@@ -162,7 +170,25 @@ const MAX_HOST_UPLOAD_JSON_REFERENCE_BYTES = 512 * 1024;
 const SHARED_RESEARCH_CONTEXT_INLINE_MAX_BYTES = 48 * 1024;
 
 function readToolManifest() {
-  return JSON.parse(readFileSync(new URL("./manifest.json", import.meta.url), "utf8"));
+  const manifest = JSON.parse(readFileSync(new URL("./manifest.json", import.meta.url), "utf8"));
+  return {
+    ...manifest,
+    tools: manifest.tools.map((tool) => {
+      if (!tool.name.startsWith("app_") || tool.name.includes("performance_")) return tool;
+      return {
+        ...tool,
+        parameters: [
+          ...(Array.isArray(tool.parameters) ? tool.parameters : []),
+          {
+            name: "performance_context",
+            type: "object",
+            required: false,
+            description: "Optional bounded Performance Trace context supplied by PPT App; it never becomes a Workspace artifact.",
+          },
+        ],
+      };
+    }),
+  };
 }
 
 const MANIFEST = readToolManifest();
@@ -170,6 +196,155 @@ const MANIFEST = readToolManifest();
 function toolAppGetRuntimeInfo() {
   return {
     ppt_engine_version: MANIFEST.version,
+    performance_testing: {
+      supported: true,
+      schema_version: 1,
+    },
+  };
+}
+
+function readPerformanceContext(args) {
+  const value = args?.performance_context;
+  if (value === undefined) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error('"performance_context" must be an object');
+  }
+  const required = ["run_id", "trace_id", "span_id"];
+  for (const key of required) {
+    if (typeof value[key] !== "string" || value[key].length < 8 || value[key].length > 128) {
+      throw new Error(`"performance_context.${key}" is invalid`);
+    }
+  }
+  for (const key of ["parent_span_id", "operation_name", "workspace_id"]) {
+    if (value[key] !== undefined && (typeof value[key] !== "string" || value[key].length > 160)) {
+      throw new Error(`"performance_context.${key}" is invalid`);
+    }
+  }
+  return {
+    run_id: value.run_id,
+    trace_id: value.trace_id,
+    span_id: value.span_id,
+    ...(value.parent_span_id ? { parent_span_id: value.parent_span_id } : {}),
+    ...(value.operation_name ? { operation_name: value.operation_name } : {}),
+    ...(value.workspace_id ? { workspace_id: value.workspace_id } : {}),
+  };
+}
+
+let performanceSequence = 0;
+const PLUGIN_PERFORMANCE_QUEUE_LIMIT = 1_000;
+const pluginPerformanceQueue = [];
+let pluginPerformanceDrain = null;
+let pluginPerformanceDropped = 0;
+
+function createPluginPerformanceEvent(context, eventType, fields = {}) {
+  return {
+    schema_version: 1,
+    event_id: randomUUID(),
+    event_type: eventType,
+    recorded_at: new Date().toISOString(),
+    producer_id: `ppt-engine-${process.pid}`,
+    sequence_number: performanceSequence++,
+    trace_id: context.trace_id,
+    span_id: context.span_id,
+    parent_span_id: context.parent_span_id,
+    operation_name: context.operation_name,
+    workspace_id: context.workspace_id,
+    ...fields,
+  };
+}
+
+function recordToolPerformance(context, event) {
+  if (!context) return;
+  if (pluginPerformanceQueue.length >= PLUGIN_PERFORMANCE_QUEUE_LIMIT) {
+    pluginPerformanceDropped += 1;
+    return;
+  }
+  pluginPerformanceQueue.push({ runId: context.run_id, event });
+  void flushPluginPerformanceQueue();
+}
+
+async function flushPluginPerformanceQueue() {
+  if (pluginPerformanceDrain) return pluginPerformanceDrain;
+  pluginPerformanceDrain = (async () => {
+    while (pluginPerformanceQueue.length > 0) {
+      const runId = pluginPerformanceQueue[0].runId;
+      const batch = [];
+      while (batch.length < 100 && pluginPerformanceQueue[0]?.runId === runId) {
+        batch.push(pluginPerformanceQueue.shift().event);
+      }
+      if (pluginPerformanceDropped > 0) {
+        const dropped = pluginPerformanceDropped;
+        pluginPerformanceDropped = 0;
+        batch.push({
+          schema_version: 1,
+          event_id: randomUUID(),
+          event_type: "data.loss",
+          recorded_at: new Date().toISOString(),
+          producer_id: `ppt-engine-${process.pid}`,
+          sequence_number: performanceSequence++,
+          attributes: { dropped_count: dropped, reason: "backend_queue_overflow" },
+        });
+      }
+      try {
+        await appendPerformanceEvents({ run_id: runId, events: batch });
+      } catch (error) {
+        process.stderr.write(`[performance] failed to append event batch: ${error instanceof Error ? error.message : String(error)}\n`);
+      }
+    }
+  })().finally(() => {
+    pluginPerformanceDrain = null;
+    if (pluginPerformanceQueue.length > 0) void flushPluginPerformanceQueue();
+  });
+  return pluginPerformanceDrain;
+}
+
+async function toolAppListPerformanceRuns() {
+  return listPerformanceRuns();
+}
+
+async function toolAppStartPerformanceRun(args) {
+  return startPerformanceRun({
+    app_version: typeof args?.app_version === "string" ? args.app_version : undefined,
+    environment: args?.environment && typeof args.environment === "object" && !Array.isArray(args.environment) ? args.environment : undefined,
+    initial_settings: args?.initial_settings && typeof args.initial_settings === "object" && !Array.isArray(args.initial_settings) ? args.initial_settings : undefined,
+  });
+}
+
+async function toolAppAppendPerformanceEvents(args) {
+  return appendPerformanceEvents({ run_id: args?.run_id, events: args?.events });
+}
+
+async function toolAppFinalizePerformanceRun(args) {
+  await flushPluginPerformanceQueue();
+  return finalizePerformanceRun({
+    run_id: args?.run_id,
+    locale: args?.locale === "zh" ? "zh" : "en",
+    force: args?.force === true,
+  });
+}
+
+async function toolAppAbandonPerformanceRun(args) {
+  await flushPluginPerformanceQueue();
+  return abandonPerformanceRun({ run_id: args?.run_id });
+}
+
+async function toolAppDeletePerformanceRun(args) {
+  return deletePerformanceRun({ run_id: args?.run_id });
+}
+
+async function toolAppPreparePerformanceReport(args) {
+  const result = await getPerformanceReportPath({ run_id: args?.run_id });
+  return {
+    run: result.run,
+    report_upload: await uploadLocalFileToHost({
+      filePath: result.report_path,
+      filename: `${result.run.run_id}-report.html`,
+      mimeType: "text/plain",
+      purpose: "user_artifact",
+      operationId: "app_prepare_performance_report",
+      source: "ppt-engine.performance-report",
+      reuseWhileValid: true,
+    }),
   };
 }
 
@@ -2830,6 +3005,13 @@ async function toolForkTemplateGroup(args) {
 
 const TOOL_DISPATCH = {
   app_get_runtime_info: toolAppGetRuntimeInfo,
+  app_list_performance_runs: toolAppListPerformanceRuns,
+  app_start_performance_run: toolAppStartPerformanceRun,
+  app_append_performance_events: toolAppAppendPerformanceEvents,
+  app_finalize_performance_run: toolAppFinalizePerformanceRun,
+  app_abandon_performance_run: toolAppAbandonPerformanceRun,
+  app_delete_performance_run: toolAppDeletePerformanceRun,
+  app_prepare_performance_report: toolAppPreparePerformanceReport,
   app_resolve_host_upload_json_reference: toolAppResolveHostUploadJsonReference,
   app_begin_generation_run: toolAppBeginGenerationRun,
   app_prepare_generation_run: toolAppPrepareGenerationRun,
@@ -3007,10 +3189,46 @@ async function handleInvoke(id, params = {}) {
     );
   }
 
+  const isPerformanceControl = tool.startsWith("app_") && tool.includes("performance_");
+  let performanceContext = null;
+  try {
+    performanceContext = isPerformanceControl ? null : readPerformanceContext(args);
+  } catch (error) {
+    return makeResponse(id, undefined, createInvalidParamsError(error instanceof Error ? error.message : String(error)));
+  }
+  const startedAt = performance.now();
+  if (performanceContext) {
+    recordToolPerformance(
+      performanceContext,
+      createPluginPerformanceEvent(performanceContext, "span.started", {
+        attributes: { layer: "ppt-engine", tool },
+      }),
+    );
+  }
   try {
     const data = await fn(args);
+    if (performanceContext) {
+      recordToolPerformance(
+        performanceContext,
+        createPluginPerformanceEvent(performanceContext, "span.finished", {
+          duration_ms: performance.now() - startedAt,
+          status: "ok",
+          attributes: { layer: "ppt-engine", tool, duration_source: "monotonic" },
+        }),
+      );
+    }
     return makeResponse(id, { success: true, data, tool });
   } catch (error) {
+    if (performanceContext) {
+      recordToolPerformance(
+        performanceContext,
+        createPluginPerformanceEvent(performanceContext, "span.finished", {
+          duration_ms: performance.now() - startedAt,
+          status: "error",
+          attributes: { layer: "ppt-engine", tool, duration_source: "monotonic" },
+        }),
+      );
+    }
     if (error instanceof HostUploadError || error instanceof ApsFilesError) {
       return makeResponse(id, undefined, {
         code: error.code,

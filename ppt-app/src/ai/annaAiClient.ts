@@ -1,4 +1,5 @@
 import type { AnnaLlmCompleteInput, AnnaRuntime } from "../runtime/annaRuntime";
+import { beginPerformanceSpan } from "../performance/performanceRecorder";
 import {
   buildGenerateOutlineLlmRequest,
   buildOutlineRepairRequest,
@@ -132,6 +133,11 @@ async function completeLlmLogged(
   const handle = logContext?.logger
     ? await logContext.logger.startInteraction(logContext, { request: input })
     : null;
+  const performanceSpan = beginPerformanceSpan({
+    operationName: "ai.interaction",
+    workspaceId: logContext?.workspace_dir.split(/[\\/]/).filter(Boolean).at(-1),
+    attributes: { layer: "anna-llm" },
+  });
 
   try {
     const result =
@@ -145,8 +151,10 @@ async function completeLlmLogged(
       response: result,
       output: extractCompletionText(result),
     });
+    performanceSpan?.finish("ok");
     return result;
   } catch (error) {
+    performanceSpan?.finish("error");
     if (handle) {
       await logContext?.logger?.finishInteraction(handle, {
         status: "failed",

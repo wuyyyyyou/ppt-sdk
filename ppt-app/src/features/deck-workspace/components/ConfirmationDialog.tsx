@@ -50,6 +50,7 @@ export function ConfirmationDialog({ request, onResolve }: ConfirmationDialogPro
       <section className={`app-confirmation-card ${request.tone}`} onClick={(event) => event.stopPropagation()}>
         {dismissible ? (
           <button
+            data-performance-id="confirmation.close"
             type="button"
             className="app-confirmation-close"
             aria-label={request.closeLabel}
@@ -66,11 +67,12 @@ export function ConfirmationDialog({ request, onResolve }: ConfirmationDialogPro
         </div>
         <footer className="app-confirmation-actions">
           {request.cancelLabel ? (
-            <button type="button" className="secondary-btn" onClick={() => onResolve(false)}>
+            <button data-performance-id="confirmation.cancel" type="button" className="secondary-btn" onClick={() => onResolve(false)}>
               {request.cancelLabel}
             </button>
           ) : null}
           <button
+            data-performance-id="confirmation.confirm"
             ref={confirmButtonRef}
             type="button"
             className={request.tone === "danger" ? "danger-btn" : "primary-btn"}
