@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { ApsFilesClient, ApsFilesError } from "../aps-files-client.js";
+import { bindInvoke } from "../invoke-context.js";
 
 test("APS Files client sends user-scoped upload frames and routes responses", async () => {
   const frames: Array<Record<string, unknown>> = [];
@@ -45,6 +46,26 @@ test("APS Files client sends reverse RPC without requiring a local initialize fl
   });
   assert.equal(frames[0]?.method, "files/upload_begin");
   assert.equal((frames[0]?.params as Record<string, unknown>)?.scope, "user");
+  client.dispatchResponse({
+    jsonrpc: "2.0",
+    id: frames[0]?.id,
+    result: { put_url: "https://storage.example/put", headers: {} },
+  });
+  await pending;
+});
+
+test("APS Files client attaches the bound parent invoke id", async () => {
+  const frames: Array<Record<string, unknown>> = [];
+  const client = new ApsFilesClient({ writeFrame: (message: Record<string, unknown>) => frames.push(message) });
+
+  const pending = bindInvoke({ context: { invoke_id: "invoke-aps" } }, () => client.uploadBegin({
+    path: "workspaces/demo/exports/current.pdf",
+    sizeBytes: 3,
+    contentType: "application/pdf",
+  }));
+  assert.deepEqual((frames[0]?.params as Record<string, unknown>)?.context, {
+    invoke_id: "invoke-aps",
+  });
   client.dispatchResponse({
     jsonrpc: "2.0",
     id: frames[0]?.id,

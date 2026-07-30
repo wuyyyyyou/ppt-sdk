@@ -116,24 +116,37 @@ Each result shows the size + chosen mode and, on success, the short-lived
 `open ↗` link. Host Upload objects are transient and **never** listed — the
 returned link is the only deliverable.
 
-## 并发竞态复现
+## 并发 invoke 关联验证
 
-页面新增了“并发 invoke 竞态复现”区域，用于排查多个独立 `tools.invoke`
-同时执行 `host/uploadFile` 时，`r2_key` 是否会在 `confirm` 阶段被错误归属。
+页面中的“并发 invoke 关联验证”区域用于确认多个独立 `tools.invoke`
+同时执行 `host/uploadFile` 时，`negotiate` 和 `confirm` 是否始终携带各自的
+`params.context.invoke_id`，且 `r2_key` 不会被错误归属。
 
 - 测试文件固定为 256 KiB，并强制使用 `negotiate → PUT → confirm`，与
   `ppt-engine` 上传页面截图的路径一致。
 - 可配置并发数、总调用数、confirm 前固定延迟和随机抖动。
-- 建议先用并发数 1 建立基线，再使用 4 或 8 进行对比。
+- 建议使用并发数 4 或 8；通过标准是归属错误为 0。
 - 浏览器记录调用调度、耗时和最终错误；Executa 单独记录
   negotiate、PUT、confirm 的阶段事件。
 - 测试完成后可从浏览器下载合并后的 JSONL。下载 URL、签名和 token 会被
-  脱敏，`run_id`、`call_id`、父级 invoke ID 和 `r2_key` 会保留用于关联。
+  脱敏，`run_id`、`call_id`、父级 `invoke_id`、reverse RPC 实际携带的
+  `wire_invoke_id` 和 `r2_key` 会保留用于关联；同一调用的两个 ID 应一致。
 - Executa 日志按约 24 KiB 的字节预算分页返回，浏览器自动逐页拉取并合并，
   避免单行 JSON-RPC 响应超过 Anna Runtime 默认的 64 KiB stdout 限制。
 
-复现真实平台问题必须使用已登录账号运行 `pnpm dev`。`pnpm dev:mock`
-不会发出真实 reverse RPC，因此只能检查界面，不能验证并发归属问题。
+`pnpm dev` 可以检查本地 Host Upload 链路和新的上下文发帧，但原缺陷只在
+平台安装模式稳定复现，因此本地测试成功不能单独证明平台问题已修复。
+最终验证应重新构建并发布 `0.2.5` Executa，通过平台安装后交给
+`1.1.0-beta.26+` 的 Local Agent 运行并发测试。通过标准如下：
+
+- 所有调用成功，归属错误为 0。
+- 每次调用的 `negotiate` 和 `confirm` 日志中，`invoke_id` 与
+  `wire_invoke_id` 一致。
+- 同一次调用从 `negotiate` 返回、PUT 使用、再传给 `confirm` 的 `r2_key`
+  完全一致。
+
+`pnpm dev:mock` 不会发出真实 reverse RPC，因此只能检查界面，不能验证
+并发归属问题。
 
 Executa 是自包含的，不依赖仓库外的 Python SDK 路径。可以先运行下面的
 启动回归测试，确认 Anna Dev 使用的真实 `uv run` 命令能够完成 `describe`

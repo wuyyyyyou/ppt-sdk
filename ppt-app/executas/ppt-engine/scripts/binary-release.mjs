@@ -160,6 +160,7 @@ async function verifyExternalAppRuntime(extractDir, toolManifest) {
   await assertDirectory(path.join(appRoot, "dist"), "external app dist");
   await assertDirectory(path.join(appRoot, "node_modules"), "external app node_modules");
   await assertFile(path.join(appRoot, "example_plugin.js"), "external app entrypoint");
+  await assertFile(path.join(appRoot, "invoke-context.js"), "external app invoke context helper");
   await assertFile(path.join(appRoot, "package.json"), "external app package manifest");
   await assertFile(path.join(appRoot, "manifest.json"), "external app tool manifest");
   await assertFile(path.join(appRoot, "dist", "index.js"), "external app engine entry");

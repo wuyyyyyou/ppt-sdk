@@ -20,6 +20,7 @@ import {
   ApsFilesClient,
   ApsFilesError,
 } from "./aps-files-client.js";
+import { attachInvokeContext, bindInvoke } from "./invoke-context.js";
 
 import {
   appendAppWorkspaceLog,
@@ -492,9 +493,9 @@ class ExecutaHostUploadClient {
       jsonrpc: "2.0",
       id,
       method: HOST_UPLOAD_METHOD,
-      params: Object.fromEntries(
+      params: attachInvokeContext(Object.fromEntries(
         Object.entries(params).filter(([, value]) => value !== undefined),
-      ),
+      )),
     };
 
     return new Promise((resolve, reject) => {
@@ -3331,9 +3332,11 @@ async function handleRequest(request) {
       return makeResponse(id, MANIFEST);
     }
     case "invoke":
-      return TASK_STATE_MACHINE_TOOL_NAMES.includes(params?.tool)
-        ? invokeTaskStateMachine({ jsonrpc: "2.0", id, method, params })
-        : handleInvoke(id, params);
+      return bindInvoke(params, () => (
+        TASK_STATE_MACHINE_TOOL_NAMES.includes(params?.tool)
+          ? invokeTaskStateMachine({ jsonrpc: "2.0", id, method, params })
+          : handleInvoke(id, params)
+      ));
     case "health":
       return makeResponse(id, {
         status: "healthy",

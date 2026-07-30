@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import threading
 import uuid
+from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Iterator, Mapping, Optional
 
 PROTOCOL_VERSION_V2 = "2.0"
 METHOD_HOST_UPLOAD_FILE = "host/uploadFile"
@@ -19,6 +21,49 @@ METHOD_HOST_UPLOAD_FILE = "host/uploadFile"
 UPLOAD_ERR_NOT_GRANTED = -32201
 UPLOAD_ERR_TOO_LARGE = -32204
 UPLOAD_ERR_TIMEOUT = -32208
+
+_CURRENT_INVOKE_ID: ContextVar[Optional[str]] = ContextVar(
+    "host_upload_current_invoke_id", default=None
+)
+
+
+def _read_invoke_id(params_or_invoke_id: Mapping[str, Any] | str | None) -> Optional[str]:
+    if isinstance(params_or_invoke_id, str) or params_or_invoke_id is None:
+        return params_or_invoke_id or None
+    context = params_or_invoke_id.get("context")
+    invoke_id = context.get("invoke_id") if isinstance(context, Mapping) else None
+    if invoke_id is None:
+        invoke_id = params_or_invoke_id.get("invoke_id")
+    return invoke_id if isinstance(invoke_id, str) and invoke_id else None
+
+
+@contextlib.contextmanager
+def bind_invoke(
+    params_or_invoke_id: Mapping[str, Any] | str | None,
+) -> Iterator[Optional[str]]:
+    """Bind one forward invoke to reverse RPCs in the current async task."""
+
+    token = _CURRENT_INVOKE_ID.set(_read_invoke_id(params_or_invoke_id))
+    try:
+        yield _CURRENT_INVOKE_ID.get()
+    finally:
+        _CURRENT_INVOKE_ID.reset(token)
+
+
+def get_current_invoke_id() -> Optional[str]:
+    return _CURRENT_INVOKE_ID.get()
+
+
+def attach_invoke_context(params: dict) -> dict:
+    invoke_id = get_current_invoke_id()
+    if not invoke_id:
+        return params
+    context = params.get("context")
+    if not isinstance(context, dict):
+        context = {}
+        params["context"] = context
+    context.setdefault("invoke_id", invoke_id)
+    return params
 
 
 class UploadError(Exception):
@@ -158,7 +203,7 @@ class HostUploadClient:
             "jsonrpc": "2.0",
             "id": request_id,
             "method": METHOD_HOST_UPLOAD_FILE,
-            "params": params,
+            "params": attach_invoke_context(params),
         }
         try:
             self._write_frame(message)

@@ -2316,9 +2316,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       confirmed_at: new Date().toISOString(),
     };
     setRequirementsConfirming(true);
+    // Move to the next stage immediately. Confirmation may include Host Upload
+    // round-trips before Outline Creation can start, but the user should see
+    // the existing outline loading surface during that work.
+    setPage("main");
+    setStage("outline");
+    setLoading("outline");
+    setOutline([]);
+    setOutlineDraft([]);
+    setOutlineError("");
+    setOutlineErrorDetail("");
     try {
       const workspace = currentWorkspace ?? await ensureCurrentWorkspace();
-      if (!workspace) return;
+      if (!workspace) throw new Error(t.errors.summaryUnknown);
       const preset = findVisualStylePreset(confirmed.selections.visual_style_preset?.id);
       let hostUpload;
       if (preset) {
@@ -2350,11 +2360,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       setOutlineDraftTitle(getWorkspaceTitle(resetWorkspace));
       setOutlineError("");
       setOutlineErrorDetail("");
-      setPage("main");
-      setStage("outline");
       await createOutlineFromConfirmedRequirements(resetWorkspace);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error));
+      const { summary, detail } = summarizeUserFacingError(t, error, t.toasts.createOutlineFirst);
+      setOutlineError(summary);
+      setOutlineErrorDetail(detail);
+      setLoading("none");
     } finally {
       setRequirementsConfirming(false);
     }
@@ -2824,6 +2835,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function retryOutlineCreation() {
+    if (presentationRequirements.status !== "confirmed") {
+      await confirmPresentationRequirements();
+      return;
+    }
     await createOutlineFromConfirmedRequirements();
   }
 

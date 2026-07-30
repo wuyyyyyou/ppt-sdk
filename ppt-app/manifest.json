@@ -3,10 +3,13 @@
   "permissions": [
     "tools.invoke"
   ],
+  "host_capabilities": [
+    "aps.scope.user.read"
+  ],
   "required_executas": [
     {
       "tool_id": "bundled:ppt-engine",
-      "min_version": "4.6.0",
+      "min_version": "4.3.10",
       "version": "latest"
     }
   ],

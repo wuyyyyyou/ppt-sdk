@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { attachInvokeContext } from "./invoke-context.js";
+
 export const APS_FILES_ERROR_NOT_GRANTED = -32021;
 export const APS_FILES_ERROR_TIMEOUT = -32030;
 export const APS_FILES_DOWNLOAD_SCOPE = "user";
@@ -92,9 +94,9 @@ export class ApsFilesClient {
       jsonrpc: "2.0",
       id,
       method,
-      params: Object.fromEntries(
+      params: attachInvokeContext(Object.fromEntries(
         Object.entries(params).filter(([, value]) => value !== undefined),
-      ),
+      )),
     };
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {

@@ -36,6 +36,7 @@ const AGENT_RUN_TIMEOUT_MS = 600_000;
 const AGENT_STREAM_IDLE_TIMEOUT_MS = 180_000;
 const MAX_AGENT_SESSION_RETRIES = 1;
 const MAX_AGENT_STREAM_IDLE_RETRIES = 1;
+const MAX_AGENT_EMPTY_COMPLETION_RETRIES = 1;
 const DEFAULT_AGENT_SESSION_EXPIRES_IN_SECONDS = 600;
 const AGENT_SESSION_RENEW_MARGIN_MS = 60_000;
 const AGENT_SESSION_CACHE_MISS_EXHAUSTED_MESSAGE =
@@ -92,7 +93,7 @@ export interface AgentClient {
 export type AgentStreamEvent =
   | { type: "content"; text: string }
   | { type: "activity"; message: string; tool?: string; path?: string; size?: number }
-  | { type: "error"; message: string; code?: string; expired?: boolean; sessionCacheMiss?: boolean }
+  | { type: "error"; message: string; code?: string; expired?: boolean; sessionCacheMiss?: boolean; retryable?: boolean }
   | { type: "complete"; usage?: unknown };
 
 export interface AgentRunOptions {
@@ -108,6 +109,7 @@ export interface AgentClientOptions {
   cacheMissRetryConfig?: Partial<AgentSessionCacheMissRetryConfig>;
   wait?: (ms: number) => Promise<void>;
   random?: () => number;
+  runTimeoutMs?: number;
   streamIdleTimeoutMs?: number;
   toolAccessPolicy?: AgentToolAccessPolicy;
 }
@@ -123,6 +125,7 @@ class AgentRunStreamError extends Error {
     public readonly expired = false,
     public readonly code?: string,
     public readonly sessionCacheMiss = false,
+    public readonly retryable = false,
   ) {
     super(message);
     this.name = "AgentRunStreamError";
@@ -152,6 +155,13 @@ export class AgentRunCancelledError extends Error {
   constructor() {
     super("Agent run cancelled");
     this.name = "AgentRunCancelledError";
+  }
+}
+
+class AgentRunTimeoutError extends Error {
+  constructor(public readonly timeoutMs: number) {
+    super(`Agent run timed out after ${timeoutMs}ms`);
+    this.name = "AgentRunTimeoutError";
   }
 }
 
@@ -375,15 +385,20 @@ function extractFrameEvents(
     }
   }
 
-  if (frame.event === "error") {
-    const message = readString(frame.message) || "Agent stream error.";
+  const errorType = readString(frame.error_type) || readString(frame.code);
+  const errorMessage = readString(frame.message) || readString(frame.error);
+  const hasErrorFrame = frame.event === "error" || Boolean(errorType) ||
+    (frame.event === "sse" && Boolean(errorMessage));
+  if (hasErrorFrame) {
+    const message = errorMessage || "Agent stream error.";
     const sessionCacheMiss = isAgentSessionCacheMissMessage(message);
     events.push({
       type: "error",
-      code: readString(frame.code) || undefined,
+      code: errorType || undefined,
       message,
       expired: /expired|APP_NOT_GRANTED|invalid app_session_token/i.test(message),
       sessionCacheMiss,
+      retryable: frame.is_retryable === true,
     });
     return events;
   }
@@ -482,6 +497,7 @@ async function collectRunText(
           event.expired,
           event.code,
           event.sessionCacheMiss === true,
+          event.retryable === true,
         );
       }
     }
@@ -563,7 +579,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
   let timeoutId: ReturnType<typeof globalThis.setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timeoutId = globalThis.setTimeout(() => {
-      reject(new Error(`Agent run timed out after ${timeoutMs}ms`));
+      reject(new AgentRunTimeoutError(timeoutMs));
     }, timeoutMs);
   });
 
@@ -651,6 +667,26 @@ export async function createAgentClient(
     await session?.delete().catch(() => undefined);
   }
 
+  function readActiveRunId(session: AnnaAgentSession): string | null {
+    const sessionRecord = session as unknown as Record<string, unknown>;
+    return typeof sessionRecord.__activeRunId === "string"
+      ? sessionRecord.__activeRunId
+      : typeof sessionRecord.run_id === "string"
+        ? sessionRecord.run_id
+        : typeof sessionRecord.runId === "string" ? sessionRecord.runId : null;
+  }
+
+  async function cancelSessionRun(session: AnnaAgentSession): Promise<void> {
+    const runId = readActiveRunId(session);
+    if (!runId || typeof session.cancel !== "function") {
+      console.warn("Agent Session cancellation is unavailable for an active run.");
+      return;
+    }
+    await session.cancel(runId).catch((error) => {
+      console.warn("Failed to cancel Agent Session run", error);
+    });
+  }
+
   function shouldRenewBeforeRun(sessionMeta: { createdAtMs: number; expiresInSeconds: number }) {
     const expiresAtMs = sessionMeta.createdAtMs + sessionMeta.expiresInSeconds * 1000;
     return expiresAtMs - Date.now() <= AGENT_SESSION_RENEW_MARGIN_MS;
@@ -663,6 +699,7 @@ export async function createAgentClient(
     sessionState: {
       sessionRetries: number;
       streamIdleRetries: number;
+      emptyCompletionRetries: number;
       sessionCacheMissRetryState: AgentSessionCacheMissRetryState;
     },
   ): Promise<CollectedAgentRun> {
@@ -674,6 +711,7 @@ export async function createAgentClient(
             session_retries: sessionState.sessionRetries,
             session_cache_miss_retries: sessionState.sessionCacheMissRetryState.retries,
             stream_idle_retries: sessionState.streamIdleRetries,
+            empty_completion_retries: sessionState.emptyCompletionRetries,
           },
         })
       : null;
@@ -696,7 +734,7 @@ export async function createAgentClient(
           clientOptions,
           toolAccessPolicy,
         ),
-        AGENT_RUN_TIMEOUT_MS,
+        clientOptions.runTimeoutMs ?? AGENT_RUN_TIMEOUT_MS,
       );
       if (interactionHandle) {
         await runOptions?.logContext?.logger?.finishInteraction(interactionHandle, {
@@ -709,6 +747,7 @@ export async function createAgentClient(
             session_retries: sessionState.sessionRetries,
             session_cache_miss_retries: sessionState.sessionCacheMissRetryState.retries,
             stream_idle_retries: sessionState.streamIdleRetries,
+            empty_completion_retries: sessionState.emptyCompletionRetries,
           },
         });
       }
@@ -722,6 +761,9 @@ export async function createAgentClient(
       return collected;
     } catch (error) {
       performanceSpan?.finish("error");
+      if (error instanceof AgentRunTimeoutError) {
+        await cancelSessionRun(sessionMeta.session);
+      }
       if (interactionHandle) {
         await runOptions?.logContext?.logger?.finishInteraction(interactionHandle, {
           status: isStreamCancelledError(error) ? "cancelled" : "failed",
@@ -731,6 +773,7 @@ export async function createAgentClient(
             session_retries: sessionState.sessionRetries,
             session_cache_miss_retries: sessionState.sessionCacheMissRetryState.retries,
             stream_idle_retries: sessionState.streamIdleRetries,
+            empty_completion_retries: sessionState.emptyCompletionRetries,
           },
         });
       }
@@ -747,6 +790,30 @@ export async function createAgentClient(
           return runPromptWithSession(sessionMeta, prompt, runOptions, sessionState);
         }
         throw toAgentInfrastructureError(error, "Agent stream idle timeout.", {
+          rawMessage: error.message,
+        });
+      }
+      if (
+        error instanceof AgentRunStreamError &&
+        error.code === "empty_completion"
+      ) {
+        if (
+          error.retryable &&
+          sessionState.emptyCompletionRetries < MAX_AGENT_EMPTY_COMPLETION_RETRIES
+        ) {
+          sessionState.emptyCompletionRetries += 1;
+          runOptions?.onStreamEvent?.({
+            type: "activity",
+            message: "Agent returned an empty completion; retrying once",
+          });
+          await deleteSession(sessionMeta.session);
+          const renewedSession = await createSession();
+          sessionMeta.session = renewedSession.session;
+          sessionMeta.createdAtMs = renewedSession.createdAtMs;
+          sessionMeta.expiresInSeconds = renewedSession.expiresInSeconds;
+          return runPromptWithSession(sessionMeta, prompt, runOptions, sessionState);
+        }
+        throw toAgentInfrastructureError(error, "Agent returned an empty completion.", {
           rawMessage: error.message,
         });
       }
@@ -835,6 +902,7 @@ export async function createAgentClient(
   > {
     let sessionRetries = 0;
     let streamIdleRetries = 0;
+    let emptyCompletionRetries = 0;
     const sessionCacheMissRetryState: AgentSessionCacheMissRetryState = {
       retries: 0,
       totalWaitMs: 0,
@@ -855,6 +923,7 @@ export async function createAgentClient(
         const sessionState = {
           sessionRetries,
           streamIdleRetries,
+          emptyCompletionRetries,
           sessionCacheMissRetryState,
         };
         const collected = await runPromptWithSession(
@@ -865,6 +934,7 @@ export async function createAgentClient(
         );
         sessionRetries = sessionState.sessionRetries;
         streamIdleRetries = sessionState.streamIdleRetries;
+        emptyCompletionRetries = sessionState.emptyCompletionRetries;
         return {
           ...collected,
           sessionRetries,
@@ -963,6 +1033,7 @@ export async function createAgentClient(
     const sessionState = {
       sessionRetries: 0,
       streamIdleRetries: 0,
+      emptyCompletionRetries: 0,
       sessionCacheMissRetryState,
     };
     try {
@@ -1039,19 +1110,7 @@ export async function createAgentClient(
 
     async cancelActiveRuns() {
       await Promise.all([...activeSessions].map(async (session) => {
-        const sessionRecord = session as unknown as Record<string, unknown>;
-        const runId = typeof sessionRecord.__activeRunId === "string"
-          ? sessionRecord.__activeRunId
-          : typeof sessionRecord.run_id === "string"
-            ? sessionRecord.run_id
-            : typeof sessionRecord.runId === "string" ? sessionRecord.runId : null;
-        if (!runId || typeof session.cancel !== "function") {
-          console.warn("Agent Session cancellation is unavailable for an active run.");
-          return;
-        }
-        await session.cancel(runId).catch((error) => {
-          console.warn("Failed to cancel Agent Session run", error);
-        });
+        await cancelSessionRun(session);
       }));
     },
 

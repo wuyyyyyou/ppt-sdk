@@ -1,6 +1,6 @@
 [project]
 name = "tool-test-file-upload-12345678"
-version = "0.2.4"
+version = "0.2.5"
 description = "Self-contained demo Executa for transient host/uploadFile reverse-RPC and concurrency diagnostics."
 requires-python = ">=3.10"
 authors = [{ name = "Anna Developer" }]

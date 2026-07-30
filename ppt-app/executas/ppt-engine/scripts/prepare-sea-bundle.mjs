@@ -16,6 +16,7 @@ const INCLUDED_PATHS = [
   "package.json",
   "manifest.json",
   "example_plugin.js",
+  "invoke-context.js",
   "aps-files-client.js",
   "host-upload-confirmation.js",
   "host-upload-cache.js",

@@ -78,9 +78,9 @@
     </section>
 
     <section id="race-section">
-      <h2 data-i18n="raceTitle">2. Concurrent invoke race reproducer</h2>
+      <h2 data-i18n="raceTitle">2. Concurrent invoke correlation check</h2>
       <p class="muted" data-i18n="raceDescription">
-        Force small files through negotiate → PUT → confirm and issue several independent tools.invoke calls concurrently.
+        Run independent tools.invoke calls concurrently and verify that negotiate and confirm carry their own parent invoke IDs.
       </p>
       <div class="control-grid">
         <label>
@@ -120,7 +120,7 @@
         </label>
       </div>
       <p class="muted note" data-i18n="raceNote">
-        Start with concurrency 1 as the baseline, then repeat with 4 or 8. The test reuses one 256 KiB local sample but gives every upload a unique filename.
+        Use concurrency 4 or 8. Passing means zero ownership errors and matching invoke_id and wire_invoke_id values in the downloaded log.
       </p>
       <div class="row">
         <button id="race-start-btn" data-i18n="startRace">Start stress test</button>
