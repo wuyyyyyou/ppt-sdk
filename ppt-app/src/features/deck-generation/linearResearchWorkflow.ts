@@ -109,7 +109,7 @@ interface LinearResearchCheckpoint {
     decision?: { needs_search: boolean; queries: string[]; rationale?: string };
     searches?: Array<QueryCheckpoint<ImageSearchOccurrence[]>>;
     search_status?: ImageWorkState;
-    prefetch_status?: ImageWorkState;
+    prepare_status?: ImageWorkState;
     deduplication?: {
       status: ImageWorkState;
       strategy: {
@@ -138,7 +138,7 @@ interface LinearResearchCheckpoint {
       strategy?: {
         version: 2;
         key: "sha256";
-        source: "anna.web.image_fetch";
+        source: "ppt-engine.https_download";
       };
       statistics: {
         fetched_candidates: number;
@@ -194,8 +194,38 @@ function readCheckpoint(value: Record<string, unknown>): LinearResearchCheckpoin
   };
 }
 
+function migrateLegacyImageCheckpoint(checkpoint: LinearResearchCheckpoint): LinearResearchCheckpoint {
+  const migrated = structuredClone(checkpoint);
+  const image = migrated.image as (NonNullable<LinearResearchCheckpoint["image"]> & { prefetch_status?: ImageWorkState }) | undefined;
+  if (!image) return migrated;
+  if (!image.prepare_status && image.prefetch_status) image.prepare_status = image.prefetch_status;
+  delete image.prefetch_status;
+  image.candidates = image.candidates?.map((value) => {
+    const candidate = value as SharedResearchImageCandidate & {
+      prefetch_status?: "pending" | "running" | "completed" | "failed";
+      prefetch_interaction_id?: string;
+      prefetch_error?: string;
+      aps_path?: string;
+      download_status?: "pending" | "imported" | "failed";
+    };
+    if (!candidate.local_download_status && candidate.prefetch_status) {
+      candidate.local_download_status = candidate.prefetch_status === "completed" ? "pending" : candidate.prefetch_status;
+    }
+    if (!candidate.upload_status) candidate.upload_status = candidate.content_duplicate_of ? "skipped" : "pending";
+    if (!candidate.import_status && candidate.download_status) candidate.import_status = candidate.download_status;
+    candidate.import_status ??= "pending";
+    delete candidate.prefetch_status;
+    delete candidate.prefetch_interaction_id;
+    delete candidate.prefetch_error;
+    delete candidate.aps_path;
+    delete candidate.download_status;
+    return candidate;
+  });
+  return migrated;
+}
+
 const IMAGE_ANALYSIS_BATCH_SIZE = 6;
-const IMAGE_PREFETCH_CONCURRENCY = 2;
+const IMAGE_DOWNLOAD_CONCURRENCY = 2;
 const IMAGE_IMPORT_CONCURRENCY = 2;
 const IMAGE_DEDUP_TRACKING_PARAMETERS = [
   "utm_*",
@@ -297,7 +327,7 @@ function stageMessage(runtime: DeckGenerationRuntime, stage: StageKey) {
     image_research: zh ? "正在搜索并筛选图片素材" : "Searching and selecting image material",
     image_search: zh ? "正在搜索图片候选" : "Searching for image candidates",
     image_deduplication: zh ? "正在合并重复图片" : "Deduplicating image candidates",
-    image_prefetch: zh ? "正在将图片候选预取到 APS" : "Prefetching image candidates to APS",
+    image_prefetch: zh ? "正在下载并准备图片候选" : "Downloading and preparing image candidates",
     image_analysis: zh ? "正在判断图片可用性" : "Assessing image candidates",
     image_import: zh ? "正在保存可用图片" : "Saving selected images",
   };
@@ -386,7 +416,7 @@ function buildSharedResearchProgressOperations(
   for (const search of changedByKey(previousImage.searches, nextImage.searches, "query")) {
     operations.push({ op: "upsert_image_search", query: String(search.query), search });
   }
-  for (const field of ["search_status", "prefetch_status", "analysis_status", "import_status"] as const) {
+  for (const field of ["search_status", "prepare_status", "analysis_status", "import_status"] as const) {
     const value = nextImage[field];
     if (value && value !== previousImage[field]) operations.push({ op: "set_image_work_status", field, state: value });
   }
@@ -590,15 +620,6 @@ function webStatisticsMarkdown(runtime: DeckGenerationRuntime, web: NonNullable<
       ].join("\n");
 }
 
-function inferAttachmentType(candidate: ResearchImageSearchResult) {
-  if (candidate.mime_type?.startsWith("image/")) return candidate.mime_type;
-  const url = candidate.image_url.toLowerCase();
-  if (/\.png(?:$|[?#])/.test(url)) return "image/png";
-  if (/\.webp(?:$|[?#])/.test(url)) return "image/webp";
-  if (/\.gif(?:$|[?#])/.test(url)) return "image/gif";
-  return "image/jpeg";
-}
-
 function buildImagePrompt(runtime: DeckGenerationRuntime, styleGuide: string, candidates: SharedResearchImageCandidate[]) {
   const targetPageIds = Object.keys(runtime.pageRefinementReasons ?? {});
   const targetPages = runtime.confirmedOutline.items.filter((item) => item.page_id && targetPageIds.includes(item.page_id));
@@ -652,127 +673,86 @@ function researchWebCallContext(runtime: DeckGenerationRuntime, operationId: str
   };
 }
 
-function storageTransferId() {
-  return `transfer-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2, 14)}`;
-}
-
-function storageErrorRecord(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  const record = error && typeof error === "object" && !Array.isArray(error)
-    ? error as Record<string, unknown>
-    : {};
-  return {
-    ...(error instanceof Error ? { name: error.name } : {}),
-    message: message.replace(/https?:\/\/\S+/gi, "[REDACTED_URL]"),
-    ...(record.code !== undefined ? { code: record.code } : {}),
-  };
-}
-
-async function appendResearchImageStorageLog(
-  runtime: DeckGenerationRuntime,
-  entry: Record<string, unknown>,
-) {
-  try {
-    await runtime.backend.appendWorkspaceLog({
-      workspace_dir: runtime.workspace.workspace_dir,
-      channel: "storage-transport",
-      entry,
-    });
-  } catch (error) {
-    console.warn("[research-image-aps-log] Failed to append storage transfer log", {
-      operation_id: entry.operation_id,
-      transfer_id: entry.transfer_id,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-}
-
-async function prefetchResearchImage(
+async function downloadResearchImageCandidate(
   runtime: DeckGenerationRuntime,
   candidate: SharedResearchImageCandidate,
   operationId: string,
 ) {
-  const transferId = storageTransferId();
-  const imageFetchContext = researchWebCallContext(runtime, operationId);
-  const base = {
-    schema_version: 1,
-    transfer_id: transferId,
-    operation_id: operationId,
-    source: "research_image_fetch",
-    transport: "aps_files",
-    candidate_id: candidate.candidate_id,
-  };
-  await appendResearchImageStorageLog(runtime, {
-    event: "storage.transfer.started",
-    ...base,
-    phase: "started",
-    status: "started",
-  });
   try {
-    const fetched = await measureResearchOperation(
+    const downloaded = await measureResearchOperation(
       runtime,
-      "research.image.prefetch",
-      () => runtime.researchWebClient.imageFetch(
-        { url: candidate.image_url, max_bytes: 20 * 1024 * 1024, purpose: "ppt-research" },
-        imageFetchContext,
-      ),
+      "research.image.download",
+      () => runtime.backend.prepareSharedResearchImageCandidate({
+        workspace_dir: runtime.workspace.workspace_dir,
+        operation_id: operationId,
+        candidate_id: candidate.candidate_id,
+        source_url: candidate.image_url,
+        ...(candidate.local_file_path && candidate.sha256 ? {
+          existing_file_path: candidate.local_file_path,
+          expected_sha256: candidate.sha256,
+        } : {}),
+      }),
       { candidate_id: candidate.candidate_id },
-      "anna-web",
+      "research-image-transfer",
     );
     Object.assign(candidate, {
-      prefetch_status: "completed" as const,
-      aps_path: fetched.path,
-      sha256: fetched.sha256,
-      mime_type: fetched.mime_type,
-      bytes_size: fetched.bytes_size,
-      final_url: fetched.final_url,
-      prefetch_interaction_id: imageFetchContext.interaction_id,
+      local_download_status: "completed" as const,
+      local_file_path: downloaded.local_file_path,
+      sha256: downloaded.sha256,
+      mime_type: downloaded.mime_type,
+      bytes_size: downloaded.bytes_size,
+      width: downloaded.width,
+      height: downloaded.height,
+      final_url: downloaded.final_url,
     });
-    delete candidate.prefetch_error;
-    await appendResearchImageStorageLog(runtime, {
-      event: "storage.transfer.finished",
-      ...base,
-      parent_interaction_id: imageFetchContext.interaction_id,
-      phase: "finished",
-      status: "succeeded",
-      aps_path: fetched.path,
-      mime_type: fetched.mime_type,
-      size_bytes: fetched.bytes_size,
-      sha256: fetched.sha256,
-    });
+    delete candidate.local_download_error;
   } catch (error) {
-    candidate.prefetch_status = "failed";
-    candidate.prefetch_interaction_id = imageFetchContext.interaction_id;
-    candidate.prefetch_error = errorMessage(error);
-    await appendResearchImageStorageLog(runtime, {
-      event: "storage.transfer.failed",
-      ...base,
-      parent_interaction_id: imageFetchContext.interaction_id,
-      phase: "prefetch",
-      status: "failed",
-      error: storageErrorRecord(error),
-    });
+    candidate.local_download_status = "failed";
+    candidate.local_download_error = errorMessage(error);
     throw error;
   }
+}
+
+async function uploadResearchImageCandidate(
+  runtime: DeckGenerationRuntime,
+  candidate: SharedResearchImageCandidate,
+  operationId: string,
+): Promise<AnnaAgentImageAttachment> {
+  if (!candidate.local_file_path || !candidate.mime_type) {
+    throw new Error(`Image candidate ${candidate.candidate_id} has no validated local file to upload`);
+  }
+  const uploaded = await runtime.backend.uploadSharedResearchImageCandidate({
+    workspace_dir: runtime.workspace.workspace_dir,
+    operation_id: operationId,
+    candidate_id: candidate.candidate_id,
+    local_file_path: candidate.local_file_path,
+    mime_type: candidate.mime_type,
+  });
+  candidate.upload_status = "completed";
+  candidate.upload_r2_key = uploaded.host_upload.r2_key;
+  candidate.upload_expires_at = uploaded.host_upload.expires_at;
+  return {
+    type: uploaded.host_upload.mime_type,
+    url: uploaded.host_upload.url,
+    filename: uploaded.host_upload.filename ?? candidate.candidate_id,
+    detail: "auto",
+  };
 }
 
 async function importSelectedImage(
   runtime: DeckGenerationRuntime,
   candidate: SharedResearchImageCandidate,
-  operationId: string,
 ) {
-  if (!candidate.aps_path || !candidate.sha256 || !candidate.mime_type || !candidate.bytes_size) {
-    throw new Error(`Image candidate ${candidate.candidate_id} has no completed APS prefetch artifact`);
+  if (!candidate.local_file_path || !candidate.sha256 || !candidate.mime_type || !candidate.bytes_size) {
+    throw new Error(`Image candidate ${candidate.candidate_id} has no validated local file`);
   }
   const imported: ImportedResearchImageAsset = await measureResearchOperation(
     runtime,
     "research.image.import",
-    () => runtime.backend.importSharedResearchImageAps({
+    () => runtime.backend.importSharedResearchImageLocal({
       workspace_dir: runtime.workspace.workspace_dir,
-      operation_id: operationId,
-      parent_interaction_id: candidate.prefetch_interaction_id,
       candidate_id: candidate.candidate_id,
-      aps_path: candidate.aps_path as string,
+      local_file_path: candidate.local_file_path as string,
       mime_type: candidate.mime_type as string,
       size_bytes: candidate.bytes_size as number,
       sha256: candidate.sha256 as string,
@@ -782,7 +762,7 @@ async function importSelectedImage(
   );
   Object.assign(candidate, {
     file_path: imported.file_path,
-    download_status: "imported" as const,
+    import_status: "imported" as const,
     sha256: imported.sha256,
     mime_type: imported.mime_type,
     bytes_size: imported.bytes_size,
@@ -795,13 +775,14 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
     workspace_dir: runtime.workspace.workspace_dir,
     reset_progress: !input.resume,
   });
-  const checkpoint = readCheckpoint(context.progress);
+  const storedCheckpoint = readCheckpoint(context.progress);
+  const checkpoint = migrateLegacyImageCheckpoint(storedCheckpoint);
   const styleGuide = await runtime.backend.getWorkspaceStyleGuide({ workspace_dir: runtime.workspace.workspace_dir });
   const decisionContext = (operation?: string) => ({
     ...researchContext(runtime, context, operation ? researchLogContext(runtime, operation) : undefined),
     styleGuide: styleGuide.content,
   });
-  let persistedCheckpoint = structuredClone(checkpoint);
+  let persistedCheckpoint = structuredClone(storedCheckpoint);
   let persistQueue = Promise.resolve();
   const persist = () => {
     const snapshot = structuredClone(checkpoint);
@@ -1105,9 +1086,10 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
                 use_in_ppt: false,
                 description: "Not returned by image analysis.",
                 reason: "Not returned by image analysis; defaulted to use_in_ppt: false.",
-                prefetch_status: "pending",
+                local_download_status: "pending",
+                upload_status: "pending",
                 analysis_status: "pending",
-                download_status: "pending",
+                import_status: "pending",
               };
               candidatesByKey.set(dedupKey, candidate);
               group = { dedup_key: persistedDedupKey, candidate_id: candidate.candidate_id, representative_occurrence_id: occurrence.occurrence_id, occurrence_ids: [occurrence.occurrence_id], matched_query_indexes: [occurrence.query_index] };
@@ -1143,28 +1125,30 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
         checkpoint.stages.image_deduplication = "completed";
       }
 
+      const attachmentByCandidateId = new Map<string, AnnaAgentImageAttachment>();
       if (checkpoint.stages.image_prefetch === "waiting" || checkpoint.stages.image_prefetch === "running") {
-        checkpoint.image.prefetch_status = "running";
+        checkpoint.image.prepare_status = "running";
         checkpoint.stages.image_prefetch = "running";
         await persist();
-        await mapWithConcurrency(candidates, IMAGE_PREFETCH_CONCURRENCY, async (candidate) => {
-          if (candidate.prefetch_status === "completed" || candidate.prefetch_status === "failed") return;
-          candidate.prefetch_status = "running";
+        await mapWithConcurrency(candidates, IMAGE_DOWNLOAD_CONCURRENCY, async (candidate) => {
+          if (candidate.local_download_status === "completed") return;
+          if (candidate.local_download_status === "failed" && !input.resume) return;
+          candidate.local_download_status = "running";
           await persist();
           try {
-            await prefetchResearchImage(runtime, candidate, researchWebOperationId);
+            await downloadResearchImageCandidate(runtime, candidate, researchWebOperationId);
           } catch (error) {
             checkpoint.image!.gaps = appendUnique(
               checkpoint.image!.gaps,
               runtime.locale === "zh"
-                ? `候选图片 ${candidate.candidate_id} 未能预取到 APS。`
-                : `Image candidate ${candidate.candidate_id} could not be prefetched to APS.`,
+                ? `候选图片 ${candidate.candidate_id} 未能安全下载。`
+                : `Image candidate ${candidate.candidate_id} could not be downloaded safely.`,
             );
             checkpoint.image!.diagnostic_errors = appendUnique(
               checkpoint.image!.diagnostic_errors,
               `${candidate.candidate_id}: ${errorMessage(error)}`,
             );
-            await logResearchError(runtime, "image-prefetch", error, { candidate_id: candidate.candidate_id });
+            await logResearchError(runtime, "image-download", error, { candidate_id: candidate.candidate_id });
           }
           await persist();
         });
@@ -1175,7 +1159,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
           candidate_ids: string[];
         }>();
         for (const candidate of candidates) {
-          if (candidate.prefetch_status !== "completed" || !candidate.sha256) continue;
+          if (candidate.local_download_status !== "completed" || !candidate.sha256) continue;
           const existing = contentGroupsBySha.get(candidate.sha256);
           if (existing) existing.candidate_ids.push(candidate.candidate_id);
           else contentGroupsBySha.set(candidate.sha256, {
@@ -1199,6 +1183,8 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
               ...(duplicate.matched_queries ?? [duplicate.query]),
             ])];
             duplicate.content_duplicate_of = representative.candidate_id;
+            duplicate.upload_status = "skipped";
+            duplicate.import_status = "skipped";
             duplicate.analysis_status = "skipped";
             duplicate.use_in_ppt = false;
             duplicate.description = `Content duplicate of ${representative.candidate_id}.`;
@@ -1209,7 +1195,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
         const fetchedCandidates = contentGroups.reduce((total, group) => total + group.candidate_ids.length, 0);
         checkpoint.image.content_deduplication = {
           status: "completed",
-          strategy: { version: 2, key: "sha256", source: "anna.web.image_fetch" },
+          strategy: { version: 2, key: "sha256", source: "ppt-engine.https_download" },
           statistics: {
             fetched_candidates: fetchedCandidates,
             unique_content: contentGroups.length,
@@ -1218,14 +1204,67 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
           groups: contentGroups,
           completed_at: new Date().toISOString(),
         };
-        const hasPrefetchFailures = candidates.some((candidate) => candidate.prefetch_status === "failed");
-        checkpoint.image.prefetch_status = hasPrefetchFailures ? "warning" : "completed";
-        checkpoint.stages.image_prefetch = checkpoint.image.prefetch_status;
+        const uploadCandidates = candidates.filter((candidate) => candidate.local_download_status === "completed" && !candidate.content_duplicate_of);
+        await mapWithConcurrency(uploadCandidates, IMAGE_DOWNLOAD_CONCURRENCY, async (candidate) => {
+          if (!candidate.local_file_path || !candidate.mime_type) return;
+          if (candidate.analysis_status === "completed") return;
+          candidate.upload_status = "running";
+          await persist();
+          try {
+            attachmentByCandidateId.set(
+              candidate.candidate_id,
+              await uploadResearchImageCandidate(runtime, candidate, researchWebOperationId),
+            );
+          } catch (error) {
+            candidate.upload_status = "failed";
+            checkpoint.image!.gaps = appendUnique(checkpoint.image!.gaps, runtime.locale === "zh"
+              ? `候选图片 ${candidate.candidate_id} 未能上传给图片分析会话。`
+              : `Image candidate ${candidate.candidate_id} could not be uploaded for image analysis.`);
+            checkpoint.image!.diagnostic_errors = appendUnique(checkpoint.image!.diagnostic_errors, `${candidate.candidate_id}: ${errorMessage(error)}`);
+            await logResearchError(runtime, "image-upload", error, { candidate_id: candidate.candidate_id });
+          }
+          await persist();
+        });
+        const hasPrepareFailures = candidates.some((candidate) => candidate.local_download_status === "failed" || candidate.upload_status === "failed");
+        checkpoint.image.prepare_status = hasPrepareFailures ? "warning" : "completed";
+        checkpoint.stages.image_prefetch = checkpoint.image.prepare_status;
         await persist();
       }
 
+      if (input.resume) {
+        const recoveryCandidates = candidates.filter((candidate) => (
+          !candidate.content_duplicate_of
+          && candidate.import_status !== "imported"
+          && (candidate.analysis_status !== "completed" || candidate.use_in_ppt)
+        ));
+        await mapWithConcurrency(recoveryCandidates, IMAGE_DOWNLOAD_CONCURRENCY, async (candidate) => {
+          try {
+            await downloadResearchImageCandidate(runtime, candidate, researchWebOperationId);
+            if (candidate.analysis_status !== "completed") {
+              candidate.upload_status = "running";
+              attachmentByCandidateId.set(
+                candidate.candidate_id,
+                await uploadResearchImageCandidate(runtime, candidate, researchWebOperationId),
+              );
+              if (candidate.analysis_status === "failed") candidate.analysis_status = "pending";
+            }
+            if (candidate.import_status === "failed") candidate.import_status = "pending";
+          } catch (error) {
+            candidate.local_download_status = "failed";
+            candidate.local_download_error = errorMessage(error);
+            if (candidate.analysis_status !== "completed") candidate.upload_status = "failed";
+            checkpoint.image!.diagnostic_errors = appendUnique(
+              checkpoint.image!.diagnostic_errors,
+              `${candidate.candidate_id}: ${errorMessage(error)}`,
+            );
+            await logResearchError(runtime, "image-recovery", error, { candidate_id: candidate.candidate_id });
+          }
+          await persist();
+        });
+      }
+
       const analysisCandidates = candidates.filter((candidate) => (
-        candidate.prefetch_status === "completed" && !candidate.content_duplicate_of
+        candidate.local_download_status === "completed" && candidate.upload_status === "completed" && !candidate.content_duplicate_of
       ));
       checkpoint.image.analysis_batches ??= chunkItems(analysisCandidates, IMAGE_ANALYSIS_BATCH_SIZE).map((batch, index) => ({
         batch_id: `image-analysis-batch-${index + 1}`,
@@ -1234,6 +1273,19 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
         attempt: 0,
         interaction_ids: [],
       }));
+      const batchedCandidateIds = new Set(checkpoint.image.analysis_batches.flatMap((batch) => batch.candidate_ids));
+      const missingAnalysisCandidates = analysisCandidates.filter((candidate) => (
+        candidate.analysis_status !== "completed" && !batchedCandidateIds.has(candidate.candidate_id)
+      ));
+      for (const batchCandidates of chunkItems(missingAnalysisCandidates, IMAGE_ANALYSIS_BATCH_SIZE)) {
+        checkpoint.image.analysis_batches.push({
+          batch_id: `image-analysis-batch-${checkpoint.image.analysis_batches.length + 1}`,
+          candidate_ids: batchCandidates.map((candidate) => candidate.candidate_id),
+          status: "pending",
+          attempt: 0,
+          interaction_ids: [],
+        });
+      }
       checkpoint.image.analysis_status = "running";
       checkpoint.stages.image_analysis = "running";
       checkpoint.image.import_status = "running";
@@ -1243,13 +1295,13 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
       const scheduledImportIds = new Set<string>();
       const importTasks: Promise<void>[] = [];
       const scheduleImport = (candidate: SharedResearchImageCandidate) => {
-        if (!candidate.use_in_ppt || candidate.download_status !== "pending" || scheduledImportIds.has(candidate.candidate_id)) return;
+        if (!candidate.use_in_ppt || candidate.import_status !== "pending" || scheduledImportIds.has(candidate.candidate_id)) return;
         scheduledImportIds.add(candidate.candidate_id);
         importTasks.push(importLimiter(async () => {
           try {
-            await importSelectedImage(runtime, candidate, researchWebOperationId);
+            await importSelectedImage(runtime, candidate);
           } catch (error) {
-            candidate.download_status = "failed";
+            candidate.import_status = "failed";
             candidate.error = errorMessage(error);
             checkpoint.image!.gaps = appendUnique(
               checkpoint.image!.gaps,
@@ -1269,30 +1321,40 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
         batch.status = "running";
         batch.attempt += 1;
         batch.started_at = new Date().toISOString();
-        const batchCandidates = candidates.filter((candidate) => batch.candidate_ids.includes(candidate.candidate_id));
+        let batchCandidates = candidates.filter((candidate) => batch.candidate_ids.includes(candidate.candidate_id));
+        const availableCandidates: SharedResearchImageCandidate[] = [];
+        for (const candidate of batchCandidates) {
+          if (!attachmentByCandidateId.has(candidate.candidate_id) && candidate.local_file_path && candidate.mime_type) {
+            try {
+              attachmentByCandidateId.set(
+                candidate.candidate_id,
+                await uploadResearchImageCandidate(runtime, candidate, researchWebOperationId),
+              );
+            } catch (error) {
+              candidate.upload_status = "failed";
+              checkpoint.image!.diagnostic_errors = appendUnique(checkpoint.image!.diagnostic_errors, `${candidate.candidate_id}: ${errorMessage(error)}`);
+              await logResearchError(runtime, "image-upload", error, { candidate_id: candidate.candidate_id, batch_id: batch.batch_id });
+            }
+          }
+          if (attachmentByCandidateId.has(candidate.candidate_id)) availableCandidates.push(candidate);
+        }
+        batchCandidates = availableCandidates;
+        batch.candidate_ids = batchCandidates.map((candidate) => candidate.candidate_id);
+        if (batchCandidates.length === 0) {
+          batch.status = "failed";
+          batch.error = "No uploaded image candidates remain for analysis";
+          batch.completed_at = new Date().toISOString();
+          await persist();
+          return;
+        }
         batchCandidates.forEach((candidate) => { candidate.analysis_status = "running"; });
         await persist();
         const logContext = researchLogContext(runtime, "image_candidate_analysis", batchCandidates.flatMap((candidate) => candidate.matched_queries ?? [candidate.query]).join("; "));
         try {
-          const resolved = await runtime.backend.getSharedResearchImageDownloadUrls({
-            workspace_dir: runtime.workspace.workspace_dir,
-            operation_id: researchWebOperationId,
-            artifacts: batchCandidates.map((candidate) => ({
-              candidate_id: candidate.candidate_id,
-              aps_path: candidate.aps_path ?? "",
-              parent_interaction_id: candidate.prefetch_interaction_id,
-            })),
-          });
-          const urlsByCandidateId = new Map(resolved.artifacts.map((artifact) => [artifact.candidate_id, artifact.download_url]));
           const attachments: AnnaAgentImageAttachment[] = batchCandidates.map((candidate) => {
-            const url = urlsByCandidateId.get(candidate.candidate_id);
-            if (!url) throw new Error(`No APS download URL returned for image candidate ${candidate.candidate_id}`);
-            return {
-              type: inferAttachmentType({ image_url: candidate.image_url, source_url: candidate.source_url, mime_type: candidate.mime_type }),
-              url,
-              filename: candidate.candidate_id,
-              detail: "auto",
-            };
+            const attachment = attachmentByCandidateId.get(candidate.candidate_id);
+            if (!attachment) throw new Error(`No Host Upload attachment returned for image candidate ${candidate.candidate_id}`);
+            return attachment;
           });
           const analysis = await runtime.agentClient.runImageResearchPrompt(buildImagePrompt(runtime, styleGuide.content, batchCandidates), {
             attachments,
@@ -1343,7 +1405,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
       checkpoint.stages.image_analysis = checkpoint.image.analysis_status;
       candidates.forEach(scheduleImport);
       await Promise.all(importTasks);
-      checkpoint.image.import_status = candidates.some((candidate) => candidate.download_status === "failed") ? "warning" : "completed";
+      checkpoint.image.import_status = candidates.some((candidate) => candidate.import_status === "failed") ? "warning" : "completed";
       checkpoint.stages.image_import = checkpoint.image.import_status;
       await persist();
       throwIfCancelled(runtime);
@@ -1389,15 +1451,17 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
         raw_candidates: checkpoint.image.deduplication?.statistics.raw_occurrences ?? candidates.length,
         unique_url_candidates: candidates.length,
         duplicate_url_occurrences: checkpoint.image.deduplication?.statistics.duplicate_occurrences ?? 0,
-        prefetched: candidates.filter((candidate) => candidate.prefetch_status === "completed").length,
+        downloaded: candidates.filter((candidate) => candidate.local_download_status === "completed").length,
+        uploaded: candidates.filter((candidate) => candidate.upload_status === "completed").length,
         unique_content_candidates: checkpoint.image.content_deduplication?.statistics.unique_content ?? 0,
-        prefetch_failed: candidates.filter((candidate) => candidate.prefetch_status === "failed").length,
+        download_failed: candidates.filter((candidate) => candidate.local_download_status === "failed").length,
+        upload_failed: candidates.filter((candidate) => candidate.upload_status === "failed").length,
         selected: candidates.filter((candidate) => candidate.use_in_ppt).length,
-        imported: candidates.filter((candidate) => candidate.download_status === "imported").length,
+        imported: candidates.filter((candidate) => candidate.import_status === "imported").length,
         unique_content_imported: new Set(candidates
-          .filter((candidate) => candidate.download_status === "imported" && candidate.sha256)
+          .filter((candidate) => candidate.import_status === "imported" && candidate.sha256)
           .map((candidate) => candidate.sha256)).size,
-        failed: candidates.filter((candidate) => candidate.prefetch_status === "failed" || candidate.download_status === "failed").length,
+        failed: candidates.filter((candidate) => candidate.local_download_status === "failed" || candidate.upload_status === "failed" || candidate.import_status === "failed").length,
         gaps: uniqueGaps.length,
       },
     };
@@ -1418,5 +1482,13 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
         ? "skipped"
         : "completed";
     await setStage(runtime, checkpoint, "image_research", status, persist);
+    try {
+      await runtime.backend.cleanupSharedResearchImageStaging({
+        workspace_dir: runtime.workspace.workspace_dir,
+        operation_id: researchWebOperationId,
+      });
+    } catch (error) {
+      await logResearchError(runtime, "image-staging-cleanup", error);
+    }
   }
 }

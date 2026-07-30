@@ -3902,7 +3902,7 @@ function compactImageCatalogAsset(value: unknown): Record<string, unknown> | nul
   const candidate = getPlainRecord(value);
   if (
     candidate.use_in_ppt !== true
-    || candidate.download_status !== "imported"
+    || candidate.import_status !== "imported"
     || !normalizeString(candidate.candidate_id)
     || !normalizeString(candidate.file_path)
     || !normalizeString(candidate.sha256)

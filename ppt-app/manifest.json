@@ -51,8 +51,7 @@
       "web": [
         "search",
         "fetch",
-        "image_search",
-        "image_fetch"
+        "image_search"
       ],
       "upload": [
         "negotiate",

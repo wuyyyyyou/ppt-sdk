@@ -74,7 +74,7 @@ function assertOperationShape(value: unknown): asserts value is AppSharedResearc
     throw new Error("Invalid analysis batch candidates");
   }
   if (op === "set_stage" && (!STAGES.includes(operation.stage as AppSharedResearchStage) || !["waiting", "running", "completed", "warning", "skipped"].includes(String(operation.state)))) throw new Error("Invalid set_stage operation");
-  if (op === "set_image_work_status" && (!["search_status", "prefetch_status", "analysis_status", "import_status"].includes(String(operation.field)) || !["waiting", "running", "completed", "warning"].includes(String(operation.state)))) throw new Error("Invalid image work status operation");
+  if (op === "set_image_work_status" && (!["search_status", "prepare_status", "analysis_status", "import_status"].includes(String(operation.field)) || !["waiting", "running", "completed", "warning"].includes(String(operation.state)))) throw new Error("Invalid image work status operation");
   if (op === "finalize_image_research" && !["completed", "warning", "skipped"].includes(String(operation.status))) throw new Error("Invalid image research final status");
 }
 
@@ -135,11 +135,18 @@ function assertStageCompletion(progress: Record<string, unknown>, stage: AppShar
   }
   if (stage === "image_prefetch") {
     const candidates = Array.isArray(image.candidates) ? image.candidates.map(record) : [];
-    if (candidates.some((candidate) => !["completed", "failed"].includes(String(candidate.prefetch_status)))) {
-      throw new Error("Image prefetch has unfinished candidates");
+    if (candidates.some((candidate) => !["completed", "failed"].includes(String(candidate.local_download_status)))) {
+      throw new Error("Image candidate preparation has unfinished downloads");
     }
-    if (state === "completed" && candidates.some((candidate) => candidate.prefetch_status === "failed")) {
-      throw new Error("Completed image prefetch cannot contain failed candidates");
+    if (candidates.some((candidate) => (
+      candidate.local_download_status === "completed"
+      && !candidate.content_duplicate_of
+      && !["completed", "failed"].includes(String(candidate.upload_status))
+    ))) {
+      throw new Error("Image candidate preparation has unfinished uploads");
+    }
+    if (state === "completed" && candidates.some((candidate) => candidate.local_download_status === "failed" || candidate.upload_status === "failed")) {
+      throw new Error("Completed image candidate preparation cannot contain failed candidates");
     }
   }
   if (stage === "image_analysis" && state === "completed") {
@@ -155,7 +162,7 @@ function assertStageCompletion(progress: Record<string, unknown>, stage: AppShar
   }
   if (stage === "image_import" && state === "completed") {
     const candidates = Array.isArray(image.candidates) ? image.candidates.map(record) : [];
-    if (candidates.some((candidate) => candidate.use_in_ppt === true && candidate.download_status !== "imported")) {
+    if (candidates.some((candidate) => candidate.use_in_ppt === true && candidate.import_status !== "imported")) {
       throw new Error("Selected image candidates have not all been imported");
     }
   }

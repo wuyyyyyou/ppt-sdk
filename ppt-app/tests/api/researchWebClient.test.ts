@@ -22,18 +22,6 @@ describe("Research Web Client", () => {
           calls.push({ method: "image_search", input });
           return { results: [{ image_url: "https://example.com/image.jpg", source_url: "https://example.com/page", mime_type: null }] };
         },
-        image_fetch: async (input: unknown, options?: unknown) => {
-          calls.push({ method: "image_fetch", input, options });
-          return {
-            path: "research/image.jpg",
-            get_url: "https://download.example/image.jpg",
-            mime_type: "image/jpeg",
-            bytes_size: 10,
-            sha256: "abc",
-            source_url: "https://example.com/image.jpg",
-            final_url: "https://example.com/image.jpg",
-          };
-        },
       },
     } as unknown as AnnaRuntime;
     const client = createResearchWebClient(runtime, {
@@ -46,7 +34,6 @@ describe("Research Web Client", () => {
     await client.search({ query: "market size", max_results: 6 }, context());
     await client.fetch({ urls: ["https://example.com"] }, context());
     await client.imageSearch({ query: "modern office" }, context());
-    await client.imageFetch({ url: "https://example.com/image.jpg" }, context());
 
     assert.deepEqual(calls[0], {
       method: "search",
@@ -61,29 +48,17 @@ describe("Research Web Client", () => {
       method: "image_search",
       input: { query: "modern office", max_results: 6, min_width: 800, min_height: 600, aspect: "any" },
     });
-    assert.deepEqual(calls[3], {
-      method: "image_fetch",
-      input: { url: "https://example.com/image.jpg", max_bytes: 20 * 1024 * 1024, purpose: "ppt-research" },
-      options: { timeoutMs: 90000 },
-    });
-    assert.deepEqual(logWrites.map((write) => write.channel), Array(8).fill("research-web-interactions"));
+    assert.deepEqual(logWrites.map((write) => write.channel), Array(6).fill("research-web-interactions"));
     assert.deepEqual(logWrites.map((write) => write.entry.status), [
-      "started", "succeeded",
       "started", "succeeded",
       "started", "succeeded",
       "started", "succeeded",
     ]);
     assert.deepEqual(logWrites.filter((write) => write.entry.status === "started").map((write) => write.entry.method), [
-      "search", "fetch", "image_search", "image_fetch",
+      "search", "fetch", "image_search",
     ]);
     assert.ok(logWrites.every((write) => write.entry.operation_id === "research-operation-1"));
-    assert.equal(new Set(logWrites.map((write) => write.entry.interaction_id)).size, 4);
-    const imageFetchFinished = logWrites.find((write) => write.entry.method === "image_fetch" && write.entry.status === "succeeded");
-    assert.equal(
-      (imageFetchFinished?.entry.raw_response as Record<string, unknown>).get_url,
-      "https://download.example/image.jpg",
-    );
-    assert.deepEqual(imageFetchFinished?.payload_keys, ["raw_response", "normalized_response"]);
+    assert.equal(new Set(logWrites.map((write) => write.entry.interaction_id)).size, 3);
   });
 
   it("keeps tolerant normalization while recording warnings and normalization failures", async () => {
@@ -102,7 +77,6 @@ describe("Research Web Client", () => {
           throw error;
         },
         image_search: async () => ({ results: [] }),
-        image_fetch: async () => ({ path: "research/image.jpg", get_url: "" }),
       },
     } as unknown as AnnaRuntime;
     const client = createResearchWebClient(runtime, {
@@ -117,15 +91,6 @@ describe("Research Web Client", () => {
       path: "$.results",
       fallback: "normalized_to_empty_array",
     }]);
-
-    await assert.rejects(
-      () => client.imageFetch({ url: "https://example.com/image.jpg" }, context()),
-      /returned no APS artifact reference/,
-    );
-    const failedFinish = logWrites.find((entry) => entry.method === "image_fetch" && entry.status === "failed");
-    assert.equal(failedFinish?.failure_phase, "normalize");
-    assert.deepEqual(failedFinish?.raw_response, { path: "research/image.jpg", get_url: "" });
-    assert.match(String((failedFinish?.error as Record<string, unknown>).stack), /returned no APS artifact reference/);
 
     await assert.rejects(
       () => client.fetch({ urls: ["https://example.com"] }, context()),
@@ -149,7 +114,6 @@ describe("Research Web Client", () => {
         search: async () => ({ results: [{ title: "Result", url: "https://example.com", snippet: "Useful", site: "example.com" }] }),
         fetch: async () => ({ pages: [] }),
         image_search: async () => ({ results: [] }),
-        image_fetch: async () => ({ path: "image", get_url: "https://download.example/image" }),
       },
     } as unknown as AnnaRuntime;
     const originalWarn = console.warn;

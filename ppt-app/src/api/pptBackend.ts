@@ -35,7 +35,9 @@ import type {
   PatchSharedResearchProgressResult,
   PublishSharedResearchBatchResult,
   ImportSharedResearchImageResult,
-  SharedResearchImageDownloadUrlResult,
+  PrepareSharedResearchImageCandidateResult,
+  UploadSharedResearchImageCandidateResult,
+  CleanupSharedResearchImageStagingResult,
   ProjectResult,
   PptxExportJob,
   ExportPdfInput,
@@ -239,21 +241,33 @@ export interface PptBackend {
   patchSharedResearchProgress(input: { workspace_dir: string; operations: SharedResearchProgressOperation[] }): Promise<PatchSharedResearchProgressResult>;
   publishPreparedWebResearchBatch(input: { workspace_dir: string }): Promise<PublishSharedResearchBatchResult>;
   publishPreparedImageResearchBatch(input: { workspace_dir: string }): Promise<PublishSharedResearchBatchResult>;
-  getSharedResearchImageDownloadUrls(input: {
+  prepareSharedResearchImageCandidate(input: {
     workspace_dir: string;
     operation_id: string;
-    artifacts: Array<{ candidate_id: string; aps_path: string; parent_interaction_id?: string }>;
-  }): Promise<{ workspace_dir: string; artifacts: SharedResearchImageDownloadUrlResult[] }>;
-  importSharedResearchImageAps(input: {
-    workspace_dir: string;
-    operation_id: string;
-    parent_interaction_id?: string;
     candidate_id: string;
-    aps_path: string;
+    source_url: string;
+    existing_file_path?: string;
+    expected_sha256?: string;
+  }): Promise<PrepareSharedResearchImageCandidateResult>;
+  uploadSharedResearchImageCandidate(input: {
+    workspace_dir: string;
+    operation_id: string;
+    candidate_id: string;
+    local_file_path: string;
+    mime_type: string;
+  }): Promise<UploadSharedResearchImageCandidateResult>;
+  importSharedResearchImageLocal(input: {
+    workspace_dir: string;
+    candidate_id: string;
+    local_file_path: string;
     mime_type: string;
     size_bytes: number;
     sha256: string;
   }): Promise<ImportSharedResearchImageResult>;
+  cleanupSharedResearchImageStaging(input: {
+    workspace_dir: string;
+    operation_id: string;
+  }): Promise<CleanupSharedResearchImageStagingResult>;
   getPageProgress(input: { workspace_dir: string }): Promise<PageProgress>;
   recordPageProgress(input: RecordPageProgressInput): Promise<PageProgress>;
   renderWorkspacePagePreview(

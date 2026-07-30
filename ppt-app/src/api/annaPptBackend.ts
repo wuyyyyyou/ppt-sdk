@@ -47,6 +47,7 @@ import type {
   ListStyleProfilesResult,
   PrepareStyleProfileCreationResult,
   HostUploadRef,
+  CleanupSharedResearchImageStagingResult,
   ListUploadedSourcesResult,
   PublishStyleProfileResult,
   SelectWorkspaceStyleProfileResult,
@@ -70,7 +71,8 @@ import type {
   PrepareGenerationRunResult,
   CommitGenerationRunResult,
   SharedResearchContextResult,
-  SharedResearchImageDownloadUrlResult,
+  PrepareSharedResearchImageCandidateResult,
+  UploadSharedResearchImageCandidateResult,
   PatchSharedResearchProgressResult,
   PublishSharedResearchBatchResult,
   ImportSharedResearchImageResult,
@@ -696,14 +698,14 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invoke<PublishSharedResearchBatchResult>(toolIds.pptEngine, "app_publish_prepared_web_research_batch", input),
     publishPreparedImageResearchBatch: (input) =>
       invoke<PublishSharedResearchBatchResult>(toolIds.pptEngine, "app_publish_prepared_image_research_batch", input),
-    getSharedResearchImageDownloadUrls: (input) =>
-      invoke<{ workspace_dir: string; artifacts: SharedResearchImageDownloadUrlResult[] }>(
-        toolIds.pptEngine,
-        "app_get_shared_research_image_download_urls",
-        input,
-      ),
-    importSharedResearchImageAps: (input) =>
-      invoke<ImportSharedResearchImageResult>(toolIds.pptEngine, "app_import_shared_research_image_aps", input),
+    prepareSharedResearchImageCandidate: (input) =>
+      invoke<PrepareSharedResearchImageCandidateResult>(toolIds.pptEngine, "app_prepare_shared_research_image_candidate", input),
+    uploadSharedResearchImageCandidate: (input) =>
+      invoke<UploadSharedResearchImageCandidateResult>(toolIds.pptEngine, "app_upload_shared_research_image_candidate", input),
+    importSharedResearchImageLocal: (input) =>
+      invoke<ImportSharedResearchImageResult>(toolIds.pptEngine, "app_import_shared_research_image_local", input),
+    cleanupSharedResearchImageStaging: (input) =>
+      invoke<CleanupSharedResearchImageStagingResult>(toolIds.pptEngine, "app_cleanup_shared_research_image_staging", input),
     getPageProgress: (input) =>
       invoke<PageProgress>(toolIds.pptEngine, "app_get_page_progress", input),
     recordPageProgress: (input) =>

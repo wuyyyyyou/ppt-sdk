@@ -89,6 +89,7 @@ import {
 export * from "./app-workspace/index.js";
 export * from "./performance-runs/index.js";
 export * from "./pptx-rasterization/index.js";
+export * from "./research-image-download/index.js";
 export * from "./task-state-machine/index.js";
 
 export interface TemplateLayoutInfo {

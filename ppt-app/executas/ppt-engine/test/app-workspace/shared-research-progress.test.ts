@@ -74,20 +74,38 @@ test("shared research progress upgrades v2 checkpoints that predate image prefet
   assert.equal((updated.progress.stages as Record<string, unknown>).image_prefetch, "running");
 });
 
-test("image prefetch cannot complete with unfinished candidates", () => {
+test("image candidate preparation cannot complete with unfinished candidates", () => {
   const initial = createDefaultSharedResearchProgress();
   const running = applySharedResearchProgressOperations(initial, [
     { op: "set_stage", stage: "image_prefetch", state: "running" },
     {
       op: "upsert_image_candidate",
       candidate_id: "candidate-1",
-      candidate: { candidate_id: "candidate-1", prefetch_status: "running" },
+      candidate: { candidate_id: "candidate-1", local_download_status: "running", upload_status: "pending" },
     },
   ]).progress;
   assert.throws(
     () => applySharedResearchProgressOperations(running, [
       { op: "set_stage", stage: "image_prefetch", state: "completed" },
     ]),
-    /Image prefetch has unfinished candidates/,
+    /Image candidate preparation has unfinished downloads/,
+  );
+});
+
+test("image candidate preparation cannot complete with unfinished uploads", () => {
+  const initial = createDefaultSharedResearchProgress();
+  const running = applySharedResearchProgressOperations(initial, [
+    { op: "set_stage", stage: "image_prefetch", state: "running" },
+    {
+      op: "upsert_image_candidate",
+      candidate_id: "candidate-1",
+      candidate: { candidate_id: "candidate-1", local_download_status: "completed", upload_status: "pending" },
+    },
+  ]).progress;
+  assert.throws(
+    () => applySharedResearchProgressOperations(running, [
+      { op: "set_stage", stage: "image_prefetch", state: "completed" },
+    ]),
+    /Image candidate preparation has unfinished uploads/,
   );
 });

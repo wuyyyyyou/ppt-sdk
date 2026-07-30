@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import readline from "node:readline";
 import { createReadStream, readFileSync } from "node:fs";
-import { mkdir, open, readFile, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rm, stat, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -97,6 +97,7 @@ import {
   appendAppWebResearchBatch,
   appendAppImageResearchBatch,
   importAppSharedResearchImage,
+  downloadResearchImage,
   prepareWorkspacePageSources,
   reconcileWorkspacePageSources,
   recordAppWorkspaceStyleGuide,
@@ -764,12 +765,6 @@ const MANUAL_PAGE_STAGING_DIR = path.join(
   "presenton-template-engine-executa",
   "manual-page-staging",
 );
-const RESEARCH_IMAGE_STAGING_DIR = path.join(
-  os.tmpdir(),
-  "presenton-template-engine-executa",
-  "research-image-staging",
-);
-
 function assertSafeUploadFilename(filename) {
   if (typeof filename !== "string" || filename.trim().length === 0) {
     throw new Error('"filename" must be a non-empty string');
@@ -870,31 +865,6 @@ async function downloadHostUploadToStaging({ hostUpload, stagingPath, expectedSi
     );
   }
   return receivedBytes;
-}
-
-async function downloadApsUrlToStaging({ downloadUrl, stagingPath, expectedSizeBytes }) {
-  const response = await fetch(downloadUrl, { cache: "no-store" });
-  if (!response.ok) throw new Error(`APS image download failed: HTTP ${response.status}`);
-  if (!response.body) throw new Error("APS image download returned an empty response body.");
-  await mkdir(path.dirname(stagingPath), { recursive: true });
-  const handle = await open(stagingPath, "w");
-  let receivedBytes = 0;
-  try {
-    for await (const chunk of Readable.fromWeb(response.body)) {
-      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      receivedBytes += buffer.byteLength;
-      if (receivedBytes > expectedSizeBytes) {
-        throw new Error(`APS image size exceeds expected size ${expectedSizeBytes}`);
-      }
-      await handle.write(buffer);
-    }
-  } finally {
-    await handle.close();
-  }
-  if (receivedBytes !== expectedSizeBytes) {
-    throw new Error(`APS image size mismatch: expected ${expectedSizeBytes}, got ${receivedBytes}`);
-  }
-  return { response, receivedBytes };
 }
 
 async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose, workspaceDir, operationId, source, reuseWhileValid }) {
@@ -2312,138 +2282,131 @@ async function toolAppAppendImageResearchBatch(args) {
   });
 }
 
-async function toolAppGetSharedResearchImageDownloadUrls(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const operationId = readRequiredStringArg(args, "operation_id");
-  if (!Array.isArray(args.artifacts) || args.artifacts.length < 1 || args.artifacts.length > 6) {
-    throw new Error('"artifacts" must contain between 1 and 6 APS image references');
-  }
-  const references = args.artifacts.map((value) => {
-    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Each APS image reference must be an object");
-    return {
-      candidateId: readRequiredStringArg(value, "candidate_id"),
-      apsPath: readRequiredStringArg(value, "aps_path"),
-      parentInteractionId: typeof value.parent_interaction_id === "string" && value.parent_interaction_id.trim().length > 0
-        ? value.parent_interaction_id.trim()
-        : undefined,
-    };
-  });
-  const artifacts = await Promise.all(references.map(async ({ candidateId, apsPath, parentInteractionId }) => {
-    const transferLogger = createApsTransferLogger({
-      workspaceDir,
-      source: "ppt-engine.research-image-session",
-      path: apsPath,
-      operationId,
-      parentInteractionId,
-    });
-    transferLogger.log("started", "started", { candidate_id: candidateId, aps_path: apsPath });
-    try {
-      const download = await apsFilesClient.downloadUrl({ path: apsPath, expiresIn: 600, scope: APS_FILES_DOWNLOAD_SCOPE });
-      if (!download || typeof download.url !== "string" || download.url.length === 0) {
-        throw new Error("files/download_url did not return a valid URL");
-      }
-      transferLogger.log("download_url", "succeeded", {
-        candidate_id: candidateId,
-        aps_path: apsPath,
-        response: redactStorageResponse(download),
-      });
-      transferLogger.log("finished", "succeeded", {
-        candidate_id: candidateId,
-        aps_path: apsPath,
-        expires_at: download.expires_at,
-      });
-      return {
-        candidate_id: candidateId,
-        aps_path: apsPath,
-        download_url: download.url,
-        expires_at: typeof download.expires_at === "string" ? download.expires_at : null,
-      };
-    } catch (error) {
-      transferLogger.log("download_url", "failed", {
-        candidate_id: candidateId,
-        aps_path: apsPath,
-        error: storageErrorRecord(error),
-      });
-      throw error;
-    }
-  }));
-  return { workspace_dir: workspaceDir, artifacts };
+function researchImageStagingDirectory(imagesDir, operationId) {
+  const safeOperationId = operationId.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 120) || "research";
+  return path.join(imagesDir, ".staging", safeOperationId);
 }
 
-async function toolAppImportSharedResearchImageAps(args) {
+function assertResearchImageStagingPath(imagesDir, value) {
+  assertAbsolutePath(value, "existing_file_path");
+  const stagingRoot = path.resolve(imagesDir, ".staging");
+  const resolved = path.resolve(value);
+  if (resolved !== stagingRoot && !resolved.startsWith(`${stagingRoot}${path.sep}`)) {
+    throw new Error('"existing_file_path" must be inside research/evidence/images/.staging');
+  }
+  return resolved;
+}
+
+async function toolAppPrepareSharedResearchImageCandidate(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
   const operationId = readRequiredStringArg(args, "operation_id");
-  const parentInteractionId = typeof args.parent_interaction_id === "string" && args.parent_interaction_id.trim().length > 0
-    ? args.parent_interaction_id.trim()
+  const candidateId = assertSafeUploadFilename(readRequiredStringArg(args, "candidate_id"));
+  const sourceUrl = readRequiredStringArg(args, "source_url");
+  const context = await getAppSharedResearchContext({ workspace_dir: workspaceDir });
+  const stagingDir = researchImageStagingDirectory(context.images_dir, operationId);
+  const existingFilePath = typeof args.existing_file_path === "string" && args.existing_file_path.length > 0
+    ? assertResearchImageStagingPath(context.images_dir, args.existing_file_path)
     : undefined;
-  const candidateId = readRequiredStringArg(args, "candidate_id");
-  const apsPath = readRequiredStringArg(args, "aps_path");
-  const sizeBytes = Number(args.size_bytes);
-  if (!Number.isInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > 20 * 1024 * 1024) {
-    throw new Error('"size_bytes" must be between 1 and 20971520');
-  }
-  const mimeType = readRequiredStringArg(args, "mime_type");
-  const sha256 = readRequiredStringArg(args, "sha256");
-  if (!/^[a-f0-9]{64}$/i.test(sha256)) throw new Error('"sha256" must be a 64-character hexadecimal digest');
-  const stagingPath = path.join(RESEARCH_IMAGE_STAGING_DIR, `${randomUUID()}.aps`);
-  const transferLogger = createApsTransferLogger({
+  const expectedSha256 = typeof args.expected_sha256 === "string" && /^[a-f0-9]{64}$/i.test(args.expected_sha256)
+    ? args.expected_sha256.toLowerCase()
+    : undefined;
+  const downloadLogger = createStorageTransferLogger({
     workspaceDir,
-    source: "ppt-engine.research-image-import",
-    filename: `${candidateId}.image`,
-    mimeType,
-    sizeBytes,
-    path: apsPath,
     operationId,
-    parentInteractionId,
+    source: "ppt-engine.research-image-download",
+    transport: "https_download",
+    filename: candidateId,
   });
-  transferLogger.log("started", "started", { candidate_id: candidateId, aps_path: apsPath });
-  let failurePhase = "download_url";
+  let sourceOrigin;
   try {
-    const download = await apsFilesClient.downloadUrl({ path: apsPath, expiresIn: 600, scope: APS_FILES_DOWNLOAD_SCOPE });
-    if (!download || typeof download.url !== "string" || download.url.length === 0) {
-      throw new Error("files/download_url did not return a valid URL");
-    }
-    transferLogger.log("download_url", "succeeded", { aps_path: apsPath, response: redactStorageResponse(download) });
-    failurePhase = "download";
-    const downloaded = await downloadApsUrlToStaging({
-      downloadUrl: download.url,
-      stagingPath,
-      expectedSizeBytes: sizeBytes,
-    });
-    transferLogger.log("download", "succeeded", {
-      candidate_id: candidateId,
-      aps_path: apsPath,
-      http_status: downloaded.response.status,
-      size_bytes: downloaded.receivedBytes,
-    });
-    failurePhase = "import";
-    const imported = await importAppSharedResearchImage({
-      workspace_dir: workspaceDir,
-      candidate_id: candidateId,
-      staging_file_path: stagingPath,
-      expected_size_bytes: sizeBytes,
-      expected_sha256: sha256,
-      mime_type: mimeType,
-    });
-    transferLogger.log("finished", "succeeded", {
-      candidate_id: candidateId,
-      aps_path: apsPath,
-      file_path: imported.file_path,
-      sha256: imported.sha256,
-    });
-    return imported;
-  } catch (error) {
-    transferLogger.log(failurePhase, "failed", {
-      candidate_id: candidateId,
-      aps_path: apsPath,
-      error: storageErrorRecord(error),
-    });
-    throw error;
-  } finally {
-    await unlink(stagingPath).catch(() => undefined);
+    sourceOrigin = new URL(sourceUrl).origin;
+  } catch {
+    sourceOrigin = "invalid";
   }
+  downloadLogger.log("started", "started", { candidate_id: candidateId, source_origin: sourceOrigin });
+  let downloaded;
+  try {
+    downloaded = await downloadResearchImage({
+      url: sourceUrl,
+      staging_dir: stagingDir,
+      candidate_id: candidateId,
+      existing_file_path: existingFilePath,
+      expected_sha256: expectedSha256,
+      onEvent: (event) => downloadLogger.log(event.phase, event.status, { candidate_id: candidateId, ...event.details }),
+    });
+    downloadLogger.log("finished", "succeeded", {
+      candidate_id: candidateId,
+      mime_type: downloaded.mime_type,
+      size_bytes: downloaded.bytes_size,
+      sha256: downloaded.sha256,
+      width: downloaded.width,
+      height: downloaded.height,
+      redirects: downloaded.redirects,
+    });
+  } catch (error) {
+    downloadLogger.log("download", "failed", { candidate_id: candidateId, error: storageErrorRecord(error) });
+    throw error;
+  }
+
+  return {
+    workspace_dir: workspaceDir,
+    candidate_id: candidateId,
+    local_file_path: downloaded.file_path,
+    final_url: downloaded.final_url,
+    mime_type: downloaded.mime_type,
+    bytes_size: downloaded.bytes_size,
+    sha256: downloaded.sha256,
+    width: downloaded.width,
+    height: downloaded.height,
+  };
+}
+
+async function toolAppUploadSharedResearchImageCandidate(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const operationId = readRequiredStringArg(args, "operation_id");
+  const candidateId = assertSafeUploadFilename(readRequiredStringArg(args, "candidate_id"));
+  const context = await getAppSharedResearchContext({ workspace_dir: workspaceDir });
+  const localFilePath = assertResearchImageStagingPath(context.images_dir, readRequiredAbsolutePathArg(args, "local_file_path"));
+  const mimeType = readRequiredStringArg(args, "mime_type");
+  const hostUpload = await uploadLocalFileToHost({
+    filePath: localFilePath,
+    filename: path.basename(localFilePath),
+    mimeType,
+    purpose: "image_input",
+    workspaceDir,
+    operationId,
+    source: "ppt-engine.research-image-session-upload",
+    reuseWhileValid: true,
+  });
+  return { workspace_dir: workspaceDir, candidate_id: candidateId, host_upload: hostUpload };
+}
+
+async function toolAppImportSharedResearchImageLocal(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const context = await getAppSharedResearchContext({ workspace_dir: workspaceDir });
+  const localFilePath = assertResearchImageStagingPath(context.images_dir, readRequiredAbsolutePathArg(args, "local_file_path"));
+  const result = await importAppSharedResearchImage({
+    workspace_dir: workspaceDir,
+    candidate_id: readRequiredStringArg(args, "candidate_id"),
+    staging_file_path: localFilePath,
+    expected_size_bytes: Number(args.size_bytes),
+    expected_sha256: readRequiredStringArg(args, "sha256"),
+    mime_type: readRequiredStringArg(args, "mime_type"),
+  });
+  await unlink(localFilePath).catch(() => undefined);
+  return result;
+}
+
+async function toolAppCleanupSharedResearchImageStaging(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const operationId = readRequiredStringArg(args, "operation_id");
+  const context = await getAppSharedResearchContext({ workspace_dir: workspaceDir });
+  await rm(path.join(context.images_dir, ".staging"), { recursive: true, force: true });
+  return { workspace_dir: workspaceDir, operation_id: operationId, cleaned: true };
 }
 
 async function toolAppRecordPageProgress(args) {
@@ -3281,8 +3244,10 @@ const TOOL_DISPATCH = {
   app_publish_prepared_image_research_batch: toolAppPublishPreparedImageResearchBatch,
   app_append_web_research_batch: toolAppAppendWebResearchBatch,
   app_append_image_research_batch: toolAppAppendImageResearchBatch,
-  app_get_shared_research_image_download_urls: toolAppGetSharedResearchImageDownloadUrls,
-  app_import_shared_research_image_aps: toolAppImportSharedResearchImageAps,
+  app_prepare_shared_research_image_candidate: toolAppPrepareSharedResearchImageCandidate,
+  app_upload_shared_research_image_candidate: toolAppUploadSharedResearchImageCandidate,
+  app_import_shared_research_image_local: toolAppImportSharedResearchImageLocal,
+  app_cleanup_shared_research_image_staging: toolAppCleanupSharedResearchImageStaging,
   app_record_page_progress: toolAppRecordPageProgress,
   app_render_workspace_page_preview: toolAppRenderWorkspacePagePreview,
   app_upload_current_page_screenshot: toolAppUploadCurrentPageScreenshot,

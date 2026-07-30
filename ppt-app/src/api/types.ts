@@ -983,16 +983,18 @@ export interface SharedResearchImageCandidate {
   use_in_ppt: boolean;
   description: string;
   reason: string;
-  prefetch_status?: "pending" | "running" | "completed" | "failed";
-  prefetch_interaction_id?: string;
-  prefetch_error?: string;
+  local_download_status?: "pending" | "running" | "completed" | "failed";
+  local_download_error?: string;
+  upload_status?: "pending" | "running" | "completed" | "failed" | "skipped";
+  upload_r2_key?: string;
+  upload_expires_at?: string;
   analysis_status?: "pending" | "running" | "completed" | "failed" | "skipped";
   file_path?: string;
-  download_status: "pending" | "imported" | "failed";
+  local_file_path?: string;
+  import_status: "pending" | "imported" | "failed" | "skipped";
   sha256?: string;
   mime_type?: string;
   bytes_size?: number;
-  aps_path?: string;
   final_url?: string;
   content_duplicate_of?: string;
   error?: string;
@@ -1015,9 +1017,11 @@ export interface SharedResearchImageBatch {
     raw_candidates?: number;
     unique_url_candidates?: number;
     duplicate_url_occurrences?: number;
-    prefetched?: number;
+    downloaded?: number;
+    uploaded?: number;
     unique_content_candidates?: number;
-    prefetch_failed?: number;
+    download_failed?: number;
+    upload_failed?: number;
     selected: number;
     imported: number;
     unique_content_imported?: number;
@@ -1077,7 +1081,7 @@ export type SharedResearchProgressOperation =
   | { op: "set_web_diagnostics"; gaps: string[]; diagnostic_errors: string[] }
   | { op: "set_image_decision"; decision: Record<string, unknown> }
   | { op: "upsert_image_search"; query: string; search: Record<string, unknown> }
-  | { op: "set_image_work_status"; field: "search_status" | "prefetch_status" | "analysis_status" | "import_status"; state: "waiting" | "running" | "completed" | "warning" }
+  | { op: "set_image_work_status"; field: "search_status" | "prepare_status" | "analysis_status" | "import_status"; state: "waiting" | "running" | "completed" | "warning" }
   | { op: "upsert_image_deduplication_entry"; candidate_id: string; group: Record<string, unknown>; candidate: Record<string, unknown> }
   | { op: "set_image_deduplication_summary"; strategy: Record<string, unknown>; statistics: Record<string, unknown> }
   | { op: "upsert_image_analysis_batch"; batch_id: string; batch: Record<string, unknown>; candidates: Array<{ candidate_id: string; candidate: Record<string, unknown> }> }
@@ -1112,11 +1116,27 @@ export interface ImportSharedResearchImageResult {
   bytes_size: number;
 }
 
-export interface SharedResearchImageDownloadUrlResult {
+export interface PrepareSharedResearchImageCandidateResult {
   candidate_id: string;
-  aps_path: string;
-  download_url: string;
-  expires_at: string | null;
+  local_file_path: string;
+  final_url: string;
+  mime_type: string;
+  bytes_size: number;
+  sha256: string;
+  width: number;
+  height: number;
+}
+
+export interface UploadSharedResearchImageCandidateResult {
+  workspace_dir: string;
+  candidate_id: string;
+  host_upload: HostUploadRef;
+}
+
+export interface CleanupSharedResearchImageStagingResult {
+  workspace_dir: string;
+  operation_id: string;
+  cleaned: boolean;
 }
 
 export interface PageProgressItem {

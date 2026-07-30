@@ -1389,8 +1389,8 @@
       ]
     },
     {
-      "name": "app_get_shared_research_image_download_urls",
-      "description": "Mint short-lived APS download URLs for one image-analysis batch without persisting the signed URLs.",
+      "name": "app_prepare_shared_research_image_candidate",
+      "description": "Safely download one HTTPS image candidate into Workspace staging and validate it for later upload or import.",
       "parameters": [
         {
           "name": "workspace_dir",
@@ -1405,26 +1405,45 @@
           "required": true
         },
         {
-          "name": "artifacts",
-          "type": "array",
-          "items": { "type": "object" },
-          "description": "One to six candidate_id and aps_path references for the next Session batch.",
+          "name": "candidate_id",
+          "type": "string",
+          "description": "Stable image candidate identifier.",
           "required": true
-        }
+        },
+        { "name": "source_url", "type": "string", "description": "Public HTTPS image URL returned by image search.", "required": true },
+        { "name": "existing_file_path", "type": "string", "description": "Optional prior staging file to validate and reuse during recovery.", "required": false },
+        { "name": "expected_sha256", "type": "string", "description": "Optional SHA-256 for the prior staging file.", "required": false }
       ]
     },
     {
-      "name": "app_import_shared_research_image_aps",
-      "description": "Resolve, download, validate, and import one selected APS research image into the shadow Workspace evidence image directory.",
+      "name": "app_upload_shared_research_image_candidate",
+      "description": "Upload one validated local research image candidate for an image-analysis Session.",
       "parameters": [
         { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
         { "name": "operation_id", "type": "string", "description": "Research operation identifier used to correlate storage logs.", "required": true },
-        { "name": "parent_interaction_id", "type": "string", "description": "Optional image_fetch interaction identifier used to correlate logs.", "required": false },
         { "name": "candidate_id", "type": "string", "description": "Stable image candidate identifier.", "required": true },
-        { "name": "aps_path", "type": "string", "description": "Persistent APS path returned by anna.web.image_fetch.", "required": true },
-        { "name": "mime_type", "type": "string", "description": "Host-validated image MIME type.", "required": true },
+        { "name": "local_file_path", "type": "string", "description": "Absolute path to the validated Workspace staging image.", "required": true },
+        { "name": "mime_type", "type": "string", "description": "Validated image MIME type.", "required": true }
+      ]
+    },
+    {
+      "name": "app_import_shared_research_image_local",
+      "description": "Validate and import one selected staged research image into the shadow Workspace evidence image directory.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
+        { "name": "candidate_id", "type": "string", "description": "Stable image candidate identifier.", "required": true },
+        { "name": "local_file_path", "type": "string", "description": "Absolute path to the validated Workspace staging image.", "required": true },
+        { "name": "mime_type", "type": "string", "description": "Validated image MIME type.", "required": true },
         { "name": "size_bytes", "type": "number", "description": "Expected image byte size.", "required": true },
-        { "name": "sha256", "type": "string", "description": "Expected image SHA-256 returned by anna.web.image_fetch.", "required": true }
+        { "name": "sha256", "type": "string", "description": "Expected image SHA-256.", "required": true }
+      ]
+    },
+    {
+      "name": "app_cleanup_shared_research_image_staging",
+      "description": "Remove all temporary research image files after one research operation has published its final evidence.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
+        { "name": "operation_id", "type": "string", "description": "Research operation identifier whose staging directory may be removed.", "required": true }
       ]
     },
     {

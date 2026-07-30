@@ -71,7 +71,7 @@ test("shared research artifacts retain only reusable imported image assets", asy
         use_in_ppt: true,
         description: "A modern office.",
         reason: "Matches the deck.",
-        download_status: "imported" as const,
+        import_status: "imported" as const,
         file_path: imported.file_path,
         sha256,
         mime_type: "image/png",
@@ -84,7 +84,7 @@ test("shared research artifacts retain only reusable imported image assets", asy
         use_in_ppt: false,
         description: "An unrelated image.",
         reason: "Does not match the deck.",
-        download_status: "pending" as const,
+        import_status: "pending" as const,
       }, {
         candidate_id: "candidate-import-failed",
         query: "modern office",
@@ -93,7 +93,7 @@ test("shared research artifacts retain only reusable imported image assets", asy
         use_in_ppt: true,
         description: "A selected image that could not be imported.",
         reason: "Matches the deck but is not locally reusable.",
-        download_status: "failed" as const,
+        import_status: "failed" as const,
       }],
       gaps: [],
     };

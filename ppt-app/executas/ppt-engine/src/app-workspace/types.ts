@@ -717,7 +717,7 @@ export type AppSharedResearchProgressOperation =
   | { op: "set_web_diagnostics"; gaps: string[]; diagnostic_errors: string[] }
   | { op: "set_image_decision"; decision: Record<string, unknown> }
   | { op: "upsert_image_search"; query: string; search: Record<string, unknown> }
-  | { op: "set_image_work_status"; field: "search_status" | "prefetch_status" | "analysis_status" | "import_status"; state: "waiting" | "running" | "completed" | "warning" }
+  | { op: "set_image_work_status"; field: "search_status" | "prepare_status" | "analysis_status" | "import_status"; state: "waiting" | "running" | "completed" | "warning" }
   | { op: "upsert_image_deduplication_entry"; candidate_id: string; group: Record<string, unknown>; candidate: Record<string, unknown> }
   | { op: "set_image_deduplication_summary"; strategy: Record<string, unknown>; statistics: Record<string, unknown> }
   | { op: "upsert_image_analysis_batch"; batch_id: string; batch: Record<string, unknown>; candidates: Array<{ candidate_id: string; candidate: Record<string, unknown> }> }

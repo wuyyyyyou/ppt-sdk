@@ -120,7 +120,7 @@ function createRuntime(overrides: Record<string, unknown> = {}) {
       imageBatches.push(structuredClone(batch));
       const assets = batch.candidates.filter((candidate) => (
         candidate.use_in_ppt
-        && candidate.download_status === "imported"
+        && candidate.import_status === "imported"
         && candidate.file_path
         && candidate.sha256
         && candidate.mime_type
@@ -146,15 +146,31 @@ function createRuntime(overrides: Record<string, unknown> = {}) {
       context.progress.image = { ...asRecord(context.progress.image), written: true };
       return { workspace_dir: context.workspace_dir, artifact_path: context.image_catalog_path, published: true, already_published: false, revision: 1 };
     },
-    getSharedResearchImageDownloadUrls: async ({ artifacts }: { artifacts: Array<{ candidate_id: string; aps_path: string }> }) => ({
+    prepareSharedResearchImageCandidate: async ({ candidate_id, source_url }: { candidate_id: string; source_url: string }) => ({
       workspace_dir: context.workspace_dir,
-      artifacts: artifacts.map((artifact) => ({
-        ...artifact,
-        download_url: `https://download.test/${artifact.candidate_id}`,
-        expires_at: null,
-      })),
+      candidate_id,
+      local_file_path: `/tmp/workspace/research/evidence/images/.staging/research/${candidate_id}.jpg`,
+      final_url: source_url,
+      mime_type: "image/jpeg",
+      bytes_size: 3,
+      sha256: candidate_id.padEnd(64, "0").slice(0, 64),
+      width: 1600,
+      height: 900,
     }),
-    importSharedResearchImageAps: async ({
+    uploadSharedResearchImageCandidate: async ({ candidate_id }: { candidate_id: string }) => ({
+      workspace_dir: context.workspace_dir,
+      candidate_id,
+      host_upload: {
+        transport: "host_upload" as const,
+        r2_key: `uploads/${candidate_id}`,
+        url: `https://upload.test/${candidate_id}`,
+        mime_type: "image/jpeg",
+        size_bytes: 3,
+        filename: `${candidate_id}.jpg`,
+        expires_at: "2099-01-01T00:00:00.000Z",
+      },
+    }),
+    importSharedResearchImageLocal: async ({
       candidate_id,
       sha256,
       mime_type,
@@ -166,6 +182,11 @@ function createRuntime(overrides: Record<string, unknown> = {}) {
       sha256,
       mime_type,
       bytes_size: size_bytes,
+    }),
+    cleanupSharedResearchImageStaging: async ({ operation_id }: { operation_id: string }) => ({
+      workspace_dir: context.workspace_dir,
+      operation_id,
+      cleaned: true,
     }),
     appendWorkspaceLog: async ({ entry }: { entry: Record<string, unknown> }) => {
       logs.push(structuredClone(entry));
@@ -308,7 +329,7 @@ describe("Linear Shared Research workflow", () => {
     }
   });
 
-  it("starts selected-image APS imports as soon as each image Session finishes", async () => {
+  it("starts selected-image local imports as soon as each image Session finishes", async () => {
     const secondSessionEntered = deferred();
     const releaseSecondSession = deferred();
     const firstImportStarted = deferred();
@@ -389,7 +410,7 @@ describe("Linear Shared Research workflow", () => {
     const originalBackend = runtimeRecord.backend;
     runtimeRecord.backend = {
       ...originalBackend,
-      importSharedResearchImageAps: async (input: { candidate_id: string; sha256: string; mime_type: string; size_bytes: number }) => {
+      importSharedResearchImageLocal: async (input: { candidate_id: string; sha256: string; mime_type: string; size_bytes: number }) => {
         firstImportStarted.resolve();
         return {
           workspace_dir: "/tmp/workspace",
@@ -467,7 +488,7 @@ describe("Linear Shared Research workflow", () => {
 
     assert.equal(analysisRuns, 1);
     assert.equal(analyzedAttachmentCount, 1);
-    assert.match(analyzedAttachmentUrl, /^https:\/\/download\.test\//);
+    assert.match(analyzedAttachmentUrl, /^https:\/\/upload\.test\//);
     assert.equal(analyzedAttachmentUrl.includes("image.test/messi.jpg"), false);
     assert.equal(imageBatches[0]?.candidates.length, 1);
     assert.deepEqual(imageBatches[0]?.candidates[0]?.matched_queries, ["first", "second"]);
@@ -482,7 +503,7 @@ describe("Linear Shared Research workflow", () => {
     assert.deepEqual(progress.image?.deduplication?.groups?.[0]?.occurrence_ids, ["image-q1-r1", "image-q2-r1"]);
   });
 
-  it("filters only the candidate whose APS prefetch fails", async () => {
+  it("filters only the candidate whose safe HTTPS download fails", async () => {
     let analyzedAttachmentCount = 0;
     const { runtime, context, imageBatches, logs } = createRuntime({
       researchAiClient: {
@@ -498,18 +519,6 @@ describe("Linear Shared Research workflow", () => {
           { image_url: "https://image.test/good.jpg", source_url: "https://source.test/good", mime_type: "image/jpeg" },
           { image_url: "https://image.test/bad.jpg", source_url: "https://source.test/bad", mime_type: "image/jpeg" },
         ] }),
-        imageFetch: async ({ url }: { url: string }) => {
-          if (url.endsWith("bad.jpg")) throw new Error("source returned 403");
-          return {
-            path: "aps/good",
-            get_url: "https://download.test/good",
-            mime_type: "image/jpeg",
-            bytes_size: 3,
-            sha256: "good-content",
-            source_url: url,
-            final_url: url,
-          };
-        },
       },
       agentClient: {
         runImageResearchPrompt: async (prompt: string, options: { attachments?: unknown[] }) => {
@@ -519,17 +528,26 @@ describe("Linear Shared Research workflow", () => {
         },
       },
     });
+    const runtimeRecord = runtime as unknown as { backend: Record<string, unknown> };
+    const originalPrepare = runtimeRecord.backend.prepareSharedResearchImageCandidate as (input: { source_url: string }) => Promise<unknown>;
+    runtimeRecord.backend = {
+      ...runtimeRecord.backend,
+      prepareSharedResearchImageCandidate: async (input: { source_url: string }) => {
+        if (input.source_url.endsWith("bad.jpg")) throw new Error("source returned 403");
+        return originalPrepare(input);
+      },
+    };
 
     await runLinearSharedResearch(runtime, { resume: false });
 
     assert.equal(analyzedAttachmentCount, 1);
     const failed = imageBatches[0]?.candidates.find((candidate) => candidate.image_url.endsWith("bad.jpg"));
-    assert.equal(failed?.prefetch_status, "failed");
+    assert.equal(failed?.local_download_status, "failed");
     assert.equal(failed?.use_in_ppt, false);
-    const progress = context.progress as { stages?: Record<string, string>; image?: { prefetch_status?: string } };
+    const progress = context.progress as { stages?: Record<string, string>; image?: { prepare_status?: string } };
     assert.equal(progress.stages?.image_prefetch, "warning");
-    assert.equal(progress.image?.prefetch_status, "warning");
-    assert.ok(logs.some((entry) => entry.event === "storage.transfer.failed" && entry.phase === "prefetch"));
+    assert.equal(progress.image?.prepare_status, "warning");
+    assert.ok(logs.some((entry) => entry.event === "research.warning" && entry.operation === "image-download"));
   });
 
   it("analyzes and imports one representative when distinct image URLs have the same content hash", async () => {
@@ -549,21 +567,6 @@ describe("Linear Shared Research workflow", () => {
           { image_url: "https://image.test/a.jpg", source_url: "https://source.test/a", mime_type: "image/jpeg" },
           { image_url: "https://image.test/b.jpg", source_url: "https://source.test/b", mime_type: "image/jpeg" },
         ] }),
-        imageFetch: async (
-          { url }: { url: string },
-          callContext: { interaction_id?: string },
-        ) => {
-          callContext.interaction_id = `image-fetch-${url.endsWith("a.jpg") ? "a" : "b"}`;
-          return {
-            path: `aps/${url.endsWith("a.jpg") ? "a" : "b"}`,
-            get_url: "https://download.test/shared-image",
-            mime_type: "image/jpeg",
-            bytes_size: 3,
-            sha256: "same-content-sha256",
-            source_url: url,
-            final_url: url,
-          };
-        },
       },
       agentClient: {
         runImageResearchPrompt: async (prompt: string, options: { attachments?: unknown[] }) => {
@@ -579,15 +582,20 @@ describe("Linear Shared Research workflow", () => {
     });
     const runtimeRecord = runtime as unknown as { backend: Record<string, unknown> };
     const originalBackend = runtimeRecord.backend;
+    const originalPrepare = originalBackend.prepareSharedResearchImageCandidate as (input: { candidate_id: string; source_url: string }) => Promise<Record<string, unknown>>;
     runtimeRecord.backend = {
       ...originalBackend,
-      importSharedResearchImageAps: async ({ candidate_id }: { candidate_id: string }) => {
+      prepareSharedResearchImageCandidate: async (input: { candidate_id: string; source_url: string }) => ({
+        ...(await originalPrepare(input)),
+        sha256: "a".repeat(64),
+      }),
+      importSharedResearchImageLocal: async ({ candidate_id }: { candidate_id: string }) => {
         backendImportCount += 1;
         return {
           workspace_dir: "/tmp/workspace",
           candidate_id,
           file_path: `/tmp/workspace/research/evidence/images/${candidate_id}.jpg`,
-          sha256: "same-content-sha256",
+          sha256: "a".repeat(64),
           mime_type: "image/jpeg",
           bytes_size: 3,
         };
@@ -597,7 +605,7 @@ describe("Linear Shared Research workflow", () => {
 
     assert.equal(analyzedAttachmentCount, 1);
     assert.equal(backendImportCount, 1);
-    assert.equal(imageBatches[0]?.candidates.filter((candidate) => candidate.download_status === "imported").length, 1);
+    assert.equal(imageBatches[0]?.candidates.filter((candidate) => candidate.import_status === "imported").length, 1);
     assert.equal(imageBatches[0]?.statistics?.unique_content_imported, 1);
     const duplicate = imageBatches[0]?.candidates.find((candidate) => candidate.content_duplicate_of);
     assert.ok(duplicate?.content_duplicate_of);
@@ -608,17 +616,10 @@ describe("Linear Shared Research workflow", () => {
     assert.equal(context.image_catalog.assets.length, 1);
     assert.equal(JSON.stringify(context.image_catalog).includes("prefetch_status"), false);
     assert.equal(JSON.stringify(context.image_catalog).includes("aps_path"), false);
-    const apsEvents = logs.filter((entry) => entry.transport === "aps_files");
-    assert.deepEqual(apsEvents.map((entry) => entry.event), [
-      "storage.transfer.started",
-      "storage.transfer.started",
-      "storage.transfer.finished",
-      "storage.transfer.finished",
-    ]);
-    assert.match(String(apsEvents.find((entry) => entry.parent_interaction_id)?.parent_interaction_id), /^image-fetch-/);
+    assert.equal(logs.some((entry) => entry.transport === "aps_files"), false);
   });
 
-  it("resumes from completed image checkpoints without repeating analysis or APS import", async () => {
+  it("resumes from completed image checkpoints without repeating analysis or local import", async () => {
     let analysisRuns = 0;
     let importCount = 0;
     const { runtime, context, imageBatches } = createRuntime({
@@ -658,7 +659,7 @@ describe("Linear Shared Research workflow", () => {
     const originalBackend = runtimeRecord.backend;
     runtimeRecord.backend = {
       ...originalBackend,
-      importSharedResearchImageAps: async (input: { candidate_id: string; sha256: string; mime_type: string; size_bytes: number }) => {
+      importSharedResearchImageLocal: async (input: { candidate_id: string; sha256: string; mime_type: string; size_bytes: number }) => {
         importCount += 1;
         return {
           workspace_dir: "/tmp/workspace",
@@ -685,7 +686,119 @@ describe("Linear Shared Research workflow", () => {
     assert.equal(analysisRuns, 1);
     assert.equal(importCount, 1);
     assert.equal(imageBatches.length, 1);
-    assert.equal(imageBatches[0]?.candidates[0]?.download_status, "imported");
+    assert.equal(imageBatches[0]?.candidates[0]?.import_status, "imported");
+  });
+
+  it("revalidates the staged file and uploads again when resuming interrupted image analysis", async () => {
+    const prepareInputs: Array<Record<string, unknown>> = [];
+    let uploadCount = 0;
+    let analysisCount = 0;
+    const { runtime, context, imageBatches } = createRuntime({
+      researchAiClient: {
+        decideWebResearch: async () => ({ needs_search: false, queries: [] }),
+        selectWebFetchResults: async () => [],
+        summarizeWebResearch: async () => "Summary",
+        decideImageResearch: async () => ({ needs_search: true, queries: ["resume image"] }),
+      },
+      researchWebClient: {
+        search: async () => ({ results: [] }),
+        fetch: async () => ({ pages: [] }),
+        imageSearch: async () => ({ results: [{
+          image_url: "https://image.test/resume.jpg",
+          source_url: "https://source.test/resume",
+          mime_type: "image/jpeg",
+        }] }),
+      },
+      agentClient: {
+        runImageResearchPrompt: async (prompt: string) => {
+          analysisCount += 1;
+          const candidateId = prompt.match(/"candidate_id": "([^"]+)"/)?.[1] ?? "";
+          return { candidates: [{ candidate_id: candidateId, use_in_ppt: true, description: "Usable", reason: "Relevant" }] };
+        },
+      },
+    });
+    const runtimeRecord = runtime as unknown as { backend: Record<string, unknown> };
+    const originalPrepare = runtimeRecord.backend.prepareSharedResearchImageCandidate as (input: Record<string, unknown>) => Promise<unknown>;
+    const originalUpload = runtimeRecord.backend.uploadSharedResearchImageCandidate as (input: Record<string, unknown>) => Promise<unknown>;
+    runtimeRecord.backend = {
+      ...runtimeRecord.backend,
+      prepareSharedResearchImageCandidate: async (input: Record<string, unknown>) => {
+        prepareInputs.push(structuredClone(input));
+        return originalPrepare(input);
+      },
+      uploadSharedResearchImageCandidate: async (input: Record<string, unknown>) => {
+        uploadCount += 1;
+        return originalUpload(input);
+      },
+    };
+
+    await runLinearSharedResearch(runtime, { resume: false });
+    const progress = context.progress as unknown as {
+      status: string;
+      stages: Record<string, string>;
+      image: {
+        written: boolean;
+        candidates: Array<Record<string, unknown>>;
+        analysis_batches: Array<Record<string, unknown>>;
+      };
+    };
+    const candidate = progress.image.candidates[0] as Record<string, unknown>;
+    const priorLocalPath = String(candidate.local_file_path);
+    const priorSha256 = String(candidate.sha256);
+    progress.status = "running";
+    progress.stages.image_research = "running";
+    progress.stages.image_analysis = "running";
+    progress.stages.image_import = "running";
+    progress.image.written = false;
+    candidate.analysis_status = "pending";
+    candidate.import_status = "pending";
+    candidate.use_in_ppt = false;
+    progress.image.analysis_batches[0] = {
+      ...progress.image.analysis_batches[0],
+      status: "running",
+    };
+    imageBatches.length = 0;
+    context.image_catalog.assets.length = 0;
+
+    await runLinearSharedResearch(runtime, { resume: true });
+
+    assert.equal(analysisCount, 2);
+    assert.equal(uploadCount, 2);
+    assert.equal(prepareInputs.length, 2);
+    assert.equal(prepareInputs[1]?.existing_file_path, priorLocalPath);
+    assert.equal(prepareInputs[1]?.expected_sha256, priorSha256);
+    assert.equal(imageBatches[0]?.candidates[0]?.import_status, "imported");
+
+    progress.status = "running";
+    progress.stages.image_research = "running";
+    progress.stages.image_analysis = "running";
+    progress.stages.image_import = "running";
+    progress.image.written = false;
+    const legacyCandidate = progress.image.candidates[0] as Record<string, unknown>;
+    legacyCandidate.prefetch_status = "completed";
+    legacyCandidate.aps_path = "legacy-aps/candidate-1.jpg";
+    legacyCandidate.download_status = "pending";
+    legacyCandidate.analysis_status = "pending";
+    legacyCandidate.use_in_ppt = false;
+    delete legacyCandidate.local_download_status;
+    delete legacyCandidate.local_file_path;
+    delete legacyCandidate.upload_status;
+    delete legacyCandidate.import_status;
+    progress.image.analysis_batches[0] = {
+      ...progress.image.analysis_batches[0],
+      status: "running",
+    };
+    imageBatches.length = 0;
+    context.image_catalog.assets.length = 0;
+
+    await runLinearSharedResearch(runtime, { resume: true });
+
+    assert.equal(analysisCount, 3);
+    assert.equal(uploadCount, 3);
+    assert.equal(prepareInputs.length, 3);
+    assert.equal(prepareInputs[2]?.existing_file_path, undefined);
+    assert.equal(JSON.stringify(context.progress).includes("legacy-aps"), false);
+    assert.equal(imageBatches[0]?.candidates[0]?.import_status, "imported");
   });
 
   it("keeps raw technical errors out of formal research batches", async () => {
