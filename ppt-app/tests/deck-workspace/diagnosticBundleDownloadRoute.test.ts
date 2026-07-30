@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 
 const HOOK = "src/features/deck-workspace/hooks/useDeckWorkspace.ts";
+const MANIFEST = "manifest.json";
 const PLUGIN = "executas/ppt-engine/example_plugin.js";
 
 async function downloadAction(): Promise<string> {
@@ -14,6 +15,13 @@ async function downloadAction(): Promise<string> {
 }
 
 describe("diagnostic bundle download route", () => {
+  it("declares the capability required to download user-scoped objects", async () => {
+    const manifest = JSON.parse(await readFile(path.resolve(MANIFEST), "utf8"));
+
+    assert.ok(manifest.ui?.host_api?.files?.includes("download"));
+    assert.ok(manifest.host_capabilities?.includes("aps.scope.user.read"));
+  });
+
   it("asks the Host to save the ZIP before it falls back to the signed URL", async () => {
     const source = await downloadAction();
 
