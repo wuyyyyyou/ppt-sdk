@@ -10,6 +10,7 @@ import type {
   GetWorkspacePageFileFingerprintsResult,
   GetPageEditContextResult,
   GetWorkspaceCoverResult,
+  GetWorkspacePageImageResult,
   SaveManualPageRevisionResult,
   RestorePageSourceVersionResult,
   PagePlan,
@@ -733,6 +734,12 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invoke<GetWorkspaceCoverResult>(
         toolIds.pptEngine,
         "app_get_workspace_cover",
+        input
+      ),
+    getWorkspacePageImage: (input) =>
+      invoke<GetWorkspacePageImageResult>(
+        toolIds.pptEngine,
+        "app_get_workspace_page_image",
         input
       ),
     recordOutline: (input) =>

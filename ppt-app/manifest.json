@@ -6,7 +6,7 @@
   "required_executas": [
     {
       "tool_id": "bundled:ppt-engine",
-      "min_version": "4.3.8",
+      "min_version": "4.6.0",
       "version": "latest"
     }
   ],
@@ -33,8 +33,8 @@
           "h": 720
         },
         "default_size": {
-          "w": 1080,
-          "h": 760
+          "w": 1860,
+          "h": 1000
         },
         "resizable": true,
         "movable": true,
@@ -54,6 +54,9 @@
       "upload": [
         "negotiate",
         "confirm"
+      ],
+      "files": [
+        "download"
       ],
       "chat": [],
       "artifact": [],

@@ -21,6 +21,7 @@ import type {
 } from "../deck-generation";
 import type { ActiveGenerationRun, GenerationViewState } from "./generationViewState";
 import type { WorkspaceCovers } from "./workspaceCovers";
+import type { GenerationPagePreviews } from "./generationPagePreviews";
 import type { PageReviewSettings } from "./reviewSettings";
 import type { ResearchSearchControlSettings } from "./researchSearchControl";
 
@@ -57,6 +58,9 @@ export interface ExportArtifact {
   fileName?: string;
   updatedAt: string;
   mirrorStatus: "ready" | "missing" | "stale";
+  /** APS Files location of the mirror, so the Host can serve it by path. */
+  mirrorPath?: string;
+  mirrorScope?: string;
 }
 
 export interface DownloadLinkState {
@@ -82,6 +86,9 @@ export interface WorkspaceDiagnosticBundleState extends DownloadLinkState {
   workspaceId?: string;
   filename?: string;
   sizeBytes?: number;
+  /** ADR-0025: lets the Host save the ZIP without this App handling a signed URL. */
+  mirrorPath?: string;
+  mirrorScope?: string;
 }
 
 export interface PerformanceTestingState {
@@ -154,6 +161,9 @@ export interface DeckWorkspaceState {
   loading: LoadingKind;
   activeGenerationRun: ActiveGenerationRun | null;
   generationViewState: GenerationViewState;
+  /** GEN-006: one preview image per page that already rendered during the run. */
+  generationPagePreviews: GenerationPagePreviews;
+  pinnedGenerationPreviewPageId: string | null;
   exportProgress: ExportProgressState;
   exportArtifact: ExportArtifact | null;
   exportDownload: ExportDownloadState;

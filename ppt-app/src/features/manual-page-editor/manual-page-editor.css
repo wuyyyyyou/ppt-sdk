@@ -299,6 +299,22 @@
   width: 108px;
 }
 
+.manual-toolbar-select.line-height {
+  width: 62px;
+}
+
+.manual-toolbar-select.space-after {
+  width: 74px;
+}
+
+/* The icon carries the meaning that the popover label used to spell out. */
+.manual-toolbar-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--manual-muted);
+}
+
 .manual-toolbar-color {
   position: relative;
   display: inline-flex;
@@ -329,11 +345,12 @@
   line-height: 1.1;
 }
 
-.manual-color-dot {
-  width: 9px;
-  height: 9px;
-  border: 1px solid rgba(17, 24, 39, 0.18);
-  border-radius: 50%;
+/* Tinting the glyph itself hides the control whenever the picked colour is
+   close to the toolbar background, so the colour rides underneath instead. */
+.manual-color-swatch {
+  display: inline-flex;
+  padding-bottom: 2px;
+  border-bottom: 3px solid;
 }
 
 .manual-toolbar-popover-anchor {
@@ -365,14 +382,6 @@
   min-width: 180px;
 }
 
-.manual-toolbar-popover.paragraph {
-  min-width: 210px;
-}
-
-.manual-toolbar-popover.opacity {
-  min-width: 240px;
-}
-
 .manual-toolbar-popover.align-right {
   right: 0;
   left: auto;
@@ -385,16 +394,6 @@
   gap: 12px;
   color: var(--manual-muted);
   font-size: 12px;
-}
-
-.manual-toolbar-popover.opacity label {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-}
-
-.manual-toolbar-popover input[type="range"] {
-  min-width: 110px;
-  accent-color: var(--manual-accent);
 }
 
 .manual-color-field input[type="color"] {
@@ -449,11 +448,22 @@
 }
 
 .manual-editor-stage {
+  position: relative;
   flex: 0 0 auto;
   overflow: hidden;
   border-radius: 5px;
   background: #fff;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 10px 34px rgba(0, 0, 0, 0.16);
+}
+
+/* Drawn in the app layer, never inside the iframe, so it cannot reach the saved
+   page HTML or its screenshot. */
+.manual-editor-hover-outline {
+  position: absolute;
+  z-index: 5;
+  box-shadow: inset 0 0 0 1.5px var(--manual-accent);
+  background: color-mix(in srgb, var(--manual-accent) 8%, transparent);
+  pointer-events: none;
 }
 
 .manual-editor-stage iframe {
@@ -468,6 +478,7 @@
   left: 50%;
   z-index: 40;
   display: flex;
+  max-width: calc(100% - 32px);
   height: 42px;
   align-items: center;
   gap: 12px;

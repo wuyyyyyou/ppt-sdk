@@ -1,6 +1,6 @@
 {
   "display_name": "ppt-engine",
-  "version": "4.3.8",
+  "version": "4.6.0",
   "description": "Anna Executa plugin for Workspace Authoring Kit setup, manifest-based deck HTML generation, and backend PPTX export.",
   "author": "Anna Developer",
   "host_capabilities": [
@@ -1587,6 +1587,30 @@
       ]
     },
     {
+      "name": "app_get_workspace_page_image",
+      "description": "Derive a preview-sized image from one rendered workspace page and return a single Host Upload reference for it.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "page_id",
+          "type": "string",
+          "description": "Page id from page-progress.json to derive the preview image for.",
+          "required": true
+        },
+        {
+          "name": "width",
+          "type": "number",
+          "description": "Optional target width in pixels. Defaults to 1280 and is capped at 1920.",
+          "required": false
+        }
+      ]
+    },
+    {
       "name": "app_render_deck_html",
       "description": "Render the selected workspace template manifest to reviewable deck HTML and return Host Upload screenshot previews.",
       "parameters": [
@@ -1744,7 +1768,7 @@
     },
     {
       "name": "app_prepare_workspace_diagnostic_bundle",
-      "description": "Create a fresh ZIP of the complete current Workspace, overwrite its user-scoped APS Files diagnostic object, and return a short-lived download URL without persisting a mirror or URL.",
+      "description": "Create a fresh ZIP of the complete current Workspace, overwrite its user-scoped APS Files diagnostic object, and return both the object reference the Host can download and a short-lived download URL, without persisting a mirror or URL.",
       "parameters": [
         {
           "name": "workspace_dir",

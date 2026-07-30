@@ -11,7 +11,9 @@ import {
 } from "../generationProgressDisplay";
 import type { GenerationStreamSnapshot } from "../types";
 import type { GenerationViewState } from "../generationViewState";
+import type { GenerationPagePreviews } from "../generationPagePreviews";
 import { summarizeUserFacingError } from "../userFacingError";
+import { GenerationPagePreviewPanel } from "./GenerationPagePreviewPanel";
 import { ThinkingStatusText } from "./BriefPage";
 
 interface GeneratingPageProps {
@@ -19,6 +21,9 @@ interface GeneratingPageProps {
   viewState: GenerationViewState;
   progress: DeckGenerationProgress | null;
   history: GenerationStreamSnapshot[];
+  pagePreviews: GenerationPagePreviews;
+  pinnedPreviewPageId: string | null;
+  onSelectPreviewPage: (pageId: string | null) => void;
   onBack: () => void;
   onBackToOutline: () => void;
   onResume: () => Promise<void>;
@@ -87,7 +92,19 @@ function stepState(
 }
 
 export function GeneratingPage(props: GeneratingPageProps) {
-  const { t, viewState, progress, history, onBack, onBackToOutline, onResume, canBackToOutline } = props;
+  const {
+    t,
+    viewState,
+    progress,
+    history,
+    pagePreviews,
+    pinnedPreviewPageId,
+    onSelectPreviewPage,
+    onBack,
+    onBackToOutline,
+    onResume,
+    canBackToOutline,
+  } = props;
   const activeIndex = majorStepIndex(progress?.step ?? null);
   const progressMessage = getGenerationProgressDisplayMessage(t, progress);
   const pageTitle = generationPageTitle(t, viewState.status);
@@ -125,17 +142,32 @@ export function GeneratingPage(props: GeneratingPageProps) {
         })}
       </ol>
 
-      {progress ? (
-        <GenerationProgressPanel
-          t={t}
-          progress={progress}
-          history={history}
-        />
-      ) : (
-        <div className="generation-progress-panel">
-          <strong>{t.status.creatingDeck}</strong>
+      {/* The run reports two things at once: what it is doing, and what it has
+          produced. They sit side by side so a finished page can be inspected
+          without losing sight of the stage that is still running. */}
+      <div className="generation-stage-split">
+        <div className="generation-stage-progress-column">
+          {progress ? (
+            <GenerationProgressPanel
+              t={t}
+              progress={progress}
+              history={history}
+            />
+          ) : (
+            <div className="generation-progress-panel">
+              <strong>{t.status.creatingDeck}</strong>
+            </div>
+          )}
         </div>
-      )}
+        <div className="generation-stage-preview-column">
+          <GenerationPagePreviewPanel
+            t={t}
+            previews={pagePreviews}
+            pinnedPageId={pinnedPreviewPageId}
+            onSelectPage={onSelectPreviewPage}
+          />
+        </div>
+      </div>
 
       {/* Back sits at the bottom of the stage, next to the recovery entries it
           belongs with. Available for the whole stage, not just the recovery

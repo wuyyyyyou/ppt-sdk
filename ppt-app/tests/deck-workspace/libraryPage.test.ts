@@ -42,7 +42,7 @@ describe("LibraryPage", () => {
       onSaveSettings: async () => undefined,
       onSaveTitle: async () => undefined,
       workspaceDiagnosticBundle: { status: "idle", message: "" },
-      onPrepareWorkspaceDiagnosticBundle: async () => undefined,
+      onDownloadWorkspaceDiagnosticBundle: async () => undefined,
       onResetWorkspaceDiagnosticBundle: () => undefined,
     }));
 
@@ -64,7 +64,7 @@ describe("LibraryPage", () => {
       onSaveSettings: async () => undefined,
       onSaveTitle: async () => undefined,
       workspaceDiagnosticBundle: { status: "idle", message: "" },
-      onPrepareWorkspaceDiagnosticBundle: async () => undefined,
+      onDownloadWorkspaceDiagnosticBundle: async () => undefined,
       onResetWorkspaceDiagnosticBundle: () => undefined,
     }));
 
@@ -86,17 +86,18 @@ describe("LibraryPage", () => {
       onSaveSettings: async () => undefined,
       onSaveTitle: async () => undefined,
       workspaceDiagnosticBundle: { status: "idle", message: "" },
-      onPrepareWorkspaceDiagnosticBundle: async () => undefined,
+      onDownloadWorkspaceDiagnosticBundle: async () => undefined,
       onResetWorkspaceDiagnosticBundle: () => undefined,
     }));
 
     assert.match(html, /问题排查包/);
     assert.match(html, /完整工作区/);
     assert.match(html, /上传资料/);
-    assert.match(html, /生成问题排查包下载链接/);
+    assert.match(html, /下载问题排查包/);
+    assert.doesNotMatch(html, /复制问题排查包链接/);
   });
 
-  it("shows a copyable URL when the diagnostic bundle is ready", () => {
+  it("keeps the download button and offers the URL as a fallback", () => {
     const html = renderToStaticMarkup(createElement(LibraryPage, {
       t: messages.zh,
       settings: {},
@@ -113,13 +114,14 @@ describe("LibraryPage", () => {
         href: "https://storage.example/diagnostic.zip",
         expiresAt: new Date(Date.now() + 60_000).toISOString(),
       },
-      onPrepareWorkspaceDiagnosticBundle: async () => undefined,
+      onDownloadWorkspaceDiagnosticBundle: async () => undefined,
       onResetWorkspaceDiagnosticBundle: () => undefined,
     }));
 
+    assert.match(html, /diagnostic-bundle-generate-btn[\s\S]*下载问题排查包/);
     assert.match(html, /https:\/\/storage\.example\/diagnostic\.zip/);
     assert.match(html, /复制问题排查包链接/);
-    assert.match(html, /不要将链接分享给无关人员/);
+    assert.match(html, /如果没有自动开始下载/);
     assert.match(html, /aria-label="重新生成问题排查包"/);
   });
 
@@ -140,7 +142,7 @@ describe("LibraryPage", () => {
         href: "https://storage.example/diagnostic.zip",
         expiresAt: new Date(Date.now() + 60_000).toISOString(),
       },
-      onPrepareWorkspaceDiagnosticBundle: async () => undefined,
+      onDownloadWorkspaceDiagnosticBundle: async () => undefined,
       onResetWorkspaceDiagnosticBundle: () => undefined,
     }));
 

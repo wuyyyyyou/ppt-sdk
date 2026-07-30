@@ -22,6 +22,33 @@ export function exceedsDragThreshold(
   return canvasDistance >= threshold;
 }
 
+export interface SelectionCandidate {
+  tagName: string;
+  /** Computed display, already blockified for absolutely positioned elements. */
+  display: string;
+  visibility: string;
+  width: number;
+  height: number;
+  isEditorArtifact: boolean;
+}
+
+const TEXT_RUN_TAGS = new Set(["SPAN", "STRONG", "EM", "B", "I", "U", "S", "BR", "SMALL", "A", "CODE"]);
+
+/**
+ * Templates draw accent bars, chips and rules as `<span>` with an explicit box,
+ * so tag name alone cannot decide what is grabbable. A run of inline text is
+ * still passed over — it has no box of its own to move or resize — but anything
+ * the layout gave a box to is fair game.
+ */
+export function isSelectableBox(candidate: SelectionCandidate): boolean {
+  if (candidate.isEditorArtifact) return false;
+  if (candidate.display === "none" || candidate.display === "contents") return false;
+  if (candidate.visibility === "hidden" || candidate.visibility === "collapse") return false;
+  if (candidate.width <= 0 || candidate.height <= 0) return false;
+  const inlineFlow = candidate.display === "inline" || candidate.display === "inline list-item";
+  return !(inlineFlow && TEXT_RUN_TAGS.has(candidate.tagName.toUpperCase()));
+}
+
 export function canvasDistance(
   distance: readonly number[],
   scale = 1,

@@ -872,6 +872,26 @@ export interface GetAppWorkspaceCoverResult {
   generated_at: string;
 }
 
+export interface GetAppWorkspacePageImageInput {
+  workspace_dir: string;
+  page_id: string;
+  width?: number;
+}
+
+export interface GetAppWorkspacePageImageResult {
+  version: 1;
+  workspace_dir: string;
+  page_id: string;
+  page_index: number;
+  page_status: string;
+  source_path: string;
+  image_path: string;
+  width: number | null;
+  height: number | null;
+  size_bytes: number;
+  generated_at: string;
+}
+
 export interface AppTemplatePlanningBlueprint {
   id: string;
   name: string;

@@ -69,7 +69,7 @@ describe("DeckPage", () => {
   it("opens the top actions row with a back entry", () => {
     const html = renderDeckPage();
 
-    assert.match(html, /deck-top-actions"><button class="secondary-btn deck-back-btn"/);
+    assert.match(html, /deck-top-actions"><button [^>]*class="secondary-btn deck-back-btn"/);
     assert.match(html, new RegExp(`deck-back-btn[\\s\\S]*${messages.zh.controls.back}`));
   });
 

@@ -10,8 +10,13 @@ import {
 } from "../../../ai/interactionLog";
 import { createPptBackend, type PptBackend } from "../../../api/pptBackend";
 import { createResearchWebClient, type ResearchWebClient } from "../../../api/researchWebClient";
+import { startBrowserDownload } from "../browserDownload";
 import { hasActiveDownloadUrl } from "../downloadUrl";
 import { connectAnnaRuntime } from "../../../runtime/annaRuntime";
+import {
+  createAppHostFileDownloadClient,
+  type AppHostFileDownloadClient,
+} from "../../../runtime/appHostFileDownload";
 import {
   createAppHostUploadClient,
   type AppHostUploadClient,
@@ -126,6 +131,12 @@ import {
   type WorkspaceCoverState,
   type WorkspaceCovers,
 } from "../workspaceCovers";
+import {
+  GENERATION_PAGE_PREVIEW_CONCURRENCY,
+  reconcileGenerationPagePreviews,
+  selectGenerationPagePreviewSources,
+  type GenerationPagePreviews,
+} from "../generationPagePreviews";
 import { resolveGenerationAbandonLanding } from "../generationAbandonLanding";
 import { resolveDeckBackStage } from "../stageBackNavigation";
 import { createMyWorkTimingRecord, publishMyWorkTiming } from "../myWorkTiming";
@@ -498,8 +509,9 @@ export interface DeckWorkspaceActions {
   applyManualPageUpdate: (result: SaveManualPageRevisionResult | RestorePageSourceVersionResult) => void;
   exportFile: (type: "PPTX" | "PDF") => Promise<void>;
   downloadExportArtifact: () => Promise<void>;
-  prepareWorkspaceDiagnosticBundle: () => Promise<void>;
+  downloadWorkspaceDiagnosticBundle: () => Promise<void>;
   resetWorkspaceDiagnosticBundle: () => void;
+  selectGenerationPreviewPage: (pageId: string | null) => void;
   returnToOutlineFromGeneration: () => void;
   backFromGeneration: () => Promise<void>;
   backFromDeck: () => Promise<void>;
@@ -581,6 +593,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     useState<ConfirmationDialogRequest | null>(null);
   const [activeGenerationRun, setActiveGenerationRun] =
     useState<ActiveGenerationRun | null>(null);
+  const [generationPagePreviews, setGenerationPagePreviews] =
+    useState<GenerationPagePreviews>({});
+  const [pinnedGenerationPreviewPageId, setPinnedGenerationPreviewPageId] =
+    useState<string | null>(null);
+  const generationPagePreviewsRef = useRef<GenerationPagePreviews>({});
+  const generationPagePreviewSessionRef = useRef(0);
   const [generationPreparing, setGenerationPreparing] = useState(false);
   const [generationTransaction, setGenerationTransaction] =
     useState<GenerationRunTransaction | null>(null);
@@ -614,6 +632,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const exportInFlightRef = useRef(false);
   const [backend, setBackend] = useState<PptBackend | null>(null);
   const [hostUploadClient, setHostUploadClient] = useState<AppHostUploadClient | null>(null);
+  const [hostFileDownloadClient, setHostFileDownloadClient] =
+    useState<AppHostFileDownloadClient | null>(null);
   const [aiClient, setAiClient] = useState<AiClient | null>(null);
   const [researchAiClient, setResearchAiClient] = useState<ResearchAiClient | null>(null);
   const [researchWebClient, setResearchWebClient] = useState<ResearchWebClient | null>(null);
@@ -1410,6 +1430,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setCreateDeckProgress(null);
     setGenerationHistory([]);
     setActiveGenerationRun(null);
+    resetGenerationPagePreviews();
     setSelectedTemplateGroupId(DEFAULT_TEMPLATE_GROUP_ID);
     if (!preserveWorkflowState) setStage("brief");
     resetGenerationUiState();
@@ -1445,6 +1466,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         if (cancelled) return;
         setBackend(nextBackend);
         setHostUploadClient(nextHostUploadClient);
+        setHostFileDownloadClient(createAppHostFileDownloadClient(runtime));
         setAiClient(nextAiClient);
         setResearchAiClient(nextResearchAiClient);
         setResearchWebClient(nextResearchWebClient);
@@ -1512,6 +1534,76 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     };
   }, []);
 
+  /**
+   * Page screenshots live in whichever Workspace the run writes to, which is the
+   * Shadow Workspace while a run is in flight and the official Workspace once it
+   * committed. Reading it from the run keeps the preview working mid-run, when
+   * the official Workspace has no rendered pages yet.
+   */
+  const generationPreviewWorkspaceDir =
+    activeGenerationRun?.shadowWorkspaceDir ?? currentWorkspace?.workspace_dir ?? "";
+
+  function resetGenerationPagePreviews() {
+    generationPagePreviewSessionRef.current += 1;
+    generationPagePreviewsRef.current = {};
+    setGenerationPagePreviews({});
+    setPinnedGenerationPreviewPageId(null);
+  }
+
+  useEffect(() => {
+    if (!backend || !generationPreviewWorkspaceDir) return;
+
+    const sources = selectGenerationPagePreviewSources(createDeckProgress);
+    const { previews, pending, changed } = reconcileGenerationPagePreviews(
+      generationPagePreviewsRef.current,
+      sources,
+    );
+    if (!changed) return;
+
+    generationPagePreviewsRef.current = previews;
+    setGenerationPagePreviews(previews);
+    if (pending.length === 0) return;
+
+    const session = generationPagePreviewSessionRef.current;
+    const workspaceDir = generationPreviewWorkspaceDir;
+
+    function applyPreview(pageId: string, url: string) {
+      if (generationPagePreviewSessionRef.current !== session) return;
+      const current = generationPagePreviewsRef.current[pageId];
+      if (!current) return;
+      const next: GenerationPagePreviews = {
+        ...generationPagePreviewsRef.current,
+        [pageId]: url
+          ? { ...current, status: "ready", url }
+          : { ...current, status: "error", url: undefined },
+      };
+      generationPagePreviewsRef.current = next;
+      setGenerationPagePreviews(next);
+    }
+
+    void mapWithConcurrencyLimit(
+      pending,
+      GENERATION_PAGE_PREVIEW_CONCURRENCY,
+      async (source) => {
+        if (generationPagePreviewSessionRef.current !== session) return;
+        // A re-render that landed while this was queued replaced the source
+        // bytes, so the newer reconciliation owns the request.
+        if (generationPagePreviewsRef.current[source.pageId]?.screenshotPath !== source.screenshotPath) {
+          return;
+        }
+        try {
+          const image = await backend.getWorkspacePageImage({
+            workspace_dir: workspaceDir,
+            page_id: source.pageId,
+          });
+          applyPreview(source.pageId, image.image_upload?.url ?? "");
+        } catch {
+          applyPreview(source.pageId, "");
+        }
+      },
+    );
+  }, [backend, createDeckProgress, generationPreviewWorkspaceDir]);
+
   function recordGenerationProgress(progress: DeckGenerationProgress) {
     setCreateDeckProgress(progress);
     const snapshot: GenerationStreamSnapshot =
@@ -1526,6 +1618,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   function resetGenerationProgress() {
     setCreateDeckProgress(null);
     setGenerationHistory([]);
+    resetGenerationPagePreviews();
     resetGenerationUiState();
   }
 
@@ -2980,6 +3073,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       ? latest.mirror as {
           provider?: unknown;
           scope?: unknown;
+          path?: unknown;
           content_disposition?: unknown;
           source_updated_at?: unknown;
         }
@@ -2999,6 +3093,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       path: latest.path,
       updatedAt: latest.updatedAt,
       mirrorStatus,
+      mirrorPath: typeof mirror?.path === "string" ? mirror.path : undefined,
+      mirrorScope: typeof mirror?.scope === "string" ? mirror.scope : undefined,
     };
   }
 
@@ -3024,6 +3120,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       fileName: result.artifact.filename,
       updatedAt: result.artifact.updated_at,
       mirrorStatus: "ready",
+      mirrorPath: result.mirror.path,
+      mirrorScope: result.mirror.scope,
     };
   }
 
@@ -3434,6 +3532,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setCreateDeckProgress(null);
     setGenerationHistory([]);
     setActiveGenerationRun(null);
+    resetGenerationPagePreviews();
     setStage("brief");
     setPage("main");
     setHistory(["main"]);
@@ -4377,14 +4476,31 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (!backend || !currentWorkspace || !exportArtifact || exportDownload.status === "preparing") {
       return;
     }
-    if (hasActiveDownloadUrl(exportDownload)) {
+    // Only the fallback route leaves a URL behind, and while it is still valid
+    // pressing the button again just retries that transfer.
+    if (hasActiveDownloadUrl(exportDownload) && exportDownload.href) {
+      startBrowserDownload(exportDownload.href, document);
+      setExportDownload({ ...exportDownload, message: t.exportPage.downloadStartedWithLink });
       return;
     }
     setExportDownload({ status: "preparing", message: t.exportPage.downloadPreparing });
     try {
       let artifact = exportArtifact;
-      if (artifact.mirrorStatus !== "ready") {
+      if (artifact.mirrorStatus !== "ready" || !artifact.mirrorPath) {
         artifact = await publishExportArtifact(currentWorkspace, artifact);
+      }
+      // Preferred route: the Host resolves the mirror, authorizes it and saves
+      // it from the top-level page, so the signed URL never reaches this App.
+      if (artifact.mirrorPath && hostFileDownloadClient) {
+        const outcome = await hostFileDownloadClient.download({
+          path: artifact.mirrorPath,
+          scope: artifact.mirrorScope,
+          filename: artifact.fileName,
+        });
+        if (outcome === "downloaded") {
+          setExportDownload({ status: "ready", message: t.exportPage.downloadStarted });
+          return;
+        }
       }
       const result = await backend.getExportArtifactDownloadUrl({
         workspace_dir: currentWorkspace.workspace_dir,
@@ -4400,10 +4516,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         ...artifact,
         fileName: result.artifact.filename,
         mirrorStatus: "ready",
+        mirrorPath: result.mirror.path,
+        mirrorScope: result.mirror.scope,
       });
+      const started = startBrowserDownload(result.download_url, document);
       setExportDownload({
         status: "ready",
-        message: t.exportPage.downloadReady,
+        message: started ? t.exportPage.downloadStartedWithLink : t.exportPage.downloadReady,
         href: result.download_url,
         expiresAt: result.expires_at,
       });
@@ -4415,8 +4534,24 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
-  async function prepareCurrentWorkspaceDiagnosticBundle() {
-    if (!backend || !currentWorkspace) return;
+  /**
+   * The ZIP is rebuilt on every request, so this is both "prepare" and "how the
+   * download starts": the Host saves the fresh object, and the signed URL only
+   * comes into play when this Host cannot.
+   */
+  async function downloadCurrentWorkspaceDiagnosticBundle() {
+    if (!backend || !currentWorkspace || workspaceDiagnosticBundle.status === "preparing") return;
+    // Only the fallback route leaves a URL behind, and while it is still valid
+    // pressing the button again just retries that transfer.
+    if (hasActiveDownloadUrl(workspaceDiagnosticBundle) && workspaceDiagnosticBundle.href) {
+      startBrowserDownload(workspaceDiagnosticBundle.href, document);
+      setWorkspaceDiagnosticBundle({
+        ...workspaceDiagnosticBundle,
+        message: t.library.diagnosticBundleDownloadStartedWithLink,
+      });
+      return;
+    }
+
     const workspaceId = currentWorkspace.workspace_id;
     const workspaceDir = currentWorkspace.workspace_dir;
     const requestId = workspaceDiagnosticBundleRequestRef.current + 1;
@@ -4437,12 +4572,46 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       ) {
         return;
       }
+      const mirrorPath = result.mirror?.path;
+      const mirrorScope = result.mirror?.scope;
+      // Preferred route: the Host resolves the object, authorizes it and saves
+      // it from the top-level page, so the signed URL never reaches this App.
+      if (mirrorPath && hostFileDownloadClient) {
+        const outcome = await hostFileDownloadClient.download({
+          path: mirrorPath,
+          scope: mirrorScope,
+          filename: result.filename,
+        });
+        if (
+          workspaceDiagnosticBundleRequestRef.current !== requestId ||
+          currentWorkspaceRef.current?.workspace_id !== workspaceId
+        ) {
+          return;
+        }
+        if (outcome === "downloaded") {
+          setWorkspaceDiagnosticBundle({
+            status: "ready",
+            message: t.library.diagnosticBundleDownloadStarted,
+            workspaceId,
+            filename: result.filename,
+            sizeBytes: result.size_bytes,
+            mirrorPath,
+            mirrorScope,
+          });
+          return;
+        }
+      }
+      const started = startBrowserDownload(result.download_url, document);
       setWorkspaceDiagnosticBundle({
         status: "ready",
-        message: t.library.diagnosticBundleReady,
+        message: started
+          ? t.library.diagnosticBundleDownloadStartedWithLink
+          : t.library.diagnosticBundleReady,
         workspaceId,
         filename: result.filename,
         sizeBytes: result.size_bytes,
+        mirrorPath,
+        mirrorScope,
         href: result.download_url,
         expiresAt: result.expires_at,
       });
@@ -4461,7 +4630,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const message = detail
         ? `${t.library.diagnosticBundleFailedPrefix}${detail}`
         : t.library.diagnosticBundleFailed;
-      console.warn("Failed to prepare the Workspace Diagnostic Bundle", error);
+      console.warn("Failed to download the Workspace Diagnostic Bundle", error);
       setWorkspaceDiagnosticBundle({
         status: "error",
         message,
@@ -4890,6 +5059,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     loading,
     activeGenerationRun,
     generationViewState,
+    generationPagePreviews,
+    pinnedGenerationPreviewPageId,
     exportProgress,
     exportArtifact,
     exportDownload,
@@ -5014,8 +5185,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     applyManualPageUpdate,
     exportFile,
     downloadExportArtifact: downloadCurrentExportArtifact,
-    prepareWorkspaceDiagnosticBundle: prepareCurrentWorkspaceDiagnosticBundle,
+    downloadWorkspaceDiagnosticBundle: downloadCurrentWorkspaceDiagnosticBundle,
     resetWorkspaceDiagnosticBundle: invalidateWorkspaceDiagnosticBundle,
+    selectGenerationPreviewPage: setPinnedGenerationPreviewPageId,
     returnToOutlineFromGeneration,
     backFromGeneration,
     backFromDeck,
