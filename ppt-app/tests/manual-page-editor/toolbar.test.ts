@@ -37,6 +37,11 @@ describe("manual page editor toolbar", () => {
       source,
       /manual-toolbar-field" title=\{t\.spaceAfter\}>\s*\n\s*<AlignVerticalJustifyStart/,
     );
+    // A divider separates the paragraph controls from the alignment buttons.
+    assert.match(
+      source,
+      /t\.alignRight[\s\S]*?<span className="manual-toolbar-divider" \/>[\s\S]*?title=\{t\.lineHeight\}/,
+    );
     // The icon replaces the visible label, so the select still needs a name.
     assert.match(source, /manual-toolbar-select line-height" aria-label=\{t\.lineHeight\}/);
     assert.match(source, /manual-toolbar-select space-after" aria-label=\{t\.spaceAfter\}/);

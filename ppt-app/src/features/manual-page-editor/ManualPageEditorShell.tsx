@@ -670,6 +670,7 @@ export function ManualPageEditorShell(props: Props) {
           <button data-performance-id="manual-editor.text.align-left" className={`manual-editor-btn icon ${selectedStyle?.textAlign === "left" || selectedStyle?.textAlign === "start" ? "active" : ""}`} title={t.alignLeft} onClick={() => patchSelected((element) => { element.style.textAlign = "left"; })}><AlignLeft size={15} /></button>
           <button data-performance-id="manual-editor.text.align-center" className={`manual-editor-btn icon ${selectedStyle?.textAlign === "center" ? "active" : ""}`} title={t.alignCenter} onClick={() => patchSelected((element) => { element.style.textAlign = "center"; })}><AlignCenter size={15} /></button>
           <button data-performance-id="manual-editor.text.align-right" className={`manual-editor-btn icon ${selectedStyle?.textAlign === "right" || selectedStyle?.textAlign === "end" ? "active" : ""}`} title={t.alignRight} onClick={() => patchSelected((element) => { element.style.textAlign = "right"; })}><AlignRight size={15} /></button>
+          <span className="manual-toolbar-divider" />
           {/* Line height and space after are one click each, so they sit on the
               toolbar instead of behind a paragraph popover. */}
           <label className="manual-toolbar-field" title={t.lineHeight}>
