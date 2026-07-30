@@ -120,7 +120,118 @@ function authoringSuccessFrames(): AnnaAgentRunFrame[] {
   ];
 }
 
+function emptyCompletionFrames(retryable = true): AnnaAgentRunFrame[] {
+  return [{
+    event: "sse",
+    error: "The Agent completed without producing output.",
+    error_type: "empty_completion",
+    is_retryable: retryable,
+  }];
+}
+
 describe("AgentClient cache miss retry", () => {
+  it("retries one retryable empty completion with a new Session", async () => {
+    const harness = createRuntime([
+      emptyCompletionFrames(),
+      authoringSuccessFrames(),
+    ]);
+    const events: AgentStreamEvent[] = [];
+    const client = await createAgentClient(harness.runtime);
+
+    const result = await client.runAuthoringPrompt("write a page", {
+      onStreamEvent: (event) => events.push(event),
+    });
+
+    assert.equal(result.status, "ready_for_render");
+    assert.equal(harness.sessionCreations, 2);
+    assert.equal(harness.sessionDeletes, 2);
+    assert.equal(
+      events.some(
+        (event) =>
+          event.type === "activity" &&
+          event.message.includes("empty completion; retrying once"),
+      ),
+      true,
+    );
+  });
+
+  it("does not retry empty completion more than once", async () => {
+    const harness = createRuntime([
+      emptyCompletionFrames(),
+      emptyCompletionFrames(),
+      authoringSuccessFrames(),
+    ]);
+    const client = await createAgentClient(harness.runtime);
+
+    await assert.rejects(
+      () => client.runAuthoringPrompt("write a page"),
+      (error) => {
+        assert.equal(error instanceof AgentInfrastructureError, true);
+        assert.equal((error as AgentInfrastructureError).code, "empty_completion");
+        return true;
+      },
+    );
+    assert.equal(harness.sessionCreations, 2);
+    assert.equal(harness.sessionDeletes, 2);
+  });
+
+  it("does not retry a non-retryable empty completion", async () => {
+    const harness = createRuntime([
+      emptyCompletionFrames(false),
+      authoringSuccessFrames(),
+    ]);
+    const client = await createAgentClient(harness.runtime);
+
+    await assert.rejects(
+      () => client.runAuthoringPrompt("write a page"),
+      (error) => {
+        assert.equal(error instanceof AgentInfrastructureError, true);
+        assert.equal((error as AgentInfrastructureError).code, "empty_completion");
+        return true;
+      },
+    );
+    assert.equal(harness.sessionCreations, 1);
+    assert.equal(harness.sessionDeletes, 1);
+  });
+
+  it("cancels the active Run before deleting its Session after total timeout", async () => {
+    const cancelledRunIds: string[] = [];
+    const cleanupOrder: string[] = [];
+    let sessionDeletes = 0;
+    const runtime: AnnaRuntime = {
+      tools: { invoke: async () => ({}) },
+      llm: { complete: async () => ({}) },
+      agent: {
+        session: async () => ({
+          run: () => (async function* () {
+            yield { event: "run_meta", run_id: "run-timeout" };
+            await new Promise(() => undefined);
+          })(),
+          cancel: async (runId) => {
+            cancelledRunIds.push(runId);
+            cleanupOrder.push("cancel");
+          },
+          delete: async () => {
+            sessionDeletes += 1;
+            cleanupOrder.push("delete");
+          },
+        }),
+      },
+    };
+    const client = await createAgentClient(runtime, {
+      runTimeoutMs: 5,
+      streamIdleTimeoutMs: 1_000,
+    });
+
+    await assert.rejects(
+      () => client.runAuthoringPrompt("write a page"),
+      /Agent run timed out after 5ms/,
+    );
+    assert.deepEqual(cancelledRunIds, ["run-timeout"]);
+    assert.equal(sessionDeletes, 1);
+    assert.deepEqual(cleanupOrder, ["cancel", "delete"]);
+  });
+
   it("normalizes an unreadable visual attachment to a failed low-confidence review", async () => {
     const harness = createRuntime([[{
       event: "message",
