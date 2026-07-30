@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  closeManagedBrowser,
   launchManagedBrowser,
   waitForRenderReady,
 } from "../../src/runtime/browser-runtime.ts";
@@ -141,6 +142,58 @@ test("launchManagedBrowser does not fall back when the bundled browser fails", a
     /Failed to launch the bundled browser/,
   ));
   assert.equal(launchCount, 1);
+});
+
+test("closeManagedBrowser closes the page before the browser", async () => {
+  const events: string[] = [];
+
+  await closeManagedBrowser({
+    purpose: "test-browser-close",
+    page: {
+      async close() {
+        events.push("page.close");
+      },
+    },
+    browser: {
+      async close() {
+        events.push("browser.close");
+      },
+    },
+    pageCloseTimeoutMs: 20,
+    browserCloseTimeoutMs: 20,
+    terminateGraceMs: 1,
+    killGraceMs: 1,
+  });
+
+  assert.deepEqual(events, ["page.close", "browser.close"]);
+});
+
+test("closeManagedBrowser force terminates Chrome when graceful close hangs", async () => {
+  const signals: string[] = [];
+  const browserProcess = {
+    exitCode: null as number | null,
+    signalCode: null as NodeJS.Signals | null,
+    kill(signal: NodeJS.Signals) {
+      signals.push(signal);
+      if (signal === "SIGKILL") this.signalCode = signal;
+      return true;
+    },
+  };
+
+  await closeManagedBrowser({
+    purpose: "test-hung-browser-close",
+    page: { close: () => new Promise<void>(() => {}) },
+    browser: {
+      close: () => new Promise<void>(() => {}),
+      process: () => browserProcess,
+    },
+    pageCloseTimeoutMs: 1,
+    browserCloseTimeoutMs: 1,
+    terminateGraceMs: 1,
+    killGraceMs: 1,
+  });
+
+  assert.deepEqual(signals, ["SIGTERM", "SIGKILL"]);
 });
 
 test("waitForRenderReady returns when the wrapper is ready", async () => {

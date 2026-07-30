@@ -59,7 +59,11 @@ import {
 import { validateThemeTokenRecord } from "../render/theme-tokens.js";
 import { resolveLocalModulePath } from "../local-template/loader.js";
 import { assertLocalTemplateTypecheck } from "../local-template/typecheck.js";
-import { launchManagedBrowser } from "../runtime/browser-runtime.js";
+import {
+  closeManagedBrowser,
+  closeManagedPage,
+  launchManagedBrowser,
+} from "../runtime/browser-runtime.js";
 import { convertDeckHtmlToPptx } from "../pptx-export/dom-to-pptx.js";
 import { rasterizePptxToImages } from "../pptx-rasterization/index.js";
 import { prepareWorkspacePageSources } from "../authoring-kit-workspace/index.js";
@@ -5440,7 +5444,9 @@ async function createPdfFromSlideHtmlPaths(
         });
         slideDataUrls.push(`data:image/png;base64,${Buffer.from(screenshot).toString("base64")}`);
       } finally {
-        await slideBrowserPage.close().catch(() => undefined);
+        await closeManagedPage(slideBrowserPage, {
+          purpose: `app PDF export slide ${path.basename(slideHtmlPath)}`,
+        });
       }
     }
 
@@ -5456,10 +5462,15 @@ async function createPdfFromSlideHtmlPaths(
         preferCSSPageSize: true,
       });
     } finally {
-      await pdfPage.close().catch(() => undefined);
+      await closeManagedPage(pdfPage, {
+        purpose: "app PDF export document",
+      });
     }
   } finally {
-    await browser.close().catch(() => undefined);
+    await closeManagedBrowser({
+      purpose: "app PDF export",
+      browser,
+    });
   }
 }
 

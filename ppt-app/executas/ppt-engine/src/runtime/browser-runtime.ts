@@ -14,6 +14,27 @@ export interface BrowserRuntimePageLike {
 export interface BrowserRuntimeBrowserLike {
   newPage: () => Promise<unknown>;
   close: () => Promise<void>;
+  process?: () => BrowserRuntimeProcessLike | null;
+}
+
+export interface BrowserRuntimePageCloseLike {
+  close: () => Promise<void>;
+}
+
+export interface BrowserRuntimeProcessLike {
+  exitCode: number | null;
+  signalCode: NodeJS.Signals | null;
+  kill: (signal: NodeJS.Signals) => boolean;
+}
+
+export interface CloseManagedBrowserInput {
+  purpose: string;
+  browser: Pick<BrowserRuntimeBrowserLike, "close" | "process">;
+  page?: BrowserRuntimePageCloseLike | null;
+  pageCloseTimeoutMs?: number;
+  browserCloseTimeoutMs?: number;
+  terminateGraceMs?: number;
+  killGraceMs?: number;
 }
 
 export interface LaunchManagedBrowserInput {
@@ -54,10 +75,129 @@ const CHROME_EXECUTABLE_ENV_KEYS = [
   "GOOGLE_CHROME_BIN",
 ];
 
+const DEFAULT_PAGE_CLOSE_TIMEOUT_MS = 2_000;
+const DEFAULT_BROWSER_CLOSE_TIMEOUT_MS = 5_000;
+const DEFAULT_BROWSER_TERMINATE_GRACE_MS = 2_000;
+const DEFAULT_BROWSER_KILL_GRACE_MS = 1_000;
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+type PromiseSettlement = "fulfilled" | "rejected" | "timed-out";
+
+async function settleWithin(
+  operation: () => Promise<unknown>,
+  timeoutMs: number,
+): Promise<PromiseSettlement> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve("timed-out");
+    }, timeoutMs);
+
+    Promise.resolve().then(operation).then(
+      () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        resolve("fulfilled");
+      },
+      () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        resolve("rejected");
+      },
+    );
+  });
+}
+
+function hasBrowserProcessExited(browserProcess: BrowserRuntimeProcessLike): boolean {
+  return browserProcess.exitCode !== null || browserProcess.signalCode !== null;
+}
+
+async function waitForBrowserProcessExit(
+  browserProcess: BrowserRuntimeProcessLike,
+  timeoutMs: number,
+): Promise<boolean> {
+  const startedAt = Date.now();
+  while (!hasBrowserProcessExited(browserProcess) && Date.now() - startedAt < timeoutMs) {
+    await delay(Math.min(25, Math.max(1, timeoutMs)));
+  }
+  return hasBrowserProcessExited(browserProcess);
+}
+
+async function forceTerminateBrowserProcess(
+  browserProcess: BrowserRuntimeProcessLike,
+  input: Pick<CloseManagedBrowserInput, "purpose" | "terminateGraceMs" | "killGraceMs">,
+): Promise<void> {
+  if (hasBrowserProcessExited(browserProcess)) return;
+
+  const terminateGraceMs = input.terminateGraceMs ?? DEFAULT_BROWSER_TERMINATE_GRACE_MS;
+  const killGraceMs = input.killGraceMs ?? DEFAULT_BROWSER_KILL_GRACE_MS;
+  process.stderr.write(
+    `[browser-runtime] Graceful Chrome shutdown timed out for ${input.purpose}; sending SIGTERM\n`,
+  );
+  browserProcess.kill("SIGTERM");
+  if (await waitForBrowserProcessExit(browserProcess, terminateGraceMs)) return;
+
+  process.stderr.write(
+    `[browser-runtime] Chrome did not exit after SIGTERM for ${input.purpose}; sending SIGKILL\n`,
+  );
+  browserProcess.kill("SIGKILL");
+  await waitForBrowserProcessExit(browserProcess, killGraceMs);
+}
+
+export async function closeManagedPage(
+  page: BrowserRuntimePageCloseLike,
+  input: { purpose: string; timeoutMs?: number },
+): Promise<void> {
+  const timeoutMs = input.timeoutMs ?? DEFAULT_PAGE_CLOSE_TIMEOUT_MS;
+  const settlement = await settleWithin(() => page.close(), timeoutMs);
+  if (settlement === "timed-out") {
+    throw new Error(`${input.purpose} page.close() timed out after ${timeoutMs}ms`);
+  }
+  if (settlement === "rejected") {
+    process.stderr.write(`[browser-runtime] page.close() failed for ${input.purpose}\n`);
+  }
+}
+
+export async function closeManagedBrowser(input: CloseManagedBrowserInput): Promise<void> {
+  const browserProcess = input.browser.process?.() ?? null;
+  const pageCloseTimeoutMs = input.pageCloseTimeoutMs ?? DEFAULT_PAGE_CLOSE_TIMEOUT_MS;
+  const browserCloseTimeoutMs = input.browserCloseTimeoutMs ?? DEFAULT_BROWSER_CLOSE_TIMEOUT_MS;
+
+  let pageSettlement: PromiseSettlement = "fulfilled";
+  if (input.page) {
+    pageSettlement = await settleWithin(() => input.page!.close(), pageCloseTimeoutMs);
+    if (pageSettlement !== "fulfilled") {
+      process.stderr.write(
+        `[browser-runtime] page.close() ${pageSettlement} for ${input.purpose}; closing the browser\n`,
+      );
+    }
+  }
+
+  const browserSettlement = await settleWithin(
+    () => input.browser.close(),
+    browserCloseTimeoutMs,
+  );
+  if (browserSettlement === "fulfilled") return;
+
+  if (browserProcess && !hasBrowserProcessExited(browserProcess)) {
+    await forceTerminateBrowserProcess(browserProcess, input);
+    return;
+  }
+
+  if (pageSettlement === "timed-out" || browserSettlement === "timed-out") {
+    process.stderr.write(
+      `[browser-runtime] Chrome shutdown timed out for ${input.purpose}, but no live browser process handle was available\n`,
+    );
+  }
 }
 
 function getNonEmptyString(value: unknown): string | null {

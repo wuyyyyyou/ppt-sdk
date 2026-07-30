@@ -3,7 +3,10 @@ import { existsSync } from "node:fs";
 import { appendFile, open, rm, stat } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { launchManagedBrowser } from "../runtime/browser-runtime.js";
+import {
+  closeManagedBrowser,
+  launchManagedBrowser,
+} from "../runtime/browser-runtime.js";
 
 const SLIDE_SELECTOR = '#presentation-slides-wrapper > [data-presenton-slide-shell="true"]';
 const SLIDE_WIDTH_PX = 1280;
@@ -59,11 +62,12 @@ export async function convertDeckHtmlToPptx(
   const callbackName = `__presentonWritePptxChunk_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   let bytesWritten = 0;
   let warningCount = 0;
+  let page: any = null;
 
   await rm(temporaryPath, { force: true });
 
   try {
-    const page = await browser.newPage();
+    page = await browser.newPage();
     page.setDefaultTimeout(timeoutMs);
     await page.setViewport({ width: SLIDE_WIDTH_PX, height: SLIDE_HEIGHT_PX });
     page.on("console", (message: any) => {
@@ -220,6 +224,10 @@ export async function convertDeckHtmlToPptx(
     await rm(temporaryPath, { force: true });
     throw error;
   } finally {
-    await browser.close().catch(() => undefined);
+    await closeManagedBrowser({
+      purpose: "PPTX export",
+      page,
+      browser,
+    });
   }
 }

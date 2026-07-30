@@ -2,6 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
 import {
+  closeManagedBrowser,
   launchManagedBrowser,
   waitForRenderReady,
 } from "../runtime/browser-runtime.js";
@@ -16,6 +17,11 @@ import {
 type BrowserLike = {
   newPage: () => Promise<PageLike>;
   close: () => Promise<void>;
+  process?: () => {
+    exitCode: number | null;
+    signalCode: NodeJS.Signals | null;
+    kill: (signal: NodeJS.Signals) => boolean;
+  } | null;
 };
 
 type PageLike = {
@@ -38,12 +44,18 @@ type PageLike = {
     pageFunction: string | ((...args: any[]) => unknown),
     ...args: any[]
   ) => Promise<unknown>;
-  close?: () => Promise<void>;
+  close: () => Promise<void>;
 };
 
 type ElementHandleLike = {
   evaluate: <T>(pageFunction: (...args: any[]) => T, ...args: any[]) => Promise<T>;
   screenshot: (options?: { path?: string }) => Promise<unknown>;
+};
+
+type ManagedPageRuntime = {
+  browser: BrowserLike;
+  page: PageLike | null;
+  close: () => Promise<void>;
 };
 
 const DEFAULT_SLIDE_SCREENSHOT_VIEWPORT = {
@@ -52,13 +64,22 @@ const DEFAULT_SLIDE_SCREENSHOT_VIEWPORT = {
   deviceScaleFactor: 2,
 };
 const DEFAULT_RENDER_TIMEOUT_MS = 300_000;
+const PAGE_BROWSER_OPERATION_TIMEOUT_MS = 50_000;
+const DECK_BROWSER_OPERATION_TIMEOUT_MS = 100_000;
+const MAX_BROWSER_OPERATION_TIMEOUT_MS = 10 * 60_000;
 const SLIDE_RENDER_SELECTOR = "#presentation-slides-wrapper";
 
-async function createManagedPage(purpose: string): Promise<{
-  browser: BrowserLike;
-  page: PageLike;
-  close: () => Promise<void>;
-}> {
+function scaleBrowserOperationTimeout(perItemTimeoutMs: number, itemCount: number): number {
+  return Math.min(
+    MAX_BROWSER_OPERATION_TIMEOUT_MS,
+    Math.max(perItemTimeoutMs, perItemTimeoutMs * Math.max(1, itemCount)),
+  );
+}
+
+async function createManagedPage(
+  purpose: string,
+  onBrowserCreated?: (runtime: ManagedPageRuntime) => void,
+): Promise<ManagedPageRuntime> {
   let puppeteerModule: any;
   try {
     const importPuppeteer = new Function(
@@ -74,16 +95,56 @@ async function createManagedPage(purpose: string): Promise<{
 
   const puppeteer = puppeteerModule.default ?? puppeteerModule;
   const browser = await launchManagedBrowser(puppeteer, { purpose }) as BrowserLike;
-  const page = await browser.newPage();
-
-  return {
+  let closePromise: Promise<void> | null = null;
+  const runtime: ManagedPageRuntime = {
     browser,
-    page,
-    close: async () => {
-      await page.close?.().catch(() => undefined);
-      await browser.close().catch(() => undefined);
+    page: null,
+    close: () => {
+      closePromise ??= closeManagedBrowser({
+        purpose,
+        page: runtime.page,
+        browser,
+      });
+      return closePromise;
     },
   };
+  onBrowserCreated?.(runtime);
+  runtime.page = await browser.newPage();
+  return runtime;
+}
+
+async function withQueuedManagedPage<T>(
+  purpose: string,
+  timeoutMs: number,
+  operation: (page: PageLike) => Promise<T>,
+): Promise<T> {
+  let runtime: ManagedPageRuntime | null = null;
+  let timedOut = false;
+
+  return withScreenshotRenderQueue(async () => {
+    runtime = await createManagedPage(purpose, (createdRuntime) => {
+      runtime = createdRuntime;
+    });
+    if (timedOut) {
+      await runtime.close();
+      throw new Error(`${purpose} was cancelled after its queue operation timed out`);
+    }
+    if (!runtime.page) {
+      throw new Error(`${purpose} did not create a browser page`);
+    }
+    try {
+      return await operation(runtime.page);
+    } finally {
+      await runtime.close();
+    }
+  }, {
+    timeoutMs,
+    label: purpose,
+    onTimeout: async () => {
+      timedOut = true;
+      await runtime?.close();
+    },
+  });
 }
 
 async function waitForSlideRenderReady(
@@ -102,66 +163,64 @@ export async function writeSlideScreenshots(
   purpose = "Page Source slide screenshots",
   options: { requireTailwind?: boolean; allowFailedImages?: boolean; validateManualSlideShell?: boolean } = {},
 ): Promise<void> {
-  await withScreenshotRenderQueue(async () => {
-    const runtime = await createManagedPage(purpose);
+  const operationTimeoutMs = scaleBrowserOperationTimeout(
+    PAGE_BROWSER_OPERATION_TIMEOUT_MS,
+    slides.length,
+  );
+  await withQueuedManagedPage(purpose, operationTimeoutMs, async (page) => {
+    await page.setViewport?.(DEFAULT_SLIDE_SCREENSHOT_VIEWPORT);
+    await installRenderReadinessTracking(page);
 
-    try {
-      await runtime.page.setViewport?.(DEFAULT_SLIDE_SCREENSHOT_VIEWPORT);
-      await installRenderReadinessTracking(runtime.page);
-
-      for (const slide of slides) {
-        if (slide.htmlPath && runtime.page.goto) {
-          await runtime.page.goto(pathToFileURL(slide.htmlPath).href, {
-            waitUntil: "domcontentloaded",
-            timeout: DEFAULT_RENDER_TIMEOUT_MS,
-          });
-        } else {
-          await runtime.page.setContent(slide.html, {
-            waitUntil: "domcontentloaded",
-            timeout: DEFAULT_RENDER_TIMEOUT_MS,
-          });
-        }
-        const slideElement = await waitForSlideRenderReady(runtime.page);
-        await waitForRenderReadiness(runtime.page, {
-          timeoutMs: 30_000,
-          requireTailwind: options.requireTailwind,
-          allowFailedImages: options.allowFailedImages,
+    for (const slide of slides) {
+      if (slide.htmlPath && page.goto) {
+        await page.goto(pathToFileURL(slide.htmlPath).href, {
+          waitUntil: "domcontentloaded",
+          timeout: DEFAULT_RENDER_TIMEOUT_MS,
         });
-        if (options.validateManualSlideShell) {
-          await runtime.page.evaluate(() => {
-            const shells = Array.from(document.querySelectorAll<HTMLElement>('[data-presenton-slide-shell="true"]'));
-            if (shells.length !== 1) throw new Error(`Manual page must contain exactly one slide shell; found ${shells.length}`);
-            const shell = shells[0]!;
-            const rect = shell.getBoundingClientRect();
-            const style = getComputedStyle(shell);
-            if (Math.round(rect.width) !== 1280 || Math.round(rect.height) !== 720) {
-              throw new Error(`Manual page slide shell must measure 1280x720; measured ${rect.width}x${rect.height}`);
-            }
-            if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) {
-              throw new Error("Manual page slide shell must be visible");
-            }
-            const fontFamilies = new Set<string>();
-            for (const element of [shell, ...Array.from(shell.querySelectorAll<HTMLElement>("*"))]) {
-              const computed = getComputedStyle(element);
-              if (computed.display !== "none" && computed.visibility !== "hidden" && element.textContent?.trim()) {
-                const family = computed.fontFamily.split(",")[0]?.trim().replace(/^['"]|['"]$/g, "");
-                if (family) fontFamilies.add(family);
-              }
-            }
-            for (const family of fontFamilies) {
-              if (document.fonts && !document.fonts.check(`16px "${family}"`)) {
-                throw new Error(`Manual page font failed to load: ${family}`);
-              }
-            }
-          });
-        }
-        const screenshot = await slideElement.screenshot({ path: slide.outputPath });
-        if (!screenshot) {
-          throw new Error(`Failed to write slide screenshot: ${slide.outputPath}`);
-        }
+      } else {
+        await page.setContent(slide.html, {
+          waitUntil: "domcontentloaded",
+          timeout: DEFAULT_RENDER_TIMEOUT_MS,
+        });
       }
-    } finally {
-      await runtime.close();
+      const slideElement = await waitForSlideRenderReady(page);
+      await waitForRenderReadiness(page, {
+        timeoutMs: 30_000,
+        requireTailwind: options.requireTailwind,
+        allowFailedImages: options.allowFailedImages,
+      });
+      if (options.validateManualSlideShell) {
+        await page.evaluate(() => {
+          const shells = Array.from(document.querySelectorAll<HTMLElement>('[data-presenton-slide-shell="true"]'));
+          if (shells.length !== 1) throw new Error(`Manual page must contain exactly one slide shell; found ${shells.length}`);
+          const shell = shells[0]!;
+          const rect = shell.getBoundingClientRect();
+          const style = getComputedStyle(shell);
+          if (Math.round(rect.width) !== 1280 || Math.round(rect.height) !== 720) {
+            throw new Error(`Manual page slide shell must measure 1280x720; measured ${rect.width}x${rect.height}`);
+          }
+          if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) {
+            throw new Error("Manual page slide shell must be visible");
+          }
+          const fontFamilies = new Set<string>();
+          for (const element of [shell, ...Array.from(shell.querySelectorAll<HTMLElement>("*"))]) {
+            const computed = getComputedStyle(element);
+            if (computed.display !== "none" && computed.visibility !== "hidden" && element.textContent?.trim()) {
+              const family = computed.fontFamily.split(",")[0]?.trim().replace(/^['"]|['"]$/g, "");
+              if (family) fontFamilies.add(family);
+            }
+          }
+          for (const family of fontFamilies) {
+            if (document.fonts && !document.fonts.check(`16px "${family}"`)) {
+              throw new Error(`Manual page font failed to load: ${family}`);
+            }
+          }
+        });
+      }
+      const screenshot = await slideElement.screenshot({ path: slide.outputPath });
+      if (!screenshot) {
+        throw new Error(`Failed to write slide screenshot: ${slide.outputPath}`);
+      }
     }
   });
 }
@@ -170,31 +229,37 @@ export async function staticizeHtmlDocuments(
   documents: Array<{ htmlPath: string; kind: StaticHtmlDocumentKind }>,
   purpose = "Page Source static HTML generation",
 ): Promise<void> {
-  await withScreenshotRenderQueue(async () => {
-    const runtime = await createManagedPage(purpose);
-    try {
-      await runtime.page.setViewport?.(DEFAULT_SLIDE_SCREENSHOT_VIEWPORT);
-      await installRenderReadinessTracking(runtime.page);
-      for (const document of documents) {
-        if (!runtime.page.goto) {
-          throw new Error("Static HTML generation requires browser file navigation support");
-        }
-        await runtime.page.goto(pathToFileURL(document.htmlPath).href, {
-          waitUntil: "domcontentloaded",
-          timeout: DEFAULT_RENDER_TIMEOUT_MS,
-        });
-        await waitForSlideRenderReady(runtime.page);
-        await waitForRenderReadiness(runtime.page, {
-          timeoutMs: document.kind === "deck" ? 60_000 : 30_000,
-        });
-        const staticHtml = await serializeRenderedPageToStaticHtml(
-          runtime.page,
-          document.kind,
-        );
-        await writeFile(document.htmlPath, staticHtml, "utf8");
+  const operationTimeoutMs = Math.min(
+    MAX_BROWSER_OPERATION_TIMEOUT_MS,
+    documents.reduce(
+      (total, document) => total + (
+        document.kind === "deck"
+          ? DECK_BROWSER_OPERATION_TIMEOUT_MS
+          : PAGE_BROWSER_OPERATION_TIMEOUT_MS
+      ),
+      0,
+    ) || PAGE_BROWSER_OPERATION_TIMEOUT_MS,
+  );
+  await withQueuedManagedPage(purpose, operationTimeoutMs, async (page) => {
+    await page.setViewport?.(DEFAULT_SLIDE_SCREENSHOT_VIEWPORT);
+    await installRenderReadinessTracking(page);
+    for (const document of documents) {
+      if (!page.goto) {
+        throw new Error("Static HTML generation requires browser file navigation support");
       }
-    } finally {
-      await runtime.close();
+      await page.goto(pathToFileURL(document.htmlPath).href, {
+        waitUntil: "domcontentloaded",
+        timeout: DEFAULT_RENDER_TIMEOUT_MS,
+      });
+      await waitForSlideRenderReady(page);
+      await waitForRenderReadiness(page, {
+        timeoutMs: document.kind === "deck" ? 60_000 : 30_000,
+      });
+      const staticHtml = await serializeRenderedPageToStaticHtml(
+        page,
+        document.kind,
+      );
+      await writeFile(document.htmlPath, staticHtml, "utf8");
     }
   });
 }
