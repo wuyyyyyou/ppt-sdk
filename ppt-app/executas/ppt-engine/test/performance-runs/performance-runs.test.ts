@@ -58,6 +58,8 @@ test("Performance Run persists append-only events and generates a report", async
         event({ event_type: "span.finished", sequence_number: 13, span_id: "span-image-analysis", operation_name: "research.image.analysis", duration_ms: 1_600, status: "ok" }),
         event({ event_type: "span.finished", sequence_number: 14, span_id: "span-render-fix", operation_name: "page.render_fix", duration_ms: 900, status: "ok", attributes: { page_id: "page-01", page_index: 0 } }),
         event({ event_type: "span.finished", sequence_number: 15, span_id: "span-visual-review", operation_name: "page.visual_review", duration_ms: 700, status: "ok", attributes: { page_id: "page-01", page_index: 0 } }),
+        event({ event_type: "span.finished", sequence_number: 16, span_id: "span-upload-1", operation_name: "host_upload", duration_ms: 1_000, status: "ok", attributes: { size_bytes: 1024 ** 2 } }),
+        event({ event_type: "span.finished", sequence_number: 17, span_id: "span-upload-2", operation_name: "host_upload", duration_ms: 3_000, status: "ok", attributes: { size_bytes: 2 * 1024 ** 2 } }),
       ],
     });
     const result = await finalizePerformanceRun({ root_dir: rootDir, run_id: run.run_id, locale: "zh" });
@@ -84,6 +86,12 @@ test("Performance Run persists append-only events and generates a report", async
     assert.match(html, /第 1 页/);
     assert.match(html, /渲染修复/);
     assert.match(html, /视觉检查/);
+    assert.match(html, /上传性能/);
+    assert.match(html, /总上传数据量/);
+    assert.match(html, /3\.00 MB/);
+    assert.match(html, /平均上传耗时<\/span><strong>2\.00s/);
+    assert.match(html, /上传耗时 P95<\/span><strong>3\.00s/);
+    assert.match(html, /最大上传耗时<\/span><strong>3\.00s/);
     assert.match(html, /技术诊断数据/);
     const eventsPath = path.join(rootDir, run.run_id, "events.jsonl");
     const eventsBeforeRegeneration = await readFile(eventsPath, "utf8");
@@ -93,10 +101,13 @@ test("Performance Run persists append-only events and generates a report", async
     assert.equal(regenerated.report_locale, "en");
     assert.equal(regenerated.ended_at, endedAt);
     assert.equal(await readFile(eventsPath, "utf8"), eventsBeforeRegeneration);
-    assert.match(await readFile(report.report_path, "utf8"), /PPT Performance Report/);
+    const englishHtml = await readFile(report.report_path, "utf8");
+    assert.match(englishHtml, /PPT Performance Report/);
+    assert.match(englishHtml, /Upload performance/);
+    assert.match(englishHtml, /Total uploaded data/);
     const listed = await listPerformanceRuns(rootDir);
     assert.equal(listed.runs.length, 1);
-    assert.equal(listed.runs[0]?.event_count, 15);
+    assert.equal(listed.runs[0]?.event_count, 17);
 
     assert.deepEqual(await deletePerformanceRun({ root_dir: rootDir, run_id: run.run_id }), {
       deleted: true,
