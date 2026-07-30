@@ -983,7 +983,10 @@ export interface SharedResearchImageCandidate {
   use_in_ppt: boolean;
   description: string;
   reason: string;
-  analysis_status?: "pending" | "running" | "completed" | "failed";
+  prefetch_status?: "pending" | "running" | "completed" | "failed";
+  prefetch_interaction_id?: string;
+  prefetch_error?: string;
+  analysis_status?: "pending" | "running" | "completed" | "failed" | "skipped";
   file_path?: string;
   download_status: "pending" | "imported" | "failed";
   sha256?: string;
@@ -1012,6 +1015,9 @@ export interface SharedResearchImageBatch {
     raw_candidates?: number;
     unique_url_candidates?: number;
     duplicate_url_occurrences?: number;
+    prefetched?: number;
+    unique_content_candidates?: number;
+    prefetch_failed?: number;
     selected: number;
     imported: number;
     unique_content_imported?: number;
@@ -1057,6 +1063,7 @@ export type SharedResearchStage =
   | "image_research"
   | "image_search"
   | "image_deduplication"
+  | "image_prefetch"
   | "image_analysis"
   | "image_import";
 
@@ -1070,7 +1077,7 @@ export type SharedResearchProgressOperation =
   | { op: "set_web_diagnostics"; gaps: string[]; diagnostic_errors: string[] }
   | { op: "set_image_decision"; decision: Record<string, unknown> }
   | { op: "upsert_image_search"; query: string; search: Record<string, unknown> }
-  | { op: "set_image_work_status"; field: "search_status" | "analysis_status" | "import_status"; state: "waiting" | "running" | "completed" | "warning" }
+  | { op: "set_image_work_status"; field: "search_status" | "prefetch_status" | "analysis_status" | "import_status"; state: "waiting" | "running" | "completed" | "warning" }
   | { op: "upsert_image_deduplication_entry"; candidate_id: string; group: Record<string, unknown>; candidate: Record<string, unknown> }
   | { op: "set_image_deduplication_summary"; strategy: Record<string, unknown>; statistics: Record<string, unknown> }
   | { op: "upsert_image_analysis_batch"; batch_id: string; batch: Record<string, unknown>; candidates: Array<{ candidate_id: string; candidate: Record<string, unknown> }> }
@@ -1103,6 +1110,13 @@ export interface ImportSharedResearchImageResult {
   sha256: string;
   mime_type: string;
   bytes_size: number;
+}
+
+export interface SharedResearchImageDownloadUrlResult {
+  candidate_id: string;
+  aps_path: string;
+  download_url: string;
+  expires_at: string | null;
 }
 
 export interface PageProgressItem {

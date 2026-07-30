@@ -11,6 +11,7 @@ const STAGES: AppSharedResearchStage[] = [
   "image_research",
   "image_search",
   "image_deduplication",
+  "image_prefetch",
   "image_analysis",
   "image_import",
 ];
@@ -73,7 +74,7 @@ function assertOperationShape(value: unknown): asserts value is AppSharedResearc
     throw new Error("Invalid analysis batch candidates");
   }
   if (op === "set_stage" && (!STAGES.includes(operation.stage as AppSharedResearchStage) || !["waiting", "running", "completed", "warning", "skipped"].includes(String(operation.state)))) throw new Error("Invalid set_stage operation");
-  if (op === "set_image_work_status" && (!["search_status", "analysis_status", "import_status"].includes(String(operation.field)) || !["waiting", "running", "completed", "warning"].includes(String(operation.state)))) throw new Error("Invalid image work status operation");
+  if (op === "set_image_work_status" && (!["search_status", "prefetch_status", "analysis_status", "import_status"].includes(String(operation.field)) || !["waiting", "running", "completed", "warning"].includes(String(operation.state)))) throw new Error("Invalid image work status operation");
   if (op === "finalize_image_research" && !["completed", "warning", "skipped"].includes(String(operation.status))) throw new Error("Invalid image research final status");
 }
 
@@ -93,6 +94,7 @@ function assertCheckpoint(progress: Record<string, unknown>) {
   const stages = record(progress.stages);
   for (const stage of STAGES) {
     const state = stages[stage];
+    if (stage === "image_prefetch" && state === undefined) continue;
     if (!["waiting", "running", "completed", "warning", "skipped"].includes(String(state))) {
       throw new Error(`Invalid shared research stage: ${stage}`);
     }
@@ -129,6 +131,15 @@ function assertStageCompletion(progress: Record<string, unknown>, stage: AppShar
     if (occurrences.some((id) => !mapped.has(id))) throw new Error("Image deduplication is missing occurrences");
     if (groups.some((group) => !candidates.some((candidate) => candidate.candidate_id === group.candidate_id))) {
       throw new Error("Image deduplication group is missing its candidate");
+    }
+  }
+  if (stage === "image_prefetch") {
+    const candidates = Array.isArray(image.candidates) ? image.candidates.map(record) : [];
+    if (candidates.some((candidate) => !["completed", "failed"].includes(String(candidate.prefetch_status)))) {
+      throw new Error("Image prefetch has unfinished candidates");
+    }
+    if (state === "completed" && candidates.some((candidate) => candidate.prefetch_status === "failed")) {
+      throw new Error("Completed image prefetch cannot contain failed candidates");
     }
   }
   if (stage === "image_analysis" && state === "completed") {
@@ -177,6 +188,9 @@ export function applySharedResearchProgressOperations(
   assertCheckpoint(currentValue);
   const previousRevision = typeof currentValue.revision === "number" ? currentValue.revision : 0;
   const next: Record<string, unknown> = clone({ ...currentValue, revision: previousRevision });
+  const nextStages = record(next.stages);
+  nextStages.image_prefetch ??= "waiting";
+  next.stages = nextStages;
 
   for (const operation of operations) {
     assertOperationShape(operation);

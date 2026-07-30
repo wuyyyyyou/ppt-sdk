@@ -16,7 +16,7 @@ Shared Research Progress（共享研究进度）由 `ppt-engine` 持有合并语
 
 单次 patch 的序列化 `args` 上限为 32 KiB，不通过 Host Upload 放大 patch。调用方以完整领域操作为不可拆分单元，保持顺序按实际 UTF-8 字节数自动装箱；单个操作超限即报错。阶段完成是独立的最终屏障，只能在所有数据批次成功后提交，因此中断恢复可重新 upsert 已完成条目并补齐缺失条目。
 
-图片去重条目将对应 group 与 candidate 作为同一领域操作，图片分析以一个分析批次及其候选判断为操作，图片导入以单个 candidate 为操作。大型 `prepared_batch` 不从前端整体提交；`finalize_image_research` 根据已持久化候选、去重统计和导入结果在引擎内派生它。
+图片 URL 去重条目将对应 group 与 candidate 作为同一领域操作。`image_prefetch` 位于 URL 去重和图片分析之间；每个候选的 `prefetch_status`、持久化 `aps_path`、MIME、大小、SHA-256、最终来源 URL 和预取错误通过既有的 candidate upsert 按 `candidate_id` 增量写入，顶层 `prefetch_status` 通过图片工作状态操作写入。`set_image_content_deduplication` 保存所有成功预取候选的 SHA-256 分组，而不是只统计最终导入候选。内容重复候选保留在进度诊断中并指向稳定代表候选，但不进入分析批次。图片分析以一个最多六张的分析批次及其候选判断为操作，图片导入仍以单个 candidate 为操作。大型 `prepared_batch` 不从前端整体提交；`finalize_image_research` 根据已持久化候选、去重统计和导入结果在引擎内派生它。
 
 正式研究证据由引擎从 checkpoint 发布，而不是由前端再次提交完整 `prepared_batch`。引擎先幂等写入 `web-summary.md` 或 `image-catalog.json`，再在同一 Workspace 锁内标记对应的 `written`；崩溃后的重试依赖正式证据写入的幂等性恢复。
 
@@ -30,11 +30,11 @@ Checkpoint 生命周期时间戳由 `ppt-engine` 生成和保留；前端不提�
 
 恢复读取仍由 `prepareSharedResearchWorkspace` 和 `getSharedResearchContext` 提供完整研究进度；当完整 JSON-RPC 响应序列化后的 UTF-8 大小超过 48 KiB 时，这两个入口使用现有 Host Upload JSON reference（JSON 引用）返回，低于阈值时继续内联。48 KiB 为相对 bridge 65,536 字节行限制保留封装和增长余量的保守阈值。
 
-检查点继续使用 `schema_version: 2`；新增的 `revision` 是兼容字段，旧文件缺失时按 0 读取，首次实际 patch 后写为 1。`prepareSharedResearchWorkspace({ reset_progress: true })` 创建 revision 0 的默认检查点，因此现有 v2 中断运行无需迁移即可恢复。
+检查点继续使用 `schema_version: 2`；新增的 `revision` 是兼容字段，旧文件缺失时按 0 读取，首次实际 patch 后写为 1。新增的 `image_prefetch` 阶段也是兼容字段：旧 v2 文件缺失时按 `waiting` 读取，并在首次实际 patch 时物化。`prepareSharedResearchWorkspace({ reset_progress: true })` 创建 revision 0 的默认检查点，因此现有 v2 中断运行无需迁移即可恢复。
 
 阶段状态使用单向迁移：`waiting` 可进入 `running` 或 `skipped`，`running` 可保持运行或进入 `completed`、`warning`、`skipped`，三个终态只能幂等地重复设置自身；任何终态回退或互相转换都被拒绝。重新开始研究轮次只能使用 `reset_progress: true`。
 
-阶段完成屏障除状态迁移外还必须验证领域前置条件，包括决策 query 与搜索记录完整对应、去重 occurrence/group/candidate 和统计一致、分析批次与候选判断齐全，以及所选候选的导入结果完备。前置条件不满足时整批拒绝；存在技术失败时使用 `warning`，不得伪装为 `completed`。
+阶段完成屏障除状态迁移外还必须验证领域前置条件，包括决策 query 与搜索记录完整对应、URL 去重 occurrence/group/candidate 和统计一致、预取候选全部进入 `completed` 或 `failed` 终态、分析批次与候选判断齐全，以及所选候选的导入结果完备。预取阶段只有不存在失败候选时才能标记 `completed`，否则必须使用 `warning`。前置条件不满足时整批拒绝；存在技术失败时使用 `warning`，不得伪装为 `completed`。
 
 根级 checkpoint 状态不接受前端直接设置。任一阶段首次进入 `running` 时引擎将根状态置为 `running`；`finalize_shared_research` 在所有阶段终态、正式研究证据已发布且前置条件满足后，依据 warning、是否需要新增研究等事实派生 `completed`、`warning` 或 `skipped`。重复 finalize 为幂等 no-op。
 

@@ -537,7 +537,7 @@ function redactStorageResponse(value) {
   if (Array.isArray(value)) return value.map(redactStorageResponse);
   if (!value || typeof value !== "object") return value;
   return Object.fromEntries(Object.entries(value).map(([key, child]) => {
-    if (/(authorization|token|signature|signed[_-]?url|put[_-]?url|download[_-]?url)/i.test(key) || key.toLowerCase() === "url") {
+    if (/(authorization|token|signature|signed[_-]?url|put[_-]?url|download[_-]?url|get[_-]?url)/i.test(key) || key.toLowerCase() === "url") {
       return [key, "[REDACTED]"];
     }
     return [key, redactStorageResponse(child)];
@@ -561,6 +561,7 @@ function createStorageTransferLogger(context = {}) {
     schema_version: 1,
     transfer_id: transferId,
     operation_id: context.operationId,
+    parent_interaction_id: context.parentInteractionId,
     source: context.source || "ppt-engine-host-upload",
     transport: context.transport || "host_upload",
     filename: context.filename,
@@ -585,7 +586,7 @@ function createStorageTransferLogger(context = {}) {
   };
 }
 
-function createApsTransferLogger({ workspaceDir, source, filename, mimeType, sizeBytes, path: apsPath, operationId }) {
+function createApsTransferLogger({ workspaceDir, source, filename, mimeType, sizeBytes, path: apsPath, operationId, parentInteractionId }) {
   return createStorageTransferLogger({
     workspaceDir,
     source,
@@ -594,6 +595,7 @@ function createApsTransferLogger({ workspaceDir, source, filename, mimeType, siz
     sizeBytes,
     transport: "aps_files",
     operationId: operationId || apsPath,
+    parentInteractionId,
   });
 }
 
@@ -868,6 +870,31 @@ async function downloadHostUploadToStaging({ hostUpload, stagingPath, expectedSi
     );
   }
   return receivedBytes;
+}
+
+async function downloadApsUrlToStaging({ downloadUrl, stagingPath, expectedSizeBytes }) {
+  const response = await fetch(downloadUrl, { cache: "no-store" });
+  if (!response.ok) throw new Error(`APS image download failed: HTTP ${response.status}`);
+  if (!response.body) throw new Error("APS image download returned an empty response body.");
+  await mkdir(path.dirname(stagingPath), { recursive: true });
+  const handle = await open(stagingPath, "w");
+  let receivedBytes = 0;
+  try {
+    for await (const chunk of Readable.fromWeb(response.body)) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      receivedBytes += buffer.byteLength;
+      if (receivedBytes > expectedSizeBytes) {
+        throw new Error(`APS image size exceeds expected size ${expectedSizeBytes}`);
+      }
+      await handle.write(buffer);
+    }
+  } finally {
+    await handle.close();
+  }
+  if (receivedBytes !== expectedSizeBytes) {
+    throw new Error(`APS image size mismatch: expected ${expectedSizeBytes}, got ${receivedBytes}`);
+  }
+  return { response, receivedBytes };
 }
 
 async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose, workspaceDir, operationId, source, reuseWhileValid }) {
@@ -2285,26 +2312,135 @@ async function toolAppAppendImageResearchBatch(args) {
   });
 }
 
-async function toolAppImportSharedResearchImageHostUpload(args) {
+async function toolAppGetSharedResearchImageDownloadUrls(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const operationId = readRequiredStringArg(args, "operation_id");
+  if (!Array.isArray(args.artifacts) || args.artifacts.length < 1 || args.artifacts.length > 6) {
+    throw new Error('"artifacts" must contain between 1 and 6 APS image references');
+  }
+  const references = args.artifacts.map((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Each APS image reference must be an object");
+    return {
+      candidateId: readRequiredStringArg(value, "candidate_id"),
+      apsPath: readRequiredStringArg(value, "aps_path"),
+      parentInteractionId: typeof value.parent_interaction_id === "string" && value.parent_interaction_id.trim().length > 0
+        ? value.parent_interaction_id.trim()
+        : undefined,
+    };
+  });
+  const artifacts = await Promise.all(references.map(async ({ candidateId, apsPath, parentInteractionId }) => {
+    const transferLogger = createApsTransferLogger({
+      workspaceDir,
+      source: "ppt-engine.research-image-session",
+      path: apsPath,
+      operationId,
+      parentInteractionId,
+    });
+    transferLogger.log("started", "started", { candidate_id: candidateId, aps_path: apsPath });
+    try {
+      const download = await apsFilesClient.downloadUrl({ path: apsPath, expiresIn: 600, scope: APS_FILES_DOWNLOAD_SCOPE });
+      if (!download || typeof download.url !== "string" || download.url.length === 0) {
+        throw new Error("files/download_url did not return a valid URL");
+      }
+      transferLogger.log("download_url", "succeeded", {
+        candidate_id: candidateId,
+        aps_path: apsPath,
+        response: redactStorageResponse(download),
+      });
+      transferLogger.log("finished", "succeeded", {
+        candidate_id: candidateId,
+        aps_path: apsPath,
+        expires_at: download.expires_at,
+      });
+      return {
+        candidate_id: candidateId,
+        aps_path: apsPath,
+        download_url: download.url,
+        expires_at: typeof download.expires_at === "string" ? download.expires_at : null,
+      };
+    } catch (error) {
+      transferLogger.log("download_url", "failed", {
+        candidate_id: candidateId,
+        aps_path: apsPath,
+        error: storageErrorRecord(error),
+      });
+      throw error;
+    }
+  }));
+  return { workspace_dir: workspaceDir, artifacts };
+}
+
+async function toolAppImportSharedResearchImageAps(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const operationId = readRequiredStringArg(args, "operation_id");
+  const parentInteractionId = typeof args.parent_interaction_id === "string" && args.parent_interaction_id.trim().length > 0
+    ? args.parent_interaction_id.trim()
+    : undefined;
   const candidateId = readRequiredStringArg(args, "candidate_id");
-  const hostUpload = readHostUploadRefArg(args, "host_upload");
+  const apsPath = readRequiredStringArg(args, "aps_path");
   const sizeBytes = Number(args.size_bytes);
-  if (!Number.isFinite(sizeBytes) || Math.floor(sizeBytes) !== hostUpload.size_bytes) throw new Error("Research image Host Upload size mismatch");
+  if (!Number.isInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > 20 * 1024 * 1024) {
+    throw new Error('"size_bytes" must be between 1 and 20971520');
+  }
   const mimeType = readRequiredStringArg(args, "mime_type");
-  if (mimeType !== hostUpload.mime_type) throw new Error("Research image Host Upload MIME type mismatch");
-  const stagingPath = path.join(RESEARCH_IMAGE_STAGING_DIR, `${randomUUID()}.upload`);
+  const sha256 = readRequiredStringArg(args, "sha256");
+  if (!/^[a-f0-9]{64}$/i.test(sha256)) throw new Error('"sha256" must be a 64-character hexadecimal digest');
+  const stagingPath = path.join(RESEARCH_IMAGE_STAGING_DIR, `${randomUUID()}.aps`);
+  const transferLogger = createApsTransferLogger({
+    workspaceDir,
+    source: "ppt-engine.research-image-import",
+    filename: `${candidateId}.image`,
+    mimeType,
+    sizeBytes,
+    path: apsPath,
+    operationId,
+    parentInteractionId,
+  });
+  transferLogger.log("started", "started", { candidate_id: candidateId, aps_path: apsPath });
+  let failurePhase = "download_url";
   try {
-    await downloadHostUploadToStaging({ hostUpload, stagingPath, expectedSizeBytes: Math.floor(sizeBytes) });
-    return await importAppSharedResearchImage({
+    const download = await apsFilesClient.downloadUrl({ path: apsPath, expiresIn: 600, scope: APS_FILES_DOWNLOAD_SCOPE });
+    if (!download || typeof download.url !== "string" || download.url.length === 0) {
+      throw new Error("files/download_url did not return a valid URL");
+    }
+    transferLogger.log("download_url", "succeeded", { aps_path: apsPath, response: redactStorageResponse(download) });
+    failurePhase = "download";
+    const downloaded = await downloadApsUrlToStaging({
+      downloadUrl: download.url,
+      stagingPath,
+      expectedSizeBytes: sizeBytes,
+    });
+    transferLogger.log("download", "succeeded", {
+      candidate_id: candidateId,
+      aps_path: apsPath,
+      http_status: downloaded.response.status,
+      size_bytes: downloaded.receivedBytes,
+    });
+    failurePhase = "import";
+    const imported = await importAppSharedResearchImage({
       workspace_dir: workspaceDir,
       candidate_id: candidateId,
       staging_file_path: stagingPath,
-      expected_size_bytes: Math.floor(sizeBytes),
-      expected_sha256: typeof args.sha256 === "string" ? args.sha256 : undefined,
+      expected_size_bytes: sizeBytes,
+      expected_sha256: sha256,
       mime_type: mimeType,
     });
+    transferLogger.log("finished", "succeeded", {
+      candidate_id: candidateId,
+      aps_path: apsPath,
+      file_path: imported.file_path,
+      sha256: imported.sha256,
+    });
+    return imported;
+  } catch (error) {
+    transferLogger.log(failurePhase, "failed", {
+      candidate_id: candidateId,
+      aps_path: apsPath,
+      error: storageErrorRecord(error),
+    });
+    throw error;
   } finally {
     await unlink(stagingPath).catch(() => undefined);
   }
@@ -3145,7 +3281,8 @@ const TOOL_DISPATCH = {
   app_publish_prepared_image_research_batch: toolAppPublishPreparedImageResearchBatch,
   app_append_web_research_batch: toolAppAppendWebResearchBatch,
   app_append_image_research_batch: toolAppAppendImageResearchBatch,
-  app_import_shared_research_image_host_upload: toolAppImportSharedResearchImageHostUpload,
+  app_get_shared_research_image_download_urls: toolAppGetSharedResearchImageDownloadUrls,
+  app_import_shared_research_image_aps: toolAppImportSharedResearchImageAps,
   app_record_page_progress: toolAppRecordPageProgress,
   app_render_workspace_page_preview: toolAppRenderWorkspacePagePreview,
   app_upload_current_page_screenshot: toolAppUploadCurrentPageScreenshot,

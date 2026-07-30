@@ -35,6 +35,7 @@ import type {
   PatchSharedResearchProgressResult,
   PublishSharedResearchBatchResult,
   ImportSharedResearchImageResult,
+  SharedResearchImageDownloadUrlResult,
   ProjectResult,
   PptxExportJob,
   ExportPdfInput,
@@ -238,13 +239,20 @@ export interface PptBackend {
   patchSharedResearchProgress(input: { workspace_dir: string; operations: SharedResearchProgressOperation[] }): Promise<PatchSharedResearchProgressResult>;
   publishPreparedWebResearchBatch(input: { workspace_dir: string }): Promise<PublishSharedResearchBatchResult>;
   publishPreparedImageResearchBatch(input: { workspace_dir: string }): Promise<PublishSharedResearchBatchResult>;
-  importSharedResearchImageHostUpload(input: {
+  getSharedResearchImageDownloadUrls(input: {
     workspace_dir: string;
+    operation_id: string;
+    artifacts: Array<{ candidate_id: string; aps_path: string; parent_interaction_id?: string }>;
+  }): Promise<{ workspace_dir: string; artifacts: SharedResearchImageDownloadUrlResult[] }>;
+  importSharedResearchImageAps(input: {
+    workspace_dir: string;
+    operation_id: string;
+    parent_interaction_id?: string;
     candidate_id: string;
+    aps_path: string;
     mime_type: string;
     size_bytes: number;
-    sha256?: string;
-    host_upload: HostUploadRef;
+    sha256: string;
   }): Promise<ImportSharedResearchImageResult>;
   getPageProgress(input: { workspace_dir: string }): Promise<PageProgress>;
   recordPageProgress(input: RecordPageProgressInput): Promise<PageProgress>;

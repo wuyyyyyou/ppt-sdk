@@ -12,7 +12,7 @@ PPT App 对 `anna.web.search`、`anna.web.fetch`、`anna.web.image_search` 和 `
 
 日志写入采用 best-effort：任何 `started`、`succeeded` 或 `failed` 记录写入失败都不得阻止 API 调用、改变其返回或异常、触发 API 重试，或延长研究恢复路径。本决策不改变现有超时、并发度、官方 Web API 无自动重试、无旧 Executa 回退和用户界面；悬空的 `started` 只表示请求结果未知或结束日志未写入，不能单独证明 Anna API 卡死。
 
-`image_fetch` 成功后的 APS 图片下载与 Host Upload 仍属于 Workspace Storage Transfer Log。它们分别拥有独立的 `transfer_id`，共享研究尝试的 `operation_id`，并以 `parent_interaction_id` 指向对应的 `image_fetch` interaction；Storage Transfer Log 继续遵守 ADR-0038 的既有脱敏规则，不复制 Research Web Interaction Log 的原始响应。
+`image_fetch` 预取结果、后续为图片 Session 签发 APS 下载地址，以及入选图片从 APS 下载并导入 Workspace，仍属于 Workspace Storage Transfer Log。每项传输拥有独立的 `transfer_id`，共享研究尝试的 `operation_id`，并以 `parent_interaction_id` 指向对应的 `image_fetch` interaction；研究图片不再经过浏览器下载和 Host Upload。Storage Transfer Log 继续遵守 ADR-0038 的既有脱敏规则，不复制 Research Web Interaction Log 的原始响应或有效签名 URL。
 
 **考虑过的方案**
 

@@ -70,6 +70,7 @@ import type {
   PrepareGenerationRunResult,
   CommitGenerationRunResult,
   SharedResearchContextResult,
+  SharedResearchImageDownloadUrlResult,
   PatchSharedResearchProgressResult,
   PublishSharedResearchBatchResult,
   ImportSharedResearchImageResult,
@@ -695,8 +696,14 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invoke<PublishSharedResearchBatchResult>(toolIds.pptEngine, "app_publish_prepared_web_research_batch", input),
     publishPreparedImageResearchBatch: (input) =>
       invoke<PublishSharedResearchBatchResult>(toolIds.pptEngine, "app_publish_prepared_image_research_batch", input),
-    importSharedResearchImageHostUpload: (input) =>
-      invoke<ImportSharedResearchImageResult>(toolIds.pptEngine, "app_import_shared_research_image_host_upload", input),
+    getSharedResearchImageDownloadUrls: (input) =>
+      invoke<{ workspace_dir: string; artifacts: SharedResearchImageDownloadUrlResult[] }>(
+        toolIds.pptEngine,
+        "app_get_shared_research_image_download_urls",
+        input,
+      ),
+    importSharedResearchImageAps: (input) =>
+      invoke<ImportSharedResearchImageResult>(toolIds.pptEngine, "app_import_shared_research_image_aps", input),
     getPageProgress: (input) =>
       invoke<PageProgress>(toolIds.pptEngine, "app_get_page_progress", input),
     recordPageProgress: (input) =>

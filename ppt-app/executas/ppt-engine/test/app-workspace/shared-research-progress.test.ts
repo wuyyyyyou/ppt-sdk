@@ -64,3 +64,30 @@ test("shared research progress rejects unknown operations", () => {
     /Unsupported shared research progress operation/,
   );
 });
+
+test("shared research progress upgrades v2 checkpoints that predate image prefetch", () => {
+  const legacy = createDefaultSharedResearchProgress();
+  delete (legacy.stages as Record<string, unknown>).image_prefetch;
+  const updated = applySharedResearchProgressOperations(legacy, [
+    { op: "set_stage", stage: "image_prefetch", state: "running" },
+  ]);
+  assert.equal((updated.progress.stages as Record<string, unknown>).image_prefetch, "running");
+});
+
+test("image prefetch cannot complete with unfinished candidates", () => {
+  const initial = createDefaultSharedResearchProgress();
+  const running = applySharedResearchProgressOperations(initial, [
+    { op: "set_stage", stage: "image_prefetch", state: "running" },
+    {
+      op: "upsert_image_candidate",
+      candidate_id: "candidate-1",
+      candidate: { candidate_id: "candidate-1", prefetch_status: "running" },
+    },
+  ]).progress;
+  assert.throws(
+    () => applySharedResearchProgressOperations(running, [
+      { op: "set_stage", stage: "image_prefetch", state: "completed" },
+    ]),
+    /Image prefetch has unfinished candidates/,
+  );
+});
