@@ -6,9 +6,3 @@ export const PPT_ENGINE_TOOL = {
   version: "4.6.0",
   displayName: "ppt-engine",
 } as const;
-
-export const ANNA_SEARCH_TOOL = {
-  handle: "anna-search",
-  version: "1.0.7",
-  displayName: "Anna Search",
-} as const;

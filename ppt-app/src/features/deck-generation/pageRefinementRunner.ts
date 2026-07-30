@@ -52,6 +52,8 @@ export async function runPageRefinement(input: RunDeckRefinementInput, instructi
   return runDeckGeneration({
     backend: input.backend,
     aiClient: input.aiClient,
+    researchAiClient: input.researchAiClient,
+    researchWebClient: input.researchWebClient,
     agentClient: input.agentClient,
     hostUploadClient: input.hostUploadClient,
     aiLogger: input.aiLogger,
@@ -66,5 +68,6 @@ export async function runPageRefinement(input: RunDeckRefinementInput, instructi
     pageRefinementReasons: { [page.page_id]: reason },
     pageRefinementVisualContexts: { [page.page_id]: visualContext(progress, page.page_id) },
     refinementRunKind: "page-refinement",
+    resumeResearch: input.skipIntentReview === true,
   });
 }

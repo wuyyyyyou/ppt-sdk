@@ -58,6 +58,18 @@ export function generationText(locale: Locale) {
     agentToolsUnavailable: zh
       ? "Agent 会话没有可执行工具权限，无法读取或编辑本地 PPT 工作区文件。请在 app grants drawer 中开启 “Let agent sessions use my tools”，然后重试本页或继续生成。"
       : "Agent sessions cannot use executable tools, so they cannot read or edit local PPT workspace files. Enable “Let agent sessions use my tools” in the app grants drawer, then retry this page or resume generation.",
+    baselineScreenshotUploadFailed: (detail: string) => zh
+      ? `无法上传页面优化所需的基线截图：${detail || "未知上传错误"}`
+      : `Unable to upload the baseline screenshot required for page refinement: ${detail || "unknown upload error"}`,
+    screenshotRefreshFailed: (detail: string) => zh
+      ? `页面截图链接即将过期，但重新上传失败：${detail || "未知上传错误"}`
+      : `The page screenshot URL was near expiry, but refreshing it failed: ${detail || "unknown upload error"}`,
+    visualReviewScreenshotUploadFailed: (detail: string) => zh
+      ? `页面已成功渲染，但视觉检查所需的截图上传失败，已接受当前页面：${detail || "未知上传错误"}`
+      : `The page rendered successfully, but uploading the screenshot for visual review failed; the current page was accepted: ${detail || "unknown upload error"}`,
+    visualReviewImageUnavailable: zh
+      ? "页面已成功渲染，但视觉检查 Agent 无法读取截图附件，已接受当前页面并跳过自动修复。"
+      : "The page rendered successfully, but the visual review Agent could not read the screenshot attachment; the current page was accepted without automatic fixing.",
     finalRender: zh ? "正在生成最终预览" : "Generating final preview",
     deckReady: zh ? "演示文稿已生成" : "Deck generated",
     activeSummary: (input: { active: number; accepted: number; failed: number; total: number }) => {

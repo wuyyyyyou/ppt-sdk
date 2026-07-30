@@ -78,6 +78,7 @@ export function TemplatePreviewModal(props: TemplatePreviewModalProps) {
             {/* layout count removed per request */}
           </div>
           <button
+            data-performance-id="template.preview.close"
             type="button"
             className="template-preview-modal-close"
             aria-label={t.template.close}
@@ -89,6 +90,7 @@ export function TemplatePreviewModal(props: TemplatePreviewModalProps) {
 
         <div className="template-preview-modal-stage">
           <button
+            data-performance-id="template.preview.previous"
             type="button"
             className="template-preview-modal-nav prev"
             aria-label={t.template.previous}
@@ -102,6 +104,7 @@ export function TemplatePreviewModal(props: TemplatePreviewModalProps) {
             <div className="template-preview-modal-counter">{counter}</div>
           </div>
           <button
+            data-performance-id="template.preview.next"
             type="button"
             className="template-preview-modal-nav next"
             aria-label={t.template.next}
@@ -115,6 +118,7 @@ export function TemplatePreviewModal(props: TemplatePreviewModalProps) {
         <div className="template-preview-modal-thumbs">
           {previews.map((image, thumbIndex) => (
             <button
+              data-performance-id="template.preview.thumbnail.select"
               key={image.layout_id}
               type="button"
               className={`template-preview-modal-thumb ${index === thumbIndex ? "active" : ""}`}
@@ -129,6 +133,7 @@ export function TemplatePreviewModal(props: TemplatePreviewModalProps) {
         <footer className="template-preview-modal-footer">
           <div className="template-preview-modal-layout-name">{current.layout_name}</div>
           <button
+            data-performance-id="template.preview.use"
             type="button"
             className="template-use-btn"
             disabled={busy || selected}

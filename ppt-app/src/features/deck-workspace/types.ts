@@ -13,6 +13,7 @@ import type {
   WorkspaceStyleProfileSelection,
   WorkspaceResult,
   WorkspaceSettings
+  , PerformanceRunSummary
 } from "../../api/types";
 import type {
   DeckGenerationProgress,
@@ -25,7 +26,7 @@ import type { PageReviewSettings } from "./reviewSettings";
 import type { ResearchSearchControlSettings } from "./researchSearchControl";
 
 export type MainStage = "brief" | "requirements" | "uploaded-source-analysis" | "outline" | "generating" | "deck";
-export type PageId = "main" | "my-work" | "settings" | "review" | "refine" | "export" | "style-profile-creation";
+export type PageId = "main" | "my-work" | "settings" | "performance-report" | "review" | "refine" | "export" | "style-profile-creation";
 export type PanelMode = "visible" | "minimized" | "closed";
 export type RefineScope = "deck" | "slide";
 export type PreviewMode = "grid" | "organize" | "present";
@@ -88,6 +89,18 @@ export interface WorkspaceDiagnosticBundleState extends DownloadLinkState {
   /** ADR-0025: lets the Host save the ZIP without this App handling a signed URL. */
   mirrorPath?: string;
   mirrorScope?: string;
+}
+
+export interface PerformanceTestingState {
+  enabled: boolean;
+  supported: boolean;
+  loading: boolean;
+  busy: boolean;
+  error: string;
+  activeRun: PerformanceRunSummary | null;
+  runs: PerformanceRunSummary[];
+  reportHtml: string;
+  reportRunId: string | null;
 }
 
 export interface ExportProgressState {
@@ -155,6 +168,7 @@ export interface DeckWorkspaceState {
   exportArtifact: ExportArtifact | null;
   exportDownload: ExportDownloadState;
   workspaceDiagnosticBundle: WorkspaceDiagnosticBundleState;
+  performanceTesting: PerformanceTestingState;
   currentStatus: string;
   workspaceScan: ListWorkspacesResult | null;
   workspaceCovers: WorkspaceCovers;

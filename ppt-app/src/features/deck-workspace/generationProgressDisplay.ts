@@ -102,7 +102,7 @@ function isPageAcceptedSummary(message: string) {
 }
 
 function activeResearchDiscoveryLabel(t: Messages, progress: DeckGenerationProgress) {
-  const activePhase = progress.researchDiscovery?.records.find((record) => record.state === "active")?.phase;
+  const activePhase = progress.researchDiscovery?.records.find((record) => record.state === "running")?.phase;
   if (activePhase) return t.generating.researchDiscovery.phases[activePhase];
   const phase = researchStepFallbackPhase(progress.step);
   return phase ? t.generating.researchDiscovery.phases[phase] : null;
@@ -113,9 +113,9 @@ function researchStepFallbackPhase(step: DeckGenerationStep): ResearchDiscoveryP
     case "research-collection":
       return "web-collection";
     case "research-curation":
-      return "web-curation";
+      return "web-collection";
     case "evidence-page-planning":
-      return "evidence-page-planning";
+      return "visual-collection";
     case "research-discovery":
       return "web-decision";
     default:

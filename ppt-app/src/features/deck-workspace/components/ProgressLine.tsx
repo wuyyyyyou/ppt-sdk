@@ -22,6 +22,7 @@ export function ProgressLine({ stage, t, outlineEnabled, onNavigate }: ProgressL
         const disabled = item === "outline" && !outlineEnabled;
         return (
           <button
+            data-performance-id={`navigation.stage.${item}`}
             key={item}
             className={`progress-node ${
               item === stage ? "active" : stageOrder(item) < stageOrder(stage) ? "completed" : ""

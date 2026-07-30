@@ -125,10 +125,10 @@ export function OutlinePage(props: OutlinePageProps) {
         <h1>{t.outline.errorTitle}</h1>
         <ErrorNotice t={t} tone="block" summary={error} detail={errorDetail} />
         <div className="requirements-error-actions">
-          <button className="primary-btn" type="button" onClick={() => void retry()} disabled={loading === "outline"}>
+          <button data-performance-id="outline.create.retry" className="primary-btn" type="button" onClick={() => void retry()} disabled={loading === "outline"}>
             <RefreshCw size={16} aria-hidden="true" />{t.outline.retry}
           </button>
-          <button className="secondary-btn" type="button" onClick={backToRequirements}>
+          <button data-performance-id="outline.back-to-requirements" className="secondary-btn" type="button" onClick={backToRequirements}>
             <ArrowLeft size={16} aria-hidden="true" />{t.outline.backToRequirements}
           </button>
         </div>
@@ -221,7 +221,7 @@ export function OutlinePage(props: OutlinePageProps) {
             disabled={busy}
           />
           <div className="feedback-actions">
-            <button className="primary-btn" onClick={() => void applyFeedback()} disabled={busy || !feedback.trim()}>
+            <button data-performance-id="outline.rewrite" className="primary-btn" onClick={() => void applyFeedback()} disabled={busy || !feedback.trim()}>
               {loading === "outline" ? <span className="spinner small" /> : <Sparkles size={14} />}
               {t.controls.reviseOutline}
             </button>
@@ -244,6 +244,7 @@ export function OutlinePage(props: OutlinePageProps) {
               />
             ) : (
               <button
+                data-performance-id="outline.presentation-title.edit"
                 className="outline-inline-read outline-presentation-title-read"
                 type="button"
                 disabled={busy}
@@ -254,10 +255,10 @@ export function OutlinePage(props: OutlinePageProps) {
             )}
           </div>
           <div className="outline-collapse-controls">
-            <button type="button" disabled={busy} onClick={expandAll}>
+            <button data-performance-id="outline.expand-all" type="button" disabled={busy} onClick={expandAll}>
               <ChevronsUpDown size={14} />{t.outline.expandAll}
             </button>
-            <button type="button" disabled={busy} onClick={collapseAll}>
+            <button data-performance-id="outline.collapse-all" type="button" disabled={busy} onClick={collapseAll}>
               <ChevronsDownUp size={14} />{t.outline.collapseAll}
             </button>
           </div>
@@ -289,9 +290,9 @@ export function OutlinePage(props: OutlinePageProps) {
                   <span className="outline-num">{formatSlideNumber(index)}</span>
                 </div>
                 <div className="outline-item-actions outline-card-floating-actions">
-                  <button type="button" title={t.outline.moveUp} disabled={busy || index === 0} onClick={() => movePage(index, index - 1)}><ArrowUp size={15} /></button>
-                  <button type="button" title={t.outline.moveDown} disabled={busy || index === outline.length - 1} onClick={() => movePage(index, index + 1)}><ArrowDown size={15} /></button>
-                  <button type="button" title={t.outline.deletePage} disabled={busy || outline.length <= 1} onClick={() => removeItem(index)}><Trash2 size={15} /></button>
+                  <button data-performance-id="outline.page.move-up" type="button" title={t.outline.moveUp} disabled={busy || index === 0} onClick={() => movePage(index, index - 1)}><ArrowUp size={15} /></button>
+                  <button data-performance-id="outline.page.move-down" type="button" title={t.outline.moveDown} disabled={busy || index === outline.length - 1} onClick={() => movePage(index, index + 1)}><ArrowDown size={15} /></button>
+                  <button data-performance-id="outline.page.delete" type="button" title={t.outline.deletePage} disabled={busy || outline.length <= 1} onClick={() => removeItem(index)}><Trash2 size={15} /></button>
                 </div>
 
                 <div className="outline-read-section">
@@ -308,6 +309,7 @@ export function OutlinePage(props: OutlinePageProps) {
                     />
                   ) : (
                     <button
+                      data-performance-id="outline.page-title.edit"
                       className="outline-inline-read outline-page-title-read"
                       type="button"
                       disabled={busy}
@@ -332,6 +334,7 @@ export function OutlinePage(props: OutlinePageProps) {
                     />
                   ) : (
                     <button
+                      data-performance-id="outline.core-message.edit"
                       className="outline-inline-read outline-core-message-read"
                       type="button"
                       disabled={busy}
@@ -343,7 +346,7 @@ export function OutlinePage(props: OutlinePageProps) {
                 </div>
 
                 <div className={`outline-required-section ${expanded ? "expanded" : ""}`}>
-                  <button className="outline-required-toggle" type="button" disabled={busy} onClick={() => toggleExpanded(index)}>
+                  <button data-performance-id="outline.required-content.toggle" className="outline-required-toggle" type="button" disabled={busy} onClick={() => toggleExpanded(index)}>
                     <span>
                       <strong>{t.outline.requiredContent}</strong>
                       <small>{t.outline.requiredContentCount.replace("{count}", String(requiredItems.length))}</small>
@@ -396,28 +399,28 @@ export function OutlinePage(props: OutlinePageProps) {
           })}
         </div>
 
-        <button className="outline-add-page" type="button" onClick={addPage} disabled={busy}>
+        <button data-performance-id="outline.page.add" className="outline-add-page" type="button" onClick={addPage} disabled={busy}>
           <Plus size={16} />{t.outline.addPage}
         </button>
 
         {removed ? (
           <div className="outline-undo" role="status">
             <span>{t.outline.deleted}</span>
-            <button type="button" onClick={restoreRemovedItem}>{t.outline.undo}</button>
+            <button data-performance-id="outline.page-delete.undo" type="button" onClick={restoreRemovedItem}>{t.outline.undo}</button>
           </div>
         ) : null}
 
         <div className="outline-card-footer">
-          <button className="secondary-btn" type="button" onClick={backToRequirements} disabled={busy}>
+          <button data-performance-id="outline.back-to-requirements" className="secondary-btn" type="button" onClick={backToRequirements} disabled={busy}>
             <ArrowLeft size={16} />{t.outline.backToRequirements}
           </button>
           <div className="outline-footer-right">
             <span className="outline-save-state">{saving ? t.outline.saving : dirty ? t.outline.unsaved : t.outline.saved}</span>
             <div className="outline-footer-actions">
-              <button className="secondary-btn" type="button" onClick={() => void save()} disabled={busy || !dirty}>
+              <button data-performance-id="outline.save" className="secondary-btn" type="button" onClick={() => void save()} disabled={busy || !dirty}>
                 <Save size={16} />{t.outline.saveChanges}
               </button>
-              <button className="primary-btn" type="button" onClick={() => void confirm()} disabled={busy}>
+              <button data-performance-id="outline.confirm" className="primary-btn" type="button" onClick={() => void confirm()} disabled={busy}>
                 {loading === "deck" ? <span className="spinner small" /> : <CheckCircle2 size={16} />}
                 {t.controls.confirmOutline}
               </button>

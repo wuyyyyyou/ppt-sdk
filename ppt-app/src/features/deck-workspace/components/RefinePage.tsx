@@ -85,6 +85,7 @@ export function RefinePage(props: RefinePageProps) {
             </label>
             {loading === "refineDeck" ? <RefineSteps steps={t.refine.deckSteps} /> : null}
             <button
+              data-performance-id="refinement.deck.apply"
               className="primary-btn full"
               onClick={() => onRefineDeck(deckInstruction)}
               disabled={loading === "refineDeck" || !deckInstruction.trim()}
@@ -113,6 +114,7 @@ export function RefinePage(props: RefinePageProps) {
             </label>
             {loading === "refineSlide" ? <RefineSteps steps={t.refine.slideSteps} /> : null}
             <button
+              data-performance-id="refinement.page.apply"
               className="primary-btn full"
               onClick={() => onRefineSlide(slideInstruction)}
               disabled={loading === "refineSlide" || !slideInstruction.trim()}

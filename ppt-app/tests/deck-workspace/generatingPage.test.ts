@@ -107,7 +107,7 @@ describe("GeneratingPage controls", () => {
     );
 
     for (const html of [running, complete]) {
-      assert.match(html, /generation-page-footer"><button class="secondary-btn" type="button">/);
+      assert.match(html, /generation-page-footer"><button [^>]*class="secondary-btn" type="button">/);
       assert.doesNotMatch(html, /page-header-left"><button/);
     }
   });
@@ -118,7 +118,7 @@ describe("GeneratingPage controls", () => {
       makeProgress("page-authoring", "authoring"),
     );
 
-    assert.match(html, /generation-page-footer"><button class="secondary-btn" type="button" disabled=""/);
+    assert.match(html, /generation-page-footer"><button [^>]*class="secondary-btn" type="button" disabled=""/);
   });
 
   it("never offers a stop entry on the page", () => {
@@ -143,7 +143,7 @@ describe("GeneratingPage controls", () => {
       makeProgress("page-authoring", "authoring"),
     );
 
-    assert.match(html, /generation-page-footer"><button class="secondary-btn" type="button">[\s\S]*?返回上一版/);
+    assert.match(html, /generation-page-footer"><button [^>]*class="secondary-btn" type="button">[\s\S]*?返回上一版/);
     assert.doesNotMatch(html, />返回</);
   });
 
@@ -219,7 +219,7 @@ describe("GeneratingPage controls", () => {
       {
         ...makeProgress("research-discovery", "pending"),
         researchDiscovery: {
-          status: "active",
+          status: "running",
           summary: {
             facts: 0,
             derivedInsights: 0,
@@ -230,15 +230,12 @@ describe("GeneratingPage controls", () => {
           records: [
             {
               phase: "web-decision",
-              state: "active",
+              state: "running",
               rationale: "Need current facts before authoring.",
             },
-            { phase: "web-collection", state: "pending" },
-            { phase: "web-curation", state: "pending" },
-            { phase: "visual-decision", state: "pending" },
-            { phase: "visual-collection", state: "pending" },
-            { phase: "visual-curation", state: "pending" },
-            { phase: "evidence-page-planning", state: "pending" },
+            { phase: "web-collection", state: "waiting" },
+            { phase: "visual-decision", state: "waiting" },
+            { phase: "visual-collection", state: "waiting" },
           ],
         },
       },
@@ -246,7 +243,7 @@ describe("GeneratingPage controls", () => {
 
     assert.match(html, /<li class="generation-major-node active" aria-current="step">[\s\S]*?<span>创作准备<\/span><\/li>/);
     assert.match(html, /事实收集/);
-    assert.match(html, /判断网页资料需求/);
+    assert.match(html, /判断是否需要网页资料/);
     assert.match(html, /Need current facts before authoring/);
   });
 
@@ -276,7 +273,7 @@ describe("GeneratingPage controls", () => {
     const html = renderPage(
       makeViewState({ status: "running" }),
       {
-        ...makeProgress("research-curation", "pending"),
+        ...makeProgress("research-collection", "pending"),
         researchDiscovery: {
           status: "warning",
           summary: {
@@ -288,12 +285,9 @@ describe("GeneratingPage controls", () => {
           },
           records: [
             { phase: "web-decision", state: "completed" },
-            { phase: "web-collection", state: "completed" },
-            { phase: "web-curation", state: "warning", gaps: ["No current price source."] },
-            { phase: "visual-decision", state: "completed" },
-            { phase: "visual-collection", state: "completed" },
-            { phase: "visual-curation", state: "completed" },
-            { phase: "evidence-page-planning", state: "completed" },
+            { phase: "web-collection", state: "warning", gaps: ["No current price source."] },
+            { phase: "visual-decision", state: "skipped" },
+            { phase: "visual-collection", state: "skipped" },
           ],
         },
       },
@@ -316,7 +310,7 @@ describe("GeneratingPage controls", () => {
         },
       );
 
-      assert.match(html, /事实收集|判断网页资料需求|搜索并抓取网页资料|筛选事实证据|证据感知页面规划/);
+      assert.match(html, /创作准备/);
       assert.doesNotMatch(html, /0\/1 页通过/);
       assert.doesNotMatch(html, /0\/1 页已通过/);
     }
@@ -387,9 +381,9 @@ describe("GeneratingPage controls", () => {
     const html = renderPage(
       makeViewState({ status: "running" }),
       {
-        ...makeProgress("research-curation", "pending"),
+        ...makeProgress("research-collection", "pending"),
         researchDiscovery: {
-          status: "active",
+          status: "running",
           summary: {
             facts: 11,
             derivedInsights: 4,
@@ -399,12 +393,9 @@ describe("GeneratingPage controls", () => {
           },
           records: [
             { phase: "web-decision", state: "completed" },
-            { phase: "web-collection", state: "completed" },
-            { phase: "web-curation", state: "active", counts: { facts: 11, derivedInsights: 4 } },
-            { phase: "visual-decision", state: "completed" },
-            { phase: "visual-collection", state: "completed" },
-            { phase: "visual-curation", state: "completed", counts: { visualAssets: 5, rejectedMaterial: 12 } },
-            { phase: "evidence-page-planning", state: "completed", counts: { gaps: 17 } },
+            { phase: "web-collection", state: "running" },
+            { phase: "visual-decision", state: "waiting" },
+            { phase: "visual-collection", state: "waiting" },
           ],
         },
       },
@@ -412,14 +403,13 @@ describe("GeneratingPage controls", () => {
 
     assert.doesNotMatch(html, /事实: 11 · 洞察: 4 · 图片: 5 · 缺口: 17 · 拒绝: 12/);
     assert.doesNotMatch(html, /research-discovery-summary/);
-    assert.match(html, /汇总[\s\S]*?事实: 11/);
   });
 
   it("keeps completed Research Discovery phases with gaps collapsed by default", () => {
     const html = renderPage(
       makeViewState({ status: "running" }),
       {
-        ...makeProgress("research-curation", "pending"),
+        ...makeProgress("research-collection", "pending"),
         researchDiscovery: {
           status: "warning",
           summary: {
@@ -431,29 +421,26 @@ describe("GeneratingPage controls", () => {
           },
           records: [
             { phase: "web-decision", state: "completed" },
-            { phase: "web-collection", state: "completed" },
-            { phase: "web-curation", state: "warning", gaps: ["No current price source."] },
-            { phase: "visual-decision", state: "pending" },
-            { phase: "visual-collection", state: "pending" },
-            { phase: "visual-curation", state: "pending" },
-            { phase: "evidence-page-planning", state: "pending" },
+            { phase: "web-collection", state: "warning", gaps: ["No current price source."] },
+            { phase: "visual-decision", state: "waiting" },
+            { phase: "visual-collection", state: "waiting" },
           ],
         },
       },
     );
 
-    assert.match(html, /判断网页资料需求[\s\S]*?aria-expanded="false"/);
-    assert.match(html, /筛选事实证据[\s\S]*?aria-expanded="false"/);
+    assert.match(html, /判断是否需要网页资料[\s\S]*?aria-expanded="false"/);
+    assert.match(html, /搜索并整理网页资料[\s\S]*?aria-expanded="false"/);
     assert.doesNotMatch(html, /No current price source/);
   });
 
-  it("does not render selected visual asset cards, thumbnails, paths, or URLs in the generating page", () => {
+  it("shows current research activity without rendering visual asset paths or URLs", () => {
     const html = renderPage(
       makeViewState({ status: "running" }),
       {
-        ...makeProgress("research-curation", "pending"),
+        ...makeProgress("research-collection", "pending"),
         researchDiscovery: {
-          status: "completed",
+          status: "running",
           summary: {
             facts: 0,
             derivedInsights: 0,
@@ -464,24 +451,12 @@ describe("GeneratingPage controls", () => {
           records: [
             { phase: "web-decision", state: "completed" },
             { phase: "web-collection", state: "completed" },
-            { phase: "web-curation", state: "completed" },
             { phase: "visual-decision", state: "completed" },
             {
               phase: "visual-collection",
-              state: "active",
-              queries: [
-                {
-                  kind: "visual",
-                  query: "factory automation photo",
-                  status: "collected",
-                  resultCount: 8,
-                  downloadCount: 3,
-                },
-              ],
-            },
-            {
-              phase: "visual-curation",
-              state: "completed",
+              state: "running",
+              activities: ["检索图片素材"],
+              lines: ["已找到 8 个候选"],
               visualAssets: [
                 {
                   id: "asset-1",
@@ -495,13 +470,13 @@ describe("GeneratingPage controls", () => {
               ],
               counts: { visualAssets: 1 },
             },
-            { phase: "evidence-page-planning", state: "completed" },
           ],
         },
       },
     );
 
-    assert.match(html, /已收集: factory automation photo \(8 条结果 · 下载 3 张\)/);
+    assert.match(html, /检索图片素材/);
+    assert.match(html, /已找到 8 个候选/);
     assert.doesNotMatch(html, /research-discovery-visual-asset/);
     assert.doesNotMatch(html, /<img /);
     assert.doesNotMatch(html, /https:\/\/images\.example\.com/);
@@ -569,20 +544,9 @@ describe("GeneratingPage controls", () => {
     const html = renderPage(
       makeViewState({ status: "running" }),
       {
-        ...makeProgress("research-curation", "pending"),
-        activeStreams: [
-          {
-            run_id: "research-web",
-            kind: "web-research-curation",
-            page_id: "discovery-web-1",
-            page_index: 0,
-            status: "正在筛选资料证据",
-            lines: ["筛选事实证据流"],
-            activities: ["读取抓取索引"],
-          },
-        ],
+        ...makeProgress("research-collection", "pending"),
         researchDiscovery: {
-          status: "active",
+          status: "running",
           summary: {
             facts: 1,
             derivedInsights: 0,
@@ -594,7 +558,9 @@ describe("GeneratingPage controls", () => {
             { phase: "web-decision", state: "completed", rationale: "Need source-backed facts." },
             {
               phase: "web-collection",
-              state: "completed",
+              state: "running",
+              activities: ["读取网页研究进度"],
+              lines: ["正在整理网页资料"],
               queries: [
                 {
                   kind: "web",
@@ -606,18 +572,16 @@ describe("GeneratingPage controls", () => {
                 },
               ],
             },
-            { phase: "web-curation", state: "active" },
-            { phase: "visual-decision", state: "pending" },
-            { phase: "visual-collection", state: "pending" },
-            { phase: "visual-curation", state: "pending" },
-            { phase: "evidence-page-planning", state: "pending" },
+            { phase: "visual-decision", state: "waiting" },
+            { phase: "visual-collection", state: "waiting" },
           ],
         },
       },
     );
 
     assert.match(html, /事实收集[\s\S]*?Page 1/);
-    assert.match(html, /筛选事实证据流/);
+    assert.match(html, /读取网页研究进度/);
+    assert.match(html, /正在整理网页资料/);
     assert.doesNotMatch(html, /1\. Deck-level web Research Discovery batch 1/);
   });
 });

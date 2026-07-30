@@ -1,5 +1,6 @@
 import type { HostUploadRef } from "../api/types";
 import type { AnnaRuntime } from "./annaRuntime";
+import { beginPerformanceSpan } from "../performance/performanceRecorder";
 
 export interface StorageTransferLogEvent {
   workspace_dir: string;
@@ -120,6 +121,14 @@ export function createAppHostUploadClient(
       const interactionId = typeof input.metadata?.interaction_id === "string"
         ? input.metadata.interaction_id
         : undefined;
+      const parentInteractionId = typeof input.metadata?.parent_interaction_id === "string"
+        ? input.metadata.parent_interaction_id
+        : undefined;
+      const performanceSpan = beginPerformanceSpan({
+        operationName: "host_upload",
+        workspaceId: workspaceDir.split(/[\\/]/).filter(Boolean).at(-1),
+        attributes: { layer: "anna-host-upload", size_bytes: file.size },
+      });
       let currentPhase = "started";
       const log = (phase: string, status: string, extra: Record<string, unknown> = {}) => {
         if (!workspaceDir || !options.appendWorkspaceLog) return;
@@ -131,6 +140,7 @@ export function createAppHostUploadClient(
             transfer_id: transferId,
             operation_id: operationId,
             interaction_id: interactionId,
+            parent_interaction_id: parentInteractionId,
             source,
             transport: "host_upload",
             phase,
@@ -188,8 +198,10 @@ export function createAppHostUploadClient(
           mode: "negotiate+confirm" as const,
         };
         log("finished", "succeeded", { r2_key: result.r2_key, expires_at: result.expires_at });
+        performanceSpan?.finish("ok");
         return result;
       } catch (error) {
+        performanceSpan?.finish("error");
         log(currentPhase, "failed", { error: errorRecord(error) });
         throw error;
       }

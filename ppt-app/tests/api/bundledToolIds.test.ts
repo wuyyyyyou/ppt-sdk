@@ -19,12 +19,10 @@ describe("Bundled tool ids", () => {
   it("resolves the required PPT tool ids from the Anna sidecar", () => {
     setToolIds({
       "ppt-engine": "tool-engine",
-      "anna-search": "tool-search",
     });
 
     assert.deepEqual(resolvePptBundledToolIds(), {
       pptEngine: "tool-engine",
-      annaSearch: "tool-search",
     });
   });
 
@@ -37,14 +35,4 @@ describe("Bundled tool ids", () => {
     );
   });
 
-  it("fails when a required bundled handle is missing", () => {
-    setToolIds({
-      "ppt-engine": "tool-engine",
-    });
-
-    assert.throws(
-      () => resolvePptBundledToolIds(),
-      /Missing Anna bundled tool id for "anna-search"/,
-    );
-  });
 });

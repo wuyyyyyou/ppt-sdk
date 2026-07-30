@@ -60,12 +60,6 @@ import {
   getAppUploadedSourceAnalysis,
   getAppUploadedSourceAnalysisDraft,
   getAppUploadedSourceAnalysisDraftFingerprint,
-  getAppResearchCurationDraft,
-  getAppResearchCurationDraftFingerprint,
-  getAppResearchEvidence,
-  getAppResearchPlan,
-  getAppResearchStatus,
-  finalizeAppResearchVisualAssets,
   getAllDiscoveredTemplateGroups,
   getAppWorkspaceOutline,
   getAppWorkspaceRequirements,
@@ -94,7 +88,14 @@ import {
   prepareAppPageFiles,
   prepareAppWorkspaceDiagnosticBundle,
   prepareAppUploadedSourceAnalysisWorkspace,
-  prepareAppResearchWorkspace,
+  prepareAppSharedResearchWorkspace,
+  getAppSharedResearchContext,
+  patchAppSharedResearchProgress,
+  publishPreparedAppWebResearchBatch,
+  publishPreparedAppImageResearchBatch,
+  appendAppWebResearchBatch,
+  appendAppImageResearchBatch,
+  importAppSharedResearchImage,
   prepareWorkspacePageSources,
   reconcileWorkspacePageSources,
   recordAppWorkspaceStyleGuide,
@@ -104,13 +105,6 @@ import {
   recordAppPagePlan,
   recordAppPageProgress,
   recordAppPdfExport,
-  recordAppResearchCurationDraft,
-  recordAppResearchEvidence,
-  recordAppResearchEvidencePage,
-  recordAppResearchEvidencePageMarkdown,
-  recordAppResearchPlan,
-  recordAppResearchStatus,
-  recordAppResearchStatusPage,
   recordAppWorkspaceThemeToken,
   rebuildWorkspaceDeckManifest,
   removeAppUploadedSource,
@@ -133,6 +127,15 @@ import {
   updateAppWorkspaceSettings,
   updateAppWorkspaceTitle,
   validateAppWorkspaceThemeToken,
+  abandonPerformanceRun,
+  appendPerformanceEvents,
+  deletePerformanceRun,
+  finalizePerformanceRun,
+  getActivePerformanceRun,
+  getPerformanceReportPath,
+  listPerformanceRuns,
+  regeneratePerformanceReport,
+  startPerformanceRun,
 } from "./dist/index.js";
 
 const TASK_STATE_MACHINE_TOOL_NAMES = [
@@ -166,9 +169,28 @@ const UPLOAD_ERR_NOT_GRANTED = -32201;
 const UPLOAD_ERR_TIMEOUT = -32208;
 const UPLOAD_ERR_NOT_NEGOTIATED = -32210;
 const MAX_HOST_UPLOAD_JSON_REFERENCE_BYTES = 512 * 1024;
+const SHARED_RESEARCH_CONTEXT_INLINE_MAX_BYTES = 48 * 1024;
 
 function readToolManifest() {
-  return JSON.parse(readFileSync(new URL("./manifest.json", import.meta.url), "utf8"));
+  const manifest = JSON.parse(readFileSync(new URL("./manifest.json", import.meta.url), "utf8"));
+  return {
+    ...manifest,
+    tools: manifest.tools.map((tool) => {
+      if (!tool.name.startsWith("app_") || tool.name.includes("performance_")) return tool;
+      return {
+        ...tool,
+        parameters: [
+          ...(Array.isArray(tool.parameters) ? tool.parameters : []),
+          {
+            name: "performance_context",
+            type: "object",
+            required: false,
+            description: "Optional bounded Performance Trace context supplied by PPT App; it never becomes a Workspace artifact.",
+          },
+        ],
+      };
+    }),
+  };
 }
 
 const MANIFEST = readToolManifest();
@@ -176,6 +198,162 @@ const MANIFEST = readToolManifest();
 function toolAppGetRuntimeInfo() {
   return {
     ppt_engine_version: MANIFEST.version,
+    performance_testing: {
+      supported: true,
+      schema_version: 1,
+    },
+  };
+}
+
+function readPerformanceContext(args) {
+  const value = args?.performance_context;
+  if (value === undefined) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error('"performance_context" must be an object');
+  }
+  const required = ["run_id", "trace_id", "span_id"];
+  for (const key of required) {
+    if (typeof value[key] !== "string" || value[key].length < 8 || value[key].length > 128) {
+      throw new Error(`"performance_context.${key}" is invalid`);
+    }
+  }
+  for (const key of ["parent_span_id", "operation_name", "workspace_id"]) {
+    if (value[key] !== undefined && (typeof value[key] !== "string" || value[key].length > 160)) {
+      throw new Error(`"performance_context.${key}" is invalid`);
+    }
+  }
+  return {
+    run_id: value.run_id,
+    trace_id: value.trace_id,
+    span_id: value.span_id,
+    ...(value.parent_span_id ? { parent_span_id: value.parent_span_id } : {}),
+    ...(value.operation_name ? { operation_name: value.operation_name } : {}),
+    ...(value.workspace_id ? { workspace_id: value.workspace_id } : {}),
+  };
+}
+
+let performanceSequence = 0;
+const PLUGIN_PERFORMANCE_QUEUE_LIMIT = 1_000;
+const pluginPerformanceQueue = [];
+let pluginPerformanceDrain = null;
+let pluginPerformanceDropped = 0;
+
+function createPluginPerformanceEvent(context, eventType, fields = {}) {
+  return {
+    schema_version: 1,
+    event_id: randomUUID(),
+    event_type: eventType,
+    recorded_at: new Date().toISOString(),
+    producer_id: `ppt-engine-${process.pid}`,
+    sequence_number: performanceSequence++,
+    trace_id: context.trace_id,
+    span_id: context.span_id,
+    parent_span_id: context.parent_span_id,
+    operation_name: context.operation_name,
+    workspace_id: context.workspace_id,
+    ...fields,
+  };
+}
+
+function recordToolPerformance(context, event) {
+  if (!context) return;
+  if (pluginPerformanceQueue.length >= PLUGIN_PERFORMANCE_QUEUE_LIMIT) {
+    pluginPerformanceDropped += 1;
+    return;
+  }
+  pluginPerformanceQueue.push({ runId: context.run_id, event });
+  void flushPluginPerformanceQueue();
+}
+
+async function flushPluginPerformanceQueue() {
+  if (pluginPerformanceDrain) return pluginPerformanceDrain;
+  pluginPerformanceDrain = (async () => {
+    while (pluginPerformanceQueue.length > 0) {
+      const runId = pluginPerformanceQueue[0].runId;
+      const batch = [];
+      while (batch.length < 100 && pluginPerformanceQueue[0]?.runId === runId) {
+        batch.push(pluginPerformanceQueue.shift().event);
+      }
+      if (pluginPerformanceDropped > 0) {
+        const dropped = pluginPerformanceDropped;
+        pluginPerformanceDropped = 0;
+        batch.push({
+          schema_version: 1,
+          event_id: randomUUID(),
+          event_type: "data.loss",
+          recorded_at: new Date().toISOString(),
+          producer_id: `ppt-engine-${process.pid}`,
+          sequence_number: performanceSequence++,
+          attributes: { dropped_count: dropped, reason: "backend_queue_overflow" },
+        });
+      }
+      try {
+        await appendPerformanceEvents({ run_id: runId, events: batch });
+      } catch (error) {
+        process.stderr.write(`[performance] failed to append event batch: ${error instanceof Error ? error.message : String(error)}\n`);
+      }
+    }
+  })().finally(() => {
+    pluginPerformanceDrain = null;
+    if (pluginPerformanceQueue.length > 0) void flushPluginPerformanceQueue();
+  });
+  return pluginPerformanceDrain;
+}
+
+async function toolAppListPerformanceRuns() {
+  return listPerformanceRuns();
+}
+
+async function toolAppStartPerformanceRun(args) {
+  return startPerformanceRun({
+    app_version: typeof args?.app_version === "string" ? args.app_version : undefined,
+    environment: args?.environment && typeof args.environment === "object" && !Array.isArray(args.environment) ? args.environment : undefined,
+    initial_settings: args?.initial_settings && typeof args.initial_settings === "object" && !Array.isArray(args.initial_settings) ? args.initial_settings : undefined,
+  });
+}
+
+async function toolAppAppendPerformanceEvents(args) {
+  return appendPerformanceEvents({ run_id: args?.run_id, events: args?.events });
+}
+
+async function toolAppFinalizePerformanceRun(args) {
+  await flushPluginPerformanceQueue();
+  return finalizePerformanceRun({
+    run_id: args?.run_id,
+    locale: args?.locale === "zh" ? "zh" : "en",
+    force: args?.force === true,
+  });
+}
+
+async function toolAppRegeneratePerformanceReport(args) {
+  return regeneratePerformanceReport({
+    run_id: args?.run_id,
+    locale: args?.locale === "zh" ? "zh" : "en",
+  });
+}
+
+async function toolAppAbandonPerformanceRun(args) {
+  await flushPluginPerformanceQueue();
+  return abandonPerformanceRun({ run_id: args?.run_id });
+}
+
+async function toolAppDeletePerformanceRun(args) {
+  return deletePerformanceRun({ run_id: args?.run_id });
+}
+
+async function toolAppPreparePerformanceReport(args) {
+  const result = await getPerformanceReportPath({ run_id: args?.run_id });
+  return {
+    run: result.run,
+    report_upload: await uploadLocalFileToHost({
+      filePath: result.report_path,
+      filename: `${result.run.run_id}-report.html`,
+      mimeType: "text/plain",
+      purpose: "user_artifact",
+      operationId: "app_prepare_performance_report",
+      source: "ppt-engine.performance-report",
+      reuseWhileValid: true,
+    }),
   };
 }
 
@@ -583,6 +761,11 @@ const MANUAL_PAGE_STAGING_DIR = path.join(
   "presenton-template-engine-executa",
   "manual-page-staging",
 );
+const RESEARCH_IMAGE_STAGING_DIR = path.join(
+  os.tmpdir(),
+  "presenton-template-engine-executa",
+  "research-image-staging",
+);
 
 function assertSafeUploadFilename(filename) {
   if (typeof filename !== "string" || filename.trim().length === 0) {
@@ -711,10 +894,12 @@ async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose, wo
     throw new Error(`Host Upload MIME type must be specific for ${safeFilename}`);
   }
   const sizeBytes = fileStat.size;
-  const logger = createStorageTransferLogger({ workspaceDir, operationId, source, filename: safeFilename, mimeType: mimeType.trim(), sizeBytes });
-  let currentPhase = "started";
-  logger.log("started", "started", { purpose: purpose || "user_artifact" });
-  try {
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const logger = createStorageTransferLogger({ workspaceDir, operationId, source, filename: safeFilename, mimeType: mimeType.trim(), sizeBytes });
+    let currentPhase = "started";
+    logger.log("started", "started", { purpose: purpose || "user_artifact", attempt, max_attempts: 3 });
+    try {
     currentPhase = "negotiate";
     const negotiated = await hostUploadClient.negotiate({
       filename: safeFilename,
@@ -752,12 +937,23 @@ async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose, wo
       filename: safeFilename,
     });
     logger.log("finished", "succeeded", { r2_key: result.r2_key, expires_at: result.expires_at });
-    if (cacheKey) storeHostUpload(hostUploadCache, cacheKey, result);
-    return result;
-  } catch (error) {
-    logger.log(currentPhase, "failed", { error: storageErrorRecord(error) });
-    throw error;
+      if (cacheKey) storeHostUpload(hostUploadCache, cacheKey, result);
+      return result;
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      const deterministic = /permission|forbidden|unauthori[sz]ed|quota|file too large|payload too large|mime|purpose|invalid (?:argument|parameter)|unsupported/i.test(message);
+      const retryable = !deterministic && attempt < 3;
+      logger.log(currentPhase, "failed", {
+        error: storageErrorRecord(error),
+        attempt,
+        max_attempts: 3,
+        retryable,
+      });
+      if (!retryable) throw error;
+    }
   }
+  throw lastError;
 }
 
 async function uploadJsonToHost(value, filename, context = {}) {
@@ -866,6 +1062,14 @@ async function registerWorkspaceJsonReference(value, workspaceDir) {
   return registerJsonReferenceWithContext(value, "workspace.json", "workspace_upload", {
     workspaceDir: resolvedWorkspaceDir,
     source: "ppt-engine.workspace-json-reference",
+  });
+}
+
+async function maybeRegisterSharedResearchContextReference(value) {
+  if (Buffer.byteLength(JSON.stringify(value), "utf8") <= SHARED_RESEARCH_CONTEXT_INLINE_MAX_BYTES) return value;
+  return registerJsonReferenceWithContext(value, "shared-research-context.json", "result_upload", {
+    workspaceDir: value?.workspace_dir,
+    source: "ppt-engine.shared-research-context",
   });
 }
 
@@ -1604,6 +1808,7 @@ async function toolAppAppendWorkspaceLog(args) {
     "ai-page-agent-stream",
     "ai-research",
     "ai-research-interactions",
+    "research-web-interactions",
     "ai-theme",
     "ai-theme-interactions",
     "storage-transport",
@@ -1612,9 +1817,16 @@ async function toolAppAppendWorkspaceLog(args) {
     throw new Error(`"channel" must be one of: ${supportedChannels.join(", ")}`);
   }
 
-  const entry = args.entry;
+  const hasInlineEntry = args.entry !== undefined;
+  const hasEntryUpload = args.entry_upload !== undefined;
+  if (hasInlineEntry === hasEntryUpload) {
+    throw new Error('Exactly one of "entry" or "entry_upload" must be provided');
+  }
+  const entry = hasEntryUpload
+    ? await toolAppResolveHostUploadJsonReference({ host_upload: args.entry_upload })
+    : args.entry;
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-    throw new Error('"entry" must be an object');
+    throw new Error('Workspace log entry must be a JSON object');
   }
   const payloadKeys = Array.isArray(args.payload_keys)
     ? args.payload_keys.filter((key) => typeof key === "string" && key.length > 0)
@@ -2021,235 +2233,80 @@ async function toolAppGetPageProgress(args) {
   return getAppPageProgress({ workspace_dir: workspaceDir });
 }
 
-async function toolAppPrepareResearchWorkspace(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  return prepareAppResearchWorkspace({ workspace_dir: workspaceDir });
+async function toolAppPrepareSharedResearchWorkspace(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  return maybeRegisterSharedResearchContextReference(await prepareAppSharedResearchWorkspace({
+    workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir"),
+    reset_progress: args.reset_progress === true,
+  }));
 }
 
-async function toolAppRecordResearchPlan(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const researchPlan = args.research_plan;
-  if (!researchPlan || typeof researchPlan !== "object" || Array.isArray(researchPlan)) {
-    throw new Error('"research_plan" must be an object');
-  }
-  return recordAppResearchPlan({ workspace_dir: workspaceDir, research_plan: researchPlan });
+async function toolAppGetSharedResearchContext(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  return maybeRegisterSharedResearchContextReference(await getAppSharedResearchContext({ workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir") }));
 }
 
-async function toolAppGetResearchPlan(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
+async function toolAppPatchSharedResearchProgress(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  if (!Array.isArray(args.operations) || args.operations.some((operation) => !operation || typeof operation !== "object" || Array.isArray(operation))) {
+    throw new Error('"operations" must be an array of objects');
   }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  return getAppResearchPlan({ workspace_dir: workspaceDir });
-}
-
-async function toolAppRecordResearchEvidence(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const evidence = args.evidence;
-  if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) {
-    throw new Error('"evidence" must be an object');
-  }
-  return recordAppResearchEvidence({ workspace_dir: workspaceDir, evidence });
-}
-
-async function toolAppRecordResearchEvidencePage(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const pageEvidence = args.page_evidence;
-  if (!pageEvidence || typeof pageEvidence !== "object" || Array.isArray(pageEvidence)) {
-    throw new Error('"page_evidence" must be an object');
-  }
-  return recordAppResearchEvidencePage({
-    workspace_dir: workspaceDir,
-    page_evidence: pageEvidence,
+  return patchAppSharedResearchProgress({
+    workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir"),
+    operations: args.operations,
   });
 }
 
-async function toolAppGetResearchEvidence(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  return registerJsonReference(
-    await getAppResearchEvidence({ workspace_dir: workspaceDir }),
-    "research-evidence.json",
-    "result_upload",
-  );
+async function toolAppPublishPreparedWebResearchBatch(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  return publishPreparedAppWebResearchBatch({ workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir") });
 }
 
-async function toolAppFinalizeResearchVisualAssets(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
+async function toolAppPublishPreparedImageResearchBatch(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  return publishPreparedAppImageResearchBatch({ workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir") });
+}
 
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const pageId = args.page_id;
-  if (typeof pageId !== "string" || pageId.length === 0) {
-    throw new Error('"page_id" must be a non-empty string');
-  }
-  const visualAssets = args.visual_assets;
-  if (!Array.isArray(visualAssets)) {
-    throw new Error('"visual_assets" must be an array');
-  }
-  const rawImageIndexPaths = Array.isArray(args.raw_image_index_paths)
-    ? args.raw_image_index_paths.filter((item) => typeof item === "string")
-    : undefined;
-  return finalizeAppResearchVisualAssets({
-    workspace_dir: workspaceDir,
-    page_id: pageId,
-    visual_assets: visualAssets,
-    raw_image_index_paths: rawImageIndexPaths,
+async function toolAppAppendWebResearchBatch(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  return appendAppWebResearchBatch({
+    workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir"),
+    markdown: readRequiredStringArg(args, "markdown"),
   });
 }
 
-async function toolAppRecordResearchCurationDraft(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const pageId = args.page_id;
-  const draftType = args.draft_type;
-  const draftId = readOptionalStringArg(args, "draft_id");
-  const draft = args.draft;
-  if (typeof pageId !== "string" || pageId.length === 0) {
-    throw new Error('"page_id" must be a non-empty string');
-  }
-  if (draftType !== "web" && draftType !== "visual") {
-    throw new Error('"draft_type" must be either "web" or "visual"');
-  }
-  if (!draft || typeof draft !== "object" || Array.isArray(draft)) {
-    throw new Error('"draft" must be an object');
-  }
-  return recordAppResearchCurationDraft({
-    workspace_dir: workspaceDir,
-    page_id: pageId,
-    draft_type: draftType,
-    draft_id: draftId,
-    draft,
+async function toolAppAppendImageResearchBatch(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  if (!args.batch || typeof args.batch !== "object" || Array.isArray(args.batch)) throw new Error('"batch" must be an object');
+  return appendAppImageResearchBatch({
+    workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir"),
+    batch: args.batch,
   });
 }
 
-async function toolAppGetResearchCurationDraft(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
+async function toolAppImportSharedResearchImageHostUpload(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const pageId = args.page_id;
-  const draftType = args.draft_type;
-  const draftId = readOptionalStringArg(args, "draft_id");
-  if (typeof pageId !== "string" || pageId.length === 0) {
-    throw new Error('"page_id" must be a non-empty string');
+  const candidateId = readRequiredStringArg(args, "candidate_id");
+  const hostUpload = readHostUploadRefArg(args, "host_upload");
+  const sizeBytes = Number(args.size_bytes);
+  if (!Number.isFinite(sizeBytes) || Math.floor(sizeBytes) !== hostUpload.size_bytes) throw new Error("Research image Host Upload size mismatch");
+  const mimeType = readRequiredStringArg(args, "mime_type");
+  if (mimeType !== hostUpload.mime_type) throw new Error("Research image Host Upload MIME type mismatch");
+  const stagingPath = path.join(RESEARCH_IMAGE_STAGING_DIR, `${randomUUID()}.upload`);
+  try {
+    await downloadHostUploadToStaging({ hostUpload, stagingPath, expectedSizeBytes: Math.floor(sizeBytes) });
+    return await importAppSharedResearchImage({
+      workspace_dir: workspaceDir,
+      candidate_id: candidateId,
+      staging_file_path: stagingPath,
+      expected_size_bytes: Math.floor(sizeBytes),
+      expected_sha256: typeof args.sha256 === "string" ? args.sha256 : undefined,
+      mime_type: mimeType,
+    });
+  } finally {
+    await unlink(stagingPath).catch(() => undefined);
   }
-  if (draftType !== "web" && draftType !== "visual") {
-    throw new Error('"draft_type" must be either "web" or "visual"');
-  }
-  return getAppResearchCurationDraft({
-    workspace_dir: workspaceDir,
-    page_id: pageId,
-    draft_type: draftType,
-    draft_id: draftId,
-  });
-}
-
-async function toolAppGetResearchCurationDraftFingerprint(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const pageId = args.page_id;
-  const draftType = args.draft_type;
-  const draftId = readOptionalStringArg(args, "draft_id");
-  if (typeof pageId !== "string" || pageId.length === 0) {
-    throw new Error('"page_id" must be a non-empty string');
-  }
-  if (draftType !== "web" && draftType !== "visual") {
-    throw new Error('"draft_type" must be either "web" or "visual"');
-  }
-  return getAppResearchCurationDraftFingerprint({
-    workspace_dir: workspaceDir,
-    page_id: pageId,
-    draft_type: draftType,
-    draft_id: draftId,
-  });
-}
-
-async function toolAppRecordResearchEvidencePageMarkdown(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const pageId = args.page_id;
-  const markdown = args.markdown;
-  if (typeof pageId !== "string" || pageId.length === 0) {
-    throw new Error('"page_id" must be a non-empty string');
-  }
-  if (typeof markdown !== "string") {
-    throw new Error('"markdown" must be a string');
-  }
-  return recordAppResearchEvidencePageMarkdown({
-    workspace_dir: workspaceDir,
-    page_id: pageId,
-    markdown,
-  });
-}
-
-async function toolAppRecordResearchStatus(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const status = args.status;
-  if (!status || typeof status !== "object" || Array.isArray(status)) {
-    throw new Error('"status" must be an object');
-  }
-  return recordAppResearchStatus({ workspace_dir: workspaceDir, status });
-}
-
-async function toolAppRecordResearchStatusPage(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const pageStatus = args.page_status;
-  if (!pageStatus || typeof pageStatus !== "object" || Array.isArray(pageStatus)) {
-    throw new Error('"page_status" must be an object');
-  }
-  return recordAppResearchStatusPage({
-    workspace_dir: workspaceDir,
-    page_status: pageStatus,
-  });
-}
-
-async function toolAppGetResearchStatus(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  return getAppResearchStatus({ workspace_dir: workspaceDir });
 }
 
 async function toolAppRecordPageProgress(args) {
@@ -2287,18 +2344,38 @@ async function toolAppRenderWorkspacePagePreview(args) {
     throw new Error('"page_id" must be a non-empty string');
   }
 
-  const result = await renderAppWorkspacePagePreview({
+  return renderAppWorkspacePagePreview({
     workspace_dir: workspaceDir,
     page_id: pageId,
   });
+}
 
-  return {
-    ...result,
-    screenshot_upload: await uploadPreviewImage(result.screenshot_path, {
-      workspaceDir,
-      source: "ppt-engine.page-preview-screenshot",
-    }),
-  };
+async function toolAppUploadCurrentPageScreenshot(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const pageId = typeof args.page_id === "string" ? args.page_id.trim() : "";
+  if (!pageId) throw new Error('"page_id" must be a non-empty string');
+
+  const progress = await getAppPageProgress({ workspace_dir: workspaceDir });
+  const pageProgress = progress.pages.find((item) => item.page_id === pageId);
+  if (!pageProgress) throw new Error(`Unknown page_id "${pageId}" in page-progress.json`);
+  const screenshotPath = pageProgress.last_screenshot_path;
+  if (!screenshotPath) throw new Error(`Page "${pageId}" does not have a current screenshot`);
+  const normalizedWorkspaceDir = path.resolve(workspaceDir);
+  const normalizedScreenshotPath = path.resolve(screenshotPath);
+  const relativePath = path.relative(normalizedWorkspaceDir, normalizedScreenshotPath);
+  if (!relativePath || relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    throw new Error(`Page "${pageId}" screenshot is outside its Workspace`);
+  }
+  if (path.extname(normalizedScreenshotPath).toLowerCase() !== ".png") {
+    throw new Error(`Page "${pageId}" screenshot must be a PNG file`);
+  }
+  return uploadPreviewImage(normalizedScreenshotPath, {
+    workspaceDir: normalizedWorkspaceDir,
+    source: "ppt-engine.current-page-screenshot",
+  });
 }
 
 async function toolAppGetPageEditContext(args) {
@@ -2977,6 +3054,14 @@ async function toolForkTemplateGroup(args) {
 
 const TOOL_DISPATCH = {
   app_get_runtime_info: toolAppGetRuntimeInfo,
+  app_list_performance_runs: toolAppListPerformanceRuns,
+  app_start_performance_run: toolAppStartPerformanceRun,
+  app_append_performance_events: toolAppAppendPerformanceEvents,
+  app_finalize_performance_run: toolAppFinalizePerformanceRun,
+  app_regenerate_performance_report: toolAppRegeneratePerformanceReport,
+  app_abandon_performance_run: toolAppAbandonPerformanceRun,
+  app_delete_performance_run: toolAppDeletePerformanceRun,
+  app_prepare_performance_report: toolAppPreparePerformanceReport,
   app_resolve_host_upload_json_reference: toolAppResolveHostUploadJsonReference,
   app_begin_generation_run: toolAppBeginGenerationRun,
   app_prepare_generation_run: toolAppPrepareGenerationRun,
@@ -3052,22 +3137,17 @@ const TOOL_DISPATCH = {
   app_prepare_deck_refinement_page_files: toolAppPrepareDeckRefinementPageFiles,
   app_get_workspace_page_file_fingerprints: toolAppGetWorkspacePageFileFingerprints,
   app_get_page_progress: toolAppGetPageProgress,
-  app_prepare_research_workspace: toolAppPrepareResearchWorkspace,
-  app_record_research_plan: toolAppRecordResearchPlan,
-  app_get_research_plan: toolAppGetResearchPlan,
-  app_record_research_evidence: toolAppRecordResearchEvidence,
-  app_record_research_evidence_page: toolAppRecordResearchEvidencePage,
-  app_get_research_evidence: toolAppGetResearchEvidence,
-  app_finalize_research_visual_assets: toolAppFinalizeResearchVisualAssets,
-  app_record_research_curation_draft: toolAppRecordResearchCurationDraft,
-  app_get_research_curation_draft: toolAppGetResearchCurationDraft,
-  app_get_research_curation_draft_fingerprint: toolAppGetResearchCurationDraftFingerprint,
-  app_record_research_evidence_page_markdown: toolAppRecordResearchEvidencePageMarkdown,
-  app_record_research_status: toolAppRecordResearchStatus,
-  app_record_research_status_page: toolAppRecordResearchStatusPage,
-  app_get_research_status: toolAppGetResearchStatus,
+  app_prepare_shared_research_workspace: toolAppPrepareSharedResearchWorkspace,
+  app_get_shared_research_context: toolAppGetSharedResearchContext,
+  app_patch_shared_research_progress: toolAppPatchSharedResearchProgress,
+  app_publish_prepared_web_research_batch: toolAppPublishPreparedWebResearchBatch,
+  app_publish_prepared_image_research_batch: toolAppPublishPreparedImageResearchBatch,
+  app_append_web_research_batch: toolAppAppendWebResearchBatch,
+  app_append_image_research_batch: toolAppAppendImageResearchBatch,
+  app_import_shared_research_image_host_upload: toolAppImportSharedResearchImageHostUpload,
   app_record_page_progress: toolAppRecordPageProgress,
   app_render_workspace_page_preview: toolAppRenderWorkspacePagePreview,
+  app_upload_current_page_screenshot: toolAppUploadCurrentPageScreenshot,
   app_get_page_edit_context: toolAppGetPageEditContext,
   app_save_manual_page_revision: toolAppSaveManualPageRevision,
   app_restore_page_source_version: toolAppRestorePageSourceVersion,
@@ -3160,10 +3240,46 @@ async function handleInvoke(id, params = {}) {
     );
   }
 
+  const isPerformanceControl = tool.startsWith("app_") && tool.includes("performance_");
+  let performanceContext = null;
+  try {
+    performanceContext = isPerformanceControl ? null : readPerformanceContext(args);
+  } catch (error) {
+    return makeResponse(id, undefined, createInvalidParamsError(error instanceof Error ? error.message : String(error)));
+  }
+  const startedAt = performance.now();
+  if (performanceContext) {
+    recordToolPerformance(
+      performanceContext,
+      createPluginPerformanceEvent(performanceContext, "span.started", {
+        attributes: { layer: "ppt-engine", tool },
+      }),
+    );
+  }
   try {
     const data = await fn(args);
+    if (performanceContext) {
+      recordToolPerformance(
+        performanceContext,
+        createPluginPerformanceEvent(performanceContext, "span.finished", {
+          duration_ms: performance.now() - startedAt,
+          status: "ok",
+          attributes: { layer: "ppt-engine", tool, duration_source: "monotonic" },
+        }),
+      );
+    }
     return makeResponse(id, { success: true, data, tool });
   } catch (error) {
+    if (performanceContext) {
+      recordToolPerformance(
+        performanceContext,
+        createPluginPerformanceEvent(performanceContext, "span.finished", {
+          duration_ms: performance.now() - startedAt,
+          status: "error",
+          attributes: { layer: "ppt-engine", tool, duration_source: "monotonic" },
+        }),
+      );
+    }
     if (error instanceof HostUploadError || error instanceof ApsFilesError) {
       return makeResponse(id, undefined, {
         code: error.code,

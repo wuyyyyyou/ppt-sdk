@@ -19,18 +19,6 @@ const TOOLS = [
     packageBinTarget: "./example_plugin.js",
     packageLockBinTarget: "example_plugin.js",
   },
-  {
-    key: "annaSearch",
-    bundledHandle: "anna-search",
-    manifestPath: "ppt-app/executas/anna-search/manifest.json",
-    pyprojectPath: "ppt-app/executas/anna-search/pyproject.toml",
-    uvLockPath: "ppt-app/executas/anna-search/uv.lock",
-    localExecutaPath: "ppt-app/executas/anna-search/executa.json",
-    bundledExecutaDir: "ppt-app/executas/anna-search",
-    generatedConstName: "ANNA_SEARCH_TOOL",
-    pythonScriptTarget: "anna_search_executa.plugin:main",
-    pythonPackageName: "anna-search-executa",
-  },
 ];
 
 function resolveRepoPath(relativePath) {

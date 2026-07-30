@@ -13,6 +13,7 @@ import type {
   GetWorkspacePageFileFingerprintsResult,
   GetPageEditContextInput,
   GetPageEditContextResult,
+  HostUploadRef,
   GetWorkspaceCoverInput,
   GetWorkspaceCoverResult,
   GetWorkspacePageImageInput,
@@ -29,24 +30,19 @@ import type {
   PrepareDeckRefinementPageFilesResult,
   PreparePageFilesInput,
   PreparePageFilesResult,
-  PrepareResearchWorkspaceResult,
+  SharedResearchContextResult,
+  SharedResearchProgressOperation,
+  PatchSharedResearchProgressResult,
+  PublishSharedResearchBatchResult,
+  ImportSharedResearchImageResult,
   ProjectResult,
   PptxExportJob,
-  ResearchEvidenceIndex,
-  ResearchCurationDraftFingerprint,
-  RecordResearchEvidenceResult,
-  RecordResearchEvidencePageResult,
-  VisualResearchCurationDraft,
-  ResearchPlan,
-  ResearchStatus,
-  WebResearchCurationDraft,
   ExportPdfInput,
   ExportPdfResult,
   ExportArtifactDownloadUrlResult,
   PublishExportArtifactResult,
   PrepareWorkspaceDiagnosticBundleInput,
   PrepareWorkspaceDiagnosticBundleResult,
-  FinalizeResearchVisualAssetsResult,
   RecordDeckReviewInput,
   RecordPagePlanInput,
   RecordPageProgressInput,
@@ -57,16 +53,13 @@ import type {
   RenderDeckHtmlResult,
   RenderWorkspacePagePreviewInput,
   RenderWorkspacePagePreviewResult,
+  UploadCurrentPageScreenshotInput,
   SaveManualPageRevisionInput,
   SaveManualPageRevisionResult,
   RestorePageSourceVersionResult,
   SelectTemplateInput,
   SelectTemplateResult,
   StartPptxExportInput,
-  WebFetchResult,
-  WebSearchResult,
-  ImageFetchResult,
-  ImageSearchResult,
   TemplatePlanningContext,
   WorkspaceThemeContext,
   WorkspaceThemeValidationResult,
@@ -121,6 +114,11 @@ import type {
   , GenerationRunTransaction
   , PrepareGenerationRunResult
   , CommitGenerationRunResult
+  , PerformanceEvent
+  , PerformanceRunSummary
+  , ListPerformanceRunsResult
+  , FinalizePerformanceRunResult
+  , PreparePerformanceReportResult
 } from "./types";
 import { createAnnaPptBackend } from "./annaPptBackend";
 import { connectAnnaRuntime } from "../runtime/annaRuntime";
@@ -128,6 +126,14 @@ import { detectRuntimeMode } from "../runtime/runtimeMode";
 
 export interface PptBackend {
   getRuntimeInfo(): Promise<PptEngineRuntimeInfo>;
+  listPerformanceRuns(): Promise<ListPerformanceRunsResult>;
+  startPerformanceRun(input: { app_version: string; environment?: Record<string, string | number | boolean | null>; initial_settings?: Record<string, unknown> }): Promise<PerformanceRunSummary>;
+  appendPerformanceEvents(input: { run_id: string; events: PerformanceEvent[] }): Promise<{ appended: number; run: PerformanceRunSummary }>;
+  finalizePerformanceRun(input: { run_id: string; locale: "en" | "zh"; force?: boolean }): Promise<FinalizePerformanceRunResult>;
+  regeneratePerformanceReport(input: { run_id: string; locale: "en" | "zh" }): Promise<PerformanceRunSummary>;
+  abandonPerformanceRun(input: { run_id: string }): Promise<PerformanceRunSummary>;
+  deletePerformanceRun(input: { run_id: string }): Promise<{ deleted: true; run_id: string }>;
+  preparePerformanceReport(input: { run_id: string }): Promise<PreparePerformanceReportResult>;
   beginGenerationRun(input: { workspace_dir: string; run_kind: GenerationRunKind; origin_page_id?: string | null }): Promise<GenerationRunTransaction>;
   prepareGenerationRun(input: { run_id: string }): Promise<PrepareGenerationRunResult>;
   abandonGenerationRun(input: { run_id: string }): Promise<GenerationRunTransaction>;
@@ -227,96 +233,25 @@ export interface PptBackend {
   getWorkspacePageFileFingerprints(
     input: GetWorkspacePageFileFingerprintsInput
   ): Promise<GetWorkspacePageFileFingerprintsResult>;
-  getResearchCurationDraftFingerprint(input: {
+  prepareSharedResearchWorkspace(input: { workspace_dir: string; reset_progress?: boolean }): Promise<SharedResearchContextResult>;
+  getSharedResearchContext(input: { workspace_dir: string }): Promise<SharedResearchContextResult>;
+  patchSharedResearchProgress(input: { workspace_dir: string; operations: SharedResearchProgressOperation[] }): Promise<PatchSharedResearchProgressResult>;
+  publishPreparedWebResearchBatch(input: { workspace_dir: string }): Promise<PublishSharedResearchBatchResult>;
+  publishPreparedImageResearchBatch(input: { workspace_dir: string }): Promise<PublishSharedResearchBatchResult>;
+  importSharedResearchImageHostUpload(input: {
     workspace_dir: string;
-    page_id: string;
-    draft_type: "web" | "visual";
-    draft_id?: string;
-  }): Promise<ResearchCurationDraftFingerprint>;
-  prepareResearchWorkspace(input: { workspace_dir: string }): Promise<PrepareResearchWorkspaceResult>;
-  recordResearchPlan(input: { workspace_dir: string; research_plan: ResearchPlan }): Promise<ResearchPlan>;
-  getResearchPlan(input: { workspace_dir: string }): Promise<ResearchPlan>;
-  recordResearchEvidence(input: { workspace_dir: string; evidence: ResearchEvidenceIndex }): Promise<RecordResearchEvidenceResult>;
-  recordResearchEvidencePage(input: {
-    workspace_dir: string;
-    page_evidence: Omit<ResearchEvidenceIndex["pages"][number], "updated_at"> & {
-      updated_at?: string;
-    };
-  }): Promise<RecordResearchEvidencePageResult>;
-  getResearchEvidence(input: { workspace_dir: string }): Promise<ResearchEvidenceIndex>;
-  finalizeResearchVisualAssets(input: {
-    workspace_dir: string;
-    page_id: string;
-    visual_assets: VisualResearchCurationDraft["visual_assets"];
-    raw_image_index_paths?: string[];
-  }): Promise<FinalizeResearchVisualAssetsResult>;
-  recordResearchCurationDraft(input: {
-    workspace_dir: string;
-    page_id: string;
-    draft_type: "web";
-    draft_id?: string;
-    draft: WebResearchCurationDraft;
-  } | {
-    workspace_dir: string;
-    page_id: string;
-    draft_type: "visual";
-    draft_id?: string;
-    draft: VisualResearchCurationDraft;
-  }): Promise<WebResearchCurationDraft | VisualResearchCurationDraft>;
-  getResearchCurationDraft(input: {
-    workspace_dir: string;
-    page_id: string;
-    draft_type: "web" | "visual";
-    draft_id?: string;
-  }): Promise<WebResearchCurationDraft | VisualResearchCurationDraft | Record<string, unknown>>;
-  recordResearchEvidencePageMarkdown(input: {
-    workspace_dir: string;
-    page_id: string;
-    markdown: string;
-  }): Promise<{
-    workspace_dir: string;
-    page_id: string;
-    markdown_path: string;
-    updated_at: string;
-  }>;
-  recordResearchStatus(input: { workspace_dir: string; status: ResearchStatus }): Promise<ResearchStatus>;
-  recordResearchStatusPage(input: {
-    workspace_dir: string;
-    page_status: ResearchStatus["pages"][number];
-  }): Promise<ResearchStatus>;
-  getResearchStatus(input: { workspace_dir: string }): Promise<ResearchStatus>;
-  webSearch(input: {
-    query: string;
-    max_results?: number;
-    safesearch?: "off" | "moderate" | "strict";
-    timelimit?: "d" | "w" | "m" | "y";
-  }): Promise<WebSearchResult>;
-  webFetch(input: {
-    urls: string[];
-    output_dir?: string;
-    format?: "text_markdown" | "text_plain" | "text_rich";
-    max_chars?: number;
-  }): Promise<WebFetchResult>;
-  imageSearch(input: {
-    query: string;
-    max_results?: number;
-    safesearch?: "off" | "moderate" | "strict";
-    timelimit?: "d" | "w" | "m" | "y";
-    size?: string;
-    color?: string;
-    type_image?: string;
-    layout?: string;
-  }): Promise<ImageSearchResult>;
-  imageFetch(input: {
-    urls: string[];
-    output_dir?: string;
-    max_bytes?: number;
-  }): Promise<ImageFetchResult>;
+    candidate_id: string;
+    mime_type: string;
+    size_bytes: number;
+    sha256?: string;
+    host_upload: HostUploadRef;
+  }): Promise<ImportSharedResearchImageResult>;
   getPageProgress(input: { workspace_dir: string }): Promise<PageProgress>;
   recordPageProgress(input: RecordPageProgressInput): Promise<PageProgress>;
   renderWorkspacePagePreview(
     input: RenderWorkspacePagePreviewInput
   ): Promise<RenderWorkspacePagePreviewResult>;
+  uploadCurrentPageScreenshot(input: UploadCurrentPageScreenshotInput): Promise<HostUploadRef>;
   getPageEditContext(input: GetPageEditContextInput): Promise<GetPageEditContextResult>;
   saveManualPageRevision(input: SaveManualPageRevisionInput): Promise<SaveManualPageRevisionResult>;
   restorePageSourceVersion(input: GetPageEditContextInput): Promise<RestorePageSourceVersionResult>;

@@ -296,6 +296,7 @@ export interface Messages {
       title: string;
       empty: string;
       warning: string;
+      statuses: Record<"waiting" | "running" | "completed" | "skipped" | "warning", string>;
       queries: string;
       sources: string;
       visualAssets: string;
@@ -312,11 +313,8 @@ export interface Messages {
       phases: Record<
         | "web-decision"
         | "web-collection"
-        | "web-curation"
         | "visual-decision"
-        | "visual-collection"
-        | "visual-curation"
-        | "evidence-page-planning",
+        | "visual-collection",
         string
       >;
     };
@@ -424,6 +422,51 @@ export interface Messages {
     diagnosticBundleCopyLink: string;
     diagnosticBundleLinkCopied: string;
   };
+  performance: {
+    title: string;
+    description: string;
+    unavailable: string;
+    loading: string;
+    active: string;
+    inactive: string;
+    start: string;
+    finish: string;
+    abandon: string;
+    history: string;
+    empty: string;
+    viewReport: string;
+    regenerateReport: string;
+    deleteRun: string;
+    refresh: string;
+    events: string;
+    integrity: string;
+    startedAt: string;
+    completed: string;
+    abandoned: string;
+    finalizationFailed: string;
+    recording: string;
+    reportTitle: string;
+    reportLoading: string;
+    started: string;
+    reportGenerated: string;
+    reportRegenerated: string;
+    activeOperationsTitle: string;
+    activeOperationsBody: string;
+    keepRecording: string;
+    forceFinish: string;
+    abandonTitle: string;
+    abandonBody: string;
+    abandonConfirm: string;
+    deleteTitle: string;
+    deleteBody: string;
+    deleteConfirm: string;
+    startFailed: string;
+    finalizeFailed: string;
+    abandonFailed: string;
+    deleteFailed: string;
+    reportFailed: string;
+    regenerateFailed: string;
+  };
   myWork: {
     title: string;
     home: string;
@@ -459,8 +502,11 @@ export interface Messages {
     textDensity: string;
     visualTone: string;
     pageGenerationConcurrency: string;
+    researchImageSessionConcurrency: string;
     visualReviewEnabled: string;
     visualReviewFailureLimit: string;
+    disableWebResearch: string;
+    disableImageResearch: string;
     enabled: string;
     disabled: string;
   };
@@ -940,6 +986,13 @@ export const messages: Record<Locale, Messages> = {
         title: "Facts collection",
         empty: "No details for this step yet.",
         warning: "Partial",
+        statuses: {
+          waiting: "Waiting",
+          running: "Running",
+          completed: "Completed",
+          skipped: "Skipped",
+          warning: "Completed with gaps"
+        },
         queries: "Queries",
         sources: "Sources",
         visualAssets: "Selected visual assets",
@@ -965,13 +1018,10 @@ export const messages: Record<Locale, Messages> = {
           rejectedMaterial: "Rejected"
         },
         phases: {
-          "web-decision": "Judge web evidence needs",
-          "web-collection": "Search and fetch web sources",
-          "web-curation": "Curate factual evidence",
-          "visual-decision": "Judge image asset needs",
-          "visual-collection": "Search and download image assets",
-          "visual-curation": "Curate image assets",
-          "evidence-page-planning": "Evidence-aware page planning"
+          "web-decision": "Decide whether web research is needed",
+          "web-collection": "Search and organize web research",
+          "visual-decision": "Decide whether image research is needed",
+          "visual-collection": "Search and select image material"
         }
       },
       currentSessionStream: "Current session stream",
@@ -1078,6 +1128,51 @@ export const messages: Record<Locale, Messages> = {
       diagnosticBundleCopyLink: "Copy troubleshooting bundle link",
       diagnosticBundleLinkCopied: "Link copied. Paste it into your browser address bar to download, and do not share it with unrelated people."
     },
+    performance: {
+      title: "Performance Testing",
+      description: "Record internal button interactions, backend round trips, and workflow timings. Data stays in the global PPT performance-runs directory.",
+      unavailable: "This ppt-engine does not support Performance Testing.",
+      loading: "Loading Performance Runs...",
+      active: "Recording",
+      inactive: "Not recording",
+      start: "Start recording",
+      finish: "Finish and generate report",
+      abandon: "Abandon recording",
+      history: "Run history",
+      empty: "No Performance Runs yet.",
+      viewReport: "View report",
+      regenerateReport: "Regenerate report",
+      deleteRun: "Delete run",
+      refresh: "Refresh runs",
+      events: "events",
+      integrity: "Data integrity",
+      startedAt: "Started",
+      completed: "Completed",
+      abandoned: "Abandoned",
+      finalizationFailed: "Report generation failed",
+      recording: "Recording",
+      reportTitle: "Performance Report",
+      reportLoading: "Loading report...",
+      started: "Performance recording started.",
+      reportGenerated: "Performance report generated.",
+      reportRegenerated: "Performance report regenerated.",
+      activeOperationsTitle: "Operations are still active",
+      activeOperationsBody: "{count} operations are unfinished. Force finish marks their measurements as interrupted but does not stop product tasks.",
+      keepRecording: "Keep recording",
+      forceFinish: "Force finish",
+      abandonTitle: "Abandon this Performance Run?",
+      abandonBody: "Raw events are retained, but no report will be generated.",
+      abandonConfirm: "Abandon run",
+      deleteTitle: "Delete Performance Run?",
+      deleteBody: "This permanently deletes raw events and the report for {runId}.",
+      deleteConfirm: "Delete permanently",
+      startFailed: "Failed to start Performance Run.",
+      finalizeFailed: "Failed to finalize Performance Run.",
+      abandonFailed: "Failed to abandon Performance Run.",
+      deleteFailed: "Failed to delete Performance Run.",
+      reportFailed: "Failed to open Performance Report.",
+      regenerateFailed: "Failed to regenerate Performance Report."
+    },
     myWork: {
       title: "My Works",
       home: "Home",
@@ -1113,8 +1208,11 @@ export const messages: Record<Locale, Messages> = {
       textDensity: "Text density",
       visualTone: "Visual tone",
       pageGenerationConcurrency: "Page generation concurrency",
+      researchImageSessionConcurrency: "Image research Session concurrency",
       visualReviewEnabled: "Visual check",
       visualReviewFailureLimit: "Visual check failure limit",
+      disableWebResearch: "Disable web research",
+      disableImageResearch: "Disable image search",
       enabled: "On",
       disabled: "Off"
     },
@@ -1594,6 +1692,13 @@ export const messages: Record<Locale, Messages> = {
         title: "事实收集",
         empty: "这个步骤暂无详细输出。",
         warning: "部分完成",
+        statuses: {
+          waiting: "等待中",
+          running: "进行中",
+          completed: "已完成",
+          skipped: "已跳过",
+          warning: "有缺口"
+        },
         queries: "查询",
         sources: "来源",
         visualAssets: "入选图片素材",
@@ -1619,13 +1724,10 @@ export const messages: Record<Locale, Messages> = {
           rejectedMaterial: "拒绝"
         },
         phases: {
-          "web-decision": "判断网页资料需求",
-          "web-collection": "搜索并抓取网页资料",
-          "web-curation": "筛选事实证据",
-          "visual-decision": "判断图片素材需求",
-          "visual-collection": "搜索并下载图片素材",
-          "visual-curation": "筛选图片素材",
-          "evidence-page-planning": "证据感知页面规划"
+          "web-decision": "判断是否需要网页资料",
+          "web-collection": "搜索并整理网页资料",
+          "visual-decision": "判断是否需要图片素材",
+          "visual-collection": "搜索并筛选图片素材"
         }
       },
       currentSessionStream: "当前会话流",
@@ -1730,6 +1832,51 @@ export const messages: Record<Locale, Messages> = {
       diagnosticBundleCopyLink: "复制问题排查包链接",
       diagnosticBundleLinkCopied: "链接已复制，请粘贴到浏览器地址栏中下载，并且不要分享给无关人员。"
     },
+    performance: {
+      title: "性能测试",
+      description: "记录内部测试中的按钮交互、后端往返和工作流耗时。数据保存在 PPT 全局 performance-runs 目录中。",
+      unavailable: "当前 ppt-engine 不支持性能测试。",
+      loading: "正在加载性能测试记录……",
+      active: "正在记录",
+      inactive: "未开始记录",
+      start: "开始记录",
+      finish: "结束并生成报告",
+      abandon: "放弃本次记录",
+      history: "历史记录",
+      empty: "暂无性能测试记录。",
+      viewReport: "查看报告",
+      regenerateReport: "重新生成报告",
+      deleteRun: "删除记录",
+      refresh: "刷新记录",
+      events: "条事件",
+      integrity: "数据完整性",
+      startedAt: "开始时间",
+      completed: "已完成",
+      abandoned: "已放弃",
+      finalizationFailed: "报告生成失败",
+      recording: "记录中",
+      reportTitle: "性能测试报告",
+      reportLoading: "正在加载报告……",
+      started: "性能记录已开始。",
+      reportGenerated: "性能报告已生成。",
+      reportRegenerated: "性能报告已重新生成。",
+      activeOperationsTitle: "仍有操作正在记录",
+      activeOperationsBody: "仍有 {count} 个操作未完成。强制结束会将这些测量标记为中断，但不会停止正在执行的产品任务。",
+      keepRecording: "继续记录",
+      forceFinish: "强制结束",
+      abandonTitle: "放弃本次性能记录？",
+      abandonBody: "本次原始事件会保留，但不会生成报告。",
+      abandonConfirm: "放弃记录",
+      deleteTitle: "删除性能记录？",
+      deleteBody: "将永久删除 {runId} 的原始事件和报告。",
+      deleteConfirm: "永久删除",
+      startFailed: "性能记录启动失败。",
+      finalizeFailed: "性能记录结束失败。",
+      abandonFailed: "放弃性能记录失败。",
+      deleteFailed: "删除性能记录失败。",
+      reportFailed: "打开性能报告失败。",
+      regenerateFailed: "重新生成性能报告失败。"
+    },
     myWork: {
       title: "我的作品",
       home: "首页",
@@ -1765,8 +1912,11 @@ export const messages: Record<Locale, Messages> = {
       textDensity: "文字密度",
       visualTone: "视觉语气",
       pageGenerationConcurrency: "页面生成并发数",
+      researchImageSessionConcurrency: "图片研究 Session 并发数",
       visualReviewEnabled: "视觉检查",
       visualReviewFailureLimit: "视觉检查失败次数上限",
+      disableWebResearch: "禁止网络资料搜索",
+      disableImageResearch: "禁止图片搜索",
       enabled: "开启",
       disabled: "关闭"
     },

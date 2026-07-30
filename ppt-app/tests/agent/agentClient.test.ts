@@ -121,6 +121,60 @@ function authoringSuccessFrames(): AnnaAgentRunFrame[] {
 }
 
 describe("AgentClient cache miss retry", () => {
+  it("normalizes an unreadable visual attachment to a failed low-confidence review", async () => {
+    const harness = createRuntime([[{
+      event: "message",
+      text: '{"pass":true,"score":9,"image_description":"IMAGE_UNAVAILABLE","issues":[],"revision_request":"","confidence":"high"}',
+    }, { event: "complete" }]]);
+    const client = await createAgentClient(harness.runtime);
+
+    const result = await client.runPageVisualReviewPrompt("review");
+
+    assert.equal(result.pass, false);
+    assert.equal(result.score, 0);
+    assert.equal(result.image_description, "IMAGE_UNAVAILABLE");
+    assert.equal(result.confidence, "low");
+  });
+
+  it("passes native image attachments only to the initial visual review run", async () => {
+    const runInputs: Array<{ content: string; attachments?: unknown[] }> = [];
+    const responses = [
+      [{ event: "message", text: "not json" }, { event: "complete" }],
+      [{ event: "message", text: '{"pass":true,"score":9,"image_description":"A clear title above three readable cards on a light canvas.","issues":[],"revision_request":"","confidence":"high"}' }, { event: "complete" }],
+    ] as AnnaAgentRunFrame[][];
+    let sessionIndex = 0;
+    const runtime: AnnaRuntime = {
+      tools: { invoke: async () => ({}) },
+      llm: { complete: async () => ({}) },
+      agent: {
+        session: async () => {
+          const frames = responses[sessionIndex++] ?? [];
+          return {
+            run: (input) => {
+              runInputs.push(input);
+              return (async function* () {
+                for (const frame of frames) yield frame;
+              })();
+            },
+            delete: async () => undefined,
+          };
+        },
+      },
+    };
+    const client = await createAgentClient(runtime);
+    await client.runPageVisualReviewPrompt("review", {
+      attachments: [{
+        type: "image/png",
+        url: "https://uploads.example/page.png",
+        filename: "page.png",
+        detail: "auto",
+      }],
+    });
+
+    assert.equal(runInputs.length, 2);
+    assert.equal(runInputs[0]?.attachments?.length, 1);
+    assert.equal(runInputs[1]?.attachments, undefined);
+  });
   it("throws AgentInfrastructureError when session create resolves no tools", async () => {
     const harness = createRuntime([authoringSuccessFrames()], {
       sessionPatch: {
@@ -464,5 +518,49 @@ describe("AgentClient cache miss retry", () => {
       },
     );
     assert.equal(harness.sessionDeletes, 1);
+  });
+
+  it("repairs malformed image JSON in the same Session without resending attachments", async () => {
+    let sessionCreations = 0;
+    let runCount = 0;
+    const runInputs: Array<{ content: string; attachments?: unknown[] }> = [];
+    const runtime: AnnaRuntime = {
+      tools: { invoke: async () => ({}) },
+      llm: { complete: async () => ({}) },
+      agent: {
+        session: async () => {
+          sessionCreations += 1;
+          return {
+            run: (input: { content: string; attachments?: unknown[] }) => {
+              runCount += 1;
+              runInputs.push(input);
+              const text = runCount === 1
+                ? "not json"
+                : "```json\n{\"candidates\":[{\"candidate_id\":\"image-1\",\"use_in_ppt\":true,\"description\":\"A room\",\"reason\":\"Relevant\"}]}\n```";
+              return (async function* () {
+                yield { event: "message", text };
+                yield { event: "complete" };
+              })();
+            },
+            delete: async () => undefined,
+          } as AnnaAgentSession;
+        },
+      },
+    };
+    const client = await createAgentClient(runtime);
+    const result = await client.runImageResearchPrompt("select images", {
+      attachments: [{ type: "image/jpeg", url: "https://example.com/image.jpg", filename: "image-1", detail: "auto" }],
+    });
+
+    assert.equal(sessionCreations, 1);
+    assert.equal(runCount, 2);
+    assert.equal(runInputs[0]?.attachments?.length, 1);
+    assert.equal(runInputs[1]?.attachments, undefined);
+    assert.deepEqual(result.candidates, [{
+      candidate_id: "image-1",
+      use_in_ppt: true,
+      description: "A room",
+      reason: "Relevant",
+    }]);
   });
 });

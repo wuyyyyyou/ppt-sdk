@@ -55,6 +55,11 @@ function renderBriefPage(options: {
         visualReviewFailureLimit: 2,
       },
       setStrictReviewMode: async () => undefined,
+      researchSearchControlSettings: {
+        disableWebResearch: false,
+        disableImageResearch: false,
+      },
+      setResearchSearchControlSettings: async () => undefined,
       workspaceSettingsSaving: options.workspaceSettingsSaving ?? false,
       generateDeck: async () => undefined,
       visualStylePresets: presets,
@@ -103,24 +108,26 @@ describe("BriefPage", () => {
     assert.match(html, /spinner small/);
   });
 
-  it("keeps sealed feature entry points hidden", () => {
+  it("shows research search controls while keeping sealed feature entry points hidden", () => {
     const html = renderBriefPage();
 
     assert.doesNotMatch(html, />附件</);
     assert.doesNotMatch(html, /上传资料/);
     assert.doesNotMatch(html, /模板选择/);
     assert.doesNotMatch(html, /风格画像/);
-    assert.doesNotMatch(html, /禁止网络资料搜索/);
-    assert.doesNotMatch(html, /禁止图片搜索/);
+    assert.match(html, /禁止网络资料搜索/);
+    assert.match(html, /禁止图片搜索/);
     assert.doesNotMatch(html, /补全上下文/);
     assert.match(html, /生成演示文稿/);
   });
 
-  it("disables create and visual review controls while workspace settings are saving", () => {
+  it("disables create, visual review, and research controls while workspace settings are saving", () => {
     const html = renderBriefPage({ workspaceSettingsSaving: true });
 
     assertDisabledButtonWithLabel(html, "生成演示文稿");
     assertDisabledButtonWithLabel(html, "视觉检查");
+    assertDisabledButtonWithLabel(html, "禁止网络资料搜索");
+    assertDisabledButtonWithLabel(html, "禁止图片搜索");
   });
 
   it("renders preset cards as cover images while keeping an accessible name", () => {

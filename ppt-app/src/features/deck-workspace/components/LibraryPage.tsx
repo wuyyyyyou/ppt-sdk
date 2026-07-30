@@ -9,6 +9,12 @@ import {
   readPageGenerationConcurrency,
 } from "../generationConcurrency";
 import {
+  RESEARCH_IMAGE_SESSION_CONCURRENCY_MAX,
+  RESEARCH_IMAGE_SESSION_CONCURRENCY_MIN,
+  readResearchImageSessionConcurrency,
+} from "../researchImageSessionConcurrency";
+import { readResearchSearchControlSettings } from "../researchSearchControl";
+import {
   DEFAULT_VISUAL_REVIEW_FAILURE_LIMIT,
   pageReviewSettingsToWorkspaceSettings,
   readPageReviewSettings,
@@ -20,9 +26,13 @@ import type { WorkspaceDiagnosticBundleState } from "../types";
 import { useDownloadUrlAvailability } from "../useDownloadUrlAvailability";
 import { CopyableDownloadLink } from "./CopyableDownloadLink";
 import { PageHeader } from "./PageHeader";
+import { PerformanceTestingPanel } from "../../performance/PerformanceTestingPanel";
+import type { PerformanceTestingState } from "../types";
+import type { PerformanceRunSummary } from "../../../api/types";
 
 interface LibraryPageProps {
   t: Messages;
+  locale: "en" | "zh";
   settings: WorkspaceSettings;
   currentWorkspace: WorkspaceResult | null;
   loading: boolean;
@@ -36,20 +46,33 @@ interface LibraryPageProps {
   workspaceDiagnosticBundle: WorkspaceDiagnosticBundleState;
   onDownloadWorkspaceDiagnosticBundle: () => Promise<void>;
   onResetWorkspaceDiagnosticBundle: () => void;
+  performanceTesting: PerformanceTestingState;
+  onRefreshPerformanceRuns: () => Promise<void>;
+  onStartPerformanceRun: () => Promise<void>;
+  onFinalizePerformanceRun: () => Promise<void>;
+  onAbandonPerformanceRun: () => Promise<void>;
+  onViewPerformanceReport: (run: PerformanceRunSummary) => Promise<void>;
+  onRegeneratePerformanceReport: (run: PerformanceRunSummary) => Promise<void>;
+  onDeletePerformanceRun: (run: PerformanceRunSummary) => Promise<void>;
 }
 
 function toEditableSettings(settings: WorkspaceSettings, pageReviewSettings: PageReviewSettings) {
+  const researchSearchControls = readResearchSearchControlSettings(settings);
   return {
     ...settings,
     ...pageReviewSettingsToWorkspaceSettings(pageReviewSettings),
     page_generation_concurrency: readPageGenerationConcurrency(settings),
+    research_image_session_concurrency: readResearchImageSessionConcurrency(settings),
     visual_review_enabled: pageReviewSettings.visualReviewEnabled,
     visual_review_failure_limit: pageReviewSettings.visualReviewFailureLimit,
+    disable_web_research: researchSearchControls.disableWebResearch,
+    disable_image_research: researchSearchControls.disableImageResearch,
   };
 }
 
 export function LibraryPage({
   t,
+  locale,
   settings,
   currentWorkspace,
   loading,
@@ -63,6 +86,14 @@ export function LibraryPage({
   workspaceDiagnosticBundle,
   onDownloadWorkspaceDiagnosticBundle,
   onResetWorkspaceDiagnosticBundle,
+  performanceTesting,
+  onRefreshPerformanceRuns,
+  onStartPerformanceRun,
+  onFinalizePerformanceRun,
+  onAbandonPerformanceRun,
+  onViewPerformanceReport,
+  onRegeneratePerformanceReport,
+  onDeletePerformanceRun,
 }: LibraryPageProps) {
   const [editing, setEditing] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -109,11 +140,11 @@ export function LibraryPage({
             {editingTitle ? (
               <span className="workspace-title-editor">
                 <input value={titleDraft} onChange={(event) => setTitleDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void saveTitle(); if (event.key === "Escape") setEditingTitle(false); }} autoFocus />
-                <button className="primary-btn compact" onClick={() => void saveTitle()} disabled={savingSettings}>{t.controls.save}</button>
-                <button className="secondary-btn compact" onClick={() => setEditingTitle(false)} disabled={savingSettings}>{t.controls.cancel}</button>
+                <button data-performance-id="settings.workspace-title.save" className="primary-btn compact" onClick={() => void saveTitle()} disabled={savingSettings}>{t.controls.save}</button>
+                <button data-performance-id="settings.workspace-title.cancel" className="secondary-btn compact" onClick={() => setEditingTitle(false)} disabled={savingSettings}>{t.controls.cancel}</button>
               </span>
             ) : (
-              <button className="workspace-title-button" onClick={() => setEditingTitle(true)} disabled={savingSettings} title={t.controls.edit}>
+              <button data-performance-id="settings.workspace-title.edit" className="workspace-title-button" onClick={() => setEditingTitle(true)} disabled={savingSettings} title={t.controls.edit}>
                 <span>{getWorkspaceTitle(currentWorkspace)}</span><Edit3 className="workspace-title-edit-icon" size={13} />
               </button>
             )}
@@ -126,11 +157,14 @@ export function LibraryPage({
         <div className="pref-header">
           <strong>{t.library.preferences}</strong>
           {editing ? (
-            <div className="pref-actions"><button className="secondary-btn compact" onClick={() => setEditing(false)} disabled={savingSettings}>{t.controls.cancel}</button><button className="primary-btn compact" onClick={() => void saveSettings()} disabled={savingSettings}>{t.controls.save}</button></div>
-          ) : <button className="secondary-btn compact" onClick={() => setEditing(true)} disabled={savingSettings}><Edit3 size={12} />{t.controls.edit}</button>}
+            <div className="pref-actions"><button data-performance-id="settings.preferences.cancel" className="secondary-btn compact" onClick={() => setEditing(false)} disabled={savingSettings}>{t.controls.cancel}</button><button data-performance-id="settings.preferences.save" className="primary-btn compact" onClick={() => void saveSettings()} disabled={savingSettings}>{t.controls.save}</button></div>
+          ) : <button data-performance-id="settings.preferences.edit" className="secondary-btn compact" onClick={() => setEditing(true)} disabled={savingSettings}><Edit3 size={12} />{t.controls.edit}</button>}
         </div>
         <PreferenceSwitch label={t.preferences.visualReviewEnabled} value={draft.visual_review_enabled === true} editing={editing} t={t} onChange={(value) => setDraft((next) => ({ ...next, visual_review_enabled: value }))} />
+        <PreferenceSwitch label={t.preferences.disableWebResearch} value={draft.disable_web_research === true} editing={editing} t={t} onChange={(value) => setDraft((next) => ({ ...next, disable_web_research: value }))} />
+        <PreferenceSwitch label={t.preferences.disableImageResearch} value={draft.disable_image_research === true} editing={editing} t={t} onChange={(value) => setDraft((next) => ({ ...next, disable_image_research: value }))} />
         <PreferenceNumber label={t.preferences.pageGenerationConcurrency} value={Number(draft.page_generation_concurrency)} editing={editing} min={PAGE_GENERATION_CONCURRENCY_MIN} max={PAGE_GENERATION_CONCURRENCY_MAX} onChange={(value) => setDraft((next) => ({ ...next, page_generation_concurrency: value }))} />
+        <PreferenceNumber label={t.preferences.researchImageSessionConcurrency} value={Number(draft.research_image_session_concurrency)} editing={editing} min={RESEARCH_IMAGE_SESSION_CONCURRENCY_MIN} max={RESEARCH_IMAGE_SESSION_CONCURRENCY_MAX} onChange={(value) => setDraft((next) => ({ ...next, research_image_session_concurrency: value }))} />
         <PreferenceNumber label={t.preferences.visualReviewFailureLimit} value={Number(draft.visual_review_failure_limit ?? DEFAULT_VISUAL_REVIEW_FAILURE_LIMIT)} editing={editing} min={REVIEW_FAILURE_LIMIT_MIN} max={REVIEW_FAILURE_LIMIT_MAX} onChange={(value) => setDraft((next) => ({ ...next, visual_review_failure_limit: value }))} />
       </div>
 
@@ -141,12 +175,25 @@ export function LibraryPage({
         {runtimeInfoError ? <div className="runtime-info-error" title={runtimeInfoError}>{t.library.runtimeInfoUnavailable}</div> : null}
       </div>
 
+      <PerformanceTestingPanel
+        t={t}
+        locale={locale}
+        state={performanceTesting}
+        onRefresh={onRefreshPerformanceRuns}
+        onStart={onStartPerformanceRun}
+        onFinish={onFinalizePerformanceRun}
+        onAbandon={onAbandonPerformanceRun}
+        onViewReport={onViewPerformanceReport}
+        onRegenerateReport={onRegeneratePerformanceReport}
+        onDelete={onDeletePerformanceRun}
+      />
+
       {currentWorkspace ? (
         <div className="diagnostic-bundle-box">
-          <div className="diagnostic-bundle-header"><div><strong>{t.library.diagnosticBundleTitle}</strong><p>{t.library.diagnosticBundleDescription}</p></div>{workspaceDiagnosticBundle.href ? <button className="diagnostic-bundle-refresh-btn" type="button" aria-label={t.library.diagnosticBundleRefresh} title={t.library.diagnosticBundleRefresh} onClick={onResetWorkspaceDiagnosticBundle}><RefreshCw size={20} /></button> : <Archive size={20} />}</div>
+          <div className="diagnostic-bundle-header"><div><strong>{t.library.diagnosticBundleTitle}</strong><p>{t.library.diagnosticBundleDescription}</p></div>{workspaceDiagnosticBundle.href ? <button data-performance-id="settings.diagnostic-bundle.reset" className="diagnostic-bundle-refresh-btn" type="button" aria-label={t.library.diagnosticBundleRefresh} title={t.library.diagnosticBundleRefresh} onClick={onResetWorkspaceDiagnosticBundle}><RefreshCw size={20} /></button> : <Archive size={20} />}</div>
           <div className="diagnostic-bundle-warning">{t.library.diagnosticBundleSensitiveHint}</div>
           <div className="diagnostic-bundle-action">
-            <button className="diagnostic-bundle-generate-btn" type="button" disabled={loading || workspaceDiagnosticBundle.status === "preparing"} aria-busy={workspaceDiagnosticBundle.status === "preparing"} onClick={() => void onDownloadWorkspaceDiagnosticBundle()}><Download size={15} /><span>{diagnosticButtonLabel}</span></button>
+            <button data-performance-id="settings.diagnostic-bundle.download" className="diagnostic-bundle-generate-btn" type="button" disabled={loading || workspaceDiagnosticBundle.status === "preparing"} aria-busy={workspaceDiagnosticBundle.status === "preparing"} onClick={() => void onDownloadWorkspaceDiagnosticBundle()}><Download size={15} /><span>{diagnosticButtonLabel}</span></button>
             {/* ADR-0025: the host iframe may still refuse to start the transfer,
                 so the signed URL stays reachable as a manual fallback. */}
             {diagnosticBundleAvailability.active && workspaceDiagnosticBundle.href ? <CopyableDownloadLink href={workspaceDiagnosticBundle.href} inputLabel={t.library.diagnosticBundleLinkLabel} copyLabel={t.library.diagnosticBundleCopyLink} copiedMessage={t.library.diagnosticBundleLinkCopied} copyHint={t.library.diagnosticBundleDownloadFallbackHint} /> : null}

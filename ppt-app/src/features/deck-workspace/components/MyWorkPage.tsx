@@ -217,6 +217,7 @@ export function MyWorkPage({
         key={project.workspace_id}
       >
         <button
+          data-performance-id="my-work.workspace.open"
           className="my-work-card-main"
           type="button"
           onClick={() => void openProject(dir)}
@@ -235,6 +236,7 @@ export function MyWorkPage({
           </span>
         ) : null}
         <button
+          data-performance-id="my-work.workspace.menu.toggle"
           type="button"
           className="my-work-card-menu-trigger"
           aria-label={t.myWork.menu}
@@ -265,6 +267,7 @@ export function MyWorkPage({
                 <Fragment key={item.id}>
                   {item.dividerBefore ? <span className="my-work-card-menu-divider" role="separator" /> : null}
                   <button
+                    data-performance-id={`my-work.workspace.${item.id}`}
                     type="button"
                     role="menuitem"
                     className={item.tone ?? ""}
@@ -322,7 +325,7 @@ export function MyWorkPage({
             summary={error || t.myWork.loadFailed}
             detail={errorDetail}
             actions={
-              <button type="button" className="secondary-btn" onClick={() => void onRetry()}>
+              <button data-performance-id="my-work.list.retry" type="button" className="secondary-btn" onClick={() => void onRetry()}>
                 {t.myWork.retry}
               </button>
             }
@@ -338,6 +341,7 @@ export function MyWorkPage({
               actions={
                 lastOpenAttemptRef.current ? (
                   <button
+                    data-performance-id="my-work.workspace.open-retry"
                     type="button"
                     className="secondary-btn"
                     disabled={busy}
@@ -349,7 +353,7 @@ export function MyWorkPage({
                     {t.myWork.openRetry}
                   </button>
                 ) : (
-                  <button type="button" className="secondary-btn" onClick={() => void onRetry()}>
+                  <button data-performance-id="my-work.list.retry" type="button" className="secondary-btn" onClick={() => void onRetry()}>
                     {t.myWork.retry}
                   </button>
                 )
@@ -359,7 +363,7 @@ export function MyWorkPage({
           <section className="my-work-section">
             <div className="my-work-section-heading"><h2>{t.myWork.presentations}</h2></div>
             <div className="my-work-grid">
-              <button type="button" className="my-work-new-card" onClick={() => void onNew()} disabled={busy}>
+              <button data-performance-id="my-work.new-presentation" type="button" className="my-work-new-card" onClick={() => void onNew()} disabled={busy}>
                 <Plus size={22} aria-hidden="true" />
                 <strong>{t.myWork.newPresentation}</strong>
               </button>
@@ -378,10 +382,10 @@ export function MyWorkPage({
       {renameTarget ? (
         <div className="my-work-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="my-work-rename-title">
           <section className="my-work-modal">
-            <button type="button" className="my-work-modal-close" onClick={() => setRenameTarget(null)} aria-label={t.controls.close}><X size={16} aria-hidden="true" /></button>
+            <button data-performance-id="my-work.rename.close" type="button" className="my-work-modal-close" onClick={() => setRenameTarget(null)} aria-label={t.controls.close}><X size={16} aria-hidden="true" /></button>
             <h2 id="my-work-rename-title">{t.myWork.renameTitle}</h2>
             <input autoFocus value={renameDraft} placeholder={t.myWork.renamePlaceholder} onChange={(event) => setRenameDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void submitRename(); if (event.key === "Escape") setRenameTarget(null); }} />
-            <div className="my-work-modal-actions"><button type="button" className="secondary-btn" onClick={() => setRenameTarget(null)} disabled={actionLoading}>{t.controls.cancel}</button><button type="button" className="primary-btn" onClick={() => void submitRename()} disabled={!renameDraft.trim() || actionLoading}>{t.controls.save}</button></div>
+            <div className="my-work-modal-actions"><button data-performance-id="my-work.rename.cancel" type="button" className="secondary-btn" onClick={() => setRenameTarget(null)} disabled={actionLoading}>{t.controls.cancel}</button><button data-performance-id="my-work.rename.save" type="button" className="primary-btn" onClick={() => void submitRename()} disabled={!renameDraft.trim() || actionLoading}>{t.controls.save}</button></div>
           </section>
         </div>
       ) : null}

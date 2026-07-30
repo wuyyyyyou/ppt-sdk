@@ -27,13 +27,23 @@ export interface AnnaAgentRunFrame {
   [key: string]: unknown;
 }
 
+export interface AnnaAgentImageAttachment {
+  type: string;
+  url: string;
+  filename?: string;
+  detail: "auto";
+}
+
 export interface AnnaAgentSession {
   appSessionUuid?: string;
   expires_in?: number;
   expiresIn?: number;
   granted_tools?: string[];
   inherit_host_tools?: boolean;
-  run(input: { content: string }): AsyncIterable<AnnaAgentRunFrame>;
+  run(input: {
+    content: string;
+    attachments?: AnnaAgentImageAttachment[];
+  }): AsyncIterable<AnnaAgentRunFrame>;
   history?(): Promise<unknown>;
   cancel?(runId: string): Promise<unknown>;
   delete(): Promise<unknown>;
@@ -85,6 +95,42 @@ export interface AnnaRuntime {
   };
   llm: {
     complete(input: AnnaLlmCompleteInput): Promise<unknown>;
+  };
+  web?: {
+    search(input: {
+      query: string;
+      max_results?: number;
+      search_depth?: "basic" | "advanced";
+      topic?: "general" | "news";
+      time_range?: "day" | "week" | "month" | "year";
+      region?: string;
+      include_domains?: string[];
+      exclude_domains?: string[];
+    }): Promise<unknown>;
+    fetch(
+      input: {
+        urls: string[];
+        format?: "markdown" | "text";
+        max_chars?: number;
+        timeout_ms?: number;
+      },
+      options?: { timeoutMs?: number },
+    ): Promise<unknown>;
+    image_search(input: {
+      query: string;
+      max_results?: number;
+      min_width?: number;
+      min_height?: number;
+      aspect?: "any" | "wide" | "tall" | "square";
+    }): Promise<unknown>;
+    image_fetch(
+      input: {
+        url: string;
+        max_bytes?: number;
+        purpose?: string;
+      },
+      options?: { timeoutMs?: number },
+    ): Promise<unknown>;
   };
   agent: {
     session(input: { submode: "auto" }): Promise<AnnaAgentSession>;

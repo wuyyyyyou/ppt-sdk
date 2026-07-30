@@ -18,6 +18,7 @@ const INCLUDED_PATHS = [
   "example_plugin.js",
   "aps-files-client.js",
   "host-upload-confirmation.js",
+  "host-upload-cache.js",
   "dist",
   "node_modules",
 ];

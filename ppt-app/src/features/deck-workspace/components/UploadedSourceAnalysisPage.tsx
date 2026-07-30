@@ -93,10 +93,10 @@ export function UploadedSourceAnalysisPage(props: UploadedSourceAnalysisPageProp
 
         {showFailureActions ? (
           <div className="generation-recovery-actions">
-            <button className="secondary-btn" onClick={onReturnToBrief}>
+            <button data-performance-id="uploaded-source-analysis.back-to-brief" className="secondary-btn" onClick={onReturnToBrief}>
               {t.uploadedSourceAnalysis.returnToBrief}
             </button>
-            <button className="primary-btn" onClick={() => void onRetry()}>
+            <button data-performance-id="uploaded-source-analysis.retry" className="primary-btn" onClick={() => void onRetry()}>
               <RotateCw size={14} />
               {t.uploadedSourceAnalysis.retry}
             </button>
@@ -122,6 +122,7 @@ function UploadedSourceAnalysisRecordView(props: {
   return (
     <article className={`generation-stage-record ${record.state}`}>
       <button
+        data-performance-id="uploaded-source-analysis.stage.toggle"
         className="generation-stage-summary"
         type="button"
         onClick={onToggle}

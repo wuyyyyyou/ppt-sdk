@@ -25,6 +25,7 @@ export function ThumbnailStrip({
         const renderedSlide = renderedSlides[index];
         return (
           <button
+            data-performance-id="deck.thumbnail.select"
             key={`${slide.title}-${index}`}
             className={`thumb ${index === currentSlide ? "active" : ""}`}
             type="button"

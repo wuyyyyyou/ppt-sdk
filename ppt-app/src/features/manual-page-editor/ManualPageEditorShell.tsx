@@ -642,14 +642,14 @@ export function ManualPageEditorShell(props: Props) {
 
   const toolbar = (
     <div ref={toolbarRef} className="manual-editor-toolbar" role="toolbar">
-      <button className="manual-editor-btn icon" onClick={undo} disabled={!history.length} title={t.undo}><Undo2 size={16} /></button>
-      <button className="manual-editor-btn icon" onClick={redo} disabled={!future.length} title={t.redo}><Redo2 size={16} /></button>
+      <button data-performance-id="manual-editor.undo" className="manual-editor-btn icon" onClick={undo} disabled={!history.length} title={t.undo}><Undo2 size={16} /></button>
+      <button data-performance-id="manual-editor.redo" className="manual-editor-btn icon" onClick={redo} disabled={!future.length} title={t.redo}><Redo2 size={16} /></button>
       <span className="manual-toolbar-divider" />
       {!selected ? (
         <>
-          <button className="manual-editor-btn icon" onClick={() => addElement("text")} title={t.addText}><Type size={16} /></button>
-          <button className="manual-editor-btn icon" onClick={() => addElement("shape")} title={t.addShape}><Shapes size={16} /></button>
-          <button className="manual-editor-btn icon" onClick={() => { setImageMode("add"); fileInputRef.current?.click(); }} title={t.addImage}><ImagePlus size={16} /></button>
+          <button data-performance-id="manual-editor.element.add-text" className="manual-editor-btn icon" onClick={() => addElement("text")} title={t.addText}><Type size={16} /></button>
+          <button data-performance-id="manual-editor.element.add-shape" className="manual-editor-btn icon" onClick={() => addElement("shape")} title={t.addShape}><Shapes size={16} /></button>
+          <button data-performance-id="manual-editor.element.add-image" className="manual-editor-btn icon" onClick={() => { setImageMode("add"); fileInputRef.current?.click(); }} title={t.addImage}><ImagePlus size={16} /></button>
         </>
       ) : null}
 
@@ -662,14 +662,14 @@ export function ManualPageEditorShell(props: Props) {
             {fontSizeOptions.map((size) => <option key={size}>{size}</option>)}
           </select>
           <span className="manual-toolbar-divider" />
-          <button className={`manual-editor-btn icon ${Number.parseInt(selectedStyle?.fontWeight ?? "400", 10) >= 600 ? "active" : ""}`} title={t.bold} onClick={() => applyTextStyle("fontWeight", Number.parseInt(selectedStyle?.fontWeight ?? "400", 10) >= 600 ? "400" : "700")}><Bold size={15} /></button>
-          <button className={`manual-editor-btn icon ${selectedStyle?.fontStyle === "italic" ? "active" : ""}`} title={t.italic} onClick={() => applyTextStyle("fontStyle", selectedStyle?.fontStyle === "italic" ? "normal" : "italic")}><Italic size={15} /></button>
-          <button className={`manual-editor-btn icon ${selectedStyle?.textDecorationLine.includes("underline") ? "active" : ""}`} title={t.underline} onClick={() => applyTextStyle("textDecoration", selectedStyle?.textDecorationLine.includes("underline") ? "none" : "underline")}><Underline size={15} /></button>
-          <button className={`manual-editor-btn icon ${selectedStyle?.textDecorationLine.includes("line-through") ? "active" : ""}`} title={t.strikethrough} onClick={() => applyTextStyle("textDecoration", selectedStyle?.textDecorationLine.includes("line-through") ? "none" : "line-through")}><Strikethrough size={15} /></button>
+          <button data-performance-id="manual-editor.text.bold" className={`manual-editor-btn icon ${Number.parseInt(selectedStyle?.fontWeight ?? "400", 10) >= 600 ? "active" : ""}`} title={t.bold} onClick={() => applyTextStyle("fontWeight", Number.parseInt(selectedStyle?.fontWeight ?? "400", 10) >= 600 ? "400" : "700")}><Bold size={15} /></button>
+          <button data-performance-id="manual-editor.text.italic" className={`manual-editor-btn icon ${selectedStyle?.fontStyle === "italic" ? "active" : ""}`} title={t.italic} onClick={() => applyTextStyle("fontStyle", selectedStyle?.fontStyle === "italic" ? "normal" : "italic")}><Italic size={15} /></button>
+          <button data-performance-id="manual-editor.text.underline" className={`manual-editor-btn icon ${selectedStyle?.textDecorationLine.includes("underline") ? "active" : ""}`} title={t.underline} onClick={() => applyTextStyle("textDecoration", selectedStyle?.textDecorationLine.includes("underline") ? "none" : "underline")}><Underline size={15} /></button>
+          <button data-performance-id="manual-editor.text.strikethrough" className={`manual-editor-btn icon ${selectedStyle?.textDecorationLine.includes("line-through") ? "active" : ""}`} title={t.strikethrough} onClick={() => applyTextStyle("textDecoration", selectedStyle?.textDecorationLine.includes("line-through") ? "none" : "line-through")}><Strikethrough size={15} /></button>
           <span className="manual-toolbar-divider" />
-          <button className={`manual-editor-btn icon ${selectedStyle?.textAlign === "left" || selectedStyle?.textAlign === "start" ? "active" : ""}`} title={t.alignLeft} onClick={() => patchSelected((element) => { element.style.textAlign = "left"; })}><AlignLeft size={15} /></button>
-          <button className={`manual-editor-btn icon ${selectedStyle?.textAlign === "center" ? "active" : ""}`} title={t.alignCenter} onClick={() => patchSelected((element) => { element.style.textAlign = "center"; })}><AlignCenter size={15} /></button>
-          <button className={`manual-editor-btn icon ${selectedStyle?.textAlign === "right" || selectedStyle?.textAlign === "end" ? "active" : ""}`} title={t.alignRight} onClick={() => patchSelected((element) => { element.style.textAlign = "right"; })}><AlignRight size={15} /></button>
+          <button data-performance-id="manual-editor.text.align-left" className={`manual-editor-btn icon ${selectedStyle?.textAlign === "left" || selectedStyle?.textAlign === "start" ? "active" : ""}`} title={t.alignLeft} onClick={() => patchSelected((element) => { element.style.textAlign = "left"; })}><AlignLeft size={15} /></button>
+          <button data-performance-id="manual-editor.text.align-center" className={`manual-editor-btn icon ${selectedStyle?.textAlign === "center" ? "active" : ""}`} title={t.alignCenter} onClick={() => patchSelected((element) => { element.style.textAlign = "center"; })}><AlignCenter size={15} /></button>
+          <button data-performance-id="manual-editor.text.align-right" className={`manual-editor-btn icon ${selectedStyle?.textAlign === "right" || selectedStyle?.textAlign === "end" ? "active" : ""}`} title={t.alignRight} onClick={() => patchSelected((element) => { element.style.textAlign = "right"; })}><AlignRight size={15} /></button>
           {/* Line height and space after are one click each, so they sit on the
               toolbar instead of behind a paragraph popover. */}
           <label className="manual-toolbar-field" title={t.lineHeight}>
@@ -690,7 +690,7 @@ export function ManualPageEditorShell(props: Props) {
 
       {selectedIsImage ? (
         <>
-          <button className="manual-editor-btn text" onClick={() => { setImageMode("replace"); fileInputRef.current?.click(); }}><ImagePlus size={15} />{t.replaceImage}</button>
+          <button data-performance-id="manual-editor.image.replace" className="manual-editor-btn text" onClick={() => { setImageMode("replace"); fileInputRef.current?.click(); }}><ImagePlus size={15} />{t.replaceImage}</button>
           <select className="manual-toolbar-select image-fit" title={t.imageFit} value={selectedStyle?.objectFit ?? "contain"} onChange={(event) => patchSelected((element) => { element.style.objectFit = event.target.value; })}>
             <option value="cover">{t.imageFitCover}</option><option value="contain">{t.imageFitContain}</option><option value="fill">{t.imageFitFill}</option>
           </select>
@@ -700,16 +700,16 @@ export function ManualPageEditorShell(props: Props) {
       {selected && !selectedIsImage ? (
         <>
           <div className="manual-toolbar-popover-anchor">
-            <button className={`manual-editor-btn icon ${toolbarPopover === "fill" ? "active" : ""}`} title={t.fill} onClick={() => togglePopover("fill")}><span className="manual-color-swatch" style={{ borderBottomColor: fillColor }}><PaintBucket size={15} /></span></button>
+            <button data-performance-id="manual-editor.fill.toggle" className={`manual-editor-btn icon ${toolbarPopover === "fill" ? "active" : ""}`} title={t.fill} onClick={() => togglePopover("fill")}><span className="manual-color-swatch" style={{ borderBottomColor: fillColor }}><PaintBucket size={15} /></span></button>
             {toolbarPopover === "fill" ? (
               <div className="manual-toolbar-popover compact align-right">
                 <label className="manual-color-field"><span>{t.fillColor}</span><input type="color" value={fillColor} onChange={(event) => patchSelected((element) => { element.style.backgroundColor = event.target.value; })} /></label>
-                <button className="manual-popover-action" onClick={() => { patchSelected((element) => { element.style.background = "transparent"; }); setToolbarPopover(null); }}>{t.noFill}</button>
+                <button data-performance-id="manual-editor.fill.clear" className="manual-popover-action" onClick={() => { patchSelected((element) => { element.style.background = "transparent"; }); setToolbarPopover(null); }}>{t.noFill}</button>
               </div>
             ) : null}
           </div>
           <div className="manual-toolbar-popover-anchor">
-            <button className={`manual-editor-btn icon ${toolbarPopover === "border" ? "active" : ""}`} title={t.border} onClick={() => togglePopover("border")}><span className="manual-color-swatch" style={{ borderBottomColor: borderColor }}><Square size={15} /></span></button>
+            <button data-performance-id="manual-editor.border.toggle" className={`manual-editor-btn icon ${toolbarPopover === "border" ? "active" : ""}`} title={t.border} onClick={() => togglePopover("border")}><span className="manual-color-swatch" style={{ borderBottomColor: borderColor }}><Square size={15} /></span></button>
             {toolbarPopover === "border" ? (
               <div className="manual-toolbar-popover compact align-right">
                 <label className="manual-color-field"><span>{t.borderColor}</span><input type="color" value={borderColor} onChange={(event) => patchSelected((element) => { element.style.borderColor = event.target.value; element.style.borderStyle = "solid"; })} /></label>
@@ -722,20 +722,20 @@ export function ManualPageEditorShell(props: Props) {
       ) : null}
 
       {selected ? (
-        <button className="manual-editor-btn icon danger" title={t.deleteElement} onClick={() => { patchSelected((element) => { element.style.visibility = "hidden"; element.dataset.pptEditorDeleted = "true"; }); setSelected(null); }}><Trash2 size={15} /></button>
+        <button data-performance-id="manual-editor.element.delete" className="manual-editor-btn icon danger" title={t.deleteElement} onClick={() => { patchSelected((element) => { element.style.visibility = "hidden"; element.dataset.pptEditorDeleted = "true"; }); setSelected(null); }}><Trash2 size={15} /></button>
       ) : null}
 
       <div className="manual-toolbar-popover-anchor manual-toolbar-more">
-        <button className={`manual-editor-btn icon ${toolbarPopover === "more" ? "active" : ""}`} title={t.more} onClick={() => togglePopover("more")}><MoreHorizontal size={16} /></button>
+        <button data-performance-id="manual-editor.more.toggle" className={`manual-editor-btn icon ${toolbarPopover === "more" ? "active" : ""}`} title={t.more} onClick={() => togglePopover("more")}><MoreHorizontal size={16} /></button>
         {toolbarPopover === "more" ? (
           <div className="manual-toolbar-menu align-right">
-            {selected ? <button disabled={!canSelectParent} onClick={selectParent}><Layers size={14} />{t.selectParent}</button> : null}
+            {selected ? <button data-performance-id="manual-editor.selection.select-parent" disabled={!canSelectParent} onClick={selectParent}><Layers size={14} />{t.selectParent}</button> : null}
             {selected ? <span className="manual-toolbar-menu-label">{t.layers}</span> : null}
-            {selected ? <button onClick={() => { arrange("front"); setToolbarPopover(null); }}><ArrowUpToLine size={14} />{t.bringToFront}</button> : null}
-            {selected ? <button onClick={() => { arrange("forward"); setToolbarPopover(null); }}><ArrowUp size={14} />{t.bringForward}</button> : null}
-            {selected ? <button onClick={() => { arrange("backward"); setToolbarPopover(null); }}><ArrowDown size={14} />{t.sendBackward}</button> : null}
-            {selected ? <button onClick={() => { arrange("back"); setToolbarPopover(null); }}><ArrowDownToLine size={14} />{t.sendToBack}</button> : null}
-            <button disabled={!context?.manually_edited} onClick={() => { setToolbarPopover(null); setConfirm({ kind: "restore" }); }}><RotateCcw size={14} />{t.restoreAiVersion}</button>
+            {selected ? <button data-performance-id="manual-editor.layer.to-front" onClick={() => { arrange("front"); setToolbarPopover(null); }}><ArrowUpToLine size={14} />{t.bringToFront}</button> : null}
+            {selected ? <button data-performance-id="manual-editor.layer.forward" onClick={() => { arrange("forward"); setToolbarPopover(null); }}><ArrowUp size={14} />{t.bringForward}</button> : null}
+            {selected ? <button data-performance-id="manual-editor.layer.backward" onClick={() => { arrange("backward"); setToolbarPopover(null); }}><ArrowDown size={14} />{t.sendBackward}</button> : null}
+            {selected ? <button data-performance-id="manual-editor.layer.to-back" onClick={() => { arrange("back"); setToolbarPopover(null); }}><ArrowDownToLine size={14} />{t.sendToBack}</button> : null}
+            <button data-performance-id="manual-editor.restore.request" disabled={!context?.manually_edited} onClick={() => { setToolbarPopover(null); setConfirm({ kind: "restore" }); }}><RotateCcw size={14} />{t.restoreAiVersion}</button>
           </div>
         ) : null}
       </div>
@@ -746,14 +746,14 @@ export function ManualPageEditorShell(props: Props) {
     <section className="manual-page-editor">
       <aside className={`manual-editor-filmstrip ${filmstripCollapsed ? "collapsed" : ""}`}>
         <div className="manual-filmstrip-header">
-          <button className="manual-editor-btn icon" onClick={requestExit} title={controls.back}><ArrowLeft size={17} /></button>
+          <button data-performance-id="manual-editor.exit.request" className="manual-editor-btn icon" onClick={requestExit} title={controls.back}><ArrowLeft size={17} /></button>
           {!filmstripCollapsed ? <strong>{t.title}</strong> : null}
-          <button className="manual-editor-btn icon" onClick={() => setFilmstripCollapsed((value) => !value)} title={filmstripCollapsed ? t.expandPages : t.collapsePages}>{filmstripCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}</button>
+          <button data-performance-id="manual-editor.filmstrip.toggle" className="manual-editor-btn icon" onClick={() => setFilmstripCollapsed((value) => !value)} title={filmstripCollapsed ? t.expandPages : t.collapsePages}>{filmstripCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}</button>
         </div>
         {!filmstripCollapsed ? (
           <div className="manual-filmstrip-scroll">
             {props.pages.map((item, index) => (
-              <button key={item.pageId} className={`manual-filmstrip-item ${index === pageIndex ? "active" : ""}`} onClick={() => requestSwitch(index)}>
+              <button data-performance-id="manual-editor.page.select" key={item.pageId} className={`manual-filmstrip-item ${index === pageIndex ? "active" : ""}`} onClick={() => requestSwitch(index)}>
                 <span className="manual-filmstrip-index">{index + 1}</span>
                 {item.screenshotUrl ? <img src={item.screenshotUrl} alt="" /> : <div className="manual-thumb-placeholder" />}
                 <small>{item.title}</small>
@@ -771,7 +771,7 @@ export function ManualPageEditorShell(props: Props) {
               <span>{t.loading}</span>
             </div>
           ) : null}
-          {error ? <div className="manual-editor-error">{error}{saveStatus === "conflict" ? <button onClick={() => void loadPage(pageIndex)}>{t.reloadLatest}</button> : null}</div> : null}
+          {error ? <div className="manual-editor-error">{error}{saveStatus === "conflict" ? <button data-performance-id="manual-editor.conflict.reload" onClick={() => void loadPage(pageIndex)}>{t.reloadLatest}</button> : null}</div> : null}
           {!loading && html ? (
             <div className="manual-editor-stage" style={{ width: 1280 * scale, height: 720 * scale }}>
               <iframe
@@ -883,13 +883,13 @@ export function ManualPageEditorShell(props: Props) {
         </div>
         <div className="manual-editor-status-bar">
           <div className="manual-editor-zoom-control">
-            <button className={`manual-editor-btn ghost ${zoom === "fit" ? "active" : ""}`} onClick={() => setZoom("fit")}>{t.fitWindow}</button>
-            <button className="manual-editor-btn icon ghost" onClick={() => setZoom(Math.max(0.25, scale - 0.1))} title={t.zoomOut}><ZoomOut size={15} /></button>
+            <button data-performance-id="manual-editor.zoom.fit" className={`manual-editor-btn ghost ${zoom === "fit" ? "active" : ""}`} onClick={() => setZoom("fit")}>{t.fitWindow}</button>
+            <button data-performance-id="manual-editor.zoom.out" className="manual-editor-btn icon ghost" onClick={() => setZoom(Math.max(0.25, scale - 0.1))} title={t.zoomOut}><ZoomOut size={15} /></button>
             <span>{Math.round(scale * 100)}%</span>
-            <button className="manual-editor-btn icon ghost" onClick={() => setZoom(Math.min(2, scale + 0.1))} title={t.zoomIn}><ZoomIn size={15} /></button>
+            <button data-performance-id="manual-editor.zoom.in" className="manual-editor-btn icon ghost" onClick={() => setZoom(Math.min(2, scale + 0.1))} title={t.zoomIn}><ZoomIn size={15} /></button>
           </div>
           <div className={`manual-save-status ${saveStatus}`}><span className="manual-save-dot" />{saveStatusLabel}</div>
-          <button className="manual-editor-btn primary" onClick={() => void save()} disabled={saveStatus === "saving" || saveStatus === "saved"}><Save size={15} />{controls.save}</button>
+          <button data-performance-id="manual-editor.save" className="manual-editor-btn primary" onClick={() => void save()} disabled={saveStatus === "saving" || saveStatus === "saved"}><Save size={15} />{controls.save}</button>
         </div>
       </main>
       <input ref={fileInputRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleImage(file); event.currentTarget.value = ""; }} />
@@ -899,9 +899,9 @@ export function ManualPageEditorShell(props: Props) {
             <strong>{confirm.kind === "restore" ? t.restoreConfirm.title : t.unsavedConfirm.title}</strong>
             <p>{confirm.kind === "restore" ? t.restoreConfirm.body : t.unsavedConfirm.body}</p>
             {confirm.kind === "restore" ? (
-              <div><button onClick={() => void resolveConfirm("cancel")}>{controls.cancel}</button><button className="primary" onClick={() => void resolveConfirm("restore")}>{t.restoreConfirm.confirm}</button></div>
+              <div><button data-performance-id="manual-editor.confirm.cancel" onClick={() => void resolveConfirm("cancel")}>{controls.cancel}</button><button data-performance-id="manual-editor.restore.confirm" className="primary" onClick={() => void resolveConfirm("restore")}>{t.restoreConfirm.confirm}</button></div>
             ) : (
-              <div><button onClick={() => void resolveConfirm("cancel")}>{t.unsavedConfirm.keepEditing}</button><button onClick={() => void resolveConfirm("discard")}>{t.unsavedConfirm.discard}</button><button className="primary" onClick={() => void resolveConfirm("save")}>{controls.save}</button></div>
+              <div><button data-performance-id="manual-editor.exit.cancel" onClick={() => void resolveConfirm("cancel")}>{t.unsavedConfirm.keepEditing}</button><button data-performance-id="manual-editor.exit.discard" onClick={() => void resolveConfirm("discard")}>{t.unsavedConfirm.discard}</button><button data-performance-id="manual-editor.exit.save" className="primary" onClick={() => void resolveConfirm("save")}>{controls.save}</button></div>
             )}
           </div>
         </div>

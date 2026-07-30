@@ -56,7 +56,7 @@ describe("ExportPage", () => {
       mirrorStatus: "ready",
     });
 
-    assert.match(html, /<button class="export-download-btn" type="button" aria-busy="false">/);
+    assert.match(html, /<button [^>]*class="export-download-btn" type="button" aria-busy="false">/);
     assert.match(html, /下载 PPTX/);
     assert.doesNotMatch(html, /准备下载/);
     assert.doesNotMatch(html, /anna-workspace/);
@@ -72,7 +72,7 @@ describe("ExportPage", () => {
       mirrorStatus: "missing",
     });
 
-    assert.match(html, /<button class="export-download-btn" type="button" aria-busy="false">/);
+    assert.match(html, /<button [^>]*class="export-download-btn" type="button" aria-busy="false">/);
     assert.match(html, /下载 PPTX/);
     assert.doesNotMatch(html, /anna-workspace/);
   });

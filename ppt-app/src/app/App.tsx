@@ -23,6 +23,7 @@ import { useDeckWorkspace } from "../features/deck-workspace/hooks/useDeckWorksp
 import { VISUAL_STYLE_PRESETS } from "../features/templates/visualStylePresets";
 import { useI18n } from "../i18n/useI18n";
 import { ManualPageEditorShell } from "../features/manual-page-editor/ManualPageEditorShell";
+import { PerformanceReportPage } from "../features/performance/PerformanceReportPage";
 
 export function App() {
   const { locale, setLocale, t } = useI18n();
@@ -67,6 +68,7 @@ export function App() {
   return (
     <main className="anna-stage">
       <button
+        data-performance-id="app.panel.open"
         className={`launcher-btn ${state.panelMode === "closed" ? "visible" : ""}`}
         onClick={() => actions.setPanelMode("visible")}
         aria-label={t.appName}
@@ -75,6 +77,7 @@ export function App() {
       </button>
 
       <button
+        data-performance-id="app.panel.restore"
         className={`minimized-pill ${state.panelMode === "minimized" ? "visible" : ""}`}
         onClick={() => actions.setPanelMode("visible")}
       >
@@ -146,6 +149,8 @@ export function App() {
               loading={state.loading}
               pageReviewSettings={state.pageReviewSettings}
               setStrictReviewMode={actions.setStrictReviewMode}
+              researchSearchControlSettings={state.researchSearchControlSettings}
+              setResearchSearchControlSettings={actions.setResearchSearchControlSettings}
               workspaceSettingsSaving={state.workspaceSettingsSaving}
               generateDeck={actions.generatePresentationRequirements}
               visualStylePresets={VISUAL_STYLE_PRESETS}
@@ -257,6 +262,7 @@ export function App() {
           {state.page === "settings" ? (
             <LibraryPage
               t={t}
+              locale={locale}
               settings={state.globalSettings}
               currentWorkspace={state.currentWorkspace}
               loading={state.workspaceLoading}
@@ -270,6 +276,23 @@ export function App() {
               workspaceDiagnosticBundle={state.workspaceDiagnosticBundle}
               onDownloadWorkspaceDiagnosticBundle={actions.downloadWorkspaceDiagnosticBundle}
               onResetWorkspaceDiagnosticBundle={actions.resetWorkspaceDiagnosticBundle}
+              performanceTesting={state.performanceTesting}
+              onRefreshPerformanceRuns={actions.refreshPerformanceRuns}
+              onStartPerformanceRun={actions.startPerformanceRun}
+              onFinalizePerformanceRun={actions.finalizePerformanceRun}
+              onAbandonPerformanceRun={actions.abandonPerformanceRun}
+              onViewPerformanceReport={actions.openPerformanceReport}
+              onRegeneratePerformanceReport={actions.regeneratePerformanceReport}
+              onDeletePerformanceRun={actions.deletePerformanceRun}
+            />
+          ) : null}
+
+          {state.page === "performance-report" ? (
+            <PerformanceReportPage
+              t={t}
+              html={state.performanceTesting.reportHtml}
+              runId={state.performanceTesting.reportRunId}
+              onBack={() => void actions.goBack()}
             />
           ) : null}
 

@@ -25,13 +25,13 @@ export function DeckPage(props: DeckPageProps) {
   return (
     <section className="page active deck-page">
       <div className="deck-top-actions">
-        <button className="secondary-btn deck-back-btn" type="button" onClick={() => props.onBack()}>
+        <button data-performance-id="deck.back" className="secondary-btn deck-back-btn" type="button" onClick={() => props.onBack()}>
           <ArrowLeft size={16} aria-hidden="true" />{props.t.controls.back}
         </button>
-        <button className="secondary-btn compact" onClick={() => props.onRefineSlide()}>
+        <button data-performance-id="deck.refine-page" className="secondary-btn compact" onClick={() => props.onRefineSlide()}>
           {props.t.controls.refineSlide}
         </button>
-        <button className="secondary-btn compact" onClick={() => props.onRefineDeck()}>
+        <button data-performance-id="deck.refine-deck" className="secondary-btn compact" onClick={() => props.onRefineDeck()}>
           {props.t.controls.refineDeck}
         </button>
       </div>
@@ -44,6 +44,7 @@ export function DeckPage(props: DeckPageProps) {
       />
       <div className="action-bar">
         <button
+          data-performance-id="deck.manual-edit"
           className="secondary-btn"
           onClick={props.onEdit}
           title={props.t.controls.edit}
@@ -52,11 +53,11 @@ export function DeckPage(props: DeckPageProps) {
           <Edit3 size={14} aria-hidden="true" />
           {props.t.controls.edit}
         </button>
-        <button className="secondary-btn" onClick={props.onPreview}>
+        <button data-performance-id="deck.preview" className="secondary-btn" onClick={props.onPreview}>
           <Eye size={14} aria-hidden="true" />
           {props.t.controls.preview}
         </button>
-        <button className="secondary-btn" onClick={props.onExport}>
+        <button data-performance-id="deck.export" className="secondary-btn" onClick={props.onExport}>
           <Download size={14} aria-hidden="true" />
           {props.t.controls.export}
         </button>

@@ -26,6 +26,8 @@ import {
   recordDeckRecovery,
 } from "./runtimeSupport";
 import { shouldResumePageGenerationStatus } from "./pageStatusPolicy";
+import { runLinearSharedResearch } from "./linearResearchWorkflow";
+import { beginPerformanceSpan } from "../../performance/performanceRecorder";
 
 function getActiveGenerationRunKind(input: RunDeckGenerationInput): NonNullable<PageProgress["recovery"]>["run_kind"] {
   return input.refinementRunKind ?? (input.pageRefinementReasons ? "page-refinement" : "deck-generation");
@@ -169,6 +171,47 @@ export async function runDeckGeneration(
       progress = nextProgress;
     },
   };
+
+  const researchSpan = beginPerformanceSpan({
+    operationName: "research.run",
+    workspaceId: input.workspace.workspace_id,
+    attributes: { layer: "workflow" },
+  });
+  try {
+    await runLinearSharedResearch(runtime, { resume: input.resumeResearch === true });
+    researchSpan?.finish("ok");
+    progress = runtime.getProgress() ?? progress;
+  } catch (error) {
+    researchSpan?.finish(isAgentRunCancelledError(error) || input.isCancelled() ? "interrupted" : "error");
+    if (isAgentRunCancelledError(error) || input.isCancelled()) {
+      const cancelledProgress = createProgress(
+        {
+          step: "cancelled",
+          message: text.cancelled,
+          currentPageIndex: null,
+          totalPages: authoringDeck.pages.length,
+        },
+        progress,
+        null,
+        runtime.activeStreams.values(),
+        attemptLimits,
+        runtime.researchDiscoveryProgress,
+      );
+      input.onProgress(cancelledProgress);
+      await recordDeckRecovery(input, {
+        status: "interrupted",
+        run_kind: getActiveGenerationRunKind(input),
+        step: "research",
+        target_page_ids: input.pageRefinementReasons ? Object.keys(input.pageRefinementReasons) : authoringDeck.pages.map((page) => page.page_id),
+        refinement_request: input.refinementRequest ?? null,
+        page_refinement_reasons: input.pageRefinementReasons ?? {},
+        error: null,
+        deck_status: "interrupted",
+      });
+      return cancelledCompletion(cancelledProgress);
+    }
+    throw error;
+  }
 
   const results = await runPagesConcurrently(runtime, authoringDeck);
   const infrastructureFailure = results.find((result) => result.reason === "agent_infrastructure");

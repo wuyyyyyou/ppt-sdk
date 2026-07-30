@@ -1,7 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { createReadStream, createWriteStream } from "node:fs";
 import { appendFile, copyFile, lstat, mkdir, readlink, readdir, readFile, realpath, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
@@ -176,6 +176,15 @@ import type {
   AppWorkspaceDiagnosticBundleSnapshot,
   AppPptxExportJob,
   AppResearchPaths,
+  AppSharedResearchContextResult,
+  AppendAppImageResearchBatchInput,
+  AppendAppWebResearchBatchInput,
+  ImportAppSharedResearchImageInput,
+  ImportAppSharedResearchImageResult,
+  PatchAppSharedResearchProgressInput,
+  PatchAppSharedResearchProgressResult,
+  PrepareAppSharedResearchWorkspaceInput,
+  PublishAppSharedResearchBatchResult,
   RecordAppPagePlanInput,
   RecordAppPageProgressInput,
   RecordAppWorkspaceStyleGuideInput,
@@ -187,30 +196,11 @@ import type {
   RecordAppWorkspaceThemeTokenInput,
   RecordAppWorkspaceThemeTokenResult,
   RecordAppPdfExportInput,
-  GetAppResearchEvidenceInput,
-  GetAppResearchPlanInput,
-  GetAppResearchStatusInput,
-  FinalizeAppResearchVisualAssetsInput,
-  FinalizeAppResearchVisualAssetsResult,
-  PrepareAppResearchWorkspaceInput,
-  PrepareAppResearchWorkspaceResult,
   PrepareAppUploadedSourceAnalysisWorkspaceInput,
   PrepareAppUploadedSourceAnalysisWorkspaceResult,
   PrepareAppStyleProfileCreationInput,
   PrepareAppStyleProfileCreationResult,
   PatchAppWorkspaceSettingsResult,
-  GetAppResearchCurationDraftInput,
-  GetAppResearchCurationDraftFingerprintInput,
-  RecordAppResearchEvidenceInput,
-  RecordAppResearchEvidenceResult,
-  RecordAppResearchEvidencePageInput,
-  RecordAppResearchEvidencePageResult,
-  RecordAppResearchCurationDraftInput,
-  RecordAppResearchEvidencePageMarkdownInput,
-  RecordAppResearchEvidencePageMarkdownResult,
-  RecordAppResearchPlanInput,
-  RecordAppResearchStatusInput,
-  RecordAppResearchStatusPageInput,
   RenderAppWorkspacePagePreviewInput,
   RenderAppWorkspacePagePreviewResult,
   RenderAppWorkspaceDeckHtmlInput,
@@ -235,6 +225,10 @@ import type {
   PublishAppStyleProfileInput,
   PublishAppStyleProfileResult,
 } from "./types.js";
+import {
+  applySharedResearchProgressOperations,
+  createDefaultSharedResearchProgress,
+} from "./shared-research-progress.js";
 
 const WORKSPACE_ROOT = path.join(os.homedir(), "anna-workspace", "ppt");
 const WORKSPACE_FORMAT = "authoring-kit-v1";
@@ -263,6 +257,7 @@ const WORKSPACE_LOG_FILE_NAMES = {
   "ai-page-agent-stream": "ai-page-agent-stream.jsonl",
   "ai-research": "ai-research.jsonl",
   "ai-research-interactions": "ai-research-interactions.jsonl",
+  "research-web-interactions": "research-web-interactions.jsonl",
   "ai-theme": "ai-theme.jsonl",
   "ai-theme-interactions": "ai-theme-interactions.jsonl",
   "storage-transport": "storage-transport.jsonl",
@@ -431,9 +426,6 @@ function buildWorkspaceFilePaths(workspaceDir: string) {
     page_progress: path.join(workspaceDir, "page-progress.json"),
     pages: path.join(workspaceDir, "pages.json"),
     template: path.join(workspaceDir, "template.json"),
-    research_plan: path.join(workspaceDir, "research", "research-plan.json"),
-    research_evidence: path.join(workspaceDir, "research", "evidence-index.json"),
-    research_status: path.join(workspaceDir, "research", "research-status.json"),
   };
 }
 
@@ -581,20 +573,15 @@ function decodeUploadedSourceBase64(value: string): Buffer {
 
 function buildResearchPaths(workspaceDir: string): AppResearchPaths {
   const rootDir = path.join(workspaceDir, "research");
-  const rawDir = path.join(rootDir, "raw");
   const evidenceDir = path.join(rootDir, "evidence");
   return {
     root_dir: rootDir,
-    raw_dir: rawDir,
-    raw_web_dir: path.join(rawDir, "web"),
-    raw_images_dir: path.join(rawDir, "images"),
     evidence_dir: evidenceDir,
-    evidence_pages_dir: path.join(evidenceDir, "pages"),
     evidence_images_dir: path.join(evidenceDir, "images"),
-    evidence_drafts_dir: path.join(evidenceDir, "drafts"),
-    research_plan_path: path.join(rootDir, "research-plan.json"),
-    evidence_index_path: path.join(rootDir, "evidence-index.json"),
-    status_path: path.join(rootDir, "research-status.json"),
+    web_summary_path: path.join(evidenceDir, "web-summary.md"),
+    image_catalog_path: path.join(evidenceDir, "image-catalog.json"),
+    images_dir: path.join(evidenceDir, "images"),
+    progress_path: path.join(rootDir, "web-image-search-progress.json"),
   };
 }
 
@@ -609,174 +596,9 @@ function assertPathUnderWorkspace(workspaceDir: string, targetPath: string, para
   }
 }
 
-function assertResearchPathUnderWorkspace(workspaceDir: string, targetPath: string, parameterName: string): void {
-  const researchRoot = buildResearchPaths(workspaceDir).root_dir;
-  const normalizedTarget = path.normalize(targetPath);
-  assertPathUnderWorkspace(researchRoot, normalizedTarget, parameterName);
-}
-
 function isPathInsideDir(parentDir: string, targetPath: string): boolean {
   const relativePath = path.relative(parentDir, targetPath);
   return relativePath.length === 0 || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
-}
-
-function fileUrlToPathOrNull(value: string): string | null {
-  try {
-    const url = new URL(value);
-    return url.protocol === "file:" ? fileURLToPath(url) : null;
-  } catch {
-    return null;
-  }
-}
-
-function normalizeVisualAssetSourcePath(workspaceDir: string, value: unknown): string {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    return "";
-  }
-
-  const trimmed = value.trim();
-  const fileUrlPath = trimmed.startsWith("file://") ? fileUrlToPathOrNull(trimmed) : null;
-  if (fileUrlPath) {
-    return path.normalize(fileUrlPath);
-  }
-  if (path.isAbsolute(trimmed)) {
-    return path.normalize(trimmed);
-  }
-
-  const agentFileToolRoot = path.dirname(path.dirname(workspaceDir));
-  const agentFileToolPath = path.normalize(path.join(agentFileToolRoot, trimmed));
-  if (isPathInsideDir(workspaceDir, agentFileToolPath)) {
-    return agentFileToolPath;
-  }
-
-  return path.normalize(path.join(workspaceDir, trimmed));
-}
-
-interface RawImageMetadataEntry {
-  file_path: string;
-  metadata: Record<string, unknown>;
-}
-
-function readOptionalVisualAssetString(record: Record<string, unknown>, key: string): string | undefined {
-  const value = record[key];
-  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
-}
-
-async function buildRawImageMetadataByPath(
-  workspaceDir: string,
-  rawImageIndexPaths: string[] | undefined,
-): Promise<Map<string, Record<string, unknown>>> {
-  const metadata = new Map<string, Record<string, unknown>>();
-  for (const indexPathValue of rawImageIndexPaths ?? []) {
-    const indexPath = normalizeVisualAssetSourcePath(workspaceDir, indexPathValue);
-    if (!indexPath || !isPathInsideDir(workspaceDir, indexPath)) continue;
-    let index: unknown;
-    try {
-      index = await readJsonFileIfExists(indexPath);
-    } catch {
-      continue;
-    }
-    const record = getPlainRecord(index);
-    const results = Array.isArray(record.results) ? record.results.map(getPlainRecord) : [];
-    for (const item of results) {
-      const candidatePaths = getRawImageMetadataCandidatePaths(workspaceDir, item);
-      for (const candidatePath of candidatePaths) {
-        metadata.set(candidatePath, item);
-      }
-    }
-  }
-  return metadata;
-}
-
-async function buildRawImageMetadataEntries(
-  workspaceDir: string,
-  rawImageIndexPaths: string[] | undefined,
-): Promise<RawImageMetadataEntry[]> {
-  const entries: RawImageMetadataEntry[] = [];
-  const seen = new Set<string>();
-  for (const indexPathValue of rawImageIndexPaths ?? []) {
-    const indexPath = normalizeVisualAssetSourcePath(workspaceDir, indexPathValue);
-    if (!indexPath || !isPathInsideDir(workspaceDir, indexPath)) continue;
-    let index: unknown;
-    try {
-      index = await readJsonFileIfExists(indexPath);
-    } catch {
-      continue;
-    }
-    const record = getPlainRecord(index);
-    const results = Array.isArray(record.results) ? record.results.map(getPlainRecord) : [];
-    for (const item of results) {
-      const filePath = normalizeVisualAssetSourcePath(workspaceDir, item.file_path);
-      if (!filePath || seen.has(filePath)) continue;
-      seen.add(filePath);
-      entries.push({ file_path: filePath, metadata: item });
-    }
-  }
-  return entries;
-}
-
-function getRawImageMetadataCandidatePaths(
-  workspaceDir: string,
-  item: Record<string, unknown>,
-): string[] {
-  return [
-    item.file_path,
-    item.path,
-    item.local_path,
-    item.output_path,
-  ].map((value) => normalizeVisualAssetSourcePath(workspaceDir, value)).filter(Boolean);
-}
-
-function normalizePathForSuffixMatch(value: string): string {
-  return path.normalize(value.trim().replace(/\\/g, "/")).replace(/\\/g, "/").replace(/^\.\/+/, "");
-}
-
-function findUniqueRawImageMetadataEntryBySuffix(
-  entries: RawImageMetadataEntry[],
-  rawPath: string,
-): RawImageMetadataEntry | "ambiguous" | null {
-  const normalizedRawPath = normalizePathForSuffixMatch(rawPath);
-  if (!normalizedRawPath) return null;
-  const matches = entries.filter((entry) => {
-    const normalizedFilePath = normalizePathForSuffixMatch(entry.file_path);
-    return normalizedFilePath === normalizedRawPath ||
-      normalizedFilePath.endsWith(`/${normalizedRawPath}`) ||
-      normalizedRawPath.endsWith(`/${normalizedFilePath}`);
-  });
-  if (matches.length === 1) return matches[0] ?? null;
-  return matches.length > 1 ? "ambiguous" : null;
-}
-
-function findRawImageMetadataEntryForAsset(input: {
-  entries: RawImageMetadataEntry[];
-  asset: Record<string, unknown>;
-  draftPaths: string[];
-}): RawImageMetadataEntry | "ambiguous" | null {
-  const draftSha256 = normalizeString(input.asset.sha256).trim().toLowerCase();
-  if (draftSha256) {
-    const matches = input.entries.filter((entry) =>
-      normalizeString(entry.metadata.sha256).trim().toLowerCase() === draftSha256
-    );
-    if (matches.length === 1) return matches[0] ?? null;
-    if (matches.length > 1) return "ambiguous";
-  }
-
-  const imageUrl = readOptionalVisualAssetString(input.asset, "image_url");
-  if (imageUrl) {
-    const matches = input.entries.filter((entry) =>
-      readOptionalVisualAssetString(entry.metadata, "image_url") === imageUrl ||
-      readOptionalVisualAssetString(entry.metadata, "url") === imageUrl
-    );
-    if (matches.length === 1) return matches[0] ?? null;
-    if (matches.length > 1) return "ambiguous";
-  }
-
-  for (const draftPath of input.draftPaths) {
-    const match = findUniqueRawImageMetadataEntryBySuffix(input.entries, draftPath);
-    if (match) return match;
-  }
-
-  return null;
 }
 
 function buildPptxExportPaths(workspaceDir: string) {
@@ -821,12 +643,28 @@ async function writeJsonFile(filePath: string, data: unknown): Promise<void> {
   await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
 }
 
+async function atomicWriteTextFile(filePath: string, content: string): Promise<void> {
+  await mkdir(path.dirname(filePath), { recursive: true });
+  const temporaryPath = path.join(path.dirname(filePath), `.${path.basename(filePath)}.${randomUUID()}.tmp`);
+  try {
+    await writeFile(temporaryPath, content, "utf8");
+    await rename(temporaryPath, filePath);
+  } finally {
+    await unlink(temporaryPath).catch(() => undefined);
+  }
+}
+
+async function atomicWriteJsonFile(filePath: string, data: unknown): Promise<void> {
+  await atomicWriteTextFile(filePath, `${JSON.stringify(data, null, 2)}\n`);
+}
+
 const pageProgressWriteQueues = new Map<string, Promise<unknown>>();
 const uploadedSourceWriteQueues = new Map<string, Promise<unknown>>();
 const styleProfileWriteQueues = new Map<string, Promise<unknown>>();
 const themeTokenWriteQueues = new Map<string, Promise<unknown>>();
 const exportArtifactWriteQueues = new Map<string, Promise<unknown>>();
 const manualFinalDeckWriteQueues = new Map<string, Promise<unknown>>();
+const sharedResearchWriteQueues = new Map<string, Promise<unknown>>();
 let pptxExportQueue = Promise.resolve();
 const activePptxExportJobIds = new Set<string>();
 
@@ -844,6 +682,18 @@ async function withExportArtifactWriteQueue<T>(
     if (exportArtifactWriteQueues.get(queueKey) === current) {
       exportArtifactWriteQueues.delete(queueKey);
     }
+  }
+}
+
+async function withSharedResearchWriteQueue<T>(workspaceDir: string, operation: () => Promise<T>): Promise<T> {
+  const queueKey = path.normalize(workspaceDir);
+  const previous = sharedResearchWriteQueues.get(queueKey) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  sharedResearchWriteQueues.set(queueKey, current);
+  try {
+    return await current;
+  } finally {
+    if (sharedResearchWriteQueues.get(queueKey) === current) sharedResearchWriteQueues.delete(queueKey);
   }
 }
 
@@ -1023,6 +873,7 @@ function createDefaultTaskJson(workspaceDir: string, title?: string) {
 function createDefaultSettingJson() {
   return {
     page_generation_concurrency: 5,
+    research_image_session_concurrency: 5,
     visual_review_enabled: false,
     visual_review_failure_limit: 2,
     disable_web_research: false,
@@ -1048,6 +899,10 @@ function normalizePageGenerationConcurrency(value: unknown): number {
   return Math.max(1, Math.min(10, Math.floor(numericValue)));
 }
 
+function normalizeResearchImageSessionConcurrency(value: unknown): number {
+  return normalizePageGenerationConcurrency(value);
+}
+
 function normalizeSettingJson(setting: unknown): Record<string, unknown> {
   const existing =
     setting && typeof setting === "object" && !Array.isArray(setting)
@@ -1056,6 +911,9 @@ function normalizeSettingJson(setting: unknown): Record<string, unknown> {
   return {
     page_generation_concurrency: normalizePageGenerationConcurrency(
       existing.page_generation_concurrency,
+    ),
+    research_image_session_concurrency: normalizeResearchImageSessionConcurrency(
+      existing.research_image_session_concurrency,
     ),
     visual_review_enabled: existing.visual_review_enabled === true,
     visual_review_failure_limit: normalizeReviewFailureLimit(
@@ -1729,19 +1587,16 @@ function normalizeFinalDeckRenderState(value: unknown): AppPageProgress["final_d
 const RESEARCH_DISCOVERY_PHASES = new Set([
   "web-decision",
   "web-collection",
-  "web-curation",
   "visual-decision",
   "visual-collection",
-  "visual-curation",
-  "evidence-page-planning",
 ]);
 
 const RESEARCH_DISCOVERY_STATES = new Set([
-  "pending",
-  "active",
+  "waiting",
+  "running",
   "completed",
   "warning",
-  "failed",
+  "skipped",
 ]);
 
 function normalizeResearchDiscoveryProgress(value: unknown): AppPageProgress["research_discovery"] {
@@ -2225,6 +2080,9 @@ export async function createAppWorkspace(
     page_generation_concurrency: normalizePageGenerationConcurrency(
       setting.page_generation_concurrency,
     ),
+    research_image_session_concurrency: normalizeResearchImageSessionConcurrency(
+      setting.research_image_session_concurrency,
+    ),
     visual_review_enabled: setting.visual_review_enabled === true,
     visual_review_failure_limit: normalizeReviewFailureLimit(
       setting.visual_review_failure_limit,
@@ -2305,9 +2163,11 @@ export async function updateAppWorkspaceTitle(
 
 /**
  * WORK-005: creates an independent Workspace from an existing one. The copy
- * keeps everything the source owns, including export artifacts, logs and an
- * interrupted generation, but never shares mutable files with it: the copied
- * tree is rebased onto the new directory and given a fresh Workspace identity.
+ * keeps the source's saved artifacts, export outputs and logs, but does not
+ * copy the global Generation Run transaction. An interrupted source therefore
+ * becomes a fresh copy of its last saved Workspace state, never a shared or
+ * resumable run. The copied tree is rebased onto the new directory and given
+ * a fresh Workspace identity.
  */
 export async function duplicateAppWorkspace(
   input: DuplicateAppWorkspaceInput,
@@ -4024,645 +3884,338 @@ export async function appendAppWorkspaceLog(
   });
 }
 
-function createDefaultResearchPlanJson(workspace: AppWorkspaceResult) {
-  const now = new Date().toISOString();
-  return {
-    version: 1,
-    status: "empty",
-    title: "",
-    source: {
-      outline_updated_at: normalizeString((normalizeOutlineJson(workspace.outline).updated_at)),
-      page_plan_updated_at: normalizeString(getPlainRecord(workspace.page_plan).updated_at),
-      template_group: normalizeString(getPlainRecord(workspace.template).selected_template_group),
-      generated_by: "system",
-    },
-    pages: [],
-    shared: {
-      web_research_needed: false,
-      image_research_needed: false,
-      query_intents: [],
-    },
-    updated_at: now,
-  };
-}
-
-function createDefaultResearchEvidenceJson() {
-  return {
-    version: 1,
-    status: "empty",
-    pages: [],
-    shared: {
-      facts: [],
-      visual_assets: [],
-      gaps: [],
-    },
-    updated_at: new Date().toISOString(),
-  };
-}
-
-function createDefaultResearchStatusJson() {
-  return {
-    version: 1,
-    status: "idle",
-    pages: [],
-    updated_at: new Date().toISOString(),
-  };
-}
-
 async function ensureResearchDirectories(workspaceDir: string): Promise<AppResearchPaths> {
   const paths = buildResearchPaths(workspaceDir);
-  await Promise.all([
-    mkdir(paths.raw_web_dir, { recursive: true }),
-    mkdir(paths.raw_images_dir, { recursive: true }),
-    mkdir(paths.evidence_pages_dir, { recursive: true }),
-    mkdir(paths.evidence_images_dir, { recursive: true }),
-    mkdir(paths.evidence_drafts_dir, { recursive: true }),
-  ]);
+  await mkdir(paths.evidence_images_dir, { recursive: true });
   return paths;
 }
 
-export async function prepareAppResearchWorkspace(
-  input: PrepareAppResearchWorkspaceInput,
-): Promise<PrepareAppResearchWorkspaceResult> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const paths = await ensureResearchDirectories(workspace.workspace_dir);
-  const preparedAt = new Date().toISOString();
+function createDefaultImageCatalog() {
+  return { schema_version: 2, assets: [] };
+}
 
-  if (!(await fileExists(paths.research_plan_path))) {
-    await writeJsonFile(paths.research_plan_path, createDefaultResearchPlanJson(workspace));
-  }
-  if (!(await fileExists(paths.evidence_index_path))) {
-    await writeJsonFile(paths.evidence_index_path, createDefaultResearchEvidenceJson());
-  }
-  if (!(await fileExists(paths.status_path))) {
-    await writeJsonFile(paths.status_path, createDefaultResearchStatusJson());
-  }
-
-  await touchWorkspaceTask(workspace, preparedAt);
-
+function compactImageCatalogAsset(value: unknown): Record<string, unknown> | null {
+  const candidate = getPlainRecord(value);
+  if (
+    candidate.use_in_ppt !== true
+    || candidate.download_status !== "imported"
+    || !normalizeString(candidate.candidate_id)
+    || !normalizeString(candidate.file_path)
+    || !normalizeString(candidate.sha256)
+    || !normalizeString(candidate.mime_type)
+    || typeof candidate.bytes_size !== "number"
+    || !Number.isFinite(candidate.bytes_size)
+    || candidate.bytes_size <= 0
+  ) return null;
+  const query = normalizeString(candidate.query);
+  const matchedQueries = normalizeStringArray(candidate.matched_queries);
   return {
-    workspace_dir: workspace.workspace_dir,
-    ...paths,
-    prepared_at: preparedAt,
+    asset_id: normalizeString(candidate.candidate_id),
+    file_path: normalizeString(candidate.file_path),
+    sha256: normalizeString(candidate.sha256),
+    mime_type: normalizeString(candidate.mime_type),
+    bytes_size: candidate.bytes_size,
+    ...(typeof candidate.width === "number" && Number.isFinite(candidate.width) && candidate.width > 0 ? { width: candidate.width } : {}),
+    ...(typeof candidate.height === "number" && Number.isFinite(candidate.height) && candidate.height > 0 ? { height: candidate.height } : {}),
+    description: normalizeString(candidate.description),
+    reason: normalizeString(candidate.reason),
+    matched_queries: matchedQueries.length > 0 ? matchedQueries : query ? [query] : [],
+    source_url: normalizeString(candidate.source_url),
   };
 }
 
-function normalizeResearchArtifact(value: unknown, fallbackStatus: string): Record<string, unknown> {
-  const record = getPlainRecord(value);
+function normalizeImageCatalogAsset(value: unknown): Record<string, unknown> | null {
+  const asset = getPlainRecord(value);
+  if (
+    !normalizeString(asset.asset_id)
+    || !normalizeString(asset.file_path)
+    || !normalizeString(asset.sha256)
+    || !normalizeString(asset.mime_type)
+    || typeof asset.bytes_size !== "number"
+    || !Number.isFinite(asset.bytes_size)
+    || asset.bytes_size <= 0
+  ) return null;
   return {
-    version: typeof record.version === "number" ? record.version : 1,
-    status: normalizeString(record.status) || fallbackStatus,
-    ...record,
-    updated_at: typeof record.updated_at === "string" ? record.updated_at : new Date().toISOString(),
+    asset_id: normalizeString(asset.asset_id),
+    file_path: normalizeString(asset.file_path),
+    sha256: normalizeString(asset.sha256),
+    mime_type: normalizeString(asset.mime_type),
+    bytes_size: asset.bytes_size,
+    ...(typeof asset.width === "number" && Number.isFinite(asset.width) && asset.width > 0 ? { width: asset.width } : {}),
+    ...(typeof asset.height === "number" && Number.isFinite(asset.height) && asset.height > 0 ? { height: asset.height } : {}),
+    description: normalizeString(asset.description),
+    reason: normalizeString(asset.reason),
+    matched_queries: normalizeStringArray(asset.matched_queries),
+    source_url: normalizeString(asset.source_url),
   };
 }
 
-function normalizeResearchPageRecord(value: unknown, label: string): Record<string, unknown> {
-  const record = getPlainRecord(value);
-  const pageId = normalizeString(record.page_id);
-  if (pageId.length === 0) {
-    throw new Error(`"${label}.page_id" must be a non-empty string`);
-  }
-  return {
-    ...record,
-    page_id: pageId,
-    updated_at: new Date().toISOString(),
-  };
-}
-
-function upsertResearchPage(
-  pages: unknown,
-  pageRecord: Record<string, unknown>,
-): Array<Record<string, unknown>> {
-  const existingPages = Array.isArray(pages) ? pages.map(getPlainRecord) : [];
-  const index = existingPages.findIndex((page) => normalizeString(page.page_id) === pageRecord.page_id);
-  if (index < 0) {
-    return [...existingPages, pageRecord];
-  }
-  return existingPages.map((page, pageIndex) => pageIndex === index ? pageRecord : page);
-}
-
-function computeResearchEvidenceStatus(pages: Array<Record<string, unknown>>): string {
-  if (pages.length === 0) {
-    return "empty";
-  }
-  if (pages.every((page) => normalizeString(page.status) === "curated" || normalizeString(page.status) === "skipped")) {
-    return "curated";
-  }
-  return "partial";
-}
-
-function computeResearchAggregateStatus(pages: Array<Record<string, unknown>>): string {
-  if (pages.some((page) => normalizeString(page.status) === "error")) {
-    return "error";
-  }
-  if (pages.some((page) => normalizeString(page.status) === "gap")) {
-    return "gap";
-  }
-  return "ready";
-}
-
-export async function recordAppResearchPlan(input: RecordAppResearchPlanInput): Promise<Record<string, unknown>> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const paths = await ensureResearchDirectories(workspace.workspace_dir);
-  const updatedAt = new Date().toISOString();
-  const plan = normalizeResearchArtifact(input.research_plan, "planned");
-  const next = {
-    ...plan,
-    updated_at: updatedAt,
-  };
-  await writeJsonFile(paths.research_plan_path, next);
-  await touchWorkspaceTask(workspace, updatedAt);
-  return next;
-}
-
-export async function getAppResearchPlan(input: GetAppResearchPlanInput): Promise<Record<string, unknown>> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const paths = await ensureResearchDirectories(workspace.workspace_dir);
-  const existing = await readJsonFileIfExists(paths.research_plan_path);
-  if (existing === null) {
-    const defaultPlan = createDefaultResearchPlanJson(workspace);
-    await writeJsonFile(paths.research_plan_path, defaultPlan);
-    return defaultPlan;
-  }
-  return normalizeResearchArtifact(existing, "empty");
-}
-
-export async function recordAppResearchEvidence(
-  input: RecordAppResearchEvidenceInput,
-): Promise<RecordAppResearchEvidenceResult> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const paths = await ensureResearchDirectories(workspace.workspace_dir);
-  const updatedAt = new Date().toISOString();
-  const evidence = normalizeResearchArtifact(input.evidence, "curated");
-  const next = {
-    ...evidence,
-    updated_at: updatedAt,
-  };
-  await writeJsonFile(paths.evidence_index_path, next);
-  await touchWorkspaceTask(workspace, updatedAt);
-  return {
-    workspace_dir: workspace.workspace_dir,
-    status: normalizeString(evidence.status),
-    evidence_index_path: paths.evidence_index_path,
-    page_count: Array.isArray(evidence.pages) ? evidence.pages.length : 0,
-    updated_at: updatedAt,
-  };
-}
-
-export async function recordAppResearchEvidencePage(
-  input: RecordAppResearchEvidencePageInput,
-): Promise<RecordAppResearchEvidencePageResult> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const paths = await ensureResearchDirectories(workspace.workspace_dir);
-  const updatedAt = new Date().toISOString();
-  const current = normalizeResearchArtifact(
-    await readJsonFileIfExists(paths.evidence_index_path) ?? createDefaultResearchEvidenceJson(),
-    "empty",
-  );
-  const pageEvidence = normalizeResearchPageRecord(input.page_evidence, "page_evidence");
-  const pages = upsertResearchPage(current.pages, {
-    ...pageEvidence,
-    updated_at: updatedAt,
-  });
-  const shared = getPlainRecord(current.shared);
-  const next = {
-    ...current,
-    version: 1,
-    status: computeResearchEvidenceStatus(pages),
-    pages,
-    shared: {
-      facts: Array.isArray(shared.facts) ? shared.facts : [],
-      visual_assets: Array.isArray(shared.visual_assets) ? shared.visual_assets : [],
-      gaps: Array.isArray(shared.gaps) ? shared.gaps : [],
-    },
-    updated_at: updatedAt,
-  };
-  await writeJsonFile(paths.evidence_index_path, next);
-  await touchWorkspaceTask(workspace, updatedAt);
-  return {
-    workspace_dir: workspace.workspace_dir,
-    page_id: normalizeString(pageEvidence.page_id),
-    status: normalizeString(pageEvidence.status),
-    evidence_index_path: paths.evidence_index_path,
-    page_count: pages.length,
-    updated_at: updatedAt,
-  };
-}
-
-export async function getAppResearchEvidence(input: GetAppResearchEvidenceInput): Promise<Record<string, unknown>> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const paths = await ensureResearchDirectories(workspace.workspace_dir);
-  const existing = await readJsonFileIfExists(paths.evidence_index_path);
-  if (existing === null) {
-    const defaultEvidence = createDefaultResearchEvidenceJson();
-    await writeJsonFile(paths.evidence_index_path, defaultEvidence);
-    return defaultEvidence;
-  }
-  return normalizeResearchArtifact(existing, "empty");
-}
-
-export async function finalizeAppResearchVisualAssets(
-  input: FinalizeAppResearchVisualAssetsInput,
-): Promise<FinalizeAppResearchVisualAssetsResult> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const paths = await ensureResearchDirectories(workspace.workspace_dir);
-  const pageId = normalizeString(input.page_id);
-  if (pageId.length === 0) {
-    throw new Error('"page_id" must be a non-empty string');
-  }
-  if (!Array.isArray(input.visual_assets)) {
-    throw new Error('"visual_assets" must be an array');
-  }
-
-  const visualAssets: FinalizeAppResearchVisualAssetsResult["visual_assets"] = [];
-  const gaps: string[] = [];
-  const rejectedMaterial: FinalizeAppResearchVisualAssetsResult["rejected_material"] = [];
-  const uploadedSourcePaths = buildUploadedSourcePaths(workspace.workspace_dir);
-  const rawMetadataByPath = await buildRawImageMetadataByPath(
-    workspace.workspace_dir,
-    input.raw_image_index_paths,
-  );
-  const rawMetadataEntries = await buildRawImageMetadataEntries(
-    workspace.workspace_dir,
-    input.raw_image_index_paths,
-  );
-
-  for (const rawAsset of input.visual_assets) {
-    const asset = getPlainRecord(rawAsset);
-    const assetId = normalizeString(asset.id);
-    let originalRawPath = normalizeVisualAssetSourcePath(workspace.workspace_dir, asset.original_raw_path);
-    let draftFilePath = normalizeVisualAssetSourcePath(workspace.workspace_dir, asset.file_path);
-    let sourcePath = originalRawPath || draftFilePath;
-    let rawMetadata = sourcePath ? rawMetadataByPath.get(sourcePath) : undefined;
-
-    if (!assetId) {
-      gaps.push("Visual asset was rejected because id is missing.");
-      rejectedMaterial.push({ reason: "Visual asset was rejected because id is missing." });
+function deduplicateImageCatalogAssets(assets: Record<string, unknown>[]) {
+  const bySha256 = new Map<string, Record<string, unknown>>();
+  for (const asset of assets) {
+    const sha256 = normalizeString(asset.sha256);
+    const previous = bySha256.get(sha256);
+    if (!previous) {
+      bySha256.set(sha256, asset);
       continue;
     }
-    if (!sourcePath) {
-      gaps.push(`Visual asset ${assetId} was rejected because no local source path was provided.`);
-      rejectedMaterial.push({
-        source: assetId,
-        reason: "Visual asset was rejected because no local source path was provided.",
-      });
-      continue;
-    }
-
-    if (
-      originalRawPath &&
-      draftFilePath &&
-      path.normalize(originalRawPath) !== path.normalize(draftFilePath)
-    ) {
-      rejectedMaterial.push({
-        source: assetId,
-        reason: "Visual asset file_path differed from original_raw_path; original_raw_path was used.",
-      });
-    }
-
-    let isRawImage = isPathInsideDir(paths.raw_images_dir, sourcePath);
-    let isEvidenceImage = isPathInsideDir(paths.evidence_images_dir, sourcePath);
-    let isUploadedSourceImage = isPathInsideDir(uploadedSourcePaths.files_dir, sourcePath);
-    if (!isRawImage && !isEvidenceImage && !isUploadedSourceImage) {
-      const recoveredEntry = findRawImageMetadataEntryForAsset({
-        entries: rawMetadataEntries,
-        asset,
-        draftPaths: [
-          normalizeString(asset.original_raw_path),
-          normalizeString(asset.file_path),
-          sourcePath,
-        ],
-      });
-      if (recoveredEntry === "ambiguous") {
-        gaps.push(`Visual asset ${assetId} was rejected because its source path had an ambiguous raw image match.`);
-        rejectedMaterial.push({
-          source: assetId,
-          reason: `Visual asset source path had an ambiguous raw image match: ${sourcePath}`,
-        });
-        continue;
-      }
-      if (recoveredEntry) {
-        sourcePath = recoveredEntry.file_path;
-        originalRawPath = recoveredEntry.file_path;
-        draftFilePath = recoveredEntry.file_path;
-        rawMetadata = recoveredEntry.metadata;
-        rejectedMaterial.push({
-          source: assetId,
-          reason: "Visual asset source path was recovered from raw image index metadata because the draft path was not directly usable.",
-        });
-        isRawImage = isPathInsideDir(paths.raw_images_dir, sourcePath);
-        isEvidenceImage = isPathInsideDir(paths.evidence_images_dir, sourcePath);
-        isUploadedSourceImage = isPathInsideDir(uploadedSourcePaths.files_dir, sourcePath);
-      }
-    }
-    if (!isRawImage && !isEvidenceImage && !isUploadedSourceImage) {
-      gaps.push(`Visual asset ${assetId} was rejected because its source path is outside research image directories or uploaded-source directories.`);
-      rejectedMaterial.push({
-        source: assetId,
-        reason: `Visual asset source path is outside research image directories or uploaded-source directories: ${sourcePath}`,
-      });
-      continue;
-    }
-
-    let sourceBytes: Buffer;
-    try {
-      const sourceStat = await stat(sourcePath);
-      if (!sourceStat.isFile()) {
-        gaps.push(`Visual asset ${assetId} was rejected because its source path is not a file.`);
-        rejectedMaterial.push({
-          source: assetId,
-          reason: `Visual asset source path is not a file: ${sourcePath}`,
-        });
-        continue;
-      }
-      sourceBytes = await readFile(sourcePath);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      gaps.push(`Visual asset ${assetId} was rejected because its source file could not be read.`);
-      rejectedMaterial.push({
-        source: assetId,
-        reason: `Visual asset source file could not be read: ${message}`,
-      });
-      continue;
-    }
-
-    const sha256 = sha256BufferHex(sourceBytes);
-    const draftSha256 = normalizeString(asset.sha256);
-    if (draftSha256 && draftSha256.toLowerCase() !== sha256) {
-      rejectedMaterial.push({
-        source: assetId,
-        reason: `Visual asset draft sha256 did not match local file bytes; using computed sha256 ${sha256}.`,
-      });
-    }
-    const metadataSha256 = rawMetadata ? normalizeString(rawMetadata.sha256) : "";
-    if (metadataSha256 && metadataSha256.toLowerCase() !== sha256) {
-      gaps.push(`Visual asset ${assetId} was rejected because raw image index sha256 did not match local file bytes.`);
-      rejectedMaterial.push({
-        source: assetId,
-        reason: `Visual asset raw image index sha256 did not match local file bytes: expected ${metadataSha256}, computed ${sha256}.`,
-      });
-      continue;
-    }
-    const metadataImageUrl = rawMetadata ? readOptionalVisualAssetString(rawMetadata, "image_url") ?? readOptionalVisualAssetString(rawMetadata, "url") : undefined;
-    const metadataPageUrl = rawMetadata ? readOptionalVisualAssetString(rawMetadata, "page_url") : undefined;
-    const assetImageUrl = readOptionalVisualAssetString(asset, "image_url");
-    const assetPageUrl = readOptionalVisualAssetString(asset, "page_url");
-    if (assetImageUrl && metadataImageUrl && assetImageUrl !== metadataImageUrl) {
-      rejectedMaterial.push({
-        source: assetId,
-        reason: "Visual asset image_url differed from raw image index metadata; draft image_url was preserved.",
-      });
-    }
-    if (assetPageUrl && metadataPageUrl && assetPageUrl !== metadataPageUrl) {
-      rejectedMaterial.push({
-        source: assetId,
-        reason: "Visual asset page_url differed from raw image index metadata; draft page_url was preserved.",
-      });
-    }
-
-    const ext = path.extname(sourcePath) || ".bin";
-    const outputFileName = [
-      sanitizeFileNamePart(pageId, "page"),
-      sanitizeFileNamePart(assetId, "asset"),
-      sha256.slice(0, 16),
-    ].join("-") + ext;
-    const outputPath = path.join(paths.evidence_images_dir, outputFileName);
-
-    if (!isEvidenceImage || sourcePath !== outputPath) {
-      try {
-        await mkdir(paths.evidence_images_dir, { recursive: true });
-        await copyFile(sourcePath, outputPath);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        gaps.push(`Visual asset ${assetId} was rejected because it could not be copied into evidence images.`);
-        rejectedMaterial.push({
-          source: assetId,
-          reason: `Visual asset could not be copied into evidence images: ${message}`,
-        });
-        continue;
-      }
-    }
-
-    visualAssets.push({
-      id: assetId,
-      file_path: outputPath,
-      original_raw_path: originalRawPath || (isRawImage || isUploadedSourceImage ? sourcePath : undefined),
-      ...(assetImageUrl || metadataImageUrl ? { image_url: assetImageUrl ?? metadataImageUrl } : {}),
-      ...(assetPageUrl || metadataPageUrl ? { page_url: assetPageUrl ?? metadataPageUrl } : {}),
-      sha256,
-      reason: normalizeString(asset.reason),
-      visual_summary: normalizeString(asset.visual_summary),
+    bySha256.set(sha256, {
+      ...previous,
+      ...asset,
+      asset_id: previous.asset_id,
+      matched_queries: [...new Set([
+        ...normalizeStringArray(previous.matched_queries),
+        ...normalizeStringArray(asset.matched_queries),
+      ])],
     });
   }
-
-  return {
-    workspace_dir: workspace.workspace_dir,
-    page_id: pageId,
-    visual_assets: visualAssets,
-    gaps,
-    rejected_material: rejectedMaterial,
-  };
+  return [...bySha256.values()];
 }
 
-function normalizeResearchDraftType(value: string): "web" | "visual" {
-  if (value === "web" || value === "visual") {
-    return value;
-  }
-  throw new Error('"draft_type" must be either "web" or "visual"');
-}
-
-function normalizeResearchDraftPageId(value: string): string {
-  const pageId = normalizeString(value);
-  if (!pageId) {
-    throw new Error('"page_id" must be a non-empty string');
-  }
-  if (!/^[a-zA-Z0-9_-]+$/.test(pageId)) {
-    throw new Error('"page_id" may only contain letters, numbers, underscores, and hyphens');
-  }
-  return pageId;
-}
-
-function normalizeResearchDraftId(value: unknown): string | null {
-  const draftId = normalizeString(value);
-  if (!draftId) {
-    return null;
-  }
-  if (!/^[a-zA-Z0-9_-]+$/.test(draftId)) {
-    throw new Error('"draft_id" may only contain letters, numbers, underscores, and hyphens');
-  }
-  return draftId;
-}
-
-function buildResearchDraftPath(
-  paths: AppResearchPaths,
-  pageId: string,
-  draftType: "web" | "visual",
-  draftId?: string | null,
-): string {
-  const fileStem = draftId ?? pageId;
-  return path.join(paths.evidence_drafts_dir, `${fileStem}-${draftType}.json`);
-}
-
-export async function recordAppResearchCurationDraft(
-  input: RecordAppResearchCurationDraftInput,
-): Promise<Record<string, unknown>> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const paths = await ensureResearchDirectories(workspace.workspace_dir);
-  const pageId = normalizeResearchDraftPageId(input.page_id);
-  const draftType = normalizeResearchDraftType(input.draft_type);
-  const draftId = normalizeResearchDraftId(input.draft_id);
-  const draftPath = buildResearchDraftPath(paths, pageId, draftType, draftId);
-  assertResearchPathUnderWorkspace(workspace.workspace_dir, draftPath, "draft_path");
-  const updatedAt = new Date().toISOString();
-  const draft = normalizeResearchArtifact(input.draft, "curated");
-  const next = {
-    ...draft,
-    page_id: pageId,
-    draft_type: draftType,
-    draft_path: draftPath,
-    updated_at: updatedAt,
-  };
-  await writeJsonFile(draftPath, next);
-  await touchWorkspaceTask(workspace, updatedAt);
-  return next;
-}
-
-export async function getAppResearchCurationDraft(
-  input: GetAppResearchCurationDraftInput,
-): Promise<Record<string, unknown>> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const paths = await ensureResearchDirectories(workspace.workspace_dir);
-  const pageId = normalizeResearchDraftPageId(input.page_id);
-  const draftType = normalizeResearchDraftType(input.draft_type);
-  const draftId = normalizeResearchDraftId(input.draft_id);
-  const draftPath = buildResearchDraftPath(paths, pageId, draftType, draftId);
-  assertResearchPathUnderWorkspace(workspace.workspace_dir, draftPath, "draft_path");
-  const existing = await readJsonFileIfExists(draftPath);
-  if (existing === null) {
+function normalizeImageCatalog(value: unknown): Record<string, unknown> {
+  const record = getPlainRecord(value);
+  if (Object.keys(record).length === 0) return createDefaultImageCatalog();
+  if (record.schema_version === 2 && Array.isArray(record.assets)) {
     return {
-      version: 1,
-      status: "empty",
-      page_id: pageId,
-      draft_type: draftType,
-      draft_path: draftPath,
-      updated_at: new Date().toISOString(),
+      schema_version: 2,
+      assets: deduplicateImageCatalogAssets(record.assets.map(normalizeImageCatalogAsset).filter((asset): asset is Record<string, unknown> => asset !== null)),
     };
   }
-  return normalizeResearchArtifact(existing, "empty");
+  throw new Error("Invalid research/evidence/image-catalog.json");
 }
 
-export async function getAppResearchCurationDraftFingerprint(
-  input: GetAppResearchCurationDraftFingerprintInput,
-): Promise<Record<string, unknown>> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const paths = await ensureResearchDirectories(workspace.workspace_dir);
-  const pageId = normalizeResearchDraftPageId(input.page_id);
-  const draftType = normalizeResearchDraftType(input.draft_type);
-  const draftId = normalizeResearchDraftId(input.draft_id);
-  const draftPath = buildResearchDraftPath(paths, pageId, draftType, draftId);
-  assertResearchPathUnderWorkspace(workspace.workspace_dir, draftPath, "draft_path");
+async function ensureSharedResearchFiles(workspaceDir: string, resetProgress: boolean): Promise<AppResearchPaths> {
+  const paths = await ensureResearchDirectories(workspaceDir);
+  await mkdir(paths.images_dir, { recursive: true });
+  if (!(await fileExists(paths.web_summary_path))) {
+    await atomicWriteTextFile(paths.web_summary_path, "# Web Research Summary\n");
+  }
+  if (!(await fileExists(paths.image_catalog_path))) {
+    await atomicWriteJsonFile(paths.image_catalog_path, createDefaultImageCatalog());
+  } else {
+    const currentCatalog = await readJsonFileIfExists(paths.image_catalog_path);
+    const normalizedCatalog = normalizeImageCatalog(currentCatalog);
+    if (JSON.stringify(currentCatalog) !== JSON.stringify(normalizedCatalog)) {
+      await atomicWriteJsonFile(paths.image_catalog_path, normalizedCatalog);
+    }
+  }
+  if (resetProgress || !(await fileExists(paths.progress_path))) {
+    await atomicWriteJsonFile(paths.progress_path, createDefaultSharedResearchProgress());
+  }
+  return paths;
+}
 
-  try {
-    const fingerprint = await fingerprintFile(draftPath);
+export async function getAppSharedResearchContext(
+  input: { workspace_dir: string },
+): Promise<AppSharedResearchContextResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureSharedResearchFiles(workspace.workspace_dir, false);
+  return {
+    workspace_dir: workspace.workspace_dir,
+    web_summary_path: paths.web_summary_path,
+    image_catalog_path: paths.image_catalog_path,
+    images_dir: paths.images_dir,
+    progress_path: paths.progress_path,
+    web_summary: await readFile(paths.web_summary_path, "utf8"),
+    image_catalog: normalizeImageCatalog(await readJsonFileIfExists(paths.image_catalog_path)),
+    progress: getPlainRecord(await readJsonFileIfExists(paths.progress_path)),
+  };
+}
+
+export async function prepareAppSharedResearchWorkspace(
+  input: PrepareAppSharedResearchWorkspaceInput,
+): Promise<AppSharedResearchContextResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  await ensureSharedResearchFiles(workspace.workspace_dir, input.reset_progress === true);
+  return getAppSharedResearchContext({ workspace_dir: workspace.workspace_dir });
+}
+
+export async function patchAppSharedResearchProgress(
+  input: PatchAppSharedResearchProgressInput,
+): Promise<PatchAppSharedResearchProgressResult> {
+  const serializedBytes = Buffer.byteLength(JSON.stringify(input), "utf8");
+  if (serializedBytes > 32 * 1024) throw new Error(`Shared research patch is ${serializedBytes} bytes; maximum is ${32 * 1024}`);
+  if (!Array.isArray(input.operations) || input.operations.length === 0) throw new Error('"operations" must be a non-empty array');
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureSharedResearchFiles(workspace.workspace_dir, false);
+  return withSharedResearchWriteQueue(workspace.workspace_dir, async () => {
+    const current = getPlainRecord(await readJsonFileIfExists(paths.progress_path));
+    const result = applySharedResearchProgressOperations(current, input.operations);
+    if (result.updated) await atomicWriteJsonFile(paths.progress_path, result.progress);
     return {
       workspace_dir: workspace.workspace_dir,
-      page_id: pageId,
-      draft_type: draftType,
-      ...(draftId ? { draft_id: draftId } : {}),
-      draft_path: draftPath,
-      exists: true,
-      sha256: fingerprint.sha256,
-      size_bytes: fingerprint.size_bytes,
+      progress_path: paths.progress_path,
+      updated: result.updated,
+      revision: result.revision,
+      updated_at: result.updated_at,
     };
-  } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
-      return {
-        workspace_dir: workspace.workspace_dir,
-        page_id: pageId,
-        draft_type: draftType,
-        ...(draftId ? { draft_id: draftId } : {}),
-        draft_path: draftPath,
-        exists: false,
-      };
-    }
-    throw error;
-  }
-}
-
-export async function recordAppResearchEvidencePageMarkdown(
-  input: RecordAppResearchEvidencePageMarkdownInput,
-): Promise<RecordAppResearchEvidencePageMarkdownResult> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const paths = await ensureResearchDirectories(workspace.workspace_dir);
-  const pageId = normalizeResearchDraftPageId(input.page_id);
-  if (typeof input.markdown !== "string") {
-    throw new Error('"markdown" must be a string');
-  }
-  const markdownPath = path.join(paths.evidence_pages_dir, `${pageId}.md`);
-  assertResearchPathUnderWorkspace(workspace.workspace_dir, markdownPath, "markdown_path");
-  const updatedAt = new Date().toISOString();
-  await writeFile(markdownPath, input.markdown, "utf8");
-  await touchWorkspaceTask(workspace, updatedAt);
-  return {
-    workspace_dir: workspace.workspace_dir,
-    page_id: pageId,
-    markdown_path: markdownPath,
-    updated_at: updatedAt,
-  };
-}
-
-export async function recordAppResearchStatus(input: RecordAppResearchStatusInput): Promise<Record<string, unknown>> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const paths = await ensureResearchDirectories(workspace.workspace_dir);
-  const updatedAt = new Date().toISOString();
-  const status = normalizeResearchArtifact(input.status, "running");
-  const next = {
-    ...status,
-    updated_at: updatedAt,
-  };
-  await writeJsonFile(paths.status_path, next);
-  await touchWorkspaceTask(workspace, updatedAt);
-  return next;
-}
-
-export async function recordAppResearchStatusPage(
-  input: RecordAppResearchStatusPageInput,
-): Promise<Record<string, unknown>> {
-  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const paths = await ensureResearchDirectories(workspace.workspace_dir);
-  const updatedAt = new Date().toISOString();
-  const current = normalizeResearchArtifact(
-    await readJsonFileIfExists(paths.status_path) ?? createDefaultResearchStatusJson(),
-    "idle",
-  );
-  const pageStatus = normalizeResearchPageRecord(input.page_status, "page_status");
-  const pages = upsertResearchPage(current.pages, {
-    ...pageStatus,
-    updated_at: updatedAt,
   });
+}
+
+async function markPreparedResearchPublished(
+  workspaceDir: string,
+  kind: "web" | "image",
+): Promise<{ progress: Record<string, unknown>; revision: number }> {
+  const paths = await ensureSharedResearchFiles(workspaceDir, false);
+  const current = getPlainRecord(await readJsonFileIfExists(paths.progress_path));
+  const section = getPlainRecord(current[kind]);
+  if (!section.prepared_batch) throw new Error(`Prepared ${kind} research batch is not ready`);
+  if (section.written === true) return { progress: current, revision: typeof current.revision === "number" ? current.revision : 0 };
   const next = {
     ...current,
-    version: 1,
-    status: computeResearchAggregateStatus(pages),
-    pages,
-    updated_at: updatedAt,
+    [kind]: { ...section, written: true },
+    revision: (typeof current.revision === "number" ? current.revision : 0) + 1,
+    updated_at: new Date().toISOString(),
   };
-  await writeJsonFile(paths.status_path, next);
-  await touchWorkspaceTask(workspace, updatedAt);
-  return next;
+  await atomicWriteJsonFile(paths.progress_path, next);
+  return { progress: next, revision: Number(next.revision) };
 }
 
-export async function getAppResearchStatus(input: GetAppResearchStatusInput): Promise<Record<string, unknown>> {
+export async function publishPreparedAppWebResearchBatch(
+  input: { workspace_dir: string },
+): Promise<PublishAppSharedResearchBatchResult> {
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  const paths = await ensureResearchDirectories(workspace.workspace_dir);
-  const existing = await readJsonFileIfExists(paths.status_path);
-  if (existing === null) {
-    const defaultStatus = createDefaultResearchStatusJson();
-    await writeJsonFile(paths.status_path, defaultStatus);
-    return defaultStatus;
+  return withSharedResearchWriteQueue(workspace.workspace_dir, async () => {
+    const paths = await ensureSharedResearchFiles(workspace.workspace_dir, false);
+    const currentProgress = getPlainRecord(await readJsonFileIfExists(paths.progress_path));
+    const block = normalizeString(getPlainRecord(currentProgress.web).prepared_batch).trim();
+    if (!block) throw new Error("Prepared web research batch is not ready");
+    const current = await readFile(paths.web_summary_path, "utf8");
+    const alreadyPublished = current.trimEnd().endsWith(block);
+    if (!alreadyPublished) await atomicWriteTextFile(paths.web_summary_path, `${current.trimEnd()}\n\n${block}\n`);
+    const marked = await markPreparedResearchPublished(workspace.workspace_dir, "web");
+    return {
+      workspace_dir: workspace.workspace_dir,
+      artifact_path: paths.web_summary_path,
+      published: !alreadyPublished,
+      already_published: alreadyPublished,
+      revision: marked.revision,
+    };
+  });
+}
+
+export async function publishPreparedAppImageResearchBatch(
+  input: { workspace_dir: string },
+): Promise<PublishAppSharedResearchBatchResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  return withSharedResearchWriteQueue(workspace.workspace_dir, async () => {
+    const paths = await ensureSharedResearchFiles(workspace.workspace_dir, false);
+    const currentProgress = getPlainRecord(await readJsonFileIfExists(paths.progress_path));
+    const batch = getPlainRecord(getPlainRecord(currentProgress.image).prepared_batch);
+    if (!normalizeString(batch.title) || !Array.isArray(batch.candidates)) throw new Error("Prepared image research batch is not ready");
+    const catalog = normalizeImageCatalog(await readJsonFileIfExists(paths.image_catalog_path));
+    const assets = Array.isArray(catalog.assets) ? catalog.assets.map(getPlainRecord) : [];
+    const nextAssets = deduplicateImageCatalogAssets([
+      ...assets,
+      ...batch.candidates.map(compactImageCatalogAsset).filter((asset): asset is Record<string, unknown> => asset !== null),
+    ]);
+    const alreadyPublished = JSON.stringify(assets) === JSON.stringify(nextAssets);
+    if (!alreadyPublished) await atomicWriteJsonFile(paths.image_catalog_path, { schema_version: 2, assets: nextAssets });
+    const marked = await markPreparedResearchPublished(workspace.workspace_dir, "image");
+    return {
+      workspace_dir: workspace.workspace_dir,
+      artifact_path: paths.image_catalog_path,
+      published: !alreadyPublished,
+      already_published: alreadyPublished,
+      revision: marked.revision,
+    };
+  });
+}
+
+export async function appendAppWebResearchBatch(
+  input: AppendAppWebResearchBatchInput,
+): Promise<{ workspace_dir: string; web_summary_path: string; appended: boolean }> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureSharedResearchFiles(workspace.workspace_dir, false);
+  const block = input.markdown.trim();
+  if (!block) throw new Error('"markdown" must be non-empty');
+  const current = await readFile(paths.web_summary_path, "utf8");
+  if (current.trimEnd().endsWith(block)) {
+    return { workspace_dir: workspace.workspace_dir, web_summary_path: paths.web_summary_path, appended: false };
   }
-  return normalizeResearchArtifact(existing, "idle");
+  await atomicWriteTextFile(paths.web_summary_path, `${current.trimEnd()}\n\n${block}\n`);
+  return { workspace_dir: workspace.workspace_dir, web_summary_path: paths.web_summary_path, appended: true };
+}
+
+export async function appendAppImageResearchBatch(
+  input: AppendAppImageResearchBatchInput,
+): Promise<{ workspace_dir: string; image_catalog_path: string; appended: boolean }> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureSharedResearchFiles(workspace.workspace_dir, false);
+  const catalog = normalizeImageCatalog(await readJsonFileIfExists(paths.image_catalog_path));
+  const assets = Array.isArray(catalog.assets) ? catalog.assets.map(getPlainRecord) : [];
+  const batch = getPlainRecord(input.batch);
+  if (!normalizeString(batch.title) || !Array.isArray(batch.candidates)) {
+    throw new Error('"batch" must contain title and candidates');
+  }
+  const nextAssets = deduplicateImageCatalogAssets([
+    ...assets,
+    ...batch.candidates.map(compactImageCatalogAsset).filter((asset): asset is Record<string, unknown> => asset !== null),
+  ]);
+  if (JSON.stringify(assets) === JSON.stringify(nextAssets)) {
+    return { workspace_dir: workspace.workspace_dir, image_catalog_path: paths.image_catalog_path, appended: false };
+  }
+  await atomicWriteJsonFile(paths.image_catalog_path, {
+    schema_version: 2,
+    assets: nextAssets,
+  });
+  return { workspace_dir: workspace.workspace_dir, image_catalog_path: paths.image_catalog_path, appended: true };
+}
+
+const SHARED_RESEARCH_IMAGE_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+};
+
+export async function importAppSharedResearchImage(
+  input: ImportAppSharedResearchImageInput,
+): Promise<ImportAppSharedResearchImageResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const paths = await ensureSharedResearchFiles(workspace.workspace_dir, false);
+  assertAbsolutePath(input.staging_file_path, "staging_file_path");
+  const extension = SHARED_RESEARCH_IMAGE_EXTENSIONS[input.mime_type];
+  if (!extension) throw new Error(`Unsupported research image MIME type: ${input.mime_type}`);
+  const bytes = await readFile(input.staging_file_path);
+  if (bytes.length !== Math.floor(input.expected_size_bytes)) {
+    throw new Error(`Research image size mismatch: expected ${Math.floor(input.expected_size_bytes)}, got ${bytes.length}`);
+  }
+  const sha256 = sha256BufferHex(bytes);
+  if (input.expected_sha256 && input.expected_sha256 !== sha256) {
+    throw new Error("Research image SHA-256 mismatch");
+  }
+  await sharp(bytes).metadata();
+  const candidateId = sanitizeFileNamePart(input.candidate_id, "image");
+  const destinationPath = path.join(paths.images_dir, `${candidateId}${extension}`);
+  if (await fileExists(destinationPath)) {
+    const existing = await readFile(destinationPath);
+    if (sha256BufferHex(existing) === sha256) {
+      return {
+        workspace_dir: workspace.workspace_dir,
+        candidate_id: input.candidate_id,
+        file_path: destinationPath,
+        sha256,
+        mime_type: input.mime_type,
+        bytes_size: bytes.length,
+      };
+    }
+  }
+  const temporaryPath = path.join(paths.images_dir, `.${candidateId}.${randomUUID()}.tmp`);
+  try {
+    await writeFile(temporaryPath, bytes);
+    await rename(temporaryPath, destinationPath);
+  } finally {
+    await unlink(temporaryPath).catch(() => undefined);
+  }
+  return {
+    workspace_dir: workspace.workspace_dir,
+    candidate_id: input.candidate_id,
+    file_path: destinationPath,
+    sha256,
+    mime_type: input.mime_type,
+    bytes_size: bytes.length,
+  };
 }
 
 function buildPersistedOutline(

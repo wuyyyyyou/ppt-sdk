@@ -358,6 +358,7 @@ button {
   display: flex;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .entry-main {
@@ -366,6 +367,7 @@ button {
   min-width: 0;
   min-height: 0;
   flex-direction: column;
+  overflow: hidden;
 }
 
 /* One separator only: the panel already provides the surface, so the sidebar
@@ -692,10 +694,13 @@ button {
    so the Brief page can grow past the fold without a nested scrollbar. */
 .view-container {
   position: relative;
-  flex: 1;
+  flex: 1 1 0;
+  height: 0;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
+  overflow-anchor: none;
+  scroll-behavior: auto;
   padding: 22px 40px 32px;
 }
 
@@ -2044,6 +2049,10 @@ article.brief-style-preset-card {
   opacity: var(--disabled-opacity);
 }
 
+.brief-style-preset-image-card {
+  padding-bottom: 0;
+}
+
 .brief-style-preset-card strong,
 .brief-style-preset-card small {
   margin: 0 12px;
@@ -2120,11 +2129,82 @@ article.brief-style-preset-card {
   background: #eef0f5;
 }
 
+.brief-style-preset-image-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-content: center;
+  gap: 8px;
+  padding: 18px;
+  background: #e5e7eb;
+  color: #6b7280;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+
+.brief-style-preset-placeholder-mark {
+  grid-column: 1 / -1;
+  width: max-content;
+  padding: 3px 6px;
+  border: 1px solid #9ca3af;
+  border-radius: 3px;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.brief-style-preset-placeholder-title,
+.brief-style-preset-placeholder-copy {
+  grid-column: 1 / -1;
+  display: block;
+  height: 9px;
+  border-radius: 999px;
+  background: #9ca3af;
+}
+
+.brief-style-preset-placeholder-title {
+  width: 64%;
+}
+
+.brief-style-preset-placeholder-copy {
+  width: 88%;
+  height: 5px;
+  background: #c1c6ce;
+}
+
+.brief-style-preset-placeholder-panels {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+
+.brief-style-preset-placeholder-panels i {
+  display: block;
+  height: 34px;
+  border: 1px solid #c1c6ce;
+  border-radius: 4px;
+  background: #d4d7dc;
+}
+
 .brief-style-preset-image-wrap img {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
+  opacity: 1;
   object-fit: cover;
+  transition: opacity 0.18s ease;
+}
+
+.brief-style-preset-image-wrap[data-image-status="ready"] img {
+  opacity: 1;
+}
+
+.brief-style-preset-image-wrap[data-image-status="ready"] .brief-style-preset-image-placeholder {
+  opacity: 0;
 }
 
 .brief-style-preset-image-fallback {
@@ -2221,9 +2301,21 @@ article.brief-style-preset-card {
   font-size: 14px;
 }
 
+.brief-style-preset-none-card small {
+  min-height: 0;
+  padding-bottom: 2px;
+}
+
 .brief-page .research-search-control-options {
-  display: grid;
-  gap: 8px;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 18px;
+  margin: 0;
+}
+
+.brief-page .research-search-control-options .checkbox-row {
+  white-space: nowrap;
 }
 
 .prompt-inline-options .checkbox-row {
@@ -3129,6 +3221,7 @@ article.brief-style-preset-card {
 .preferences-box,
 .diagnostic-bundle-box,
 .runtime-info-box,
+.performance-testing-box,
 .workspace-row {
   border: 1px solid rgba(17, 24, 39, 0.05);
   border-radius: 14px;
@@ -5199,6 +5292,172 @@ details.generation-history-panel > summary::-webkit-details-marker {
   padding: 14px;
 }
 
+.performance-testing-box {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px;
+}
+
+.performance-testing-header,
+.performance-run-status,
+.performance-history-header,
+.performance-run-row,
+.performance-testing-actions,
+.performance-run-actions {
+  display: flex;
+  align-items: center;
+}
+
+.performance-testing-header,
+.performance-history-header,
+.performance-run-row {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.performance-testing-header > div,
+.performance-run-main {
+  min-width: 0;
+}
+
+.performance-testing-header strong,
+.performance-history-header strong {
+  font-size: 13px;
+}
+
+.performance-testing-header p {
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.performance-run-status {
+  gap: 10px;
+  border-left: 3px solid #a4aab7;
+  padding: 9px 10px;
+  background: rgba(17, 24, 39, 0.035);
+}
+
+.performance-run-status.recording {
+  border-left-color: #15803d;
+  background: rgba(21, 128, 61, 0.07);
+}
+
+.performance-run-status > div,
+.performance-run-main {
+  display: grid;
+  gap: 2px;
+}
+
+.performance-run-status span,
+.performance-run-main span,
+.performance-history-header span,
+.performance-testing-message {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.performance-testing-actions,
+.performance-run-actions {
+  gap: 8px;
+}
+
+.performance-history-header {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.performance-run-list {
+  display: grid;
+  border-top: 1px solid var(--line);
+}
+
+.performance-run-row {
+  min-height: 54px;
+  border-bottom: 1px solid var(--line);
+  padding: 7px 0;
+}
+
+.performance-run-main strong {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.performance-testing-message.error {
+  color: #b42318;
+}
+
+.performance-testing-box .icon-btn {
+  display: inline-grid;
+  flex: 0 0 36px;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.performance-testing-box .icon-btn:hover:not(:disabled) {
+  border-color: #aeb6c3;
+  background: #f3f5f8;
+}
+
+.performance-testing-box .icon-btn:focus-visible {
+  outline: 2px solid #6d5dfc;
+  outline-offset: 2px;
+}
+
+.performance-testing-box .icon-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.performance-testing-box .icon-btn.danger {
+  color: #b42318;
+}
+
+.performance-testing-box .icon-btn.danger:hover:not(:disabled) {
+  border-color: #f2b8b5;
+  background: #fff1f0;
+}
+
+.performance-report-page {
+  min-height: 0;
+}
+
+.performance-report-frame {
+  width: 100%;
+  min-height: 620px;
+  height: calc(100vh - 150px);
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+@media (max-width: 640px) {
+  .performance-testing-actions,
+  .performance-run-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .performance-testing-actions > button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .performance-run-actions {
+    justify-content: flex-end;
+  }
+}
+
 .runtime-info-header {
   margin-bottom: 6px;
   font-size: 13px;
@@ -6337,6 +6596,10 @@ details.generation-history-panel > summary::-webkit-details-marker {
   .brief-toggle-columns {
     grid-template-columns: 1fr;
     column-gap: 0;
+  }
+
+  .brief-page .research-search-control-options {
+    display: grid;
   }
 
   .deck-panel {

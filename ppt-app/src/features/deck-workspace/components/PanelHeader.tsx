@@ -27,6 +27,7 @@ export function PanelHeader(props: PanelHeaderProps) {
     <header className="panel-header">
       <div className="header-left">
         <button
+          data-performance-id="navigation.home"
           className="header-home-btn"
           type="button"
           onClick={onHome}
@@ -40,6 +41,7 @@ export function PanelHeader(props: PanelHeaderProps) {
       </div>
       <div className="header-controls">
         <button
+          data-performance-id="navigation.settings"
           className="control-btn text"
           onClick={onLibrary}
           title={t.controls.library}

@@ -30,7 +30,7 @@ const workspace: WorkspaceResult = {
 };
 
 describe("LibraryPage", () => {
-  it("does not expose sealed or optional preferences", () => {
+  it("shows research controls without exposing sealed preferences", () => {
     const html = renderToStaticMarkup(createElement(LibraryPage, {
       t: messages.zh,
       settings: {},
@@ -47,8 +47,8 @@ describe("LibraryPage", () => {
     }));
 
     assert.doesNotMatch(html, /先审阅大纲/);
-    assert.doesNotMatch(html, /禁用网页搜索|禁用图片搜索/);
-    assert.doesNotMatch(html, /Disable web research|Disable image research/);
+    assert.match(html, /禁止网络资料搜索/);
+    assert.match(html, /禁止图片搜索/);
     assert.doesNotMatch(html, /新建任务|打开/);
   });
 

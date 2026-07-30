@@ -116,17 +116,35 @@ export interface VisualStylePresetPreview {
   alt: string;
 }
 
+export type VisualStylePresetTheme = "dark" | "light";
+
+export type VisualStylePresetColor =
+  | "black"
+  | "white"
+  | "gray"
+  | "red"
+  | "orange"
+  | "yellow"
+  | "green"
+  | "cyan"
+  | "blue"
+  | "purple"
+  | "pink"
+  | "brown"
+  | "beige";
+
 export interface VisualStylePreset {
   id: string;
   version: number;
-  score: number;
+  ppt_number: number;
+  score?: number;
+  theme: VisualStylePresetTheme;
+  color: VisualStylePresetColor[];
   name: string;
   description: string;
   user: string;
   use_case: string;
   industry: string;
-  theme: string;
-  color: string;
   style_guide: string;
   preview_images: VisualStylePresetPreview[];
 }
@@ -441,6 +459,7 @@ export interface WorkspaceSettings {
   /** Legacy isolated setting; not persisted by authoring-kit-v1 Workspaces. */
   text_density?: string;
   page_generation_concurrency?: number;
+  research_image_session_concurrency?: number;
   visual_review_enabled?: boolean;
   visual_review_failure_limit?: number;
   disable_web_research?: boolean;
@@ -453,6 +472,7 @@ export type CreatedWorkspaceSetting = Required<
   Pick<
     WorkspaceSettings,
     | "page_generation_concurrency"
+    | "research_image_session_concurrency"
     | "visual_review_enabled"
     | "visual_review_failure_limit"
     | "disable_web_research"
@@ -569,6 +589,71 @@ export interface WorkspaceDefaultsResult {
 
 export interface PptEngineRuntimeInfo {
   ppt_engine_version: string;
+  performance_testing?: {
+    supported: boolean;
+    schema_version: number;
+  };
+}
+
+export type PerformanceRunStatus = "recording" | "finalizing" | "completed" | "finalization_failed" | "abandoned";
+export interface PerformanceContext {
+  run_id: string;
+  trace_id: string;
+  span_id: string;
+  parent_span_id?: string;
+  operation_name?: string;
+  workspace_id?: string;
+}
+export interface PerformanceEvent {
+  schema_version: 1;
+  event_id: string;
+  event_type: "span.started" | "span.finished" | "button.interaction" | "data.loss";
+  recorded_at: string;
+  producer_id: string;
+  sequence_number: number;
+  trace_id?: string;
+  span_id?: string;
+  parent_span_id?: string;
+  operation_name?: string;
+  workspace_id?: string;
+  duration_ms?: number;
+  interaction_delay_ms?: number;
+  feedback_delay_ms?: number;
+  status?: "ok" | "error" | "interrupted";
+  attributes?: Record<string, string | number | boolean | null>;
+}
+export interface PerformanceRunSummary {
+  schema_version: 1;
+  run_id: string;
+  status: PerformanceRunStatus;
+  data_integrity: "complete" | "degraded";
+  started_at: string;
+  updated_at: string;
+  ended_at: string | null;
+  report_locale: "en" | "zh" | null;
+  report_status: "not_generated" | "generated" | "failed";
+  report_error: string | null;
+  app_version: string;
+  environment: Record<string, string | number | boolean | null>;
+  initial_settings: Record<string, unknown>;
+  event_count: number;
+  dropped_event_count: number;
+  run_dir: string;
+  report_available: boolean;
+}
+export interface ListPerformanceRunsResult {
+  root_dir: string;
+  active_run: PerformanceRunSummary | null;
+  runs: PerformanceRunSummary[];
+}
+export interface FinalizePerformanceRunResult {
+  run: PerformanceRunSummary;
+  requires_force: boolean;
+  active_span_count: number;
+}
+export interface PreparePerformanceReportResult {
+  run: PerformanceRunSummary;
+  report_upload: HostUploadRef;
 }
 
 export interface PatchWorkspaceDefaultsInput {
@@ -647,6 +732,7 @@ export interface AppendWorkspaceLogInput {
     | "ai-page-agent-stream"
     | "ai-research"
     | "ai-research-interactions"
+    | "research-web-interactions"
     | "ai-theme"
     | "ai-theme-interactions"
     | "storage-transport";
@@ -879,330 +965,144 @@ export interface GetWorkspacePageFileFingerprintsResult {
   data: PageFileFingerprint;
 }
 
-export interface ResearchCurationDraftFingerprint {
-  workspace_dir: string;
-  page_id: string;
-  draft_type: "web" | "visual";
-  draft_id?: string;
-  draft_path: string;
-  exists: boolean;
-  sha256?: string;
-  size_bytes?: number;
-}
+export type SharedResearchStageState = "waiting" | "running" | "completed" | "skipped" | "warning";
 
-export interface ResearchPaths {
-  root_dir: string;
-  raw_dir: string;
-  raw_web_dir: string;
-  raw_images_dir: string;
-  evidence_dir: string;
-  evidence_pages_dir: string;
-  evidence_images_dir: string;
-  evidence_drafts_dir: string;
-  research_plan_path: string;
-  evidence_index_path: string;
-  status_path: string;
-}
-
-export interface PrepareResearchWorkspaceResult extends ResearchPaths {
-  workspace_dir: string;
-  prepared_at: string;
-}
-
-export interface RecordResearchEvidenceResult {
-  workspace_dir: string;
-  status: string;
-  evidence_index_path: string;
-  page_count: number;
-  updated_at: string;
-}
-
-export interface RecordResearchEvidencePageResult {
-  workspace_dir: string;
-  page_id: string;
-  status: string;
-  evidence_index_path: string;
-  page_count: number;
-  updated_at: string;
-}
-
-export type ResearchSourceType = "user_provided" | "web_source" | "image_source";
-
-export interface ResearchRequirement {
-  page_id: string;
-  index: number;
-  title: string;
-  web_research_needed: boolean;
-  image_research_needed: boolean;
-  query_intents: string[];
-  image_query_intents: string[];
-  evidence_needs: string[];
-  visual_needs: string[];
-  gap_strategy: string;
-  reason: string;
-}
-
-export interface ResearchPlan {
-  version: 1;
-  status: "planned" | "empty" | "stale";
-  title: string;
-  source: {
-    outline_updated_at: string | null;
-    page_plan_updated_at: string | null;
-    template_group: string;
-    generated_by: string;
-  };
-  pages: ResearchRequirement[];
-  shared: {
-    web_research_needed: boolean;
-    image_research_needed: boolean;
-    query_intents: string[];
-  };
-  updated_at: string;
-}
-
-export interface ResearchEvidenceFact {
-  id: string;
-  claim: string;
-  source_type: ResearchSourceType;
-  source_title?: string;
-  source_url?: string;
-  source_file?: string;
-  retrieved_at?: string;
-  excerpt?: string;
-  source_note?: string;
-  confidence?: "low" | "medium" | "high";
-}
-
-export interface VisualResearchEvidence {
-  id: string;
-  /** Final Research Evidence must use a canonical absolute path under research/evidence/images. */
-  file_path: string;
-  /** Original selected Raw Research Material path, usually under research/raw/images. */
-  original_raw_path?: string;
-  image_url?: string;
-  page_url?: string;
-  sha256?: string;
-  reason: string;
-  visual_summary: string;
-}
-
-export interface ResearchDiscoveryEvidencePool {
-  version: 1;
-  status: "empty" | "partial" | "curated" | "gap";
-  facts: ResearchEvidenceFact[];
-  derived_insights: Array<{
-    id: string;
-    insight: string;
-    supporting_fact_ids: string[];
-  }>;
-  visual_assets: VisualResearchEvidence[];
-  gaps: string[];
-  rejected_material: ResearchCurationRejectedMaterial[];
-  source_summaries: Array<{
-    id: string;
-    kind: "web" | "visual";
-    summary: string;
-    source_count?: number;
-    updated_at: string;
-  }>;
-  iterations: ResearchDiscoveryIterationRecord[];
-  updated_at: string;
-}
-
-export interface ResearchDiscoveryIterationRecord {
-  id: string;
-  phase: "web" | "visual";
-  iteration: number;
-  status: "completed" | "gap" | "error";
-  decision: ResearchDiscoveryDecision;
-  query_summaries: ResearchDiscoveryQuerySummary[];
-  draft_page_id?: string;
-  curation_run_id?: string;
-  gaps: string[];
-  merged_counts: {
-    facts: number;
-    derived_insights: number;
-    visual_assets: number;
-    gaps: number;
-    rejected_material: number;
-  };
-  completed_at: string;
-}
-
-export interface ResearchDiscoveryQuerySummary {
-  kind: "web" | "visual";
+export interface SharedResearchImageCandidate {
+  candidate_id: string;
   query: string;
-  raw_index_path?: string;
-  result_count?: number;
-  fetch_count?: number;
-  status: "collected" | "gap" | "error" | "skipped_duplicate";
-  message?: string;
-}
-
-export interface ResearchDiscoveryDecision {
-  action: "stop" | "search";
-  phase: "web" | "visual";
-  queries: string[];
-  rationale: string;
-  evidence_needs: string[];
-  visual_needs: string[];
-  gaps: string[];
-}
-
-export interface FinalizeResearchVisualAssetsResult {
-  workspace_dir: string;
-  page_id: string;
-  visual_assets: VisualResearchEvidence[];
-  gaps: string[];
-  rejected_material: ResearchCurationRejectedMaterial[];
-}
-
-export interface ResearchEvidencePage {
-  page_id: string;
-  status: "curated" | "gap" | "error" | "skipped";
-  facts: ResearchEvidenceFact[];
-  visual_assets: VisualResearchEvidence[];
-  derived_insights: Array<{
-    id: string;
-    insight: string;
-    supporting_fact_ids: string[];
-  }>;
-  gaps: string[];
-  rejected_material: Array<{
-    source?: string;
-    reason: string;
-  }>;
-  markdown_path?: string;
-  updated_at: string;
-}
-
-export type ResearchCurationDraftStatus = "curated" | "gap" | "error" | "skipped";
-
-export interface ResearchCurationRejectedMaterial {
-  source?: string;
+  dedup_key?: string;
+  representative_occurrence_id?: string;
+  matched_occurrence_ids?: string[];
+  matched_queries?: string[];
+  image_url: string;
+  thumbnail_url?: string | null;
+  source_url: string;
+  title?: string | null;
+  width?: number | null;
+  height?: number | null;
+  use_in_ppt: boolean;
+  description: string;
   reason: string;
+  analysis_status?: "pending" | "running" | "completed" | "failed";
+  file_path?: string;
+  download_status: "pending" | "imported" | "failed";
+  sha256?: string;
+  mime_type?: string;
+  bytes_size?: number;
+  aps_path?: string;
+  final_url?: string;
+  content_duplicate_of?: string;
+  error?: string;
 }
 
-export interface WebResearchCurationDraft {
-  version: 1;
-  page_id: string;
-  curation_run_id?: string;
-  draft_type?: "web";
-  status: ResearchCurationDraftStatus;
-  facts: ResearchEvidenceFact[];
-  derived_insights: Array<{
-    id: string;
-    insight: string;
-    supporting_fact_ids: string[];
-  }>;
-  gaps: string[];
-  rejected_material: ResearchCurationRejectedMaterial[];
-  source_summary?: string;
-  updated_at: string;
-}
-
-export interface VisualResearchCurationDraft {
-  version: 1;
-  page_id: string;
-  curation_run_id?: string;
-  draft_type?: "visual";
-  status: ResearchCurationDraftStatus;
-  visual_assets: VisualResearchEvidence[];
-  gaps: string[];
-  rejected_material: ResearchCurationRejectedMaterial[];
-  visual_summary?: string;
-  updated_at: string;
-}
-
-export interface ResearchEvidenceIndex {
-  version: 1;
-  status: "empty" | "partial" | "curated";
-  pages: ResearchEvidencePage[];
-  shared: {
-    facts: ResearchEvidenceFact[];
-    visual_assets: VisualResearchEvidence[];
-    gaps: string[];
-  };
-  discovery_pool?: ResearchDiscoveryEvidencePool;
-  updated_at: string;
-}
-
-export interface ResearchStatus {
-  version: 1;
-  status: "idle" | "planning" | "collecting" | "curating" | "ready" | "gap" | "error";
-  pages: Array<{
-    page_id: string;
-    status: string;
+export interface SharedResearchImageBatch {
+  title: string;
+  status: SharedResearchStageState;
+  queries: Array<{
+    query: string;
+    status: SharedResearchStageState;
+    candidate_count: number;
     message?: string;
-    evidence_path?: string;
-    updated_at?: string;
   }>;
-  collection_ledger?: {
-    version: 1;
-    pages: Array<{
-      page_id: string;
-      web_queries: Array<{
-        key: string;
-        query: string;
-        collected_at: string;
-        raw_index_path?: string;
-      }>;
-      image_queries: Array<{
-        key: string;
-        query: string;
-        collected_at: string;
-        raw_index_path?: string;
-      }>;
-    }>;
+  candidates: SharedResearchImageCandidate[];
+  gaps: string[];
+  statistics?: {
+    queries: number;
+    candidates: number;
+    raw_candidates?: number;
+    unique_url_candidates?: number;
+    duplicate_url_occurrences?: number;
+    selected: number;
+    imported: number;
+    unique_content_imported?: number;
+    failed: number;
+    gaps: number;
   };
+}
+
+export interface SharedResearchImageAsset {
+  asset_id: string;
+  file_path: string;
+  sha256: string;
+  mime_type: string;
+  bytes_size: number;
+  width?: number;
+  height?: number;
+  description: string;
+  reason: string;
+  matched_queries: string[];
+  source_url: string;
+}
+
+export interface SharedResearchImageCatalog {
+  schema_version: 2;
+  assets: SharedResearchImageAsset[];
+}
+
+export interface SharedResearchContextResult {
+  workspace_dir: string;
+  web_summary_path: string;
+  image_catalog_path: string;
+  images_dir: string;
+  progress_path: string;
+  web_summary: string;
+  image_catalog: SharedResearchImageCatalog;
+  progress: Record<string, unknown>;
+}
+
+export type SharedResearchStage =
+  | "web_decision"
+  | "web_research"
+  | "image_decision"
+  | "image_research"
+  | "image_search"
+  | "image_deduplication"
+  | "image_analysis"
+  | "image_import";
+
+export type SharedResearchProgressOperation =
+  | { op: "set_stage"; stage: SharedResearchStage; state: SharedResearchStageState }
+  | { op: "set_web_decision"; decision: Record<string, unknown> }
+  | { op: "upsert_web_search"; query: string; search: Record<string, unknown> }
+  | { op: "set_web_fetch_result_ids"; result_ids: string[] }
+  | { op: "upsert_web_fetched_page"; url: string; page: Record<string, unknown> }
+  | { op: "set_web_prepared_batch"; markdown: string }
+  | { op: "set_web_diagnostics"; gaps: string[]; diagnostic_errors: string[] }
+  | { op: "set_image_decision"; decision: Record<string, unknown> }
+  | { op: "upsert_image_search"; query: string; search: Record<string, unknown> }
+  | { op: "set_image_work_status"; field: "search_status" | "analysis_status" | "import_status"; state: "waiting" | "running" | "completed" | "warning" }
+  | { op: "upsert_image_deduplication_entry"; candidate_id: string; group: Record<string, unknown>; candidate: Record<string, unknown> }
+  | { op: "set_image_deduplication_summary"; strategy: Record<string, unknown>; statistics: Record<string, unknown> }
+  | { op: "upsert_image_analysis_batch"; batch_id: string; batch: Record<string, unknown>; candidates: Array<{ candidate_id: string; candidate: Record<string, unknown> }> }
+  | { op: "upsert_image_candidate"; candidate_id: string; candidate: Record<string, unknown> }
+  | { op: "set_image_diagnostics"; gaps: string[]; diagnostic_errors: string[] }
+  | { op: "set_image_content_deduplication"; value: Record<string, unknown> }
+  | { op: "finalize_image_research"; title: string; status: SharedResearchStageState; queries: Array<Record<string, unknown>>; gaps: string[]; statistics: Record<string, unknown> }
+  | { op: "finalize_shared_research" };
+
+export interface PatchSharedResearchProgressResult {
+  workspace_dir: string;
+  progress_path: string;
+  updated: boolean;
+  revision: number;
   updated_at: string;
 }
 
-export interface SearchResultItem {
-  title: string;
-  url: string;
-  snippet: string;
-  source?: string;
+export interface PublishSharedResearchBatchResult {
+  workspace_dir: string;
+  artifact_path: string;
+  published: boolean;
+  already_published: boolean;
+  revision: number;
 }
 
-export interface WebSearchResult {
-  query: string;
-  provider: string;
-  results: SearchResultItem[];
-  count: number;
-}
-
-export interface WebFetchResult {
-  output_dir: string;
-  index_path: string;
-  format: string;
-  max_chars: number;
-  results: Array<Record<string, unknown>>;
-  count: number;
-}
-
-export interface ImageSearchResult {
-  query: string;
-  provider: string;
-  results: Array<{
-    title: string;
-    image_url: string;
-    thumbnail_url?: string;
-    page_url?: string;
-    width?: number;
-    height?: number;
-    source?: string;
-  }>;
-  count: number;
-}
-
-export interface ImageFetchResult {
-  output_dir: string;
-  index_path: string;
-  max_bytes: number;
-  results: Array<Record<string, unknown>>;
-  count: number;
+export interface ImportSharedResearchImageResult {
+  workspace_dir: string;
+  candidate_id: string;
+  file_path: string;
+  sha256: string;
+  mime_type: string;
+  bytes_size: number;
 }
 
 export interface PageProgressItem {
@@ -1304,18 +1204,15 @@ export interface FinalDeckRenderState {
 export type ResearchDiscoveryProgressPhase =
   | "web-decision"
   | "web-collection"
-  | "web-curation"
   | "visual-decision"
-  | "visual-collection"
-  | "visual-curation"
-  | "evidence-page-planning";
+  | "visual-collection";
 
 export type ResearchDiscoveryProgressState =
-  | "pending"
-  | "active"
+  | "waiting"
+  | "running"
   | "completed"
   | "warning"
-  | "failed";
+  | "skipped";
 
 export interface ResearchDiscoveryProgressSource {
   title?: string;
@@ -1461,13 +1358,19 @@ export interface RenderWorkspacePagePreviewResult {
   manifest_path: string;
   html_path: string;
   screenshot_path: string;
-  screenshot_upload: HostUploadRef;
+  /** @deprecated Rendering no longer uploads; kept optional for compatibility with older callers. */
+  screenshot_upload?: HostUploadRef;
   page_index: number;
   page_number: number;
   slide_id: string;
   layout_id: string;
   title: string;
   rendered_at: string;
+}
+
+export interface UploadCurrentPageScreenshotInput {
+  workspace_dir: string;
+  page_id: string;
 }
 
 export interface ManualPageRevisionManifest {

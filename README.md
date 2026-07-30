@@ -19,7 +19,6 @@ ppt-sdk/
     scripts/
     executas/
       ppt-engine/
-      anna-search/
   third_party/
     dom-to-pptx/
 ```
@@ -28,11 +27,11 @@ ppt-sdk/
 
 - `ppt-app/src/`：Anna App 前端工作台。React 页面只通过 `PptBackend` 调用后端能力。
 - `ppt-app/executas/ppt-engine/`：模板发现、Deck HTML 渲染、PPTX 导出、校验、任务状态机和工作区工具。
-- `ppt-app/executas/anna-search/`：Anna App bundled search Executa。
+- Web 和图片搜索由 Anna Host 官方 Web API 提供，不再打包本地搜索 Executa。
 - `third_party/dom-to-pptx/`：仓库内维护的权威 HTML 到 PPTX 源码，不通过 npm 发布。
 - `ppt-app/scripts/`：tool manifest 同步、模板预览同步和 VS Code pipeline 辅助脚本。
 
-Package/project name 暂时保留历史名称，例如 `presenton-template-engine-executa`、`anna-search-executa`。目录位置以 `ppt-app/executas/*` 为准。
+Package/project name 暂时保留历史名称，例如 `presenton-template-engine-executa`。目录位置以 `ppt-app/executas/*` 为准。
 
 ## 本地调试
 
@@ -74,12 +73,6 @@ cd ppt-app/executas/ppt-engine && npm run test:unit
 cd ppt-app && npm run check
 cd ppt-app && npm run build
 cd ppt-app && npm run validate
-```
-
-搜索 Executa 使用 `uv`：
-
-```bash
-cd ppt-app/executas/anna-search && uv run --project . python example_plugin.py
 ```
 
 默认不要由 agent 启动 dev server。需要运行 Anna App harness 时，由用户明确要求后再执行 `cd ppt-app && npm run dev`。

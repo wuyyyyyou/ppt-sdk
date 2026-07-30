@@ -1,11 +1,7 @@
-import {
-  ANNA_SEARCH_TOOL,
-  PPT_ENGINE_TOOL,
-} from "./toolManifests.generated";
+import { PPT_ENGINE_TOOL } from "./toolManifests.generated";
 
 export interface PptBundledToolIds {
   pptEngine: string;
-  annaSearch: string;
 }
 
 function readBundledToolId(handle: string): string {
@@ -20,6 +16,5 @@ function readBundledToolId(handle: string): string {
 export function resolvePptBundledToolIds(): PptBundledToolIds {
   return {
     pptEngine: readBundledToolId(PPT_ENGINE_TOOL.handle),
-    annaSearch: readBundledToolId(ANNA_SEARCH_TOOL.handle),
   };
 }

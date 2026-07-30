@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import appManifest from "../../../../app.json";
 import { createAgentClient, type AgentClient } from "../../../agent/agentClient";
 import { resolveAgentToolAccessPolicy } from "../../../agent/agentToolAccessPolicy";
 import { createAiClient, type AiAttemptLog, type AiClient, type LlmContextRow } from "../../../ai/aiClient";
+import { createResearchAiClient, type ResearchAiClient } from "../../../ai/researchAiClient";
 import {
   createAiInteractionLogger,
   type AiOperationLogContext,
 } from "../../../ai/interactionLog";
 import { createPptBackend, type PptBackend } from "../../../api/pptBackend";
+import { createResearchWebClient, type ResearchWebClient } from "../../../api/researchWebClient";
 import { startBrowserDownload } from "../browserDownload";
 import { hasActiveDownloadUrl } from "../downloadUrl";
 import { connectAnnaRuntime } from "../../../runtime/annaRuntime";
@@ -40,7 +43,8 @@ import type {
   WorkspacePages,
   WorkspaceStyleProfileSelection,
   WorkspaceSettings,
-  GenerationRunTransaction
+  GenerationRunTransaction,
+  PerformanceRunSummary,
 } from "../../../api/types";
 import {
   createLocalProjectDeck,
@@ -183,6 +187,7 @@ import {
   requirementsAreComplete,
 } from "../../requirements";
 import { findVisualStylePreset, toVisualStylePresetSelection } from "../../templates/visualStylePresets";
+import { beginPerformanceSpan, installPerformanceButtonCollector } from "../../../performance/performanceRecorder";
 
 const DEFAULT_TEMPLATE_GROUP_ID = "red-finance-canvas";
 const AGENT_TOOL_ACCESS_POLICY = resolveAgentToolAccessPolicy(
@@ -193,6 +198,23 @@ const PPTX_EXPORT_POLL_INTERVAL_MS = 1500;
 const PPTX_EXPORT_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 const PPTX_EXPORT_STATUS_ERROR_LIMIT = 5;
 const AGENT_CANCELLATION_WAIT_MS = 3_000;
+const PERFORMANCE_TESTING_ENABLED = import.meta.env.VITE_PERFORMANCE_TESTING_ENABLED === "true";
+
+async function measurePerformanceOperation<T>(operationName: string, workspaceDir: string, task: () => Promise<T>): Promise<T> {
+  const span = beginPerformanceSpan({
+    operationName,
+    workspaceId: workspaceDir.split(/[\\/]/).filter(Boolean).at(-1),
+    attributes: { layer: "workflow" },
+  });
+  try {
+    const result = await task();
+    span?.finish("ok");
+    return result;
+  } catch (error) {
+    span?.finish("error");
+    throw error;
+  }
+}
 
 function padDatePart(value: number) {
   return String(value).padStart(2, "0");
@@ -410,6 +432,13 @@ export interface DeckWorkspaceActions {
   navigateMain: (stage: MainStage) => Promise<void>;
   goBack: () => Promise<void>;
   resolveConfirmation: (confirmed: boolean) => void;
+  refreshPerformanceRuns: () => Promise<void>;
+  startPerformanceRun: () => Promise<void>;
+  finalizePerformanceRun: () => Promise<void>;
+  abandonPerformanceRun: () => Promise<void>;
+  deletePerformanceRun: (run: PerformanceRunSummary) => Promise<void>;
+  openPerformanceReport: (run: PerformanceRunSummary) => Promise<void>;
+  regeneratePerformanceReport: (run: PerformanceRunSummary) => Promise<void>;
   addContextRow: (row: ContextRow) => void;
   updateContextRow: (id: string, value: string) => void;
   removeContextRow: (id: string) => void;
@@ -588,6 +617,17 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       status: "idle",
       message: "",
     });
+  const [performanceTesting, setPerformanceTesting] = useState<DeckWorkspaceState["performanceTesting"]>({
+    enabled: PERFORMANCE_TESTING_ENABLED,
+    supported: false,
+    loading: PERFORMANCE_TESTING_ENABLED,
+    busy: false,
+    error: "",
+    activeRun: null,
+    runs: [],
+    reportHtml: "",
+    reportRunId: null,
+  });
   const workspaceDiagnosticBundleRequestRef = useRef(0);
   const exportInFlightRef = useRef(false);
   const [backend, setBackend] = useState<PptBackend | null>(null);
@@ -595,6 +635,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [hostFileDownloadClient, setHostFileDownloadClient] =
     useState<AppHostFileDownloadClient | null>(null);
   const [aiClient, setAiClient] = useState<AiClient | null>(null);
+  const [researchAiClient, setResearchAiClient] = useState<ResearchAiClient | null>(null);
+  const [researchWebClient, setResearchWebClient] = useState<ResearchWebClient | null>(null);
   const [agentClient, setAgentClient] = useState<AgentClient | null>(null);
   const cancelCreateDeckRef = useRef(false);
   const cancelCreateDeckAbortRef = useRef<AbortController | null>(null);
@@ -647,6 +689,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   });
   const styleProfileCreationAbortRef = useRef<AbortController | null>(null);
   const aiLogger = useMemo(() => backend ? createAiInteractionLogger(backend) : null, [backend]);
+
+  useEffect(() => {
+    if (!PERFORMANCE_TESTING_ENABLED) return;
+    return installPerformanceButtonCollector();
+  }, []);
 
   function invalidateWorkspaceDiagnosticBundle() {
     workspaceDiagnosticBundleRequestRef.current += 1;
@@ -1412,12 +1459,41 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
             entry: event.entry,
           }),
         });
+        const nextResearchAiClient = createResearchAiClient(runtime);
+        const nextResearchWebClient = createResearchWebClient(runtime, {
+          appendWorkspaceLog: (input) => nextBackend.appendWorkspaceLog(input),
+        });
         if (cancelled) return;
         setBackend(nextBackend);
         setHostUploadClient(nextHostUploadClient);
         setHostFileDownloadClient(createAppHostFileDownloadClient(runtime));
         setAiClient(nextAiClient);
+        setResearchAiClient(nextResearchAiClient);
+        setResearchWebClient(nextResearchWebClient);
         setAgentClient(nextAgentClient);
+        if (PERFORMANCE_TESTING_ENABLED) {
+          void nextBackend.listPerformanceRuns().then((result) => {
+            if (!cancelled) {
+              setPerformanceTesting((current) => ({
+                ...current,
+                supported: true,
+                loading: false,
+                error: "",
+                activeRun: result.active_run,
+                runs: result.runs,
+              }));
+            }
+          }).catch((error) => {
+            if (!cancelled) {
+              setPerformanceTesting((current) => ({
+                ...current,
+                supported: false,
+                loading: false,
+                error: error instanceof Error ? error.message : t.performance.unavailable,
+              }));
+            }
+          });
+        }
         void nextBackend.getRuntimeInfo().then((result) => {
           if (!cancelled) {
             setRuntimeInfo(result);
@@ -1648,7 +1724,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setGenerationTransaction({ ...transaction, state: "committing" });
     setActiveGenerationRun((current) => current ? { ...current, committing: true } : current);
     try {
-      return await backend.commitGenerationRun({ run_id: transaction.run_id });
+      const operationName = transaction.run_kind === "deck-generation"
+        ? "generation.commit"
+        : "deck_refinement.commit";
+      return await measurePerformanceOperation(
+        operationName,
+        transaction.shadow_workspace_dir,
+        () => backend.commitGenerationRun({ run_id: transaction.run_id }),
+      );
     } catch (error) {
       const { summary } = summarizeUserFacingError(t, error, t.generating.commitFailed.body);
       await requestConfirmation({
@@ -1865,7 +1948,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function navigate(nextPage: PageId) {
     if (isGenerationInFlight()) return;
     if (nextPage !== page && !await canLeaveCurrentEditor()) return;
-    if (!generated && nextPage !== "main" && nextPage !== "my-work" && nextPage !== "settings") {
+    if (!generated && nextPage !== "main" && nextPage !== "my-work" && nextPage !== "settings" && nextPage !== "performance-report") {
       showToast(t.toasts.createDeckFirst);
       return;
     }
@@ -2093,17 +2176,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       if (!workspace || requirementsOperationRef.current !== operation) return;
       setPrompt(brief);
       const selectedPreset = findVisualStylePreset(presetIdOverride === undefined ? selectedVisualStylePresetId : presetIdOverride);
-      const candidates = await aiClient.generatePresentationRequirements({
-        brief,
-        visualStylePreset: toVisualStylePresetSelection(selectedPreset),
-        logContext: buildAiLogContext(workspace, "requirements", "generate_requirements"),
-      });
-      if (requirementsOperationRef.current !== operation) return;
-      const draftCandidates = selectedPreset ? { ...candidates, visual_tone: [] } : candidates;
-      const draft = createRequirementsDraft(brief, draftCandidates, toVisualStylePresetSelection(selectedPreset));
-      const updatedWorkspace = await backend.updateWorkspaceRequirements({
-        workspace_dir: workspace.workspace_dir,
-        requirements: draft,
+      const { candidates, updatedWorkspace } = await measurePerformanceOperation("requirements.create", workspace.workspace_dir, async () => {
+        const generatedCandidates = await aiClient.generatePresentationRequirements({
+          brief,
+          visualStylePreset: toVisualStylePresetSelection(selectedPreset),
+          logContext: buildAiLogContext(workspace, "requirements", "generate_requirements"),
+        });
+        const draftCandidates = selectedPreset ? { ...generatedCandidates, visual_tone: [] } : generatedCandidates;
+        const draft = createRequirementsDraft(brief, draftCandidates, toVisualStylePresetSelection(selectedPreset));
+        const persistedWorkspace = await backend.updateWorkspaceRequirements({
+          workspace_dir: workspace.workspace_dir,
+          requirements: draft,
+        });
+        return { candidates: generatedCandidates, updatedWorkspace: persistedWorkspace };
       });
       if (requirementsOperationRef.current !== operation) return;
       setPresentationRequirements(updatedWorkspace.requirements);
@@ -2352,23 +2437,27 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       if (workspace.requirements.status !== "confirmed") {
         throw new Error("请先确认演示需求，再创建大纲。");
       }
+      const activeWorkspace = workspace;
       setStage("outline");
       setLoading("outline");
-      const outlineLogContext = buildAiLogContext(workspace, "outline", "generate_outline");
-      const result = await aiClient.generateOutline({
-        requirements: workspace.requirements,
-        logContext: outlineLogContext,
+      const outlineLogContext = buildAiLogContext(activeWorkspace, "outline", "generate_outline");
+      const { result, normalized, updatedWorkspace } = await measurePerformanceOperation("outline.create", activeWorkspace.workspace_dir, async () => {
+        const generated = await aiClient.generateOutline({
+          requirements: activeWorkspace.requirements,
+          logContext: outlineLogContext,
+        });
+        const nextOutline = normalizeValidOutline({
+          title: generated.outline.title,
+          items: generated.outline.items,
+        });
+        const persistedWorkspace = await backend.saveWorkspaceOutlineDraft({
+          workspace_dir: activeWorkspace.workspace_dir,
+          outline: nextOutline,
+        });
+        return { result: generated, normalized: nextOutline, updatedWorkspace: persistedWorkspace };
       });
       if (outlineOperationRef.current !== operation) return;
       await appendOutlineAiAttemptLogs(workspace, result.attempts, outlineLogContext);
-      const normalized = normalizeValidOutline({
-        title: result.outline.title,
-        items: result.outline.items,
-      });
-      const updatedWorkspace = await backend.saveWorkspaceOutlineDraft({
-        workspace_dir: workspace.workspace_dir,
-        outline: normalized,
-      });
       // The user may have walked away while the Outline was being written, and
       // landing here would drag them back onto a stage they left.
       if (outlineOperationRef.current !== operation) return;
@@ -2493,7 +2582,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function createDeckFromOutline() {
-    if (!backend || !aiClient || !hostUploadClient) return;
+    if (!backend || !aiClient || !researchAiClient || !researchWebClient || !hostUploadClient) return;
     if (!agentClient) {
       if (uploadedSources.length > 0) {
         showToast(t.errors.uploadedSourceAnalysisUnavailable);
@@ -2555,9 +2644,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       activeRunWorkspaceDir = confirmedWorkspace.workspace_dir;
       shouldReconcileActiveRun = true;
 
-      const completion = await runDeckGeneration({
+      const completion = await measurePerformanceOperation("generation.run", confirmedWorkspace.workspace_dir, () => runDeckGeneration({
         backend,
         aiClient,
+        researchAiClient,
+        researchWebClient,
         agentClient,
         hostUploadClient,
         aiLogger,
@@ -2568,7 +2659,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         onProgress: generationProgressHandler(cancelSignal),
         isCancelled: () => cancelCreateDeckRef.current,
         cancelSignal,
-      });
+      }));
       if (!ownsGenerationOperation(cancelSignal)) return;
       if (completion.status === "completed") {
         const committed = await commitShadowGenerationRun(generationRun);
@@ -2621,25 +2712,29 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       if (workspace.requirements.status !== "confirmed") {
         throw new Error("请先确认演示需求，再改写大纲。");
       }
+      const activeWorkspace = workspace;
       setLoading("outline");
-      const outlineLogContext = buildAiLogContext(workspace, "outline", "revise_outline");
-      const result = await aiClient.reviseOutline({
-        title: outlineDraftTitle,
-        outline: outlineDraft,
-        feedback: outlineFeedback,
-        requirements: workspace.requirements,
-        logContext: outlineLogContext,
+      const outlineLogContext = buildAiLogContext(activeWorkspace, "outline", "revise_outline");
+      const { result, normalized, updatedWorkspace } = await measurePerformanceOperation("outline.rewrite", activeWorkspace.workspace_dir, async () => {
+        const revised = await aiClient.reviseOutline({
+          title: outlineDraftTitle,
+          outline: outlineDraft,
+          feedback: outlineFeedback,
+          requirements: activeWorkspace.requirements,
+          logContext: outlineLogContext,
+        });
+        const nextOutline = normalizeValidOutline({
+          title: revised.outline.title,
+          items: revised.outline.items,
+        });
+        const persistedWorkspace = await backend.saveWorkspaceOutlineDraft({
+          workspace_dir: activeWorkspace.workspace_dir,
+          outline: nextOutline,
+        });
+        return { result: revised, normalized: nextOutline, updatedWorkspace: persistedWorkspace };
       });
       if (outlineOperationRef.current !== operation) return;
       await appendOutlineAiAttemptLogs(workspace, result.attempts, outlineLogContext);
-      const normalized = normalizeValidOutline({
-        title: result.outline.title,
-        items: result.outline.items,
-      });
-      const updatedWorkspace = await backend.saveWorkspaceOutlineDraft({
-        workspace_dir: workspace.workspace_dir,
-        outline: normalized,
-      });
       if (outlineOperationRef.current !== operation) return;
       setCurrentWorkspace(updatedWorkspace);
       setDeckTitle(normalized.title);
@@ -3701,7 +3796,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function refineDeck(instruction: string) {
-    if (!backend || !aiClient || !agentClient) return;
+    if (!backend || !aiClient || !researchAiClient || !researchWebClient || !agentClient || !hostUploadClient) return;
     const trimmedInstruction = instruction.trim();
     if (!trimmedInstruction) return;
 
@@ -3720,9 +3815,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       shouldReconcileActiveRun = true;
       setStage("generating");
       setPage("main");
-      const completion = await runDeckRefinement({
+      const completion = await measurePerformanceOperation("deck_refinement.run", shadowRun.workspace.workspace_dir, () => runDeckRefinement({
         backend,
         aiClient,
+        researchAiClient,
+        researchWebClient,
         agentClient,
         hostUploadClient,
         aiLogger,
@@ -3734,7 +3831,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         onProgress: generationProgressHandler(cancelSignal),
         isCancelled: () => cancelCreateDeckRef.current,
         cancelSignal,
-      });
+      }));
       if (!ownsGenerationOperation(cancelSignal)) return;
       if (completion.status === "completed" && completion.noChange) {
         await backend.abandonGenerationRun({ run_id: generationRun.run_id });
@@ -3769,7 +3866,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function refineSlide(instruction: string) {
-    if (!backend || !aiClient || !agentClient) return;
+    if (!backend || !aiClient || !researchAiClient || !researchWebClient || !agentClient || !hostUploadClient) return;
     const trimmedInstruction = instruction.trim();
     if (!trimmedInstruction) return;
     const slide = deck[currentSlide];
@@ -3791,9 +3888,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       shouldReconcileActiveRun = true;
       setStage("generating");
       setPage("main");
-      const completion = await runDeckRefinement({
+      const completion = await measurePerformanceOperation("page_refinement.run", shadowRun.workspace.workspace_dir, () => runDeckRefinement({
         backend,
         aiClient,
+        researchAiClient,
+        researchWebClient,
         agentClient,
         hostUploadClient,
         aiLogger,
@@ -3806,7 +3905,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         onProgress: generationProgressHandler(cancelSignal),
         isCancelled: () => cancelCreateDeckRef.current,
         cancelSignal,
-      });
+      }));
       if (!ownsGenerationOperation(cancelSignal)) return;
       if (completion.status === "completed") {
         const committed = await commitShadowGenerationRun(generationRun);
@@ -4132,7 +4231,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function resumeDeckGeneration() {
-    if (!backend || !aiClient || !agentClient || !hostUploadClient) return;
+    if (!backend || !aiClient || !researchAiClient || !researchWebClient || !agentClient || !hostUploadClient) return;
     if (loading === "deck" || loading === "deckFromOutline") return;
 
     let activeRunWorkspaceDir: string | undefined;
@@ -4159,6 +4258,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       const commonInput = {
             backend,
             aiClient,
+            researchAiClient,
+            researchWebClient,
             agentClient,
             hostUploadClient,
             aiLogger,
@@ -4169,8 +4270,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
             isCancelled: () => cancelCreateDeckRef.current,
             cancelSignal,
           };
-      const completion = isRefinementResume
-        ? await runDeckRefinement({
+      const completion = await measurePerformanceOperation(
+        isRefinementResume ? (recoveryKind === "page-refinement" ? "page_refinement.run" : "deck_refinement.run") : "generation.run",
+        refreshedWorkspace.workspace_dir,
+        () => isRefinementResume
+        ? runDeckRefinement({
             ...commonInput,
             instruction: recoveryProgress.recovery?.refinement_request ?? "Resume refinement",
             scope: recoveryKind === "page-refinement" ? "slide" : "deck",
@@ -4178,7 +4282,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
             resumePageIds: recoveryProgress.recovery?.target_page_ids,
             skipIntentReview: true,
           })
-        : await runDeckGeneration({ ...commonInput, startMode: "resume" });
+        : runDeckGeneration({ ...commonInput, startMode: "resume", resumeResearch: true }),
+      );
       if (!ownsGenerationOperation(cancelSignal)) return;
       if (completion.status === "completed" && generationRun) {
         const committed = await commitShadowGenerationRun(generationRun);
@@ -4204,7 +4309,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function retryPageGeneration(pageId: string) {
-    if (!backend || !aiClient || !agentClient) return;
+    if (!backend || !aiClient || !researchAiClient || !researchWebClient || !agentClient || !hostUploadClient) return;
     if (loading === "deck" || loading === "deckFromOutline") return;
 
     let activeRunWorkspaceDir: string | undefined;
@@ -4224,10 +4329,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       shouldReconcileActiveRun = true;
       setStage("generating");
       setPage("main");
-      const completion = await runPageGenerationRetry({
+      const completion = await measurePerformanceOperation("page.generation", refreshedWorkspace.workspace_dir, () => runPageGenerationRetry({
         backend,
         aiClient,
+        researchAiClient,
+        researchWebClient,
         agentClient,
+        hostUploadClient,
         aiLogger,
         workspace: refreshedWorkspace,
         confirmedOutline: workspaceOutlineForDownstream(refreshedWorkspace),
@@ -4236,7 +4344,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         onProgress: generationProgressHandler(cancelSignal),
         isCancelled: () => cancelCreateDeckRef.current,
         cancelSignal,
-      });
+        resumeResearch: true,
+      }));
       if (!ownsGenerationOperation(cancelSignal)) return;
       if (completion.status === "completed" && generationRun) {
         const committed = await commitShadowGenerationRun(generationRun);
@@ -4742,6 +4851,159 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
+  async function refreshPerformanceRuns() {
+    if (!backend || !PERFORMANCE_TESTING_ENABLED) return;
+    setPerformanceTesting((current) => ({ ...current, loading: true, error: "" }));
+    try {
+      const result = await backend.listPerformanceRuns();
+      setPerformanceTesting((current) => ({
+        ...current,
+        supported: true,
+        loading: false,
+        activeRun: result.active_run,
+        runs: result.runs,
+      }));
+    } catch (error) {
+      setPerformanceTesting((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : t.performance.unavailable }));
+    }
+  }
+
+  async function startPerformanceRun() {
+    if (!backend || performanceTesting.busy || performanceTesting.activeRun) return;
+    setPerformanceTesting((current) => ({ ...current, busy: true, error: "" }));
+    try {
+      const run = await backend.startPerformanceRun({
+        app_version: appManifest.version,
+        environment: {
+          locale,
+          viewport_width: window.innerWidth,
+          viewport_height: window.innerHeight,
+          device_pixel_ratio: window.devicePixelRatio,
+          online: navigator.onLine,
+        },
+        initial_settings: globalSettings,
+      });
+      setPerformanceTesting((current) => ({ ...current, busy: false, activeRun: run, runs: [run, ...current.runs.filter((item) => item.run_id !== run.run_id)] }));
+      showToast(t.performance.started);
+    } catch (error) {
+      setPerformanceTesting((current) => ({ ...current, busy: false, error: error instanceof Error ? error.message : t.performance.startFailed }));
+    }
+  }
+
+  async function finalizePerformanceRun() {
+    if (!backend || performanceTesting.busy || !performanceTesting.activeRun) return;
+    const runId = performanceTesting.activeRun.run_id;
+    setPerformanceTesting((current) => ({ ...current, busy: true, error: "" }));
+    try {
+      let result = await backend.finalizePerformanceRun({ run_id: runId, locale });
+      if (result.requires_force) {
+        setPerformanceTesting((current) => ({ ...current, busy: false }));
+        const force = await requestConfirmation({
+          title: t.performance.activeOperationsTitle,
+          body: formatMessage(t.performance.activeOperationsBody, { count: result.active_span_count }),
+          cancelLabel: t.performance.keepRecording,
+          confirmLabel: t.performance.forceFinish,
+          tone: "warning",
+        });
+        if (!force) return;
+        setPerformanceTesting((current) => ({ ...current, busy: true }));
+        result = await backend.finalizePerformanceRun({ run_id: runId, locale, force: true });
+      }
+      setPerformanceTesting((current) => ({
+        ...current,
+        busy: false,
+        activeRun: null,
+        runs: [result.run, ...current.runs.filter((item) => item.run_id !== result.run.run_id)],
+      }));
+      showToast(t.performance.reportGenerated);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t.performance.finalizeFailed;
+      try {
+        const latest = await backend.listPerformanceRuns();
+        setPerformanceTesting((current) => ({ ...current, busy: false, error: message, activeRun: latest.active_run, runs: latest.runs }));
+      } catch {
+        setPerformanceTesting((current) => ({ ...current, busy: false, error: message }));
+      }
+    }
+  }
+
+  async function abandonPerformanceRun() {
+    if (!backend || performanceTesting.busy || !performanceTesting.activeRun) return;
+    const confirmed = await requestConfirmation({
+      title: t.performance.abandonTitle,
+      body: t.performance.abandonBody,
+      cancelLabel: t.controls.cancel,
+      confirmLabel: t.performance.abandonConfirm,
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    setPerformanceTesting((current) => ({ ...current, busy: true, error: "" }));
+    try {
+      const run = await backend.abandonPerformanceRun({ run_id: performanceTesting.activeRun.run_id });
+      setPerformanceTesting((current) => ({ ...current, busy: false, activeRun: null, runs: [run, ...current.runs.filter((item) => item.run_id !== run.run_id)] }));
+    } catch (error) {
+      setPerformanceTesting((current) => ({ ...current, busy: false, error: error instanceof Error ? error.message : t.performance.abandonFailed }));
+    }
+  }
+
+  async function deletePerformanceRun(run: PerformanceRunSummary) {
+    if (!backend || performanceTesting.busy) return;
+    const confirmed = await requestConfirmation({
+      title: t.performance.deleteTitle,
+      body: formatMessage(t.performance.deleteBody, { runId: run.run_id }),
+      cancelLabel: t.controls.cancel,
+      confirmLabel: t.performance.deleteConfirm,
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    setPerformanceTesting((current) => ({ ...current, busy: true, error: "" }));
+    try {
+      await backend.deletePerformanceRun({ run_id: run.run_id });
+      setPerformanceTesting((current) => ({ ...current, busy: false, runs: current.runs.filter((item) => item.run_id !== run.run_id) }));
+    } catch (error) {
+      setPerformanceTesting((current) => ({ ...current, busy: false, error: error instanceof Error ? error.message : t.performance.deleteFailed }));
+    }
+  }
+
+  async function openPerformanceReport(run: PerformanceRunSummary) {
+    if (!backend || performanceTesting.busy || !run.report_available) return;
+    setPerformanceTesting((current) => ({ ...current, busy: true, error: "" }));
+    try {
+      const result = await backend.preparePerformanceReport({ run_id: run.run_id });
+      if (result.report_upload.mime_type !== "text/plain") throw new Error(`${t.performance.reportFailed} MIME: ${result.report_upload.mime_type}`);
+      const response = await fetch(result.report_upload.url, { cache: "no-store" });
+      if (!response.ok) throw new Error(`${t.performance.reportFailed} HTTP ${response.status}`);
+      const html = await response.text();
+      setPerformanceTesting((current) => ({ ...current, busy: false, reportHtml: html, reportRunId: run.run_id }));
+      setPage("performance-report");
+      setHistory((items) => [...items, "performance-report"]);
+    } catch (error) {
+      setPerformanceTesting((current) => ({ ...current, busy: false, error: error instanceof Error ? error.message : t.performance.reportFailed }));
+    }
+  }
+
+  async function regeneratePerformanceReport(run: PerformanceRunSummary) {
+    if (!backend || performanceTesting.busy || run.status !== "completed") return;
+    setPerformanceTesting((current) => ({ ...current, busy: true, error: "" }));
+    try {
+      const regenerated = await backend.regeneratePerformanceReport({ run_id: run.run_id, locale });
+      setPerformanceTesting((current) => ({
+        ...current,
+        busy: false,
+        runs: current.runs.map((item) => item.run_id === regenerated.run_id ? regenerated : item),
+      }));
+      showToast(t.performance.reportRegenerated);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t.performance.regenerateFailed;
+      try {
+        const latest = await backend.listPerformanceRuns();
+        setPerformanceTesting((current) => ({ ...current, busy: false, error: message, activeRun: latest.active_run, runs: latest.runs }));
+      } catch {
+        setPerformanceTesting((current) => ({ ...current, busy: false, error: message }));
+      }
+    }
+  }
+
   const state: DeckWorkspaceState = {
     panelMode,
     page,
@@ -4788,6 +5050,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     exportArtifact,
     exportDownload,
     workspaceDiagnosticBundle,
+    performanceTesting,
     currentStatus,
     workspaceScan,
     workspaceCovers,
@@ -4827,6 +5090,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setRefineScope,
     showToast,
     resolveConfirmation,
+    refreshPerformanceRuns,
+    startPerformanceRun,
+    finalizePerformanceRun,
+    abandonPerformanceRun,
+    deletePerformanceRun,
+    openPerformanceReport,
+    regeneratePerformanceReport,
     cancelGenerateDeck,
     navigate,
     navigateFromHeader,

@@ -8,11 +8,6 @@
       "tool_id": "bundled:ppt-engine",
       "min_version": "4.6.0",
       "version": "latest"
-    },
-    {
-      "tool_id": "bundled:anna-search",
-      "version": "latest",
-      "min_version": "1.0.7"
     }
   ],
   "optional_executas": [],
@@ -48,8 +43,13 @@
     ],
     "host_api": {
       "tools": [
-        "required:bundled:ppt-engine",
-        "required:bundled:anna-search"
+        "required:bundled:ppt-engine"
+      ],
+      "web": [
+        "search",
+        "fetch",
+        "image_search",
+        "image_fetch"
       ],
       "upload": [
         "negotiate",
@@ -66,7 +66,7 @@
       "agent": {
         "session": {
           "auto": true,
-          "fixed": null
+          "fixed": {}
         },
         "tools": []
       },

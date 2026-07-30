@@ -4,7 +4,7 @@ import {
   type AgentInfrastructureError,
   type AgentRunSummary,
 } from "../../agent/agentClient";
-import type { PageProgress, RenderWorkspacePagePreviewResult } from "../../api/types";
+import type { HostUploadRef, PageProgress, RenderWorkspacePagePreviewResult } from "../../api/types";
 import type { Locale } from "../../i18n/messages";
 import { generationText } from "./messages";
 import { buildDeckGenerationSummary, emitRuntime as emitRuntimeProgress } from "./progressProjection";
@@ -14,6 +14,7 @@ import {
   buildPageVisualReviewPrompt,
   targetPageFingerprintReadErrorMessage,
   targetPageNoChangeMessage,
+  visualReviewImageUnavailable,
   visualReviewPassed,
 } from "./prompts";
 import {
@@ -36,6 +37,7 @@ import {
   type RenderFailureHistoryItem,
   type RenderFailurePhase,
 } from "./types";
+import { beginPerformanceSpan } from "../../performance/performanceRecorder";
 
 function emitRuntime(
   input: DeckGenerationRuntime,
@@ -57,6 +59,17 @@ function classifyRenderFailurePhase(message: string): RenderFailurePhase {
   return message.includes("Pre-render TypeScript check failed") ? "pre-render-typecheck" : "render";
 }
 
+function uploadRefExpiryMs(ref: HostUploadRef, receivedAtMs: number) {
+  if (ref.expires_at) {
+    const parsed = Date.parse(ref.expires_at);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  if (typeof ref.expires_in === "number" && Number.isFinite(ref.expires_in) && ref.expires_in > 0) {
+    return receivedAtMs + ref.expires_in * 1000;
+  }
+  return Number.POSITIVE_INFINITY;
+}
+
 async function getTargetPageFingerprint(input: DeckGenerationRuntime, page: AuthoringPage) {
   return input.backend.getWorkspacePageSourceFingerprint({
     workspace_dir: input.workspace.workspace_dir,
@@ -64,10 +77,29 @@ async function getTargetPageFingerprint(input: DeckGenerationRuntime, page: Auth
   });
 }
 
-export async function runPageGeneration(
+function beginPageStageSpan(
+  input: DeckGenerationRuntime,
+  page: AuthoringPage,
+  operationName: string,
+  parentSpanId?: string,
+) {
+  return beginPerformanceSpan({
+    operationName,
+    parentSpanId,
+    workspaceId: input.workspace.workspace_id,
+    attributes: {
+      layer: "page-stage",
+      page_id: page.page_id,
+      page_index: page.index,
+    },
+  });
+}
+
+async function runPageGenerationInternal(
   input: DeckGenerationRuntime,
   authoringDeck: AuthoringDeck,
   page: AuthoringPage,
+  performanceParentSpanId?: string,
 ): Promise<PageGenerationResult> {
   const text = generationText(input.locale);
   const totalPages = authoringDeck.pages.length;
@@ -94,14 +126,98 @@ export async function runPageGeneration(
   }] : [];
   let noChangeRetry: NoChangeAuthoringRetry | null = null;
   let noChangeRetryCount = 0;
-  const manualRevision = input.refinementRequest?.trim()
+  let baselineAttachment: { ref: HostUploadRef; receivedAtMs: number } | null = null;
+  let baselineAttachmentError = "";
+  const refinementVisualContext = input.pageRefinementVisualContexts?.[page.page_id];
+  const shouldLoadBaseline = Boolean(
+    refinementVisualContext?.screenshotPath?.trim() || existing?.last_screenshot_path,
+  );
+  const manualContext = input.refinementRequest?.trim() && shouldLoadBaseline
     ? await input.backend.getPageEditContext({
       workspace_dir: input.workspace.workspace_dir,
       page_id: page.page_id,
-    }).then((context) => context.manifest).catch(() => null)
+    }).catch((error) => {
+      baselineAttachmentError = error instanceof Error ? error.message : String(error);
+      return null;
+    })
     : null;
+  const manualRevision = manualContext?.manifest ?? null;
+  if (manualContext?.screenshot_upload) {
+    baselineAttachment = { ref: manualContext.screenshot_upload, receivedAtMs: Date.now() };
+  } else if (existing?.last_screenshot_path) {
+    const ref = await input.backend.uploadCurrentPageScreenshot({
+      workspace_dir: input.workspace.workspace_dir,
+      page_id: page.page_id,
+    }).catch((error) => {
+      baselineAttachmentError = error instanceof Error ? error.message : String(error);
+      return null;
+    });
+    if (ref) baselineAttachment = { ref, receivedAtMs: Date.now() };
+  }
+
+  if (shouldLoadBaseline && !baselineAttachment) {
+    const message = text.baselineScreenshotUploadFailed(baselineAttachmentError);
+    if (visualReview) {
+      progress = await recordProgress(input, page, {
+        status: "accepted",
+        visual_review: visualReview,
+        last_error: message,
+      });
+      input.setProgress(progress);
+      return { page, reason: "accepted", progress };
+    }
+    agentInfrastructureFailures += 1;
+    progress = await recordProgress(input, page, {
+      status: "agent_infrastructure_failed",
+      agent_infrastructure_failures: agentInfrastructureFailures,
+      last_error: message,
+    });
+    input.setProgress(progress);
+    return {
+      page,
+      reason: "agent_infrastructure",
+      progress,
+      error: { type: "agent_infrastructure", message, page_id: page.page_id, page_index: page.index, page_status: "agent_infrastructure_failed" },
+    };
+  }
 
   while (!input.isCancelled()) {
+    if (baselineAttachment && uploadRefExpiryMs(baselineAttachment.ref, baselineAttachment.receivedAtMs) - Date.now() < 120_000) {
+      const refreshed = await input.backend.uploadCurrentPageScreenshot({
+        workspace_dir: input.workspace.workspace_dir,
+        page_id: page.page_id,
+      }).catch((error) => {
+        baselineAttachmentError = error instanceof Error ? error.message : String(error);
+        return null;
+      });
+      if (refreshed) {
+        baselineAttachment = { ref: refreshed, receivedAtMs: Date.now() };
+      } else {
+        const message = text.screenshotRefreshFailed(baselineAttachmentError);
+        if (visualReview) {
+          progress = await recordProgress(input, page, {
+            status: "accepted",
+            visual_review: visualReview,
+            last_error: message,
+          });
+          input.setProgress(progress);
+          return { page, reason: "accepted", progress };
+        }
+        agentInfrastructureFailures += 1;
+        progress = await recordProgress(input, page, {
+          status: "agent_infrastructure_failed",
+          agent_infrastructure_failures: agentInfrastructureFailures,
+          last_error: message,
+        });
+        input.setProgress(progress);
+        return {
+          page,
+          reason: "agent_infrastructure",
+          progress,
+          error: { type: "agent_infrastructure", message, page_id: page.page_id, page_index: page.index, page_status: "agent_infrastructure_failed" },
+        };
+      }
+    }
     progress = await recordProgress(input, page, {
       status: renderError ? "render_fixing" : visualReview ? "visual_review_fixing" : "authoring",
     });
@@ -113,7 +229,6 @@ export async function runPageGeneration(
       totalPages,
     }, progress);
 
-    const currentProgressPage = getProgressPage(input.getProgress(), page.page_id);
     const prompt = buildAuthoringPrompt({
       workspaceRoot: input.workspace.workspace_root,
       workspaceDir: input.workspace.workspace_dir,
@@ -124,11 +239,11 @@ export async function runPageGeneration(
       renderError,
       renderFailureHistory,
       visualReview,
-      visualReviewScreenshotPath: currentProgressPage?.last_screenshot_path ?? "",
+      hasImageAttachment: Boolean(baselineAttachment),
       noChangeRetry,
       refinementRequest: input.refinementRequest,
       refinementReason,
-      refinementVisualContext: input.pageRefinementVisualContexts?.[page.page_id],
+      refinementVisualContext,
       manualRevision,
     });
     const tracker = createAgentRunTracker({
@@ -142,6 +257,12 @@ export async function runPageGeneration(
       kind: renderError ? "render-fix" : visualReview ? "visual-review-fix" : "authoring",
       attemptLimits,
     });
+    const authoringOperation = renderError
+      ? "page.render_fix"
+      : visualReview
+        ? "page.visual_review_fix"
+        : "page.authoring";
+    const authoringSpan = beginPageStageSpan(input, page, authoringOperation, performanceParentSpanId);
 
     try {
       const before = await getTargetPageFingerprint(input, page).catch((error) => {
@@ -149,7 +270,17 @@ export async function runPageGeneration(
       });
       const result: AgentRunSummary = await input.agentClient.runAuthoringPrompt(
         prompt,
-        buildAgentRunOptions(input, tracker.onStreamEvent, tracker.logContext),
+        {
+          ...buildAgentRunOptions(input, tracker.onStreamEvent, tracker.logContext),
+          ...(baselineAttachment ? {
+            attachments: [{
+              type: baselineAttachment.ref.mime_type,
+              url: baselineAttachment.ref.url,
+              filename: baselineAttachment.ref.filename,
+              detail: "auto" as const,
+            }],
+          } : {}),
+        },
       );
       const after = await getTargetPageFingerprint(input, page).catch((error) => {
         throw new Error(targetPageFingerprintReadErrorMessage(input.locale, page, error));
@@ -164,6 +295,7 @@ export async function runPageGeneration(
         target_tsx_fingerprint: { before, after },
         target_tsx_changed: changed,
       });
+      authoringSpan?.finish("ok");
       if (!changed) {
         const exhausted = noChangeRetryCount >= LOCAL_GATE_REPAIR_LIMIT;
         const message = targetPageNoChangeMessage(input.locale, page);
@@ -188,12 +320,23 @@ export async function runPageGeneration(
       renderError = "";
       visualReview = null;
     } catch (error) {
+      authoringSpan?.finish(isAgentRunCancelledError(error) ? "interrupted" : "error");
       if (isAgentRunCancelledError(error)) {
         await tracker.flush("error", { cancelled: true });
         return { page, reason: "cancelled", progress: input.getProgress() ?? progress as PageProgress };
       }
       if (isAgentInfrastructureError(error)) {
         const message = localizeAgentInfrastructureMessage(error, input.locale);
+        if (visualReview) {
+          await tracker.flush("error", { error: message, raw_error: error.rawMessage });
+          progress = await recordProgress(input, page, {
+            status: "accepted",
+            visual_review: visualReview,
+            last_error: message,
+          });
+          input.setProgress(progress);
+          return { page, reason: "accepted", progress };
+        }
         agentInfrastructureFailures += 1;
         await tracker.flush("error", { error: message, raw_error: error.rawMessage });
         progress = await recordProgress(input, page, {
@@ -223,6 +366,8 @@ export async function runPageGeneration(
     }
 
     let preview: RenderWorkspacePagePreviewResult;
+    let latestAttachment: HostUploadRef | null = null;
+    const renderSpan = beginPageStageSpan(input, page, "page.render", performanceParentSpanId);
     try {
       progress = await recordProgress(input, page, { status: "rendering", last_error: "" });
       input.setProgress(progress);
@@ -236,6 +381,7 @@ export async function runPageGeneration(
         workspace_dir: input.workspace.workspace_dir,
         page_id: page.page_id,
       });
+      renderSpan?.finish("ok");
       progress = await recordProgress(input, page, {
         status: reviewSettings.visualReviewEnabled ? "visual_review" : "accepted",
         last_html_path: preview.html_path,
@@ -244,7 +390,29 @@ export async function runPageGeneration(
       });
       input.setProgress(progress);
       renderFailureHistory = [];
+      if (reviewSettings.visualReviewEnabled) {
+        let uploadError = "";
+        latestAttachment = await input.backend.uploadCurrentPageScreenshot({
+          workspace_dir: input.workspace.workspace_dir,
+          page_id: page.page_id,
+        }).catch((error) => {
+          uploadError = error instanceof Error ? error.message : String(error);
+          return null;
+        });
+        if (!latestAttachment) {
+          const message = text.visualReviewScreenshotUploadFailed(uploadError);
+          progress = await recordProgress(input, page, {
+            status: "accepted",
+            last_html_path: preview.html_path,
+            last_screenshot_path: preview.screenshot_path,
+            last_error: message,
+          });
+          input.setProgress(progress);
+          return { page, reason: "accepted", progress };
+        }
+      }
     } catch (error) {
+      renderSpan?.finish("error");
       renderAttempts += 1;
       renderError = error instanceof Error ? error.message : String(error);
       renderFailureHistory.push({
@@ -274,11 +442,7 @@ export async function runPageGeneration(
       totalPages,
     }, progress);
     const reviewPrompt = buildPageVisualReviewPrompt({
-      workspaceRoot: input.workspace.workspace_root,
-      workspaceDir: input.workspace.workspace_dir,
       page,
-      screenshotPath: preview.screenshot_path,
-      preview,
     });
     const reviewTracker = createAgentRunTracker({
       flowInput: input,
@@ -291,36 +455,46 @@ export async function runPageGeneration(
       kind: "page-visual-review",
       attemptLimits,
     });
+    const visualReviewSpan = beginPageStageSpan(input, page, "page.visual_review", performanceParentSpanId);
     try {
       visualReview = await input.agentClient.runPageVisualReviewPrompt(
         reviewPrompt,
-        buildAgentRunOptions(input, reviewTracker.onStreamEvent, reviewTracker.logContext),
+        {
+          ...buildAgentRunOptions(input, reviewTracker.onStreamEvent, reviewTracker.logContext),
+          attachments: latestAttachment ? [{
+            type: latestAttachment.mime_type,
+            url: latestAttachment.url,
+            filename: latestAttachment.filename,
+            detail: "auto" as const,
+          }] : undefined,
+        },
       );
       await reviewTracker.flush("completed", { parsed_review: true, review: visualReview });
+      visualReviewSpan?.finish("ok");
     } catch (error) {
+      visualReviewSpan?.finish(isAgentRunCancelledError(error) ? "interrupted" : "error");
       if (isAgentRunCancelledError(error)) {
         await reviewTracker.flush("error", { cancelled: true });
         return { page, reason: "cancelled", progress };
       }
       const message = error instanceof Error ? error.message : String(error);
       await reviewTracker.flush("error", { error: message });
-      visualReviewAttempts += 1;
-      if (visualReviewAttempts >= attemptLimits.visualReview) {
-        progress = await recordProgress(input, page, {
-          status: "accepted",
-          visual_review_attempts: visualReviewAttempts,
-          last_error: message,
-        });
-        input.setProgress(progress);
-        return { page, reason: "accepted", progress };
-      }
       progress = await recordProgress(input, page, {
-        status: "visual_review_fixing",
-        visual_review_attempts: visualReviewAttempts,
+        status: "accepted",
         last_error: message,
       });
       input.setProgress(progress);
-      continue;
+      return { page, reason: "accepted", progress };
+    }
+
+    if (visualReviewImageUnavailable(visualReview)) {
+      progress = await recordProgress(input, page, {
+        status: "accepted",
+        visual_review: visualReview,
+        last_error: text.visualReviewImageUnavailable,
+      });
+      input.setProgress(progress);
+      return { page, reason: "accepted", progress };
     }
 
     if (visualReviewPassed(visualReview)) {
@@ -329,6 +503,9 @@ export async function runPageGeneration(
       return { page, reason: "accepted", progress };
     }
 
+    if (latestAttachment) {
+      baselineAttachment = { ref: latestAttachment, receivedAtMs: Date.now() };
+    }
     visualReviewAttempts += 1;
     if (visualReviewAttempts >= attemptLimits.visualReview) {
       progress = await recordProgress(input, page, {
@@ -356,6 +533,37 @@ export async function runPageGeneration(
     ? createFailedPageError(failedPage, input.locale, page.index)
     : { type: "page_failed" as const, message: `Page ${page.index + 1} failed`, page_id: page.page_id, page_index: page.index, page_status: "failed" };
   return { page, reason: "page_failed", progress, error };
+}
+
+export async function runPageGeneration(
+  input: DeckGenerationRuntime,
+  authoringDeck: AuthoringDeck,
+  page: AuthoringPage,
+): Promise<PageGenerationResult> {
+  const pageSpan = beginPerformanceSpan({
+    operationName: "page.generation",
+    workspaceId: input.workspace.workspace_id,
+    attributes: {
+      layer: "page-workflow",
+      page_id: page.page_id,
+      page_index: page.index,
+    },
+  });
+  try {
+    const result = await runPageGenerationInternal(input, authoringDeck, page, pageSpan?.spanId);
+    pageSpan?.finish(
+      result.reason === "accepted"
+        ? "ok"
+        : result.reason === "cancelled"
+          ? "interrupted"
+          : "error",
+      { result: result.reason },
+    );
+    return result;
+  } catch (error) {
+    pageSpan?.finish(isAgentRunCancelledError(error) || input.isCancelled() ? "interrupted" : "error");
+    throw error;
+  }
 }
 
 export async function runPagesConcurrently(

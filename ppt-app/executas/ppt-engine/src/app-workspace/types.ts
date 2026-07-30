@@ -22,9 +22,6 @@ export interface AppWorkspaceFiles {
   page_progress: string;
   pages: string;
   template: string;
-  research_plan: string;
-  research_evidence: string;
-  research_status: string;
 }
 
 export interface AppPresentationRequirementCandidate {
@@ -126,6 +123,7 @@ export interface AppWorkspaceSettings {
   visual_tone?: string;
   theme_id?: string;
   page_generation_concurrency?: number;
+  research_image_session_concurrency?: number;
   visual_review_enabled?: boolean;
   visual_review_failure_limit?: number;
   disable_web_research?: boolean;
@@ -136,6 +134,7 @@ export interface AppWorkspaceSettings {
 
 export interface AppCreateWorkspaceSetting {
   page_generation_concurrency: number;
+  research_image_session_concurrency: number;
   visual_review_enabled: boolean;
   visual_review_failure_limit: number;
   disable_web_research: boolean;
@@ -654,6 +653,7 @@ export interface AppendAppWorkspaceLogInput {
     | "ai-page-agent-stream"
     | "ai-research"
     | "ai-research-interactions"
+    | "research-web-interactions"
     | "ai-theme"
     | "ai-theme-interactions"
     | "storage-transport";
@@ -670,156 +670,109 @@ export interface AppendAppWorkspaceLogResult {
 
 export interface AppResearchPaths {
   root_dir: string;
-  raw_dir: string;
-  raw_web_dir: string;
-  raw_images_dir: string;
   evidence_dir: string;
-  evidence_pages_dir: string;
   evidence_images_dir: string;
-  evidence_drafts_dir: string;
-  research_plan_path: string;
-  evidence_index_path: string;
-  status_path: string;
+  web_summary_path: string;
+  image_catalog_path: string;
+  images_dir: string;
+  progress_path: string;
 }
 
-export interface PrepareAppResearchWorkspaceInput {
+export interface PrepareAppSharedResearchWorkspaceInput {
   workspace_dir: string;
+  reset_progress?: boolean;
 }
 
-export interface PrepareAppResearchWorkspaceResult extends AppResearchPaths {
+export interface AppSharedResearchContextResult {
   workspace_dir: string;
-  prepared_at: string;
+  web_summary_path: string;
+  image_catalog_path: string;
+  images_dir: string;
+  progress_path: string;
+  web_summary: string;
+  image_catalog: Record<string, unknown>;
+  progress: Record<string, unknown>;
 }
 
-export interface RecordAppResearchPlanInput {
+export type AppSharedResearchStage =
+  | "web_decision"
+  | "web_research"
+  | "image_decision"
+  | "image_research"
+  | "image_search"
+  | "image_deduplication"
+  | "image_analysis"
+  | "image_import";
+
+export type AppSharedResearchStageState = "waiting" | "running" | "completed" | "skipped" | "warning";
+
+export type AppSharedResearchProgressOperation =
+  | { op: "set_stage"; stage: AppSharedResearchStage; state: AppSharedResearchStageState }
+  | { op: "set_web_decision"; decision: Record<string, unknown> }
+  | { op: "upsert_web_search"; query: string; search: Record<string, unknown> }
+  | { op: "set_web_fetch_result_ids"; result_ids: string[] }
+  | { op: "upsert_web_fetched_page"; url: string; page: Record<string, unknown> }
+  | { op: "set_web_prepared_batch"; markdown: string }
+  | { op: "set_web_diagnostics"; gaps: string[]; diagnostic_errors: string[] }
+  | { op: "set_image_decision"; decision: Record<string, unknown> }
+  | { op: "upsert_image_search"; query: string; search: Record<string, unknown> }
+  | { op: "set_image_work_status"; field: "search_status" | "analysis_status" | "import_status"; state: "waiting" | "running" | "completed" | "warning" }
+  | { op: "upsert_image_deduplication_entry"; candidate_id: string; group: Record<string, unknown>; candidate: Record<string, unknown> }
+  | { op: "set_image_deduplication_summary"; strategy: Record<string, unknown>; statistics: Record<string, unknown> }
+  | { op: "upsert_image_analysis_batch"; batch_id: string; batch: Record<string, unknown>; candidates: Array<{ candidate_id: string; candidate: Record<string, unknown> }> }
+  | { op: "upsert_image_candidate"; candidate_id: string; candidate: Record<string, unknown> }
+  | { op: "set_image_diagnostics"; gaps: string[]; diagnostic_errors: string[] }
+  | { op: "set_image_content_deduplication"; value: Record<string, unknown> }
+  | { op: "finalize_image_research"; title: string; status: AppSharedResearchStageState; queries: Array<Record<string, unknown>>; gaps: string[]; statistics: Record<string, unknown> }
+  | { op: "finalize_shared_research" };
+
+export interface PatchAppSharedResearchProgressInput {
   workspace_dir: string;
-  research_plan: unknown;
+  operations: AppSharedResearchProgressOperation[];
 }
 
-export interface GetAppResearchPlanInput {
+export interface PatchAppSharedResearchProgressResult {
   workspace_dir: string;
-}
-
-export interface RecordAppResearchEvidenceInput {
-  workspace_dir: string;
-  evidence: unknown;
-}
-
-export interface RecordAppResearchEvidenceResult {
-  workspace_dir: string;
-  status: string;
-  evidence_index_path: string;
-  page_count: number;
+  progress_path: string;
+  updated: boolean;
+  revision: number;
   updated_at: string;
 }
 
-export interface RecordAppResearchEvidencePageInput {
+export interface PublishAppSharedResearchBatchResult {
   workspace_dir: string;
-  page_evidence: unknown;
+  artifact_path: string;
+  published: boolean;
+  already_published: boolean;
+  revision: number;
 }
 
-export interface RecordAppResearchEvidencePageResult {
+export interface AppendAppWebResearchBatchInput {
   workspace_dir: string;
-  page_id: string;
-  status: string;
-  evidence_index_path: string;
-  page_count: number;
-  updated_at: string;
-}
-
-export interface GetAppResearchEvidenceInput {
-  workspace_dir: string;
-}
-
-export interface AppVisualResearchEvidence {
-  id: string;
-  file_path: string;
-  original_raw_path?: string;
-  image_url?: string;
-  page_url?: string;
-  sha256?: string;
-  reason: string;
-  visual_summary: string;
-}
-
-export interface AppResearchRejectedMaterial {
-  source?: string;
-  reason: string;
-}
-
-export interface FinalizeAppResearchVisualAssetsInput {
-  workspace_dir: string;
-  page_id: string;
-  visual_assets: AppVisualResearchEvidence[];
-  raw_image_index_paths?: string[];
-}
-
-export interface FinalizeAppResearchVisualAssetsResult {
-  workspace_dir: string;
-  page_id: string;
-  visual_assets: AppVisualResearchEvidence[];
-  gaps: string[];
-  rejected_material: AppResearchRejectedMaterial[];
-}
-
-export interface RecordAppResearchCurationDraftInput {
-  workspace_dir: string;
-  page_id: string;
-  draft_type: "web" | "visual";
-  draft_id?: string;
-  draft: unknown;
-}
-
-export interface GetAppResearchCurationDraftInput {
-  workspace_dir: string;
-  page_id: string;
-  draft_type: "web" | "visual";
-  draft_id?: string;
-}
-
-export interface GetAppResearchCurationDraftFingerprintInput {
-  workspace_dir: string;
-  page_id: string;
-  draft_type: "web" | "visual";
-  draft_id?: string;
-}
-
-export interface AppResearchCurationDraftFingerprint {
-  workspace_dir: string;
-  page_id: string;
-  draft_type: "web" | "visual";
-  draft_id?: string;
-  draft_path: string;
-  exists: boolean;
-  sha256?: string;
-  size_bytes?: number;
-}
-
-export interface RecordAppResearchEvidencePageMarkdownInput {
-  workspace_dir: string;
-  page_id: string;
   markdown: string;
 }
 
-export interface RecordAppResearchEvidencePageMarkdownResult {
+export interface AppendAppImageResearchBatchInput {
   workspace_dir: string;
-  page_id: string;
-  markdown_path: string;
-  updated_at: string;
+  batch: unknown;
 }
 
-export interface RecordAppResearchStatusInput {
+export interface ImportAppSharedResearchImageInput {
   workspace_dir: string;
-  status: unknown;
+  candidate_id: string;
+  staging_file_path: string;
+  expected_size_bytes: number;
+  expected_sha256?: string;
+  mime_type: string;
 }
 
-export interface RecordAppResearchStatusPageInput {
+export interface ImportAppSharedResearchImageResult {
   workspace_dir: string;
-  page_status: unknown;
-}
-
-export interface GetAppResearchStatusInput {
-  workspace_dir: string;
+  candidate_id: string;
+  file_path: string;
+  sha256: string;
+  mime_type: string;
+  bytes_size: number;
 }
 
 export interface AppTemplatePreviewRef {

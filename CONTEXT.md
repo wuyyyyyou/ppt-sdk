@@ -150,29 +150,25 @@ User-facing Chinese label: 创建风格画像
 _Avoid_: Deck Generation, Uploaded Source Analysis
 
 **Research Discovery**:
-The deck-level iterative process that decides what external material is still needed, collects candidate web and image material, curates it into Research Evidence, and stops when enough useful evidence has been collected or the iteration limit is reached. It happens before Page Generation Units are authored. When Uploaded Source Analysis exists, Research Discovery treats it as prior source context and should search only for unresolved gaps, required current external facts, public benchmarks, or additional visual assets. Web material is discovered before visual material so image needs can be informed by curated facts and insights; visual material does not become factual evidence by itself. Interrupted Research Discovery work is not complete discovery work and must not be promoted into the Research Discovery Evidence Pool.
+The deck-level process that independently decides whether web material and visual material are needed, collects the required candidates, and curates them into Shared Research Evidence before Page Generation Units are authored. Web material is discovered before visual material when both are required so image needs can be informed by curated facts and insights; visual material does not become factual evidence by itself.
 User-facing Chinese label: 事实收集
 _Avoid_: Research Planning
 
-**Research Discovery Evidence Pool**:
-The deck-level curated evidence pool produced during Research Discovery before evidence is assigned to Page Generation Units. It supports further Research Discovery decisions and Page Evidence Assignment, but it is not by itself an allowed grounding source for Page Authoring.
-_Avoid_: Shared Research Evidence, Page Research Evidence
-
-**Research Collection Ledger**:
-A Workspace-owned record of which web and image query intents have already been collected during Research Discovery or later refinement research. It is used to avoid repeating completed query intents while preserving existing Research Evidence; interrupted research work must not make a query intent count as completed collection.
-
 **Research Search Control**:
-A Workspace-level or run-level user preference that disables new web or visual external search and fetch during Research Discovery. It does not disable reuse of existing Research Evidence, Page Evidence Assignment, Uploaded Source Material, or Uploaded Source Analysis.
+A Workspace-level or run-level user preference that disables new web or visual external search and fetch during Research Discovery. It does not disable reuse of existing Shared Research Evidence, Uploaded Source Material, or Uploaded Source Analysis.
 _Avoid_: Disable evidence, disable uploaded sources
 
 **Research Requirement**:
-The decision that more external material is needed because the deck or a refinement target depends on real-world facts, current information, source-backed data, or external visual assets that are not already available in Research Evidence.
+The decision that more external material is needed because the deck or a refinement target depends on material not already available in Shared Research Evidence. Web Research Requirement and Visual Research Requirement are evaluated independently.
+
+**Web Research Requirement**:
+The decision that source-backed web material is needed for real-world facts, current information, public data, citations, named cases, or conflict investigation.
+
+**Visual Research Requirement**:
+The decision that external visual assets are needed for the Deck or refinement target. It is independent of Web Research Requirement, although curated web material may inform later visual searches.
 
 **Research Evidence Gap**:
-A case where Research Discovery, Research Curation, or Page Evidence Assignment cannot produce enough Research Evidence for a requested deck or page intent. It does not block Page Generation and does not make completed research work partially failed; unsupported concrete details must be omitted, generalized, or marked as TBD / 待补充. Reaching a Research Discovery iteration limit may produce a Research Evidence Gap. Generation Abandonment or interruption during research is unfinished work, not a Research Evidence Gap.
-
-**Page Evidence Assignment**:
-The deck-level step after Research Discovery that assigns relevant facts, derived insights, and visual assets to Page Generation Units and directly materializes page-assigned Research Evidence before Page Authoring. It does not create a Page Plan, choose page composition, modify the Confirmed Outline, or make Raw Research Material or full Uploaded Source Analysis a Page Authoring grounding source.
+A case where Research Discovery or Research Curation cannot produce enough Shared Research Evidence for a requested deck or page intent. The gap is recorded in the current Shared Research Evidence so Page Authoring knows which details cannot be asserted; it does not block Page Generation, and unsupported concrete details must be omitted, generalized, or marked as TBD / 待补充. Technical failure details belong in the Research Log. Generation Abandonment or interruption during research is unfinished work, not a Research Evidence Gap.
 
 **Raw Research Material**:
 External material collected by search, fetch, or image lookup before cleanup or selection. It is not grounding evidence until promoted into Research Evidence.
@@ -184,7 +180,7 @@ User-facing Chinese label: 上传资料
 User-facing English label: Source material
 
 **Uploaded Source Analysis**:
-A deck-level analysis result produced from Uploaded Source Material before Outline Creation or Deck Generation uses the uploaded material. It captures selected factual content, visual asset understanding, source-use constraints, gaps, and rejected or unusable material. Uploaded Source Analysis may inform Outline Creation and later evidence assignment, but it is not the same artifact as the Research Discovery Evidence Pool. It combines the continuation decisions from the factual and visual analysis drafts into the overall decision about whether Outline Creation may continue. When the Uploaded Source Material set or file content changes, existing Uploaded Source Analysis becomes stale, and any Outline Draft or Confirmed Outline that depended on it must be regenerated or reconfirmed before downstream generation uses the changed material.
+A deck-level analysis result produced from Uploaded Source Material before Outline Creation or Deck Generation uses the uploaded material. It captures selected factual content, visual asset understanding, source-use constraints, gaps, and rejected or unusable material. Uploaded Source Analysis remains separate from Shared Research Evidence. It combines the continuation decisions from the factual and visual analysis drafts into the overall decision about whether Outline Creation may continue. When the Uploaded Source Material set or file content changes, existing Uploaded Source Analysis becomes stale, and any Outline Draft or Confirmed Outline that depended on it must be regenerated or reconfirmed before downstream generation uses the changed material.
 
 **Uploaded Source Analysis Continuation Decision**:
 A structured decision inside a valid Uploaded Source Analysis result that states whether downstream Outline Creation may continue when some Uploaded Source Material could not be fully parsed or understood. The decision is valid only after the analysis draft itself has been written and passed deterministic validation. Agent session failure, missing or invalid analysis drafts, or missing continuation decisions are analysis failures, not continuable uploaded-source gaps.
@@ -193,32 +189,31 @@ A structured decision inside a valid Uploaded Source Analysis result that states
 An intermediate analysis result that selects factual claims, tables, metrics, source excerpts, gaps, and rejected material from Uploaded Source Material. It owns the continuation decision for factual uploaded-source analysis. It must not select visual assets for page use.
 
 **Uploaded Source Visual Analysis Draft**:
-An intermediate analysis result that interprets images, screenshots, charts, diagrams, and other visual material found in Uploaded Source Material, including suitability for PPT use and user-provided use constraints. It owns the continuation decision for visual uploaded-source analysis. Uploaded images and embedded visuals are not page-usable Visual Research Evidence until selected through Uploaded Source Visual Analysis and later assigned to a page. It must not promote visual text or chart content as factual evidence unless that content is separately captured by factual analysis.
+An intermediate analysis result that interprets images, screenshots, charts, diagrams, and other visual material found in Uploaded Source Material, including suitability for PPT use and user-provided use constraints. It owns the continuation decision for visual uploaded-source analysis. Uploaded images and embedded visuals are not usable Visual Research Evidence until selected through Uploaded Source Visual Analysis and promoted into Shared Research Evidence. It must not promote visual text or chart content as factual evidence unless that content is separately captured by factual analysis.
 
 **Research Curation**:
-The step that turns Raw Research Material into Research Evidence by selecting relevant facts, sources, and visual assets for a Page Generation Unit.
-
-**Research Curation Draft**:
-An intermediate curation result selected from Raw Research Material before it is promoted into a Research Discovery Evidence Pool or page-assigned Research Evidence. Drafts from interrupted research work are not valid inputs for Research Evidence until the research stage is completed again.
-
-**Web Research Curation Draft**:
-A Research Curation Draft that contains candidate factual evidence, source judgments, derived insights, rejected material, and gaps from web material.
-
-**Visual Research Curation Draft**:
-A Research Curation Draft that contains candidate visual assets, visual judgments, rejected material, and gaps from image material.
+The step that turns Raw Research Material into Shared Research Evidence by selecting relevant facts, derived insights, visual assets, and gaps for the Deck.
 
 **Research Log**:
-A Workspace-owned diagnostic record of Research Discovery, Research Collection, Research Curation, and Page Evidence Assignment activity. It is separate from Page Generation Stage Records and is used for troubleshooting evidence decisions.
+A Workspace-owned diagnostic record of Research Discovery, Research Collection, and Research Curation activity, including external research API interactions and technical failures. It is separate from AI Interaction Logs, Workspace Storage Transfer Logs, and Page Generation Stage Records; their correlation identifiers connect related AI decisions, external collection, and asset transfers without merging their ownership boundaries.
 
 **Research Evidence**:
-Curated facts, sources, and visual assets selected from Raw Research Material for use in Page Generation. Page-assigned Research Evidence is materialized for one Page Generation Unit from the Research Discovery Evidence Pool and evidence-assignment decisions. It is an allowed grounding source for generated page content.
+Curated facts, derived insights, visual assets, and gaps selected from Raw Research Material for use in Page Generation. Shared Research Evidence is the deck-level authoritative grounding source for generated page content; raw material is never a substitute for it.
 _Avoid_: Raw search results, raw crawl output
 
 **Visual Research Evidence**:
-A curated visual asset selected for a Page Generation Unit because it fits the page intent and is visually usable. Text, charts, or claims visible inside the asset are not grounded facts unless separately captured as Research Evidence.
+A curated visual asset selected for the Deck because it is visually usable and has a documented source. Text, charts, or claims visible inside the asset are not grounded facts unless separately captured as Research Evidence.
+
+**Visual Research Candidate**:
+An image returned by external visual search and inspected for possible Deck use. A candidate is not Visual Research Evidence until it is selected as usable; rejected candidates remain diagnostic material and cannot be used for Page Authoring.
 
 **Shared Research Evidence**:
-Curated deck-level material that can support multiple Page Generation Units without belonging exclusively to one page.
+Curated deck-level facts, derived insights, visual assets, and gaps that can support multiple Page Generation Units. It is composed of an ordered history of Research Batches and is the authoritative research grounding source available to page authoring, while external URLs and raw collection records remain diagnostic material rather than Page Authoring context.
+
+**Research Batch**:
+One ordered addition to Shared Research Evidence produced during initial Deck Generation or a later Deck or Page Refinement. A batch records curated evidence or an explicit skipped or gap outcome. Its heading may describe the generation or refinement that produced it for human readability, but it does not define page-level applicability and Page Authoring does not filter research by a structured target-page scope. Newer information takes precedence when it conflicts with older information, while older batches remain part of the evidence history.
+User-facing Chinese label: 研究批次
+_Avoid_: Research Update, Page Evidence Assignment
 
 **Deck**:
 The finished presentation content before export.
@@ -294,7 +289,7 @@ The visible stream for an Active Page Generation. It shows the current page run 
 The user-facing record of what happened within one Page Generation Unit across stages such as authoring, rendering, review, and fixing. It may include live or completed agent output, but it is presented as page work rather than as session history.
 
 **Page Visual Review**:
-The optional, user-enabled Page Generation check that judges whether a rendered page screenshot is visually usable as a PPT page, including layout completeness, readability, overlap, cutoff, contrast, missing or broken visuals, unintended blank areas, and fit within the canvas. It does not read or judge the Workspace Style Guide or Visual Style Preset, and does not review factual grounding, output language, or content correctness; after its bounded automatic fix attempts are exhausted, the page is accepted with the unresolved review recorded so the user can inspect the completed Deck instead of being blocked.
+The optional, user-enabled Page Generation check that judges whether a rendered page screenshot is visually usable as a PPT page, including layout completeness, readability, overlap, cutoff, contrast, missing or broken visuals, unintended blank areas, and fit within the canvas. A valid review also includes a concise description of what the attached screenshot visibly contains, so diagnostics can distinguish an actual visual judgment from an unreadable image input. Failure to make the screenshot available or obtain a valid review is a Page Visual Review infrastructure failure rather than a page render or usability failure; after its own infrastructure retries are exhausted, the current rendered page is accepted without entering visual-review-fix. It does not read or judge the Workspace Style Guide or Visual Style Preset, and does not review factual grounding, output language, or content correctness; after bounded automatic fixes for a valid failed review are exhausted, the page is accepted with the unresolved review recorded so the user can inspect the completed Deck instead of being blocked.
 _Avoid_: Self Review when referring to the visual-only screenshot check.
 
 **Generation Session History**:
@@ -309,6 +304,60 @@ _Avoid_: Session History, Live Page Stream
 A Workspace-owned diagnostic record of Host Upload and APS Files transfer activity associated with the Workspace, including transfer lifecycle phases, source operation associations, storage identifiers, and failure responses. It is separate from AI Interaction Logs and does not store file contents; it exists to trace transport and persistence boundaries for troubleshooting.
 _Avoid_: Agent Session Log, Export History, Uploaded Source Material
 
+**Performance Testing**:
+An internal, explicitly enabled testing capability that measures user-perceived interactions and authoritative workflow stages before release using performance metadata rather than business content or raw diagnostic payloads. It is separate from Workspace diagnostics and does not collect ordinary users' production activity.
+User-facing Chinese label: 性能测试
+_Avoid_: Production Telemetry, Product Analytics, Workspace Diagnostics
+
+**Performance Run**:
+A bounded recording session within Performance Testing that captures the tester's actual product operations and may involve zero, one, or multiple Workspaces. It begins and ends explicitly, remains active across an app or engine interruption until a tester resolves it, is the source record for its performance report, and at most one may be active within a PPT global workspace root.
+User-facing Chinese label: 性能测试运行
+_Avoid_: Workspace, Generation Run, User Session
+
+**Performance Run Finalization**:
+The retryable process that stops a Performance Run from accepting new observations and derives its performance report from the captured source record. When explicitly forced, it marks unfinished Performance Operations as interrupted without stopping the measured product work; its own failure is a failure of the testing capability rather than a verdict on any measured product operation.
+User-facing Chinese label: 结束并生成报告
+
+**Abandoned Performance Run**:
+A Performance Run explicitly ended by a tester without producing a valid performance report. Its captured observations remain diagnostic material rather than becoming a completed test result.
+User-facing Chinese label: 已放弃的性能测试运行
+_Avoid_: Deleted Performance Run, Failed Product Operation
+
+**Button Interaction**:
+A measured activation of a PPT App-owned button with a stable testing identity, from the tester's action through the browser's next presentation of that interaction. It describes interaction responsiveness rather than completion of asynchronous business work; key asynchronous buttons may additionally measure their explicit feedback state, and controls inside generated content or embedded page output are excluded.
+User-facing Chinese label: 按钮交互
+_Avoid_: Button Task, Business Operation, Click Handler Duration
+
+**Performance Operation**:
+A measured product operation with an explicit lifecycle and outcome, potentially spanning frontend, backend, and workflow stages. A key asynchronous Button Interaction may start one, while purely local controls do not require one.
+User-facing Chinese label: 性能操作
+_Avoid_: Button Interaction, Diagnostic Log Entry
+
+**Performance Attempt**:
+One actual automatic attempt within a parent Performance Operation, including its own lifecycle and outcome. Automatic retries create additional attempts under the same operation, while a tester's explicit retry begins a new Performance Trace.
+User-facing Chinese label: 性能尝试
+_Avoid_: Performance Operation, User Retry, Hidden Recovered Failure
+
+**Performance Trace**:
+The causally connected record of one tester intent or system-initiated flow within a Performance Run, composed of related Performance Operations across product boundaries. A Performance Run contains many Performance Traces, while existing diagnostic operation and interaction identifiers remain linked evidence rather than being redefined by the trace.
+User-facing Chinese label: 性能链路
+_Avoid_: Performance Run, AI Interaction Log, User Session
+
+**Performance Report**:
+A derived presentation of the performance measurements captured by one completed Performance Run, organized by stable interactions, operations, and workflow stages. It reports observed metrics without assigning a product score or turning measured business failures into a verdict on the report itself.
+User-facing Chinese label: 性能报告
+_Avoid_: Performance Score, Test Verdict, Diagnostic Bundle
+
+**Performance Data Integrity**:
+The completeness assessment of a Performance Run's captured measurements, based on known event loss, corruption, or producer sequence gaps. It is independent of the run's lifecycle, report generation outcome, and the success or failure of measured product operations.
+User-facing Chinese label: 性能数据完整性
+_Avoid_: Performance Run Status, Product Operation Status
+
+**Performance Run History**:
+The retained collection of terminal Performance Runs available for later inspection or report regeneration. It is not automatically expired; testers explicitly remove runs they no longer need.
+User-facing Chinese label: 性能测试历史
+_Avoid_: Workspace History, Generation Session History, Automatic Retention
+
 **Failed Page Generation**:
 A Page Generation Unit that reached a terminal state without becoming accepted after its automatic recovery attempts are exhausted or manual review is required. Its run and accepted pages remain available for retry while the pre-run Workspace stays current; only Generation Abandonment discards them, and Generation Commit cannot begin until every failed page is resolved.
 
@@ -320,7 +369,7 @@ _Avoid_: Abandoned Page — Generation Abandonment discards the whole run rather
 A transient Agent Session infrastructure failure where the platform cannot continue an Agent run because the app session authorization is unavailable. It is treated as infrastructure failure, not as a Page Generation content or render failure.
 
 **Deck Refinement**:
-A user-requested revision of an accepted Deck as a whole after Deck Generation. It may update deck-level context, output language, Confirmed Outline, page-assigned Research Evidence, and selected Page Generation Units while preserving unaffected accepted pages when safe.
+A user-requested revision of an accepted Deck as a whole after Deck Generation. It may update deck-level context, output language, Confirmed Outline, Shared Research Evidence, and selected Page Generation Units while preserving unaffected accepted pages when safe.
 When the Confirmed Outline changes without changing output language, only Page Generation Units whose outline intent changed are affected unless the request explicitly asks for a global style, language, or narrative rewrite.
 Deck Refinement preserves the Deck title unless the request explicitly changes it. A changed title updates the Workspace and active Confirmed Outline authorities but affects only the Page Generation Units that the reconciliation identifies as needing to express the new title.
 An explicit output-language change updates the Confirmed Presentation Requirements, rewrites the active Confirmed Outline in the new language, and makes every retained Page Generation Unit a refinement target. Merely using foreign terms or examples does not change the Deck output language.
@@ -342,7 +391,7 @@ The user's active instruction for revising an accepted Deck as a whole. It may e
 The pre-commit decision process that reconciles a Deck Refinement Request into the resulting Deck title, output-language decision, ordered page operations, complete changed or added Outline Entries, shared Style Guide decision when the Workspace has no Visual Style Preset, and page-level refinement reasons. With a confirmed preset, the planning result keeps the preset Style Guide and still identifies every Page Generation Unit affected by the active request. It does not author Page Sources and preserves page count and order unless the request explicitly authorizes structural change.
 
 **Deck Refinement Resume**:
-The user action that continues an unfinished Deck Refinement from persisted deck-level decisions and target pages. It does not reinterpret completed context, outline, evidence-assignment, or research-routing decisions as a new request.
+The user action that continues an unfinished Deck Refinement from persisted deck-level decisions and target pages. It does not reinterpret completed context, outline, Shared Research Evidence, or research-routing decisions as a new request.
 The committed target Page Generation Units already own their refinement execution states, while the persisted Deck Refinement Request and page-level reasons preserve the authoring intent needed to continue without replanning.
 
 **Deck Refinement Preparation**:
@@ -369,10 +418,10 @@ _Avoid_: Visual Review Issue, Rewrite Request
 The user action that continues an unfinished Page Refinement using the same persisted Page Refinement Request and the same target pages. It preserves non-target accepted pages and does not reinterpret the refinement as a new request.
 
 **Page Refinement Visual Context**:
-The last successful rendered screenshot preserved for a target page when Page or Deck Refinement resets that page's execution state. It is an optimization-before baseline for visual and layout changes until a new successful render replaces it, but text, numbers, charts, and claims visible in it are not grounding evidence unless separately present in allowed sources.
+The last successful rendered screenshot preserved for a retained target page when Page or Deck Refinement resets that page's execution state. It is required visual input for initial Page Authoring, no-change/session retries, and render-fix attempts until a new successful render replaces it; once a new render exists, Page Visual Review and visual-review-fix use that latest rendered screenshot instead. Text, numbers, charts, and claims visible in any screenshot are not grounding evidence unless separately present in allowed sources. A newly added Page Generation Unit has no Page Refinement Visual Context, and a non-target page does not receive one.
 
 **Deck Generation Resume**:
-The user action that continues the same unfinished Deck Generation by completing missing Workspace Style Guide, research, evidence-assignment, or Page Source preparation work, re-running any Page Generation Unit that is not accepted yet, including Interrupted Page Generations, pending pages, infrastructure failures, and Failed Page Generations, or by continuing Final Deck Render when all pages are accepted but final Deck artifacts are not ready. It keeps accepted pages from that run without replacing the pre-run current Workspace until Generation Commit succeeds; an unfinished page keeps its previous state until its resumed work actually starts.
+The user action that continues the same unfinished Deck Generation by completing missing Workspace Style Guide, research, or Page Source preparation work, re-running any Page Generation Unit that is not accepted yet, including Interrupted Page Generations, pending pages, infrastructure failures, and Failed Page Generations, or by continuing Final Deck Render when all pages are accepted but final Deck artifacts are not ready. It keeps accepted pages from that run without replacing the pre-run current Workspace until Generation Commit succeeds; an unfinished page keeps its previous state until its resumed work actually starts.
 _Avoid_: Regenerate, Restart — those discard accepted pages and start the whole Deck over.
 
 **Generation Abandonment**:
@@ -464,3 +513,19 @@ Expert: "No. An Export Artifact Mirror is PPT App-internal transport under an in
 Dev: "Can the support action be called Log Export if it includes the whole Workspace?"
 
 Expert: "No. Call it a Workspace Diagnostic Bundle so users understand that uploaded sources, authoring files, logs, and generated artifacts may all be included."
+
+Dev: "Anna image fetch succeeded, but the image never reached the Workspace. Is the Research Log enough to locate the failure?"
+
+Expert: "No. The Research Log shows the external API interaction; use its correlation identifiers with the Workspace Storage Transfer Log to distinguish the later APS download and Host Upload stages."
+
+Dev: "Should creating a Workspace automatically create a Performance Run?"
+
+Expert: "No. A Performance Run belongs to an explicitly started internal test recording, which may include creating, opening, or never using a Workspace at all."
+
+Dev: "The tester confirmed an Outline and that started a full Deck Generation. Are those separate Performance Runs?"
+
+Expert: "No. They belong to one Performance Run and one causal Performance Trace, with confirmation and downstream generation represented as related Performance Operations."
+
+Dev: "One telemetry batch could not be delivered, but the PPT finished and the report was generated. Did the Performance Run fail?"
+
+Expert: "No. The report may complete while Performance Data Integrity is degraded; the measured PPT result and the testing data's completeness are separate facts."

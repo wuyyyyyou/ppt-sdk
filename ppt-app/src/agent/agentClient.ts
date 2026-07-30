@@ -1,4 +1,9 @@
-import type { AnnaAgentSession, AnnaRuntime } from "../runtime/annaRuntime";
+import type {
+  AnnaAgentImageAttachment,
+  AnnaAgentSession,
+  AnnaRuntime,
+} from "../runtime/annaRuntime";
+import { beginPerformanceSpan } from "../performance/performanceRecorder";
 import {
   AGENT_TOOLS_UNAVAILABLE_MESSAGE,
   getAgentToolAccessWarning,
@@ -53,6 +58,7 @@ export interface AgentRunSummary {
 export interface AgentPageVisualReviewResult {
   pass: boolean;
   score: number;
+  image_description: string;
   issues: Array<{
     severity?: string;
     area?: string;
@@ -64,10 +70,21 @@ export interface AgentPageVisualReviewResult {
   session_cache_miss_retries?: number;
 }
 
+export interface AgentImageResearchDecision {
+  candidates: Array<{
+    candidate_id: string;
+    use_in_ppt: boolean;
+    description: string;
+    reason: string;
+  }>;
+  session_cache_miss_retries?: number;
+}
+
 export interface AgentClient {
   checkToolAccess(): Promise<void>;
   runAuthoringPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentRunSummary>;
   runPageVisualReviewPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentPageVisualReviewResult>;
+  runImageResearchPrompt(prompt: string, options?: AgentRunOptions): Promise<AgentImageResearchDecision>;
   cancelActiveRuns(): Promise<void>;
   close(): Promise<void>;
 }
@@ -79,6 +96,7 @@ export type AgentStreamEvent =
   | { type: "complete"; usage?: unknown };
 
 export interface AgentRunOptions {
+  attachments?: AnnaAgentImageAttachment[];
   onStreamEvent?: (event: AgentStreamEvent) => void;
   signal?: AbortSignal;
   isCancelled?: () => boolean;
@@ -223,9 +241,18 @@ function normalizePageVisualReview(value: unknown): AgentPageVisualReviewResult 
     ? (value as Partial<AgentPageVisualReviewResult>)
     : {};
 
+  const imageDescription = typeof record.image_description === "string"
+    ? record.image_description.trim()
+    : "";
+  const normalizedImageDescription = imageDescription || "IMAGE_UNAVAILABLE";
+  const imageUnavailable = normalizedImageDescription.toUpperCase() === "IMAGE_UNAVAILABLE";
+
   return {
-    pass: record.pass === true,
-    score: typeof record.score === "number" ? record.score : 0,
+    pass: imageUnavailable ? false : record.pass === true,
+    score: imageUnavailable
+      ? 0
+      : typeof record.score === "number" ? record.score : 0,
+    image_description: normalizedImageDescription,
     issues: Array.isArray(record.issues)
       ? record.issues
           .filter((item): item is AgentPageVisualReviewResult["issues"][number] =>
@@ -237,11 +264,25 @@ function normalizePageVisualReview(value: unknown): AgentPageVisualReviewResult 
       : [],
     revision_request:
       typeof record.revision_request === "string" ? record.revision_request : "",
-    confidence:
-      record.confidence === "high" || record.confidence === "low"
+    confidence: imageUnavailable
+      ? "low"
+      : record.confidence === "high" || record.confidence === "low"
         ? record.confidence
         : "medium",
   };
+}
+
+function normalizeImageResearchDecision(value: unknown): AgentImageResearchDecision {
+  const record = isRecord(value) ? value : {};
+  const candidates = Array.isArray(record.candidates)
+    ? record.candidates.filter(isRecord).map((candidate) => ({
+        candidate_id: readString(candidate.candidate_id).trim(),
+        use_in_ppt: candidate.use_in_ppt === true,
+        description: readString(candidate.description).trim() || "No image description was returned.",
+        reason: readString(candidate.reason).trim() || "No selection reason was returned.",
+      })).filter((candidate) => candidate.candidate_id.length > 0)
+    : [];
+  return { candidates };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -405,7 +446,10 @@ async function collectRunText(
   let output = "";
   const events: AgentStreamEvent[] = [];
 
-  const rawStream = session.run({ content });
+  const rawStream = session.run({
+    content,
+    ...(options?.attachments?.length ? { attachments: options.attachments } : {}),
+  });
   const sessionRecord = session as unknown as Record<string, unknown>;
   const streamRecord = rawStream as unknown as Record<string, unknown>;
   const initialRunId = typeof streamRecord.run_id === "string"
@@ -450,7 +494,7 @@ function isActiveSessionLimitMessage(message: string) {
 }
 
 function isInfrastructureMessage(message: string) {
-  return /APP_NOT_GRANTED|invalid app_session_token|session\.mint|agent\.session|transport|HTTP 401|HTTP 429/i.test(message);
+  return /APP_NOT_GRANTED|APP_MODEL_NOT_VISION_CAPABLE|invalid app_session_token|session\.mint|agent\.session|transport|HTTP 401|HTTP 429/i.test(message);
 }
 
 function toErrorMessage(error: unknown) {
@@ -575,6 +619,7 @@ export async function createAgentClient(
   const toolAccessPolicy =
     clientOptions.toolAccessPolicy ?? DEFAULT_AGENT_TOOL_ACCESS_POLICY;
   async function createSession() {
+    const performanceSpan = beginPerformanceSpan({ operationName: "agent.session", attributes: { phase: "create" } });
     try {
       const session = await runtime.agent.session({ submode: "auto" });
       activeSessions.add(session);
@@ -589,12 +634,14 @@ export async function createAgentClient(
           }
         }
       }
+      performanceSpan?.finish("ok");
       return {
         session,
         createdAtMs: Date.now(),
         expiresInSeconds: readSessionExpiresInSeconds(session),
       };
     } catch (error) {
+      performanceSpan?.finish("error");
       throw toAgentInfrastructureError(error, "Failed to create Agent session.");
     }
   }
@@ -630,6 +677,16 @@ export async function createAgentClient(
           },
         })
       : null;
+    const performanceSpan = beginPerformanceSpan({
+      operationName: "agent.session.attempt",
+      workspaceId: runOptions?.logContext?.workspace_dir.split(/[\\/]/).filter(Boolean).at(-1),
+      attributes: {
+        phase: "run",
+        session_retry: sessionState.sessionRetries,
+        stream_idle_retry: sessionState.streamIdleRetries,
+        cache_miss_retry: sessionState.sessionCacheMissRetryState.retries,
+      },
+    });
     try {
       const collected = await withTimeout(
         collectRunText(
@@ -661,8 +718,10 @@ export async function createAgentClient(
           message: `Agent session recovered after ${sessionState.sessionCacheMissRetryState.retries - cacheMissRetriesAtRunStart} retries`,
         });
       }
+      performanceSpan?.finish("ok");
       return collected;
     } catch (error) {
+      performanceSpan?.finish("error");
       if (interactionHandle) {
         await runOptions?.logContext?.logger?.finishInteraction(interactionHandle, {
           status: isStreamCancelledError(error) ? "cancelled" : "failed",
@@ -754,7 +813,7 @@ export async function createAgentClient(
       }
       if (
         error instanceof AgentRunStreamError &&
-        (error.expired || error.code === "http" || isInfrastructureMessage(error.message))
+        (error.expired || error.code === "http" || error.code === "APP_MODEL_NOT_VISION_CAPABLE" || isInfrastructureMessage(error.message))
       ) {
         throw toAgentInfrastructureError(error, "Agent session failed.");
       }
@@ -881,7 +940,7 @@ export async function createAgentClient(
         }
         if (
           error instanceof AgentRunStreamError &&
-          (error.expired || error.code === "http" || isInfrastructureMessage(error.message))
+          (error.expired || error.code === "http" || error.code === "APP_MODEL_NOT_VISION_CAPABLE" || isInfrastructureMessage(error.message))
         ) {
           throw toAgentInfrastructureError(error, "Agent session failed.");
         }
@@ -892,6 +951,46 @@ export async function createAgentClient(
       } finally {
         await deleteSession(sessionMeta?.session ?? null);
       }
+    }
+  }
+
+  async function collectImageResearchWithSameSessionRepair(
+    prompt: string,
+    runOptions: AgentRunOptions | undefined,
+  ): Promise<AgentImageResearchDecision> {
+    const sessionMeta = await createSession();
+    const sessionCacheMissRetryState: AgentSessionCacheMissRetryState = { retries: 0, totalWaitMs: 0 };
+    const sessionState = {
+      sessionRetries: 0,
+      streamIdleRetries: 0,
+      sessionCacheMissRetryState,
+    };
+    try {
+      const collected = await runPromptWithSession(sessionMeta, prompt, runOptions, sessionState);
+      try {
+        return {
+          ...normalizeImageResearchDecision(parseJsonObject(collected.text, "image research")),
+          session_cache_miss_retries: sessionCacheMissRetryState.retries,
+        };
+      } catch (error) {
+        const repairPrompt = buildStructuredJsonRepairPrompt(
+          collected.text,
+          '{"candidates":[{"candidate_id":"image-id","use_in_ppt":false,"description":"short description","reason":"short reason"}]}',
+          error instanceof Error ? error.message : String(error),
+        );
+        const repaired = await runPromptWithSession(
+          sessionMeta,
+          repairPrompt,
+          runOptions ? { ...runOptions, attachments: undefined } : undefined,
+          sessionState,
+        );
+        return {
+          ...normalizeImageResearchDecision(parseJsonObject(repaired.text, "image research")),
+          session_cache_miss_retries: sessionCacheMissRetryState.retries,
+        };
+      }
+    } finally {
+      await deleteSession(sessionMeta.session);
     }
   }
 
@@ -920,16 +1019,22 @@ export async function createAgentClient(
       } catch (error) {
         const repairPrompt = buildStructuredJsonRepairPrompt(
           collected.text,
-          '{"pass":true,"score":8,"issues":[],"revision_request":"","confidence":"medium"}',
+          '{"pass":false,"score":0,"image_description":"IMAGE_UNAVAILABLE","issues":[],"revision_request":"","confidence":"low"}',
           error instanceof Error ? error.message : String(error)
         );
-        const repaired = await collectWithSessionRetry(repairPrompt, options);
+        const repaired = await collectWithSessionRetry(repairPrompt, options
+          ? { ...options, attachments: undefined }
+          : undefined);
         return {
           ...normalizePageVisualReview(parseJsonObject(repaired.text, "page visual review")),
           session_cache_miss_retries:
             collected.sessionCacheMissRetries + repaired.sessionCacheMissRetries,
         };
       }
+    },
+
+    runImageResearchPrompt(prompt, options) {
+      return collectImageResearchWithSameSessionRepair(prompt, options);
     },
 
     async cancelActiveRuns() {

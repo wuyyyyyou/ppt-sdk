@@ -266,6 +266,7 @@ test(
       assert.equal(response.result?.data?.workspace_dir, workspaceDir);
       assert.deepEqual(response.result?.data?.setting, {
         page_generation_concurrency: 5,
+        research_image_session_concurrency: 5,
         visual_review_enabled: true,
         visual_review_failure_limit: 2,
         disable_web_research: false,
@@ -345,6 +346,16 @@ test("Workspace Style Guide Host Upload waits for persistence before staging cle
   assert.match(handler, /return await recordAppWorkspaceStyleGuide\(\{/);
 });
 
+test("Shared Research Image Host Upload waits for import before staging cleanup", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+  const handler = source.match(
+    /async function toolAppImportSharedResearchImageHostUpload\(args\) \{[\s\S]*?\n\}/,
+  )?.[0];
+
+  assert.ok(handler, "Missing Shared Research Image Host Upload handler");
+  assert.match(handler, /return await importAppSharedResearchImage\(\{/);
+});
+
 test("app_get_rendered_deck_html is declared and routed", async () => {
   const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
   const manifest = JSON.parse(
@@ -419,20 +430,45 @@ test("style profile app tools are declared and routed", async () => {
   );
 });
 
-test("app_get_research_evidence returns a JSON result reference", async () => {
+test("legacy research tools are no longer declared or routed", async () => {
   const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
   const manifest = JSON.parse(
     await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
-  ) as { tools: Array<{ name: string; description?: string }> };
+  ) as { tools: Array<{ name: string }> };
 
-  assert.match(source, /app_get_research_evidence:\s*toolAppGetResearchEvidence/);
-  assert.match(source, /registerJsonReference\(\s*await getAppResearchEvidence/);
-  assert.match(source, /"research-evidence\.json"/);
-  assert.match(source, /"result_upload"/);
-  assert.match(
-    manifest.tools.find((tool) => tool.name === "app_get_research_evidence")?.description ?? "",
-    /result_upload/,
-  );
+  const legacyToolNames = [
+    "app_prepare_research_workspace",
+    "app_record_research_plan",
+    "app_get_research_plan",
+    "app_append_research_evidence",
+    "app_get_research_evidence",
+    "app_record_page_evidence_assignment",
+    "app_get_page_evidence_assignment",
+    "app_finalize_research_visual_assets",
+    "app_record_research_curation_draft",
+    "app_get_research_curation_draft",
+    "app_get_research_curation_draft_fingerprint",
+    "app_record_research_status",
+    "app_get_research_status",
+  ];
+
+  for (const toolName of legacyToolNames) {
+    assert.equal(manifest.tools.some((tool) => tool.name === toolName), false, toolName);
+    assert.equal(source.includes(`${toolName}:`), false, toolName);
+  }
+});
+
+test("page preview rendering and current screenshot upload are separate tools", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+  const manifest = JSON.parse(
+    await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
+  ) as { tools: Array<{ name: string }> };
+
+  assert.match(source, /app_render_workspace_page_preview:\s*toolAppRenderWorkspacePagePreview/);
+  assert.match(source, /app_upload_current_page_screenshot:\s*toolAppUploadCurrentPageScreenshot/);
+  assert.ok(manifest.tools.some((tool) => tool.name === "app_upload_current_page_screenshot"));
+  assert.match(source, /for \(let attempt = 1; attempt <= 3; attempt \+= 1\)/);
+  assert.match(source, /getAppPageProgress\(\{ workspace_dir: workspaceDir \}\)/);
 });
 
 test("Host Upload JSON references declare a bounded server-side CORS fallback", async () => {
@@ -483,121 +519,14 @@ test("workspace theme token tools are declared and routed", async () => {
   );
 });
 
-test("research curation draft tools declare optional draft_id", async () => {
-  const manifest = JSON.parse(
-    await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
-  ) as { tools: Array<{ name: string; parameters?: Array<{ name: string; required?: boolean }> }> };
-
-  for (const toolName of [
-    "app_record_research_curation_draft",
-    "app_get_research_curation_draft",
-    "app_get_research_curation_draft_fingerprint",
-  ]) {
-    const parameter = getToolParameter(manifest, toolName, "draft_id");
-    assert.equal(parameter.required, false);
-  }
-});
-
-test("research curation draft plugin wrapper forwards draft_id", async () => {
-  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
-
-  assert.match(source, /const draftId = readOptionalStringArg\(args, "draft_id"\)/);
-  assert.match(source, /draft_id:\s*draftId/);
-});
-
 let pluginInvokeSkip: string | false = false;
 try {
-  const distIndex = await readFile(new URL("../../dist/index.js", import.meta.url), "utf8");
-  if (!distIndex.includes("draft_id")) {
-    pluginInvokeSkip = "requires a built dist/index.js with draft_id support";
-  }
+  await readFile(new URL("../../dist/index.js", import.meta.url), "utf8");
 } catch {
   pluginInvokeSkip = "requires a built dist/index.js";
 }
 
-test("research curation draft plugin invoke uses scoped draft_id paths", { skip: pluginInvokeSkip }, async () => {
-  const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-plugin-draft-home-"));
-  const workspaceDir = path.join(homeDir, "anna-workspace", "ppt", "ppt-20260701-000001");
-  const previousHome = process.env.HOME;
-  process.env.HOME = homeDir;
-  const plugin = await startPluginProcess();
-
-  try {
-    const describe = await plugin.request("describe");
-    assert.ok(!describe.error, describe.error?.message);
-    const tools = describe.result?.tools ?? [];
-    const manifest = { tools };
-    assert.equal(getToolParameter(manifest, "app_record_research_curation_draft", "draft_id").required, false);
-
-    const draftId = "discovery-page-06-web-1-test-run";
-    const record = await plugin.request("invoke", {
-      tool: "app_record_research_curation_draft",
-      arguments: {
-        workspace_dir: workspaceDir,
-        page_id: "page-01",
-        draft_type: "web",
-        draft_id: draftId,
-        draft: {
-          version: 1,
-          status: "curated",
-          facts: [{ id: "fact-1", claim: "Scoped claim", source_type: "web_source" }],
-          derived_insights: [],
-          gaps: [],
-          rejected_material: [],
-        },
-      },
-    });
-    assert.ok(!record.error, record.error?.message);
-    assert.equal(path.basename(String(record.result?.data?.draft_path)), `${draftId}-web.json`);
-
-    const read = await plugin.request("invoke", {
-      tool: "app_get_research_curation_draft",
-      arguments: {
-        workspace_dir: workspaceDir,
-        page_id: "page-01",
-        draft_type: "web",
-        draft_id: draftId,
-      },
-    });
-    assert.ok(!read.error, read.error?.message);
-    assert.equal(path.basename(String(read.result?.data?.draft_path)), `${draftId}-web.json`);
-
-    const fingerprint = await plugin.request("invoke", {
-      tool: "app_get_research_curation_draft_fingerprint",
-      arguments: {
-        workspace_dir: workspaceDir,
-        page_id: "page-01",
-        draft_type: "web",
-        draft_id: draftId,
-      },
-    });
-    assert.ok(!fingerprint.error, fingerprint.error?.message);
-    assert.equal(fingerprint.result?.data?.draft_id, draftId);
-    assert.equal(path.basename(String(fingerprint.result?.data?.draft_path)), `${draftId}-web.json`);
-
-    const legacy = await plugin.request("invoke", {
-      tool: "app_get_research_curation_draft_fingerprint",
-      arguments: {
-        workspace_dir: workspaceDir,
-        page_id: "page-01",
-        draft_type: "web",
-      },
-    });
-    assert.ok(!legacy.error, legacy.error?.message);
-    assert.equal(legacy.result?.data?.exists, false);
-    assert.equal(path.basename(String(legacy.result?.data?.draft_path)), "page-01-web.json");
-  } finally {
-    await plugin.close();
-    if (previousHome === undefined) {
-      delete process.env.HOME;
-    } else {
-      process.env.HOME = previousHome;
-    }
-    await rm(homeDir, { recursive: true, force: true });
-  }
-});
-
-test("app_append_workspace_log plugin wrapper accepts theme, style-guide, and storage log channels", { skip: pluginInvokeSkip }, async () => {
+test("app_append_workspace_log plugin wrapper accepts research web, theme, style-guide, and storage log channels", { skip: pluginInvokeSkip }, async () => {
   const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-plugin-theme-log-home-"));
   const workspaceDir = path.join(homeDir, "anna-workspace", "ppt", "ppt-20260701-000002");
   const previousHome = process.env.HOME;
@@ -610,6 +539,7 @@ test("app_append_workspace_log plugin wrapper accepts theme, style-guide, and st
       "ai-theme-interactions",
       "ai-style-guide",
       "ai-style-guide-interactions",
+      "research-web-interactions",
       "storage-transport",
     ] as const) {
       const response = await plugin.request("invoke", {
@@ -637,10 +567,12 @@ test("app_append_workspace_log plugin wrapper accepts theme, style-guide, and st
       "utf8",
     );
     const storageLog = await readFile(path.join(workspaceDir, ".log", "storage-transport.jsonl"), "utf8");
+    const researchWebLog = await readFile(path.join(workspaceDir, ".log", "research-web-interactions.jsonl"), "utf8");
     assert.match(themeLog, /ai-theme\.test/);
     assert.match(themeInteractionLog, /ai-theme-interactions\.test/);
     assert.match(styleGuideLog, /ai-style-guide\.test/);
     assert.match(styleGuideInteractionLog, /ai-style-guide-interactions\.test/);
+    assert.match(researchWebLog, /research-web-interactions\.test/);
     assert.match(storageLog, /storage-transport\.test/);
   } finally {
     await plugin.close();
@@ -651,4 +583,19 @@ test("app_append_workspace_log plugin wrapper accepts theme, style-guide, and st
     }
     await rm(homeDir, { recursive: true, force: true });
   }
+});
+
+test("app_append_workspace_log declares mutually exclusive inline and Host Upload entries", async () => {
+  const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
+  const manifest = JSON.parse(
+    await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
+  ) as { tools: Array<{ name: string; parameters?: Array<{ name: string; required?: boolean }> }> };
+
+  assert.equal(getToolParameter(manifest, "app_append_workspace_log", "entry").required, false);
+  assert.equal(getToolParameter(manifest, "app_append_workspace_log", "entry_upload").required, false);
+  assert.match(source, /Exactly one of \"entry\" or \"entry_upload\" must be provided/);
+  assert.match(
+    source,
+    /toolAppResolveHostUploadJsonReference\(\{ host_upload: args\.entry_upload \}\)/,
+  );
 });

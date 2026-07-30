@@ -1,3 +1,7 @@
+---
+status: superseded by ADR-0043
+---
+
 # 拆分 Research Curation Draft 并由代码合并最终 Research Evidence
 
 Research Curation 从 Raw Research Material 中筛选事实证据和视觉素材，但 web 事实判断与图片可用性判断是不同任务。决定将单个 Research Curation agent 拆为 Web Research Curation Draft 和 Visual Research Curation Draft 两类中间产物；agent 只写各自 draft，最终 Research Evidence 由代码确定性合并写入。这样牺牲一部分生成速度和实现简单性，换取事实证据、视觉资产和最终 evidence 写入边界更清晰，并避免多个 agent 竞争修改同一个 `evidence-index.json`。

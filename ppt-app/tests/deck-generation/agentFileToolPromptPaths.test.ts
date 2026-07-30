@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type {
-  RenderWorkspacePagePreviewResult,
-  WorkspaceOutline,
-} from "../../src/api/types.ts";
+import type { WorkspaceOutline } from "../../src/api/types.ts";
 import type { AuthoringDeck, AuthoringPage } from "../../src/features/deck-generation/types.ts";
 import {
   buildAuthoringPrompt,
@@ -60,45 +57,48 @@ describe("Agent file-tool path prompt blocks", () => {
     assert.match(prompt, /Agent file-tool absolute path: \/tmp\/anna-workspace\/ppt\/ppt-20260630-152620\/outline\.json/);
     assert.match(prompt, /Agent file-tool absolute path: \/tmp\/anna-workspace\/ppt\/ppt-20260630-152620\/style-guide\.md/);
     assert.match(prompt, /Agent file-tool absolute path: \/tmp\/anna-workspace\/ppt\/ppt-20260630-152620\/authoring-kit\/README\.md/);
+    assert.match(prompt, /file_path 是当前 Workspace 中已导入图片的绝对路径/);
+    assert.match(prompt, /必须原样使用该 file_path/);
+    assert.match(prompt, /不得改成相对路径、添加 \.\/ 或 \.\.\//);
+    assert.match(prompt, /不得使用远程 image_url 或 thumbnail_url/);
     assert.doesNotMatch(prompt, /Agent file-tool root:/);
     assert.doesNotMatch(prompt, /Agent file-tool path: ppt\//);
     assert.doesNotMatch(prompt, /Canonical absolute path/);
   });
 
-  it("adds Agent file-tool paths to visual review upload and fallback paths", () => {
-    const preview: RenderWorkspacePagePreviewResult = {
-      workspace_dir: workspaceDir,
-      manifest_path: `${workspaceDir}/template/manifest.json`,
-      page_index: 1,
-      page_number: 2,
-      slide_id: "page-02",
-      layout_id: "simple",
-      title: page.title,
-      html_path: `${workspaceDir}/output/page-02.html`,
-      screenshot_path: `${workspaceDir}/output/page-02.png`,
-      screenshot_upload: {
-        transport: "host_upload",
-        r2_key: "uploads/page-02.png",
-        url: "https://upload.example/page-02.png",
-        mime_type: "image/png",
-        size_bytes: 1024,
-        filename: "page-02.png",
-        mode: "negotiate+confirm",
-      },
-      rendered_at: "2026-06-30T00:00:00.000Z",
-    };
+  it("keeps local paths out of native-image visual review prompts", () => {
     const prompt = buildPageVisualReviewPrompt({
-      workspaceRoot,
-      workspaceDir,
       page,
-      screenshotPath: preview.screenshot_path,
-      preview,
     });
 
-    assert.match(prompt, /Screenshot path:/);
-    assert.match(prompt, /Agent file-tool absolute path: \/tmp\/anna-workspace\/ppt\/ppt-20260630-152620\/output\/page-02\.png/);
-    assert.match(prompt, /Rendered HTML path:/);
-    assert.match(prompt, /Agent file-tool absolute path: \/tmp\/anna-workspace\/ppt\/ppt-20260630-152620\/output\/page-02\.html/);
-    assert.doesNotMatch(prompt, /Agent file-tool path: ppt\//);
+    assert.match(prompt, /native image attachment/);
+    assert.match(prompt, /title and subtitle/);
+    assert.match(prompt, /foreground\/background contrast/);
+    assert.match(prompt, /score of 6 or lower/);
+    assert.match(prompt, /image_description/);
+    assert.match(prompt, /IMAGE_UNAVAILABLE/);
+    assert.doesNotMatch(prompt, /\{"pass":true/);
+    assert.match(prompt, /Page id: page-02/);
+    assert.doesNotMatch(prompt, /Screenshot path:/);
+    assert.doesNotMatch(prompt, /Rendered HTML path:/);
+    assert.doesNotMatch(prompt, /upload_local_file|analyze_image/);
+  });
+
+  it("keeps the absolute local-image contract in every page authoring round", () => {
+    for (const attemptKind of ["initial", "page-refinement", "render-fix", "visual-review-fix"] as const) {
+      const prompt = buildAuthoringPrompt({
+        workspaceRoot,
+        workspaceDir,
+        page,
+        authoringDeck,
+        outline,
+        attemptKind,
+        ...(attemptKind === "render-fix" ? { renderError: "Render failed" } : {}),
+      });
+
+      assert.match(prompt, /file_path 是当前 Workspace 中已导入图片的绝对路径/);
+      assert.match(prompt, /必须原样使用该 file_path/);
+      assert.match(prompt, /不得改成相对路径、添加 \.\/ 或 \.\.\//);
+    }
   });
 });

@@ -1,4 +1,5 @@
 import type { AnnaLlmCompleteInput, AnnaRuntime } from "../runtime/annaRuntime";
+import { beginPerformanceSpan } from "../performance/performanceRecorder";
 import {
   buildGenerateOutlineLlmRequest,
   buildOutlineRepairRequest,
@@ -9,12 +10,6 @@ import {
   buildPagePlanRepairPrompt,
   parsePagePlanJson,
 } from "./pagePlanPrompt";
-import {
-  buildEvidenceAwarePagePlanLlmRequest,
-  buildResearchDiscoveryDecisionLlmRequest,
-  parseEvidenceAwarePagePlanJson,
-  parseResearchDiscoveryDecisionJson,
-} from "./researchDiscoveryPrompt";
 import {
   buildDeckRefinementPlanningRepairRequest,
   buildDeckRefinementPlanningRequest,
@@ -138,6 +133,11 @@ async function completeLlmLogged(
   const handle = logContext?.logger
     ? await logContext.logger.startInteraction(logContext, { request: input })
     : null;
+  const performanceSpan = beginPerformanceSpan({
+    operationName: "ai.interaction",
+    workspaceId: logContext?.workspace_dir.split(/[\\/]/).filter(Boolean).at(-1),
+    attributes: { layer: "anna-llm" },
+  });
 
   try {
     const result =
@@ -151,8 +151,10 @@ async function completeLlmLogged(
       response: result,
       output: extractCompletionText(result),
     });
+    performanceSpan?.finish("ok");
     return result;
   } catch (error) {
+    performanceSpan?.finish("error");
     if (handle) {
       await logContext?.logger?.finishInteraction(handle, {
         status: "failed",
@@ -548,20 +550,6 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
       }
 
       throw new Error("Anna LLM returned invalid added-page plan JSON.");
-    },
-
-    async generateResearchDiscoveryDecision(input) {
-      const request = buildResearchDiscoveryDecisionLlmRequest(input);
-      const rawResult = await completeLlm(runtime, request, input.logContext);
-      const rawText = extractCompletionText(rawResult);
-      return parseResearchDiscoveryDecisionJson(rawText, input.phase);
-    },
-
-    async generateEvidenceAwarePagePlan(input) {
-      const request = buildEvidenceAwarePagePlanLlmRequest(input);
-      const rawResult = await completeLlm(runtime, request, input.logContext);
-      const rawText = extractCompletionText(rawResult);
-      return parseEvidenceAwarePagePlanJson(rawText, input.pagePlan, input.targetPageIds);
     },
 
     async planDeckRefinement(input) {
