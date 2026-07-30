@@ -4263,22 +4263,16 @@ details.generation-history-panel > summary::-webkit-details-marker {
 }
 
 /*
- * GEN-006: the run log keeps the narrower column so the rendered page can be
- * read at a useful size next to it.
+ * GEN-006: the rendered pages lead the stage and the run log follows, so the
+ * preview keeps the full content width and the log scrolls under it.
  */
-.generation-stage-split {
+.generation-stage-stack {
   display: grid;
-  grid-template-columns: minmax(280px, 38fr) minmax(0, 62fr);
   gap: 16px;
-  align-items: start;
-}
-
-.generation-stage-progress-column,
-.generation-stage-preview-column {
   min-width: 0;
 }
 
-.generation-stage-progress-column .generation-progress-panel {
+.generation-stage-stack .generation-progress-panel {
   margin-bottom: 0;
 }
 
@@ -4327,11 +4321,15 @@ details.generation-history-panel > summary::-webkit-details-marker {
   background: rgba(124, 108, 240, 0.18);
 }
 
+/*
+ * Height-led rather than width-led: on a wide window a 16/9 box would push the
+ * progress list off screen, so the page is sized to fit the viewport instead.
+ */
 .generation-preview-stage {
   display: grid;
   place-items: center;
   overflow: hidden;
-  aspect-ratio: 16 / 9;
+  height: min(46vh, 420px);
   border: 1px solid rgba(17, 24, 39, 0.08);
   border-radius: 10px;
   background: rgba(17, 24, 39, 0.04);
@@ -4339,9 +4337,12 @@ details.generation-history-panel > summary::-webkit-details-marker {
 
 .generation-preview-stage img {
   display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(17, 24, 39, 0.12);
 }
 
 .generation-preview-placeholder {
@@ -4415,12 +4416,12 @@ details.generation-history-panel > summary::-webkit-details-marker {
 }
 
 @media (max-width: 1080px) {
-  .generation-stage-split {
-    grid-template-columns: minmax(0, 1fr);
+  .generation-preview-stage {
+    height: min(38vh, 320px);
   }
 
-  .generation-stage-preview-column {
-    order: -1;
+  .generation-preview-thumbnail {
+    width: 78px;
   }
 }
 

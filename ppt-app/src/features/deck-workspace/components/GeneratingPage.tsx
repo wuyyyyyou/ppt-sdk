@@ -142,31 +142,27 @@ export function GeneratingPage(props: GeneratingPageProps) {
         })}
       </ol>
 
-      {/* The run reports two things at once: what it is doing, and what it has
-          produced. They sit side by side so a finished page can be inspected
-          without losing sight of the stage that is still running. */}
-      <div className="generation-stage-split">
-        <div className="generation-stage-progress-column">
-          {progress ? (
-            <GenerationProgressPanel
-              t={t}
-              progress={progress}
-              history={history}
-            />
-          ) : (
-            <div className="generation-progress-panel">
-              <strong>{t.status.creatingDeck}</strong>
-            </div>
-          )}
-        </div>
-        <div className="generation-stage-preview-column">
-          <GenerationPagePreviewPanel
+      {/* The run reports two things at once: what it has produced and what it is
+          doing. The finished pages lead, because that is what the user is
+          waiting for; the running stage detail follows underneath. */}
+      <div className="generation-stage-stack">
+        <GenerationPagePreviewPanel
+          t={t}
+          previews={pagePreviews}
+          pinnedPageId={pinnedPreviewPageId}
+          onSelectPage={onSelectPreviewPage}
+        />
+        {progress ? (
+          <GenerationProgressPanel
             t={t}
-            previews={pagePreviews}
-            pinnedPageId={pinnedPreviewPageId}
-            onSelectPage={onSelectPreviewPage}
+            progress={progress}
+            history={history}
           />
-        </div>
+        ) : (
+          <div className="generation-progress-panel">
+            <strong>{t.status.creatingDeck}</strong>
+          </div>
+        )}
       </div>
 
       {/* Back sits at the bottom of the stage, next to the recovery entries it

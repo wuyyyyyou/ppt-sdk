@@ -485,7 +485,7 @@ describe("GeneratingPage controls", () => {
     assert.doesNotMatch(html, /Factory line photo/);
   });
 
-  it("puts the run log beside the rendered page preview", () => {
+  it("leads with the rendered page preview and keeps the run log underneath", () => {
     const html = renderPage(
       makeViewState({ status: "running" }),
       {
@@ -510,12 +510,12 @@ describe("GeneratingPage controls", () => {
 
     assert.match(
       html,
-      /generation-stage-split"><div class="generation-stage-progress-column">[\s\S]*generation-progress-panel/,
+      /generation-stage-stack"><section class="generation-preview-panel"/,
     );
-    assert.match(
-      html,
-      /generation-stage-preview-column"><section class="generation-preview-panel"/,
-    );
+    // The preview leads and the progress panel follows it in document order.
+    const previewIndex = html.indexOf("generation-preview-panel");
+    const progressIndex = html.indexOf("generation-progress-panel");
+    assert.ok(previewIndex > -1 && progressIndex > previewIndex, "preview should precede the run log");
     assert.match(html, /<img src="https:\/\/example\.test\/one\.webp"/);
   });
 
