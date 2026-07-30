@@ -117,7 +117,7 @@ test("confirmation falls back to negotiated key and local byte size", () => {
   assert.equal(result.size_bytes, 1_024);
 });
 
-test("create stays inline while full Workspace results use Host Upload", { timeout: 10_000 }, async () => {
+test("concurrent Workspace uploads preserve their parent invoke context", { timeout: 10_000 }, async () => {
   const homeDir = await mkdtemp(path.join(os.tmpdir(), "ppt-engine-host-upload-home-"));
   const uploadServer = createServer(async (request, response) => {
     for await (const _chunk of request) {
@@ -139,12 +139,18 @@ test("create stays inline while full Workspace results use Host Upload", { timeo
   const pending = new Map<number, (message: Record<string, unknown>) => void>();
   let nextId = 1;
   let hostUploadRequests = 0;
+  const hostUploadInvokeIds: unknown[] = [];
 
   lines.on("line", async (line) => {
     let message = JSON.parse(line) as {
       id: number | string;
       method?: string;
-      params?: { mode?: string; size_bytes?: number; r2_key?: string };
+      params?: {
+        mode?: string;
+        size_bytes?: number;
+        r2_key?: string;
+        context?: { invoke_id?: string };
+      };
       __file_transport?: string;
       __trans_file__?: string;
     };
@@ -154,10 +160,24 @@ test("create stays inline while full Workspace results use Host Upload", { timeo
     }
     if (message.method === "host/uploadFile") {
       hostUploadRequests += 1;
+      const invokeId = message.params?.context?.invoke_id;
+      hostUploadInvokeIds.push(invokeId);
+      const expectedR2Key = `exec-uploads/staging/${invokeId}.json`;
+      if (message.params?.mode === "confirm" && message.params.r2_key !== expectedR2Key) {
+        child.stdin.write(`${JSON.stringify({
+          jsonrpc: "2.0",
+          id: message.id,
+          error: {
+            code: -32204,
+            message: "r2_key does not belong to this invoke",
+          },
+        })}\n`);
+        return;
+      }
       const result = message.params?.mode === "negotiate"
         ? {
             put_url: `http://127.0.0.1:${address.port}/upload`,
-            r2_key: "exec-uploads/staging/workspace.json",
+            r2_key: expectedR2Key,
             headers: {},
           }
         : {
@@ -204,20 +224,33 @@ test("create stays inline while full Workspace results use Host Upload", { timeo
     assert.equal(createResponse.result?.data?.workspace_upload, undefined);
     assert.equal(hostUploadRequests, 0);
 
-    const openResponse = await request("invoke", {
+    const openWorkspace = (invokeId: string) => request("invoke", {
       tool: "app_open_workspace",
       arguments: { workspace_dir: createResponse.result?.data?.workspace_dir },
-    }) as {
+      context: { invoke_id: invokeId },
+    }) as Promise<{
       result?: { data?: { workspace_upload?: Record<string, unknown> } };
       error?: { message?: string };
-    };
+    }>;
+    const [firstOpenResponse, secondOpenResponse] = await Promise.all([
+      openWorkspace("invoke-open-a"),
+      openWorkspace("invoke-open-b"),
+    ]);
 
-    assert.ok(!openResponse.error, openResponse.error?.message);
-    assert.ok(openResponse.result?.data?.workspace_upload, JSON.stringify(openResponse));
-    assert.equal(openResponse.result?.data?.workspace_upload?.url, "https://uploads.example/platform-workspace");
-    assert.equal(openResponse.result?.data?.workspace_upload?.size_bytes, 256);
-    assert.equal(openResponse.result?.data?.workspace_upload?.expires_in, 1_800);
-    assert.equal(hostUploadRequests, 2);
+    for (const openResponse of [firstOpenResponse, secondOpenResponse]) {
+      assert.ok(!openResponse.error, openResponse.error?.message);
+      assert.ok(openResponse.result?.data?.workspace_upload, JSON.stringify(openResponse));
+      assert.equal(openResponse.result?.data?.workspace_upload?.url, "https://uploads.example/platform-workspace");
+      assert.equal(openResponse.result?.data?.workspace_upload?.size_bytes, 256);
+      assert.equal(openResponse.result?.data?.workspace_upload?.expires_in, 1_800);
+    }
+    assert.equal(hostUploadRequests, 4);
+    assert.deepEqual(hostUploadInvokeIds.sort(), [
+      "invoke-open-a",
+      "invoke-open-a",
+      "invoke-open-b",
+      "invoke-open-b",
+    ]);
   } finally {
     lines.close();
     child.kill("SIGTERM");

@@ -9,6 +9,7 @@
     "manifest.json",
     "dist",
     "example_plugin.js",
+    "invoke-context.js",
     "aps-files-client.js",
     "host-upload-confirmation.js",
     "host-upload-cache.js",

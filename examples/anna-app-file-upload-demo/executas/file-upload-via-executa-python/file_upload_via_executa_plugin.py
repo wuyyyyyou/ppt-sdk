@@ -68,6 +68,7 @@ from host_upload_client import (
     PROTOCOL_VERSION_V2,
     HostUploadClient,
     UploadError,
+    bind_invoke,
     make_response_router,
 )
 
@@ -92,7 +93,7 @@ _RPC_TRACE_CONTEXTS: dict[str, dict] = {}
 
 MANIFEST = {
     "display_name": "Host Upload via Executa",
-    "version": "0.2.4",
+    "version": "0.2.5",
     "description": (
         "Demonstrates the host/uploadFile reverse-RPC (inline / negotiate / "
         "confirm) by reading a local file and persisting it to short-lived "
@@ -255,6 +256,9 @@ def _write_frame(msg: dict) -> None:
             status="sent",
             reverse_rpc_id=reverse_rpc_id,
             reverse_rpc_mode=(msg.get("params") or {}).get("mode"),
+            wire_invoke_id=((msg.get("params") or {}).get("context") or {}).get(
+                "invoke_id"
+            ),
             r2_key=(msg.get("params") or {}).get("r2_key"),
         )
     payload = json.dumps(msg, ensure_ascii=False)
@@ -696,32 +700,38 @@ _loop_thread.start()
 def _handle_invoke(req_id: Any, params: dict) -> None:
     tool = params.get("tool")
     args = params.get("arguments") or {}
-    if tool == "make_sample":
-        coro = _make_sample(args.get("size_bytes", 0), str(args.get("filename", "")))
-    elif tool == "host_upload_path":
-        coro = _host_upload_path(
-            str(args.get("path", "")),
-            str(args.get("filename", "")),
-            str(args.get("mime_type", "application/octet-stream")),
-            str(args.get("purpose", "user_artifact")),
-            str(args.get("mode", "auto")),
-            str(args.get("run_id", "")),
-            str(args.get("call_id", "")),
-            args.get("delay_before_confirm_ms", 0),
-            args.get("jitter_ms", 0),
-            req_id,
-        )
-    elif tool == "get_diagnostic_log":
-        coro = _get_diagnostic_log(
-            str(args.get("run_id", "")),
-            args.get("cursor", 0),
-            args.get("max_bytes", _DIAGNOSTIC_PAGE_DEFAULT_BYTES),
-        )
-    else:
+    if tool not in {"make_sample", "host_upload_path", "get_diagnostic_log"}:
         _err(req_id, -32601, f"Unknown tool: {tool}")
         return
 
-    fut = asyncio.run_coroutine_threadsafe(coro, _loop)
+    # contextvars do not cross the run_coroutine_threadsafe thread hop, so
+    # bind inside the coroutine that runs on the Executa event loop.
+    async def _run_bound() -> dict:
+        with bind_invoke(params) as invoke_id:
+            if tool == "make_sample":
+                return await _make_sample(
+                    args.get("size_bytes", 0), str(args.get("filename", ""))
+                )
+            if tool == "host_upload_path":
+                return await _host_upload_path(
+                    str(args.get("path", "")),
+                    str(args.get("filename", "")),
+                    str(args.get("mime_type", "application/octet-stream")),
+                    str(args.get("purpose", "user_artifact")),
+                    str(args.get("mode", "auto")),
+                    str(args.get("run_id", "")),
+                    str(args.get("call_id", "")),
+                    args.get("delay_before_confirm_ms", 0),
+                    args.get("jitter_ms", 0),
+                    invoke_id,
+                )
+            return await _get_diagnostic_log(
+                str(args.get("run_id", "")),
+                args.get("cursor", 0),
+                args.get("max_bytes", _DIAGNOSTIC_PAGE_DEFAULT_BYTES),
+            )
+
+    fut = asyncio.run_coroutine_threadsafe(_run_bound(), _loop)
     try:
         data = fut.result(timeout=300.0)
     except UploadError as e:

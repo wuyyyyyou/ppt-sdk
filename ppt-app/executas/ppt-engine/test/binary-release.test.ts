@@ -66,6 +66,7 @@ async function writeExternalAppRuntime(
   await mkdir(path.join(appRoot, "dist"), { recursive: true });
   await mkdir(path.join(appRoot, "node_modules"), { recursive: true });
   await writeFile(path.join(appRoot, "example_plugin.js"), "export {};\n", "utf8");
+  await writeFile(path.join(appRoot, "invoke-context.js"), "export {};\n", "utf8");
   await writeFile(path.join(appRoot, "package.json"), '{"type":"module"}\n', "utf8");
   await writeFile(path.join(appRoot, "dist", "index.js"), "export {};\n", "utf8");
   await writeFile(

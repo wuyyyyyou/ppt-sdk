@@ -1,0 +1,45 @@
+{
+  "id": "corporate-esg-annual-progress-report",
+  "version": 1,
+  "ppt_number": 76,
+  "theme": "light",
+  "color": [
+    "beige",
+    "green",
+    "yellow",
+    "white"
+  ],
+  "name": "Corporate ESG Annual Progress",
+  "description": "A rigorous sustainability reporting system with warm-white analytical pages, deep forest chapter panels, gold milestones, KPI scorecards, accountable roadmaps, risk registers, and selective full-bleed environmental photography.",
+  "user": "Executives & Business Leaders",
+  "use_case": "Business Reporting & Reviews",
+  "industry": "Energy, Climate & Sustainability",
+  "score": 90,
+  "style_guide": "# Corporate ESG Annual Progress\n\n## Design intent\nPresent environmental, social, and governance progress with the restraint of an assured annual report. Every page should connect a public commitment to a baseline, current result, target, owner, status, and next action. The tone is executive and evidence-led, while landscape photography and a natural palette keep the report connected to real-world impact.\n\nPreview images are visual references only. Never reuse their company, leaders, reporting period, metrics, ratings, standards claims, targets, cases, suppliers, sites, or assurance language. Build all disclosures from current workspace evidence.\n\n## Canvas and grid\n- Use a fixed `1280 × 720 px` 16:9 canvas with `64–72 px` side margins and `44–56 px` vertical margins.\n- Organize pages on a 12-column grid with `18–24 px` gutters.\n- Most analytical pages use a warm-white canvas; reserve full deep-green pages for the cover, major section transitions, or the forward agenda.\n- Headlines span the upper quarter and should express one conclusion, not just a topic label.\n- Align table columns, chart baselines, target markers, card edges, and footnotes precisely.\n\n## Color system\n- Warm report paper `#F3F0E7`: default analytical canvas.\n- Paper white `#FCFBF7`: cards, tables, and raised data surfaces.\n- Deep forest `#074A37`: primary text, chapter fields, dark panels, and current data.\n- Evergreen `#4E815E`: secondary data, social indicators, and intermediate governance layers.\n- Sage `#9CAF92`: historical series and quiet environmental context.\n- Assurance gold `#D9A51E`: current-year markers, milestones, target emphasis, and controlled highlights.\n- Warm stone `#918C7C`: sources, axes, metadata, and non-emphasized labels.\n\nUse green for structure and continuity; use gold only for the current point, a priority, or an accountable milestone. Risk states may introduce muted red or amber only when semantically required.\n\n## Typography\n- Use `Inter`, `Aptos`, `Helvetica Neue`, or a comparable neutral sans-serif.\n- Cover title: `64–82 px`, weight `350–450`; one short phrase may be italic.\n- Analytical headline: `42–58 px`, weight `400–500`, line-height `1.05–1.12`.\n- Section eyebrow: `10–13 px`, uppercase, letter-spacing `3–4 px`.\n- Body and table text: `15–20 px`, line-height `1.3–1.45`.\n- KPI values: `42–68 px` with tabular numerals and explicit units.\n- Footnotes and assurance statements: `9–12 px`, never below comfortable reading size.\n\n## Components\n- Cards are square-cornered white fields with `1 px` sand borders and no shadows.\n- Dark insight panels use deep forest, white copy, and gold labels or numerals.\n- Status labels use pale semantic fills, a dot, and a text state such as `On track`, `Delivered`, or `Behind`.\n- Section pages may use a vertical deep-green chapter rail paired with a warm-white evidence field.\n- Keep page numbers, reporting period, source notes, and assurance scope consistent in the footer.\n\n## Charts and diagrams\n- Emissions trajectories use direct-labeled bars or lines with clearly distinguished baseline, current result, interim target, and long-term target.\n- ESG roadmaps use one horizontal axis with dated milestones; fill only completed and current nodes.\n- Governance structures use stacked responsibility layers connected by a single vertical accountability line.\n- Risk registers use compact cards with likelihood or severity, risk type, exposure, mitigation, owner, and timing.\n- Tables should show prior year, current year, target, and status in stable columns.\n- Avoid decorative leaf icons, 3D charts, unlabeled ratings, and environmental imagery used as a substitute for performance data.\n\n## Composition families\n- Full-bleed report cover with green photographic overlay, large report title, and a translucent three-number scorecard.\n- Strategy framework with a chapter rail, E/S/G pillar cards, and a milestone roadmap.\n- Environmental dashboard with four KPIs, one primary trajectory chart, and a dark drivers or emissions-mix panel.\n- Social progress page with an open target table and a quantified impact-story panel.\n- Governance page with accountability layers, compliance metrics, and a compact risk register.\n- Forward agenda with five equal initiative cards, named metrics and owners, plus a cadence strip.\n\n## Imagery\n- Use aerial landscapes, renewable infrastructure, water systems, operations, workers, and communities when the asset is relevant and licensed.\n- Grade photographs toward deep green, warm gold, and muted stone; apply a controlled overlay to protect white text.\n- Do not imply a photographed site, worker, community, or technology belongs to the organization without evidence.\n- Analytical pages should prioritize charts and tables over decorative photography.\n\n## Content integrity\n- State reporting boundary, period, currency, methodology, units, baseline year, target year, restatements, and assurance scope where applicable.\n- Distinguish absolute from intensity metrics and Scope 1, 2, and 3 emissions.\n- Do not claim alignment, certification, ratings, net zero, renewable sourcing, living wage, diversity, safety, or supplier coverage without documented support.\n- Status calculations must follow a declared method and not be visually upgraded to appear on track.\n- Identify estimates, exclusions, acquisitions, divestments, methodology changes, and limited data coverage.\n\n## Avoid\n- Do not copy preview company names, executives, targets, ratings, case studies, vendor counts, dates, or performance figures.\n- Do not greenwash through landscape imagery, vague commitments, or selective denominator choices.\n- Do not mix multiple target baselines without explanation.\n- Do not use glossy gradients, rounded dashboard widgets, excessive icons, or rainbow ESG palettes.\n- Do not hide negative trends, missed targets, risk exposure, or assurance limitations.\n- Do not separate a metric from its unit, baseline, period, or source.\n",
+  "preview_images": [
+    {
+      "path": "images/cover-esg-annual-report.png",
+      "alt": "ESG annual report cover over a green-and-gold renewable energy landscape with a three-number scorecard"
+    },
+    {
+      "path": "images/strategy-and-commitments.png",
+      "alt": "ESG strategy page with environmental, social, and governance pillar cards and a 2030 roadmap"
+    },
+    {
+      "path": "images/environmental-performance.png",
+      "alt": "Environmental performance dashboard with KPI cards, emissions trajectory, scope mix, and reduction drivers"
+    },
+    {
+      "path": "images/social-impact.png",
+      "alt": "Social impact page combining a target progress table with a quantified workforce case story"
+    },
+    {
+      "path": "images/governance-risk-and-compliance.png",
+      "alt": "Governance page with accountability layers, compliance metrics, and a climate risk register"
+    },
+    {
+      "path": "images/next-year-priorities.png",
+      "alt": "Deep green forward agenda with five accountable ESG initiatives and a quarterly review cadence"
+    }
+  ]
+}
