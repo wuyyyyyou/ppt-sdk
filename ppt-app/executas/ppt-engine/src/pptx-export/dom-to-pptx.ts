@@ -7,6 +7,7 @@ import {
   closeManagedBrowser,
   launchManagedBrowser,
 } from "../runtime/browser-runtime.js";
+import { extractCssImageUrls } from "./css-image-url.js";
 
 const SLIDE_SELECTOR = '#presentation-slides-wrapper > [data-presenton-slide-shell="true"]';
 const SLIDE_WIDTH_PX = 1280;
@@ -60,6 +61,7 @@ export async function convertDeckHtmlToPptx(
   const browser = await launchManagedBrowser(puppeteer, { purpose: "PPTX export" }) as any;
   const temporaryPath = `${outputPath}.tmp`;
   const callbackName = `__presentonWritePptxChunk_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const cssImageUrlCallbackName = `__presentonExtractCssImageUrls_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   let bytesWritten = 0;
   let warningCount = 0;
   let page: any = null;
@@ -78,10 +80,19 @@ export async function convertDeckHtmlToPptx(
       bytesWritten += chunk.byteLength;
       await appendFile(temporaryPath, chunk);
     });
+    await page.exposeFunction(cssImageUrlCallbackName, (values: string[]) => (
+      values.map((value) => extractCssImageUrls(value))
+    ));
     await page.goto(pathToFileURL(htmlPath).href, { waitUntil: "networkidle0", timeout: timeoutMs });
     await page.evaluate("globalThis.__name = (target) => target");
 
-    const validation = await page.evaluate(async ({ selector, width, height, expectedSlideCount }: any) => {
+    const validation = await page.evaluate(async ({
+      selector,
+      width,
+      height,
+      expectedSlideCount,
+      cssImageUrlCallback,
+    }: any) => {
       const wrapperMatches = document.querySelectorAll("#presentation-slides-wrapper");
       if (wrapperMatches.length !== 1) {
         throw new Error(`Deck HTML must contain exactly one #presentation-slides-wrapper; found ${wrapperMatches.length}`);
@@ -108,10 +119,9 @@ export async function convertDeckHtmlToPptx(
       ]);
 
       const urls = new Map<string, number>();
-      const addUrl = (value: string | null, pageNumber: number) => {
-        if (!value) return;
-        const matches = value.matchAll(/url\(["']?([^"')]+)["']?\)/g);
-        for (const match of matches) urls.set(match[1], pageNumber);
+      const cssImageValues: Array<{ value: string; pageNumber: number }> = [];
+      const addCssImageValue = (value: string | null, pageNumber: number) => {
+        if (value && value !== "none") cssImageValues.push({ value, pageNumber });
       };
       for (const [index, slide] of slides.entries()) {
         const pageNumber = index + 1;
@@ -119,9 +129,9 @@ export async function convertDeckHtmlToPptx(
           const rect = element.getBoundingClientRect();
           const style = getComputedStyle(element);
           if (!rect.width || !rect.height || style.display === "none" || style.visibility === "hidden") continue;
-          addUrl(style.backgroundImage, pageNumber);
-          addUrl(getComputedStyle(element, "::before").backgroundImage, pageNumber);
-          addUrl(getComputedStyle(element, "::after").backgroundImage, pageNumber);
+          addCssImageValue(style.backgroundImage, pageNumber);
+          addCssImageValue(getComputedStyle(element, "::before").backgroundImage, pageNumber);
+          addCssImageValue(getComputedStyle(element, "::after").backgroundImage, pageNumber);
           if (element instanceof HTMLImageElement) {
             if (!element.complete || element.naturalWidth <= 0 || element.naturalHeight <= 0) {
               throw new Error(`Slide ${pageNumber} contains an image that failed to load`);
@@ -133,6 +143,14 @@ export async function convertDeckHtmlToPptx(
             if (href) urls.set(href, pageNumber);
           }
         }
+      }
+      const parsedCssImageUrls = await (globalThis as any)[cssImageUrlCallback](
+        cssImageValues.map(({ value }) => value),
+      ) as string[][];
+      for (const [index, extractedUrls] of parsedCssImageUrls.entries()) {
+        const pageNumber = cssImageValues[index]?.pageNumber;
+        if (pageNumber === undefined) continue;
+        for (const url of extractedUrls) urls.set(url, pageNumber);
       }
       for (const [url, pageNumber] of urls) {
         try {
@@ -160,6 +178,7 @@ export async function convertDeckHtmlToPptx(
       width: SLIDE_WIDTH_PX,
       height: SLIDE_HEIGHT_PX,
       expectedSlideCount: input.expectedSlideCount,
+      cssImageUrlCallback: cssImageUrlCallbackName,
     });
 
     await page.addScriptTag({ path: runtimePath("dom-to-pptx.bundle.js") });

@@ -11,5 +11,6 @@
 - The package pins pnpm 11.15.1 and supports the PPT-SDK Node.js 22 build baseline.
 - Radial-gradient backgrounds are converted to SVG with deterministic solid-color fallback.
 - `<img>` elements and URL background images preserve their own and inherited CSS opacity in PPTX output.
+- CSS background URLs use quote-aware parsing so SVG data URLs retain internal fragment references.
 
 Upstream changes are reviewed and selectively ported into this directory. Do not replace this directory from an external checkout wholesale.

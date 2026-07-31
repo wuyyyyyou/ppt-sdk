@@ -35,6 +35,7 @@ import {
   collectTextParts,
 } from './utils.js';
 import { getProcessedImage } from './image-processor.js';
+import { extractCssImageUrls } from './css-image-url.js';
 import { parseAnimation } from './animations/css-parser.js';
 import { extractTransitionFromElement } from './animations/transitions.js';
 
@@ -1493,8 +1494,9 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
     !isBgClipText &&
     bgImgStr &&
     /(?:^|,)\s*(?:linear|radial)-gradient\(/i.test(bgImgStr);
-  const urlMatch = !isBgClipText && !hasGradient && bgImgStr ? bgImgStr.match(/url\(['"]?(.*?)['"]?\)/) : null;
-  const hasBgImgUrl = !!urlMatch;
+  const backgroundImageUrls = !isBgClipText && !hasGradient ? extractCssImageUrls(bgImgStr) : [];
+  const bgUrl = backgroundImageUrls[0];
+  const hasBgImgUrl = !!bgUrl;
 
   const borderColorObj = parseColor(style.borderColor);
   const borderWidth = parseFloat(style.borderWidth);
@@ -1569,7 +1571,6 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
 
   if (hasBgImgUrl || hasGradient || (softEdge && bgColorObj.hex && !isImageWrapper)) {
     if (hasBgImgUrl) {
-      const bgUrl = urlMatch[1];
       const transparency = getImageTransparency(safeOpacity);
       const radii = {
         tl: parseFloat(style.borderTopLeftRadius) || 0,

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { collectTextParts } from '../utils.js';
 import { exportToPptx } from '../index.js';
+import { getProcessedImage } from '../image-processor.js';
 
 // Mock pptxgenjs
 const mockAddText = vi.fn();
@@ -193,5 +194,18 @@ describe('Bug 4: Image opacity is preserved in PPTX', () => {
 
     expect(imageOptions).toHaveLength(1);
     expect(imageOptions[0]).not.toHaveProperty('transparency');
+  });
+
+  it('passes a complete SVG data URL with an internal fragment to image processing', async () => {
+    const background = document.createElement('div');
+    const dataUrl =
+      'data:image/svg+xml,%3Csvg viewBox="0 0 200 200"%3E%3Cfilter id="noiseFilter"/%3E%3Crect filter="url(%23noiseFilter)"/%3E%3C/svg%3E';
+    background.style.backgroundImage = `url('${dataUrl}')`;
+    vi.mocked(getProcessedImage).mockClear();
+
+    await exportElement(background);
+
+    expect(getProcessedImage).toHaveBeenCalledOnce();
+    expect(vi.mocked(getProcessedImage).mock.calls[0][0]).toBe(dataUrl);
   });
 });
