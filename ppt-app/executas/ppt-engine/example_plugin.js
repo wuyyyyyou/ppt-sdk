@@ -2574,20 +2574,7 @@ async function toolAppRenderDeckHtml(args) {
   const result = await renderAppWorkspaceDeckHtml({
     workspace_dir: workspaceDir,
   });
-  const slides = await Promise.all(
-    result.slides.map(async (slide) => ({
-      ...slide,
-      screenshot_upload: await uploadPreviewImage(slide.screenshot_path, {
-        workspaceDir,
-        source: "ppt-engine.deck-screenshot",
-      }),
-    })),
-  );
-
-  return {
-    ...result,
-    slides,
-  };
+  return result;
 }
 
 async function toolAppGetRenderedDeckHtml(args) {

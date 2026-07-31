@@ -23,6 +23,7 @@ import {
 } from "../../../runtime/appHostUploadClient";
 import type {
   ListWorkspacesResult,
+  RenderDeckHtmlResult,
   PageProgress,
   PresentationRequirements,
   PresentationRequirementsSelections,
@@ -90,6 +91,7 @@ import {
   type CreateStyleProfileWorkflowEvent,
 } from "../../deck-generation/styleProfileWorkflow";
 import { reconcileInterruptedPageProgress } from "../../deck-generation/interruptedReconciliation";
+import { waitForFinalDeckRender } from "../../deck-generation/renderPolling";
 import {
   createArtifactExportProgress,
   createExportErrorProgress,
@@ -1232,7 +1234,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   function applyRenderedDeck(
-    result: Awaited<ReturnType<PptBackend["renderDeckHtml"]>>,
+    result: RenderDeckHtmlResult,
     outlineItems?: WorkspaceOutlineItem[],
     options: { activateDeck?: boolean } = {},
   ) {
@@ -3998,7 +4000,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function renderDeckHtmlForWorkspace(
     workspace: WorkspaceResult,
     loadingKind: LoadingKind
-  ): Promise<Awaited<ReturnType<PptBackend["renderDeckHtml"]>> | null> {
+  ): Promise<RenderDeckHtmlResult | null> {
     if (!backend) return null;
 
     setLoading(loadingKind);
@@ -4010,8 +4012,18 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }));
 
     try {
-      const result = await backend.renderDeckHtml({
+      const submission = await backend.renderDeckHtml({
         workspace_dir: workspace.workspace_dir
+      });
+      const completedProgress = await waitForFinalDeckRender({
+        backend,
+        workspaceDir: workspace.workspace_dir,
+        submission,
+        onProgress: (nextProgress) => setPageProgress(nextProgress),
+      });
+      if (!completedProgress) throw new Error("Final Deck render was cancelled.");
+      const result = await backend.getRenderedDeckHtml({
+        workspace_dir: workspace.workspace_dir,
       });
       const refreshedWorkspace = await backend.openWorkspace({
         workspace_dir: workspace.workspace_dir
@@ -4052,7 +4064,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   async function loadDeckHtmlForWorkspace(
     workspace: WorkspaceResult,
     loadingKind: LoadingKind
-  ): Promise<Awaited<ReturnType<PptBackend["renderDeckHtml"]>> | null> {
+  ): Promise<RenderDeckHtmlResult | null> {
     if (!backend) return null;
 
     setLoading(loadingKind);

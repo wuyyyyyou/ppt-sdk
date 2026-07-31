@@ -23,7 +23,8 @@ import type {
   PptxExportJob,
   PptEngineRuntimeInfo,
   RenderDeckHtmlResult,
-  RenderWorkspacePagePreviewResult,
+  RenderDeckHtmlSubmissionResult,
+  RenderWorkspacePagePreviewSubmissionResult,
   RecordPdfExportInput,
   SelectTemplateResult,
   TemplatePlanningContext,
@@ -715,11 +716,10 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         input
       ),
     renderWorkspacePagePreview: (input) =>
-      invoke<RenderWorkspacePagePreviewResult>(
+      invoke<RenderWorkspacePagePreviewSubmissionResult>(
         toolIds.pptEngine,
         "app_render_workspace_page_preview",
         input,
-        { timeoutMs: LONG_RUNNING_TOOL_TIMEOUT_MS },
       ),
     uploadCurrentPageScreenshot: (input) =>
       invoke<HostUploadRef>(
@@ -754,11 +754,10 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
     recordOutline: (input) =>
       invoke<ProjectResult>(toolIds.pptEngine, "app_record_outline", input),
     renderDeckHtml: (input) =>
-      invoke<RenderDeckHtmlResult>(
+      invoke<RenderDeckHtmlSubmissionResult>(
         toolIds.pptEngine,
         "app_render_deck_html",
         input,
-        { timeoutMs: LONG_RUNNING_TOOL_TIMEOUT_MS },
       ),
     recordDeckReview: (input) =>
       invoke<ProjectResult>(

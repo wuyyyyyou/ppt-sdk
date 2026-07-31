@@ -1,6 +1,6 @@
 {
   "display_name": "ppt-engine",
-  "version": "4.3.12",
+  "version": "4.3.13",
   "description": "Anna Executa plugin for Workspace Authoring Kit setup, manifest-based deck HTML generation, and backend PPTX export.",
   "author": "Anna Developer",
   "host_capabilities": [
@@ -1472,7 +1472,7 @@
     },
     {
       "name": "app_render_workspace_page_preview",
-      "description": "Render one workspace manifest page to lightweight HTML and PNG preview for Agent review.",
+      "description": "Submit one workspace page render to the in-memory serial queue and return immediately; poll app_get_page_progress for the completed HTML and PNG paths.",
       "parameters": [
         {
           "name": "workspace_dir",
@@ -1628,7 +1628,7 @@
     },
     {
       "name": "app_render_deck_html",
-      "description": "Render the selected workspace template manifest to reviewable deck HTML and return Host Upload screenshot previews.",
+      "description": "Submit final Deck HTML rendering to the in-memory queue and return immediately; poll app_get_page_progress.final_deck_render for completion. Review screenshots are reused separately.",
       "parameters": [
         {
           "name": "workspace_dir",

@@ -41,6 +41,7 @@ import {
   buildDeckHtmlFromManifest,
   buildDeckHtmlPagesAndScreenshotsFromManifest,
   buildDeckHtmlPagesFromManifest,
+  buildDeckHtmlSnapshotFromManifest,
   buildDeckPageScreenshotFromManifest,
 } from "./render/build-deck-from-manifest.js";
 import {
@@ -55,6 +56,7 @@ import type {
   BuildDeckHtmlFromManifestInput,
   BuildDeckHtmlPagesAndScreenshotsFromManifestResult,
   BuildDeckHtmlPagesFromManifestResult,
+  BuildDeckHtmlSnapshotFromManifestResult,
   BuildDeckPageScreenshotFromManifestInput,
   BuildDeckPageScreenshotFromManifestResult,
   BuildDeckHtmlInput,
@@ -295,6 +297,7 @@ export {
   buildDeckHtmlFromManifest,
   buildDeckHtmlPagesAndScreenshotsFromManifest,
   buildDeckHtmlPagesFromManifest,
+  buildDeckHtmlSnapshotFromManifest,
   buildDeckPageScreenshotFromManifest,
   buildPageSourcePreview,
   buildStandaloneDeckHtml,

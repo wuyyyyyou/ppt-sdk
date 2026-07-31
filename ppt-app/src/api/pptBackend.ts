@@ -54,8 +54,9 @@ import type {
   RecordOutlineInput,
   RenderDeckHtmlInput,
   RenderDeckHtmlResult,
+  RenderDeckHtmlSubmissionResult,
   RenderWorkspacePagePreviewInput,
-  RenderWorkspacePagePreviewResult,
+  RenderWorkspacePagePreviewSubmissionResult,
   UploadCurrentPageScreenshotInput,
   SaveManualPageRevisionInput,
   SaveManualPageRevisionResult,
@@ -272,7 +273,7 @@ export interface PptBackend {
   recordPageProgress(input: RecordPageProgressInput): Promise<PageProgress>;
   renderWorkspacePagePreview(
     input: RenderWorkspacePagePreviewInput
-  ): Promise<RenderWorkspacePagePreviewResult>;
+  ): Promise<RenderWorkspacePagePreviewSubmissionResult>;
   uploadCurrentPageScreenshot(input: UploadCurrentPageScreenshotInput): Promise<HostUploadRef>;
   getPageEditContext(input: GetPageEditContextInput): Promise<GetPageEditContextResult>;
   saveManualPageRevision(input: SaveManualPageRevisionInput): Promise<SaveManualPageRevisionResult>;
@@ -281,7 +282,7 @@ export interface PptBackend {
   getRenderedDeckHtml(input: RenderDeckHtmlInput): Promise<RenderDeckHtmlResult>;
   getWorkspaceCover(input: GetWorkspaceCoverInput): Promise<GetWorkspaceCoverResult>;
   getWorkspacePageImage(input: GetWorkspacePageImageInput): Promise<GetWorkspacePageImageResult>;
-  renderDeckHtml(input: RenderDeckHtmlInput): Promise<RenderDeckHtmlResult>;
+  renderDeckHtml(input: RenderDeckHtmlInput): Promise<RenderDeckHtmlSubmissionResult>;
   recordDeckReview(input: RecordDeckReviewInput): Promise<ProjectResult>;
   startPptxExport(input: StartPptxExportInput): Promise<PptxExportJob>;
   getPptxExportStatus(input: { workspace_dir: string }): Promise<PptxExportJob>;

@@ -186,6 +186,22 @@ export interface BuildDeckHtmlPagesAndScreenshotsFromManifestResult {
   manifestPath: string;
 }
 
+export interface BuildDeckHtmlSnapshotFromManifestSlideOutput {
+  slideId: string;
+  layoutId: string;
+  title: string;
+  speakerNote: string;
+}
+
+export interface BuildDeckHtmlSnapshotFromManifestResult {
+  outputDir: string;
+  deckHtmlPath: string;
+  slides: BuildDeckHtmlSnapshotFromManifestSlideOutput[];
+  slideCount: number;
+  title: string;
+  manifestPath: string;
+}
+
 export interface BrowserRenderTheme {
   logoUrl: string | null;
   companyName: string | null;

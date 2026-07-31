@@ -1149,6 +1149,7 @@ export interface PageProgressItem {
   last_html_path: string;
   last_screenshot_path: string;
   last_error: string;
+  render_source_sha256?: string;
   visual_review?: unknown | null;
   updated_at: string | null;
 }
@@ -1233,6 +1234,7 @@ export interface FinalDeckRenderState {
   deck_html_path: string | null;
   rendered_at: string | null;
   updated_at: string | null;
+  source_fingerprint?: string | null;
 }
 
 export type ResearchDiscoveryProgressPhase =
@@ -1387,13 +1389,26 @@ export interface WorkspaceStyleGuide extends WorkspaceStyleGuideStatus {
   content: string;
 }
 
+export interface RenderWorkspacePagePreviewSubmissionResult {
+  status: "queued" | "running";
+  already_queued: boolean;
+  workspace_dir: string;
+  manifest_path: string;
+  page_index: number;
+  page_number: number;
+  slide_id: string;
+  layout_id: string;
+  title: string;
+  render_attempt: number;
+  source_sha256: string;
+  submitted_at: string;
+}
+
 export interface RenderWorkspacePagePreviewResult {
   workspace_dir: string;
   manifest_path: string;
   html_path: string;
   screenshot_path: string;
-  /** @deprecated Rendering no longer uploads; kept optional for compatibility with older callers. */
-  screenshot_upload?: HostUploadRef;
   page_index: number;
   page_number: number;
   slide_id: string;
@@ -1483,6 +1498,16 @@ export interface RecordOutlineInput {
 
 export interface RenderDeckHtmlInput {
   workspace_dir: string;
+}
+
+export interface RenderDeckHtmlSubmissionResult {
+  status: "queued" | "running";
+  already_queued: boolean;
+  workspace_dir: string;
+  manifest_path: string;
+  output_dir: string;
+  source_fingerprint: string;
+  submitted_at: string;
 }
 
 export interface RenderDeckHtmlResult {
