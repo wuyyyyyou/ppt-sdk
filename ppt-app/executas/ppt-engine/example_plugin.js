@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import readline from "node:readline";
 import { createReadStream, readFileSync } from "node:fs";
-import { mkdir, open, readFile, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rm, stat, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -99,6 +99,7 @@ import {
   appendAppWebResearchBatch,
   appendAppImageResearchBatch,
   importAppSharedResearchImage,
+  downloadResearchImage,
   prepareWorkspacePageSources,
   reconcileWorkspacePageSources,
   recordAppWorkspaceStyleGuide,
@@ -539,7 +540,7 @@ function redactStorageResponse(value) {
   if (Array.isArray(value)) return value.map(redactStorageResponse);
   if (!value || typeof value !== "object") return value;
   return Object.fromEntries(Object.entries(value).map(([key, child]) => {
-    if (/(authorization|token|signature|signed[_-]?url|put[_-]?url|download[_-]?url)/i.test(key) || key.toLowerCase() === "url") {
+    if (/(authorization|token|signature|signed[_-]?url|put[_-]?url|download[_-]?url|get[_-]?url)/i.test(key) || key.toLowerCase() === "url") {
       return [key, "[REDACTED]"];
     }
     return [key, redactStorageResponse(child)];
@@ -563,6 +564,7 @@ function createStorageTransferLogger(context = {}) {
     schema_version: 1,
     transfer_id: transferId,
     operation_id: context.operationId,
+    parent_interaction_id: context.parentInteractionId,
     source: context.source || "ppt-engine-host-upload",
     transport: context.transport || "host_upload",
     filename: context.filename,
@@ -587,7 +589,7 @@ function createStorageTransferLogger(context = {}) {
   };
 }
 
-function createApsTransferLogger({ workspaceDir, source, filename, mimeType, sizeBytes, path: apsPath, operationId }) {
+function createApsTransferLogger({ workspaceDir, source, filename, mimeType, sizeBytes, path: apsPath, operationId, parentInteractionId }) {
   return createStorageTransferLogger({
     workspaceDir,
     source,
@@ -596,6 +598,7 @@ function createApsTransferLogger({ workspaceDir, source, filename, mimeType, siz
     sizeBytes,
     transport: "aps_files",
     operationId: operationId || apsPath,
+    parentInteractionId,
   });
 }
 
@@ -769,12 +772,6 @@ const MANAGED_FONT_STAGING_DIR = path.join(
   "presenton-template-engine-executa",
   "managed-font-staging",
 );
-const RESEARCH_IMAGE_STAGING_DIR = path.join(
-  os.tmpdir(),
-  "presenton-template-engine-executa",
-  "research-image-staging",
-);
-
 function assertSafeUploadFilename(filename) {
   if (typeof filename !== "string" || filename.trim().length === 0) {
     throw new Error('"filename" must be a non-empty string');
@@ -2292,29 +2289,131 @@ async function toolAppAppendImageResearchBatch(args) {
   });
 }
 
-async function toolAppImportSharedResearchImageHostUpload(args) {
+function researchImageStagingDirectory(imagesDir, operationId) {
+  const safeOperationId = operationId.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 120) || "research";
+  return path.join(imagesDir, ".staging", safeOperationId);
+}
+
+function assertResearchImageStagingPath(imagesDir, value) {
+  assertAbsolutePath(value, "existing_file_path");
+  const stagingRoot = path.resolve(imagesDir, ".staging");
+  const resolved = path.resolve(value);
+  if (resolved !== stagingRoot && !resolved.startsWith(`${stagingRoot}${path.sep}`)) {
+    throw new Error('"existing_file_path" must be inside research/evidence/images/.staging');
+  }
+  return resolved;
+}
+
+async function toolAppPrepareSharedResearchImageCandidate(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  const candidateId = readRequiredStringArg(args, "candidate_id");
-  const hostUpload = readHostUploadRefArg(args, "host_upload");
-  const sizeBytes = Number(args.size_bytes);
-  if (!Number.isFinite(sizeBytes) || Math.floor(sizeBytes) !== hostUpload.size_bytes) throw new Error("Research image Host Upload size mismatch");
-  const mimeType = readRequiredStringArg(args, "mime_type");
-  if (mimeType !== hostUpload.mime_type) throw new Error("Research image Host Upload MIME type mismatch");
-  const stagingPath = path.join(RESEARCH_IMAGE_STAGING_DIR, `${randomUUID()}.upload`);
+  const operationId = readRequiredStringArg(args, "operation_id");
+  const candidateId = assertSafeUploadFilename(readRequiredStringArg(args, "candidate_id"));
+  const sourceUrl = readRequiredStringArg(args, "source_url");
+  const context = await getAppSharedResearchContext({ workspace_dir: workspaceDir });
+  const stagingDir = researchImageStagingDirectory(context.images_dir, operationId);
+  const existingFilePath = typeof args.existing_file_path === "string" && args.existing_file_path.length > 0
+    ? assertResearchImageStagingPath(context.images_dir, args.existing_file_path)
+    : undefined;
+  const expectedSha256 = typeof args.expected_sha256 === "string" && /^[a-f0-9]{64}$/i.test(args.expected_sha256)
+    ? args.expected_sha256.toLowerCase()
+    : undefined;
+  const downloadLogger = createStorageTransferLogger({
+    workspaceDir,
+    operationId,
+    source: "ppt-engine.research-image-download",
+    transport: "https_download",
+    filename: candidateId,
+  });
+  let sourceOrigin;
   try {
-    await downloadHostUploadToStaging({ hostUpload, stagingPath, expectedSizeBytes: Math.floor(sizeBytes) });
-    return await importAppSharedResearchImage({
-      workspace_dir: workspaceDir,
-      candidate_id: candidateId,
-      staging_file_path: stagingPath,
-      expected_size_bytes: Math.floor(sizeBytes),
-      expected_sha256: typeof args.sha256 === "string" ? args.sha256 : undefined,
-      mime_type: mimeType,
-    });
-  } finally {
-    await unlink(stagingPath).catch(() => undefined);
+    sourceOrigin = new URL(sourceUrl).origin;
+  } catch {
+    sourceOrigin = "invalid";
   }
+  downloadLogger.log("started", "started", { candidate_id: candidateId, source_origin: sourceOrigin });
+  let downloaded;
+  try {
+    downloaded = await downloadResearchImage({
+      url: sourceUrl,
+      staging_dir: stagingDir,
+      candidate_id: candidateId,
+      existing_file_path: existingFilePath,
+      expected_sha256: expectedSha256,
+      onEvent: (event) => downloadLogger.log(event.phase, event.status, { candidate_id: candidateId, ...event.details }),
+    });
+    downloadLogger.log("finished", "succeeded", {
+      candidate_id: candidateId,
+      mime_type: downloaded.mime_type,
+      size_bytes: downloaded.bytes_size,
+      sha256: downloaded.sha256,
+      width: downloaded.width,
+      height: downloaded.height,
+      redirects: downloaded.redirects,
+    });
+  } catch (error) {
+    downloadLogger.log("download", "failed", { candidate_id: candidateId, error: storageErrorRecord(error) });
+    throw error;
+  }
+
+  return {
+    workspace_dir: workspaceDir,
+    candidate_id: candidateId,
+    local_file_path: downloaded.file_path,
+    final_url: downloaded.final_url,
+    mime_type: downloaded.mime_type,
+    bytes_size: downloaded.bytes_size,
+    sha256: downloaded.sha256,
+    width: downloaded.width,
+    height: downloaded.height,
+  };
+}
+
+async function toolAppUploadSharedResearchImageCandidate(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const operationId = readRequiredStringArg(args, "operation_id");
+  const candidateId = assertSafeUploadFilename(readRequiredStringArg(args, "candidate_id"));
+  const context = await getAppSharedResearchContext({ workspace_dir: workspaceDir });
+  const localFilePath = assertResearchImageStagingPath(context.images_dir, readRequiredAbsolutePathArg(args, "local_file_path"));
+  const mimeType = readRequiredStringArg(args, "mime_type");
+  const hostUpload = await uploadLocalFileToHost({
+    filePath: localFilePath,
+    filename: path.basename(localFilePath),
+    mimeType,
+    purpose: "image_input",
+    workspaceDir,
+    operationId,
+    source: "ppt-engine.research-image-session-upload",
+    reuseWhileValid: true,
+  });
+  return { workspace_dir: workspaceDir, candidate_id: candidateId, host_upload: hostUpload };
+}
+
+async function toolAppImportSharedResearchImageLocal(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const context = await getAppSharedResearchContext({ workspace_dir: workspaceDir });
+  const localFilePath = assertResearchImageStagingPath(context.images_dir, readRequiredAbsolutePathArg(args, "local_file_path"));
+  const result = await importAppSharedResearchImage({
+    workspace_dir: workspaceDir,
+    candidate_id: readRequiredStringArg(args, "candidate_id"),
+    staging_file_path: localFilePath,
+    expected_size_bytes: Number(args.size_bytes),
+    expected_sha256: readRequiredStringArg(args, "sha256"),
+    mime_type: readRequiredStringArg(args, "mime_type"),
+  });
+  await unlink(localFilePath).catch(() => undefined);
+  return result;
+}
+
+async function toolAppCleanupSharedResearchImageStaging(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Arguments must be an object");
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const operationId = readRequiredStringArg(args, "operation_id");
+  const context = await getAppSharedResearchContext({ workspace_dir: workspaceDir });
+  await rm(path.join(context.images_dir, ".staging"), { recursive: true, force: true });
+  return { workspace_dir: workspaceDir, operation_id: operationId, cleaned: true };
 }
 
 async function toolAppRecordPageProgress(args) {
@@ -2563,20 +2662,7 @@ async function toolAppRenderDeckHtml(args) {
   const result = await renderAppWorkspaceDeckHtml({
     workspace_dir: workspaceDir,
   });
-  const slides = await Promise.all(
-    result.slides.map(async (slide) => ({
-      ...slide,
-      screenshot_upload: await uploadPreviewImage(slide.screenshot_path, {
-        workspaceDir,
-        source: "ppt-engine.deck-screenshot",
-      }),
-    })),
-  );
-
-  return {
-    ...result,
-    slides,
-  };
+  return result;
 }
 
 async function toolAppGetRenderedDeckHtml(args) {
@@ -3233,7 +3319,10 @@ const TOOL_DISPATCH = {
   app_publish_prepared_image_research_batch: toolAppPublishPreparedImageResearchBatch,
   app_append_web_research_batch: toolAppAppendWebResearchBatch,
   app_append_image_research_batch: toolAppAppendImageResearchBatch,
-  app_import_shared_research_image_host_upload: toolAppImportSharedResearchImageHostUpload,
+  app_prepare_shared_research_image_candidate: toolAppPrepareSharedResearchImageCandidate,
+  app_upload_shared_research_image_candidate: toolAppUploadSharedResearchImageCandidate,
+  app_import_shared_research_image_local: toolAppImportSharedResearchImageLocal,
+  app_cleanup_shared_research_image_staging: toolAppCleanupSharedResearchImageStaging,
   app_record_page_progress: toolAppRecordPageProgress,
   app_render_workspace_page_preview: toolAppRenderWorkspacePagePreview,
   app_upload_current_page_screenshot: toolAppUploadCurrentPageScreenshot,

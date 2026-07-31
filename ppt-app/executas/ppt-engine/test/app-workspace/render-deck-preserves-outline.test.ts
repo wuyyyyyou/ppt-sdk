@@ -37,6 +37,19 @@ async function writePageSource(templateDir: string, pageId: string) {
   );
 }
 
+async function waitForProgress(
+  workspaceDir: string,
+  predicate: (progress: any) => boolean,
+  getProgress: (input: { workspace_dir: string }) => Promise<any>,
+) {
+  for (let attempt = 0; attempt < 600; attempt += 1) {
+    const progress = await getProgress({ workspace_dir: workspaceDir });
+    if (predicate(progress)) return progress;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error("Timed out waiting for page-progress.json");
+}
+
 function createWorkspaceDir(homeDir: string) {
   const suffix = String(randomInt(0, 1_000_000)).padStart(6, "0");
   return path.join(homeDir, "anna-workspace", "ppt", `ppt-20260602-${suffix}`);
@@ -47,7 +60,8 @@ test("renderAppWorkspaceDeckHtml preserves the confirmed outline artifact", asyn
   const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-render-outline-home-"));
   process.env.HOME = homeDir;
 
-  const { renderAppWorkspaceDeckHtml } = await import("../../src/app-workspace/index.ts");
+    const engine = await import("../../src/app-workspace/index.ts");
+    const { renderAppWorkspaceDeckHtml } = engine;
   const workspaceDir = createWorkspaceDir(homeDir);
   const templateDir = path.join(workspaceDir, "template");
   const manifestPath = path.join(templateDir, "manifest.json");
@@ -123,12 +137,13 @@ test("renderAppWorkspaceDeckHtml preserves the confirmed outline artifact", asyn
       updated_at: "2026-06-02T00:00:00.000Z",
     });
 
-    const rendered = await renderAppWorkspaceDeckHtml({
+    const submitted = await renderAppWorkspaceDeckHtml({
       workspace_dir: workspaceDir,
     });
+    assert.equal(submitted.status, "queued");
+    const progress = await waitForProgress(workspaceDir, (value) => value.final_deck_render.status === "completed", engine.getAppPageProgress);
 
-    assert.match(rendered.slides[0]?.screenshot_path ?? "", /\.png$/);
-    const renderedHtml = await readFile(rendered.slides[0]!.html_path, "utf8");
+    const renderedHtml = await readFile(progress.final_deck_render.deck_html_path, "utf8");
     assert.match(renderedHtml, /data-presenton-render-document="static"/);
     assert.doesNotMatch(
       renderedHtml,
@@ -147,16 +162,16 @@ test("renderAppWorkspaceDeckHtml preserves the confirmed outline artifact", asyn
     assert.equal(outline.updated_at, "2026-06-02T00:00:00.000Z");
     assert.equal(outline.confirmed_at, "2026-06-02T00:00:00.000Z");
 
-    const progress = await readJson<{
+    const persisted = await readJson<{
       final_deck_render: { status: string; output_dir: string; deck_html_path: string };
       pages: Array<{ page_id: string; last_html_path: string; last_screenshot_path: string }>;
     }>(path.join(workspaceDir, "page-progress.json"));
-    assert.equal(progress.final_deck_render.status, "completed");
-    assert.equal(progress.final_deck_render.output_dir, rendered.output_dir);
-    assert.match(progress.final_deck_render.deck_html_path, /\.html$/);
-    assert.equal(progress.pages[0]?.page_id, PAGE_1);
-    assert.match(progress.pages[0]?.last_html_path ?? "", /\.html$/);
-    assert.match(progress.pages[0]?.last_screenshot_path ?? "", /\.png$/);
+    assert.equal(persisted.final_deck_render.status, "completed");
+    assert.equal(persisted.final_deck_render.output_dir, submitted.output_dir);
+    assert.match(persisted.final_deck_render.deck_html_path, /\.html$/);
+    assert.equal(persisted.pages[0]?.page_id, PAGE_1);
+    assert.equal(persisted.pages[0]?.last_html_path, "");
+    assert.equal(persisted.pages[0]?.last_screenshot_path, "");
     await assert.rejects(
       () => readFile(path.join(workspaceDir, "pages.json"), "utf8"),
       (error: NodeJS.ErrnoException) => error.code === "ENOENT",
@@ -176,7 +191,8 @@ test("renderAppWorkspacePagePreview includes stable slide id in preview filename
   const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-page-preview-home-"));
   process.env.HOME = homeDir;
 
-  const { renderAppWorkspacePagePreview } = await import(`../../src/app-workspace/index.ts?preview=${Date.now()}`);
+  const engine = await import(`../../src/app-workspace/index.ts?preview=${Date.now()}`);
+  const { renderAppWorkspacePagePreview } = engine;
   const workspaceDir = createWorkspaceDir(homeDir);
   const templateDir = path.join(workspaceDir, "template");
   const manifestPath = path.join(templateDir, "manifest.json");
@@ -210,11 +226,23 @@ test("renderAppWorkspacePagePreview includes stable slide id in preview filename
         writePageSource(templateDir, pageId),
       ),
     );
+    await writeJson(path.join(workspaceDir, "page-progress.json"), {
+      version: 1,
+      status: "running",
+      final_deck_render: { status: "idle" },
+      pages: [PAGE_1, PAGE_2, PAGE_3, PAGE_4, PAGE_5].map((page_id) => ({ page_id, status: "pending", render_attempts: 0 })),
+    });
 
-    const preview = await renderAppWorkspacePagePreview({
+    const submitted = await renderAppWorkspacePagePreview({
       workspace_dir: workspaceDir,
       page_id: PAGE_5,
     });
+    const progress = await waitForProgress(workspaceDir, (value) => value.pages.find((page: any) => page.page_id === PAGE_5)?.status === "rendered", engine.getAppPageProgress);
+    const preview = {
+      ...submitted,
+      html_path: progress.pages.find((page: any) => page.page_id === PAGE_5).last_html_path,
+      screenshot_path: progress.pages.find((page: any) => page.page_id === PAGE_5).last_screenshot_path,
+    };
 
     assert.equal(preview.slide_id, PAGE_5);
     assert.equal(preview.layout_id, PAGE_5);
@@ -247,7 +275,8 @@ test("renderAppWorkspacePagePreview typechecks canonical string slide sources be
   const homeDir = await mkdtemp(path.join(os.tmpdir(), "presenton-page-preview-typecheck-home-"));
   process.env.HOME = homeDir;
 
-  const { renderAppWorkspacePagePreview } = await import(`../../src/app-workspace/index.ts?typecheck=${Date.now()}`);
+  const engine = await import(`../../src/app-workspace/index.ts?typecheck=${Date.now()}`);
+  const { renderAppWorkspacePagePreview } = engine;
   const workspaceDir = createWorkspaceDir(homeDir);
   const manifestPath = path.join(workspaceDir, "manifest.json");
   const sourcePath = path.join(workspaceDir, "slides", `${PAGE_1}.tsx`);
@@ -279,19 +308,17 @@ test("renderAppWorkspacePagePreview typechecks canonical string slide sources be
       ].join("\n"),
       "utf8",
     );
+    await writeJson(path.join(workspaceDir, "page-progress.json"), {
+      version: 1,
+      status: "running",
+      final_deck_render: { status: "idle" },
+      pages: [{ page_id: PAGE_1, status: "pending", render_attempts: 0 }],
+    });
 
-    await assert.rejects(
-      () => renderAppWorkspacePagePreview({
-        workspace_dir: workspaceDir,
-        page_id: PAGE_1,
-      }),
-      (error) => {
-        assert.ok(error instanceof Error);
-        assert.match(error.message, /Pre-render TypeScript check failed/);
-        assert.match(error.message, /Cannot find name 'space'/);
-        return true;
-      },
-    );
+    await renderAppWorkspacePagePreview({ workspace_dir: workspaceDir, page_id: PAGE_1 });
+    const progress = await waitForProgress(workspaceDir, (value) => value.pages[0]?.status === "render_failed", engine.getAppPageProgress);
+    assert.match(progress.pages[0]?.last_error ?? "", /Pre-render TypeScript check failed/);
+    assert.match(progress.pages[0]?.last_error ?? "", /Cannot find name 'space'/);
   } finally {
     if (previousHome === undefined) {
       delete process.env.HOME;

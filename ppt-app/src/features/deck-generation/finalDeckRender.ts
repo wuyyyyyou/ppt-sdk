@@ -3,6 +3,7 @@ import { generationText } from "./messages";
 import { createProgress, emit as emitProgress } from "./progressProjection";
 import { recordDeckRecovery } from "./runtimeSupport";
 import { getAttemptLimits } from "./settings";
+import { waitForFinalDeckRender } from "./renderPolling";
 import type {
   DeckGenerationCompletion,
   AuthoringDeck,
@@ -83,10 +84,32 @@ export async function runFinalDeckRender(input: {
 
   let rendered: DeckGenerationResult["rendered"];
   try {
-    rendered = await flowInput.backend.renderDeckHtml({
+    const submission = await flowInput.backend.renderDeckHtml({
       workspace_dir: flowInput.workspace.workspace_dir,
     });
-    if (flowInput.isCancelled()) {
+    const completedProgress = await waitForFinalDeckRender({
+      backend: flowInput.backend,
+      workspaceDir: flowInput.workspace.workspace_dir,
+      submission,
+      isCancelled: flowInput.isCancelled,
+      onProgress: (nextProgress) => {
+        progress = nextProgress;
+        flowInput.onProgress(createProgress(
+          {
+            step: "final-render",
+            message: text.finalRender,
+            currentPageIndex: null,
+            totalPages: authoringDeck.pages.length,
+          },
+          nextProgress,
+          null,
+          activeStreams,
+          attemptLimits,
+          researchDiscoveryProgress,
+        ));
+      },
+    });
+    if (!completedProgress || flowInput.isCancelled()) {
       progress = await recordDeckRecovery(flowInput, {
         status: "interrupted",
         run_kind: "final-deck-render",
@@ -118,6 +141,9 @@ export async function runFinalDeckRender(input: {
         progress: cancelledProgress,
       };
     }
+    rendered = await flowInput.backend.getRenderedDeckHtml({
+      workspace_dir: flowInput.workspace.workspace_dir,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     progress = await recordDeckRecovery(flowInput, {

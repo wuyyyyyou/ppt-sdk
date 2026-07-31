@@ -25,7 +25,8 @@ import type {
   PptxExportJob,
   PptEngineRuntimeInfo,
   RenderDeckHtmlResult,
-  RenderWorkspacePagePreviewResult,
+  RenderDeckHtmlSubmissionResult,
+  RenderWorkspacePagePreviewSubmissionResult,
   RecordPdfExportInput,
   SelectTemplateResult,
   TemplatePlanningContext,
@@ -49,6 +50,7 @@ import type {
   ListStyleProfilesResult,
   PrepareStyleProfileCreationResult,
   HostUploadRef,
+  CleanupSharedResearchImageStagingResult,
   ListUploadedSourcesResult,
   PublishStyleProfileResult,
   SelectWorkspaceStyleProfileResult,
@@ -72,6 +74,8 @@ import type {
   PrepareGenerationRunResult,
   CommitGenerationRunResult,
   SharedResearchContextResult,
+  PrepareSharedResearchImageCandidateResult,
+  UploadSharedResearchImageCandidateResult,
   PatchSharedResearchProgressResult,
   PublishSharedResearchBatchResult,
   ImportSharedResearchImageResult,
@@ -699,8 +703,14 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       invoke<PublishSharedResearchBatchResult>(toolIds.pptEngine, "app_publish_prepared_web_research_batch", input),
     publishPreparedImageResearchBatch: (input) =>
       invoke<PublishSharedResearchBatchResult>(toolIds.pptEngine, "app_publish_prepared_image_research_batch", input),
-    importSharedResearchImageHostUpload: (input) =>
-      invoke<ImportSharedResearchImageResult>(toolIds.pptEngine, "app_import_shared_research_image_host_upload", input),
+    prepareSharedResearchImageCandidate: (input) =>
+      invoke<PrepareSharedResearchImageCandidateResult>(toolIds.pptEngine, "app_prepare_shared_research_image_candidate", input),
+    uploadSharedResearchImageCandidate: (input) =>
+      invoke<UploadSharedResearchImageCandidateResult>(toolIds.pptEngine, "app_upload_shared_research_image_candidate", input),
+    importSharedResearchImageLocal: (input) =>
+      invoke<ImportSharedResearchImageResult>(toolIds.pptEngine, "app_import_shared_research_image_local", input),
+    cleanupSharedResearchImageStaging: (input) =>
+      invoke<CleanupSharedResearchImageStagingResult>(toolIds.pptEngine, "app_cleanup_shared_research_image_staging", input),
     getPageProgress: (input) =>
       invoke<PageProgress>(toolIds.pptEngine, "app_get_page_progress", input),
     recordPageProgress: (input) =>
@@ -710,11 +720,10 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         input
       ),
     renderWorkspacePagePreview: (input) =>
-      invoke<RenderWorkspacePagePreviewResult>(
+      invoke<RenderWorkspacePagePreviewSubmissionResult>(
         toolIds.pptEngine,
         "app_render_workspace_page_preview",
         input,
-        { timeoutMs: LONG_RUNNING_TOOL_TIMEOUT_MS },
       ),
     uploadCurrentPageScreenshot: (input) =>
       invoke<HostUploadRef>(
@@ -757,11 +766,10 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
     recordOutline: (input) =>
       invoke<ProjectResult>(toolIds.pptEngine, "app_record_outline", input),
     renderDeckHtml: (input) =>
-      invoke<RenderDeckHtmlResult>(
+      invoke<RenderDeckHtmlSubmissionResult>(
         toolIds.pptEngine,
         "app_render_deck_html",
         input,
-        { timeoutMs: LONG_RUNNING_TOOL_TIMEOUT_MS },
       ),
     recordDeckReview: (input) =>
       invoke<ProjectResult>(

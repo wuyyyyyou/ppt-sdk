@@ -346,14 +346,15 @@ test("Workspace Style Guide Host Upload waits for persistence before staging cle
   assert.match(handler, /return await recordAppWorkspaceStyleGuide\(\{/);
 });
 
-test("Shared Research Image Host Upload waits for import before staging cleanup", async () => {
+test("Shared Research Image local import waits for persistence before staging cleanup", async () => {
   const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
   const handler = source.match(
-    /async function toolAppImportSharedResearchImageHostUpload\(args\) \{[\s\S]*?\n\}/,
+    /async function toolAppImportSharedResearchImageLocal\(args\) \{[\s\S]*?\n\}/,
   )?.[0];
 
-  assert.ok(handler, "Missing Shared Research Image Host Upload handler");
-  assert.match(handler, /return await importAppSharedResearchImage\(\{/);
+  assert.ok(handler, "Missing Shared Research Image local import handler");
+  assert.match(handler, /const result = await importAppSharedResearchImage\(\{/);
+  assert.match(handler, /await unlink\(localFilePath\)/);
 });
 
 test("app_get_rendered_deck_html is declared and routed", async () => {
@@ -450,6 +451,8 @@ test("legacy research tools are no longer declared or routed", async () => {
     "app_get_research_curation_draft_fingerprint",
     "app_record_research_status",
     "app_get_research_status",
+    "app_get_shared_research_image_download_urls",
+    "app_import_shared_research_image_aps",
   ];
 
   for (const toolName of legacyToolNames) {

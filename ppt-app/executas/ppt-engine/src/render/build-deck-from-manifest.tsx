@@ -11,12 +11,20 @@ import { prepareManifestRenderPlan } from "./manifest-render-plan.js";
 import type {
   BuildDeckHtmlPagesAndScreenshotsFromManifestResult,
   BuildDeckHtmlPagesFromManifestResult,
+  BuildDeckHtmlSnapshotFromManifestResult,
   BuildDeckPageScreenshotFromManifestInput,
   BuildDeckPageScreenshotFromManifestResult,
   BuildDeckHtmlFromManifestFileOutput,
   BuildDeckHtmlFromManifestInput,
   BuildDeckHtmlFromManifestResult,
 } from "./types.js";
+
+export interface BuildDeckHtmlSnapshotFromManifestOptions {
+  transformDeckHtml?: (
+    deckHtml: string,
+    slides: BuildDeckHtmlSnapshotFromManifestResult["slides"],
+  ) => Promise<string> | string;
+}
 
 export function buildSinglePagePreviewBaseFileName(input: {
   pageNumber: number;
@@ -157,6 +165,42 @@ export async function buildDeckHtmlPagesAndScreenshotsFromManifest(
       screenshotPath: slide.screenshotPath,
       speakerNote: slide.slide.speaker_note,
     })),
+    slideCount: prepared.slideCount,
+    title: prepared.title,
+    manifestPath: prepared.manifestPath,
+  };
+}
+
+export async function buildDeckHtmlSnapshotFromManifest(
+  input: BuildDeckHtmlFromManifestInput,
+  options: BuildDeckHtmlSnapshotFromManifestOptions = {},
+): Promise<BuildDeckHtmlSnapshotFromManifestResult> {
+  const prepared = await prepareManifestRenderPlan(input);
+  const deckHtmlPath = path.join(prepared.outputDir, `${prepared.deckBaseName}-deck.html`);
+  const slides = prepared.slides.map((slide) => ({
+    slideId: slide.slideId,
+    layoutId: slide.layoutId,
+    title: slide.context.title,
+    speakerNote: slide.speaker_note,
+  }));
+  let deckHtml = buildStandaloneDeckHtml({
+    title: prepared.title,
+    slides: prepared.slides,
+    runtimeBundle: prepared.deckRuntimeBundle,
+    tailwindRuntimeBundle: prepared.tailwindRuntimeBundle,
+  });
+  if (options.transformDeckHtml) {
+    deckHtml = await options.transformDeckHtml(deckHtml, slides);
+  }
+
+  await mkdir(prepared.outputDir, { recursive: true });
+  await writeFile(deckHtmlPath, deckHtml, "utf8");
+  await staticizeHtmlDocuments([{ htmlPath: deckHtmlPath, kind: "deck" }]);
+
+  return {
+    outputDir: prepared.outputDir,
+    deckHtmlPath,
+    slides,
     slideCount: prepared.slideCount,
     title: prepared.title,
     manifestPath: prepared.manifestPath,

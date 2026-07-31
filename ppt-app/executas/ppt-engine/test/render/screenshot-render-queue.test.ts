@@ -82,3 +82,33 @@ test("withScreenshotRenderQueue continues after a failed operation", async () =>
   assert.equal(await second, "ok");
   assert.deepEqual(events, ["first:start", "second:start"]);
 });
+
+test("withScreenshotRenderQueue releases the queue after an operation timeout", async () => {
+  const events: string[] = [];
+
+  const first = withScreenshotRenderQueue(
+    async () => {
+      events.push("first:start");
+      await new Promise<void>(() => {});
+    },
+    {
+      timeoutMs: 5,
+      onTimeout: async () => {
+        events.push("first:timeout-cleanup");
+      },
+      label: "hung screenshot render",
+    },
+  );
+  const second = withScreenshotRenderQueue(async () => {
+    events.push("second:start");
+    return "ok";
+  });
+
+  await assert.rejects(first, /hung screenshot render timed out after 5ms/);
+  assert.equal(await second, "ok");
+  assert.deepEqual(events, [
+    "first:start",
+    "first:timeout-cleanup",
+    "second:start",
+  ]);
+});

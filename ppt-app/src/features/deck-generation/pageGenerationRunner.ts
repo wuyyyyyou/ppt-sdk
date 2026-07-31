@@ -38,6 +38,7 @@ import {
   type RenderFailurePhase,
 } from "./types";
 import { beginPerformanceSpan } from "../../performance/performanceRecorder";
+import { waitForWorkspacePagePreview } from "./renderPolling";
 
 function emitRuntime(
   input: DeckGenerationRuntime,
@@ -377,10 +378,26 @@ async function runPageGenerationInternal(
         currentPageIndex: page.index,
         totalPages,
       }, progress);
-      preview = await input.backend.renderWorkspacePagePreview({
+      const submission = await input.backend.renderWorkspacePagePreview({
         workspace_dir: input.workspace.workspace_dir,
         page_id: page.page_id,
       });
+      const completedPreview = await waitForWorkspacePagePreview({
+        backend: input.backend,
+        workspaceDir: input.workspace.workspace_dir,
+        submission,
+        isCancelled: input.isCancelled,
+        onProgress: (nextProgress) => {
+          progress = nextProgress;
+          input.setProgress(nextProgress);
+        },
+      });
+      if (!completedPreview) {
+        renderSpan?.finish("interrupted");
+        return { page, reason: "cancelled", progress: input.getProgress() ?? progress as PageProgress };
+      }
+      preview = completedPreview;
+      renderAttempts = submission.render_attempt;
       renderSpan?.finish("ok");
       progress = await recordProgress(input, page, {
         status: reviewSettings.visualReviewEnabled ? "visual_review" : "accepted",
@@ -413,7 +430,11 @@ async function runPageGenerationInternal(
       }
     } catch (error) {
       renderSpan?.finish("error");
-      renderAttempts += 1;
+      const latestProgress = await input.backend.getPageProgress({
+        workspace_dir: input.workspace.workspace_dir,
+      }).catch(() => null);
+      const latestPage = latestProgress?.pages.find((item) => item.page_id === page.page_id);
+      renderAttempts = latestPage?.render_attempts ?? (renderAttempts + 1);
       renderError = error instanceof Error ? error.message : String(error);
       renderFailureHistory.push({
         attempt: renderAttempts,

@@ -11,6 +11,7 @@ const STAGES: AppSharedResearchStage[] = [
   "image_research",
   "image_search",
   "image_deduplication",
+  "image_prefetch",
   "image_analysis",
   "image_import",
 ];
@@ -73,7 +74,7 @@ function assertOperationShape(value: unknown): asserts value is AppSharedResearc
     throw new Error("Invalid analysis batch candidates");
   }
   if (op === "set_stage" && (!STAGES.includes(operation.stage as AppSharedResearchStage) || !["waiting", "running", "completed", "warning", "skipped"].includes(String(operation.state)))) throw new Error("Invalid set_stage operation");
-  if (op === "set_image_work_status" && (!["search_status", "analysis_status", "import_status"].includes(String(operation.field)) || !["waiting", "running", "completed", "warning"].includes(String(operation.state)))) throw new Error("Invalid image work status operation");
+  if (op === "set_image_work_status" && (!["search_status", "prepare_status", "analysis_status", "import_status"].includes(String(operation.field)) || !["waiting", "running", "completed", "warning"].includes(String(operation.state)))) throw new Error("Invalid image work status operation");
   if (op === "finalize_image_research" && !["completed", "warning", "skipped"].includes(String(operation.status))) throw new Error("Invalid image research final status");
 }
 
@@ -93,6 +94,7 @@ function assertCheckpoint(progress: Record<string, unknown>) {
   const stages = record(progress.stages);
   for (const stage of STAGES) {
     const state = stages[stage];
+    if (stage === "image_prefetch" && state === undefined) continue;
     if (!["waiting", "running", "completed", "warning", "skipped"].includes(String(state))) {
       throw new Error(`Invalid shared research stage: ${stage}`);
     }
@@ -131,6 +133,22 @@ function assertStageCompletion(progress: Record<string, unknown>, stage: AppShar
       throw new Error("Image deduplication group is missing its candidate");
     }
   }
+  if (stage === "image_prefetch") {
+    const candidates = Array.isArray(image.candidates) ? image.candidates.map(record) : [];
+    if (candidates.some((candidate) => !["completed", "failed"].includes(String(candidate.local_download_status)))) {
+      throw new Error("Image candidate preparation has unfinished downloads");
+    }
+    if (candidates.some((candidate) => (
+      candidate.local_download_status === "completed"
+      && !candidate.content_duplicate_of
+      && !["completed", "failed"].includes(String(candidate.upload_status))
+    ))) {
+      throw new Error("Image candidate preparation has unfinished uploads");
+    }
+    if (state === "completed" && candidates.some((candidate) => candidate.local_download_status === "failed" || candidate.upload_status === "failed")) {
+      throw new Error("Completed image candidate preparation cannot contain failed candidates");
+    }
+  }
   if (stage === "image_analysis" && state === "completed") {
     const batches = Array.isArray(image.analysis_batches) ? image.analysis_batches.map(record) : [];
     if (batches.some((batch) => batch.status !== "completed")) throw new Error("Image analysis has unfinished batches");
@@ -144,7 +162,7 @@ function assertStageCompletion(progress: Record<string, unknown>, stage: AppShar
   }
   if (stage === "image_import" && state === "completed") {
     const candidates = Array.isArray(image.candidates) ? image.candidates.map(record) : [];
-    if (candidates.some((candidate) => candidate.use_in_ppt === true && candidate.download_status !== "imported")) {
+    if (candidates.some((candidate) => candidate.use_in_ppt === true && candidate.import_status !== "imported")) {
       throw new Error("Selected image candidates have not all been imported");
     }
   }
@@ -177,6 +195,9 @@ export function applySharedResearchProgressOperations(
   assertCheckpoint(currentValue);
   const previousRevision = typeof currentValue.revision === "number" ? currentValue.revision : 0;
   const next: Record<string, unknown> = clone({ ...currentValue, revision: previousRevision });
+  const nextStages = record(next.stages);
+  nextStages.image_prefetch ??= "waiting";
+  next.stages = nextStages;
 
   for (const operation of operations) {
     assertOperationShape(operation);

@@ -49,17 +49,6 @@ export interface ResearchImageSearchResponse {
   cached?: boolean;
 }
 
-export interface ResearchImageFetchResponse {
-  path: string;
-  get_url: string;
-  mime_type: string;
-  bytes_size: number;
-  sha256: string;
-  source_url: string;
-  final_url: string;
-  quota_consumed?: number;
-}
-
 export interface ResearchWebNormalizationWarning {
   code: string;
   path: string;
@@ -206,35 +195,13 @@ function normalizeImageSearchResponse(value: unknown): NormalizedResult<Research
   };
 }
 
-function normalizeImageFetchResponse(value: unknown): NormalizedResult<ResearchImageFetchResponse> {
-  const warnings: ResearchWebNormalizationWarning[] = [];
-  const record = normalizedRecord(value, warnings);
-  const path = readString(record.path);
-  const getUrl = readString(record.get_url);
-  if (!path || !getUrl) throw new Error("anna.web.image_fetch returned no APS artifact reference");
-  return {
-    value: {
-      path,
-      get_url: getUrl,
-      mime_type: readString(record.mime_type),
-      bytes_size: readFiniteNumber(record.bytes_size) ?? 0,
-      sha256: readString(record.sha256),
-      source_url: readString(record.source_url),
-      final_url: readString(record.final_url),
-      ...(readFiniteNumber(record.quota_consumed) !== undefined ? { quota_consumed: readFiniteNumber(record.quota_consumed) } : {}),
-    },
-    warnings,
-  };
-}
-
 export interface ResearchWebClient {
   search(input: { query: string; max_results?: number }, context: ResearchWebCallContext): Promise<ResearchWebSearchResponse>;
   fetch(input: { urls: string[]; max_chars?: number }, context: ResearchWebCallContext): Promise<ResearchWebFetchResponse>;
   imageSearch(input: { query: string; max_results?: number; min_width?: number; min_height?: number; aspect?: "any" | "wide" | "tall" | "square" }, context: ResearchWebCallContext): Promise<ResearchImageSearchResponse>;
-  imageFetch(input: { url: string; max_bytes?: number; purpose?: string }, context: ResearchWebCallContext): Promise<ResearchImageFetchResponse>;
 }
 
-type ResearchWebMethod = "search" | "fetch" | "image_search" | "image_fetch";
+type ResearchWebMethod = "search" | "fetch" | "image_search";
 
 function randomDiagnosticPart() {
   return globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2, 14);
@@ -347,8 +314,7 @@ function responseSummary(method: ResearchWebMethod, response: unknown, input: un
     const value = response as ResearchImageSearchResponse;
     return { result_count: value.results.length, cached: value.cached, quota_consumed: value.quota_consumed };
   }
-  const value = response as ResearchImageFetchResponse;
-  return { path: value.path, mime_type: value.mime_type, bytes_size: value.bytes_size, sha256: value.sha256, quota_consumed: value.quota_consumed };
+  return {};
 }
 
 export function createResearchWebClient(runtime: AnnaRuntime, options: ResearchWebClientOptions): ResearchWebClient {
@@ -416,7 +382,7 @@ export function createResearchWebClient(runtime: AnnaRuntime, options: ResearchW
 
     let rawResponse: unknown;
     const performanceSpan = beginPerformanceSpan({
-      operationName: input.method === "image_search" ? "image.search" : input.method === "image_fetch" ? "image.fetch" : `web.${input.method}`,
+      operationName: input.method === "image_search" ? "image.search" : `web.${input.method}`,
       workspaceId: input.context.workspace_dir.split(/[\\/]/).filter(Boolean).at(-1),
       attributes: { layer: "anna-web" },
     });
@@ -514,15 +480,6 @@ export function createResearchWebClient(runtime: AnnaRuntime, options: ResearchW
         aspect: input.aspect ?? "any",
       } as const;
       return invoke({ method: "image_search", callerInput: input, runtimeRequest, context, call: () => web.image_search(runtimeRequest), normalize: normalizeImageSearchResponse });
-    },
-    async imageFetch(input, context) {
-      const runtimeRequest = {
-        url: input.url,
-        max_bytes: input.max_bytes ?? 20 * 1024 * 1024,
-        purpose: input.purpose ?? "ppt-research",
-      };
-      const runtimeOptions = { timeoutMs: 90000 };
-      return invoke({ method: "image_fetch", callerInput: input, runtimeRequest, runtimeOptions, context, call: () => web.image_fetch(runtimeRequest, runtimeOptions), normalize: normalizeImageFetchResponse });
     },
   };
 }

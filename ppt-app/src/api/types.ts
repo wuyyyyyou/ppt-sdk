@@ -983,13 +983,18 @@ export interface SharedResearchImageCandidate {
   use_in_ppt: boolean;
   description: string;
   reason: string;
-  analysis_status?: "pending" | "running" | "completed" | "failed";
+  local_download_status?: "pending" | "running" | "completed" | "failed";
+  local_download_error?: string;
+  upload_status?: "pending" | "running" | "completed" | "failed" | "skipped";
+  upload_r2_key?: string;
+  upload_expires_at?: string;
+  analysis_status?: "pending" | "running" | "completed" | "failed" | "skipped";
   file_path?: string;
-  download_status: "pending" | "imported" | "failed";
+  local_file_path?: string;
+  import_status: "pending" | "imported" | "failed" | "skipped";
   sha256?: string;
   mime_type?: string;
   bytes_size?: number;
-  aps_path?: string;
   final_url?: string;
   content_duplicate_of?: string;
   error?: string;
@@ -1012,6 +1017,11 @@ export interface SharedResearchImageBatch {
     raw_candidates?: number;
     unique_url_candidates?: number;
     duplicate_url_occurrences?: number;
+    downloaded?: number;
+    uploaded?: number;
+    unique_content_candidates?: number;
+    download_failed?: number;
+    upload_failed?: number;
     selected: number;
     imported: number;
     unique_content_imported?: number;
@@ -1057,6 +1067,7 @@ export type SharedResearchStage =
   | "image_research"
   | "image_search"
   | "image_deduplication"
+  | "image_prefetch"
   | "image_analysis"
   | "image_import";
 
@@ -1070,7 +1081,7 @@ export type SharedResearchProgressOperation =
   | { op: "set_web_diagnostics"; gaps: string[]; diagnostic_errors: string[] }
   | { op: "set_image_decision"; decision: Record<string, unknown> }
   | { op: "upsert_image_search"; query: string; search: Record<string, unknown> }
-  | { op: "set_image_work_status"; field: "search_status" | "analysis_status" | "import_status"; state: "waiting" | "running" | "completed" | "warning" }
+  | { op: "set_image_work_status"; field: "search_status" | "prepare_status" | "analysis_status" | "import_status"; state: "waiting" | "running" | "completed" | "warning" }
   | { op: "upsert_image_deduplication_entry"; candidate_id: string; group: Record<string, unknown>; candidate: Record<string, unknown> }
   | { op: "set_image_deduplication_summary"; strategy: Record<string, unknown>; statistics: Record<string, unknown> }
   | { op: "upsert_image_analysis_batch"; batch_id: string; batch: Record<string, unknown>; candidates: Array<{ candidate_id: string; candidate: Record<string, unknown> }> }
@@ -1105,6 +1116,29 @@ export interface ImportSharedResearchImageResult {
   bytes_size: number;
 }
 
+export interface PrepareSharedResearchImageCandidateResult {
+  candidate_id: string;
+  local_file_path: string;
+  final_url: string;
+  mime_type: string;
+  bytes_size: number;
+  sha256: string;
+  width: number;
+  height: number;
+}
+
+export interface UploadSharedResearchImageCandidateResult {
+  workspace_dir: string;
+  candidate_id: string;
+  host_upload: HostUploadRef;
+}
+
+export interface CleanupSharedResearchImageStagingResult {
+  workspace_dir: string;
+  operation_id: string;
+  cleaned: boolean;
+}
+
 export interface PageProgressItem {
   page_id: string;
   status: string;
@@ -1115,6 +1149,7 @@ export interface PageProgressItem {
   last_html_path: string;
   last_screenshot_path: string;
   last_error: string;
+  render_source_sha256?: string;
   visual_review?: unknown | null;
   updated_at: string | null;
 }
@@ -1199,6 +1234,7 @@ export interface FinalDeckRenderState {
   deck_html_path: string | null;
   rendered_at: string | null;
   updated_at: string | null;
+  source_fingerprint?: string | null;
 }
 
 export type ResearchDiscoveryProgressPhase =
@@ -1353,13 +1389,26 @@ export interface WorkspaceStyleGuide extends WorkspaceStyleGuideStatus {
   content: string;
 }
 
+export interface RenderWorkspacePagePreviewSubmissionResult {
+  status: "queued" | "running";
+  already_queued: boolean;
+  workspace_dir: string;
+  manifest_path: string;
+  page_index: number;
+  page_number: number;
+  slide_id: string;
+  layout_id: string;
+  title: string;
+  render_attempt: number;
+  source_sha256: string;
+  submitted_at: string;
+}
+
 export interface RenderWorkspacePagePreviewResult {
   workspace_dir: string;
   manifest_path: string;
   html_path: string;
   screenshot_path: string;
-  /** @deprecated Rendering no longer uploads; kept optional for compatibility with older callers. */
-  screenshot_upload?: HostUploadRef;
   page_index: number;
   page_number: number;
   slide_id: string;
@@ -1486,6 +1535,16 @@ export interface RecordOutlineInput {
 
 export interface RenderDeckHtmlInput {
   workspace_dir: string;
+}
+
+export interface RenderDeckHtmlSubmissionResult {
+  status: "queued" | "running";
+  already_queued: boolean;
+  workspace_dir: string;
+  manifest_path: string;
+  output_dir: string;
+  source_fingerprint: string;
+  submitted_at: string;
 }
 
 export interface RenderDeckHtmlResult {

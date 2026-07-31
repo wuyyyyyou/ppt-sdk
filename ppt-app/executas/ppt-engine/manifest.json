@@ -1,6 +1,6 @@
 {
   "display_name": "ppt-engine",
-  "version": "4.3.10",
+  "version": "4.3.13",
   "description": "Anna Executa plugin for Workspace Authoring Kit setup, manifest-based deck HTML generation, and backend PPTX export.",
   "author": "Anna Developer",
   "host_capabilities": [
@@ -1389,8 +1389,8 @@
       ]
     },
     {
-      "name": "app_import_shared_research_image_host_upload",
-      "description": "Validate and import one selected research image Host Upload into the shadow Workspace evidence image directory.",
+      "name": "app_prepare_shared_research_image_candidate",
+      "description": "Safely download one HTTPS image candidate into Workspace staging and validate it for later upload or import.",
       "parameters": [
         {
           "name": "workspace_dir",
@@ -1399,35 +1399,51 @@
           "required": true
         },
         {
+          "name": "operation_id",
+          "type": "string",
+          "description": "Research operation identifier used to correlate storage logs.",
+          "required": true
+        },
+        {
           "name": "candidate_id",
           "type": "string",
           "description": "Stable image candidate identifier.",
           "required": true
         },
-        {
-          "name": "mime_type",
-          "type": "string",
-          "description": "Host-validated image MIME type.",
-          "required": true
-        },
-        {
-          "name": "size_bytes",
-          "type": "number",
-          "description": "Expected image byte size.",
-          "required": true
-        },
-        {
-          "name": "sha256",
-          "type": "string",
-          "description": "Expected image SHA-256 from anna.web.image_fetch.",
-          "required": false
-        },
-        {
-          "name": "host_upload",
-          "type": "object",
-          "description": "Image HostUploadRef returned by the Anna App Host Upload API.",
-          "required": true
-        }
+        { "name": "source_url", "type": "string", "description": "Public HTTPS image URL returned by image search.", "required": true },
+        { "name": "existing_file_path", "type": "string", "description": "Optional prior staging file to validate and reuse during recovery.", "required": false },
+        { "name": "expected_sha256", "type": "string", "description": "Optional SHA-256 for the prior staging file.", "required": false }
+      ]
+    },
+    {
+      "name": "app_upload_shared_research_image_candidate",
+      "description": "Upload one validated local research image candidate for an image-analysis Session.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
+        { "name": "operation_id", "type": "string", "description": "Research operation identifier used to correlate storage logs.", "required": true },
+        { "name": "candidate_id", "type": "string", "description": "Stable image candidate identifier.", "required": true },
+        { "name": "local_file_path", "type": "string", "description": "Absolute path to the validated Workspace staging image.", "required": true },
+        { "name": "mime_type", "type": "string", "description": "Validated image MIME type.", "required": true }
+      ]
+    },
+    {
+      "name": "app_import_shared_research_image_local",
+      "description": "Validate and import one selected staged research image into the shadow Workspace evidence image directory.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
+        { "name": "candidate_id", "type": "string", "description": "Stable image candidate identifier.", "required": true },
+        { "name": "local_file_path", "type": "string", "description": "Absolute path to the validated Workspace staging image.", "required": true },
+        { "name": "mime_type", "type": "string", "description": "Validated image MIME type.", "required": true },
+        { "name": "size_bytes", "type": "number", "description": "Expected image byte size.", "required": true },
+        { "name": "sha256", "type": "string", "description": "Expected image SHA-256.", "required": true }
+      ]
+    },
+    {
+      "name": "app_cleanup_shared_research_image_staging",
+      "description": "Remove all temporary research image files after one research operation has published its final evidence.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
+        { "name": "operation_id", "type": "string", "description": "Research operation identifier whose staging directory may be removed.", "required": true }
       ]
     },
     {
@@ -1456,7 +1472,7 @@
     },
     {
       "name": "app_render_workspace_page_preview",
-      "description": "Render one workspace manifest page to lightweight HTML and PNG preview for Agent review.",
+      "description": "Submit one workspace page render to the in-memory serial queue and return immediately; poll app_get_page_progress for the completed HTML and PNG paths.",
       "parameters": [
         {
           "name": "workspace_dir",
@@ -1660,7 +1676,7 @@
     },
     {
       "name": "app_render_deck_html",
-      "description": "Render the selected workspace template manifest to reviewable deck HTML and return Host Upload screenshot previews.",
+      "description": "Submit final Deck HTML rendering to the in-memory queue and return immediately; poll app_get_page_progress.final_deck_render for completion. Review screenshots are reused separately.",
       "parameters": [
         {
           "name": "workspace_dir",

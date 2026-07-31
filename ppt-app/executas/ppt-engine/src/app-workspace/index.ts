@@ -37,7 +37,7 @@ import {
 } from "../template-previews/index.js";
 import {
   buildDeckHtmlFromManifest,
-  buildDeckHtmlPagesAndScreenshotsFromManifest,
+  buildDeckHtmlSnapshotFromManifest,
   buildDeckPageScreenshotFromManifest,
 } from "../render/build-deck-from-manifest.js";
 import { writeSlideScreenshots } from "../render/browser-artifacts.js";
@@ -59,7 +59,11 @@ import {
 import { validateThemeTokenRecord } from "../render/theme-tokens.js";
 import { resolveLocalModulePath } from "../local-template/loader.js";
 import { assertLocalTemplateTypecheck } from "../local-template/typecheck.js";
-import { launchManagedBrowser } from "../runtime/browser-runtime.js";
+import {
+  closeManagedBrowser,
+  closeManagedPage,
+  launchManagedBrowser,
+} from "../runtime/browser-runtime.js";
 import { convertDeckHtmlToPptx } from "../pptx-export/dom-to-pptx.js";
 import { rasterizePptxToImages } from "../pptx-rasterization/index.js";
 import { prepareWorkspacePageSources } from "../authoring-kit-workspace/index.js";
@@ -209,8 +213,10 @@ import type {
   PatchAppWorkspaceSettingsResult,
   RenderAppWorkspacePagePreviewInput,
   RenderAppWorkspacePagePreviewResult,
+  RenderedAppWorkspacePagePreviewResult,
   RenderAppWorkspaceDeckHtmlInput,
   RenderAppWorkspaceDeckHtmlResult,
+  SubmitAppWorkspaceDeckHtmlResult,
   SelectAppWorkspaceTemplateInput,
   SelectAppWorkspaceTemplateResult,
   SelectAppWorkspaceStyleProfileInput,
@@ -671,6 +677,17 @@ const themeTokenWriteQueues = new Map<string, Promise<unknown>>();
 const exportArtifactWriteQueues = new Map<string, Promise<unknown>>();
 const manualFinalDeckWriteQueues = new Map<string, Promise<unknown>>();
 const sharedResearchWriteQueues = new Map<string, Promise<unknown>>();
+type ActivePageRender = {
+  token: symbol;
+  sourceSha256: string;
+  renderAttempt: number;
+};
+type ActiveDeckRender = {
+  token: symbol;
+  sourceFingerprint: string;
+};
+const activePageRenders = new Map<string, ActivePageRender>();
+const activeDeckRenders = new Map<string, ActiveDeckRender>();
 let pptxExportQueue = Promise.resolve();
 const activePptxExportJobIds = new Set<string>();
 
@@ -1494,6 +1511,7 @@ function normalizePageProgressItem(value: unknown): AppPageProgressItem | null {
     last_html_path: normalizeString(record.last_html_path),
     last_screenshot_path: normalizeString(record.last_screenshot_path),
     last_error: normalizeString(record.last_error),
+    render_source_sha256: normalizeString(record.render_source_sha256),
     visual_review: record.visual_review ?? null,
     updated_at: typeof record.updated_at === "string" ? record.updated_at : null,
   };
@@ -1503,6 +1521,7 @@ const PAGE_PROGRESS_PAGE_STATUSES = new Set([
   "pending",
   "authoring",
   "rendering",
+  "rendered",
   "render_fixing",
   "visual_review",
   "visual_review_fixing",
@@ -1591,6 +1610,7 @@ function normalizeFinalDeckRenderState(value: unknown): AppPageProgress["final_d
     deck_html_path: normalizeNullableString(record.deck_html_path),
     rendered_at: typeof record.rendered_at === "string" ? record.rendered_at : null,
     updated_at: typeof record.updated_at === "string" ? record.updated_at : null,
+    source_fingerprint: normalizeNullableString(record.source_fingerprint),
   };
 }
 
@@ -1694,6 +1714,7 @@ function createDefaultPageProgressJson(): AppPageProgress {
       deck_html_path: null,
       rendered_at: null,
       updated_at: null,
+      source_fingerprint: null,
     },
     research_discovery: undefined,
     pages: [],
@@ -3908,7 +3929,7 @@ function compactImageCatalogAsset(value: unknown): Record<string, unknown> | nul
   const candidate = getPlainRecord(value);
   if (
     candidate.use_in_ppt !== true
-    || candidate.download_status !== "imported"
+    || candidate.import_status !== "imported"
     || !normalizeString(candidate.candidate_id)
     || !normalizeString(candidate.file_path)
     || !normalizeString(candidate.sha256)
@@ -4766,6 +4787,7 @@ async function invalidateFinalDeckRender(
       deck_html_path: null,
       rendered_at: null,
       updated_at: updatedAt,
+      source_fingerprint: null,
     },
     updated_at: updatedAt,
   } satisfies AppPageProgress);
@@ -4815,7 +4837,7 @@ export async function getAppPageEditContext(
     await stat(htmlPath).then((value) => value.isFile()).catch(() => false) &&
     await stat(screenshotPath).then((value) => value.isFile()).catch(() => false);
   if (!existingArtifactsAvailable) {
-    const preview = await renderAppWorkspacePagePreview({
+    const preview = await performAppWorkspacePagePreview({
       workspace_dir: workspace.workspace_dir,
       page_id: input.page_id,
     });
@@ -4898,6 +4920,12 @@ async function commitManualPageToFinalDeck(input: {
       incrementalError = "No completed Final Deck Render is available for incremental publication.";
     }
 
+    const nextSourceFingerprint = finalDeckRenderUpdated
+      ? await fingerprintAppWorkspaceDeckRender(
+        workspace,
+        readSelectedTemplateManifestPath(workspace),
+      )
+      : null;
     const nextFinalRender = finalDeckRenderUpdated
       ? {
           ...currentFinalRender,
@@ -4906,6 +4934,7 @@ async function commitManualPageToFinalDeck(input: {
           error: null,
           rendered_at: input.updated_at,
           updated_at: input.updated_at,
+          source_fingerprint: nextSourceFingerprint,
         }
       : {
           status: "idle" as const,
@@ -4915,6 +4944,7 @@ async function commitManualPageToFinalDeck(input: {
           deck_html_path: null,
           rendered_at: null,
           updated_at: input.updated_at,
+          source_fingerprint: null,
         };
     const nextProgress: AppPageProgress = {
       ...progress,
@@ -5038,7 +5068,7 @@ export async function restoreAppPageSourceVersion(
 ): Promise<RestoreAppPageSourceVersionResult> {
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
   await removeManualPageRevision(workspace.workspace_dir, input.page_id);
-  const preview = await renderAppWorkspacePagePreview({
+  const preview = await performAppWorkspacePagePreview({
     workspace_dir: workspace.workspace_dir,
     page_id: input.page_id,
   });
@@ -5060,79 +5090,187 @@ export async function restoreAppPageSourceVersion(
   };
 }
 
+async function fingerprintAppWorkspaceDeckRender(
+  workspace: AppWorkspaceResult,
+  manifestPath: string,
+): Promise<string> {
+  const manifest = getPlainRecord(JSON.parse(await readFile(manifestPath, "utf8")) as unknown);
+  const slides = Array.isArray(manifest.slides) ? manifest.slides : [];
+  const fingerprint = createHash("sha256").update(await readFile(manifestPath));
+  for (const [index, slideValue] of slides.entries()) {
+    const slide = getPlainRecord(slideValue);
+    const pageId = normalizeString(slide.id);
+    const localSlide = await readManifestLocalSlideSourcePath({ manifestPath, pageIndex: index });
+    if (!localSlide) throw new Error(`Deck slide "${pageId || index + 1}" must use a local Page Source`);
+    fingerprint.update(await readFile(localSlide.absolutePath));
+    const revision = pageId ? await readManualPageRevision(workspace.workspace_dir, pageId) : null;
+    fingerprint.update(revision?.current_html_sha256 ?? "");
+  }
+  return fingerprint.digest("hex");
+}
+
+async function updateFinalDeckRenderIfActive(input: {
+  workspaceDir: string;
+  token: symbol;
+  sourceFingerprint: string;
+  patch: Partial<AppPageProgress["final_deck_render"]>;
+}): Promise<boolean> {
+  return withPageProgressWriteQueue(input.workspaceDir, async () => {
+    const active = activeDeckRenders.get(path.normalize(input.workspaceDir));
+    if (!active || active.token !== input.token || active.sourceFingerprint !== input.sourceFingerprint) {
+      return false;
+    }
+    const workspace = await ensureWorkspaceFiles(input.workspaceDir);
+    const current = normalizePageProgressJson(workspace.page_progress);
+    const updatedAt = new Date().toISOString();
+    const nextProgress: AppPageProgress = {
+      ...current,
+      final_deck_render: normalizeFinalDeckRenderState({
+        ...current.final_deck_render,
+        ...input.patch,
+        source_fingerprint: input.sourceFingerprint,
+        updated_at: updatedAt,
+      }),
+      updated_at: updatedAt,
+    };
+    await writeJsonFile(workspace.files.page_progress, nextProgress);
+    await touchWorkspaceTask(workspace, updatedAt);
+    return true;
+  });
+}
+
+async function performAppWorkspaceDeckHtmlRender(input: {
+  workspace: AppWorkspaceResult;
+  manifestPath: string;
+  outputDir: string;
+}) {
+  return buildDeckHtmlSnapshotFromManifest({
+    manifestPath: input.manifestPath,
+    outputDir: input.outputDir,
+    name: `${input.workspace.workspace_id}-review`,
+  }, {
+    transformDeckHtml: async (initialDeckHtml, slides) => {
+      let deckHtml = initialDeckHtml;
+      for (const [index, slide] of slides.entries()) {
+        const revision = await readManualPageRevision(input.workspace.workspace_dir, slide.slideId);
+        if (!revision) continue;
+        const manualHtml = await injectWorkspaceManagedFontCss(
+          input.workspace.workspace_dir,
+          await readFile(revision.current_html_path, "utf8"),
+        );
+        deckHtml = replaceSlideShellAtIndex(deckHtml, index, extractSlideShell(manualHtml).shell);
+      }
+      return deckHtml;
+    },
+  });
+}
+
+async function runAppWorkspaceDeckRenderTask(input: {
+  workspaceDir: string;
+  manifestPath: string;
+  outputDir: string;
+  sourceFingerprint: string;
+  token: symbol;
+}): Promise<void> {
+  try {
+    const workspace = await ensureWorkspaceFiles(input.workspaceDir);
+    const result = await performAppWorkspaceDeckHtmlRender({
+      workspace,
+      manifestPath: input.manifestPath,
+      outputDir: input.outputDir,
+    });
+    const renderedAt = new Date().toISOString();
+    await updateFinalDeckRenderIfActive({
+      workspaceDir: input.workspaceDir,
+      token: input.token,
+      sourceFingerprint: input.sourceFingerprint,
+      patch: {
+        status: "completed",
+        message: null,
+        error: null,
+        output_dir: result.outputDir,
+        deck_html_path: result.deckHtmlPath,
+        rendered_at: renderedAt,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await updateFinalDeckRenderIfActive({
+      workspaceDir: input.workspaceDir,
+      token: input.token,
+      sourceFingerprint: input.sourceFingerprint,
+      patch: { status: "failed", message, error: message },
+    }).catch(() => undefined);
+  } finally {
+    const key = path.normalize(input.workspaceDir);
+    if (activeDeckRenders.get(key)?.token === input.token) activeDeckRenders.delete(key);
+  }
+}
+
 export async function renderAppWorkspaceDeckHtml(
   input: RenderAppWorkspaceDeckHtmlInput,
-): Promise<RenderAppWorkspaceDeckHtmlResult> {
+): Promise<SubmitAppWorkspaceDeckHtmlResult> {
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
   const manifestPath = readSelectedTemplateManifestPath(workspace);
-  const renderedAt = new Date().toISOString();
   const outputDir = path.join(workspace.workspace_dir, "output", "app-render");
-  const result = await buildDeckHtmlPagesAndScreenshotsFromManifest({
+  const sourceFingerprint = await fingerprintAppWorkspaceDeckRender(workspace, manifestPath);
+  const key = path.normalize(workspace.workspace_dir);
+  const existing = activeDeckRenders.get(key);
+  const submittedAt = new Date().toISOString();
+  const persistedFinal = normalizePageProgressJson(workspace.page_progress).final_deck_render;
+  if (existing?.sourceFingerprint === sourceFingerprint || (
+    !existing &&
+    persistedFinal.status === "completed" &&
+    persistedFinal.source_fingerprint === sourceFingerprint &&
+    persistedFinal.deck_html_path &&
+    await fileExists(persistedFinal.deck_html_path)
+  )) {
+    return {
+      status: "running",
+      already_queued: true,
+      workspace_dir: workspace.workspace_dir,
+      manifest_path: manifestPath,
+      output_dir: outputDir,
+      source_fingerprint: sourceFingerprint,
+      submitted_at: submittedAt,
+    };
+  }
+
+  const token = Symbol("deck-render");
+  activeDeckRenders.set(key, { token, sourceFingerprint });
+  try {
+    await updateFinalDeckRenderIfActive({
+      workspaceDir: workspace.workspace_dir,
+      token,
+      sourceFingerprint,
+      patch: {
+        status: "running",
+        message: "Rendering final Deck HTML.",
+        error: null,
+        output_dir: outputDir,
+        deck_html_path: null,
+        rendered_at: null,
+      },
+    });
+  } catch (error) {
+    if (activeDeckRenders.get(key)?.token === token) activeDeckRenders.delete(key);
+    throw error;
+  }
+  void runAppWorkspaceDeckRenderTask({
+    workspaceDir: workspace.workspace_dir,
     manifestPath,
     outputDir,
-    name: `${workspace.workspace_id}-review`,
+    sourceFingerprint,
+    token,
   });
-  let deckHtml = await readFile(result.deckHtmlPath, "utf8");
-  const slides: RenderAppWorkspaceDeckHtmlResult["slides"] = [];
-  for (const [index, slide] of result.slides.entries()) {
-    const revision = await readManualPageRevision(workspace.workspace_dir, slide.slideId);
-    if (revision) {
-      const manualHtml = await injectWorkspaceManagedFontCss(
-        workspace.workspace_dir,
-        await readFile(revision.current_html_path, "utf8"),
-      );
-      const shell = extractSlideShell(manualHtml).shell;
-      deckHtml = replaceSlideShellAtIndex(deckHtml, index, shell);
-      await writeFile(slide.htmlPath, manualHtml, "utf8");
-      await copyFile(revision.screenshot_path, slide.screenshotPath);
-    }
-    slides.push({
-      slide_id: slide.slideId,
-      layout_id: slide.layoutId,
-      title: slide.title,
-      html_path: slide.htmlPath,
-      screenshot_path: slide.screenshotPath,
-      speaker_note: slide.speakerNote,
-      manually_edited: Boolean(revision),
-    });
-  }
-  await writeFile(result.deckHtmlPath, deckHtml, "utf8");
-  const currentProgress = normalizePageProgressJson(workspace.page_progress);
-  const renderedByPageId = new Map(slides.map((slide) => [slide.slide_id, slide]));
-  const nextProgress: AppPageProgress = {
-    ...currentProgress,
-    final_deck_render: {
-      status: "completed",
-      message: null,
-      error: null,
-      output_dir: result.outputDir,
-      deck_html_path: result.deckHtmlPath,
-      rendered_at: renderedAt,
-      updated_at: renderedAt,
-    },
-    pages: currentProgress.pages.map((page) => {
-      const rendered = renderedByPageId.get(page.page_id);
-      return rendered ? {
-        ...page,
-        last_html_path: rendered.html_path,
-        last_screenshot_path: rendered.screenshot_path,
-        updated_at: renderedAt,
-      } : page;
-    }),
-    updated_at: renderedAt,
-  };
-  await writeJsonFile(workspace.files.page_progress, nextProgress);
-  await touchWorkspaceTask(workspace, renderedAt);
-
   return {
+    status: "queued",
+    already_queued: false,
     workspace_dir: workspace.workspace_dir,
-    manifest_path: result.manifestPath,
-    output_dir: result.outputDir,
-    deck_html_path: result.deckHtmlPath,
-    slides,
-    slide_count: result.slideCount,
-    title: result.title,
-    rendered_at: renderedAt,
+    manifest_path: manifestPath,
+    output_dir: outputDir,
+    source_fingerprint: sourceFingerprint,
+    submitted_at: submittedAt,
   };
 }
 
@@ -5476,7 +5614,9 @@ async function createPdfFromSlideHtmlPaths(
         });
         slideDataUrls.push(`data:image/png;base64,${Buffer.from(screenshot).toString("base64")}`);
       } finally {
-        await slideBrowserPage.close().catch(() => undefined);
+        await closeManagedPage(slideBrowserPage, {
+          purpose: `app PDF export slide ${path.basename(slideHtmlPath)}`,
+        });
       }
     }
 
@@ -5492,10 +5632,15 @@ async function createPdfFromSlideHtmlPaths(
         preferCSSPageSize: true,
       });
     } finally {
-      await pdfPage.close().catch(() => undefined);
+      await closeManagedPage(pdfPage, {
+        purpose: "app PDF export document",
+      });
     }
   } finally {
-    await browser.close().catch(() => undefined);
+    await closeManagedBrowser({
+      purpose: "app PDF export",
+      browser,
+    });
   }
 }
 
@@ -5725,15 +5870,13 @@ export async function exportAppPdf(
         )
         .filter((htmlPath): htmlPath is string => htmlPath.length > 0)
     : [];
-  const rendered = existingHtmlPaths.length > 0
-    ? null
-    : await renderAppWorkspaceDeckHtml({
-      workspace_dir: workspace.workspace_dir,
-    });
-  const htmlPaths =
-    existingHtmlPaths.length > 0
-      ? existingHtmlPaths
-      : rendered?.slides.map((slide) => slide.html_path) ?? [];
+  const progressHtmlPaths = normalizePageProgressJson(workspace.page_progress).pages
+    .map((page) => page.last_html_path)
+    .filter((htmlPath) => htmlPath.length > 0);
+  const htmlPaths = existingHtmlPaths.length > 0 ? existingHtmlPaths : progressHtmlPaths;
+  if (htmlPaths.length === 0) {
+    throw new Error("No rendered page HTML is available for PDF export. Render the pages first.");
+  }
 
   await mkdir(outputDir, { recursive: true });
   await createPdfFromSlideHtmlPaths(htmlPaths, pdfPath);
@@ -5741,7 +5884,7 @@ export async function exportAppPdf(
 
   return {
     workspace_dir: workspace.workspace_dir,
-    manifest_path: rendered?.manifest_path ?? readSelectedTemplateManifestPath(workspace),
+    manifest_path: readSelectedTemplateManifestPath(workspace),
     html_path: htmlPaths[0] ?? "",
     pdf_path: pdfPath,
     output_dir: outputDir,
@@ -6414,6 +6557,7 @@ function buildInitialPageProgress(pagePlan: AppPagePlan): AppPageProgress {
       last_html_path: "",
       last_screenshot_path: "",
       last_error: "",
+      render_source_sha256: "",
       visual_review: null,
       updated_at: now,
     })),
@@ -6869,7 +7013,37 @@ export async function getAppPageProgress(
   input: GetAppPageProgressInput,
 ): Promise<AppPageProgress> {
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
-  return normalizePageProgressJson(workspace.page_progress);
+  const progress = normalizePageProgressJson(workspace.page_progress);
+  const workspaceKey = path.normalize(workspace.workspace_dir);
+  const interruptedPageIds = progress.pages
+    .filter((page) => page.status === "rendering" && !activePageRenders.has(`${workspaceKey}\0${page.page_id}`))
+    .map((page) => page.page_id);
+  const finalInterrupted = progress.final_deck_render.status === "running" && !activeDeckRenders.has(workspaceKey);
+  if (interruptedPageIds.length === 0 && !finalInterrupted) return progress;
+
+  return withPageProgressWriteQueue(workspace.workspace_dir, async () => {
+    const latestWorkspace = await ensureWorkspaceFiles(workspace.workspace_dir);
+    const latest = normalizePageProgressJson(latestWorkspace.page_progress);
+    const updatedAt = new Date().toISOString();
+    const next: AppPageProgress = {
+      ...latest,
+      pages: latest.pages.map((page) => page.status === "rendering" && !activePageRenders.has(`${workspaceKey}\0${page.page_id}`)
+        ? { ...page, status: "interrupted", last_error: "Rendering was interrupted because the engine process restarted.", updated_at: updatedAt }
+        : page),
+      final_deck_render: finalInterrupted && latest.final_deck_render.status === "running"
+        ? {
+          ...latest.final_deck_render,
+          status: "interrupted",
+          message: "Final Deck rendering was interrupted because the engine process restarted.",
+          error: "Final Deck rendering was interrupted because the engine process restarted.",
+          updated_at: updatedAt,
+        }
+        : latest.final_deck_render,
+      updated_at: updatedAt,
+    };
+    await writeJsonFile(latestWorkspace.files.page_progress, next);
+    return next;
+  });
 }
 
 export async function recordAppWorkspaceStyleGuide(
@@ -7042,9 +7216,44 @@ export async function recordAppPageProgress(
   });
 }
 
-export async function renderAppWorkspacePagePreview(
+async function updatePageRenderIfActive(input: {
+  workspaceDir: string;
+  pageId: string;
+  token: symbol;
+  sourceSha256: string;
+  patch: Partial<AppPageProgressItem>;
+}): Promise<boolean> {
+  return withPageProgressWriteQueue(input.workspaceDir, async () => {
+    const key = `${path.normalize(input.workspaceDir)}\0${input.pageId}`;
+    const active = activePageRenders.get(key);
+    if (!active || active.token !== input.token || active.sourceSha256 !== input.sourceSha256) return false;
+    const workspace = await ensureWorkspaceFiles(input.workspaceDir);
+    const current = normalizePageProgressJson(workspace.page_progress);
+    const page = current.pages.find((item) => item.page_id === input.pageId);
+    if (!page) return false;
+    const updatedAt = new Date().toISOString();
+    const nextProgress: AppPageProgress = {
+      ...current,
+      pages: current.pages.map((item) => item.page_id === input.pageId
+        ? normalizePageProgressItem({
+          ...item,
+          ...input.patch,
+          page_id: item.page_id,
+          render_source_sha256: input.sourceSha256,
+          updated_at: updatedAt,
+        }) as AppPageProgressItem
+        : item),
+      updated_at: updatedAt,
+    };
+    await writeJsonFile(workspace.files.page_progress, nextProgress);
+    await touchWorkspaceTask(workspace, updatedAt);
+    return true;
+  });
+}
+
+async function performAppWorkspacePagePreview(
   input: RenderAppWorkspacePagePreviewInput,
-): Promise<RenderAppWorkspacePagePreviewResult> {
+): Promise<RenderedAppWorkspacePagePreviewResult> {
   const workspace = await ensureWorkspaceFiles(input.workspace_dir);
   const manifestPath = readSelectedTemplateManifestPath(workspace);
   const manifest = getPlainRecord(JSON.parse(await readFile(manifestPath, "utf8")) as unknown);
@@ -7086,6 +7295,130 @@ export async function renderAppWorkspacePagePreview(
     layout_id: result.layoutId,
     title: result.title,
     rendered_at: renderedAt,
+  };
+}
+
+async function runAppWorkspacePageRenderTask(input: {
+  workspaceDir: string;
+  pageId: string;
+  token: symbol;
+  sourceSha256: string;
+}): Promise<void> {
+  try {
+    const result = await performAppWorkspacePagePreview({
+      workspace_dir: input.workspaceDir,
+      page_id: input.pageId,
+    });
+    await updatePageRenderIfActive({
+      workspaceDir: input.workspaceDir,
+      pageId: input.pageId,
+      token: input.token,
+      sourceSha256: input.sourceSha256,
+      patch: {
+        status: "rendered",
+        last_html_path: result.html_path,
+        last_screenshot_path: result.screenshot_path,
+        last_error: "",
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await updatePageRenderIfActive({
+      workspaceDir: input.workspaceDir,
+      pageId: input.pageId,
+      token: input.token,
+      sourceSha256: input.sourceSha256,
+      patch: {
+        status: "render_failed",
+        last_error: message,
+      },
+    }).catch(() => undefined);
+  } finally {
+    const key = `${path.normalize(input.workspaceDir)}\0${input.pageId}`;
+    if (activePageRenders.get(key)?.token === input.token) activePageRenders.delete(key);
+  }
+}
+
+export async function renderAppWorkspacePagePreview(
+  input: RenderAppWorkspacePagePreviewInput,
+): Promise<RenderAppWorkspacePagePreviewResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const manifestPath = readSelectedTemplateManifestPath(workspace);
+  const manifest = getPlainRecord(JSON.parse(await readFile(manifestPath, "utf8")) as unknown);
+  const slides = Array.isArray(manifest.slides) ? manifest.slides.map(getPlainRecord) : [];
+  const pageIndex = slides.findIndex((slide) => normalizeString(slide.id) === input.page_id);
+  if (pageIndex < 0) throw new Error(`Unknown page_id "${input.page_id}" in manifest.json`);
+  const localSlide = await readManifestLocalSlideSourcePath({ manifestPath, pageIndex });
+  if (!localSlide) throw new Error(`Page Source for "${input.page_id}" must be a local file`);
+  const sourceSha256 = sha256BufferHex(await readFile(localSlide.absolutePath));
+  const page = normalizePageProgressJson(workspace.page_progress).pages.find((item) => item.page_id === input.page_id);
+  if (!page) throw new Error(`Page Progress is missing for page_id "${input.page_id}"`);
+  const key = `${path.normalize(workspace.workspace_dir)}\0${input.page_id}`;
+  const existing = activePageRenders.get(key);
+  const submittedAt = new Date().toISOString();
+  if (existing?.sourceSha256 === sourceSha256 || (
+    !existing &&
+    page.render_source_sha256 === sourceSha256 &&
+    ["rendered", "accepted", "visual_review"].includes(page.status) &&
+    Boolean(page.last_html_path && page.last_screenshot_path) &&
+    await fileExists(page.last_html_path) &&
+    await fileExists(page.last_screenshot_path)
+  )) {
+    return {
+      status: "running",
+      already_queued: true,
+      workspace_dir: workspace.workspace_dir,
+      manifest_path: manifestPath,
+      page_index: pageIndex,
+      page_number: pageIndex + 1,
+      slide_id: input.page_id,
+      layout_id: normalizeString(slides[pageIndex]?.layout_id) || input.page_id,
+      title: normalizeString(slides[pageIndex]?.title) || input.page_id,
+      render_attempt: existing?.renderAttempt ?? page.render_attempts,
+      source_sha256: sourceSha256,
+      submitted_at: submittedAt,
+    };
+  }
+
+  const token = Symbol("page-render");
+  const renderAttempt = page.render_attempts + 1;
+  activePageRenders.set(key, { token, sourceSha256, renderAttempt });
+  try {
+    const updated = await updatePageRenderIfActive({
+      workspaceDir: workspace.workspace_dir,
+      pageId: input.page_id,
+      token,
+      sourceSha256,
+      patch: {
+        status: "rendering",
+        render_attempts: renderAttempt,
+        last_error: "",
+      },
+    });
+    if (!updated) throw new Error(`Page render submission was superseded for "${input.page_id}"`);
+  } catch (error) {
+    if (activePageRenders.get(key)?.token === token) activePageRenders.delete(key);
+    throw error;
+  }
+  void runAppWorkspacePageRenderTask({
+    workspaceDir: workspace.workspace_dir,
+    pageId: input.page_id,
+    token,
+    sourceSha256,
+  });
+  return {
+    status: "queued",
+    already_queued: false,
+    workspace_dir: workspace.workspace_dir,
+    manifest_path: manifestPath,
+    page_index: pageIndex,
+    page_number: pageIndex + 1,
+    slide_id: input.page_id,
+    layout_id: normalizeString(slides[pageIndex]?.layout_id) || input.page_id,
+    title: normalizeString(slides[pageIndex]?.title) || input.page_id,
+    render_attempt: renderAttempt,
+    source_sha256: sourceSha256,
+    submitted_at: submittedAt,
   };
 }
 
@@ -7162,6 +7495,8 @@ export type {
   RenderAppWorkspaceDeckHtmlResult,
   RenderAppWorkspacePagePreviewInput,
   RenderAppWorkspacePagePreviewResult,
+  RenderedAppWorkspacePagePreviewResult,
+  SubmitAppWorkspaceDeckHtmlResult,
   SelectAppWorkspaceTemplateInput,
   SelectAppWorkspaceTemplateResult,
   ConfirmAppWorkspaceOutlineInput,

@@ -3,6 +3,7 @@ const ACTIVE_PAGE_STATUSES = new Set([
   "research_curating",
   "authoring",
   "rendering",
+  "rendered",
   "visual_review",
   "visual_review_fixing",
   "render_fixing",

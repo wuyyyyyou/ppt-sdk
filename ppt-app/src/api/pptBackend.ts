@@ -35,6 +35,9 @@ import type {
   PatchSharedResearchProgressResult,
   PublishSharedResearchBatchResult,
   ImportSharedResearchImageResult,
+  PrepareSharedResearchImageCandidateResult,
+  UploadSharedResearchImageCandidateResult,
+  CleanupSharedResearchImageStagingResult,
   ProjectResult,
   PptxExportJob,
   ExportPdfInput,
@@ -51,8 +54,9 @@ import type {
   RecordOutlineInput,
   RenderDeckHtmlInput,
   RenderDeckHtmlResult,
+  RenderDeckHtmlSubmissionResult,
   RenderWorkspacePagePreviewInput,
-  RenderWorkspacePagePreviewResult,
+  RenderWorkspacePagePreviewSubmissionResult,
   UploadCurrentPageScreenshotInput,
   SaveManualPageRevisionInput,
   SaveManualPageRevisionResult,
@@ -241,19 +245,38 @@ export interface PptBackend {
   patchSharedResearchProgress(input: { workspace_dir: string; operations: SharedResearchProgressOperation[] }): Promise<PatchSharedResearchProgressResult>;
   publishPreparedWebResearchBatch(input: { workspace_dir: string }): Promise<PublishSharedResearchBatchResult>;
   publishPreparedImageResearchBatch(input: { workspace_dir: string }): Promise<PublishSharedResearchBatchResult>;
-  importSharedResearchImageHostUpload(input: {
+  prepareSharedResearchImageCandidate(input: {
+    workspace_dir: string;
+    operation_id: string;
+    candidate_id: string;
+    source_url: string;
+    existing_file_path?: string;
+    expected_sha256?: string;
+  }): Promise<PrepareSharedResearchImageCandidateResult>;
+  uploadSharedResearchImageCandidate(input: {
+    workspace_dir: string;
+    operation_id: string;
+    candidate_id: string;
+    local_file_path: string;
+    mime_type: string;
+  }): Promise<UploadSharedResearchImageCandidateResult>;
+  importSharedResearchImageLocal(input: {
     workspace_dir: string;
     candidate_id: string;
+    local_file_path: string;
     mime_type: string;
     size_bytes: number;
-    sha256?: string;
-    host_upload: HostUploadRef;
+    sha256: string;
   }): Promise<ImportSharedResearchImageResult>;
+  cleanupSharedResearchImageStaging(input: {
+    workspace_dir: string;
+    operation_id: string;
+  }): Promise<CleanupSharedResearchImageStagingResult>;
   getPageProgress(input: { workspace_dir: string }): Promise<PageProgress>;
   recordPageProgress(input: RecordPageProgressInput): Promise<PageProgress>;
   renderWorkspacePagePreview(
     input: RenderWorkspacePagePreviewInput
-  ): Promise<RenderWorkspacePagePreviewResult>;
+  ): Promise<RenderWorkspacePagePreviewSubmissionResult>;
   uploadCurrentPageScreenshot(input: UploadCurrentPageScreenshotInput): Promise<HostUploadRef>;
   getPageEditContext(input: GetPageEditContextInput): Promise<GetPageEditContextResult>;
   pinManagedFont(input: { workspace_dir: string; family: string }): Promise<ManagedFontRuntimeFamily>;
@@ -264,7 +287,7 @@ export interface PptBackend {
   getRenderedDeckHtml(input: RenderDeckHtmlInput): Promise<RenderDeckHtmlResult>;
   getWorkspaceCover(input: GetWorkspaceCoverInput): Promise<GetWorkspaceCoverResult>;
   getWorkspacePageImage(input: GetWorkspacePageImageInput): Promise<GetWorkspacePageImageResult>;
-  renderDeckHtml(input: RenderDeckHtmlInput): Promise<RenderDeckHtmlResult>;
+  renderDeckHtml(input: RenderDeckHtmlInput): Promise<RenderDeckHtmlSubmissionResult>;
   recordDeckReview(input: RecordDeckReviewInput): Promise<ProjectResult>;
   startPptxExport(input: StartPptxExportInput): Promise<PptxExportJob>;
   getPptxExportStatus(input: { workspace_dir: string }): Promise<PptxExportJob>;

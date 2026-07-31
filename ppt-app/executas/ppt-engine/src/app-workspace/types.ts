@@ -706,6 +706,7 @@ export type AppSharedResearchStage =
   | "image_research"
   | "image_search"
   | "image_deduplication"
+  | "image_prefetch"
   | "image_analysis"
   | "image_import";
 
@@ -721,7 +722,7 @@ export type AppSharedResearchProgressOperation =
   | { op: "set_web_diagnostics"; gaps: string[]; diagnostic_errors: string[] }
   | { op: "set_image_decision"; decision: Record<string, unknown> }
   | { op: "upsert_image_search"; query: string; search: Record<string, unknown> }
-  | { op: "set_image_work_status"; field: "search_status" | "analysis_status" | "import_status"; state: "waiting" | "running" | "completed" | "warning" }
+  | { op: "set_image_work_status"; field: "search_status" | "prepare_status" | "analysis_status" | "import_status"; state: "waiting" | "running" | "completed" | "warning" }
   | { op: "upsert_image_deduplication_entry"; candidate_id: string; group: Record<string, unknown>; candidate: Record<string, unknown> }
   | { op: "set_image_deduplication_summary"; strategy: Record<string, unknown>; statistics: Record<string, unknown> }
   | { op: "upsert_image_analysis_batch"; batch_id: string; batch: Record<string, unknown>; candidates: Array<{ candidate_id: string; candidate: Record<string, unknown> }> }
@@ -1059,6 +1060,7 @@ export interface AppPageProgressItem {
   last_html_path: string;
   last_screenshot_path: string;
   last_error: string;
+  render_source_sha256?: string;
   visual_review?: unknown | null;
   updated_at: string | null;
 }
@@ -1141,6 +1143,7 @@ export interface AppFinalDeckRenderState {
   deck_html_path: string | null;
   rendered_at: string | null;
   updated_at: string | null;
+  source_fingerprint?: string | null;
 }
 
 export interface AppPageProgress {
@@ -1169,12 +1172,25 @@ export interface RenderAppWorkspacePagePreviewInput {
 }
 
 export interface RenderAppWorkspacePagePreviewResult {
+  status: "queued" | "running";
+  already_queued: boolean;
+  workspace_dir: string;
+  manifest_path: string;
+  page_index: number;
+  page_number: number;
+  slide_id: string;
+  layout_id: string;
+  title: string;
+  render_attempt: number;
+  source_sha256: string;
+  submitted_at: string;
+}
+
+export interface RenderedAppWorkspacePagePreviewResult {
   workspace_dir: string;
   manifest_path: string;
   html_path: string;
-  preview_url?: string;
   screenshot_path: string;
-  screenshot_url?: string;
   page_index: number;
   page_number: number;
   slide_id: string;
@@ -1332,6 +1348,16 @@ export interface RenderAppWorkspaceDeckHtmlResult {
   slide_count: number;
   title: string;
   rendered_at: string;
+}
+
+export interface SubmitAppWorkspaceDeckHtmlResult {
+  status: "queued" | "running";
+  already_queued: boolean;
+  workspace_dir: string;
+  manifest_path: string;
+  output_dir: string;
+  source_fingerprint: string;
+  submitted_at: string;
 }
 
 export type AppPptxExportStatus =

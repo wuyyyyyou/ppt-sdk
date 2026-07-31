@@ -514,9 +514,9 @@ Dev: "Can the support action be called Log Export if it includes the whole Works
 
 Expert: "No. Call it a Workspace Diagnostic Bundle so users understand that uploaded sources, authoring files, logs, and generated artifacts may all be included."
 
-Dev: "Anna image fetch succeeded, but the image never reached the Workspace. Is the Research Log enough to locate the failure?"
+Dev: "Anna image search returned a candidate, but the image never reached the Workspace. Is the Research Log enough to locate the failure?"
 
-Expert: "No. The Research Log shows the external API interaction; use its correlation identifiers with the Workspace Storage Transfer Log to distinguish the later APS download and Host Upload stages."
+Expert: "No. The Research Log shows the external image-search interaction; use the shared operation identifier with the Workspace Storage Transfer Log to distinguish the later safe HTTPS download and Host Upload stages."
 
 Dev: "Should creating a Workspace automatically create a Performance Run?"
 
