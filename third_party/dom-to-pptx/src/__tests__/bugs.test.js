@@ -4,11 +4,16 @@ import { exportToPptx } from '../index.js';
 
 // Mock pptxgenjs
 const mockAddText = vi.fn();
+const mockAddImage = vi.fn();
 const mockAddSlide = vi.fn(() => ({
   addText: mockAddText,
   addShape: vi.fn(),
-  addImage: vi.fn(),
+  addImage: mockAddImage,
   addTable: vi.fn(),
+}));
+
+vi.mock('../image-processor.js', () => ({
+  getProcessedImage: vi.fn(() => Promise.resolve('data:image/png;base64,mock')),
 }));
 
 vi.mock('pptxgenjs', () => {
@@ -107,5 +112,86 @@ describe('Bug 3: No duplicate rendering of inline elements', () => {
     expect(pmaCalls.length).toBe(0);
 
     document.body.removeChild(container);
+  });
+});
+
+describe('Bug 4: Image opacity is preserved in PPTX', () => {
+  function setRect(element, { width = 960, height = 540, left = 0, top = 0 } = {}) {
+    element.getBoundingClientRect = () => ({
+      width,
+      height,
+      left,
+      top,
+      right: left + width,
+      bottom: top + height,
+      x: left,
+      y: top,
+    });
+  }
+
+  async function exportElement(element) {
+    const container = document.createElement('div');
+    container.style.width = '960px';
+    container.style.height = '540px';
+    setRect(container);
+    setRect(element);
+    container.appendChild(element);
+    document.body.appendChild(container);
+
+    mockAddImage.mockClear();
+    await exportToPptx(container, { skipDownload: true, skipNormalize: true });
+    document.body.removeChild(container);
+
+    return mockAddImage.mock.calls.map(([options]) => options);
+  }
+
+  it('applies an img element opacity as image transparency', async () => {
+    const image = document.createElement('img');
+    image.src = 'https://example.com/background.png';
+    image.style.opacity = '0.15';
+
+    const imageOptions = await exportElement(image);
+
+    expect(imageOptions).toHaveLength(1);
+    expect(imageOptions[0].transparency).toBeCloseTo(85);
+  });
+
+  it('combines parent and img opacity as image transparency', async () => {
+    const wrapper = document.createElement('div');
+    wrapper.style.opacity = '0.5';
+    setRect(wrapper);
+
+    const image = document.createElement('img');
+    image.src = 'https://example.com/background.png';
+    image.style.opacity = '0.5';
+    setRect(image);
+    wrapper.appendChild(image);
+
+    const imageOptions = await exportElement(wrapper);
+
+    expect(imageOptions).toHaveLength(1);
+    expect(imageOptions[0].transparency).toBeCloseTo(75);
+  });
+
+  it('applies element opacity to a CSS background image', async () => {
+    const background = document.createElement('div');
+    background.style.backgroundImage = 'url("https://example.com/background.png")';
+    background.style.backgroundSize = 'cover';
+    background.style.opacity = '0.05';
+
+    const imageOptions = await exportElement(background);
+
+    expect(imageOptions).toHaveLength(1);
+    expect(imageOptions[0].transparency).toBeCloseTo(95);
+  });
+
+  it('does not add transparency to an opaque image', async () => {
+    const image = document.createElement('img');
+    image.src = 'https://example.com/background.png';
+
+    const imageOptions = await exportElement(image);
+
+    expect(imageOptions).toHaveLength(1);
+    expect(imageOptions[0]).not.toHaveProperty('transparency');
   });
 });

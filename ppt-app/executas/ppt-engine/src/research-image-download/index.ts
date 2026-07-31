@@ -4,6 +4,7 @@ import { createWriteStream } from "node:fs";
 import { copyFile, mkdir, readFile, rename, stat, unlink } from "node:fs/promises";
 import { request } from "node:https";
 import { isIP } from "node:net";
+import type { LookupFunction } from "node:net";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 
@@ -40,6 +41,16 @@ export interface ResearchImageDownloadResult {
 interface ResolvedAddress {
   address: string;
   family: 4 | 6;
+}
+
+export function createPinnedResearchImageLookup(resolved: ResolvedAddress): LookupFunction {
+  return (_hostname, options, callback) => {
+    if (options.all) {
+      callback(null, [{ address: resolved.address, family: resolved.family }]);
+      return;
+    }
+    callback(null, resolved.address, resolved.family);
+  };
 }
 
 export function isDisallowedResearchImageAddress(address: string): boolean {
@@ -166,7 +177,7 @@ async function requestToFile(input: {
       headers: { Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8", "User-Agent": "Anna-PPT-Research/1.0" },
       signal: input.signal,
       ...(isIP(tlsHostname) ? {} : { servername: tlsHostname }),
-      lookup: (_hostname, _options, callback) => callback(null, resolved.address, resolved.family),
+      lookup: createPinnedResearchImageLookup(resolved),
     }, async (response) => {
       const statusCode = response.statusCode ?? 0;
       const location = typeof response.headers.location === "string" ? response.headers.location : undefined;

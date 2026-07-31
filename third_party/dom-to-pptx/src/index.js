@@ -41,6 +41,12 @@ import { extractTransitionFromElement } from './animations/transitions.js';
 const PPI = 96;
 const PX_TO_INCH = 1 / PPI;
 
+function getImageTransparency(opacity) {
+  const clampedOpacity = Math.min(1, Math.max(0, Number.isFinite(opacity) ? opacity : 1));
+  const transparency = (1 - clampedOpacity) * 100;
+  return transparency > 0 ? transparency : undefined;
+}
+
 /**
  * Main export function.
  * @param {HTMLElement | string | Array<HTMLElement | string>} target
@@ -1379,12 +1385,21 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
 
     const objectFit = style.objectFit || 'fill';
     const objectPosition = style.objectPosition || '50% 50%';
+    const transparency = getImageTransparency(safeOpacity);
 
     const item = {
       type: 'image',
       zIndex: parentSortKey.concat([0, -1]),
       domOrder,
-      options: { x, y, w, h, rotate: rotation, data: null },
+      options: {
+        x,
+        y,
+        w,
+        h,
+        rotate: rotation,
+        data: null,
+        ...(transparency !== undefined && { transparency }),
+      },
     };
 
     const job = async () => {
@@ -1555,6 +1570,7 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
   if (hasBgImgUrl || hasGradient || (softEdge && bgColorObj.hex && !isImageWrapper)) {
     if (hasBgImgUrl) {
       const bgUrl = urlMatch[1];
+      const transparency = getImageTransparency(safeOpacity);
       const radii = {
         tl: parseFloat(style.borderTopLeftRadius) || 0,
         tr: parseFloat(style.borderTopRightRadius) || 0,
@@ -1566,7 +1582,15 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
         type: 'image',
         zIndex: parentSortKey.concat([-Infinity]),
         domOrder,
-        options: { x, y, w, h, rotate: rotation, data: null },
+        options: {
+          x,
+          y,
+          w,
+          h,
+          rotate: rotation,
+          data: null,
+          ...(transparency !== undefined && { transparency }),
+        },
       };
       items.push(bgItem);
 

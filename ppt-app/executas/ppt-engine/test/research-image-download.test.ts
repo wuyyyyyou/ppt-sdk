@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   assertSafeResearchImageUrl,
+  createPinnedResearchImageLookup,
   isDisallowedResearchImageAddress,
   RESEARCH_IMAGE_DOWNLOAD_LIMITS,
 } from "../src/research-image-download/index.js";
@@ -37,4 +38,32 @@ test("research image downloader blocks private and special-purpose addresses", (
   }
   assert.equal(isDisallowedResearchImageAddress("8.8.8.8"), false);
   assert.equal(isDisallowedResearchImageAddress("2606:4700:4700::1111"), false);
+});
+
+test("research image downloader returns an address array when Node requests all lookup results", async () => {
+  const pinnedLookup = createPinnedResearchImageLookup({ address: "8.8.8.8", family: 4 });
+  await new Promise<void>((resolve, reject) => {
+    pinnedLookup("images.example.test", { all: true }, (error, addresses, family) => {
+      try {
+        assert.equal(error, null);
+        assert.deepEqual(addresses, [{ address: "8.8.8.8", family: 4 }]);
+        assert.equal(family, undefined);
+        resolve();
+      } catch (assertionError) {
+        reject(assertionError);
+      }
+    });
+  });
+  await new Promise<void>((resolve, reject) => {
+    pinnedLookup("images.example.test", { all: false }, (error, address, family) => {
+      try {
+        assert.equal(error, null);
+        assert.equal(address, "8.8.8.8");
+        assert.equal(family, 4);
+        resolve();
+      } catch (assertionError) {
+        reject(assertionError);
+      }
+    });
+  });
 });
