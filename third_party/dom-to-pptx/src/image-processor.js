@@ -1,6 +1,14 @@
 // src/image-processor.js
 
-export async function getProcessedImage(src, targetW, targetH, radius, objectFit = 'fill', objectPosition = '50% 50%') {
+export async function getProcessedImage(
+  src,
+  targetW,
+  targetH,
+  radius,
+  objectFit = 'fill',
+  objectPosition = '50% 50%',
+  sourceCrop = null
+) {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'Anonymous';
@@ -59,7 +67,19 @@ export async function getProcessedImage(src, targetW, targetH, radius, objectFit
       const hRatio = targetH / img.height;
       let renderW, renderH;
 
-      if (objectFit === 'contain') {
+      const hasSourceCrop =
+        sourceCrop &&
+        Number.isFinite(sourceCrop.x) &&
+        Number.isFinite(sourceCrop.y) &&
+        Number.isFinite(sourceCrop.width) &&
+        Number.isFinite(sourceCrop.height) &&
+        sourceCrop.width > 0 &&
+        sourceCrop.height > 0;
+
+      if (hasSourceCrop) {
+        renderW = targetW / sourceCrop.width;
+        renderH = targetH / sourceCrop.height;
+      } else if (objectFit === 'contain') {
         const fitScale = Math.min(wRatio, hRatio);
         renderW = img.width * fitScale;
         renderH = img.height * fitScale;
@@ -97,8 +117,12 @@ export async function getProcessedImage(src, targetW, targetH, radius, objectFit
         posY = posParts.length > 1 ? parsePos(posParts[1]) : 0.5;
       }
 
-      const renderX = (targetW - renderW) * posX;
-      const renderY = (targetH - renderH) * posY;
+      const renderX = hasSourceCrop
+        ? -sourceCrop.x * renderW
+        : (targetW - renderW) * posX;
+      const renderY = hasSourceCrop
+        ? -sourceCrop.y * renderH
+        : (targetH - renderH) * posY;
 
       ctx.drawImage(img, renderX, renderY, renderW, renderH);
 

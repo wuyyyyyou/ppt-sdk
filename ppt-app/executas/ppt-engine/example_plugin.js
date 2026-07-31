@@ -50,6 +50,8 @@ import {
   getAppPagePlan,
   getAppPageProgress,
   getAppPageEditContext,
+  pinManagedFontToWorkspace,
+  commitManagedFontUpload,
   getAppPptxExportStatus,
   getAppWorkspaceCover,
   getAppWorkspacePageImage,
@@ -761,6 +763,11 @@ const MANUAL_PAGE_STAGING_DIR = path.join(
   os.tmpdir(),
   "presenton-template-engine-executa",
   "manual-page-staging",
+);
+const MANAGED_FONT_STAGING_DIR = path.join(
+  os.tmpdir(),
+  "presenton-template-engine-executa",
+  "managed-font-staging",
 );
 const RESEARCH_IMAGE_STAGING_DIR = path.join(
   os.tmpdir(),
@@ -2387,8 +2394,13 @@ async function toolAppGetPageEditContext(args) {
   const pageId = typeof args.page_id === "string" ? args.page_id.trim() : "";
   if (!pageId) throw new Error('"page_id" must be a non-empty string');
   const result = await getAppPageEditContext({ workspace_dir: workspaceDir, page_id: pageId });
+  const workspaceFonts = await Promise.all(
+    (Array.isArray(result.workspace_fonts) ? result.workspace_fonts : [])
+      .map((font) => serializeManagedFontFamily(font, workspaceDir)),
+  );
   return {
     ...result,
+    workspace_fonts: workspaceFonts,
     html_upload: await uploadLocalFileToHost({
       filePath: result.html_path,
       filename: `${pageId}.html`,
@@ -2402,6 +2414,82 @@ async function toolAppGetPageEditContext(args) {
       source: "ppt-engine.manual-page-edit-context-screenshot",
     }),
   };
+}
+
+async function serializeManagedFontFamily(font, workspaceDir) {
+  const variants = {};
+  for (const [variant, file] of Object.entries(font?.variants || {})) {
+    if (!file || typeof file.file_path !== "string") continue;
+    variants[variant] = {
+      variant,
+      format: file.format,
+      mime_type: file.mime_type,
+      size_bytes: file.size_bytes,
+      source_upload: await uploadLocalFileToHost({
+        filePath: file.file_path,
+        filename: `${font.family}-${variant}.${file.format}`,
+        mimeType: file.mime_type,
+        purpose: "user_artifact",
+        workspaceDir,
+        source: "ppt-engine.managed-font",
+        reuseWhileValid: true,
+      }),
+    };
+  }
+  return { family: font.family, variants };
+}
+
+async function toolAppPinManagedFont(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const family = typeof args.family === "string" ? args.family.trim() : "";
+  if (!family) throw new Error('"family" must be a non-empty string');
+  return serializeManagedFontFamily(
+    await pinManagedFontToWorkspace(workspaceDir, family),
+    workspaceDir,
+  );
+}
+
+async function toolAppCommitManagedFontHostUpload(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const filename = assertSafeUploadFilename(args.filename);
+  const expectedSizeBytes = Number(args.size_bytes);
+  if (
+    !Number.isInteger(expectedSizeBytes) ||
+    expectedSizeBytes <= 0 ||
+    expectedSizeBytes > 20 * 1024 * 1024
+  ) {
+    throw new Error('"size_bytes" must be between 1 and 20971520');
+  }
+  const hostUpload = readHostUploadRefArg(args, "host_upload");
+  const stagingPath = path.join(
+    MANAGED_FONT_STAGING_DIR,
+    `${randomUUID()}${path.extname(filename).toLowerCase()}`,
+  );
+  try {
+    await downloadHostUploadToStaging({
+      hostUpload,
+      stagingPath,
+      expectedSizeBytes,
+    });
+    const result = await commitManagedFontUpload({
+      workspace_dir: workspaceDir,
+      staging_file_path: stagingPath,
+      filename,
+      expected_size_bytes: expectedSizeBytes,
+    });
+    return {
+      library: result.library,
+      font: await serializeManagedFontFamily(result.font, workspaceDir),
+    };
+  } finally {
+    await unlink(stagingPath).catch(() => undefined);
+  }
 }
 
 async function toolAppSaveManualPageRevision(args) {
@@ -3150,6 +3238,8 @@ const TOOL_DISPATCH = {
   app_render_workspace_page_preview: toolAppRenderWorkspacePagePreview,
   app_upload_current_page_screenshot: toolAppUploadCurrentPageScreenshot,
   app_get_page_edit_context: toolAppGetPageEditContext,
+  app_pin_managed_font: toolAppPinManagedFont,
+  app_commit_managed_font_host_upload: toolAppCommitManagedFontHostUpload,
   app_save_manual_page_revision: toolAppSaveManualPageRevision,
   app_restore_page_source_version: toolAppRestorePageSourceVersion,
   app_get_rendered_deck_html: toolAppGetRenderedDeckHtml,

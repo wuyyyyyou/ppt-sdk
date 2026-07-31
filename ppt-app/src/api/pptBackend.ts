@@ -56,6 +56,9 @@ import type {
   UploadCurrentPageScreenshotInput,
   SaveManualPageRevisionInput,
   SaveManualPageRevisionResult,
+  CommitManagedFontUploadInput,
+  CommitManagedFontUploadResult,
+  ManagedFontRuntimeFamily,
   RestorePageSourceVersionResult,
   SelectTemplateInput,
   SelectTemplateResult,
@@ -253,6 +256,8 @@ export interface PptBackend {
   ): Promise<RenderWorkspacePagePreviewResult>;
   uploadCurrentPageScreenshot(input: UploadCurrentPageScreenshotInput): Promise<HostUploadRef>;
   getPageEditContext(input: GetPageEditContextInput): Promise<GetPageEditContextResult>;
+  pinManagedFont(input: { workspace_dir: string; family: string }): Promise<ManagedFontRuntimeFamily>;
+  commitManagedFontUpload(input: CommitManagedFontUploadInput): Promise<CommitManagedFontUploadResult>;
   saveManualPageRevision(input: SaveManualPageRevisionInput): Promise<SaveManualPageRevisionResult>;
   restorePageSourceVersion(input: GetPageEditContextInput): Promise<RestorePageSourceVersionResult>;
   recordOutline(input: RecordOutlineInput): Promise<ProjectResult>;

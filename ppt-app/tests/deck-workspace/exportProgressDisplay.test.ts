@@ -27,6 +27,7 @@ function makePptxJob(overrides: Partial<PptxExportJob>): PptxExportJob {
     updated_at: null,
     completed_at: null,
     error: null,
+    warnings: [],
     warning_count: 0,
     ...overrides,
   };
@@ -88,6 +89,24 @@ describe("Export Progress Display", () => {
         type: "PPTX",
         mode: "error",
         message: "Generator failed",
+        percent: 100,
+        active: false,
+      },
+    );
+  });
+
+  it("keeps managed font variant warnings visible after export completes", () => {
+    assert.deepEqual(
+      createPptxJobExportProgress(messages.zh, makePptxJob({
+        status: "completed",
+        percent: 100,
+        warnings: ["Portable Demo: bold, italic"],
+        warning_count: 2,
+      })),
+      {
+        type: "PPTX",
+        mode: "complete",
+        message: "PPTX 已就绪 — 以下托管字体缺少字形，使用时将模拟粗体或斜体：Portable Demo: bold, italic",
         percent: 100,
         active: false,
       },

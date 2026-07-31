@@ -539,6 +539,8 @@ export interface Messages {
     loadFailed: string;
     tooLarge: string;
     imageRejected: string;
+    fontRejected: string;
+    fontLoadFailed: string;
     missingShell: string;
     reloadLatest: string;
     newTextPlaceholder: string;
@@ -557,6 +559,7 @@ export interface Messages {
     addShape: string;
     addImage: string;
     fontFamily: string;
+    uploadFont: string;
     fontSize: string;
     bold: string;
     italic: string;
@@ -569,10 +572,8 @@ export interface Messages {
     spaceAfter: string;
     textColor: string;
     replaceImage: string;
-    imageFit: string;
-    imageFitCover: string;
-    imageFitContain: string;
-    imageFitFill: string;
+    cropImage: string;
+    resetCrop: string;
     fill: string;
     fillColor: string;
     noFill: string;
@@ -582,11 +583,6 @@ export interface Messages {
     deleteElement: string;
     more: string;
     selectParent: string;
-    layers: string;
-    bringToFront: string;
-    bringForward: string;
-    sendBackward: string;
-    sendToBack: string;
     restoreAiVersion: string;
     fitWindow: string;
     zoomOut: string;
@@ -632,6 +628,7 @@ export interface Messages {
     exportFailedSummary: string;
     retryExport: string;
     pptxTimedOut: string;
+    fontVariantWarning: string;
   };
   toasts: {
     localFolder: string;
@@ -1253,6 +1250,8 @@ export const messages: Record<Locale, Messages> = {
       loadFailed: "Could not load the page HTML: HTTP {status}",
       tooLarge: "This page is larger than 64 MiB and cannot be saved.",
       imageRejected: "Only PNG, JPEG or WebP images up to 20 MiB are supported.",
+      fontRejected: "Only valid TTF, OTF, WOFF or WOFF2 fonts up to 20 MiB are supported.",
+      fontLoadFailed: "A managed font could not be loaded: {message}",
       missingShell: "This page has no editable slide shell.",
       reloadLatest: "Load the latest saved version",
       newTextPlaceholder: "Double-click to edit",
@@ -1271,6 +1270,7 @@ export const messages: Record<Locale, Messages> = {
       addShape: "Add shape",
       addImage: "Add image",
       fontFamily: "Font",
+      uploadFont: "Upload font…",
       fontSize: "Font size",
       bold: "Bold",
       italic: "Italic",
@@ -1283,10 +1283,8 @@ export const messages: Record<Locale, Messages> = {
       spaceAfter: "Space after",
       textColor: "Text color",
       replaceImage: "Replace image",
-      imageFit: "Image fit",
-      imageFitCover: "Fill and crop",
-      imageFitContain: "Show whole image",
-      imageFitFill: "Stretch to fill",
+      cropImage: "Crop",
+      resetCrop: "Reset crop",
       fill: "Fill",
       fillColor: "Fill color",
       noFill: "No fill",
@@ -1296,11 +1294,6 @@ export const messages: Record<Locale, Messages> = {
       deleteElement: "Delete (Del)",
       more: "More",
       selectParent: "Select parent",
-      layers: "Layer",
-      bringToFront: "Bring to front",
-      bringForward: "Bring forward",
-      sendBackward: "Send backward",
-      sendToBack: "Send to back",
       restoreAiVersion: "Restore AI version",
       fitWindow: "Fit to window",
       zoomOut: "Zoom out",
@@ -1345,7 +1338,8 @@ export const messages: Record<Locale, Messages> = {
       resumedJob: "Reconnected to the export already running for this deck.",
       exportFailedSummary: "The export could not be completed.",
       retryExport: "Try exporting again",
-      pptxTimedOut: "Timed out waiting for the PPTX export."
+      pptxTimedOut: "Timed out waiting for the PPTX export.",
+      fontVariantWarning: "Missing managed font variants will be simulated if used: {warnings}"
     },
     toasts: {
       localFolder: "Opening local folder...",
@@ -1955,6 +1949,8 @@ export const messages: Record<Locale, Messages> = {
       loadFailed: "加载页面 HTML 失败：HTTP {status}",
       tooLarge: "当前页面 HTML 超过 64 MiB，无法保存。",
       imageRejected: "仅支持不超过 20 MiB 的 PNG、JPEG、WebP 图片。",
+      fontRejected: "仅支持不超过 20 MiB 的有效 TTF、OTF、WOFF、WOFF2 字体。",
+      fontLoadFailed: "受管字体加载失败：{message}",
       missingShell: "页面缺少可编辑 slide shell。",
       reloadLatest: "加载后端最新版本",
       newTextPlaceholder: "双击输入文字",
@@ -1973,6 +1969,7 @@ export const messages: Record<Locale, Messages> = {
       addShape: "新增形状",
       addImage: "新增图片",
       fontFamily: "字体",
+      uploadFont: "上传字体…",
       fontSize: "字号",
       bold: "加粗",
       italic: "斜体",
@@ -1985,10 +1982,8 @@ export const messages: Record<Locale, Messages> = {
       spaceAfter: "段后间距",
       textColor: "文字颜色",
       replaceImage: "替换图片",
-      imageFit: "图片适应方式",
-      imageFitCover: "填满并裁切",
-      imageFitContain: "完整显示",
-      imageFitFill: "拉伸填满",
+      cropImage: "裁剪",
+      resetCrop: "重置裁剪",
       fill: "填充",
       fillColor: "填充颜色",
       noFill: "无填充",
@@ -1998,11 +1993,6 @@ export const messages: Record<Locale, Messages> = {
       deleteElement: "删除（Delete）",
       more: "更多",
       selectParent: "选择父级",
-      layers: "图层",
-      bringToFront: "置于顶层",
-      bringForward: "上移一层",
-      sendBackward: "下移一层",
-      sendToBack: "置于底层",
       restoreAiVersion: "恢复 AI 版本",
       fitWindow: "适应窗口",
       zoomOut: "缩小",
@@ -2047,7 +2037,8 @@ export const messages: Record<Locale, Messages> = {
       resumedJob: "已重新连接到这份演示文稿正在进行的导出任务。",
       exportFailedSummary: "导出未能完成。",
       retryExport: "重新导出",
-      pptxTimedOut: "PPTX 导出等待超时。"
+      pptxTimedOut: "PPTX 导出等待超时。",
+      fontVariantWarning: "以下托管字体缺少字形，使用时将模拟粗体或斜体：{warnings}"
     },
     toasts: {
       localFolder: "正在打开本地文件夹...",

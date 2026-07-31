@@ -1509,6 +1509,54 @@
       ]
     },
     {
+      "name": "app_pin_managed_font",
+      "description": "Copy one shared managed font family into a PPT workspace and return its runtime font files through Host Upload.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing PPT workspace.",
+          "required": true
+        },
+        {
+          "name": "family",
+          "type": "string",
+          "description": "Exact managed font family name from the shared font library.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_commit_managed_font_host_upload",
+      "description": "Validate a font Host Upload, replace its shared family variant, pin it to the current workspace, and return runtime font files.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing PPT workspace.",
+          "required": true
+        },
+        {
+          "name": "filename",
+          "type": "string",
+          "description": "Original font filename using .ttf, .otf, .woff, or .woff2.",
+          "required": true
+        },
+        {
+          "name": "size_bytes",
+          "type": "number",
+          "description": "Expected font file size, up to 20 MiB.",
+          "required": true
+        },
+        {
+          "name": "host_upload",
+          "type": "object",
+          "description": "HostUploadRef containing the uploaded font file.",
+          "required": true
+        }
+      ]
+    },
+    {
       "name": "app_save_manual_page_revision",
       "description": "Validate and persist the latest self-contained manual HTML revision, then incrementally publish it into the completed Deck when possible.",
       "parameters": [

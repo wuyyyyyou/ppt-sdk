@@ -36,8 +36,8 @@
           "h": 720
         },
         "default_size": {
-          "w": 1860,
-          "h": 1000
+          "w": 1200,
+          "h": 800
         },
         "resizable": true,
         "movable": true,

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { access, mkdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import sharp from "sharp";
+import { injectWorkspaceManagedFontCss } from "../font-library/index.js";
 
 export const MANUAL_HTML_MAX_BYTES = 64 * 1024 * 1024;
 export const AGENT_HTML_MAX_BYTES = 2 * 1024 * 1024;
@@ -257,6 +258,7 @@ export async function sanitizeManualPageHtml(
   }
   let html = ensureSinglePageSlideShell(removeActiveContent(inputHtml));
   html = ensureShellDimensions(ensureEditorCsp(html));
+  html = await injectWorkspaceManagedFontCss(workspaceDir, html);
   extractSlideShell(html);
   return extractDataUrlAssets(html, manualPageRevisionPaths(workspaceDir, pageId));
 }

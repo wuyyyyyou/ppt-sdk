@@ -12,6 +12,8 @@ import type {
   GetWorkspaceCoverResult,
   GetWorkspacePageImageResult,
   SaveManualPageRevisionResult,
+  CommitManagedFontUploadResult,
+  ManagedFontRuntimeFamily,
   RestorePageSourceVersionResult,
   PagePlan,
   PageProgress,
@@ -232,6 +234,8 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
     app_prepare_page_refinement: "page_refinement.run",
     app_commit_deck_refinement: "deck_refinement.commit",
     app_get_page_edit_context: "manual_page.load",
+    app_pin_managed_font: "manual_page.font.pin",
+    app_commit_managed_font_host_upload: "manual_page.font.upload",
     app_save_manual_page_revision: "manual_page.save",
     app_restore_page_source_version: "manual_page.restore",
     app_start_pptx_export: "pptx_export.run",
@@ -720,6 +724,14 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       ),
     getPageEditContext: (input) =>
       invoke<GetPageEditContextResult>(toolIds.pptEngine, "app_get_page_edit_context", input),
+    pinManagedFont: (input) =>
+      invoke<ManagedFontRuntimeFamily>(toolIds.pptEngine, "app_pin_managed_font", input),
+    commitManagedFontUpload: (input) =>
+      invoke<CommitManagedFontUploadResult>(
+        toolIds.pptEngine,
+        "app_commit_managed_font_host_upload",
+        input,
+      ),
     saveManualPageRevision: (input) =>
       invoke<SaveManualPageRevisionResult>(toolIds.pptEngine, "app_save_manual_page_revision", input),
     restorePageSourceVersion: (input) =>

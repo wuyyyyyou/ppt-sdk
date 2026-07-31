@@ -1373,6 +1373,41 @@ export interface UploadCurrentPageScreenshotInput {
   page_id: string;
 }
 
+export type ManagedFontVariant = "regular" | "bold" | "italic" | "boldItalic";
+export type ManagedFontFormat = "ttf" | "otf" | "woff" | "woff2";
+
+export interface ManagedFontFamilySummary {
+  family: string;
+  variants: ManagedFontVariant[];
+}
+
+export interface ManagedFontRuntimeVariant {
+  variant: ManagedFontVariant;
+  format: ManagedFontFormat;
+  mime_type: string;
+  size_bytes: number;
+  source_upload: HostUploadRef;
+}
+
+export interface ManagedFontRuntimeFamily {
+  family: string;
+  variants: Partial<Record<ManagedFontVariant, ManagedFontRuntimeVariant>>;
+}
+
+export interface CommitManagedFontUploadInput {
+  workspace_dir: string;
+  filename: string;
+  size_bytes: number;
+  host_upload: HostUploadRef;
+}
+
+export interface CommitManagedFontUploadResult {
+  library: {
+    families: ManagedFontFamilySummary[];
+  };
+  font: ManagedFontRuntimeFamily;
+}
+
 export interface ManualPageRevisionManifest {
   version: 1;
   page_id: string;
@@ -1405,6 +1440,8 @@ export interface GetPageEditContextResult {
   html_upload: HostUploadRef;
   screenshot_upload: HostUploadRef;
   manifest: ManualPageRevisionManifest | null;
+  font_library: ManagedFontFamilySummary[];
+  workspace_fonts: ManagedFontRuntimeFamily[];
 }
 
 export interface SaveManualPageRevisionInput {
@@ -1542,6 +1579,7 @@ export interface PptxExportJob {
     message: string;
     stack?: string;
   } | null;
+  warnings: string[];
   warning_count: number;
 }
 

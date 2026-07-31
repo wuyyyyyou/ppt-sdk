@@ -1,3 +1,8 @@
+import type {
+  ManagedFontFamily,
+  ManagedFontFamilySummary,
+} from "../font-library/index.js";
+
 export interface AppWorkspaceSummary {
   workspace_id: string;
   task_id: string;
@@ -1208,6 +1213,8 @@ export interface GetAppPageEditContextResult {
   html_path: string;
   screenshot_path: string;
   manifest: AppManualPageRevisionManifest | null;
+  font_library: ManagedFontFamilySummary[];
+  workspace_fonts: ManagedFontFamily[];
 }
 
 export interface SaveAppManualPageRevisionInput {
@@ -1353,6 +1360,7 @@ export interface AppPptxExportJob {
     message: string;
     stack?: string;
   } | null;
+  warnings: string[];
   warning_count: number;
 }
 

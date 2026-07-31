@@ -1352,6 +1352,44 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
 
   // --- ASYNC JOB: IMG Tags ---
   if ((node?.tagName || '').toLowerCase() === 'img') {
+    const cropFrame =
+      node.getAttribute('data-ppt-editor-image-source') === 'true' &&
+      node.parentElement?.getAttribute('data-ppt-editor-image-crop') === 'true'
+        ? node.parentElement
+        : null;
+    let imageX = x;
+    let imageY = y;
+    let imageW = w;
+    let imageH = h;
+    let imageWidthPx = widthPx;
+    let imageHeightPx = heightPx;
+    let imageRotation = rotation;
+    let sourceCrop = null;
+
+    if (cropFrame) {
+      const cropRect = cropFrame.getBoundingClientRect();
+      const cropStyle = window.getComputedStyle(cropFrame);
+      imageRotation = getRotation(cropStyle.transform);
+      imageWidthPx = imageRotation === 0
+        ? cropRect.width || cropFrame.offsetWidth
+        : cropFrame.offsetWidth || cropRect.width;
+      imageHeightPx = imageRotation === 0
+        ? cropRect.height || cropFrame.offsetHeight
+        : cropFrame.offsetHeight || cropRect.height;
+      imageW = imageWidthPx * PX_TO_INCH * config.scale;
+      imageH = imageHeightPx * PX_TO_INCH * config.scale;
+      const cropCenterX = cropRect.left + cropRect.width / 2;
+      const cropCenterY = cropRect.top + cropRect.height / 2;
+      imageX = config.offX + (cropCenterX - config.rootX) * PX_TO_INCH * config.scale - imageW / 2;
+      imageY = config.offY + (cropCenterY - config.rootY) * PX_TO_INCH * config.scale - imageH / 2;
+      sourceCrop = {
+        x: parseFloat(cropFrame.dataset.pptEditorCropX || '0'),
+        y: parseFloat(cropFrame.dataset.pptEditorCropY || '0'),
+        width: parseFloat(cropFrame.dataset.pptEditorCropWidth || '1'),
+        height: parseFloat(cropFrame.dataset.pptEditorCropHeight || '1'),
+      };
+    }
+
     let radii = {
       tl: parseFloat(style.borderTopLeftRadius) || 0,
       tr: parseFloat(style.borderTopRightRadius) || 0,
@@ -1359,8 +1397,18 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
       bl: parseFloat(style.borderBottomLeftRadius) || 0,
     };
 
+    if (cropFrame) {
+      const cropStyle = window.getComputedStyle(cropFrame);
+      radii = {
+        tl: parseFloat(cropStyle.borderTopLeftRadius) || 0,
+        tr: parseFloat(cropStyle.borderTopRightRadius) || 0,
+        br: parseFloat(cropStyle.borderBottomRightRadius) || 0,
+        bl: parseFloat(cropStyle.borderBottomLeftRadius) || 0,
+      };
+    }
+
     const hasAnyRadius = radii.tl > 0 || radii.tr > 0 || radii.br > 0 || radii.bl > 0;
-    if (!hasAnyRadius) {
+    if (!hasAnyRadius && !cropFrame) {
       const parent = node.parentElement;
       const parentStyle = window.getComputedStyle(parent);
       if (parentStyle.overflow !== 'visible') {
@@ -1384,11 +1432,19 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
       type: 'image',
       zIndex: parentSortKey.concat([0, -1]),
       domOrder,
-      options: { x, y, w, h, rotate: rotation, data: null },
+      options: { x: imageX, y: imageY, w: imageW, h: imageH, rotate: imageRotation, data: null },
     };
 
     const job = async () => {
-      const processed = await getProcessedImage(node.src, widthPx, heightPx, radii, objectFit, objectPosition);
+      const processed = await getProcessedImage(
+        node.src,
+        imageWidthPx,
+        imageHeightPx,
+        radii,
+        objectFit,
+        objectPosition,
+        sourceCrop
+      );
       if (processed) item.options.data = processed;
       else item.skip = true;
     };

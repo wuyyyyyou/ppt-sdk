@@ -295,10 +295,6 @@
   width: 60px;
 }
 
-.manual-toolbar-select.image-fit {
-  width: 108px;
-}
-
 .manual-toolbar-select.line-height {
   width: 62px;
 }
@@ -436,15 +432,6 @@
 .manual-toolbar-menu button:disabled {
   opacity: 0.38;
   cursor: default;
-}
-
-.manual-toolbar-menu-label {
-  padding: 5px 9px 0;
-  color: var(--manual-muted);
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .manual-editor-stage {

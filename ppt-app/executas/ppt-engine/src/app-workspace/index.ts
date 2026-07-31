@@ -63,6 +63,12 @@ import { launchManagedBrowser } from "../runtime/browser-runtime.js";
 import { convertDeckHtmlToPptx } from "../pptx-export/dom-to-pptx.js";
 import { rasterizePptxToImages } from "../pptx-rasterization/index.js";
 import { prepareWorkspacePageSources } from "../authoring-kit-workspace/index.js";
+import {
+  injectWorkspaceManagedFontCss,
+  listManagedFontLibrary,
+  managedFontVariantWarningsForHtml,
+  managedFontsUsedByHtml,
+} from "../font-library/index.js";
 import type {
   AppendAppWorkspaceLogInput,
   AppendAppWorkspaceLogResult,
@@ -794,6 +800,7 @@ function createPptxExportJob(
     updated_at: now,
     completed_at: null,
     error: null,
+    warnings: [],
     warning_count: 0,
     ...patch,
   };
@@ -833,6 +840,9 @@ function normalizePptxExportJob(
       existing.error && typeof existing.error === "object" && !Array.isArray(existing.error)
         ? existing.error as AppPptxExportJob["error"]
         : null,
+    warnings: Array.isArray(existing.warnings)
+      ? existing.warnings.filter((warning): warning is string => typeof warning === "string")
+      : [],
     warning_count: typeof existing.warning_count === "number" ? existing.warning_count : 0,
   });
 }
@@ -4770,6 +4780,18 @@ export async function getAppPageEditContext(
   if (pageIndex < 0) throw new Error(`Unknown page_id "${input.page_id}"`);
   const existing = await readManualPageRevision(workspace.workspace_dir, input.page_id);
   if (existing) {
+    const currentHtml = await injectWorkspaceManagedFontCss(
+      workspace.workspace_dir,
+      await readFile(existing.current_html_path, "utf8"),
+    );
+    const contextDir = path.join(workspace.workspace_dir, "output", "manual-editor-context");
+    await mkdir(contextDir, { recursive: true });
+    const contextHtmlPath = path.join(contextDir, `${input.page_id}.html`);
+    await writeFile(contextHtmlPath, currentHtml, "utf8");
+    const [fontLibrary, workspaceFonts] = await Promise.all([
+      listManagedFontLibrary(),
+      managedFontsUsedByHtml(workspace.workspace_dir, currentHtml),
+    ]);
     return {
       workspace_dir: workspace.workspace_dir,
       page_id: input.page_id,
@@ -4777,9 +4799,11 @@ export async function getAppPageEditContext(
       page_index: pageIndex,
       revision: existing.revision,
       manually_edited: true,
-      html_path: existing.current_html_path,
+      html_path: contextHtmlPath,
       screenshot_path: existing.screenshot_path,
       manifest: existing,
+      font_library: fontLibrary.families,
+      workspace_fonts: workspaceFonts,
     };
   }
 
@@ -4798,14 +4822,21 @@ export async function getAppPageEditContext(
     htmlPath = preview.html_path;
     screenshotPath = preview.screenshot_path;
   }
-  const html = await embedWorkspaceLocalImageResources(
+  const html = await injectWorkspaceManagedFontCss(
     workspace.workspace_dir,
-    ensureSinglePageSlideShell(await readFile(htmlPath, "utf8")),
+    await embedWorkspaceLocalImageResources(
+      workspace.workspace_dir,
+      ensureSinglePageSlideShell(await readFile(htmlPath, "utf8")),
+    ),
   );
   const contextDir = path.join(workspace.workspace_dir, "output", "manual-editor-context");
   await mkdir(contextDir, { recursive: true });
   const contextHtmlPath = path.join(contextDir, `${input.page_id}.html`);
   await writeFile(contextHtmlPath, html, "utf8");
+  const [fontLibrary, workspaceFonts] = await Promise.all([
+    listManagedFontLibrary(),
+    managedFontsUsedByHtml(workspace.workspace_dir, html),
+  ]);
   return {
     workspace_dir: workspace.workspace_dir,
     page_id: input.page_id,
@@ -4816,6 +4847,8 @@ export async function getAppPageEditContext(
     html_path: contextHtmlPath,
     screenshot_path: screenshotPath,
     manifest: null,
+    font_library: fontLibrary.families,
+    workspace_fonts: workspaceFonts,
   };
 }
 
@@ -5044,10 +5077,13 @@ export async function renderAppWorkspaceDeckHtml(
   for (const [index, slide] of result.slides.entries()) {
     const revision = await readManualPageRevision(workspace.workspace_dir, slide.slideId);
     if (revision) {
-      const manualHtml = await readFile(revision.current_html_path, "utf8");
+      const manualHtml = await injectWorkspaceManagedFontCss(
+        workspace.workspace_dir,
+        await readFile(revision.current_html_path, "utf8"),
+      );
       const shell = extractSlideShell(manualHtml).shell;
       deckHtml = replaceSlideShellAtIndex(deckHtml, index, shell);
-      await copyFile(revision.current_html_path, slide.htmlPath);
+      await writeFile(slide.htmlPath, manualHtml, "utf8");
       await copyFile(revision.screenshot_path, slide.screenshotPath);
     }
     slides.push({
@@ -5518,19 +5554,36 @@ async function runPptxExportJob(job: AppPptxExportJob): Promise<void> {
       throw new Error("Recorded deck.html is outside the Final Deck Render output directory");
     }
 
+    const materializedDeckHtml = await injectWorkspaceManagedFontCss(
+      workspace.workspace_dir,
+      await readFile(normalizedDeckPath, "utf8"),
+    );
+    await writeFile(normalizedDeckPath, materializedDeckHtml, "utf8");
+    const fontWarnings = await managedFontVariantWarningsForHtml(
+      workspace.workspace_dir,
+      materializedDeckHtml,
+    );
     await writePptxExportJob({
       ...job,
       status: "validating",
-      message: "Validating Deck HTML.",
+      message: fontWarnings.length > 0
+        ? "Validating Deck HTML. Some managed font variants may be simulated."
+        : "Validating Deck HTML.",
       percent: 15,
       deck_html_path: normalizedDeckPath,
+      warnings: fontWarnings,
+      warning_count: fontWarnings.length,
     });
     await writePptxExportJob({
       ...job,
       status: "converting",
-      message: "Generating PPTX.",
+      message: fontWarnings.length > 0
+        ? "Generating PPTX with managed font variant warnings."
+        : "Generating PPTX.",
       percent: 30,
       deck_html_path: normalizedDeckPath,
+      warnings: fontWarnings,
+      warning_count: fontWarnings.length,
     });
     const summary = await convertDeckHtmlToPptx({
       htmlPath: normalizedDeckPath,
@@ -5543,11 +5596,14 @@ async function runPptxExportJob(job: AppPptxExportJob): Promise<void> {
     await writePptxExportJob({
       ...job,
       status: "completed",
-      message: "PPTX export completed.",
+      message: fontWarnings.length > 0
+        ? "PPTX export completed with managed font variant warnings."
+        : "PPTX export completed.",
       percent: 100,
       deck_html_path: normalizedDeckPath,
       completed_at: new Date().toISOString(),
-      warning_count: summary.warningCount,
+      warnings: fontWarnings,
+      warning_count: fontWarnings.length + summary.warningCount,
       error: null,
     });
   } catch (error) {
@@ -5579,7 +5635,21 @@ export async function startAppPptxExport(
     return current;
   }
 
-  const job = createPptxExportJob(workspace.workspace_dir);
+  const progress = normalizePageProgressJson(workspace.page_progress);
+  const deckHtmlPath = progress.final_deck_render.deck_html_path;
+  const fontWarnings = deckHtmlPath && await fileExists(deckHtmlPath)
+    ? await managedFontVariantWarningsForHtml(
+        workspace.workspace_dir,
+        await readFile(deckHtmlPath, "utf8"),
+      )
+    : [];
+  const job = createPptxExportJob(workspace.workspace_dir, {
+    message: fontWarnings.length > 0
+      ? "Waiting to export PPTX. Some managed font variants may be simulated."
+      : "Waiting to export PPTX.",
+    warnings: fontWarnings,
+    warning_count: fontWarnings.length,
+  });
   await clearCurrentPptxArtifact(workspace, job.pptx_path);
   activePptxExportJobIds.add(job.job_id);
   const written = await writePptxExportJob(job);

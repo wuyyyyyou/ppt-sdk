@@ -103,6 +103,52 @@ export async function convertDeckHtmlToPptx(
         new Promise((resolve) => setTimeout(resolve, 10_000)),
       ]);
 
+      const normalizeFamily = (value: string) =>
+        value.split(",")[0]?.trim().replace(/^['"]|['"]$/g, "") ?? "";
+      const declaredManagedFamilies = new Set<string>();
+      for (const sheet of Array.from(document.styleSheets)) {
+        try {
+          for (const rule of Array.from(sheet.cssRules)) {
+            if (rule.type !== CSSRule.FONT_FACE_RULE) continue;
+            const family = normalizeFamily((rule as CSSFontFaceRule).style.fontFamily);
+            if (family) declaredManagedFamilies.add(family);
+          }
+        } catch {
+          // Cross-origin stylesheets are irrelevant to workspace-managed
+          // fonts, whose rules are materialized directly in Deck HTML.
+        }
+      }
+      const fontChecks = new Map<string, { family: string; descriptor: string; text: string; pageNumber: number }>();
+      for (const element of Array.from(document.querySelectorAll<HTMLElement>("[data-ppt-editor-font-family]"))) {
+        const family = element.dataset.pptEditorFontFamily?.trim() ?? "";
+        if (!family) continue;
+        const pageNumber = Math.max(1, slides.findIndex((slide) => slide.contains(element)) + 1);
+        if (!declaredManagedFamilies.has(family)) {
+          throw new Error(`Slide ${pageNumber} uses a managed font with no embedded source: ${family}`);
+        }
+        const style = getComputedStyle(element);
+        const escapedFamily = family.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+        const descriptor = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} "${escapedFamily}"`;
+        const key = `${family}\0${descriptor}`;
+        fontChecks.set(key, {
+          family,
+          descriptor,
+          text: element.textContent?.trim().slice(0, 64) || "BESbswy",
+          pageNumber,
+        });
+      }
+      for (const check of fontChecks.values()) {
+        let faces: FontFace[];
+        try {
+          faces = await document.fonts.load(check.descriptor, check.text);
+        } catch {
+          throw new Error(`Slide ${check.pageNumber} could not load managed font: ${check.family}`);
+        }
+        if (faces.length === 0 || faces.some((face) => face.status !== "loaded")) {
+          throw new Error(`Slide ${check.pageNumber} could not load managed font: ${check.family}`);
+        }
+      }
+
       const urls = new Map<string, number>();
       const addUrl = (value: string | null, pageNumber: number) => {
         if (!value) return;
@@ -166,7 +212,7 @@ export async function convertDeckHtmlToPptx(
       const blob = await converter(slides, {
         skipDownload: true,
         skipNormalize: false,
-        autoEmbedFonts: false,
+        autoEmbedFonts: true,
         svgAsVector: false,
         width: 13.333333,
         height: 7.5,

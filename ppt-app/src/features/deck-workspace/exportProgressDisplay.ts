@@ -85,6 +85,12 @@ export function createPptxJobExportProgress(
   job: PptxExportJob,
 ): ExportProgressState {
   const percent = clampPercent(job.percent);
+  const fontWarning = job.warnings?.length
+    ? formatMessage(t.exportPage.fontVariantWarning, {
+        warnings: job.warnings.join("; "),
+      })
+    : "";
+  const withFontWarning = (message: string) => fontWarning ? `${message} — ${fontWarning}` : message;
 
   if (job.error?.message) {
     return createExportErrorProgress(job.error.message, "PPTX", percent);
@@ -95,7 +101,7 @@ export function createPptxJobExportProgress(
       return {
         type: "PPTX",
         mode: "determinate",
-        message: t.exportPage.pptxPreparingModel,
+        message: withFontWarning(t.exportPage.pptxPreparingModel),
         percent,
         active: true,
       };
@@ -103,7 +109,7 @@ export function createPptxJobExportProgress(
       return {
         type: "PPTX",
         mode: "determinate",
-        message: t.exportPage.pptxModelReady,
+        message: withFontWarning(t.exportPage.pptxModelReady),
         percent,
         active: true,
       };
@@ -111,7 +117,7 @@ export function createPptxJobExportProgress(
       return {
         type: "PPTX",
         mode: "determinate",
-        message: t.exportPage.pptxGenerating,
+        message: withFontWarning(t.exportPage.pptxGenerating),
         percent,
         active: true,
       };
@@ -119,7 +125,7 @@ export function createPptxJobExportProgress(
       return {
         type: "PPTX",
         mode: "complete",
-        message: formatMessage(t.exportPage.ready, { type: "PPTX" }),
+        message: withFontWarning(formatMessage(t.exportPage.ready, { type: "PPTX" })),
         percent: 100,
         active: false,
       };
