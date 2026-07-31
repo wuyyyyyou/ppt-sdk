@@ -6,9 +6,10 @@ import { getProcessedImage } from '../image-processor.js';
 // Mock pptxgenjs
 const mockAddText = vi.fn();
 const mockAddImage = vi.fn();
+const mockAddShape = vi.fn();
 const mockAddSlide = vi.fn(() => ({
   addText: mockAddText,
-  addShape: vi.fn(),
+  addShape: mockAddShape,
   addImage: mockAddImage,
   addTable: vi.fn(),
 }));
@@ -104,7 +105,10 @@ describe('Bug 3: No duplicate rendering of inline elements', () => {
     const pmaCalls = mockAddText.mock.calls.filter((call) => {
       const [textParts] = call;
       if (Array.isArray(textParts)) {
-        const textStr = textParts.map(p => p.text).join('').trim();
+        const textStr = textParts
+          .map((p) => p.text)
+          .join('')
+          .trim();
         return textStr === 'PMA';
       }
       return false;
@@ -140,6 +144,7 @@ describe('Bug 4: Image opacity is preserved in PPTX', () => {
     document.body.appendChild(container);
 
     mockAddImage.mockClear();
+    mockAddShape.mockClear();
     await exportToPptx(container, { skipDownload: true, skipNormalize: true });
     document.body.removeChild(container);
 
@@ -207,5 +212,69 @@ describe('Bug 4: Image opacity is preserved in PPTX', () => {
 
     expect(getProcessedImage).toHaveBeenCalledOnce();
     expect(vi.mocked(getProcessedImage).mock.calls[0][0]).toBe(dataUrl);
+  });
+
+  it('keeps a solid background below a transparent gradient background', async () => {
+    const background = document.createElement('div');
+    background.style.backgroundColor = 'rgb(245, 241, 227)';
+    background.style.backgroundImage = 'radial-gradient(rgba(0, 0, 0, 0.02) 2%, transparent 2%)';
+
+    const imageOptions = await exportElement(background);
+
+    expect(mockAddShape).toHaveBeenCalledOnce();
+    expect(mockAddShape.mock.calls[0][1].fill).toMatchObject({ color: 'F5F1E3', transparency: 0 });
+    expect(imageOptions).toHaveLength(1);
+    expect(mockAddShape.mock.invocationCallOrder[0]).toBeLessThan(mockAddImage.mock.invocationCallOrder[0]);
+  });
+
+  it('keeps a solid background below a URL background image', async () => {
+    const background = document.createElement('div');
+    background.style.backgroundColor = 'rgb(245, 241, 227)';
+    background.style.backgroundImage = 'url("https://example.com/transparent-background.png")';
+
+    const imageOptions = await exportElement(background);
+
+    expect(mockAddShape).toHaveBeenCalledOnce();
+    expect(mockAddShape.mock.calls[0][1].fill).toMatchObject({ color: 'F5F1E3', transparency: 0 });
+    expect(imageOptions).toHaveLength(1);
+    expect(mockAddShape.mock.invocationCallOrder[0]).toBeLessThan(mockAddImage.mock.invocationCallOrder[0]);
+  });
+
+  it('renders a background border and shadow only once around layered backgrounds', async () => {
+    const background = document.createElement('div');
+    background.style.backgroundColor = 'rgb(245, 241, 227)';
+    background.style.backgroundImage = 'linear-gradient(rgba(0, 0, 0, 0.1), transparent)';
+    background.style.border = '2px solid rgb(30, 40, 50)';
+    background.style.borderRadius = '12px';
+    background.style.boxShadow = 'rgb(0, 0, 0) 2px 3px 4px';
+
+    await exportElement(background);
+
+    const shapeOptions = mockAddShape.mock.calls.map(([, options]) => options);
+    expect(shapeOptions.filter((options) => options.fill?.color === 'F5F1E3')).toHaveLength(1);
+    expect(shapeOptions.filter((options) => options.line)).toHaveLength(1);
+    expect(shapeOptions.filter((options) => options.shadow)).toHaveLength(1);
+
+    const borderCallIndex = shapeOptions.findIndex((options) => options.line);
+    expect(mockAddImage.mock.invocationCallOrder[0]).toBeLessThan(
+      mockAddShape.mock.invocationCallOrder[borderCallIndex]
+    );
+  });
+
+  it('keeps the solid background and skips explicitly sized repeating gradient textures', async () => {
+    const background = document.createElement('div');
+    background.style.backgroundColor = 'rgb(245, 241, 227)';
+    background.style.backgroundImage = 'radial-gradient(rgb(0, 0, 0) 1px, transparent 0px)';
+    background.style.backgroundSize = '40px 40px';
+    background.style.backgroundRepeat = 'repeat';
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const imageOptions = await exportElement(background);
+
+    expect(imageOptions).toHaveLength(0);
+    expect(mockAddShape).toHaveBeenCalledOnce();
+    expect(mockAddShape.mock.calls[0][1].fill).toMatchObject({ color: 'F5F1E3', transparency: 0 });
+    expect(warning).toHaveBeenCalledOnce();
+    warning.mockRestore();
   });
 });

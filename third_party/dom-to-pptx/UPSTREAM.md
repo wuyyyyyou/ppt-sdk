@@ -12,5 +12,7 @@
 - Radial-gradient backgrounds are converted to SVG with deterministic solid-color fallback.
 - `<img>` elements and URL background images preserve their own and inherited CSS opacity in PPTX output.
 - CSS background URLs use quote-aware parsing so SVG data URLs retain internal fragment references.
+- Elements with both a background color and a background image or gradient preserve the CSS layer order, with borders and shadows emitted only once.
+- Repeating gradients with an explicit background size are skipped instead of being stretched across the element, while their background color fallback is preserved.
 
 Upstream changes are reviewed and selectively ported into this directory. Do not replace this directory from an external checkout wholesale.

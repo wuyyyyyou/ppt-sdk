@@ -48,6 +48,16 @@ function getImageTransparency(opacity) {
   return transparency > 0 ? transparency : undefined;
 }
 
+function hasExplicitRepeatingGradientTexture(style) {
+  const backgroundSize = String(style.backgroundSize || '').trim();
+  if (!backgroundSize || /^(?:auto)(?:\s+auto)?$/i.test(backgroundSize)) return false;
+
+  const backgroundRepeat = String(style.backgroundRepeat || '')
+    .trim()
+    .toLowerCase();
+  return !!backgroundRepeat && !/^(?:no-repeat)(?:\s+no-repeat)?$/.test(backgroundRepeat);
+}
+
 /**
  * Main export function.
  * @param {HTMLElement | string | Array<HTMLElement | string>} target
@@ -287,13 +297,7 @@ export async function exportToPptx(target, options = {}) {
             })
           );
 
-          await embedder.addFont(
-            fontCfg.name,
-            subsets,
-            options.woff2WasmUrl,
-            undefined,
-            fontCfg.variant || 'regular'
-          );
+          await embedder.addFont(fontCfg.name, subsets, options.woff2WasmUrl, undefined, fontCfg.variant || 'regular');
           embedResults.push({ label, ok: true });
         } catch (e) {
           const reason = e && e.message ? e.message : String(e);
@@ -585,7 +589,10 @@ async function elementToCanvasImage(node, widthPx, heightPx) {
           // 4. Adjust alignment for Icons to prevent baseline clipping
           // (Applies to <i>, <span>, or standard icon classes)
           const tag = (clonedNode?.tagName || '').toLowerCase();
-          const className = typeof clonedNode.className === 'string' ? clonedNode.className : (clonedNode.className && clonedNode.className.baseVal) || '';
+          const className =
+            typeof clonedNode.className === 'string'
+              ? clonedNode.className
+              : (clonedNode.className && clonedNode.className.baseVal) || '';
           if (tag === 'i' || tag === 'span' || className.includes('fa-')) {
             // Flex center helps align the glyph exactly in the middle of the box
             // preventing top/bottom cropping due to line-height mismatches.
@@ -1439,26 +1446,7 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
     borderTopLeftRadius !== borderTopRightRadius ||
     borderTopLeftRadius !== borderBottomRightRadius ||
     borderTopLeftRadius !== borderBottomLeftRadius;
-
-  const tempBg = parseColor(style.backgroundColor);
-  const isTxt = isTextContainer(node);
   const hasContent = node.textContent.trim().length > 0 || node.children.length > 0;
-
-  if (hasPartialBorderRadius && tempBg.hex && !isTxt && !hasContent && !customShapeName) {
-    const shapeSvg = generateCustomShapeSVG(widthPx, heightPx, tempBg.hex, tempBg.opacity, {
-      tl: parseFloat(style.borderTopLeftRadius) || 0,
-      tr: parseFloat(style.borderTopRightRadius) || 0,
-      br: parseFloat(style.borderBottomRightRadius) || 0,
-      bl: parseFloat(style.borderBottomLeftRadius) || 0,
-    });
-
-    items.push({
-      type: 'image',
-      zIndex: parentSortKey.concat([-Infinity]),
-      domOrder,
-      options: { data: shapeSvg, x, y, w, h, rotate: rotation },
-    });
-  }
 
   let bgJob = null;
 
@@ -1490,10 +1478,8 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
   const bgClip = style.webkitBackgroundClip || style.backgroundClip;
   const isBgClipText = bgClip === 'text';
   const bgImgStr = style.backgroundImage;
-  const hasGradient =
-    !isBgClipText &&
-    bgImgStr &&
-    /(?:^|,)\s*(?:linear|radial)-gradient\(/i.test(bgImgStr);
+  const hasGradient = !isBgClipText && bgImgStr && /(?:^|,)\s*(?:linear|radial)-gradient\(/i.test(bgImgStr);
+  const hasRepeatingGradientTexture = hasGradient && hasExplicitRepeatingGradientTexture(style);
   const backgroundImageUrls = !isBgClipText && !hasGradient ? extractCssImageUrls(bgImgStr) : [];
   const bgUrl = backgroundImageUrls[0];
   const hasBgImgUrl = !!bgUrl;
@@ -1570,6 +1556,63 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
   }
 
   if (hasBgImgUrl || hasGradient || (softEdge && bgColorObj.hex && !isImageWrapper)) {
+    const hasLayeredBackground = hasBgImgUrl || hasGradient;
+    const hasBackgroundFillLayer = hasLayeredBackground && bgColorObj.hex && !isImageWrapper;
+    const useUniformBorderOverlay = hasLayeredBackground && hasUniformBorder && !hasPartialBorderRadius;
+
+    if (hasBackgroundFillLayer) {
+      const finalAlpha = safeOpacity * bgColorObj.opacity;
+      const transparency = (1 - finalAlpha) * 100;
+
+      if (hasPartialBorderRadius && !customShapeName) {
+        const shapeSvg = generateCustomShapeSVG(widthPx, heightPx, bgColorObj.hex, finalAlpha, {
+          tl: borderTopLeftRadius,
+          tr: borderTopRightRadius,
+          br: borderBottomRightRadius,
+          bl: borderBottomLeftRadius,
+        });
+        items.push({
+          type: 'image',
+          zIndex: parentSortKey.concat([-Infinity, -2]),
+          domOrder,
+          options: { data: shapeSvg, x, y, w, h, rotate: rotation },
+        });
+      } else {
+        const minDimension = Math.min(widthPx, heightPx);
+        const rawRadius = parseFloat(style.borderRadius) || 0;
+        const isPercentage = style.borderRadius && style.borderRadius.toString().includes('%');
+        const radiusPx = isPercentage ? (rawRadius / 100) * minDimension : rawRadius;
+        const isSquare = Math.abs(widthPx - heightPx) < 1;
+        const isFullyRound = radiusPx >= minDimension / 2;
+        let shapeType = pptx.ShapeType.rect;
+        const shapeOptions = {
+          x,
+          y,
+          w,
+          h,
+          rotate: rotation,
+          fill: { color: bgColorObj.hex, transparency },
+          line: null,
+        };
+
+        if (isFullyRound && (isPercentage || isSquare)) {
+          shapeType = pptx.ShapeType.ellipse;
+        } else if (radiusPx > 0) {
+          shapeType = pptx.ShapeType.roundRect;
+          shapeOptions.rectRadius = Math.min(radiusPx, minDimension / 2) * PX_TO_INCH * config.scale;
+        }
+        if (hasShadow) shapeOptions.shadow = getVisibleShadow(shadowStr, config.scale);
+
+        items.push({
+          type: 'shape',
+          zIndex: parentSortKey.concat([-Infinity, -2]),
+          domOrder,
+          shapeType,
+          options: shapeOptions,
+        });
+      }
+    }
+
     if (hasBgImgUrl) {
       const transparency = getImageTransparency(safeOpacity);
       const radii = {
@@ -1581,7 +1624,7 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
 
       const bgItem = {
         type: 'image',
-        zIndex: parentSortKey.concat([-Infinity]),
+        zIndex: parentSortKey.concat([-Infinity, -1]),
         domOrder,
         options: {
           x,
@@ -1614,6 +1657,10 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
         const svgInfo = generateBlurredSVG(widthPx, heightPx, bgColorObj.hex, borderRadiusValue, softEdge);
         bgData = svgInfo.data;
         padIn = svgInfo.padding * PX_TO_INCH * config.scale;
+      } else if (hasRepeatingGradientTexture) {
+        console.warn(
+          '[dom-to-pptx] Skipping a repeating gradient texture with explicit background-size; the solid background color remains available as fallback.'
+        );
       } else {
         bgData = generateGradientSVG(
           widthPx,
@@ -1627,14 +1674,14 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
                 bl: borderBottomLeftRadius,
               }
             : borderRadiusValue,
-          hasBorder ? { color: borderColorObj.hex, width: borderWidth } : null
+          hasBorder && !useUniformBorderOverlay ? { color: borderColorObj.hex, width: borderWidth } : null
         );
       }
 
       if (bgData) {
         items.push({
           type: 'image',
-          zIndex: parentSortKey.concat([-Infinity]),
+          zIndex: parentSortKey.concat([-Infinity, -1]),
           domOrder,
           options: {
             data: bgData,
@@ -1646,6 +1693,40 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
           },
         });
       }
+    }
+
+    if (useUniformBorderOverlay) {
+      const minDimension = Math.min(widthPx, heightPx);
+      const rawRadius = parseFloat(style.borderRadius) || 0;
+      const isPercentage = style.borderRadius && style.borderRadius.toString().includes('%');
+      const radiusPx = isPercentage ? (rawRadius / 100) * minDimension : rawRadius;
+      const isSquare = Math.abs(widthPx - heightPx) < 1;
+      const isFullyRound = radiusPx >= minDimension / 2;
+      let shapeType = pptx.ShapeType.rect;
+      const borderOptions = {
+        x,
+        y,
+        w,
+        h,
+        rotate: rotation,
+        fill: { color: 'FFFFFF', transparency: 100 },
+        line: borderInfo.options,
+      };
+
+      if (isFullyRound && (isPercentage || isSquare)) {
+        shapeType = pptx.ShapeType.ellipse;
+      } else if (radiusPx > 0) {
+        shapeType = pptx.ShapeType.roundRect;
+        borderOptions.rectRadius = Math.min(radiusPx, minDimension / 2) * PX_TO_INCH * config.scale;
+      }
+
+      items.push({
+        type: 'shape',
+        zIndex: parentSortKey.concat([-500000]),
+        domOrder,
+        shapeType,
+        options: borderOptions,
+      });
     }
 
     if (textPayload) {
