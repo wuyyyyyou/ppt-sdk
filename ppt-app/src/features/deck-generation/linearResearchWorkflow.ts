@@ -495,13 +495,12 @@ async function setStage(
   checkpoint.status = state === "running" ? "running" : checkpoint.status;
   checkpoint.stages[stage] = state;
   runtime.researchDiscoveryProgress = uiProgress(checkpoint);
-  await Promise.all([
-    persist(),
-    runtime.backend.recordPageProgress({
-      workspace_dir: runtime.workspace.workspace_dir,
-      patch: { research_discovery: runtime.researchDiscoveryProgress },
-    }).then(runtime.setProgress),
-  ]);
+  await persist();
+  const nextProgress = await runtime.backend.recordPageProgress({
+    workspace_dir: runtime.workspace.workspace_dir,
+    patch: { research_discovery: runtime.researchDiscoveryProgress },
+  });
+  runtime.setProgress(nextProgress);
   emitRuntime(runtime, {
     step: "prepare",
     message: stageMessage(runtime, stage),
