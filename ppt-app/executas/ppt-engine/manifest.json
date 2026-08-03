@@ -1,6 +1,6 @@
 {
   "display_name": "ppt-engine",
-  "version": "4.3.13",
+  "version": "4.3.14",
   "description": "Anna Executa plugin for Workspace Authoring Kit setup, manifest-based deck HTML generation, and backend PPTX export.",
   "author": "Anna Developer",
   "host_capabilities": [
@@ -11,6 +11,11 @@
     {
       "name": "app_get_runtime_info",
       "description": "Return lightweight identity information from the currently running ppt-engine process.",
+      "parameters": []
+    },
+    {
+      "name": "app_get_agent_resource_info",
+      "description": "Return a fresh diagnostic snapshot of the Agent host/container and ppt-engine process resources.",
       "parameters": []
     },
     {

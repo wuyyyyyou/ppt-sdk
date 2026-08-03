@@ -1,7 +1,7 @@
-import { Archive, Download, Edit3, RefreshCw } from "lucide-react";
+import { Archive, Cpu, Download, Edit3, MemoryStick, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import appManifest from "../../../../app.json";
-import type { PptEngineRuntimeInfo, WorkspaceResult, WorkspaceSettings } from "../../../api/types";
+import type { PptAgentResourceInfo, PptEngineRuntimeInfo, WorkspaceResult, WorkspaceSettings } from "../../../api/types";
 import type { Messages } from "../../../i18n/messages";
 import {
   PAGE_GENERATION_CONCURRENCY_MAX,
@@ -27,7 +27,7 @@ import { useDownloadUrlAvailability } from "../useDownloadUrlAvailability";
 import { CopyableDownloadLink } from "./CopyableDownloadLink";
 import { PageHeader } from "./PageHeader";
 import { PerformanceTestingPanel } from "../../performance/PerformanceTestingPanel";
-import type { PerformanceTestingState } from "../types";
+import type { AgentResourceInfoState, PerformanceTestingState } from "../types";
 import type { PerformanceRunSummary } from "../../../api/types";
 
 interface LibraryPageProps {
@@ -40,6 +40,7 @@ interface LibraryPageProps {
   pageReviewSettings: PageReviewSettings;
   runtimeInfo: PptEngineRuntimeInfo | null;
   runtimeInfoError: string;
+  agentResourceInfo: AgentResourceInfoState;
   onBack: () => void;
   onSaveSettings: (setting: WorkspaceSettings) => Promise<void>;
   onSaveTitle: (title: string) => Promise<void>;
@@ -48,6 +49,7 @@ interface LibraryPageProps {
   onResetWorkspaceDiagnosticBundle: () => void;
   performanceTesting: PerformanceTestingState;
   onRefreshPerformanceRuns: () => Promise<void>;
+  onRefreshAgentResourceInfo: () => Promise<void>;
   onStartPerformanceRun: () => Promise<void>;
   onFinalizePerformanceRun: () => Promise<void>;
   onAbandonPerformanceRun: () => Promise<void>;
@@ -80,6 +82,7 @@ export function LibraryPage({
   pageReviewSettings,
   runtimeInfo,
   runtimeInfoError,
+  agentResourceInfo,
   onBack,
   onSaveSettings,
   onSaveTitle,
@@ -88,6 +91,7 @@ export function LibraryPage({
   onResetWorkspaceDiagnosticBundle,
   performanceTesting,
   onRefreshPerformanceRuns,
+  onRefreshAgentResourceInfo,
   onStartPerformanceRun,
   onFinalizePerformanceRun,
   onAbandonPerformanceRun,
@@ -175,6 +179,13 @@ export function LibraryPage({
         {runtimeInfoError ? <div className="runtime-info-error" title={runtimeInfoError}>{t.library.runtimeInfoUnavailable}</div> : null}
       </div>
 
+      <AgentResourceInfoPanel
+        t={t}
+        locale={locale}
+        state={agentResourceInfo}
+        onRefresh={onRefreshAgentResourceInfo}
+      />
+
       <PerformanceTestingPanel
         t={t}
         locale={locale}
@@ -203,6 +214,106 @@ export function LibraryPage({
       ) : null}
     </section>
   );
+}
+
+function formatBytes(value: number): string {
+  if (!Number.isFinite(value) || value < 0) return "—";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let amount = value;
+  let unit = 0;
+  while (amount >= 1024 && unit < units.length - 1) {
+    amount /= 1024;
+    unit += 1;
+  }
+  return `${amount >= 10 || unit === 0 ? amount.toFixed(0) : amount.toFixed(1)} ${units[unit]}`;
+}
+
+function formatPercent(value: number | null): string {
+  return value === null || !Number.isFinite(value) ? "—" : `${value.toFixed(1)}%`;
+}
+
+function formatCores(value: number, locale: "en" | "zh"): string {
+  const amount = Number.isInteger(value) ? value : value.toFixed(2);
+  return locale === "zh" ? `${amount} 核` : `${amount} core${value === 1 ? "" : "s"}`;
+}
+
+function formatSampleTime(value: string, locale: "en" | "zh"): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(date);
+}
+
+function limitSourceLabel(source: PptAgentResourceInfo["cpu"]["limit_source"], t: Messages): string {
+  if (source === "cgroup") return t.library.agentResourceInfoCgroupLimit;
+  if (source === "system") return t.library.agentResourceInfoSystemVisible;
+  return t.library.agentResourceInfoUnknown;
+}
+
+function AgentResourceInfoPanel({
+  t,
+  locale,
+  state,
+  onRefresh,
+}: {
+  t: Messages;
+  locale: "en" | "zh";
+  state: AgentResourceInfoState;
+  onRefresh: () => Promise<void>;
+}) {
+  if (!state.enabled) return null;
+  const info = state.info;
+  const refreshLabel = state.loading ? t.library.agentResourceInfoRefreshing : t.library.agentResourceInfoRefresh;
+  return (
+    <div className="agent-resource-info-box" data-performance-control="true">
+      <div className="agent-resource-info-header">
+        <div>
+          <strong>{t.library.agentResourceInfoTitle}</strong>
+          <p>{t.library.agentResourceInfoDescription}</p>
+        </div>
+        <button
+          data-performance-id="settings.agent-resource-info.refresh"
+          className="secondary-btn compact agent-resource-info-refresh"
+          type="button"
+          onClick={() => void onRefresh()}
+          disabled={state.loading}
+          aria-label={refreshLabel}
+          title={refreshLabel}
+        >
+          <RefreshCw size={14} className={state.loading ? "spin" : undefined} />
+          <span>{state.loading ? t.library.agentResourceInfoRefreshing : t.library.agentResourceInfoRefresh}</span>
+        </button>
+      </div>
+      {state.error ? <div className="runtime-info-error" title={state.error}>{t.library.agentResourceInfoUnavailable}</div> : null}
+      {info ? (
+        <>
+          <div className="agent-resource-info-section-title"><Cpu size={14} />{t.library.agentResourceInfoSystem}</div>
+          <div className="agent-resource-info-grid">
+            <ResourceMetric label={t.library.agentResourceInfoConfiguredCores} value={`${formatCores(info.cpu.configured_cores, locale)} · ${limitSourceLabel(info.cpu.limit_source, t)}`} />
+            <ResourceMetric label={t.library.agentResourceInfoVisibleCores} value={formatCores(info.cpu.visible_cores, locale)} />
+            <ResourceMetric label={t.library.agentResourceInfoCpuUsage} value={formatPercent(info.cpu.system_usage_percent)} />
+            <ResourceMetric label={t.library.agentResourceInfoMemoryUsage} value={`${formatPercent(info.memory.usage_percent)} · ${formatBytes(info.memory.used_bytes)} / ${formatBytes(info.memory.total_bytes)} · ${limitSourceLabel(info.memory.limit_source, t)}`} />
+          </div>
+          <div className="agent-resource-info-section-title"><MemoryStick size={14} />{t.library.agentResourceInfoProcess}</div>
+          <div className="agent-resource-info-grid">
+            <ResourceMetric label={t.library.agentResourceInfoProcessCpuUsage} value={formatPercent(info.process.cpu_usage_percent)} />
+            <ResourceMetric label={t.library.agentResourceInfoProcessMemory} value={formatBytes(info.process.rss_bytes)} />
+            <ResourceMetric label={t.library.agentResourceInfoPlatform} value={`${info.environment.platform} / ${info.environment.arch}`} />
+            <ResourceMetric label={t.library.agentResourceInfoNode} value={info.environment.node_version} />
+            {info.cpu.load_average ? <ResourceMetric label={t.library.agentResourceInfoLoadAverage} value={info.cpu.load_average.join(" / ")} /> : null}
+            <ResourceMetric label={t.library.agentResourceInfoSampledAt} value={formatSampleTime(info.sampled_at, locale)} />
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function ResourceMetric({ label, value }: { label: string; value: string }) {
+  return <div className="agent-resource-info-metric"><span>{label}</span><strong>{value}</strong></div>;
 }
 
 function getWorkspaceTitle(workspace: WorkspaceResult | null) {

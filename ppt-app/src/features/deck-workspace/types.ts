@@ -3,6 +3,7 @@ import type {
   ListWorkspacesResult,
   PageProgress,
   PptEngineRuntimeInfo,
+  PptAgentResourceInfo,
   GetStyleProfileResult,
   GetStyleProfilePreviewResult,
   StyleProfileIndexEntry,
@@ -103,6 +104,13 @@ export interface PerformanceTestingState {
   reportRunId: string | null;
 }
 
+export interface AgentResourceInfoState {
+  enabled: boolean;
+  loading: boolean;
+  error: string;
+  info: PptAgentResourceInfo | null;
+}
+
 export interface ExportProgressState {
   type: "PPTX" | "PDF" | null;
   mode: "idle" | "determinate" | "indeterminate" | "complete" | "error";
@@ -184,6 +192,7 @@ export interface DeckWorkspaceState {
   workspaceSettingsSaving: boolean;
   runtimeInfo: PptEngineRuntimeInfo | null;
   runtimeInfoError: string;
+  agentResourceInfo: AgentResourceInfoState;
   templateGroups: TemplateSummary[];
   selectedVisualStylePresetId: string | null;
   selectedTemplateGroupId: string | null;

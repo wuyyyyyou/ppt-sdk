@@ -140,6 +140,7 @@ import {
   listPerformanceRuns,
   regeneratePerformanceReport,
   startPerformanceRun,
+  getAgentResourceInfo,
 } from "./dist/index.js";
 
 const TASK_STATE_MACHINE_TOOL_NAMES = [
@@ -207,6 +208,10 @@ function toolAppGetRuntimeInfo() {
       schema_version: 1,
     },
   };
+}
+
+async function toolAppGetAgentResourceInfo() {
+  return getAgentResourceInfo();
 }
 
 function readPerformanceContext(args) {
@@ -3217,6 +3222,7 @@ async function toolForkTemplateGroup(args) {
 
 const TOOL_DISPATCH = {
   app_get_runtime_info: toolAppGetRuntimeInfo,
+  app_get_agent_resource_info: toolAppGetAgentResourceInfo,
   app_list_performance_runs: toolAppListPerformanceRuns,
   app_start_performance_run: toolAppStartPerformanceRun,
   app_append_performance_events: toolAppAppendPerformanceEvents,

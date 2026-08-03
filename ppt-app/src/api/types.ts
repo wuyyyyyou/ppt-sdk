@@ -595,6 +595,41 @@ export interface PptEngineRuntimeInfo {
   };
 }
 
+export type AgentResourceLimitSource = "cgroup" | "system" | "unknown";
+
+export interface PptAgentResourceInfo {
+  sampled_at: string;
+  sample_duration_ms: number;
+  environment: {
+    platform: string;
+    arch: string;
+    node_version: string;
+  };
+  cpu: {
+    system_usage_percent: number | null;
+    configured_cores: number;
+    visible_cores: number;
+    limit_source: AgentResourceLimitSource;
+    load_average: number[] | null;
+  };
+  memory: {
+    used_bytes: number;
+    available_bytes: number;
+    total_bytes: number;
+    usage_percent: number | null;
+    limit_source: AgentResourceLimitSource;
+  };
+  process: {
+    pid: number;
+    cpu_usage_percent: number | null;
+    rss_bytes: number;
+    heap_used_bytes: number;
+    heap_total_bytes: number;
+    external_bytes: number;
+    uptime_seconds: number;
+  };
+}
+
 export type PerformanceRunStatus = "recording" | "finalizing" | "completed" | "finalization_failed" | "abandoned";
 export interface PerformanceContext {
   run_id: string;

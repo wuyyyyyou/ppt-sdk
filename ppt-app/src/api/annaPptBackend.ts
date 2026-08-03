@@ -24,6 +24,7 @@ import type {
   ProjectResult,
   PptxExportJob,
   PptEngineRuntimeInfo,
+  PptAgentResourceInfo,
   RenderDeckHtmlResult,
   RenderDeckHtmlSubmissionResult,
   RenderWorkspacePagePreviewSubmissionResult,
@@ -208,6 +209,7 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
   const toolIds = resolvePptBundledToolIds();
   const hostUploadClient = createAppHostUploadClient(runtime);
   const performanceControlMethods = new Set([
+    "app_get_agent_resource_info",
     "app_list_performance_runs",
     "app_start_performance_run",
     "app_append_performance_events",
@@ -311,6 +313,8 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
   return {
     getRuntimeInfo: () =>
       invoke<PptEngineRuntimeInfo>(toolIds.pptEngine, "app_get_runtime_info", {}),
+    getAgentResourceInfo: () =>
+      invoke<PptAgentResourceInfo>(toolIds.pptEngine, "app_get_agent_resource_info", {}),
     listPerformanceRuns: async () => {
       const result = await invoke<ListPerformanceRunsResult>(toolIds.pptEngine, "app_list_performance_runs", {});
       setActivePerformanceRun(result.active_run?.run_id ?? null);

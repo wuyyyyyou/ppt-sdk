@@ -1,4 +1,6 @@
 import { templates } from "./app/presentation-templates/index.js";
+export { getAgentResourceInfo } from "./agent-resource-info.js";
+export type { AgentResourceInfo, AgentResourceLimitSource } from "./agent-resource-info.js";
 export {
   ensureConfirmedOutlinePageIds,
   fingerprintWorkspacePageSource,

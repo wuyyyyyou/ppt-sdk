@@ -24,6 +24,7 @@ import type {
   PagePlan,
   PageProgress,
   PptEngineRuntimeInfo,
+  PptAgentResourceInfo,
   OpenWorkspaceInput,
   PatchWorkspaceDefaultsInput,
   PrepareDeckRefinementPageFilesInput,
@@ -133,6 +134,7 @@ import { detectRuntimeMode } from "../runtime/runtimeMode";
 
 export interface PptBackend {
   getRuntimeInfo(): Promise<PptEngineRuntimeInfo>;
+  getAgentResourceInfo(): Promise<PptAgentResourceInfo>;
   listPerformanceRuns(): Promise<ListPerformanceRunsResult>;
   startPerformanceRun(input: { app_version: string; environment?: Record<string, string | number | boolean | null>; initial_settings?: Record<string, unknown> }): Promise<PerformanceRunSummary>;
   appendPerformanceEvents(input: { run_id: string; events: PerformanceEvent[] }): Promise<{ appended: number; run: PerformanceRunSummary }>;

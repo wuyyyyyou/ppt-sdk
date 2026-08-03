@@ -270,6 +270,7 @@ export function App() {
               pageReviewSettings={state.pageReviewSettings}
               runtimeInfo={state.runtimeInfo}
               runtimeInfoError={state.runtimeInfoError}
+              agentResourceInfo={state.agentResourceInfo}
               onBack={actions.goBack}
               onSaveSettings={actions.saveWorkspaceSettings}
               onSaveTitle={actions.saveWorkspaceTitle}
@@ -278,6 +279,7 @@ export function App() {
               onResetWorkspaceDiagnosticBundle={actions.resetWorkspaceDiagnosticBundle}
               performanceTesting={state.performanceTesting}
               onRefreshPerformanceRuns={actions.refreshPerformanceRuns}
+              onRefreshAgentResourceInfo={actions.refreshAgentResourceInfo}
               onStartPerformanceRun={actions.startPerformanceRun}
               onFinalizePerformanceRun={actions.finalizePerformanceRun}
               onAbandonPerformanceRun={actions.abandonPerformanceRun}

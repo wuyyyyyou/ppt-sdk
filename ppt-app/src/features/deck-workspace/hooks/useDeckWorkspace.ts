@@ -203,6 +203,7 @@ const PPTX_EXPORT_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 const PPTX_EXPORT_STATUS_ERROR_LIMIT = 5;
 const AGENT_CANCELLATION_WAIT_MS = 3_000;
 const PERFORMANCE_TESTING_ENABLED = import.meta.env.VITE_PERFORMANCE_TESTING_ENABLED === "true";
+const AGENT_RESOURCE_INFO_ENABLED = import.meta.env.VITE_AGENT_RESOURCE_INFO_ENABLED === "true";
 
 async function measurePerformanceOperation<T>(operationName: string, workspaceDir: string, task: () => Promise<T>): Promise<T> {
   const span = beginPerformanceSpan({
@@ -461,6 +462,7 @@ export interface DeckWorkspaceActions {
   goBack: () => Promise<void>;
   resolveConfirmation: (confirmed: boolean) => void;
   refreshPerformanceRuns: () => Promise<void>;
+  refreshAgentResourceInfo: () => Promise<void>;
   startPerformanceRun: () => Promise<void>;
   finalizePerformanceRun: () => Promise<void>;
   abandonPerformanceRun: () => Promise<void>;
@@ -699,6 +701,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   const [workspaceSettingsSaving, setWorkspaceSettingsSaving] = useState(false);
   const [runtimeInfo, setRuntimeInfo] = useState<PptEngineRuntimeInfo | null>(null);
   const [runtimeInfoError, setRuntimeInfoError] = useState("");
+  const [agentResourceInfo, setAgentResourceInfo] = useState<DeckWorkspaceState["agentResourceInfo"]>({
+    enabled: AGENT_RESOURCE_INFO_ENABLED,
+    loading: AGENT_RESOURCE_INFO_ENABLED,
+    error: "",
+    info: null,
+  });
   const [templateGroups, setTemplateGroups] = useState<TemplateSummary[]>([]);
   const [selectedVisualStylePresetId, setSelectedVisualStylePresetId] = useState<string | null>(null);
   const [selectedTemplateGroupId, setSelectedTemplateGroupId] = useState<string | null>(DEFAULT_TEMPLATE_GROUP_ID);
@@ -1566,6 +1574,21 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
             setRuntimeInfoError(error instanceof Error ? error.message : "Failed to read runtime version.");
           }
         });
+        if (AGENT_RESOURCE_INFO_ENABLED) {
+          void nextBackend.getAgentResourceInfo().then((result) => {
+            if (!cancelled) {
+              setAgentResourceInfo({ enabled: true, loading: false, error: "", info: result });
+            }
+          }).catch((error) => {
+            if (!cancelled) {
+              setAgentResourceInfo((current) => ({
+                ...current,
+                loading: false,
+                error: error instanceof Error ? error.message : t.library.agentResourceInfoUnavailable,
+              }));
+            }
+          });
+        }
         const scan = await nextBackend.listWorkspaces();
         if (cancelled) return;
         setWorkspaceScan(scan);
@@ -5069,6 +5092,21 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
   }
 
+  async function refreshAgentResourceInfo() {
+    if (!backend || !AGENT_RESOURCE_INFO_ENABLED || agentResourceInfo.loading) return;
+    setAgentResourceInfo((current) => ({ ...current, loading: true, error: "" }));
+    try {
+      const result = await backend.getAgentResourceInfo();
+      setAgentResourceInfo({ enabled: true, loading: false, error: "", info: result });
+    } catch (error) {
+      setAgentResourceInfo((current) => ({
+        ...current,
+        loading: false,
+        error: error instanceof Error ? error.message : t.library.agentResourceInfoUnavailable,
+      }));
+    }
+  }
+
   async function startPerformanceRun() {
     if (!backend || performanceTesting.busy || performanceTesting.activeRun) return;
     setPerformanceTesting((current) => ({ ...current, busy: true, error: "" }));
@@ -5266,6 +5304,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     workspaceSettingsSaving,
     runtimeInfo,
     runtimeInfoError,
+    agentResourceInfo,
     templateGroups,
     selectedVisualStylePresetId,
     selectedTemplateGroupId,
@@ -5292,6 +5331,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     showToast,
     resolveConfirmation,
     refreshPerformanceRuns,
+    refreshAgentResourceInfo,
     startPerformanceRun,
     finalizePerformanceRun,
     abandonPerformanceRun,

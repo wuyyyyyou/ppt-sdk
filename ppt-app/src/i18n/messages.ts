@@ -400,6 +400,26 @@ export interface Messages {
     annaDeckVersion: string;
     pptEngineVersion: string;
     runtimeInfoUnavailable: string;
+    agentResourceInfoTitle: string;
+    agentResourceInfoDescription: string;
+    agentResourceInfoRefresh: string;
+    agentResourceInfoRefreshing: string;
+    agentResourceInfoUnavailable: string;
+    agentResourceInfoSystem: string;
+    agentResourceInfoProcess: string;
+    agentResourceInfoCpuUsage: string;
+    agentResourceInfoProcessCpuUsage: string;
+    agentResourceInfoConfiguredCores: string;
+    agentResourceInfoVisibleCores: string;
+    agentResourceInfoMemoryUsage: string;
+    agentResourceInfoProcessMemory: string;
+    agentResourceInfoPlatform: string;
+    agentResourceInfoNode: string;
+    agentResourceInfoLoadAverage: string;
+    agentResourceInfoSampledAt: string;
+    agentResourceInfoCgroupLimit: string;
+    agentResourceInfoSystemVisible: string;
+    agentResourceInfoUnknown: string;
     lastEditedToday: string;
     lastEditedYesterday: string;
     lastEditedDate: string;
@@ -1101,6 +1121,26 @@ export const messages: Record<Locale, Messages> = {
       annaDeckVersion: "Anna Deck version",
       pptEngineVersion: "ppt-engine version",
       runtimeInfoUnavailable: "The runtime version is temporarily unavailable.",
+      agentResourceInfoTitle: "Agent configuration",
+      agentResourceInfoDescription: "Internal troubleshooting snapshot of the Agent host and ppt-engine process.",
+      agentResourceInfoRefresh: "Refresh Agent configuration",
+      agentResourceInfoRefreshing: "Refreshing...",
+      agentResourceInfoUnavailable: "Agent resource information is temporarily unavailable.",
+      agentResourceInfoSystem: "System resources",
+      agentResourceInfoProcess: "ppt-engine process",
+      agentResourceInfoCpuUsage: "System CPU usage",
+      agentResourceInfoProcessCpuUsage: "Process CPU usage",
+      agentResourceInfoConfiguredCores: "Configured CPU",
+      agentResourceInfoVisibleCores: "Visible CPU cores",
+      agentResourceInfoMemoryUsage: "System memory usage",
+      agentResourceInfoProcessMemory: "Process RSS memory",
+      agentResourceInfoPlatform: "Platform",
+      agentResourceInfoNode: "Node.js",
+      agentResourceInfoLoadAverage: "Load average",
+      agentResourceInfoSampledAt: "Last refreshed",
+      agentResourceInfoCgroupLimit: "cgroup limit",
+      agentResourceInfoSystemVisible: "system visible",
+      agentResourceInfoUnknown: "Unavailable",
       lastEditedToday: "Last edited today",
       lastEditedYesterday: "Last edited yesterday",
       lastEditedDate: "Last edited {date}",
@@ -1804,6 +1844,26 @@ export const messages: Record<Locale, Messages> = {
       annaDeckVersion: "Anna Deck 版本",
       pptEngineVersion: "ppt-engine 版本",
       runtimeInfoUnavailable: "暂时无法获取运行版本。",
+      agentResourceInfoTitle: "Agent 配置信息",
+      agentResourceInfoDescription: "用于问题排查的 Agent 环境与 ppt-engine 进程资源快照。",
+      agentResourceInfoRefresh: "刷新 Agent 配置信息",
+      agentResourceInfoRefreshing: "正在刷新……",
+      agentResourceInfoUnavailable: "暂时无法获取 Agent 资源信息。",
+      agentResourceInfoSystem: "系统资源",
+      agentResourceInfoProcess: "ppt-engine 进程",
+      agentResourceInfoCpuUsage: "系统 CPU 占用",
+      agentResourceInfoProcessCpuUsage: "进程 CPU 占用",
+      agentResourceInfoConfiguredCores: "CPU 配额",
+      agentResourceInfoVisibleCores: "可见 CPU 核数",
+      agentResourceInfoMemoryUsage: "系统内存占用",
+      agentResourceInfoProcessMemory: "进程 RSS 内存",
+      agentResourceInfoPlatform: "平台",
+      agentResourceInfoNode: "Node.js",
+      agentResourceInfoLoadAverage: "Load average",
+      agentResourceInfoSampledAt: "最近刷新",
+      agentResourceInfoCgroupLimit: "cgroup 配额",
+      agentResourceInfoSystemVisible: "系统可见值",
+      agentResourceInfoUnknown: "不可用",
       lastEditedToday: "今天编辑",
       lastEditedYesterday: "昨天编辑",
       lastEditedDate: "{date} 编辑",
