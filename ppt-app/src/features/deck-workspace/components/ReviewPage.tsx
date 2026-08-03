@@ -16,6 +16,7 @@ interface ReviewPageProps {
   setPreviewMode: (mode: PreviewMode) => void;
   reviewRender: DeckReviewRenderState;
   renderDeckHtml: () => Promise<void>;
+  refreshPageImage: (pageId: string) => Promise<void>;
   onBack: () => void;
   onEdit: () => void;
 }
@@ -84,7 +85,10 @@ export function ReviewPage(props: ReviewPageProps) {
               <span>{formatSlideNumber(index)}</span>
               {renderedSlides[index]?.screenshot_upload ? (
                 <div className="grid-card-html-frame">
-                  <RenderedSlideImage slide={renderedSlides[index]} />
+                  <RenderedSlideImage
+                    slide={renderedSlides[index]}
+                    onLoadError={(pageId) => void props.refreshPageImage(pageId)}
+                  />
                 </div>
               ) : renderWaiting ? (
                 <PreviewLoadingFrame compact label={props.t.review.rendering} />
@@ -98,7 +102,11 @@ export function ReviewPage(props: ReviewPageProps) {
           {selectedRenderedSlide?.screenshot_upload
             ? (
               <div className="present-html-frame">
-                <RenderedSlideImage slide={selectedRenderedSlide} loading="eager" />
+                <RenderedSlideImage
+                  slide={selectedRenderedSlide}
+                  loading="eager"
+                  onLoadError={(pageId) => void props.refreshPageImage(pageId)}
+                />
               </div>
             )
             : <PreviewLoadingFrame label={props.t.review.rendering} />}

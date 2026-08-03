@@ -306,6 +306,7 @@ export function App() {
               setPreviewMode={actions.setPreviewMode}
               reviewRender={state.reviewRender}
               renderDeckHtml={actions.renderDeckHtml}
+              refreshPageImage={actions.refreshReviewPageImage}
               onBack={actions.goBack}
               onEdit={() => setManualEditorOpen(true)}
             />

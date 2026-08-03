@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { randomInt } from "node:crypto";
+import { createHash, randomInt } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 
@@ -91,6 +91,10 @@ test("getRenderedAppWorkspaceDeckHtml reads complete rendered pages and rejects 
     assert.equal(rendered.slide_count, 1);
     assert.equal(rendered.slides[0]?.slide_id, "page-11111111-1111-4111-8111-111111111111");
     assert.match(rendered.slides[0]?.screenshot_path ?? "", /slide-1\.png$/);
+    assert.equal(
+      rendered.slides[0]?.preview_source_fingerprint,
+      createHash("sha256").update("png fixture").digest("hex"),
+    );
 
     const task = await readJson<{ updated_at: string }>(path.join(workspaceDir, "task.json"));
     assert.equal(task.updated_at, "2026-06-30T00:00:00.000Z");

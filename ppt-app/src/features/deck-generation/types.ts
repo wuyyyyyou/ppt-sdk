@@ -88,6 +88,7 @@ export interface DeckGenerationProgressPage {
   agent_infrastructure_failures: number;
   last_error?: string;
   last_screenshot_path?: string;
+  render_source_sha256?: string;
 }
 
 export interface DeckGenerationStream {

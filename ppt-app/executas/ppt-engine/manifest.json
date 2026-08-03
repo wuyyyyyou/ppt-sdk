@@ -1628,7 +1628,7 @@
     },
     {
       "name": "app_get_rendered_deck_html",
-      "description": "Read existing rendered workspace deck HTML and screenshots, upload screenshot previews via Host Upload, and fail if any rendered artifact is missing.",
+      "description": "Read existing rendered workspace Deck metadata and verify its local HTML and screenshot artifacts without uploading page images.",
       "parameters": [
         {
           "name": "workspace_dir",
@@ -1670,6 +1670,12 @@
           "name": "width",
           "type": "number",
           "description": "Optional target width in pixels. Defaults to 1280 and is capped at 1920.",
+          "required": false
+        },
+        {
+          "name": "force_upload_refresh",
+          "type": "boolean",
+          "description": "Start a new Host Upload transaction for this page image instead of reusing a still-valid cached reference.",
           "required": false
         }
       ]

@@ -1558,6 +1558,8 @@ export interface RenderDeckHtmlResult {
     title: string;
     html_path: string;
     screenshot_path?: string;
+    render_source_fingerprint?: string;
+    preview_source_fingerprint?: string;
     screenshot_upload?: HostUploadRef;
     speaker_note: string;
     manually_edited?: boolean;
@@ -1589,6 +1591,7 @@ export interface GetWorkspacePageImageInput {
   workspace_dir: string;
   page_id: string;
   width?: number;
+  force_upload_refresh?: boolean;
 }
 
 export interface GetWorkspacePageImageResult {
@@ -1598,6 +1601,7 @@ export interface GetWorkspacePageImageResult {
   page_index: number;
   page_status: string;
   source_path: string;
+  preview_source_fingerprint: string;
   image_path: string;
   width: number | null;
   height: number | null;

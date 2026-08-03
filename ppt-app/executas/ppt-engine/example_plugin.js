@@ -2674,20 +2674,7 @@ async function toolAppGetRenderedDeckHtml(args) {
   const result = await getRenderedAppWorkspaceDeckHtml({
     workspace_dir: workspaceDir,
   });
-  const slides = await Promise.all(
-    result.slides.map(async (slide) => ({
-      ...slide,
-      screenshot_upload: await uploadPreviewImage(slide.screenshot_path, {
-        workspaceDir,
-        source: "ppt-engine.deck-screenshot",
-      }),
-    })),
-  );
-
-  return {
-    ...result,
-    slides,
-  };
+  return result;
 }
 
 async function toolAppGetWorkspaceCover(args) {
@@ -2731,6 +2718,7 @@ async function toolAppGetWorkspacePageImage(args) {
     image_upload: await uploadPreviewImage(image.image_path, {
       workspaceDir,
       source: "ppt-engine.workspace-page-image",
+      reuseWhileValid: args.force_upload_refresh !== true,
     }),
   };
 }

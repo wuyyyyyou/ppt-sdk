@@ -45,8 +45,8 @@ export function GenerationPagePreviewPanel(props: GenerationPagePreviewPanelProp
       </div>
 
       <div className="generation-preview-stage">
-        {selected?.status === "ready" && selected.url ? (
-          <img src={selected.url} alt={pageHeading(t, selected)} />
+        {selected?.status === "ready" && selected.imageUpload?.url ? (
+          <img src={selected.imageUpload.url} alt={pageHeading(t, selected)} />
         ) : selected?.status === "error" ? (
           <div className="generation-preview-placeholder">
             <AlertCircle size={20} aria-hidden="true" />
@@ -87,8 +87,8 @@ export function GenerationPagePreviewPanel(props: GenerationPagePreviewPanelProp
                 onClick={() => onSelectPage(entry.pageId)}
               >
                 <span className="generation-preview-thumbnail-frame">
-                  {entry.status === "ready" && entry.url ? (
-                    <img src={entry.url} alt="" loading="lazy" />
+                  {entry.status === "ready" && entry.imageUpload?.url ? (
+                    <img src={entry.imageUpload.url} alt="" loading="lazy" />
                   ) : entry.status === "error" ? (
                     <AlertCircle size={14} aria-hidden="true" />
                   ) : (

@@ -64,6 +64,7 @@ export function mapProgress(
     agent_infrastructure_failures: page.agent_infrastructure_failures,
     last_error: page.last_error,
     last_screenshot_path: page.last_screenshot_path,
+    render_source_sha256: page.render_source_sha256,
   })) ?? [];
 }
 

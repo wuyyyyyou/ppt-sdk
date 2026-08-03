@@ -187,6 +187,8 @@ test("app_get_workspace_page_image uploads one image for the requested page", as
   assert.equal(tool.parameters?.find((item) => item.name === "workspace_dir")?.required, true);
   assert.equal(tool.parameters?.find((item) => item.name === "page_id")?.required, true);
   assert.equal(tool.parameters?.find((item) => item.name === "width")?.required, false);
+  assert.equal(tool.parameters?.find((item) => item.name === "force_upload_refresh")?.required, false);
+  assert.match(wrapper, /reuseWhileValid:\s*args\.force_upload_refresh !== true/);
 });
 
 test("preview image uploads reuse confirmed references while they stay valid", async () => {
@@ -357,7 +359,7 @@ test("Shared Research Image local import waits for persistence before staging cl
   assert.match(handler, /await unlink\(localFilePath\)/);
 });
 
-test("app_get_rendered_deck_html is declared and routed", async () => {
+test("app_get_rendered_deck_html is declared, routed, and metadata-only", async () => {
   const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
   const manifest = JSON.parse(
     await readFile(new URL("../../manifest.json", import.meta.url), "utf8"),
@@ -365,6 +367,12 @@ test("app_get_rendered_deck_html is declared and routed", async () => {
 
   assert.match(source, /app_get_rendered_deck_html:\s*toolAppGetRenderedDeckHtml/);
   assert.ok(manifest.tools.some((tool) => tool.name === "app_get_rendered_deck_html"));
+  const wrapper = source.slice(
+    source.indexOf("async function toolAppGetRenderedDeckHtml("),
+    source.indexOf("async function toolAppGetWorkspaceCover("),
+  );
+  assert.match(wrapper, /getRenderedAppWorkspaceDeckHtml\(\{/);
+  assert.doesNotMatch(wrapper, /uploadPreviewImage\(/);
 });
 
 test("app_rasterize_pptx_to_images is declared and routed", async () => {

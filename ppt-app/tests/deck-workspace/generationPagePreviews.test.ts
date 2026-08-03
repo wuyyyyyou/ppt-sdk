@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import type { DeckGenerationProgress, DeckGenerationProgressPage } from "../../src/features/deck-generation/index.ts";
 import {
   orderGenerationPagePreviews,
+  isGenerationPagePreviewReusable,
   reconcileGenerationPagePreviews,
   resolveGenerationPreviewSelection,
   selectGenerationPagePreviewSources,
@@ -70,6 +71,13 @@ describe("reconcileGenerationPagePreviews", () => {
     title: "One",
     screenshotPath: "/tmp/one.png",
   };
+  const upload = {
+    transport: "host_upload" as const,
+    r2_key: "preview-one",
+    url: "https://example.test/one.webp",
+    mime_type: "image/webp",
+    size_bytes: 123,
+  };
 
   it("requests previews for newly rendered pages", () => {
     const { previews, pending, changed } = reconcileGenerationPagePreviews({}, [source]);
@@ -81,19 +89,19 @@ describe("reconcileGenerationPagePreviews", () => {
 
   it("stays a no-op while the same pages keep polling", () => {
     const ready: GenerationPagePreviews = {
-      "page-1": { ...source, status: "ready", url: "https://example.test/one.webp" },
+      "page-1": { ...source, status: "ready", imageUpload: upload },
     };
 
     const { pending, changed, previews } = reconcileGenerationPagePreviews(ready, [source]);
 
     assert.equal(changed, false);
     assert.deepEqual(pending, []);
-    assert.equal(previews["page-1"]?.url, "https://example.test/one.webp");
+    assert.equal(previews["page-1"]?.imageUpload?.url, "https://example.test/one.webp");
   });
 
   it("re-requests a page once it re-renders to new bytes", () => {
     const ready: GenerationPagePreviews = {
-      "page-1": { ...source, status: "ready", url: "https://example.test/one.webp" },
+      "page-1": { ...source, status: "ready", imageUpload: upload },
     };
 
     const { pending, previews, changed } = reconcileGenerationPagePreviews(ready, [
@@ -103,19 +111,19 @@ describe("reconcileGenerationPagePreviews", () => {
     assert.equal(changed, true);
     assert.equal(pending.length, 1);
     assert.equal(previews["page-1"]?.status, "loading");
-    assert.equal(previews["page-1"]?.url, undefined);
+    assert.equal(previews["page-1"]?.imageUpload, undefined);
   });
 
   it("drops pages that no longer exist", () => {
     const ready: GenerationPagePreviews = {
-      "page-1": { ...source, status: "ready", url: "https://example.test/one.webp" },
+      "page-1": { ...source, status: "ready", imageUpload: upload },
       "page-2": {
         pageId: "page-2",
         pageIndex: 1,
         title: "Two",
         screenshotPath: "/tmp/two.png",
         status: "ready",
-        url: "https://example.test/two.webp",
+        imageUpload: { ...upload, r2_key: "preview-two", url: "https://example.test/two.webp" },
       },
     };
 
@@ -136,12 +144,78 @@ describe("reconcileGenerationPagePreviews", () => {
     assert.deepEqual(pending, []);
     assert.equal(previews["page-1"]?.status, "error");
   });
+
+  it("keeps a ready preview when only the Shadow Workspace path changes", () => {
+    const ready: GenerationPagePreviews = {
+      "page-1": {
+        ...source,
+        renderSourceFingerprint: "source-v1",
+        previewSourceFingerprint: "image-v1",
+        status: "ready",
+        imageUpload: upload,
+      },
+    };
+
+    const { pending, previews } = reconcileGenerationPagePreviews(ready, [{
+      ...source,
+      screenshotPath: "/official/one.png",
+      renderSourceFingerprint: "source-v1",
+    }]);
+
+    assert.deepEqual(pending, []);
+    assert.equal(previews["page-1"]?.status, "ready");
+    assert.equal(previews["page-1"]?.screenshotPath, "/official/one.png");
+  });
+});
+
+describe("isGenerationPagePreviewReusable", () => {
+  const baseEntry: GenerationPagePreviewEntry = {
+    pageId: "page-1",
+    pageIndex: 0,
+    title: "One",
+    screenshotPath: "/shadow/one.png",
+    previewSourceFingerprint: "image-v1",
+    status: "ready",
+    imageUpload: {
+      transport: "host_upload",
+      r2_key: "preview-one",
+      url: "https://example.test/one.webp",
+      mime_type: "image/webp",
+      size_bytes: 123,
+    },
+  };
+
+  it("requires the same visual fingerprint", () => {
+    assert.equal(isGenerationPagePreviewReusable({
+      entry: baseEntry,
+      previewSourceFingerprint: "image-v2",
+      nowMs: 1_000,
+    }), false);
+  });
+
+  it("uses the fixed receipt time for expires_in", () => {
+    const entry: GenerationPagePreviewEntry = {
+      ...baseEntry,
+      receivedAtMs: 1_000,
+      imageUpload: { ...baseEntry.imageUpload!, expires_in: 300 },
+    };
+    assert.equal(isGenerationPagePreviewReusable({
+      entry,
+      previewSourceFingerprint: "image-v1",
+      nowMs: 60_000,
+    }), true);
+    assert.equal(isGenerationPagePreviewReusable({
+      entry,
+      previewSourceFingerprint: "image-v1",
+      nowMs: 190_000,
+    }), false);
+  });
 });
 
 describe("resolveGenerationPreviewSelection", () => {
   const entries: GenerationPagePreviewEntry[] = [
-    { pageId: "page-1", pageIndex: 0, title: "One", screenshotPath: "/tmp/one.png", status: "ready", url: "one" },
-    { pageId: "page-2", pageIndex: 1, title: "Two", screenshotPath: "/tmp/two.png", status: "ready", url: "two" },
+    { pageId: "page-1", pageIndex: 0, title: "One", screenshotPath: "/tmp/one.png", status: "ready", imageUpload: { transport: "host_upload", r2_key: "one", url: "one", mime_type: "image/webp", size_bytes: 1 } },
+    { pageId: "page-2", pageIndex: 1, title: "Two", screenshotPath: "/tmp/two.png", status: "ready", imageUpload: { transport: "host_upload", r2_key: "two", url: "two", mime_type: "image/webp", size_bytes: 1 } },
     { pageId: "page-3", pageIndex: 2, title: "Three", screenshotPath: "/tmp/three.png", status: "loading" },
   ];
 
@@ -177,7 +251,7 @@ describe("orderGenerationPagePreviews", () => {
         title: "Two",
         screenshotPath: "/tmp/two.png",
         status: "ready",
-        url: "two",
+        imageUpload: { transport: "host_upload", r2_key: "two", url: "two", mime_type: "image/webp", size_bytes: 1 },
       },
       "page-1": {
         pageId: "page-1",

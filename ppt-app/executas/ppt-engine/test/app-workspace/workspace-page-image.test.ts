@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { mkdtempSync } from "node:fs";
-import { randomInt } from "node:crypto";
+import { createHash, randomInt } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
@@ -124,6 +124,10 @@ test("getAppWorkspacePageImage derives a preview image for one rendered page", a
   assert.equal(image.page_index, 0);
   assert.equal(image.page_status, "accepted");
   assert.equal(image.source_path, firstScreenshotPath);
+  assert.equal(
+    image.preview_source_fingerprint,
+    createHash("sha256").update(await readFile(firstScreenshotPath)).digest("hex"),
+  );
   assert.match(image.image_path, /output\/page-previews\/page-[a-z0-9-]+-[0-9a-f]{16}\.webp$/);
   assert.equal(image.width, 1280);
   assert.equal(image.height, 720);
@@ -174,6 +178,7 @@ test("getAppWorkspacePageImage reuses the preview until the page is re-rendered"
     page_id: pageIds[0],
   });
   assert.equal(second.image_path, first.image_path);
+  assert.equal(second.preview_source_fingerprint, first.preview_source_fingerprint);
   assert.equal((await stat(second.image_path)).mtimeMs, firstStat.mtimeMs);
 
   await writeSlidePng(firstScreenshotPath, { r: 240, g: 240, b: 10 });
@@ -183,6 +188,7 @@ test("getAppWorkspacePageImage reuses the preview until the page is re-rendered"
   });
 
   assert.notEqual(rerendered.image_path, first.image_path);
+  assert.notEqual(rerendered.preview_source_fingerprint, first.preview_source_fingerprint);
   const previews = await readdir(path.dirname(rerendered.image_path));
   assert.deepEqual(previews, [path.basename(rerendered.image_path)]);
 });

@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 
 import { buildStandaloneDeckHtml } from "./build-deck.js";
 import {
+  staticizeAndWriteSlideScreenshots,
   staticizeHtmlDocuments,
   writeSlideScreenshots,
 } from "./browser-artifacts.js";
@@ -242,8 +243,7 @@ export async function buildDeckPageScreenshotFromManifest(
   const screenshotPath = path.join(outputDir, screenshotFileName);
 
   await writeFile(htmlPath, slide.html, "utf8");
-  await staticizeHtmlDocuments([{ htmlPath, kind: "page" }]);
-  await writeSlideScreenshots([{ html: slide.html, htmlPath, outputPath: screenshotPath }]);
+  await staticizeAndWriteSlideScreenshots([{ htmlPath, outputPath: screenshotPath }]);
 
   return {
     manifestPath: prepared.manifestPath,

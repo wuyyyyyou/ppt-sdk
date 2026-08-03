@@ -23,6 +23,7 @@ import {
 } from "../../../runtime/appHostUploadClient";
 import type {
   ListWorkspacesResult,
+  GetWorkspacePageImageResult,
   RenderDeckHtmlResult,
   PageProgress,
   PresentationRequirements,
@@ -139,6 +140,7 @@ import {
   selectGenerationPagePreviewSources,
   type GenerationPagePreviews,
 } from "../generationPagePreviews";
+import { assembleReviewRender } from "../reviewRenderAssembly";
 import { resolveGenerationAbandonLanding } from "../generationAbandonLanding";
 import { resolveDeckBackStage } from "../stageBackNavigation";
 import { createMyWorkTimingRecord, publishMyWorkTiming } from "../myWorkTiming";
@@ -212,6 +214,30 @@ async function measurePerformanceOperation<T>(operationName: string, workspaceDi
     const result = await task();
     span?.finish("ok");
     return result;
+  } catch (error) {
+    span?.finish("error");
+    throw error;
+  }
+}
+
+async function assembleMeasuredReviewRender(input: Parameters<typeof assembleReviewRender>[0]) {
+  const span = beginPerformanceSpan({
+    operationName: "review.preview_handoff",
+    workspaceId: input.workspaceDir.split(/[\\/]/).filter(Boolean).at(-1),
+    attributes: {
+      layer: "review-assembly",
+      page_count: input.metadata.slide_count,
+    },
+  });
+  try {
+    const assembled = await assembleReviewRender(input);
+    span?.finish("ok", {
+      cache_hit_page_count:
+        input.metadata.slide_count - assembled.fetchedPageIds.length - assembled.failedPageIds.length,
+      uploaded_page_count: assembled.fetchedPageIds.length,
+      failed_page_count: assembled.failedPageIds.length,
+    });
+    return assembled;
   } catch (error) {
     span?.finish("error");
     throw error;
@@ -508,6 +534,7 @@ export interface DeckWorkspaceActions {
   rewriteCurrentSlide: () => Promise<void>;
   changeCurrentSlideLayout: (mode: "simpler" | "visual" | "comparison" | "process" | "report") => Promise<void>;
   renderDeckHtml: () => Promise<void>;
+  refreshReviewPageImage: (pageId: string) => Promise<void>;
   applyManualPageUpdate: (result: SaveManualPageRevisionResult | RestorePageSourceVersionResult) => void;
   exportFile: (type: "PPTX" | "PDF") => Promise<void>;
   downloadExportArtifact: () => Promise<void>;
@@ -601,6 +628,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     useState<string | null>(null);
   const generationPagePreviewsRef = useRef<GenerationPagePreviews>({});
   const generationPagePreviewSessionRef = useRef(0);
+  const reviewPageImageRefreshAttemptsRef = useRef(new Set<string>());
   const [generationPreparing, setGenerationPreparing] = useState(false);
   const [generationTransaction, setGenerationTransaction] =
     useState<GenerationRunTransaction | null>(null);
@@ -1253,8 +1281,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   function applyWorkspace(
     workspace: WorkspaceResult,
-    options: { syncEmptyContextRows?: boolean; preserveCurrentSlide?: boolean } = {}
+    options: {
+      syncEmptyContextRows?: boolean;
+      preserveCurrentSlide?: boolean;
+      reviewRenderResult?: RenderDeckHtmlResult;
+    } = {}
   ) {
+    currentWorkspaceRef.current = workspace;
     setCurrentWorkspace(workspace);
     setPresentationRequirements(workspace.requirements);
     setSelectedVisualStylePresetId(workspace.requirements.selections.visual_style_preset?.id ?? null);
@@ -1312,25 +1345,51 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     );
     if (completedDeckAvailable) {
       setDeck(workspaceOutline.map((item) => ({ title: item.title, subtitle: "" })));
-      setReviewRender({
-        status: "loading",
-        result: null,
-        error: "",
-        renderKey,
-      });
+      if (options.reviewRenderResult) {
+        applyRenderedDeck(options.reviewRenderResult, workspaceOutline, { activateDeck: false });
+        setReviewRender({
+          status: "ready",
+          result: options.reviewRenderResult,
+          error: "",
+          renderKey,
+        });
+      } else {
+        setReviewRender({
+          status: "loading",
+          result: null,
+          error: "",
+          renderKey,
+        });
+      }
     }
-    if (completedDeckAvailable && backend) {
+    if (completedDeckAvailable && backend && !options.reviewRenderResult) {
       void backend.getRenderedDeckHtml({ workspace_dir: workspace.workspace_dir })
-        .then((result) => {
-          applyRenderedDeck(result, workspaceOutline, { activateDeck: false });
+        .then((metadata) => assembleMeasuredReviewRender({
+          backend,
+          metadata,
+          workspaceDir: workspace.workspace_dir,
+          previews: generationPagePreviewsRef.current,
+        }))
+        .then((assembled) => {
+          if (
+            currentWorkspaceRef.current?.workspace_dir !== workspace.workspace_dir ||
+            workspaceReviewRenderKey(currentWorkspaceRef.current) !== renderKey
+          ) return;
+          generationPagePreviewsRef.current = assembled.previews;
+          setGenerationPagePreviews(assembled.previews);
+          applyRenderedDeck(assembled.result, workspaceOutline, { activateDeck: false });
           setReviewRender({
             status: "ready",
-            result,
+            result: assembled.result,
             error: "",
-            renderKey: workspaceReviewRenderKey(workspace),
+            renderKey,
           });
         })
         .catch((error) => {
+          if (
+            currentWorkspaceRef.current?.workspace_dir !== workspace.workspace_dir ||
+            workspaceReviewRenderKey(currentWorkspaceRef.current) !== renderKey
+          ) return;
           setReviewRender({
             status: "error",
             result: null,
@@ -1569,15 +1628,37 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const session = generationPagePreviewSessionRef.current;
     const workspaceDir = generationPreviewWorkspaceDir;
 
-    function applyPreview(pageId: string, url: string) {
+    function applyPreview(
+      source: ReturnType<typeof selectGenerationPagePreviewSources>[number],
+      image: GetWorkspacePageImageResult | null,
+    ) {
       if (generationPagePreviewSessionRef.current !== session) return;
-      const current = generationPagePreviewsRef.current[pageId];
+      const current = generationPagePreviewsRef.current[source.pageId];
       if (!current) return;
+      const sameRenderSource = Boolean(
+        source.renderSourceFingerprint &&
+        current.renderSourceFingerprint === source.renderSourceFingerprint,
+      );
+      if (!sameRenderSource && current.screenshotPath !== source.screenshotPath) return;
       const next: GenerationPagePreviews = {
         ...generationPagePreviewsRef.current,
-        [pageId]: url
-          ? { ...current, status: "ready", url }
-          : { ...current, status: "error", url: undefined },
+        [source.pageId]: image
+          ? {
+              ...current,
+              status: "ready",
+              previewSourceFingerprint: image.preview_source_fingerprint,
+              imagePath: image.image_path,
+              imageUpload: image.image_upload,
+              receivedAtMs: Date.now(),
+            }
+          : {
+              ...current,
+              status: "error",
+              previewSourceFingerprint: undefined,
+              imagePath: undefined,
+              imageUpload: undefined,
+              receivedAtMs: undefined,
+            },
       };
       generationPagePreviewsRef.current = next;
       setGenerationPagePreviews(next);
@@ -1598,9 +1679,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
             workspace_dir: workspaceDir,
             page_id: source.pageId,
           });
-          applyPreview(source.pageId, image.image_upload?.url ?? "");
+          applyPreview(source, image);
         } catch {
-          applyPreview(source.pageId, "");
+          applyPreview(source, null);
         }
       },
     );
@@ -1617,10 +1698,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     });
   }
 
-  function resetGenerationProgress() {
+  function resetGenerationProgress(options: { preservePagePreviews?: boolean } = {}) {
     setCreateDeckProgress(null);
     setGenerationHistory([]);
-    resetGenerationPagePreviews();
+    if (!options.preservePagePreviews) resetGenerationPagePreviews();
     resetGenerationUiState();
   }
 
@@ -2417,17 +2498,23 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const refreshedWorkspace = backend
       ? await backend.openWorkspace({ workspace_dir: workspace.workspace_dir })
       : workspace;
-    applyWorkspace(refreshedWorkspace);
+    const assembled = backend
+      ? await assembleMeasuredReviewRender({
+          backend,
+          metadata: completion.result.rendered,
+          workspaceDir: refreshedWorkspace.workspace_dir,
+          previews: generationPagePreviewsRef.current,
+        })
+      : null;
+    if (assembled) {
+      generationPagePreviewsRef.current = assembled.previews;
+      setGenerationPagePreviews(assembled.previews);
+    }
+    const rendered = assembled?.result ?? completion.result.rendered;
+    applyWorkspace(refreshedWorkspace, { reviewRenderResult: rendered });
     setDeckTitle(completion.result.outline.title);
     setOutline(completion.result.outline.items);
     setPageProgress(completion.result.progress);
-    applyRenderedDeck(completion.result.rendered, completion.result.outline.items);
-    setReviewRender({
-      status: "ready",
-      result: completion.result.rendered,
-      error: "",
-      renderKey: workspaceReviewRenderKey(refreshedWorkspace),
-    });
     setPage("main");
     setHistory((items) => (items.at(-1) === "main" ? items : [...items, "main"]));
   }
@@ -3822,7 +3909,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     let generationRun: GenerationRunTransaction | null = null;
     const cancelSignal = beginCancellableGeneration();
     setLoading("refineDeck");
-    resetGenerationProgress();
+    resetGenerationProgress({ preservePagePreviews: true });
     try {
       const refreshedWorkspace = await refreshCurrentWorkspaceSnapshot();
       if (!refreshedWorkspace) return;
@@ -3894,7 +3981,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     let generationRun: GenerationRunTransaction | null = null;
     const cancelSignal = beginCancellableGeneration();
     setLoading("refineSlide");
-    resetGenerationProgress();
+    resetGenerationProgress({ preservePagePreviews: true });
     try {
       const refreshedWorkspace = await refreshCurrentWorkspaceSnapshot();
       if (!refreshedWorkspace) return;
@@ -4022,21 +4109,22 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         onProgress: (nextProgress) => setPageProgress(nextProgress),
       });
       if (!completedProgress) throw new Error("Final Deck render was cancelled.");
-      const result = await backend.getRenderedDeckHtml({
+      const metadata = await backend.getRenderedDeckHtml({
         workspace_dir: workspace.workspace_dir,
       });
+      const assembled = await assembleMeasuredReviewRender({
+        backend,
+        metadata,
+        workspaceDir: workspace.workspace_dir,
+        previews: generationPagePreviewsRef.current,
+      });
+      const result = assembled.result;
+      generationPagePreviewsRef.current = assembled.previews;
+      setGenerationPagePreviews(assembled.previews);
       const refreshedWorkspace = await backend.openWorkspace({
         workspace_dir: workspace.workspace_dir
       });
-      const renderKey = workspaceReviewRenderKey(refreshedWorkspace);
-      applyWorkspace(refreshedWorkspace);
-      applyRenderedDeck(result);
-      setReviewRender({
-        status: "ready",
-        result,
-        error: "",
-        renderKey
-      });
+      applyWorkspace(refreshedWorkspace, { reviewRenderResult: result });
       void backend.listWorkspaces().then(setWorkspaceScan).catch((error) => {
         console.warn(
           "Failed to refresh tasks after render",
@@ -4076,9 +4164,18 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }));
 
     try {
-      const result = await backend.getRenderedDeckHtml({
+      const metadata = await backend.getRenderedDeckHtml({
         workspace_dir: workspace.workspace_dir
       });
+      const assembled = await assembleMeasuredReviewRender({
+        backend,
+        metadata,
+        workspaceDir: workspace.workspace_dir,
+        previews: generationPagePreviewsRef.current,
+      });
+      const result = assembled.result;
+      generationPagePreviewsRef.current = assembled.previews;
+      setGenerationPagePreviews(assembled.previews);
       const renderKey = workspaceReviewRenderKey(workspace);
       applyRenderedDeck(result);
       setReviewRender({
@@ -4091,6 +4188,68 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       return result;
     } catch {
       return renderDeckHtmlForWorkspace(workspace, loadingKind);
+    }
+  }
+
+  async function refreshReviewPageImage(pageId: string): Promise<void> {
+    const workspace = currentWorkspaceRef.current;
+    const slide = reviewRender.result?.slides.find((entry) => entry.slide_id === pageId);
+    if (!backend || !workspace || !slide || reviewRender.status !== "ready") return;
+
+    const refreshKey = [
+      reviewRender.renderKey,
+      pageId,
+      slide.preview_source_fingerprint ?? slide.screenshot_path ?? "unknown",
+    ].join(":");
+    if (reviewPageImageRefreshAttemptsRef.current.has(refreshKey)) return;
+    reviewPageImageRefreshAttemptsRef.current.add(refreshKey);
+
+    try {
+      const image = await backend.getWorkspacePageImage({
+        workspace_dir: workspace.workspace_dir,
+        page_id: pageId,
+        force_upload_refresh: true,
+      });
+      if (
+        slide.preview_source_fingerprint &&
+        image.preview_source_fingerprint !== slide.preview_source_fingerprint
+      ) return;
+      if (
+        currentWorkspaceRef.current?.workspace_dir !== workspace.workspace_dir ||
+        workspaceReviewRenderKey(currentWorkspaceRef.current) !== reviewRender.renderKey
+      ) return;
+
+      const pageIndex = reviewRender.result?.slides.findIndex((entry) => entry.slide_id === pageId) ?? -1;
+      const nextPreview = {
+        pageId,
+        pageIndex,
+        title: slide.title,
+        screenshotPath: slide.screenshot_path ?? image.source_path,
+        previewSourceFingerprint: image.preview_source_fingerprint,
+        imagePath: image.image_path,
+        imageUpload: image.image_upload,
+        receivedAtMs: Date.now(),
+        status: "ready" as const,
+      };
+      generationPagePreviewsRef.current = {
+        ...generationPagePreviewsRef.current,
+        [pageId]: nextPreview,
+      };
+      setGenerationPagePreviews(generationPagePreviewsRef.current);
+      setReviewRender((current) => {
+        if (current.renderKey !== reviewRender.renderKey || !current.result) return current;
+        return {
+          ...current,
+          result: {
+            ...current.result,
+            slides: current.result.slides.map((entry) => entry.slide_id === pageId
+              ? { ...entry, screenshot_upload: image.image_upload }
+              : entry),
+          },
+        };
+      });
+    } catch {
+      showToast(t.review.renderFailed);
     }
   }
 
@@ -4113,6 +4272,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       ? result.manifest.screenshot_path
       : result.screenshot_path;
     const manuallyEdited = "manifest" in result;
+    const nextGenerationPreviews = { ...generationPagePreviewsRef.current };
+    delete nextGenerationPreviews[result.page_id];
+    generationPagePreviewsRef.current = nextGenerationPreviews;
+    setGenerationPagePreviews(nextGenerationPreviews);
     const patchProgress = (current: PageProgress | null): PageProgress | null => {
       if (!current) return current;
       const existingFinalRender = current.final_deck_render;
@@ -4158,6 +4321,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           ...slide,
           html_path: htmlPath,
           screenshot_path: screenshotPath,
+          preview_source_fingerprint: undefined,
           screenshot_upload: result.screenshot_upload,
           manually_edited: manuallyEdited,
         } : slide),
@@ -5194,6 +5358,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     rewriteCurrentSlide,
     changeCurrentSlideLayout,
     renderDeckHtml,
+    refreshReviewPageImage,
     applyManualPageUpdate,
     exportFile,
     downloadExportArtifact: downloadCurrentExportArtifact,

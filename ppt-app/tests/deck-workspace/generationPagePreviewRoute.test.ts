@@ -54,7 +54,7 @@ describe("generation page preview route", () => {
     assert.ok(tool, "the engine manifest must declare app_get_workspace_page_image");
     assert.deepEqual(
       tool.parameters.map((parameter) => [parameter.name, parameter.required === true]),
-      [["workspace_dir", true], ["page_id", true], ["width", false]],
+      [["workspace_dir", true], ["page_id", true], ["width", false], ["force_upload_refresh", false]],
     );
   });
 });

@@ -63,6 +63,7 @@ function renderReviewPage(
       setPreviewMode: () => undefined,
       reviewRender,
       renderDeckHtml: async () => undefined,
+      refreshPageImage: async () => undefined,
       onBack: () => undefined,
       updateDeckTitle: () => undefined,
       moveSlide: async () => undefined,

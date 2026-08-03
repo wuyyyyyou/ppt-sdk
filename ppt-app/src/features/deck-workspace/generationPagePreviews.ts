@@ -1,18 +1,24 @@
+import type { HostUploadRef } from "../../api/types";
 import type { DeckGenerationProgress } from "../deck-generation";
 
 /** Requests stay bounded so previews never starve the generation polling. */
 export const GENERATION_PAGE_PREVIEW_CONCURRENCY = 2;
+export const GENERATION_PAGE_PREVIEW_EXPIRY_SAFETY_MS = 2 * 60_000;
 
 export interface GenerationPagePreviewSource {
   pageId: string;
   pageIndex: number;
   title: string;
   screenshotPath: string;
+  renderSourceFingerprint?: string;
 }
 
 export interface GenerationPagePreviewEntry extends GenerationPagePreviewSource {
   status: "loading" | "ready" | "error";
-  url?: string;
+  previewSourceFingerprint?: string;
+  imagePath?: string;
+  imageUpload?: HostUploadRef;
+  receivedAtMs?: number;
 }
 
 export type GenerationPagePreviews = Record<string, GenerationPagePreviewEntry | undefined>;
@@ -34,6 +40,7 @@ export function selectGenerationPagePreviewSources(
         pageIndex: page.index,
         title: page.title,
         screenshotPath,
+        renderSourceFingerprint: page.render_source_sha256,
       }];
     })
     .sort((left, right) => left.pageIndex - right.pageIndex);
@@ -60,14 +67,26 @@ export function reconcileGenerationPagePreviews(
 
   for (const source of sources) {
     const existing = previous[source.pageId];
-    if (existing && existing.screenshotPath === source.screenshotPath) {
+    const sameRenderSource = Boolean(
+      existing &&
+      source.renderSourceFingerprint &&
+      existing.renderSourceFingerprint === source.renderSourceFingerprint,
+    );
+    if (existing && (sameRenderSource || existing.screenshotPath === source.screenshotPath)) {
       const refreshed: GenerationPagePreviewEntry = {
         ...existing,
         pageIndex: source.pageIndex,
         title: source.title,
+        screenshotPath: source.screenshotPath,
+        renderSourceFingerprint: source.renderSourceFingerprint,
       };
       previews[source.pageId] = refreshed;
-      if (refreshed.pageIndex !== existing.pageIndex || refreshed.title !== existing.title) {
+      if (
+        refreshed.pageIndex !== existing.pageIndex ||
+        refreshed.title !== existing.title ||
+        refreshed.screenshotPath !== existing.screenshotPath ||
+        refreshed.renderSourceFingerprint !== existing.renderSourceFingerprint
+      ) {
         changed = true;
       }
       continue;
@@ -105,4 +124,36 @@ export function resolveGenerationPreviewSelection(input: {
   }
   const readyEntries = entries.filter((entry) => entry.status === "ready");
   return readyEntries[readyEntries.length - 1] ?? entries[entries.length - 1];
+}
+
+export function isGenerationPagePreviewReusable(input: {
+  entry: GenerationPagePreviewEntry | undefined;
+  previewSourceFingerprint: string | undefined;
+  nowMs?: number;
+  safetyWindowMs?: number;
+}): boolean {
+  const { entry, previewSourceFingerprint } = input;
+  if (
+    !entry ||
+    entry.status !== "ready" ||
+    !entry.imageUpload?.url ||
+    !entry.previewSourceFingerprint ||
+    !previewSourceFingerprint ||
+    entry.previewSourceFingerprint !== previewSourceFingerprint
+  ) {
+    return false;
+  }
+
+  const nowMs = input.nowMs ?? Date.now();
+  const safetyWindowMs = input.safetyWindowMs ?? GENERATION_PAGE_PREVIEW_EXPIRY_SAFETY_MS;
+  const upload = entry.imageUpload;
+  if (upload.expires_at) {
+    const expiresAtMs = Date.parse(upload.expires_at);
+    return Number.isFinite(expiresAtMs) && expiresAtMs - nowMs >= safetyWindowMs;
+  }
+  if (typeof upload.expires_in === "number" && Number.isFinite(upload.expires_in)) {
+    if (upload.expires_in <= 0 || entry.receivedAtMs === undefined) return false;
+    return entry.receivedAtMs + upload.expires_in * 1000 - nowMs >= safetyWindowMs;
+  }
+  return true;
 }

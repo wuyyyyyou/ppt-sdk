@@ -225,6 +225,48 @@ export async function writeSlideScreenshots(
   });
 }
 
+export async function staticizeAndWriteSlideScreenshots(
+  slides: Array<{ htmlPath: string; outputPath: string }>,
+  purpose = "Page Source static HTML and slide screenshots",
+): Promise<void> {
+  const operationTimeoutMs = scaleBrowserOperationTimeout(
+    PAGE_BROWSER_OPERATION_TIMEOUT_MS * 2,
+    slides.length,
+  );
+  await withQueuedManagedPage(purpose, operationTimeoutMs, async (page) => {
+    if (!page.goto) {
+      throw new Error("Static HTML generation requires browser file navigation support");
+    }
+    await page.setViewport?.(DEFAULT_SLIDE_SCREENSHOT_VIEWPORT);
+    await installRenderReadinessTracking(page);
+
+    for (const slide of slides) {
+      const slideUrl = pathToFileURL(slide.htmlPath).href;
+      await page.goto(slideUrl, {
+        waitUntil: "domcontentloaded",
+        timeout: DEFAULT_RENDER_TIMEOUT_MS,
+      });
+      await waitForSlideRenderReady(page);
+      await waitForRenderReadiness(page, { timeoutMs: 30_000 });
+      const staticHtml = await serializeRenderedPageToStaticHtml(page, "page");
+      await writeFile(slide.htmlPath, staticHtml, "utf8");
+
+      // The screenshot must come from the persisted snapshot, not the live
+      // React document that produced it.
+      await page.goto(slideUrl, {
+        waitUntil: "domcontentloaded",
+        timeout: DEFAULT_RENDER_TIMEOUT_MS,
+      });
+      const slideElement = await waitForSlideRenderReady(page);
+      await waitForRenderReadiness(page, { timeoutMs: 30_000 });
+      const screenshot = await slideElement.screenshot({ path: slide.outputPath });
+      if (!screenshot) {
+        throw new Error(`Failed to write slide screenshot: ${slide.outputPath}`);
+      }
+    }
+  });
+}
+
 export async function staticizeHtmlDocuments(
   documents: Array<{ htmlPath: string; kind: StaticHtmlDocumentKind }>,
   purpose = "Page Source static HTML generation",

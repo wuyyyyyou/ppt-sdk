@@ -5302,6 +5302,7 @@ const DERIVED_IMAGE_QUALITY = 78;
 
 interface DerivedImage {
   path: string;
+  source_fingerprint: string;
   width: number | null;
   height: number | null;
   size_bytes: number;
@@ -5319,11 +5320,11 @@ async function deriveWorkspaceImage(input: {
   prefix: string;
   width: number;
 }): Promise<DerivedImage> {
-  const sourceStat = await stat(input.sourcePath);
-  // Keyed by the bytes it was derived from, so a re-render lands on a new name
-  // instead of serving a stale thumbnail.
+  const sourceFingerprint = await sha256FileHex(input.sourcePath);
+  // Keyed by source bytes rather than the absolute path so Shadow Workspace
+  // publication does not create a different visual version.
   const fingerprint = createHash("sha256")
-    .update(`${input.sourcePath}|${sourceStat.size}|${Math.trunc(sourceStat.mtimeMs)}|${input.width}`)
+    .update(`${sourceFingerprint}|${input.width}`)
     .digest("hex")
     .slice(0, 16);
   const targetPath = path.join(input.outputDir, `${input.prefix}-${fingerprint}.webp`);
@@ -5349,6 +5350,7 @@ async function deriveWorkspaceImage(input: {
   const dimensions = await readImageDimensions(targetPath);
   return {
     path: targetPath,
+    source_fingerprint: sourceFingerprint,
     width: dimensions.width,
     height: dimensions.height,
     size_bytes: targetStat.size,
@@ -5435,6 +5437,7 @@ export async function getAppWorkspacePageImage(
     page_index: pageIndex,
     page_status: page.status,
     source_path: sourcePath,
+    preview_source_fingerprint: image.source_fingerprint,
     image_path: image.path,
     width: image.width,
     height: image.height,
@@ -5508,6 +5511,8 @@ export async function getRenderedAppWorkspaceDeckHtml(
         title: normalizeString(manifestSlide.title) || pageId,
         html_path: htmlPath,
         screenshot_path: screenshotPath,
+        render_source_fingerprint: page.render_source_sha256,
+        preview_source_fingerprint: await sha256FileHex(screenshotPath),
         speaker_note: normalizeString(manifestSlide.speaker_note),
         manually_edited: Boolean(await readManualPageRevision(workspace.workspace_dir, pageId)),
       };

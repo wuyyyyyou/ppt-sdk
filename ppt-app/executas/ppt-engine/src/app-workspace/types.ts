@@ -891,6 +891,7 @@ export interface GetAppWorkspacePageImageResult {
   page_index: number;
   page_status: string;
   source_path: string;
+  preview_source_fingerprint: string;
   image_path: string;
   width: number | null;
   height: number | null;
@@ -1340,6 +1341,8 @@ export interface RenderAppWorkspaceDeckHtmlResult {
     title: string;
     html_path: string;
     screenshot_path: string;
+    render_source_fingerprint?: string;
+    preview_source_fingerprint: string;
     screenshot_url?: string;
     preview_url?: string;
     speaker_note: string;
