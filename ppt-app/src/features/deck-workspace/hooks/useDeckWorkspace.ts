@@ -2512,6 +2512,16 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
     const rendered = assembled?.result ?? completion.result.rendered;
     applyWorkspace(refreshedWorkspace, { reviewRenderResult: rendered });
+    // The successful completion is authoritative for this run. The Workspace
+    // snapshot can briefly lag the committed Final Deck Render, so do not let
+    // `applyWorkspace`'s recovery gate keep a successful run on Generating.
+    applyRenderedDeck(rendered, completion.result.outline.items);
+    setReviewRender({
+      status: "ready",
+      result: rendered,
+      error: "",
+      renderKey: workspaceReviewRenderKey(refreshedWorkspace),
+    });
     setDeckTitle(completion.result.outline.title);
     setOutline(completion.result.outline.items);
     setPageProgress(completion.result.progress);
