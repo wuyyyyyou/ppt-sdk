@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { collectTextParts } from '../utils.js';
 import { exportToPptx } from '../index.js';
 import { getProcessedImage } from '../image-processor.js';
@@ -276,5 +276,96 @@ describe('Bug 4: Image opacity is preserved in PPTX', () => {
     expect(mockAddShape.mock.calls[0][1].fill).toMatchObject({ color: 'F5F1E3', transparency: 0 });
     expect(warning).toHaveBeenCalledOnce();
     warning.mockRestore();
+  });
+});
+
+describe('Bug 5: Browser-rendered single-line text must not re-wrap in PPTX', () => {
+  let rangeSpy;
+
+  function setRect(element, { width = 960, height = 540, left = 0, top = 0 } = {}) {
+    element.getBoundingClientRect = () => ({
+      width,
+      height,
+      left,
+      top,
+      right: left + width,
+      bottom: top + height,
+      x: left,
+      y: top,
+    });
+  }
+
+  function mockTextClientRects(rects) {
+    rangeSpy = vi.spyOn(document, 'createRange').mockImplementation(() => ({
+      selectNode: vi.fn(),
+      selectNodeContents: vi.fn(),
+      getClientRects: () => rects,
+      getBoundingClientRect: () => rects[0] || { width: 0, height: 0, left: 0, top: 0, right: 0, bottom: 0 },
+      detach: vi.fn(),
+    }));
+  }
+
+  async function exportTextElement(element) {
+    const container = document.createElement('div');
+    container.style.width = '960px';
+    container.style.height = '540px';
+    setRect(container);
+    setRect(element, { width: 380, height: 40, left: 20, top: 20 });
+    container.appendChild(element);
+    document.body.appendChild(container);
+
+    mockAddText.mockClear();
+    await exportToPptx(container, { skipDownload: true, skipNormalize: true });
+    document.body.removeChild(container);
+
+    const call = mockAddText.mock.calls.find(([parts]) =>
+      Array.isArray(parts) && parts.map((part) => part.text).join('').includes(element.textContent.trim())
+    );
+    expect(call).toBeDefined();
+    return call[1];
+  }
+
+  afterEach(() => {
+    rangeSpy?.mockRestore();
+    rangeSpy = undefined;
+  });
+
+  it('disables wrapping when multiple inline fragments share one visual line', async () => {
+    const element = document.createElement('div');
+    element.innerHTML = '<strong>世界地图：</strong><span>红土大陆、伟大航路与四大海域</span>';
+    mockTextClientRects([
+      { width: 80, height: 20, left: 20, top: 20, right: 100, bottom: 40 },
+      { width: 300, height: 20, left: 100, top: 20.25, right: 400, bottom: 40.25 },
+    ]);
+
+    const options = await exportTextElement(element);
+
+    expect(options.wrap).toBe(false);
+  });
+
+  it('keeps wrapping enabled when browser layout contains multiple visual lines', async () => {
+    const element = document.createElement('div');
+    element.textContent = '第一行文字 第二行文字';
+    mockTextClientRects([
+      { width: 180, height: 20, left: 20, top: 20, right: 200, bottom: 40 },
+      { width: 120, height: 20, left: 20, top: 42, right: 140, bottom: 62 },
+    ]);
+
+    const options = await exportTextElement(element);
+
+    expect(options.wrap).toBe(true);
+  });
+
+  it('also disables wrapping for a standalone text node rendered on one line', async () => {
+    const element = document.createElement('div');
+    element.appendChild(document.createTextNode('作品概况'));
+    const emptyBlock = document.createElement('div');
+    emptyBlock.style.display = 'block';
+    element.appendChild(emptyBlock);
+    mockTextClientRects([{ width: 56, height: 20, left: 20, top: 20, right: 76, bottom: 40 }]);
+
+    const options = await exportTextElement(element);
+
+    expect(options.wrap).toBe(false);
   });
 });

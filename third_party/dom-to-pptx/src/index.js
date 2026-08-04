@@ -911,6 +911,82 @@ function countParagraphs(node, scale) {
   return count;
 }
 
+function countRenderedTextLines(node) {
+  if (!node || typeof document?.createRange !== 'function') return null;
+
+  const range = document.createRange();
+  try {
+    range.selectNodeContents(node);
+    if (typeof range.getClientRects !== 'function') return null;
+
+    const fragments = Array.from(range.getClientRects())
+      .map((rect) => {
+        const left = Number(rect.left);
+        const top = Number(rect.top);
+        const right = Number(rect.right);
+        const bottom = Number(rect.bottom);
+        const width = Number.isFinite(Number(rect.width)) ? Number(rect.width) : right - left;
+        const height = Number.isFinite(Number(rect.height)) ? Number(rect.height) : bottom - top;
+        return { left, top, right, bottom, width, height };
+      })
+      .filter(
+        (rect) =>
+          Number.isFinite(rect.left) &&
+          Number.isFinite(rect.top) &&
+          Number.isFinite(rect.right) &&
+          Number.isFinite(rect.bottom) &&
+          rect.width > 0 &&
+          rect.height > 0
+      )
+      .sort((a, b) => a.top - b.top || a.left - b.left);
+
+    if (fragments.length === 0) return null;
+
+    const lines = [];
+    for (const fragment of fragments) {
+      const fragmentCenter = (fragment.top + fragment.bottom) / 2;
+      let matchingLine = null;
+
+      for (const line of lines) {
+        const overlap = Math.min(line.bottom, fragment.bottom) - Math.max(line.top, fragment.top);
+        const minHeight = Math.min(line.bottom - line.top, fragment.height);
+        const centerDelta = Math.abs((line.top + line.bottom) / 2 - fragmentCenter);
+        const hasMeaningfulOverlap = overlap >= Math.max(0.5, minHeight * 0.25);
+        const hasNearlyEqualCenter = centerDelta <= Math.max(0.75, minHeight * 0.15);
+
+        if (hasMeaningfulOverlap || hasNearlyEqualCenter) {
+          matchingLine = line;
+          break;
+        }
+      }
+
+      if (matchingLine) {
+        matchingLine.top = Math.min(matchingLine.top, fragment.top);
+        matchingLine.bottom = Math.max(matchingLine.bottom, fragment.bottom);
+      } else {
+        lines.push({ top: fragment.top, bottom: fragment.bottom });
+      }
+    }
+
+    return lines.length;
+  } catch {
+    return null;
+  } finally {
+    range.detach?.();
+  }
+}
+
+function shouldWrapText(node, style, writingModeVert = null, rotation = 0) {
+  if (style.whiteSpace === 'nowrap' || style.whiteSpace === 'pre') return false;
+
+  // Range client rects are viewport-axis-aligned after transforms. Rotated and
+  // vertical text therefore need their existing CSS-based fallback rather than
+  // being misclassified by horizontal visual-line grouping.
+  if (rotation !== 0 || (writingModeVert && writingModeVert !== 'none')) return true;
+
+  return countRenderedTextLines(node) !== 1;
+}
+
 function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, computedStyle, globalOptions = {}) {
   // 1. Text Node Handling
   if (node.nodeType === 3) {
@@ -928,6 +1004,8 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
     range.detach();
 
     const style = window.getComputedStyle(parent);
+    const rotation = getRotation(style.transform);
+    const writingModeVert = getWritingModeVert(style.writingMode, style.textOrientation);
     const widthPx = rect.width;
     const heightPx = rect.height;
     const unrotatedW = widthPx * PX_TO_INCH * config.scale;
@@ -968,7 +1046,7 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
             h: unrotatedH,
             margin: 0,
             autoFit: true,
-            wrap: !(style.whiteSpace === 'nowrap' || style.whiteSpace === 'pre'),
+            wrap: shouldWrapText(node, style, writingModeVert, rotation),
           },
         },
       ],
@@ -1310,7 +1388,7 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
           // Apply CSS padding as PPTX text box inset margin [top, right, bottom, left] in points
           margin: listMargin,
           autoFit: true,
-          wrap: !(style.whiteSpace === 'nowrap' || style.whiteSpace === 'pre'),
+          wrap: shouldWrapText(node, style, writingModeVert, rotation),
           vert: writingModeVert,
           ...(writingModeVert && { textDirection: mapVertToTextDirection(writingModeVert) }),
         },
@@ -1607,7 +1685,13 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
         padding[0] * 72, // left
       ];
 
-      textPayload = { text: textParts, align, valign, margin };
+      textPayload = {
+        text: textParts,
+        align,
+        valign,
+        margin,
+        wrap: shouldWrapText(node, style, writingModeVert, rotation),
+      };
     }
   }
 
@@ -1800,7 +1884,7 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
           valign: textPayload.valign,
           rotate: rotation,
           margin: textPayload.margin,
-          wrap: !(style.whiteSpace === 'nowrap' || style.whiteSpace === 'pre'),
+          wrap: textPayload.wrap,
           autoFit: true,
           vert: writingModeVert,
           ...(writingModeVert && { textDirection: mapVertToTextDirection(writingModeVert) }),
@@ -1896,7 +1980,7 @@ function prepareRenderItem(node, config, domOrder, pptx, effectiveZIndex, comput
           align: textPayload.align,
           valign: textPayload.valign,
           margin: textPayload.margin,
-          wrap: !(style.whiteSpace === 'nowrap' || style.whiteSpace === 'pre'),
+          wrap: textPayload.wrap,
           autoFit: true,
           vert: writingModeVert,
           ...(writingModeVert && { textDirection: mapVertToTextDirection(writingModeVert) }),
