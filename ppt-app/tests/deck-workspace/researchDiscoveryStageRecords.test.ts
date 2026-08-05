@@ -82,4 +82,33 @@ describe("Linear Research Stage Records", () => {
     assert.equal(group?.records[2]?.state, "active");
     assert.equal(group?.records[3]?.state, "pending");
   });
+
+  it("formats structured activity in both locales and hides full source URLs", () => {
+    const records: NonNullable<DeckGenerationProgress["researchDiscovery"]>["records"] = [
+      { phase: "web-decision", state: "completed" },
+      {
+        phase: "web-collection",
+        state: "running",
+        activity: { kind: "web-fetch", completed: 2, total: 4 },
+        queries: [{
+          kind: "web",
+          query: "EV market 2026",
+          status: "collected",
+          resultCount: 6,
+          fetchCount: 2,
+          sources: [{ title: "IEA report", url: "https://example.com/private/path?token=secret" }],
+        }],
+      },
+      { phase: "visual-decision", state: "waiting" },
+      { phase: "visual-collection", state: "waiting" },
+    ];
+    const en = buildResearchDiscoveryStageRecords({ t: messages.en, progress: makeProgress("running", records) });
+    const zh = buildResearchDiscoveryStageRecords({ t: messages.zh, progress: makeProgress("running", records) });
+
+    assert.equal(en?.records[1]?.activities[0], "Fetching web pages: 2/4 completed");
+    assert.equal(zh?.records[1]?.activities[0], "正在抓取网页正文：已完成 2/4");
+    assert.equal(en?.records[1]?.queryLines[0], "Collected: EV market 2026 (6 results · 2 fetched)");
+    assert.deepEqual(en?.records[1]?.sourceLines, ["IEA report"]);
+    assert.equal(JSON.stringify(en).includes("token=secret"), false);
+  });
 });

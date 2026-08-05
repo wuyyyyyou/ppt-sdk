@@ -8,6 +8,7 @@ import type {
   PagePlanItem,
   PageProgress,
   ResearchDiscoveryProgress,
+  ResearchDiscoveryProgressActivity,
   ResearchDiscoveryProgressPhase,
   ResearchDiscoveryProgressPhaseRecord,
   ResearchDiscoveryProgressQuery,
@@ -105,6 +106,7 @@ export interface DeckGenerationStream {
 
 export type {
   ResearchDiscoveryProgress,
+  ResearchDiscoveryProgressActivity,
   ResearchDiscoveryProgressPhase,
   ResearchDiscoveryProgressPhaseRecord,
   ResearchDiscoveryProgressQuery,

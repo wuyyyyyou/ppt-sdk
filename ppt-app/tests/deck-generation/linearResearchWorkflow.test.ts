@@ -9,6 +9,7 @@ import type {
   SharedResearchProgressOperation,
 } from "../../src/api/types.ts";
 import {
+  buildLinearResearchUiProgress,
   chunkSharedResearchProgressOperations,
   runLinearSharedResearch,
 } from "../../src/features/deck-generation/linearResearchWorkflow.ts";
@@ -248,6 +249,62 @@ function createRuntime(overrides: Record<string, unknown> = {}) {
 }
 
 describe("Linear Shared Research workflow", () => {
+  it("projects bounded live Web and image progress from the checkpoint", () => {
+    const checkpoint = {
+      schema_version: 2,
+      status: "running",
+      stages: {
+        web_decision: "completed",
+        web_research: "running",
+        image_decision: "completed",
+        image_research: "running",
+        image_search: "completed",
+        image_deduplication: "completed",
+        image_prefetch: "completed",
+        image_analysis: "running",
+        image_import: "running",
+      },
+      web: {
+        decision: { needs_search: true, queries: ["market evidence", "policy update"], rationale: "Current sources are needed." },
+        searches: [
+          { query: "market evidence", status: "completed", result: [{ result_id: "web-q1-r1", title: "Official report", url: "https://source.test/report", snippet: "Evidence", site: "source.test" }] },
+          { query: "policy update", status: "running" },
+        ],
+      },
+      image: {
+        decision: { needs_search: true, queries: ["factory photo"] },
+        searches: [{ query: "factory photo", status: "completed", result: [] }],
+        candidates: [{
+          candidate_id: "image-1",
+          query: "factory photo",
+          image_url: "https://images.test/factory.jpg",
+          source_url: "https://source.test/factory",
+          use_in_ppt: true,
+          description: "Factory",
+          reason: "Relevant",
+          local_download_status: "completed",
+          upload_status: "completed",
+          analysis_status: "completed",
+          import_status: "imported",
+        }],
+        analysis_batches: [
+          { batch_id: "batch-1", candidate_ids: ["image-1"], status: "completed", attempt: 1, interaction_ids: [] },
+          { batch_id: "batch-2", candidate_ids: [], status: "running", attempt: 1, interaction_ids: [] },
+        ],
+      },
+    } as Parameters<typeof buildLinearResearchUiProgress>[0];
+
+    const progress = buildLinearResearchUiProgress(checkpoint, "2026-08-05T00:00:00.000Z");
+    const web = progress.records.find((record) => record.phase === "web-collection");
+    const image = progress.records.find((record) => record.phase === "visual-collection");
+
+    assert.deepEqual(web?.activity, { kind: "web-search", completed: 1, total: 2 });
+    assert.deepEqual(web?.queries?.map((query) => query.status), ["collected", "running"]);
+    assert.deepEqual(image?.activity, { kind: "image-analysis", completed: 1, total: 2, selected: 1 });
+    assert.equal(progress.summary.visualAssets, 1);
+    assert.equal(JSON.stringify(progress).includes("images.test"), false);
+  });
+
   it("fetches selected web pages one URL at a time in order", async () => {
     const urls = [
       "https://source.test/first",
@@ -302,6 +359,35 @@ describe("Linear Shared Research workflow", () => {
 
     assert.deepEqual(fetchCalls, urls.map((url) => ({ urls: [url], max_chars: 8000 })));
     assert.equal(maxActiveFetches, 1);
+  });
+
+  it("continues fetching the remaining selected pages after one page fails", async () => {
+    const urls = ["https://source.test/failing", "https://source.test/available"];
+    const fetchCalls: string[] = [];
+    const { runtime, context } = createRuntime({
+      researchAiClient: {
+        decideWebResearch: async () => ({ needs_search: true, queries: ["market evidence"] }),
+        selectWebFetchResults: async (input: { results: Array<{ result_id: string }> }) => input.results.map((result) => result.result_id),
+        summarizeWebResearch: async () => "Market evidence summary.",
+        decideImageResearch: async () => ({ needs_search: false, queries: [] }),
+      },
+      researchWebClient: {
+        search: async () => ({ results: urls.map((url, index) => ({ title: `Source ${index + 1}`, url, snippet: "Evidence", site: "source.test" })) }),
+        fetch: async ({ urls: requested }: { urls: string[] }) => {
+          const url = requested[0] ?? "";
+          fetchCalls.push(url);
+          if (url.endsWith("failing")) throw new Error("source unavailable");
+          return { pages: [{ url, ok: true, content: "Available evidence" }] };
+        },
+        imageSearch: async () => ({ results: [] }),
+      },
+    });
+
+    await runLinearSharedResearch(runtime, { resume: false });
+
+    assert.deepEqual(fetchCalls, urls);
+    const fetchedPages = (context.progress as { web?: { fetched_pages?: Array<{ ok: boolean }> } }).web?.fetched_pages ?? [];
+    assert.deepEqual(fetchedPages.map((page) => page.ok), [false, true]);
   });
 
   it("splits a five-query image checkpoint into patches below 32 KiB", () => {

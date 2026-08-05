@@ -1293,7 +1293,7 @@ export interface ResearchDiscoveryProgressSource {
 export interface ResearchDiscoveryProgressQuery {
   kind: "web" | "visual";
   query: string;
-  status: "collected" | "gap" | "error" | "skipped_duplicate";
+  status: "running" | "collected" | "gap" | "error" | "skipped_duplicate";
   resultCount?: number;
   fetchCount?: number;
   downloadCount?: number;
@@ -1319,6 +1319,35 @@ export interface ResearchDiscoveryProgressSummary {
   rejectedMaterial: number;
 }
 
+export type ResearchDiscoveryProgressActivityKind =
+  | "web-decision"
+  | "web-search"
+  | "web-fetch-selection"
+  | "web-fetch"
+  | "web-synthesis"
+  | "web-publish"
+  | "web-complete"
+  | "web-skipped"
+  | "image-decision"
+  | "image-search"
+  | "image-deduplication"
+  | "image-download"
+  | "image-prepare"
+  | "image-analysis"
+  | "image-import"
+  | "image-publish"
+  | "image-complete"
+  | "image-skipped";
+
+export interface ResearchDiscoveryProgressActivity {
+  kind: ResearchDiscoveryProgressActivityKind;
+  completed?: number;
+  total?: number;
+  count?: number;
+  selected?: number;
+  failed?: number;
+}
+
 export interface ResearchDiscoveryProgressPhaseRecord {
   phase: ResearchDiscoveryProgressPhase;
   state: ResearchDiscoveryProgressState;
@@ -1327,6 +1356,7 @@ export interface ResearchDiscoveryProgressPhaseRecord {
   queries?: ResearchDiscoveryProgressQuery[];
   sources?: ResearchDiscoveryProgressSource[];
   visualAssets?: ResearchDiscoveryProgressVisualAsset[];
+  activity?: ResearchDiscoveryProgressActivity;
   activities?: string[];
   lines?: string[];
   gaps?: string[];

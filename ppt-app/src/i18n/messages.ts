@@ -308,7 +308,28 @@ export interface Messages {
       fetchCount: string;
       downloadCount: string;
       visualEvidenceNote: string;
-      queryStatuses: Record<"collected" | "gap" | "error" | "skipped_duplicate", string>;
+      queryStatuses: Record<"running" | "collected" | "gap" | "error" | "skipped_duplicate", string>;
+      activities: Record<
+        | "webDecision"
+        | "webSearch"
+        | "webFetchSelection"
+        | "webFetch"
+        | "webSynthesis"
+        | "webPublish"
+        | "webComplete"
+        | "webSkipped"
+        | "imageDecision"
+        | "imageSearch"
+        | "imageDeduplication"
+        | "imageDownload"
+        | "imagePrepare"
+        | "imageAnalysis"
+        | "imageImport"
+        | "imagePublish"
+        | "imageComplete"
+        | "imageSkipped",
+        string
+      >;
       counts: Record<"facts" | "derivedInsights" | "visualAssets" | "gaps" | "rejectedMaterial", string>;
       phases: Record<
         | "web-decision"
@@ -1022,10 +1043,31 @@ export const messages: Record<Locale, Messages> = {
         downloadCount: "{count} downloaded",
         visualEvidenceNote: "Selected images are visual evidence only; text or charts inside an image are not factual grounding by themselves.",
         queryStatuses: {
+          running: "Running",
           collected: "Collected",
           gap: "Gap",
           error: "Error",
           skipped_duplicate: "Skipped duplicate"
+        },
+        activities: {
+          webDecision: "Deciding whether new web research is needed",
+          webSearch: "Searching web sources: {completed}/{total} queries completed",
+          webFetchSelection: "Selecting sources to read in full",
+          webFetch: "Fetching web pages: {completed}/{total} completed",
+          webSynthesis: "Organizing the collected web material",
+          webPublish: "Saving the web research result",
+          webComplete: "Web research complete: {count} results, {completed} sources fetched",
+          webSkipped: "Existing material is sufficient; no new web search is needed",
+          imageDecision: "Deciding whether new image material is needed",
+          imageSearch: "Searching image candidates: {completed}/{total} queries completed",
+          imageDeduplication: "Merging duplicate image candidates: {count} found",
+          imageDownload: "Downloading image candidates: {completed}/{total} completed, {failed} failed",
+          imagePrepare: "Preparing downloaded images for assessment: {completed}/{total} completed, {failed} failed",
+          imageAnalysis: "Assessing image candidates: {completed}/{total} batches completed, {selected} selected",
+          imageImport: "Saving selected images: {completed}/{total} completed, {failed} failed",
+          imagePublish: "Saving the selected image catalog",
+          imageComplete: "Image research complete: {selected} selected, {completed} saved",
+          imageSkipped: "No new image material is needed for this run"
         },
         counts: {
           facts: "Facts",
@@ -1745,10 +1787,31 @@ export const messages: Record<Locale, Messages> = {
         downloadCount: "下载 {count} 张",
         visualEvidenceNote: "入选图片只作为视觉素材；图片里的文字、图表或结论本身不构成事实依据。",
         queryStatuses: {
+          running: "进行中",
           collected: "已收集",
           gap: "有缺口",
           error: "出错",
           skipped_duplicate: "跳过重复"
+        },
+        activities: {
+          webDecision: "正在判断是否需要补充网页资料",
+          webSearch: "正在搜索网页资料：已完成 {completed}/{total} 个搜索词",
+          webFetchSelection: "正在选择需要阅读全文的来源",
+          webFetch: "正在抓取网页正文：已完成 {completed}/{total}",
+          webSynthesis: "正在整理已收集的网页资料",
+          webPublish: "正在保存网页研究结果",
+          webComplete: "网页研究完成：获得 {count} 条结果，抓取 {completed} 个来源",
+          webSkipped: "现有资料已足够，本轮无需新增网页搜索",
+          imageDecision: "正在判断是否需要补充图片素材",
+          imageSearch: "正在搜索图片候选：已完成 {completed}/{total} 个搜索词",
+          imageDeduplication: "正在合并重复图片：已找到 {count} 个候选",
+          imageDownload: "正在下载图片候选：已完成 {completed}/{total}，失败 {failed}",
+          imagePrepare: "正在准备图片分析附件：已完成 {completed}/{total}，失败 {failed}",
+          imageAnalysis: "正在判断图片可用性：已完成 {completed}/{total} 批，入选 {selected} 张",
+          imageImport: "正在保存入选图片：已完成 {completed}/{total}，失败 {failed}",
+          imagePublish: "正在保存入选图片目录",
+          imageComplete: "图片研究完成：入选 {selected} 张，已保存 {completed} 张",
+          imageSkipped: "本轮无需新增图片素材"
         },
         counts: {
           facts: "事实",

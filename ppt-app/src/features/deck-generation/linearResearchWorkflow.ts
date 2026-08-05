@@ -2,7 +2,9 @@ import type { AnnaAgentImageAttachment } from "../../runtime/annaRuntime";
 import { isAgentRunCancelledError } from "../../agent/agentClient";
 import type {
   ResearchDiscoveryProgress,
+  ResearchDiscoveryProgressActivity,
   ResearchDiscoveryProgressPhaseRecord,
+  ResearchDiscoveryProgressQuery,
   SharedResearchContextResult,
   SharedResearchImageBatch,
   SharedResearchImageCandidate,
@@ -299,23 +301,194 @@ function createConcurrencyLimiter(concurrency: number) {
   };
 }
 
+function progressPublishInterval(total: number) {
+  return Math.max(1, Math.ceil(total / 6));
+}
+
 function progressState(state: SharedResearchStageState): ResearchDiscoveryProgressPhaseRecord["state"] {
   return state;
 }
 
-function uiProgress(checkpoint: LinearResearchCheckpoint): ResearchDiscoveryProgress {
-  const mapping: Array<{ key: StageKey; phase: ResearchDiscoveryProgressPhaseRecord["phase"] }> = [
-    { key: "web_decision", phase: "web-decision" },
-    { key: "web_research", phase: "web-collection" },
-    { key: "image_decision", phase: "visual-decision" },
-    { key: "image_research", phase: "visual-collection" },
+export function buildLinearResearchUiProgress(
+  checkpoint: LinearResearchCheckpoint,
+  now = new Date().toISOString(),
+): ResearchDiscoveryProgress {
+  const webQueries = projectWebQueries(checkpoint);
+  const imageQueries = projectImageQueries(checkpoint);
+  const webSources = webQueries.flatMap((query) => query.sources ?? []).slice(0, 8);
+  const imageCandidates = checkpoint.image?.candidates ?? [];
+  const importedImages = imageCandidates.filter((candidate) => candidate.import_status === "imported").length;
+  const gaps = [...(checkpoint.web?.gaps ?? []), ...(checkpoint.image?.gaps ?? [])];
+  const records: ResearchDiscoveryProgressPhaseRecord[] = [
+    {
+      phase: "web-decision",
+      state: progressState(checkpoint.stages.web_decision),
+      activity: checkpoint.stages.web_decision === "running" ? { kind: "web-decision" } : undefined,
+      rationale: trimUiText(checkpoint.web?.decision?.rationale, 320),
+      gaps: checkpoint.stages.web_decision === "warning" ? checkpoint.web?.gaps?.slice(0, 6) : undefined,
+      updatedAt: now,
+    },
+    {
+      phase: "web-collection",
+      state: progressState(checkpoint.stages.web_research),
+      activity: webActivity(checkpoint),
+      queries: checkpoint.stages.web_research === "waiting" ? undefined : webQueries,
+      sources: webSources,
+      gaps: checkpoint.web?.gaps?.slice(0, 8),
+      counts: checkpoint.web?.gaps?.length ? { gaps: checkpoint.web.gaps.length } : undefined,
+      updatedAt: now,
+    },
+    {
+      phase: "visual-decision",
+      state: progressState(checkpoint.stages.image_decision),
+      activity: checkpoint.stages.image_decision === "running" ? { kind: "image-decision" } : undefined,
+      rationale: trimUiText(checkpoint.image?.decision?.rationale, 320),
+      gaps: checkpoint.stages.image_decision === "warning" ? checkpoint.image?.gaps?.slice(0, 6) : undefined,
+      updatedAt: now,
+    },
+    {
+      phase: "visual-collection",
+      state: progressState(checkpoint.stages.image_research),
+      activity: imageActivity(checkpoint),
+      queries: checkpoint.stages.image_research === "waiting" ? undefined : imageQueries,
+      gaps: checkpoint.image?.gaps?.slice(0, 8),
+      counts: checkpoint.stages.image_research === "waiting"
+        ? undefined
+        : { visualAssets: importedImages, ...(checkpoint.image?.gaps?.length ? { gaps: checkpoint.image.gaps.length } : {}) },
+      updatedAt: now,
+    },
   ];
   return {
     status: progressState(checkpoint.status),
-    records: mapping.map(({ key, phase }) => ({ phase, state: progressState(checkpoint.stages[key]) })),
-    summary: { facts: 0, derivedInsights: 0, visualAssets: 0, gaps: 0, rejectedMaterial: 0 },
-    updatedAt: new Date().toISOString(),
+    records,
+    summary: { facts: 0, derivedInsights: 0, visualAssets: importedImages, gaps: gaps.length, rejectedMaterial: 0 },
+    updatedAt: now,
   };
+}
+
+function projectWebQueries(checkpoint: LinearResearchCheckpoint): ResearchDiscoveryProgressQuery[] {
+  const decisionQueries = checkpoint.web?.decision?.queries ?? [];
+  const searches = new Map((checkpoint.web?.searches ?? []).map((search) => [search.query, search]));
+  const fetchedPages = checkpoint.web?.fetched_pages ?? [];
+  const fetchedUrls = new Set(fetchedPages
+    .filter((page) => page.ok)
+    .flatMap((page) => [page.url, page.final_url].filter((value): value is string => Boolean(value))));
+  return decisionQueries.slice(0, 8).map((query) => {
+    const search = searches.get(query);
+    const results = search?.result ?? [];
+    const fetchedResults = results.filter((result) => fetchedUrls.has(result.url));
+    return {
+      kind: "web",
+      query: trimUiText(query, 180) ?? query,
+      status: queryStatus(search),
+      ...(search ? { resultCount: results.length } : {}),
+      ...(fetchedResults.length > 0 ? { fetchCount: fetchedResults.length } : {}),
+      sources: fetchedResults
+        .map((result) => ({ title: trimUiText(result.title, 160) }))
+        .filter((source) => Boolean(source.title))
+        .slice(0, 8),
+    };
+  });
+}
+
+function projectImageQueries(checkpoint: LinearResearchCheckpoint): ResearchDiscoveryProgressQuery[] {
+  const decisionQueries = checkpoint.image?.decision?.queries ?? [];
+  const searches = new Map((checkpoint.image?.searches ?? []).map((search) => [search.query, search]));
+  const candidates = checkpoint.image?.candidates ?? [];
+  return decisionQueries.slice(0, 8).map((query) => {
+    const search = searches.get(query);
+    const downloaded = candidates.filter((candidate) => (
+      (candidate.matched_queries ?? [candidate.query]).includes(query) && candidate.local_download_status === "completed"
+    )).length;
+    return {
+      kind: "visual",
+      query: trimUiText(query, 180) ?? query,
+      status: queryStatus(search),
+      ...(search ? { resultCount: search.result?.length ?? 0 } : {}),
+      ...(downloaded > 0 ? { downloadCount: downloaded } : {}),
+    };
+  });
+}
+
+function queryStatus(search: QueryCheckpoint<unknown> | undefined): ResearchDiscoveryProgressQuery["status"] {
+  if (!search || search.status === "running") return "running";
+  if (search.status === "completed") return "collected";
+  return search.error ? "error" : "gap";
+}
+
+function webActivity(checkpoint: LinearResearchCheckpoint): ResearchDiscoveryProgressActivity | undefined {
+  const state = checkpoint.stages.web_research;
+  const decision = checkpoint.web?.decision;
+  if (state === "waiting") return undefined;
+  if (state === "skipped" || decision?.needs_search === false) return { kind: "web-skipped" };
+  const searches = checkpoint.web?.searches ?? [];
+  const queryTotal = decision?.queries.length ?? 0;
+  const completedQueries = searches.filter((search) => search.status !== "running").length;
+  if (state === "running" && (searches.length < queryTotal || searches.some((search) => search.status === "running"))) {
+    return { kind: "web-search", completed: completedQueries, total: queryTotal };
+  }
+  const allResults = searches.flatMap((search) => search.result ?? []);
+  if (state === "running" && checkpoint.web?.fetch_result_ids === undefined) return { kind: "web-fetch-selection" };
+  const selectedUrls = new Set((checkpoint.web?.fetch_result_ids ?? []).map((resultId) => allResults.find((result) => result.result_id === resultId)?.url).filter((value): value is string => Boolean(value)));
+  const fetchedPages = checkpoint.web?.fetched_pages ?? [];
+  const fetchedUrls = new Set(fetchedPages.map((page) => page.url));
+  const fetchedCount = [...selectedUrls].filter((url) => fetchedUrls.has(url)).length;
+  if (state === "running" && fetchedCount < selectedUrls.size) {
+    return { kind: "web-fetch", completed: fetchedCount, total: selectedUrls.size };
+  }
+  if (state === "running" && !checkpoint.web?.prepared_batch) return { kind: "web-synthesis" };
+  if (state === "running" && !checkpoint.web?.written) return { kind: "web-publish" };
+  return { kind: "web-complete", count: allResults.length, completed: fetchedPages.filter((page) => page.ok).length };
+}
+
+function imageActivity(checkpoint: LinearResearchCheckpoint): ResearchDiscoveryProgressActivity | undefined {
+  const state = checkpoint.stages.image_research;
+  const decision = checkpoint.image?.decision;
+  if (state === "waiting") return undefined;
+  if (state === "skipped" || decision?.needs_search === false) return { kind: "image-skipped" };
+  const searches = checkpoint.image?.searches ?? [];
+  const queryTotal = decision?.queries.length ?? 0;
+  if (checkpoint.stages.image_search === "waiting" || checkpoint.stages.image_search === "running") {
+    return { kind: "image-search", completed: searches.filter((search) => search.status !== "running").length, total: queryTotal };
+  }
+  const candidates = checkpoint.image?.candidates ?? [];
+  if (checkpoint.stages.image_deduplication === "running") {
+    return { kind: "image-deduplication", count: searches.reduce((count, search) => count + (search.result?.length ?? 0), 0) };
+  }
+  if (checkpoint.stages.image_prefetch === "waiting" || checkpoint.stages.image_prefetch === "running") {
+    const downloaded = candidates.filter((candidate) => candidate.local_download_status === "completed" || candidate.local_download_status === "failed").length;
+    const downloadFailed = candidates.filter((candidate) => candidate.local_download_status === "failed").length;
+    if (downloaded < candidates.length) {
+      return { kind: "image-download", completed: downloaded, total: candidates.length, failed: downloadFailed };
+    }
+    const uploadCandidates = candidates.filter((candidate) => candidate.local_download_status === "completed" && !candidate.content_duplicate_of);
+    const prepared = uploadCandidates.filter((candidate) => candidate.upload_status === "completed" || candidate.upload_status === "failed" || candidate.upload_status === "skipped").length;
+    const prepareFailed = uploadCandidates.filter((candidate) => candidate.upload_status === "failed").length;
+    return { kind: "image-prepare", completed: prepared, total: uploadCandidates.length, failed: prepareFailed };
+  }
+  const batches = checkpoint.image?.analysis_batches ?? [];
+  const selected = candidates.filter((candidate) => candidate.use_in_ppt).length;
+  if (checkpoint.stages.image_analysis === "waiting" || checkpoint.stages.image_analysis === "running") {
+    return {
+      kind: "image-analysis",
+      completed: batches.filter((batch) => batch.status === "completed" || batch.status === "failed").length,
+      total: batches.length,
+      selected,
+    };
+  }
+  const imported = candidates.filter((candidate) => candidate.import_status === "imported").length;
+  const importFailed = candidates.filter((candidate) => candidate.import_status === "failed").length;
+  if (checkpoint.stages.image_import === "waiting" || checkpoint.stages.image_import === "running" || !checkpoint.image?.prepared_batch) {
+    return { kind: "image-import", completed: imported, total: selected, failed: importFailed };
+  }
+  if (state === "running" && !checkpoint.image?.written) return { kind: "image-publish" };
+  return { kind: "image-complete", selected, completed: imported };
+}
+
+function trimUiText(value: string | null | undefined, maxLength: number) {
+  const normalized = value?.trim();
+  if (!normalized) return undefined;
+  return normalized.length <= maxLength ? normalized : `${normalized.slice(0, maxLength - 1)}…`;
 }
 
 function stageMessage(runtime: DeckGenerationRuntime, stage: StageKey) {
@@ -490,23 +663,11 @@ async function setStage(
   checkpoint: LinearResearchCheckpoint,
   stage: StageKey,
   state: SharedResearchStageState,
-  persist: () => Promise<void>,
+  persistAndPublish: (message: string) => Promise<void>,
 ) {
   checkpoint.status = state === "running" ? "running" : checkpoint.status;
   checkpoint.stages[stage] = state;
-  runtime.researchDiscoveryProgress = uiProgress(checkpoint);
-  await persist();
-  const nextProgress = await runtime.backend.recordPageProgress({
-    workspace_dir: runtime.workspace.workspace_dir,
-    patch: { research_discovery: runtime.researchDiscoveryProgress },
-  });
-  runtime.setProgress(nextProgress);
-  emitRuntime(runtime, {
-    step: "prepare",
-    message: stageMessage(runtime, stage),
-    currentPageIndex: null,
-    totalPages: runtime.confirmedOutline.items.length,
-  }, runtime.getProgress(), undefined, getAttemptLimits(runtime));
+  await persistAndPublish(stageMessage(runtime, stage));
 }
 
 function errorMessage(error: unknown) {
@@ -783,8 +944,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
   });
   let persistedCheckpoint = structuredClone(storedCheckpoint);
   let persistQueue = Promise.resolve();
-  const persist = () => {
-    const snapshot = structuredClone(checkpoint);
+  const persist = (snapshot = structuredClone(checkpoint)) => {
     persistQueue = persistQueue.then(async () => {
       const operations = buildSharedResearchProgressOperations(persistedCheckpoint, snapshot);
       for (const batch of chunkSharedResearchProgressOperations(runtime.workspace.workspace_dir, operations)) {
@@ -794,21 +954,48 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
     });
     return persistQueue;
   };
+  let publishQueue = Promise.resolve();
+  const publish = (message: string, snapshot: LinearResearchCheckpoint) => {
+    publishQueue = publishQueue.then(async () => {
+      runtime.researchDiscoveryProgress = buildLinearResearchUiProgress(snapshot);
+      const nextProgress = await runtime.backend.recordPageProgress({
+        workspace_dir: runtime.workspace.workspace_dir,
+        patch: { research_discovery: runtime.researchDiscoveryProgress },
+      });
+      runtime.setProgress(nextProgress);
+      emitRuntime(runtime, {
+        step: "prepare",
+        message,
+        currentPageIndex: null,
+        totalPages: runtime.confirmedOutline.items.length,
+      }, runtime.getProgress(), undefined, getAttemptLimits(runtime));
+    });
+    return publishQueue;
+  };
+  const persistAndPublish = async (message: string) => {
+    const snapshot = structuredClone(checkpoint);
+    await persist(snapshot);
+    await publish(message, snapshot);
+  };
   const controls = getResearchSearchControlSettings(runtime);
 
   if (checkpoint.stages.web_decision === "waiting" || checkpoint.stages.web_decision === "running") {
-    await setStage(runtime, checkpoint, "web_decision", "running", persist);
+    await setStage(runtime, checkpoint, "web_decision", "running", persistAndPublish);
     try {
       checkpoint.web ??= {};
       checkpoint.web.decision = await measureResearchOperation(
         runtime,
         "research.web.decision",
         () => controls.disableWebResearch
-          ? Promise.resolve({ needs_search: false, queries: [], rationale: "Web research is disabled by the user setting." })
+          ? Promise.resolve({
+              needs_search: false,
+              queries: [],
+              rationale: runtime.locale === "zh" ? "网页搜索已在设置中关闭。" : "Web research is disabled in settings.",
+            })
           : runtime.researchAiClient.decideWebResearch(decisionContext("web_research_decision")),
         { disabled: controls.disableWebResearch },
       );
-      await setStage(runtime, checkpoint, "web_decision", checkpoint.web.decision.needs_search ? "completed" : "skipped", persist);
+      await setStage(runtime, checkpoint, "web_decision", checkpoint.web.decision.needs_search ? "completed" : "skipped", persistAndPublish);
     } catch (error) {
       checkpoint.web = {
         decision: {
@@ -820,13 +1007,13 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
         diagnostic_errors: [errorMessage(error)],
       };
       await logResearchError(runtime, "web-decision", error);
-      await setStage(runtime, checkpoint, "web_decision", "warning", persist);
+      await setStage(runtime, checkpoint, "web_decision", "warning", persistAndPublish);
     }
   }
   throwIfCancelled(runtime);
 
   if (!checkpoint.web?.written) {
-    await setStage(runtime, checkpoint, "web_research", "running", persist);
+    await setStage(runtime, checkpoint, "web_research", "running", persistAndPublish);
     const decision = checkpoint.web?.decision ?? { needs_search: false, queries: [] };
     const title = batchTitle(runtime);
     if (!decision.needs_search) {
@@ -835,7 +1022,9 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
       checkpoint.web.prepared_batch = buildWebBatch(runtime.locale, title, checkpoint.web.gaps?.length ? "warning" : "skipped", body);
     } else if (decision.queries.length === 0) {
       checkpoint.web ??= {};
-      checkpoint.web.gaps = ["Web research was requested, but no usable query was returned."];
+      checkpoint.web.gaps = [runtime.locale === "zh"
+        ? "需要网页资料，但没有生成可用的搜索词。"
+        : "Web research was needed, but no usable query was returned."];
       checkpoint.web.prepared_batch = buildWebBatch(runtime.locale, title, "warning", runtime.locale === "zh"
         ? "### 信息缺口\n\n- 需要网页资料，但模型没有返回可用的搜索词。"
         : "### Information gaps\n\n- Web research was needed, but the model returned no usable query.");
@@ -858,7 +1047,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
             checkpoint.web!.diagnostic_errors = appendUnique(checkpoint.web!.diagnostic_errors, `${query}: ${errorMessage(error)}`);
             await logResearchError(runtime, "web-search", error, { query });
           }
-          await persist();
+          await persistAndPublish(stageMessage(runtime, "web_research"));
         })).then(() => undefined), { query_count: pendingQueries.length });
       const allResults = checkpoint.web.searches.flatMap((item) => item.result ?? []);
       const gaps = checkpoint.web.searches.flatMap((item) => item.error
@@ -886,42 +1075,46 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
             checkpoint.web.diagnostic_errors = appendUnique(checkpoint.web.diagnostic_errors, `Fetch selection: ${errorMessage(error)}`);
             await logResearchError(runtime, "web-fetch-selection", error);
           }
-          await persist();
+          await persistAndPublish(stageMessage(runtime, "web_research"));
         }
-        if (!checkpoint.web.fetched_pages) {
-          const urls = dedupeExactUrls(checkpoint.web.fetch_result_ids, allResults);
-          if (urls.length > 0) {
-            try {
-              const fetchedPages = await measureResearchOperation(runtime, "research.web.fetch", async () => {
-                const pages: ResearchWebFetchPage[] = [];
-                for (const url of urls) {
-                  const fetched = await runtime.researchWebClient.fetch(
-                    { urls: [url], max_chars: 8000 },
-                    researchWebCallContext(runtime, researchWebOperationId),
-                  );
-                  pages.push(...fetched.pages);
-                }
-                return pages;
-              }, { url_count: urls.length });
-              checkpoint.web.fetched_pages = fetchedPages;
-              const failedPages = fetchedPages.filter((page) => !page.ok);
-              if (failedPages.length > 0) {
-                gaps.push(runtime.locale === "zh" ? `${failedPages.length} 个选中网页未能读取正文。` : `${failedPages.length} selected web page(s) could not be read.`);
-                checkpoint.web.diagnostic_errors = appendUnique(
-                  checkpoint.web.diagnostic_errors,
-                  failedPages.map((page) => `${page.url}: ${page.error || "Fetch failed"}`).join("\n"),
+        const urls = dedupeExactUrls(checkpoint.web.fetch_result_ids, allResults);
+        checkpoint.web.fetched_pages ??= [];
+        const fetchedUrls = new Set(checkpoint.web.fetched_pages.map((page) => page.url));
+        const pendingUrls = urls.filter((url) => !fetchedUrls.has(url));
+        if (pendingUrls.length > 0) {
+          await measureResearchOperation(runtime, "research.web.fetch", async () => {
+            for (const url of pendingUrls) {
+              let fetchedPages: ResearchWebFetchPage[];
+              try {
+                const fetched = await runtime.researchWebClient.fetch(
+                  { urls: [url], max_chars: 8000 },
+                  researchWebCallContext(runtime, researchWebOperationId),
                 );
+                fetchedPages = fetched.pages.length > 0 ? fetched.pages : [{ url, ok: false, error: "No page returned" }];
+              } catch (error) {
+                fetchedPages = [{ url, ok: false, error: errorMessage(error) }];
+                checkpoint.web!.diagnostic_errors = appendUnique(checkpoint.web!.diagnostic_errors, `${url}: ${errorMessage(error)}`);
+                await logResearchError(runtime, "web-fetch", error, { url });
               }
-            } catch (error) {
-              checkpoint.web.fetched_pages = [];
-              gaps.push(runtime.locale === "zh" ? "本轮选中的网页正文未能完成抓取。" : "Selected web page content could not be fetched for this run.");
-              checkpoint.web.diagnostic_errors = appendUnique(checkpoint.web.diagnostic_errors, errorMessage(error));
-              await logResearchError(runtime, "web-fetch", error, { urls });
+              for (const page of fetchedPages) {
+                const existingIndex = checkpoint.web!.fetched_pages!.findIndex((item) => item.url === page.url);
+                if (existingIndex >= 0) checkpoint.web!.fetched_pages![existingIndex] = page;
+                else checkpoint.web!.fetched_pages!.push(page);
+              }
+              await persistAndPublish(stageMessage(runtime, "web_research"));
             }
-          } else checkpoint.web.fetched_pages = [];
-          checkpoint.web.gaps = gaps;
-          await persist();
+          }, { url_count: pendingUrls.length });
         }
+        const failedPages = checkpoint.web.fetched_pages.filter((page) => !page.ok);
+        if (failedPages.length > 0) {
+          gaps.push(runtime.locale === "zh" ? `${failedPages.length} 个选中网页未能读取正文。` : `${failedPages.length} selected web page(s) could not be read.`);
+          checkpoint.web.diagnostic_errors = appendUnique(
+            checkpoint.web.diagnostic_errors,
+            failedPages.map((page) => `${page.url}: ${page.error || "Fetch failed"}`).join("\n"),
+          );
+        }
+        checkpoint.web.gaps = gaps;
+        await persistAndPublish(stageMessage(runtime, "web_research"));
         if (!checkpoint.web.prepared_batch) {
           try {
             const fetchedPages = checkpoint.web.fetched_pages.filter((page) => page.ok);
@@ -954,7 +1147,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
     if (!checkpoint.web.prepared_batch?.includes(statisticsHeading)) {
       checkpoint.web.prepared_batch = `${checkpoint.web.prepared_batch ?? ""}\n\n${webStatisticsMarkdown(runtime, checkpoint.web)}`.trim();
     }
-    await persist();
+    await persistAndPublish(stageMessage(runtime, "web_research"));
     await measureResearchOperation(
       runtime,
       "research.web.publish",
@@ -963,24 +1156,28 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
     checkpoint.web.written = true;
     persistedCheckpoint.web ??= {};
     persistedCheckpoint.web.written = true;
-    await setStage(runtime, checkpoint, "web_research", checkpoint.web.gaps?.length ? "warning" : decision.needs_search ? "completed" : "skipped", persist);
+    await setStage(runtime, checkpoint, "web_research", checkpoint.web.gaps?.length ? "warning" : decision.needs_search ? "completed" : "skipped", persistAndPublish);
   }
   context = await runtime.backend.getSharedResearchContext({ workspace_dir: runtime.workspace.workspace_dir });
   throwIfCancelled(runtime);
 
   if (checkpoint.stages.image_decision === "waiting" || checkpoint.stages.image_decision === "running") {
-    await setStage(runtime, checkpoint, "image_decision", "running", persist);
+    await setStage(runtime, checkpoint, "image_decision", "running", persistAndPublish);
     try {
       checkpoint.image ??= {};
       checkpoint.image.decision = await measureResearchOperation(
         runtime,
         "research.image.decision",
         () => controls.disableImageResearch
-          ? Promise.resolve({ needs_search: false, queries: [], rationale: "Image research is disabled by the user setting." })
+          ? Promise.resolve({
+              needs_search: false,
+              queries: [],
+              rationale: runtime.locale === "zh" ? "图片搜索已在设置中关闭。" : "Image research is disabled in settings.",
+            })
           : runtime.researchAiClient.decideImageResearch(decisionContext("image_research_decision")),
         { disabled: controls.disableImageResearch },
       );
-      await setStage(runtime, checkpoint, "image_decision", checkpoint.image.decision.needs_search ? "completed" : "skipped", persist);
+      await setStage(runtime, checkpoint, "image_decision", checkpoint.image.decision.needs_search ? "completed" : "skipped", persistAndPublish);
     } catch (error) {
       checkpoint.image = {
         decision: {
@@ -992,13 +1189,13 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
         diagnostic_errors: [errorMessage(error)],
       };
       await logResearchError(runtime, "image-decision", error);
-      await setStage(runtime, checkpoint, "image_decision", "warning", persist);
+      await setStage(runtime, checkpoint, "image_decision", "warning", persistAndPublish);
     }
   }
   throwIfCancelled(runtime);
 
   if (!checkpoint.image?.written) {
-    await setStage(runtime, checkpoint, "image_research", "running", persist);
+    await setStage(runtime, checkpoint, "image_research", "running", persistAndPublish);
     checkpoint.image ??= {};
     const decision = checkpoint.image.decision ?? { needs_search: false, queries: [] };
     const queries: SharedResearchImageBatch["queries"] = [];
@@ -1014,7 +1211,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
         return previous?.query === query ? previous : { query, status: "running" };
       });
       checkpoint.image.searches = searchesByQuery;
-      await persist();
+      await persistAndPublish(stageMessage(runtime, "image_search"));
       await measureResearchOperation(runtime, "research.image.search", () => Promise.all(decision.queries.map(async (query, queryIndex) => {
           const existing = searchesByQuery[queryIndex];
           if (existing && existing.status !== "running") return;
@@ -1037,7 +1234,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
             searchesByQuery[queryIndex] = { query, status: "warning", error: errorMessage(error) };
           }
           checkpoint.image!.searches = searchesByQuery;
-          await persist();
+          await persistAndPublish(stageMessage(runtime, "image_search"));
         })).then(() => undefined), { query_count: decision.queries.length });
       checkpoint.image.search_status = "completed";
       checkpoint.stages.image_search = checkpoint.image.searches.some((search) => search.status === "warning") ? "warning" : "completed";
@@ -1058,7 +1255,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
           statistics: { raw_occurrences: 0, unique_urls: 0, duplicate_occurrences: 0, duplicate_groups: 0 },
           groups: [],
         };
-        await persist();
+        await persistAndPublish(stageMessage(runtime, "image_deduplication"));
         const groupsByKey = new Map<string, ImageDeduplicationGroup>();
         const candidatesByKey = new Map<string, SharedResearchImageCandidate>();
         for (const search of checkpoint.image.searches) {
@@ -1118,7 +1315,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
         checkpoint.image.candidates = [...candidatesByKey.values()];
         candidates = checkpoint.image.candidates;
         checkpoint.stages.image_deduplication = "completed";
-        await persist();
+        await persistAndPublish(stageMessage(runtime, "image_prefetch"));
       } else {
         candidates = checkpoint.image.candidates ?? [];
         checkpoint.stages.image_deduplication = "completed";
@@ -1128,7 +1325,11 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
       if (checkpoint.stages.image_prefetch === "waiting" || checkpoint.stages.image_prefetch === "running") {
         checkpoint.image.prepare_status = "running";
         checkpoint.stages.image_prefetch = "running";
-        await persist();
+        await persistAndPublish(stageMessage(runtime, "image_prefetch"));
+        let lastPublishedDownloadCount = candidates.filter((candidate) => (
+          candidate.local_download_status === "completed" || candidate.local_download_status === "failed"
+        )).length;
+        const downloadPublishInterval = progressPublishInterval(candidates.length);
         await mapWithConcurrency(candidates, IMAGE_DOWNLOAD_CONCURRENCY, async (candidate) => {
           if (candidate.local_download_status === "completed") return;
           if (candidate.local_download_status === "failed" && !input.resume) return;
@@ -1140,8 +1341,8 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
             checkpoint.image!.gaps = appendUnique(
               checkpoint.image!.gaps,
               runtime.locale === "zh"
-                ? `候选图片 ${candidate.candidate_id} 未能安全下载。`
-                : `Image candidate ${candidate.candidate_id} could not be downloaded safely.`,
+                ? "部分候选图片未能安全下载。"
+                : "Some image candidates could not be downloaded safely.",
             );
             checkpoint.image!.diagnostic_errors = appendUnique(
               checkpoint.image!.diagnostic_errors,
@@ -1149,7 +1350,18 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
             );
             await logResearchError(runtime, "image-download", error, { candidate_id: candidate.candidate_id });
           }
-          await persist();
+          const progressSnapshot = structuredClone(checkpoint);
+          await persist(progressSnapshot);
+          const completedDownloadCount = candidates.filter((item) => (
+            item.local_download_status === "completed" || item.local_download_status === "failed"
+          )).length;
+          if (
+            completedDownloadCount === candidates.length ||
+            completedDownloadCount - lastPublishedDownloadCount >= downloadPublishInterval
+          ) {
+            lastPublishedDownloadCount = completedDownloadCount;
+            await publish(stageMessage(runtime, "image_prefetch"), progressSnapshot);
+          }
         });
 
         const contentGroupsBySha = new Map<string, {
@@ -1203,7 +1415,12 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
           groups: contentGroups,
           completed_at: new Date().toISOString(),
         };
+        await persistAndPublish(stageMessage(runtime, "image_prefetch"));
         const uploadCandidates = candidates.filter((candidate) => candidate.local_download_status === "completed" && !candidate.content_duplicate_of);
+        let lastPublishedUploadCount = uploadCandidates.filter((candidate) => (
+          candidate.upload_status === "completed" || candidate.upload_status === "failed" || candidate.upload_status === "skipped"
+        )).length;
+        const uploadPublishInterval = progressPublishInterval(uploadCandidates.length);
         await mapWithConcurrency(uploadCandidates, IMAGE_DOWNLOAD_CONCURRENCY, async (candidate) => {
           if (!candidate.local_file_path || !candidate.mime_type) return;
           if (candidate.analysis_status === "completed") return;
@@ -1217,12 +1434,23 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
           } catch (error) {
             candidate.upload_status = "failed";
             checkpoint.image!.gaps = appendUnique(checkpoint.image!.gaps, runtime.locale === "zh"
-              ? `候选图片 ${candidate.candidate_id} 未能上传给图片分析会话。`
-              : `Image candidate ${candidate.candidate_id} could not be uploaded for image analysis.`);
+              ? "部分候选图片未能提供给图片分析会话。"
+              : "Some image candidates could not be provided to the image analysis session.");
             checkpoint.image!.diagnostic_errors = appendUnique(checkpoint.image!.diagnostic_errors, `${candidate.candidate_id}: ${errorMessage(error)}`);
             await logResearchError(runtime, "image-upload", error, { candidate_id: candidate.candidate_id });
           }
-          await persist();
+          const progressSnapshot = structuredClone(checkpoint);
+          await persist(progressSnapshot);
+          const completedUploadCount = uploadCandidates.filter((item) => (
+            item.upload_status === "completed" || item.upload_status === "failed" || item.upload_status === "skipped"
+          )).length;
+          if (
+            completedUploadCount === uploadCandidates.length ||
+            completedUploadCount - lastPublishedUploadCount >= uploadPublishInterval
+          ) {
+            lastPublishedUploadCount = completedUploadCount;
+            await publish(stageMessage(runtime, "image_prefetch"), progressSnapshot);
+          }
         });
         const hasPrepareFailures = candidates.some((candidate) => candidate.local_download_status === "failed" || candidate.upload_status === "failed");
         checkpoint.image.prepare_status = hasPrepareFailures ? "warning" : "completed";
@@ -1289,7 +1517,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
       checkpoint.stages.image_analysis = "running";
       checkpoint.image.import_status = "running";
       checkpoint.stages.image_import = "running";
-      await persist();
+      await persistAndPublish(stageMessage(runtime, "image_analysis"));
       const importLimiter = createConcurrencyLimiter(IMAGE_IMPORT_CONCURRENCY);
       const scheduledImportIds = new Set<string>();
       const importTasks: Promise<void>[] = [];
@@ -1304,7 +1532,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
             candidate.error = errorMessage(error);
             checkpoint.image!.gaps = appendUnique(
               checkpoint.image!.gaps,
-              runtime.locale === "zh" ? `候选图片 ${candidate.candidate_id} 未能保存为本地素材。` : `Image candidate ${candidate.candidate_id} could not be saved as a local asset.`,
+              runtime.locale === "zh" ? "部分入选图片未能保存为本地素材。" : "Some selected images could not be saved as local assets.",
             );
             checkpoint.image!.diagnostic_errors = appendUnique(checkpoint.image!.diagnostic_errors, `${candidate.candidate_id}: ${candidate.error}`);
             await logResearchError(runtime, "image-import", error, { candidate_id: candidate.candidate_id });
@@ -1343,7 +1571,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
           batch.status = "failed";
           batch.error = "No uploaded image candidates remain for analysis";
           batch.completed_at = new Date().toISOString();
-          await persist();
+          await persistAndPublish(stageMessage(runtime, "image_analysis"));
           return;
         }
         batchCandidates.forEach((candidate) => { candidate.analysis_status = "running"; });
@@ -1398,7 +1626,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
           checkpoint.image!.diagnostic_errors = appendUnique(checkpoint.image!.diagnostic_errors, `${batch.batch_id}: ${errorMessage(error)}`);
           await logResearchError(runtime, "image-analysis", error, { batch_id: batch.batch_id, candidate_ids: batch.candidate_ids });
         }
-        await persist();
+        await persistAndPublish(stageMessage(runtime, "image_analysis"));
       }), { batch_count: checkpoint.image.analysis_batches.length });
       checkpoint.image.analysis_status = checkpoint.image.analysis_batches.every((batch) => batch.status === "completed") ? "completed" : "warning";
       checkpoint.stages.image_analysis = checkpoint.image.analysis_status;
@@ -1406,7 +1634,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
       await Promise.all(importTasks);
       checkpoint.image.import_status = candidates.some((candidate) => candidate.import_status === "failed") ? "warning" : "completed";
       checkpoint.stages.image_import = checkpoint.image.import_status;
-      await persist();
+      await persistAndPublish(stageMessage(runtime, "image_import"));
       throwIfCancelled(runtime);
       gaps.push(...(checkpoint.image.gaps ?? []));
       for (const search of checkpoint.image.searches) {
@@ -1419,7 +1647,9 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
         if (search.error) gaps.push(runtime.locale === "zh" ? `图片搜索词“${search.query}”未获得可用候选。` : `No usable image candidates were collected for query “${search.query}”.`);
       }
     } else if (decision.needs_search) {
-      gaps.push("Image research was requested, but no usable query was returned.");
+      gaps.push(runtime.locale === "zh"
+        ? "需要图片素材，但没有生成可用的搜索词。"
+        : "Image research was needed, but no usable query was returned.");
       checkpoint.stages.image_search = "warning";
       checkpoint.stages.image_deduplication = "skipped";
       checkpoint.stages.image_prefetch = "skipped";
@@ -1464,7 +1694,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
         gaps: uniqueGaps.length,
       },
     };
-    await persist();
+    await persistAndPublish(stageMessage(runtime, "image_research"));
     await measureResearchOperation(
       runtime,
       "research.image.publish",
@@ -1480,7 +1710,7 @@ export async function runLinearSharedResearch(runtime: DeckGenerationRuntime, in
       : noNewResearch
         ? "skipped"
         : "completed";
-    await setStage(runtime, checkpoint, "image_research", status, persist);
+    await setStage(runtime, checkpoint, "image_research", status, persistAndPublish);
     try {
       await runtime.backend.cleanupSharedResearchImageStaging({
         workspace_dir: runtime.workspace.workspace_dir,
