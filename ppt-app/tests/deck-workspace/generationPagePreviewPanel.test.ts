@@ -53,10 +53,14 @@ const readyPreviews: GenerationPagePreviews = {
 };
 
 describe("GenerationPagePreviewPanel", () => {
-  it("explains that previews appear per page before anything rendered", () => {
+  it("keeps spinning before anything rendered instead of looking unfinished", () => {
     const html = renderPanel({});
 
-    assert.match(html, new RegExp(t.generating.preview.waiting));
+    assert.match(html, new RegExp(t.generating.preview.loading));
+    assert.match(html, /generation-running-icon/);
+    assert.match(html, /role="status"/);
+    // The heading used to repeat this sentence, so it showed up twice on screen.
+    assert.doesNotMatch(html, new RegExp(t.generating.preview.waiting));
     assert.doesNotMatch(html, /generation-preview-thumbnails/);
   });
 

@@ -1,4 +1,4 @@
-import { AlertCircle, ImageIcon, LoaderCircle } from "lucide-react";
+import { AlertCircle, LoaderCircle } from "lucide-react";
 import { useMemo } from "react";
 import { formatMessage, type Messages } from "../../../i18n/messages";
 import {
@@ -28,7 +28,9 @@ export function GenerationPagePreviewPanel(props: GenerationPagePreviewPanelProp
       <div className="generation-preview-header">
         <div>
           <div className="section-label">{t.generating.preview.title}</div>
-          <strong>{selected ? pageHeading(t, selected) : t.generating.preview.waiting}</strong>
+          {/* No page yet: the stage below already carries the loading status, so
+              leaving the heading empty keeps that message on screen only once. */}
+          <strong>{selected ? pageHeading(t, selected) : null}</strong>
         </div>
         {entries.length > 0 ? (
           followingLatest ? (
@@ -59,9 +61,9 @@ export function GenerationPagePreviewPanel(props: GenerationPagePreviewPanelProp
             <span>{t.generating.preview.loading}</span>
           </div>
         ) : (
-          <div className="generation-preview-placeholder">
-            <ImageIcon size={20} aria-hidden="true" />
-            <span>{t.generating.preview.waiting}</span>
+          <div className="generation-preview-placeholder" role="status" aria-live="polite">
+            <LoaderCircle className="generation-running-icon" size={20} aria-hidden="true" />
+            <span>{t.generating.preview.loading}</span>
           </div>
         )}
       </div>
