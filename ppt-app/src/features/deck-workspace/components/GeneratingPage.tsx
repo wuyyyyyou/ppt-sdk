@@ -357,9 +357,7 @@ function ResearchDiscoveryStageRecordView(props: {
     record.sourceLines.length > 0 ||
     displayActivities.length > 0 ||
     displayLines.some((line) => line.trim()) ||
-    record.gaps.length > 0 ||
-    record.rejectedReasons.length > 0 ||
-    record.summaryLines.length > 0;
+    record.rejectedReasons.length > 0;
 
   return (
     <article className={`generation-stage-record research-discovery-record ${record.state}`}>
@@ -405,9 +403,7 @@ function ResearchDiscoveryStageRecordView(props: {
               {displayLines.join("\n").trim()}
             </pre>
           ) : null}
-          <ResearchDiscoveryLineList title={t.generating.researchDiscovery.gaps} lines={record.gaps} warning />
           <ResearchDiscoveryLineList title={t.generating.researchDiscovery.rejected} lines={record.rejectedReasons} />
-          <ResearchDiscoveryLineList title={t.generating.researchDiscovery.summary} lines={record.summaryLines} />
           {!hasBody ? (
             <p className="generation-empty-stream">{t.generating.researchDiscovery.empty}</p>
           ) : null}

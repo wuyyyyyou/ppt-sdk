@@ -1038,7 +1038,7 @@ export const messages: Record<Locale, Messages> = {
           running: "Running",
           completed: "Completed",
           skipped: "Skipped",
-          warning: "Completed with gaps"
+          warning: "Completed"
         },
         queries: "Queries",
         sources: "Sources",
@@ -1054,7 +1054,7 @@ export const messages: Record<Locale, Messages> = {
         queryStatuses: {
           running: "Running",
           collected: "Collected",
-          gap: "Gap",
+          gap: "Completed",
           error: "Error",
           skipped_duplicate: "Skipped duplicate"
         },
@@ -1787,7 +1787,7 @@ export const messages: Record<Locale, Messages> = {
           running: "进行中",
           completed: "已完成",
           skipped: "已跳过",
-          warning: "有缺口"
+          warning: "已完成"
         },
         queries: "查询",
         sources: "来源",
@@ -1803,7 +1803,7 @@ export const messages: Record<Locale, Messages> = {
         queryStatuses: {
           running: "进行中",
           collected: "已收集",
-          gap: "有缺口",
+          gap: "已完成",
           error: "出错",
           skipped_duplicate: "跳过重复"
         },

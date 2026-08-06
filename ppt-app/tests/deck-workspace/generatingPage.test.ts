@@ -300,6 +300,39 @@ describe("GeneratingPage controls", () => {
     assert.doesNotMatch(html, /research-discovery-stage-group warning/);
     assert.doesNotMatch(html, /generation-status-badge warning/);
     assert.doesNotMatch(html, /部分完成/);
+    assert.doesNotMatch(html, /证据缺口/);
+    assert.doesNotMatch(html, /汇总/);
+    assert.doesNotMatch(html, /No current price source\./);
+  });
+
+  it("hides gap and summary sections while a research phase is expanded", () => {
+    const html = renderPage(
+      makeViewState({ status: "running" }),
+      {
+        ...makeProgress("research-collection", "pending"),
+        researchDiscovery: {
+          status: "running",
+          summary: {
+            facts: 1,
+            derivedInsights: 0,
+            visualAssets: 0,
+            gaps: 1,
+            rejectedMaterial: 0,
+          },
+          records: [
+            { phase: "web-decision", state: "completed" },
+            { phase: "web-collection", state: "running", gaps: ["A source is unavailable."] },
+            { phase: "visual-decision", state: "waiting" },
+            { phase: "visual-collection", state: "waiting" },
+          ],
+        },
+      },
+    );
+
+    assert.match(html, /research-discovery-record active[\s\S]*aria-expanded="true"/);
+    assert.doesNotMatch(html, /证据缺口/);
+    assert.doesNotMatch(html, /汇总/);
+    assert.doesNotMatch(html, /A source is unavailable\./);
   });
 
   it("does not show accepted page counts during deck-level Research Discovery steps", () => {
