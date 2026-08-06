@@ -884,7 +884,17 @@ async function downloadHostUploadToStaging({ hostUpload, stagingPath, expectedSi
   return receivedBytes;
 }
 
-async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose, workspaceDir, operationId, source, reuseWhileValid }) {
+async function uploadLocalFileToHost({
+  filePath,
+  filename,
+  mimeType,
+  purpose,
+  workspaceDir,
+  operationId,
+  source,
+  reuseWhileValid,
+  snapshotBeforeNegotiate = false,
+}) {
   const normalizedPath = path.normalize(filePath);
   const fileStat = await stat(normalizedPath);
   if (!fileStat.isFile()) {
@@ -904,11 +914,21 @@ async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose, wo
     const cached = readCachedHostUpload(hostUploadCache, cacheKey);
     if (cached) return cached;
   }
+  const sizeBytes = fileStat.size;
+  // Preview artifacts can move from the Shadow Workspace to the official
+  // Workspace while Host Upload negotiation is in flight. Capture their bytes
+  // before that async boundary so the PUT does not reopen a stale local path.
+  const fileSnapshot = snapshotBeforeNegotiate ? await readFile(normalizedPath) : null;
+  if (fileSnapshot && fileSnapshot.byteLength !== sizeBytes) {
+    throw new Error(
+      `Host Upload source changed while reading ${normalizedPath}: ` +
+      `expected ${sizeBytes} bytes, got ${fileSnapshot.byteLength} bytes.`,
+    );
+  }
   const safeFilename = assertSafeUploadFilename(filename || path.basename(normalizedPath));
   if (typeof mimeType !== "string" || mimeType.trim().length === 0 || mimeType === "application/octet-stream") {
     throw new Error(`Host Upload MIME type must be specific for ${safeFilename}`);
   }
-  const sizeBytes = fileStat.size;
   let lastError;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const logger = createStorageTransferLogger({ workspaceDir, operationId, source, filename: safeFilename, mimeType: mimeType.trim(), sizeBytes });
@@ -933,7 +953,7 @@ async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose, wo
         ...(negotiated.headers ?? {}),
         "Content-Length": String(sizeBytes),
       },
-      body: createReadStream(normalizedPath),
+      body: fileSnapshot ?? createReadStream(normalizedPath),
       duplex: "half",
     });
     if (!putResponse.ok) {
@@ -1059,6 +1079,7 @@ async function uploadPreviewImage(imagePath, context = {}) {
     reuseWhileValid: true,
     ...context,
     purpose: "user_artifact",
+    snapshotBeforeNegotiate: true,
   });
 }
 

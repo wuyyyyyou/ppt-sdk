@@ -4051,15 +4051,18 @@ details.generation-history-panel > summary::-webkit-details-marker {
   background: rgba(255, 251, 235, 0.74);
 }
 
-.research-discovery-stage-group.completed {
+.research-discovery-stage-group.completed,
+.persistent-elements-stage-group.completed {
   box-shadow: inset 3px 0 0 #16a34a;
 }
 
-.research-discovery-stage-group.active {
+.research-discovery-stage-group.active,
+.persistent-elements-stage-group.active {
   box-shadow: inset 3px 0 0 rgba(124, 108, 240, 0.58);
 }
 
-.research-discovery-stage-group.failed {
+.research-discovery-stage-group.failed,
+.persistent-elements-stage-group.failed {
   box-shadow: inset 3px 0 0 #dc2626;
 }
 

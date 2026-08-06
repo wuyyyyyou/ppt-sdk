@@ -2518,38 +2518,48 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
     setGenerationUnresumable(false);
     setGenerationResumeAllowed(false);
-    const refreshedWorkspace = backend
-      ? await backend.openWorkspace({ workspace_dir: workspace.workspace_dir })
-      : workspace;
-    const assembled = backend
-      ? await assembleMeasuredReviewRender({
-          backend,
-          metadata: completion.result.rendered,
-          workspaceDir: refreshedWorkspace.workspace_dir,
-          previews: generationPagePreviewsRef.current,
-        })
-      : null;
-    if (assembled) {
-      generationPagePreviewsRef.current = assembled.previews;
-      setGenerationPagePreviews(assembled.previews);
-    }
-    const rendered = assembled?.result ?? completion.result.rendered;
-    applyWorkspace(refreshedWorkspace, { reviewRenderResult: rendered });
+    const renderKey = workspaceReviewRenderKey(workspace);
+    applyWorkspace(workspace, { reviewRenderResult: completion.result.rendered });
     // The successful completion is authoritative for this run. The Workspace
     // snapshot can briefly lag the committed Final Deck Render, so do not let
     // `applyWorkspace`'s recovery gate keep a successful run on Generating.
-    applyRenderedDeck(rendered, completion.result.outline.items);
+    applyRenderedDeck(completion.result.rendered, completion.result.outline.items);
     setReviewRender({
       status: "ready",
-      result: rendered,
+      result: completion.result.rendered,
       error: "",
-      renderKey: workspaceReviewRenderKey(refreshedWorkspace),
+      renderKey,
     });
     setDeckTitle(completion.result.outline.title);
     setOutline(completion.result.outline.items);
     setPageProgress(completion.result.progress);
     setPage("main");
     setHistory((items) => (items.at(-1) === "main" ? items : [...items, "main"]));
+
+    if (backend) {
+      try {
+        const assembled = await assembleMeasuredReviewRender({
+          backend,
+          metadata: completion.result.rendered,
+          workspaceDir: workspace.workspace_dir,
+          previews: generationPagePreviewsRef.current,
+        });
+        if (
+          currentWorkspaceRef.current?.workspace_dir !== workspace.workspace_dir ||
+          workspaceReviewRenderKey(currentWorkspaceRef.current) !== renderKey
+        ) return;
+        generationPagePreviewsRef.current = assembled.previews;
+        setGenerationPagePreviews(assembled.previews);
+        setReviewRender({
+          status: "ready",
+          result: assembled.result,
+          error: "",
+          renderKey,
+        });
+      } catch (error) {
+        console.warn("Failed to assemble optional completed Deck previews", error);
+      }
+    }
   }
 
   async function createOutlineFromConfirmedRequirements(

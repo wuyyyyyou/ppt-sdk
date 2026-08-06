@@ -191,14 +191,38 @@ test("app_get_workspace_page_image uploads one image for the requested page", as
   assert.match(wrapper, /reuseWhileValid:\s*args\.force_upload_refresh !== true/);
 });
 
-test("preview image uploads reuse confirmed references while they stay valid", async () => {
+test("preview image uploads snapshot local bytes before Host Upload negotiation", async () => {
   const source = await readFile(new URL("../../example_plugin.js", import.meta.url), "utf8");
 
   const uploadPreviewImage = source.slice(
     source.indexOf("async function uploadPreviewImage("),
     source.indexOf("async function registerJsonReference("),
   );
+  const uploadLocalFileToHost = source.slice(
+    source.indexOf("async function uploadLocalFileToHost("),
+    source.indexOf("async function uploadJsonToHost("),
+  );
+
   assert.match(uploadPreviewImage, /reuseWhileValid:\s*true/);
+  assert.match(uploadPreviewImage, /snapshotBeforeNegotiate:\s*true/);
+  assert.match(
+    uploadLocalFileToHost,
+    /snapshotBeforeNegotiate\s*\?\s*await readFile\(normalizedPath\)\s*:\s*null/,
+  );
+  assert.match(
+    uploadLocalFileToHost,
+    /body:\s*fileSnapshot\s*\?\?\s*createReadStream\(normalizedPath\)/,
+  );
+  assert.ok(
+    uploadLocalFileToHost.indexOf("const sizeBytes = fileStat.size") <
+      uploadLocalFileToHost.indexOf("await readFile(normalizedPath)"),
+    "the expected byte size must be initialized before reading and validating the snapshot",
+  );
+  assert.ok(
+    uploadLocalFileToHost.indexOf("await readFile(normalizedPath)") <
+      uploadLocalFileToHost.indexOf("await hostUploadClient.negotiate"),
+    "preview bytes must be captured before the async Host Upload negotiation",
+  );
   assert.match(source, /readCachedHostUpload\(hostUploadCache, cacheKey\)/);
   assert.match(source, /storeHostUpload\(hostUploadCache, cacheKey, result\)/);
 });
