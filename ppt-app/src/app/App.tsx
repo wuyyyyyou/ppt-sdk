@@ -11,7 +11,11 @@ import { LibraryPage } from "../features/deck-workspace/components/LibraryPage";
 import { MyWorkPage } from "../features/deck-workspace/components/MyWorkPage";
 import { OutlinePage } from "../features/deck-workspace/components/OutlinePage";
 import { PanelHeader } from "../features/deck-workspace/components/PanelHeader";
-import { ProgressLine } from "../features/deck-workspace/components/ProgressLine";
+import {
+  adjacentEnabledStage,
+  ProgressLine,
+  type ProgressStageAvailability,
+} from "../features/deck-workspace/components/ProgressLine";
 import { ReviewPage } from "../features/deck-workspace/components/ReviewPage";
 import { RefinePage } from "../features/deck-workspace/components/RefinePage";
 import {
@@ -48,6 +52,23 @@ export function App() {
       : null
   );
   const showEntrySidebar = (state.page === "main" && state.stage === "brief") || state.page === "my-work";
+  const stageAvailability: ProgressStageAvailability = {
+    brief: true,
+    requirements: state.presentationRequirements.status !== "empty",
+    outline:
+      state.outline.length > 0 &&
+      confirmedRequirementsAllowOutline(state.currentWorkspace?.requirements),
+    generating: state.createDeckProgress !== null,
+    deck: state.generated,
+  };
+  const previousStage = adjacentEnabledStage(state.stage, stageAvailability, -1);
+  const nextStage = adjacentEnabledStage(state.stage, stageAvailability, 1);
+  const browsePreviousStage = previousStage
+    ? () => { void actions.navigateMain(previousStage); }
+    : undefined;
+  const browseNextStage = nextStage
+    ? () => { void actions.navigateMain(nextStage); }
+    : undefined;
 
   if (manualEditorOpen && state.currentWorkspace?.workspace_dir && manualEditorPages.length > 0) {
     return (
@@ -135,7 +156,10 @@ export function App() {
             <ProgressLine
               stage={state.stage}
               t={t}
-              outlineEnabled={confirmedRequirementsAllowOutline(state.currentWorkspace?.requirements)}
+              requirementsEnabled={stageAvailability.requirements}
+              outlineEnabled={stageAvailability.outline}
+              generatingEnabled={stageAvailability.generating}
+              deckEnabled={stageAvailability.deck}
               onNavigate={actions.navigateMain}
             />
           ) : null}
@@ -156,6 +180,7 @@ export function App() {
               visualStylePresets={VISUAL_STYLE_PRESETS}
               selectedVisualStylePresetId={state.selectedVisualStylePresetId}
               onSelectVisualStylePreset={actions.selectVisualStylePreset}
+              onForward={browseNextStage}
             />
           ) : null}
 
@@ -174,7 +199,8 @@ export function App() {
               onSelect={actions.selectPresentationRequirement}
               onRetry={() => void actions.generatePresentationRequirements()}
               onManual={() => void actions.useManualPresentationRequirements()}
-              onBack={actions.returnToBriefFromRequirements}
+              onBack={browsePreviousStage ?? (() => undefined)}
+              onForward={browseNextStage}
               onSave={() => void actions.savePresentationRequirements()}
               onConfirm={() => void actions.confirmPresentationRequirements()}
             />
@@ -197,7 +223,8 @@ export function App() {
               moveItem={actions.moveOutlineDraftItem}
               save={actions.saveOutlineDraft}
               retry={actions.retryOutlineCreation}
-              backToRequirements={actions.returnToRequirementsFromOutline}
+              backToRequirements={browsePreviousStage ?? (() => undefined)}
+              forward={browseNextStage}
               feedback={state.outlineFeedback}
               setFeedback={actions.setOutlineFeedback}
               applyFeedback={actions.applyOutlineFeedback}
@@ -215,7 +242,8 @@ export function App() {
               pagePreviews={state.generationPagePreviews}
               pinnedPreviewPageId={state.pinnedGenerationPreviewPageId}
               onSelectPreviewPage={actions.selectGenerationPreviewPage}
-              onBack={() => void actions.backFromGeneration()}
+              onBack={browsePreviousStage ?? (() => undefined)}
+              onForward={browseNextStage}
               onBackToOutline={actions.returnToOutlineFromGeneration}
               onResume={actions.resumeDeckGeneration}
               canBackToOutline={state.outline.length > 0}
@@ -231,7 +259,7 @@ export function App() {
               reviewRender={state.reviewRender}
               loading={state.loading}
               onPreview={() => actions.navigate("review")}
-              onBack={() => void actions.backFromDeck()}
+              onBack={browsePreviousStage ?? (() => undefined)}
               onRefineSlide={actions.openRefineSlide}
               onRefineDeck={actions.openRefineDeck}
               onExport={() => actions.navigate("export")}

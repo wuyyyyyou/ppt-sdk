@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowLeft,
+  ArrowRight,
   ArrowUp,
   CheckCircle2,
   ChevronDown,
@@ -40,6 +41,7 @@ interface OutlinePageProps {
   save: () => Promise<void>;
   retry: () => Promise<void>;
   backToRequirements: () => void;
+  forward?: () => void;
   feedback: string;
   setFeedback: (value: string) => void;
   applyFeedback: () => Promise<void>;
@@ -96,6 +98,7 @@ export function OutlinePage(props: OutlinePageProps) {
     save,
     retry,
     backToRequirements,
+    forward,
     feedback,
     setFeedback,
     applyFeedback,
@@ -209,24 +212,6 @@ export function OutlinePage(props: OutlinePageProps) {
     <section className="page active outline-page">
       <div className="page-header compact">
         <div><div className="page-title">{t.outline.title}</div><p>{t.outline.helper}</p></div>
-      </div>
-
-      <div className="outline-review-controls">
-        <div className="feedback-box">
-          <textarea
-            className="prompt-input compact"
-            value={feedback}
-            onChange={(event) => setFeedback(event.target.value)}
-            placeholder={t.outline.feedbackPlaceholder}
-            disabled={busy}
-          />
-          <div className="feedback-actions">
-            <button data-performance-id="outline.rewrite" className="primary-btn" onClick={() => void applyFeedback()} disabled={busy || !feedback.trim()}>
-              {loading === "outline" ? <span className="spinner small" /> : <Sparkles size={14} />}
-              {t.controls.reviseOutline}
-            </button>
-          </div>
-        </div>
       </div>
 
       <section className="outline-card outline-review-card">
@@ -346,13 +331,15 @@ export function OutlinePage(props: OutlinePageProps) {
                 </div>
 
                 <div className={`outline-required-section ${expanded ? "expanded" : ""}`}>
-                  <button data-performance-id="outline.required-content.toggle" className="outline-required-toggle" type="button" disabled={busy} onClick={() => toggleExpanded(index)}>
-                    <span>
-                      <strong>{t.outline.requiredContent}</strong>
-                      <small>{t.outline.requiredContentCount.replace("{count}", String(requiredItems.length))}</small>
-                    </span>
-                    {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </button>
+                  <div className="outline-required-header">
+                    <button data-performance-id="outline.required-content.toggle" className="outline-required-toggle" type="button" disabled={busy} onClick={() => toggleExpanded(index)}>
+                      <span>
+                        <strong>{t.outline.requiredContent}</strong>
+                        <small>{t.outline.requiredContentCount.replace("{count}", String(requiredItems.length))}</small>
+                      </span>
+                      {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </button>
+                  </div>
 
                   {expanded ? (
                     pageIsEditing(index, "required_content") ? (
@@ -389,7 +376,7 @@ export function OutlinePage(props: OutlinePageProps) {
                             </li>
                           ))}
                         </ul>
-                        <span className="outline-markdown-edit"><Pencil size={13} />{t.outline.clickToEdit}</span>
+                        <Pencil className="outline-markdown-edit-icon" size={13} aria-hidden="true" />
                       </div>
                     )
                   ) : null}
@@ -410,24 +397,51 @@ export function OutlinePage(props: OutlinePageProps) {
           </div>
         ) : null}
 
-        <div className="outline-card-footer">
+      </section>
+
+      <div className="outline-review-controls">
+        <strong className="outline-feedback-title">{t.outline.feedbackTitle}</strong>
+        <div className="feedback-box">
+          <textarea
+            className="prompt-input compact"
+            value={feedback}
+            onChange={(event) => setFeedback(event.target.value)}
+            placeholder={t.outline.feedbackPlaceholder}
+            disabled={busy}
+          />
+          <div className="feedback-actions">
+            <button data-performance-id="outline.rewrite" className="primary-btn" onClick={() => void applyFeedback()} disabled={busy || !feedback.trim()}>
+              {loading === "outline" ? <span className="spinner small" /> : <Sparkles size={14} />}
+              {t.controls.reviseOutline}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="outline-card-footer">
+        <div className="stage-navigation">
           <button data-performance-id="outline.back-to-requirements" className="secondary-btn" type="button" onClick={backToRequirements} disabled={busy}>
             <ArrowLeft size={16} />{t.outline.backToRequirements}
           </button>
-          <div className="outline-footer-right">
-            <span className="outline-save-state">{saving ? t.outline.saving : dirty ? t.outline.unsaved : t.outline.saved}</span>
-            <div className="outline-footer-actions">
-              <button data-performance-id="outline.save" className="secondary-btn" type="button" onClick={() => void save()} disabled={busy || !dirty}>
-                <Save size={16} />{t.outline.saveChanges}
-              </button>
-              <button data-performance-id="outline.confirm" className="primary-btn" type="button" onClick={() => void confirm()} disabled={busy}>
-                {loading === "deck" ? <span className="spinner small" /> : <CheckCircle2 size={16} />}
-                {t.controls.confirmOutline}
-              </button>
-            </div>
+          {forward ? (
+            <button data-performance-id="outline.forward" className="secondary-btn" type="button" onClick={forward} disabled={busy}>
+              {t.controls.forward}<ArrowRight size={16} aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
+        <div className="outline-footer-right">
+          <span className="outline-save-state">{saving ? t.outline.saving : dirty ? t.outline.unsaved : t.outline.saved}</span>
+          <div className="outline-footer-actions">
+            <button data-performance-id="outline.save" className="secondary-btn" type="button" onClick={() => void save()} disabled={busy || !dirty}>
+              <Save size={16} />{t.outline.saveChanges}
+            </button>
+            <button data-performance-id="outline.confirm" className="primary-btn" type="button" onClick={() => void confirm()} disabled={busy}>
+              {loading === "deck" ? <span className="spinner small" /> : <CheckCircle2 size={16} />}
+              {t.controls.confirmOutline}
+            </button>
           </div>
         </div>
-      </section>
+      </div>
     </section>
   );
 }

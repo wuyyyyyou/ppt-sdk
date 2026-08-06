@@ -28,7 +28,13 @@ const readyPreviews: GenerationPagePreviews = {
     title: "开场",
     screenshotPath: "/tmp/one.png",
     status: "ready",
-    url: "https://example.test/one.webp",
+    imageUpload: {
+      transport: "host_upload",
+      r2_key: "preview-one",
+      url: "https://example.test/one.webp",
+      mime_type: "image/webp",
+      size_bytes: 123,
+    },
   },
   "page-2": {
     pageId: "page-2",
@@ -36,7 +42,13 @@ const readyPreviews: GenerationPagePreviews = {
     title: "方案",
     screenshotPath: "/tmp/two.png",
     status: "ready",
-    url: "https://example.test/two.webp",
+    imageUpload: {
+      transport: "host_upload",
+      r2_key: "preview-two",
+      url: "https://example.test/two.webp",
+      mime_type: "image/webp",
+      size_bytes: 123,
+    },
   },
 };
 

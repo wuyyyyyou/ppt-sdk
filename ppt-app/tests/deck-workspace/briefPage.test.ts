@@ -65,6 +65,7 @@ function renderBriefPage(options: {
       visualStylePresets: presets,
       selectedVisualStylePresetId: options.selectedVisualStylePresetId ?? null,
       onSelectVisualStylePreset: () => undefined,
+      onForward: () => undefined,
     }),
   );
 }
@@ -77,6 +78,14 @@ function assertDisabledButtonWithLabel(html: string, label: string) {
 }
 
 describe("BriefPage", () => {
+  it("offers stage browsing separately from presentation generation", () => {
+    const html = renderBriefPage();
+
+    assert.match(html, /data-performance-id="brief.forward"/);
+    assert.match(html, />前进</);
+    assert.match(html, /data-performance-id="brief.create-deck"/);
+  });
+
   it("keeps the original styled composer structure", () => {
     const html = renderBriefPage();
 
@@ -87,6 +96,7 @@ describe("BriefPage", () => {
     assert.match(html, /class="prompt-inline-actions"/);
     assert.match(html, /class="inline-create-btn"/);
     assert.match(html, /class="help-tooltip"/);
+    assert.ok(html.indexOf('<textarea class="prompt-input"') < html.indexOf('class="prompt-inline-actions"'));
   });
 
   it("keeps the visual check switch inside the composer action row", () => {
@@ -156,17 +166,21 @@ describe("BriefPage", () => {
     const html = renderBriefPage({ selectedVisualStylePresetId: "midnight-product" });
 
     assert.match(html, /brief-style-preset-card active/);
-    assert.match(html, /aria-pressed="true"[^>]*>[\s\S]*?Midnight Product/);
     assert.match(html, /class="brief-style-preset-selected"/);
   });
 
-  it("offers an all option for every style filter", () => {
+  it("does not expose template filter management", () => {
     const html = renderBriefPage();
 
-    const filterBlock = /class="brief-style-preset-filters"[\s\S]*?class="brief-style-preset-grid"/
-      .exec(html)?.[0] ?? "";
-    const allOptions = filterBlock.match(/<option value=""[^>]*>全部<\/option>/g) ?? [];
-    assert.equal(allOptions.length, 5);
-    assert.match(filterBlock, /<option value="咨询">咨询<\/option>/);
+    assert.doesNotMatch(html, /brief-style-preset-filters/);
+    assert.doesNotMatch(html, /视觉风格筛选/);
+  });
+
+  it("opens a preview from the whole card and only applies the style from the dialog", () => {
+    const html = renderBriefPage();
+
+    assert.match(html, /data-performance-id="brief.visual-style.preview"[^>]*aria-haspopup="dialog"/);
+    assert.doesNotMatch(html, /brief-style-preset-preview-btn/);
+    assert.doesNotMatch(html, /data-performance-id="brief.visual-style.select"/);
   });
 });

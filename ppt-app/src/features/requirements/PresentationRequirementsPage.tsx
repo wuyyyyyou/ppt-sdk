@@ -1,5 +1,5 @@
-import { ArrowLeft, Check, ChevronDown, RefreshCw, Save, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, ArrowRight, Check, ChevronDown, RefreshCw, Save, Sparkles } from "lucide-react";
+import { useRef, useState } from "react";
 import type {
   PresentationRequirementCandidate,
   PresentationRequirements,
@@ -10,6 +10,7 @@ import { ErrorNotice } from "../deck-workspace/components/ErrorNotice";
 
 type SemanticField = "audience" | "purpose" | "desired_outcome" | "visual_tone";
 type SimpleField = "slide_count" | "output_language";
+type RequirementField = SemanticField | SimpleField;
 
 export interface PresentationRequirementsPageProps {
   t: Messages;
@@ -29,6 +30,7 @@ export interface PresentationRequirementsPageProps {
   onRetry: () => void;
   onManual: () => void;
   onBack: () => void;
+  onForward?: () => void;
   onSave: () => void;
   onConfirm: () => void;
 }
@@ -47,7 +49,7 @@ function semanticMatches(
 }
 
 export function PresentationRequirementsPage(props: PresentationRequirementsPageProps) {
-  const { t, brief, requirements, status, error, errorDetail, saving, confirming, dirty, hasSavedDraft, onSelect, onRetry, onManual, onBack, onSave, onConfirm } = props;
+  const { t, brief, requirements, status, error, errorDetail, saving, confirming, dirty, hasSavedDraft, onSelect, onRetry, onManual, onBack, onForward, onSave, onConfirm } = props;
   const [customValues, setCustomValues] = useState<Record<string, string>>(() => {
     const values: Record<string, string> = {};
     for (const field of ["audience", "purpose", "desired_outcome", "visual_tone"] as const) {
@@ -64,14 +66,46 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
     }
     return values;
   });
+  const [activeCustomFields, setActiveCustomFields] = useState<Set<RequirementField>>(() => {
+    const active = new Set<RequirementField>();
+    for (const field of ["audience", "purpose", "desired_outcome", "visual_tone"] as const) {
+      const selection = requirements.selections[field];
+      if (selection && !requirements.candidates[field].some((candidate) => semanticMatches(selection, candidate))) {
+        active.add(field);
+      }
+    }
+    for (const field of ["slide_count", "output_language"] as const) {
+      const selection = requirements.selections[field];
+      if (selection !== null && !(requirements.candidates[field] as Array<number | string>).includes(selection)) {
+        active.add(field);
+      }
+    }
+    return active;
+  });
+  const customInputRefs = useRef<Partial<Record<RequirementField, HTMLInputElement | null>>>({});
+
+  function setCustomFieldActive(field: RequirementField, active: boolean) {
+    setActiveCustomFields((current) => {
+      const next = new Set(current);
+      if (active) next.add(field);
+      else next.delete(field);
+      return next;
+    });
+  }
+
+  function clearSelection(field: RequirementField) {
+    onSelect(field as never, null as never);
+  }
 
   function setCustomSemantic(field: SemanticField, value: string) {
     setCustomValues((current) => ({ ...current, [field]: value }));
+    setCustomFieldActive(field, true);
     onSelect(field, value.trim() ? { label: t.requirements.other, description: value.trim() } : null);
   }
 
   function setCustomSimple(field: SimpleField, value: string) {
     setCustomValues((current) => ({ ...current, [field]: value }));
+    setCustomFieldActive(field, true);
     if (field === "slide_count") {
       const number = Number(value);
       onSelect(field, Number.isInteger(number) && number > 0 ? number : null);
@@ -79,6 +113,36 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
     }
     const language = value.trim();
     onSelect(field, language && language.toLowerCase() !== "auto" ? language : null);
+  }
+
+  function applyCustomValue(field: RequirementField, value: string) {
+    if (field === "slide_count" || field === "output_language") {
+      setCustomSimple(field, value);
+    } else {
+      setCustomSemantic(field, value);
+    }
+  }
+
+  function activateCustomField(field: RequirementField, focusInput = false) {
+    setCustomFieldActive(field, true);
+    applyCustomValue(field, customValues[field] ?? "");
+    if (focusInput) {
+      window.setTimeout(() => customInputRefs.current[field]?.focus(), 0);
+    }
+  }
+
+  function toggleCustomField(field: RequirementField) {
+    if (activeCustomFields.has(field)) {
+      setCustomFieldActive(field, false);
+      clearSelection(field);
+      return;
+    }
+    activateCustomField(field, true);
+  }
+
+  function selectCandidate(field: RequirementField, candidate: unknown) {
+    setCustomFieldActive(field, false);
+    onSelect(field as never, candidate as never);
   }
 
   if (status === "loading") {
@@ -153,9 +217,7 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
               const candidates = requirements.candidates[field];
               const selection = requirements.selections[field];
               const customValue = customValues[field] ?? "";
-              const customSelected = isSemantic
-                ? Boolean(selection && !candidates.some((candidate) => semanticMatches(selection as PresentationRequirementCandidate, candidate as PresentationRequirementCandidate)))
-                : Boolean(selection !== null && !candidates.includes(selection as never));
+              const customSelected = activeCustomFields.has(field);
               return (
                 <fieldset className="requirement-field" key={field}>
                   <legend>{t.requirements.fields[field]}</legend>
@@ -171,7 +233,7 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
                           data-performance-id={`requirements.${field}.select-candidate`}
                           type="button"
                           className={`requirement-option ${selected ? "selected" : ""}`}
-                          onClick={() => onSelect(field as never, candidate as never)}
+                          onClick={() => selectCandidate(field, candidate)}
                           key={`${label}-${index}`}
                         >
                           <span className="requirement-radio">{selected ? <Check size={13} strokeWidth={3} /> : null}</span>
@@ -180,20 +242,37 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
                         </button>
                       );
                     })}
-                    <label className={`requirement-option requirement-custom ${customSelected ? "selected" : ""}`}>
+                    <div
+                      className={`requirement-option requirement-custom${customSelected ? " selected" : ""}`}
+                      role="radio"
+                      aria-checked={customSelected}
+                      tabIndex={0}
+                      onClick={() => toggleCustomField(field)}
+                      onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) return;
+                        event.preventDefault();
+                        toggleCustomField(field);
+                      }}
+                    >
                       <span className="requirement-radio">{customSelected ? <Check size={13} strokeWidth={3} /> : null}</span>
                       <span><strong>{t.requirements.other}</strong>
                         <input
+                          ref={(element) => { customInputRefs.current[field] = element; }}
                           type={field === "slide_count" ? "number" : "text"}
                           min={field === "slide_count" ? 1 : undefined}
                           value={customValue}
+                          disabled={saving || confirming}
                           placeholder={t.requirements.customPlaceholders[field]}
+                          onClick={(event) => event.stopPropagation()}
+                          onFocus={() => {
+                            if (!activeCustomFields.has(field)) activateCustomField(field);
+                          }}
                           onChange={(event) => isSemantic
                             ? setCustomSemantic(field as SemanticField, event.target.value)
                             : setCustomSimple(field as SimpleField, event.target.value)}
                         />
                       </span>
-                    </label>
+                    </div>
                   </div>
                 </fieldset>
               );
@@ -203,7 +282,14 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
       </div>
 
       <footer className="requirements-footer">
-        <button data-performance-id="requirements.back" className="secondary-btn" type="button" onClick={onBack}><ArrowLeft size={16} />{t.requirements.back}</button>
+        <div className="stage-navigation">
+          <button data-performance-id="requirements.back" className="secondary-btn" type="button" onClick={onBack}><ArrowLeft size={16} />{t.requirements.back}</button>
+          {onForward ? (
+            <button data-performance-id="requirements.forward" className="secondary-btn" type="button" onClick={onForward} disabled={saving || confirming}>
+              {t.controls.forward}<ArrowRight size={16} aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
         <span>{confirming ? t.requirements.confirming : saving ? t.requirements.saving : dirty ? t.requirements.unsaved : hasSavedDraft ? t.requirements.saved : ""}</span>
         <div className="requirements-footer-actions">
           <button data-performance-id="requirements.save" className="secondary-btn" type="button" disabled={saving || confirming || !dirty} onClick={onSave}>

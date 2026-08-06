@@ -13,12 +13,13 @@ interface GenerationPagePreviewPanelProps {
   previews: GenerationPagePreviews;
   pinnedPageId: string | null;
   onSelectPage: (pageId: string | null) => void;
+  activePageIndex?: number | null;
 }
 
 export function GenerationPagePreviewPanel(props: GenerationPagePreviewPanelProps) {
-  const { t, previews, pinnedPageId, onSelectPage } = props;
+  const { t, previews, pinnedPageId, onSelectPage, activePageIndex } = props;
   const entries = useMemo(() => orderGenerationPagePreviews(previews), [previews]);
-  const selected = resolveGenerationPreviewSelection({ entries, pinnedPageId });
+  const selected = resolveGenerationPreviewSelection({ entries, pinnedPageId, activePageIndex });
   const latest = entries[entries.length - 1] ?? null;
   const followingLatest = !pinnedPageId || pinnedPageId === latest?.pageId;
 

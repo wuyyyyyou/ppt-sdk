@@ -1,14 +1,7 @@
-import { Check, ChevronDown, ChevronLeft, ChevronRight, HelpCircle, ImageOff, Maximize2, Sparkles, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowRight, Check, ChevronLeft, ChevronRight, HelpCircle, ImageOff, Sparkles, X } from "lucide-react";
+import { useState } from "react";
 import type { Messages } from "../../../i18n/messages";
 import type { VisualStylePreset } from "../../../api/types";
-import {
-  buildVisualStylePresetFilterOptions,
-  createEmptyVisualStylePresetFilters,
-  filterVisualStylePresets,
-  VISUAL_STYLE_PRESET_FILTER_FIELDS,
-  type VisualStylePresetFilters,
-} from "../../templates/visualStylePresetFilters";
 import {
   isStrictReviewModeEnabled,
   type PageReviewSettings,
@@ -32,6 +25,7 @@ export interface BriefPageProps {
   visualStylePresets: readonly VisualStylePreset[];
   selectedVisualStylePresetId: string | null;
   onSelectVisualStylePreset: (presetId: string | null) => void;
+  onForward?: () => void;
 }
 
 export function BriefPage({
@@ -48,6 +42,7 @@ export function BriefPage({
   visualStylePresets,
   selectedVisualStylePresetId,
   onSelectVisualStylePreset,
+  onForward,
 }: BriefPageProps) {
   const busy = loading !== "none";
   const strictReviewMode = isStrictReviewModeEnabled(pageReviewSettings);
@@ -55,17 +50,6 @@ export function BriefPage({
   const [submitting, setSubmitting] = useState(false);
   const [preview, setPreview] = useState<{ preset: VisualStylePreset; index: number } | null>(null);
   const [brokenPreviewIds, setBrokenPreviewIds] = useState<string[]>([]);
-  const [presetFilters, setPresetFilters] = useState<VisualStylePresetFilters>(
-    createEmptyVisualStylePresetFilters,
-  );
-  const filterOptions = useMemo(
-    () => buildVisualStylePresetFilterOptions(visualStylePresets),
-    [visualStylePresets],
-  );
-  const filteredPresets = useMemo(
-    () => filterVisualStylePresets(visualStylePresets, presetFilters),
-    [presetFilters, visualStylePresets],
-  );
   // A local guard so the very first click already locks the composer, before the
   // Workspace or requirements request has had a chance to move `loading`.
   const submitBlocked = busy || submitting || workspaceSettingsSaving;
@@ -167,25 +151,6 @@ export function BriefPage({
           </div>
           <span className="brief-style-presets-note">{selectedVisualStylePresetId ? t.template.selected : t.template.noneSelected}</span>
         </div>
-        <div className="brief-style-preset-filters" role="group" aria-label={t.template.filtersLabel}>
-          {VISUAL_STYLE_PRESET_FILTER_FIELDS.map((field) => (
-            <label className={`brief-style-preset-filter ${presetFilters[field] ? "active" : ""}`} key={field}>
-              <span>{t.template.filters[field]}</span>
-              <select
-                value={presetFilters[field]}
-                disabled={busy}
-                title={presetFilters[field] || t.template.all}
-                onChange={(event) => setPresetFilters((current) => ({ ...current, [field]: event.target.value }))}
-              >
-                <option value="">{t.template.all}</option>
-                {filterOptions[field].map((option) => (
-                  <option value={option} key={option}>{option}</option>
-                ))}
-              </select>
-              <ChevronDown className="brief-style-preset-filter-chevron" size={14} aria-hidden="true" />
-            </label>
-          ))}
-        </div>
         <div className="brief-style-preset-grid">
           {/* The "no preset" card keeps its visible label: HOME-004 only covers
               ordinary Visual Style Preset cards, and its final form is still an
@@ -221,7 +186,7 @@ export function BriefPage({
               <strong>{t.template.none}</strong>
             </span>
           </button>
-          {filteredPresets.map((preset: VisualStylePreset) => {
+          {visualStylePresets.map((preset: VisualStylePreset) => {
             const selected = selectedVisualStylePresetId === preset.id;
             const cover = preset.preview_images[0];
             const coverBroken = brokenPreviewIds.includes(preset.id);
@@ -246,25 +211,14 @@ export function BriefPage({
                   )}
                 </span>
                 <button
-                  data-performance-id="brief.visual-style.select"
+                  data-performance-id="brief.visual-style.preview"
                   type="button"
                   className="brief-style-preset-select"
                   disabled={busy}
-                  aria-pressed={selected}
-                  onClick={() => onSelectVisualStylePreset(preset.id)}
-                >
-                  <span className="brief-style-preset-accessible-name">{preset.name}</span>
-                </button>
-                <button
-                  data-performance-id="brief.visual-style.preview"
-                  type="button"
-                  className="brief-style-preset-preview-btn"
-                  disabled={busy}
-                  title={`${t.template.previewTitle} · ${preset.name}`}
-                  aria-label={`${t.template.previewTitle} · ${preset.name}`}
+                  aria-haspopup="dialog"
                   onClick={() => setPreview({ preset, index: 0 })}
                 >
-                  <Maximize2 size={14} aria-hidden="true" />
+                  <span className="brief-style-preset-accessible-name">{preset.name}</span>
                 </button>
                 {selected ? (
                   <span className="brief-style-preset-selected" aria-hidden="true"><Check size={14} /></span>
@@ -272,11 +226,19 @@ export function BriefPage({
               </article>
             );
           })}
-          {filteredPresets.length === 0 ? (
-            <p className="brief-style-preset-empty">{t.template.noFilterMatches}</p>
+          {visualStylePresets.length === 0 ? (
+            <p className="brief-style-preset-empty">{t.template.empty}</p>
           ) : null}
         </div>
       </section>
+
+      {onForward ? (
+        <div className="stage-navigation stage-navigation-end">
+          <button data-performance-id="brief.forward" className="secondary-btn" type="button" onClick={onForward} disabled={busy}>
+            {t.controls.forward}<ArrowRight size={16} aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
 
       {preview ? (
         <div className="template-preview-modal" role="dialog" aria-modal="true" aria-label={preview.preset.name} onClick={() => setPreview(null)}>
@@ -292,7 +254,16 @@ export function BriefPage({
             </div>
             <footer className="template-preview-modal-footer">
               <span className="template-preview-modal-layout-name">{t.template.previewTitle}</span>
-              <button data-performance-id="brief.visual-style.preview.use" type="button" className="template-use-btn" onClick={() => { onSelectVisualStylePreset(preview.preset.id); setPreview(null); }}>{t.controls.useTemplate}</button>
+              <button
+                data-performance-id="brief.visual-style.preview.use"
+                type="button"
+                className="template-use-btn"
+                disabled={busy || selectedVisualStylePresetId === preview.preset.id}
+                onClick={() => { onSelectVisualStylePreset(preview.preset.id); setPreview(null); }}
+              >
+                {selectedVisualStylePresetId === preview.preset.id ? <Check size={14} /> : null}
+                {selectedVisualStylePresetId === preview.preset.id ? t.template.selected : t.controls.useTemplate}
+              </button>
             </footer>
           </section>
         </div>

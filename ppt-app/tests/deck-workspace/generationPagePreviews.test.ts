@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import type { DeckGenerationProgress, DeckGenerationProgressPage } from "../../src/features/deck-generation/index.ts";
 import {
   orderGenerationPagePreviews,
+  createLoadingGenerationPagePreviews,
   isGenerationPagePreviewReusable,
   reconcileGenerationPagePreviews,
   resolveGenerationPreviewSelection,
@@ -40,7 +41,7 @@ function makeProgress(pages: DeckGenerationProgressPage[]): DeckGenerationProgre
 }
 
 describe("selectGenerationPagePreviewSources", () => {
-  it("only offers pages that already rendered, in deck order", () => {
+  it("offers every planned page and leaves unrendered pages loading", () => {
     const sources = selectGenerationPagePreviewSources(
       makeProgress([
         makePage({ page_id: "page-2", index: 1, title: "Two", last_screenshot_path: "/tmp/two.png" }),
@@ -55,6 +56,8 @@ describe("selectGenerationPagePreviewSources", () => {
       [
         ["page-1", 0, "/tmp/one.png"],
         ["page-2", 1, "/tmp/two.png"],
+        ["page-3", 2, ""],
+        ["page-4", 3, ""],
       ],
     );
   });
@@ -84,6 +87,14 @@ describe("reconcileGenerationPagePreviews", () => {
 
     assert.equal(changed, true);
     assert.deepEqual(pending, [source]);
+    assert.equal(previews["page-1"]?.status, "loading");
+  });
+
+  it("keeps an unrendered page loading without requesting an image", () => {
+    const waiting = { ...source, screenshotPath: "" };
+    const { previews, pending } = reconcileGenerationPagePreviews({}, [waiting]);
+
+    assert.deepEqual(pending, []);
     assert.equal(previews["page-1"]?.status, "loading");
   });
 
@@ -224,6 +235,15 @@ describe("resolveGenerationPreviewSelection", () => {
     assert.equal(selected?.pageId, "page-2");
   });
 
+  it("follows the actively generating page even before it renders", () => {
+    const selected = resolveGenerationPreviewSelection({
+      entries,
+      pinnedPageId: null,
+      activePageIndex: 2,
+    });
+    assert.equal(selected?.pageId, "page-3");
+  });
+
   it("keeps the page the user picked", () => {
     const selected = resolveGenerationPreviewSelection({ entries, pinnedPageId: "page-1" });
     assert.equal(selected?.pageId, "page-1");
@@ -239,6 +259,18 @@ describe("resolveGenerationPreviewSelection", () => {
 
   it("has nothing to show before the first page renders", () => {
     assert.equal(resolveGenerationPreviewSelection({ entries: [], pinnedPageId: null }), null);
+  });
+});
+
+describe("createLoadingGenerationPagePreviews", () => {
+  it("replaces old images with loading-only entries for the requested scope", () => {
+    const previews = createLoadingGenerationPagePreviews([
+      { pageId: "page-2", pageIndex: 1, title: "Two" },
+    ]);
+
+    assert.deepEqual(Object.keys(previews), ["page-2"]);
+    assert.equal(previews["page-2"]?.status, "loading");
+    assert.equal(previews["page-2"]?.imageUpload, undefined);
   });
 });
 

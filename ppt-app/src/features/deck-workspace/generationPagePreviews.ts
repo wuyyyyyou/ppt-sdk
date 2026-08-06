@@ -23,10 +23,8 @@ export interface GenerationPagePreviewEntry extends GenerationPagePreviewSource 
 
 export type GenerationPagePreviews = Record<string, GenerationPagePreviewEntry | undefined>;
 
-/**
- * A page only has a screenshot path once it rendered successfully, so this is
- * also the "which pages can be previewed yet" question during a run.
- */
+/** Every planned page participates in preview state. Pages without a rendered
+ * screenshot stay loading instead of leaving an unexplained empty frame. */
 export function selectGenerationPagePreviewSources(
   progress: DeckGenerationProgress | null,
 ): GenerationPagePreviewSource[] {
@@ -34,7 +32,7 @@ export function selectGenerationPagePreviewSources(
     .flatMap((page) => {
       const screenshotPath = page.last_screenshot_path?.trim() ?? "";
       const pageId = page.page_id?.trim() ?? "";
-      if (!screenshotPath || !pageId) return [];
+      if (!pageId) return [];
       return [{
         pageId,
         pageIndex: page.index,
@@ -92,7 +90,7 @@ export function reconcileGenerationPagePreviews(
       continue;
     }
     previews[source.pageId] = { ...source, status: "loading" };
-    pending.push(source);
+    if (source.screenshotPath) pending.push(source);
     changed = true;
   }
 
@@ -115,15 +113,34 @@ export function orderGenerationPagePreviews(
 export function resolveGenerationPreviewSelection(input: {
   entries: readonly GenerationPagePreviewEntry[];
   pinnedPageId: string | null;
+  activePageIndex?: number | null;
 }): GenerationPagePreviewEntry | null {
-  const { entries, pinnedPageId } = input;
+  const { entries, pinnedPageId, activePageIndex } = input;
   if (entries.length === 0) return null;
   if (pinnedPageId) {
     const pinned = entries.find((entry) => entry.pageId === pinnedPageId);
     if (pinned) return pinned;
   }
+  if (activePageIndex !== null && activePageIndex !== undefined) {
+    const active = entries.find((entry) => entry.pageIndex === activePageIndex);
+    if (active) return active;
+  }
   const readyEntries = entries.filter((entry) => entry.status === "ready");
   return readyEntries[readyEntries.length - 1] ?? entries[entries.length - 1];
+}
+
+export function createLoadingGenerationPagePreviews(
+  pages: ReadonlyArray<{ pageId: string; pageIndex: number; title: string }>,
+): GenerationPagePreviews {
+  return Object.fromEntries(
+    pages
+      .filter((page) => page.pageId.trim())
+      .map((page) => [page.pageId, {
+        ...page,
+        screenshotPath: "",
+        status: "loading" as const,
+      }]),
+  );
 }
 
 export function isGenerationPagePreviewReusable(input: {

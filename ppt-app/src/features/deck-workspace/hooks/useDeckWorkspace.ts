@@ -135,6 +135,7 @@ import {
   type WorkspaceCovers,
 } from "../workspaceCovers";
 import {
+  createLoadingGenerationPagePreviews,
   GENERATION_PAGE_PREVIEW_CONCURRENCY,
   reconcileGenerationPagePreviews,
   selectGenerationPagePreviewSources,
@@ -1632,6 +1633,23 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     generationPagePreviewsRef.current = {};
     setGenerationPagePreviews({});
     setPinnedGenerationPreviewPageId(null);
+  }
+
+  function showRefinementLoadingPreviews(
+    scope: RefineScope,
+    items: readonly WorkspaceOutlineItem[],
+    targetPageId: string | undefined,
+  ) {
+    const pages = items.flatMap((item, pageIndex) => {
+      const pageId = item.page_id?.trim() ?? "";
+      if (!pageId || (scope === "slide" && pageId !== targetPageId)) return [];
+      return [{ pageId, pageIndex, title: item.title }];
+    });
+    const previews = createLoadingGenerationPagePreviews(pages);
+    generationPagePreviewSessionRef.current += 1;
+    generationPagePreviewsRef.current = previews;
+    setGenerationPagePreviews(previews);
+    setPinnedGenerationPreviewPageId(targetPageId ?? pages[0]?.pageId ?? null);
   }
 
   useEffect(() => {
@@ -3933,7 +3951,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function refineDeck(instruction: string) {
-    if (!backend || !aiClient || !researchAiClient || !researchWebClient || !agentClient || !hostUploadClient) return;
+    if (!backend || !aiClient || !researchAiClient || !researchWebClient || !agentClient || !hostUploadClient || !currentWorkspace) return;
     const trimmedInstruction = instruction.trim();
     if (!trimmedInstruction) return;
 
@@ -3942,7 +3960,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     let generationRun: GenerationRunTransaction | null = null;
     const cancelSignal = beginCancellableGeneration();
     setLoading("refineDeck");
-    resetGenerationProgress({ preservePagePreviews: true });
+    resetGenerationProgress();
+    const initialOutline = workspaceOutlineForDownstream(currentWorkspace).items;
+    const initialTargetPageId = initialOutline[currentSlide]?.page_id;
+    showRefinementLoadingPreviews("deck", initialOutline, initialTargetPageId);
+    setStage("generating");
+    setPage("main");
     try {
       const refreshedWorkspace = await refreshCurrentWorkspaceSnapshot();
       if (!refreshedWorkspace) return;
@@ -3950,8 +3973,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       generationRun = shadowRun.transaction;
       activeRunWorkspaceDir = shadowRun.workspace.workspace_dir;
       shouldReconcileActiveRun = true;
-      setStage("generating");
-      setPage("main");
+      showRefinementLoadingPreviews(
+        "deck",
+        workspaceOutlineForDownstream(shadowRun.workspace).items,
+        initialTargetPageId,
+      );
       const completion = await measurePerformanceOperation("deck_refinement.run", shadowRun.workspace.workspace_dir, () => runDeckRefinement({
         backend,
         aiClient,
@@ -4003,7 +4029,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function refineSlide(instruction: string) {
-    if (!backend || !aiClient || !researchAiClient || !researchWebClient || !agentClient || !hostUploadClient) return;
+    if (!backend || !aiClient || !researchAiClient || !researchWebClient || !agentClient || !hostUploadClient || !currentWorkspace) return;
     const trimmedInstruction = instruction.trim();
     if (!trimmedInstruction) return;
     const slide = deck[currentSlide];
@@ -4014,7 +4040,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     let generationRun: GenerationRunTransaction | null = null;
     const cancelSignal = beginCancellableGeneration();
     setLoading("refineSlide");
-    resetGenerationProgress({ preservePagePreviews: true });
+    resetGenerationProgress();
+    const initialOutline = workspaceOutlineForDownstream(currentWorkspace).items;
+    const initialTargetPageId = initialOutline[currentSlide]?.page_id;
+    showRefinementLoadingPreviews("slide", initialOutline, initialTargetPageId);
+    setStage("generating");
+    setPage("main");
     try {
       const refreshedWorkspace = await refreshCurrentWorkspaceSnapshot();
       if (!refreshedWorkspace) return;
@@ -4023,8 +4054,11 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       generationRun = shadowRun.transaction;
       activeRunWorkspaceDir = shadowRun.workspace.workspace_dir;
       shouldReconcileActiveRun = true;
-      setStage("generating");
-      setPage("main");
+      showRefinementLoadingPreviews(
+        "slide",
+        workspaceOutlineForDownstream(shadowRun.workspace).items,
+        originPageId,
+      );
       const completion = await measurePerformanceOperation("page_refinement.run", shadowRun.workspace.workspace_dir, () => runDeckRefinement({
         backend,
         aiClient,
