@@ -109,7 +109,9 @@ export function buildPersistentElementsStageGroup(input: {
       return {
         id: snapshot.id,
         stageKey: "persistentElements",
-        label: t.generating.persistentElements.session,
+        label: state === "active"
+          ? t.generating.persistentElements.session
+          : t.generating.stageRecords.stages.persistentElements,
         statusLabel: stateLabel(t, state),
         state,
         lines: [...snapshot.lines],
@@ -126,7 +128,9 @@ export function buildPersistentElementsStageGroup(input: {
   const activeRecords: PageGenerationStageRecord[] = activeStream ? [{
     id: activeId as string,
     stageKey: "persistentElements",
-    label: t.generating.persistentElements.session,
+    label: activeState === "active"
+      ? t.generating.persistentElements.session
+      : t.generating.stageRecords.stages.persistentElements,
     statusLabel: stateLabel(t, activeState),
     state: activeState,
     lines: [...activeStream.lines],

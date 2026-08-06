@@ -487,13 +487,13 @@ function PageStageRecordView(props: {
   onToggle: () => void;
 }) {
   const { stage, t, open, onToggle } = props;
-  const displayActivities = stage.activities
-    .map((activity) => sanitizeGenerationDebugText(activity))
-    .filter((activity) => activity.length > 0);
   const displayLines = stage.lines
     .map((line) => sanitizeGenerationDebugText(line))
     .filter((line) => line.length > 0);
   const hasLines = displayLines.some((line) => line.trim());
+  const emptyMessage = stage.state === "active"
+    ? stage.label
+    : stage.lastError ?? t.generating.stageRecords.noOutput;
   const badgeState = statusBadgeState(stage.state);
 
   return (
@@ -523,20 +523,13 @@ function PageStageRecordView(props: {
       </button>
       {open ? (
         <div className="generation-stage-body">
-          {displayActivities.length > 0 ? (
-            <div className="generation-activity-list" aria-label={t.generating.stageRecords.activities}>
-              {displayActivities.map((activity, index) => (
-                <span key={`${stage.id}-activity-${index}`}>{activity}</span>
-              ))}
-            </div>
-          ) : null}
           {hasLines ? (
             <pre className="generation-stream-text" aria-label={t.generating.stageRecords.stream}>
               {displayLines.join("\n").trim()}
             </pre>
           ) : null}
-          {!hasLines && displayActivities.length === 0 ? (
-            <p className="generation-empty-stream">{stage.lastError ?? t.generating.stageRecords.noOutput}</p>
+          {!hasLines ? (
+            <p className="generation-empty-stream">{emptyMessage}</p>
           ) : null}
         </div>
       ) : null}

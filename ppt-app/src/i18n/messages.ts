@@ -1136,7 +1136,7 @@ export const messages: Record<Locale, Messages> = {
           visualResearchCuration: "Curating images",
           prepare: "File preparation",
           persistentElements: "Generating shared decorations",
-          authoring: "Page expression",
+          authoring: "Designing page content and layout",
           deckRefinement: "Deck refinement",
           rendering: "Page rendering",
           renderFix: "Render issue fix",
@@ -1776,7 +1776,7 @@ export const messages: Record<Locale, Messages> = {
       },
       persistentElements: {
         title: "跨页装饰生成",
-        session: "生成跨页装饰"
+        session: "正在生成跨页装饰"
       },
       researchDiscovery: {
         title: "事实收集",
@@ -1885,7 +1885,7 @@ export const messages: Record<Locale, Messages> = {
           visualResearchCuration: "筛选图片素材",
           prepare: "文件准备",
           persistentElements: "生成跨页装饰",
-          authoring: "页面表达",
+          authoring: "设计页面内容和布局",
           deckRefinement: "整套优化",
           rendering: "页面渲染",
           renderFix: "渲染问题修复",
