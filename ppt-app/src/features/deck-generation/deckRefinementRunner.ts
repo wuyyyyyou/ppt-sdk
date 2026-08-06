@@ -4,7 +4,7 @@ import type { PageProgress, RenderDeckHtmlResult, WorkspaceOutline, WorkspaceRes
 import { createProgress, emit as emitProgress } from "./progressProjection";
 import { failedCompletion } from "./deckGenerationCompletion";
 import { runDeckGeneration } from "./deckGenerationWorkflow";
-import { authoringDeckFromConfirmedOutline } from "./deckGenerationStartArtifacts";
+import { authoringDeckFromConfirmedOutline, ensurePersistentElementsReference } from "./deckGenerationStartArtifacts";
 import { getAttemptLimits } from "./settings";
 import type { DeckGenerationCompletion, RunDeckRefinementInput } from "./types";
 
@@ -38,7 +38,7 @@ function readRenderedDeck(workspace: WorkspaceResult): RenderDeckHtmlResult | nu
   };
 }
 
-function emit(input: RunDeckRefinementInput, progress: PageProgress | null, step: "deck-refinement-planning" | "deck-refinement-style-guide" | "deck-refinement-commit", message: string) {
+function emit(input: RunDeckRefinementInput, progress: PageProgress | null, step: "deck-refinement-planning" | "deck-refinement-style-guide" | "persistent-elements" | "deck-refinement-commit", message: string) {
   emitProgress(input, {
     step,
     message,
@@ -216,6 +216,13 @@ export async function runDeckRefinementWorkflow(input: RunDeckRefinementInput, i
         metadata: { workspace_dir: input.workspace.workspace_dir, artifact: "workspace-style-guide-refinement" },
       });
       styleGuideUpload = { size_bytes: hostUpload.size_bytes, host_upload: hostUpload };
+    }
+
+    if (plan.persistent_elements_action === "revise") {
+      emit(input, progress, "persistent-elements", input.locale === "zh" ? "正在重写跨页固定元素参考" : "Revising persistent elements reference");
+      await ensurePersistentElementsReference(input, true);
+    } else {
+      emit(input, progress, "persistent-elements", input.locale === "zh" ? "沿用现有跨页固定元素参考" : "Preserving the existing persistent elements reference");
     }
 
     emit(input, null, "deck-refinement-commit", input.locale === "zh" ? "正在提交整套优化方案" : "Committing deck refinement");

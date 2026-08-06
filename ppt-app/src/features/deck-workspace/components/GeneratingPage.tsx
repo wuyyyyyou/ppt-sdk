@@ -2,7 +2,7 @@ import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, Circle, LoaderCircle
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Messages } from "../../../i18n/messages";
 import type { DeckGenerationProgress, DeckGenerationStep } from "../../deck-generation";
-import { buildPageGenerationStageRecords, type PageGenerationStageRecord, type PageGenerationStageRecordGroup } from "../generationStageRecords";
+import { buildPageGenerationStageRecords, buildPersistentElementsStageGroup, type PageGenerationStageRecord, type PageGenerationStageRecordGroup, type PersistentElementsStageGroup } from "../generationStageRecords";
 import { buildResearchDiscoveryStageRecords, type ResearchDiscoveryStageRecord, type ResearchDiscoveryStageGroup } from "../researchDiscoveryStageRecords";
 import {
   buildGenerationPageSummary,
@@ -212,7 +212,21 @@ function GenerationProgressPanel(props: {
     () => buildResearchDiscoveryStageRecords({ t, progress }),
     [t, progress],
   );
+  const persistentElementsGroup = useMemo(
+    () => buildPersistentElementsStageGroup({ t, progress, history }),
+    [t, progress, history],
+  );
+  const persistentElementsDisclosureGroups = useMemo(() => persistentElementsGroup ? [{
+    pageId: "persistent-elements",
+    pageIndex: -1,
+    title: persistentElementsGroup.title,
+    pageStatus: persistentElementsGroup.state,
+    pageStatusLabel: persistentElementsGroup.statusLabel,
+    state: persistentElementsGroup.state,
+    stages: persistentElementsGroup.records,
+  }] : [], [persistentElementsGroup]);
   const disclosure = useStageDisclosure(stageGroups);
+  const persistentElementsDisclosure = useStageDisclosure(persistentElementsDisclosureGroups);
   const researchDisclosure = useResearchDiscoveryDisclosure(researchDiscoveryGroup);
   const running = isProgressRunning(progress);
 
@@ -235,6 +249,13 @@ function GenerationProgressPanel(props: {
           ) : null}
         </div>
       </div>
+      {persistentElementsGroup ? (
+        <PersistentElementsStageGroupView
+          group={persistentElementsGroup}
+          t={t}
+          disclosure={persistentElementsDisclosure}
+        />
+      ) : null}
       {researchDiscoveryGroup ? (
         <ResearchDiscoveryStageGroupView
           group={researchDiscoveryGroup}
@@ -255,6 +276,33 @@ function GenerationProgressPanel(props: {
         </div>
       ) : null}
     </section>
+  );
+}
+
+function PersistentElementsStageGroupView(props: {
+  group: PersistentElementsStageGroup;
+  t: Messages;
+  disclosure: ReturnType<typeof useStageDisclosure>;
+}) {
+  const { group, t, disclosure } = props;
+  return (
+    <article className={`generation-page-item generation-stage-page persistent-elements-stage-group ${group.state}`}>
+      <div className="generation-page-item-header">
+        <div><strong>{group.title}</strong></div>
+        <span className={`generation-status-badge ${statusBadgeState(group.state)}`}>{group.statusLabel}</span>
+      </div>
+      <div className="generation-page-stage-list">
+        {group.records.map((record) => (
+          <PageStageRecordView
+            key={record.id}
+            stage={record}
+            t={t}
+            open={disclosure.isOpen(record)}
+            onToggle={() => disclosure.toggle(record.id)}
+          />
+        ))}
+      </div>
+    </article>
   );
 }
 

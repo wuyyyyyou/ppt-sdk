@@ -59,6 +59,7 @@ export interface WorkspaceFiles {
   outline: string;
   manifest: string;
   style_guide: string;
+  persistent_elements: string;
   authoring_kit: string;
   page_plan?: string;
   page_progress: string;
@@ -760,6 +761,8 @@ export interface AppendWorkspaceLogInput {
     | "ai-outline-interactions"
     | "ai-style-guide"
     | "ai-style-guide-interactions"
+    | "ai-persistent-elements"
+    | "ai-persistent-elements-interactions"
     | "ai-page-plan"
     | "ai-page-plan-interactions"
     | "ai-page-agent"
@@ -1452,6 +1455,15 @@ export interface WorkspaceStyleGuideStatus {
 
 export interface WorkspaceStyleGuide extends WorkspaceStyleGuideStatus {
   content: string;
+}
+
+export interface WorkspacePersistentElementsReferenceStatus {
+  workspace_dir: string;
+  persistent_elements_path: string;
+  exists: boolean;
+  non_empty: boolean;
+  size_bytes: number;
+  sha256?: string;
 }
 
 export interface RenderWorkspacePagePreviewSubmissionResult {

@@ -1,0 +1,39 @@
+---
+status: accepted
+---
+
+# Use a Workspace Persistent Elements Reference without runtime sharing
+
+Deck Generation will create one Workspace-owned Persistent Elements Reference at the fixed root path `persistent-elements.tsx` in a serial, user-visible Generation Step after the Workspace Style Guide and before Page Source initialization, Shared Research, or concurrent Page Authoring. The App initializes a minimal valid but visually empty TSX Bootstrap with the stable slide canvas and export behaviour, an Agent authors and TypeScript-checks it, and every Page Authoring Agent reads it as the specific implementation authority for repeated elements and their Content Safe Area; Page Sources decide whether those elements suit the current page, copy the applicable implementation when used, and never import the reference or add it to the Deck Manifest. This preserves independent Page Sources and page-level flexibility while improving repeated-element consistency without adding shared visual runtime state or page-role metadata.
+
+The Generation Step is user-visible in the existing generation progress surface, with localized running, success, and failure states. Completion exposes a read-only summary and reference-file inspection path; the first implementation does not require a browser-rendered reference preview or a direct TSX editor.
+
+Initial reference authoring reads only the Brief, Confirmed Presentation Requirements, Confirmed Outline, Workspace Style Guide, Workspace Authoring Kit guidance, and any Authoring Kit source selected through that guidance. It does not read Shared Research Evidence, image catalogs, Page Sources, rendered pages, screenshots, or Manual Page Revisions, and it may repeat only Deck identity text grounded in those allowed authorities. A replacement run additionally receives the current reference and active Deck Refinement Request.
+
+Each Page Authoring Agent receives the reference as a mandatory Workspace file path and must read it completely through the existing file tools before editing its target Page Source. The App does not duplicate the TSX source into the prompt, and the Agent-reported file-read record remains diagnostic rather than an acceptance gate. The prompt forbids importing or modifying the reference, requires any used repeated element to follow it, uses the actual page index and page count supplied for the current Page Generation Unit instead of illustrative values in the reference, and gives the active explicit user request precedence when it conflicts.
+
+Repeated-element structure and visual styling remain copied into each Page Source, but page-number values are a narrow renderer-owned exception. A Page Source may place raw `data-presenton-page-number="current|total"` markers directly in its TSX; the renderer fills their values from the Manifest Render Plan while leaving placement, typography, separators, visibility, and surrounding structure under Page Source control. The marker syntax is documented in the Workspace Authoring Kit README and Page Authoring prompts rather than wrapped in a new Foundation Module, so the generated reference remains self-contained and directly copyable. This marker contract requires no shared visual TSX import and prevents page reordering or page-count changes from forcing Page Authoring solely to refresh numeric values.
+
+An explicit Page Refinement Request may override the reference only for its target page without replacing the Deck-level artifact. Only a Deck Refinement Request that explicitly changes repeated elements may replace the reference; replacing it makes every affected Page Source a refinement target because existing pages contain copied implementations rather than a live shared dependency. Agent completion is accepted only when the final reference TSX fingerprint differs from its original Bootstrap fingerprint and the file passes TypeScript validation. No-change and TypeScript failures share at most three local-gate repair attempts against the current file; the first implementation adds no render, visual, or semantic gate.
+
+Deck Refinement Planning adds `persistent_elements_action: preserve | revise`. Ordinary content, narrative, page-order, and page-count changes preserve the current reference; only an explicit request to change deck-wide repeated elements selects `revise`. A page-local request remains a Page Refinement override and does not replace the Workspace reference. When `revise` is selected, the replacement reference is authored and gated before targeted Page Authoring begins; an invalid or ambiguous planning result follows the existing planning repair and failure behaviour.
+
+The reference Generation Step appears in first Deck Generation and in Deck Refinement only when `persistent_elements_action` is `revise`. A `preserve` Deck Refinement reports that the existing reference is being reused without starting a reference Agent, and Page Refinement consumes the current reference without adding a separate reference stage.
+
+The first implementation does not infer or persist historical page-local exceptions. A Deck Refinement with `revise` re-authors all retained pages against the replacement reference and the active Deck Refinement Request; a user who wants a special page treatment can submit a later Page Refinement for that page.
+
+The reference Agent must make an explicit authoring decision even when the Deck uses no repeated elements. In that case it rewrites the Bootstrap into a valid empty reference that records the intentional absence; leaving the Bootstrap byte-for-byte unchanged is still treated as no-change.
+
+Reference-stage failure is resumable before Page Source initialization, Shared Research, or Page Authoring begins. Resume retries only the reference Agent against the existing file and its current diagnostics; a missing reference is recreated from the minimal Bootstrap, while an existing invalid or unchanged file is repaired in place. Successful Style Guide, Brief, Requirements, and Outline artifacts are not regenerated for this recovery.
+
+**Considered Options**
+
+- Inject one shared visual TSX module into every page at render time. Rejected because it would add renderer and manual-revision layering, broad shared-module lifecycle rules, and runtime ownership of visual structure that are disproportionate to the current consistency goal. The accepted renderer-owned page-number markers carry only order-derived values, not visual implementation.
+- Require every Page Source to import one generated shared module. Rejected because it weakens Page Source independence and turns a Deck-specific visual reference into a compatibility contract.
+- Store only Markdown guidance. Rejected because exact JSX structure, geometry, typography, and spacing are easier for Page Authoring Agents to reproduce from a concrete TSX example.
+
+**Consequences**
+
+- Consistency is prompt-enforced rather than structurally guaranteed; applicability remains an Agent judgment, while any repeated element that is used must follow the reference unless an explicit user request overrides it.
+- Updating the reference alone does not change existing pages, so a global repeated-element refinement must re-author every affected Page Source.
+- The reference is persisted with the Workspace for later refinement but is not part of the Deck Manifest or Final Deck rendering dependency graph. The first implementation does not persist a long-lived reference-version fingerprint or add a reference-specific recovery receipt; the existing reference-authoring fingerprint is only a local no-change gate. Resume relies on the intact shadow Workspace and the existing unsupported out-of-band mutation rule. Page-number marker output instead depends on the current manifest order and slide count, which must participate in relevant preview and final-render cache decisions.

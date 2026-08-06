@@ -68,8 +68,8 @@ export function normalizeDeckRefinementPlan(value: unknown, input: Pick<PlanDeck
   if (!isRecord(value)) throw new DeckRefinementPlanningValidationError(["root must be an object"]);
   const stylePresetSelected = input.visualStylePresetSelected === true;
   assertOnlyKeys(value, stylePresetSelected
-    ? ["route", "title", "output_language_change", "operations", "reason"]
-    : ["route", "title", "output_language_change", "style_guide_change", "operations", "reason"], "root", errors);
+    ? ["route", "title", "output_language_change", "persistent_elements_action", "operations", "reason"]
+    : ["route", "title", "output_language_change", "style_guide_change", "persistent_elements_action", "operations", "reason"], "root", errors);
   const route = cleanString(value.route);
   if (route !== "proceed" && route !== "no_op") errors.push('route must be "proceed" or "no_op"');
   const title = cleanString(value.title);
@@ -96,6 +96,11 @@ export function normalizeDeckRefinementPlan(value: unknown, input: Pick<PlanDeck
     if (!styleReason) errors.push("style_guide_change.reason must be non-empty");
   }
 
+  const persistentElementsAction = cleanString(value.persistent_elements_action);
+  if (persistentElementsAction !== "preserve" && persistentElementsAction !== "revise") {
+    errors.push('persistent_elements_action must be "preserve" or "revise"');
+  }
+
   const rawOperations = Array.isArray(value.operations) ? value.operations : [];
   if (route === "proceed" && rawOperations.length === 0) errors.push("proceed requires at least one operation");
   if (route === "no_op" && rawOperations.length > 0) errors.push("no_op must return an empty operations array");
@@ -119,7 +124,7 @@ export function normalizeDeckRefinementPlan(value: unknown, input: Pick<PlanDeck
   if (languageChanged && operations.some((operation) => operation.op === "keep")) {
     errors.push("output language changes require update operations for retained pages");
   }
-  if (route === "no_op" && (languageChanged || (!stylePresetSelected && styleAction !== "preserve") || title !== input.outline.title)) {
+  if (route === "no_op" && (languageChanged || (!stylePresetSelected && styleAction !== "preserve") || persistentElementsAction !== "preserve" || title !== input.outline.title)) {
     errors.push("no_op cannot change title, output language, or Style Guide");
   }
   const reason = cleanString(value.reason);
@@ -134,6 +139,7 @@ export function normalizeDeckRefinementPlan(value: unknown, input: Pick<PlanDeck
       reason: cleanString(languageRecord.reason) || undefined,
     },
     style_guide_change: { action: styleAction, reason: styleReason },
+    persistent_elements_action: persistentElementsAction as "preserve" | "revise",
     operations,
     reason,
   };
@@ -144,6 +150,7 @@ export function buildDeckRefinementPlanningRequest(input: PlanDeckRefinementInpu
     route: "proceed",
     title: input.outline.title,
     output_language_change: { changed: false, output_language: "", reason: "" },
+    persistent_elements_action: "preserve",
     ...(input.visualStylePresetSelected ? {} : { style_guide_change: { action: "preserve", reason: "" } }),
     operations: [
       { op: "keep", page_id: "page-uuid", reason: "" },
@@ -176,6 +183,7 @@ export function buildDeckRefinementPlanningRequest(input: PlanDeckRefinementInpu
             "Keep and update retain the existing page_id. Add does not include page_id; the system allocates it. Delete references an existing page_id.",
             "Use update only when the page's Outline Entry or page content must change. Use keep for unchanged pages unless a global output-language or Style Guide change requires all retained pages to be targeted.",
             "Add, delete, or reorder pages only when the request explicitly asks for page count, structure, sequence, section organization, or narrative-flow changes.",
+            "Set persistent_elements_action to revise only when the user explicitly asks to change the deck-wide header, footer, page number, or persistent decoration treatment. Ambiguous requests such as overall polish preserve it.",
             input.visualStylePresetSelected
               ? "A Visual Style Preset is selected. Do not return style_guide_change. Treat the selected Style Guide as immutable; express shared visual requests through page operations and reasons."
               : "Set style_guide_change.action to regenerate only for an explicit shared visual-direction change. A page-local visual change uses preserve.",

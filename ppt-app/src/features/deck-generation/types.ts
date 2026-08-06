@@ -52,6 +52,7 @@ export interface NoChangeAuthoringRetry {
 export type DeckGenerationStep =
   | "authoring-kit"
   | "style-guide"
+  | "persistent-elements"
   | "page-sources"
   | "page-refinement-prepare"
   | "deck-refinement-planning"

@@ -411,6 +411,12 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       ),
     getWorkspaceStyleGuide: (input) =>
       invoke<WorkspaceStyleGuide>(toolIds.pptEngine, "app_get_workspace_style_guide", input),
+    ensureWorkspacePersistentElementsReference: (input) =>
+      invoke(toolIds.pptEngine, "app_ensure_workspace_persistent_elements_reference", input),
+    getWorkspacePersistentElementsReferenceStatus: (input) =>
+      invoke(toolIds.pptEngine, "app_get_workspace_persistent_elements_status", input),
+    typecheckWorkspacePersistentElements: (input) =>
+      invoke(toolIds.pptEngine, "app_typecheck_workspace_persistent_elements", input),
     initializePageProgress: (input) =>
       invoke<PageProgress>(toolIds.pptEngine, "app_initialize_page_progress", input),
     preparePageRefinement: (input) =>

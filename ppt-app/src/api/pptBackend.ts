@@ -114,6 +114,7 @@ import type {
   , ConfirmWorkspaceRequirementsResult
   , WorkspaceStyleGuideStatus
   , WorkspaceStyleGuide
+  , WorkspacePersistentElementsReferenceStatus
   , PreparePageRefinementInput
   , PreparePageRefinementResult
   , CommitDeckRefinementInput
@@ -166,6 +167,9 @@ export interface PptBackend {
   confirmWorkspaceRequirements(input: ConfirmWorkspaceRequirementsInput): Promise<ConfirmWorkspaceRequirementsResult>;
   getWorkspaceStyleGuideStatus(input: { workspace_dir: string }): Promise<WorkspaceStyleGuideStatus>;
   getWorkspaceStyleGuide(input: { workspace_dir: string }): Promise<WorkspaceStyleGuide>;
+  ensureWorkspacePersistentElementsReference(input: { workspace_dir: string; reset_existing?: boolean }): Promise<WorkspacePersistentElementsReferenceStatus & { created: boolean }>;
+  getWorkspacePersistentElementsReferenceStatus(input: { workspace_dir: string }): Promise<WorkspacePersistentElementsReferenceStatus>;
+  typecheckWorkspacePersistentElements(input: { workspace_dir: string }): Promise<WorkspacePersistentElementsReferenceStatus>;
   initializePageProgress(input: { workspace_dir: string }): Promise<PageProgress>;
   preparePageRefinement(input: PreparePageRefinementInput): Promise<PreparePageRefinementResult>;
   commitDeckRefinement(input: CommitDeckRefinementInput): Promise<CommitDeckRefinementResult>;

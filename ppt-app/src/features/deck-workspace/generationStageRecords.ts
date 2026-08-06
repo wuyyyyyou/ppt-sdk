@@ -22,6 +22,7 @@ type StageLabelKey =
   | "webResearchCuration"
   | "visualResearchCuration"
   | "prepare"
+  | "persistentElements"
   | "authoring"
   | "deckRefinement"
   | "rendering"
@@ -77,6 +78,76 @@ export interface PageGenerationStageRecordGroup {
   state: PageStageRecordState;
   lastError?: string;
   stages: PageGenerationStageRecord[];
+}
+
+export interface PersistentElementsStageGroup {
+  title: string;
+  statusLabel: string;
+  state: PageStageRecordState;
+  records: PageGenerationStageRecord[];
+}
+
+export function buildPersistentElementsStageGroup(input: {
+  t: Messages;
+  progress: DeckGenerationProgress | null;
+  history: GenerationStreamSnapshot[];
+}): PersistentElementsStageGroup | null {
+  const { t, progress, history } = input;
+  const activeStream = (progress?.activeStreams ?? (progress?.stream ? [progress.stream] : []))
+    .find((stream) => stream.kind === "persistent-elements");
+  const activeId = activeStream
+    ? `persistent-elements:${activeStream.page_id}:${activeStream.run_id ?? activeStream.kind ?? activeStream.status}`
+    : null;
+  const snapshotRecords = history
+    .filter((snapshot) => snapshot.kind === "persistent-elements" && snapshot.id !== activeId)
+    .map((snapshot): PageGenerationStageRecord => {
+      const state = snapshot.status === "error"
+        ? "failed"
+        : snapshot.status === "completed"
+          ? "completed"
+          : "active";
+      return {
+        id: snapshot.id,
+        stageKey: "persistentElements",
+        label: t.generating.persistentElements.session,
+        statusLabel: stateLabel(t, state),
+        state,
+        lines: [...snapshot.lines],
+        activities: [...snapshot.activities],
+        hasStream: snapshot.lines.some((line) => line.trim()) || snapshot.activities.length > 0,
+        updatedAt: snapshot.updated_at,
+      };
+    });
+  const activeState: PageStageRecordState = activeStream?.status === "error"
+    ? "failed"
+    : activeStream?.status === "completed"
+      ? "completed"
+      : "active";
+  const activeRecords: PageGenerationStageRecord[] = activeStream ? [{
+    id: activeId as string,
+    stageKey: "persistentElements",
+    label: t.generating.persistentElements.session,
+    statusLabel: stateLabel(t, activeState),
+    state: activeState,
+    lines: [...activeStream.lines],
+    activities: [...activeStream.activities],
+    hasStream: activeStream.lines.some((line) => line.trim()) || activeStream.activities.length > 0,
+    startedAt: activeStream.started_at,
+    updatedAt: activeStream.updated_at,
+  }] : [];
+  let records = sortStageRecords([...snapshotRecords, ...activeRecords]);
+  if (records.length === 0) return null;
+  const latest = records[records.length - 1];
+  const state: PageStageRecordState = activeRecords.length > 0
+    ? activeState
+    : latest?.state ?? "pending";
+  records = hideRecoveredFailures(t, records, state === "failed");
+  return {
+    title: t.generating.persistentElements.title,
+    statusLabel: stateLabel(t, state),
+    state,
+    records,
+  };
 }
 
 export function buildPageGenerationStageRecords(input: {
@@ -261,6 +332,7 @@ function buildPageStatusStageRecord(
 function sortStageRecords(records: PageGenerationStageRecord[]) {
   const order: StageLabelKey[] = [
     "pending",
+    "persistentElements",
     "researchPlanning",
     "researchDiscovery",
     "researchCollection",

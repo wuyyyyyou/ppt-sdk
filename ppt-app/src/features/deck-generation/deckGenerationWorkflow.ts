@@ -158,7 +158,34 @@ export async function runDeckGeneration(
       });
       return cancelledCompletion(progress);
     }
-    throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    const failedProgress = createProgress(
+      {
+        step: "failed",
+        message,
+        currentPageIndex: null,
+        totalPages: input.confirmedOutline.items.length,
+      },
+      null,
+      undefined,
+      undefined,
+      attemptLimits,
+    );
+    input.onProgress(failedProgress);
+    await recordDeckRecovery(input, {
+      status: "failed",
+      run_kind: getActiveGenerationRunKind(input),
+      step: "persistent-elements",
+      target_page_ids: input.confirmedOutline.items.map((item) => item.page_id).filter((id): id is string => Boolean(id)),
+      refinement_request: input.refinementRequest ?? null,
+      page_refinement_reasons: input.pageRefinementReasons ?? {},
+      error: message,
+      deck_status: "failed",
+    });
+    return failedCompletion({
+      progress: failedProgress,
+      error: { type: "page_failed", message },
+    });
   }
 
   const { authoringDeck } = artifacts;

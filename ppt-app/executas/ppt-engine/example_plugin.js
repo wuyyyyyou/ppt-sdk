@@ -101,10 +101,15 @@ import {
   importAppSharedResearchImage,
   downloadResearchImage,
   prepareWorkspacePageSources,
+  ensureWorkspacePersistentElementsReference,
+  fingerprintWorkspacePersistentElements,
   reconcileWorkspacePageSources,
   recordAppWorkspaceStyleGuide,
   getAppWorkspaceStyleGuideStatus,
   getAppWorkspaceStyleGuide,
+  ensureAppWorkspacePersistentElementsReference,
+  getAppWorkspacePersistentElementsStatus,
+  typecheckAppWorkspacePersistentElements,
   initializeAppPageProgress,
   recordAppPagePlan,
   recordAppPageProgress,
@@ -1340,6 +1345,22 @@ async function toolAppGetWorkspaceStyleGuideStatus(args) {
 
 async function toolAppGetWorkspaceStyleGuide(args) {
   return getAppWorkspaceStyleGuide({ workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir") });
+}
+
+async function toolAppEnsureWorkspacePersistentElementsReference(args) {
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return ensureAppWorkspacePersistentElementsReference({
+    workspace_dir: workspaceDir,
+    reset_existing: args?.reset_existing === true,
+  });
+}
+
+async function toolAppGetWorkspacePersistentElementsStatus(args) {
+  return getAppWorkspacePersistentElementsStatus({ workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir") });
+}
+
+async function toolAppTypecheckWorkspacePersistentElements(args) {
+  return typecheckAppWorkspacePersistentElements({ workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir") });
 }
 
 async function toolAppPreparePageRefinement(args) {
@@ -3252,6 +3273,9 @@ const TOOL_DISPATCH = {
   app_commit_workspace_style_guide_host_upload: toolAppCommitWorkspaceStyleGuideHostUpload,
   app_get_workspace_style_guide_status: toolAppGetWorkspaceStyleGuideStatus,
   app_get_workspace_style_guide: toolAppGetWorkspaceStyleGuide,
+  app_ensure_workspace_persistent_elements_reference: toolAppEnsureWorkspacePersistentElementsReference,
+  app_get_workspace_persistent_elements_status: toolAppGetWorkspacePersistentElementsStatus,
+  app_typecheck_workspace_persistent_elements: toolAppTypecheckWorkspacePersistentElements,
   app_initialize_page_progress: toolAppInitializePageProgress,
   app_rebuild_workspace_deck_manifest: toolAppRebuildWorkspaceDeckManifest,
   app_get_workspace_page_source_fingerprint: toolAppGetWorkspacePageSourceFingerprint,

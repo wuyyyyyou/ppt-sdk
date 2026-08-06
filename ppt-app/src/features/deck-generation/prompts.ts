@@ -72,6 +72,7 @@ export function buildAuthoringPrompt(input: {
   const requirementsPath = `${input.workspaceDir}/requirements.json`;
   const outlinePath = `${input.workspaceDir}/outline.json`;
   const styleGuidePath = `${input.workspaceDir}/style-guide.md`;
+  const persistentElementsPath = `${input.workspaceDir}/persistent-elements.tsx`;
   const authoringKitReadmePath = `${input.workspaceDir}/authoring-kit/README.md`;
   const webResearchSummaryPath = `${input.workspaceDir}/research/evidence/web-summary.md`;
   const imageCatalogPath = `${input.workspaceDir}/research/evidence/image-catalog.json`;
@@ -118,9 +119,10 @@ export function buildAuthoringPrompt(input: {
       `4. ${toolPath("演示需求", requirementsPath)}`,
       `5. ${toolPath("已确认大纲", outlinePath)}`,
       `6. ${toolPath("艺术指导", styleGuidePath)}`,
-      `7. ${toolPath("Authoring Kit 总说明", authoringKitReadmePath)}`,
-      "8. 根据总说明判断当前页相关的 foundations / references 分类，并完整读取相关分类 README。",
-      "9. 如果认为任何 Foundation Module（基础模块）或 Reference Implementation（参考实现）适合使用或参考，必须先完整读取对应组件的 TSX 文件，再开始写当前页面。不能只看文件名、README 摘要或局部代码。",
+      `7. ${toolPath("跨页固定元素参考", persistentElementsPath)}`,
+      `8. ${toolPath("Authoring Kit 总说明", authoringKitReadmePath)}`,
+      "9. 根据总说明判断当前页相关的 foundations / references 分类，并完整读取相关分类 README。",
+      "10. 如果认为任何 Foundation Module（基础模块）或 Reference Implementation（参考实现）适合使用或参考，必须先完整读取对应组件的 TSX 文件，再开始写当前页面。不能只看文件名、README 摘要或局部代码。",
       input.hasImageAttachment
         ? "用户最新人工页面截图已作为当前 Session 的原生图片附件提供，仅作视觉参考。"
         : "用户最新人工页面截图附件不可用。",
@@ -130,9 +132,10 @@ export function buildAuthoringPrompt(input: {
       `2. ${toolPath("演示需求", requirementsPath)}`,
       `3. ${toolPath("已确认大纲", outlinePath)}`,
       `4. ${toolPath("艺术指导", styleGuidePath)}`,
-      `5. ${toolPath("Authoring Kit 总说明", authoringKitReadmePath)}`,
-      "6. 根据总说明判断当前页相关的 foundations / references 分类，并完整读取相关分类 README。",
-      "7. 如果认为任何 Foundation Module（基础模块）或 Reference Implementation（参考实现）适合使用或参考，必须先完整读取对应组件的 TSX 文件，再开始写当前页面。不能只看文件名、README 摘要或局部代码。",
+      `5. ${toolPath("跨页固定元素参考", persistentElementsPath)}`,
+      `6. ${toolPath("Authoring Kit 总说明", authoringKitReadmePath)}`,
+      "7. 根据总说明判断当前页相关的 foundations / references 分类，并完整读取相关分类 README。",
+      "8. 如果认为任何 Foundation Module（基础模块）或 Reference Implementation（参考实现）适合使用或参考，必须先完整读取对应组件的 TSX 文件，再开始写当前页面。不能只看文件名、README 摘要或局部代码。",
     ]),
     ...(shouldReadResearch ? [
       "",
@@ -152,6 +155,8 @@ export function buildAuthoringPrompt(input: {
     `- 页面意图: ${input.page.outline}`,
     `- Deck 标题: ${input.outline.title}`,
     "- 保持 Page Source Bootstrap（页面源引导文件）要求的固定画布和导出行为。",
+    "- 先判断当前页是否需要页眉、页脚、页码或持续装饰；特殊页可以省略或调整。只要使用其中任一元素，必须仿照 persistent-elements.tsx 的 JSX 结构、位置、字体、字号、颜色和间距；不要 import 它，也不要自行设计近似版本。",
+    "- persistent-elements.tsx 中的页码数字只是示意；复制页码时保留 data-presenton-page-number 标记，current 为当前页（1-based），total 为总页数。",
     "- 用清晰的视觉层级表达当前页唯一核心信息；事实和数字只能来自已读 Workspace 文件，不要自行补造。",
     "",
     "当前轮次：",

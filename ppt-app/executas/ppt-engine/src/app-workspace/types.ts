@@ -22,6 +22,7 @@ export interface AppWorkspaceFiles {
   outline: string;
   manifest: string;
   style_guide: string;
+  persistent_elements: string;
   authoring_kit: string;
   page_plan: string;
   page_progress: string;
@@ -661,6 +662,8 @@ export interface AppendAppWorkspaceLogInput {
     | "research-web-interactions"
     | "ai-theme"
     | "ai-theme-interactions"
+    | "ai-persistent-elements"
+    | "ai-persistent-elements-interactions"
     | "storage-transport";
   entry: Record<string, unknown>;
   payload_keys?: string[];
@@ -1287,6 +1290,19 @@ export interface RecordAppWorkspaceStyleGuideResult {
 
 export interface GetAppWorkspaceStyleGuideStatusInput {
   workspace_dir: string;
+}
+
+export interface GetAppWorkspacePersistentElementsStatusInput {
+  workspace_dir: string;
+}
+
+export interface GetAppWorkspacePersistentElementsStatusResult {
+  workspace_dir: string;
+  persistent_elements_path: string;
+  exists: boolean;
+  non_empty: boolean;
+  size_bytes: number;
+  sha256?: string;
 }
 
 export interface GetAppWorkspaceStyleGuideStatusResult {

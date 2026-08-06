@@ -292,6 +292,10 @@ export interface Messages {
       followingLatest: string;
       backToLatest: string;
     };
+    persistentElements: {
+      title: string;
+      session: string;
+    };
     researchDiscovery: {
       title: string;
       empty: string;
@@ -383,6 +387,7 @@ export interface Messages {
         | "webResearchCuration"
         | "visualResearchCuration"
         | "prepare"
+        | "persistentElements"
         | "authoring"
         | "deckRefinement"
         | "rendering"
@@ -1020,6 +1025,10 @@ export const messages: Record<Locale, Messages> = {
         followingLatest: "Following the newest page",
         backToLatest: "Follow the newest page"
       },
+      persistentElements: {
+        title: "Cross-slide decoration generation",
+        session: "Generating shared decorations"
+      },
       researchDiscovery: {
         title: "Facts collection",
         empty: "No details for this step yet.",
@@ -1126,6 +1135,7 @@ export const messages: Record<Locale, Messages> = {
           webResearchCuration: "Curating facts",
           visualResearchCuration: "Curating images",
           prepare: "File preparation",
+          persistentElements: "Generating shared decorations",
           authoring: "Page expression",
           deckRefinement: "Deck refinement",
           rendering: "Page rendering",
@@ -1764,6 +1774,10 @@ export const messages: Record<Locale, Messages> = {
         followingLatest: "正在跟随最新一页",
         backToLatest: "跟随最新一页"
       },
+      persistentElements: {
+        title: "跨页装饰生成",
+        session: "生成跨页装饰"
+      },
       researchDiscovery: {
         title: "事实收集",
         empty: "这个步骤暂无详细输出。",
@@ -1870,6 +1884,7 @@ export const messages: Record<Locale, Messages> = {
           webResearchCuration: "筛选事实证据",
           visualResearchCuration: "筛选图片素材",
           prepare: "文件准备",
+          persistentElements: "生成跨页装饰",
           authoring: "页面表达",
           deckRefinement: "整套优化",
           rendering: "页面渲染",

@@ -14,6 +14,8 @@ export function createPageSourceRenderContext(input: {
   id: string;
   title: string;
   templateGroup?: string;
+  pageNumber?: number;
+  totalPages?: number;
 }): BrowserRenderContext {
   return {
     templateGroup: input.templateGroup ?? "authoring-kit",
@@ -30,6 +32,8 @@ export function createPageSourceRenderContext(input: {
       fontName: null,
       fontUrl: null,
     },
+    pageNumber: input.pageNumber,
+    totalPages: input.totalPages,
   };
 }
 

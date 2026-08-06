@@ -215,6 +215,28 @@
       ]
     },
     {
+      "name": "app_ensure_workspace_persistent_elements_reference",
+      "description": "Create the minimal Persistent Elements Reference Bootstrap in the workspace root unless it already exists.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true },
+        { "name": "reset_existing", "type": "boolean", "description": "Replace the current reference with Bootstrap.", "required": false }
+      ]
+    },
+    {
+      "name": "app_get_workspace_persistent_elements_status",
+      "description": "Return the existence, size, and SHA-256 fingerprint of persistent-elements.tsx.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true }
+      ]
+    },
+    {
+      "name": "app_typecheck_workspace_persistent_elements",
+      "description": "Run the local TypeScript gate for persistent-elements.tsx.",
+      "parameters": [
+        { "name": "workspace_dir", "type": "string", "description": "Absolute path to an existing PPT workspace.", "required": true }
+      ]
+    },
+    {
       "name": "app_reconcile_workspace_page_sources",
       "description": "Repair missing pending Page Sources from the Bootstrap and reject missing progressed Page Sources without checking the Authoring Kit directory.",
       "parameters": [
