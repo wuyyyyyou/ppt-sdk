@@ -2577,6 +2577,21 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (!backend) return;
     if (!requirementsAreComplete(presentationRequirements) && !requirementsAreCompleteWithoutVisualSelection(presentationRequirements)) return;
     setRequirementsConfirming(true);
+    const previousOutline = cloneOutlineItems(outline);
+    const previousOutlineDraft = cloneOutlineItems(outlineDraft);
+    const previousOutlineDraftTitle = outlineDraftTitle;
+    const previousOutlineError = outlineError;
+    const previousOutlineErrorDetail = outlineErrorDetail;
+    // Confirmation can include LLM selection, Host Upload and backend work.
+    // Show the existing Outline loading surface immediately while those steps
+    // continue, instead of leaving the user on a disabled confirmation button.
+    setPage("main");
+    setStage("outline");
+    setLoading("outline");
+    setOutline([]);
+    setOutlineDraft([]);
+    setOutlineError("");
+    setOutlineErrorDetail("");
     let workspace: WorkspaceResult | null = null;
     let requirementsCommitted = false;
     try {
@@ -2631,15 +2646,6 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       });
       requirementsCommitted = true;
       const resetWorkspace = result.workspace;
-      // Move to the next stage only after the requirements and any selected
-      // preset Style Guide have been committed successfully.
-      setPage("main");
-      setStage("outline");
-      setLoading("outline");
-      setOutline([]);
-      setOutlineDraft([]);
-      setOutlineError("");
-      setOutlineErrorDetail("");
       setPresentationRequirements(confirmed);
       setSelectedVisualStylePresetId(confirmed.selections.visual_style_preset?.id ?? null);
       setCurrentWorkspace(resetWorkspace);
@@ -2665,6 +2671,13 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         setOutlineErrorDetail(detail);
         setLoading("none");
       } else {
+        setPage("main");
+        setStage("requirements");
+        setOutline(previousOutline);
+        setOutlineDraft(previousOutlineDraft);
+        setOutlineDraftTitle(previousOutlineDraftTitle);
+        setOutlineError(previousOutlineError);
+        setOutlineErrorDetail(previousOutlineErrorDetail);
         setRequirementsError(summary);
         setRequirementsErrorDetail(detail);
         setRequirementsRetryMode("select");

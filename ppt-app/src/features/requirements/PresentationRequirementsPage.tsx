@@ -187,19 +187,6 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
             })}
           </section>
         ))}
-        {requirements.selections.visual_style_preset ? (
-          <section className="requirements-group">
-            <h2>{t.template.title}</h2>
-            <fieldset className="requirement-field">
-              <legend>{t.template.title}</legend>
-              <div className="requirement-preset-summary">
-                <strong>{requirements.selections.visual_style_preset.name}</strong>
-                <span>{requirements.selections.visual_style_preset.description}</span>
-                <small>{t.requirements.templateLocked}</small>
-              </div>
-            </fieldset>
-          </section>
-        ) : null}
       </div>
 
       <footer className="requirements-footer">

@@ -56,7 +56,7 @@ test("draft presentation requirements own workspace recovery even when later art
   assert.equal(requirementsOwnedRecoveryStage({ status: "confirmed" }), null);
 });
 
-test("renders loading, candidates, Other inputs, and the final confirmation action", () => {
+test("renders requirements without exposing the selected visual style summary", () => {
   const draft = createRequirementsDraft("制作一份 5 页中文方案", candidates, selectedPreset);
   const common = {
     t: messages.zh,
@@ -76,7 +76,7 @@ test("renders loading, candidates, Other inputs, and the final confirmation acti
   };
   const ready = renderToStaticMarkup(createElement(PresentationRequirementsPage, { ...common, status: "ready" }));
   assert.equal((ready.match(/>其他</g) ?? []).length, 5);
-  assert.match(ready, /Editorial Sports/);
+  assert.doesNotMatch(ready, /Editorial Sports/);
   assert.doesNotMatch(ready, /体育媒体特刊/);
   assert.match(ready, /<details class="requirements-brief">/);
   assert.match(ready, /用户需求/);
