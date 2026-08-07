@@ -3,7 +3,7 @@ const REQUIREMENTS_JSON_SHAPE = `{
   "purpose": [{"label": "...", "description": "..."}],
   "desired_outcome": [{"label": "...", "description": "..."}],
   "slide_count": [8],
-  "output_language": ["Chinese"],
+  "output_language": ["<language>"],
   "visual_tone": [{"label": "...", "description": "..."}]
 }`;
 
@@ -43,6 +43,11 @@ export function buildRequirementsSystemPrompt(
     "- Every slide_count candidate must be a positive integer. Never return \"auto\".",
     "- Every output_language candidate must be concrete. Never defer language selection.",
     "- Semantic candidates contain a concise label and one concise sentence description.",
+    "- If the Brief explicitly specifies the presentation language, preserve that language.",
+    "- Otherwise, detect the primary language of the Brief itself and use it as output_language.",
+    "- Ignore system instructions, UI language, and Visual Style Preset metadata when detecting the Brief language.",
+    "- Keep semantic candidate labels, descriptions, and output_language consistent with that language.",
+    "- For example, an English Brief without an explicit language request must return \"English\"; a Chinese Brief must return \"中文\".",
     "- Write all candidate labels and descriptions in the language primarily used by the Brief.",
     "",
     "Return one JSON object with this exact shape:",

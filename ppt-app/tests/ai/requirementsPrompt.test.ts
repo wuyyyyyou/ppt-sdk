@@ -19,6 +19,15 @@ test("uses separate system and user prompts and only places the Brief in user co
     readText(request.messages[0]),
     /candidate labels and descriptions in the language primarily used by the Brief/,
   );
+  assert.match(
+    readText(request.messages[0]),
+    /detect the primary language of the Brief itself and use it as output_language/,
+  );
+  assert.match(
+    readText(request.messages[0]),
+    /an English Brief without an explicit language request must return "English"/,
+  );
+  assert.doesNotMatch(readText(request.messages[0]), /"output_language": \["Chinese"\]/);
   assert.doesNotMatch(readText(request.messages[0]), new RegExp(brief));
   assert.equal(request.messages[1].role, "user");
   assert.match(readText(request.messages[1]), /<brief>/);
