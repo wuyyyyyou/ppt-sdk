@@ -23,7 +23,13 @@ const ANNA_RUNTIME_SDK_URLS = [
 ];
 const SESSION_STORAGE_KEY = "test-session-app.saved-session-ids.v1";
 const SETTINGS_STORAGE_KEY = "test-session-app.settings.v1";
-const SESSION_CREATE_INPUT = { submode: "auto" };
+const SESSION_CREATE_INPUT = {
+  submode: "auto",
+  quotaCaps: {
+    inherit_host_tools: false,
+    allowed_tools: ["fs_read_file"],
+  },
+};
 
 const els = Object.fromEntries(
   [
@@ -577,7 +583,6 @@ async function runSessionById(id, source) {
     app_session_uuid: id,
     source,
     content,
-    allowed_tools: ["fs_read_file"],
   };
   const entry = beginOperation("session", "session.run", runInput);
   entry.record.stream_id = "";
@@ -597,7 +602,6 @@ async function runSessionById(id, source) {
     const runResult = await anna.agent.session.run({
       app_session_uuid: id,
       content,
-      allowed_tools: ["fs_read_file"],
     });
     entry.record.metrics.run_rpc_ms = elapsedMs(entry.startedPerf);
     entry.record.response = { rpc_response: toSerializable(runResult) };

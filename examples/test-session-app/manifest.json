@@ -35,7 +35,7 @@
           "auto": true,
           "fixed": null
         },
-        "tools": []
+        "tools": ["fs_read_file"]
       },
       "fs": [],
       "storage": [],
