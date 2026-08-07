@@ -152,6 +152,7 @@ export function GeneratingPage(props: GeneratingPageProps) {
           pinnedPageId={pinnedPreviewPageId}
           onSelectPage={onSelectPreviewPage}
           activePageIndex={progress?.currentPageIndex}
+          isActive={viewState.isActive}
         />
         {progress ? (
           <GenerationProgressPanel

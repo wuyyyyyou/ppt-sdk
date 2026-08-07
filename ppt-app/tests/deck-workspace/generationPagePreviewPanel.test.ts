@@ -10,13 +10,18 @@ import type { GenerationPagePreviews } from "../../src/features/deck-workspace/g
 
 const t = messages.zh as Messages;
 
-function renderPanel(previews: GenerationPagePreviews, pinnedPageId: string | null = null) {
+function renderPanel(
+  previews: GenerationPagePreviews,
+  pinnedPageId: string | null = null,
+  isActive = true,
+) {
   return renderToStaticMarkup(
     createElement(GenerationPagePreviewPanel, {
       t,
       previews,
       pinnedPageId,
       onSelectPage: () => undefined,
+      isActive,
     }),
   );
 }
@@ -54,7 +59,7 @@ const readyPreviews: GenerationPagePreviews = {
 
 describe("GenerationPagePreviewPanel", () => {
   it("keeps spinning before anything rendered instead of looking unfinished", () => {
-    const html = renderPanel({});
+    const html = renderPanel({}, null, true);
 
     assert.match(html, new RegExp(t.generating.preview.loading));
     assert.match(html, /generation-running-icon/);
@@ -62,6 +67,19 @@ describe("GenerationPagePreviewPanel", () => {
     // The heading used to repeat this sentence, so it showed up twice on screen.
     assert.doesNotMatch(html, new RegExp(t.generating.preview.waiting));
     assert.doesNotMatch(html, /generation-preview-thumbnails/);
+  });
+
+  it("stops spinning once the run is over with nothing to show", () => {
+    const html = renderPanel({}, null, false);
+
+    // The empty preview area cannot tell "nothing yet" from "nothing at all" on
+    // its own, so it used to spin in both. A finished run must not animate: a
+    // sibling assertion in generatingPage.test.ts holds the whole completed
+    // stage to no running icon anywhere.
+    assert.doesNotMatch(html, /generation-running-icon/);
+    assert.doesNotMatch(html, new RegExp(t.generating.preview.loading));
+    assert.match(html, new RegExp(t.generating.preview.waiting));
+    assert.match(html, /lucide-image/);
   });
 
   it("shows the newest rendered page and one thumbnail per page", () => {
