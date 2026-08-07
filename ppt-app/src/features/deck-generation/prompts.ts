@@ -76,6 +76,7 @@ export function buildAuthoringPrompt(input: {
   const persistentElementsPath = `${input.workspaceDir}/persistent-elements.tsx`;
   const authoringKitReadmePath = `${input.workspaceDir}/authoring-kit/README.md`;
   const presentationPrinciplesPath = `${input.workspaceDir}/authoring-kit/presentation-principles.md`;
+  const formalCoverReferencePath = `${input.workspaceDir}/authoring-kit/references/pages/FormalCover.tsx`;
   const webResearchSummaryPath = `${input.workspaceDir}/research/evidence/web-summary.md`;
   const imageCatalogPath = `${input.workspaceDir}/research/evidence/image-catalog.json`;
   const shouldReadResearch = input.attemptKind === "initial" || input.attemptKind === "page-refinement";
@@ -128,6 +129,7 @@ export function buildAuthoringPrompt(input: {
       `9. ${toolPath("Authoring Kit 总说明", authoringKitReadmePath)}`,
       "10. 根据总说明判断当前页相关的 foundations / references 分类，并完整读取相关分类 README。",
       "11. 如果认为任何 Foundation Module（基础模块）或 Reference Implementation（参考实现）适合使用或参考，必须先完整读取对应组件的 TSX 文件，再开始写当前页面。不能只看文件名、README 摘要或局部代码。",
+      `如果当前页承担 Deck 封面或 Formal Presentation Cover（正式汇报封面）职责，必须完整读取 ${toolPath("正式汇报封面参考", formalCoverReferencePath)}，再开始写当前页面。`,
       input.hasImageAttachment
         ? "用户最新人工页面截图已作为当前 Session 的原生图片附件提供，仅作视觉参考。"
         : "用户最新人工页面截图附件不可用。",
@@ -142,6 +144,7 @@ export function buildAuthoringPrompt(input: {
       `7. ${toolPath("Authoring Kit 总说明", authoringKitReadmePath)}`,
       "8. 根据总说明判断当前页相关的 foundations / references 分类，并完整读取相关分类 README。",
       "9. 如果认为任何 Foundation Module（基础模块）或 Reference Implementation（参考实现）适合使用或参考，必须先完整读取对应组件的 TSX 文件，再开始写当前页面。不能只看文件名、README 摘要或局部代码。",
+      `如果当前页承担 Deck 封面或 Formal Presentation Cover（正式汇报封面）职责，必须完整读取 ${toolPath("正式汇报封面参考", formalCoverReferencePath)}，再开始写当前页面。`,
     ]),
     ...(shouldReadResearch ? [
       "",
@@ -162,6 +165,7 @@ export function buildAuthoringPrompt(input: {
     `- Deck 标题: ${input.outline.title}`,
     "- 保持 Page Source Bootstrap（页面源引导文件）要求的固定画布和导出行为。",
     "- 先判断当前页是否需要页眉、页脚、页码、持续装饰、页面标题或副标题；特殊页可以省略或选择适用的标题处理变体。只要使用其中任一元素，必须仿照 persistent-elements.tsx 对应示例的 JSX 结构、位置、字体、字号、字重、是否斜体、颜色和间距；不要 import 它，也不要自行设计近似版本。",
+    "- 如果当前页承担 Deck 封面或 Formal Presentation Cover（正式汇报封面）职责，不要套用普通内容页的顶部模块导航、复杂页眉、页码、标准页面标题/副标题处理或密集正文布局；优先采用 FormalCover.tsx 的封面层级和结构。封面可以省略页码、复杂页眉和正文图表，但必须保留清晰的演示标题、主题/场景识别，以及 Workspace 已提供的身份、周期或日期信息；不得虚构缺失的元数据。",
     "- persistent-elements.tsx 中的标题和副标题文字只是视觉示意，不是当前页面的内容或事实依据。普通页面创作时，页面标题默认使用当前页 Outline 标题；如果是人工页面修订，必须保留用户最新人工内容，除非本次优化明确要求改变标题。副标题只有在当前页确实需要时才添加，并且必须来自已读 Workspace 文件或当前页面意图，不能复制参考文件中的示例文案，也不要仅为填充空间而添加。",
     "- persistent-elements.tsx 中的页码数字只是示意；复制页码时保留 data-presenton-page-number 标记，current 为当前页（1-based），total 为总页数。",
     "- 用清晰的视觉层级表达当前页唯一核心信息；事实和数字只能来自已读 Workspace 文件，不要自行补造。",
