@@ -13,3 +13,11 @@ export async function openFullscreenPreview(
     fallback();
   }
 }
+
+export async function startFullscreenPresentation(
+  element: HTMLElement | null,
+  enterPresentMode: () => void,
+): Promise<void> {
+  enterPresentMode();
+  await openFullscreenPreview(element, () => undefined);
+}

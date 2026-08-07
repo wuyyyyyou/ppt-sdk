@@ -1065,6 +1065,14 @@ export interface AppPageProgressItem {
   last_screenshot_path: string;
   last_error: string;
   render_source_sha256?: string;
+  /**
+   * Source hash the current `last_screenshot_path` bytes were actually rendered
+   * from. `render_source_sha256` moves to the new source the moment a render is
+   * submitted, while the screenshot file keeps the previous bytes until the
+   * render finishes, so only this field can tell a stale preview from a fresh
+   * one. Empty on Workspaces written before the field existed.
+   */
+  screenshot_source_sha256?: string;
   visual_review?: unknown | null;
   updated_at: string | null;
 }

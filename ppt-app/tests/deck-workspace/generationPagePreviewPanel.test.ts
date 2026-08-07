@@ -13,7 +13,6 @@ const t = messages.zh as Messages;
 function renderPanel(
   previews: GenerationPagePreviews,
   pinnedPageId: string | null = null,
-  isActive = true,
 ) {
   return renderToStaticMarkup(
     createElement(GenerationPagePreviewPanel, {
@@ -21,7 +20,6 @@ function renderPanel(
       previews,
       pinnedPageId,
       onSelectPage: () => undefined,
-      isActive,
     }),
   );
 }
@@ -69,17 +67,13 @@ describe("GenerationPagePreviewPanel", () => {
     assert.doesNotMatch(html, /generation-preview-thumbnails/);
   });
 
-  it("stops spinning once the run is over with nothing to show", () => {
-    const html = renderPanel({}, null, false);
+  it("keeps the empty preview frame in loading state", () => {
+    const html = renderPanel({});
 
-    // The empty preview area cannot tell "nothing yet" from "nothing at all" on
-    // its own, so it used to spin in both. A finished run must not animate: a
-    // sibling assertion in generatingPage.test.ts holds the whole completed
-    // stage to no running icon anywhere.
-    assert.doesNotMatch(html, /generation-running-icon/);
-    assert.doesNotMatch(html, new RegExp(t.generating.preview.loading));
-    assert.match(html, new RegExp(t.generating.preview.waiting));
-    assert.match(html, /lucide-image/);
+    assert.match(html, /generation-running-icon/);
+    assert.match(html, new RegExp(t.generating.preview.loading));
+    assert.doesNotMatch(html, new RegExp(t.generating.preview.waiting));
+    assert.doesNotMatch(html, /lucide-image/);
   });
 
   it("shows the newest rendered page and one thumbnail per page", () => {

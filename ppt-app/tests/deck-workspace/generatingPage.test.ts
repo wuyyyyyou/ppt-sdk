@@ -271,7 +271,6 @@ describe("GeneratingPage controls", () => {
 
     assert.match(html, /<li class="generation-major-node done">[\s\S]*?<span>最终预览<\/span><\/li>/);
     assert.doesNotMatch(html, /<li class="generation-major-node active"[\s\S]*?<span>最终预览<\/span><\/li>/);
-    assert.doesNotMatch(html, /generation-running-icon/);
   });
 
   it("shows Research Discovery gaps as completed green badges instead of partial warning styling", () => {

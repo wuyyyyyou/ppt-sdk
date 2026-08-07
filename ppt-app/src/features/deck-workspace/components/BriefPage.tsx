@@ -1,7 +1,14 @@
-import { ArrowRight, Check, ChevronLeft, ChevronRight, HelpCircle, ImageOff, Sparkles, X } from "lucide-react";
-import { useState } from "react";
+import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, HelpCircle, ImageOff, Sparkles, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import type { Messages } from "../../../i18n/messages";
 import type { VisualStylePreset } from "../../../api/types";
+import {
+  buildVisualStylePresetFilterOptions,
+  createEmptyVisualStylePresetFilters,
+  filterVisualStylePresets,
+  VISUAL_STYLE_PRESET_FILTER_FIELDS,
+  type VisualStylePresetFilters,
+} from "../../templates/visualStylePresetFilters";
 import {
   isStrictReviewModeEnabled,
   type PageReviewSettings,
@@ -50,6 +57,17 @@ export function BriefPage({
   const [submitting, setSubmitting] = useState(false);
   const [preview, setPreview] = useState<{ preset: VisualStylePreset; index: number } | null>(null);
   const [brokenPreviewIds, setBrokenPreviewIds] = useState<string[]>([]);
+  const [presetFilters, setPresetFilters] = useState<VisualStylePresetFilters>(
+    createEmptyVisualStylePresetFilters,
+  );
+  const filterOptions = useMemo(
+    () => buildVisualStylePresetFilterOptions(visualStylePresets),
+    [visualStylePresets],
+  );
+  const filteredPresets = useMemo(
+    () => filterVisualStylePresets(visualStylePresets, presetFilters),
+    [presetFilters, visualStylePresets],
+  );
   // A local guard so the very first click already locks the composer, before the
   // Workspace or requirements request has had a chance to move `loading`.
   const submitBlocked = busy || submitting || workspaceSettingsSaving;
@@ -151,6 +169,25 @@ export function BriefPage({
           </div>
           <span className="brief-style-presets-note">{selectedVisualStylePresetId ? t.template.selected : t.template.noneSelected}</span>
         </div>
+        <div className="brief-style-preset-filters" role="group" aria-label={t.template.filtersLabel}>
+          {VISUAL_STYLE_PRESET_FILTER_FIELDS.map((field) => (
+            <label className={`brief-style-preset-filter ${presetFilters[field] ? "active" : ""}`} key={field}>
+              <span>{t.template.filters[field]}</span>
+              <select
+                value={presetFilters[field]}
+                disabled={busy}
+                title={presetFilters[field] || t.template.all}
+                onChange={(event) => setPresetFilters((current) => ({ ...current, [field]: event.target.value }))}
+              >
+                <option value="">{t.template.all}</option>
+                {filterOptions[field].map((option) => (
+                  <option value={option} key={option}>{option}</option>
+                ))}
+              </select>
+              <ChevronDown className="brief-style-preset-filter-chevron" size={14} aria-hidden="true" />
+            </label>
+          ))}
+        </div>
         <div className="brief-style-preset-grid">
           {/* The "no preset" card keeps its visible label: HOME-004 only covers
               ordinary Visual Style Preset cards, and its final form is still an
@@ -186,7 +223,7 @@ export function BriefPage({
               <strong>{t.template.none}</strong>
             </span>
           </button>
-          {visualStylePresets.map((preset: VisualStylePreset) => {
+          {filteredPresets.map((preset: VisualStylePreset) => {
             const selected = selectedVisualStylePresetId === preset.id;
             const cover = preset.preview_images[0];
             const coverBroken = brokenPreviewIds.includes(preset.id);
@@ -226,8 +263,8 @@ export function BriefPage({
               </article>
             );
           })}
-          {visualStylePresets.length === 0 ? (
-            <p className="brief-style-preset-empty">{t.template.empty}</p>
+          {filteredPresets.length === 0 ? (
+            <p className="brief-style-preset-empty">{t.template.noFilterMatches}</p>
           ) : null}
         </div>
       </section>

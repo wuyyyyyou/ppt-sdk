@@ -169,11 +169,14 @@ describe("BriefPage", () => {
     assert.match(html, /class="brief-style-preset-selected"/);
   });
 
-  it("does not expose template filter management", () => {
+  it("offers an all option for every style filter", () => {
     const html = renderBriefPage();
 
-    assert.doesNotMatch(html, /brief-style-preset-filters/);
-    assert.doesNotMatch(html, /视觉风格筛选/);
+    const filterBlock = /class="brief-style-preset-filters"[\s\S]*?class="brief-style-preset-grid"/
+      .exec(html)?.[0] ?? "";
+    const allOptions = filterBlock.match(/<option value=""[^>]*>全部<\/option>/g) ?? [];
+    assert.equal(allOptions.length, 5);
+    assert.match(filterBlock, /<option value="咨询">咨询<\/option>/);
   });
 
   it("opens a preview from the whole card and only applies the style from the dialog", () => {

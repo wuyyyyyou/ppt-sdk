@@ -1188,6 +1188,13 @@ export interface PageProgressItem {
   last_screenshot_path: string;
   last_error: string;
   render_source_sha256?: string;
+  /**
+   * Source hash the bytes at `last_screenshot_path` were rendered from.
+   * `render_source_sha256` advances when a render is submitted, so it matches
+   * this field only once the new screenshot has actually landed on disk. Empty
+   * on Workspaces written before the field existed.
+   */
+  screenshot_source_sha256?: string;
   visual_review?: unknown | null;
   updated_at: string | null;
 }

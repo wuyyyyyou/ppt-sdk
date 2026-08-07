@@ -91,6 +91,7 @@ export interface DeckGenerationProgressPage {
   last_error?: string;
   last_screenshot_path?: string;
   render_source_sha256?: string;
+  screenshot_source_sha256?: string;
 }
 
 export interface DeckGenerationStream {
@@ -131,6 +132,12 @@ export interface DeckGenerationProgress {
   currentPageIndex: number | null;
   totalPages: number;
   pages: DeckGenerationProgressPage[];
+  /**
+   * Pages this run will rewrite. Absent until the run knows them, which for a
+   * deck refinement is only after its plan commits. Consumers use it to hold a
+   * placeholder over a page whose current screenshot is about to be replaced.
+   */
+  targetPageIds?: string[];
   recoveryRunKind?: NonNullable<PageProgress["recovery"]>["run_kind"];
   stream?: DeckGenerationStream;
   activeStreams?: DeckGenerationStream[];
@@ -250,6 +257,7 @@ export interface PageGenerationResult {
 }
 
 export interface DeckGenerationRuntime extends DeckGenerationContext {
+  targetPageIds?: readonly string[];
   activeStreams: Map<string, DeckGenerationStream>;
   researchDiscoveryProgress?: ResearchDiscoveryProgress;
   getProgress: () => PageProgress | null;

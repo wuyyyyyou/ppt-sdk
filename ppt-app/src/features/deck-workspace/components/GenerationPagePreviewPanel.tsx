@@ -1,4 +1,4 @@
-import { AlertCircle, ImageIcon, LoaderCircle } from "lucide-react";
+import { AlertCircle, LoaderCircle } from "lucide-react";
 import { useMemo } from "react";
 import { formatMessage, type Messages } from "../../../i18n/messages";
 import {
@@ -14,15 +14,10 @@ interface GenerationPagePreviewPanelProps {
   pinnedPageId: string | null;
   onSelectPage: (pageId: string | null) => void;
   activePageIndex?: number | null;
-  /* Whether the run is still going. "No preview yet" and "still working" are the
-     same thing right up until the run ends, which is why the empty state could
-     get away with reading the previews alone — but once it finishes with nothing
-     to show, a spinner claims work that is over. */
-  isActive: boolean;
 }
 
 export function GenerationPagePreviewPanel(props: GenerationPagePreviewPanelProps) {
-  const { t, previews, pinnedPageId, onSelectPage, activePageIndex, isActive } = props;
+  const { t, previews, pinnedPageId, onSelectPage, activePageIndex } = props;
   const entries = useMemo(() => orderGenerationPagePreviews(previews), [previews]);
   const selected = resolveGenerationPreviewSelection({ entries, pinnedPageId, activePageIndex });
   const latest = entries[entries.length - 1] ?? null;
@@ -54,7 +49,12 @@ export function GenerationPagePreviewPanel(props: GenerationPagePreviewPanelProp
 
       <div className="generation-preview-stage">
         {selected?.status === "ready" && selected.imageUpload?.url ? (
-          <img src={selected.imageUpload.url} alt={pageHeading(t, selected)} />
+          <>
+            <img src={selected.imageUpload.url} alt={pageHeading(t, selected)} />
+            {selected.notApplied ? (
+              <span className="generation-preview-not-applied">{t.generating.preview.notApplied}</span>
+            ) : null}
+          </>
         ) : selected?.status === "error" ? (
           <div className="generation-preview-placeholder">
             <AlertCircle size={20} aria-hidden="true" />
@@ -65,15 +65,10 @@ export function GenerationPagePreviewPanel(props: GenerationPagePreviewPanelProp
             <LoaderCircle className="generation-running-icon" size={20} aria-hidden="true" />
             <span>{t.generating.preview.loading}</span>
           </div>
-        ) : isActive ? (
+        ) : (
           <div className="generation-preview-placeholder" role="status" aria-live="polite">
             <LoaderCircle className="generation-running-icon" size={20} aria-hidden="true" />
             <span>{t.generating.preview.loading}</span>
-          </div>
-        ) : (
-          <div className="generation-preview-placeholder">
-            <ImageIcon size={20} aria-hidden="true" />
-            <span>{t.generating.preview.waiting}</span>
           </div>
         )}
       </div>
@@ -86,14 +81,20 @@ export function GenerationPagePreviewPanel(props: GenerationPagePreviewPanelProp
         >
           {entries.map((entry) => {
             const active = entry.pageId === selected?.pageId;
+            const className = ["generation-preview-thumbnail", entry.status]
+              .concat(entry.notApplied ? ["not-applied"] : [])
+              .concat(active ? ["active"] : [])
+              .join(" ");
             return (
               <button
                 key={entry.pageId}
-                className={`generation-preview-thumbnail ${entry.status} ${active ? "active" : ""}`}
+                className={className}
                 type="button"
                 role="tab"
                 aria-selected={active}
-                title={pageHeading(t, entry)}
+                title={entry.notApplied
+                  ? `${pageHeading(t, entry)} — ${t.generating.preview.notApplied}`
+                  : pageHeading(t, entry)}
                 aria-label={formatMessage(t.generating.preview.selectPage, {
                   page: entry.pageIndex + 1,
                 })}

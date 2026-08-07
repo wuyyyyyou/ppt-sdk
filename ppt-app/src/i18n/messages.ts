@@ -169,6 +169,10 @@ export interface Messages {
     previous: string;
     next: string;
     close: string;
+    filtersLabel: string;
+    filters: Record<"user" | "use_case" | "industry" | "theme" | "color", string>;
+    all: string;
+    noFilterMatches: string;
   };
   outline: {
     title: string;
@@ -295,6 +299,7 @@ export interface Messages {
       latest: string;
       followingLatest: string;
       backToLatest: string;
+      notApplied: string;
     };
     persistentElements: {
       title: string;
@@ -890,6 +895,10 @@ export const messages: Record<Locale, Messages> = {
       previous: "Previous",
       next: "Next",
       close: "Close",
+      filtersLabel: "Style filters",
+      filters: { user: "User", use_case: "Use case", industry: "Industry", theme: "Theme", color: "Color" },
+      all: "All",
+      noFilterMatches: "No styles match the current filters.",
     },
     outline: {
       title: "Review outline",
@@ -1031,7 +1040,8 @@ export const messages: Record<Locale, Messages> = {
         selectPage: "Show page {page}",
         latest: "Latest",
         followingLatest: "Following the newest page",
-        backToLatest: "Follow the newest page"
+        backToLatest: "Follow the newest page",
+        notApplied: "Unchanged \u2014 this run did not replace it"
       },
       persistentElements: {
         title: "Cross-slide decoration generation",
@@ -1649,6 +1659,10 @@ export const messages: Record<Locale, Messages> = {
       previous: "上一页",
       next: "下一页",
       close: "关闭",
+      filtersLabel: "视觉风格筛选",
+      filters: { user: "用户", use_case: "使用场景", industry: "行业", theme: "主题", color: "色彩" },
+      all: "全部",
+      noFilterMatches: "没有符合当前筛选条件的视觉风格。",
     },
     outline: {
       title: "审阅大纲",
@@ -1784,7 +1798,8 @@ export const messages: Record<Locale, Messages> = {
         selectPage: "查看第 {page} 页",
         latest: "最新",
         followingLatest: "正在跟随最新一页",
-        backToLatest: "跟随最新一页"
+        backToLatest: "跟随最新一页",
+        notApplied: "未改动 — 本次没有替换这一页"
       },
       persistentElements: {
         title: "跨页装饰生成",

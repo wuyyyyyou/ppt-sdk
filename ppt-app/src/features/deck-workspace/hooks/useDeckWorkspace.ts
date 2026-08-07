@@ -135,9 +135,10 @@ import {
   type WorkspaceCovers,
 } from "../workspaceCovers";
 import {
-  createLoadingGenerationPagePreviews,
+  createRunGenerationPagePreviews,
   GENERATION_PAGE_PREVIEW_CONCURRENCY,
   reconcileGenerationPagePreviews,
+  releaseAwaitingGenerationPagePreviews,
   selectGenerationPagePreviewSources,
   type GenerationPagePreviews,
 } from "../generationPagePreviews";
@@ -631,6 +632,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     useState<string | null>(null);
   const generationPagePreviewsRef = useRef<GenerationPagePreviews>({});
   const generationPagePreviewSessionRef = useRef(0);
+  // A page is put on hold once per run. Without this the next progress poll
+  // would keep re-arming the hold and the preview could never come back.
+  const generationPreviewHeldPageIdsRef = useRef(new Set<string>());
   const reviewPageImageRefreshAttemptsRef = useRef(new Set<string>());
   const [generationPreparing, setGenerationPreparing] = useState(false);
   const [generationTransaction, setGenerationTransaction] =
@@ -1631,10 +1635,16 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   function resetGenerationPagePreviews() {
     generationPagePreviewSessionRef.current += 1;
     generationPagePreviewsRef.current = {};
+    generationPreviewHeldPageIdsRef.current = new Set();
     setGenerationPagePreviews({});
     setPinnedGenerationPreviewPageId(null);
   }
 
+  /**
+   * The panel opens as the whole deck rather than just the pages in flight:
+   * untouched pages keep the image the user is already looking at, and the
+   * pages the run will rewrite hold a placeholder over theirs.
+   */
   function showRefinementLoadingPreviews(
     scope: RefineScope,
     items: readonly WorkspaceOutlineItem[],
@@ -1642,24 +1652,51 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   ) {
     const pages = items.flatMap((item, pageIndex) => {
       const pageId = item.page_id?.trim() ?? "";
-      if (!pageId || (scope === "slide" && pageId !== targetPageId)) return [];
+      if (!pageId) return [];
       return [{ pageId, pageIndex, title: item.title }];
     });
-    const previews = createLoadingGenerationPagePreviews(pages);
+    // A deck refinement only knows which pages it rewrites once its plan
+    // commits, so nothing is held back until the run reports its targets.
+    const targetPageIds = scope === "slide" && targetPageId ? [targetPageId] : [];
+    const previews = createRunGenerationPagePreviews({
+      pages,
+      targetPageIds,
+      slides: reviewRender.result?.slides,
+      previous: generationPagePreviewsRef.current,
+    });
     generationPagePreviewSessionRef.current += 1;
     generationPagePreviewsRef.current = previews;
+    generationPreviewHeldPageIdsRef.current = new Set(targetPageIds);
     setGenerationPagePreviews(previews);
     setPinnedGenerationPreviewPageId(targetPageId ?? pages[0]?.pageId ?? null);
   }
 
+  function releaseGenerationPagePreviewHolds() {
+    const released = releaseAwaitingGenerationPagePreviews(generationPagePreviewsRef.current);
+    if (released === generationPagePreviewsRef.current) return;
+    generationPagePreviewsRef.current = released;
+    setGenerationPagePreviews(released);
+  }
+
   useEffect(() => {
     if (!backend || !generationPreviewWorkspaceDir) return;
+    // Starting a Shadow Workspace and publishing its first progress snapshot
+    // are separate async steps. Keep the seeded refinement previews during
+    // that gap; reconciling `null` as an empty page list would discard the
+    // target page's hold and let the next snapshot fetch its old screenshot.
+    if (!createDeckProgress) return;
 
     const sources = selectGenerationPagePreviewSources(createDeckProgress);
+    const held = generationPreviewHeldPageIdsRef.current;
+    const lockPageIds = (createDeckProgress?.targetPageIds ?? []).filter(
+      (pageId) => !held.has(pageId),
+    );
     const { previews, pending, changed } = reconcileGenerationPagePreviews(
       generationPagePreviewsRef.current,
       sources,
+      lockPageIds,
     );
+    for (const pageId of lockPageIds) held.add(pageId);
     if (!changed) return;
 
     generationPagePreviewsRef.current = previews;
@@ -1676,6 +1713,9 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       if (generationPagePreviewSessionRef.current !== session) return;
       const current = generationPagePreviewsRef.current[source.pageId];
       if (!current) return;
+      // A newer run put the page back on hold while this was in flight, so the
+      // bytes this fetched are the version the hold exists to suppress.
+      if (current.awaitingRenderFrom !== undefined) return;
       const sameRenderSource = Boolean(
         source.renderSourceFingerprint &&
         current.renderSourceFingerprint === source.renderSourceFingerprint,
@@ -1687,6 +1727,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           ? {
               ...current,
               status: "ready",
+              notApplied: undefined,
               previewSourceFingerprint: image.preview_source_fingerprint,
               imagePath: image.image_path,
               imageUpload: image.image_upload,
@@ -1695,6 +1736,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
           : {
               ...current,
               status: "error",
+              notApplied: undefined,
               previewSourceFingerprint: undefined,
               imagePath: undefined,
               imageUpload: undefined,
@@ -1712,7 +1754,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         if (generationPagePreviewSessionRef.current !== session) return;
         // A re-render that landed while this was queued replaced the source
         // bytes, so the newer reconciliation owns the request.
-        if (generationPagePreviewsRef.current[source.pageId]?.screenshotPath !== source.screenshotPath) {
+        const queued = generationPagePreviewsRef.current[source.pageId];
+        if (
+          !queued ||
+          queued.screenshotPath !== source.screenshotPath ||
+          queued.screenshotSourceFingerprint !== source.screenshotSourceFingerprint
+        ) {
           return;
         }
         try {
@@ -2508,6 +2555,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       options.resumeAllowedOnRecoverableStop !== false;
 
     if (completion.status === "cancelled") {
+      releaseGenerationPagePreviewHolds();
       setGenerationResumeAllowed(resumeAllowedOnRecoverableStop);
       const latestWorkspace = backend
         ? await backend.openWorkspace({ workspace_dir: workspace.workspace_dir })
@@ -2520,6 +2568,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     }
 
     if (completion.status === "failed") {
+      releaseGenerationPagePreviewHolds();
       if (completion.progress) {
         setCreateDeckProgress(completion.progress);
       }
@@ -3970,7 +4019,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     let generationRun: GenerationRunTransaction | null = null;
     const cancelSignal = beginCancellableGeneration();
     setLoading("refineDeck");
-    resetGenerationProgress();
+    resetGenerationProgress({ preservePagePreviews: true });
     const initialOutline = workspaceOutlineForDownstream(currentWorkspace).items;
     const initialTargetPageId = initialOutline[currentSlide]?.page_id;
     showRefinementLoadingPreviews("deck", initialOutline, initialTargetPageId);
@@ -4028,6 +4077,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       showToast(error instanceof Error ? error.message : t.status.refiningDeck);
     } finally {
       if (ownsGenerationOperation(cancelSignal)) {
+        releaseGenerationPagePreviewHolds();
         setLoading("none");
         await finishActiveGenerationRun({
           workspaceDir: activeRunWorkspaceDir,
@@ -4050,7 +4100,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     let generationRun: GenerationRunTransaction | null = null;
     const cancelSignal = beginCancellableGeneration();
     setLoading("refineSlide");
-    resetGenerationProgress();
+    resetGenerationProgress({ preservePagePreviews: true });
     const initialOutline = workspaceOutlineForDownstream(currentWorkspace).items;
     const initialTargetPageId = initialOutline[currentSlide]?.page_id;
     showRefinementLoadingPreviews("slide", initialOutline, initialTargetPageId);
@@ -4105,6 +4155,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       showToast(error instanceof Error ? error.message : t.status.refiningSlide);
     } finally {
       if (ownsGenerationOperation(cancelSignal)) {
+        releaseGenerationPagePreviewHolds();
         setLoading("none");
         await finishActiveGenerationRun({
           workspaceDir: activeRunWorkspaceDir,
