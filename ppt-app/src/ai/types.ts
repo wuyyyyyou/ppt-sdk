@@ -1,6 +1,13 @@
 import type { OutlineDetail, Slide } from "../data/mockDeck";
 import type { AnnaLlmCompleteInput } from "../runtime/annaRuntime";
-import type { PresentationRequirements, PresentationRequirementsCandidates, VisualStylePresetSelection, WorkspaceSettings } from "../api/types";
+import type {
+  PresentationRequirements,
+  PresentationRequirementsCandidates,
+  VisualStylePreset,
+  VisualStylePresetColor,
+  VisualStylePresetSelection,
+  WorkspaceSettings,
+} from "../api/types";
 import type {
   PagePlan,
   PagePlanItem,
@@ -39,6 +46,27 @@ export interface GenerateDeckInput extends DeckBriefInput {
 export interface GeneratePresentationRequirementsInput {
   brief: string;
   visualStylePreset?: VisualStylePresetSelection | null;
+  visualToneRequired?: boolean;
+  logContext?: AiOperationLogContext;
+}
+
+export type VisualStylePresetSelectionCandidate = Pick<
+  VisualStylePreset,
+  "id" | "version" | "name" | "description" | "theme" | "color" | "user" | "use_case" | "industry" | "style_guide"
+>;
+
+export interface SelectVisualStylePresetColorInput {
+  brief: string;
+  requirements: PresentationRequirements;
+  colors: VisualStylePresetColor[];
+  logContext?: AiOperationLogContext;
+}
+
+export interface SelectVisualStylePresetInput {
+  brief: string;
+  requirements: PresentationRequirements;
+  color: VisualStylePresetColor;
+  candidates: VisualStylePresetSelectionCandidate[];
   logContext?: AiOperationLogContext;
 }
 
@@ -210,6 +238,12 @@ export interface AiClient {
   generatePresentationRequirements(
     input: GeneratePresentationRequirementsInput
   ): Promise<PresentationRequirementsCandidates>;
+  selectVisualStylePresetColor(
+    input: SelectVisualStylePresetColorInput,
+  ): Promise<VisualStylePresetColor>;
+  selectVisualStylePreset(
+    input: SelectVisualStylePresetInput,
+  ): Promise<string>;
   generateOutline(input: GenerateOutlineInput): Promise<OutlineGenerationResult>;
   generateWorkspaceStyleGuide(input: GenerateWorkspaceStyleGuideInput): Promise<string>;
   generateThemeToken(input: GenerateThemeTokenInput): Promise<unknown>;

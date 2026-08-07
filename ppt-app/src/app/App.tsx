@@ -172,7 +172,7 @@ export function App() {
               dirty={state.requirementsDirty}
               hasSavedDraft={state.requirementsHasSavedDraft}
               onSelect={actions.selectPresentationRequirement}
-              onRetry={() => void actions.generatePresentationRequirements()}
+              onRetry={() => void actions.retryPresentationRequirements()}
               onManual={() => void actions.useManualPresentationRequirements()}
               onBack={actions.returnToBriefFromRequirements}
               onSave={() => void actions.savePresentationRequirements()}

@@ -12,7 +12,7 @@ PPT App 的“模板”采用新的领域概念 `Visual Style Preset（视觉风
 
 `ppt-app` 构建前必须独立校验每个 `preset.json` 的必需字段和字段类型，并确认 `preview_images` 中的相对路径仍位于对应预设目录内、指向实际存在且受支持的图片文件。任何协议或图片路径错误都会使构建失败；运行时加载器仍保留防御性检查。
 
-未选择模板时保持现有 Visual Tone 和 LLM Style Guide 生成流程。选择或取消模板会要求重新生成演示需求；用户在 Brief 页面修改模板后不能继续确认旧需求，确认新的需求后才清理旧的下游产物。模板模式下 Deck Refinement 使用独立的 Prompt/Schema，不返回 `style_guide_change`，模板 Style Guide 不可被替换；用户本轮 Refinement Request 仍传给目标页面，并在页面创作时优先于模板指导。Page Visual Review 只检查溢出、截断、可读性、对比度、缺失视觉元素、异常空白和画布边界，不检查模板风格一致性。
+未选择模板时不再生成或展示 Visual Tone。Presentation Requirements Creation 先生成其它需求，再由 LLM 分两步选择 Visual Style Preset：先从目录颜色分类中选一个颜色，再从该颜色下最多十个随机候选及其完整 `style_guide` 中选一个预设。选出的预设进入与用户显式选择相同的确认和 Style Guide 上传流程；颜色选择或模板选择失败时需求阶段直接失败并支持重试。选择或取消模板会要求重新生成演示需求；用户在 Brief 页面修改模板后不能继续确认旧需求，确认新的需求后才清理旧的下游产物。模板模式下 Deck Refinement 使用独立的 Prompt/Schema，不返回 `style_guide_change`，模板 Style Guide 不可被替换；用户本轮 Refinement Request 仍传给目标页面，并在页面创作时优先于模板指导。Page Visual Review 只检查溢出、截断、可读性、对比度、缺失视觉元素、异常空白和画布边界，不检查模板风格一致性。
 
 ## Considered Options
 

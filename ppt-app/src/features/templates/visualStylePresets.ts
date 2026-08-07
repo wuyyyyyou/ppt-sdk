@@ -7,6 +7,7 @@ import {
   buildVisualStylePresetFilterOptions,
   sortVisualStylePresetsByScore,
 } from "./visualStylePresetFilters";
+import { sampleVisualStylePresetsByColor as samplePresetsByColor } from "./visualStylePresetSampling";
 export { toVisualStylePresetSelection } from "./visualStylePresetSelection";
 
 export const NO_VISUAL_STYLE_PRESET_ID = "none";
@@ -126,6 +127,18 @@ export const VISUAL_STYLE_PRESETS = loadVisualStylePresets();
 
 export const VISUAL_STYLE_PRESET_FILTER_OPTIONS =
   buildVisualStylePresetFilterOptions(VISUAL_STYLE_PRESETS);
+
+export function listVisualStylePresetColors(): VisualStylePresetColor[] {
+  return [...new Set(VISUAL_STYLE_PRESETS.flatMap((preset) => preset.color))];
+}
+
+export function sampleVisualStylePresetsByColor(
+  color: VisualStylePresetColor,
+  limit = 10,
+  random = Math.random,
+): VisualStylePreset[] {
+  return samplePresetsByColor(VISUAL_STYLE_PRESETS, color, limit, random);
+}
 
 export function findVisualStylePreset(id: string | null | undefined): VisualStylePreset | null {
   if (!id || id === NO_VISUAL_STYLE_PRESET_ID) return null;

@@ -7,8 +7,9 @@ import type {
 } from "../../api/types";
 import type { Messages } from "../../i18n/messages";
 import { ErrorNotice } from "../deck-workspace/components/ErrorNotice";
+import { requirementsAreCompleteWithoutVisualSelection } from "./presentationRequirements";
 
-type SemanticField = "audience" | "purpose" | "desired_outcome" | "visual_tone";
+type SemanticField = "audience" | "purpose" | "desired_outcome";
 type SimpleField = "slide_count" | "output_language";
 
 export interface PresentationRequirementsPageProps {
@@ -36,7 +37,6 @@ export interface PresentationRequirementsPageProps {
 const GROUPS: Array<{ title: keyof Messages["requirements"]["groups"]; fields: Array<SemanticField | SimpleField> }> = [
   { title: "content", fields: ["audience", "purpose", "desired_outcome"] },
   { title: "specifications", fields: ["slide_count", "output_language"] },
-  { title: "visual", fields: ["visual_tone"] },
 ];
 
 function semanticMatches(
@@ -50,7 +50,7 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
   const { t, brief, requirements, status, error, errorDetail, saving, confirming, dirty, hasSavedDraft, onSelect, onRetry, onManual, onBack, onSave, onConfirm } = props;
   const [customValues, setCustomValues] = useState<Record<string, string>>(() => {
     const values: Record<string, string> = {};
-    for (const field of ["audience", "purpose", "desired_outcome", "visual_tone"] as const) {
+    for (const field of ["audience", "purpose", "desired_outcome"] as const) {
       const selection = requirements.selections[field];
       if (selection && !requirements.candidates[field].some((candidate) => semanticMatches(selection, candidate))) {
         values[field] = selection.description;
@@ -136,19 +136,6 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
           <section className="requirements-group" key={group.title}>
             <h2>{t.requirements.groups[group.title]}</h2>
             {group.fields.map((field) => {
-              if (field === "visual_tone" && requirements.selections.visual_style_preset) {
-                const preset = requirements.selections.visual_style_preset;
-                return (
-                  <fieldset className="requirement-field" key="visual-style-preset">
-                    <legend>{t.requirements.fields.visual_tone}</legend>
-                    <div className="requirement-preset-summary">
-                      <strong>{preset.name}</strong>
-                      <span>{preset.description}</span>
-                      <small>{t.requirements.templateLocked}</small>
-                    </div>
-                  </fieldset>
-                );
-              }
               const isSemantic = field !== "slide_count" && field !== "output_language";
               const candidates = requirements.candidates[field];
               const selection = requirements.selections[field];
@@ -200,6 +187,19 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
             })}
           </section>
         ))}
+        {requirements.selections.visual_style_preset ? (
+          <section className="requirements-group">
+            <h2>{t.template.title}</h2>
+            <fieldset className="requirement-field">
+              <legend>{t.template.title}</legend>
+              <div className="requirement-preset-summary">
+                <strong>{requirements.selections.visual_style_preset.name}</strong>
+                <span>{requirements.selections.visual_style_preset.description}</span>
+                <small>{t.requirements.templateLocked}</small>
+              </div>
+            </fieldset>
+          </section>
+        ) : null}
       </div>
 
       <footer className="requirements-footer">
@@ -209,7 +209,7 @@ export function PresentationRequirementsPage(props: PresentationRequirementsPage
           <button data-performance-id="requirements.save" className="secondary-btn" type="button" disabled={saving || confirming || !dirty} onClick={onSave}>
             <Save size={16} />{t.controls.save}
           </button>
-          <button data-performance-id="requirements.confirm" className="primary-btn" type="button" disabled={saving || confirming || !((requirements.selections.visual_style_preset || requirements.selections.visual_tone) && Object.entries(requirements.selections).filter(([key]) => key !== "visual_style_preset" && key !== "visual_tone").every(([, value]) => value !== null)) || requirements.selections.output_language?.trim().toLowerCase() === "auto"} onClick={onConfirm}>
+          <button data-performance-id="requirements.confirm" className="primary-btn" type="button" disabled={saving || confirming || !requirementsAreCompleteWithoutVisualSelection(requirements)} onClick={onConfirm}>
             <Check size={16} />{t.requirements.confirm}
           </button>
         </div>

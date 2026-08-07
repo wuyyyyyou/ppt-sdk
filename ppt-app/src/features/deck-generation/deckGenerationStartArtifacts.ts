@@ -219,7 +219,7 @@ export async function loadResumeArtifacts(input: RunDeckGenerationInput) {
   if (progress.pages.length === 0) {
     emitPreparationStep(input, "authoring-kit", generationText(input.locale).authoringKit);
     await input.backend.installWorkspaceAuthoringKit({ workspace_dir: input.workspace.workspace_dir });
-    if (!styleGuide.non_empty && !input.workspace.requirements.selections.visual_style_preset) {
+    if (!styleGuide.non_empty) {
       emitPreparationStep(input, "style-guide", generationText(input.locale).styleGuide);
       await ensureWorkspaceStyleGuide(input);
     }

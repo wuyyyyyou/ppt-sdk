@@ -26,6 +26,12 @@ import {
   buildPresentationRequirementsRequest,
 } from "./requirementsPrompt";
 import {
+  buildVisualStylePresetColorRequest,
+  buildVisualStylePresetRequest,
+  parseVisualStylePresetColorResponse,
+  parseVisualStylePresetResponse,
+} from "./visualStylePresetSelectionPrompt";
+import {
   parsePresentationRequirementsCandidates,
   PresentationRequirementsValidationError,
 } from "./requirementsParser";
@@ -187,6 +193,7 @@ async function completeJson<T>(
       ]
     },
     expectedShape,
+    undefined,
     logContext,
   );
 }
@@ -196,6 +203,7 @@ async function completeJsonRequest<T>(
   label: string,
   initialRequest: AnnaLlmCompleteInput,
   expectedShape: string,
+  parseResponse: (rawText: string) => T = (rawText) => parseJsonResult<T>(rawText, label),
   logContext?: AiOperationLogContext
 ): Promise<T> {
   let request: AnnaLlmCompleteInput = {
@@ -210,7 +218,7 @@ async function completeJsonRequest<T>(
     const rawText = extractCompletionText(result);
 
     try {
-      return parseJsonResult<T>(rawText, label);
+      return parseResponse(rawText);
     } catch (error) {
       if (attempt >= 2) {
         throw error;
@@ -247,9 +255,10 @@ async function completePresentationRequirementsWithRetry(
   runtime: AnnaRuntime,
   brief: string,
   visualStylePreset?: { name: string; description: string } | null,
+  visualToneRequired = !visualStylePreset,
   logContext?: AiOperationLogContext,
 ) {
-  let request = buildPresentationRequirementsRequest(brief, visualStylePreset);
+  let request = buildPresentationRequirementsRequest(brief, visualStylePreset, visualToneRequired);
   let lastErrors: string[] = [];
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -258,13 +267,14 @@ async function completePresentationRequirementsWithRetry(
     try {
       return parsePresentationRequirementsCandidates(rawText, {
         visualStylePresetSelected: Boolean(visualStylePreset),
+        visualToneRequired,
       });
     } catch (error) {
       lastErrors = error instanceof PresentationRequirementsValidationError
         ? error.errors
         : [error instanceof Error ? error.message : String(error)];
       if (attempt < 2) {
-        request = buildPresentationRequirementsRepairRequest(request, rawText, lastErrors, visualStylePreset);
+        request = buildPresentationRequirementsRepairRequest(request, rawText, lastErrors, visualStylePreset, visualToneRequired);
       }
     }
   }
@@ -272,6 +282,38 @@ async function completePresentationRequirementsWithRetry(
   throw new AiPresentationRequirementsError(
     `Anna LLM returned invalid Presentation Requirements JSON: ${lastErrors.join("; ")}`,
     lastErrors,
+  );
+}
+
+async function selectVisualStylePresetColorWithRetry(
+  runtime: AnnaRuntime,
+  input: Parameters<typeof buildVisualStylePresetColorRequest>[0],
+  logContext?: AiOperationLogContext,
+) {
+  const request = buildVisualStylePresetColorRequest(input);
+  return completeJsonRequest(
+    runtime,
+    "visual style preset color",
+    request,
+    '{"color":"blue"}',
+    (rawText) => parseVisualStylePresetColorResponse(parseStructuredJson(rawText), input.colors),
+    logContext,
+  );
+}
+
+async function selectVisualStylePresetWithRetry(
+  runtime: AnnaRuntime,
+  input: Parameters<typeof buildVisualStylePresetRequest>[0],
+  logContext?: AiOperationLogContext,
+) {
+  const request = buildVisualStylePresetRequest(input);
+  return completeJsonRequest(
+    runtime,
+    "visual style preset",
+    request,
+    '{"preset_id":"candidate-id"}',
+    (rawText) => parseVisualStylePresetResponse(parseStructuredJson(rawText), input.candidates),
+    logContext,
   );
 }
 
@@ -412,7 +454,24 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
         runtime,
         input.brief,
         input.visualStylePreset,
+        input.visualToneRequired,
         input.logContext,
+      );
+    },
+
+    selectVisualStylePresetColor(input) {
+      return selectVisualStylePresetColorWithRetry(
+        runtime,
+        input,
+        input.logContext ? { ...input.logContext, operation: "select_preset_color" } : undefined,
+      );
+    },
+
+    selectVisualStylePreset(input) {
+      return selectVisualStylePresetWithRetry(
+        runtime,
+        input,
+        input.logContext ? { ...input.logContext, operation: "select_preset_template" } : undefined,
       );
     },
 
@@ -459,6 +518,7 @@ export function createAnnaAiClient(runtime: AnnaRuntime): AiClient {
           ],
         },
         JSON.stringify(input.themeContext.default_token),
+        undefined,
         input.logContext,
       );
       return result;

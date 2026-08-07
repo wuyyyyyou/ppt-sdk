@@ -679,6 +679,10 @@ async function atomicWriteJsonFile(filePath: string, data: unknown): Promise<voi
   await atomicWriteTextFile(filePath, `${JSON.stringify(data, null, 2)}\n`);
 }
 
+async function writePageProgressFile(filePath: string, data: unknown): Promise<void> {
+  await atomicWriteJsonFile(filePath, data);
+}
+
 const pageProgressWriteQueues = new Map<string, Promise<unknown>>();
 const uploadedSourceWriteQueues = new Map<string, Promise<unknown>>();
 const styleProfileWriteQueues = new Map<string, Promise<unknown>>();
@@ -1913,7 +1917,7 @@ async function ensureWorkspaceFiles(
   const currentPageProgress = await readJsonFileIfExists(files.page_progress);
   const normalizedPageProgress = normalizePageProgressJson(currentPageProgress);
   if (JSON.stringify(currentPageProgress) !== JSON.stringify(normalizedPageProgress)) {
-    await writeJsonFile(files.page_progress, normalizedPageProgress);
+    await writePageProgressFile(files.page_progress, normalizedPageProgress);
   }
 
   const missingFiles: string[] = [];
@@ -3619,7 +3623,7 @@ export async function updateAppWorkspacePages(
     })
     .filter((page): page is AppPageProgressItem => page !== null);
   if (nextProgressPages.length > 0) {
-    await writeJsonFile(workspace.files.page_progress, {
+    await writePageProgressFile(workspace.files.page_progress, {
       ...pageProgressRecord,
       pages: nextProgressPages,
       updated_at: updatedAt,
@@ -3776,7 +3780,7 @@ export async function duplicateAppWorkspacePage(
       .filter((page): page is AppPageProgressItem => page !== null);
 
     if (nextProgressPages.length > 0) {
-      await writeJsonFile(workspace.files.page_progress, {
+      await writePageProgressFile(workspace.files.page_progress, {
         ...pageProgressRecord,
         pages: nextProgressPages,
         updated_at: updatedAt,
@@ -4787,7 +4791,7 @@ async function invalidateFinalDeckRender(
   updatedAt = new Date().toISOString(),
 ): Promise<void> {
   const progress = normalizePageProgressJson(workspace.page_progress);
-  await writeJsonFile(workspace.files.page_progress, {
+  await writePageProgressFile(workspace.files.page_progress, {
     ...progress,
     final_deck_render: {
       status: "idle",
@@ -4967,7 +4971,7 @@ async function commitManualPageToFinalDeck(input: {
       } : page),
       updated_at: input.updated_at,
     };
-    await writeJsonFile(workspace.files.page_progress, nextProgress);
+    await writePageProgressFile(workspace.files.page_progress, nextProgress);
 
     const task = getPlainRecord(workspace.task);
     const artifacts = getPlainRecord(task.artifacts);
@@ -5143,7 +5147,7 @@ async function updateFinalDeckRenderIfActive(input: {
       }),
       updated_at: updatedAt,
     };
-    await writeJsonFile(workspace.files.page_progress, nextProgress);
+    await writePageProgressFile(workspace.files.page_progress, nextProgress);
     await touchWorkspaceTask(workspace, updatedAt);
     return true;
   });
@@ -6638,7 +6642,7 @@ export async function prepareAppPageFiles(
 
   await writeJsonFile(context.manifest_path, nextManifest);
   await writeJsonFile(workspace.files.page_plan, preparedPlan);
-  await writeJsonFile(workspace.files.page_progress, buildInitialPageProgress(preparedPlan));
+  await writePageProgressFile(workspace.files.page_progress, buildInitialPageProgress(preparedPlan));
   await touchWorkspaceTask(workspace, preparedAt);
 
   return {
@@ -6771,7 +6775,7 @@ export async function prepareAppDeckRefinementPageFiles(
 
   await writeJsonFile(context.manifest_path, nextManifest);
   await writeJsonFile(workspace.files.page_plan, preparedPlan);
-  await writeJsonFile(workspace.files.page_progress, nextProgress);
+  await writePageProgressFile(workspace.files.page_progress, nextProgress);
   await writeJsonFile(workspace.files.pages, {
     ...existingPagesRecord,
     status: nextRenderedPages.length === preparedPlan.pages.length ? existingPagesRecord.status : "stale",
@@ -6852,7 +6856,7 @@ export async function prepareAppPageRefinement(
     } : page),
     updated_at: updatedAt,
   };
-  await writeJsonFile(workspace.files.page_progress, progress);
+  await writePageProgressFile(workspace.files.page_progress, progress);
   await touchWorkspaceTask(workspace, updatedAt);
   return { workspace_dir: workspace.workspace_dir, page_id: pageId, progress };
 }
@@ -7011,7 +7015,7 @@ export async function commitAppDeckRefinement(
     });
     if (replacementStyleGuide) await writeFile(workspace.files.style_guide, replacementStyleGuide);
     await prepareWorkspacePageSources({ workspace_dir: workspace.workspace_dir });
-    await writeJsonFile(workspace.files.page_progress, nextProgress);
+    await writePageProgressFile(workspace.files.page_progress, nextProgress);
   } catch (error) {
     for (const [filePath, bytes] of backups) {
       if (bytes) await writeFile(filePath, bytes).catch(() => undefined);
@@ -7067,7 +7071,7 @@ export async function getAppPageProgress(
         : latest.final_deck_render,
       updated_at: updatedAt,
     };
-    await writeJsonFile(latestWorkspace.files.page_progress, next);
+    await writePageProgressFile(latestWorkspace.files.page_progress, next);
     return next;
   });
 }
@@ -7232,7 +7236,7 @@ export async function initializeAppPageProgress(
     })),
     updated_at: updatedAt,
   };
-  await writeJsonFile(workspace.files.page_progress, progress);
+  await writePageProgressFile(workspace.files.page_progress, progress);
   await touchWorkspaceTask(workspace, updatedAt);
   return progress;
 }
@@ -7289,7 +7293,7 @@ export async function recordAppPageProgress(
       updated_at: updatedAt,
     };
 
-    await writeJsonFile(workspace.files.page_progress, nextProgress);
+    await writePageProgressFile(workspace.files.page_progress, nextProgress);
     if (pageId && normalizeString(input.patch.status) === "accepted") {
       await removeManualPageRevision(workspace.workspace_dir, pageId);
     }
@@ -7327,7 +7331,7 @@ async function updatePageRenderIfActive(input: {
         : item),
       updated_at: updatedAt,
     };
-    await writeJsonFile(workspace.files.page_progress, nextProgress);
+    await writePageProgressFile(workspace.files.page_progress, nextProgress);
     await touchWorkspaceTask(workspace, updatedAt);
     return true;
   });

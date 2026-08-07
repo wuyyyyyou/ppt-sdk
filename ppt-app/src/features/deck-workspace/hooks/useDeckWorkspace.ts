@@ -190,8 +190,14 @@ import {
   createRequirementsDraft,
   requirementsOwnedRecoveryStage,
   requirementsAreComplete,
+  requirementsAreCompleteWithoutVisualSelection,
 } from "../../requirements";
-import { findVisualStylePreset, toVisualStylePresetSelection } from "../../templates/visualStylePresets";
+import {
+  findVisualStylePreset,
+  listVisualStylePresetColors,
+  sampleVisualStylePresetsByColor,
+  toVisualStylePresetSelection,
+} from "../../templates/visualStylePresets";
 import { beginPerformanceSpan, installPerformanceButtonCollector } from "../../../performance/performanceRecorder";
 
 const DEFAULT_TEMPLATE_GROUP_ID = "red-finance-canvas";
@@ -476,6 +482,7 @@ export interface DeckWorkspaceActions {
   addStyleRow: () => void;
   generateDeck: () => Promise<void>;
   generatePresentationRequirements: () => Promise<void>;
+  retryPresentationRequirements: () => Promise<void>;
   selectVisualStylePreset: (presetId: string | null) => Promise<void>;
   useManualPresentationRequirements: () => Promise<void>;
   selectPresentationRequirement: <K extends keyof PresentationRequirementsSelections>(
@@ -574,6 +581,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     useState<"idle" | "loading" | "ready" | "error">("idle");
   const [requirementsError, setRequirementsError] = useState("");
   const [requirementsErrorDetail, setRequirementsErrorDetail] = useState("");
+  const [requirementsRetryMode, setRequirementsRetryMode] = useState<"generate" | "select">("generate");
   const [requirementsSaving, setRequirementsSaving] = useState(false);
   const [requirementsConfirming, setRequirementsConfirming] = useState(false);
   const [requirementsDirty, setRequirementsDirty] = useState(false);
@@ -2265,6 +2273,37 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     });
   }
 
+  async function autoSelectVisualStylePreset(
+    workspace: WorkspaceResult,
+    brief: string,
+    requirements: PresentationRequirements,
+  ) {
+    if (!aiClient) throw new Error("AI client is unavailable");
+    const logContext = buildAiLogContext(workspace, "requirements", "select_visual_style_preset");
+    const color = await aiClient.selectVisualStylePresetColor({
+      brief,
+      requirements,
+      colors: listVisualStylePresetColors(),
+      logContext,
+    });
+    const candidates = sampleVisualStylePresetsByColor(color, 10);
+    if (candidates.length === 0) {
+      throw new Error(`No Visual Style Preset candidates were found for color ${color}.`);
+    }
+    const presetId = await aiClient.selectVisualStylePreset({
+      brief,
+      requirements,
+      color,
+      candidates,
+      logContext,
+    });
+    const preset = findVisualStylePreset(presetId);
+    if (!preset || !preset.color.includes(color)) {
+      throw new Error("The selected Visual Style Preset is not in the candidate set.");
+    }
+    return preset;
+  }
+
   async function generatePresentationRequirements(presetIdOverride?: string | null) {
     if (!backend || !aiClient) return;
     const brief = prompt.trim();
@@ -2278,6 +2317,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     setPage("main");
     setStage("requirements");
     setRequirementsStatus("loading");
+    setRequirementsRetryMode("generate");
     setRequirementsError("");
     setRequirementsErrorDetail("");
     setLoading("requirements");
@@ -2287,24 +2327,36 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       if (!workspace || requirementsOperationRef.current !== operation) return;
       setPrompt(brief);
       const selectedPreset = findVisualStylePreset(presetIdOverride === undefined ? selectedVisualStylePresetId : presetIdOverride);
-      const { candidates, updatedWorkspace } = await measurePerformanceOperation("requirements.create", workspace.workspace_dir, async () => {
+      const { candidates, updatedWorkspace, selectedPresetId } = await measurePerformanceOperation("requirements.create", workspace.workspace_dir, async () => {
         const generatedCandidates = await aiClient.generatePresentationRequirements({
           brief,
           visualStylePreset: toVisualStylePresetSelection(selectedPreset),
+          visualToneRequired: false,
           logContext: buildAiLogContext(workspace, "requirements", "generate_requirements"),
         });
-        const draftCandidates = selectedPreset ? { ...generatedCandidates, visual_tone: [] } : generatedCandidates;
-        const draft = createRequirementsDraft(brief, draftCandidates, toVisualStylePresetSelection(selectedPreset));
+        const initialDraft = createRequirementsDraft(brief, generatedCandidates, null);
+        const resolvedPreset = selectedPreset ?? await autoSelectVisualStylePreset(workspace, brief, initialDraft);
+        const draft = createRequirementsDraft(
+          brief,
+          { ...generatedCandidates, visual_tone: [] },
+          toVisualStylePresetSelection(resolvedPreset),
+        );
         const persistedWorkspace = await backend.updateWorkspaceRequirements({
           workspace_dir: workspace.workspace_dir,
           requirements: draft,
         });
-        return { candidates: generatedCandidates, updatedWorkspace: persistedWorkspace };
+        return {
+          candidates: generatedCandidates,
+          updatedWorkspace: persistedWorkspace,
+          selectedPresetId: resolvedPreset.id,
+        };
       });
       if (requirementsOperationRef.current !== operation) return;
+      setSelectedVisualStylePresetId(selectedPresetId);
       setPresentationRequirements(updatedWorkspace.requirements);
       setCurrentWorkspace(updatedWorkspace);
       setRequirementsStatus("ready");
+      setRequirementsRetryMode("generate");
       setRequirementsDirty(false);
       setRequirementsHasSavedDraft(true);
       await backend.appendWorkspaceLog({
@@ -2362,6 +2414,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     draft.selections.visual_style_preset = toVisualStylePresetSelection(findVisualStylePreset(selectedVisualStylePresetId));
     setPresentationRequirements(draft);
     setRequirementsStatus("ready");
+    setRequirementsRetryMode("generate");
     setRequirementsError("");
     setRequirementsErrorDetail("");
     setRequirementsDirty(false);
@@ -2419,27 +2472,43 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   }
 
   async function confirmPresentationRequirements() {
-    if (!backend || !requirementsAreComplete(presentationRequirements)) return;
-    const confirmed: PresentationRequirements = {
-      ...presentationRequirements,
-      status: "confirmed",
-      updated_at: new Date().toISOString(),
-      confirmed_at: new Date().toISOString(),
-    };
+    if (!backend) return;
+    if (!requirementsAreComplete(presentationRequirements) && !requirementsAreCompleteWithoutVisualSelection(presentationRequirements)) return;
     setRequirementsConfirming(true);
-    // Move to the next stage immediately. Confirmation may include Host Upload
-    // round-trips before Outline Creation can start, but the user should see
-    // the existing outline loading surface during that work.
-    setPage("main");
-    setStage("outline");
-    setLoading("outline");
-    setOutline([]);
-    setOutlineDraft([]);
-    setOutlineError("");
-    setOutlineErrorDetail("");
+    let workspace: WorkspaceResult | null = null;
+    let requirementsCommitted = false;
     try {
-      const workspace = currentWorkspace ?? await ensureCurrentWorkspace();
+      workspace = currentWorkspace ?? await ensureCurrentWorkspace();
       if (!workspace) throw new Error(t.errors.summaryUnknown);
+      let workingRequirements = presentationRequirements;
+      if (!workingRequirements.selections.visual_style_preset) {
+        const preset = await autoSelectVisualStylePreset(
+          workspace,
+          workingRequirements.source?.brief ?? prompt.trim(),
+          workingRequirements,
+        );
+        workingRequirements = {
+          ...workingRequirements,
+          selections: {
+            ...workingRequirements.selections,
+            visual_tone: null,
+            visual_style_preset: toVisualStylePresetSelection(preset),
+          },
+          updated_at: new Date().toISOString(),
+          confirmed_at: null,
+        };
+        setPresentationRequirements(workingRequirements);
+        setSelectedVisualStylePresetId(preset.id);
+      }
+      if (!requirementsAreComplete(workingRequirements)) {
+        throw new Error("Presentation Requirements are incomplete after Visual Style Preset selection.");
+      }
+      const confirmed: PresentationRequirements = {
+        ...workingRequirements,
+        status: "confirmed",
+        updated_at: new Date().toISOString(),
+        confirmed_at: new Date().toISOString(),
+      };
       const preset = findVisualStylePreset(confirmed.selections.visual_style_preset?.id);
       let hostUpload;
       if (preset) {
@@ -2458,11 +2527,22 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         ...(hostUpload ? { size_bytes: hostUpload.size_bytes, host_upload: hostUpload } : {}),
         clear_style_guide: !preset && Boolean(workspace.requirements.selections.visual_style_preset),
       });
+      requirementsCommitted = true;
       const resetWorkspace = result.workspace;
+      // Move to the next stage only after the requirements and any selected
+      // preset Style Guide have been committed successfully.
+      setPage("main");
+      setStage("outline");
+      setLoading("outline");
+      setOutline([]);
+      setOutlineDraft([]);
+      setOutlineError("");
+      setOutlineErrorDetail("");
       setPresentationRequirements(confirmed);
       setSelectedVisualStylePresetId(confirmed.selections.visual_style_preset?.id ?? null);
       setCurrentWorkspace(resetWorkspace);
       setRequirementsStatus("ready");
+      setRequirementsRetryMode("generate");
       setRequirementsDirty(false);
       setRequirementsHasSavedDraft(true);
       setDeckTitle(getWorkspaceTitle(resetWorkspace));
@@ -2473,13 +2553,33 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       setOutlineErrorDetail("");
       await createOutlineFromConfirmedRequirements(resetWorkspace);
     } catch (error) {
-      const { summary, detail } = summarizeUserFacingError(t, error, t.toasts.createOutlineFirst);
-      setOutlineError(summary);
-      setOutlineErrorDetail(detail);
-      setLoading("none");
+      const { summary, detail } = summarizeUserFacingError(
+        t,
+        error,
+        requirementsCommitted ? t.toasts.createOutlineFirst : t.requirements.errorBody,
+      );
+      if (requirementsCommitted) {
+        setOutlineError(summary);
+        setOutlineErrorDetail(detail);
+        setLoading("none");
+      } else {
+        setRequirementsError(summary);
+        setRequirementsErrorDetail(detail);
+        setRequirementsRetryMode("select");
+        setRequirementsStatus("error");
+        setLoading("none");
+      }
     } finally {
       setRequirementsConfirming(false);
     }
+  }
+
+  async function retryPresentationRequirements() {
+    if (requirementsRetryMode === "select") {
+      await confirmPresentationRequirements();
+      return;
+    }
+    await generatePresentationRequirements();
   }
 
   function isUnresumableDeckGenerationError(error: DeckGenerationError) {
@@ -5372,6 +5472,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     addStyleRow,
     generateDeck: () => generateDeck(),
     generatePresentationRequirements,
+    retryPresentationRequirements,
     selectVisualStylePreset,
     useManualPresentationRequirements,
     selectPresentationRequirement,

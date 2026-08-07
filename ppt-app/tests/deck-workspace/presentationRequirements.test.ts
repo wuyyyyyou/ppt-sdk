@@ -7,6 +7,7 @@ import {
   confirmedRequirementsAllowOutline,
   createRequirementsDraft,
   projectRequirementsToLegacyInputs,
+  requirementsAreCompleteWithoutVisualSelection,
   requirementsOwnedRecoveryStage,
 } from "../../src/features/requirements/presentationRequirements";
 import { messages } from "../../src/i18n/messages";
@@ -18,6 +19,13 @@ const candidates = {
   slide_count: [5],
   output_language: ["中文"],
   visual_tone: [{ label: "体育媒体特刊", description: "强视觉、鲜明标题和编辑式阅读节奏。" }],
+};
+
+const selectedPreset = {
+  id: "editorial-sports",
+  version: 1,
+  name: "Editorial Sports",
+  description: "强视觉、鲜明标题和编辑式阅读节奏。",
 };
 
 test("defaults every field to the first recommended candidate and projects legacy inputs", () => {
@@ -37,6 +45,11 @@ test("only confirmed presentation requirements allow outline work", () => {
   assert.equal(confirmedRequirementsAllowOutline(null), false);
 });
 
+test("allows confirmation before the automatic visual preset selection", () => {
+  const draft = createRequirementsDraft("制作一份 5 页中文方案", candidates);
+  assert.equal(requirementsAreCompleteWithoutVisualSelection(draft), true);
+});
+
 test("draft presentation requirements own workspace recovery even when later artifacts exist", () => {
   assert.equal(requirementsOwnedRecoveryStage({ status: "empty" }), "brief");
   assert.equal(requirementsOwnedRecoveryStage({ status: "draft" }), "requirements");
@@ -44,7 +57,7 @@ test("draft presentation requirements own workspace recovery even when later art
 });
 
 test("renders loading, candidates, Other inputs, and the final confirmation action", () => {
-  const draft = createRequirementsDraft("制作一份 5 页中文方案", candidates);
+  const draft = createRequirementsDraft("制作一份 5 页中文方案", candidates, selectedPreset);
   const common = {
     t: messages.zh,
     brief: draft.source!.brief,
@@ -62,8 +75,9 @@ test("renders loading, candidates, Other inputs, and the final confirmation acti
     onConfirm: () => undefined,
   };
   const ready = renderToStaticMarkup(createElement(PresentationRequirementsPage, { ...common, status: "ready" }));
-  assert.match(ready, /体育媒体特刊/);
-  assert.equal((ready.match(/>其他</g) ?? []).length, 6);
+  assert.equal((ready.match(/>其他</g) ?? []).length, 5);
+  assert.match(ready, /Editorial Sports/);
+  assert.doesNotMatch(ready, /体育媒体特刊/);
   assert.match(ready, /<details class="requirements-brief">/);
   assert.match(ready, /用户需求/);
   assert.match(ready, />保存</);
@@ -76,7 +90,7 @@ test("renders loading, candidates, Other inputs, and the final confirmation acti
 });
 
 test("shows a generated draft as saved until the user edits it", () => {
-  const draft = createRequirementsDraft("制作一份 5 页中文方案", candidates);
+  const draft = createRequirementsDraft("制作一份 5 页中文方案", candidates, selectedPreset);
   const html = renderToStaticMarkup(createElement(PresentationRequirementsPage, {
     t: messages.zh,
     brief: draft.source!.brief,
@@ -97,7 +111,7 @@ test("shows a generated draft as saved until the user edits it", () => {
 
   assert.match(html, /草稿已保存/);
   assert.doesNotMatch(html, /有未保存的修改/);
-  assert.match(html, /<button class="secondary-btn" type="button" disabled="">/);
+  assert.match(html, /class="secondary-btn"[^>]*disabled=""/);
 });
 
 test("shows confirmation separately from draft saving", () => {

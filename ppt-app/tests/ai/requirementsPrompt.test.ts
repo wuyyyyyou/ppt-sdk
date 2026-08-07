@@ -39,3 +39,12 @@ test("repair request preserves the full conversation and requests all six fields
   assert.match(readText(repaired.messages[3]), /desired_outcome/);
   assert.match(readText(repaired.messages[3]), /slide_count\[0\]/);
 });
+
+test("deferred visual selection requests only the five non-visual fields", () => {
+  const request = buildPresentationRequirementsRequest("A brief", null, false);
+  const system = readText(request.messages[0]);
+  const user = readText(request.messages[1]);
+  assert.match(system, /separate Visual Style Preset selection step/);
+  assert.match(user, /Do not generate a Visual Tone field/);
+  assert.match(system, /Do not return visual_tone/);
+});

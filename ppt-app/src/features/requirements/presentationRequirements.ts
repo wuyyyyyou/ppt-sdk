@@ -68,10 +68,14 @@ export function createManualRequirementsDraft(brief: string): PresentationRequir
 }
 
 export function requirementsAreComplete(requirements: PresentationRequirements) {
-  const { visual_tone, visual_style_preset, ...otherSelections } = requirements.selections;
-  const normalizedPreset = visual_style_preset ?? null;
+  return requirementsAreCompleteWithoutVisualSelection(requirements) &&
+    ((requirements.selections.visual_tone !== null) !== (requirements.selections.visual_style_preset !== null)) &&
+    requirements.selections.output_language?.trim().toLowerCase() !== "auto";
+}
+
+export function requirementsAreCompleteWithoutVisualSelection(requirements: PresentationRequirements) {
+  const { visual_tone: _visualTone, visual_style_preset: _visualStylePreset, ...otherSelections } = requirements.selections;
   return Object.values(otherSelections).every((value) => value !== null) &&
-    ((visual_tone !== null) !== (normalizedPreset !== null)) &&
     requirements.selections.output_language?.trim().toLowerCase() !== "auto";
 }
 

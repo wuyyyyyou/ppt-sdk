@@ -49,3 +49,11 @@ test("rejects auto, string slide counts, and duplicate candidates", () => {
   expectInvalid({ ...validValue, slide_count: ["8"] }, /positive integer/);
   expectInvalid({ ...validValue, audience: [validValue.audience[0], validValue.audience[0]] }, /duplicate/);
 });
+
+test("accepts the deferred visual selection shape without visual_tone", () => {
+  const { visual_tone: _visualTone, ...deferred } = validValue;
+  assert.deepEqual(
+    parsePresentationRequirementsCandidates(JSON.stringify(deferred), { visualToneRequired: false }),
+    { ...deferred, visual_tone: [] },
+  );
+});

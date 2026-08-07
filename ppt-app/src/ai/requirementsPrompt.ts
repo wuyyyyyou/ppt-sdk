@@ -5,16 +5,20 @@ import {
   buildRequirementsUserPrompt,
 } from "./requirementsPromptMessages";
 
-export function buildPresentationRequirementsRequest(brief: string, visualStylePreset?: { name: string; description: string } | null): AnnaLlmCompleteInput {
+export function buildPresentationRequirementsRequest(
+  brief: string,
+  visualStylePreset?: { name: string; description: string } | null,
+  visualToneRequired = !visualStylePreset,
+): AnnaLlmCompleteInput {
   return {
     messages: [
       {
         role: "system",
-        content: { type: "text", text: buildRequirementsSystemPrompt(visualStylePreset) },
+        content: { type: "text", text: buildRequirementsSystemPrompt(visualStylePreset, visualToneRequired) },
       },
       {
         role: "user",
-        content: { type: "text", text: buildRequirementsUserPrompt(brief, visualStylePreset) },
+        content: { type: "text", text: buildRequirementsUserPrompt(brief, visualStylePreset, visualToneRequired) },
       },
     ],
   };
@@ -25,6 +29,7 @@ export function buildPresentationRequirementsRepairRequest(
   rawResponse: string,
   validationErrors: string[],
   visualStylePreset?: { name: string; description: string } | null,
+  visualToneRequired = !visualStylePreset,
 ): AnnaLlmCompleteInput {
   return {
     ...previousRequest,
@@ -38,7 +43,7 @@ export function buildPresentationRequirementsRepairRequest(
         role: "user",
         content: {
           type: "text",
-          text: buildRequirementsRepairPrompt(validationErrors, visualStylePreset),
+          text: buildRequirementsRepairPrompt(validationErrors, visualStylePreset, visualToneRequired),
         },
       },
     ],

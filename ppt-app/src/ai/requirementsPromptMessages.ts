@@ -7,13 +7,18 @@ const REQUIREMENTS_JSON_SHAPE = `{
   "visual_tone": [{"label": "...", "description": "..."}]
 }`;
 
-export function buildRequirementsSystemPrompt(visualStylePreset?: { name: string; description: string } | null) {
+export function buildRequirementsSystemPrompt(
+  visualStylePreset?: { name: string; description: string } | null,
+  visualToneRequired = !visualStylePreset,
+) {
   const visualField = visualStylePreset
     ? "- visual direction: fixed by the user-selected Visual Style Preset. Do not return visual_tone or visual_style_preset."
-    : "- visual_tone: the qualitative visual character and intended viewing experience. It may reference a recognizable editorial or cultural style, but must not prescribe exact colors, fonts, templates, or page layouts.";
-  const shape = visualStylePreset
-    ? REQUIREMENTS_JSON_SHAPE.replace('  "visual_tone": [{"label": "...", "description": "..."}]\n', "")
-    : REQUIREMENTS_JSON_SHAPE;
+    : visualToneRequired
+      ? "- visual_tone: the qualitative visual character and intended viewing experience. It may reference a recognizable editorial or cultural style, but must not prescribe exact colors, fonts, templates, or page layouts."
+      : "- visual direction: will be selected in a separate Visual Style Preset selection step. Do not return visual_tone or visual_style_preset.";
+  const shape = visualToneRequired && !visualStylePreset
+    ? REQUIREMENTS_JSON_SHAPE
+    : REQUIREMENTS_JSON_SHAPE.replace('  "visual_tone": [{"label": "...", "description": "..."}]\n', "");
   return [
     "You are a senior presentation strategist.",
     "Your task is to derive a Presentation Requirements Draft solely from the user's Brief.",
@@ -46,32 +51,44 @@ export function buildRequirementsSystemPrompt(visualStylePreset?: { name: string
   ].join("\n");
 }
 
-export function buildRequirementsUserPrompt(brief: string, visualStylePreset?: { name: string; description: string } | null) {
+export function buildRequirementsUserPrompt(
+  brief: string,
+  visualStylePreset?: { name: string; description: string } | null,
+  visualToneRequired = !visualStylePreset,
+) {
   return [
     "Create a Presentation Requirements Draft from the Brief below.",
     "",
     "<brief>",
     brief,
     "</brief>",
-    visualStylePreset ? `The user selected Visual Style Preset: ${visualStylePreset.name} — ${visualStylePreset.description}. Do not generate a Visual Tone field.` : "",
+    visualStylePreset
+      ? `The user selected Visual Style Preset: ${visualStylePreset.name} — ${visualStylePreset.description}. Do not generate a Visual Tone field.`
+      : visualToneRequired
+        ? ""
+        : "Do not generate a Visual Tone field. Visual style will be selected after these requirements are derived.",
   ].join("\n");
 }
 
-export function buildRequirementsRepairPrompt(validationErrors: string[], visualStylePreset?: { name: string; description: string } | null) {
+export function buildRequirementsRepairPrompt(
+  validationErrors: string[],
+  visualStylePreset?: { name: string; description: string } | null,
+  visualToneRequired = !visualStylePreset,
+) {
   return [
     "The previous response did not satisfy the Presentation Requirements JSON contract.",
     "",
     "Validation errors:",
     ...validationErrors.map((error) => `- ${error}`),
     "",
-    "Return one complete corrected JSON object for all six fields.",
+    `Return one complete corrected JSON object for all ${visualToneRequired && !visualStylePreset ? "six" : "five"} fields.`,
     "Do not return only the fields mentioned in the validation errors.",
     "Re-evaluate the previous response against the original Brief and all original instructions.",
     "",
     "Use this exact shape:",
-    visualStylePreset
-      ? REQUIREMENTS_JSON_SHAPE.replace('  "visual_tone": [{"label": "...", "description": "..."}]\n', "")
-      : REQUIREMENTS_JSON_SHAPE,
+    visualToneRequired && !visualStylePreset
+      ? REQUIREMENTS_JSON_SHAPE
+      : REQUIREMENTS_JSON_SHAPE.replace('  "visual_tone": [{"label": "...", "description": "..."}]\n', ""),
     "Return JSON only.",
   ].join("\n");
 }

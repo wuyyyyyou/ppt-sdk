@@ -104,7 +104,7 @@ export function createMockAiClient(): AiClient {
         }],
         slide_count: [8],
         output_language: [usesChinese ? "中文" : "English"],
-        visual_tone: [{
+        visual_tone: input.visualToneRequired === false ? [] : [{
           label: usesChinese ? "编辑式专业感" : "Editorial professionalism",
           description: usesChinese
             ? "采用清晰有力的标题与编辑式节奏，呈现专业而有观点的阅读体验。"
@@ -117,6 +117,21 @@ export function createMockAiClient(): AiClient {
         result,
       );
       return result;
+    },
+
+    async selectVisualStylePresetColor(input) {
+      await sleep(120);
+      const color = input.colors[0];
+      await logMockInteraction(input.logContext, { method: "selectVisualStylePresetColor", input }, { color });
+      return color;
+    },
+
+    async selectVisualStylePreset(input) {
+      await sleep(120);
+      const presetId = input.candidates[0]?.id;
+      if (!presetId) throw new Error("Mock visual style preset candidates are empty");
+      await logMockInteraction(input.logContext, { method: "selectVisualStylePreset", input }, { preset_id: presetId });
+      return presetId;
     },
 
     async generateOutline(input) {
