@@ -64,6 +64,10 @@ describe("Agent file-tool path prompt blocks", () => {
     assert.match(prompt, /必须原样使用该 file_path/);
     assert.match(prompt, /不得改成相对路径、添加 \.\/ 或 \.\.\//);
     assert.match(prompt, /不得使用远程 image_url 或 thumbnail_url/);
+    assert.match(prompt, /页面标题或副标题/);
+    assert.match(prompt, /标题和副标题文字只是视觉示意/);
+    assert.match(prompt, /不能复制参考文件中的示例文案/);
+    assert.match(prompt, /人工页面修订/);
     assert.doesNotMatch(prompt, /Agent file-tool root:/);
     assert.doesNotMatch(prompt, /Agent file-tool path: ppt\//);
     assert.doesNotMatch(prompt, /Canonical absolute path/);

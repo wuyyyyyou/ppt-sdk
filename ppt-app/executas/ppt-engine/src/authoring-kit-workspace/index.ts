@@ -74,11 +74,11 @@ const PERSISTENT_ELEMENTS_BOOTSTRAP = `import React from "react";
 
 /**
  * Persistent Elements Reference（跨页固定元素参考）Bootstrap。
- * Agent 必须把本文件改写为本 Deck 的完整参考页；没有固定元素时也要保留明确的空参考。
+ * Agent 必须把本文件改写为本 Deck 的完整参考页；没有固定元素或标题处理参考时也要保留明确的空参考。
  */
 export default function PersistentElementsReference() {
   return <div style={{ width: 1280, height: 720, position: "relative", background: "#ffffff" }}>
-    {/* No persistent elements for this deck. */}
+    {/* No persistent elements or title treatments for this deck. */}
   </div>;
 }
 `;
