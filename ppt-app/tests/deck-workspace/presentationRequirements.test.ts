@@ -71,6 +71,7 @@ test("renders requirements without exposing the selected visual style summary", 
     onRetry: () => undefined,
     onManual: () => undefined,
     onBack: () => undefined,
+    onForward: () => undefined,
     onSave: () => undefined,
     onConfirm: () => undefined,
   };
@@ -82,6 +83,7 @@ test("renders requirements without exposing the selected visual style summary", 
   assert.match(ready, /用户需求/);
   assert.match(ready, />保存</);
   assert.match(ready, />返回</);
+  assert.match(ready, /data-performance-id="requirements.forward"/);
   assert.match(ready, /确认并继续/);
   const loading = renderToStaticMarkup(createElement(PresentationRequirementsPage, { ...common, status: "loading" }));
   assert.match(loading, /正在梳理演示需求\.\.\./);
@@ -112,6 +114,36 @@ test("shows a generated draft as saved until the user edits it", () => {
   assert.match(html, /草稿已保存/);
   assert.doesNotMatch(html, /有未保存的修改/);
   assert.match(html, /class="secondary-btn"[^>]*disabled=""/);
+  assert.match(html, /data-performance-id="requirements.save"[^>]*disabled=""/);
+});
+
+test("renders Other as an independently selectable radio while preserving a custom draft", () => {
+  const draft = createRequirementsDraft("制作一份 5 页中文方案", candidates);
+  draft.selections.audience = {
+    label: messages.zh.requirements.other,
+    description: "董事会成员",
+  };
+  const html = renderToStaticMarkup(createElement(PresentationRequirementsPage, {
+    t: messages.zh,
+    brief: draft.source!.brief,
+    requirements: draft,
+    status: "ready",
+    error: "",
+    saving: false,
+    confirming: false,
+    dirty: true,
+    hasSavedDraft: true,
+    onSelect: () => undefined,
+    onRetry: () => undefined,
+    onManual: () => undefined,
+    onBack: () => undefined,
+    onSave: () => undefined,
+    onConfirm: () => undefined,
+  }));
+
+  assert.match(html, /requirement-custom selected" role="radio" aria-checked="true"/);
+  assert.match(html, /value="董事会成员"/);
+  assert.match(html, /requirement-custom" role="radio" aria-checked="false"/);
 });
 
 test("shows confirmation separately from draft saving", () => {

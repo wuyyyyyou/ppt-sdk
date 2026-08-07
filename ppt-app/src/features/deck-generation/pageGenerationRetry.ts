@@ -108,6 +108,7 @@ export async function runPageGenerationRetry(
   });
   const runtime: DeckGenerationRuntime = {
     ...input,
+    targetPageIds: [page.page_id],
     activeStreams: new Map(),
     getProgress: () => progress,
     setProgress: (nextProgress) => {

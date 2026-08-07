@@ -65,6 +65,7 @@ export function mapProgress(
     last_error: page.last_error,
     last_screenshot_path: page.last_screenshot_path,
     render_source_sha256: page.render_source_sha256,
+    screenshot_source_sha256: page.screenshot_source_sha256,
   })) ?? [];
 }
 
@@ -93,7 +94,9 @@ export function createProgress(
 }
 
 export function emit(
-  input: Pick<DeckGenerationContext, "onProgress"> & Partial<Pick<DeckGenerationContext, "confirmedOutline">>,
+  input: Pick<DeckGenerationContext, "onProgress">
+    & Partial<Pick<DeckGenerationContext, "confirmedOutline">>
+    & { targetPageIds?: readonly string[] },
   value: Omit<DeckGenerationProgress, "pages">,
   progress: PageProgress | null,
   stream?: DeckGenerationStream | null,
@@ -110,6 +113,7 @@ export function emit(
     researchDiscovery,
   );
   projected.pages = mapProgress(progress, attemptLimits, input.confirmedOutline);
+  if (input.targetPageIds) projected.targetPageIds = [...input.targetPageIds];
   input.onProgress(projected);
 }
 

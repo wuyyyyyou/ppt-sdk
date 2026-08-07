@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowLeft, CheckCircle2, ChevronDown, Circle, LoaderCircle, Play, Sparkles } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, Circle, LoaderCircle, Play, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Messages } from "../../../i18n/messages";
 import type { DeckGenerationProgress, DeckGenerationStep } from "../../deck-generation";
@@ -25,6 +25,7 @@ interface GeneratingPageProps {
   pinnedPreviewPageId: string | null;
   onSelectPreviewPage: (pageId: string | null) => void;
   onBack: () => void;
+  onForward?: () => void;
   onBackToOutline: () => void;
   onResume: () => Promise<void>;
   canBackToOutline: boolean;
@@ -101,6 +102,7 @@ export function GeneratingPage(props: GeneratingPageProps) {
     pinnedPreviewPageId,
     onSelectPreviewPage,
     onBack,
+    onForward,
     onBackToOutline,
     onResume,
     canBackToOutline,
@@ -108,9 +110,7 @@ export function GeneratingPage(props: GeneratingPageProps) {
   const activeIndex = majorStepIndex(progress?.step ?? null);
   const progressMessage = getGenerationProgressDisplayMessage(t, progress);
   const pageTitle = generationPageTitle(t, viewState.status);
-  const backLabel = viewState.runIntent === "refinement"
-    ? t.controls.backToLastVersion
-    : t.controls.back;
+  const backLabel = t.controls.back;
 
   return (
     <section className="page active generating-page">
@@ -151,6 +151,7 @@ export function GeneratingPage(props: GeneratingPageProps) {
           previews={pagePreviews}
           pinnedPageId={pinnedPreviewPageId}
           onSelectPage={onSelectPreviewPage}
+          activePageIndex={progress?.currentPageIndex}
         />
         {progress ? (
           <GenerationProgressPanel
@@ -165,14 +166,19 @@ export function GeneratingPage(props: GeneratingPageProps) {
         )}
       </div>
 
-      {/* Back sits at the bottom of the stage, next to the recovery entries it
-          belongs with. Available for the whole stage, not just the recovery
-          states: a run in flight routes through the abandonment confirmation
-          instead of taking the entry away. */}
+      {/* Stage navigation only browses existing artifacts. It stays separate
+          from resume/recovery actions and locks while a run is writing them. */}
       <div className="generation-page-footer">
-        <button data-performance-id="generation.back" className="secondary-btn" type="button" onClick={onBack} disabled={viewState.navigationLocked}>
-          <ArrowLeft size={16} aria-hidden="true" />{backLabel}
-        </button>
+        <div className="stage-navigation">
+          <button data-performance-id="generation.back" className="secondary-btn" type="button" onClick={onBack} disabled={viewState.navigationLocked || viewState.isActive}>
+            <ArrowLeft size={16} aria-hidden="true" />{backLabel}
+          </button>
+          {onForward ? (
+            <button data-performance-id="generation.forward" className="secondary-btn" type="button" onClick={onForward} disabled={viewState.navigationLocked || viewState.isActive}>
+              {t.controls.forward}<ArrowRight size={16} aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
         {viewState.showResume || viewState.showBackToOutline ? (
           <div className="generation-recovery-actions">
             {viewState.showResume ? (

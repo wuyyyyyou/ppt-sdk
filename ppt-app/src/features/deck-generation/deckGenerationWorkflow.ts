@@ -192,6 +192,7 @@ export async function runDeckGeneration(
   let { progress } = artifacts;
   const runtime: DeckGenerationRuntime = {
     ...input,
+    targetPageIds: getAuthoringPageIds(input, authoringDeck, artifacts.progress),
     activeStreams: new Map(),
     getProgress: () => progress,
     setProgress: (nextProgress) => {

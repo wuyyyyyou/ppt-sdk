@@ -66,6 +66,9 @@ export async function assembleReviewRender(input: {
         title: slide.title,
         screenshotPath: slide.screenshot_path ?? fetched.source_path,
         renderSourceFingerprint: slide.render_source_fingerprint,
+        // Deck metadata is only assembled from finished renders, so the
+        // screenshot on disk is by definition the one this source produced.
+        screenshotSourceFingerprint: slide.render_source_fingerprint,
         previewSourceFingerprint: fetched.preview_source_fingerprint,
         imagePath: fetched.image_path,
         imageUpload: fetched.image_upload,
@@ -87,6 +90,7 @@ export async function assembleReviewRender(input: {
         title: slide.title,
         screenshotPath: slide.screenshot_path ?? cached.screenshotPath,
         renderSourceFingerprint: slide.render_source_fingerprint,
+        screenshotSourceFingerprint: slide.render_source_fingerprint,
       };
       return { ...slide, screenshot_upload: cached.imageUpload };
     }

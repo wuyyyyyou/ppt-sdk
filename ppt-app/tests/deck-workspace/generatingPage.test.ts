@@ -75,6 +75,7 @@ function renderPage(
       pinnedPreviewPageId: null,
       onSelectPreviewPage: () => undefined,
       onBack: () => undefined,
+      onForward: () => undefined,
       onBackToOutline: () => undefined,
       onResume: async () => undefined,
       canBackToOutline: true,
@@ -109,7 +110,8 @@ describe("GeneratingPage controls", () => {
     );
 
     for (const html of [running, complete]) {
-      assert.match(html, /generation-page-footer"><button [^>]*class="secondary-btn" type="button">/);
+      assert.match(html, /generation-page-footer"><div class="stage-navigation"><button [^>]*class="secondary-btn"/);
+      assert.match(html, /data-performance-id="generation.forward"/);
       assert.doesNotMatch(html, /page-header-left"><button/);
     }
   });
@@ -120,7 +122,8 @@ describe("GeneratingPage controls", () => {
       makeProgress("page-authoring", "authoring"),
     );
 
-    assert.match(html, /generation-page-footer"><button [^>]*class="secondary-btn" type="button" disabled=""/);
+    assert.match(html, /data-performance-id="generation.back"[^>]*disabled=""/);
+    assert.match(html, /data-performance-id="generation.forward"[^>]*disabled=""/);
   });
 
   it("never offers a stop entry on the page", () => {
@@ -139,14 +142,14 @@ describe("GeneratingPage controls", () => {
     }
   });
 
-  it("labels back as returning to the last version while refining", () => {
+  it("keeps refinement navigation labelled as stage browsing", () => {
     const html = renderPage(
       makeViewState({ status: "running", runIntent: "refinement" }),
       makeProgress("page-authoring", "authoring"),
     );
 
-    assert.match(html, /generation-page-footer"><button [^>]*class="secondary-btn" type="button">[\s\S]*?返回上一版/);
-    assert.doesNotMatch(html, />返回</);
+    assert.match(html, /data-performance-id="generation.back"[^>]*>[\s\S]*?返回/);
+    assert.doesNotMatch(html, /返回上一版/);
   });
 
   it("shows interrupted title and resume action when no task is running", () => {
@@ -268,7 +271,6 @@ describe("GeneratingPage controls", () => {
 
     assert.match(html, /<li class="generation-major-node done">[\s\S]*?<span>最终预览<\/span><\/li>/);
     assert.doesNotMatch(html, /<li class="generation-major-node active"[\s\S]*?<span>最终预览<\/span><\/li>/);
-    assert.doesNotMatch(html, /generation-running-icon/);
   });
 
   it("shows Research Discovery gaps as completed green badges instead of partial warning styling", () => {
@@ -540,10 +542,10 @@ describe("GeneratingPage controls", () => {
           status: "ready",
           imageUpload: {
             transport: "host_upload",
-            r2_key: "one",
+            r2_key: "preview-one",
             url: "https://example.test/one.webp",
             mime_type: "image/webp",
-            size_bytes: 1,
+            size_bytes: 123,
           },
         },
       },

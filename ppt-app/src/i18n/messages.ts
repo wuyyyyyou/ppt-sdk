@@ -10,6 +10,7 @@ export interface Messages {
     minimize: string;
     close: string;
     back: string;
+    forward: string;
     backToLastVersion: string;
     open: string;
     edit: string;
@@ -56,6 +57,13 @@ export interface Messages {
     brief: string;
     requirements: string;
     uploadedSourceAnalysis: string;
+    outline: string;
+    generating: string;
+    deck: string;
+  };
+  progressStages: {
+    brief: string;
+    requirements: string;
     outline: string;
     generating: string;
     deck: string;
@@ -171,6 +179,7 @@ export interface Messages {
     helper: string;
     cardTitle: string;
     saveChanges: string;
+    feedbackTitle: string;
     feedbackPlaceholder: string;
     presentationTitle: string;
     pageTitle: string;
@@ -178,7 +187,6 @@ export interface Messages {
     requiredContent: string;
     requiredContentHint: string;
     requiredContentCount: string;
-    clickToEdit: string;
     expandAll: string;
     collapseAll: string;
     addPage: string;
@@ -291,6 +299,7 @@ export interface Messages {
       latest: string;
       followingLatest: string;
       backToLatest: string;
+      notApplied: string;
     };
     persistentElements: {
       title: string;
@@ -720,6 +729,7 @@ export const messages: Record<Locale, Messages> = {
       minimize: "Minimize",
       close: "Close",
       back: "Back",
+      forward: "Forward",
       backToLastVersion: "Back to last version",
       open: "Open",
       edit: "Edit",
@@ -769,6 +779,13 @@ export const messages: Record<Locale, Messages> = {
       outline: "Outline",
       generating: "Generating",
       deck: "Deck"
+    },
+    progressStages: {
+      brief: "Create",
+      requirements: "Requirements",
+      outline: "Outline",
+      generating: "Generate",
+      deck: "Result"
     },
     status: {
       draftReady: "Draft ready",
@@ -884,13 +901,14 @@ export const messages: Record<Locale, Messages> = {
       filtersLabel: "Style filters",
       filters: { user: "User", use_case: "Use case", industry: "Industry", theme: "Theme", color: "Color" },
       all: "All",
-      noFilterMatches: "No styles match the current filters."
+      noFilterMatches: "No styles match the current filters.",
     },
     outline: {
       title: "Review outline",
       helper: "Adjust the structure before Anna designs the deck.",
       cardTitle: "Outline",
       saveChanges: "Save",
+      feedbackTitle: "Tell Anna how you want to adjust the outline",
       feedbackPlaceholder:
         "Enter a rewrite request, such as adding a security slide, making it more executive-facing, or reducing to 5 slides...",
       presentationTitle: "Presentation title",
@@ -899,7 +917,6 @@ export const messages: Record<Locale, Messages> = {
       requiredContent: "Required content",
       requiredContentHint: "Write one item per line; saving will format it as a Markdown list",
       requiredContentCount: "{count} items",
-      clickToEdit: "Click to edit Markdown",
       expandAll: "Expand all",
       collapseAll: "Collapse all",
       addPage: "Add page",
@@ -1026,7 +1043,8 @@ export const messages: Record<Locale, Messages> = {
         selectPage: "Show page {page}",
         latest: "Latest",
         followingLatest: "Following the newest page",
-        backToLatest: "Follow the newest page"
+        backToLatest: "Follow the newest page",
+        notApplied: "Unchanged \u2014 this run did not replace it"
       },
       persistentElements: {
         title: "Cross-slide decoration generation",
@@ -1478,6 +1496,7 @@ export const messages: Record<Locale, Messages> = {
       minimize: "最小化",
       close: "关闭",
       back: "返回",
+      forward: "前进",
       backToLastVersion: "返回上一版",
       open: "打开",
       edit: "编辑",
@@ -1527,6 +1546,13 @@ export const messages: Record<Locale, Messages> = {
       outline: "大纲",
       generating: "生成中",
       deck: "成稿"
+    },
+    progressStages: {
+      brief: "创建",
+      requirements: "需求",
+      outline: "大纲",
+      generating: "生成",
+      deck: "结果"
     },
     status: {
       draftReady: "草稿已就绪",
@@ -1642,13 +1668,14 @@ export const messages: Record<Locale, Messages> = {
       filtersLabel: "视觉风格筛选",
       filters: { user: "用户", use_case: "使用场景", industry: "行业", theme: "主题", color: "色彩" },
       all: "全部",
-      noFilterMatches: "没有符合当前筛选条件的视觉风格。"
+      noFilterMatches: "没有符合当前筛选条件的视觉风格。",
     },
     outline: {
       title: "审阅大纲",
       helper: "先改结构，再确认后继续生成。",
       cardTitle: "大纲",
       saveChanges: "保存",
+      feedbackTitle: "告诉Anna你想如何调整大纲",
       feedbackPlaceholder: "输入重构需求，例如增加安全页、改成更面向高管，或缩减到 5 页...",
       presentationTitle: "演示文稿标题",
       pageTitle: "页面标题",
@@ -1656,7 +1683,6 @@ export const messages: Record<Locale, Messages> = {
       requiredContent: "必要内容",
       requiredContentHint: "每行填写一项，保存时会自动整理为 Markdown 列表",
       requiredContentCount: "{count} 项",
-      clickToEdit: "点击编辑 Markdown",
       expandAll: "全部展开",
       collapseAll: "全部收起",
       addPage: "新增页面",
@@ -1778,7 +1804,8 @@ export const messages: Record<Locale, Messages> = {
         selectPage: "查看第 {page} 页",
         latest: "最新",
         followingLatest: "正在跟随最新一页",
-        backToLatest: "跟随最新一页"
+        backToLatest: "跟随最新一页",
+        notApplied: "未改动 — 本次没有替换这一页"
       },
       persistentElements: {
         title: "跨页装饰生成",

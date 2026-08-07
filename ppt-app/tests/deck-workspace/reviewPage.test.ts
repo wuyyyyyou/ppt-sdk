@@ -110,6 +110,7 @@ describe("ReviewPage", () => {
   it("constrains the selected screenshot inside the present preview frame", () => {
     const html = renderReviewPage("present", readyReviewRender);
 
+    assert.match(html, /class="review-fullscreen-preview"/);
     assert.match(html, /class="present-html-frame"><img/);
   });
 

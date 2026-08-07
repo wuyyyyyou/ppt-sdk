@@ -630,13 +630,24 @@ button {
 
 .progress-line-container {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 48px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: start;
+  height: 64px;
   margin: 0 auto;
   width: min(78%, 760px);
   flex-shrink: 0;
+}
+
+/* The dot centres sit 13px down — 6px of button padding plus the 7px radius —
+   and the rail has to put its own centre there, not its top edge. `top` is
+   therefore 13 − 1, one half of the rail's 2px height. */
+.progress-line-rail {
+  position: absolute;
+  top: 12px;
+  left: 10%;
+  right: 10%;
+  height: 2px;
 }
 
 .progress-line-track,
@@ -644,10 +655,9 @@ button {
   position: absolute;
   left: 0;
   right: 0;
-  top: 50%;
+  top: 0;
   height: 2px;
   border-radius: 2px;
-  transform: translateY(-50%);
 }
 
 .progress-line-track {
@@ -663,21 +673,49 @@ button {
 .progress-node {
   position: relative;
   z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 6px 8px 4px;
+  border: 0;
+  color: var(--text-muted);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 650;
+  transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.progress-node-dot {
+  position: relative;
+  display: block;
   width: 14px;
   height: 14px;
   border: 2px solid rgba(17, 24, 39, 0.12);
   border-radius: 999px;
   background: #fff;
+  transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .progress-node.active,
 .progress-node.completed {
+  color: var(--text-main);
+}
+
+.progress-node.active .progress-node-dot,
+.progress-node.completed .progress-node-dot {
   border-color: var(--accent);
   background: var(--accent);
 }
 
-.progress-node.active::after,
-.progress-node.completed::after {
+/* `inset` pins all four edges, so the core is centred by the box model rather
+   than by where it happens to land. Sizing it with width/height + margin leaves
+   `top`/`left` at `auto`, which resolves to the static position — and that is
+   set by the `text-align: center` this inherits from the `<button>` above it,
+   putting the core 5px right of the dot centre, flush with its right edge.
+   The size is unchanged: the dot's content box is 10px, so 10 − 3 − 3 = 4px. */
+.progress-node.active .progress-node-dot::after,
+.progress-node.completed .progress-node-dot::after {
   position: absolute;
   content: "";
   inset: 3px;
@@ -685,9 +723,45 @@ button {
   background: #fff;
 }
 
+.progress-node:not(:disabled):hover,
+.progress-node:not(:disabled):focus-visible {
+  color: var(--accent);
+  transform: translateY(-2px) scale(1.04);
+}
+
+.progress-node:not(:disabled):hover .progress-node-dot,
+.progress-node:not(:disabled):focus-visible .progress-node-dot {
+  box-shadow: 0 0 0 6px rgba(124, 108, 240, 0.12);
+}
+
+.progress-node.active .progress-node-dot {
+  animation: progress-node-breathe 1.8s ease-in-out infinite;
+}
+
 .progress-node:disabled {
-  cursor: not-allowed;
+  cursor: default;
   opacity: 0.42;
+}
+
+@keyframes progress-node-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(124, 108, 240, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(124, 108, 240, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-node,
+  .progress-node-dot {
+    transition: none;
+  }
+
+  .progress-node.active .progress-node-dot {
+    animation: none;
+  }
 }
 
 /* The single scrolling region for every page. Pages themselves never scroll,
@@ -727,6 +801,9 @@ button {
 }
 
 .requirements-page {
+  --requirement-option-height: 96px;
+  --requirement-note-font-size: 12px;
+  --requirement-note-line-height: 1.45;
   gap: 28px;
 }
 
@@ -863,7 +940,8 @@ button {
   grid-template-columns: 22px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: start;
-  min-height: 70px;
+  height: var(--requirement-option-height);
+  min-height: var(--requirement-option-height);
   padding: 14px;
   border: 1px solid rgba(17, 24, 39, 0.11);
   border-radius: 8px;
@@ -914,21 +992,29 @@ button {
 
 .requirement-option small {
   margin-top: 4px;
+  display: -webkit-box;
+  overflow: hidden;
   color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: var(--requirement-note-font-size);
+  line-height: var(--requirement-note-line-height);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .requirement-option em {
   color: #0f766e;
-  font-size: 10px;
+  font-size: var(--requirement-note-font-size);
+  line-height: var(--requirement-note-line-height);
   font-style: normal;
   font-weight: 800;
 }
 
 .requirement-preset-summary {
   display: grid;
+  align-content: center;
   gap: 6px;
+  height: var(--requirement-option-height);
+  min-height: var(--requirement-option-height);
   padding: 14px 16px;
   border: 1px solid rgba(124, 108, 240, 0.28);
   border-radius: 8px;
@@ -943,8 +1029,8 @@ button {
 .requirement-preset-summary span,
 .requirement-preset-summary small {
   color: var(--text-muted);
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: var(--requirement-note-font-size);
+  line-height: var(--requirement-note-line-height);
 }
 
 .requirement-custom input {
@@ -955,8 +1041,8 @@ button {
   outline: none;
   color: var(--text-main);
   background: transparent;
-  font: inherit;
-  line-height: 1.5;
+  font-size: var(--requirement-note-font-size);
+  line-height: var(--requirement-note-line-height);
 }
 
 .requirements-footer {
@@ -984,6 +1070,17 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.stage-navigation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stage-navigation-end {
+  justify-content: flex-end;
+  margin-top: 18px;
 }
 
 .requirements-footer button,
@@ -1668,7 +1765,16 @@ button {
 
 .prompt-input-wrapper {
   position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, auto) auto;
+  gap: 0;
+  overflow: hidden;
   margin-bottom: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow:
+    inset 0 0 0 1px rgba(17, 24, 39, 0.05),
+    0 10px 25px rgba(17, 24, 39, 0.04);
 }
 
 .prompt-input,
@@ -1683,15 +1789,14 @@ button {
 
 /* Capped so a wide window grows the template area instead of the input box. */
 .prompt-input {
+  field-sizing: content;
   min-height: 220px;
   max-height: 320px;
   overflow-y: auto;
-  padding: 18px 20px 74px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.58);
-  box-shadow:
-    inset 0 0 0 1px rgba(17, 24, 39, 0.05),
-    0 10px 25px rgba(17, 24, 39, 0.04);
+  padding: 18px 20px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   font-size: 16px;
   line-height: 1.6;
 }
@@ -1704,18 +1809,21 @@ button {
   box-shadow: none;
 }
 
-/* HOME-002: the visual check switch shares the composer action row with the
-   generate button, so the Brief card owns both controls. */
+/* The action area is a separate, non-scrolling row inside the composer. The
+   textarea owns all text scrolling, so long input can never sit underneath or
+   overlap these controls. */
 .prompt-inline-actions {
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: 14px;
-  display: flex;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
   gap: 8px 12px;
+  min-height: 68px;
+  padding: 11px 16px;
+  border-top: 1px solid rgba(17, 24, 39, 0.07);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(10px);
 }
 
 .prompt-inline-options {
@@ -2092,33 +2200,6 @@ article.brief-style-preset-card {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
-}
-
-.brief-style-preset-preview-btn {
-  position: absolute;
-  z-index: 2;
-  top: 8px;
-  left: 8px;
-  display: grid;
-  width: 26px;
-  height: 26px;
-  place-items: center;
-  border: 0;
-  border-radius: 999px;
-  color: var(--text-main);
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 2px 8px rgba(17, 24, 39, 0.18);
-  opacity: 0;
-  transition: opacity 0.16s ease, background 0.16s ease;
-}
-
-.brief-style-preset-card:hover .brief-style-preset-preview-btn,
-.brief-style-preset-preview-btn:focus-visible {
-  opacity: 1;
-}
-
-.brief-style-preset-preview-btn:hover:not(:disabled) {
-  background: #fff;
 }
 
 .brief-style-preset-image-wrap {
@@ -3230,8 +3311,21 @@ article.brief-style-preset-card {
 
 .outline-review-controls {
   display: grid;
-  gap: 12px;
+  gap: 8px;
+  margin-top: 28px;
   margin-bottom: 24px;
+}
+
+.outline-feedback-title {
+  color: var(--text-main);
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.outline-review-controls .prompt-input.compact {
+  min-height: 140px;
+  max-height: 200px;
 }
 
 .feedback-box {
@@ -3426,11 +3520,17 @@ details.generation-history-panel > summary::-webkit-details-marker {
 }
 
 .outline-card-footer {
+  position: sticky;
+  bottom: -32px;
+  z-index: 3;
   justify-content: space-between;
   gap: 24px;
   flex-wrap: wrap;
-  padding-top: 18px;
-  border-top: 1px solid rgba(17, 24, 39, 0.06);
+  margin-top: auto;
+  padding: 18px 0;
+  border-top: 1px solid rgba(17, 24, 39, 0.09);
+  background: rgba(247, 248, 250, 0.94);
+  backdrop-filter: blur(12px);
 }
 
 .outline-footer-right,
@@ -3776,6 +3876,12 @@ details.generation-history-panel > summary::-webkit-details-marker {
   margin-top: 2px;
 }
 
+.outline-required-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .outline-required-toggle {
   display: flex;
   align-items: center;
@@ -3824,6 +3930,21 @@ details.generation-history-panel > summary::-webkit-details-marker {
   cursor: text;
 }
 
+.outline-markdown-edit-icon {
+  position: absolute;
+  top: 11px;
+  right: 12px;
+  color: var(--text-muted);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease;
+}
+
+.outline-markdown-preview:hover .outline-markdown-edit-icon,
+.outline-markdown-preview:focus-visible .outline-markdown-edit-icon {
+  opacity: 1;
+}
+
 .outline-markdown-preview:hover,
 .outline-markdown-preview:focus-visible {
   background: rgba(124, 108, 240, 0.06);
@@ -3845,23 +3966,6 @@ details.generation-history-panel > summary::-webkit-details-marker {
 
 .outline-markdown-preview li::marker {
   color: var(--accent);
-}
-
-.outline-markdown-edit {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--text-muted);
-  font-size: 10px;
-  opacity: 0;
-}
-
-.outline-markdown-preview:hover .outline-markdown-edit,
-.outline-markdown-preview:focus-visible .outline-markdown-edit {
-  opacity: 1;
 }
 
 .outline-required-editor {
@@ -4256,13 +4360,21 @@ details.generation-history-panel > summary::-webkit-details-marker {
   justify-content: flex-end;
 }
 
-/* Back sits bottom-left, recovery entries keep the right side of the row. */
+/* The generation footer follows the requirements footer: it remains visible
+   at the bottom of the shared page scroller while the run detail moves. */
 .generation-page-footer {
+  position: sticky;
+  bottom: -32px;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 16px;
+  margin-top: auto;
+  padding: 18px 0;
+  border-top: 1px solid rgba(17, 24, 39, 0.09);
+  background: rgba(247, 248, 250, 0.94);
+  backdrop-filter: blur(12px);
 }
 
 /*
@@ -4500,6 +4612,49 @@ details.generation-history-panel > summary::-webkit-details-marker {
   height: 100%;
   background: #fff;
   object-fit: contain;
+}
+
+.deck-fullscreen-preview:fullscreen {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  width: 100vw;
+  height: 100vh;
+  padding: 18px 24px 12px;
+  color: #fff;
+  background: #090b12;
+}
+
+.deck-fullscreen-preview:fullscreen .deck-stage-html-frame,
+.deck-fullscreen-preview:fullscreen .deck-stage-loading,
+.deck-fullscreen-preview:fullscreen .slide-preview-card.large {
+  width: min(100%, calc((100vh - 150px) * 16 / 9));
+  max-height: calc(100vh - 150px);
+  align-self: center;
+  justify-self: center;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.deck-fullscreen-preview:fullscreen .preview-controls {
+  margin: 0;
+}
+
+.deck-fullscreen-preview:fullscreen .slide-counter {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.deck-fullscreen-preview:fullscreen .nav-arrow {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.deck-fullscreen-preview:fullscreen .thumbnail-strip {
+  justify-content: center;
+  min-height: 62px;
+  padding-bottom: 0;
 }
 
 .deck-stage-loading {
@@ -6733,6 +6888,11 @@ details.generation-history-panel > summary::-webkit-details-marker {
     grid-template-columns: 1fr;
   }
 
+  .outline-card-footer,
+  .generation-page-footer {
+    bottom: -18px;
+  }
+
   .requirements-footer > span {
     display: none;
   }
@@ -6747,13 +6907,13 @@ details.generation-history-panel > summary::-webkit-details-marker {
   }
 
   .prompt-inline-actions {
-    left: 18px;
-    justify-content: flex-end;
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .inline-create-btn,
   .inline-context-btn {
-    flex: 1 1 0;
+    width: 100%;
     justify-content: center;
     min-width: 0;
     padding: 0 12px;

@@ -1,4 +1,4 @@
-import { AlertCircle, ImageIcon, LoaderCircle } from "lucide-react";
+import { AlertCircle, LoaderCircle } from "lucide-react";
 import { useMemo } from "react";
 import { formatMessage, type Messages } from "../../../i18n/messages";
 import {
@@ -13,12 +13,13 @@ interface GenerationPagePreviewPanelProps {
   previews: GenerationPagePreviews;
   pinnedPageId: string | null;
   onSelectPage: (pageId: string | null) => void;
+  activePageIndex?: number | null;
 }
 
 export function GenerationPagePreviewPanel(props: GenerationPagePreviewPanelProps) {
-  const { t, previews, pinnedPageId, onSelectPage } = props;
+  const { t, previews, pinnedPageId, onSelectPage, activePageIndex } = props;
   const entries = useMemo(() => orderGenerationPagePreviews(previews), [previews]);
-  const selected = resolveGenerationPreviewSelection({ entries, pinnedPageId });
+  const selected = resolveGenerationPreviewSelection({ entries, pinnedPageId, activePageIndex });
   const latest = entries[entries.length - 1] ?? null;
   const followingLatest = !pinnedPageId || pinnedPageId === latest?.pageId;
 
@@ -27,7 +28,9 @@ export function GenerationPagePreviewPanel(props: GenerationPagePreviewPanelProp
       <div className="generation-preview-header">
         <div>
           <div className="section-label">{t.generating.preview.title}</div>
-          <strong>{selected ? pageHeading(t, selected) : t.generating.preview.waiting}</strong>
+          {/* No page yet: the stage below already carries the loading status, so
+              leaving the heading empty keeps that message on screen only once. */}
+          <strong>{selected ? pageHeading(t, selected) : null}</strong>
         </div>
         {entries.length > 0 ? (
           followingLatest ? (
@@ -46,7 +49,12 @@ export function GenerationPagePreviewPanel(props: GenerationPagePreviewPanelProp
 
       <div className="generation-preview-stage">
         {selected?.status === "ready" && selected.imageUpload?.url ? (
-          <img src={selected.imageUpload.url} alt={pageHeading(t, selected)} />
+          <>
+            <img src={selected.imageUpload.url} alt={pageHeading(t, selected)} />
+            {selected.notApplied ? (
+              <span className="generation-preview-not-applied">{t.generating.preview.notApplied}</span>
+            ) : null}
+          </>
         ) : selected?.status === "error" ? (
           <div className="generation-preview-placeholder">
             <AlertCircle size={20} aria-hidden="true" />
@@ -58,9 +66,9 @@ export function GenerationPagePreviewPanel(props: GenerationPagePreviewPanelProp
             <span>{t.generating.preview.loading}</span>
           </div>
         ) : (
-          <div className="generation-preview-placeholder">
-            <ImageIcon size={20} aria-hidden="true" />
-            <span>{t.generating.preview.waiting}</span>
+          <div className="generation-preview-placeholder" role="status" aria-live="polite">
+            <LoaderCircle className="generation-running-icon" size={20} aria-hidden="true" />
+            <span>{t.generating.preview.loading}</span>
           </div>
         )}
       </div>
@@ -73,14 +81,20 @@ export function GenerationPagePreviewPanel(props: GenerationPagePreviewPanelProp
         >
           {entries.map((entry) => {
             const active = entry.pageId === selected?.pageId;
+            const className = ["generation-preview-thumbnail", entry.status]
+              .concat(entry.notApplied ? ["not-applied"] : [])
+              .concat(active ? ["active"] : [])
+              .join(" ");
             return (
               <button
                 key={entry.pageId}
-                className={`generation-preview-thumbnail ${entry.status} ${active ? "active" : ""}`}
+                className={className}
                 type="button"
                 role="tab"
                 aria-selected={active}
-                title={pageHeading(t, entry)}
+                title={entry.notApplied
+                  ? `${pageHeading(t, entry)} — ${t.generating.preview.notApplied}`
+                  : pageHeading(t, entry)}
                 aria-label={formatMessage(t.generating.preview.selectPage, {
                   page: entry.pageIndex + 1,
                 })}

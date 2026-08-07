@@ -1,4 +1,4 @@
-import { Check, ChevronDown, ChevronLeft, ChevronRight, HelpCircle, ImageOff, Maximize2, Sparkles, X } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, HelpCircle, ImageOff, Sparkles, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { Messages } from "../../../i18n/messages";
 import type { VisualStylePreset } from "../../../api/types";
@@ -32,6 +32,7 @@ export interface BriefPageProps {
   visualStylePresets: readonly VisualStylePreset[];
   selectedVisualStylePresetId: string | null;
   onSelectVisualStylePreset: (presetId: string | null) => void;
+  onForward?: () => void;
 }
 
 export function BriefPage({
@@ -48,6 +49,7 @@ export function BriefPage({
   visualStylePresets,
   selectedVisualStylePresetId,
   onSelectVisualStylePreset,
+  onForward,
 }: BriefPageProps) {
   const busy = loading !== "none";
   const strictReviewMode = isStrictReviewModeEnabled(pageReviewSettings);
@@ -246,25 +248,14 @@ export function BriefPage({
                   )}
                 </span>
                 <button
-                  data-performance-id="brief.visual-style.select"
+                  data-performance-id="brief.visual-style.preview"
                   type="button"
                   className="brief-style-preset-select"
                   disabled={busy}
-                  aria-pressed={selected}
-                  onClick={() => onSelectVisualStylePreset(preset.id)}
-                >
-                  <span className="brief-style-preset-accessible-name">{preset.name}</span>
-                </button>
-                <button
-                  data-performance-id="brief.visual-style.preview"
-                  type="button"
-                  className="brief-style-preset-preview-btn"
-                  disabled={busy}
-                  title={`${t.template.previewTitle} · ${preset.name}`}
-                  aria-label={`${t.template.previewTitle} · ${preset.name}`}
+                  aria-haspopup="dialog"
                   onClick={() => setPreview({ preset, index: 0 })}
                 >
-                  <Maximize2 size={14} aria-hidden="true" />
+                  <span className="brief-style-preset-accessible-name">{preset.name}</span>
                 </button>
                 {selected ? (
                   <span className="brief-style-preset-selected" aria-hidden="true"><Check size={14} /></span>
@@ -277,6 +268,14 @@ export function BriefPage({
           ) : null}
         </div>
       </section>
+
+      {onForward ? (
+        <div className="stage-navigation stage-navigation-end">
+          <button data-performance-id="brief.forward" className="secondary-btn" type="button" onClick={onForward} disabled={busy}>
+            {t.controls.forward}<ArrowRight size={16} aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
 
       {preview ? (
         <div className="template-preview-modal" role="dialog" aria-modal="true" aria-label={preview.preset.name} onClick={() => setPreview(null)}>
@@ -292,7 +291,16 @@ export function BriefPage({
             </div>
             <footer className="template-preview-modal-footer">
               <span className="template-preview-modal-layout-name">{t.template.previewTitle}</span>
-              <button data-performance-id="brief.visual-style.preview.use" type="button" className="template-use-btn" onClick={() => { onSelectVisualStylePreset(preview.preset.id); setPreview(null); }}>{t.controls.useTemplate}</button>
+              <button
+                data-performance-id="brief.visual-style.preview.use"
+                type="button"
+                className="template-use-btn"
+                disabled={busy || selectedVisualStylePresetId === preview.preset.id}
+                onClick={() => { onSelectVisualStylePreset(preview.preset.id); setPreview(null); }}
+              >
+                {selectedVisualStylePresetId === preview.preset.id ? <Check size={14} /> : null}
+                {selectedVisualStylePresetId === preview.preset.id ? t.template.selected : t.controls.useTemplate}
+              </button>
             </footer>
           </section>
         </div>

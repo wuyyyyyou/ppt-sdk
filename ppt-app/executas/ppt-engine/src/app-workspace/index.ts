@@ -1547,6 +1547,7 @@ function normalizePageProgressItem(value: unknown): AppPageProgressItem | null {
     last_screenshot_path: normalizeString(record.last_screenshot_path),
     last_error: normalizeString(record.last_error),
     render_source_sha256: normalizeString(record.render_source_sha256),
+    screenshot_source_sha256: normalizeString(record.screenshot_source_sha256),
     visual_review: record.visual_review ?? null,
     updated_at: typeof record.updated_at === "string" ? record.updated_at : null,
   };
@@ -6847,6 +6848,7 @@ function buildInitialPageProgress(pagePlan: AppPagePlan): AppPageProgress {
       last_screenshot_path: "",
       last_error: "",
       render_source_sha256: "",
+      screenshot_source_sha256: "",
       visual_review: null,
       updated_at: now,
     })),
@@ -7663,6 +7665,7 @@ async function runAppWorkspacePageRenderTask(input: {
         status: "rendered",
         last_html_path: result.html_path,
         last_screenshot_path: result.screenshot_path,
+        screenshot_source_sha256: input.sourceSha256,
         last_error: "",
       },
     });

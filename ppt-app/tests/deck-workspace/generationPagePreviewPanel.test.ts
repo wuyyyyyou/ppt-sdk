@@ -10,7 +10,10 @@ import type { GenerationPagePreviews } from "../../src/features/deck-workspace/g
 
 const t = messages.zh as Messages;
 
-function renderPanel(previews: GenerationPagePreviews, pinnedPageId: string | null = null) {
+function renderPanel(
+  previews: GenerationPagePreviews,
+  pinnedPageId: string | null = null,
+) {
   return renderToStaticMarkup(
     createElement(GenerationPagePreviewPanel, {
       t,
@@ -28,7 +31,13 @@ const readyPreviews: GenerationPagePreviews = {
     title: "开场",
     screenshotPath: "/tmp/one.png",
     status: "ready",
-    url: "https://example.test/one.webp",
+    imageUpload: {
+      transport: "host_upload",
+      r2_key: "preview-one",
+      url: "https://example.test/one.webp",
+      mime_type: "image/webp",
+      size_bytes: 123,
+    },
   },
   "page-2": {
     pageId: "page-2",
@@ -36,16 +45,35 @@ const readyPreviews: GenerationPagePreviews = {
     title: "方案",
     screenshotPath: "/tmp/two.png",
     status: "ready",
-    url: "https://example.test/two.webp",
+    imageUpload: {
+      transport: "host_upload",
+      r2_key: "preview-two",
+      url: "https://example.test/two.webp",
+      mime_type: "image/webp",
+      size_bytes: 123,
+    },
   },
 };
 
 describe("GenerationPagePreviewPanel", () => {
-  it("explains that previews appear per page before anything rendered", () => {
+  it("keeps spinning before anything rendered instead of looking unfinished", () => {
+    const html = renderPanel({}, null, true);
+
+    assert.match(html, new RegExp(t.generating.preview.loading));
+    assert.match(html, /generation-running-icon/);
+    assert.match(html, /role="status"/);
+    // The heading used to repeat this sentence, so it showed up twice on screen.
+    assert.doesNotMatch(html, new RegExp(t.generating.preview.waiting));
+    assert.doesNotMatch(html, /generation-preview-thumbnails/);
+  });
+
+  it("keeps the empty preview frame in loading state", () => {
     const html = renderPanel({});
 
-    assert.match(html, new RegExp(t.generating.preview.waiting));
-    assert.doesNotMatch(html, /generation-preview-thumbnails/);
+    assert.match(html, /generation-running-icon/);
+    assert.match(html, new RegExp(t.generating.preview.loading));
+    assert.doesNotMatch(html, new RegExp(t.generating.preview.waiting));
+    assert.doesNotMatch(html, /lucide-image/);
   });
 
   it("shows the newest rendered page and one thumbnail per page", () => {
