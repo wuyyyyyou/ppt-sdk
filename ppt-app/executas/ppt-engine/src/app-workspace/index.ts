@@ -4838,7 +4838,10 @@ export async function getAppPageEditContext(
   if (existing) {
     const currentHtml = await injectWorkspaceManagedFontCss(
       workspace.workspace_dir,
-      await readFile(existing.current_html_path, "utf8"),
+      await embedWorkspaceLocalImageResources(
+        workspace.workspace_dir,
+        await readFile(existing.current_html_path, "utf8"),
+      ),
     );
     const contextDir = path.join(workspace.workspace_dir, "output", "manual-editor-context");
     await mkdir(contextDir, { recursive: true });

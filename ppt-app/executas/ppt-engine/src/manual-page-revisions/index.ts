@@ -9,6 +9,10 @@ export const MANUAL_HTML_MAX_BYTES = 64 * 1024 * 1024;
 export const AGENT_HTML_MAX_BYTES = 2 * 1024 * 1024;
 const revisionPublishQueues = new Map<string, Promise<unknown>>();
 const deckPublishQueues = new Map<string, Promise<unknown>>();
+const WORKSPACE_LOCAL_IMAGE_ROOTS = [
+  "research/evidence/images",
+  "page-assets",
+] as const;
 
 export interface ManualPageRevisionManifest {
   version: 1;
@@ -181,17 +185,44 @@ const LOCAL_IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
   ".webp": "image/webp",
 };
 
+function collectLocalImageReferences(html: string): string[] {
+  const references = new Set(html.match(/file:\/\/[^\s"'<>),]+/gi) ?? []);
+  const absolutePathPattern = /\b(?:src|href|xlink:href)\s*=\s*(["'])(\/(?:[^"'<>]|\\.)+|[A-Za-z]:[\\/](?:[^"'<>]|\\.)+)\1/gi;
+  for (const match of html.matchAll(absolutePathPattern)) {
+    if (match[2]) references.add(match[2]);
+  }
+  const cssUrlPattern = /url\(\s*(["']?)(\/(?:[^"'<>)]|\\.)+|[A-Za-z]:[\\/](?:[^"'<>)]|\\.)+)\1\s*\)/gi;
+  for (const match of html.matchAll(cssUrlPattern)) {
+    if (match[2]) references.add(match[2]);
+  }
+  return [...references];
+}
+
+function isPathWithin(root: string, candidate: string): boolean {
+  const relative = path.relative(root, candidate);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
 export async function embedWorkspaceLocalImageResources(
   workspaceDir: string,
   html: string,
 ): Promise<string> {
   const workspaceRealPath = await realpath(workspaceDir);
-  const fileUrls = new Set(html.match(/file:\/\/[^\s"'<>),]+/gi) ?? []);
+  const allowedRoots = (await Promise.all(
+    WORKSPACE_LOCAL_IMAGE_ROOTS.map(async (relativeRoot) => {
+      try {
+        return await realpath(path.join(workspaceRealPath, relativeRoot));
+      } catch {
+        return null;
+      }
+    }),
+  )).filter((root): root is string => root !== null);
+  const references = collectLocalImageReferences(html);
   let embedded = html;
-  for (const fileUrl of fileUrls) {
+  for (const reference of references) {
     let filePath: string;
     try {
-      filePath = fileURLToPath(fileUrl);
+      filePath = reference.startsWith("file://") ? fileURLToPath(reference) : reference;
     } catch {
       continue;
     }
@@ -199,15 +230,14 @@ export async function embedWorkspaceLocalImageResources(
     const mimeType = LOCAL_IMAGE_MIME_BY_EXTENSION[extension];
     if (!mimeType) continue;
     const fileRealPath = await realpath(filePath);
-    const relative = path.relative(workspaceRealPath, fileRealPath);
-    if (relative.startsWith("..") || path.isAbsolute(relative)) {
-      throw new Error(`Manual page local image must be inside the Workspace: ${filePath}`);
+    if (!allowedRoots.some((root) => isPathWithin(root, fileRealPath))) {
+      throw new Error(`Manual page local image must be inside an allowed Workspace image directory: ${filePath}`);
     }
     const bytes = await readFile(fileRealPath);
     if (bytes.length > 20 * 1024 * 1024) {
       throw new Error(`Manual page local image exceeds 20 MiB: ${filePath}`);
     }
-    embedded = embedded.replaceAll(fileUrl, `data:${mimeType};base64,${bytes.toString("base64")}`);
+    embedded = embedded.replaceAll(reference, `data:${mimeType};base64,${bytes.toString("base64")}`);
   }
   if (Buffer.byteLength(embedded, "utf8") > MANUAL_HTML_MAX_BYTES) {
     throw new Error(`Manual page HTML exceeds ${MANUAL_HTML_MAX_BYTES} bytes after embedding local images`);
@@ -258,6 +288,7 @@ export async function sanitizeManualPageHtml(
   }
   let html = ensureSinglePageSlideShell(removeActiveContent(inputHtml));
   html = ensureShellDimensions(ensureEditorCsp(html));
+  html = await embedWorkspaceLocalImageResources(workspaceDir, html);
   html = await injectWorkspaceManagedFontCss(workspaceDir, html);
   extractSlideShell(html);
   return extractDataUrlAssets(html, manualPageRevisionPaths(workspaceDir, pageId));

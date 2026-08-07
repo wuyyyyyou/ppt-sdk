@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -32,12 +32,56 @@ test("wraps a single-page render in exactly one slide shell", () => {
 test("embeds Workspace-local file images for the iframe editing context", async () => {
   const workspaceDir = await mkdtemp(path.join(os.tmpdir(), "manual-page-embed-"));
   try {
-    const imagePath = path.join(workspaceDir, "image.png");
+    const imagePath = path.join(workspaceDir, "research", "evidence", "images", "image.png");
+    await mkdir(path.dirname(imagePath), { recursive: true });
     await writeFile(imagePath, Buffer.from(PNG_1X1, "base64"));
     const source = pageHtml(`<img src="${new URL(`file://${imagePath}`).href}">`);
     const result = await embedWorkspaceLocalImageResources(workspaceDir, source);
     assert.match(result, /src="data:image\/png;base64,/);
     assert.doesNotMatch(result, /file:\/\//);
+  } finally {
+    await rm(workspaceDir, { recursive: true, force: true });
+  }
+});
+
+test("embeds Workspace-local absolute image paths for the iframe editing context", async () => {
+  const workspaceDir = await mkdtemp(path.join(os.tmpdir(), "manual-page-absolute-image-"));
+  try {
+    const imagePath = path.join(workspaceDir, "research", "evidence", "images", "image.png");
+    await mkdir(path.dirname(imagePath), { recursive: true });
+    await writeFile(imagePath, Buffer.from(PNG_1X1, "base64"));
+    const result = await embedWorkspaceLocalImageResources(workspaceDir, pageHtml(`<img src="${imagePath}">`));
+    assert.match(result, /src="data:image\/png;base64,/);
+    assert.doesNotMatch(result, /research\/evidence\/images\/image\.png/);
+  } finally {
+    await rm(workspaceDir, { recursive: true, force: true });
+  }
+});
+
+test("rejects local image paths outside the allowed Workspace image directories", async () => {
+  const workspaceDir = await mkdtemp(path.join(os.tmpdir(), "manual-page-outside-image-"));
+  const outsideDir = await mkdtemp(path.join(os.tmpdir(), "manual-page-outside-image-file-"));
+  try {
+    const imagePath = path.join(outsideDir, "image.png");
+    await writeFile(imagePath, Buffer.from(PNG_1X1, "base64"));
+    await assert.rejects(
+      () => embedWorkspaceLocalImageResources(workspaceDir, pageHtml(`<img src="${imagePath}">`)),
+      /allowed Workspace image directory/i,
+    );
+  } finally {
+    await rm(workspaceDir, { recursive: true, force: true });
+    await rm(outsideDir, { recursive: true, force: true });
+  }
+});
+
+test("sanitizes Workspace-local absolute image paths before saving a manual revision", async () => {
+  const workspaceDir = await mkdtemp(path.join(os.tmpdir(), "manual-page-sanitize-image-"));
+  try {
+    const imagePath = path.join(workspaceDir, "research", "evidence", "images", "image.png");
+    await mkdir(path.dirname(imagePath), { recursive: true });
+    await writeFile(imagePath, Buffer.from(PNG_1X1, "base64"));
+    const result = await sanitizeManualPageHtml(workspaceDir, "page-test", pageHtml(`<img src="${imagePath}">`));
+    assert.match(result.currentHtml, /src="data:image\/png;base64,/);
   } finally {
     await rm(workspaceDir, { recursive: true, force: true });
   }
