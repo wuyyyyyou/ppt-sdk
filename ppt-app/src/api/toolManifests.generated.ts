@@ -3,6 +3,6 @@
 
 export const PPT_ENGINE_TOOL = {
   handle: "ppt-engine",
-  version: "4.3.17",
+  version: "4.4.0",
   displayName: "ppt-engine",
 } as const;
