@@ -639,9 +639,12 @@ button {
   flex-shrink: 0;
 }
 
+/* The dot centres sit 13px down — 6px of button padding plus the 7px radius —
+   and the rail has to put its own centre there, not its top edge. `top` is
+   therefore 13 − 1, one half of the rail's 2px height. */
 .progress-line-rail {
   position: absolute;
-  top: 13px;
+  top: 12px;
   left: 10%;
   right: 10%;
   height: 2px;
