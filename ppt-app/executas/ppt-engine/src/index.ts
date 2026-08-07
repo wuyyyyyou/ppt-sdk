@@ -6,6 +6,8 @@ export {
   fingerprintWorkspacePageSource,
   getWorkspaceAuthoringPaths,
   installWorkspaceAuthoringKit,
+  ensureWorkspacePersistentElementsReference,
+  fingerprintWorkspacePersistentElements,
   prepareWorkspacePageSources,
   reconcileWorkspacePageSources,
   rebuildWorkspaceDeckManifest,

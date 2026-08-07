@@ -14,6 +14,7 @@ export interface WorkspaceAuthoringPaths {
   authoring_kit_dir: string;
   manifest_path: string;
   slides_dir: string;
+  persistent_elements_path: string;
 }
 
 export interface WorkspaceAuthoringKitResult extends WorkspaceAuthoringPaths {
@@ -65,6 +66,51 @@ export function getWorkspaceAuthoringPaths(workspaceDir: string): WorkspaceAutho
     authoring_kit_dir: path.join(normalized, "authoring-kit"),
     manifest_path: path.join(normalized, "manifest.json"),
     slides_dir: path.join(normalized, "slides"),
+    persistent_elements_path: path.join(normalized, "persistent-elements.tsx"),
+  };
+}
+
+const PERSISTENT_ELEMENTS_BOOTSTRAP = `import React from "react";
+
+/**
+ * Persistent Elements Reference（跨页固定元素参考）Bootstrap。
+ * Agent 必须把本文件改写为本 Deck 的完整参考页；没有固定元素时也要保留明确的空参考。
+ */
+export default function PersistentElementsReference() {
+  return <div style={{ width: 1280, height: 720, position: "relative", background: "#ffffff" }}>
+    {/* No persistent elements for this deck. */}
+  </div>;
+}
+`;
+
+export async function ensureWorkspacePersistentElementsReference(input: {
+  workspace_dir: string;
+  reset_existing?: boolean;
+}): Promise<{ path: string; created: boolean; sha256: string; size_bytes: number }> {
+  const paths = getWorkspaceAuthoringPaths(input.workspace_dir);
+  await mkdir(paths.workspace_dir, { recursive: true });
+  let created = false;
+  if (input.reset_existing === true || !(await pathExists(paths.persistent_elements_path))) {
+    await writeFile(paths.persistent_elements_path, PERSISTENT_ELEMENTS_BOOTSTRAP, "utf8");
+    created = true;
+  }
+  const bytes = await readFile(paths.persistent_elements_path);
+  return {
+    path: paths.persistent_elements_path,
+    created,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+    size_bytes: bytes.length,
+  };
+}
+
+export async function fingerprintWorkspacePersistentElements(input: { workspace_dir: string }) {
+  const paths = getWorkspaceAuthoringPaths(input.workspace_dir);
+  const bytes = await readFile(paths.persistent_elements_path);
+  const fileStat = await stat(paths.persistent_elements_path);
+  return {
+    path: paths.persistent_elements_path,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+    size_bytes: fileStat.size,
   };
 }
 

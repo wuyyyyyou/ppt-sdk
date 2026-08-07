@@ -228,6 +228,8 @@ export async function prepareManifestRenderPlan(input: {
     const context = createPageSourceRenderContext({
       id: slide.id,
       title: `${manifest.title} – ${pageNumber}`,
+      pageNumber,
+      totalPages: manifest.slides.length,
     });
     const fileName = `${pageNumber}-${deckBaseName}-${sanitizeFileNamePart(slide.id)}.png`;
     return {

@@ -296,6 +296,10 @@ export interface Messages {
       followingLatest: string;
       backToLatest: string;
     };
+    persistentElements: {
+      title: string;
+      session: string;
+    };
     researchDiscovery: {
       title: string;
       empty: string;
@@ -387,6 +391,7 @@ export interface Messages {
         | "webResearchCuration"
         | "visualResearchCuration"
         | "prepare"
+        | "persistentElements"
         | "authoring"
         | "deckRefinement"
         | "rendering"
@@ -1028,6 +1033,10 @@ export const messages: Record<Locale, Messages> = {
         followingLatest: "Following the newest page",
         backToLatest: "Follow the newest page"
       },
+      persistentElements: {
+        title: "Cross-slide decoration generation",
+        session: "Generating shared decorations"
+      },
       researchDiscovery: {
         title: "Facts collection",
         empty: "No details for this step yet.",
@@ -1037,7 +1046,7 @@ export const messages: Record<Locale, Messages> = {
           running: "Running",
           completed: "Completed",
           skipped: "Skipped",
-          warning: "Completed with gaps"
+          warning: "Completed"
         },
         queries: "Queries",
         sources: "Sources",
@@ -1053,7 +1062,7 @@ export const messages: Record<Locale, Messages> = {
         queryStatuses: {
           running: "Running",
           collected: "Collected",
-          gap: "Gap",
+          gap: "Completed",
           error: "Error",
           skipped_duplicate: "Skipped duplicate"
         },
@@ -1134,7 +1143,8 @@ export const messages: Record<Locale, Messages> = {
           webResearchCuration: "Curating facts",
           visualResearchCuration: "Curating images",
           prepare: "File preparation",
-          authoring: "Page expression",
+          persistentElements: "Generating shared decorations",
+          authoring: "Designing page content and layout",
           deckRefinement: "Deck refinement",
           rendering: "Page rendering",
           renderFix: "Render issue fix",
@@ -1776,6 +1786,10 @@ export const messages: Record<Locale, Messages> = {
         followingLatest: "正在跟随最新一页",
         backToLatest: "跟随最新一页"
       },
+      persistentElements: {
+        title: "跨页装饰生成",
+        session: "正在生成跨页装饰"
+      },
       researchDiscovery: {
         title: "事实收集",
         empty: "这个步骤暂无详细输出。",
@@ -1785,7 +1799,7 @@ export const messages: Record<Locale, Messages> = {
           running: "进行中",
           completed: "已完成",
           skipped: "已跳过",
-          warning: "有缺口"
+          warning: "已完成"
         },
         queries: "查询",
         sources: "来源",
@@ -1801,7 +1815,7 @@ export const messages: Record<Locale, Messages> = {
         queryStatuses: {
           running: "进行中",
           collected: "已收集",
-          gap: "有缺口",
+          gap: "已完成",
           error: "出错",
           skipped_duplicate: "跳过重复"
         },
@@ -1882,7 +1896,8 @@ export const messages: Record<Locale, Messages> = {
           webResearchCuration: "筛选事实证据",
           visualResearchCuration: "筛选图片素材",
           prepare: "文件准备",
-          authoring: "页面表达",
+          persistentElements: "生成跨页装饰",
+          authoring: "设计页面内容和布局",
           deckRefinement: "整套优化",
           rendering: "页面渲染",
           renderFix: "渲染问题修复",

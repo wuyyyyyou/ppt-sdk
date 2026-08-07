@@ -6,6 +6,10 @@ export function generationText(locale: Locale) {
   return {
     authoringKit: zh ? "正在准备 Authoring Kit（创作套件）" : "Preparing the Authoring Kit",
     styleGuide: zh ? "正在生成艺术指导" : "Creating the Workspace Style Guide",
+    persistentElements: zh ? "正在生成跨页装饰" : "Creating cross-slide decorations",
+    persistentElementsReady: zh ? "跨页装饰已生成" : "Cross-slide decorations created",
+    persistentElementsPreserved: zh ? "沿用现有跨页装饰" : "Preserving existing cross-slide decorations",
+    agentSessionCompleted: zh ? "Agent 会话已完成" : "Agent session completed",
     pageSources: zh ? "正在初始化 Page Sources（页面源文件）" : "Preparing Page Sources",
     pagePlan: zh ? "正在规划页面和模板蓝图" : "Planning pages and template blueprints",
     researchPlanning: zh ? "正在规划检索需求" : "Planning research needs",

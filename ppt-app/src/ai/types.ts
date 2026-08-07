@@ -166,6 +166,7 @@ export interface DeckRefinementPlan {
     action: "preserve" | "regenerate";
     reason: string;
   };
+  persistent_elements_action: "preserve" | "revise";
   operations: DeckRefinementOutlineOperation[];
   reason: string;
 }

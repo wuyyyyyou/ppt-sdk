@@ -49,7 +49,7 @@ describe("Linear Research Stage Records", () => {
     assert.deepEqual(group?.records[1]?.sourceLines, []);
   });
 
-  it("presents a terminal warning as completed with gaps", () => {
+  it("presents a terminal warning as completed while retaining the underlying gaps", () => {
     const group = buildResearchDiscoveryStageRecords({
       t: messages.en,
       progress: makeProgress("warning", [
@@ -61,7 +61,7 @@ describe("Linear Research Stage Records", () => {
     });
 
     assert.equal(group?.state, "completed");
-    assert.equal(group?.statusLabel, "Completed with gaps");
+    assert.equal(group?.statusLabel, "Completed");
     assert.equal(group?.records[1]?.state, "completed");
     assert.deepEqual(group?.records[1]?.gaps, ["Some selected pages could not be read."]);
   });
@@ -110,5 +110,24 @@ describe("Linear Research Stage Records", () => {
     assert.equal(en?.records[1]?.queryLines[0], "Collected: EV market 2026 (6 results · 2 fetched)");
     assert.deepEqual(en?.records[1]?.sourceLines, ["IEA report"]);
     assert.equal(JSON.stringify(en).includes("token=secret"), false);
+  });
+
+  it("labels query gaps as completed in both locales", () => {
+    const records: NonNullable<DeckGenerationProgress["researchDiscovery"]>["records"] = [
+      { phase: "web-decision", state: "completed" },
+      {
+        phase: "web-collection",
+        state: "warning",
+        queries: [{ kind: "web", query: "Official source", status: "gap" }],
+      },
+      { phase: "visual-decision", state: "skipped" },
+      { phase: "visual-collection", state: "skipped" },
+    ];
+
+    const en = buildResearchDiscoveryStageRecords({ t: messages.en, progress: makeProgress("warning", records) });
+    const zh = buildResearchDiscoveryStageRecords({ t: messages.zh, progress: makeProgress("warning", records) });
+
+    assert.match(en?.records[1]?.queryLines[0] ?? "", /^Completed: /);
+    assert.match(zh?.records[1]?.queryLines[0] ?? "", /^已完成:/);
   });
 });

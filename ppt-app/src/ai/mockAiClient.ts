@@ -266,6 +266,7 @@ export function createMockAiClient(): AiClient {
       const wantsDelete = /delete|remove|删除|删掉|去掉/.test(lower);
       const wantsGlobalRewrite = /audience|style|受众|风格|表达|统一/.test(lower);
       const wantsUpdate = /update|rewrite|优化|调整|改/.test(lower);
+      const wantsPersistentRevision = /header|footer|page number|页眉|页脚|页码|持续装饰/.test(lower);
 
       const result: DeckRefinementPlan = wantsNoOp
           ? {
@@ -273,6 +274,7 @@ export function createMockAiClient(): AiClient {
               title: input.outline.title,
               output_language_change: { changed: false },
               style_guide_change: { action: "preserve", reason: "No shared visual change." },
+              persistent_elements_action: "preserve",
               operations: [],
               reason: "Mock no-op Deck Refinement.",
             }
@@ -288,6 +290,7 @@ export function createMockAiClient(): AiClient {
                 action: wantsThemeChange ? "regenerate" : "preserve",
                 reason: wantsThemeChange ? "Mock explicit shared visual change." : "Preserve current shared direction.",
               },
+              persistent_elements_action: wantsPersistentRevision ? "revise" : "preserve",
               operations: input.outline.items.flatMap((page, index): DeckRefinementOutlineOperation[] => {
                 if (wantsDelete && index === input.outline.items.length - 1) {
                   return [{ op: "delete" as const, page_id: page.page_id!, reason: "Mock delete last page." }];

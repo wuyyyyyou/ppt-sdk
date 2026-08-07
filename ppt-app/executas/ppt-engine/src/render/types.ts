@@ -219,4 +219,6 @@ export interface BrowserRenderContext {
   speakerNote: string;
   title: string;
   theme: BrowserRenderTheme;
+  pageNumber?: number;
+  totalPages?: number;
 }

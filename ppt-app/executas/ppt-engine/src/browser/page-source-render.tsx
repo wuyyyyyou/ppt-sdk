@@ -50,6 +50,21 @@ function waitForReady(container: HTMLElement) {
   window.setTimeout(tick, 50);
 }
 
+function replacePageNumberMarkers(container: HTMLElement, context: BrowserRenderContext) {
+  const current = context.pageNumber;
+  const total = context.totalPages;
+  container.querySelectorAll<HTMLElement>("[data-presenton-page-number]").forEach((element) => {
+    const kind = element.getAttribute("data-presenton-page-number");
+    const value = kind === "current" ? current : kind === "total" ? total : undefined;
+    if (!Number.isInteger(value) || (value as number) < 1) {
+      throw new Error(`Invalid data-presenton-page-number marker: ${kind ?? "missing"}`);
+    }
+    const pad = Number(element.getAttribute("data-presenton-page-number-pad") ?? "0");
+    const text = String(value).padStart(Number.isInteger(pad) && pad > 0 ? pad : 0, "0");
+    element.textContent = text;
+  });
+}
+
 function ErrorFallback({ message }: { message: string }) {
   return (
     <div
@@ -108,6 +123,7 @@ export function renderPageSourceSlideWithErrorBoundary(
     markStatus(container, "loading");
     document.title = context.title;
     renderPageSource(container, context, resolvePageSource);
+    replacePageNumberMarkers(container, context);
     waitForReady(container);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown browser render error";
@@ -137,6 +153,7 @@ export function renderPageSourceDeckWithErrorBoundary(
         throw new Error(`Missing deck slot for slide ${index}`);
       }
       renderPageSource(slot, context, resolvePageSource);
+      replacePageNumberMarkers(slot, context);
     });
     waitForReady(container);
   } catch (error) {

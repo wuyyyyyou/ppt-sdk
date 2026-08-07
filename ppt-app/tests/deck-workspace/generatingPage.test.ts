@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
+import path from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -301,6 +303,39 @@ describe("GeneratingPage controls", () => {
     assert.doesNotMatch(html, /research-discovery-stage-group warning/);
     assert.doesNotMatch(html, /generation-status-badge warning/);
     assert.doesNotMatch(html, /部分完成/);
+    assert.doesNotMatch(html, /证据缺口/);
+    assert.doesNotMatch(html, /汇总/);
+    assert.doesNotMatch(html, /No current price source\./);
+  });
+
+  it("hides gap and summary sections while a research phase is expanded", () => {
+    const html = renderPage(
+      makeViewState({ status: "running" }),
+      {
+        ...makeProgress("research-collection", "pending"),
+        researchDiscovery: {
+          status: "running",
+          summary: {
+            facts: 1,
+            derivedInsights: 0,
+            visualAssets: 0,
+            gaps: 1,
+            rejectedMaterial: 0,
+          },
+          records: [
+            { phase: "web-decision", state: "completed" },
+            { phase: "web-collection", state: "running", gaps: ["A source is unavailable."] },
+            { phase: "visual-decision", state: "waiting" },
+            { phase: "visual-collection", state: "waiting" },
+          ],
+        },
+      },
+    );
+
+    assert.match(html, /research-discovery-record active[\s\S]*aria-expanded="true"/);
+    assert.doesNotMatch(html, /证据缺口/);
+    assert.doesNotMatch(html, /汇总/);
+    assert.doesNotMatch(html, /A source is unavailable\./);
   });
 
   it("does not show accepted page counts during deck-level Research Discovery steps", () => {
@@ -526,6 +561,26 @@ describe("GeneratingPage controls", () => {
     const progressIndex = html.indexOf("generation-progress-panel");
     assert.ok(previewIndex > -1 && progressIndex > previewIndex, "preview should precede the run log");
     assert.match(html, /<img src="https:\/\/example\.test\/one\.webp"/);
+  });
+
+  it("uses the same status rail colors for persistent elements and research discovery", async () => {
+    const css = await readFile(
+      path.resolve("src/features/deck-workspace/styles/deck-workspace.css"),
+      "utf8",
+    );
+
+    assert.match(
+      css,
+      /\.research-discovery-stage-group\.completed,\s*\.persistent-elements-stage-group\.completed\s*\{\s*box-shadow:\s*inset 3px 0 0 #16a34a;/,
+    );
+    assert.match(
+      css,
+      /\.research-discovery-stage-group\.active,\s*\.persistent-elements-stage-group\.active\s*\{\s*box-shadow:\s*inset 3px 0 0 rgba\(124, 108, 240, 0\.58\);/,
+    );
+    assert.match(
+      css,
+      /\.research-discovery-stage-group\.failed,\s*\.persistent-elements-stage-group\.failed\s*\{\s*box-shadow:\s*inset 3px 0 0 #dc2626;/,
+    );
   });
 
   it("does not surface a failure the run is still recovering from", () => {

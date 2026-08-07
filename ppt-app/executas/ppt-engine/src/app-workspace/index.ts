@@ -66,7 +66,11 @@ import {
 } from "../runtime/browser-runtime.js";
 import { convertDeckHtmlToPptx } from "../pptx-export/dom-to-pptx.js";
 import { rasterizePptxToImages } from "../pptx-rasterization/index.js";
-import { prepareWorkspacePageSources } from "../authoring-kit-workspace/index.js";
+import {
+  ensureWorkspacePersistentElementsReference,
+  fingerprintWorkspacePersistentElements,
+  prepareWorkspacePageSources,
+} from "../authoring-kit-workspace/index.js";
 import {
   injectWorkspaceManagedFontCss,
   listManagedFontLibrary,
@@ -202,6 +206,8 @@ import type {
   GetAppWorkspaceStyleGuideStatusInput,
   GetAppWorkspaceStyleGuideStatusResult,
   GetAppWorkspaceStyleGuideResult,
+  GetAppWorkspacePersistentElementsStatusInput,
+  GetAppWorkspacePersistentElementsStatusResult,
   InitializeAppPageProgressInput,
   RecordAppWorkspaceThemeTokenInput,
   RecordAppWorkspaceThemeTokenResult,
@@ -262,6 +268,8 @@ const WORKSPACE_LOG_FILE_NAMES = {
   "ai-outline-interactions": "ai-outline-interactions.jsonl",
   "ai-style-guide": "ai-style-guide.jsonl",
   "ai-style-guide-interactions": "ai-style-guide-interactions.jsonl",
+  "ai-persistent-elements": "ai-persistent-elements.jsonl",
+  "ai-persistent-elements-interactions": "ai-persistent-elements-interactions.jsonl",
   "ai-page-plan": "ai-page-plan.jsonl",
   "ai-page-plan-interactions": "ai-page-plan-interactions.jsonl",
   "ai-page-agent": "ai-page-agent.jsonl",
@@ -433,6 +441,7 @@ function buildWorkspaceFilePaths(workspaceDir: string) {
     outline: path.join(workspaceDir, "outline.json"),
     manifest: path.join(workspaceDir, "manifest.json"),
     style_guide: path.join(workspaceDir, "style-guide.md"),
+    persistent_elements: path.join(workspaceDir, "persistent-elements.tsx"),
     authoring_kit: path.join(workspaceDir, "authoring-kit"),
     page_plan: path.join(workspaceDir, "page-plan.json"),
     page_progress: path.join(workspaceDir, "page-progress.json"),
@@ -892,6 +901,7 @@ function createDefaultTaskJson(workspaceDir: string, title?: string) {
       page_progress: "page-progress.json",
       manifest: "manifest.json",
       style_guide: "style-guide.md",
+      persistent_elements: "persistent-elements.tsx",
       authoring_kit: "authoring-kit/",
     },
   };
@@ -5144,6 +5154,15 @@ async function performAppWorkspaceDeckHtmlRender(input: {
   manifestPath: string;
   outputDir: string;
 }) {
+  const replacePageNumberMarkers = (html: string, pageNumber: number, totalPages: number) => html.replace(
+    /(<[^>]*data-presenton-page-number="(current|total)"[^>]*>)([^<]*)(<\/[^>]+>)/g,
+    (_match, open: string, kind: string, _value: string, close: string) => {
+      const raw = kind === "current" ? pageNumber : totalPages;
+      const padMatch = open.match(/data-presenton-page-number-pad="(\d+)"/);
+      const pad = padMatch ? Number(padMatch[1]) : 0;
+      return `${open}${String(raw).padStart(Number.isInteger(pad) && pad > 0 ? pad : 0, "0")}${close}`;
+    },
+  );
   return buildDeckHtmlSnapshotFromManifest({
     manifestPath: input.manifestPath,
     outputDir: input.outputDir,
@@ -5158,7 +5177,9 @@ async function performAppWorkspaceDeckHtmlRender(input: {
           input.workspace.workspace_dir,
           await readFile(revision.current_html_path, "utf8"),
         );
-        deckHtml = replaceSlideShellAtIndex(deckHtml, index, extractSlideShell(manualHtml).shell);
+        deckHtml = replaceSlideShellAtIndex(deckHtml, index, extractSlideShell(
+          replacePageNumberMarkers(manualHtml, index + 1, slides.length),
+        ).shell);
       }
       return deckHtml;
     },
@@ -7115,6 +7136,62 @@ export async function getAppWorkspaceStyleGuide(
   const status = await getAppWorkspaceStyleGuideStatus(input);
   if (!status.non_empty) throw new Error("Workspace Style Guide is unavailable");
   return { ...status, content: await readFile(status.style_guide_path, "utf8") };
+}
+
+export async function ensureAppWorkspacePersistentElementsReference(input: {
+  workspace_dir: string;
+  reset_existing?: boolean;
+}) {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  const result = await ensureWorkspacePersistentElementsReference(input);
+  await touchWorkspaceTask(workspace, new Date().toISOString());
+  return {
+    workspace_dir: workspace.workspace_dir,
+    persistent_elements_path: result.path,
+    created: result.created,
+    sha256: result.sha256,
+    size_bytes: result.size_bytes,
+  };
+}
+
+export async function getAppWorkspacePersistentElementsStatus(
+  input: GetAppWorkspacePersistentElementsStatusInput,
+): Promise<GetAppWorkspacePersistentElementsStatusResult> {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  try {
+    const result = await fingerprintWorkspacePersistentElements(input);
+    return {
+      workspace_dir: workspace.workspace_dir,
+      persistent_elements_path: result.path,
+      exists: true,
+      non_empty: result.size_bytes > 0,
+      size_bytes: result.size_bytes,
+      sha256: result.sha256,
+    };
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return {
+        workspace_dir: workspace.workspace_dir,
+        persistent_elements_path: workspace.files.persistent_elements,
+        exists: false,
+        non_empty: false,
+        size_bytes: 0,
+      };
+    }
+    throw error;
+  }
+}
+
+export async function typecheckAppWorkspacePersistentElements(input: {
+  workspace_dir: string;
+}) {
+  const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+  await assertLocalTemplateTypecheck({
+    entryPath: workspace.files.persistent_elements,
+    cwd: workspace.workspace_dir,
+    label: "persistent-elements.tsx",
+  });
+  return getAppWorkspacePersistentElementsStatus(input);
 }
 
 export async function initializeAppPageProgress(

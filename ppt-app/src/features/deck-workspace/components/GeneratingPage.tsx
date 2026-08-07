@@ -2,7 +2,7 @@ import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, Circle, 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Messages } from "../../../i18n/messages";
 import type { DeckGenerationProgress, DeckGenerationStep } from "../../deck-generation";
-import { buildPageGenerationStageRecords, type PageGenerationStageRecord, type PageGenerationStageRecordGroup } from "../generationStageRecords";
+import { buildPageGenerationStageRecords, buildPersistentElementsStageGroup, type PageGenerationStageRecord, type PageGenerationStageRecordGroup, type PersistentElementsStageGroup } from "../generationStageRecords";
 import { buildResearchDiscoveryStageRecords, type ResearchDiscoveryStageRecord, type ResearchDiscoveryStageGroup } from "../researchDiscoveryStageRecords";
 import {
   buildGenerationPageSummary,
@@ -218,7 +218,21 @@ function GenerationProgressPanel(props: {
     () => buildResearchDiscoveryStageRecords({ t, progress }),
     [t, progress],
   );
+  const persistentElementsGroup = useMemo(
+    () => buildPersistentElementsStageGroup({ t, progress, history }),
+    [t, progress, history],
+  );
+  const persistentElementsDisclosureGroups = useMemo(() => persistentElementsGroup ? [{
+    pageId: "persistent-elements",
+    pageIndex: -1,
+    title: persistentElementsGroup.title,
+    pageStatus: persistentElementsGroup.state,
+    pageStatusLabel: persistentElementsGroup.statusLabel,
+    state: persistentElementsGroup.state,
+    stages: persistentElementsGroup.records,
+  }] : [], [persistentElementsGroup]);
   const disclosure = useStageDisclosure(stageGroups);
+  const persistentElementsDisclosure = useStageDisclosure(persistentElementsDisclosureGroups);
   const researchDisclosure = useResearchDiscoveryDisclosure(researchDiscoveryGroup);
   const running = isProgressRunning(progress);
 
@@ -241,6 +255,13 @@ function GenerationProgressPanel(props: {
           ) : null}
         </div>
       </div>
+      {persistentElementsGroup ? (
+        <PersistentElementsStageGroupView
+          group={persistentElementsGroup}
+          t={t}
+          disclosure={persistentElementsDisclosure}
+        />
+      ) : null}
       {researchDiscoveryGroup ? (
         <ResearchDiscoveryStageGroupView
           group={researchDiscoveryGroup}
@@ -261,6 +282,33 @@ function GenerationProgressPanel(props: {
         </div>
       ) : null}
     </section>
+  );
+}
+
+function PersistentElementsStageGroupView(props: {
+  group: PersistentElementsStageGroup;
+  t: Messages;
+  disclosure: ReturnType<typeof useStageDisclosure>;
+}) {
+  const { group, t, disclosure } = props;
+  return (
+    <article className={`generation-page-item generation-stage-page persistent-elements-stage-group ${group.state}`}>
+      <div className="generation-page-item-header">
+        <div><strong>{group.title}</strong></div>
+        <span className={`generation-status-badge ${statusBadgeState(group.state)}`}>{group.statusLabel}</span>
+      </div>
+      <div className="generation-page-stage-list">
+        {group.records.map((record) => (
+          <PageStageRecordView
+            key={record.id}
+            stage={record}
+            t={t}
+            open={disclosure.isOpen(record)}
+            onToggle={() => disclosure.toggle(record.id)}
+          />
+        ))}
+      </div>
+    </article>
   );
 }
 
@@ -315,9 +363,7 @@ function ResearchDiscoveryStageRecordView(props: {
     record.sourceLines.length > 0 ||
     displayActivities.length > 0 ||
     displayLines.some((line) => line.trim()) ||
-    record.gaps.length > 0 ||
-    record.rejectedReasons.length > 0 ||
-    record.summaryLines.length > 0;
+    record.rejectedReasons.length > 0;
 
   return (
     <article className={`generation-stage-record research-discovery-record ${record.state}`}>
@@ -363,9 +409,7 @@ function ResearchDiscoveryStageRecordView(props: {
               {displayLines.join("\n").trim()}
             </pre>
           ) : null}
-          <ResearchDiscoveryLineList title={t.generating.researchDiscovery.gaps} lines={record.gaps} warning />
           <ResearchDiscoveryLineList title={t.generating.researchDiscovery.rejected} lines={record.rejectedReasons} />
-          <ResearchDiscoveryLineList title={t.generating.researchDiscovery.summary} lines={record.summaryLines} />
           {!hasBody ? (
             <p className="generation-empty-stream">{t.generating.researchDiscovery.empty}</p>
           ) : null}
@@ -449,13 +493,13 @@ function PageStageRecordView(props: {
   onToggle: () => void;
 }) {
   const { stage, t, open, onToggle } = props;
-  const displayActivities = stage.activities
-    .map((activity) => sanitizeGenerationDebugText(activity))
-    .filter((activity) => activity.length > 0);
   const displayLines = stage.lines
     .map((line) => sanitizeGenerationDebugText(line))
     .filter((line) => line.length > 0);
   const hasLines = displayLines.some((line) => line.trim());
+  const emptyMessage = stage.state === "active"
+    ? stage.label
+    : stage.lastError ?? t.generating.stageRecords.noOutput;
   const badgeState = statusBadgeState(stage.state);
 
   return (
@@ -485,20 +529,13 @@ function PageStageRecordView(props: {
       </button>
       {open ? (
         <div className="generation-stage-body">
-          {displayActivities.length > 0 ? (
-            <div className="generation-activity-list" aria-label={t.generating.stageRecords.activities}>
-              {displayActivities.map((activity, index) => (
-                <span key={`${stage.id}-activity-${index}`}>{activity}</span>
-              ))}
-            </div>
-          ) : null}
           {hasLines ? (
             <pre className="generation-stream-text" aria-label={t.generating.stageRecords.stream}>
               {displayLines.join("\n").trim()}
             </pre>
           ) : null}
-          {!hasLines && displayActivities.length === 0 ? (
-            <p className="generation-empty-stream">{stage.lastError ?? t.generating.stageRecords.noOutput}</p>
+          {!hasLines ? (
+            <p className="generation-empty-stream">{emptyMessage}</p>
           ) : null}
         </div>
       ) : null}

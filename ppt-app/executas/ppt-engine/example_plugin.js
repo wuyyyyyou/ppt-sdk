@@ -101,10 +101,15 @@ import {
   importAppSharedResearchImage,
   downloadResearchImage,
   prepareWorkspacePageSources,
+  ensureWorkspacePersistentElementsReference,
+  fingerprintWorkspacePersistentElements,
   reconcileWorkspacePageSources,
   recordAppWorkspaceStyleGuide,
   getAppWorkspaceStyleGuideStatus,
   getAppWorkspaceStyleGuide,
+  ensureAppWorkspacePersistentElementsReference,
+  getAppWorkspacePersistentElementsStatus,
+  typecheckAppWorkspacePersistentElements,
   initializeAppPageProgress,
   recordAppPagePlan,
   recordAppPageProgress,
@@ -879,7 +884,17 @@ async function downloadHostUploadToStaging({ hostUpload, stagingPath, expectedSi
   return receivedBytes;
 }
 
-async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose, workspaceDir, operationId, source, reuseWhileValid }) {
+async function uploadLocalFileToHost({
+  filePath,
+  filename,
+  mimeType,
+  purpose,
+  workspaceDir,
+  operationId,
+  source,
+  reuseWhileValid,
+  snapshotBeforeNegotiate = false,
+}) {
   const normalizedPath = path.normalize(filePath);
   const fileStat = await stat(normalizedPath);
   if (!fileStat.isFile()) {
@@ -899,11 +914,21 @@ async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose, wo
     const cached = readCachedHostUpload(hostUploadCache, cacheKey);
     if (cached) return cached;
   }
+  const sizeBytes = fileStat.size;
+  // Preview artifacts can move from the Shadow Workspace to the official
+  // Workspace while Host Upload negotiation is in flight. Capture their bytes
+  // before that async boundary so the PUT does not reopen a stale local path.
+  const fileSnapshot = snapshotBeforeNegotiate ? await readFile(normalizedPath) : null;
+  if (fileSnapshot && fileSnapshot.byteLength !== sizeBytes) {
+    throw new Error(
+      `Host Upload source changed while reading ${normalizedPath}: ` +
+      `expected ${sizeBytes} bytes, got ${fileSnapshot.byteLength} bytes.`,
+    );
+  }
   const safeFilename = assertSafeUploadFilename(filename || path.basename(normalizedPath));
   if (typeof mimeType !== "string" || mimeType.trim().length === 0 || mimeType === "application/octet-stream") {
     throw new Error(`Host Upload MIME type must be specific for ${safeFilename}`);
   }
-  const sizeBytes = fileStat.size;
   let lastError;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const logger = createStorageTransferLogger({ workspaceDir, operationId, source, filename: safeFilename, mimeType: mimeType.trim(), sizeBytes });
@@ -928,7 +953,7 @@ async function uploadLocalFileToHost({ filePath, filename, mimeType, purpose, wo
         ...(negotiated.headers ?? {}),
         "Content-Length": String(sizeBytes),
       },
-      body: createReadStream(normalizedPath),
+      body: fileSnapshot ?? createReadStream(normalizedPath),
       duplex: "half",
     });
     if (!putResponse.ok) {
@@ -1054,6 +1079,7 @@ async function uploadPreviewImage(imagePath, context = {}) {
     reuseWhileValid: true,
     ...context,
     purpose: "user_artifact",
+    snapshotBeforeNegotiate: true,
   });
 }
 
@@ -1340,6 +1366,22 @@ async function toolAppGetWorkspaceStyleGuideStatus(args) {
 
 async function toolAppGetWorkspaceStyleGuide(args) {
   return getAppWorkspaceStyleGuide({ workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir") });
+}
+
+async function toolAppEnsureWorkspacePersistentElementsReference(args) {
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  return ensureAppWorkspacePersistentElementsReference({
+    workspace_dir: workspaceDir,
+    reset_existing: args?.reset_existing === true,
+  });
+}
+
+async function toolAppGetWorkspacePersistentElementsStatus(args) {
+  return getAppWorkspacePersistentElementsStatus({ workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir") });
+}
+
+async function toolAppTypecheckWorkspacePersistentElements(args) {
+  return typecheckAppWorkspacePersistentElements({ workspace_dir: readRequiredAbsolutePathArg(args, "workspace_dir") });
 }
 
 async function toolAppPreparePageRefinement(args) {
@@ -3252,6 +3294,9 @@ const TOOL_DISPATCH = {
   app_commit_workspace_style_guide_host_upload: toolAppCommitWorkspaceStyleGuideHostUpload,
   app_get_workspace_style_guide_status: toolAppGetWorkspaceStyleGuideStatus,
   app_get_workspace_style_guide: toolAppGetWorkspaceStyleGuide,
+  app_ensure_workspace_persistent_elements_reference: toolAppEnsureWorkspacePersistentElementsReference,
+  app_get_workspace_persistent_elements_status: toolAppGetWorkspacePersistentElementsStatus,
+  app_typecheck_workspace_persistent_elements: toolAppTypecheckWorkspacePersistentElements,
   app_initialize_page_progress: toolAppInitializePageProgress,
   app_rebuild_workspace_deck_manifest: toolAppRebuildWorkspaceDeckManifest,
   app_get_workspace_page_source_fingerprint: toolAppGetWorkspacePageSourceFingerprint,

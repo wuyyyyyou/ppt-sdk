@@ -1,6 +1,6 @@
 import type { AppendWorkspaceLogInput } from "../api/types";
 
-export type AiLogDomain = "requirements" | "outline" | "style_guide" | "page_plan" | "page_agent" | "research" | "theme";
+export type AiLogDomain = "requirements" | "outline" | "style_guide" | "persistent_elements" | "page_plan" | "page_agent" | "research" | "theme";
 export type AiInteractionStatus =
   | "started"
   | "succeeded"
@@ -51,6 +51,7 @@ const INTERACTION_CHANNELS = {
   requirements: "ai-requirements-interactions",
   outline: "ai-outline-interactions",
   style_guide: "ai-style-guide-interactions",
+  persistent_elements: "ai-persistent-elements-interactions",
   page_plan: "ai-page-plan-interactions",
   page_agent: "ai-page-agent-interactions",
   research: "ai-research-interactions",
@@ -61,6 +62,7 @@ const SEMANTIC_CHANNELS = {
   requirements: "ai-requirements",
   outline: "ai-outline",
   style_guide: "ai-style-guide",
+  persistent_elements: "ai-persistent-elements",
   page_plan: "ai-page-plan",
   page_agent: "ai-page-agent",
   research: "ai-research",

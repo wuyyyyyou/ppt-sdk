@@ -112,9 +112,19 @@ The stable, engine-owned minimal TSX resource used to initialize a new Page Sour
 _Avoid_: Blueprint, Blank Template Layout, Example Slide
 
 **Workspace Style Guide**:
-The Workspace-owned Markdown style guidance artifact that defines the Deck's shared visual direction, including exact values, qualitative rules, and allowed page-level variation. It guides Page Authoring rather than configuring rendering at runtime, and changing it makes affected Page Sources stale until they are re-authored.
+The Workspace-owned Markdown style guidance artifact that defines the Deck's shared visual direction, including exact values, qualitative rules, and allowed page-level variation. It guides Page Authoring rather than configuring rendering at runtime; the Persistent Elements Reference is the more specific authority for repeated elements within its scope, and changing the guide makes affected Page Sources stale until they are re-authored.
 User-facing Chinese label: 艺术指导
 _Avoid_: Workspace Theme Token, Runtime Theme, Preset Theme
+
+**Persistent Elements Reference**:
+The Workspace-owned, Deck-level authoring reference that concretely defines the standard appearance, placement, and Content Safe Area for repeated elements such as headers, footers, page numbers, and persistent decoration when Page Authoring chooses to use them. It is the specific implementation authority within that scope but does not assign page roles or decide applicability for individual pages; it remains with the Deck across generation and refinement, and only an explicit Deck Refinement of those repeated elements may replace it.
+User-facing Chinese label: 跨页固定元素参考
+_Avoid_: Template, Framework, Reference Implementation, Runtime Dependency
+
+**Content Safe Area**:
+The region of a page available to page-specific content after the space required by Persistent Elements has been reserved. It constrains where content may appear without prescribing the page's composition.
+User-facing Chinese label: 内容安全区域
+_Avoid_: Page Layout, Content Template
 
 **Workspace Style Guide Creation**:
 The required automatic generation-time step that synthesizes the original Brief, Confirmed Presentation Requirements, and Confirmed Outline into the Workspace Style Guide before Page Authoring. The Brief remains original user context, while later confirmed requirements and outline decisions override conflicting Brief wording; there is no separate user confirmation step, and failure leaves Page Authoring blocked until creation succeeds.
