@@ -1744,8 +1744,26 @@
       ]
     },
     {
-      "name": "app_publish_export_artifact",
-      "description": "Publish or reuse the current recorded PPTX or PDF as a user-scoped APS Files Export Artifact Mirror without minting a download URL.",
+      "name": "app_start_export_artifact_publish",
+      "description": "Start or reuse the asynchronous publication of the current recorded PPTX or PDF as a user-scoped APS Files Export Artifact Mirror.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "artifact_type",
+          "type": "string",
+          "description": "Export artifact type. Supports pptx and pdf.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_get_export_artifact_publish_status",
+      "description": "Read the persisted status of the current asynchronous APS Files Export Artifact Mirror publication task.",
       "parameters": [
         {
           "name": "workspace_dir",

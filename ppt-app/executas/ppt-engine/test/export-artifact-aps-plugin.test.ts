@@ -8,16 +8,25 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-test("export artifact tools publish through APS Files and mint links without Host Upload", { timeout: 15_000 }, async () => {
+test("export artifact publish jobs use APS Files and mint links without Host Upload", { timeout: 15_000 }, async () => {
   const previousHome = process.env.HOME;
   const homeDir = await mkdtemp(path.join(os.tmpdir(), "ppt-engine-aps-plugin-home-"));
   process.env.HOME = homeDir;
-  const { createAppWorkspace, recordAppPptxExport } = await import("../src/app-workspace/index.js");
+  const { createAppWorkspace } = await import("../src/app-workspace/index.js");
   const created = await createAppWorkspace({ title: "APS plugin" });
   const pptxPath = path.join(created.workspace_dir, "output", "deck.pptx");
   await mkdir(path.dirname(pptxPath), { recursive: true });
   await writeFile(pptxPath, "pptx-through-aps");
-  await recordAppPptxExport({ workspace_dir: created.workspace_dir, pptx_path: pptxPath });
+  const taskPath = path.join(created.workspace_dir, "task.json");
+  const task = JSON.parse(await readFile(taskPath, "utf8")) as { artifacts?: Record<string, unknown> };
+  await writeFile(taskPath, `${JSON.stringify({
+    ...task,
+    updated_at: new Date().toISOString(),
+    artifacts: {
+      ...(task.artifacts ?? {}),
+      pptx: { path: pptxPath, updated_at: new Date().toISOString() },
+    },
+  }, null, 2)}\n`);
   if (previousHome === undefined) delete process.env.HOME;
   else process.env.HOME = previousHome;
 
@@ -94,6 +103,19 @@ test("export artifact tools publish through APS Files and mint links without Hos
     return response;
   };
 
+  const waitForPublishCompletion = async (workspaceDir: string) => {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const response = await request("invoke", {
+        tool: "app_get_export_artifact_publish_status",
+        arguments: { workspace_dir: workspaceDir, artifact_type: "pptx" },
+      });
+      const job = (response.result as { data?: { status?: string } })?.data;
+      if (job?.status === "completed" || job?.status === "failed") return response;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    throw new Error("Timed out waiting for export artifact publish job test completion");
+  };
+
   try {
     const missing = await request("invoke", {
       tool: "app_get_export_artifact_download_url",
@@ -105,15 +127,26 @@ test("export artifact tools publish through APS Files and mint links without Hos
     );
     assert.deepEqual(apsMethods, []);
 
-    const published = await request("invoke", {
-      tool: "app_publish_export_artifact",
+    const started = await request("invoke", {
+      tool: "app_start_export_artifact_publish",
       arguments: { workspace_dir: created.workspace_dir, artifact_type: "pptx" },
     });
-    assert.ok(published.result, JSON.stringify(published));
+    assert.ok(started.result, JSON.stringify(started));
+    assert.equal(
+      ((started.result as { data?: { status?: unknown } })?.data)?.status,
+      "queued",
+    );
+
+    const published = await waitForPublishCompletion(created.workspace_dir);
     assert.equal(
       ((published.result as { data?: { status?: unknown } })?.data)?.status,
-      "ready",
+      "completed",
     );
+    const publishedData = (published.result as {
+      data?: { artifact?: Record<string, unknown> };
+    })?.data;
+    assert.equal("snapshot_path" in (publishedData?.artifact ?? {}), false);
+    assert.equal("content_type" in (publishedData?.artifact ?? {}), false);
     assert.equal(uploaded.toString(), "pptx-through-aps");
     assert.equal(
       uploadedContentDisposition,

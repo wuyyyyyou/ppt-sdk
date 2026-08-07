@@ -114,6 +114,9 @@ import type {
   AppExportArtifactMirror,
   AppExportArtifactMirrorStatus,
   AppExportArtifactInfo,
+  AppExportArtifactPublishJob,
+  AppExportArtifactPublishStatus,
+  StartAppExportArtifactPublishInput,
   AppExportArtifactSnapshot,
   AppWorkspacePages,
   AppWorkspaceTemplateSelection,
@@ -284,6 +287,7 @@ const WORKSPACE_LOG_FILE_NAMES = {
 } as const;
 const WORKSPACE_LOG_INLINE_PAYLOAD_MAX_BYTES = 64 * 1024;
 const PPTX_EXPORT_STATUS_FILE_NAME = "pptx-export.json";
+const EXPORT_ARTIFACT_PUBLISH_STATUS_FILE_PREFIX = "export-artifact-publish";
 const PPTX_EXPORT_STATUSES: AppPptxExportJob["status"][] = [
   "idle",
   "queued",
@@ -631,6 +635,20 @@ function buildPptxExportPaths(workspaceDir: string) {
   };
 }
 
+function buildExportArtifactPublishPaths(
+  workspaceDir: string,
+  artifactType: "pptx" | "pdf",
+) {
+  const outputDir = path.join(workspaceDir, "output");
+  return {
+    outputDir,
+    statusPath: path.join(
+      outputDir,
+      `${EXPORT_ARTIFACT_PUBLISH_STATUS_FILE_PREFIX}-${artifactType}.json`,
+    ),
+  };
+}
+
 function isPathWithin(childPath: string, parentPath: string): boolean {
   const relative = path.relative(parentPath, childPath);
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
@@ -703,6 +721,8 @@ const activePageRenders = new Map<string, ActivePageRender>();
 const activeDeckRenders = new Map<string, ActiveDeckRender>();
 let pptxExportQueue = Promise.resolve();
 const activePptxExportJobIds = new Set<string>();
+const exportArtifactPublishStatusQueues = new Map<string, Promise<unknown>>();
+const exportArtifactPublishStartQueues = new Map<string, Promise<unknown>>();
 
 async function withExportArtifactWriteQueue<T>(
   workspaceDir: string,
@@ -5880,6 +5900,241 @@ export async function getAppPptxExportStatus(input: {
   return normalized;
 }
 
+const EXPORT_ARTIFACT_PUBLISH_STATUSES: AppExportArtifactPublishStatus[] = [
+  "idle",
+  "queued",
+  "preparing",
+  "uploading",
+  "committing",
+  "completed",
+  "failed",
+];
+
+function createExportArtifactPublishJob(
+  workspaceDir: string,
+  artifactType: "pptx" | "pdf",
+  patch: Partial<AppExportArtifactPublishJob> = {},
+): AppExportArtifactPublishJob {
+  const paths = buildExportArtifactPublishPaths(workspaceDir, artifactType);
+  const now = new Date().toISOString();
+  return {
+    version: 1,
+    job_id: `${path.basename(workspaceDir)}-${artifactType}-${Date.now()}-${randomUUID().slice(0, 8)}`,
+    status: "queued",
+    message: "Waiting to publish the export artifact.",
+    percent: 5,
+    workspace_dir: workspaceDir,
+    artifact_type: artifactType,
+    status_path: paths.statusPath,
+    source_updated_at: "",
+    source_sha256: "",
+    size_bytes: 0,
+    started_at: now,
+    updated_at: now,
+    completed_at: null,
+    artifact: null,
+    mirror: null,
+    error: null,
+    ...patch,
+  };
+}
+
+function normalizeExportArtifactPublishJob(
+  value: unknown,
+  workspaceDir: string,
+  artifactType: "pptx" | "pdf",
+): AppExportArtifactPublishJob {
+  const existing = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Partial<AppExportArtifactPublishJob>
+    : {};
+  const paths = buildExportArtifactPublishPaths(workspaceDir, artifactType);
+  const status = EXPORT_ARTIFACT_PUBLISH_STATUSES.includes(existing.status as AppExportArtifactPublishStatus)
+    ? existing.status as AppExportArtifactPublishStatus
+    : "idle";
+  const artifactValue = existing.artifact && typeof existing.artifact === "object" && !Array.isArray(existing.artifact)
+    ? existing.artifact as unknown as Record<string, unknown>
+    : null;
+  const artifact = artifactValue &&
+      typeof artifactValue.workspace_dir === "string" &&
+      typeof artifactValue.workspace_id === "string" &&
+      typeof artifactValue.title === "string" &&
+      (artifactValue.artifact_type === "pptx" || artifactValue.artifact_type === "pdf") &&
+      artifactValue.artifact_type === artifactType &&
+      typeof artifactValue.path === "string" &&
+      typeof artifactValue.filename === "string" &&
+      typeof artifactValue.updated_at === "string"
+    ? {
+        workspace_dir: artifactValue.workspace_dir,
+        workspace_id: artifactValue.workspace_id,
+        title: artifactValue.title,
+        artifact_type: artifactType,
+        path: artifactValue.path,
+        filename: artifactValue.filename,
+        updated_at: artifactValue.updated_at,
+        mirror: normalizeExportArtifactMirror(artifactValue.mirror),
+      } satisfies AppExportArtifactInfo
+    : null;
+  return createExportArtifactPublishJob(workspaceDir, artifactType, {
+    ...existing,
+    version: 1,
+    job_id: typeof existing.job_id === "string" ? existing.job_id : "",
+    status,
+    message: typeof existing.message === "string" ? existing.message : "",
+    percent: typeof existing.percent === "number" ? existing.percent : 0,
+    status_path: paths.statusPath,
+    source_updated_at: typeof existing.source_updated_at === "string" ? existing.source_updated_at : "",
+    source_sha256: typeof existing.source_sha256 === "string" ? existing.source_sha256 : "",
+    size_bytes: typeof existing.size_bytes === "number" ? existing.size_bytes : 0,
+    started_at: typeof existing.started_at === "string" ? existing.started_at : null,
+    updated_at: typeof existing.updated_at === "string" ? existing.updated_at : null,
+    completed_at: typeof existing.completed_at === "string" ? existing.completed_at : null,
+    artifact,
+    mirror: existing.mirror && typeof existing.mirror === "object" && !Array.isArray(existing.mirror)
+      ? normalizeExportArtifactMirror(existing.mirror)
+      : null,
+    error: existing.error && typeof existing.error === "object" && !Array.isArray(existing.error)
+      ? existing.error as AppExportArtifactPublishJob["error"]
+      : null,
+  });
+}
+
+async function withExportArtifactPublishStatusQueue<T>(
+  workspaceDir: string,
+  artifactType: "pptx" | "pdf",
+  operation: () => Promise<T>,
+): Promise<T> {
+  const queueKey = `${path.normalize(workspaceDir)}\0${artifactType}`;
+  const previous = exportArtifactPublishStatusQueues.get(queueKey) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  exportArtifactPublishStatusQueues.set(queueKey, current);
+  try {
+    return await current;
+  } finally {
+    if (exportArtifactPublishStatusQueues.get(queueKey) === current) {
+      exportArtifactPublishStatusQueues.delete(queueKey);
+    }
+  }
+}
+
+async function withExportArtifactPublishStartQueue<T>(
+  workspaceDir: string,
+  artifactType: "pptx" | "pdf",
+  operation: () => Promise<T>,
+): Promise<T> {
+  const queueKey = `${path.normalize(workspaceDir)}\0${artifactType}`;
+  const previous = exportArtifactPublishStartQueues.get(queueKey) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  exportArtifactPublishStartQueues.set(queueKey, current);
+  try {
+    return await current;
+  } finally {
+    if (exportArtifactPublishStartQueues.get(queueKey) === current) {
+      exportArtifactPublishStartQueues.delete(queueKey);
+    }
+  }
+}
+
+export async function writeAppExportArtifactPublishJob(
+  job: AppExportArtifactPublishJob,
+): Promise<AppExportArtifactPublishJob> {
+  return withExportArtifactPublishStatusQueue(job.workspace_dir, job.artifact_type, async () => {
+    const normalized = normalizeExportArtifactPublishJob(job, job.workspace_dir, job.artifact_type);
+    const updated = {
+      ...normalized,
+      updated_at: new Date().toISOString(),
+    };
+    await atomicWriteJsonFile(updated.status_path, updated);
+    return normalizeExportArtifactPublishJob(updated, updated.workspace_dir, updated.artifact_type);
+  });
+}
+
+export async function getAppExportArtifactPublishStatus(input: {
+  workspace_dir: string;
+  artifact_type: "pptx" | "pdf";
+}): Promise<AppExportArtifactPublishJob> {
+  const workspaceDir = normalizeWorkspaceDir(input.workspace_dir);
+  const paths = buildExportArtifactPublishPaths(workspaceDir, input.artifact_type);
+  const existing = await readJsonFileIfExists(paths.statusPath);
+  if (existing === null) {
+    return createExportArtifactPublishJob(workspaceDir, input.artifact_type, {
+      job_id: "",
+      status: "idle",
+      message: "",
+      percent: 0,
+      started_at: null,
+      updated_at: null,
+      status_path: paths.statusPath,
+    });
+  }
+  return normalizeExportArtifactPublishJob(existing, workspaceDir, input.artifact_type);
+}
+
+export async function markAppExportArtifactPublishJobInterrupted(
+  job: AppExportArtifactPublishJob,
+): Promise<AppExportArtifactPublishJob> {
+  return writeAppExportArtifactPublishJob({
+    ...job,
+    status: "failed",
+    message: "Export artifact publication was interrupted because the engine process restarted.",
+    percent: 100,
+    completed_at: new Date().toISOString(),
+    error: {
+      message: "Export artifact publication was interrupted because the engine process restarted.",
+      interrupted: true,
+    },
+  });
+}
+
+export async function startAppExportArtifactPublish(
+  input: StartAppExportArtifactPublishInput,
+): Promise<AppExportArtifactPublishJob> {
+  return withExportArtifactPublishStartQueue(input.workspace_dir, input.artifact_type, async () => {
+    const workspace = await ensureWorkspaceFiles(input.workspace_dir);
+    const current = await getAppExportArtifactPublishStatus({
+      workspace_dir: workspace.workspace_dir,
+      artifact_type: input.artifact_type,
+    });
+    if (["queued", "preparing", "uploading", "committing"].includes(current.status)) {
+      return current;
+    }
+
+    const mirrorStatus = await getAppExportArtifactMirrorStatus({
+      workspace_dir: workspace.workspace_dir,
+      artifact_type: input.artifact_type,
+    });
+    if (mirrorStatus.status === "ready" && mirrorStatus.mirror) {
+      return writeAppExportArtifactPublishJob(createExportArtifactPublishJob(
+        workspace.workspace_dir,
+        input.artifact_type,
+        {
+          status: "completed",
+          message: "Export artifact mirror is ready.",
+          percent: 100,
+          source_updated_at: mirrorStatus.artifact.updated_at,
+          source_sha256: mirrorStatus.mirror.source_sha256,
+          size_bytes: mirrorStatus.mirror.size_bytes,
+          completed_at: mirrorStatus.mirror.published_at,
+          artifact: mirrorStatus.artifact,
+          mirror: mirrorStatus.mirror,
+        },
+      ));
+    }
+
+    const sourceSha256 = await sha256FileHex(mirrorStatus.artifact.path);
+    return writeAppExportArtifactPublishJob(createExportArtifactPublishJob(
+      workspace.workspace_dir,
+      input.artifact_type,
+      {
+        source_updated_at: mirrorStatus.artifact.updated_at,
+        source_sha256: sourceSha256,
+        size_bytes: (await stat(mirrorStatus.artifact.path)).size,
+        artifact: mirrorStatus.artifact,
+        mirror: null,
+      },
+    ));
+  });
+}
+
 export async function exportAppPdf(
   input: ExportAppPdfInput,
 ): Promise<ExportAppPdfResult> {
@@ -7516,6 +7771,10 @@ export type {
   AppPageProgress,
   AppPageProgressItem,
   AppExportArtifactInfo,
+  AppExportArtifactMirror,
+  AppExportArtifactPublishJob,
+  AppExportArtifactPublishStatus,
+  StartAppExportArtifactPublishInput,
   ExportAppPdfInput,
   ExportAppPdfResult,
   AppTemplatePlanningBlueprint,

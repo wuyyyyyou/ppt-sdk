@@ -453,7 +453,7 @@ describe("Anna PPT Backend", () => {
     });
   });
 
-  it("separates Export Artifact Mirror publication from download URL minting", async () => {
+  it("separates asynchronous Export Artifact Mirror publication from download URL minting", async () => {
     setToolIds();
     const calls: Array<{ method?: unknown; args?: unknown }> = [];
     const mirror = {
@@ -477,12 +477,33 @@ describe("Anna PPT Backend", () => {
       updated_at: mirror.source_updated_at,
       mirror,
     };
+    const queuedJob = {
+      version: 1 as const,
+      job_id: "demo-pptx-1",
+      status: "queued" as const,
+      message: "Waiting to publish the export artifact.",
+      percent: 5,
+      workspace_dir: artifact.workspace_dir,
+      artifact_type: "pptx" as const,
+      status_path: "/tmp/workspaces/demo/output/export-artifact-publish-pptx.json",
+      source_updated_at: mirror.source_updated_at,
+      source_sha256: mirror.source_sha256,
+      size_bytes: mirror.size_bytes,
+      started_at: mirror.source_updated_at,
+      updated_at: mirror.source_updated_at,
+      completed_at: null,
+      artifact: null,
+      mirror: null,
+      error: null,
+    };
     const backend = createAnnaPptBackend(createRuntimeWithInvoke(async (input) => {
       calls.push(input as { method?: unknown; args?: unknown });
       return {
         success: true,
-        data: input.method === "app_publish_export_artifact"
-          ? { status: "ready", artifact, mirror, published: true }
+        data: input.method === "app_start_export_artifact_publish"
+          ? queuedJob
+          : input.method === "app_get_export_artifact_publish_status"
+            ? { ...queuedJob, status: "completed", percent: 100, artifact, mirror }
           : {
               status: "ready",
               reason: null,
@@ -494,7 +515,11 @@ describe("Anna PPT Backend", () => {
       };
     }));
 
-    await backend.publishExportArtifact({
+    await backend.startExportArtifactPublish({
+      workspace_dir: artifact.workspace_dir,
+      artifact_type: "pptx",
+    });
+    await backend.getExportArtifactPublishStatus({
       workspace_dir: artifact.workspace_dir,
       artifact_type: "pptx",
     });
@@ -504,7 +529,8 @@ describe("Anna PPT Backend", () => {
     });
 
     assert.deepEqual(calls.map((call) => call.method), [
-      "app_publish_export_artifact",
+      "app_start_export_artifact_publish",
+      "app_get_export_artifact_publish_status",
       "app_get_export_artifact_download_url",
     ]);
     assert.deepEqual(calls[0]?.args, {

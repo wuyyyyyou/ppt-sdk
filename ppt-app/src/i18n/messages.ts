@@ -668,6 +668,9 @@ export interface Messages {
     pptxGenerating: string;
     pptxFailed: string;
     pdfGenerating: string;
+    mirrorPreparing: string;
+    mirrorUploading: string;
+    mirrorCommitting: string;
     pptxQueued: string;
     checkingStatus: string;
     resumedJob: string;
@@ -1425,6 +1428,9 @@ export const messages: Record<Locale, Messages> = {
       pptxGenerating: "Generating PPTX file",
       pptxFailed: "PPTX export failed",
       pdfGenerating: "Generating PDF file",
+      mirrorPreparing: "Preparing the download mirror",
+      mirrorUploading: "Uploading the export artifact",
+      mirrorCommitting: "Finalizing the download mirror",
       pptxQueued: "PPTX export queued",
       checkingStatus: "Checking export status...",
       resumedJob: "Reconnected to the export already running for this deck.",
@@ -2170,6 +2176,9 @@ export const messages: Record<Locale, Messages> = {
       pptxGenerating: "正在生成 PPTX 文件",
       pptxFailed: "PPTX 导出失败",
       pdfGenerating: "正在生成 PDF 文件",
+      mirrorPreparing: "正在准备下载镜像",
+      mirrorUploading: "正在上传导出文件",
+      mirrorCommitting: "正在完成下载镜像",
       pptxQueued: "PPTX 导出已排队",
       checkingStatus: "正在查询导出状态……",
       resumedJob: "已重新连接到这份演示文稿正在进行的导出任务。",

@@ -33,6 +33,7 @@ import type {
   SaveManualPageRevisionResult,
   GetStyleProfilePreviewResult,
   PptxExportJob,
+  ExportArtifactPublishJob,
   StyleProfileIndexEntry,
   TemplateSummary,
   UploadedSourceAnalysisDependency,
@@ -101,6 +102,8 @@ import {
   createIdleExportProgress,
   createPptxJobExportProgress,
   isPptxExportJobRunning,
+  createExportArtifactPublishProgress,
+  isExportArtifactPublishJobRunning,
 } from "../exportProgressDisplay";
 import {
   completedDeckIsAvailable,
@@ -671,6 +674,7 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
   });
   const workspaceDiagnosticBundleRequestRef = useRef(0);
   const exportInFlightRef = useRef(false);
+  const exportArtifactPublishInFlightRef = useRef(false);
   const [backend, setBackend] = useState<PptBackend | null>(null);
   const [hostUploadClient, setHostUploadClient] = useState<AppHostUploadClient | null>(null);
   const [hostFileDownloadClient, setHostFileDownloadClient] =
@@ -1028,6 +1032,23 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     return backend.startPptxExport({ workspace_dir: workspaceDir });
   }
 
+  async function startOrResumeExportArtifactPublish(
+    workspaceDir: string,
+    artifactType: "PPTX" | "PDF",
+  ): Promise<ExportArtifactPublishJob> {
+    if (!backend) throw new Error("PptBackend is not available.");
+    const input = {
+      workspace_dir: workspaceDir,
+      artifact_type: artifactType.toLowerCase() as "pptx" | "pdf",
+    };
+    const existing = await backend.getExportArtifactPublishStatus(input).catch(() => null);
+    if (existing && isExportArtifactPublishJobRunning(existing)) {
+      showToast(t.exportPage.resumedJob);
+      return existing;
+    }
+    return backend.startExportArtifactPublish(input);
+  }
+
   function assertPptxExportPath(value: string, name: string) {
     if (!value) {
       throw new Error(
@@ -1049,7 +1070,10 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     const job = await backend
       .getPptxExportStatus({ workspace_dir: workspaceDir })
       .catch(() => null);
-    if (!job || !isPptxExportJobRunning(job)) return;
+    if (!job || !isPptxExportJobRunning(job)) {
+      void resumeExportArtifactPublishJob();
+      return;
+    }
 
     exportInFlightRef.current = true;
     setLoading("export");
@@ -1061,7 +1085,12 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
         (item) => item.status === "completed" || item.status === "failed",
       );
       if (completed.status === "completed") {
-        applyWorkspace(await backend.openWorkspace({ workspace_dir: workspaceDir }));
+        const updatedWorkspace = await backend.openWorkspace({ workspace_dir: workspaceDir });
+        applyWorkspace(updatedWorkspace);
+        const artifact = readWorkspaceExportArtifactPath(updatedWorkspace);
+        if (artifact) {
+          await publishExportArtifact(updatedWorkspace, artifact);
+        }
       }
     } catch (error) {
       const { summary } = summarizeUserFacingError(t, error, t.exportPage.exportFailedSummary);
@@ -1069,6 +1098,42 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     } finally {
       exportInFlightRef.current = false;
       setLoading("none");
+    }
+  }
+
+  async function resumeExportArtifactPublishJob() {
+    const workspace = currentWorkspaceRef.current;
+    if (!backend || !workspace || exportArtifactPublishInFlightRef.current) return;
+    const artifact = readWorkspaceExportArtifactPath(workspace);
+    if (!artifact) return;
+    const status = await backend.getExportArtifactPublishStatus({
+      workspace_dir: workspace.workspace_dir,
+      artifact_type: artifact.type.toLowerCase() as "pptx" | "pdf",
+    }).catch(() => null);
+    if (!status || !isExportArtifactPublishJobRunning(status)) return;
+
+    exportArtifactPublishInFlightRef.current = true;
+    if (!exportInFlightRef.current) setLoading("export");
+    setExportProgress(createExportArtifactPublishProgress(t, status));
+    showToast(t.exportPage.resumedJob);
+    try {
+      const completed = await waitForExportArtifactPublishStatus(
+        workspace.workspace_dir,
+        artifact.type,
+        (job) => job.status === "completed" || job.status === "failed",
+      );
+      if (completed.status === "completed") {
+        const updatedWorkspace = await backend.openWorkspace({ workspace_dir: workspace.workspace_dir });
+        applyWorkspace(updatedWorkspace);
+        setExportArtifact(readWorkspaceExportArtifactPath(updatedWorkspace));
+        setExportDownload({ status: "idle", message: t.exportPage.downloadNotPrepared });
+      }
+    } catch (error) {
+      const { summary } = summarizeUserFacingError(t, error, t.exportPage.exportFailedSummary);
+      setExportProgress((current) => createExportErrorProgress(summary, artifact.type, current.percent));
+    } finally {
+      exportArtifactPublishInFlightRef.current = false;
+      if (!exportInFlightRef.current) setLoading("none");
     }
   }
 
@@ -1115,6 +1180,43 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       await sleep(PPTX_EXPORT_POLL_INTERVAL_MS);
     }
 
+    throw new Error(t.exportPage.pptxTimedOut);
+  }
+
+  async function waitForExportArtifactPublishStatus(
+    workspaceDir: string,
+    artifactType: "PPTX" | "PDF",
+    isDone: (job: ExportArtifactPublishJob) => boolean,
+  ) {
+    if (!backend) throw new Error("PptBackend is not available.");
+    const startedAt = Date.now();
+    let consecutiveStatusErrors = 0;
+    while (Date.now() - startedAt < PPTX_EXPORT_POLL_TIMEOUT_MS) {
+      let job: ExportArtifactPublishJob;
+      try {
+        job = await backend.getExportArtifactPublishStatus({
+          workspace_dir: workspaceDir,
+          artifact_type: artifactType.toLowerCase() as "pptx" | "pdf",
+        });
+      } catch (error) {
+        consecutiveStatusErrors += 1;
+        if (consecutiveStatusErrors > PPTX_EXPORT_STATUS_ERROR_LIMIT) throw error;
+        setExportProgress((current) => ({
+          ...current,
+          message: t.exportPage.checkingStatus,
+          active: true,
+        }));
+        await sleep(PPTX_EXPORT_POLL_INTERVAL_MS);
+        continue;
+      }
+      consecutiveStatusErrors = 0;
+      if (isDone(job)) {
+        setExportProgress(createExportArtifactPublishProgress(t, job));
+        return job;
+      }
+      setExportProgress(createExportArtifactPublishProgress(t, job));
+      await sleep(PPTX_EXPORT_POLL_INTERVAL_MS);
+    }
     throw new Error(t.exportPage.pptxTimedOut);
   }
 
@@ -3350,15 +3452,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       : `Failed to prepare the export download: ${detail}`;
   }
 
-  function artifactFromPublishedResult(result: Awaited<ReturnType<PptBackend["publishExportArtifact"]>>): ExportArtifact {
+  function artifactFromPublishedJob(
+    job: ExportArtifactPublishJob,
+    fallback: ExportArtifact,
+  ): ExportArtifact {
+    const mirror = job.mirror;
     return {
-      type: result.artifact.artifact_type === "pptx" ? "PPTX" : "PDF",
-      path: result.artifact.path,
-      fileName: result.artifact.filename,
-      updatedAt: result.artifact.updated_at,
+      type: fallback.type,
+      path: job.artifact?.path ?? fallback.path,
+      fileName: job.artifact?.filename ?? fallback.fileName,
+      updatedAt: job.artifact?.updated_at ?? fallback.updatedAt,
       mirrorStatus: "ready",
-      mirrorPath: result.mirror.path,
-      mirrorScope: result.mirror.scope,
+      mirrorPath: mirror?.path ?? fallback.mirrorPath,
+      mirrorScope: mirror?.scope ?? fallback.mirrorScope,
     };
   }
 
@@ -3366,11 +3472,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
     if (!backend) {
       throw new Error("PptBackend is not available.");
     }
-    const result = await backend.publishExportArtifact({
-      workspace_dir: workspace.workspace_dir,
-      artifact_type: artifact.type.toLowerCase() as "pptx" | "pdf",
-    });
-    const published = artifactFromPublishedResult(result);
+    const started = await startOrResumeExportArtifactPublish(workspace.workspace_dir, artifact.type);
+    setExportProgress(createExportArtifactPublishProgress(t, started));
+    const completed = started.status === "completed" || started.status === "failed"
+      ? started
+      : await waitForExportArtifactPublishStatus(
+          workspace.workspace_dir,
+          artifact.type,
+          (job) => job.status === "completed" || job.status === "failed",
+        );
+    if (completed.status === "failed") {
+      throw new Error(completed.message || t.exportPage.exportFailedSummary);
+    }
+    const published = artifactFromPublishedJob(completed, artifact);
     setExportArtifact(published);
     return published;
   }

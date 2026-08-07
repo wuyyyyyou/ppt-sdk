@@ -13,7 +13,10 @@ const {
   createAppExportArtifactSnapshot,
   createAppWorkspace,
   getAppExportArtifactMirrorStatus,
-  recordAppPptxExport,
+  getAppExportArtifactPublishStatus,
+  markAppExportArtifactPublishJobInterrupted,
+  startAppExportArtifactPublish,
+  writeAppExportArtifactPublishJob,
 } = await import("../../src/app-workspace/index.js");
 const isolatedWorkspaceRoot = path.join(homeDir, "anna-workspace", "ppt");
 
@@ -33,6 +36,24 @@ function assertWorkspaceIsIsolated(workspaceDir: string) {
   );
 }
 
+async function recordPptxArtifact(workspaceDir: string, pptxPath: string) {
+  const taskPath = path.join(workspaceDir, "task.json");
+  const task = JSON.parse(await readFile(taskPath, "utf8")) as {
+    artifacts?: Record<string, unknown>;
+  };
+  await writeFile(taskPath, `${JSON.stringify({
+    ...task,
+    updated_at: new Date().toISOString(),
+    artifacts: {
+      ...(task.artifacts ?? {}),
+      pptx: {
+        path: pptxPath,
+        updated_at: new Date().toISOString(),
+      },
+    },
+  }, null, 2)}\n`);
+}
+
 test("Export Artifact Mirror uses a snapshot and becomes stale when the source changes", async () => {
   const created = await createAppWorkspace({ title: "Mirror test" });
   assertWorkspaceIsIsolated(created.workspace_dir);
@@ -40,10 +61,7 @@ test("Export Artifact Mirror uses a snapshot and becomes stale when the source c
   const bytes = Buffer.from("pptx-v1");
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, bytes);
-  await recordAppPptxExport({
-    workspace_dir: created.workspace_dir,
-    pptx_path: outputPath,
-  });
+  await recordPptxArtifact(created.workspace_dir, outputPath);
 
   assert.equal((await getAppExportArtifactMirrorStatus({
     workspace_dir: created.workspace_dir,
@@ -100,7 +118,7 @@ test("an older snapshot cannot be committed after a newer export is recorded", a
   const outputPath = path.join(created.workspace_dir, "output", "deck.pptx");
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, "pptx-v1");
-  await recordAppPptxExport({ workspace_dir: created.workspace_dir, pptx_path: outputPath });
+  await recordPptxArtifact(created.workspace_dir, outputPath);
   const snapshot = await createAppExportArtifactSnapshot({
     workspace_dir: created.workspace_dir,
     artifact_type: "pptx",
@@ -108,7 +126,7 @@ test("an older snapshot cannot be committed after a newer export is recorded", a
   try {
     await new Promise((resolve) => setTimeout(resolve, 2));
     await writeFile(outputPath, "pptx-v2");
-    await recordAppPptxExport({ workspace_dir: created.workspace_dir, pptx_path: outputPath });
+    await recordPptxArtifact(created.workspace_dir, outputPath);
     await assert.rejects(
       commitAppExportArtifactMirror({
         workspace_dir: created.workspace_dir,
@@ -141,7 +159,7 @@ test("a legacy tool-scoped mirror is treated as missing", async () => {
   const outputPath = path.join(created.workspace_dir, "output", "deck.pptx");
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, "pptx-v1");
-  await recordAppPptxExport({ workspace_dir: created.workspace_dir, pptx_path: outputPath });
+  await recordPptxArtifact(created.workspace_dir, outputPath);
   const snapshot = await createAppExportArtifactSnapshot({
     workspace_dir: created.workspace_dir,
     artifact_type: "pptx",
@@ -174,4 +192,87 @@ test("a legacy tool-scoped mirror is treated as missing", async () => {
   } finally {
     await unlink(snapshot.snapshot_path).catch(() => undefined);
   }
+});
+
+test("Export Artifact Publish status is idle when no persisted job exists", async () => {
+  const workspaceDir = path.join(isolatedWorkspaceRoot, "ppt-20260807-000001");
+  const status = await getAppExportArtifactPublishStatus({
+    workspace_dir: workspaceDir,
+    artifact_type: "pptx",
+  });
+
+  assert.equal(status.status, "idle");
+  assert.equal(status.job_id, "");
+  assert.equal(status.percent, 0);
+  assert.equal(status.status_path, path.join(workspaceDir, "output", "export-artifact-publish-pptx.json"));
+});
+
+test("Export Artifact Publish status persists normalized artifact metadata and marks interrupted jobs", async () => {
+  const created = await createAppWorkspace({ title: "Publish status" });
+  assertWorkspaceIsIsolated(created.workspace_dir);
+  const outputPath = path.join(created.workspace_dir, "output", "deck.pptx");
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  await writeFile(outputPath, "pptx-publish-status");
+  await recordPptxArtifact(created.workspace_dir, outputPath);
+
+  const started = await startAppExportArtifactPublish({
+    workspace_dir: created.workspace_dir,
+    artifact_type: "pptx",
+  });
+  assert.equal(started.status, "queued");
+
+  const persisted = JSON.parse(await readFile(started.status_path, "utf8")) as {
+    artifact?: Record<string, unknown>;
+  };
+  assert.equal(persisted.artifact?.path, outputPath);
+  assert.equal("snapshot_path" in (persisted.artifact ?? {}), false);
+  assert.equal("content_type" in (persisted.artifact ?? {}), false);
+
+  const loaded = await getAppExportArtifactPublishStatus({
+    workspace_dir: created.workspace_dir,
+    artifact_type: "pptx",
+  });
+  assert.equal(loaded.job_id, started.job_id);
+  assert.equal(loaded.status, "queued");
+
+  const interrupted = await markAppExportArtifactPublishJobInterrupted(loaded);
+  assert.equal(interrupted.status, "failed");
+  assert.equal(interrupted.error?.interrupted, true);
+  assert.equal(interrupted.percent, 100);
+
+  const afterRestart = await getAppExportArtifactPublishStatus({
+    workspace_dir: created.workspace_dir,
+    artifact_type: "pptx",
+  });
+  assert.equal(afterRestart.status, "failed");
+  assert.equal(afterRestart.error?.interrupted, true);
+});
+
+test("a failed publish job can be restarted with a new job id", async () => {
+  const created = await createAppWorkspace({ title: "Publish retry" });
+  assertWorkspaceIsIsolated(created.workspace_dir);
+  const outputPath = path.join(created.workspace_dir, "output", "deck.pptx");
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  await writeFile(outputPath, "pptx-publish-retry");
+  await recordPptxArtifact(created.workspace_dir, outputPath);
+
+  const first = await startAppExportArtifactPublish({
+    workspace_dir: created.workspace_dir,
+    artifact_type: "pptx",
+  });
+  await writeAppExportArtifactPublishJob({
+    ...first,
+    status: "failed",
+    message: "upload failed",
+    percent: 100,
+    completed_at: new Date().toISOString(),
+    error: { message: "upload failed" },
+  });
+  const second = await startAppExportArtifactPublish({
+    workspace_dir: created.workspace_dir,
+    artifact_type: "pptx",
+  });
+
+  assert.equal(second.status, "queued");
+  assert.notEqual(second.job_id, first.job_id);
 });

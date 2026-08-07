@@ -1,4 +1,4 @@
-import type { PptxExportJob } from "../../api/types";
+import type { ExportArtifactPublishJob, PptxExportJob } from "../../api/types";
 import { formatMessage, type Messages } from "../../i18n/messages";
 import type { ExportArtifact, ExportProgressState } from "./types";
 
@@ -142,4 +142,51 @@ export function createPptxJobExportProgress(
     default:
       return createExportStartProgress(t, "PPTX");
   }
+}
+
+export function isExportArtifactPublishJobRunning(
+  job: ExportArtifactPublishJob | null | undefined,
+): boolean {
+  if (!job) return false;
+  return ["queued", "preparing", "uploading", "committing"].includes(job.status);
+}
+
+export function createExportArtifactPublishProgress(
+  t: Messages,
+  job: ExportArtifactPublishJob,
+): ExportProgressState {
+  const percent = clampPercent(job.percent);
+  if (job.status === "failed") {
+    return createExportErrorProgress(
+      job.message || t.exportPage.exportFailedSummary,
+      job.artifact_type === "pptx" ? "PPTX" : "PDF",
+      percent,
+    );
+  }
+  if (job.status === "completed") {
+    return {
+      type: job.artifact_type === "pptx" ? "PPTX" : "PDF",
+      mode: "complete",
+      message: formatMessage(t.exportPage.ready, {
+        type: job.artifact_type === "pptx" ? "PPTX" : "PDF",
+      }),
+      percent: 100,
+      active: false,
+    };
+  }
+  const type = job.artifact_type === "pptx" ? "PPTX" : "PDF";
+  const message = job.status === "preparing"
+    ? t.exportPage.mirrorPreparing
+    : job.status === "uploading"
+      ? t.exportPage.mirrorUploading
+      : job.status === "committing"
+        ? t.exportPage.mirrorCommitting
+        : job.message || t.exportPage.downloadPreparing;
+  return {
+    type,
+    mode: "indeterminate",
+    message,
+    percent,
+    active: true,
+  };
 }

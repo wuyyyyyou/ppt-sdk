@@ -1771,11 +1771,33 @@ export interface ExportArtifactInfo {
   mirror: ExportArtifactMirror | null;
 }
 
-export interface PublishExportArtifactResult {
-  status: "ready";
-  artifact: ExportArtifactInfo;
-  mirror: ExportArtifactMirror;
-  published: boolean;
+export type ExportArtifactPublishStatus =
+  | "idle"
+  | "queued"
+  | "preparing"
+  | "uploading"
+  | "committing"
+  | "completed"
+  | "failed";
+
+export interface ExportArtifactPublishJob {
+  version: 1;
+  job_id: string;
+  status: ExportArtifactPublishStatus;
+  message: string;
+  percent: number;
+  workspace_dir: string;
+  artifact_type: "pptx" | "pdf";
+  status_path: string;
+  source_updated_at: string;
+  source_sha256: string;
+  size_bytes: number;
+  started_at: string | null;
+  updated_at: string | null;
+  completed_at: string | null;
+  artifact: ExportArtifactInfo | null;
+  mirror: ExportArtifactMirror | null;
+  error: { message: string; stack?: string; interrupted?: boolean } | null;
 }
 
 export type ExportArtifactDownloadUrlResult =

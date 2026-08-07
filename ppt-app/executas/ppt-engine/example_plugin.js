@@ -53,6 +53,10 @@ import {
   pinManagedFontToWorkspace,
   commitManagedFontUpload,
   getAppPptxExportStatus,
+  startAppExportArtifactPublish,
+  getAppExportArtifactPublishStatus,
+  writeAppExportArtifactPublishJob,
+  markAppExportArtifactPublishJobInterrupted,
   getAppWorkspaceCover,
   getAppWorkspacePageImage,
   getRenderedAppWorkspaceDeckHtml,
@@ -543,7 +547,8 @@ const hostUploadCache = createHostUploadCache();
 const apsFilesClient = new ApsFilesClient({
   writeFrame: (message) => writeStdoutLine(JSON.stringify(message)),
 });
-const exportMirrorPublishQueues = new Map();
+const activeExportArtifactPublishJobIds = new Set();
+let exportArtifactPublishQueue = Promise.resolve();
 const workspaceDiagnosticBundleQueues = new Map();
 
 function redactStorageResponse(value) {
@@ -610,19 +615,6 @@ function createApsTransferLogger({ workspaceDir, source, filename, mimeType, siz
     operationId: operationId || apsPath,
     parentInteractionId,
   });
-}
-
-async function withExportMirrorPublishQueue(queueKey, operation) {
-  const previous = exportMirrorPublishQueues.get(queueKey) ?? Promise.resolve();
-  const current = previous.catch(() => undefined).then(operation);
-  exportMirrorPublishQueues.set(queueKey, current);
-  try {
-    return await current;
-  } finally {
-    if (exportMirrorPublishQueues.get(queueKey) === current) {
-      exportMirrorPublishQueues.delete(queueKey);
-    }
-  }
 }
 
 async function withWorkspaceDiagnosticBundleQueue(workspaceDir, operation) {
@@ -2792,7 +2784,191 @@ async function toolAppGetPptxExportStatus(args) {
   });
 }
 
-async function toolAppPublishExportArtifact(args) {
+function isExportArtifactPublishJobRunning(job) {
+  return job && ["queued", "preparing", "uploading", "committing"].includes(job.status);
+}
+
+function exportArtifactInfoFromSnapshot(snapshot) {
+  return {
+    workspace_dir: snapshot.workspace_dir,
+    workspace_id: snapshot.workspace_id,
+    title: snapshot.title,
+    artifact_type: snapshot.artifact_type,
+    path: snapshot.path,
+    filename: snapshot.filename,
+    updated_at: snapshot.updated_at,
+    mirror: snapshot.mirror ?? null,
+  };
+}
+
+async function runAppExportArtifactPublishJob(job) {
+  let snapshot = null;
+  let transferLogger = null;
+  try {
+    await writeAppExportArtifactPublishJob({
+      ...job,
+      status: "preparing",
+      message: "Preparing the export artifact upload.",
+      percent: 15,
+      error: null,
+    });
+    snapshot = await createAppExportArtifactSnapshot({
+      workspace_dir: job.workspace_dir,
+      artifact_type: job.artifact_type,
+    });
+    if (
+      snapshot.updated_at !== job.source_updated_at ||
+      snapshot.source_sha256.toLowerCase() !== job.source_sha256.toLowerCase()
+    ) {
+      throw new Error("Export artifact changed before its APS mirror upload started");
+    }
+    transferLogger = createApsTransferLogger({
+      workspaceDir: job.workspace_dir,
+      source: "ppt-engine.export-artifact-mirror",
+      filename: snapshot.filename,
+      mimeType: snapshot.content_type,
+      sizeBytes: snapshot.size_bytes,
+      path: snapshot.mirror_path,
+      operationId: `app_start_export_artifact_publish:${job.artifact_type}`,
+    });
+    transferLogger.log("started", "started", { aps_path: snapshot.mirror_path, artifact_type: job.artifact_type });
+    await writeAppExportArtifactPublishJob({
+      ...job,
+      status: "uploading",
+      message: "Uploading the export artifact.",
+      percent: 30,
+      artifact: exportArtifactInfoFromSnapshot(snapshot),
+      size_bytes: snapshot.size_bytes,
+      error: null,
+    });
+
+    const upload = await apsFilesClient.uploadBegin({
+      path: snapshot.mirror_path,
+      sizeBytes: snapshot.size_bytes,
+      contentType: snapshot.content_type,
+      scope: APS_FILES_DOWNLOAD_SCOPE,
+      metadata: {
+        workspace_id: snapshot.workspace_id,
+        artifact_type: snapshot.artifact_type,
+        source_updated_at: snapshot.updated_at,
+        source_sha256: snapshot.source_sha256,
+      },
+    });
+    if (!upload || typeof upload.put_url !== "string" || upload.put_url.length === 0) {
+      throw new Error("files/upload_begin did not return a valid put_url");
+    }
+    transferLogger.log("negotiate", "succeeded", { response: redactStorageResponse(upload), aps_path: snapshot.mirror_path });
+    const contentDisposition = buildAttachmentContentDisposition(snapshot.filename);
+    const putResponse = await fetch(upload.put_url, {
+      method: "PUT",
+      headers: {
+        ...(upload.headers ?? {}),
+        "Content-Length": String(snapshot.size_bytes),
+        "Content-Disposition": contentDisposition,
+      },
+      body: createReadStream(snapshot.snapshot_path),
+      duplex: "half",
+    });
+    if (!putResponse.ok) {
+      const message = await putResponse.text().catch(() => "");
+      throw new Error(message || `APS Files PUT failed: HTTP ${putResponse.status}`);
+    }
+    transferLogger.log("put", "succeeded", { http_status: putResponse.status, aps_path: snapshot.mirror_path });
+    await writeAppExportArtifactPublishJob({
+      ...job,
+      status: "committing",
+      message: "Finalizing the export artifact mirror.",
+      percent: 85,
+      artifact: exportArtifactInfoFromSnapshot(snapshot),
+      size_bytes: snapshot.size_bytes,
+      error: null,
+    });
+    const putEtag = putResponse.headers.get("etag") ?? undefined;
+    const completed = await apsFilesClient.uploadComplete({
+      path: snapshot.mirror_path,
+      etag: putEtag,
+      sizeBytes: snapshot.size_bytes,
+      contentType: snapshot.content_type,
+      scope: APS_FILES_DOWNLOAD_SCOPE,
+    });
+    transferLogger.log("commit", "succeeded", { response: redactStorageResponse(completed), aps_path: snapshot.mirror_path });
+    const mirror = {
+      provider: "aps.files",
+      scope: APS_FILES_DOWNLOAD_SCOPE,
+      path: snapshot.mirror_path,
+      etag: typeof completed?.etag === "string" ? completed.etag : putEtag ?? "",
+      size_bytes: Number.isFinite(Number(completed?.size_bytes))
+        ? Math.floor(Number(completed.size_bytes))
+        : snapshot.size_bytes,
+      content_type: snapshot.content_type,
+      content_disposition: contentDisposition,
+      source_updated_at: snapshot.updated_at,
+      source_sha256: snapshot.source_sha256,
+      published_at: new Date().toISOString(),
+    };
+    const committed = await commitAppExportArtifactMirror({
+      workspace_dir: job.workspace_dir,
+      artifact_type: job.artifact_type,
+      expected_updated_at: snapshot.updated_at,
+      expected_sha256: snapshot.source_sha256,
+      mirror,
+    });
+    transferLogger.log("finished", "succeeded", { aps_path: snapshot.mirror_path, etag: committed.etag });
+    await writeAppExportArtifactPublishJob({
+      ...job,
+      status: "completed",
+      message: "Export artifact mirror is ready.",
+      percent: 100,
+      completed_at: committed.published_at,
+      artifact: {
+        workspace_dir: snapshot.workspace_dir,
+        workspace_id: snapshot.workspace_id,
+        title: snapshot.title,
+        artifact_type: snapshot.artifact_type,
+        path: snapshot.path,
+        filename: snapshot.filename,
+        updated_at: snapshot.updated_at,
+        mirror: committed,
+      },
+      mirror: committed,
+      size_bytes: snapshot.size_bytes,
+      error: null,
+    });
+  } catch (error) {
+    transferLogger?.log("unknown", "failed", {
+      aps_path: snapshot?.mirror_path,
+      error: storageErrorRecord(error),
+    });
+    await writeAppExportArtifactPublishJob({
+      ...job,
+      status: "failed",
+      message: error instanceof Error ? error.message : String(error),
+      percent: 100,
+      completed_at: new Date().toISOString(),
+      error: {
+        message: error instanceof Error ? error.message : String(error),
+        ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
+      },
+    });
+  } finally {
+    if (snapshot?.snapshot_path) {
+      await unlink(snapshot.snapshot_path).catch(() => undefined);
+    }
+  }
+}
+
+function queueAppExportArtifactPublishJob(job) {
+  if (!job || job.status !== "queued" || activeExportArtifactPublishJobIds.has(job.job_id)) {
+    return;
+  }
+  activeExportArtifactPublishJobIds.add(job.job_id);
+  exportArtifactPublishQueue = exportArtifactPublishQueue
+    .catch(() => undefined)
+    .then(() => runAppExportArtifactPublishJob(job))
+    .finally(() => activeExportArtifactPublishJobIds.delete(job.job_id));
+}
+
+async function toolAppStartExportArtifactPublish(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
   }
@@ -2802,121 +2978,39 @@ async function toolAppPublishExportArtifact(args) {
   if (artifactType !== "pptx" && artifactType !== "pdf") {
     throw new Error('"artifact_type" must be "pptx" or "pdf"');
   }
-
-  return withExportMirrorPublishQueue(`${workspaceDir}\0${artifactType}`, async () => {
-    const current = await getAppExportArtifactMirrorStatus({
-      workspace_dir: workspaceDir,
-      artifact_type: artifactType,
-    });
-    if (current.status === "ready") {
-      return {
-        status: "ready",
-        artifact: current.artifact,
-        mirror: current.mirror,
-        published: false,
-      };
-    }
-
-    const snapshot = await createAppExportArtifactSnapshot({
-      workspace_dir: workspaceDir,
-      artifact_type: artifactType,
-    });
-    const transferLogger = createApsTransferLogger({
-      workspaceDir,
-      source: "ppt-engine.export-artifact-mirror",
-      filename: snapshot.filename,
-      mimeType: snapshot.content_type,
-      sizeBytes: snapshot.size_bytes,
-      path: snapshot.mirror_path,
-      operationId: `app_publish_export_artifact:${artifactType}`,
-    });
-    transferLogger.log("started", "started", { aps_path: snapshot.mirror_path, artifact_type: artifactType });
-    try {
-      const upload = await apsFilesClient.uploadBegin({
-        path: snapshot.mirror_path,
-        sizeBytes: snapshot.size_bytes,
-        contentType: snapshot.content_type,
-        scope: APS_FILES_DOWNLOAD_SCOPE,
-        metadata: {
-          workspace_id: snapshot.workspace_id,
-          artifact_type: snapshot.artifact_type,
-          source_updated_at: snapshot.updated_at,
-          source_sha256: snapshot.source_sha256,
-        },
-      });
-      if (!upload || typeof upload.put_url !== "string" || upload.put_url.length === 0) {
-        throw new Error("files/upload_begin did not return a valid put_url");
-      }
-      transferLogger.log("negotiate", "succeeded", { response: redactStorageResponse(upload), aps_path: snapshot.mirror_path });
-      const contentDisposition = buildAttachmentContentDisposition(snapshot.filename);
-      const putResponse = await fetch(upload.put_url, {
-        method: "PUT",
-        headers: {
-          ...(upload.headers ?? {}),
-          "Content-Length": String(snapshot.size_bytes),
-          "Content-Disposition": contentDisposition,
-        },
-        body: createReadStream(snapshot.snapshot_path),
-        duplex: "half",
-      });
-      if (!putResponse.ok) {
-        const message = await putResponse.text().catch(() => "");
-        throw new Error(message || `APS Files PUT failed: HTTP ${putResponse.status}`);
-      }
-      transferLogger.log("put", "succeeded", { http_status: putResponse.status, aps_path: snapshot.mirror_path });
-      const putEtag = putResponse.headers.get("etag") ?? undefined;
-      const completed = await apsFilesClient.uploadComplete({
-        path: snapshot.mirror_path,
-        etag: putEtag,
-        sizeBytes: snapshot.size_bytes,
-        contentType: snapshot.content_type,
-        scope: APS_FILES_DOWNLOAD_SCOPE,
-      });
-      transferLogger.log("commit", "succeeded", { response: redactStorageResponse(completed), aps_path: snapshot.mirror_path });
-      const mirror = {
-        provider: "aps.files",
-        scope: APS_FILES_DOWNLOAD_SCOPE,
-        path: snapshot.mirror_path,
-        etag: typeof completed?.etag === "string" ? completed.etag : putEtag ?? "",
-        size_bytes: Number.isFinite(Number(completed?.size_bytes))
-          ? Math.floor(Number(completed.size_bytes))
-          : snapshot.size_bytes,
-        content_type: snapshot.content_type,
-        content_disposition: contentDisposition,
-        source_updated_at: snapshot.updated_at,
-        source_sha256: snapshot.source_sha256,
-        published_at: new Date().toISOString(),
-      };
-      const committed = await commitAppExportArtifactMirror({
-        workspace_dir: workspaceDir,
-        artifact_type: artifactType,
-        expected_updated_at: snapshot.updated_at,
-        expected_sha256: snapshot.source_sha256,
-        mirror,
-      });
-      transferLogger.log("finished", "succeeded", { aps_path: snapshot.mirror_path, etag: committed.etag });
-      return {
-        status: "ready",
-        artifact: {
-          workspace_dir: snapshot.workspace_dir,
-          workspace_id: snapshot.workspace_id,
-          title: snapshot.title,
-          artifact_type: snapshot.artifact_type,
-          path: snapshot.path,
-          filename: snapshot.filename,
-          updated_at: snapshot.updated_at,
-          mirror: committed,
-        },
-        mirror: committed,
-        published: true,
-      };
-    } catch (error) {
-      transferLogger.log("unknown", "failed", { aps_path: snapshot.mirror_path, error: storageErrorRecord(error) });
-      throw error;
-    } finally {
-      await unlink(snapshot.snapshot_path).catch(() => undefined);
-    }
+  let current = await getAppExportArtifactPublishStatus({
+    workspace_dir: workspaceDir,
+    artifact_type: artifactType,
   });
+  if (isExportArtifactPublishJobRunning(current) && !activeExportArtifactPublishJobIds.has(current.job_id)) {
+    current = await markAppExportArtifactPublishJobInterrupted(current);
+  }
+  const job = await startAppExportArtifactPublish({
+    workspace_dir: workspaceDir,
+    artifact_type: artifactType,
+  });
+  queueAppExportArtifactPublishJob(job);
+  return job;
+}
+
+async function toolAppGetExportArtifactPublishStatus(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  const artifactType = args.artifact_type;
+  if (artifactType !== "pptx" && artifactType !== "pdf") {
+    throw new Error('"artifact_type" must be "pptx" or "pdf"');
+  }
+  const current = await getAppExportArtifactPublishStatus({
+    workspace_dir: workspaceDir,
+    artifact_type: artifactType,
+  });
+  if (isExportArtifactPublishJobRunning(current) && !activeExportArtifactPublishJobIds.has(current.job_id)) {
+    return markAppExportArtifactPublishJobInterrupted(current);
+  }
+  return current;
 }
 
 async function toolAppGetExportArtifactDownloadUrl(args) {
@@ -3376,7 +3470,8 @@ const TOOL_DISPATCH = {
   app_render_deck_html: toolAppRenderDeckHtml,
   app_start_pptx_export: toolAppStartPptxExport,
   app_get_pptx_export_status: toolAppGetPptxExportStatus,
-  app_publish_export_artifact: toolAppPublishExportArtifact,
+  app_start_export_artifact_publish: toolAppStartExportArtifactPublish,
+  app_get_export_artifact_publish_status: toolAppGetExportArtifactPublishStatus,
   app_get_export_artifact_download_url: toolAppGetExportArtifactDownloadUrl,
   app_prepare_workspace_diagnostic_bundle: toolAppPrepareWorkspaceDiagnosticBundle,
   app_export_pdf: toolAppExportPdf,

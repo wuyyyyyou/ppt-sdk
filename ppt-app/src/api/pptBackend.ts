@@ -44,7 +44,7 @@ import type {
   ExportPdfInput,
   ExportPdfResult,
   ExportArtifactDownloadUrlResult,
-  PublishExportArtifactResult,
+  ExportArtifactPublishJob,
   PrepareWorkspaceDiagnosticBundleInput,
   PrepareWorkspaceDiagnosticBundleResult,
   RecordDeckReviewInput,
@@ -299,9 +299,12 @@ export interface PptBackend {
   getPptxExportStatus(input: { workspace_dir: string }): Promise<PptxExportJob>;
   exportPdf(input: ExportPdfInput): Promise<ExportPdfResult>;
   recordPdfExport(input: RecordPdfExportInput): Promise<WorkspaceResult>;
-  publishExportArtifact(
+  startExportArtifactPublish(
     input: GetExportArtifactDownloadUrlInput
-  ): Promise<PublishExportArtifactResult>;
+  ): Promise<ExportArtifactPublishJob>;
+  getExportArtifactPublishStatus(
+    input: GetExportArtifactDownloadUrlInput
+  ): Promise<ExportArtifactPublishJob>;
   getExportArtifactDownloadUrl(
     input: GetExportArtifactDownloadUrlInput
   ): Promise<ExportArtifactDownloadUrlResult>;

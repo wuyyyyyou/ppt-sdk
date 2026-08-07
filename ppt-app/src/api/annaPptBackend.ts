@@ -5,7 +5,7 @@ import type {
   AppendWorkspaceLogResult,
   ExportPdfInput,
   ExportArtifactDownloadUrlResult,
-  PublishExportArtifactResult,
+  ExportArtifactPublishJob,
   ExportPdfResult,
   GetWorkspacePageFileFingerprintsResult,
   GetPageEditContextResult,
@@ -95,7 +95,6 @@ import {
 } from "../performance/performanceRecorder";
 
 const LONG_RUNNING_TOOL_TIMEOUT_MS = 600_000;
-const EXPORT_ARTIFACT_PUBLISH_TIMEOUT_MS = 120_000;
 const WORKSPACE_LOG_INLINE_INVOKE_MAX_BYTES = 48 * 1024;
 
 interface HostUploadJsonReference {
@@ -248,7 +247,8 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
     app_start_pptx_export: "pptx_export.run",
     app_get_pptx_export_status: "pptx_export.status",
     app_export_pdf: "pdf_export.run",
-    app_publish_export_artifact: "export_download.prepare",
+    app_start_export_artifact_publish: "export_download.prepare",
+    app_get_export_artifact_publish_status: "export_download.status",
     app_get_export_artifact_download_url: "export_download.prepare",
   };
   async function invokeRaw<T>(toolId: string, method: string, args: object, options?: { timeoutMs?: number }) {
@@ -735,6 +735,7 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         toolIds.pptEngine,
         "app_render_workspace_page_preview",
         input,
+        { timeoutMs: LONG_RUNNING_TOOL_TIMEOUT_MS },
       ),
     uploadCurrentPageScreenshot: (input) =>
       invoke<HostUploadRef>(
@@ -781,6 +782,7 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         toolIds.pptEngine,
         "app_render_deck_html",
         input,
+        { timeoutMs: LONG_RUNNING_TOOL_TIMEOUT_MS },
       ),
     recordDeckReview: (input) =>
       invoke<ProjectResult>(
@@ -809,15 +811,23 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         workspace_dir: input.workspace_dir,
         pdf_path: input.pdfPath,
       }),
-    publishExportArtifact: (input) =>
-      invoke<PublishExportArtifactResult>(
+    startExportArtifactPublish: (input) =>
+      invoke<ExportArtifactPublishJob>(
         toolIds.pptEngine,
-        "app_publish_export_artifact",
+        "app_start_export_artifact_publish",
         {
           workspace_dir: input.workspace_dir,
           artifact_type: input.artifact_type,
         },
-        { timeoutMs: EXPORT_ARTIFACT_PUBLISH_TIMEOUT_MS },
+      ),
+    getExportArtifactPublishStatus: (input) =>
+      invoke<ExportArtifactPublishJob>(
+        toolIds.pptEngine,
+        "app_get_export_artifact_publish_status",
+        {
+          workspace_dir: input.workspace_dir,
+          artifact_type: input.artifact_type,
+        },
       ),
     getExportArtifactDownloadUrl: (input) =>
       invoke<ExportArtifactDownloadUrlResult>(
