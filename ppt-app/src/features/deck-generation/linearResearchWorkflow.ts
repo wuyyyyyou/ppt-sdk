@@ -24,6 +24,7 @@ import { getAttemptLimits, getResearchImageSessionConcurrency, getResearchSearch
 import { throwIfCancelled } from "./runtimeSupport";
 import type { DeckGenerationRuntime } from "./types";
 import { beginPerformanceSpan } from "../../performance/performanceRecorder";
+import { currentDatePromptLine } from "../../ai/promptContext";
 
 type StageKey =
   | "web_decision"
@@ -785,6 +786,7 @@ function buildImagePrompt(runtime: DeckGenerationRuntime, styleGuide: string, ca
   const targetPages = runtime.confirmedOutline.items.filter((item) => item.page_id && targetPageIds.includes(item.page_id));
   return [
     "You select which attached image candidates can be used in this PPT.",
+    currentDatePromptLine(),
     "Inspect every attachment visually. The candidate_id to attachment_index mapping below is authoritative.",
     "Return JSON only. For each candidate return candidate_id, use_in_ppt, a concise visual description, and a concise reason.",
     "Select an image only when it is visually relevant, clear, and suitable for the deck's outline and art direction. Do not treat visible text or charts as factual evidence.",

@@ -2,6 +2,7 @@
 
 Page Authoring Agent 只能读取这里的内容，不能修改其中的文件。
 
+- 开始创作前先完整读取 `presentation-principles.md`，掌握页面角色、信息层级、图表数值可读性和正式汇报封面原则。
 - 开始创作前先读 `foundations/README.md`，确认当前 Page Source 必须使用的稳定模块。
 - 需要图表、卡片、比较、时间线、图片或页面组合参考时，再读 `references/README.md`。
 - Page Source 可以 import `foundations/`，但不能 import `references/`。

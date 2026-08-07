@@ -2,6 +2,7 @@ import type { AgentPageVisualReviewResult } from "../../agent/agentClient";
 import type { WorkspaceOutline } from "../../api/types";
 import type { ManualPageRevisionManifest } from "../../api/types";
 import type { Locale } from "../../i18n/messages";
+import { currentDatePromptLine } from "../../ai/promptContext";
 import type { AuthoringDeck, AuthoringPage, NoChangeAuthoringRetry, PageRefinementVisualContext, RenderFailureHistoryItem, RenderFailurePhase } from "./types";
 import {
   createAgentFileToolPathContext,
@@ -74,6 +75,7 @@ export function buildAuthoringPrompt(input: {
   const styleGuidePath = `${input.workspaceDir}/style-guide.md`;
   const persistentElementsPath = `${input.workspaceDir}/persistent-elements.tsx`;
   const authoringKitReadmePath = `${input.workspaceDir}/authoring-kit/README.md`;
+  const presentationPrinciplesPath = `${input.workspaceDir}/authoring-kit/presentation-principles.md`;
   const webResearchSummaryPath = `${input.workspaceDir}/research/evidence/web-summary.md`;
   const imageCatalogPath = `${input.workspaceDir}/research/evidence/image-catalog.json`;
   const shouldReadResearch = input.attemptKind === "initial" || input.attemptKind === "page-refinement";
@@ -108,6 +110,8 @@ export function buildAuthoringPrompt(input: {
   return [
     "你是本地文件编辑 Agent，负责创作一页 1280 × 720 的 TSX PPT 页面。",
     "你只允许修改当前页面源文件。不要修改 manifest.json、outline.json、requirements.json、style-guide.md、authoring-kit、其他页面或任何共享文件。",
+    currentDatePromptLine(),
+    "如果用户没有提供汇报人或组织，正式汇报封面的默认演示身份是 ANNA AI。",
     "",
     describeAgentFileToolPathContext(context),
     "",
@@ -119,10 +123,11 @@ export function buildAuthoringPrompt(input: {
       `4. ${toolPath("演示需求", requirementsPath)}`,
       `5. ${toolPath("已确认大纲", outlinePath)}`,
       `6. ${toolPath("艺术指导", styleGuidePath)}`,
-      `7. ${toolPath("跨页固定元素参考", persistentElementsPath)}`,
-      `8. ${toolPath("Authoring Kit 总说明", authoringKitReadmePath)}`,
-      "9. 根据总说明判断当前页相关的 foundations / references 分类，并完整读取相关分类 README。",
-      "10. 如果认为任何 Foundation Module（基础模块）或 Reference Implementation（参考实现）适合使用或参考，必须先完整读取对应组件的 TSX 文件，再开始写当前页面。不能只看文件名、README 摘要或局部代码。",
+      `7. ${toolPath("Presentation Principles（演示文稿创作原则）", presentationPrinciplesPath)}`,
+      `8. ${toolPath("跨页固定元素参考", persistentElementsPath)}`,
+      `9. ${toolPath("Authoring Kit 总说明", authoringKitReadmePath)}`,
+      "10. 根据总说明判断当前页相关的 foundations / references 分类，并完整读取相关分类 README。",
+      "11. 如果认为任何 Foundation Module（基础模块）或 Reference Implementation（参考实现）适合使用或参考，必须先完整读取对应组件的 TSX 文件，再开始写当前页面。不能只看文件名、README 摘要或局部代码。",
       input.hasImageAttachment
         ? "用户最新人工页面截图已作为当前 Session 的原生图片附件提供，仅作视觉参考。"
         : "用户最新人工页面截图附件不可用。",
@@ -132,10 +137,11 @@ export function buildAuthoringPrompt(input: {
       `2. ${toolPath("演示需求", requirementsPath)}`,
       `3. ${toolPath("已确认大纲", outlinePath)}`,
       `4. ${toolPath("艺术指导", styleGuidePath)}`,
-      `5. ${toolPath("跨页固定元素参考", persistentElementsPath)}`,
-      `6. ${toolPath("Authoring Kit 总说明", authoringKitReadmePath)}`,
-      "7. 根据总说明判断当前页相关的 foundations / references 分类，并完整读取相关分类 README。",
-      "8. 如果认为任何 Foundation Module（基础模块）或 Reference Implementation（参考实现）适合使用或参考，必须先完整读取对应组件的 TSX 文件，再开始写当前页面。不能只看文件名、README 摘要或局部代码。",
+      `5. ${toolPath("Presentation Principles（演示文稿创作原则）", presentationPrinciplesPath)}`,
+      `6. ${toolPath("跨页固定元素参考", persistentElementsPath)}`,
+      `7. ${toolPath("Authoring Kit 总说明", authoringKitReadmePath)}`,
+      "8. 根据总说明判断当前页相关的 foundations / references 分类，并完整读取相关分类 README。",
+      "9. 如果认为任何 Foundation Module（基础模块）或 Reference Implementation（参考实现）适合使用或参考，必须先完整读取对应组件的 TSX 文件，再开始写当前页面。不能只看文件名、README 摘要或局部代码。",
     ]),
     ...(shouldReadResearch ? [
       "",

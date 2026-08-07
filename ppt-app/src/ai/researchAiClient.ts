@@ -5,6 +5,7 @@ import type { AnnaLlmCompleteInput, AnnaRuntime } from "../runtime/annaRuntime";
 import { beginPerformanceSpan } from "../performance/performanceRecorder";
 import type { AiOperationLogContext } from "./interactionLog";
 import { buildStructuredJsonRepairPrompt, parseStructuredJson } from "./structuredJson";
+import { currentDatePromptLine } from "./promptContext";
 
 export interface ResearchNeedDecision {
   needs_search: boolean;
@@ -160,6 +161,7 @@ function normalizeDecision(value: unknown): ResearchNeedDecision {
 
 function commonContext(input: ResearchDecisionContext, options: { includeImageCatalog?: boolean } = {}) {
   return [
+    currentDatePromptLine(),
     `Output locale: ${input.locale}`,
     `User brief:\n${input.brief || "(empty)"}`,
     `Current refinement request:\n${input.refinementRequest?.trim() || "(none; initial deck generation)"}`,

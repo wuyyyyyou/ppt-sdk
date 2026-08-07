@@ -19,6 +19,7 @@ export interface ChartWithNarrativeReferenceProps {
   minValue: number;
   maxValue: number;
   ticks: number[];
+  unit?: string;
   insights: ChartNarrativeItem[];
   conclusion: string;
 }
@@ -32,6 +33,7 @@ export default function ChartWithNarrativeReference({
   minValue,
   maxValue,
   ticks,
+  unit,
   insights,
   conclusion,
 }: ChartWithNarrativeReferenceProps) {
@@ -45,7 +47,7 @@ export default function ChartWithNarrativeReference({
         <section style={{ display: "flex", minHeight: 0, flexDirection: "column", padding: 22, border: "1px solid #d7dce5", borderRadius: 14, background: "#ffffff" }}>
           <h2 style={{ margin: "0 0 14px", fontSize: 19 }}>{chartTitle}</h2>
           <MeasuredChartArea minHeight={300}>
-            {({ width, height }) => <LineChartReference labels={labels} series={series} minValue={minValue} maxValue={maxValue} ticks={ticks} width={width} height={height} />}
+            {({ width, height }) => <LineChartReference labels={labels} series={series} minValue={minValue} maxValue={maxValue} ticks={ticks} width={width} height={height} labelMode="key" unit={unit} />}
           </MeasuredChartArea>
         </section>
         <section style={{ display: "flex", minHeight: 0, flexDirection: "column", padding: 22, border: "1px solid #d7dce5", borderRadius: 14, background: "#ffffff" }}>

@@ -177,6 +177,10 @@ export async function installWorkspaceAuthoringKit(input: {
     path.join(source.kitDir, "README.md"),
     path.join(paths.authoring_kit_dir, "README.md"),
   );
+  await copyFile(
+    path.join(source.kitDir, "presentation-principles.md"),
+    path.join(paths.authoring_kit_dir, "presentation-principles.md"),
+  );
   for (const directoryName of ["foundations", "references"]) {
     await copyDirectory(
       path.join(source.kitDir, directoryName),

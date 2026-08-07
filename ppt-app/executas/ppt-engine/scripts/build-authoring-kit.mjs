@@ -19,6 +19,7 @@ async function main() {
     });
   }
   await cp(path.join(sourceDir, "README.md"), path.join(kitDir, "README.md"));
+  await cp(path.join(sourceDir, "presentation-principles.md"), path.join(kitDir, "presentation-principles.md"));
   await cp(
     path.join(sourceDir, "page-source-starters"),
     pageSourceStartersDir,

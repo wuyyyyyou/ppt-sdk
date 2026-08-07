@@ -49,6 +49,7 @@ test("installs the Authoring Kit once and leaves an existing copy unchanged", as
     assert.equal(first.installed, true);
     assert.equal(second.installed, false);
     assert.equal(await readFile(readmePath, "utf8"), "locally changed\n");
+    await access(path.join(workspaceDir, "authoring-kit", "presentation-principles.md"));
     await assert.rejects(
       () => readFile(path.join(workspaceDir, "authoring-kit.lock.json"), "utf8"),
       /ENOENT/,
@@ -84,6 +85,7 @@ test("installs the Authoring Kit once and leaves an existing copy unchanged", as
       ["timelines", "VerticalMilestones.tsx"],
       ["media", "ImageShowcase.tsx"],
       ["pages", "ChartWithNarrative.tsx"],
+      ["pages", "FormalCover.tsx"],
       ["pages", "ImageNarrative.tsx"],
       ["pages", "KpiSummary.tsx"],
     ]) {

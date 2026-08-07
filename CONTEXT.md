@@ -91,6 +91,41 @@ The explicit user action that first preserves the currently displayed content as
 The released page-authoring foundation used to initialize Deck Generation work. It provides a stable Page Source Bootstrap together with reusable foundations and reference guidance, but it is not a selectable visual style and does not determine a Deck's final visual identity.
 _Avoid_: Template, Template Catalog
 
+**Presentation Principles**:
+The Authoring Kit's shared normative guidance for page-role and information-hierarchy decisions, Chart Value Readability, and Formal Presentation Cover conventions. A Workspace receives the principles as part of its read-only Authoring Kit snapshot; they provide defaults beneath explicit user requests and confirmed Presentation Requirements or Outline decisions, while the Workspace Style Guide specializes visual expression. They do not prescribe executable layouts or replace Required Content or a Reference Implementation.
+User-facing Chinese label: 演示文稿创作原则
+_Avoid_: PPT Tips, PPT Skills, Slide Tips, Workspace Style Guide
+
+**Chart Value Readability**:
+The condition that a chart's decision-relevant numerical values and their meaning are directly readable rather than recoverable only by estimating marks, colors, or axes. Small-category exact-value charts should expose each relevant value, while dense charts may expose key values or an equivalent readable numerical expression; quantitative charts identify the necessary unit and statistical scope, and externally sourced data includes a concise traceable source when needed.
+User-facing Chinese label: 图表数值可读性
+_Avoid_: Data Labels, Chart Decoration, Axis Readability
+
+**Formal Presentation Cover**:
+A cover page convention for formal reporting contexts such as board meetings, operating reviews, project reports, policy briefings, and serious proposals. It normally identifies the presentation title, topic or period, presenter or organization, and presentation date when those facts are available; it is conditional on the Deck's purpose and is not synonymous with the first page or every opening page.
+User-facing Chinese label: 正式汇报封面
+_Avoid_: Generic Cover, First Page, Opening Page
+
+**Opening / Orientation Page**:
+A page that orients the audience to the topic, context, central thesis, or reading path before or alongside the first substantive point. It may be combined with a Content / Analysis Page and does not automatically require a Formal Presentation Cover.
+User-facing Chinese label: 开场/导览页
+_Avoid_: Generic Cover, Agenda Page
+
+**Content / Analysis Page**:
+A page whose primary responsibility is to develop one substantive idea through evidence, comparison, metrics, a chart, a timeline, or another explanatory structure. Its visual composition serves the page's Core Message rather than functioning as a deck identifier or a closing gesture.
+User-facing Chinese label: 内容/分析页
+_Avoid_: Detail Dump, Generic Content Page
+
+**Closing / Next Action Page**:
+A page that synthesizes the Deck's takeaway, recommendation, decision, or next action for the audience. It is not defined by a thank-you label alone and may be combined with the final substantive point when the page count is small.
+User-facing Chinese label: 收束/下一步页
+_Avoid_: Thank-you Page, Empty Closing
+
+**Presentation Identity**:
+The presenter or organization identity shown on a Formal Presentation Cover. User-provided identity takes precedence; when the user provides neither, the default Presentation Identity is ANNA AI.
+User-facing Chinese label: 演示身份
+_Avoid_: Author, Owner, Speaker Note
+
 **Workspace Authoring Kit**:
 A Workspace-owned, read-only snapshot of the Authoring Kit used to create and reproduce that Workspace's pages. Page Authoring cannot modify it, and later Authoring Kit releases never change it implicitly.
 _Avoid_: Live Authoring Kit Reference, Selected Template

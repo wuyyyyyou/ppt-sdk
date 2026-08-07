@@ -56,7 +56,10 @@ describe("Agent file-tool path prompt blocks", () => {
     assert.match(prompt, /Agent file-tool absolute path: \/tmp\/anna-workspace\/ppt\/ppt-20260630-152620\/requirements\.json/);
     assert.match(prompt, /Agent file-tool absolute path: \/tmp\/anna-workspace\/ppt\/ppt-20260630-152620\/outline\.json/);
     assert.match(prompt, /Agent file-tool absolute path: \/tmp\/anna-workspace\/ppt\/ppt-20260630-152620\/style-guide\.md/);
+    assert.match(prompt, /Agent file-tool absolute path: \/tmp\/anna-workspace\/ppt\/ppt-20260630-152620\/authoring-kit\/presentation-principles\.md/);
     assert.match(prompt, /Agent file-tool absolute path: \/tmp\/anna-workspace\/ppt\/ppt-20260630-152620\/authoring-kit\/README\.md/);
+    assert.match(prompt, /Current date \(Asia\/Shanghai\):/);
+    assert.match(prompt, /默认演示身份是 ANNA AI/);
     assert.match(prompt, /file_path 是当前 Workspace 中已导入图片的绝对路径/);
     assert.match(prompt, /必须原样使用该 file_path/);
     assert.match(prompt, /不得改成相对路径、添加 \.\/ 或 \.\.\//);
