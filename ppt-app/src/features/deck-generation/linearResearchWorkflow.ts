@@ -228,7 +228,7 @@ function migrateLegacyImageCheckpoint(checkpoint: LinearResearchCheckpoint): Lin
 }
 
 const IMAGE_ANALYSIS_BATCH_SIZE = 6;
-const IMAGE_DOWNLOAD_CONCURRENCY = 2;
+const IMAGE_DOWNLOAD_CONCURRENCY = 4;
 const IMAGE_IMPORT_CONCURRENCY = 2;
 const IMAGE_DEDUP_TRACKING_PARAMETERS = [
   "utm_*",
