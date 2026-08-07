@@ -77,6 +77,7 @@ import {
   managedFontVariantWarningsForHtml,
   managedFontsUsedByHtml,
 } from "../font-library/index.js";
+import { getPptWorkspaceRoot } from "../workspace-root.js";
 import type {
   AppendAppWorkspaceLogInput,
   AppendAppWorkspaceLogResult,
@@ -251,7 +252,7 @@ import {
   createDefaultSharedResearchProgress,
 } from "./shared-research-progress.js";
 
-const WORKSPACE_ROOT = path.join(os.homedir(), "anna-workspace", "ppt");
+const WORKSPACE_ROOT = getPptWorkspaceRoot();
 const WORKSPACE_FORMAT = "authoring-kit-v1";
 const LEGACY_TASK_ROOT = path.join(WORKSPACE_ROOT, "tasks");
 const WORKSPACE_SETTING_PATH = path.join(WORKSPACE_ROOT, "setting.json");

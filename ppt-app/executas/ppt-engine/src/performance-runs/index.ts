@@ -1,7 +1,7 @@
-import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { appendFile, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { getPptWorkspaceRoot } from "../workspace-root.js";
 
 export type PerformanceRunStatus =
   | "recording"
@@ -78,7 +78,7 @@ export interface PerformanceFinalizeResult {
   active_span_count: number;
 }
 
-const DEFAULT_ROOT = path.join(os.homedir(), "anna-workspace", "ppt", "performance-runs");
+const DEFAULT_ROOT = path.join(getPptWorkspaceRoot(), "performance-runs");
 const RUN_ID_PATTERN = /^perf-\d{8}-\d{6}-[0-9a-f]{8}$/;
 const MAX_EVENTS_PER_APPEND = 200;
 const MAX_APPEND_BYTES = 256 * 1024;

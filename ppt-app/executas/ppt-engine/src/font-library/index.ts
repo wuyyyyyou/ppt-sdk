@@ -1,9 +1,9 @@
 import path from "node:path";
-import os from "node:os";
 import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { brotliDecompressSync, inflateSync } from "node:zlib";
 import { pathToFileURL } from "node:url";
+import { getPptWorkspaceRoot } from "../workspace-root.js";
 
 export const MANAGED_FONT_MAX_BYTES = 20 * 1024 * 1024;
 export const MANAGED_FONT_STYLE_ATTRIBUTE = "data-ppt-editor-fonts";
@@ -70,7 +70,7 @@ export interface ParsedFontMetadata {
   format: ManagedFontFormat;
 }
 
-const WORKSPACE_ROOT = path.join(os.homedir(), "anna-workspace", "ppt");
+const WORKSPACE_ROOT = getPptWorkspaceRoot();
 const GLOBAL_FONT_DIR = path.join(WORKSPACE_ROOT, ".fonts");
 const GLOBAL_FONT_INDEX_PATH = path.join(GLOBAL_FONT_DIR, "index.json");
 const WORKSPACE_FONT_DIRNAME = "fonts";
