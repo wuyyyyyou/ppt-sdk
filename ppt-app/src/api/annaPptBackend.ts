@@ -95,6 +95,7 @@ import {
 } from "../performance/performanceRecorder";
 
 const LONG_RUNNING_TOOL_TIMEOUT_MS = 600_000;
+const EXPORT_ARTIFACT_PUBLISH_TIMEOUT_MS = 120_000;
 const WORKSPACE_LOG_INLINE_INVOKE_MAX_BYTES = 48 * 1024;
 
 interface HostUploadJsonReference {
@@ -815,7 +816,8 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         {
           workspace_dir: input.workspace_dir,
           artifact_type: input.artifact_type,
-        }
+        },
+        { timeoutMs: EXPORT_ARTIFACT_PUBLISH_TIMEOUT_MS },
       ),
     getExportArtifactDownloadUrl: (input) =>
       invoke<ExportArtifactDownloadUrlResult>(

@@ -235,7 +235,7 @@ export async function convertDeckHtmlToPptx(
       const blob = await converter(slides, {
         skipDownload: true,
         skipNormalize: false,
-        autoEmbedFonts: true,
+        autoEmbedFonts: false,
         svgAsVector: false,
         width: 13.333333,
         height: 7.5,

@@ -4,6 +4,8 @@ import { describe, it } from "node:test";
 import type { PptxExportJob } from "../../src/api/types.ts";
 import {
   createArtifactExportProgress,
+  createExportDownloadPreparingProgress,
+  createExportStartProgress,
   createIdleExportProgress,
   createPptxJobExportProgress,
   isPptxExportJobRunning,
@@ -62,6 +64,18 @@ describe("Export Progress Display", () => {
     });
   });
 
+  it("uses an indeterminate bar while either export format is active", () => {
+    assert.equal(createExportStartProgress(messages.zh, "PPTX").mode, "indeterminate");
+    assert.equal(createExportStartProgress(messages.zh, "PDF").mode, "indeterminate");
+    assert.deepEqual(createExportDownloadPreparingProgress(messages.zh, "PPTX"), {
+      type: "PPTX",
+      mode: "indeterminate",
+      message: "准备下载...",
+      percent: 0,
+      active: true,
+    });
+  });
+
   it("uses localized PPTX job status text and real percent", () => {
     assert.deepEqual(
       createPptxJobExportProgress(messages.zh, makePptxJob({
@@ -70,7 +84,7 @@ describe("Export Progress Display", () => {
       })),
       {
         type: "PPTX",
-        mode: "determinate",
+        mode: "indeterminate",
         message: "正在生成 PPTX 文件",
         percent: 75,
         active: true,

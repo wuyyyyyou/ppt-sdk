@@ -95,6 +95,7 @@ import { reconcileInterruptedPageProgress } from "../../deck-generation/interrup
 import { waitForFinalDeckRender } from "../../deck-generation/renderPolling";
 import {
   createArtifactExportProgress,
+  createExportDownloadPreparingProgress,
   createExportErrorProgress,
   createExportStartProgress,
   createIdleExportProgress,
@@ -1065,7 +1066,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
   async function waitForPptxExportStatus(
     workspaceDir: string,
-    isDone: (job: PptxExportJob) => boolean
+    isDone: (job: PptxExportJob) => boolean,
+    options: { deferCompletionProgress?: boolean } = {},
   ) {
     if (!backend) {
       throw new Error("PptBackend is not available.");
@@ -1093,11 +1095,14 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       }
 
       consecutiveStatusErrors = 0;
-      setExportProgress(createPptxJobExportProgress(t, job));
-
       if (isDone(job)) {
+        if (!options.deferCompletionProgress) {
+          setExportProgress(createPptxJobExportProgress(t, job));
+        }
         return job;
       }
+
+      setExportProgress(createPptxJobExportProgress(t, job));
 
       await sleep(PPTX_EXPORT_POLL_INTERVAL_MS);
     }
@@ -4636,7 +4641,8 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
 
         const completed = await waitForPptxExportStatus(
           workspace.workspace_dir,
-          (job) => job.status === "completed" || job.status === "failed"
+          (job) => job.status === "completed" || job.status === "failed",
+          { deferCompletionProgress: true },
         );
         if (completed.status === "failed") {
           throw new Error(getPptxExportErrorMessage(completed));
@@ -4665,13 +4671,19 @@ export function useDeckWorkspace(t: Messages, locale: Locale) {
       if (!artifact) {
         throw new Error(`${type} export was recorded without an artifact path.`);
       }
-      setExportArtifactWithProgress(artifact);
-      setExportDownload({ status: "preparing", message: t.exportPage.downloadPreparing });
+      setExportArtifact(artifact);
+      setExportProgress(createExportDownloadPreparingProgress(t, type));
+      setExportDownload({ status: "preparing", message: "" });
       try {
-        await publishExportArtifact(updatedWorkspace, artifact);
+        const published = await publishExportArtifact(updatedWorkspace, artifact);
+        setExportProgress(createArtifactExportProgress(t, published));
         setExportDownload({ status: "idle", message: t.exportPage.downloadNotPrepared });
         showToast(type === "PPTX" ? t.toasts.pptxExported : t.toasts.pdfExported);
       } catch (error) {
+        // The local export artifact is still valid even when its APS mirror
+        // could not be published. Keep the export complete and let the user
+        // retry the download preparation without regenerating the file.
+        setExportProgress(createArtifactExportProgress(t, artifact));
         const message = formatExportDownloadError(error);
         console.warn("Failed to publish the Export Artifact Mirror", error);
         setExportDownload({ status: "error", message });

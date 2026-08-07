@@ -38,20 +38,23 @@ export function createExportStartProgress(
   t: Messages,
   type: "PPTX" | "PDF",
 ): ExportProgressState {
-  if (type === "PDF") {
-    return {
-      type,
-      mode: "indeterminate",
-      message: t.exportPage.pdfGenerating,
-      percent: 0,
-      active: true,
-    };
-  }
-
   return {
     type,
-    mode: "determinate",
-    message: t.exportPage.preparing,
+    mode: "indeterminate",
+    message: type === "PDF" ? t.exportPage.pdfGenerating : t.exportPage.preparing,
+    percent: 0,
+    active: true,
+  };
+}
+
+export function createExportDownloadPreparingProgress(
+  t: Messages,
+  type: "PPTX" | "PDF",
+): ExportProgressState {
+  return {
+    type,
+    mode: "indeterminate",
+    message: t.exportPage.downloadPreparing,
     percent: 0,
     active: true,
   };
@@ -100,7 +103,7 @@ export function createPptxJobExportProgress(
     case "queued":
       return {
         type: "PPTX",
-        mode: "determinate",
+        mode: "indeterminate",
         message: withFontWarning(t.exportPage.pptxPreparingModel),
         percent,
         active: true,
@@ -108,7 +111,7 @@ export function createPptxJobExportProgress(
     case "validating":
       return {
         type: "PPTX",
-        mode: "determinate",
+        mode: "indeterminate",
         message: withFontWarning(t.exportPage.pptxModelReady),
         percent,
         active: true,
@@ -116,7 +119,7 @@ export function createPptxJobExportProgress(
     case "converting":
       return {
         type: "PPTX",
-        mode: "determinate",
+        mode: "indeterminate",
         message: withFontWarning(t.exportPage.pptxGenerating),
         percent,
         active: true,
