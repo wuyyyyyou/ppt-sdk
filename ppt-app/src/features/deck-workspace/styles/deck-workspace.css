@@ -705,13 +705,17 @@ button {
   background: var(--accent);
 }
 
+/* `inset` pins all four edges, so the core is centred by the box model rather
+   than by where it happens to land. Sizing it with width/height + margin leaves
+   `top`/`left` at `auto`, which resolves to the static position — and that is
+   set by the `text-align: center` this inherits from the `<button>` above it,
+   putting the core 5px right of the dot centre, flush with its right edge.
+   The size is unchanged: the dot's content box is 10px, so 10 − 3 − 3 = 4px. */
 .progress-node.active .progress-node-dot::after,
 .progress-node.completed .progress-node-dot::after {
   position: absolute;
   content: "";
-  width: 4px;
-  height: 4px;
-  margin: 3px;
+  inset: 3px;
   border-radius: 999px;
   background: #fff;
 }
