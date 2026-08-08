@@ -1,7 +1,7 @@
 {
   "slug": "ppt-engine",
   "name": "ppt-engine",
-  "version": "4.4.3",
+  "version": "4.4.2",
   "executa_type": "tool",
   "description": "Anna Executa plugin for Workspace Authoring Kit setup, manifest-based deck HTML generation, and backend PPTX export.",
   "tool_id": "tool-lightvoss-ppt-engine-kqhra9hy",
@@ -21,24 +21,24 @@
       "binary": {
         "type": "binary",
         "supports_protocol": true,
-        "binary_artifacts": {
+        "binary_urls": {
           "darwin-arm64": {
-            "path": "bundle/ppt-engine-v{version}-darwin-arm64.tar.gz",
+            "url": "https://github.com/wuyyyyyou/ppt-sdk/releases/download/ppt-engine-v4.4.2/ppt-engine-v4.4.2-darwin-arm64.tar.gz",
             "entrypoint": "ppt-engine",
             "format": "tar.gz"
           },
           "darwin-x86_64": {
-            "path": "bundle/ppt-engine-v{version}-darwin-x86_64.tar.gz",
+            "url": "https://github.com/wuyyyyyou/ppt-sdk/releases/download/ppt-engine-v4.4.2/ppt-engine-v4.4.2-darwin-x86_64.tar.gz",
             "entrypoint": "ppt-engine",
             "format": "tar.gz"
           },
           "linux-x86_64": {
-            "path": "bundle/ppt-engine-v{version}-linux-x86_64.tar.gz",
+            "url": "https://github.com/wuyyyyyou/ppt-sdk/releases/download/ppt-engine-v4.4.2/ppt-engine-v4.4.2-linux-x86_64.tar.gz",
             "entrypoint": "ppt-engine",
             "format": "tar.gz"
           },
           "windows-x86_64": {
-            "path": "bundle/ppt-engine-v{version}-windows-x86_64.zip",
+            "url": "https://github.com/wuyyyyyou/ppt-sdk/releases/download/ppt-engine-v4.4.2/ppt-engine-v4.4.2-windows-x86_64.zip",
             "entrypoint": "ppt-engine.exe",
             "format": "zip"
           }

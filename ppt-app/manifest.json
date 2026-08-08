@@ -9,7 +9,7 @@
   "required_executas": [
     {
       "tool_id": "bundled:ppt-engine",
-      "min_version": "4.4.2",
+      "min_version": "4.4.3",
       "version": "latest"
     }
   ],
