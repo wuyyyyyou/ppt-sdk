@@ -497,9 +497,11 @@ async function processSlide(root, slide, pptx, globalOptions = {}) {
   // 1. Traverse and build the structure (Fast)
   collect(root, []);
 
-  // 2. Execute all heavy tasks in parallel (Fast)
-  if (asyncTasks.length > 0) {
-    await Promise.all(asyncTasks.map((task) => task()));
+  // 2. Execute heavy tasks sequentially to cap browser CPU/memory pressure.
+  // These tasks rasterize images/SVG/Canvas content; starting all of them with
+  // Promise.all can overwhelm small cloud-agent instances during export.
+  for (const task of asyncTasks) {
+    await task();
   }
 
   // 3. Cleanup and Sort
