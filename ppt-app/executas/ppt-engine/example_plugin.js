@@ -548,7 +548,9 @@ const apsFilesClient = new ApsFilesClient({
   writeFrame: (message) => writeStdoutLine(JSON.stringify(message)),
 });
 const activeExportArtifactPublishJobIds = new Set();
+const activeExportArtifactPublishJobPromises = new Map();
 let exportArtifactPublishQueue = Promise.resolve();
+const EXPORT_ASYNC_TIMEOUT_MS = 600_000;
 const workspaceDiagnosticBundleQueues = new Map();
 
 function redactStorageResponse(value) {
@@ -2763,14 +2765,7 @@ async function toolAppGetWorkspacePageImage(args) {
 }
 
 async function toolAppStartPptxExport(args) {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    throw new Error("Arguments must be an object");
-  }
-
-  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  return startAppPptxExport({
-    workspace_dir: workspaceDir,
-  });
+  return toolAppRunPptxExport(args);
 }
 
 async function toolAppGetPptxExportStatus(args) {
@@ -2782,6 +2777,30 @@ async function toolAppGetPptxExportStatus(args) {
   return getAppPptxExportStatus({
     workspace_dir: workspaceDir,
   });
+}
+
+async function toolAppRunPptxExport(args) {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    throw new Error("Arguments must be an object");
+  }
+
+  const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
+  let job = await startAppPptxExport({ workspace_dir: workspaceDir });
+  if (job.status === "completed") return job;
+  if (job.status === "failed") {
+    throw new Error(job.error?.message || job.message || "PPTX export failed");
+  }
+
+  const deadline = Date.now() + EXPORT_ASYNC_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    job = await getAppPptxExportStatus({ workspace_dir: workspaceDir });
+    if (job.status === "completed") return job;
+    if (job.status === "failed") {
+      throw new Error(job.error?.message || job.message || "PPTX export failed");
+    }
+  }
+  throw new Error("PPTX export exceeded the 10-minute Host Async Job deadline.");
 }
 
 function isExportArtifactPublishJobRunning(job) {
@@ -2829,7 +2848,7 @@ async function runAppExportArtifactPublishJob(job) {
       mimeType: snapshot.content_type,
       sizeBytes: snapshot.size_bytes,
       path: snapshot.mirror_path,
-      operationId: `app_start_export_artifact_publish:${job.artifact_type}`,
+      operationId: `app_run_export_artifact_publish:${job.artifact_type}`,
     });
     transferLogger.log("started", "started", { aps_path: snapshot.mirror_path, artifact_type: job.artifact_type });
     await writeAppExportArtifactPublishJob({
@@ -2957,18 +2976,27 @@ async function runAppExportArtifactPublishJob(job) {
   }
 }
 
-function queueAppExportArtifactPublishJob(job) {
-  if (!job || job.status !== "queued" || activeExportArtifactPublishJobIds.has(job.job_id)) {
-    return;
+function awaitAppExportArtifactPublishJob(job) {
+  if (!job || job.status !== "queued") {
+    return Promise.resolve(job);
   }
+  const existing = activeExportArtifactPublishJobPromises.get(job.job_id);
+  if (existing) return existing;
+
   activeExportArtifactPublishJobIds.add(job.job_id);
-  exportArtifactPublishQueue = exportArtifactPublishQueue
+  const queued = exportArtifactPublishQueue
     .catch(() => undefined)
-    .then(() => runAppExportArtifactPublishJob(job))
-    .finally(() => activeExportArtifactPublishJobIds.delete(job.job_id));
+    .then(() => runAppExportArtifactPublishJob(job));
+  exportArtifactPublishQueue = queued.catch(() => undefined);
+  const tracked = queued.finally(() => {
+    activeExportArtifactPublishJobIds.delete(job.job_id);
+    activeExportArtifactPublishJobPromises.delete(job.job_id);
+  });
+  activeExportArtifactPublishJobPromises.set(job.job_id, tracked);
+  return tracked;
 }
 
-async function toolAppStartExportArtifactPublish(args) {
+async function toolAppRunExportArtifactPublish(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
   }
@@ -2978,6 +3006,7 @@ async function toolAppStartExportArtifactPublish(args) {
   if (artifactType !== "pptx" && artifactType !== "pdf") {
     throw new Error('"artifact_type" must be "pptx" or "pdf"');
   }
+
   let current = await getAppExportArtifactPublishStatus({
     workspace_dir: workspaceDir,
     artifact_type: artifactType,
@@ -2989,8 +3018,22 @@ async function toolAppStartExportArtifactPublish(args) {
     workspace_dir: workspaceDir,
     artifact_type: artifactType,
   });
-  queueAppExportArtifactPublishJob(job);
-  return job;
+  if (job.status === "completed") return job;
+  if (job.status === "failed") {
+    throw new Error(job.error?.message || job.message || "Export artifact publication failed");
+  }
+
+  await awaitAppExportArtifactPublishJob(job);
+  const completed = await getAppExportArtifactPublishStatus({
+    workspace_dir: workspaceDir,
+    artifact_type: artifactType,
+  });
+  if (completed.status === "completed") return completed;
+  throw new Error(completed.error?.message || completed.message || "Export artifact publication failed");
+}
+
+async function toolAppStartExportArtifactPublish(args) {
+  return toolAppRunExportArtifactPublish(args);
 }
 
 async function toolAppGetExportArtifactPublishStatus(args) {
@@ -3216,14 +3259,21 @@ async function toolAppGetWorkspaceGenerationRun(args) {
 }
 
 async function toolAppExportPdf(args) {
+  return toolAppRunPdfExport(args);
+}
+
+async function toolAppRunPdfExport(args) {
   if (!args || typeof args !== "object" || Array.isArray(args)) {
     throw new Error("Arguments must be an object");
   }
 
   const workspaceDir = readRequiredAbsolutePathArg(args, "workspace_dir");
-  return exportAppPdf({
+  const result = await exportAppPdf({ workspace_dir: workspaceDir });
+  await recordAppPdfExport({
     workspace_dir: workspaceDir,
+    pdf_path: result.pdf_path,
   });
+  return result;
 }
 
 async function toolAppRecordPdfExport(args) {
@@ -3470,11 +3520,14 @@ const TOOL_DISPATCH = {
   app_render_deck_html: toolAppRenderDeckHtml,
   app_start_pptx_export: toolAppStartPptxExport,
   app_get_pptx_export_status: toolAppGetPptxExportStatus,
+  app_run_pptx_export: toolAppRunPptxExport,
   app_start_export_artifact_publish: toolAppStartExportArtifactPublish,
   app_get_export_artifact_publish_status: toolAppGetExportArtifactPublishStatus,
+  app_run_export_artifact_publish: toolAppRunExportArtifactPublish,
   app_get_export_artifact_download_url: toolAppGetExportArtifactDownloadUrl,
   app_prepare_workspace_diagnostic_bundle: toolAppPrepareWorkspaceDiagnosticBundle,
   app_export_pdf: toolAppExportPdf,
+  app_run_pdf_export: toolAppRunPdfExport,
   app_record_pdf_export: toolAppRecordPdfExport,
   listDiscoveredTemplateGroupSummaries: toolListDiscoveredTemplateGroupSummaries,
   getAllDiscoveredTemplateGroups: toolGetAllDiscoveredTemplateGroups,

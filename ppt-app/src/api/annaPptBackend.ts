@@ -1,4 +1,8 @@
-import type { AnnaRuntime } from "../runtime/annaRuntime";
+import type {
+  AnnaRuntime,
+  AnnaToolJobProgress,
+  AnnaToolJobSnapshot,
+} from "../runtime/annaRuntime";
 import { createAppHostUploadClient } from "../runtime/appHostUploadClient";
 import type { PptBackend } from "./pptBackend";
 import type {
@@ -94,7 +98,8 @@ import {
   setActivePerformanceRun,
 } from "../performance/performanceRecorder";
 
-const LONG_RUNNING_TOOL_TIMEOUT_MS = 600_000;
+export const EXPORT_ASYNC_TIMEOUT_MS = 600_000;
+const LONG_RUNNING_TOOL_TIMEOUT_MS = EXPORT_ASYNC_TIMEOUT_MS;
 const WORKSPACE_LOG_INLINE_INVOKE_MAX_BYTES = 48 * 1024;
 
 interface HostUploadJsonReference {
@@ -246,9 +251,12 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
     app_restore_page_source_version: "manual_page.restore",
     app_start_pptx_export: "pptx_export.run",
     app_get_pptx_export_status: "pptx_export.status",
+    app_run_pptx_export: "pptx_export.async",
     app_export_pdf: "pdf_export.run",
+    app_run_pdf_export: "pdf_export.async",
     app_start_export_artifact_publish: "export_download.prepare",
     app_get_export_artifact_publish_status: "export_download.status",
+    app_run_export_artifact_publish: "export_download.async",
     app_get_export_artifact_download_url: "export_download.prepare",
   };
   async function invokeRaw<T>(toolId: string, method: string, args: object, options?: { timeoutMs?: number }) {
@@ -256,6 +264,58 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
       ? { tool_id: toolId, method, args }
       : { tool_id: toolId, method, args, timeoutMs: options.timeoutMs };
     return unwrapToolResult<T>(await runtime.tools.invoke(input, options));
+  }
+  async function invokeAsyncAwaitRaw<T>(
+    toolId: string,
+    method: string,
+    args: object,
+    clientTag: string,
+    options: {
+      timeoutMs?: number;
+      signal?: AbortSignal;
+      onProgress?: (progress: AnnaToolJobProgress) => void;
+    } = {},
+  ): Promise<T> {
+    if (!runtime.tools.invokeAsyncAwait) {
+      throw new Error(
+        "Anna Host Async Job API is unavailable. Upgrade the Anna runtime before exporting.",
+      );
+    }
+    const result = await runtime.tools.invokeAsyncAwait<T>(
+      {
+        tool_id: toolId,
+        method,
+        args,
+        timeoutMs: options.timeoutMs ?? EXPORT_ASYNC_TIMEOUT_MS,
+        clientTag,
+      },
+      {
+        ...options,
+        timeoutMs: options.timeoutMs ?? EXPORT_ASYNC_TIMEOUT_MS,
+      },
+    );
+    return unwrapToolResult<T>(result);
+  }
+  function exportClientTag(
+    workspaceDir: string,
+    kind: "pptx" | "pdf" | "mirror",
+    artifactType?: "pptx" | "pdf",
+  ): string {
+    const workspaceId = workspaceDir.split(/[\\/]/).filter(Boolean).at(-1) ?? workspaceDir;
+    return artifactType
+      ? `ppt-export:${kind}:${workspaceId}:${artifactType}`
+      : `ppt-export:${kind}:${workspaceId}`;
+  }
+  function normalizeAsyncJobSnapshot(value: unknown): AnnaToolJobSnapshot {
+    const record = isRecord(value) ? value : {};
+    const jobId = readString(record, "jobId", "job_id");
+    const state = readString(record, "state", "status") as AnnaToolJobSnapshot["state"];
+    return {
+      ...(record as Partial<AnnaToolJobSnapshot>),
+      jobId,
+      clientTag: readString(record, "clientTag", "client_tag") || undefined,
+      state,
+    };
   }
   configurePerformanceEventSink((runId, events) => invokeRaw(
     toolIds.pptEngine,
@@ -802,10 +862,32 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
         "app_get_pptx_export_status",
         input
       ),
+    runPptxExport: (input) =>
+      invokeAsyncAwaitRaw<PptxExportJob>(
+        toolIds.pptEngine,
+        "app_run_pptx_export",
+        { workspace_dir: input.workspace_dir },
+        exportClientTag(input.workspace_dir, "pptx"),
+        {
+          signal: input.signal,
+          onProgress: input.onProgress,
+        },
+      ),
     exportPdf: (input: ExportPdfInput) =>
       invoke<ExportPdfResult>(toolIds.pptEngine, "app_export_pdf", input).then(
         normalizeExportPdfResult
       ),
+    runPdfExport: (input) =>
+      invokeAsyncAwaitRaw<ExportPdfResult>(
+        toolIds.pptEngine,
+        "app_run_pdf_export",
+        { workspace_dir: input.workspace_dir },
+        exportClientTag(input.workspace_dir, "pdf"),
+        {
+          signal: input.signal,
+          onProgress: input.onProgress,
+        },
+      ).then(normalizeExportPdfResult),
     recordPdfExport: (input: RecordPdfExportInput) =>
       invokeWorkspaceResult("app_record_pdf_export", {
         workspace_dir: input.workspace_dir,
@@ -829,6 +911,98 @@ export function createAnnaPptBackend(runtime: AnnaRuntime): PptBackend {
           artifact_type: input.artifact_type,
         },
       ),
+    runExportArtifactPublish: (input) =>
+      invokeAsyncAwaitRaw<ExportArtifactPublishJob>(
+        toolIds.pptEngine,
+        "app_run_export_artifact_publish",
+        {
+          workspace_dir: input.workspace_dir,
+          artifact_type: input.artifact_type,
+        },
+        exportClientTag(input.workspace_dir, "mirror", input.artifact_type),
+        {
+          signal: input.signal,
+          onProgress: input.onProgress,
+        },
+      ),
+    listExportJobs: async (input) => {
+      if (!runtime.tools.listJobs) {
+        throw new Error(
+          "Anna Host job recovery API is unavailable. Upgrade the Anna runtime before refreshing export tasks.",
+        );
+      }
+      const clientTags = input.artifact_type
+        ? [exportClientTag(input.workspace_dir, "mirror", input.artifact_type)]
+        : [
+            exportClientTag(input.workspace_dir, "pptx"),
+            exportClientTag(input.workspace_dir, "pdf"),
+            exportClientTag(input.workspace_dir, "mirror", "pptx"),
+            exportClientTag(input.workspace_dir, "mirror", "pdf"),
+          ];
+      const responses = await Promise.all(
+        clientTags.map(async (clientTag) => ({
+          clientTag,
+          response: await runtime.tools.listJobs!({
+            tool_id: toolIds.pptEngine,
+            clientTag,
+            state: ["queued", "running"],
+            limit: 10,
+          }),
+        })),
+      );
+      return responses.flatMap(({ clientTag, response }) =>
+        (Array.isArray(response.jobs) ? response.jobs : []).map((job) => {
+          const normalized = normalizeAsyncJobSnapshot(job);
+          return normalized.clientTag ? normalized : { ...normalized, clientTag };
+        }),
+      );
+    },
+    awaitExportJob: async <T>(input: {
+      job_id: string;
+      signal?: AbortSignal;
+      onProgress?: (progress: AnnaToolJobProgress) => void;
+    }) => {
+      if (!runtime.tools.getJob) {
+        throw new Error(
+          "Anna Host job recovery API is unavailable. Upgrade the Anna runtime before refreshing export tasks.",
+        );
+      }
+      const deadline = Date.now() + EXPORT_ASYNC_TIMEOUT_MS;
+      let sinceSeq = 0;
+      while (Date.now() < deadline) {
+        if (input.signal?.aborted) {
+          if (runtime.tools.cancelJob) {
+            await runtime.tools.cancelJob({ jobId: input.job_id, reason: "user_cancelled" }).catch(() => undefined);
+          }
+          throw new DOMException("Export job was cancelled.", "AbortError");
+        }
+        const snapshot = normalizeAsyncJobSnapshot(await runtime.tools.getJob<T>({
+          jobId: input.job_id,
+          sinceSeq,
+          limit: 100,
+        }));
+        for (const progress of snapshot.progress ?? []) {
+          input.onProgress?.(progress);
+          sinceSeq = Math.max(sinceSeq, progress.seq);
+        }
+        if (snapshot.state === "succeeded") {
+          return unwrapToolResult<T>(snapshot.result);
+        }
+        if (snapshot.state === "failed" || snapshot.state === "cancelled" || snapshot.state === "expired") {
+          throw new Error(snapshot.error?.message || `Export Host job ended in state ${snapshot.state}.`);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+      throw new Error("Export Host job exceeded the 10-minute deadline.");
+    },
+    cancelExportJob: async (input) => {
+      if (!runtime.tools.cancelJob) {
+        throw new Error(
+          "Anna Host job cancellation API is unavailable. Upgrade the Anna runtime before cancelling export tasks.",
+        );
+      }
+      return runtime.tools.cancelJob({ jobId: input.job_id, reason: input.reason });
+    },
     getExportArtifactDownloadUrl: (input) =>
       invoke<ExportArtifactDownloadUrlResult>(
         toolIds.pptEngine,

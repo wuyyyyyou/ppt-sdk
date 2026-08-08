@@ -1,6 +1,6 @@
 {
   "display_name": "ppt-engine",
-  "version": "4.4.0",
+  "version": "4.4.1",
   "description": "Anna Executa plugin for Workspace Authoring Kit setup, manifest-based deck HTML generation, and backend PPTX export.",
   "author": "Anna Developer",
   "host_capabilities": [
@@ -1744,6 +1744,18 @@
       ]
     },
     {
+      "name": "app_run_pptx_export",
+      "description": "Run the complete Workspace PPTX export and wait for its terminal result inside this invoke.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
       "name": "app_start_export_artifact_publish",
       "description": "Start or reuse the asynchronous publication of the current recorded PPTX or PDF as a user-scoped APS Files Export Artifact Mirror.",
       "parameters": [
@@ -1764,6 +1776,24 @@
     {
       "name": "app_get_export_artifact_publish_status",
       "description": "Read the persisted status of the current asynchronous APS Files Export Artifact Mirror publication task.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        },
+        {
+          "name": "artifact_type",
+          "type": "string",
+          "description": "Export artifact type. Supports pptx and pdf.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_run_export_artifact_publish",
+      "description": "Upload and commit the current PPTX or PDF Export Artifact Mirror while keeping the APS invoke context alive until completion.",
       "parameters": [
         {
           "name": "workspace_dir",
@@ -1896,6 +1926,18 @@
     {
       "name": "app_export_pdf",
       "description": "Render the workspace deck into a share-ready PDF file.",
+      "parameters": [
+        {
+          "name": "workspace_dir",
+          "type": "string",
+          "description": "Absolute path to an existing ppt-YYYYMMDD-HHmmss workspace.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "app_run_pdf_export",
+      "description": "Render and record the workspace PDF export while waiting for the complete result inside this invoke.",
       "parameters": [
         {
           "name": "workspace_dir",

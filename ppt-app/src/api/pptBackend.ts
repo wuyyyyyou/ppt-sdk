@@ -131,6 +131,7 @@ import type {
 } from "./types";
 import { createAnnaPptBackend } from "./annaPptBackend";
 import { connectAnnaRuntime } from "../runtime/annaRuntime";
+import type { AnnaToolJobSnapshot } from "../runtime/annaRuntime";
 import { detectRuntimeMode } from "../runtime/runtimeMode";
 
 export interface PptBackend {
@@ -297,7 +298,17 @@ export interface PptBackend {
   recordDeckReview(input: RecordDeckReviewInput): Promise<ProjectResult>;
   startPptxExport(input: StartPptxExportInput): Promise<PptxExportJob>;
   getPptxExportStatus(input: { workspace_dir: string }): Promise<PptxExportJob>;
+  runPptxExport(input: {
+    workspace_dir: string;
+    signal?: AbortSignal;
+    onProgress?: (progress: { percent?: number; message?: string; phase?: string }) => void;
+  }): Promise<PptxExportJob>;
   exportPdf(input: ExportPdfInput): Promise<ExportPdfResult>;
+  runPdfExport(input: {
+    workspace_dir: string;
+    signal?: AbortSignal;
+    onProgress?: (progress: { percent?: number; message?: string; phase?: string }) => void;
+  }): Promise<ExportPdfResult>;
   recordPdfExport(input: RecordPdfExportInput): Promise<WorkspaceResult>;
   startExportArtifactPublish(
     input: GetExportArtifactDownloadUrlInput
@@ -305,6 +316,24 @@ export interface PptBackend {
   getExportArtifactPublishStatus(
     input: GetExportArtifactDownloadUrlInput
   ): Promise<ExportArtifactPublishJob>;
+  runExportArtifactPublish(input: GetExportArtifactDownloadUrlInput & {
+    signal?: AbortSignal;
+    onProgress?: (progress: { percent?: number; message?: string; phase?: string }) => void;
+  }): Promise<ExportArtifactPublishJob>;
+  listExportJobs(input: {
+    workspace_dir: string;
+    artifact_type?: "pptx" | "pdf";
+  }): Promise<Array<AnnaToolJobSnapshot>>;
+  awaitExportJob<T = unknown>(input: {
+    job_id: string;
+    signal?: AbortSignal;
+    onProgress?: (progress: { percent?: number; message?: string; phase?: string }) => void;
+  }): Promise<T>;
+  cancelExportJob(input: { job_id: string; reason?: string }): Promise<{
+    jobId: string;
+    state: string;
+    cancelled: boolean;
+  }>;
   getExportArtifactDownloadUrl(
     input: GetExportArtifactDownloadUrlInput
   ): Promise<ExportArtifactDownloadUrlResult>;

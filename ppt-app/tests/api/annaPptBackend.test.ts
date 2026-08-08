@@ -579,4 +579,33 @@ describe("Anna PPT Backend", () => {
       ["app_render_deck_html", 600_000],
     ]);
   });
+
+  it("routes export operations through Host Async Jobs with a stable 10-minute deadline", async () => {
+    setToolIds();
+    const calls: Array<Record<string, unknown>> = [];
+    const runtime = createRuntime({});
+    runtime.tools.invokeAsyncAwait = async (input) => {
+      calls.push(input as unknown as Record<string, unknown>);
+      return {
+        success: true,
+        data: {
+          status: "completed",
+          artifact_type: "pptx",
+          mirror: null,
+        },
+      };
+    };
+    const backend = createAnnaPptBackend(runtime);
+
+    await backend.runPptxExport({ workspace_dir: "/tmp/workspaces/demo" });
+    await backend.runExportArtifactPublish({
+      workspace_dir: "/tmp/workspaces/demo",
+      artifact_type: "pptx",
+    });
+
+    assert.deepEqual(calls.map((call) => [call.method, call.timeoutMs, call.clientTag]), [
+      ["app_run_pptx_export", 600_000, "ppt-export:pptx:demo"],
+      ["app_run_export_artifact_publish", 600_000, "ppt-export:mirror:demo:pptx"],
+    ]);
+  });
 });

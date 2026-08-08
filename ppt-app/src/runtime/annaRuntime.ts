@@ -5,6 +5,40 @@ export interface AnnaToolInvokeInput {
   timeoutMs?: number;
 }
 
+export interface AnnaToolInvokeAsyncInput extends AnnaToolInvokeInput {
+  clientTag?: string;
+}
+
+export type AnnaToolJobState =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancelled"
+  | "expired";
+
+export interface AnnaToolJobProgress {
+  seq: number;
+  phase?: string;
+  percent?: number;
+  message?: string;
+  data?: unknown;
+}
+
+export interface AnnaToolJobSnapshot<T = unknown> {
+  jobId: string;
+  clientTag?: string;
+  state: AnnaToolJobState;
+  result?: T;
+  error?: {
+    code?: string;
+    message: string;
+    details?: unknown;
+  };
+  progress?: AnnaToolJobProgress[];
+  lastSeq?: number;
+}
+
 export interface AnnaLlmCompleteInput {
   messages: Array<{
     role: "user" | "assistant" | "system";
@@ -92,6 +126,30 @@ export interface AnnaRuntime {
       input: AnnaToolInvokeInput,
       options?: { timeoutMs?: number }
     ): Promise<unknown>;
+    invokeAsyncAwait?<T = unknown>(
+      input: AnnaToolInvokeAsyncInput,
+      options?: {
+        timeoutMs?: number;
+        onProgress?: (progress: AnnaToolJobProgress) => void;
+        signal?: AbortSignal;
+      },
+    ): Promise<T>;
+    listJobs?(input?: {
+      tool_id?: string;
+      state?: AnnaToolJobState | AnnaToolJobState[];
+      clientTag?: string;
+      limit?: number;
+    }): Promise<{ jobs: Array<AnnaToolJobSnapshot>; truncated?: boolean }>;
+    getJob?<T = unknown>(input: {
+      jobId: string;
+      sinceSeq?: number;
+      limit?: number;
+    }): Promise<AnnaToolJobSnapshot<T>>;
+    cancelJob?(input: { jobId: string; reason?: string }): Promise<{
+      jobId: string;
+      state: AnnaToolJobState;
+      cancelled: boolean;
+    }>;
   };
   llm: {
     complete(input: AnnaLlmCompleteInput): Promise<unknown>;
